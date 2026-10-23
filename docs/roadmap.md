@@ -12,9 +12,9 @@ Estado: motor experimental. Cada etapa se considera terminada cuando sus criteri
 
 ## 2. Plantillas completas
 
-- [ ] Atributos dinámicos y booleanos con escape SSR y actualización reactiva.
-- [ ] Condiciones con límites de región deterministas entre servidor y navegador.
-- [ ] Listas con claves obligatorias, inserción, eliminación y reordenamiento sin perder el estado de elementos conservados.
+- [x] Atributos dinámicos y booleanos con escape SSR y actualización reactiva.
+- [x] Condiciones con límites de región deterministas entre servidor y navegador.
+- [x] Listas con claves obligatorias, inserción, eliminación y reordenamiento sin perder el estado de elementos conservados.
 - [ ] Tipos precisos de props, eventos y variables locales de listas.
 
 **Aceptación:** cada construcción tiene pruebas de salida SSR, hidratación sin reemplazar nodos, actualización y eliminación de observadores.

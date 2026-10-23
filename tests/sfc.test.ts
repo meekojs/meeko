@@ -46,3 +46,13 @@ test("sitúa errores de script, plantilla y CSS en el archivo original", () => {
     });
   }
 });
+
+test("una lista sin clave falla antes de generar el módulo", () => {
+  const source = `<script lang="ts">const items = [1, 2];</script>\n<template><li each:of="items" each:as="item">{item}</li></template>`;
+  assert.throws(() => compile(source, "List.meeko"), (error: unknown) => {
+    assert.ok(error instanceof MeekoCompileError);
+    assert.equal(error.diagnostic.code, "MEEK023");
+    assert.equal(error.diagnostic.location.line, 2);
+    return true;
+  });
+});

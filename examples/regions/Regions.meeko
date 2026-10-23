@@ -1,0 +1,52 @@
+<script lang="ts">
+import { signal } from "meeko";
+
+const props = defineProps<{ initial: string }>();
+type Item = { id: string; label: string };
+const items = signal<Item[]>([{ id: "a", label: props.initial }, { id: "b", label: "Beta" }]);
+const visible = signal(true);
+const selected = signal("none");
+
+function reverse(): void {
+  items.value = [...items.value].reverse();
+}
+
+function prepend(): void {
+  items.value = [{ id: "c", label: "Gamma" }, ...items.value];
+}
+
+function remove(): void {
+  items.value = items.value.filter((item) => item.id !== "b");
+}
+
+function rename(): void {
+  items.value = items.value.map((item) => item.id === "a" ? { ...item, label: "Renamed" } : item);
+}
+
+function toggle(): void {
+  visible.value = !visible.value;
+}
+
+function select(id: string): void {
+  selected.value = id;
+}
+</script>
+
+<template>
+  <section>
+    <button on:click="reverse">Reverse</button>
+    <button on:click="prepend">Prepend</button>
+    <button on:click="remove">Remove</button>
+    <button on:click="rename">Rename</button>
+    <button on:click="toggle">Toggle</button>
+    <p if:when="visible.value">Selected: {selected.value}</p>
+    <ul>
+      <li each:of="items.value" each:as="item" each:key="item.id" bind:data-id="item.id">
+        <button on:click="() => select(item.id)">{item.label}</button>
+        <small>{index}</small>
+        <strong if:when="index === 0">first</strong>
+        <span if:when="selected.value === item.id"> selected</span>
+      </li>
+    </ul>
+  </section>
+</template>

@@ -1,0 +1,14 @@
+<script lang="ts">
+import { signal } from "meeko";
+
+const labels = signal(["Alpha", "Beta"]);
+
+function update(): void {
+  labels.value = ["Gamma", "Beta"];
+}
+</script>
+
+<template>
+  <button on:click="update">Update</button>
+  <ul><li each:of="labels.value" each:as="label" each:key="index">{label}</li></ul>
+</template>

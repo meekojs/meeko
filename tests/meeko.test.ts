@@ -5,9 +5,12 @@ import { Window } from "happy-dom";
 import { compile } from "../src/compiler.ts";
 import { batch, computed, createRoot, effect, signal } from "../src/reactivity.ts";
 import { escapeHtml, serializeJson } from "../src/server.ts";
+import { renderFor } from "../src/dom.ts";
 import { hydrate, renderToString } from "../examples/counter/Counter.generated.ts";
 import { renderExamplePage } from "../examples/counter/server.ts";
 import { hydrate as hydrateAttributes, renderToString as renderAttributes } from "../examples/attributes/Attributes.generated.ts";
+import { hydrate as hydrateRegions, renderToString as renderRegions } from "../examples/regions/Regions.generated.ts";
+import { hydrate as hydratePrimitives, renderToString as renderPrimitives } from "../examples/primitives/Primitives.generated.ts";
 
 test("SSR genera HTML escapado y estado aislado por render", () => {
   assert.match(renderToString({ initial: 2 }), /meeko:text:0-->2/);
@@ -89,6 +92,71 @@ test("atributos dinámicos se escapan en SSR y se actualizan sobre el nodo hidra
   button.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
   assert.equal(input.getAttribute("value"), "updated & ready");
   window.happyDOM.abort();
+});
+
+test("condiciones y listas con claves preservan nodos al reordenar y liberan regiones", () => {
+  const window = new Window();
+  const root = window.document.createElement("main");
+  root.innerHTML = renderRegions({ initial: "Alpha" });
+  const itemA = root.querySelector('[data-id="a"]');
+  const itemB = root.querySelector('[data-id="b"]');
+  assert.ok(itemA);
+  assert.ok(itemB);
+  const dispose = hydrateRegions(root as unknown as Element, { initial: "Alpha" });
+  const click = (name: string): void => {
+    const button = [...root.querySelectorAll("button")].find((candidate) => candidate.textContent === name);
+    assert.ok(button, `Missing ${name} button`);
+    button.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+  };
+  click("Reverse");
+  assert.deepEqual([...root.querySelectorAll("li")].map((item) => item.getAttribute("data-id")), ["b", "a"]);
+  assert.equal(root.querySelector('[data-id="a"]'), itemA);
+  assert.equal(root.querySelector('[data-id="b"]'), itemB);
+  assert.equal(itemB.querySelector("small")?.textContent, "0");
+  assert.equal(itemA.querySelector("small")?.textContent, "1");
+  assert.equal(itemB.querySelector("strong")?.textContent, "first");
+  assert.equal(itemA.querySelector("strong"), null);
+  click("Prepend");
+  assert.deepEqual([...root.querySelectorAll("li")].map((item) => item.getAttribute("data-id")), ["c", "b", "a"]);
+  assert.equal(itemB.querySelector("small")?.textContent, "1");
+  assert.equal(itemB.querySelector("strong"), null);
+  click("Beta");
+  assert.match(root.textContent ?? "", /Selected: b/);
+  assert.match(itemB.textContent ?? "", /selected/);
+  assert.doesNotMatch(itemA.textContent ?? "", /selected/);
+  click("Rename");
+  assert.equal(root.querySelector('[data-id="a"]'), itemA);
+  assert.match(itemA.textContent ?? "", /Renamed/);
+  click("Remove");
+  assert.deepEqual([...root.querySelectorAll("li")].map((item) => item.getAttribute("data-id")), ["c", "a"]);
+  assert.equal(itemB.isConnected, false);
+  click("Toggle");
+  assert.equal(root.querySelector("p"), null);
+  click("Toggle");
+  assert.match(root.querySelector("p")?.textContent ?? "", /Selected: b/);
+  dispose();
+  click("Reverse");
+  assert.deepEqual([...root.querySelectorAll("li")].map((item) => item.getAttribute("data-id")), ["c", "a"]);
+  window.happyDOM.abort();
+});
+
+test("una lista de valores primitivos actualiza el texto sin reemplazar su nodo", () => {
+  const window = new Window();
+  const root = window.document.createElement("main");
+  root.innerHTML = renderPrimitives({});
+  const first = root.querySelector("li");
+  assert.ok(first);
+  const dispose = hydratePrimitives(root as unknown as Element, {});
+  root.querySelector("button")?.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+  assert.equal(root.querySelector("li"), first);
+  assert.equal(first.textContent, "Gamma");
+  dispose();
+  window.happyDOM.abort();
+});
+
+test("SSR rechaza claves duplicadas y claves no serializables", () => {
+  assert.throws(() => renderFor(0, [{ id: "a" }, { id: "a" }], (item) => item.id, () => "<li></li>"), /Duplicate Meeko list key/);
+  assert.throws(() => renderFor(0, [{ id: null }], (item) => item.id, () => "<li></li>"), /keys must be strings or finite numbers/);
 });
 
 test("batch y computed actualizan una sola vez y liberan observadores", () => {

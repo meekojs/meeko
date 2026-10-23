@@ -20,7 +20,7 @@
     "build": "tsc -p tsconfig.build.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "pnpm run build && pnpm run example:compile && tsx --test tests/*.test.ts",
-    "example:compile": "node dist/cli.js compile examples/counter/Counter.meeko examples/counter/Counter.generated.ts && node dist/cli.js compile examples/attributes/Attributes.meeko examples/attributes/Attributes.generated.ts",
+    "example:compile": "node dist/cli.js compile examples/counter/Counter.meeko examples/counter/Counter.generated.ts && node dist/cli.js compile examples/attributes/Attributes.meeko examples/attributes/Attributes.generated.ts && node dist/cli.js compile examples/regions/Regions.meeko examples/regions/Regions.generated.ts && node dist/cli.js compile examples/primitives/Primitives.meeko examples/primitives/Primitives.generated.ts",
     "example:bundle": "pnpm run build && pnpm run example:compile && esbuild examples/counter/client.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=examples/counter/client.bundle.js",
     "example:check": "tsc -p examples/counter/tsconfig.json --noEmit",
     "example:serve": "pnpm run example:bundle && tsx examples/counter/server.ts",

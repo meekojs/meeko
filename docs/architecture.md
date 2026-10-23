@@ -7,7 +7,7 @@ Meeko compila archivos `.meeko` a código TypeScript con dos entradas por compon
 ## Contrato actual
 
 1. `<script lang="ts">` declara tipos, imports y estado. `defineProps<Props>()` es una macro de compilación.
-2. `<template>` define HTML, expresiones de texto `{expression}`, eventos `on:event="handler"` y atributos dinámicos `bind:name="expression"`.
+2. `<template>` define HTML, expresiones de texto `{expression}`, eventos `on:event="handler"`, atributos dinámicos `bind:name="expression"`, condiciones `if:when` y listas `each:of` con claves obligatorias.
 3. `<style>` es opcional. `scoped` añade un atributo estable a los elementos y a los selectores CSS.
 4. El servidor escapa el texto dinámico e inserta marcadores para las expresiones reactivas.
 5. La aplicación transfiere las mismas props al navegador como JSON escapado. Durante `hydrate`, Meeko busca los marcadores, verifica el texto existente, conecta eventos y crea observadores. La función devuelta libera estos recursos.
@@ -25,6 +25,8 @@ El ejemplo de `examples/counter` ejercita el contrato en un servidor HTTP. Cada 
 | Integración de herramientas | Mostrar diagnósticos en `.meeko`, transformar archivos en Vite y mantener HMR. |
 
 El parser de secciones vive en `src/compiler/sfc.ts` y conserva los desplazamientos del archivo original. El generador de `src/compiler.ts` usa esas posiciones para errores de sintaxis. Los errores de tipos todavía requieren un mapa entre el código generado y `.meeko`.
+
+El runtime de `src/dom.ts` usa comentarios como límites de condiciones y listas. Una lista comprueba las claves durante SSR y al hidratar; al cambiar, mueve los rangos de nodos de las claves existentes. Cada elemento de la lista mantiene señales para su dato y su índice, de modo que expresiones reactivas y comparaciones estrictas leen los valores actuales. Al quitar una región se desconectan sus eventos y observadores.
 
 El plugin `src/vite.ts` usa el mismo compilador para cliente y SSR. Expone el CSS del componente como módulo virtual. Durante desarrollo hace una recarga completa al cambiar un `.meeko`; todavía no preserva estado de instancias activas.
 

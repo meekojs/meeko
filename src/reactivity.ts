@@ -83,11 +83,14 @@ export function effect(fn: () => void): () => void {
     run() {
       detach(observer);
       const previous = activeObserver;
+      const previousOwner = activeOwner;
       activeObserver = observer;
+      activeOwner = owner;
       try {
         fn();
       } finally {
         activeObserver = previous;
+        activeOwner = previousOwner;
       }
     },
   };
@@ -118,6 +121,17 @@ export function batch<T>(fn: () => T): T {
   } finally {
     batchDepth--;
     flush();
+  }
+}
+
+/** Lee señales sin registrar dependencias en el observador activo. */
+export function untrack<T>(fn: () => T): T {
+  const previous = activeObserver;
+  activeObserver = undefined;
+  try {
+    return fn();
+  } finally {
+    activeObserver = previous;
   }
 }
 

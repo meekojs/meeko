@@ -60,10 +60,14 @@ La aplicación debe pasar **las mismas props** a `renderToString(props)` y `hydr
 
 ## Sintaxis inicial
 
-Un archivo tiene `<script lang="ts">`, `<template>` y un `<style>` opcional; `scoped` limita las reglas CSS al componente. `defineProps<Props>()` declara las props. La plantilla acepta expresiones de texto `{expression}`, eventos `on:click="handler"` y atributos dinámicos `bind:title="expression"`. Los atributos booleanos, como `bind:disabled`, se agregan o eliminan según el valor. Los errores de sintaxis de script, plantilla y CSS tienen ubicación en `.meeko`; los errores de tipos en expresiones aparecen en el archivo generado por ahora.
+Un archivo tiene `<script lang="ts">`, `<template>` y un `<style>` opcional; `scoped` limita las reglas CSS al componente. `defineProps<Props>()` declara las props. La plantilla acepta expresiones de texto `{expression}`, eventos `on:click="handler"` y atributos dinámicos `bind:title="expression"`. Los atributos booleanos, como `bind:disabled`, se agregan o eliminan según el valor.
+
+`if:when="expression"` muestra u oculta un elemento. Una lista usa `each:of="items"`, `each:as="item"` y `each:key="item.id"`; `each:index="position"` permite nombrar el índice, que se llama `index` por defecto. Las claves deben ser cadenas o números finitos y no pueden repetirse. Meeko conserva los nodos de las claves existentes al reordenar la lista. [Regions.meeko](examples/regions/Regions.meeko) muestra condiciones, listas anidadas, eventos y atributos dinámicos.
+
+Los errores de sintaxis de script, plantilla y CSS tienen ubicación en `.meeko`; los errores de tipos en expresiones aparecen en el archivo generado por ahora.
 
 Los nombres e identificadores de código se escriben en inglés. La API pública y sus contratos llevan JSDoc en español.
 
 ## Alcance actual
 
-Esta base todavía no implementa condiciones, listas, `:global` en CSS, mapas de origen para errores de tipos, servidor de lenguaje ni streaming. El compilador rechaza varias construcciones no soportadas. Esas capacidades necesitan conservar el mismo contrato de SSR e hidratación antes de añadirse.
+Esta base todavía no implementa componentes anidados, `:global` en CSS, mapas de origen para errores de tipos, servidor de lenguaje, HMR con conservación de estado ni streaming. El compilador rechaza varias construcciones no soportadas. Esas capacidades necesitan conservar el mismo contrato de SSR e hidratación antes de añadirse.
