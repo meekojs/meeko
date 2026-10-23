@@ -30,7 +30,7 @@ interface Owner {
 }
 
 interface InternalSignal<T> extends Signal<T> {
-  subscribers: Set<Observer>;
+  subscribers: Set<Observer> | undefined;
 }
 
 const writableSignals = new WeakSet<object>();
@@ -49,7 +49,7 @@ let flushing = false;
 const pending = new Set<Observer>();
 
 function detach(observer: Observer): void {
-  for (const dependency of observer.dependencies) dependency.subscribers.delete(observer);
+  for (const dependency of observer.dependencies) dependency.subscribers?.delete(observer);
   observer.dependencies.clear();
 }
 
@@ -72,12 +72,11 @@ function flush(): void {
 /** Crea un valor observable. Las escrituras iguales no notifican cambios. */
 export function signal<T>(initial: T): Signal<T> {
   let current = initial;
-  const subscribers = new Set<Observer>();
   const result: InternalSignal<T> = {
-    subscribers,
+    subscribers: undefined,
     get value() {
       if (activeObserver) {
-        subscribers.add(activeObserver);
+        (result.subscribers ??= new Set()).add(activeObserver);
         activeObserver.dependencies.add(result as InternalSignal<unknown>);
       }
       return current;
@@ -85,7 +84,7 @@ export function signal<T>(initial: T): Signal<T> {
     set value(next: T) {
       if (Object.is(current, next)) return;
       current = next;
-      for (const observer of subscribers) pending.add(observer);
+      if (result.subscribers) for (const observer of result.subscribers) pending.add(observer);
       flush();
     },
   };
@@ -133,7 +132,7 @@ export function currentEffectOwner(): object | undefined {
 export function signalReadSites(value: Signal<unknown>, owner: object | undefined): EffectSource[] {
   if (!owner || !isWritableSignal(value)) return [];
   const sites = new Map<string, EffectSource>();
-  for (const observer of (value as InternalSignal<unknown>).subscribers) {
+  for (const observer of (value as InternalSignal<unknown>).subscribers ?? []) {
     const metadata = effectSources.get(observer);
     if (observer.disposed || metadata?.owner !== owner || !metadata) continue;
     const source = metadata.source;

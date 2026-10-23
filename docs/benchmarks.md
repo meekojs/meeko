@@ -86,3 +86,9 @@ Windows 11 `10.0.26300`, Intel Core Ultra 9 285K, Node 24.21.0, Chrome 155.0.805
 Bundle conjunto: Meeko 19.617 B (6.254 B gzip); Vue 83.084 B (32.958 B gzip). Al invertir el orden, la actualización de lista fue 0,260 frente a 0,433 ms; la navegación que reutiliza nodos, 0,055 frente a 0,065 ms; y el montaje completo, 0,283 frente a 0,070 ms. El nuevo algoritmo de listas mejora la actualización, pero su hidratación y heap siguen por encima de Vue en este caso. El montaje completo de una vista también sigue siendo más lento. La comparación anterior de navegación mezclaba montaje en Meeko con reutilización en Vue; se sustituyó por las dos cargas equivalentes.
 
 Estas cifras pertenecen a una máquina y dos implementaciones concretas. La carga HTTP local no mide red real ni Web Vitals; las diferencias pequeñas de actualización se acercan a la resolución del temporizador. Falta validar una aplicación de producción y una contraparte Vue con plantilla compilada.
+
+### Optimización de memoria en desarrollo de 0.0.3
+
+En la misma máquina y con el mismo runner, después de omitir escrituras DOM iniciales redundantes y asignar conjuntos de suscriptores y señales de índice sólo cuando se usan, se repitió la suite en ambos órdenes. La lista de 1.000 filas pasó de **3,17 MiB** en el registro anterior a **2,87 MiB** de heap JS tras hidratar (3.007.284 y 3.007.096 B); Vue registró 2,15 MiB (2.255.532 y 2.259.476 B). Su actualización pasó de 0,263 ms a 0,223 y 0,217 ms por paso; Vue registró 0,433 y 0,437 ms.
+
+La hidratación de lista marcó 3,9 y 3,1 ms en Meeko frente a 1,8 y 1,9 ms en Vue. La variación entre corridas impide atribuir un cambio preciso a esta optimización, y el coste sigue por encima de Vue. El montaje completo de navegación marcó 0,252 y 0,230 ms por paso en Meeko frente a 0,077 y 0,072 ms en Vue. Las instantáneas de heap y medianas locales siguen siendo indicadores del escenario, no garantías de producción.

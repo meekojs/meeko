@@ -154,16 +154,31 @@ export function bindText(scope: DomScope, id: number, read: () => unknown, locat
   const marker = findComment(scope, `meeko:text:${id}`);
   const text = marker.nextSibling;
   if (!text || text.nodeType !== 3) throw new Error(`Missing text node in ${location}`);
-  if (text.textContent !== String(read())) throw new Error(`Hydration mismatch in ${location}`);
-  return effect(() => { text.textContent = String(read()); }, source);
+  const initial = String(read());
+  if (text.textContent !== initial) throw new Error(`Hydration mismatch in ${location}`);
+  let first = true;
+  return effect(() => {
+    const next = String(read());
+    if (first) {
+      first = false;
+      if (text.textContent === next) return;
+    }
+    text.textContent = next;
+  }, source);
 }
 
 /** Conecta un atributo dinámico al elemento SSR y comprueba su valor inicial. */
 export function bindAttribute(scope: DomScope, id: number, name: string, read: () => unknown, location: string, source?: EffectSource): () => void {
   const target = findElement(scope, `data-meeko-a-${id}`);
-  if (target.getAttribute(name) !== attributeValue(name, read())) throw new Error(`Hydration mismatch in ${location}`);
+  const initial = attributeValue(name, read());
+  if (target.getAttribute(name) !== initial) throw new Error(`Hydration mismatch in ${location}`);
+  let first = true;
   return effect(() => {
     const next = attributeValue(name, read());
+    if (first) {
+      first = false;
+      if (target.getAttribute(name) === next) return;
+    }
     if (next === null) target.removeAttribute(name);
     else target.setAttribute(name, next);
   }, source);
@@ -229,7 +244,7 @@ interface ListEntry<T> {
   start: Comment;
   end: Comment;
   value: Signal<T>;
-  index: Signal<number>;
+  index: Signal<number> | undefined;
   release: () => void;
 }
 
@@ -270,8 +285,12 @@ function stableListPositions(indices: readonly number[]): Set<number> {
   return stable;
 }
 
-/** Hidrata una lista y reordena regiones por clave sin reemplazar nodos conservados. */
-export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>, keyOf: (item: T, index: number) => string | number, render: (item: T, index: number) => string, hydrate: (item: Signal<T>, index: Signal<number>, inner: DomScope) => () => void): () => void {
+/**
+ * Hidrata una lista y reordena regiones por clave sin reemplazar nodos conservados.
+ * El compilador desactiva `trackIndex` sólo cuando el cuerpo de hidratación no lee
+ * la señal de índice; las llamadas directas conservan la señal por defecto.
+ */
+export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>, keyOf: (item: T, index: number) => string | number, render: (item: T, index: number) => string, hydrate: (item: Signal<T>, index: Signal<number>, inner: DomScope) => () => void, trackIndex = true): () => void {
   const outer = region(scope, "for", id);
   const entries = new Map<string, ListEntry<T>>();
   const initial = [...read()];
@@ -289,9 +308,9 @@ export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>,
     while (end && (end.nodeType !== 8 || (end as Comment).data !== endData)) end = end.nextSibling;
     if (!end) throw new Error(`Missing end marker for list key ${key}`);
     const value = signal(item);
-    const position = signal(index);
+    const position = trackIndex ? signal(index) : undefined;
     const release = createRoot((dispose) => {
-      const cleanup = hydrate(value, position, { root: scope.root, start, end: end as Comment });
+      const cleanup = hydrate(value, position as Signal<number>, { root: scope.root, start, end: end as Comment });
       return () => { cleanup(); dispose(); };
     });
     entries.set(key, { key, start, end: end as Comment, value, index: position, release });
@@ -339,16 +358,16 @@ export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>,
         while (start && (start.nodeType !== 8 || (start as Comment).data !== `meeko:item:${id}:${key}`)) start = start.previousSibling;
         if (!start) throw new Error(`Missing new list marker for ${key}`);
         const value = signal(item);
-        const position = signal(index);
+        const position = trackIndex ? signal(index) : undefined;
         const release = createRoot((dispose) => {
-          const cleanup = hydrate(value, position, { root: scope.root, start: start as Comment, end });
+          const cleanup = hydrate(value, position as Signal<number>, { root: scope.root, start: start as Comment, end });
           return () => { cleanup(); dispose(); };
         });
         entry = { key, start: start as Comment, end, value, index: position, release };
         entries.set(key, entry);
       } else {
         entry.value.value = item;
-        entry.index.value = index;
+        if (entry.index) entry.index.value = index;
       }
       if (oldIndices[index] !== -1 && !stable.has(index) && entry.end.nextSibling !== before) moveRange(entry.start, entry.end, before);
       before = entry.start;

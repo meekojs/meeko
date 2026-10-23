@@ -68,6 +68,7 @@ Estado: motor experimental. Cada etapa se considera terminada cuando sus criteri
 ## Desarrollo de 0.0.3
 
 - [x] Optimizar el movimiento de listas con claves y comparar 1.000 filas en ambos órdenes de ejecución.
+- [x] Evitar escrituras DOM iniciales redundantes y asignar señales de índice y conjuntos de suscriptores sólo cuando se usan.
 - [x] Separar en el benchmark la navegación que reutiliza nodos de la que monta una vista nueva.
 - [x] Crear un piloto SSR con rutas, formulario, lista, componentes anidados y datos asíncronos; verificar desarrollo y producción en Chromium, Firefox y WebKit.
 - [x] Generar una aplicación SSR independiente con `meeko init` y compilarla desde un tarball instalado fuera del repositorio.
@@ -77,4 +78,4 @@ Estado: motor experimental. Cada etapa se considera terminada cuando sus criteri
 - [ ] Vincular el Trusted Publisher en npm antes de activar la publicación automática de una versión posterior.
 - [ ] Medir el coste de instalación en frío y el arranque SSR de un consumidor publicado antes de decidir si se separan runtime y compilador.
 
-La [comparativa actual](benchmarks.md) señala dos trabajos de rendimiento pendientes: reducir el coste de hidratación y memoria de listas, y acelerar el montaje completo de vistas. Las cifras locales no sustituyen mediciones de una aplicación desplegada.
+La [comparativa actual](benchmarks.md) muestra una reducción del heap de listas, aunque su hidratación sigue por encima de Vue en las dos corridas. También queda por acelerar el montaje completo de vistas. Las cifras locales no sustituyen mediciones de una aplicación desplegada.

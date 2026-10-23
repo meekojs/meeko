@@ -2,6 +2,7 @@
 
 ## 0.0.3 (en desarrollo)
 
+- Hidratación sin escrituras iniciales redundantes de texto y atributos; señales sin lectores y filas que no usan el índice asignan menos memoria.
 - Reconciliación de listas con claves que conserva regiones ordenadas y evita movimientos innecesarios; hidratación inicial sin reconciliación cuando el estado SSR sigue intacto.
 - Aplicación piloto con SSR, hidratación, formularios, navegación, componentes anidados y API asíncrona, probada en desarrollo y producción con Chromium, Firefox y WebKit.
 - `meeko init <directorio>` genera un proyecto SSR independiente que fija la versión exacta de su compilador y runtime.

@@ -422,7 +422,10 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
       const innerLocals = new Map(locals);
       innerLocals.set(entry.itemName, "__meeko_item.value");
       innerLocals.set(entry.indexName, "__meeko_index.value");
-      statements.push(`cleanups.push(__meeko.bindFor(__scope, ${entry.id}, () => ${mappedExpression(entry.expression, entry.offset)}, (${entry.itemName}, ${entry.indexName}) => ${mappedExpression(entry.key, entry.keyOffset, outerLocals)}, (${entry.itemName}, ${entry.indexName}) => ${rewriteLocals(entry.render, outerLocals)}, (__meeko_item, __meeko_index, __scope) => { ${hydrationBody(entry.bindings, context, hot, innerLocals)} }));`);
+      const innerHydration = hydrationBody(entry.bindings, context, hot, innerLocals);
+      // El callback generado sólo usa la señal de índice si aparece en su hidratación.
+      const trackIndex = innerHydration.includes("__meeko_index.value");
+      statements.push(`cleanups.push(__meeko.bindFor(__scope, ${entry.id}, () => ${mappedExpression(entry.expression, entry.offset)}, (${entry.itemName}, ${entry.indexName}) => ${mappedExpression(entry.key, entry.keyOffset, outerLocals)}, (${entry.itemName}, ${entry.indexName}) => ${rewriteLocals(entry.render, outerLocals)}, (__meeko_item, __meeko_index, __scope) => { ${innerHydration} }, ${trackIndex}));`);
     }
   }
   return `const cleanups: Array<() => void> = [];

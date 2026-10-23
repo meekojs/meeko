@@ -5,7 +5,7 @@ import { Window } from "happy-dom";
 import { compile } from "../src/compiler.ts";
 import { batch, computed, createRoot, effect, signal } from "../src/reactivity.ts";
 import { escapeHtml, serializeJson } from "../src/server.ts";
-import { bindFor, renderFor } from "../src/dom.ts";
+import { bindAttribute, bindFor, bindText, renderFor } from "../src/dom.ts";
 import { hydrate, renderToString, renderWithState } from "../examples/counter/Counter.generated.ts";
 import { renderExamplePage } from "../examples/counter/server.ts";
 import { hydrate as hydrateAttributes, renderToString as renderAttributes } from "../examples/attributes/Attributes.generated.ts";
@@ -18,6 +18,26 @@ test("SSR genera HTML escapado y estado aislado por render", () => {
   assert.equal(escapeHtml('<img src="x" onerror="x">'), "&lt;img src=&quot;x&quot; onerror=&quot;x&quot;&gt;");
   assert.equal(serializeJson({ value: "</script>" }), '{"value":"\\u003c/script\\u003e"}');
   assert.match(renderExamplePage({ initial: 2 }), /<script id="meeko-payload" type="application\/json">/);
+});
+
+test("hidratar texto y atributos iguales al SSR no muta el DOM", () => {
+  const window = new Window();
+  const root = window.document.createElement("main");
+  root.innerHTML = '<!--meeko:text:0-->A<!--/meeko:text:0--><span data-meeko-a-0="" title="A"></span>';
+  const value = signal("A");
+  const observer = new window.MutationObserver(() => {});
+  observer.observe(root, { subtree: true, childList: true, characterData: true, attributes: true });
+  const stopText = bindText({ root: root as unknown as Element }, 0, () => value.value, "Test.meeko:1:1");
+  const stopAttribute = bindAttribute({ root: root as unknown as Element }, 0, "title", () => value.value, "Test.meeko:1:2");
+  assert.equal(observer.takeRecords().length, 0);
+  value.value = "B";
+  assert.equal(root.querySelector("span")?.getAttribute("title"), "B");
+  assert.equal(root.firstChild?.nextSibling?.textContent, "B");
+  assert.ok(observer.takeRecords().length > 0);
+  stopAttribute();
+  stopText();
+  observer.disconnect();
+  window.happyDOM.abort();
 });
 
 test("la transferencia de estado rechaza datos que JSON cambiaría silenciosamente", () => {
