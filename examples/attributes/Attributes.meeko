@@ -1,0 +1,19 @@
+<script lang="ts">
+import { signal } from "meeko";
+
+const props = defineProps<{ initial: string }>();
+const message = signal(props.initial);
+const enabled = signal(false);
+
+function toggle(): void {
+  message.value = "updated & ready";
+  enabled.value = true;
+}
+</script>
+
+<template>
+  <div>
+    <button on:click="toggle">Update</button>
+    <input bind:value="message.value" bind:disabled="!enabled.value">
+  </div>
+</template>

@@ -19,7 +19,8 @@ El proyecto está en etapa temprana. Ya funciona el recorrido completo de un con
 | Ruta | Responsabilidad |
 | --- | --- |
 | `src/reactivity.ts` | `signal`, `computed`, `effect`, `batch` y liberación de efectos por instancia. |
-| `src/compiler.ts` | Analiza `.meeko` y genera un módulo TypeScript con SSR e hidratación. |
+| `src/compiler/sfc.ts` | Analiza secciones `.meeko` y conserva posiciones para diagnósticos. |
+| `src/compiler.ts` | Analiza plantillas y genera un módulo TypeScript con SSR e hidratación. |
 | `src/server.ts` | Escapado de contenido dinámico para HTML. |
 | `src/cli.ts` | Comando `meeko compile`. |
 | `examples/counter` | Componente de referencia tipado. |
@@ -47,10 +48,10 @@ La aplicación debe pasar **las mismas props** a `renderToString(props)` y `hydr
 
 ## Sintaxis inicial
 
-Un archivo tiene `<script lang="ts">`, `<template>` y un `<style>` opcional; `scoped` limita las reglas CSS al componente. `defineProps<Props>()` declara las props. La plantilla acepta expresiones de texto `{expression}` y eventos `on:click="handler"`. El código generado se comprueba con TypeScript 7; los errores de tipos en la plantilla aparecen en el archivo generado por ahora.
+Un archivo tiene `<script lang="ts">`, `<template>` y un `<style>` opcional; `scoped` limita las reglas CSS al componente. `defineProps<Props>()` declara las props. La plantilla acepta expresiones de texto `{expression}`, eventos `on:click="handler"` y atributos dinámicos `bind:title="expression"`. Los atributos booleanos, como `bind:disabled`, se agregan o eliminan según el valor. Los errores de sintaxis de script, plantilla y CSS tienen ubicación en `.meeko`; los errores de tipos en expresiones aparecen en el archivo generado por ahora.
 
 Los nombres e identificadores de código se escriben en inglés. La API pública y sus contratos llevan JSDoc en español.
 
 ## Alcance actual
 
-Esta base todavía no implementa condiciones, listas, atributos dinámicos, `:global` en CSS, mapas de origen de diagnósticos, servidor de lenguaje ni streaming. El compilador rechaza varias construcciones no soportadas en vez de simular que funcionan. Esas capacidades necesitan conservar el mismo contrato de SSR e hidratación antes de añadirse.
+Esta base todavía no implementa condiciones, listas, `:global` en CSS, mapas de origen para errores de tipos, servidor de lenguaje ni streaming. El compilador rechaza varias construcciones no soportadas. Esas capacidades necesitan conservar el mismo contrato de SSR e hidratación antes de añadirse.

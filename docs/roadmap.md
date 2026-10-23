@@ -5,7 +5,7 @@ Estado: motor experimental. Cada etapa se considera terminada cuando sus criteri
 ## 1. Parser y diagnósticos
 
 - [ ] Analizar secciones y plantilla con un AST propio y posiciones de inicio y fin.
-- [ ] Rechazar secciones duplicadas, HTML inválido y expresiones incompletas con diagnósticos en `.meeko`.
+- [x] Rechazar secciones duplicadas, HTML inválido y expresiones incompletas con diagnósticos en `.meeko`.
 - [ ] Conservar un mapa desde código generado hasta archivo original para errores de TypeScript.
 
 **Aceptación:** un error en script, plantilla o estilo señala la ubicación correcta del `.meeko` y el CLI falla sin emitir un módulo incompleto.

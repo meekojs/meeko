@@ -7,12 +7,12 @@ Meeko compila archivos `.meeko` a código TypeScript con dos entradas por compon
 ## Contrato actual
 
 1. `<script lang="ts">` declara tipos, imports y estado. `defineProps<Props>()` es una macro de compilación.
-2. `<template>` define HTML, expresiones de texto `{expression}` y eventos `on:event="handler"`.
+2. `<template>` define HTML, expresiones de texto `{expression}`, eventos `on:event="handler"` y atributos dinámicos `bind:name="expression"`.
 3. `<style>` es opcional. `scoped` añade un atributo estable a los elementos y a los selectores CSS.
 4. El servidor escapa el texto dinámico e inserta marcadores para las expresiones reactivas.
 5. La aplicación transfiere las mismas props al navegador como JSON escapado. Durante `hydrate`, Meeko busca los marcadores, verifica el texto existente, conecta eventos y crea observadores. La función devuelta libera estos recursos.
 
-El ejemplo de `examples/counter` ejercita el contrato en un servidor HTTP. Este contrato aún admite una sola raíz de componente por llamada a `hydrate`; la composición de múltiples raíces y el estado compartido requieren un protocolo explícito antes de ofrecerse como API estable.
+El ejemplo de `examples/counter` ejercita el contrato en un servidor HTTP. Cada llamada a `hydrate` reclama una raíz de componente; varias llamadas sobre raíces independientes mantienen sus señales y eventos aislados. La composición de componentes anidados requiere un protocolo explícito antes de ofrecerse como API estable.
 
 ## Límites de responsabilidad
 
@@ -24,7 +24,7 @@ El ejemplo de `examples/counter` ejercita el contrato en un servidor HTTP. Este 
 | Runtime de navegador | Reclamar nodos existentes, conectar eventos y aplicar cambios precisos. |
 | Integración de herramientas | Mostrar diagnósticos en `.meeko`, transformar archivos en Vite y mantener HMR. |
 
-En la implementación actual, el parser de secciones y el generador viven juntos en `src/compiler.ts`. La siguiente etapa los separará conservando posiciones de origen; eso evita que diagnósticos y herramientas del editor dependan de buscar fragmentos de texto en el código generado.
+El parser de secciones vive en `src/compiler/sfc.ts` y conserva los desplazamientos del archivo original. El generador de `src/compiler.ts` usa esas posiciones para errores de sintaxis. Los errores de tipos todavía requieren un mapa entre el código generado y `.meeko`.
 
 ## Reglas para SSR
 
