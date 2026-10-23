@@ -1,0 +1,21 @@
+<script lang="ts">
+import { computed, signal } from "meeko";
+
+/** Propiedades públicas del contador. */
+export interface Props {
+  /** Valor inicial mostrado en el servidor y el navegador. */
+  initial?: number;
+}
+
+const props = defineProps<Props>();
+const count = signal(props.initial ?? 0);
+const doubled = computed(() => count.value * 2);
+</script>
+
+<template>
+  <button type="button" on:click="() => count.value++">{count.value} · doble: {doubled.value}</button>
+</template>
+
+<style scoped>
+button { cursor: pointer; }
+</style>

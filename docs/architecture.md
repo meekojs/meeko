@@ -1,0 +1,39 @@
+# Arquitectura de Meeko
+
+## Objetivo
+
+Meeko compila archivos `.meeko` a código TypeScript con dos entradas por componente: `renderToString(props)` para SSR y `hydrate(root, props)` para conectar eventos y señales al DOM existente. El runtime del navegador evita un árbol virtual y actualiza los nodos afectados por cada señal.
+
+## Contrato actual
+
+1. `<script lang="ts">` declara tipos, imports y estado. `defineProps<Props>()` es una macro de compilación.
+2. `<template>` define HTML, expresiones de texto `{expression}` y eventos `on:event="handler"`.
+3. `<style>` es opcional. `scoped` añade un atributo estable a los elementos y a los selectores CSS.
+4. El servidor escapa el texto dinámico e inserta marcadores para las expresiones reactivas.
+5. La aplicación transfiere las mismas props al navegador como JSON escapado. Durante `hydrate`, Meeko busca los marcadores, verifica el texto existente, conecta eventos y crea observadores. La función devuelta libera estos recursos.
+
+El ejemplo de `examples/counter` ejercita el contrato en un servidor HTTP. Este contrato aún admite una sola raíz de componente por llamada a `hydrate`; la composición de múltiples raíces y el estado compartido requieren un protocolo explícito antes de ofrecerse como API estable.
+
+## Límites de responsabilidad
+
+| Parte | Responsabilidad |
+| --- | --- |
+| Parser | Analizar secciones, plantilla y expresiones conservando posiciones originales. |
+| Compilador | Validar la sintaxis y producir módulos tipados para SSR e hidratación. |
+| Runtime reactivo | Registrar dependencias, agrupar actualizaciones y liberar observadores por instancia. |
+| Runtime de navegador | Reclamar nodos existentes, conectar eventos y aplicar cambios precisos. |
+| Integración de herramientas | Mostrar diagnósticos en `.meeko`, transformar archivos en Vite y mantener HMR. |
+
+En la implementación actual, el parser de secciones y el generador viven juntos en `src/compiler.ts`. La siguiente etapa los separará conservando posiciones de origen; eso evita que diagnósticos y herramientas del editor dependan de buscar fragmentos de texto en el código generado.
+
+## Reglas para SSR
+
+- Cada petición debe crear su propio estado. No se comparten señales con datos de usuarios entre peticiones.
+- El HTML dinámico se escapa antes de insertarse. El JSON inicial se escapa para no cerrar su etiqueta `<script>`.
+- Las expresiones que afectan el HTML inicial deben producir el mismo valor en servidor y navegador. Una diferencia es un error de hidratación.
+- Los IDs de marcadores deben ser únicos por instancia cuando se soporten varias raíces o componentes anidados.
+- Las listas deberán exigir claves estables para poder conservar nodos y estado al reordenarse.
+
+## TypeScript
+
+El proyecto utiliza TypeScript 7.0.2 estable para la compilación y la verificación de tipos. El parser de scripts usa temporalmente `@typescript/typescript6`, aislado como dependencia del compilador, porque TypeScript 7.0 no expone una API programática estable. El módulo generado se comprueba con TypeScript 7. La integración futura del editor deberá mapear diagnósticos y posiciones entre `.meeko` y los documentos TypeScript virtuales.

@@ -1,0 +1,27 @@
+{
+  "name": "meeko-language",
+  "displayName": "Meeko Language",
+  "description": "Syntax support for .meeko components",
+  "version": "0.0.1",
+  "private": true,
+  "engines": { "vscode": "^1.95.0" },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [{
+      "id": "meeko",
+      "aliases": ["Meeko"],
+      "extensions": [".meeko"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "meeko",
+      "scopeName": "source.meeko",
+      "path": "./syntaxes/meeko.tmLanguage.json",
+      "embeddedLanguages": {
+        "meta.embedded.block.typescript": "typescript",
+        "meta.embedded.block.html": "html",
+        "meta.embedded.block.css": "css"
+      }
+    }]
+  }
+}
