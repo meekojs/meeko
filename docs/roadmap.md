@@ -51,7 +51,7 @@ Estado: motor experimental. Cada etapa se considera terminada cuando sus criteri
 - [x] Probar el paquete como dependencia de una aplicación externa con CLI, SSR, tipos y Vite.
 - [x] Revisar las exportaciones internas de DOM/HMR: el compilador usa `@meekojs/meeko/internal` y los exports antiguos de la raíz se conservan por compatibilidad durante `0.x`.
 - [x] Publicar el repositorio en GitHub y la primera versión del paquete en npm.
-- [ ] Preparar y comprobar la extensión de VS Code para otras plataformas además de Windows x64.
+- [x] Preparar y comprobar la extensión de VS Code para Windows, Linux y macOS en x64/arm64. Las pruebas de host corrieron en Windows x64, Linux x64 y macOS arm64; las demás variantes se comprobaron por contenido del VSIX y binario nativo.
 - [x] Ampliar la comparativa a árboles, listas grandes y navegación, con condiciones y resultados reproducibles. La lista muestra una oportunidad clara de optimización.
 - [x] Decidir el alcance de `0.0.2`: `:global` en CSS, streaming SSR y un servidor de lenguaje independiente se posponen. Se evaluarán por separado antes de una versión estable.
 
