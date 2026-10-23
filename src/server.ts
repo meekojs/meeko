@@ -24,8 +24,41 @@ export function renderAttribute(name: string, value: unknown): string {
   return resolved === null ? "" : ` ${name}="${escapeHtml(resolved)}"`;
 }
 
-/** Serializa datos iniciales para un bloque JSON dentro del HTML de SSR. */
+function assertSerializable(value: unknown, path: string, ancestors: WeakSet<object>): void {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return;
+  if (typeof value === "number") {
+    if (Number.isFinite(value)) return;
+    throw new TypeError(`Non-finite number at ${path}`);
+  }
+  if (typeof value !== "object") throw new TypeError(`Non-serializable value at ${path}`);
+  if (ancestors.has(value)) throw new TypeError(`Circular reference at ${path}`);
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) {
+    throw new TypeError(`Non-plain object at ${path}`);
+  }
+  if (Object.hasOwn(value, "toJSON")) throw new TypeError(`Custom toJSON at ${path}`);
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index++) {
+      if (!Object.hasOwn(value, index)) throw new TypeError(`Sparse array at ${path}[${index}]`);
+    }
+  }
+  ancestors.add(value);
+  try {
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key !== "string") throw new TypeError(`Symbol key at ${path}`);
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor?.enumerable) continue;
+      if (!("value" in descriptor)) throw new TypeError(`Accessor property at ${path}.${key}`);
+      assertSerializable(descriptor.value, `${path}.${key}`, ancestors);
+    }
+  } finally {
+    ancestors.delete(value);
+  }
+}
+
+/** Serializa estado y props transferibles al navegador, rechazando valores ambiguos. */
 export function serializeJson(value: unknown): string {
+  assertSerializable(value, "$", new WeakSet());
   const json = JSON.stringify(value);
   if (json === undefined) throw new TypeError("Value cannot be serialized to JSON");
   return json

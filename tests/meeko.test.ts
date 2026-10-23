@@ -17,6 +17,17 @@ test("SSR genera HTML escapado y estado aislado por render", () => {
   assert.match(renderExamplePage({ initial: 2 }), /<script id="meeko-props" type="application\/json">/);
 });
 
+test("la transferencia de estado rechaza datos que JSON cambiaría silenciosamente", () => {
+  assert.throws(() => serializeJson({ value: Number.NaN }), /Non-finite number at \$\.value/);
+  assert.throws(() => serializeJson({ value: undefined }), /Non-serializable value at \$\.value/);
+  assert.throws(() => serializeJson({ value: new Date() }), /Non-plain object at \$\.value/);
+  assert.throws(() => serializeJson([, 1]), /Sparse array/);
+  const circular: { self?: unknown } = {};
+  circular.self = circular;
+  assert.throws(() => serializeJson(circular), /Circular reference at \$\.self/);
+  assert.equal(serializeJson({ nested: ["<script>", 2] }), '{"nested":["\\u003cscript\\u003e",2]}');
+});
+
 test("hidrata el HTML existente y actualiza solo los textos reactivos", () => {
   const window = new Window();
   const root = window.document.createElement("div");
@@ -55,7 +66,7 @@ test("detecta diferencias entre el servidor y el navegador", () => {
   const window = new Window();
   const root = window.document.createElement("div");
   root.innerHTML = renderToString({ initial: 2 });
-  assert.throws(() => hydrate(root as unknown as Element, { initial: 3 }), /Hydration mismatch/);
+  assert.throws(() => hydrate(root as unknown as Element, { initial: 3 }), /Hydration mismatch in Counter\.meeko:\d+:\d+/);
   window.happyDOM.abort();
 });
 

@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
+import { basename } from "node:path";
 import ts from "@typescript/typescript6";
 import { parseFragment } from "parse5";
 import postcss from "postcss";
 import selectorParser from "postcss-selector-parser";
-import { compileError, parseSfc } from "./compiler/sfc.js";
+import { compileError, locate, parseSfc } from "./compiler/sfc.js";
 import type { SfcSection } from "./compiler/sfc.js";
 
 interface TemplateAttribute {
@@ -23,6 +24,7 @@ interface TemplateNode {
 interface DynamicText {
   id: number;
   expression: string;
+  offset: number;
 }
 
 interface EventBinding {
@@ -35,6 +37,7 @@ interface AttributeBinding {
   id: number;
   name: string;
   expression: string;
+  offset: number;
 }
 
 /** Resultado del compilador de un componente .meeko. */
@@ -70,7 +73,7 @@ function textParts(value: string, dynamics: DynamicText[], source: string, filen
     if (!expression) throw compileError(source, filename, "MEEK009", "Empty template expression", offset + index);
     validateExpression(expression, source, filename, offset + index + 1 + rawExpression.indexOf(expression));
     const id = dynamics.length;
-    dynamics.push({ id, expression });
+    dynamics.push({ id, expression, offset: offset + index });
     parts.push(`${quote(`<!--meeko:text:${id}-->`)} + __meeko.escapeHtml(${expression}) + ${quote(`<!--/meeko:text:${id}-->`)}`);
     cursor = index + match[0].length;
   }
@@ -103,7 +106,7 @@ function renderNode(node: TemplateNode, dynamics: DynamicText[], events: EventBi
       }
       validateExpression(attr.value, source, filename, templateOffset + (node.sourceCodeLocation?.startOffset ?? 0));
       const id = attributes.length;
-      attributes.push({ id, name, expression: attr.value });
+      attributes.push({ id, name, expression: attr.value, offset: templateOffset + (node.sourceCodeLocation?.startOffset ?? 0) });
       attrs.push({ kind: "static", value: ` data-meeko-a-${id}=""` });
       attrs.push({ kind: "dynamic", expression: `__meeko.renderAttribute(${quote(name)}, ${attr.value})` });
     } else if (attr.name.startsWith(":")) {
@@ -231,12 +234,12 @@ export function compile(source: string, filename = "anonymous.meeko"): CompileRe
   const html = renderNode(parsed, dynamics, events, attributes, source, filename, template.contentStart, scopeAttribute);
   const scriptParts = compileScript(script, source, filename);
   const bindings = scriptParts.names.join(", ");
-  const markerCases = dynamics.map(({ id, expression }) => `
+  const markerCases = dynamics.map(({ id, expression, offset }) => `
     {
       const marker = markers.get(${quote(`meeko:text:${id}`)});
       const text = marker?.nextSibling;
-      if (!text || text.nodeType !== 3) throw new Error(${quote(`Missing text node for marker ${id}`)});
-      if (text.textContent !== String(${expression})) throw new Error(${quote(`Hydration mismatch at text ${id}`)});
+      if (!text || text.nodeType !== 3) throw new Error(${quote(`Missing text node in ${basename(filename)}:${locate(source, offset).line}:${locate(source, offset).column} (marker ${id})`)});
+      if (text.textContent !== String(${expression})) throw new Error(${quote(`Hydration mismatch in ${basename(filename)}:${locate(source, offset).line}:${locate(source, offset).column} (text ${id})`)});
       cleanups.push(__meeko.effect(() => { text.textContent = String(${expression}); }));
     }`).join("\n");
   const eventCases = events.map(({ id, name, expression }) => `
@@ -250,12 +253,12 @@ export function compile(source: string, filename = "anonymous.meeko"): CompileRe
       target.addEventListener(${quote(name)}, listener);
       cleanups.push(() => target.removeEventListener(${quote(name)}, listener));
     }`).join("\n");
-  const attributeCases = attributes.map(({ id, name, expression }) => `
+  const attributeCases = attributes.map(({ id, name, expression, offset }) => `
     {
       const target = root.querySelector(${quote(`[data-meeko-a-${id}]`)});
-      if (!target) throw new Error(${quote(`Missing attribute target ${id}`)});
+      if (!target) throw new Error(${quote(`Missing attribute target in ${basename(filename)}:${locate(source, offset).line}:${locate(source, offset).column} (${name})`)});
       const initial = __meeko.attributeValue(${quote(name)}, ${expression});
-      if (target.getAttribute(${quote(name)}) !== initial) throw new Error(${quote(`Hydration mismatch at attribute ${name} (${id})`)});
+      if (target.getAttribute(${quote(name)}) !== initial) throw new Error(${quote(`Hydration mismatch in ${basename(filename)}:${locate(source, offset).line}:${locate(source, offset).column} (attribute ${name})`)});
       cleanups.push(__meeko.effect(() => {
         const next = __meeko.attributeValue(${quote(name)}, ${expression});
         if (next === null) target.removeAttribute(${quote(name)});
