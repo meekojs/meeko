@@ -1,5 +1,11 @@
 # Meeko
 
+<p align="center">
+  <img src="assets/brand/meeko-logo.png" alt="Carita de Meeko, una gatita de ojos azules, orejas oscuras y pelaje crema" width="200" />
+</p>
+
+Este proyecto está dedicado a mi gatita Meeko. Su carita inspira el logo que lo acompaña.
+
 **Meeko** es un motor experimental de componentes para TypeScript. Los archivos `.meeko` combinan lógica tipada, plantilla y estilos; el compilador produce HTML para SSR y conecta la reactividad al HTML existente durante la hidratación.
 
 El proyecto está en etapa temprana. Ya funciona el recorrido completo de un contador renderizado en servidor, hidratado en navegador y actualizado por señales. La sintaxis y las API públicas pueden cambiar antes de la primera versión estable.

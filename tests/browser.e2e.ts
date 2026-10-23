@@ -16,6 +16,7 @@ async function assertBrowserBehavior(url: string): Promise<void> {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(url, { waitUntil: "networkidle" });
+    assert.equal(await page.locator("header img[alt='Meeko']").evaluate((image: HTMLImageElement) => image.naturalWidth > 0), true);
     assert.match(await page.locator("#app button").innerText(), /^2 · doble: 4$/);
     await page.locator("#app button").click();
     assert.match(await page.locator("#app button").innerText(), /^3 · doble: 6$/);
@@ -83,6 +84,9 @@ test("la página SSR hidrata y vuelve a crear estado al navegar", async () => {
     const response = await fetch(url);
     assert.equal(response.status, 200);
     assert.match(await response.text(), /meeko:text:0-->2/);
+    const logoResponse = await fetch(`${url}meeko-logo.png`);
+    assert.equal(logoResponse.status, 200);
+    assert.match(logoResponse.headers.get("content-type") ?? "", /^image\/png/);
     browser = await chromium.launch({
       ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: "chrome" as const }),
       headless: true,

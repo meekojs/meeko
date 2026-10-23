@@ -2,6 +2,8 @@
 
 La extensión reconoce archivos `.meeko`, resalta las secciones TypeScript, HTML y CSS y muestra los mismos diagnósticos de compilación y tipos que `meeko check`. El análisis semántico usa un archivo TypeScript virtual: las referencias del `<script>` y las expresiones del `<template>` comparten completado, navegación, hover y renombrado. El formato de documento delega cada sección al formateador de TypeScript, HTML o CSS instalado en VS Code.
 
+El icono de la extensión y el icono de lenguaje de `.meeko` usan una copia de [`assets/brand/meeko-logo.png`](../../assets/brand/meeko-logo.png). VS Code muestra el icono del lenguaje cuando el tema de iconos activo admite ese mecanismo y no define otro icono para `.meeko`; algunos temas pueden reemplazarlo.
+
 ## Probar en desarrollo
 
 Desde `D:\Clients\meeko\editors\vscode`:

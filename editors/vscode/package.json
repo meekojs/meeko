@@ -3,6 +3,7 @@
   "publisher": "meekojs",
   "displayName": "Meeko Language",
   "description": "Syntax, diagnostics and TypeScript editing for .meeko components",
+  "icon": "./icons/meeko-logo.png",
   "version": "0.0.1",
   "private": true,
   "repository": { "type": "git", "url": "https://github.com/meekojs/meeko" },
@@ -28,6 +29,10 @@
       "id": "meeko",
       "aliases": ["Meeko"],
       "extensions": [".meeko"],
+      "icon": {
+        "light": "./icons/meeko-logo.png",
+        "dark": "./icons/meeko-logo.png"
+      },
       "configuration": "./language-configuration.json"
     }],
     "grammars": [{

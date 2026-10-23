@@ -16,7 +16,7 @@ try {
   foreach ($name in @('package.json', 'README.md', 'language-configuration.json', '.vscodeignore')) {
     Copy-Item -LiteralPath (Join-Path $extensionRoot $name) -Destination $stagingRoot
   }
-  foreach ($name in @('dist', 'syntaxes')) {
+  foreach ($name in @('dist', 'syntaxes', 'icons')) {
     Copy-Item -LiteralPath (Join-Path $extensionRoot $name) -Destination $stagingRoot -Recurse
   }
 

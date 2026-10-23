@@ -44,3 +44,11 @@ Estado: motor experimental. Cada etapa se considera terminada cuando sus criteri
 - [x] Documentación de API, límites de compatibilidad y preparación de publicación.
 
 **Aceptación:** una aplicación de ejemplo se ejecuta en desarrollo y producción sin pasos manuales de generación; las cifras de rendimiento incluyen scripts y condiciones de medición reproducibles.
+
+## Próxima etapa: publicación y adopción
+
+- [ ] Elegir licencia y política de versiones; retirar `private` sólo cuando el paquete esté listo.
+- [ ] Probar el paquete del motor como dependencia de una aplicación externa con instalación reproducible y definir qué API internas permanecen públicas.
+- [ ] Preparar y comprobar la extensión de VS Code para otras plataformas además de Windows x64.
+- [ ] Ampliar la comparativa a árboles, listas grandes y navegación antes de hacer afirmaciones generales de rendimiento.
+- [ ] Decidir si `:global` en CSS, streaming SSR y un servidor de lenguaje independiente entran en la primera versión pública.

@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { existsSync } = require("node:fs");
 const path = require("node:path");
 const vscode = require("vscode");
 
@@ -17,6 +18,9 @@ exports.run = async function run() {
   const document = await vscode.workspace.openTextDocument(uri);
   const extension = vscode.extensions.getExtension("meekojs.meeko-language");
   assert.ok(extension, "No se encontró la extensión empaquetada");
+  assert.equal(extension.packageJSON.icon, "./icons/meeko-logo.png");
+  assert.ok(existsSync(path.join(extension.extensionPath, "icons", "meeko-logo.png")), "El logo debe estar empaquetado");
+  assert.equal(extension.packageJSON.contributes.languages[0].icon.dark, "./icons/meeko-logo.png");
   await extension.activate();
 
   const diagnostics = await waitForDiagnostics(uri, "TS2322");
