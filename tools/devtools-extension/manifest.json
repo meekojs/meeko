@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Meeko DevTools",
+  "version": "0.0.1",
+  "description": "Inspecciona componentes, señales y eventos de Meeko en desarrollo.",
+  "devtools_page": "devtools.html",
+  "icons": {
+    "128": "meeko-logo.png"
+  }
+}

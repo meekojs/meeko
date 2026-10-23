@@ -16,6 +16,7 @@ El proyecto está en etapa temprana. Ya funciona el recorrido completo de un con
 - [API y límites de compatibilidad](docs/api.md)
 - [Plan de desarrollo y criterios de aceptación](docs/roadmap.md)
 - [Comparativa reproducible con Vue](docs/benchmarks.md)
+- [DevTools para depurar componentes](docs/devtools.md)
 - [Publicación y verificaciones](docs/releasing.md)
 - [Guía para contribuir](CONTRIBUTING.md)
 
@@ -55,12 +56,15 @@ El paquete incluye TypeScript 7 y la CLI `meeko`. Puedes comprobar un componente
 | `src/server.ts` | Escapado de contenido dinámico para HTML. |
 | `src/cli.ts` | Comandos `meeko check` y `meeko compile`. |
 | `src/vite.ts` | Plugin de Vite para transformar `.meeko` en cliente y SSR. |
+| `src/devtools.ts` | Instrumentación de instancias y señales sólo durante desarrollo. |
+| `src/devtools-ui` | Panel de inspección dentro de la página. |
 | `examples/counter` | Componente de referencia tipado. |
 | `examples/vite` | Aplicación Vite sin generación manual de componentes. |
 | `examples/nested` | Composición de componentes con rangos de hidratación y props tipadas. |
 | `editors/vscode` | Extensión local con resaltado, diagnósticos y operaciones semánticas. |
 | `benchmarks` | Comparativa repetible de Meeko y Vue en SSR y Chrome. |
 | `tests` | Pruebas de SSR, hidratación y reactividad. |
+| `tools/devtools-extension` | Panel local de Chrome DevTools. |
 
 ## Desarrollo
 
@@ -84,6 +88,8 @@ pnpm run vite:build
 ```
 
 El plugin `@meekojs/meeko/vite` transforma imports de `.meeko` en cliente y SSR y procesa el CSS del componente. En desarrollo, HMR sustituye las instancias hidratadas sin recargar la página, conserva las señales editables que mantienen su nombre y aplica cambios de CSS. Un cambio en el runtime del motor provoca una recarga completa.
+
+El ejemplo Vite muestra [Meeko DevTools](docs/devtools.md) durante el desarrollo: permite seleccionar cada instancia, revisar props y señales, seguir eventos y activar un punto de parada cuando cambia una señal. También hay un panel local para Chrome DevTools. Esta funcionalidad pertenece al código actual del repositorio y todavía no está incluida en el paquete npm `0.0.1`.
 
 `vite:types` genera declaraciones `.d.meeko.ts` para los imports de la aplicación y comprueba el consumidor con TypeScript 7 y `allowArbitraryExtensions`. Las declaraciones del ejemplo se regeneran; no se versionan.
 

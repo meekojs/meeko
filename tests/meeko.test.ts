@@ -56,10 +56,10 @@ test("hidrata el HTML existente y actualiza solo los textos reactivos", () => {
   const dispose = hydrate(root as unknown as Element, { initial: 2 });
   assert.equal(root.querySelector("button"), button);
   button.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
-  assert.equal(button.textContent, "3 · doble: 6");
+  assert.equal(button.textContent?.trim(), "3 · doble: 6");
   dispose();
   button.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
-  assert.equal(button.textContent, "3 · doble: 6");
+  assert.equal(button.textContent?.trim(), "3 · doble: 6");
   window.happyDOM.abort();
 });
 

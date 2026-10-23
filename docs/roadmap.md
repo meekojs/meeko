@@ -54,3 +54,13 @@ Estado: motor experimental. Cada etapa se considera terminada cuando sus criteri
 - [ ] Preparar y comprobar la extensión de VS Code para otras plataformas además de Windows x64.
 - [ ] Ampliar la comparativa a árboles, listas grandes y navegación antes de hacer afirmaciones generales de rendimiento.
 - [ ] Decidir si `:global` en CSS, streaming SSR y un servidor de lenguaje independiente entran en la primera versión pública.
+
+## DevTools experimental
+
+- [x] Instrumentar instancias hidratadas, props, señales, árbol, eventos y limpieza en desarrollo.
+- [x] Ofrecer selección, resaltado y puntos de parada por instancia en un panel integrado.
+- [x] Ofrecer un panel local de Chrome DevTools que consuma el mismo hook.
+- [x] Verificar el runtime, las interfaces y el ejemplo en Chrome.
+- [ ] Publicar una nueva versión npm que incluya DevTools y preparar la distribución de la extensión.
+
+**Aceptación:** la [guía de DevTools](devtools.md) documenta el uso y los límites; SSR y producción no exponen el hook de desarrollo.

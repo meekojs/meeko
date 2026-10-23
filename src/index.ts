@@ -5,3 +5,5 @@ export { bindAttribute, bindComponent, bindEvent, bindFor, bindIf, bindText, key
 export type { ComponentModule, ComponentRelease, DomScope } from "./dom.js";
 export { enableHotModule, registerHotInstance, registerHotScope, replaceHotModule, replaceHotStyle, restoreSignals, snapshotSignals } from "./hmr.js";
 export type { HotComponent, HotState } from "./hmr.js";
+export { registerDevtoolsInstance } from "./devtools.js";
+export type { DevtoolsEvent, DevtoolsHook, DevtoolsInstance, DevtoolsRegistration, DevtoolsSnapshot, DevtoolsValue } from "./devtools.js";

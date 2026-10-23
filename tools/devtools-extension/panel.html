@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Meeko DevTools</title>
+    <link rel="stylesheet" href="panel.css">
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="identity">
+          <img src="meeko-logo.png" alt="" width="32" height="32">
+          <div>
+            <strong>Meeko</strong>
+            <span>Componentes</span>
+          </div>
+        </div>
+        <div class="connection" id="connection" role="status" aria-live="polite">Buscando runtime</div>
+      </header>
+
+      <div class="workspace">
+        <aside class="sidebar" aria-label="Instancias por componente">
+          <div class="sidebar-head">
+            <h1>Instancias <span id="instance-count">0</span></h1>
+            <label class="search-label" for="search">Filtrar componentes</label>
+            <input id="search" type="search" placeholder="Nombre o archivo" autocomplete="off">
+          </div>
+          <div id="instance-list" class="instance-list"></div>
+        </aside>
+
+        <main class="detail" id="detail" aria-label="Detalles de instancia">
+          <div class="empty" id="detail-empty">
+            <strong id="empty-title">Selecciona una instancia</strong>
+            <p id="empty-description">Examina sus propiedades, señales y relación con otros componentes.</p>
+          </div>
+          <div id="detail-content" hidden>
+            <div class="detail-heading">
+              <div>
+                <p class="eyebrow">INSTANCIA</p>
+                <h2 id="detail-name"></h2>
+                <p class="file" id="detail-file"></p>
+              </div>
+              <span class="instance-id" id="detail-id"></span>
+            </div>
+            <div class="actions" aria-label="Acciones de instancia">
+              <button type="button" id="highlight" aria-pressed="false">Resaltar DOM</button>
+              <button type="button" id="breakpoint" aria-pressed="false">Activar breakpoint</button>
+            </div>
+            <dl class="relations">
+              <div><dt>Padre</dt><dd id="detail-parent"></dd></div>
+              <div><dt>Hijos</dt><dd id="detail-children"></dd></div>
+              <div><dt>Estado</dt><dd id="detail-status"></dd></div>
+            </dl>
+            <div class="values">
+              <section aria-labelledby="props-title">
+                <h3 id="props-title">Props</h3>
+                <pre id="props-value"></pre>
+              </section>
+              <section aria-labelledby="signals-title">
+                <h3 id="signals-title">Señales</h3>
+                <pre id="signals-value"></pre>
+              </section>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <section class="events" aria-labelledby="events-title">
+        <div class="events-head">
+          <h2 id="events-title">Eventos <span id="event-count">0</span></h2>
+          <label><input type="checkbox" id="selected-events"> Sólo instancia seleccionada</label>
+        </div>
+        <ol id="event-list" class="event-list"></ol>
+      </section>
+    </div>
+    <script type="module" src="panel.js"></script>
+  </body>
+</html>

@@ -20,6 +20,10 @@
     "./vite": {
       "types": "./dist/vite.d.ts",
       "default": "./dist/vite.js"
+    },
+    "./devtools-ui": {
+      "types": "./dist/devtools-ui/index.d.ts",
+      "default": "./dist/devtools-ui/index.js"
     }
   },
   "bin": {
@@ -41,7 +45,8 @@
     "benchmark:check": "pnpm run example:compile && tsc -p tsconfig.benchmark.json --noEmit",
     "benchmark": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/run.ts",
     "package:smoke": "pwsh -NoProfile -File tests/package-consumer.ps1",
-    "verify": "pnpm run check && pnpm run test && pnpm run example:check && tsc -p tsconfig.test.json --noEmit && pnpm run vite:types && pnpm run benchmark:check && pnpm run vite:build"
+    "devtools:check": "node --test tools/devtools-extension/tests/*.test.js && tsc -p tools/devtools-extension/tsconfig.json --noEmit",
+    "verify": "pnpm run check && pnpm run test && pnpm run devtools:check && pnpm run example:check && tsc -p tsconfig.test.json --noEmit && pnpm run vite:types && pnpm run benchmark:check && pnpm run vite:build"
   },
   "dependencies": {
     "@typescript/typescript6": "6.0.2",

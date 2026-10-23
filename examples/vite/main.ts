@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 import { hydrate, renderToString } from "../counter/Counter.meeko";
 import { hydrate as hydrateRegions, renderToString as renderRegions } from "../regions/Regions.meeko";
 import { hydrate as hydrateHot, renderToString as renderHot } from "./Hot.meeko";
@@ -23,3 +25,9 @@ const nestedRoot = document.querySelector("#nested");
 if (!nestedRoot) throw new Error("Missing #nested root");
 nestedRoot.innerHTML = renderNested({ initial: "Root" });
 hydrateNested(nestedRoot, { initial: "Root" });
+
+if (import.meta.env.DEV) {
+  void import("@meekojs/meeko/devtools-ui").then(({ mountDevtoolsPanel }) => {
+    mountDevtoolsPanel();
+  });
+}

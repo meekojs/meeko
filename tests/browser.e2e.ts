@@ -6,7 +6,7 @@ import { chromium } from "playwright-core";
 import { createServer, preview } from "vite";
 import { createExampleServer } from "../examples/counter/server.ts";
 
-async function assertBrowserBehavior(url: string): Promise<void> {
+async function assertBrowserBehavior(url: string, development: boolean): Promise<void> {
   const browser = await chromium.launch({
     ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: "chrome" as const }),
     headless: true,
@@ -16,10 +16,29 @@ async function assertBrowserBehavior(url: string): Promise<void> {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(url, { waitUntil: "networkidle" });
+    if (development) {
+      await page.waitForFunction(() => Boolean(window.__MEEKO_DEVTOOLS__));
+      const initial = await page.evaluate(() => window.__MEEKO_DEVTOOLS__!.snapshot());
+      assert.ok(initial.instances.some((instance) => instance.name === "Counter"));
+      assert.ok(initial.instances.some((instance) => instance.name === "Parent"));
+      assert.ok(initial.instances.every((instance) => instance.status === "hydrated"));
+      await page.locator('[data-meeko-devtools-panel] button[data-action="select"]', { hasText: "Counter" }).click();
+      assert.equal(await page.locator('[data-meeko-devtools-panel] h3', { hasText: "Señales" }).count(), 1);
+    } else {
+      assert.equal(await page.evaluate(() => window.__MEEKO_DEVTOOLS__ === undefined), true);
+      assert.equal(await page.locator("[data-meeko-devtools-panel]").count(), 0);
+    }
     assert.equal(await page.locator("header img[alt='Meeko']").evaluate((image: HTMLImageElement) => image.naturalWidth > 0), true);
     assert.match(await page.locator("#app button").innerText(), /^2 · doble: 4$/);
     await page.locator("#app button").click();
     assert.match(await page.locator("#app button").innerText(), /^3 · doble: 6$/);
+    if (development) {
+      const updated = await page.evaluate(() => window.__MEEKO_DEVTOOLS__!.snapshot());
+      const counter = updated.instances.find((instance) => instance.name === "Counter");
+      assert.ok(counter);
+      assert.equal(counter.signals.count, 3);
+      assert.ok(updated.events.some((event) => event.kind === "signal" && event.instanceId === counter.id));
+    }
 
     await page.locator("#regions button", { hasText: "Prepend" }).click();
     await page.locator("#regions button", { hasText: "Reverse" }).click();
@@ -53,7 +72,7 @@ test("Vite en desarrollo hidrata y actualiza componentes en Chrome real", async 
     await server.listen();
     const address = server.httpServer?.address() as AddressInfo | null;
     if (!address) throw new Error("Vite did not open an HTTP server");
-    await assertBrowserBehavior(`http://127.0.0.1:${address.port}/`);
+    await assertBrowserBehavior(`http://127.0.0.1:${address.port}/`, true);
   } finally {
     await server.close();
   }
@@ -68,7 +87,7 @@ test("Vite en producción hidrata y actualiza componentes en Chrome real", async
   try {
     const address = server.httpServer.address() as AddressInfo | null;
     if (!address) throw new Error("Vite preview did not open an HTTP server");
-    await assertBrowserBehavior(`http://127.0.0.1:${address.port}/`);
+    await assertBrowserBehavior(`http://127.0.0.1:${address.port}/`, false);
   } finally {
     await new Promise<void>((resolveDone, reject) => server.httpServer.close((error) => error ? reject(error) : resolveDone()));
   }
