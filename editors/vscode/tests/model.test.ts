@@ -64,7 +64,7 @@ test("formatea el script mediante TypeScript", () => {
 });
 
 test("formatea un componente mínimo con error de tipos", () => {
-  const compact = `<script lang="ts">\nimport { signal } from "meeko";\nconst count=signal(0);\nconst bad: number = "invalid";\n</script>\n<template>\n  <button on:click="() => count.value++">{count.value}</button>\n</template>\n`;
+  const compact = `<script lang="ts">\nimport { signal } from "@meekojs/meeko";\nconst count=signal(0);\nconst bad: number = "invalid";\n</script>\n<template>\n  <button on:click="() => count.value++">{count.value}</button>\n</template>\n`;
   const model = createEditorModel(compact, filename);
   try {
     const end = compact.indexOf("</script>") - compact.indexOf("<script lang=\"ts\">") - "<script lang=\"ts\">".length;

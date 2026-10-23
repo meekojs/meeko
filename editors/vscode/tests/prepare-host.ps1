@@ -18,7 +18,7 @@ try {
   Set-Content -LiteralPath (Join-Path $consumer 'package.json') -Encoding utf8 -Value '{"name":"meeko-consumer-test","private":true,"type":"module"}'
   Set-Content -LiteralPath (Join-Path $consumer 'Counter.meeko') -Encoding utf8 -Value @'
 <script lang="ts">
-import { signal } from "meeko";
+import { signal } from "@meekojs/meeko";
 const count=signal(0);
 const bad: number = "invalid";
 </script>

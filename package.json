@@ -1,8 +1,17 @@
 {
-  "name": "meeko",
+  "name": "@meekojs/meeko",
   "version": "0.0.1",
-  "private": true,
+  "packageManager": "pnpm@12.14.0",
+  "description": "Typed .meeko component engine with SSR, hydration, signals, and Vite integration.",
+  "license": "MIT",
   "type": "module",
+  "files": ["dist/"],
+  "types": "./dist/index.d.ts",
+  "repository": { "type": "git", "url": "https://github.com/meekojs/meeko.git" },
+  "homepage": "https://github.com/meekojs/meeko#readme",
+  "bugs": { "url": "https://github.com/meekojs/meeko/issues" },
+  "keywords": ["meeko", "components", "ssr", "hydration", "reactivity", "vite", "typescript"],
+  "publishConfig": { "access": "public" },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -17,6 +26,7 @@
     "meeko": "./dist/cli.js"
   },
   "scripts": {
+    "prepack": "tsc -p tsconfig.build.json",
     "build": "tsc -p tsconfig.build.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "pnpm run build && pnpm run example:compile && tsx --test tests/*.test.ts",
@@ -30,13 +40,21 @@
     "e2e": "pnpm run example:bundle && pnpm run vite:build && tsx --test tests/browser.e2e.ts",
     "benchmark:check": "pnpm run example:compile && tsc -p tsconfig.benchmark.json --noEmit",
     "benchmark": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/run.ts",
+    "package:smoke": "pwsh -NoProfile -File tests/package-consumer.ps1",
     "verify": "pnpm run check && pnpm run test && pnpm run example:check && tsc -p tsconfig.test.json --noEmit && pnpm run vite:types && pnpm run benchmark:check && pnpm run vite:build"
   },
   "dependencies": {
     "@typescript/typescript6": "6.0.2",
     "parse5": "^8.0.0",
     "postcss": "^8.5.31",
-    "postcss-selector-parser": "^7.1.7"
+    "postcss-selector-parser": "^7.1.7",
+    "typescript": "7.0.2"
+  },
+  "peerDependencies": {
+    "vite": "^8.3.5"
+  },
+  "peerDependenciesMeta": {
+    "vite": { "optional": true }
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
@@ -44,7 +62,6 @@
     "happy-dom": "^20.0.0",
     "playwright-core": "1.64.1",
     "tsx": "^4.20.0",
-    "typescript": "7.0.2",
     "vite": "8.3.5",
     "vue": "3.5.44"
   },

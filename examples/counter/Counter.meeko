@@ -1,5 +1,5 @@
 <script lang="ts">
-import { computed, signal } from "meeko";
+import { computed, signal } from "@meekojs/meeko";
 
 /** Propiedades públicas del contador. */
 export interface Props {

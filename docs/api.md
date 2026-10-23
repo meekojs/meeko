@@ -8,7 +8,7 @@ Un componente contiene un `<script lang="ts">` y un `<template>`; `<style scoped
 
 ```html
 <script lang="ts">
-import { signal } from "meeko";
+import { signal } from "@meekojs/meeko";
 
 interface Props { initial: number }
 const props = defineProps<Props>();
@@ -31,7 +31,7 @@ Cada `.meeko` exporta `ComponentProps`, `css`, `renderWithState(props)`, `render
 
 ```ts
 import { hydrate, renderWithState } from "./Counter.meeko";
-import { serializeJson } from "meeko";
+import { serializeJson } from "@meekojs/meeko";
 
 const props = { initial: 1 };
 const { html, state } = renderWithState(props);
@@ -51,16 +51,16 @@ Los observadores creados durante `hydrate` pertenecen a esa instancia. Durante H
 
 ## Herramientas
 
-`meeko check archivo.meeko` comprueba sintaxis y tipos; `--json` entrega diagnósticos estructurados. `meeko compile entrada.meeko salida.ts` genera el módulo tipado y no escribe un archivo si hay errores. `meeko types archivo.meeko` emite declaraciones `Archivo.d.meeko.ts` para ese componente y los hijos importados. El consumidor activa `allowArbitraryExtensions` en TypeScript para resolver los imports `.meeko` con props precisas. El plugin `meeko/vite` compila los imports `.meeko` en cliente y SSR y añade HMR y CSS durante desarrollo. Consulta [la extensión local de VS Code](../editors/vscode/README.md) para usar las mismas comprobaciones en el editor.
+`meeko check archivo.meeko` comprueba sintaxis y tipos; `--json` entrega diagnósticos estructurados. `meeko compile entrada.meeko salida.ts` genera el módulo tipado y no escribe un archivo si hay errores. `meeko types archivo.meeko` emite declaraciones `Archivo.d.meeko.ts` para ese componente y los hijos importados. El consumidor activa `allowArbitraryExtensions` en TypeScript para resolver los imports `.meeko` con props precisas. El plugin `@meekojs/meeko/vite` compila los imports `.meeko` en cliente y SSR y añade HMR y CSS durante desarrollo. Consulta [la extensión local de VS Code](../editors/vscode/README.md) para usar las mismas comprobaciones en el editor.
 
 ## Compatibilidad y límites
 
 - Node.js 24 o posterior y TypeScript 7.0.2 para el flujo de desarrollo actual.
-- La API pública aún puede cambiar; el paquete sigue marcado `private` y no se publica en npm.
+- La API pública aún puede cambiar durante la serie `0.x`; el paquete se prepara como `@meekojs/meeko` bajo licencia MIT.
 - El parser acepta el subconjunto de TypeScript y HTML descrito arriba; informa las construcciones no soportadas mediante diagnósticos.
 - La hidratación requiere que el servidor y el navegador obtengan los mismos valores iniciales y el mismo orden de listas.
 - No se ofrecen todavía streaming SSR, un servidor de lenguaje independiente ni garantías de compatibilidad con plugins de Vue.
 
 ## Antes de publicar
 
-La primera publicación requiere elegir una licencia, fijar semver y la política de cambios, validar el paquete del motor en un proyecto consumidor fuera del monorepo, ampliar las pruebas de compatibilidad y decidir qué funciones internas de DOM/HMR permanecen exportadas. La extensión de VS Code ya se empaquetó y probó en un host aislado con un proyecto consumidor externo. La publicación y el push se harán en un paso separado del desarrollo local.
+La licencia MIT y el nombre `@meekojs/meeko` ya están definidos. `pnpm run package:smoke` instala el tarball en un consumidor fuera del monorepo y comprueba CLI, SSR, tipos y Vite. Antes de declarar estable la API se ampliarán las pruebas de compatibilidad y se revisarán las exportaciones internas de DOM/HMR. La extensión de VS Code ya se empaquetó y probó en un host aislado con un proyecto consumidor externo.

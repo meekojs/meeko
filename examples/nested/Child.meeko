@@ -1,5 +1,5 @@
 <script lang="ts">
-import { signal } from "meeko";
+import { signal } from "@meekojs/meeko";
 import * as Grandchild from "./Grandchild.meeko";
 
 const props = defineProps<{ label: string }>();

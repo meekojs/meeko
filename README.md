@@ -8,12 +8,15 @@ Este proyecto está dedicado a mi gatita Meeko. Su carita inspira el logo que lo
 
 **Meeko** es un motor experimental de componentes para TypeScript. Los archivos `.meeko` combinan lógica tipada, plantilla y estilos; el compilador produce HTML para SSR y conecta la reactividad al HTML existente durante la hidratación.
 
+El código se distribuye bajo la [licencia MIT](LICENSE). El paquete público se llama `@meekojs/meeko`; la CLI se invoca como `meeko` y el plugin de Vite se importa desde `@meekojs/meeko/vite`.
+
 El proyecto está en etapa temprana. Ya funciona el recorrido completo de un contador renderizado en servidor, hidratado en navegador y actualizado por señales. La sintaxis y las API públicas pueden cambiar antes de la primera versión estable.
 
 - [Arquitectura y contratos](docs/architecture.md)
 - [API y límites de compatibilidad](docs/api.md)
 - [Plan de desarrollo y criterios de aceptación](docs/roadmap.md)
 - [Comparativa reproducible con Vue](docs/benchmarks.md)
+- [Publicación y verificaciones](docs/releasing.md)
 - [Guía para contribuir](CONTRIBUTING.md)
 
 ## Requisitos
@@ -47,10 +50,11 @@ El proyecto está en etapa temprana. Ya funciona el recorrido completo de un con
 pnpm install
 pnpm run verify
 pnpm run e2e
+pnpm run package:smoke
 pnpm run example:serve
 ```
 
-`e2e` usa Chrome instalado localmente; `MEEKO_CHROME_PATH` permite indicar otro ejecutable compatible. Prueba Vite en desarrollo y producción, además de una página SSR con navegación. La última orden sirve el ejemplo en `http://127.0.0.1:4173`. El servidor envía HTML y las props iniciales como JSON escapado; el navegador hidrata el botón sin reemplazarlo.
+`e2e` usa Chrome instalado localmente; `MEEKO_CHROME_PATH` permite indicar otro ejecutable compatible. Prueba Vite en desarrollo y producción, además de una página SSR con navegación. `package:smoke` instala el tarball en un proyecto temporal externo y prueba CLI, SSR, tipos y Vite. La última orden sirve el ejemplo en `http://127.0.0.1:4173`. El servidor envía HTML y las props iniciales como JSON escapado; el navegador hidrata el botón sin reemplazarlo.
 
 Para probar la compilación automática con Vite:
 
@@ -61,7 +65,7 @@ pnpm run vite:types
 pnpm run vite:build
 ```
 
-El plugin `meeko/vite` transforma imports de `.meeko` en cliente y SSR y procesa el CSS del componente. En desarrollo, HMR sustituye las instancias hidratadas sin recargar la página, conserva las señales editables que mantienen su nombre y aplica cambios de CSS. Un cambio en el runtime del motor provoca una recarga completa.
+El plugin `@meekojs/meeko/vite` transforma imports de `.meeko` en cliente y SSR y procesa el CSS del componente. En desarrollo, HMR sustituye las instancias hidratadas sin recargar la página, conserva las señales editables que mantienen su nombre y aplica cambios de CSS. Un cambio en el runtime del motor provoca una recarga completa.
 
 `vite:types` genera declaraciones `.d.meeko.ts` para los imports de la aplicación y comprueba el consumidor con TypeScript 7 y `allowArbitraryExtensions`. Las declaraciones del ejemplo se regeneran; no se versionan.
 

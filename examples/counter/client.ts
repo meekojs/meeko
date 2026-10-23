@@ -1,5 +1,5 @@
 import { hydrate, type ComponentProps } from "./Counter.generated.ts";
-import type { HotState } from "meeko";
+import type { HotState } from "@meekojs/meeko";
 
 function readProps(value: unknown): ComponentProps {
   if (typeof value !== "object" || value === null || !("initial" in value)) throw new TypeError("Invalid server props");

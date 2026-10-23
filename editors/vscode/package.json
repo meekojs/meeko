@@ -5,6 +5,7 @@
   "description": "Syntax, diagnostics and TypeScript editing for .meeko components",
   "icon": "./icons/meeko-logo.png",
   "version": "0.0.1",
+  "license": "MIT",
   "private": true,
   "repository": { "type": "git", "url": "https://github.com/meekojs/meeko" },
   "type": "module",

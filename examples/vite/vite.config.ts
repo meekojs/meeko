@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import { meeko } from "meeko/vite";
+import { meeko } from "@meekojs/meeko/vite";
 
 export default defineConfig({
   plugins: [meeko()],

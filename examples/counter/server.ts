@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { serializeJson } from "meeko";
+import { serializeJson } from "@meekojs/meeko";
 import { css, renderWithState, type ComponentProps } from "./Counter.generated.ts";
 
 /** Genera la página completa con HTML inicial y props para hidratación. */
