@@ -25,6 +25,24 @@ El proyecto está en etapa temprana. Ya funciona el recorrido completo de un con
 - `pnpm`.
 - TypeScript **7.0.2 estable** para compilar y comprobar los tipos. `@typescript/typescript6` se usa únicamente como analizador sintáctico del formato `.meeko`, porque TypeScript 7.0 todavía no ofrece una API programática estable para lenguajes incrustados.
 
+## Instalación en una aplicación
+
+```powershell
+pnpm add @meekojs/meeko
+pnpm add -D vite
+```
+
+Si usas Vite, agrega el plugin a `vite.config.ts`:
+
+```ts
+import { defineConfig } from "vite";
+import { meeko } from "@meekojs/meeko/vite";
+
+export default defineConfig({ plugins: [meeko()] });
+```
+
+El paquete incluye TypeScript 7 y la CLI `meeko`. Puedes comprobar un componente con `pnpm exec meeko check ruta/Componente.meeko`. Vite es opcional si sólo usas el compilador y SSR.
+
 ## Estructura
 
 | Ruta | Responsabilidad |

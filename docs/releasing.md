@@ -23,3 +23,7 @@ npm pack --dry-run --json
 El primer push crea `main` en GitHub. Tras comprobar la ejecución de CI y verificar que el commit remoto coincide con el probado localmente, publica la versión con `npm publish --access public`. npm puede pedir autenticación de dos factores; no guardes códigos ni tokens en el repositorio. Comprueba después la versión y el acceso público en el registro. Una versión publicada no se sobrescribe; las correcciones requieren un número nuevo.
 
 La extensión de VS Code se empaqueta por separado. Su VSIX local no implica publicación en Marketplace. Antes de publicarla, prepara artefactos y pruebas para otras plataformas y revisa las condiciones de Marketplace.
+
+## Versión 0.0.1
+
+La primera versión pública salió del commit `b6324b0` y está disponible en [npm](https://www.npmjs.com/package/@meekojs/meeko/v/0.0.1). La [verificación de GitHub Actions](https://github.com/meekojs/meeko/actions/runs/39952217750) pasó las comprobaciones, las pruebas de navegador y la instalación del paquete en una aplicación externa. Después de publicar, se instaló `@meekojs/meeko@0.0.1` desde el registro y se comprobaron su reactividad y la CLI con un componente `.meeko`.
