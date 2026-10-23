@@ -1,11 +1,28 @@
 {
   "name": "meeko-language",
+  "publisher": "meekojs",
   "displayName": "Meeko Language",
-  "description": "Syntax support for .meeko components",
+  "description": "Syntax, diagnostics and TypeScript editing for .meeko components",
   "version": "0.0.1",
   "private": true,
-  "engines": { "vscode": "^1.95.0" },
+  "repository": { "type": "git", "url": "https://github.com/meekojs/meeko" },
+  "type": "module",
+  "main": "./dist/extension.js",
+  "engines": { "vscode": "^1.140.0" },
+  "activationEvents": ["onLanguage:meeko"],
   "categories": ["Programming Languages"],
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "test:host": "node tests/run-host.mjs",
+    "test:host:isolated": "pwsh -NoProfile -File tests/prepare-host.ps1",
+    "package:vsix": "pwsh -NoProfile -File package-vsix.ps1"
+  },
+  "dependencies": {
+    "@typescript/typescript6": "6.0.2",
+    "typescript": "7.0.2"
+  },
   "contributes": {
     "languages": [{
       "id": "meeko",
@@ -23,5 +40,12 @@
         "meta.embedded.block.css": "css"
       }
     }]
+  },
+  "devDependencies": {
+    "@types/node": "24.0.0",
+    "@types/vscode": "1.140.0",
+    "@vscode/test-electron": "3.1.0",
+    "esbuild": "0.28.2",
+    "tsx": "^4.20.0"
   }
 }

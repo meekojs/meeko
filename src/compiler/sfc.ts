@@ -45,6 +45,8 @@ interface ParsedNode {
 /** Una sección SFC con posiciones conservadas en el archivo fuente. */
 export interface SfcSection {
   name: "script" | "template" | "style";
+  start: number;
+  end: number;
   content: string;
   contentStart: number;
   contentEnd: number;
@@ -100,6 +102,8 @@ export function parseSfc(source: string, filename = "anonymous.meeko"): SfcDocum
     }
     sections.set(tag, {
       name: tag,
+      start: location.startOffset,
+      end: location.endOffset,
       content: source.slice(location.startTag.endOffset, location.endTag.startOffset),
       contentStart: location.startTag.endOffset,
       contentEnd: location.endTag.startOffset,

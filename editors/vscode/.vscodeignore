@@ -1,0 +1,9 @@
+src/**
+tests/**
+build.mjs
+package-vsix.ps1
+tsconfig.json
+pnpm-lock.yaml
+README.md
+dist/*.map
+dist/*.cjs

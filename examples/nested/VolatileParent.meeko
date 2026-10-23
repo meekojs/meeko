@@ -1,0 +1,9 @@
+<script lang="ts">
+import * as VolatileChild from "./VolatileChild.meeko";
+
+const props = defineProps<{ label: string }>();
+</script>
+
+<template>
+  <component is="VolatileChild" bind:label="props.label"></component>
+</template>

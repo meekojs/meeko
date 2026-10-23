@@ -1,0 +1,17 @@
+<script lang="ts">
+import { signal } from "meeko";
+
+const count = signal(0);
+
+function increment(): void {
+  count.value++;
+}
+</script>
+
+<template>
+  <button on:click="increment">Hot v3 {count.value}</button>
+</template>
+
+<style scoped>
+button { color: #1d4ed8; }
+</style>

@@ -1,0 +1,7 @@
+<script lang="ts">
+const props = defineProps<{ label: string }>();
+</script>
+
+<template>
+  <em>{props.label}</em>
+</template>

@@ -1,0 +1,30 @@
+<script lang="ts">
+import { signal } from "meeko";
+import * as Child from "./Child.meeko";
+
+const props = defineProps<{ initial: string }>();
+const label = signal(props.initial);
+const visible = signal(true);
+const items = signal([{ id: "a", label: "A" }, { id: "b", label: "B" }]);
+
+function reverse(): void {
+  items.value = [...items.value].reverse();
+}
+</script>
+
+<template>
+  <section>
+    <component is="Child" bind:label="label.value"></component>
+    <component is="Child" bind:label="'Fixed'"></component>
+    <p>{label.value}</p>
+    <button on:click="() => label.value = 'Updated'">Update</button>
+    <button on:click="() => visible.value = !visible.value">Toggle</button>
+    <div if:when="visible.value"><component is="Child" bind:label="'Conditional'"></component></div>
+    <ul>
+      <li each:of="items.value" each:as="item" each:key="item.id" bind:data-id="item.id">
+        <component is="Child" bind:label="item.label"></component>
+      </li>
+    </ul>
+    <button on:click="reverse">Reverse</button>
+  </section>
+</template>

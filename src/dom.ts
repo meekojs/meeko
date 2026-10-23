@@ -1,6 +1,6 @@
 import { createRoot, effect, signal } from "./reactivity.js";
 import type { Signal } from "./reactivity.js";
-import { attributeValue } from "./server.js";
+import { attributeValue, serializeJson } from "./server.js";
 
 /** Fragmento de DOM que pertenece a una instancia o a una región dinámica. */
 export interface DomScope {
@@ -9,27 +9,54 @@ export interface DomScope {
   end?: Comment;
 }
 
+/** Contrato de un módulo de componente compilado para composición sin wrapper. */
+export interface ComponentModule<Props extends object> {
+  renderToString(props: Props, state?: Record<string, unknown>): string;
+  renderWithState?(props: Props): { html: string; state: Record<string, unknown> };
+  hydrateScope(scope: DomScope, props: Props, state?: Record<string, unknown>): ComponentRelease;
+}
+
+/** Función de limpieza que puede exponer el estado editable de su instancia. */
+export interface ComponentRelease {
+  (): void;
+  snapshot?: () => Record<string, unknown>;
+}
+
+/** Añade una lectura de estado a la limpieza de un componente compilado. */
+export function withStateSnapshot(release: () => void, snapshot: () => Record<string, unknown>): ComponentRelease {
+  return Object.assign(release, { snapshot });
+}
+
+const componentStart = /^meeko:component:\d+(?::.*)?$/;
+
+function componentEnd(start: Node): Node {
+  let depth = 0;
+  for (let node: Node | null = start; node; node = node.nextSibling) {
+    if (node.nodeType !== 8) continue;
+    const data = (node as Comment).data;
+    if (componentStart.test(data)) depth++;
+    else if (/^\/meeko:component:\d+$/.test(data) && --depth === 0) return node;
+  }
+  throw new Error(`Missing end marker for ${(start as Comment).data}`);
+}
+
 function visit(scope: DomScope, callback: (node: Node) => boolean): Node | undefined {
-  function descend(node: Node): Node | undefined {
-    if (callback(node)) return node;
-    for (const child of node.childNodes) {
-      const found = descend(child);
+  function siblings(first: Node | null, stop: Node | null = null): Node | undefined {
+    for (let node = first; node && node !== stop;) {
+      if (callback(node)) return node;
+      if (node.nodeType === 8 && componentStart.test((node as Comment).data)) {
+        const end = componentEnd(node);
+        if (callback(end)) return end;
+        node = end.nextSibling;
+        continue;
+      }
+      const found = siblings(node.firstChild);
       if (found) return found;
+      node = node.nextSibling;
     }
     return undefined;
   }
-  if (scope.start && scope.end) {
-    for (let node = scope.start.nextSibling; node && node !== scope.end; node = node.nextSibling) {
-      const found = descend(node);
-      if (found) return found;
-    }
-    return undefined;
-  }
-  for (const child of scope.root.childNodes) {
-    const found = descend(child);
-    if (found) return found;
-  }
-  return undefined;
+  return siblings(scope.start?.nextSibling ?? scope.root.firstChild, scope.end ?? null);
 }
 
 function findComment(scope: DomScope, data: string): Comment {
@@ -66,6 +93,60 @@ function insertHtml(end: Comment, html: string): void {
   const range = end.ownerDocument.createRange();
   range.selectNodeContents(parent);
   parent.insertBefore(range.createContextualFragment(html), end);
+}
+
+function sameProps<Props extends object>(first: Props, second: Props): boolean {
+  const firstKeys = Object.keys(first);
+  const secondKeys = Object.keys(second);
+  return firstKeys.length === secondKeys.length && firstKeys.every((key) => Object.hasOwn(second, key) && Object.is(first[key as keyof Props], second[key as keyof Props]));
+}
+
+/** Renderiza un hijo entre comentarios de ámbito sin añadir un elemento visual. */
+export function renderComponent<Props extends object>(id: number, component: ComponentModule<Props>, props: Props, transferState = false): string {
+  if (transferState) {
+    if (!component.renderWithState) throw new TypeError(`Component ${id} cannot transfer SSR state`);
+    const rendered = component.renderWithState(props);
+    return `<!--meeko:component:${id}:${encodeURIComponent(serializeJson(rendered.state))}-->${rendered.html}<!--/meeko:component:${id}-->`;
+  }
+  return `<!--meeko:component:${id}-->${component.renderToString(props)}<!--/meeko:component:${id}-->`;
+}
+
+function componentRegion(scope: DomScope, id: number): { inner: DomScope; state?: Record<string, unknown> } {
+  const prefix = `meeko:component:${id}`;
+  const start = visit(scope, (candidate) => candidate.nodeType === 8 && ((candidate as Comment).data === prefix || (candidate as Comment).data.startsWith(`${prefix}:`))) as Comment | undefined;
+  if (!start) throw new Error(`Missing Meeko marker ${prefix}`);
+  const end = findComment(scope, `/meeko:component:${id}`);
+  if (start.parentNode !== end.parentNode) throw new Error(`Invalid Meeko region component:${id}`);
+  const encoded = start.data.slice(prefix.length);
+  if (!encoded) return { inner: { root: scope.root, start, end } };
+  const parsed: unknown = JSON.parse(decodeURIComponent(encoded.slice(1)));
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new TypeError(`Invalid Meeko state for component:${id}`);
+  return { inner: { root: scope.root, start, end }, state: parsed as Record<string, unknown> };
+}
+
+/** Hidrata un hijo dentro de su rango y actualiza props reactivas con limpieza previa. */
+export function bindComponent<Props extends object>(scope: DomScope, id: number, component: ComponentModule<Props>, read: () => Props, location: string): () => void {
+  let inner: DomScope;
+  let state: Record<string, unknown> | undefined;
+  try {
+    ({ inner, state } = componentRegion(scope, id));
+  } catch (error) {
+    throw new Error(`Hydration mismatch in ${location}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+  }
+  let props = read();
+  let release = component.hydrateScope(inner, props, state);
+  const stop = effect(() => {
+    const next = read();
+    if (sameProps(props, next)) return;
+    const state = release.snapshot?.();
+    const html = component.renderToString(next, state);
+    release();
+    clearRegion(inner);
+    insertHtml(inner.end!, html);
+    release = component.hydrateScope(inner, next, state);
+    props = next;
+  });
+  return () => { stop(); release(); };
 }
 
 /** Conecta un texto reactivo al marcador SSR y comprueba su valor inicial. */
@@ -129,7 +210,7 @@ export function keyToken(key: unknown): string {
 }
 
 /** Renderiza una lista con límites identificados por claves únicas. */
-export function renderFor<T>(id: number, items: Iterable<T>, keyOf: (item: T, index: number) => unknown, render: (item: T, index: number) => string): string {
+export function renderFor<T>(id: number, items: Iterable<T>, keyOf: (item: T, index: number) => string | number, render: (item: T, index: number) => string): string {
   const seen = new Set<string>();
   let html = `<!--meeko:for:${id}-->`;
   let index = 0;
@@ -168,7 +249,7 @@ function moveRange(start: Comment, end: Comment, before: Node): void {
 }
 
 /** Hidrata una lista y reordena regiones por clave sin reemplazar nodos conservados. */
-export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>, keyOf: (item: T, index: number) => unknown, render: (item: T, index: number) => string, hydrate: (item: Signal<T>, index: Signal<number>, inner: DomScope) => () => void): () => void {
+export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>, keyOf: (item: T, index: number) => string | number, render: (item: T, index: number) => string, hydrate: (item: Signal<T>, index: Signal<number>, inner: DomScope) => () => void): () => void {
   const outer = region(scope, "for", id);
   const entries = new Map<string, ListEntry<T>>();
   const initial = [...read()];

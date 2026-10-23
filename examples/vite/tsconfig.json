@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "noEmit": true,
+    "allowArbitraryExtensions": true
+  },
+  "include": ["main.ts"]
+}

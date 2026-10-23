@@ -24,6 +24,14 @@ interface InternalSignal<T> extends Signal<T> {
   subscribers: Set<Observer>;
 }
 
+const writableSignals = new WeakSet<object>();
+const derivedSignals = new WeakSet<object>();
+
+/** Identifica señales editables creadas por Meeko para conservarlas durante HMR. */
+export function isWritableSignal(value: unknown): value is Signal<unknown> {
+  return typeof value === "object" && value !== null && writableSignals.has(value) && !derivedSignals.has(value);
+}
+
 let activeObserver: Observer | undefined;
 let activeOwner: Owner | undefined;
 let batchDepth = 0;
@@ -71,6 +79,7 @@ export function signal<T>(initial: T): Signal<T> {
       flush();
     },
   };
+  writableSignals.add(result);
   return result;
 }
 
@@ -107,6 +116,7 @@ export function effect(fn: () => void): () => void {
 /** Deriva un valor de otras señales y lo actualiza cuando cambian. */
 export function computed<T>(fn: () => T): ReadonlySignal<T> {
   const result = signal<T>(undefined as T);
+  derivedSignals.add(result);
   effect(() => {
     result.value = fn();
   });

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { MeekoCompileError, locate, parseSfc } from "../src/compiler/sfc.ts";
+import { parseTemplate } from "../src/compiler/template.ts";
 import { compile } from "../src/compiler.ts";
 
 const validSource = `<script lang="ts">\nconst label = "<template>literal</template>";\n</script>\n<template><button>{label}</button></template>\n<style scoped>button { color: red; }</style>`;
@@ -8,10 +9,27 @@ const validSource = `<script lang="ts">\nconst label = "<template>literal</templ
 test("conserva contenido y posiciones de secciones .meeko", () => {
   const document = parseSfc(validSource, "Counter.meeko");
   assert.match(document.script.content, /<template>literal<\/template>/);
+  assert.equal(document.script.start, validSource.indexOf("<script"));
+  assert.equal(document.script.end, validSource.indexOf("</script>") + "</script>".length);
   assert.equal(document.script.contentStart, validSource.indexOf(">\n") + 1);
   assert.equal(document.template.content, "<button>{label}</button>");
   assert.ok(document.style?.attributes.some((attribute) => attribute.name === "scoped"));
   assert.deepEqual(locate("a\r\nb\nc", 4), { offset: 4, line: 2, column: 2 });
+});
+
+test("el AST propio de plantilla conserva límites de nodos y atributos", () => {
+  const source = `<script lang="ts">const name = "Meeko";</script>\n<template><p title="greeting">{name}</p></template>`;
+  const section = parseSfc(source, "Ast.meeko").template;
+  const root = parseTemplate(source, section, "Ast.meeko");
+  const paragraph = root.childNodes?.[0];
+  assert.ok(paragraph);
+  assert.equal(root.start, section.contentStart);
+  assert.equal(root.end, section.contentEnd);
+  assert.equal(paragraph.start, source.indexOf("<p"));
+  assert.equal(paragraph.end, source.indexOf("</p>") + 4);
+  assert.equal(paragraph.attrs?.[0]?.start, source.indexOf('title="greeting"'));
+  assert.equal(paragraph.attrs?.[0]?.end, source.indexOf('title="greeting"') + 'title="greeting"'.length);
+  assert.equal(paragraph.childNodes?.[0]?.start, source.indexOf("{name}"));
 });
 
 test("señala secciones duplicadas en la línea original", () => {
@@ -36,6 +54,7 @@ test("sitúa errores de script, plantilla y CSS en el archivo original", () => {
     { source: `<script lang="ts">const value = 1;</script>\n<template>\n{value(}\n</template>`, code: "MEEK020", line: 3 },
     { source: `<script lang="ts">const value = 1;</script>\n<template>\n{value\n</template>`, code: "MEEK010", line: 3 },
     { source: `<script lang="ts">const value = 1;</script>\n<template></template>\n<style scoped>\nbutton { color: ;\n</style>`, code: "MEEK019", line: 4 },
+    { source: `<script lang="ts">const value = 1;</script>\n<template></template>\n<style scoped>\n:global(button) { color: red; }\n</style>`, code: "MEEK019", line: 4 },
   ];
   for (const { source, code, line } of cases) {
     assert.throws(() => compile(source, "Broken.meeko"), (error: unknown) => {

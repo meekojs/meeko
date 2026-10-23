@@ -6,7 +6,7 @@ import { compile } from "../src/compiler.ts";
 import { batch, computed, createRoot, effect, signal } from "../src/reactivity.ts";
 import { escapeHtml, serializeJson } from "../src/server.ts";
 import { renderFor } from "../src/dom.ts";
-import { hydrate, renderToString } from "../examples/counter/Counter.generated.ts";
+import { hydrate, renderToString, renderWithState } from "../examples/counter/Counter.generated.ts";
 import { renderExamplePage } from "../examples/counter/server.ts";
 import { hydrate as hydrateAttributes, renderToString as renderAttributes } from "../examples/attributes/Attributes.generated.ts";
 import { hydrate as hydrateRegions, renderToString as renderRegions } from "../examples/regions/Regions.generated.ts";
@@ -17,7 +17,7 @@ test("SSR genera HTML escapado y estado aislado por render", () => {
   assert.match(renderToString({ initial: 7 }), /meeko:text:0-->7/);
   assert.equal(escapeHtml('<img src="x" onerror="x">'), "&lt;img src=&quot;x&quot; onerror=&quot;x&quot;&gt;");
   assert.equal(serializeJson({ value: "</script>" }), '{"value":"\\u003c/script\\u003e"}');
-  assert.match(renderExamplePage({ initial: 2 }), /<script id="meeko-props" type="application\/json">/);
+  assert.match(renderExamplePage({ initial: 2 }), /<script id="meeko-payload" type="application\/json">/);
 });
 
 test("la transferencia de estado rechaza datos que JSON cambiaría silenciosamente", () => {
@@ -29,6 +29,22 @@ test("la transferencia de estado rechaza datos que JSON cambiaría silenciosamen
   circular.self = circular;
   assert.throws(() => serializeJson(circular), /Circular reference at \$\.self/);
   assert.equal(serializeJson({ nested: ["<script>", 2] }), '{"nested":["\\u003cscript\\u003e",2]}');
+});
+
+test("SSR entrega señales serializables y la hidratación restaura sus valores", () => {
+  const { html, state } = renderWithState({ initial: 6 });
+  assert.deepEqual(state, { count: 6 });
+  assert.match(html, /meeko:text:0-->6/);
+  assert.equal(serializeJson(state), '{"count":6}');
+  assert.match(renderToString({ initial: 0 }, state), /meeko:text:0-->6/);
+  const window = new Window();
+  const root = window.document.createElement("main");
+  root.innerHTML = html;
+  const release = hydrate(root as unknown as Element, { initial: 6 }, state);
+  root.querySelector("button")?.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+  assert.match(root.textContent ?? "", /7 · doble: 14/);
+  release();
+  window.happyDOM.abort();
 });
 
 test("hidrata el HTML existente y actualiza solo los textos reactivos", () => {
@@ -156,7 +172,7 @@ test("una lista de valores primitivos actualiza el texto sin reemplazar su nodo"
 
 test("SSR rechaza claves duplicadas y claves no serializables", () => {
   assert.throws(() => renderFor(0, [{ id: "a" }, { id: "a" }], (item) => item.id, () => "<li></li>"), /Duplicate Meeko list key/);
-  assert.throws(() => renderFor(0, [{ id: null }], (item) => item.id, () => "<li></li>"), /keys must be strings or finite numbers/);
+  assert.throws(() => renderFor(0, [{ id: null }], (item) => item.id as unknown as string, () => "<li></li>"), /keys must be strings or finite numbers/);
 });
 
 test("batch y computed actualizan una sola vez y liberan observadores", () => {
