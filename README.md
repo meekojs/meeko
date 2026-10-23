@@ -23,7 +23,9 @@ El proyecto está en etapa temprana. Ya funciona el recorrido completo de un con
 | `src/compiler.ts` | Analiza plantillas y genera un módulo TypeScript con SSR e hidratación. |
 | `src/server.ts` | Escapado de contenido dinámico para HTML. |
 | `src/cli.ts` | Comando `meeko compile`. |
+| `src/vite.ts` | Plugin de Vite para transformar `.meeko` en cliente y SSR. |
 | `examples/counter` | Componente de referencia tipado. |
+| `examples/vite` | Aplicación Vite sin generación manual de componentes. |
 | `editors/vscode` | Asociación de `.meeko` y resaltado básico de script, plantilla y CSS. |
 | `tests` | Pruebas de SSR, hidratación y reactividad. |
 
@@ -36,6 +38,16 @@ pnpm run example:serve
 ```
 
 La segunda orden sirve el ejemplo en `http://127.0.0.1:4173`. El servidor envía HTML y las props iniciales como JSON escapado; el navegador hidrata el botón sin reemplazarlo.
+
+Para probar la compilación automática con Vite:
+
+```powershell
+pnpm run build
+pnpm run vite:dev
+pnpm run vite:build
+```
+
+El plugin `meeko/vite` transforma imports de `.meeko` en cliente y SSR, procesa CSS del componente y, durante el desarrollo, recarga la página al cambiar un componente. La conservación del estado durante HMR aún no está implementada.
 
 Para compilar otro componente:
 

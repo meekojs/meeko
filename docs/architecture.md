@@ -26,6 +26,8 @@ El ejemplo de `examples/counter` ejercita el contrato en un servidor HTTP. Cada 
 
 El parser de secciones vive en `src/compiler/sfc.ts` y conserva los desplazamientos del archivo original. El generador de `src/compiler.ts` usa esas posiciones para errores de sintaxis. Los errores de tipos todavía requieren un mapa entre el código generado y `.meeko`.
 
+El plugin `src/vite.ts` usa el mismo compilador para cliente y SSR. Expone el CSS del componente como módulo virtual. Durante desarrollo hace una recarga completa al cambiar un `.meeko`; todavía no preserva estado de instancias activas.
+
 ## Reglas para SSR
 
 - Cada petición debe crear su propio estado. No se comparten señales con datos de usuarios entre peticiones.

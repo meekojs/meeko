@@ -7,6 +7,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "default": "./dist/vite.js"
     }
   },
   "bin": {
@@ -20,7 +24,9 @@
     "example:bundle": "pnpm run build && pnpm run example:compile && esbuild examples/counter/client.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=examples/counter/client.bundle.js",
     "example:check": "tsc -p examples/counter/tsconfig.json --noEmit",
     "example:serve": "pnpm run example:bundle && tsx examples/counter/server.ts",
-    "verify": "pnpm run check && pnpm run test && pnpm run example:check && tsc -p tsconfig.test.json --noEmit"
+    "vite:dev": "vite examples/vite --config examples/vite/vite.config.ts",
+    "vite:build": "vite build examples/vite --config examples/vite/vite.config.ts",
+    "verify": "pnpm run check && pnpm run test && pnpm run example:check && tsc -p tsconfig.test.json --noEmit && pnpm run vite:build"
   },
   "dependencies": {
     "@typescript/typescript6": "6.0.2",
@@ -33,7 +39,8 @@
     "esbuild": "0.28.2",
     "happy-dom": "^20.0.0",
     "tsx": "^4.20.0",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vite": "8.3.5"
   },
   "engines": {
     "node": ">=24"
