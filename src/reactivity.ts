@@ -8,6 +8,15 @@ export interface Signal<T> extends ReadonlySignal<T> {
   value: T;
 }
 
+/** Ubicación de una expresión de plantilla que lee una señal durante desarrollo. */
+export interface EffectSource {
+  file: string;
+  line: number;
+  column: number;
+  expression: string;
+  kind: "text" | "attribute";
+}
+
 interface Observer {
   run: () => void;
   dependencies: Set<InternalSignal<unknown>>;
@@ -26,6 +35,7 @@ interface InternalSignal<T> extends Signal<T> {
 
 const writableSignals = new WeakSet<object>();
 const derivedSignals = new WeakSet<object>();
+const effectSources = new WeakMap<Observer, { owner: Owner | undefined; source: EffectSource }>();
 
 /** Identifica señales editables creadas por Meeko para conservarlas durante HMR. */
 export function isWritableSignal(value: unknown): value is Signal<unknown> {
@@ -84,7 +94,7 @@ export function signal<T>(initial: T): Signal<T> {
 }
 
 /** Ejecuta una función cuando cambian las señales leídas por ella. */
-export function effect(fn: () => void): () => void {
+export function effect(fn: () => void, source?: EffectSource): () => void {
   const owner = activeOwner;
   const observer: Observer = {
     dependencies: new Set(),
@@ -103,6 +113,7 @@ export function effect(fn: () => void): () => void {
       }
     },
   };
+  if (source) effectSources.set(observer, { owner, source });
   owner?.observers.add(observer);
   observer.run();
   return () => {
@@ -111,6 +122,25 @@ export function effect(fn: () => void): () => void {
     detach(observer);
     owner?.observers.delete(observer);
   };
+}
+
+/** Identidad opaca de la raíz reactiva activa; permite aislar instancias anidadas. */
+export function currentEffectOwner(): object | undefined {
+  return activeOwner;
+}
+
+/** Devuelve expresiones de plantilla actualmente dependientes de una señal en una raíz. */
+export function signalReadSites(value: Signal<unknown>, owner: object | undefined): EffectSource[] {
+  if (!owner || !isWritableSignal(value)) return [];
+  const sites = new Map<string, EffectSource>();
+  for (const observer of (value as InternalSignal<unknown>).subscribers) {
+    const metadata = effectSources.get(observer);
+    if (observer.disposed || metadata?.owner !== owner || !metadata) continue;
+    const source = metadata.source;
+    const key = `${source.file}\u0000${source.line}\u0000${source.column}\u0000${source.kind}\u0000${source.expression}`;
+    sites.set(key, source);
+  }
+  return [...sites.values()];
 }
 
 /** Deriva un valor de otras señales y lo actualiza cuando cambian. */

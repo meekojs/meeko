@@ -21,6 +21,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run verify
       - run: pnpm run e2e
+      - run: node node_modules/playwright-core/cli.js install chromium firefox webkit
+      - run: pnpm run pilot:e2e
       - run: pnpm run package:smoke
 
   vscode-extension:

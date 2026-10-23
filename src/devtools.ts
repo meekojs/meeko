@@ -1,6 +1,6 @@
 import type { DomScope } from "./dom.js";
-import { effect, isWritableSignal, untrack } from "./reactivity.js";
-import type { Signal } from "./reactivity.js";
+import { currentEffectOwner, effect, isWritableSignal, signalReadSites, untrack } from "./reactivity.js";
+import type { EffectSource, Signal } from "./reactivity.js";
 
 /** Valores seguros para transportar una captura al panel de desarrollo. */
 export type DevtoolsValue = null | boolean | number | string | DevtoolsValue[] | { [key: string]: DevtoolsValue };
@@ -26,6 +26,14 @@ export interface DevtoolsEvent {
   kind: "mount" | "unmount" | "signal" | "breakpoint" | "select" | "hmr";
   instanceId: string;
   detail?: string;
+  /** Identidad del componente conservada incluso después del desmontaje. */
+  componentName?: string;
+  /** Archivo fuente `.meeko` proporcionado por la compilación de desarrollo. */
+  file?: string;
+  /** Valor posterior de una señal, copiado con los mismos límites que una captura. */
+  value?: DevtoolsValue;
+  /** Expresiones de plantilla que dependían de la señal en esta instancia. No son el origen de la escritura. */
+  reads?: EffectSource[];
 }
 
 /** Captura independiente de referencias DOM y de valores no serializables. */
@@ -63,6 +71,7 @@ declare global {
 interface ActiveInstance extends DevtoolsRegistration {
   id: string;
   key: Node;
+  owner: object | undefined;
   breakpoint: boolean;
   stopSignals: Array<() => void>;
 }
@@ -131,9 +140,16 @@ function notify(): void {
   }
 }
 
-function record(kind: DevtoolsEvent["kind"], instanceId: string, detail?: string): void {
+function record(kind: DevtoolsEvent["kind"], instanceId: string, detail?: string, value?: DevtoolsValue, source?: ActiveInstance, reads?: EffectSource[]): void {
   const event: DevtoolsEvent = { id: nextEvent++, at: Date.now(), kind, instanceId };
   if (detail !== undefined) event.detail = detail;
+  const entry = source ?? active.get(instanceId);
+  if (entry) {
+    event.componentName = entry.name;
+    event.file = entry.file;
+  }
+  if (value !== undefined) event.value = value;
+  if (reads?.length) event.reads = reads;
   recent.push(event);
   if (recent.length > 100) recent.shift();
   notify();
@@ -281,7 +297,7 @@ function unregister(entry: ActiveInstance): void {
   active.delete(entry.id);
   if (selectedId === entry.id) selectedId = null;
   if (highlightedId === entry.id) removeHighlight();
-  record("unmount", entry.id);
+  record("unmount", entry.id, undefined, undefined, entry);
 }
 
 /** Registra señales y ámbito de una instancia hidratada en Vite desarrollo. */
@@ -297,16 +313,16 @@ export function registerDevtoolsInstance(input: DevtoolsRegistration): () => voi
   identities.set(key, identity);
   const existing = active.get(identity.id);
   if (existing) unregister(existing);
-  const entry: ActiveInstance = { ...input, id: identity.id, key, breakpoint: identity.breakpoint, stopSignals: [] };
+  const entry: ActiveInstance = { ...input, id: identity.id, key, owner: currentEffectOwner(), breakpoint: identity.breakpoint, stopSignals: [] };
   active.set(entry.id, entry);
   for (const [name, value] of Object.entries(input.bindings)) {
     if (!isWritableSignal(value)) continue;
     const signal = value as Signal<unknown>;
     let initial = true;
     entry.stopSignals.push(effect(() => {
-      void signal.value;
+      const current = signal.value;
       if (initial) { initial = false; return; }
-      record("signal", entry.id, name);
+      record("signal", entry.id, name, safeValue(current), entry, signalReadSites(signal, entry.owner));
       if (entry.breakpoint) {
         debugger;
       }

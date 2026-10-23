@@ -1,0 +1,19 @@
+<script lang="ts">
+import { signal } from "@meekojs/meeko";
+import type { Task } from "./model.js";
+
+/** Datos de una tarjeta, sin estado global compartido con otras instancias. */
+const props = defineProps<{ task: Task }>();
+const expanded = signal(false);
+</script>
+
+<template>
+  <article class="task-card" bind:data-task-id="props.task.id">
+    <button class="task-details" type="button" on:click="() => expanded.value = !expanded.value" bind:aria-expanded="expanded.value">
+      <strong>{props.task.title}</strong>
+      <span if:when="expanded.value">Ocultar detalle</span>
+      <span if:when="!expanded.value">Ver detalle</span>
+    </button>
+    <p class="task-detail" if:when="expanded.value">{props.task.detail}</p>
+  </article>
+</template>

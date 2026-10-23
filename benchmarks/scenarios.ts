@@ -12,13 +12,13 @@ import { renderToString as renderVueToString } from "vue/server-renderer";
 import { renderToString as renderMeekoTree } from "./cases/Tree.generated.ts";
 import { renderToString as renderMeekoList } from "./cases/List.generated.ts";
 import { renderToString as renderMeekoNavigation } from "./cases/Navigation.generated.ts";
-import { VueTree, VueList, VueNavigation } from "./vue-scenarios.js";
+import { VueTree, VueList, VueNavigation, VueNavigationMount } from "./vue-scenarios.js";
 import type { Scenario } from "./scenario-protocol.js";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const warmupRounds = 2;
 const measuredRounds = 7;
-const scenarios: Scenario[] = ["tree", "list", "navigation"];
+const scenarios: Scenario[] = ["tree", "list", "navigation", "navigation-mount"];
 
 type Framework = "meeko" | "vue";
 type Samples = { median: number; minimum: number; maximum: number };
@@ -28,6 +28,7 @@ const config: Record<Scenario, CaseConfig> = {
   tree: { ssrIterations: 30, updateIterations: 100 },
   list: { ssrIterations: 30, updateIterations: 30 },
   navigation: { ssrIterations: 100, updateIterations: 60 },
+  "navigation-mount": { ssrIterations: 100, updateIterations: 60 },
 };
 
 /** Resume las siete rondas medidas, sin eliminar valores extremos. */
@@ -40,12 +41,12 @@ function summarize(samples: number[]): Samples {
 function renderMeeko(scenario: Scenario): string {
   if (scenario === "tree") return renderMeekoTree({});
   if (scenario === "list") return renderMeekoList({});
-  return renderMeekoNavigation({});
+  return renderMeekoNavigation({ mode: scenario === "navigation" ? "reuse" : "mount" });
 }
 
 /** Crea una aplicación Vue nueva en cada render SSR. */
 async function renderVue(scenario: Scenario): Promise<string> {
-  const component = scenario === "tree" ? VueTree : scenario === "list" ? VueList : VueNavigation;
+  const component = scenario === "tree" ? VueTree : scenario === "list" ? VueList : scenario === "navigation" ? VueNavigation : VueNavigationMount;
   return renderVueToString(createSSRApp(component));
 }
 
@@ -54,7 +55,8 @@ function assertServerHtml(html: string, scenario: Scenario): void {
   const count = (needle: RegExp): number => [...html.matchAll(needle)].length;
   if (scenario === "tree" && count(/data-id="\d+-\d+"/g) !== 128) throw new Error("Incorrect tree SSR");
   if (scenario === "list" && count(/<li\b/g) !== 1000) throw new Error("Incorrect list SSR");
-  if (scenario === "navigation" && (!html.includes("View 0") || count(/<p\b/g) !== 40)) {
+  if ((scenario === "navigation" || scenario === "navigation-mount")
+    && (!html.replace(/<!--[\s\S]*?-->/g, "").includes("View 0") || count(/<p\b/g) !== 40)) {
     throw new Error("Incorrect navigation SSR");
   }
 }
@@ -71,7 +73,7 @@ async function measureSsr(render: () => string | Promise<string>, scenario: Scen
   return summarize(samples);
 }
 
-/** Cada motor empaqueta sus tres casos; el tamaño mide este conjunto, no un caso individual. */
+/** Cada motor empaqueta todos los casos; el tamaño mide el conjunto, no un caso individual. */
 async function buildClient(framework: Framework): Promise<Uint8Array> {
   const output = await build({
     entryPoints: [resolve(projectRoot, `benchmarks/${framework}-scenarios-client.ts`)],
@@ -102,7 +104,7 @@ async function serve(
     const url = new URL(request.url ?? "/", "http://localhost");
     const framework = url.pathname.slice(1);
     const scenario = url.searchParams.get("scenario");
-    if ((framework === "meeko" || framework === "vue") && (scenario === "tree" || scenario === "list" || scenario === "navigation")) {
+    if ((framework === "meeko" || framework === "vue") && (scenario === "tree" || scenario === "list" || scenario === "navigation" || scenario === "navigation-mount")) {
       response.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=3600" });
       response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${framework} ${scenario}</title></head><body><div id="app">${pages[framework][scenario]}</div><script type="module" src="/${framework}.js"></script></body></html>`);
     } else if (framework === "meeko.js" || framework === "vue.js") {
@@ -183,7 +185,7 @@ async function measureBrowser(browser: Browser, url: string, scenario: Scenario)
 /** Ejecuta los escenarios seleccionados y produce JSON con entorno y configuración. */
 async function main(): Promise<void> {
   const selected = process.env.MEEKO_BENCH_SCENARIO;
-  if (selected && selected !== "tree" && selected !== "list" && selected !== "navigation") {
+  if (selected && selected !== "tree" && selected !== "list" && selected !== "navigation" && selected !== "navigation-mount") {
     throw new Error(`Invalid MEEKO_BENCH_SCENARIO: ${selected}`);
   }
   const cases = selected ? [selected] as Scenario[] : scenarios;

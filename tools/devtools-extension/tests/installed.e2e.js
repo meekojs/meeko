@@ -116,7 +116,9 @@ test("la extensión instalada registra su panel y comunica con una app Meeko rea
     await page.locator("#app button").click();
     const updated = await inspectedWindow(evaluateExtension, "window.__MEEKO_DEVTOOLS__.snapshot()");
     assert.equal(updated.instances.find((item) => item.id === counter.id).signals.count, 3);
-    assert.ok(updated.events.some((event) => event.kind === "signal" && event.instanceId === counter.id));
+    const countEvent = updated.events.find((event) => event.kind === "signal" && event.instanceId === counter.id && event.componentName === "Counter" && event.file.endsWith("Counter.meeko") && event.detail === "count" && event.value === 3);
+    assert.ok(countEvent);
+    assert.ok(countEvent.reads?.some((read) => read.file.endsWith("Counter.meeko") && read.expression === "count.value" && read.kind === "text" && read.line > 0 && read.column > 0));
   } finally {
     await context?.close();
     await server.close();

@@ -21,7 +21,10 @@ test("panel DevTools muestra ausencia del hook y se conecta cuando queda disponi
       { id: "parent", componentId: "p", name: "Parent", file: "Parent.meeko", props: { label: "<script>" }, signals: { count: 2 }, parentId: null, childIds: ["child"], status: "hydrated", breakpoint: false },
       { id: "child", componentId: "c", name: "Child", file: "Child.meeko", props: {}, signals: {}, parentId: "parent", childIds: [], status: "hydrated", breakpoint: false },
     ],
-    events: [{ id: 1, at: eventAt, kind: "mount", instanceId: "parent" }],
+    events: [
+      { id: 1, at: eventAt, kind: "mount", instanceId: "parent", componentName: "Parent", file: "Parent.meeko" },
+      { id: 2, at: eventAt, kind: "signal", instanceId: "parent", detail: "count", componentName: "Parent", file: "Parent.meeko", value: 2, reads: [{ file: "Parent.meeko", line: 8, column: 5, expression: "count.value", kind: "text" }] },
+    ],
   };
   const listeners = new Set<() => void>();
   const highlighted: Array<string | null> = [];
@@ -41,10 +44,20 @@ test("panel DevTools muestra ausencia del hook y se conecta cuando queda disponi
   assert.equal(listeners.size, 1);
   assert.equal(shadow.querySelector(".tree-children button")?.textContent, "Child");
   assert.equal(shadow.querySelectorAll("script").length, 0);
-  const eventText = shadow.querySelector(".events li")?.textContent ?? "";
+  const eventText = shadow.querySelector(".events ol > li:last-child")?.textContent ?? "";
   assert.ok(eventText.includes(new Date(eventAt).toLocaleTimeString("es", { hour12: false })));
   assert.match(eventText, /Montaje · parent/);
+  assert.match(eventText, /Parent\.meeko/);
   assert.ok(!eventText.includes(String(eventAt)));
+  const signalFilter = shadow.querySelector<HTMLInputElement>('.events input[type="checkbox"]');
+  assert.ok(signalFilter);
+  signalFilter.checked = true;
+  signalFilter.dispatchEvent(new browser.Event("change") as unknown as Event);
+  assert.equal(shadow.querySelectorAll(".events ol > li").length, 1);
+  assert.match(shadow.querySelector(".events ol > li")?.textContent ?? "", /Señal · parent.*count → 2/);
+  assert.match(shadow.querySelector(".events ol > li details")?.textContent ?? "", /Parent\.meeko:8:5.*count\.value/);
+  shadow.querySelector<HTMLButtonElement>(".events ol > li button")?.click();
+  assert.equal(snapshot.selectedId, "parent");
 
   const select = shadow.querySelector<HTMLButtonElement>('button[data-instance-id="parent"][data-action="select"]');
   assert.ok(select);

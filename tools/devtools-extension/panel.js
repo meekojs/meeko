@@ -24,6 +24,7 @@ const highlightButton = /** @type {HTMLButtonElement} */ (required("highlight"))
 const breakpointButton = /** @type {HTMLButtonElement} */ (required("breakpoint"));
 const search = /** @type {HTMLInputElement} */ (required("search"));
 const selectedEvents = /** @type {HTMLInputElement} */ (required("selected-events"));
+const signalEvents = /** @type {HTMLInputElement} */ (required("signal-events"));
 const eventList = required("event-list");
 const eventCount = required("event-count");
 
@@ -205,14 +206,41 @@ function eventTime(/** @type {number} */ at) {
 function renderEvents() {
   const all = snapshot?.events ?? [];
   const selectedId = snapshot?.selectedId;
-  const events = selectedEvents.checked ? all.filter((event) => event.instanceId === selectedId) : all;
+  const events = all.filter((event) => (!selectedEvents.checked || event.instanceId === selectedId) && (!signalEvents.checked || event.kind === "signal"));
   eventCount.textContent = String(events.length);
   const fragment = document.createDocumentFragment();
   for (const event of [...events].reverse()) {
     const item = document.createElement("li");
+    item.dataset.eventId = String(event.id);
     const time = node("time", eventTime(event.at));
     if (event.at > 1_000_000_000_000) time.setAttribute("datetime", new Date(event.at).toISOString());
-    item.append(time, node("span", event.kind, "event-kind"), node("span", event.instanceId, "event-id"), node("span", event.detail ?? "", "event-detail"));
+    const instance = snapshot?.instances.find((entry) => entry.id === event.instanceId);
+    const name = event.componentName ?? instance?.name ?? event.instanceId;
+    const file = event.file ?? instance?.file ?? "";
+    const sourceLabel = `${name} · ${event.instanceId}${file ? ` · ${file}` : ""}`;
+    const source = node(instance ? "button" : "span", sourceLabel, "event-source");
+    source.title = file || name;
+    if (source instanceof HTMLButtonElement) {
+      source.type = "button";
+      source.setAttribute("aria-label", `Seleccionar ${name}, instancia ${event.instanceId}`);
+      source.addEventListener("click", () => { void selectInstance(event.instanceId); });
+    }
+    const detail = event.kind === "signal"
+      ? `${event.detail ?? "Señal"}${Object.hasOwn(event, "value") ? ` → ${valueText(event.value)}` : ""}`
+      : event.detail ?? "";
+    item.append(time, node("span", event.kind, "event-kind"), source, node("span", detail, "event-detail"));
+    if (event.kind === "signal" && event.reads?.length) {
+      const sites = node("details", "", "event-reads");
+      sites.append(node("summary", `${event.reads.length} expresión(es) que dependen de la señal`));
+      const list = document.createElement("ul");
+      for (const read of event.reads) {
+        const row = document.createElement("li");
+        row.append(node("code", `${read.file}:${read.line}:${read.column}`), node("span", ` ${read.kind}: `), node("code", read.expression));
+        list.append(row);
+      }
+      sites.append(list);
+      item.append(sites);
+    }
     fragment.append(item);
   }
   if (!events.length) fragment.append(node("li", selectedEvents.checked && !selectedId ? "Selecciona una instancia para ver sus eventos." : "Sin eventos registrados.", "list-empty"));
@@ -262,6 +290,7 @@ breakpointButton.addEventListener("click", async () => {
 
 search.addEventListener("input", renderInstances);
 selectedEvents.addEventListener("change", renderEvents);
+signalEvents.addEventListener("change", renderEvents);
 instanceList.addEventListener("keydown", (event) => {
   if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
   const buttons = [...instanceList.querySelectorAll("button[data-instance-id]")];

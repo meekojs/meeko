@@ -17,6 +17,7 @@ El proyecto está en etapa temprana. Ya funciona el recorrido completo de un con
 - [Plan de desarrollo y criterios de aceptación](docs/roadmap.md)
 - [Comparativa reproducible con Vue](docs/benchmarks.md)
 - [DevTools para depurar componentes](docs/devtools.md)
+- [Aplicación piloto SSR](examples/pilot/README.md)
 - [Publicación y verificaciones](docs/releasing.md)
 - [Historial de cambios](CHANGELOG.md)
 - [Guía para contribuir](CONTRIBUTING.md)
@@ -44,6 +45,19 @@ export default defineConfig({ plugins: [meeko()] });
 ```
 
 El paquete incluye TypeScript 7 y la CLI `meeko`. Puedes comprobar un componente con `pnpm exec meeko check ruta/Componente.meeko`. Vite es opcional si sólo usas el compilador y SSR.
+
+### Crear una aplicación SSR
+
+Con el paquete instalado, `meeko init` crea un proyecto independiente. El servidor renderiza el componente `.meeko` y transfiere props y señales para que el navegador hidrate el HTML existente.
+
+```powershell
+pnpm exec meeko init mi-app
+cd mi-app
+npm install
+npm run dev
+```
+
+Abre `http://127.0.0.1:4173`. `npm run check` genera los tipos del componente y ejecuta TypeScript 7. `npm run build` compila cliente y servidor; `npm start` sirve la versión compilada con SSR. La CLI exige un directorio nuevo o vacío para evitar sobrescribir archivos.
 
 ## Estructura
 
@@ -73,11 +87,12 @@ El paquete incluye TypeScript 7 y la CLI `meeko`. Puedes comprobar un componente
 pnpm install
 pnpm run verify
 pnpm run e2e
+pnpm run pilot:e2e
 pnpm run package:smoke
 pnpm run example:serve
 ```
 
-`e2e` usa Chrome instalado localmente; `MEEKO_CHROME_PATH` permite indicar otro ejecutable compatible. Prueba Vite en desarrollo y producción, además de una página SSR con navegación. `package:smoke` instala el tarball en un proyecto temporal externo y prueba CLI, SSR, tipos y Vite. La última orden sirve el ejemplo en `http://127.0.0.1:4173`. El servidor envía HTML y las props iniciales como JSON escapado; el navegador hidrata el botón sin reemplazarlo.
+`e2e` usa Chrome instalado localmente; `MEEKO_CHROME_PATH` permite indicar otro ejecutable compatible. Prueba Vite en desarrollo y producción, además de una página SSR con navegación. `pilot:e2e` prueba la aplicación piloto en Chromium, Firefox y WebKit instalados por Playwright, tanto en desarrollo como en producción. `package:smoke` instala el tarball en un proyecto temporal externo y prueba CLI, SSR, tipos, Vite y `meeko init`. La última orden sirve el contador en `http://127.0.0.1:4173`.
 
 Para probar la compilación automática con Vite:
 
@@ -107,6 +122,10 @@ node dist/cli.js types ruta/Componente.meeko
 `check` devuelve errores de sintaxis y tipos con línea y columna del `.meeko`; `--json` entrega diagnósticos estructurados para editores. `compile` ejecuta la misma comprobación y no escribe el módulo si encuentra errores. `types` genera declaraciones del componente y sus imports `.meeko` para que TypeScript compruebe las props del consumidor. La verificación usa TypeScript 7 y resuelve imports desde el directorio del componente.
 
 La aplicación debe pasar **las mismas props** al render y a `hydrate`. `renderWithState(props)` entrega HTML y señales editables serializables; el ejemplo SSR transfiere ambos junto con las props mediante `serializeJson` y llama `hydrate(root, props, state)`. Meeko comprueba que el texto existente coincida durante la hidratación y devuelve una función que desconecta eventos y observadores. El HTML dinámico se escapa en el servidor.
+
+## Aplicación piloto
+
+[`examples/pilot`](examples/pilot/README.md) reúne SSR, hidratación, componentes anidados, listas, formularios, rutas y una API asíncrona. Se ejecuta con `pnpm run pilot:dev`; `pnpm run pilot:build` y `pnpm run pilot:serve` prueban los artefactos de producción sin middleware de Vite. La prueba `pnpm run pilot:e2e` recorre ambos modos en Chromium, Firefox y WebKit. WebKit de Playwright no equivale a una prueba en Safari real.
 
 ## Sintaxis inicial
 

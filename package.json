@@ -1,6 +1,6 @@
 {
   "name": "@meekojs/meeko",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "packageManager": "pnpm@12.14.0",
   "description": "Typed .meeko component engine with SSR, hydration, signals, Vite, and DevTools.",
   "license": "MIT",
@@ -45,13 +45,18 @@
     "vite:dev": "vite examples/vite --config examples/vite/vite.config.ts",
     "vite:types": "pnpm run build && node dist/cli.js types examples/counter/Counter.meeko && node dist/cli.js types examples/regions/Regions.meeko && node dist/cli.js types examples/vite/Hot.meeko && node dist/cli.js types examples/nested/Parent.meeko && tsc -p examples/vite/tsconfig.json --noEmit",
     "vite:build": "vite build examples/vite --config examples/vite/vite.config.ts",
+    "pilot:dev": "tsx examples/pilot/server.ts",
+    "pilot:check": "pnpm run build && node dist/cli.js check examples/pilot/App.meeko && node dist/cli.js types examples/pilot/App.meeko && tsc -p examples/pilot/tsconfig.json --noEmit",
+    "pilot:build": "tsx examples/pilot/build.ts",
+    "pilot:serve": "node examples/pilot/.output/server/http.js",
+    "pilot:e2e": "tsx --test tests/pilot.e2e.ts",
     "e2e": "pnpm run example:bundle && pnpm run vite:build && tsx --test tests/browser.e2e.ts",
     "benchmark:check": "pnpm run example:compile && node dist/cli.js compile benchmarks/cases/TreeLeaf.meeko benchmarks/cases/TreeLeaf.generated.ts && node dist/cli.js compile benchmarks/cases/TreeBranch.meeko benchmarks/cases/TreeBranch.generated.ts && node dist/cli.js compile benchmarks/cases/Tree.meeko benchmarks/cases/Tree.generated.ts && node dist/cli.js compile benchmarks/cases/List.meeko benchmarks/cases/List.generated.ts && node dist/cli.js compile benchmarks/cases/Navigation.meeko benchmarks/cases/Navigation.generated.ts && tsc -p tsconfig.benchmark.json --noEmit",
     "benchmark": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/run.ts",
     "benchmark:scenarios": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/scenarios.ts",
     "package:smoke": "pwsh -NoProfile -File tests/package-consumer.ps1",
     "devtools:check": "node --test tools/devtools-extension/tests/*.test.js && tsc -p tools/devtools-extension/tsconfig.json --noEmit",
-    "verify": "pnpm run check && pnpm run test && pnpm run devtools:check && pnpm run example:check && tsc -p tsconfig.test.json --noEmit && pnpm run vite:types && pnpm run benchmark:check && pnpm run vite:build"
+    "verify": "pnpm run check && pnpm run test && pnpm run devtools:check && pnpm run example:check && tsc -p tsconfig.test.json --noEmit && pnpm run vite:types && pnpm run benchmark:check && pnpm run vite:build && pnpm run pilot:check"
   },
   "dependencies": {
     "@typescript/typescript6": "6.0.2",

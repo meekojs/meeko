@@ -43,3 +43,9 @@ Los módulos generados importan el runtime desde `@meekojs/meeko/internal`. Esta
 ## TypeScript
 
 El proyecto utiliza TypeScript 7.0.2 estable para la compilación y la verificación de tipos. El parser de scripts usa temporalmente `@typescript/typescript6`, aislado como dependencia del compilador, porque TypeScript 7.0 no expone una API programática estable. El módulo generado se comprueba con TypeScript 7. `meeko types` emite declaraciones `.d.meeko.ts` para que un consumidor con `allowArbitraryExtensions` compruebe imports y props. La extensión local de VS Code usa los mapeos de origen y un documento TypeScript virtual para ofrecer diagnósticos y operaciones semánticas sobre `.meeko`.
+
+## Límite entre runtime y herramientas
+
+El bundle del navegador sólo incorpora los módulos usados por la aplicación; [las mediciones](benchmarks.md) registran su tamaño comprimido por separado. La instalación de `@meekojs/meeko` sí incluye el compilador, TypeScript 7, el analizador TypeScript 6, parse5 y PostCSS porque la CLI y el plugin Vite pertenecen al mismo paquete. El coste de instalación y el tamaño del JS servido son métricas distintas.
+
+Durante la serie experimental mantenemos un paquete: el código generado y `@meekojs/meeko/internal` deben tener exactamente la misma versión. Separar el compilador y el runtime antes de fijar ese contrato añadiría una segunda versión que coordinar en cada build. Mediremos instalación en frío, arranque SSR y bundle en consumidores externos antes de decidir la separación. Si el coste de instalación resulta relevante, la división conservará una ruta de compatibilidad para los módulos `.meeko` ya compilados y tendrá pruebas de consumo desde paquetes publicados.

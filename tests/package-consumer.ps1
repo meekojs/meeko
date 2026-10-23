@@ -65,10 +65,24 @@ if (typeof mountDevtoolsPanel !== "function") {
     if ($LASTEXITCODE -ne 0) { throw 'Falló TypeScript en el consumidor externo.' }
     & node node_modules/vite/bin/vite.js build
     if ($LASTEXITCODE -ne 0) { throw 'Falló Vite en el consumidor externo.' }
+
+    $starter = Join-Path $testRoot 'starter'
+    & $cli init $starter
+    if ($LASTEXITCODE -ne 0) { throw 'Falló meeko init desde el paquete instalado.' }
+    $starterManifestPath = Join-Path $starter 'package.json'
+    $starterManifest = Get-Content -LiteralPath $starterManifestPath -Raw | ConvertFrom-Json
+    $packageVersion = (Get-Content -LiteralPath (Join-Path $repoRoot 'package.json') -Raw | ConvertFrom-Json).version
+    if ($starterManifest.dependencies.'@meekojs/meeko' -ne $packageVersion) { throw 'El proyecto generado no fijó la versión instalada de Meeko.' }
+    $starterManifest.dependencies.'@meekojs/meeko' = $tarball
+    $starterManifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $starterManifestPath -Encoding utf8
+    & npm install --prefix $starter --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudieron instalar las dependencias del proyecto generado.' }
+    & npm run build --prefix $starter
+    if ($LASTEXITCODE -ne 0) { throw 'Falló el build SSR del proyecto generado.' }
   } finally {
     Pop-Location
   }
-  Write-Output 'Consumidor externo: CLI, tipos y Vite OK.'
+  Write-Output 'Consumidor externo: CLI, tipos, Vite e init SSR OK.'
 } finally {
   $resolvedTarget = [System.IO.Path]::GetFullPath($testRoot)
   if ($resolvedTarget.StartsWith($temporaryRoot, [System.StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $resolvedTarget)) {

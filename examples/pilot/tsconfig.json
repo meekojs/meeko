@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "allowImportingTsExtensions": true,
+    "allowArbitraryExtensions": true
+  },
+  "include": ["client.ts", "server.ts", "production-server.ts", "build.ts", "page.ts", "model.ts", "*.d.meeko.ts"]
+}

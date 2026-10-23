@@ -1,5 +1,5 @@
 import { createRoot, effect, signal } from "./reactivity.js";
-import type { Signal } from "./reactivity.js";
+import type { EffectSource, Signal } from "./reactivity.js";
 import { attributeValue, serializeJson } from "./server.js";
 
 /** Fragmento de DOM que pertenece a una instancia o a una región dinámica. */
@@ -150,23 +150,23 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
 }
 
 /** Conecta un texto reactivo al marcador SSR y comprueba su valor inicial. */
-export function bindText(scope: DomScope, id: number, read: () => unknown, location: string): () => void {
+export function bindText(scope: DomScope, id: number, read: () => unknown, location: string, source?: EffectSource): () => void {
   const marker = findComment(scope, `meeko:text:${id}`);
   const text = marker.nextSibling;
   if (!text || text.nodeType !== 3) throw new Error(`Missing text node in ${location}`);
   if (text.textContent !== String(read())) throw new Error(`Hydration mismatch in ${location}`);
-  return effect(() => { text.textContent = String(read()); });
+  return effect(() => { text.textContent = String(read()); }, source);
 }
 
 /** Conecta un atributo dinámico al elemento SSR y comprueba su valor inicial. */
-export function bindAttribute(scope: DomScope, id: number, name: string, read: () => unknown, location: string): () => void {
+export function bindAttribute(scope: DomScope, id: number, name: string, read: () => unknown, location: string, source?: EffectSource): () => void {
   const target = findElement(scope, `data-meeko-a-${id}`);
   if (target.getAttribute(name) !== attributeValue(name, read())) throw new Error(`Hydration mismatch in ${location}`);
   return effect(() => {
     const next = attributeValue(name, read());
     if (next === null) target.removeAttribute(name);
     else target.setAttribute(name, next);
-  });
+  }, source);
 }
 
 /** Conecta un evento al elemento SSR y entrega su función de limpieza. */
@@ -248,11 +248,34 @@ function moveRange(start: Comment, end: Comment, before: Node): void {
   parent.insertBefore(fragment, before);
 }
 
+/** Encuentra las posiciones que ya mantienen el orden relativo de la lista anterior. */
+function stableListPositions(indices: readonly number[]): Set<number> {
+  const tails: number[] = [];
+  const previous = new Int32Array(indices.length).fill(-1);
+  for (let index = 0; index < indices.length; index++) {
+    const oldIndex = indices[index]!;
+    if (oldIndex < 0) continue;
+    let low = 0;
+    let high = tails.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (indices[tails[middle]!]! < oldIndex) low = middle + 1;
+      else high = middle;
+    }
+    if (low > 0) previous[index] = tails[low - 1]!;
+    tails[low] = index;
+  }
+  const stable = new Set<number>();
+  for (let index = tails.at(-1) ?? -1; index >= 0; index = previous[index]!) stable.add(index);
+  return stable;
+}
+
 /** Hidrata una lista y reordena regiones por clave sin reemplazar nodos conservados. */
 export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>, keyOf: (item: T, index: number) => string | number, render: (item: T, index: number) => string, hydrate: (item: Signal<T>, index: Signal<number>, inner: DomScope) => () => void): () => void {
   const outer = region(scope, "for", id);
   const entries = new Map<string, ListEntry<T>>();
   const initial = [...read()];
+  let currentKeys: string[] = [];
   let cursor = outer.start!.nextSibling;
   for (let index = 0; index < initial.length; index++) {
     const item = initial[index]!;
@@ -272,15 +295,27 @@ export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>,
       return () => { cleanup(); dispose(); };
     });
     entries.set(key, { key, start, end: end as Comment, value, index: position, release });
+    currentKeys.push(key);
     cursor = end.nextSibling;
   }
   if (cursor !== outer.end) throw new Error(`Hydration mismatch in list ${id}: extra nodes`);
+  let initialItems: T[] | undefined = initial;
   const stop = effect(() => {
     const items = [...read()];
+    if (initialItems) {
+      const previous = initialItems;
+      initialItems = undefined;
+      if (items.length === previous.length && items.every((item, index) =>
+        Object.is(item, previous[index]) && keyToken(keyOf(item, index)) === currentKeys[index])) return;
+    }
     const nextKeys = items.map((item, index) => keyToken(keyOf(item, index)));
-    if (new Set(nextKeys).size !== nextKeys.length) throw new Error(`Duplicate Meeko list key in region ${id}`);
+    const nextKeySet = new Set(nextKeys);
+    if (nextKeySet.size !== nextKeys.length) throw new Error(`Duplicate Meeko list key in region ${id}`);
+    const oldPositions = new Map(currentKeys.map((key, index) => [key, index]));
+    const oldIndices = nextKeys.map((key) => oldPositions.get(key) ?? -1);
+    const stable = stableListPositions(oldIndices);
     for (const [key, entry] of entries) {
-      if (nextKeys.includes(key)) continue;
+      if (nextKeySet.has(key)) continue;
       entry.release();
       let node: Node | null = entry.start;
       while (node) {
@@ -315,9 +350,10 @@ export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>,
         entry.value.value = item;
         entry.index.value = index;
       }
-      if (entry.end.nextSibling !== before) moveRange(entry.start, entry.end, before);
+      if (oldIndices[index] !== -1 && !stable.has(index) && entry.end.nextSibling !== before) moveRange(entry.start, entry.end, before);
       before = entry.start;
     }
+    currentKeys = nextKeys;
   });
   return () => { stop(); for (const entry of entries.values()) entry.release(); entries.clear(); };
 }

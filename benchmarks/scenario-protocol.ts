@@ -1,5 +1,5 @@
 /** Escenarios medidos por el runner de cargas ampliadas. */
-export type Scenario = "tree" | "list" | "navigation";
+export type Scenario = "tree" | "list" | "navigation" | "navigation-mount";
 
 export interface ScenarioClient {
   hydrationMs: number;
@@ -14,7 +14,7 @@ declare global {
 }
 
 /** Comprueba el DOM y la URL tras cada operación; no se incluye en la espera de Vue. */
-export function assertScenario(root: Element, scenario: Scenario, step: number): void {
+export function assertScenario(root: Element, scenario: Scenario, step: number, previousView?: Element | null): void {
   if (scenario === "tree") {
     const button = root.querySelector('button[data-id="0-0"]');
     if (button?.textContent !== `0-0: ${step}` || root.querySelectorAll("button").length !== 128) {
@@ -38,6 +38,8 @@ export function assertScenario(root: Element, scenario: Scenario, step: number):
       || active.querySelectorAll("p").length !== 40
       || active.querySelector("p:first-of-type")?.textContent !== `${names[expected]} 0`
       || active.querySelector("p:last-of-type")?.textContent !== `${names[expected]} 39`
+      || (step > 0 && scenario === "navigation" && active !== previousView)
+      || (step > 0 && scenario === "navigation-mount" && active === previousView)
       || (step > 0 && location.pathname !== `/navigation/${expected}`)) {
       throw new Error(`Incorrect navigation at step ${step}`);
     }

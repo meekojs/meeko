@@ -4,9 +4,10 @@ import { Window } from "happy-dom";
 import { compile } from "../src/compiler.ts";
 import { registerDevtoolsInstance } from "../src/devtools.ts";
 import type { DevtoolsHook } from "../src/devtools.ts";
+import { bindAttribute, bindText } from "../src/dom.ts";
 import { enableHotModule, registerHotInstance, replaceHotModule } from "../src/hmr.ts";
 import type { HotComponent, HotState } from "../src/hmr.ts";
-import { signal } from "../src/reactivity.ts";
+import { createRoot, signal } from "../src/reactivity.ts";
 
 /** Sustituye temporalmente las clases DOM globales durante una prueba de navegador. */
 async function withBrowser<T>(window: Window, run: () => T | Promise<T>): Promise<T> {
@@ -27,10 +28,61 @@ async function withBrowser<T>(window: Window, run: () => T | Promise<T>): Promis
 test("DevTools sólo se emite en compilación de desarrollo y no se instala durante SSR", () => {
   const source = `<script lang="ts">const count = signal(1);</script><template><p>{count.value}</p></template>`;
   assert.doesNotMatch(compile(source, "Probe.meeko").code, /registerDevtoolsInstance/);
-  assert.match(compile(source, "Probe.meeko", { hot: true }).code, /registerDevtoolsInstance/);
+  const hotCode = compile(source, "Probe.meeko", { hot: true }).code;
+  assert.match(hotCode, /registerDevtoolsInstance/);
+  assert.doesNotMatch(compile(source, "Probe.meeko").code, /expression: "count\.value"/);
+  assert.ok(hotCode.includes(`file: "Probe.meeko", line: 1, column: ${source.indexOf("count.value") + 1}, expression: "count.value", kind: "text"`));
   const release = registerDevtoolsInstance({ componentId: "server", name: "Server", file: "Server.meeko", scope: { root: {} as Element }, props: {}, bindings: {} });
   release();
   assert.equal(Reflect.has(globalThis, "window"), false);
+});
+
+test("DevTools atribuye la lectura a la expresión y raíz actuales, no al lugar de escritura", async () => {
+  const browser = new Window();
+  try {
+    await withBrowser(browser, () => {
+      const shared = signal(1);
+      const visible = signal(true);
+      const rootA = browser.document.createElement("div");
+      rootA.innerHTML = "<!--meeko:text:0-->1<!--meeko:text:1-->1<span data-meeko-a-0 title=\"1\"></span>";
+      const rootB = browser.document.createElement("div");
+      rootB.innerHTML = "<!--meeko:text:0-->1";
+      browser.document.body.append(rootA, rootB);
+      const sourceA = { file: "/src/A.meeko", line: 4, column: 8, expression: "visible.value ? shared.value : 'off'", kind: "text" as const };
+      const sourceA2 = { file: "/src/A.meeko", line: 5, column: 7, expression: "shared.value", kind: "text" as const };
+      const sourceA3 = { file: "/src/A.meeko", line: 6, column: 15, expression: "shared.value", kind: "attribute" as const };
+      const sourceB = { file: "/src/B.meeko", line: 3, column: 9, expression: "shared.value", kind: "text" as const };
+      const releaseA = createRoot((dispose) => {
+        const stopA = bindText({ root: rootA as unknown as Element }, 0, () => visible.value ? shared.value : "off", "A.meeko:4:8", sourceA);
+        const stopA2 = bindText({ root: rootA as unknown as Element }, 1, () => shared.value, "A.meeko:5:7", sourceA2);
+        const stopA3 = bindAttribute({ root: rootA as unknown as Element }, 0, "title", () => shared.value, "A.meeko:6:15", sourceA3);
+        const stopDevtools = registerDevtoolsInstance({ componentId: "a", name: "A", file: sourceA.file, scope: { root: rootA as unknown as Element }, props: {}, bindings: { shared, visible } });
+        return () => { stopA(); stopA2(); stopA3(); stopDevtools(); dispose(); };
+      });
+      const releaseB = createRoot((dispose) => {
+        const stopB = bindText({ root: rootB as unknown as Element }, 0, () => shared.value, "B.meeko:3:9", sourceB);
+        const stopDevtools = registerDevtoolsInstance({ componentId: "b", name: "B", file: sourceB.file, scope: { root: rootB as unknown as Element }, props: {}, bindings: { shared } });
+        return () => { stopB(); stopDevtools(); dispose(); };
+      });
+      const hook = Reflect.get(browser, "__MEEKO_DEVTOOLS__") as DevtoolsHook;
+      const instances = hook.snapshot().instances;
+      const idA = instances.find((entry) => entry.name === "A")!.id;
+      const idB = instances.find((entry) => entry.name === "B")!.id;
+      shared.value = 2;
+      const firstEvents = hook.snapshot().events.filter((event) => event.kind === "signal" && event.detail === "shared");
+      assert.deepEqual(firstEvents.find((event) => event.instanceId === idA)?.reads, [sourceA, sourceA2, sourceA3]);
+      assert.deepEqual(firstEvents.find((event) => event.instanceId === idB)?.reads, [sourceB]);
+      visible.value = false;
+      shared.value = 3;
+      const latestA = hook.snapshot().events.filter((event) => event.kind === "signal" && event.instanceId === idA && event.detail === "shared").at(-1);
+      assert.deepEqual(latestA?.reads, [sourceA2, sourceA3]);
+      assert.equal(latestA?.file, "/src/A.meeko");
+      releaseA();
+      releaseB();
+    });
+  } finally {
+    browser.happyDOM.abort();
+  }
 });
 
 test("DevTools registra árbol, valores seguros, señales y limpia instancias", async () => {
@@ -70,6 +122,10 @@ test("DevTools registra árbol, valores seguros, señales y limpia instancias", 
       assert.equal(hook.snapshot().selectedId, child.id);
       assert.equal(hook.snapshot().instances.find((instance) => instance.id === child.id)?.signals.count, 2);
       assert.ok(hook.snapshot().events.some((event) => event.kind === "signal" && event.instanceId === child.id && event.detail === "count"));
+      const signalEvent = hook.snapshot().events.find((event) => event.kind === "signal" && event.instanceId === child.id);
+      assert.equal(signalEvent?.componentName, "Child");
+      assert.equal(signalEvent?.file, "Child.meeko");
+      assert.equal(signalEvent?.value, 2);
       assert.ok(notices >= 3);
       let left = 10;
       Object.defineProperty(root, "getBoundingClientRect", {
@@ -84,6 +140,10 @@ test("DevTools registra árbol, valores seguros, señales y limpia instancias", 
       assert.equal(overlay.style.left, "35px");
       unsubscribe();
       releaseChild();
+      const unmountEvent = hook.snapshot().events.at(-1);
+      assert.equal(unmountEvent?.kind, "unmount");
+      assert.equal(unmountEvent?.componentName, "Child");
+      assert.equal(unmountEvent?.file, "Child.meeko");
       assert.equal(hook.snapshot().selectedId, null);
       assert.equal(hook.snapshot().instances.length, 1);
       releaseParent();

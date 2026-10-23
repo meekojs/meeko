@@ -19,13 +19,14 @@ test("normaliza la captura y descarta eventos con marcas temporales inválidas",
   const snapshot = normalizeSnapshot({
     instances: [{ id: "i1", name: "Counter", componentId: "counter", file: "/Counter.meeko", props: { start: 1 }, signals: { count: 1 }, parentId: null, childIds: [], status: "mounted", breakpoint: false }],
     events: [
-      { id: 1, at: 1234, kind: "mount", instanceId: "i1" },
+      { id: 1, at: 1234, kind: "signal", instanceId: "i1", detail: "count", componentName: "Counter", file: "/Counter.meeko", value: 2, reads: [{ file: "/Counter.meeko", line: 3, column: 8, expression: "count.value", kind: "text" }, { file: "bad", line: -1, column: 1, expression: "bad", kind: "text" }] },
       { id: 2, at: Infinity, kind: "signal", instanceId: "i1" },
     ],
     selectedId: "i1",
   });
   assert.equal(snapshot?.instances.length, 1);
   assert.equal(snapshot?.events.length, 1);
+  assert.deepEqual(snapshot?.events[0], { id: 1, at: 1234, kind: "signal", instanceId: "i1", detail: "count", componentName: "Counter", file: "/Counter.meeko", value: 2, reads: [{ file: "/Counter.meeko", line: 3, column: 8, expression: "count.value", kind: "text" }] });
   assert.equal(snapshot?.selectedId, "i1");
   assert.equal(normalizeSnapshot({ instances: [], events: "invalid" }), null);
 });

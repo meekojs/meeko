@@ -55,7 +55,7 @@ export const VueList = defineComponent({
   },
 });
 
-/** Cambio de tres vistas con History API y 40 filas por vista. */
+/** Cambia el contenido de una vista y conserva sus 40 filas. */
 export const VueNavigation = defineComponent({
   name: "BenchmarkNavigation",
   setup() {
@@ -68,6 +68,26 @@ export const VueNavigation = defineComponent({
     return () => h("main", [
       h("button", { type: "button", onClick: navigate }, "Next view"),
       h("section", { "data-view": view.value }, [
+        h("h1", `View ${view.value}`),
+        ...rows.map((row) => h("p", { key: row }, `${names[view.value]} ${row}`)),
+      ]),
+    ]);
+  },
+});
+
+/** Sustituye toda la vista, incluidas sus 40 filas, en cada navegación. */
+export const VueNavigationMount = defineComponent({
+  name: "BenchmarkNavigationMount",
+  setup() {
+    const view = ref(0);
+    const navigate = (): void => {
+      view.value = (view.value + 1) % 3;
+      history.pushState({ view: view.value }, "", `/navigation/${view.value}`);
+    };
+    const names = ["Home", "Catalog", "Profile"];
+    return () => h("main", [
+      h("button", { type: "button", onClick: navigate }, "Next view"),
+      h("section", { key: view.value, "data-view": view.value }, [
         h("h1", `View ${view.value}`),
         ...rows.map((row) => h("p", { key: row }, `${names[view.value]} ${row}`)),
       ]),

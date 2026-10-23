@@ -56,7 +56,7 @@ test("el panel permanece legible y sin desbordamiento horizontal en DevTools est
         ];
         let selectedId = "meeko-1";
         window.__MEEKO_DEVTOOLS__ = {
-          snapshot: () => ({ instances, selectedId, events: [{ id: 1, at: Date.now(), kind: "signal", instanceId: "meeko-1", detail: "NombreDeSeñalExtremadamenteLargoSinEspaciosParaProbarElAncho" }] }),
+          snapshot: () => ({ instances, selectedId, events: [{ id: 1, at: Date.now(), kind: "signal", instanceId: "meeko-1", detail: "NombreDeSeñalExtremadamenteLargoSinEspaciosParaProbarElAncho", componentName: "Counter", file: "/src/Counter.meeko", value: 2, reads: [{ file: "/src/Counter.meeko", line: 4, column: 10, expression: "count.value", kind: "text" }] }] }),
           select: (id) => { selectedId = id; },
           highlight: () => {},
           setBreakpoint: (id, enabled) => { const instance = instances.find((item) => item.id === id); if (instance) instance.breakpoint = enabled; },
@@ -71,7 +71,12 @@ test("el panel permanece legible y sin desbordamiento horizontal en DevTools est
       await page.goto(`http://127.0.0.1:${address.port}/panel.html`);
       await page.locator(".instance-button").first().waitFor();
       assert.equal(await page.locator("#detail-name").textContent(), "Counter");
-      assert.equal(await page.locator("#event-list li").count(), 1);
+      assert.equal(await page.locator("#event-list > li").count(), 1);
+      assert.match(await page.locator("#event-list > li").innerText(), /Counter.*Counter\.meeko.*→ 2/s);
+      await page.locator("#event-list details summary").click();
+      assert.match(await page.locator("#event-list details").innerText(), /Counter\.meeko:4:10.*count\.value/s);
+      await page.locator("#signal-events").check();
+      assert.equal(await page.locator("#event-list > li").count(), 1);
       const layout = await page.evaluate(() => ({
         viewport: window.innerWidth,
         document: document.documentElement.scrollWidth,

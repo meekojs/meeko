@@ -1,7 +1,8 @@
 // @ts-check
 
 /** @typedef {{id:string,componentId:string,name:string,file:string,props:unknown,signals:Record<string,unknown>,parentId:string|null,childIds:string[],status:string,breakpoint:boolean}} DevtoolsInstance */
-/** @typedef {{id:number,at:number,kind:string,instanceId:string,detail?:string}} DevtoolsEvent */
+/** @typedef {{file:string,line:number,column:number,expression:string,kind:'text'|'attribute'}} EffectSource */
+/** @typedef {{id:number,at:number,kind:string,instanceId:string,detail?:string,componentName?:string,file?:string,value?:unknown,reads?:EffectSource[]}} DevtoolsEvent */
 /** @typedef {{instances:DevtoolsInstance[],events:DevtoolsEvent[],selectedId:string|null}} DevtoolsSnapshot */
 
 const commands = new Set(["select", "highlight", "setBreakpoint"]);
@@ -48,8 +49,19 @@ export function normalizeSnapshot(/** @type {unknown} */ value) {
     if (!entry || typeof entry !== "object") continue;
     const item = /** @type {Record<string,unknown>} */ (entry);
     if (typeof item.id !== "number" || !Number.isFinite(item.id) || typeof item.at !== "number" || !Number.isFinite(item.at) || Math.abs(item.at) > 8.64e15 || typeof item.kind !== "string" || typeof item.instanceId !== "string") continue;
+    /** @type {DevtoolsEvent} */
     const event = { id: item.id, at: item.at, kind: item.kind, instanceId: item.instanceId };
-    events.push(typeof item.detail === "string" ? { ...event, detail: item.detail } : event);
+    if (typeof item.detail === "string") event.detail = item.detail;
+    if (typeof item.componentName === "string") event.componentName = item.componentName;
+    if (typeof item.file === "string") event.file = item.file;
+    if (Object.hasOwn(item, "value")) event.value = item.value;
+    if (Array.isArray(item.reads)) {
+      event.reads = item.reads.filter((read) => read && typeof read === "object"
+        && typeof read.file === "string" && typeof read.expression === "string"
+        && Number.isSafeInteger(read.line) && read.line > 0 && Number.isSafeInteger(read.column) && read.column > 0
+        && (read.kind === "text" || read.kind === "attribute")).slice(0, 30);
+    }
+    events.push(event);
   }
   return {
     instances,

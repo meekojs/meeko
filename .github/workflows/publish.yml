@@ -1,0 +1,42 @@
+name: Publicar en npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+      - name: Comprobar versión de la etiqueta
+        shell: pwsh
+        run: |
+          $packageVersion = node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version"
+          if ($env:GITHUB_REF_NAME -ne "v$packageVersion") {
+            throw "La etiqueta $env:GITHUB_REF_NAME no coincide con package.json ($packageVersion)."
+          }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run verify
+      - run: pnpm run e2e
+      - run: node node_modules/playwright-core/cli.js install chromium firefox webkit
+      - run: pnpm run pilot:e2e
+      - run: pnpm run package:smoke
+      - name: Publicar con identidad OIDC
+        shell: pwsh
+        run: |
+          npm install --global npm@11.19.0
+          npm publish --access public

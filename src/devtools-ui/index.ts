@@ -41,7 +41,14 @@ button[aria-pressed="true"] { border-color: #79b8ff; background: #25476c; }
 .muted { color: #aab7ca; }
 .path { overflow-wrap: anywhere; }
 pre { margin: 4px 0 0; padding: 8px; max-height: 130px; overflow: auto; border-radius: 6px; background: #0a111e; color: #dbeafe; font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
-.events { border-top: 1px solid #334155; padding: 10px 12px; max-height: 130px; overflow: auto; }
+.events { border-top: 1px solid #334155; padding: 10px 12px; max-height: 160px; overflow: auto; }
+.events-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.events-head label { color: #aab7ca; }
+.event-button { width: 100%; text-align: left; }
+.event-reads { margin: 4px 0 8px; color: #aab7ca; }
+.event-reads summary { cursor: pointer; }
+.event-reads li { overflow-wrap: anywhere; }
+.event-reads code { color: #dbeafe; }
 .events li { overflow-wrap: anywhere; }
 .status { padding: 7px 12px; border-top: 1px solid #334155; color: #aab7ca; }
 @media (max-width: 540px) {
@@ -93,7 +100,10 @@ function eventLabel(event: DevtoolsEvent): string {
   };
   const time = Number.isFinite(event.at) ? new Date(event.at).toLocaleTimeString("es", { hour12: false }) : "hora desconocida";
   const detail = event.detail ? ` · ${event.detail}` : "";
-  return `${time} · ${kinds[event.kind]} · ${event.instanceId}${detail}`;
+  const source = event.componentName ? ` · ${event.componentName}` : "";
+  const file = event.file ? ` · ${event.file}` : "";
+  const value = event.kind === "signal" && "value" in event ? ` → ${formatValue(event.value).replace(/\s+/g, " ").slice(0, 240)}` : "";
+  return `${time} · ${kinds[event.kind]} · ${event.instanceId}${source}${file}${detail}${value}`;
 }
 
 /** Exige un documento conectado a una ventana para registrar eventos del hook. */
@@ -148,9 +158,16 @@ export function mountDevtoolsPanel(options: DevtoolsPanelOptions = {}): Devtools
 
   const eventsSection = element(ownerDocument, "section", undefined, "events");
   const eventsTitle = element(ownerDocument, "h2", "Eventos recientes");
+  const eventsHead = element(ownerDocument, "div", undefined, "events-head");
+  const signalFilterLabel = element(ownerDocument, "label", " Sólo señales");
+  const signalFilter = element(ownerDocument, "input");
+  signalFilter.type = "checkbox";
+  signalFilter.setAttribute("aria-label", "Mostrar sólo eventos de señales");
+  signalFilterLabel.prepend(signalFilter);
+  eventsHead.append(eventsTitle, signalFilterLabel);
   const eventsList = element(ownerDocument, "ol");
   eventsList.setAttribute("aria-label", "Eventos recientes de Meeko");
-  eventsSection.append(eventsTitle, eventsList);
+  eventsSection.append(eventsHead, eventsList);
   const status = element(ownerDocument, "div", undefined, "status");
   status.setAttribute("role", "status");
   status.setAttribute("aria-live", "polite");
@@ -275,9 +292,40 @@ export function mountDevtoolsPanel(options: DevtoolsPanelOptions = {}): Devtools
       detailSection.append(element(ownerDocument, "p", "Selecciona una instancia para ver props y señales."));
     }
 
-    const recent = snapshot.events.slice(-30).reverse();
+    const recent = snapshot.events.filter((event) => !signalFilter.checked || event.kind === "signal").slice(-30).reverse();
     if (recent.length === 0) eventsList.append(element(ownerDocument, "li", "Sin eventos.", "muted"));
-    for (const event of recent) eventsList.append(element(ownerDocument, "li", eventLabel(event)));
+    for (const event of recent) {
+      const row = element(ownerDocument, "li");
+      const instance = byId.get(event.instanceId);
+      const label = eventLabel(event);
+      if (instance) {
+        const button = element(ownerDocument, "button", label, "event-button");
+        button.type = "button";
+        button.dataset.instanceId = instance.id;
+        button.dataset.action = "event";
+        button.addEventListener("click", () => {
+          hook?.select(instance.id);
+          showMobileView("detail");
+          render();
+        });
+        row.append(button);
+      } else {
+        row.textContent = label;
+      }
+      if (event.kind === "signal" && event.reads?.length) {
+        const sites = element(ownerDocument, "details", undefined, "event-reads");
+        sites.append(element(ownerDocument, "summary", `${event.reads.length} expresión(es) que dependen de la señal`));
+        const list = element(ownerDocument, "ul");
+        for (const read of event.reads) {
+          const usage = element(ownerDocument, "li");
+          usage.append(element(ownerDocument, "code", `${read.file}:${read.line}:${read.column}`), element(ownerDocument, "span", ` ${read.kind}: `), element(ownerDocument, "code", read.expression));
+          list.append(usage);
+        }
+        sites.append(list);
+        row.append(sites);
+      }
+      eventsList.append(row);
+    }
     restoreFocus(focusId, focusAction);
   }
 
@@ -306,6 +354,7 @@ export function mountDevtoolsPanel(options: DevtoolsPanelOptions = {}): Devtools
   }
 
   view.addEventListener("meeko:devtools-ready", connect);
+  signalFilter.addEventListener("change", render);
   refreshButton.addEventListener("click", connect);
   closeButton.addEventListener("click", unmount);
   connect();

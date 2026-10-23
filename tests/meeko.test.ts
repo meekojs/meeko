@@ -5,7 +5,7 @@ import { Window } from "happy-dom";
 import { compile } from "../src/compiler.ts";
 import { batch, computed, createRoot, effect, signal } from "../src/reactivity.ts";
 import { escapeHtml, serializeJson } from "../src/server.ts";
-import { renderFor } from "../src/dom.ts";
+import { bindFor, renderFor } from "../src/dom.ts";
 import { hydrate, renderToString, renderWithState } from "../examples/counter/Counter.generated.ts";
 import { renderExamplePage } from "../examples/counter/server.ts";
 import { hydrate as hydrateAttributes, renderToString as renderAttributes } from "../examples/attributes/Attributes.generated.ts";
@@ -166,6 +166,95 @@ test("una lista de valores primitivos actualiza el texto sin reemplazar su nodo"
   root.querySelector("button")?.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
   assert.equal(root.querySelector("li"), first);
   assert.equal(first.textContent, "Gamma");
+  dispose();
+  window.happyDOM.abort();
+});
+
+test("listas con claves mueven solo las regiones necesarias y conservan estado y nodos", () => {
+  const window = new Window();
+  const root = window.document.createElement("main");
+  type Item = { id: number; label: string };
+  const items = signal<Item[]>(Array.from({ length: 5 }, (_, id) => ({ id, label: `Row ${id}` })));
+  root.innerHTML = renderFor(0, items.value, (item) => item.id, (item) => `<li data-id="${item.id}">${item.label}</li>`);
+  const nodes = new Map([...root.querySelectorAll("li")].map((node) => [Number(node.getAttribute("data-id")), node]));
+  const originalInsertBefore = root.insertBefore.bind(root);
+  let moves = 0;
+  root.insertBefore = (node, before) => {
+    if (node.nodeType === 11) moves++;
+    return originalInsertBefore(node, before);
+  };
+  const dispose = bindFor(
+    { root: root as unknown as Element }, 0, () => items.value, (item) => item.id,
+    (item) => `<li data-id="${item.id}">${item.label}</li>`,
+    (item, index, inner) => {
+      const element = inner.start!.nextSibling as Element;
+      return effect(() => { element.textContent = `${item.value.label}:${index.value}`; });
+    },
+  );
+  const assertOrder = (ids: number[]): void => {
+    assert.deepEqual([...root.querySelectorAll("li")].map((node) => Number(node.getAttribute("data-id"))), ids);
+    for (const id of ids) assert.equal(root.querySelector(`[data-id="${id}"]`), nodes.get(id));
+  };
+  assert.equal(moves, 0);
+  items.value = [items.value[4]!, ...items.value.slice(0, -1)];
+  assertOrder([4, 0, 1, 2, 3]);
+  assert.equal(moves, 1, "una rotación solo mueve un rango");
+  assert.equal(nodes.get(4)?.textContent, "Row 4:0");
+  const newItem = { id: 5, label: "New" };
+  items.value = [items.value[0]!, newItem, items.value[2]!, items.value[4]!];
+  nodes.set(5, root.querySelector('[data-id="5"]')!);
+  assertOrder([4, 5, 1, 3]);
+  assert.equal(nodes.get(0)?.isConnected, false);
+  assert.equal(nodes.get(2)?.isConnected, false);
+  items.value = [...items.value].reverse().map((item) => item.id === 5 ? { ...item, label: "Renamed" } : item);
+  assertOrder([3, 1, 5, 4]);
+  assert.equal(nodes.get(5)?.textContent, "Renamed:2");
+  const permutations = (values: Item[]): Item[][] => values.length === 0 ? [[]] : values.flatMap((value, index) =>
+    permutations(values.filter((_, candidate) => candidate !== index)).map((tail) => [value, ...tail]));
+  for (const permutation of permutations(items.value)) {
+    items.value = permutation;
+    assertOrder(permutation.map((item) => item.id));
+  }
+  dispose();
+  window.happyDOM.abort();
+});
+
+test("una lista reconcilia cambios ocurridos durante la hidratación inicial", () => {
+  const window = new Window();
+  const root = window.document.createElement("main");
+  const items = signal(["a", "b"]);
+  root.innerHTML = renderFor(0, items.value, (item) => item, (item) => `<span>${item}</span>`);
+  const first = root.querySelector("span");
+  const second = root.querySelectorAll("span")[1];
+  const dispose = bindFor(
+    { root: root as unknown as Element }, 0, () => items.value, (item) => item,
+    (item) => `<span>${item}</span>`,
+    (item) => {
+      if (item.value === "a") items.value = ["b", "a"];
+      return () => {};
+    },
+  );
+  assert.deepEqual([...root.querySelectorAll("span")], [second, first]);
+  dispose();
+  window.happyDOM.abort();
+});
+
+test("una lista detecta claves mutadas durante la hidratación inicial", () => {
+  const window = new Window();
+  const root = window.document.createElement("main");
+  const items = [{ id: 1 }, { id: 2 }];
+  root.innerHTML = renderFor(0, items, (item) => item.id, (item) => `<span>${item.id}</span>`);
+  const oldSecond = root.querySelectorAll("span")[1];
+  const dispose = bindFor(
+    { root: root as unknown as Element }, 0, () => items, (item) => item.id,
+    (item) => `<span>${item.id}</span>`,
+    (item) => {
+      if (item.value.id === 2) items[1]!.id = 3;
+      return () => {};
+    },
+  );
+  assert.deepEqual([...root.querySelectorAll("span")].map((node) => node.textContent), ["1", "3"]);
+  assert.equal(oldSecond?.isConnected, false);
   dispose();
   window.happyDOM.abort();
 });

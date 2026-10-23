@@ -22,10 +22,13 @@ El resultado aparece en `tools/devtools-extension/artifacts/meeko-devtools-0.0.1
 
 - Agrupa instancias por componente y permite buscarlas por nombre o archivo.
 - Muestra propiedades, señales, parentesco, estado y eventos del puente de desarrollo.
+- La línea de tiempo muestra el componente, archivo `.meeko`, señal y valor posterior; permite filtrar sólo señales o la instancia seleccionada. Pulsa un evento para volver a una instancia que siga activa. Los eventos conservan su origen después del desmontaje. Al desplegar un evento de señal se ven las expresiones de texto y atributo que dependían directamente de ella, con línea y columna.
 - Permite seleccionar una instancia, resaltar su DOM y activar o desactivar su breakpoint.
 - Soporta navegación por teclado en la lista con flechas arriba y abajo.
 
 El panel consulta `window.__MEEKO_DEVTOOLS__` de la página inspeccionada. Este puente sólo existe tras la hidratación en el navegador con Vite en modo desarrollo. Una página SSR antes de hidratarse, una compilación de producción o una página ajena a Meeko mostrará **Meeko no detectado**. Los breakpoints pausan la ejecución al cambiar una señal de esa instancia; Chrome debe tener abiertos sus DevTools para ver la pausa. Las propiedades y señales se muestran como datos serializables y pueden aparecer truncadas a 100 000 caracteres por valor.
+
+La ubicación de lectura indica **dónde se usa la señal en la plantilla**, no dónde el código escribió su nuevo valor. Sólo se muestran dependencias observadas directamente por expresiones de texto y atributos en la instancia actual. Las dependencias indirectas a través de `computed`, condiciones, listas o props de componentes no reciben una ubicación de lectura hasta que esos bindings tengan instrumentación propia.
 
 ## Verificación local
 

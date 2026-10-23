@@ -1,0 +1,93 @@
+<script lang="ts">
+import { computed, signal } from "@meekojs/meeko";
+import * as TaskCard from "./TaskCard.meeko";
+import { parseTasks, type Task, type TaskView } from "./model.js";
+
+/** Estado inicial que llega del servidor junto con la ruta solicitada. */
+export interface Props {
+  view: TaskView;
+  tasks: Task[];
+}
+
+const props = defineProps<Props>();
+const tasks = signal<Task[]>([...props.tasks]);
+const draft = signal("");
+const busy = signal(false);
+const error = signal("");
+const syncMessage = signal("");
+const visibleTasks = computed(() => tasks.value.filter((task) => props.view === "completed" ? task.done : !task.done));
+const activeCount = computed(() => tasks.value.filter((task) => !task.done).length);
+
+/** Agrega una tarea local sin perder el estado de las tarjetas existentes. */
+function addTask(event: Event): void {
+  event.preventDefault();
+  const title = draft.value.trim();
+  if (!title) {
+    error.value = "Escribe un título para la tarea.";
+    return;
+  }
+  tasks.value = [{ id: `local-${crypto.randomUUID()}`, title, detail: "Creada en esta sesión.", done: false }, ...tasks.value];
+  draft.value = "";
+  error.value = "";
+  syncMessage.value = "Tarea creada localmente.";
+  const input = (event.target as HTMLFormElement).querySelector("input");
+  if (input) input.value = "";
+}
+
+/** Cambia el estado de una tarea a través de su clave estable. */
+function toggleTask(id: string): void {
+  tasks.value = tasks.value.map((task) => task.id === id ? { ...task, done: !task.done } : task);
+}
+
+/** Consulta la API de ejemplo y muestra errores recuperables. */
+async function synchronize(): Promise<void> {
+  if (busy.value) return;
+  busy.value = true;
+  error.value = "";
+  syncMessage.value = "";
+  try {
+    const response = await fetch("/api/tasks");
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    tasks.value = parseTasks(await response.json() as unknown);
+    syncMessage.value = "Datos actualizados desde la API.";
+  } catch {
+    error.value = "No se pudieron sincronizar las tareas. Inténtalo de nuevo.";
+  } finally {
+    busy.value = false;
+  }
+}
+</script>
+
+<template>
+  <section class="workspace">
+    <header class="intro">
+      <p class="eyebrow">Meeko · aplicación piloto</p>
+      <h1>Bandeja de trabajo</h1>
+      <p>Organiza tareas y comprueba cómo Meeko hidrata el HTML del servidor.</p>
+    </header>
+    <nav aria-label="Vistas de tareas" class="tabs">
+      <a href="/" bind:aria-current="props.view === 'active' ? 'page' : null">Pendientes ({activeCount.value})</a>
+      <a href="/completed" bind:aria-current="props.view === 'completed' ? 'page' : null">Terminadas</a>
+    </nav>
+    <div class="toolbar">
+      <form on:submit="addTask">
+        <label for="new-task">Nueva tarea</label>
+        <div class="form-row">
+          <input id="new-task" name="title" autocomplete="off" placeholder="Ej. revisar navegación" on:input="(event: Event) => draft.value = (event.target as HTMLInputElement).value">
+          <button type="submit">Agregar</button>
+        </div>
+      </form>
+      <button class="sync" type="button" on:click="synchronize" bind:disabled="busy.value">{busy.value ? 'Sincronizando…' : 'Sincronizar API'}</button>
+    </div>
+    <p role="alert" class="feedback error" if:when="error.value !== ''">{error.value}</p>
+    <p role="status" class="feedback" if:when="syncMessage.value !== ''">{syncMessage.value}</p>
+    <p class="summary">{visibleTasks.value.length} {props.view === 'completed' ? 'terminadas' : 'pendientes'}</p>
+    <ul class="task-list">
+      <li each:of="visibleTasks.value" each:as="task" each:key="task.id" bind:data-id="task.id">
+        <component is="TaskCard" bind:task="task"></component>
+        <button class="state-button" type="button" on:click="() => toggleTask(task.id)">{task.done ? 'Reabrir' : 'Completar'}</button>
+      </li>
+    </ul>
+    <p class="empty" if:when="visibleTasks.value.length === 0">No hay tareas en esta vista.</p>
+  </section>
+</template>
