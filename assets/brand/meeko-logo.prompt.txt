@@ -1,0 +1,13 @@
+Tool: built-in image_gen (transparent_background=true)
+Reference: user-provided photograph of Meeko. The photograph is not stored in the repository.
+
+INITIAL GENERATION
+Use case: logo-brand.
+Create a finished logo mark for Meeko, a TypeScript component framework named in honor of the user's beloved female cat. Input image is SUBJECT IDENTITY REFERENCE, not an edit target: faithfully translate THIS cat's face into a distinctive, refined flat logo.
+Subject: head only, front-facing, soft fluffy cream-white cheek silhouette, tall dark charcoal-taupe ears, muted taupe mask around both blue-gray eyes, narrow slightly irregular white inverted-V blaze down the middle forehead widening around the small dusty pink triangular nose and white muzzle. Preserve her calm sweet expression and actual characteristic markings from the photo. Eyes blue with dark pupils, modest and elegant, not exaggerated anime eyes.
+Style: premium simple vector-like brand mark, bold clean shapes, minimal controlled curves, 5-6 flat colors, subtly organic, appealing and memorable, readable at small size. A very subtle dark warm contour can provide definition on light or dark backgrounds. No photorealism, fur texture, gradients, shadows, glows, 3D, body, paws, collar, heart, angel wings, flowers, badge, enclosing circle, text, typography or watermark.
+Composition: single face centered in square canvas, large mark occupies about 85% of canvas with balanced small transparent margin. Actual transparent background, not a checkerboard drawing. High quality clean transparent PNG suitable for a GitHub README and app identity.
+
+FINAL REFINEMENT
+Refine the attached Meeko cat head illustration into a genuinely SIMPLE FLAT LOGO. Preserve this individual cat's cream cheeks, dark ears, taupe eye patches, narrow central white blaze, muted blue eyes and tiny pink nose, calm gentle expression. CHANGE ONLY graphic simplification and edge cleanup.
+CRITICAL: reduce all fur detail to large smooth solid shapes. Maximum 12 broad color regions for the whole head, only 3 rounded tufts per cheek, smooth solid ears with one inner ear shape, simple blue eye oval with dark pupil and one small white highlight. No individual hairs, no fur streaks, no internal fur texture, no gradients or shading. White muzzle solid, dark taupe mask in 2 simple shapes. Clean warm charcoal outline of consistent medium thickness around head. Flat cream silhouette, friendly sophisticated developer-framework logo, not a detailed portrait. No whisker lines outside silhouette. Entire head must fit with 12% transparent margin on all sides. Absolutely clean edges, no particles, no speckles or detached stray pixels. No words, no body, no background. True transparent PNG.
