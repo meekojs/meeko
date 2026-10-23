@@ -39,4 +39,46 @@ Windows 11 `10.0.26300`, Intel Core Ultra 9 285K, Node 24.21.0, Chrome 155.0.805
 | Clic y actualización | 0,00250 ms (0,00250–0,00300) | 0,00275 ms (0,00250–0,00350) |
 | Heap JS tras hidratar | 1.287.168 B | 1.517.856 B |
 
-En este contador, la diferencia de tamaño es clara. Las medidas de carga y actualización se solapan, y la hidratación está cerca de la resolución del temporizador: no permiten afirmar una ventaja práctica. El heap es orientativo por ser una sola instantánea. Esta comparativa cubre un componente pequeño; Vue incluye funciones maduras que Meeko todavía no ofrece, y una plantilla Vue compilada podría dar cifras distintas a su función `render`. Como explica la [guía de rendimiento de Vue](https://vuejs.org/guide/best-practices/performance), el coste depende de la arquitectura y del trabajo real de cada aplicación. Antes de hacer afirmaciones generales, conviene ampliar los casos a listas grandes, árboles de componentes, navegación y redes representativas.
+En este contador, la diferencia de tamaño es clara. Las medidas de carga y actualización se solapan, y la hidratación está cerca de la resolución del temporizador: no permiten afirmar una ventaja práctica. El heap es orientativo por ser una sola instantánea. Vue incluye funciones maduras que Meeko todavía no ofrece, y una plantilla Vue compilada podría dar cifras distintas a su función `render`. Como explica la [guía de rendimiento de Vue](https://vuejs.org/guide/best-practices/performance), el coste depende de la arquitectura y del trabajo real de cada aplicación.
+
+## Escenarios ampliados: árbol, lista y navegación
+
+```powershell
+pnpm run benchmark:scenarios
+$env:MEEKO_BENCH_ORDER = 'vue-first'
+try { pnpm run benchmark:scenarios } finally { Remove-Item Env:MEEKO_BENCH_ORDER }
+```
+
+Para aislar un escenario, define `MEEKO_BENCH_SCENARIO` como `tree`, `list` o `navigation`. [`benchmarks/scenarios.ts`](../benchmarks/scenarios.ts) compila las fuentes `.meeko` de [`benchmarks/cases`](../benchmarks/cases), comprueba SSR y valida el DOM tras cada operación. Los archivos `*.generated.ts` se ignoran en Git. Las implementaciones Vue están en [`benchmarks/vue-scenarios.ts`](../benchmarks/vue-scenarios.ts); usan funciones `render` escritas a mano y el runtime de producción, sin compilador de plantillas en el navegador.
+
+| Caso | Trabajo equivalente |
+| --- | --- |
+| Árbol | 16 ramas × 8 hojas interactivas: 145 componentes contando la raíz. Cada paso incrementa la primera hoja y verifica su texto y las 128 hojas. |
+| Lista | 1.000 filas con claves estables. Cada paso rota el último elemento al principio y verifica cardinalidad y claves de primera/última fila. |
+| Navegación | Tres vistas de 40 filas. Cada paso cambia la vista, usa `history.pushState` y verifica la URL, la vista activa y las 40 filas. Es navegación local sintética; no mide un router, carga de datos, `popstate` ni red. |
+
+Cada caso usa dos rondas de calentamiento y siete medidas. SSR crea una instancia nueva por render: 30 renders por ronda para árbol/lista y 100 para navegación. El navegador hace siete navegaciones medidas por caso y motor, con caché caliente; se mide `loadEventEnd - startTime`, hidratación con `performance.now()` y una instantánea de heap JS tras solicitar GC. La actualización promedia 100 pasos por ronda para árbol, 30 para lista y 60 para navegación. La ventana medida incluye clic, reacción y `nextTick()` en Vue; la verificación del DOM ocurre después de detener el temporizador en cada paso. Como el temporizador del navegador tiene resolución limitada, especialmente en el árbol, las diferencias de milésimas de milisegundo no son concluyentes. El bundle de cada motor **incluye los tres casos** y sólo se mide una vez para el conjunto, no por escenario. Se excluyen HTML, CSS, encabezados HTTP y dependencias de desarrollo.
+
+### Registro local del 23 de octubre de 2026
+
+Windows 11 `10.0.26300`, Intel Core Ultra 9 285K, Node 24.21.0, Chrome 155.0.8059.85, Vue 3.5.44 y esbuild 0.28.2. Revisión base `654b078`, árbol de trabajo con cambios locales. Se ejecutó Meeko → Vue y se repitió Vue → Meeko sin otros benchmarks concurrentes. La tabla muestra **medianas de la primera corrida**, en milisegundos por render o paso, salvo carga e hidratación (milisegundos por navegación) y heap (MiB). El JSON de cada ejecución incluye mínimos, máximos, orden, versiones y parámetros.
+
+| Caso | Métrica | Meeko | Vue |
+| --- | --- | ---: | ---: |
+| Árbol | SSR | 0,520 | 1,001 |
+| Árbol | Carga HTTP local | 8,1 | 7,3 |
+| Árbol | Hidratación | 1,4 | 1,3 |
+| Árbol | Actualización | 0,003 | 0,004 |
+| Árbol | Heap JS | 1,80 MiB | 1,89 MiB |
+| Lista | SSR | 0,673 | 0,701 |
+| Lista | Carga HTTP local | 17,3 | 11,8 |
+| Lista | Hidratación | 5,8 | 1,8 |
+| Lista | Actualización | 3,420 | 0,430 |
+| Lista | Heap JS | 3,18 MiB | 2,15 MiB |
+| Navegación | SSR | 0,029 | 0,014 |
+| Navegación | Carga HTTP local | 5,4 | 5,6 |
+| Navegación | Hidratación | 0,5 | 0,3 |
+| Navegación | Actualización | 0,310 | 0,070 |
+| Navegación | Heap JS | 1,35 MiB | 1,51 MiB |
+
+Bundle conjunto: Meeko 17.721 B (5.756 B gzip); Vue 82.492 B (32.904 B gzip). Al invertir el orden se mantuvieron las diferencias más relevantes: SSR del árbol 0,381 frente a 1,031 ms; actualización de lista 3,373 frente a 0,420 ms; actualización de navegación 0,293 frente a 0,072 ms. La lista es una prioridad de optimización para Meeko: su hidratación, actualización y heap fueron mayores en estas cargas. Las cifras describen este equipo, estas implementaciones y esta ejecución local; no son Web Vitals ni prueban una ventaja general de ninguno de los motores. Falta evaluar redes representativas, aplicaciones completas y una contraparte Vue con plantilla compilada.

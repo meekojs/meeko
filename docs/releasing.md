@@ -18,11 +18,11 @@ npm pack --dry-run --json
 
 `package:smoke` instala el tarball en un proyecto temporal fuera del monorepo y comprueba CLI, SSR, declaraciones de TypeScript y Vite. El paquete npm sólo incluye `dist`, `README.md`, `LICENSE` y `package.json`; no incluye ejemplos, pruebas, variantes del logo ni archivos locales. Antes de subir una versión, se revisa el resultado de `npm pack --dry-run --json` para confirmar esa lista.
 
-## Primera publicación
+## Publicar una actualización
 
-El primer push crea `main` en GitHub. Tras comprobar la ejecución de CI y verificar que el commit remoto coincide con el probado localmente, publica la versión con `npm publish --access public`. npm puede pedir autenticación de dos factores; no guardes códigos ni tokens en el repositorio. Comprueba después la versión y el acceso público en el registro. Una versión publicada no se sobrescribe; las correcciones requieren un número nuevo.
+Actualiza la versión de `package.json` y [CHANGELOG.md](../CHANGELOG.md), ejecuta las verificaciones y sube el commit a `main`. Tras comprobar que CI pasó y que el commit remoto coincide con el probado localmente, publica con `npm publish --access public`. npm puede pedir autenticación de dos factores; no guardes códigos ni tokens en el repositorio. Comprueba después la versión y el acceso público en el registro. Una versión publicada no se sobrescribe; las correcciones requieren un número nuevo. Crea y sube la etiqueta `v<versión>` sólo cuando la publicación de npm esté confirmada.
 
-La extensión de VS Code se empaqueta por separado. Su VSIX local no implica publicación en Marketplace. Antes de publicarla, prepara artefactos y pruebas para otras plataformas y revisa las condiciones de Marketplace.
+La extensión de VS Code se empaqueta por separado. Su VSIX local no implica publicación en Marketplace. Las extensiones de VS Code y Chrome tienen su propio número de versión y requieren pruebas en sus anfitriones antes de publicarse en sus respectivas tiendas. Los artefactos locales pueden adjuntarse a una versión de GitHub indicando qué plataformas se probaron realmente.
 
 ## Versión 0.0.1
 

@@ -30,6 +30,8 @@ El runtime de `src/dom.ts` usa comentarios como límites de condiciones, listas 
 
 El plugin `src/vite.ts` usa el mismo compilador para cliente y SSR y expone el CSS como módulo virtual. En desarrollo, cada componente acepta sus propias actualizaciones HMR: `src/hmr.ts` captura las señales editables por instancia, renderiza la nueva versión, hidrata su raíz o rango existente y actualiza los estilos. Una actualización del runtime recarga la página.
 
+Los módulos generados importan el runtime desde `@meekojs/meeko/internal`. Esta ruta agrupa las funciones de DOM, SSR, HMR y DevTools que el compilador necesita y se versiona junto con él. En desarrollo, `src/devtools.ts` registra las instancias hidratadas y expone un hook de lectura que comparten el panel integrado y la extensión de Chrome. Ni SSR ni el build de producción registran instancias en ese hook.
+
 ## Reglas para SSR
 
 - Cada petición debe crear su propio estado. No se comparten señales con datos de usuarios entre peticiones.

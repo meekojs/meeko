@@ -18,6 +18,7 @@ El proyecto está en etapa temprana. Ya funciona el recorrido completo de un con
 - [Comparativa reproducible con Vue](docs/benchmarks.md)
 - [DevTools para depurar componentes](docs/devtools.md)
 - [Publicación y verificaciones](docs/releasing.md)
+- [Historial de cambios](CHANGELOG.md)
 - [Guía para contribuir](CONTRIBUTING.md)
 
 ## Requisitos
@@ -89,7 +90,7 @@ pnpm run vite:build
 
 El plugin `@meekojs/meeko/vite` transforma imports de `.meeko` en cliente y SSR y procesa el CSS del componente. En desarrollo, HMR sustituye las instancias hidratadas sin recargar la página, conserva las señales editables que mantienen su nombre y aplica cambios de CSS. Un cambio en el runtime del motor provoca una recarga completa.
 
-El ejemplo Vite muestra [Meeko DevTools](docs/devtools.md) durante el desarrollo: permite seleccionar cada instancia, revisar props y señales, seguir eventos y activar un punto de parada cuando cambia una señal. También hay un panel local para Chrome DevTools. Esta funcionalidad pertenece al código actual del repositorio y todavía no está incluida en el paquete npm `0.0.1`.
+El ejemplo Vite muestra [Meeko DevTools](docs/devtools.md) durante el desarrollo: permite seleccionar cada instancia, revisar props y señales, seguir eventos y activar un punto de parada cuando cambia una señal. También hay un panel local para Chrome DevTools. La funcionalidad se incorpora al paquete a partir de `0.0.2`.
 
 `vite:types` genera declaraciones `.d.meeko.ts` para los imports de la aplicación y comprueba el consumidor con TypeScript 7 y `allowArbitraryExtensions`. Las declaraciones del ejemplo se regeneran; no se versionan.
 

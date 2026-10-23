@@ -1,0 +1,20 @@
+<script lang="ts">
+import { signal } from "@meekojs/meeko";
+
+type Item = { id: number; label: string };
+const items = signal<Item[]>(Array.from({ length: 1000 }, (_, id) => ({ id, label: `Row ${id}` })));
+
+function rotate(): void {
+  const current = items.value;
+  items.value = [current[current.length - 1]!, ...current.slice(0, -1)];
+}
+</script>
+
+<template>
+  <section>
+    <button type="button" on:click="rotate">Rotate</button>
+    <ul>
+      <li each:of="items.value" each:as="item" each:key="item.id" bind:data-id="item.id">{item.label}</li>
+    </ul>
+  </section>
+</template>

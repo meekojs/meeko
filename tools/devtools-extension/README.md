@@ -10,6 +10,14 @@ Panel local de Chrome DevTools para inspeccionar componentes `.meeko` hidratados
 
 La carpeta es el paquete instalable para desarrollo. Si se distribuye como ZIP, hay que descomprimirlo antes de usar **Cargar descomprimida**. No se publica en Chrome Web Store desde este repositorio.
 
+Para crear un ZIP con sólo los archivos necesarios de la extensión desde la raíz del repositorio:
+
+```powershell
+pwsh -NoProfile -File tools/devtools-extension/package-zip.ps1
+```
+
+El resultado aparece en `tools/devtools-extension/artifacts/meeko-devtools-0.0.1.zip`, contiene la carpeta `meeko-devtools/` y muestra su SHA-256. El empaquetador rechaza un nombre de archivo ya existente para evitar reemplazos accidentales. La versión de esta extensión es independiente de la versión del paquete npm.
+
 ## Funciones
 
 - Agrupa instancias por componente y permite buscarlas por nombre o archivo.
@@ -27,8 +35,11 @@ Desde la raíz del repositorio:
 node --test tools/devtools-extension/tests/protocol.test.js
 node --test tools/devtools-extension/tests/layout.test.js
 pnpm exec tsc -p tools/devtools-extension/tsconfig.json
+node --test tools/devtools-extension/tests/installed.e2e.js
 ```
 
 La prueba de layout abre Chrome en modo sin interfaz a 360, 400, 420 y 800 píxeles y comprueba contenido, teclado y ausencia de desplazamiento horizontal. Usa `playwright-core` del entorno de desarrollo y Chrome instalado; se omite cuando alguno no está disponible. Para otra ruta de Chrome, configura `MEEKO_CHROME` antes de ejecutarla.
+
+La prueba `installed.e2e.js` inicia una aplicación Meeko con Vite y un perfil temporal aislado de **Chrome for Testing**. Carga la extensión real, comprueba que el panel se registre y usa `chrome.devtools.inspectedWindow.eval` para probar instancias, selección, resaltado, breakpoint y eventos de señales. Si Chrome for Testing está en otra ruta, usa `MEEKO_CHROME_FOR_TESTING`. Esta prueba se ejecuta aparte de `pnpm run verify` porque necesita una sesión gráfica. La apertura visual de la pestaña Meeko desde el menú de Chrome DevTools queda como comprobación manual.
 
 Después de modificar un archivo de la extensión, usa **Recargar** en `chrome://extensions` y vuelve a abrir DevTools. El panel no necesita permisos de host ni scripts de contenido: usa la API oficial `chrome.devtools.inspectedWindow.eval` exclusivamente desde DevTools.

@@ -6,26 +6,30 @@ El icono de la extensión y el icono de lenguaje de `.meeko` usan una copia de [
 
 ## Probar en desarrollo
 
-Desde `D:\Clients\meeko\editors\vscode`:
+Desde `editors/vscode` en el repositorio:
 
 ```powershell
 pnpm install
 pnpm run check
 pnpm run test
 pnpm run build
-code --new-window --extensionDevelopmentPath="D:\Clients\meeko\editors\vscode" "D:\Clients\meeko"
+code --new-window --extensionDevelopmentPath="$(Get-Location)" "$(Resolve-Path ../..)"
 ```
 
 Abre un `.meeko` y consulta el panel **Problemas** para errores `MEEK` o `TS`. La extensión analiza los cambios después de una pausa de 450 ms. La salida **Meeko** registra fallos internos del comprobador. `meeko check <archivo.meeko> --json` permite contrastar los diagnósticos desde una terminal.
 
-## Paquete local para Windows x64
+## Paquetes locales por plataforma
 
 ```powershell
 pnpm run package:vsix
+pwsh -NoProfile -File package-vsix.ps1 -Target linux-x64
+pwsh -NoProfile -File package-vsix.ps1 -Target darwin-arm64
 pnpm run test:host:isolated
 ```
 
-El primer comando genera `artifacts/meeko-language-0.0.1-win32-x64.vsix` sin publicarlo ni instalarlo en VS Code. Usa una carpeta temporal limpia para incorporar TypeScript 6, TypeScript 7 y su ejecutable nativo de Windows. El segundo extrae ese VSIX, crea fuera del monorepo un proyecto consumidor con Meeko instalado y comprueba diagnósticos, navegación, hover, renombrado y completado en un host real de VS Code. Requiere VS Code instalado en la ruta habitual de Windows.
+`package:vsix` genera un VSIX para el sistema y arquitectura del equipo. `-Target` también admite `win32-x64`, `win32-arm64`, `linux-x64`, `linux-arm64`, `darwin-x64` y `darwin-arm64`, de modo que se pueden preparar paquetes para otros equipos desde Windows. Cada archivo se guarda en `artifacts/meeko-language-<versión>-<target>.vsix`; no se publica ni instala automáticamente. El script requiere PowerShell 7, aísla la instalación de TypeScript 6/7 y verifica que el VSIX contenga exactamente el ejecutable nativo de TypeScript 7 para su destino. [VS Code distribuye extensiones con binarios nativos por plataforma](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#platform-specific-extensions).
+
+`test:host:isolated` prueba el VSIX de la **plataforma anfitriona** en un VS Code real: extrae el paquete, instala Meeko en un proyecto consumidor temporal y comprueba diagnósticos, navegación, hover, renombrado, completado y formato. En Windows busca la instalación habitual de VS Code; en macOS y Linux intenta encontrar `code` en `PATH`. Si no lo encuentra, `@vscode/test-electron` descarga la versión estable en una carpeta temporal. Puedes indicar otra instalación con `pwsh -NoProfile -File tests/prepare-host.ps1 -VSCodeExecutable <ruta>`. La matriz de CI ejecuta esta prueba en Windows, Linux y macOS (con `xvfb-run` en Linux). No se generan VSIX para Alpine ni para web, que necesitarían soporte adicional del ejecutable TypeScript 7 y del host de extensión.
 
 ## Alcance actual
 
@@ -33,4 +37,4 @@ El primer comando genera `artifacts/meeko-language-0.0.1-win32-x64.vsix` sin pub
 - El modelo virtual requiere que las secciones estén sintácticamente cerradas. Mientras se escribe un archivo incompleto, los diagnósticos siguen disponibles, pero las funciones semánticas pueden pausarse hasta que vuelva a ser válido.
 - La interpolación de texto anidada y los valores de atributos sin comillas todavía no tienen correspondencia semántica completa. El compilador y `meeko check` siguen siendo la fuente de verdad para validar esos casos.
 - El formato depende de que VS Code tenga proveedores para TypeScript, HTML y CSS. Una sección sin proveedor conserva su texto.
-- El VSIX generado es específico de Windows x64 porque TypeScript 7 incluye un ejecutable nativo para esa plataforma. Aún no se prepararon paquetes para otras plataformas ni se publicó la extensión.
+- El paquete sigue siendo local y no se ha publicado en el Marketplace. El host real se ha validado localmente en Windows x64; la matriz de CI verificará Linux y macOS al ejecutarse en GitHub. Generar un VSIX cruzado confirma su contenido, pero no sustituye la prueba del host de destino.

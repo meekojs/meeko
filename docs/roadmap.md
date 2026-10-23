@@ -49,11 +49,11 @@ Estado: motor experimental. Cada etapa se considera terminada cuando sus criteri
 
 - [x] Elegir licencia MIT y preparar el paquete público `@meekojs/meeko` con versión experimental `0.0.1`.
 - [x] Probar el paquete como dependencia de una aplicación externa con CLI, SSR, tipos y Vite.
-- [ ] Revisar las exportaciones internas de DOM/HMR antes de declarar estable la API.
+- [x] Revisar las exportaciones internas de DOM/HMR: el compilador usa `@meekojs/meeko/internal` y los exports antiguos de la raíz se conservan por compatibilidad durante `0.x`.
 - [x] Publicar el repositorio en GitHub y la primera versión del paquete en npm.
 - [ ] Preparar y comprobar la extensión de VS Code para otras plataformas además de Windows x64.
-- [ ] Ampliar la comparativa a árboles, listas grandes y navegación antes de hacer afirmaciones generales de rendimiento.
-- [ ] Decidir si `:global` en CSS, streaming SSR y un servidor de lenguaje independiente entran en la primera versión pública.
+- [x] Ampliar la comparativa a árboles, listas grandes y navegación, con condiciones y resultados reproducibles. La lista muestra una oportunidad clara de optimización.
+- [x] Decidir el alcance de `0.0.2`: `:global` en CSS, streaming SSR y un servidor de lenguaje independiente se posponen. Se evaluarán por separado antes de una versión estable.
 
 ## DevTools experimental
 

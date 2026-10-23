@@ -37,8 +37,12 @@ export default defineConfig({ plugins: [meeko()] });
   Set-Content -LiteralPath (Join-Path $consumer 'tsconfig.json') -Encoding utf8 -Value '{"compilerOptions":{"target":"ES2022","module":"NodeNext","moduleResolution":"NodeNext","strict":true,"noEmit":true,"lib":["ES2022","DOM"],"allowArbitraryExtensions":true},"include":["main.ts"]}'
   Set-Content -LiteralPath (Join-Path $consumer 'smoke.mjs') -Encoding utf8 -Value @'
 import { renderToString } from "./Counter.generated.ts";
+import { mountDevtoolsPanel } from "@meekojs/meeko/devtools-ui";
 if (!renderToString({ initial: 4 }).includes("meeko:text:0-->4")) {
   throw new Error("SSR del paquete instalado produjo un resultado inesperado");
+}
+if (typeof mountDevtoolsPanel !== "function") {
+  throw new Error("El paquete instalado no exporta el panel DevTools");
 }
 '@
 

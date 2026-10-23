@@ -1,6 +1,6 @@
 # Meeko DevTools (experimental)
 
-DevTools permite examinar cada instancia hidratada durante el desarrollo con Vite. Esta función se está desarrollando después de la versión npm `0.0.1`; para probarla desde el repositorio usa el código actual. Hay dos interfaces para el mismo runtime: un panel dentro de la página y un panel de Chrome DevTools.
+DevTools permite examinar cada instancia hidratada durante el desarrollo con Vite. Se incorpora al paquete desde `0.0.2`. Hay dos interfaces para el mismo runtime: un panel dentro de la página y un panel de Chrome DevTools.
 
 ## Plan de esta etapa
 
@@ -20,7 +20,7 @@ pnpm run build
 pnpm run vite:dev
 ```
 
-Cuando una versión con DevTools esté publicada, otra aplicación podrá montarlo explícitamente:
+Una aplicación puede montar el panel explícitamente con `@meekojs/meeko@0.0.2` o posterior:
 
 ```ts
 if (import.meta.env.DEV) {

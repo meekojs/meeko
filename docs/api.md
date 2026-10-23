@@ -1,6 +1,6 @@
 # API de Meeko
 
-Meeko está en versión experimental `0.0.1`. Esta página describe el contrato que ejercitan los ejemplos y las pruebas actuales; la sintaxis puede cambiar antes de una versión estable.
+Meeko está en la serie experimental `0.x`. Esta página describe el contrato que ejercitan los ejemplos y las pruebas actuales; la sintaxis puede cambiar antes de una versión estable.
 
 ## Componentes `.meeko`
 
@@ -49,6 +49,8 @@ Para transferir props o estado en una etiqueta `<script>`, usa `serializeJson(va
 
 Los observadores creados durante `hydrate` pertenecen a esa instancia. Durante HMR de Vite se conservan por nombre las señales editables del script; los valores derivados se calculan otra vez. Este estado en memoria de HMR es independiente de la transferencia JSON entre servidor y navegador.
 
+La superficie para aplicaciones es `@meekojs/meeko` (`signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot` y `serializeJson`), junto con los submódulos documentados `@meekojs/meeko/vite` y `@meekojs/meeko/devtools-ui`. El compilador importa sus funciones de DOM, HMR y registro de DevTools desde `@meekojs/meeko/internal`. Esta ruta es un contrato entre el compilador y su runtime de la **misma versión**; no está destinada a imports manuales. Los exports internos antiguos permanecen temporalmente en la raíz para no romper módulos generados con `0.0.1`, pero no tienen garantía de estabilidad.
+
 ## Herramientas
 
 `meeko check archivo.meeko` comprueba sintaxis y tipos; `--json` entrega diagnósticos estructurados. `meeko compile entrada.meeko salida.ts` genera el módulo tipado y no escribe un archivo si hay errores. `meeko types archivo.meeko` emite declaraciones `Archivo.d.meeko.ts` para ese componente y los hijos importados. El consumidor activa `allowArbitraryExtensions` en TypeScript para resolver los imports `.meeko` con props precisas. El plugin `@meekojs/meeko/vite` compila los imports `.meeko` en cliente y SSR y añade HMR y CSS durante desarrollo. Consulta [la extensión local de VS Code](../editors/vscode/README.md) para usar las mismas comprobaciones en el editor.
@@ -63,4 +65,4 @@ Los observadores creados durante `hydrate` pertenecen a esa instancia. Durante H
 
 ## Antes de publicar
 
-La licencia MIT y el nombre `@meekojs/meeko` ya están definidos. `pnpm run package:smoke` instala el tarball en un consumidor fuera del monorepo y comprueba CLI, SSR, tipos y Vite. Antes de declarar estable la API se ampliarán las pruebas de compatibilidad y se revisarán las exportaciones internas de DOM/HMR. La extensión de VS Code ya se empaquetó y probó en un host aislado con un proyecto consumidor externo.
+La licencia MIT y el nombre `@meekojs/meeko` ya están definidos. `pnpm run package:smoke` instala el tarball en un consumidor fuera del monorepo y comprueba CLI, SSR, tipos y Vite. Antes de declarar estable la API se ampliarán las pruebas de compatibilidad y se decidirá cuándo retirar de la raíz los exports internos heredados. La extensión de VS Code ya se empaquetó y probó en un host aislado con un proyecto consumidor externo.

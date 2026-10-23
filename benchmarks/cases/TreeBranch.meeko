@@ -1,0 +1,14 @@
+<script lang="ts">
+import * as Leaf from "./TreeLeaf.generated.js";
+
+const props = defineProps<{ branch: number }>();
+const leaves = Array.from({ length: 8 }, (_, index) => index);
+</script>
+
+<template>
+  <div class="branch">
+    <div each:of="leaves" each:as="leaf" each:key="leaf">
+      <component is="Leaf" bind:id="`${props.branch}-${leaf}`"></component>
+    </div>
+  </div>
+</template>

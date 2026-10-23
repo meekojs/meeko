@@ -18,8 +18,8 @@ test("panel DevTools muestra ausencia del hook y se conecta cuando queda disponi
   const snapshot: DevtoolsSnapshot = {
     selectedId: null,
     instances: [
-      { id: "parent", componentId: "p", name: "Parent", file: "Parent.meeko", props: { label: "<script>" }, signals: { count: 2 }, parentId: null, childIds: ["child"], status: "mounted", breakpoint: false },
-      { id: "child", componentId: "c", name: "Child", file: "Child.meeko", props: {}, signals: {}, parentId: "parent", childIds: [], status: "mounted", breakpoint: false },
+      { id: "parent", componentId: "p", name: "Parent", file: "Parent.meeko", props: { label: "<script>" }, signals: { count: 2 }, parentId: null, childIds: ["child"], status: "hydrated", breakpoint: false },
+      { id: "child", componentId: "c", name: "Child", file: "Child.meeko", props: {}, signals: {}, parentId: "parent", childIds: [], status: "hydrated", breakpoint: false },
     ],
     events: [{ id: 1, at: eventAt, kind: "mount", instanceId: "parent" }],
   };

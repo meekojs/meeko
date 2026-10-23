@@ -66,7 +66,10 @@ async function buildClient(entry: Framework): Promise<Uint8Array> {
     minify: true,
     treeShaking: true,
     define: { "process.env.NODE_ENV": '"production"' },
-    alias: { meeko: resolve(projectRoot, "src/index.ts") },
+    alias: {
+      "@meekojs/meeko/internal": resolve(projectRoot, "src/internal.ts"),
+      "@meekojs/meeko": resolve(projectRoot, "src/index.ts"),
+    },
   });
   const js = output.outputFiles[0];
   if (!js) throw new Error(`Missing ${entry} client bundle`);

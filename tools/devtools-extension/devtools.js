@@ -2,6 +2,7 @@
 
 /** Registra el panel propio y suspende el sondeo cuando deja de estar visible. */
 chrome.devtools.panels.create("Meeko", "meeko-logo.png", "panel.html", (panel) => {
+  document.documentElement.dataset.meekoPanelRegistered = "true";
   /** @type {Window | undefined} */
   let panelWindow;
   panel.onShown.addListener((shown) => {

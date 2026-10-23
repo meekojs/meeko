@@ -1,0 +1,10 @@
+<script lang="ts">
+import { signal } from "@meekojs/meeko";
+
+const props = defineProps<{ id: string }>();
+const count = signal(0);
+</script>
+
+<template>
+  <button type="button" bind:data-id="props.id" on:click="() => count.value++">{props.id}: {count.value}</button>
+</template>

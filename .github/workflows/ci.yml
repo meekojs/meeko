@@ -22,3 +22,31 @@ jobs:
       - run: pnpm run verify
       - run: pnpm run e2e
       - run: pnpm run package:smoke
+
+  vscode-extension:
+    name: VS Code (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
+        working-directory: editors/vscode
+      - run: pnpm run package:vsix
+        working-directory: editors/vscode
+      - run: pnpm run test:host:isolated
+        working-directory: editors/vscode
+        if: runner.os != 'Linux'
+      - run: xvfb-run -a pnpm run test:host:isolated
+        working-directory: editors/vscode
+        if: runner.os == 'Linux'
