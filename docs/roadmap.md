@@ -61,7 +61,7 @@ Estado: motor experimental. Cada etapa se considera terminada cuando sus criteri
 - [x] Ofrecer selección, resaltado y puntos de parada por instancia en un panel integrado.
 - [x] Ofrecer un panel local de Chrome DevTools que consuma el mismo hook.
 - [x] Verificar el runtime, las interfaces y el ejemplo en Chrome.
-- [ ] Publicar una nueva versión npm que incluya DevTools y preparar la distribución de la extensión.
+- [x] Publicar `0.0.2` en npm con DevTools y adjuntar el ZIP de Chrome y los seis VSIX a la versión de GitHub. Las extensiones todavía no están publicadas en sus tiendas.
 
 **Aceptación:** la [guía de DevTools](devtools.md) documenta el uso y los límites; SSR y producción no exponen el hook de desarrollo.
 
@@ -74,7 +74,7 @@ Estado: motor experimental. Cada etapa se considera terminada cuando sus criteri
 - [x] Generar una aplicación SSR independiente con `meeko init` y compilarla desde un tarball instalado fuera del repositorio.
 - [x] Mostrar en ambos paneles DevTools las expresiones `.meeko` que leen cada señal, con archivo, línea y columna.
 - [x] Preparar el workflow OIDC para publicaciones futuras y documentar el límite actual entre runtime y herramientas.
-- [ ] Publicar `0.0.2` en npm y crear su etiqueta y versión en GitHub tras completar la autorización de npm.
+- [x] Publicar `0.0.2` en npm y crear su etiqueta y [versión en GitHub](https://github.com/meekojs/meeko/releases/tag/v0.0.2) tras completar la autorización de npm.
 - [ ] Vincular el Trusted Publisher en npm antes de activar la publicación automática de una versión posterior.
 - [ ] Medir el coste de instalación en frío y el arranque SSR de un consumidor publicado antes de decidir si se separan runtime y compilador.
 
