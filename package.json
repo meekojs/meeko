@@ -7,7 +7,7 @@
   "type": "module",
   "files": ["dist/"],
   "types": "./dist/index.d.ts",
-  "repository": { "type": "git", "url": "https://github.com/meekojs/meeko.git" },
+  "repository": { "type": "git", "url": "git+https://github.com/meekojs/meeko.git" },
   "homepage": "https://github.com/meekojs/meeko#readme",
   "bugs": { "url": "https://github.com/meekojs/meeko/issues" },
   "keywords": ["meeko", "components", "ssr", "hydration", "reactivity", "vite", "typescript"],
@@ -23,7 +23,7 @@
     }
   },
   "bin": {
-    "meeko": "./dist/cli.js"
+    "meeko": "dist/cli.js"
   },
   "scripts": {
     "prepack": "tsc -p tsconfig.build.json",

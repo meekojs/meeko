@@ -47,14 +47,15 @@ if (!renderToString({ initial: 4 }).includes("meeko:text:0-->4")) {
 
   Push-Location $consumer
   try {
-    $cli = Join-Path $consumer 'node_modules/@meekojs/meeko/dist/cli.js'
-    & node $cli check Counter.meeko
+    $cli = Join-Path $consumer 'node_modules/.bin/meeko.cmd'
+    if (!(Test-Path -LiteralPath $cli)) { throw 'El paquete no instaló el comando meeko.' }
+    & $cli check Counter.meeko
     if ($LASTEXITCODE -ne 0) { throw 'Falló meeko check desde el paquete instalado.' }
-    & node $cli compile Counter.meeko Counter.generated.ts
+    & $cli compile Counter.meeko Counter.generated.ts
     if ($LASTEXITCODE -ne 0) { throw 'Falló meeko compile desde el paquete instalado.' }
     & node smoke.mjs
     if ($LASTEXITCODE -ne 0) { throw 'Falló SSR desde el paquete instalado.' }
-    & node $cli types Counter.meeko
+    & $cli types Counter.meeko
     if ($LASTEXITCODE -ne 0) { throw 'Falló meeko types desde el paquete instalado.' }
     & node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit
     if ($LASTEXITCODE -ne 0) { throw 'Falló TypeScript en el consumidor externo.' }
