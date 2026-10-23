@@ -12,7 +12,7 @@ $targetCpu = switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArch
   default { throw 'Arquitectura no admitida por las pruebas host.' }
 }
 $target = "$targetOs-$targetCpu"
-$temporaryRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
+$temporaryRoot = if ($IsWindows) { [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()) } else { '/tmp' }
 $testRoot = Join-Path $temporaryRoot ("meeko-host-" + [guid]::NewGuid().ToString('N'))
 $consumer = Join-Path $testRoot 'consumer'
 $extension = Join-Path $testRoot 'vsix/extension'
