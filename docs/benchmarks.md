@@ -92,3 +92,19 @@ Estas cifras pertenecen a una máquina y dos implementaciones concretas. La carg
 En la misma máquina y con el mismo runner, después de omitir escrituras DOM iniciales redundantes y asignar conjuntos de suscriptores y señales de índice sólo cuando se usan, se repitió la suite en ambos órdenes. La lista de 1.000 filas pasó de **3,17 MiB** en el registro anterior a **2,87 MiB** de heap JS tras hidratar (3.007.284 y 3.007.096 B); Vue registró 2,15 MiB (2.255.532 y 2.259.476 B). Su actualización pasó de 0,263 ms a 0,223 y 0,217 ms por paso; Vue registró 0,433 y 0,437 ms.
 
 La hidratación de lista marcó 3,9 y 3,1 ms en Meeko frente a 1,8 y 1,9 ms en Vue. La variación entre corridas impide atribuir un cambio preciso a esta optimización, y el coste sigue por encima de Vue. El montaje completo de navegación marcó 0,252 y 0,230 ms por paso en Meeko frente a 0,077 y 0,072 ms en Vue. Las instantáneas de heap y medianas locales siguen siendo indicadores del escenario, no garantías de producción.
+
+## Consumidor instalado desde npm
+
+El 23 de octubre de 2026 se instaló `@meekojs/meeko@0.0.2` dos veces desde el registro público, cada vez en un directorio temporal y con una caché npm vacía. Se compiló un contador `.meeko` con la CLI instalada y se midieron siete procesos Node separados que importan el componente generado y hacen un render SSR. El ensayo se reproduce con `pwsh -NoProfile -File tools/measure-published-consumer.ps1 -Version 0.0.2`. Máquina: Windows 11, Intel Core Ultra 9 285K, Node 24.21.0 y npm 11.19.0.
+
+| Métrica | Primera corrida | Segunda corrida |
+| --- | ---: | ---: |
+| Instalación con caché vacía | 7,98 s | 7,87 s |
+| Archivos instalados en `node_modules` | — | 56.675.717 B |
+| Archivos de `@meekojs/meeko` | — | 131.785 B |
+| Compilación del contador | 745 ms | 721 ms |
+| Arranque del proceso SSR, mediana | 65,42 ms | 65,26 ms |
+| Importación del componente, mediana | 27,24 ms | 27,11 ms |
+| Primer render, mediana | 0,155 ms | 0,156 ms |
+
+La instalación incluye descarga, resolución y extracción de dependencias; la duración depende de la red y del registro. El tiempo de proceso incluye el arranque de Node y el import del módulo. Es un solo contador sin contraparte equivalente de Vue ni despliegue real. El tamaño instalado, muy superior al de los archivos de Meeko, justifica evaluar una separación de runtime y herramientas, pero estos datos no demuestran todavía que esa separación mejore un consumidor de producción.
