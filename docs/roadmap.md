@@ -75,7 +75,7 @@ Estado: motor experimental. Cada etapa se considera terminada cuando sus criteri
 - [x] Mostrar en ambos paneles DevTools las expresiones `.meeko` que leen cada señal, con archivo, línea y columna.
 - [x] Preparar el workflow OIDC para publicaciones futuras y documentar el límite actual entre runtime y herramientas.
 - [x] Publicar `0.0.2` en npm y crear su etiqueta y [versión en GitHub](https://github.com/meekojs/meeko/releases/tag/v0.0.2) tras completar la autorización de npm.
-- [ ] Vincular el Trusted Publisher en npm antes de activar la publicación automática de una versión posterior.
+- [x] Vincular el Trusted Publisher en npm para `meekojs/meeko` y `publish.yml`. Falta comprobar el flujo en la primera publicación automática de una versión posterior.
 - [x] Medir el coste de instalación en frío y el arranque SSR de un consumidor publicado. El [primer ensayo](benchmarks.md#consumidor-instalado-desde-npm) no decide aún si se separan runtime y compilador.
 
 La [comparativa actual](benchmarks.md) muestra una reducción del heap de listas, aunque su hidratación sigue por encima de Vue en las dos corridas. También queda por acelerar el montaje completo de vistas. Las cifras locales no sustituyen mediciones de una aplicación desplegada.
