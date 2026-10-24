@@ -2,7 +2,19 @@
 
 La extensión reconoce archivos `.meeko`, resalta las secciones TypeScript, HTML y CSS y muestra los mismos diagnósticos de compilación y tipos que `meeko check`. El análisis semántico usa un archivo TypeScript virtual: las referencias del `<script>` y las expresiones del `<template>` comparten completado, navegación, hover y renombrado. El formato de documento delega cada sección al formateador de TypeScript, HTML o CSS instalado en VS Code.
 
-El icono de la extensión y el icono de lenguaje de `.meeko` usan una copia de [`assets/brand/meeko-logo.png`](../../assets/brand/meeko-logo.png). VS Code muestra el icono del lenguaje cuando el tema de iconos activo admite ese mecanismo y no define otro icono para `.meeko`; algunos temas pueden reemplazarlo.
+## Primeros pasos
+
+1. Instala **Meeko Language** en Visual Studio Code 1.140.0 o posterior.
+2. Abre tu proyecto Meeko y un archivo con extensión `.meeko`.
+3. Usa completado, hover, ir a definición, renombrado y **Format Document** desde el editor.
+
+Consulta el panel **Problemas** para ver los diagnósticos de compilación y TypeScript. El canal de salida **Meeko** muestra los fallos internos del comprobador.
+
+La extensión incluye sus herramientas de análisis. Para crear y ejecutar una aplicación, consulta el [repositorio de Meeko](https://github.com/meekojs/meeko). Puedes reportar problemas en [GitHub Issues](https://github.com/meekojs/meeko/issues).
+
+Se distribuyen paquetes para Windows, Linux y macOS, en arquitecturas x64 y ARM64. No se admite VS Code para web ni Alpine Linux.
+
+El icono del lenguaje `.meeko` aparece cuando el tema de iconos activo admite ese mecanismo y no define otro icono para `.meeko`; algunos temas pueden reemplazarlo.
 
 ## Probar en desarrollo
 
@@ -18,7 +30,7 @@ code --new-window --extensionDevelopmentPath="$(Get-Location)" "$(Resolve-Path .
 
 Abre un `.meeko` y consulta el panel **Problemas** para errores `MEEK` o `TS`. La extensión analiza los cambios después de una pausa de 450 ms. La salida **Meeko** registra fallos internos del comprobador. `meeko check <archivo.meeko> --json` permite contrastar los diagnósticos desde una terminal.
 
-## Paquetes locales por plataforma
+## Desarrollo: paquetes por plataforma
 
 ```powershell
 pnpm run package:vsix
@@ -37,4 +49,4 @@ pnpm run test:host:isolated
 - El modelo virtual requiere que las secciones estén sintácticamente cerradas. Mientras se escribe un archivo incompleto, los diagnósticos siguen disponibles, pero las funciones semánticas pueden pausarse hasta que vuelva a ser válido.
 - La interpolación de texto anidada y los valores de atributos sin comillas todavía no tienen correspondencia semántica completa. El compilador y `meeko check` siguen siendo la fuente de verdad para validar esos casos.
 - El formato depende de que VS Code tenga proveedores para TypeScript, HTML y CSS. Una sección sin proveedor conserva su texto.
-- El paquete sigue siendo local y no se ha publicado en el Marketplace. El host real se ha validado localmente en Windows x64; la matriz de CI verificará Linux y macOS al ejecutarse en GitHub. Generar un VSIX cruzado confirma su contenido, pero no sustituye la prueba del host de destino.
+- Generar un VSIX cruzado confirma su contenido, pero no sustituye la prueba del host de destino. La matriz de CI comprueba la extensión en Windows, Linux y macOS.

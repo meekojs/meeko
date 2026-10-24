@@ -38,7 +38,7 @@ try {
   if ($LASTEXITCODE -ne 0) { throw 'Falló la compilación de la extensión.' }
 
   New-Item -ItemType Directory -Path $stagingRoot -Force | Out-Null
-  foreach ($name in @('package.json', 'README.md', 'language-configuration.json', '.vscodeignore')) {
+  foreach ($name in @('package.json', 'README.md', 'CHANGELOG.md', 'language-configuration.json', '.vscodeignore')) {
     Copy-Item -LiteralPath (Join-Path $extensionRoot $name) -Destination $stagingRoot
   }
   Copy-Item -LiteralPath (Join-Path $extensionRoot '../../LICENSE') -Destination $stagingRoot
