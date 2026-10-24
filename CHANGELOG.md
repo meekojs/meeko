@@ -8,7 +8,7 @@
 - Aplicación piloto con SSR, hidratación, formularios, navegación, componentes anidados y API asíncrona, probada en desarrollo y producción con Chromium, Firefox y WebKit.
 - `meeko init <directorio>` genera un proyecto SSR independiente que fija la versión exacta de su compilador y runtime.
 - Línea de tiempo de señales en ambos paneles DevTools, con componente, valor seguro y expresiones de texto o atributo que leen cada señal, ubicadas en el `.meeko`.
-- Workflow de publicación npm mediante Trusted Publishing; vínculo OIDC registrado para `meekojs/meeko` y `publish.yml`, pendiente de su primera ejecución con una versión nueva.
+- Primera publicación npm mediante Trusted Publishing, con procedencia firmada desde `meekojs/meeko` y `publish.yml`.
 
 ## 0.0.2
 

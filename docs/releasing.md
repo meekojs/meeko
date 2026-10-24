@@ -28,9 +28,9 @@ Actualiza la versión de `package.json` y [CHANGELOG.md](../CHANGELOG.md), ejecu
 
 ## Publicación confiable para versiones posteriores
 
-El workflow [`.github/workflows/publish.yml`](../.github/workflows/publish.yml) ejecuta las verificaciones, comprueba que `v<versión>` coincida con `package.json` y publica desde un runner de GitHub mediante OIDC. El **Trusted Publisher** para `meekojs/meeko` y `publish.yml` se registró en npm con permiso de publicación. La CLI confirmó el alta y `npm trust list @meekojs/meeko` mostró el vínculo; la primera publicación OIDC sigue pendiente. No añadas un token de publicación a GitHub.
+El workflow [`.github/workflows/publish.yml`](../.github/workflows/publish.yml) ejecuta las verificaciones, comprueba que `v<versión>` coincida con `package.json` y publica desde un runner de GitHub mediante OIDC. El **Trusted Publisher** para `meekojs/meeko` y `publish.yml` se registró en npm con permiso de publicación. Su primera ejecución publicó `0.0.3` con procedencia firmada. No añadas un token de publicación a GitHub.
 
-Antes de la siguiente versión, comprueba de nuevo `npm trust list @meekojs/meeko`: npm indica que un vínculo nuevo caduca si no completa su primera publicación en dos días. Crea `v<versión>` sobre el commit aprobado y súbela. La etiqueta activa el workflow; comprueba que éste terminó correctamente y que la versión pública de npm corresponde a la etiqueta antes de crear la versión de GitHub. npm genera procedencia automáticamente cuando publica desde este flujo confiable. Si falla la publicación, conserva la etiqueta y corrige el flujo; no reutilices la misma versión después de una publicación exitosa.
+Antes de cada versión, comprueba `npm trust list @meekojs/meeko`. Crea `v<versión>` sobre el commit aprobado y súbela. La etiqueta activa el workflow; comprueba que éste terminó correctamente y que la versión pública de npm corresponde a la etiqueta antes de crear la versión de GitHub. npm genera procedencia automáticamente cuando publica desde este flujo confiable. Si falla la publicación, conserva la etiqueta y corrige el flujo; no reutilices la misma versión después de una publicación exitosa.
 
 La extensión de VS Code se empaqueta por separado. Su VSIX local no implica publicación en Marketplace. Las extensiones de VS Code y Chrome tienen su propio número de versión y requieren pruebas en sus anfitriones antes de publicarse en sus respectivas tiendas. Los artefactos locales pueden adjuntarse a una versión de GitHub indicando qué plataformas se probaron realmente.
 
@@ -41,3 +41,7 @@ La primera versión pública salió del commit `b6324b0` y está disponible en [
 ## Versión 0.0.2
 
 El paquete [npm `0.0.2`](https://www.npmjs.com/package/@meekojs/meeko/v/0.0.2) salió del commit `d587f29` y coincide con la etiqueta [`v0.0.2`](https://github.com/meekojs/meeko/releases/tag/v0.0.2). La [CI de ese commit](https://github.com/meekojs/meeko/actions/runs/39959569174) pasó antes de publicar. La versión de GitHub contiene el ZIP de Chrome DevTools y seis VSIX de VS Code para Windows, Linux y macOS en x64/arm64; son artefactos descargables, aún no versiones de las tiendas. El consumidor instalado desde npm se midió [por separado](benchmarks.md#consumidor-instalado-desde-npm).
+
+## Versión 0.0.3
+
+El paquete [npm `0.0.3`](https://www.npmjs.com/package/@meekojs/meeko/v/0.0.3) salió del commit `2b71e9c` y coincide con la etiqueta [`v0.0.3`](https://github.com/meekojs/meeko/releases/tag/v0.0.3). La [CI de `main`](https://github.com/meekojs/meeko/actions/runs/40059687018) pasó en cuatro trabajos antes de etiquetar. El [workflow de publicación](https://github.com/meekojs/meeko/actions/runs/40059931166) pasó y publicó mediante OIDC con procedencia firmada. Se instaló después desde npm en un proyecto pnpm preexistente, donde `meeko init .`, el chequeo de tipos, la compilación de cliente y servidor y la respuesta SSR de producción funcionaron.
