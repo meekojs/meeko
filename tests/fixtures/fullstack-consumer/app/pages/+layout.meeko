@@ -1,0 +1,21 @@
+<script lang="ts">
+import type { ComponentModule } from "@meekojs/meeko";
+
+export interface Props {
+  outlet: ComponentModule<Record<string, unknown>>;
+}
+
+const props = defineProps<Props>();
+</script>
+
+<template>
+  <div class="app-shell">
+    <header><a href="/">Meeko</a><a href="/users">Users</a><a href="/dashboard">Dashboard</a><a href="/chat">Chat</a><a href="/layer-demo">Layer</a></header>
+    <main><component is="props.outlet"></component></main>
+  </div>
+</template>
+
+<style scoped>
+.app-shell { max-width: 64rem; margin: 0 auto; padding: 2rem; font-family: system-ui, sans-serif; }
+header { margin-bottom: 2rem; }
+</style>

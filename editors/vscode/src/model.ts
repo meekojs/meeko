@@ -1,7 +1,10 @@
 import { dirname, resolve } from "node:path";
-import { parseFragment } from "parse5";
 import ts from "@typescript/typescript6";
+import { applyAutoImports, discoverAutoImportsSync } from "../../../src/autoimports.js";
+import { projectRoot } from "../../../src/compiler/project-root.js";
 import { parseSfc } from "../../../src/compiler/sfc.js";
+import { parseTemplate } from "../../../src/compiler/template.js";
+import type { TemplateNode, TemplateAttribute } from "../../../src/compiler/template.js";
 
 /** Tramo equivalente entre el componente y el archivo TypeScript virtual. */
 export interface SourceSpan {
@@ -9,20 +12,6 @@ export interface SourceSpan {
   sourceEnd: number;
   generatedStart: number;
   generatedEnd: number;
-}
-
-interface NodeLocation {
-  startOffset: number;
-  endOffset: number;
-  attrs?: Record<string, { startOffset: number; endOffset: number }>;
-}
-
-interface TemplateNode {
-  nodeName: string;
-  value?: string;
-  attrs?: Array<{ name: string; value: string }>;
-  childNodes?: TemplateNode[];
-  sourceCodeLocation?: NodeLocation;
 }
 
 /** Modelo semántico de un componente abierto en el editor. */
@@ -59,24 +48,22 @@ export function createEditorModel(source: string, filename: string): EditorModel
     code += ");\n";
   };
 
-  const template = document.template;
-  const root = parseFragment(template.content, { sourceCodeLocationInfo: true }) as unknown as TemplateNode;
+  const root = parseTemplate(source, document.template, filename);
 
   /** Recorre la plantilla y conserva el ámbito de cada lista. */
   const visit = (node: TemplateNode): void => {
     const attrs = node.attrs ?? [];
-    const location = node.sourceCodeLocation;
     const list = attrs.find((attr) => attr.name === "each:of");
     const item = attrs.find((attr) => attr.name === "each:as")?.value ?? "item";
     const index = attrs.find((attr) => attr.name === "each:index")?.value ?? "index";
     if (list) {
-      const listStart = attributeValueStart(template.content, location?.attrs?.["each:of"]);
+      const listStart = attributeValueStart(source, list);
       code += `for (const ${validIdentifier(item) ? item : "item"} of (`;
       const generatedStart = code.length;
       code += list.value;
       if (listStart !== undefined) spans.push({
-        sourceStart: template.contentStart + listStart,
-        sourceEnd: template.contentStart + listStart + list.value.length,
+        sourceStart: listStart,
+        sourceEnd: listStart + list.value.length,
         generatedStart,
         generatedEnd: code.length,
       });
@@ -84,28 +71,42 @@ export function createEditorModel(source: string, filename: string): EditorModel
     }
 
     for (const attr of attrs) {
-      if (!/^(?:bind|on|if|each):/.test(attr.name) || ["each:of", "each:as", "each:index"].includes(attr.name)) continue;
-      const start = attributeValueStart(template.content, location?.attrs?.[attr.name]);
-      if (start !== undefined) expression(attr.value, template.contentStart + start);
+      if (!/^(?:bind|on|if|each):/.test(attr.name) && !(node.tagName === "component" && attr.name === "is")) continue;
+      if (["each:of", "each:as", "each:index"].includes(attr.name)) continue;
+      const start = attributeValueStart(source, attr);
+      if (start !== undefined) expression(attr.value, start);
     }
 
-    if (node.nodeName === "#text" && location) {
-      const original = template.content.slice(location.startOffset, location.endOffset);
+    if (node.nodeName === "#text") {
+      const original = source.slice(node.start, node.end);
       const matches = original.matchAll(/\{([^{}]+)\}/g);
       for (const match of matches) {
         const value = match[1];
         if (value !== undefined && match.index !== undefined) {
-          expression(value, template.contentStart + location.startOffset + match.index + 1);
+          expression(value, node.start + match.index + 1);
         }
       }
     }
     for (const child of node.childNodes ?? []) visit(child);
+    for (const child of node.content?.childNodes ?? []) visit(child);
     if (list) code += "}\n";
   };
   for (const node of root.childNodes ?? []) visit(node);
   code += "}\n";
 
   const virtualFilename = `${resolve(filename).replaceAll("\\", "/")}.ts`;
+  const rootDirectory = projectRoot(filename);
+  const registry = discoverAutoImportsSync(rootDirectory);
+  const target = resolve(filename).replaceAll("\\", "/").includes("/server/") ? "server" : "client";
+  const transformed = applyAutoImports(code, virtualFilename, registry, target);
+  const prefixLength = transformed.length - code.length;
+  if (prefixLength) {
+    for (const span of spans) {
+      span.generatedStart += prefixLength;
+      span.generatedEnd += prefixLength;
+    }
+    code = transformed;
+  }
   const host: ts.LanguageServiceHost = {
     getCompilationSettings: () => ({
       target: ts.ScriptTarget.ES2022,
@@ -114,6 +115,8 @@ export function createEditorModel(source: string, filename: string): EditorModel
       strict: true,
       skipLibCheck: true,
       noEmit: true,
+      rootDirs: [rootDirectory, resolve(rootDirectory, ".meeko/types")],
+      allowArbitraryExtensions: true,
     }),
     getScriptFileNames: () => [virtualFilename],
     getScriptVersion: () => "1",
@@ -159,9 +162,8 @@ function validIdentifier(value: string): boolean {
 }
 
 /** Encuentra el inicio del valor literal de un atributo en la plantilla. */
-function attributeValueStart(source: string, range?: { startOffset: number; endOffset: number }): number | undefined {
-  if (!range) return undefined;
-  const raw = source.slice(range.startOffset, range.endOffset);
+function attributeValueStart(source: string, attribute: TemplateAttribute): number | undefined {
+  const raw = source.slice(attribute.start, attribute.end);
   const match = /=\s*(["'])/.exec(raw);
-  return match && match.index !== undefined ? range.startOffset + match.index + match[0].length : undefined;
+  return match && match.index !== undefined ? attribute.start + match.index + match[0].length : undefined;
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 import { checkSource } from "../src/check.ts";
@@ -89,7 +89,109 @@ test("CLI types genera declaraciones de imports .meeko para un consumidor TS7", 
   assert.match(stdout, /Parent\.d\.meeko\.ts/);
   assert.match(stdout, /Child\.d\.meeko\.ts/);
   assert.match(stdout, /Grandchild\.d\.meeko\.ts/);
-  const declaration = await readFile(resolve("examples/nested/Child.d.meeko.ts"), "utf8");
+  const declaration = await readFile(resolve(".meeko/types/examples/nested/Child.d.meeko.ts"), "utf8");
   assert.match(declaration, /export type ComponentProps = \{\s*label: string;/);
   await execFileAsync(process.execPath, [resolve("node_modules/typescript/bin/tsc"), "-p", resolve("examples/nested/tsconfig.json"), "--noEmit"]);
+});
+
+test("tipos externos y reexportados conservan las props estrictas entre componentes", async () => {
+  const directory = await mkdtemp(join(exampleDirectory, ".meeko-types-test-"));
+  const contract = join(directory, "contract.ts");
+  const child = join(directory, "Child.meeko");
+  const parent = join(directory, "Parent.meeko");
+  const childSource = `<script lang="ts">
+import type { ComputedRef, ExternalProps } from "./contract.js";
+export type { ExternalProps } from "./contract.js";
+export interface CardProps extends ExternalProps { label: string }
+const props = defineProps<CardProps & ComputedRef<string>>();
+</script><template><span>{props.label}: {props.value}</span></template>`;
+  const parentSource = `<script lang="ts">
+import * as Child from "./Child.meeko";
+import type { CardProps } from "./Child.meeko";
+const card: CardProps = { id: 1, label: "ok" };
+</script><template><component is="Child" bind:id="card.id" bind:label="card.label" bind:value="'computed'"></component></template>`;
+  await writeFile(contract, "export interface ExternalProps { id: number }\nexport interface ComputedRef<T> { readonly value: T }\n");
+  await writeFile(child, childSource);
+  await writeFile(parent, parentSource);
+  try {
+    assert.deepEqual(await checkSource(childSource, child), []);
+    assert.deepEqual(await checkSource(parentSource, parent), []);
+    const outputs = await generateTypes(parentSource, parent);
+    assert.equal(outputs.length, 2);
+    const declaration = await readFile(resolve(".meeko/types", relative(resolve("."), directory), "Child.d.meeko.ts"), "utf8");
+    assert.match(declaration, /export type \{ ExternalProps \} from "[^"]+\/contract\.js"/);
+    assert.match(declaration, /export interface CardProps extends ExternalProps/);
+    assert.match(declaration, /CardProps & ComputedRef<string>/);
+    const consumer = join(directory, "consumer.ts");
+    await writeFile(consumer, `import type { CardProps, ComponentProps, ExternalProps } from "./Child.meeko";
+const external: ExternalProps = { id: 1 };
+const card: CardProps = { ...external, label: "ok" };
+const props: ComponentProps = { ...card, value: "computed" };
+void props;
+`);
+    const config = join(directory, "tsconfig.json");
+    await writeFile(config, JSON.stringify({ compilerOptions: {
+      noEmit: true, strict: true, skipLibCheck: true, module: "nodenext", moduleResolution: "nodenext",
+      target: "es2022", allowArbitraryExtensions: true,
+      rootDirs: [resolve("."), resolve(".meeko/types")],
+    }, files: [consumer] }));
+    await execFileAsync(process.execPath, [resolve("node_modules/typescript/bin/tsc"), "-p", config]);
+    const bad = parentSource.replace("bind:value=\"'computed'\"", "bind:value=\"42\"");
+    const errors = await checkSource(bad, parent);
+    assert.ok(errors.some((diagnostic) => diagnostic.code === "TS2322" && diagnostic.filename === parent), JSON.stringify(errors));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+    await rm(resolve(".meeko/types", relative(resolve("."), directory)), { recursive: true, force: true });
+  }
+});
+
+test("un componente recibido como contenido conserva las props de su outlet", async () => {
+  const directory = await mkdtemp(join(exampleDirectory, ".meeko-outlet-test-"));
+  const content = join(directory, "Content.meeko");
+  const host = join(directory, "Host.meeko");
+  const parent = join(directory, "Parent.meeko");
+  const hostSource = `<script lang="ts">
+import type { Component } from "@meekojs/meeko";
+const props = defineProps<{ content: Component<{ label: string }>; label: string }>();
+</script><template><section><component is="props.content" bind:label="props.label"></component></section></template>`;
+  const parentSource = `<script lang="ts">
+import * as Content from "./Content.meeko";
+import * as Host from "./Host.meeko";
+</script><template><component is="Host" bind:content="Content" bind:label="'ok'"></component></template>`;
+  await writeFile(content, `<script lang="ts">const props = defineProps<{ label: string }>();</script><template><strong>{props.label}</strong></template>`);
+  await writeFile(host, hostSource);
+  await writeFile(parent, parentSource);
+  try {
+    assert.deepEqual(await checkSource(parentSource, parent), []);
+    const wrong = parentSource.replace("bind:content=\"Content\"", "bind:content=\"42\"");
+    const errors = await checkSource(wrong, parent);
+    assert.ok(errors.some((diagnostic) => diagnostic.code === "TS2322" && diagnostic.filename === parent), JSON.stringify(errors));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("callbacks de componente comprueban parámetros en ambos lados", async () => {
+  const directory = await mkdtemp(join(exampleDirectory, ".meeko-callback-test-"));
+  const child = join(directory, "Child.meeko");
+  const parent = join(directory, "Parent.meeko");
+  const childSource = `<script lang="ts">
+export interface ChildProps { onSave: (id: number) => void }
+const props = defineProps<ChildProps>();
+</script><template><button on:click="() => props.onSave(1)">Save</button></template>`;
+  const parentSource = `<script lang="ts">
+import * as Child from "./Child.meeko";
+const save = (id: number): void => { void id; };
+</script><template><component is="Child" bind:onSave="save"></component></template>`;
+  await writeFile(child, childSource);
+  await writeFile(parent, parentSource);
+  try {
+    assert.deepEqual(await checkSource(parentSource, parent), []);
+    const wrong = parentSource.replace("(id: number)", "(id: string)");
+    assert.ok((await checkSource(wrong, parent)).some((diagnostic) => diagnostic.code === "TS2322"));
+    const wrongEmit = childSource.replace("props.onSave(1)", "props.onSave('wrong')");
+    assert.ok((await checkSource(wrongEmit, child)).some((diagnostic) => diagnostic.code === "TS2345"));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });

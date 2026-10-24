@@ -11,7 +11,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** Archivos autocontenidos del proyecto inicial, incluidos en la CLI publicada. */
 const starterFiles: Readonly<Record<string, string>> = {
-  ".gitignore": "node_modules/\ndist/\n*.d.meeko.ts\n",
+  ".gitignore": "node_modules/\ndist/\n.meeko/\n",
   "index.html": `<!doctype html>
 <html lang="es">
   <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Meeko SSR</title></head>
@@ -28,9 +28,10 @@ export default defineConfig({ plugins: [meeko()] });
     "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext",
     "lib": ["ES2022", "DOM"], "types": ["node", "vite/client"],
     "strict": true, "noEmit": true, "allowArbitraryExtensions": true,
+    "rootDirs": ["src", ".meeko/types/src"],
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "vite.config.ts"]
+  "include": ["src/**/*.ts", "vite.config.ts", ".meeko/types/routes.d.ts"]
 }
 `,
   "src/App.meeko": `<script lang="ts">

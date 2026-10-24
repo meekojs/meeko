@@ -1,0 +1,18 @@
+<script lang="ts">
+export interface Props {
+  params: Record<string, string>;
+  search: Record<string, string>;
+  data?: { id: string; name: string };
+}
+const props = defineProps<Props>();
+const result = signal("idle");
+const getUser = async () => { result.value = (await api.users.byId.get({ params: { id: "123" } })).name; };
+const postUser = async () => { result.value = (await api.users.post({ body: { name: "Grace" } })).name; };
+</script>
+<template>
+  <section><h1>Users</h1><p id="users-data">{props.data?.name}</p>
+    <button id="get-user" type="button" on:click="getUser">Get user</button>
+    <button id="post-user" type="button" on:click="postUser">Post user</button>
+    <p id="users-result">{result.value}</p>
+  </section>
+</template>

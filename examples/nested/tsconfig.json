@@ -3,7 +3,8 @@
   "compilerOptions": {
     "noEmit": true,
     "rootDir": ".",
+    "rootDirs": ["../..", "../../.meeko/types"],
     "allowArbitraryExtensions": true
   },
-  "include": ["consumer.ts", "*.d.meeko.ts"]
+  "include": ["consumer.ts"]
 }

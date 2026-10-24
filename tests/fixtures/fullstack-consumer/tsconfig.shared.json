@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["shared/**/*.ts", ".meeko/types/autoimports/shared.d.ts"]
+}

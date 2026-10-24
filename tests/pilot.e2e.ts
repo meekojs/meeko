@@ -9,6 +9,9 @@ import { createPilotServer } from "../examples/pilot/server.ts";
 
 const browsers = { chromium, firefox, webkit } as const;
 type PilotBrowser = keyof typeof browsers;
+// A failed browser launch may leave Playwright cleanup pending. The runner uses
+// --test-force-exit after all engines report, while per-engine timeouts bound failures.
+const browserTimeoutMs = 12_000;
 
 /** Ejecuta el mismo contrato observable en un motor y entorno concretos. */
 async function assertPilotFlow(base: string, production: boolean, engine: PilotBrowser): Promise<void> {
@@ -36,14 +39,16 @@ async function assertPilotFlow(base: string, production: boolean, engine: PilotB
 
     browser = await browsers[engine].launch({
       headless: true,
+      timeout: browserTimeoutMs,
       ...(engine === "chromium" && process.env.MEEKO_CHROME_PATH
         ? { executablePath: process.env.MEEKO_CHROME_PATH }
         : {}),
     });
     const page = await browser.newPage();
+    page.setDefaultTimeout(browserTimeoutMs);
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    await page.goto(base, { waitUntil: "networkidle" });
+    await page.goto(base, { waitUntil: "networkidle", timeout: browserTimeoutMs });
     await page.waitForFunction(() => document.documentElement.dataset.hydrated === "true");
     assert.equal(await page.locator(".task-list li").count(), 2);
 
@@ -82,20 +87,22 @@ async function assertPilotFlow(base: string, production: boolean, engine: PilotB
   }
 }
 
-test("el piloto entrega SSR e hidrata en desarrollo", async (context) => {
+test("el piloto entrega SSR e hidrata en desarrollo", { timeout: 60_000 }, async (context) => {
   const pilot = await createPilotServer();
   await new Promise<void>((ready) => pilot.server.listen(0, "127.0.0.1", ready));
   const address = pilot.server.address() as AddressInfo;
   try {
     for (const engine of Object.keys(browsers) as PilotBrowser[]) {
-      await context.test(engine, () => assertPilotFlow(`http://127.0.0.1:${address.port}`, false, engine));
+      console.log(`[pilot:e2e] development/${engine}: start`);
+      await context.test(engine, { timeout: 18_000 }, () => assertPilotFlow(`http://127.0.0.1:${address.port}`, false, engine));
+      console.log(`[pilot:e2e] development/${engine}: finished`);
     }
   } finally {
     await pilot.close();
   }
 });
 
-test("el piloto entrega SSR e hidrata los artefactos de producción", async (context) => {
+test("el piloto entrega SSR e hidrata los artefactos de producción", { timeout: 60_000 }, async (context) => {
   await buildPilot();
   const moduleUrl = pathToFileURL(resolve("examples/pilot/.output/server/http.js")).href;
   const productionModule = await import(moduleUrl) as { createProductionPilotServer(): Promise<import("node:http").Server> };
@@ -104,7 +111,9 @@ test("el piloto entrega SSR e hidrata los artefactos de producción", async (con
   const address = server.address() as AddressInfo;
   try {
     for (const engine of Object.keys(browsers) as PilotBrowser[]) {
-      await context.test(engine, () => assertPilotFlow(`http://127.0.0.1:${address.port}`, true, engine));
+      console.log(`[pilot:e2e] production/${engine}: start`);
+      await context.test(engine, { timeout: 18_000 }, () => assertPilotFlow(`http://127.0.0.1:${address.port}`, true, engine));
+      console.log(`[pilot:e2e] production/${engine}: finished`);
     }
   } finally {
     await new Promise<void>((done, reject) => server.close((error) => error ? reject(error) : done()));

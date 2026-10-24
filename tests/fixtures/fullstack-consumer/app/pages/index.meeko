@@ -1,0 +1,19 @@
+<script lang="ts">
+import { signal } from "@meekojs/meeko";
+
+export interface Props {
+  params: Record<string, string>;
+  search: Record<string, string>;
+  data?: unknown;
+}
+
+const count = signal(0);
+</script>
+
+<template>
+  <section>
+    <h1>Welcome to Meeko</h1>
+    <p>File routes, server rendering, and hydration are ready.</p>
+    <button type="button" on:click="() => count.value++">Count: {count.value}</button>
+  </section>
+</template>

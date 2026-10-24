@@ -21,6 +21,14 @@
       "types": "./dist/vite.d.ts",
       "default": "./dist/vite.js"
     },
+    "./framework": {
+      "types": "./dist/framework.d.ts",
+      "default": "./dist/framework.js"
+    },
+    "./server": {
+      "types": "./dist/node.d.ts",
+      "default": "./dist/node.js"
+    },
     "./internal": {
       "types": "./dist/internal.d.ts",
       "default": "./dist/internal.js"
@@ -49,7 +57,7 @@
     "pilot:check": "pnpm run build && node dist/cli.js check examples/pilot/App.meeko && node dist/cli.js types examples/pilot/App.meeko && tsc -p examples/pilot/tsconfig.json --noEmit",
     "pilot:build": "tsx examples/pilot/build.ts",
     "pilot:serve": "node examples/pilot/.output/server/http.js",
-    "pilot:e2e": "tsx --test tests/pilot.e2e.ts",
+    "pilot:e2e": "node --import tsx --test --test-force-exit tests/pilot.e2e.ts",
     "e2e": "pnpm run example:bundle && pnpm run vite:build && tsx --test tests/browser.e2e.ts",
     "benchmark:check": "pnpm run example:compile && node dist/cli.js compile benchmarks/cases/TreeLeaf.meeko benchmarks/cases/TreeLeaf.generated.ts && node dist/cli.js compile benchmarks/cases/TreeBranch.meeko benchmarks/cases/TreeBranch.generated.ts && node dist/cli.js compile benchmarks/cases/Tree.meeko benchmarks/cases/Tree.generated.ts && node dist/cli.js compile benchmarks/cases/List.meeko benchmarks/cases/List.generated.ts && node dist/cli.js compile benchmarks/cases/Navigation.meeko benchmarks/cases/Navigation.generated.ts && tsc -p tsconfig.benchmark.json --noEmit",
     "benchmark": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/run.ts",
@@ -63,7 +71,8 @@
     "parse5": "^8.0.0",
     "postcss": "^8.5.31",
     "postcss-selector-parser": "^7.1.7",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "ws": "8.22.0"
   },
   "peerDependencies": {
     "vite": "^8.3.5"
@@ -73,9 +82,11 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@types/ws": "8.18.2",
     "esbuild": "0.28.2",
     "happy-dom": "^20.0.0",
     "playwright-core": "1.64.1",
+    "redis": "6.3.0",
     "tsx": "^4.20.0",
     "vite": "8.3.5",
     "vue": "3.5.44"

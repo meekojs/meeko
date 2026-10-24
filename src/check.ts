@@ -1,12 +1,14 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readFile, unlink, writeFile } from "node:fs/promises";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
-import { compile } from "./compiler.js";
+import { compileWithAutoImports } from "./autoimports.js";
 import { originalOffset } from "./compiler/mapping.js";
 import type { SourceMapping } from "./compiler/mapping.js";
+import { moduleSpecifiers } from "./compiler/import-graph.js";
+import { projectRoot } from "./compiler/project-root.js";
 import { compileError, MeekoCompileError, locate } from "./compiler/sfc.js";
 import type { CompileDiagnostic } from "./compiler/sfc.js";
 
@@ -21,40 +23,48 @@ interface GeneratedEntry {
   mappings: SourceMapping[];
 }
 
-async function compileGraph(source: string, filename: string): Promise<{ root: GeneratedEntry; entries: Map<string, GeneratedEntry> }> {
+async function compileGraph(source: string, filename: string): Promise<{ root: GeneratedEntry; entries: Map<string, GeneratedEntry>; tempDirectory: string }> {
   const byOriginal = new Map<string, GeneratedEntry>();
   const byGenerated = new Map<string, GeneratedEntry>();
   const nonce = randomUUID();
+  const rootDirectory = projectRoot(filename);
+  const generatedDirectory = join(rootDirectory, ".meeko", "check", nonce);
   async function add(original: string, content: string): Promise<GeneratedEntry> {
     const previous = byOriginal.get(original);
     if (previous) return previous;
-    const compiled = compile(content, original);
+    const target = relative(rootDirectory, original).split(/[\\/]/)[0] === "server" ? "server" : "client";
+    const compiled = await compileWithAutoImports(content, original, {}, target);
     const entry: GeneratedEntry = {
       original, source: content, code: compiled.code,
-      generated: join(dirname(original), `.${basename(original)}.__meeko_check_${nonce}.ts`),
+      generated: join(generatedDirectory, relative(rootDirectory, original) + ".ts"),
       mappings: compiled.mappings.map((mapping) => ({ ...mapping })),
     };
     byOriginal.set(original, entry);
     byGenerated.set(entry.generated, entry);
-    const importPattern = /\b(?:from\s*|import\s*)["']([^"']+\.meeko)["']/g;
     const edits: Array<{ start: number; end: number; text: string }> = [];
-    for (const match of entry.code.matchAll(importPattern)) {
-      const specifier = match[1]!;
-      const start = match.index + match[0].indexOf(specifier);
-      if (!specifier.startsWith(".")) {
+    for (const specifier of moduleSpecifiers(entry.code, entry.generated)) {
+      const { value, start, end } = specifier;
+      if (!value.endsWith(".meeko") && !value.startsWith(".")) continue;
+      if (value.endsWith(".meeko") && !value.startsWith(".")) {
         throw compileError(content, original, "MEEK033", "Component imports must use relative .meeko paths", originalOffset(entry.mappings, start) ?? 0);
       }
-      const childFilename = resolve(dirname(original), specifier);
-      let childSource: string;
-      try {
-        childSource = await readFile(childFilename, "utf8");
-      } catch {
-        throw compileError(content, original, "MEEK034", `Component import not found: ${specifier}`, originalOffset(entry.mappings, start) ?? 0);
+      let destination: string;
+      if (value.endsWith(".meeko")) {
+        const childFilename = resolve(dirname(original), value);
+        let childSource: string;
+        try {
+          childSource = await readFile(childFilename, "utf8");
+        } catch {
+          throw compileError(content, original, "MEEK034", `Component import not found: ${value}`, originalOffset(entry.mappings, start) ?? 0);
+        }
+        const child = await add(childFilename, childSource);
+        destination = child.generated.replace(/\.ts$/, ".js");
+      } else {
+        destination = resolve(dirname(original), value);
       }
-      const child = await add(childFilename, childSource);
-      let target = relative(dirname(entry.generated), child.generated).replaceAll("\\", "/").replace(/\.ts$/, ".js");
+      let target = relative(dirname(entry.generated), destination).replaceAll("\\", "/");
       if (!target.startsWith("./") && !target.startsWith("../")) target = `./${target}`;
-      edits.push({ start, end: start + specifier.length, text: target });
+      edits.push({ start, end, text: target });
     }
     for (const edit of edits.reverse()) {
       const delta = edit.text.length - (edit.end - edit.start);
@@ -67,7 +77,7 @@ async function compileGraph(source: string, filename: string): Promise<{ root: G
     return entry;
   }
   const root = await add(filename, source);
-  return { root, entries: byGenerated };
+  return { root, entries: byGenerated, tempDirectory: generatedDirectory };
 }
 
 function generatedOffset(code: string, line: number, column: number): number {
@@ -98,12 +108,11 @@ export async function checkSource(source: string, filename: string): Promise<Com
     throw error;
   }
 
-  const written: string[] = [];
   let output = "";
   try {
     for (const entry of graph.entries.values()) {
+      await mkdir(dirname(entry.generated), { recursive: true });
       await writeFile(entry.generated, entry.code, { encoding: "utf8", flag: "wx" });
-      written.push(entry.generated);
     }
     try {
       const result = await execFileAsync(process.execPath, [
@@ -119,7 +128,7 @@ export async function checkSource(source: string, filename: string): Promise<Com
       if (!output.trim()) throw error;
     }
   } finally {
-    await Promise.all(written.map((path) => unlink(path)));
+    await rm(graph.tempDirectory, { recursive: true, force: true });
   }
 
   const typed = parseTypeScriptOutput(output);

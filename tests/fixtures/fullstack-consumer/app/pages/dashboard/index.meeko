@@ -1,0 +1,9 @@
+<script lang="ts">
+export interface Props {
+  params: Record<string, string>;
+  search: Record<string, string>;
+  data?: { id: string; name: string };
+}
+const props = defineProps<Props>();
+</script>
+<template><section><h1>Dashboard</h1><p id="dashboard-user">{props.data?.name}</p></section></template>

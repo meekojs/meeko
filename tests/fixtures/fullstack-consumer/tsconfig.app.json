@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "rootDirs": [".", ".meeko/types"] },
+  "include": ["app/**/*.ts", ".meeko/types/app/**/*.d.meeko.ts", ".meeko/types/routes.d.ts", ".meeko/types/virtual-pages.d.ts", ".meeko/types/server-contracts.d.ts", ".meeko/types/autoimports/client.d.ts"]
+}

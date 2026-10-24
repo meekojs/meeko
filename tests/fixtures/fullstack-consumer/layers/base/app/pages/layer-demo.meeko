@@ -1,0 +1,2 @@
+<script lang="ts">const label = "Layer route works";</script>
+<template><p id="layer-demo">{label}</p></template>

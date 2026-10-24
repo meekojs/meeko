@@ -3,14 +3,56 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { Window } from "happy-dom";
 import { compile } from "../src/compiler.ts";
-import { batch, computed, createRoot, effect, signal } from "../src/reactivity.ts";
+import { batch, computed, createContext, createRoot, effect, inject, provide, signal } from "../src/reactivity.ts";
 import { escapeHtml, serializeJson } from "../src/server.ts";
-import { bindAttribute, bindFor, bindText, renderFor } from "../src/dom.ts";
+import { bindAttribute, bindComponent, bindFor, bindText, renderFor } from "../src/dom.ts";
+import type { Component } from "../src/dom.ts";
 import { hydrate, renderToString, renderWithState } from "../examples/counter/Counter.generated.ts";
 import { renderExamplePage } from "../examples/counter/server.ts";
 import { hydrate as hydrateAttributes, renderToString as renderAttributes } from "../examples/attributes/Attributes.generated.ts";
 import { hydrate as hydrateRegions, renderToString as renderRegions } from "../examples/regions/Regions.generated.ts";
 import { hydrate as hydratePrimitives, renderToString as renderPrimitives } from "../examples/primitives/Primitives.generated.ts";
+
+test("el contexto usa la instancia antecesora más cercana sin mezclar raíces", () => {
+  const key = createContext<number>("count");
+  assert.throws(() => inject(key), /Missing Meeko context/);
+  assert.throws(() => provide(key, 1), /active component root/);
+  createRoot((dispose) => {
+    provide(key, 2);
+    assert.equal(inject(key), 2);
+    createRoot(() => {
+      assert.equal(inject(key), 2);
+      provide(key, 3);
+      assert.equal(inject(key), 3);
+    });
+    assert.equal(inject(key), 2);
+    dispose();
+  });
+  createRoot(() => assert.throws(() => inject(key), /Missing Meeko context/));
+});
+
+test("un contenido de componente tipado puede cambiar conservando sus límites", () => {
+  const window = new Window();
+  const root = window.document.createElement("div");
+  root.innerHTML = "<!--meeko:component:0--><span>A</span><!--/meeko:component:0-->";
+  const released: string[] = [];
+  const moduleFor = (name: string): Component<{ label: string }> => ({
+    renderToString: ({ label }) => `<span>${name}:${label}</span>`,
+    renderWithState: ({ label }) => ({ html: `<span>${name}:${label}</span>`, state: {} }),
+    hydrateScope: () => () => { released.push(name); },
+  });
+  const first = moduleFor("A");
+  const second = moduleFor("B");
+  const selected = signal<Component<{ label: string }>>(first);
+  const stop = bindComponent({ root: root as unknown as Element }, 0, () => selected.value, () => ({ label: "ok" }), "Host.meeko:1:1");
+  assert.equal(root.textContent, "A");
+  selected.value = second;
+  assert.equal(root.textContent, "B:ok");
+  assert.deepEqual(released, ["A"]);
+  stop();
+  assert.deepEqual(released, ["A", "B"]);
+  window.happyDOM.abort();
+});
 
 test("SSR genera HTML escapado y estado aislado por render", () => {
   assert.match(renderToString({ initial: 2 }), /meeko:text:0-->2/);

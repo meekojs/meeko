@@ -1,0 +1,11 @@
+<script lang="ts">
+const result = signal("idle");
+const chat = typeof window === "undefined" ? undefined : useSocket("chat", { roomId: "general" });
+const unsubscribe = chat?.on("message", (message) => { result.value = message.text; });
+const send = async () => { await chat?.emit("message", { text: "Hola", roomId: "general" }); };
+const direct = typeof window === "undefined" ? undefined : socket.chat;
+const directResult = signal("idle");
+const directUnsubscribe = direct?.on("message", (message) => { directResult.value = message.text; });
+const sendDirect = async () => { await direct?.emit("message", { text: "Direct", roomId: "general" }); };
+</script>
+<template><section><h1>Chat</h1><button id="send-chat" type="button" on:click="send">Send</button><p id="chat-result">{result.value}</p><button id="send-direct" type="button" on:click="sendDirect">Direct</button><p id="direct-result">{directResult.value}</p></section></template>

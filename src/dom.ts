@@ -16,6 +16,11 @@ export interface ComponentModule<Props extends object> {
   hydrateScope(scope: DomScope, props: Props, state?: Record<string, unknown>): ComponentRelease;
 }
 
+/** Componente compilado que puede transferir su estado durante SSR. */
+export type Component<Props extends object> = ComponentModule<Props> & {
+  renderWithState(props: Props): { html: string; state: Record<string, unknown> };
+};
+
 /** Función de limpieza que puede exponer el estado editable de su instancia. */
 export interface ComponentRelease {
   (): void;
@@ -125,7 +130,7 @@ function componentRegion(scope: DomScope, id: number): { inner: DomScope; state?
 }
 
 /** Hidrata un hijo dentro de su rango y actualiza props reactivas con limpieza previa. */
-export function bindComponent<Props extends object>(scope: DomScope, id: number, component: ComponentModule<Props>, read: () => Props, location: string): () => void {
+export function bindComponent<Props extends object>(scope: DomScope, id: number, input: ComponentModule<Props> | (() => ComponentModule<Props>), read: () => Props, location: string): () => void {
   let inner: DomScope;
   let state: Record<string, unknown> | undefined;
   try {
@@ -133,17 +138,21 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
   } catch (error) {
     throw new Error(`Hydration mismatch in ${location}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
   }
+  const resolveComponent = (): ComponentModule<Props> => typeof input === "function" ? input() : input;
+  let component = resolveComponent();
   let props = read();
   let release = component.hydrateScope(inner, props, state);
   const stop = effect(() => {
+    const nextComponent = resolveComponent();
     const next = read();
-    if (sameProps(props, next)) return;
-    const state = release.snapshot?.();
-    const html = component.renderToString(next, state);
+    if (nextComponent === component && sameProps(props, next)) return;
+    const state = nextComponent === component ? release.snapshot?.() : undefined;
+    const html = nextComponent.renderToString(next, state);
     release();
     clearRegion(inner);
     insertHtml(inner.end!, html);
-    release = component.hydrateScope(inner, next, state);
+    release = nextComponent.hydrateScope(inner, next, state);
+    component = nextComponent;
     props = next;
   });
   return () => { stop(); release(); };

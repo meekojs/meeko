@@ -1,5 +1,7 @@
 node_modules/
 dist/
+.meeko/
+.pnpm-store/
 .serena/
 *.generated.ts
 *.d.meeko.ts

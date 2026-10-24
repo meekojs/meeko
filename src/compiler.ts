@@ -233,9 +233,9 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
     const position = node.start;
     const referenceAttribute = node.attrs?.find((attribute) => attribute.name === "is");
     const reference = referenceAttribute?.value ?? "";
-    if (!/^[a-zA-Z_$][\w$]*$/.test(reference) || reference.startsWith("__")) {
-      throw compileError(context.source, context.filename, "MEEK030", "A component requires is=\"ImportedComponent\"", position);
-    }
+    if (!reference.trim()) throw compileError(context.source, context.filename, "MEEK030", "A component requires is=\"expression\"", position);
+    const referenceOffset = attributeValueOffset(node, "is", context);
+    validateExpression(reference, context.source, context.filename, referenceOffset);
     if ((node.childNodes ?? []).some((child) => child.nodeName !== "#text" || Boolean(child.value?.trim()))) {
       throw compileError(context.source, context.filename, "MEEK031", "Component children are not supported; close the tag without content", position);
     }
@@ -252,7 +252,6 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
       props.push({ name, nameOffset: attribute.start + 5, expression: attribute.value, offset });
     }
     const id = context.nextRegion++;
-    const referenceOffset = attributeValueOffset(node, "is", context);
     bindings.components.push({ id, reference, referenceOffset, props, offset: position });
     const mappedProps = props.map((prop) => `${markSource(quote(prop.name), prop.nameOffset, prop.name.length)}: ${markSource(prop.expression, prop.offset)}`);
     const object = markSource(`{ ${mappedProps.join(", ")} }`, position, node.end - position);
@@ -348,6 +347,11 @@ function compileScript(section: SfcSection, source: string, filename: string): {
       types.push(markSource(statement.getText(file), section.contentStart + statement.getStart(file)));
       continue;
     }
+    if (ts.isExportDeclaration(statement) && (statement.isTypeOnly ||
+      (statement.exportClause && ts.isNamedExports(statement.exportClause) && statement.exportClause.elements.every((element) => element.isTypeOnly)))) {
+      types.push(markSource(statement.getText(file), section.contentStart + statement.getStart(file)));
+      continue;
+    }
     if (ts.isVariableStatement(statement)) {
       if (statement.declarationList.declarations.length !== 1) throw compileError(source, filename, "MEEK014", "Declare one variable per statement in .meeko scripts", section.contentStart + statement.getStart(file));
       for (const declaration of statement.declarationList.declarations) {
@@ -409,7 +413,7 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
     const location = `${basename(context.filename)}:${point.line}:${point.column} (component ${entry.reference})`;
     const props = entry.props.map((prop) => `${markSource(quote(prop.name), prop.nameOffset, prop.name.length)}: ${mappedExpression(prop.expression, prop.offset)}`);
     const object = markSource(`{ ${props.join(", ")} }`, entry.offset, 1);
-    componentStatements.push(`cleanups.push(__meeko.bindComponent(__scope, ${entry.id}, ${mappedExpression(entry.reference, entry.referenceOffset)}, () => (${object}), ${quote(location)}));`);
+    componentStatements.push(`cleanups.push(__meeko.bindComponent(__scope, ${entry.id}, () => ${mappedExpression(entry.reference, entry.referenceOffset)}, () => (${object}), ${quote(location)}));`);
   }
   statements.unshift(...componentStatements);
   for (const entry of bindings.regions) {

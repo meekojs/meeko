@@ -8,6 +8,14 @@ export interface Signal<T> extends ReadonlySignal<T> {
   value: T;
 }
 
+/** Clave nominal para compartir un valor tipado entre instancias anidadas. */
+export type ContextKey<T> = symbol & { readonly __meekoValue?: (value: T) => T };
+
+/** Crea una clave única; el tipo no se infiere de un valor global compartido. */
+export function createContext<T>(description?: string): ContextKey<T> {
+  return Symbol(description) as ContextKey<T>;
+}
+
 /** Ubicación de una expresión de plantilla que lee una señal durante desarrollo. */
 export interface EffectSource {
   file: string;
@@ -27,6 +35,7 @@ interface Owner {
   observers: Set<Observer>;
   children: Set<() => void>;
   parent: Owner | undefined;
+  context: Map<symbol, unknown>;
 }
 
 interface InternalSignal<T> extends Signal<T> {
@@ -47,6 +56,26 @@ let activeOwner: Owner | undefined;
 let batchDepth = 0;
 let flushing = false;
 const pending = new Set<Observer>();
+
+/** Publica un valor en la instancia activa y sus descendientes. */
+export function provide<T>(key: ContextKey<T>, value: T): void {
+  if (!activeOwner) throw new Error("provide() requires an active component root");
+  activeOwner.context.set(key, value);
+}
+
+/** Lee el proveedor más cercano; falla si falta para evitar un valor implícito. */
+export function inject<T>(key: ContextKey<T>): T {
+  for (let owner = activeOwner; owner; owner = owner.parent) {
+    if (owner.context.has(key)) return owner.context.get(key) as T;
+  }
+  throw new Error(`Missing Meeko context${key.description ? `: ${key.description}` : ""}`);
+}
+
+/** Registers an external resource to be released with the current component root. */
+export function onCleanup(release: () => void): void {
+  if (!activeOwner) throw new Error("onCleanup() requires an active component root");
+  activeOwner.children.add(release);
+}
 
 function detach(observer: Observer): void {
   for (const dependency of observer.dependencies) dependency.subscribers?.delete(observer);
@@ -176,11 +205,14 @@ export function untrack<T>(fn: () => T): T {
 
 /** Asocia efectos a una instancia y entrega una función para liberarlos. */
 export function createRoot<T>(fn: (dispose: () => void) => T): T {
-  const owner: Owner = { observers: new Set(), children: new Set(), parent: activeOwner };
+  const owner: Owner = { observers: new Set(), children: new Set(), parent: activeOwner, context: new Map() };
   const previous = activeOwner;
   activeOwner = owner;
   const dispose = () => {
-    for (const child of [...owner.children]) child();
+    const failures: unknown[] = [];
+    for (const child of [...owner.children]) {
+      try { child(); } catch (error) { failures.push(error); }
+    }
     owner.children.clear();
     for (const observer of owner.observers) {
       observer.disposed = true;
@@ -188,7 +220,10 @@ export function createRoot<T>(fn: (dispose: () => void) => T): T {
       detach(observer);
     }
     owner.observers.clear();
+    owner.context.clear();
     owner.parent?.children.delete(dispose);
+    if (failures.length === 1) throw failures[0];
+    if (failures.length > 1) throw new AggregateError(failures, "Meeko root cleanup failed");
   };
   owner.parent?.children.add(dispose);
   try {

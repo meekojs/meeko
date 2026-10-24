@@ -34,7 +34,7 @@ import { defineConfig } from "vite";
 import { meeko } from "@meekojs/meeko/vite";
 export default defineConfig({ plugins: [meeko()] });
 '@
-  Set-Content -LiteralPath (Join-Path $consumer 'tsconfig.json') -Encoding utf8 -Value '{"compilerOptions":{"target":"ES2022","module":"NodeNext","moduleResolution":"NodeNext","strict":true,"noEmit":true,"lib":["ES2022","DOM"],"allowArbitraryExtensions":true},"include":["main.ts"]}'
+  Set-Content -LiteralPath (Join-Path $consumer 'tsconfig.json') -Encoding utf8 -Value '{"compilerOptions":{"target":"ES2022","module":"NodeNext","moduleResolution":"NodeNext","strict":true,"noEmit":true,"lib":["ES2022","DOM"],"allowArbitraryExtensions":true,"rootDirs":[".",".meeko/types"]},"include":["main.ts"]}'
   Set-Content -LiteralPath (Join-Path $consumer 'smoke.mjs') -Encoding utf8 -Value @'
 import { renderToString } from "./Counter.generated.ts";
 import { mountDevtoolsPanel } from "@meekojs/meeko/devtools-ui";

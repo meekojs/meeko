@@ -1,0 +1,24 @@
+﻿{
+    "name":  "fullstack-consumer",
+    "private":  true,
+    "type":  "module",
+    "engines":  {
+                    "node":  "\u003e=24"
+                },
+    "scripts":  {
+                    "dev":  "node server.mjs",
+                    "check":  "meeko routes . \u0026\u0026 meeko check-app . \u0026\u0026 tsc -p tsconfig.json --noEmit \u0026\u0026 tsc -p tsconfig.shared.json --noEmit \u0026\u0026 tsc -p tsconfig.app.json --noEmit \u0026\u0026 tsc -p tsconfig.server.json --noEmit",
+                    "build":  "npm run check \u0026\u0026 vite build --config vite.config.ts \u0026\u0026 vite build --config vite.server.config.ts \u0026\u0026 meeko prerender .",
+                    "start":  "node server.mjs --production"
+                },
+    "dependencies":  {
+                         "@meekojs/meeko":  "0.0.3",
+                         "valibot":  "^1.5.0"
+                     },
+    "devDependencies":  {
+                            "@types/node":  "^24.0.0",
+                            "typescript":  "^7.0.2",
+                            "vite":  "^8.3.5",
+                            "ws":  "8.22.0"
+                        }
+}
