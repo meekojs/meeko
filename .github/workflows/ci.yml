@@ -10,20 +10,98 @@ permissions:
 jobs:
   test:
     runs-on: windows-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
       - uses: pnpm/action-setup@v6
         with:
           version: 12.14.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run verify
-      - run: pnpm run e2e
+      - name: Verify package and DevTools
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .meeko/ci-logs | Out-Null
+          pnpm run verify 2>&1 | Tee-Object -FilePath .meeko/ci-logs/verify.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - run: node node_modules/playwright-core/cli.js install chromium firefox webkit
-      - run: pnpm run pilot:e2e
+      - name: Browser E2E
+        shell: pwsh
+        run: |
+          pnpm run e2e 2>&1 | Tee-Object -FilePath .meeko/ci-logs/browser-e2e.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Pilot multimotor E2E
+        shell: pwsh
+        run: |
+          pnpm run pilot:e2e 2>&1 | Tee-Object -FilePath .meeko/ci-logs/pilot-e2e.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - run: pnpm run package:smoke
+      - name: Pack public artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .meeko/ci-artifacts | Out-Null
+          pnpm pack --pack-destination .meeko/ci-artifacts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Full-stack tarball consumer and browser
+        shell: pwsh
+        env:
+          MEEKO_BROWSER_CHANNEL: chromium
+        run: ./tests/fullstack-consumer.ps1 -Tarball .meeko/ci-artifacts/meekojs-meeko-0.0.3.tgz
+      - name: Diagnostic logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meeko-test-logs
+          path: .meeko/ci-logs/
+          if-no-files-found: ignore
+      - name: Inspected tarball
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meeko-tarball
+          path: .meeko/ci-artifacts/*.tgz
+          if-no-files-found: ignore
+
+  redis-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Redis real session integration
+        run: |
+          mkdir -p .meeko/ci-logs
+          set -o pipefail
+          pnpm exec tsx --test tests/redis.integration.ts 2>&1 | tee .meeko/ci-logs/redis.log
+        env:
+          MEEKO_REDIS_URL: redis://127.0.0.1:6379
+      - name: Redis diagnostic log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meeko-redis-log
+          path: .meeko/ci-logs/redis.log
+          if-no-files-found: ignore
 
   vscode-extension:
     name: VS Code (${{ matrix.os }})
@@ -35,12 +113,13 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
       - uses: pnpm/action-setup@v6
         with:
           version: 12.14.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm install --frozen-lockfile
         working-directory: editors/vscode
