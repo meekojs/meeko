@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { checkSource } from "./check.js";
 import { compile } from "./compiler.js";
 import { generateTypes } from "./types.js";
@@ -13,7 +15,9 @@ if ((command !== "compile" && command !== "check" && command !== "types" && comm
   try {
     if (command === "init") {
       const target = await initProject(input);
-      process.stdout.write(`Created ${target}\nNext: cd ${target} && npm install && npm run dev\n`);
+      const manager = existsSync(join(target, "pnpm-lock.yaml")) ? "pnpm" : "npm";
+      const prefix = target === resolve(".") ? "" : `cd ${target} && `;
+      process.stdout.write(`Created ${target}\nNext: ${prefix}${manager} install && ${manager} run dev\n`);
     } else {
       const source = await readFile(input, "utf8");
       const diagnostics = await checkSource(source, input);

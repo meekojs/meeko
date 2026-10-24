@@ -79,6 +79,25 @@ if (typeof mountDevtoolsPanel !== "function") {
     if ($LASTEXITCODE -ne 0) { throw 'No se pudieron instalar las dependencias del proyecto generado.' }
     & npm run build --prefix $starter
     if ($LASTEXITCODE -ne 0) { throw 'Falló el build SSR del proyecto generado.' }
+
+    $prepared = Join-Path $testRoot 'prepared'
+    New-Item -ItemType Directory -Path $prepared -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $prepared 'package.json') -Encoding utf8 -Value '{"name":"existing-shell","type":"commonjs","scripts":{"test":"echo original"},"dependencies":{"@meekojs/meeko":"^0.0.2"}}'
+    Set-Content -LiteralPath (Join-Path $prepared 'pnpm-workspace.yaml') -Encoding utf8 -Value "minimumReleaseAgeExclude:`n  - '@meekojs/meeko@0.0.2'`n"
+    Set-Content -LiteralPath (Join-Path $prepared 'pnpm-lock.yaml') -Encoding utf8 -Value "lockfileVersion: '9.0'`n"
+    & $cli init $prepared
+    if ($LASTEXITCODE -ne 0) { throw 'Falló meeko init en un directorio preparado por pnpm.' }
+    $preparedManifestPath = Join-Path $prepared 'package.json'
+    $preparedManifest = Get-Content -LiteralPath $preparedManifestPath -Raw | ConvertFrom-Json
+    if ($preparedManifest.scripts.test -ne 'echo original' -or $preparedManifest.dependencies.'@meekojs/meeko' -ne $packageVersion) {
+      throw 'meeko init no conservó el manifiesto o no fijó la versión instalada.'
+    }
+    $preparedManifest.dependencies.'@meekojs/meeko' = $tarball
+    $preparedManifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $preparedManifestPath -Encoding utf8
+    & pnpm -C $prepared install --no-frozen-lockfile
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudo instalar el proyecto preparado con pnpm.' }
+    & pnpm -C $prepared run build
+    if ($LASTEXITCODE -ne 0) { throw 'Falló el build SSR del proyecto preparado con pnpm.' }
   } finally {
     Pop-Location
   }

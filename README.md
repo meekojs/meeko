@@ -57,7 +57,9 @@ npm install
 npm run dev
 ```
 
-Abre `http://127.0.0.1:4173`. `npm run check` genera los tipos del componente y ejecuta TypeScript 7. `npm run build` compila cliente y servidor; `npm start` sirve la versión compilada con SSR. La CLI exige un directorio nuevo o vacío para evitar sobrescribir archivos.
+Abre `http://127.0.0.1:4173`. `npm run check` genera los tipos del componente y ejecuta TypeScript 7. `npm run build` compila cliente y servidor; `npm start` sirve la versión compilada con SSR. La CLI no sobrescribe archivos de aplicación existentes.
+
+Desde `0.0.3`, si ya ejecutaste `pnpm add @meekojs/meeko` en una carpeta sin código, puedes inicializarla directamente con `pnpm exec meeko init .`. Se conservan el manifiesto, los lockfiles, el workspace y `node_modules`; la CLI rechaza archivos de aplicación o scripts que entrarían en conflicto. Después ejecuta `pnpm install` y `pnpm run dev`. Para actualizar desde `0.0.2`, usa `pnpm add @meekojs/meeko@0.0.3` antes de `init .`.
 
 ## Estructura
 
