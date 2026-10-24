@@ -1,18 +1,34 @@
 # Cambios de Meeko
 
-## Unreleased
+## [0.0.4] - Unreleased
 
-### Fixed
+### Framework full-stack
 
-- `ws` se carga al activar el adaptador WebSocket de Node; importar el motor o la entrada de servidor no inicia el transporte.
-- El servidor generado rechaza enlaces simbólicos que salen de los directorios públicos, y la composición rechaza layers enlazados fuera del proyecto.
+- Rutas basadas en archivos con parámetros y navegación tipados, layouts persistentes, SSR e hidratación.
+- Estado `useState` aislado por petición, prerender y composición de módulos y layers.
+- Starter `meeko init-framework` y generación de manifiestos mediante CLI y Vite.
 
-### Verification
+### Autoimports y tipos
 
-- Lockfile actualizado para `ws`, `@types/ws` y la dependencia de prueba `redis`.
-- Prueba de integración Redis y gates de CI con un servicio Redis real.
-- Baseline reproducible de compilación, HMR, SSR, hidratación, navegación, tamaño y dispatchers.
-- Source maps de JavaScript publicados con fuentes embebidas.
+- Autoimports tipados en `.meeko` y `.ts` para componentes, composables, stores y utilidades; símbolos `api`, `rpc`, `socket` y `useSocket`.
+- Declaraciones TypeScript generadas por ámbito, con separación entre código cliente, servidor y shared.
+
+### Servidor
+
+- API HTTP y RPC tipados mediante contratos Standard Schema; despacho RPC local durante SSR con la misma validación y autorización.
+- Sesiones con adaptadores Redis y SQL, y canales WebSocket con transporte Node.
+- Validación de entradas y salidas, autorización y errores normalizados.
+
+### Seguridad y correcciones
+
+- Aislamiento de peticiones SSR, protección CSRF y límites de imports entre cliente y servidor.
+- Protección de rutas públicas y layers frente a enlaces simbólicos que salen del proyecto.
+- Comprobaciones de Origin y autorización de WebSocket; `ws` se carga sólo al activar el adaptador Node.
+
+### Verificación y herramientas
+
+- Mejoras de Vite y CLI, source maps de JavaScript con fuentes embebidas y baseline reproducible de rendimiento.
+- Consumidor externo desde tarball, integración con Redis real en CI y E2E en Chromium, Firefox y WebKit.
 
 ## 0.0.3
 

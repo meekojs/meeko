@@ -62,6 +62,22 @@ Abre `http://127.0.0.1:4173`. `npm run check` genera los tipos del componente y 
 
 Desde `0.0.3`, si ya ejecutaste `pnpm add @meekojs/meeko` en una carpeta sin código, puedes inicializarla directamente con `pnpm exec meeko init .`. Se conservan el manifiesto, los lockfiles, el workspace y `node_modules`; la CLI rechaza archivos de aplicación o scripts que entrarían en conflicto. Después ejecuta `pnpm install` y `pnpm run dev`. Para actualizar desde `0.0.2`, usa `pnpm add @meekojs/meeko@0.0.3` antes de `init .`.
 
+### Crear una aplicación full-stack
+
+Meeko Engine permite usar componentes `.meeko` de forma independiente. Meeko Framework añade rutas por archivos, layouts, SSR, estado por petición, API, RPC, sesiones y WebSocket con el mismo compilador y runtime. **La versión `0.0.4` que incluye este framework está preparada, pero aún no se ha publicado en npm.** Una vez publicada e instalada, crea una aplicación con:
+
+```powershell
+pnpm exec meeko init-framework my-app
+cd my-app
+npm install
+npm run dev
+npm run check
+npm run build
+npm start
+```
+
+`check` genera contratos y comprueba tipos; `build` produce cliente, servidor y prerender. `start` sirve SSR de producción con Node 24 y requiere configurar sesiones persistentes. La [guía del framework](docs/framework.md) explica configuración, autoimports, rutas, despliegue y seguridad.
+
 ## Estructura
 
 | Ruta | Responsabilidad |

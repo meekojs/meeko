@@ -97,7 +97,7 @@ jobs:
         shell: pwsh
         env:
           MEEKO_BROWSER_CHANNEL: chromium
-        run: ./tests/fullstack-consumer.ps1 -Tarball .meeko/ci-artifacts/meekojs-meeko-0.0.3.tgz
+        run: ./tests/fullstack-consumer.ps1 -Tarball .meeko/ci-artifacts/meekojs-meeko-0.0.4.tgz
       - name: Diagnostic logs on failure
         if: failure()
         uses: actions/upload-artifact@v4

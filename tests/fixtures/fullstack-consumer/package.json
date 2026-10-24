@@ -12,7 +12,7 @@
                     "start":  "node server.mjs --production"
                 },
     "dependencies":  {
-                         "@meekojs/meeko":  "0.0.3",
+                         "@meekojs/meeko":  "0.0.4",
                          "valibot":  "^1.5.0"
                      },
     "devDependencies":  {

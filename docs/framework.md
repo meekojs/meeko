@@ -2,7 +2,7 @@
 
 Meeko conserva el motor independiente en `@meekojs/meeko`. El modo de aplicación usa `@meekojs/meeko/framework`, el servidor Node usa `@meekojs/meeko/server` y Vite usa `@meekojs/meeko/vite`. Las tres subrutas pertenecen al mismo paquete y versión. Node 24 es el destino de servidor publicado; SSR está activo por defecto.
 
-La versión actual del paquete es `0.0.3`. La aplicación generada necesita Node 24 o posterior y TypeScript 7 para comprobar sus declaraciones; el compilador de `.meeko` utiliza internamente TypeScript 6. El paquete es ESM. `vite` es un peer opcional: una aplicación que sólo usa el motor puede importar `@meekojs/meeko` sin iniciar el framework, el servidor, sesiones o Socket. El adaptador Node carga `ws` al activar `attachNodeWebSocketServer`, no al importar el motor.
+La versión `0.0.4` está preparada para publicación y aún no está disponible en npm. La aplicación generada necesita Node 24 o posterior y TypeScript 7 para comprobar sus declaraciones; el compilador de `.meeko` utiliza internamente TypeScript 6. El paquete es ESM. `vite` es un peer opcional: una aplicación que sólo usa el motor puede importar `@meekojs/meeko` sin iniciar el framework, el servidor, sesiones o Socket. El adaptador Node carga `ws` al activar `attachNodeWebSocketServer`, no al importar el motor.
 
 ## Crear una aplicación
 
