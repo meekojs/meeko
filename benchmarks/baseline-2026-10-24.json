@@ -1,0 +1,109 @@
+{
+  "environment": {
+    "timestamp": "2026-10-24T07:11:59.815Z",
+    "node": "v24.21.0",
+    "os": "win32 10.0.26300",
+    "cpu": "Intel(R) Core(TM) Ultra 9 285K",
+    "chrome": "channel:chrome",
+    "rounds": 7,
+    "warmups": 2,
+    "consumer": "tarball-installed full-stack fixture",
+    "productionOrigin": "http://127.0.0.1:57660"
+  },
+  "metrics": {
+    "compileColdMs": {
+      "samples": 7,
+      "median": 9.401399999999967,
+      "p10": 9.077299999999923,
+      "p90": 9.445100000000139,
+      "minimum": 9.077299999999923,
+      "maximum": 9.536299999999983
+    },
+    "compileAfterEditMs": {
+      "samples": 7,
+      "median": 0.8697999999999411,
+      "p10": 0.5260000000000673,
+      "p90": 1.1434999999999036,
+      "minimum": 0.5260000000000673,
+      "maximum": 1.2479000000000724
+    },
+    "hmrBrowserUpdateMs": {
+      "samples": 7,
+      "median": 28.626499999999396,
+      "p10": 27.1862000000001,
+      "p90": 29.106199999999262,
+      "minimum": 27.1862000000001,
+      "maximum": 30.96900000000005
+    },
+    "ssrRequestMs": {
+      "samples": 7,
+      "median": 0.040317000000000006,
+      "p10": 0.03207600000000184,
+      "p90": 0.05974800000000414,
+      "minimum": 0.03207600000000184,
+      "maximum": 0.06843199999999797
+    },
+    "hydrationMs": {
+      "samples": 7,
+      "median": 11.099999994039536,
+      "p10": 10.700000017881393,
+      "p90": 11.199999988079071,
+      "minimum": 10.700000017881393,
+      "maximum": 11.399999976158142
+    },
+    "clientNavigationMs": {
+      "samples": 7,
+      "median": 1.9000000059604645,
+      "p10": 1.7999999821186066,
+      "p90": 2.0999999940395355,
+      "minimum": 1.7999999821186066,
+      "maximum": 2.300000011920929
+    },
+    "engineBundle": {
+      "bytes": 19134,
+      "gzipBytes": 7222
+    },
+    "minimalAppBundle": {
+      "files": 2,
+      "bytes": 21314,
+      "gzipBytes": 6438
+    },
+    "fullstackAppBundle": {
+      "files": 13,
+      "bytes": 36063,
+      "gzipBytes": 14897
+    },
+    "ssrMemory": {
+      "heapBeforeBytes": 87276056,
+      "heapAfterBytes": 87012304,
+      "heapDeltaBytes": -263752,
+      "peakRssBytes": 224952320,
+      "requests": 500
+    },
+    "apiDispatchMs": {
+      "samples": 7,
+      "median": 0.018553000000001704,
+      "p10": 0.01664299999999912,
+      "p90": 0.018597999999997228,
+      "minimum": 0.01664299999999912,
+      "maximum": 0.019056000000000496
+    },
+    "rpcDispatchMs": {
+      "samples": 7,
+      "median": 0.04864700000000084,
+      "p10": 0.043908000000001265,
+      "p90": 0.05443199999999706,
+      "minimum": 0.043908000000001265,
+      "maximum": 0.05547199999999975
+    }
+  },
+  "notes": [
+    "Cold compilation times exclude worker startup and module import; each sample uses a fresh worker.",
+    "Compile-after-edit measures full compile of a changed source; Meeko does not cache compiler output.",
+    "HMR measures file write through visible browser update in the official Vite example's development mode.",
+    "SSR and dispatcher timings use in-process Fetch handlers from the production server bundle.",
+    "Hydration duration uses marks around mountClientApp in the external fixture.",
+    "Client navigation uses mountClientApp.navigate with serverData enabled.",
+    "Minimal app size is the existing examples/vite production asset set; full-stack size is the tarball-installed fixture asset set."
+  ]
+}

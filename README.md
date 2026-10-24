@@ -14,6 +14,7 @@ El proyecto está en etapa temprana. Ya funciona el recorrido completo de un con
 
 - [Arquitectura y contratos](docs/architecture.md)
 - [API y límites de compatibilidad](docs/api.md)
+- [Aplicaciones full-stack con Meeko](docs/framework.md)
 - [Plan de desarrollo y criterios de aceptación](docs/roadmap.md)
 - [Comparativa reproducible con Vue](docs/benchmarks.md)
 - [DevTools para depurar componentes](docs/devtools.md)
@@ -135,7 +136,7 @@ Un archivo tiene `<script lang="ts">`, `<template>` y un `<style>` opcional; `sc
 
 `if:when="expression"` muestra u oculta un elemento. Una lista usa `each:of="items"`, `each:as="item"` y `each:key="item.id"`; `each:index="position"` permite nombrar el índice, que se llama `index` por defecto. Las claves deben ser cadenas o números finitos y no pueden repetirse. Meeko conserva los nodos de las claves existentes al reordenar la lista. [Regions.meeko](examples/regions/Regions.meeko) muestra condiciones, listas anidadas, eventos y atributos dinámicos.
 
-Un componente importado en el script se inserta con `<component is="Child" bind:label="expression"></component>`. Las props se comprueban con TypeScript y cada hijo se hidrata dentro de un rango de comentarios, sin un elemento envolvente. El cierre explícito es obligatorio; la sintaxis autocerrada de HTML no se admite para `<component>`. [Parent.meeko](examples/nested/Parent.meeko) muestra hijos y nietos dentro de condiciones y listas.
+Un componente importado en el script se inserta con `<component is="Child" bind:label="expression"></component>`. Las props se comprueban con TypeScript y cada hijo se hidrata dentro de un rango de comentarios, sin un elemento envolvente. `is` también acepta un componente recibido como prop tipada `Component<Props>`; así se puede insertar contenido reutilizable y cambiarlo reactivamente. La comunicación hacia el padre usa callbacks tipados en las props, y `createContext<T>()` permite compartir valores con descendientes. El cierre explícito es obligatorio; la sintaxis autocerrada de HTML no se admite para `<component>`. [Parent.meeko](examples/nested/Parent.meeko) muestra hijos y nietos dentro de condiciones y listas.
 
 Los errores de sintaxis de script, plantilla y CSS, así como los errores de tipos en declaraciones y expresiones, tienen ubicación en `.meeko`. Los errores atribuibles sólo al código auxiliar generado se identifican explícitamente.
 

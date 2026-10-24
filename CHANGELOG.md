@@ -1,5 +1,19 @@
 # Cambios de Meeko
 
+## Unreleased
+
+### Fixed
+
+- `ws` se carga al activar el adaptador WebSocket de Node; importar el motor o la entrada de servidor no inicia el transporte.
+- El servidor generado rechaza enlaces simbólicos que salen de los directorios públicos, y la composición rechaza layers enlazados fuera del proyecto.
+
+### Verification
+
+- Lockfile actualizado para `ws`, `@types/ws` y la dependencia de prueba `redis`.
+- Prueba de integración Redis y gates de CI con un servicio Redis real.
+- Baseline reproducible de compilación, HMR, SSR, hidratación, navegación, tamaño y dispatchers.
+- Source maps de JavaScript publicados con fuentes embebidas.
+
 ## 0.0.3
 
 - `meeko init .` configura una carpeta recién preparada con pnpm, conserva su manifiesto y archivos del gestor, y rechaza proyectos que ya contienen código o scripts incompatibles.

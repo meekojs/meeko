@@ -8,36 +8,69 @@ Un componente contiene un `<script lang="ts">` y un `<template>`; `<style scoped
 
 ```html
 <script lang="ts">
-import { signal } from "@meekojs/meeko";
+    import { signal } from '@meekojs/meeko'
 
-interface Props { initial: number }
-const props = defineProps<Props>();
-const count = signal(props.initial);
-function increment(): void { count.value++; }
+    interface Props {
+        initial: number
+    }
+    const props = defineProps<Props>()
+    const count = signal(props.initial)
+    function increment(): void {
+        count.value++
+    }
 </script>
 
 <template>
-  <button on:click="increment" bind:title="String(count.value)">{count.value}</button>
+    <button
+        on:click="increment"
+        bind:title="String(count.value)"
+    >
+        {count.value}
+    </button>
 </template>
 ```
 
 La plantilla acepta texto `{expression}`, eventos `on:event="handler"`, atributos dinámicos `bind:name="expression"`, condiciones `if:when="expression"` y listas con `each:of`, `each:as` y `each:key`. `each:index` nombra el índice y su valor predeterminado es `index`. Las claves son cadenas o números finitos y deben ser únicas entre hermanos. Los atributos booleanos se agregan o eliminan según el valor de la expresión.
 
-Para componer componentes, importa el módulo hijo en el script y usa `<component is="Child" bind:label="expression"></component>`. `is` nombra el import y cada `bind:` define una prop tipada. `<component>` requiere cierre explícito y no admite contenido interno. El HTML SSR marca un rango de comentarios para hidratar el hijo sin elemento envolvente; los hijos pueden aparecer en condiciones y listas.
+Para componer componentes, importa el módulo hijo en el script y usa `<component is="Child" bind:label="expression"></component>`. `is` acepta una expresión de módulo y cada `bind:` define una prop tipada. `<component>` requiere cierre explícito y no admite contenido interno. El HTML SSR marca un rango de comentarios para hidratar el hijo sin elemento envolvente; los hijos pueden aparecer en condiciones y listas.
+
+`is` también acepta una expresión que devuelva un módulo de componente. Esto permite pasar contenido como una prop `Component<Props>` y renderizarlo dentro de otro componente con props comprobadas por TypeScript:
+
+```html
+<!-- Card.meeko -->
+<script lang="ts">
+    import type { Component } from '@meekojs/meeko'
+    const props = defineProps<{ content: Component<{ label: string }>; label: string }>()
+</script>
+<template>
+    <section>
+        <component
+            is="props.content"
+            bind:label="props.label"
+        ></component>
+    </section>
+</template>
+```
+
+El padre puede usar `<component is="Card" bind:content="Content" bind:label="'Hola'"></component>`, donde `Content` es un módulo `.meeko` importado. Si la expresión `is` cambia reactivamente, Meeko libera la instancia anterior y renderiza e hidrata la nueva dentro de los mismos marcadores. El contenido se crea como componente independiente, con su propio estado y limpieza. No existe aún una sintaxis de contenido inline dentro de `<component>`.
+
+Para comunicar un hijo con su padre, declara un callback tipado en las props: `onSave: (id: number) => void`. El hijo llama `props.onSave(id)` y el padre pasa `bind:onSave="save"`. TypeScript comprueba tanto los argumentos emitidos por el hijo como la firma entregada por el padre. Esta comunicación explícita evita un canal de eventos sin contrato.
+
+Los scripts aceptan `import type`, `export interface`, `export type` y reexportaciones de tipos. Por ejemplo, `import type { ComputedRef } from "./contract.js"; export interface CardProps { label: string }; const props = defineProps<CardProps & ComputedRef<string>>();` conserva la intersección en `ComponentProps` y en la declaración `.d.meeko.ts`. El consumidor debe proporcionar todos sus campos; el nombre `ComputedRef` por sí mismo no convierte una prop en señal reactiva.
 
 ## Módulo generado
 
 Cada `.meeko` exporta `ComponentProps`, `css`, `renderWithState(props)`, `renderToString(props)`, `hydrate(root, props, state?)` y `hydrateScope(scope, props, state?)`. La aplicación entrega las mismas props serializables al servidor y al navegador. `renderWithState` devuelve HTML y una captura de señales editables validada como JSON; `hydrate` restaura esos valores antes de reclamar el HTML existente. Los hijos transportan su propio estado dentro de sus marcadores de comentarios. `hydrateScope` lo usa el compilador para esos hijos. La función de limpieza libera observadores y eventos. Una diferencia en el HTML inicial produce un error de hidratación.
 
 ```ts
-import { hydrate, renderWithState } from "./Counter.meeko";
-import { serializeJson } from "@meekojs/meeko";
+import { hydrate, renderWithState } from './Counter.meeko'
+import { serializeJson } from '@meekojs/meeko'
 
-const props = { initial: 1 };
-const { html, state } = renderWithState(props);
-const payload = serializeJson({ props, state });
+const props = { initial: 1 }
+const { html, state } = renderWithState(props)
+const payload = serializeJson({ props, state })
 // El servidor inserta html en la raíz y payload en un script JSON seguro.
-const release = hydrate(document.querySelector("#counter")!, props, state);
+const release = hydrate(document.querySelector('#counter')!, props, state)
 // Llamar release() cuando la raíz deje de usarse.
 ```
 
@@ -46,6 +79,8 @@ Para transferir props o estado en una etiqueta `<script>`, usa `serializeJson(va
 ## Reactividad
 
 `signal(initial)` crea un valor editable con `.value`. `computed(() => expression)` crea un valor derivado de solo lectura. `effect(() => ...)` observa las señales leídas y devuelve una función que cancela el observador. `batch(() => ...)` agrupa actualizaciones; `untrack(() => ...)` lee sin suscribir el observador actual. `createRoot(dispose => ...)` agrupa efectos para liberarlos al desmontar una instancia.
+
+`createContext<T>()` crea una clave única tipada. `provide(key, value)` publica un valor en la instancia activa; `inject(key)` busca el proveedor más cercano y falla explícitamente si falta. Las raíces independientes no comparten valores. Si el valor es una señal, los descendientes pueden leerla reactivamente.
 
 Los observadores creados durante `hydrate` pertenecen a esa instancia. Durante HMR de Vite se conservan por nombre las señales editables del script; los valores derivados se calculan otra vez. Este estado en memoria de HMR es independiente de la transferencia JSON entre servidor y navegador.
 
