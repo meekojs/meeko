@@ -1,6 +1,5 @@
-import { pathToFileURL } from "node:url";
 import type { ApiRouteDefinition, RpcDefinition, Schema } from "./contracts.js";
-import type { ServerManifest } from "./discovery.js";
+import type { ServerManifest, ServerModuleLoader } from "./discovery.js";
 import { serializeJson } from "../server.js";
 
 export interface OpenApiOptions {
@@ -10,7 +9,8 @@ export interface OpenApiOptions {
   publicSchemas: Readonly<Record<string, Schema>>;
   /** For Valibot, supply a converter from @valibot/to-json-schema. */
   toJsonSchema(schema: Schema): unknown;
-  load?: (file: string) => Promise<unknown>;
+  /** Resolves each manifest file key to its handler module. */
+  load: ServerModuleLoader;
   cookieName?: string;
 }
 
@@ -39,7 +39,8 @@ function publicPath(pathname: string): string {
 
 /** Generates OpenAPI only from a caller-provided public schema registry. */
 export async function generateOpenApi(options: OpenApiOptions): Promise<Record<string, unknown>> {
-  const load = options.load ?? (async (file: string) => import(pathToFileURL(file).href) as Promise<unknown>);
+  if (typeof options.load !== "function") throw new TypeError("OpenAPI generation requires a module loader");
+  const load = options.load;
   const registry = new Map<Schema, string>();
   for (const [name, schema] of Object.entries(options.publicSchemas)) {
     if (!/^[A-Za-z_$][\w$]*$/.test(name)) throw new Error(`Invalid public schema name: ${name}`);

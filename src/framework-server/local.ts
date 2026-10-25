@@ -1,8 +1,7 @@
-import { pathToFileURL } from "node:url";
 import { ApiError, dispatchApiRoute, dispatchRpc, errorResponse, reportServerError } from "./contracts.js";
 import type { ApiRouteDefinition, RpcDefinition, Schema, ServerErrorObserver } from "./contracts.js";
 import type { RequestContext } from "./context.js";
-import type { ApiMethod, ServerManifest } from "./discovery.js";
+import type { ApiMethod, ServerManifest, ServerModuleLoader } from "./discovery.js";
 import type { SessionManager } from "./sessions.js";
 import { serializeJson } from "../server.js";
 
@@ -10,7 +9,8 @@ export interface LocalCallOptions<S> {
   manifest: ServerManifest;
   context: RequestContext<S>;
   sessions: SessionManager;
-  load?: (file: string) => Promise<unknown>;
+  /** Resolves each manifest file key to its handler module. */
+  load: ServerModuleLoader;
   onError?: ServerErrorObserver;
 }
 
@@ -58,7 +58,8 @@ function routeModule(module: unknown): unknown {
 
 /** Local calls use in-memory Request objects, never a network fetch or global context. */
 export function createLocalCalls<S>(options: LocalCallOptions<S>) {
-  const load = options.load ?? (async (file: string) => import(pathToFileURL(file).href) as Promise<unknown>);
+  if (typeof options.load !== "function") throw new TypeError("Local calls require a module loader");
+  const load = options.load;
   const derived = (request: Request): RequestContext<S> => ({ ...options.context, request });
   return {
     async api(clientKey: string, method: ApiMethod, input: LocalApiInput = {}): Promise<Response> {

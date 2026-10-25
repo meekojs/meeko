@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { createNavigator, createRouteManifest, href, matchRoute } from "../src/framework/router.ts";
-import { createFrameworkHandler, discoverRoutes } from "../src/framework/server.ts";
+import { createFrameworkHandler } from "../src/framework/server.ts";
+import { discoverRoutes } from "../src/framework/routes-discovery.ts";
 import { currentRequest } from "../src/framework-server/context.ts";
 import { ApiError, createRequestContext, MemorySessionStore, SessionManager, useRequestState } from "../src/framework-server.ts";
 

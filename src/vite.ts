@@ -9,13 +9,13 @@ import { sourceMapForCompiled } from "./compiler/sourcemap.js";
 import { discoverAutoImports, transformAutoImports } from "./autoimports.js";
 import { transformTypeScriptAutoImports, typeScriptAutoImportMap } from "./autoimports-ts.js";
 import { discoverConfiguredRoutes, loadMeekoConfig, resolveConfigSources } from "./framework/config.js";
+import { clientRoutesSource, readBuildAppData, serverAppSource } from "./framework/app-manifest.js";
 
 const stylePrefix = "\0virtual:meeko-style:";
-const pageModules = new Map<string, "client" | "server" | "routes">([
-  ["virtual:meeko-client-pages", "client"],
-  ["virtual:meeko-server-pages", "server"],
-  ["virtual:meeko-server-routes", "routes"],
-]);
+const clientPagesModule = "virtual:meeko-client-pages";
+const clientRoutesModule = "virtual:meeko-manifest/client";
+const serverAppModule = "virtual:meeko-server-app";
+const virtualModules = new Set([clientPagesModule, clientRoutesModule, serverAppModule]);
 const runtimeDirectory = `${normalizePath(dirname(fileURLToPath(import.meta.url)))}/`;
 
 /** Transforma componentes .meeko para Vite, tanto en cliente como en SSR. */
@@ -34,30 +34,23 @@ export function meeko(): Plugin {
     },
     resolveId(id) {
       if (id.startsWith("virtual:meeko-style:")) return `\0${id}`;
-      if (pageModules.has(id)) return `\0${id}`;
+      if (virtualModules.has(id)) return `\0${id}`;
       return null;
     },
     async load(id) {
-      const kind = pageModules.get(id.slice(1));
-      if (kind) {
+      const virtual = id.startsWith("\0") ? id.slice(1) : undefined;
+      if (virtual === clientRoutesModule) return clientRoutesSource(root);
+      if (virtual === serverAppModule) return serverAppSource(root, ssrBuild && !isDev ? await readBuildAppData(root) : undefined);
+      if (virtual === clientPagesModule) {
         const routes = await discoverConfiguredRoutes(root);
-        const files = kind === "routes"
-          ? routes.flatMap((route) => route.sidecar ? [route.sidecar] : [])
-          : routes.flatMap((route) => [route.file, ...route.layouts, ...(route.error ? [route.error] : [])]);
-        const unique = [...new Set(files)];
-        const entries = unique.map((file, index) => {
+        const unique = [...new Set(routes.flatMap((route) => [route.file, ...route.layouts, ...(route.error ? [route.error] : [])]))];
+        const entries = unique.map((file) => {
           const path = relative(root, file).replaceAll("\\", "/");
           if (path === ".." || path.startsWith("../") || isAbsolute(path)) throw new Error(`Page outside Meeko project: ${file}`);
           const specifier = `/${path}`;
-          return kind === "client"
-            ? `${JSON.stringify(specifier)}: () => import(${JSON.stringify(specifier)})`
-            : `${JSON.stringify(specifier)}: module${index}`;
+          return `${JSON.stringify(specifier)}: () => import(${JSON.stringify(specifier)})`;
         });
-        const imports = kind === "client" ? "" : unique.map((file, index) => {
-          const path = relative(root, file).replaceAll("\\", "/");
-          return `import * as module${index} from ${JSON.stringify(`/${path}`)};`;
-        }).join("\n");
-        return `${imports}\nexport const modules = {${entries.join(",")}};`;
+        return `export const modules = {${entries.join(",")}};`;
       }
       if (!id.startsWith(stylePrefix) || !id.endsWith(".css")) return null;
       return styles.get(id) ?? null;

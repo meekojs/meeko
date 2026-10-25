@@ -49,6 +49,16 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
       throw new TypeError(`${file}: ${key} must be an array of nonempty paths`);
     }
   }
+  const server = config.server as Record<string, unknown> | undefined;
+  if (server !== undefined) {
+    if (!server || typeof server !== "object" || !["node", "cloudflare", "deno", "bun"].includes(server.adapter as string)) {
+      throw new TypeError(`${file}: server.adapter must be "node", "cloudflare", "deno" or "bun"`);
+    }
+    if (server.host !== undefined && (typeof server.host !== "string" || !server.host)) throw new TypeError(`${file}: server.host must be a nonempty string`);
+    if (server.port !== undefined && (!Number.isInteger(server.port) || (server.port as number) < 0 || (server.port as number) > 65535)) {
+      throw new TypeError(`${file}: server.port must be an integer between 0 and 65535`);
+    }
+  }
   return config;
 }
 

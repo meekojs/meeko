@@ -3,6 +3,7 @@ import { access, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:f
 import { join, relative, resolve, sep } from "node:path";
 import test from "node:test";
 import { checkFrameworkProject } from "../src/framework/check-project.js";
+import { buildProject, startProject } from "../src/framework/project.js";
 
 test("framework project check generates scoped TS projects and reports server type errors", async () => {
   const parent = resolve(".meeko");
@@ -44,11 +45,11 @@ test("framework project check generates scoped TS projects and reports server ty
       '});',
       "",
     ].join("\n"));
-    await writeFile(join(root, "server", "session.ts"), [
-      'import { MemorySessionStore, SessionManager } from "@meekojs/meeko/server";',
-      "export function createSessionManager(_production: boolean) {",
-      "  return new SessionManager({ store: new MemorySessionStore(), production: false });",
-      "}",
+    await writeFile(join(root, "server", "runtime.ts"), [
+      'import { defineServerRuntime, MemorySessionStore, SessionManager } from "@meekojs/meeko/server";',
+      "export default defineServerRuntime(() => ({",
+      "  sessions: new SessionManager({ store: new MemorySessionStore(), production: false }),",
+      "}));",
       "",
     ].join("\n"));
     await checkFrameworkProject(root);
@@ -273,11 +274,11 @@ test("framework project check removes only owned declarations for deleted compon
       'export const props: ComponentProps = { label: "typed" };',
       "",
     ].join("\n"));
-    await writeFile(join(root, "server", "session.ts"), [
-      'import { MemorySessionStore, SessionManager } from "@meekojs/meeko/server";',
-      "export function createSessionManager(_production: boolean) {",
-      "  return new SessionManager({ store: new MemorySessionStore(), production: false });",
-      "}",
+    await writeFile(join(root, "server", "runtime.ts"), [
+      'import { defineServerRuntime, MemorySessionStore, SessionManager } from "@meekojs/meeko/server";',
+      "export default defineServerRuntime(() => ({",
+      "  sessions: new SessionManager({ store: new MemorySessionStore(), production: false }),",
+      "}));",
       "",
     ].join("\n"));
 
@@ -333,6 +334,24 @@ test("framework project check removes only owned declarations for deleted compon
     await access(transitive);
     await access(standaloneType);
     assert.equal(await readFile(foreign, "utf8"), foreignDeclaration);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a leftover server/session.ts stops check, dev and build with the runtime migration", async () => {
+  const parent = resolve(".meeko");
+  await mkdir(parent, { recursive: true });
+  const root = await mkdtemp(join(parent, "legacy-session-"));
+  try {
+    await mkdir(join(root, "app", "pages"), { recursive: true });
+    await mkdir(join(root, "server"), { recursive: true });
+    await writeFile(join(root, "app", "pages", "index.meeko"), "<template><p>Home</p></template>");
+    await writeFile(join(root, "server", "session.ts"), "export function createSessionManager() {}\n");
+    const migration = /server[\\/]session\.ts: Meeko no longer loads server\/session\.ts\.\nMove its SessionManager into server\/runtime\.ts and delete server\/session\.ts:[\s\S]*export default defineServerRuntime\(/;
+    await assert.rejects(checkFrameworkProject(root), migration);
+    await assert.rejects(startProject(root, false), migration);
+    await assert.rejects(buildProject(root), migration);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

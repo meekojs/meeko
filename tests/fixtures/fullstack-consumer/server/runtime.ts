@@ -1,10 +1,10 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { MemorySessionStore, SessionManager, SqlSessionStore } from "@meekojs/meeko/server";
+import { defineServerRuntime, MemorySessionStore, SessionManager, SqlSessionStore } from "@meekojs/meeko/server";
 import type { SqlSessionDriver, SqlSessionRow } from "@meekojs/meeko/server";
 
-export function createSessionManager(production: boolean) {
+function createSessionManager(production: boolean) {
   if (!production) return new SessionManager({ store: new MemorySessionStore<{ user: string }>(), production: false, secure: false });
   const directory = resolve(".meeko/output");
   mkdirSync(directory, { recursive: true });
@@ -38,3 +38,9 @@ export function createSessionManager(production: boolean) {
   };
   return new SessionManager({ store: new SqlSessionStore<{ user: string }>(driver, { closeDriver: true }), production: true });
 }
+
+// Prerendering runs during `meeko build` without client traffic, so it keeps
+// the memory store instead of opening the production database.
+export default defineServerRuntime(({ production, prerendering }) => ({
+  sessions: createSessionManager(production && !prerendering),
+}));

@@ -3,7 +3,8 @@ import { createServer } from "node:http";
 import { once } from "node:events";
 import test from "node:test";
 import WebSocket from "ws";
-import { attachNodeWebSocketServer, createSocketHub, defineSocketChannel, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
+import { attachNodeWebSocketServer } from "../src/node.ts";
+import { createSocketHub, defineSocketChannel, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
 import type { Schema } from "../src/framework-server.ts";
 import type { SocketHub } from "../src/framework-server/socket.ts";
 

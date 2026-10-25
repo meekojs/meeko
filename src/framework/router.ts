@@ -1,4 +1,5 @@
 import { observeCallback } from "../error-observer.js";
+import type { PageRender } from "./page.js";
 
 /** A route manifest is shared by the server renderer and browser navigator. */
 export interface RouteRecord {
@@ -7,6 +8,8 @@ export interface RouteRecord {
   readonly layouts: readonly string[];
   readonly error?: string;
   readonly sidecar?: string;
+  /** Render mode read statically from the sidecar at discovery; absent means SSR. */
+  readonly render?: PageRender;
 }
 
 export interface RouteMatch {

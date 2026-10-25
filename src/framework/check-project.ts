@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { checkApp } from "./check-app.js";
 import { prepareProject } from "./project.js";
+import { assertNoLegacySessionFile } from "./runtime-migration.js";
 import { prepareFrameworkTypeDeclarations, projectNames } from "./type-declarations.js";
 
 const execute = promisify(execFile);
@@ -30,6 +31,7 @@ export async function prepareFrameworkTypes(projectRoot: string): Promise<void> 
 /** Generates declarations, checks .meeko sources, then checks app/server/shared TS separately. */
 export async function checkFrameworkProject(projectRoot: string): Promise<void> {
   const root = resolve(projectRoot);
+  assertNoLegacySessionFile(root);
   await prepareFrameworkTypes(root);
   const sourceDiagnostics = await checkApp(root);
   if (sourceDiagnostics.length > 0) {

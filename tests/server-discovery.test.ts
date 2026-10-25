@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import test from "node:test";
-import { createServerDispatcher, defineApiRoute, defineRpc, discoverServerManifest, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
+import { createServerDispatcher, defineApiRoute, defineRpc, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
+import { discoverServerManifest } from "../src/build.ts";
 import type { Schema } from "../src/framework-server.ts";
 
 const textSchema: Schema<string> = { "~standard": { version: 1, validate(value) { return typeof value === "string" ? { value } : { issues: [{}] }; } } };

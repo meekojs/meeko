@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
-import { discoverServerManifest, loadSocketChannels } from "../src/framework-server/discovery.ts";
+import { loadSocketChannels } from "../src/framework-server/discovery.ts";
+import { discoverServerManifest } from "../src/framework-server/manifest-discovery.ts";
 import { generateSocketContracts } from "../src/framework/socket-contracts-generate.ts";
 
 test("Socket contracts discover channels and generate only shared schema imports", async (context) => {

@@ -1,16 +1,18 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { access, mkdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
+import { renderPage } from "../framework-server/app.js";
+import type { InternalServerApp, ServerApp } from "../framework-server/app.js";
 import { serializeJson } from "../server.js";
 import { href, matchRoute } from "./router.js";
 import type { RouteRecord } from "./router.js";
-import { createFrameworkHandler } from "./server.js";
-import { discoverConfiguredRoutes } from "./config.js";
-import { stylesheetLinks } from "./styles.js";
-import type { PageModule, PageRoute } from "./server.js";
+import { DOCUMENT_HEAD_PREFIX } from "./server.js";
+import type { PageRoute } from "./server.js";
 
 export interface PrerenderOptions {
   readonly routes: readonly RouteRecord[];
+  /** Renders one page; it should not run server middleware, which runs again when the page is served. */
   readonly handler: (request: Request) => Promise<Response>;
   readonly loadRoute?: (file: string) => Promise<PageRoute>;
   readonly outputRoot: string;
@@ -18,8 +20,26 @@ export interface PrerenderOptions {
   readonly transformHtml?: (html: string) => string | Promise<string>;
 }
 
+/** Index written next to prerendered HTML and read by adapters at startup. */
+export interface PrerenderIndex {
+  readonly version: 1;
+  readonly pages: Readonly<Record<string, { readonly file: string; readonly headOffset: number; readonly etag: string; readonly payload?: string }>>;
+}
+
 function hasParams(id: string): boolean {
   return /\[(?:\.\.\.)?[A-Za-z_$][\w$]*\]/.test(id);
+}
+
+function contentTag(value: string): string {
+  return `"${createHash("sha256").update(value).digest("base64url").slice(0, 27)}"`;
+}
+
+/** Finds where the per-request CSRF meta tag belongs inside a stored document. */
+function headOffset(pathname: string, html: string): number {
+  if (html.startsWith(DOCUMENT_HEAD_PREFIX)) return DOCUMENT_HEAD_PREFIX.length;
+  const close = html.search(/<\/head>/i);
+  if (close < 0) throw new Error(`Prerendered ${pathname} has no <head>; the CSRF token cannot be inserted`);
+  return close;
 }
 
 /** Writes only fully resolved, successful HTML responses to the prerender output. */
@@ -29,7 +49,7 @@ export async function prerenderRoutes(options: PrerenderOptions): Promise<string
   const urls = new Map<string, string>();
   for (const route of options.routes) {
     const sidecar = route.sidecar && options.loadRoute ? await options.loadRoute(route.sidecar) : undefined;
-    if (sidecar?.render !== "prerender") continue;
+    if ((route.render ?? sidecar?.render) !== "prerender") continue;
     const dynamic = hasParams(route.id);
     const entries = dynamic
       ? typeof sidecar?.prerenderEntries === "function" ? await sidecar.prerenderEntries() : sidecar?.prerenderEntries
@@ -46,10 +66,10 @@ export async function prerenderRoutes(options: PrerenderOptions): Promise<string
     }
   }
   const outputs: string[] = [];
+  const pages: Record<string, PrerenderIndex["pages"][string]> = {};
   await mkdir(outputRoot, { recursive: true });
   for (const pathname of urls.keys()) {
-    const request = new Request(new URL(pathname, origin));
-    const response = await options.handler(request);
+    const response = await options.handler(new Request(new URL(pathname, origin)));
     if (response.status !== 200 || !(response.headers.get("content-type") ?? "").includes("text/html")) {
       throw new Error(`Prerender ${pathname} returned HTTP ${response.status} instead of HTML 200`);
     }
@@ -57,63 +77,60 @@ export async function prerenderRoutes(options: PrerenderOptions): Promise<string
     const output = resolve(outputRoot, ...parts, "index.html");
     if (!output.startsWith(outputRoot + sep)) throw new Error(`Prerender path escaped output: ${pathname}`);
     await mkdir(resolve(output, ".."), { recursive: true });
-    const html = await response.text();
-    await writeFile(output, options.transformHtml ? await options.transformHtml(html) : html, "utf8");
+    const rendered = await response.text();
+    const html = options.transformHtml ? await options.transformHtml(rendered) : rendered;
+    await writeFile(output, html, "utf8");
     outputs.push(output);
+    const file = [...parts, "index.html"].join("/");
+    const navigation = await options.handler(new Request(new URL(pathname, origin), { headers: { accept: "application/meeko+json" } }));
+    let payload: string | undefined;
+    if (navigation.status === 200 && (navigation.headers.get("content-type") ?? "").startsWith("application/meeko+json")) {
+      payload = [...parts, "index.meeko.json"].join("/");
+      await writeFile(resolve(outputRoot, ...parts, "index.meeko.json"), await navigation.text(), "utf8");
+    } else await navigation.body?.cancel();
+    pages[pathname] = { file, headOffset: headOffset(pathname, html), etag: contentTag(html), ...(payload ? { payload } : {}) };
   }
-  await writeFile(join(outputRoot, "manifest.json"), serializeJson({ paths: [...urls.keys()] }) + "\n", "utf8");
+  const index: PrerenderIndex = { version: 1, pages };
+  await writeFile(join(outputRoot, "manifest.json"), serializeJson(index) + "\n", "utf8");
   return outputs;
 }
 
-/** Renders from the production server bundle and client manifest. */
-export async function prerenderProject(projectRoot: string): Promise<string[]> {
-  const root = resolve(projectRoot);
-  const manifestFile = resolve(root, ".meeko/output/client/.vite/manifest.json");
-  let manifest: Record<string, { file?: string; css?: string[] }>;
-  try {
-    manifest = JSON.parse(await readFile(manifestFile, "utf8")) as Record<string, { file?: string }>;
-  } catch {
-    throw new Error("Client build manifest is missing; run the client build before prerender");
-  }
-  const entry = manifest[".meeko/generated/entry-client.ts"]?.file
-    ?? manifest["app/entry-client.ts"]?.file;
-  if (!entry) throw new Error("Client build manifest has no Meeko client entry");
-  const entryManifest = manifest[".meeko/generated/entry-client.ts"] ?? manifest["app/entry-client.ts"];
-  const globalStyles = stylesheetLinks((entryManifest?.css ?? []).map((file) => "/" + file));
-  const serverBundle = resolve(root, ".meeko/output/server/entry.js");
-  let server: {
-    loadPage(root: string, file: string): Promise<PageModule>;
-    loadRoute(root: string, file: string): Promise<PageRoute>;
-  };
-  try {
-    server = await import(pathToFileURL(serverBundle).href) as typeof server;
-  } catch (error) {
-    throw new Error(`Cannot load the server build at ${serverBundle}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
-  }
-  if (typeof server.loadPage !== "function" || typeof server.loadRoute !== "function") {
-    throw new Error("Server build does not expose the Meeko prerender loaders");
-  }
-  const routes = await discoverConfiguredRoutes(root);
-  const loadPage = (file: string) => server.loadPage(root, file);
-  const loadRoute = (file: string) => server.loadRoute(root, file);
-  const handler = createFrameworkHandler({ routes, loadPage, loadRoute, clientEntry: `/${entry}` });
-  const portable = routes.map((route) => ({
-    id: route.id,
-    file: "/" + fileRelative(root, route.file),
-    layouts: route.layouts.map((file) => "/" + fileRelative(root, file)),
-    ...(route.error ? { error: "/" + fileRelative(root, route.error) } : {}),
-  }));
-  return await prerenderRoutes({
-    routes, handler, loadRoute,
-    outputRoot: resolve(root, ".meeko/output/prerender"),
-    transformHtml: (html) => html
-      .replace("</head>", `${globalStyles}</head>`)
-      .replace("</body>", `<script id="meeko-routes" type="application/json">${serializeJson(portable)}</script></body>`),
-  });
+interface NodeOutputModule {
+  createNodeApp(options: { prerendering: boolean }): Promise<ServerApp>;
+  load(key: string): Promise<unknown>;
 }
 
-function fileRelative(root: string, file: string): string {
-  const absolute = resolve(file);
-  if (!absolute.startsWith(root + sep)) throw new Error(`Route file escaped project: ${file}`);
-  return absolute.slice(root.length + 1).replaceAll("\\", "/");
+/** Imports the built Node application without serving it. */
+export async function importNodeOutput(projectRoot: string): Promise<NodeOutputModule> {
+  const entry = resolve(projectRoot, ".meeko/output/node/index.mjs");
+  try { await access(entry); }
+  catch { throw new Error(`Missing production build at ${entry}; run meeko build`); }
+  // A query keeps repeated builds in one process from reusing a cached entry.
+  const output = await import(`${pathToFileURL(entry).href}?build=${Date.now()}`) as Partial<NodeOutputModule>;
+  if (typeof output.createNodeApp !== "function" || typeof output.load !== "function") {
+    throw new Error(`${entry} is not a Meeko Node build; run meeko build`);
+  }
+  return output as NodeOutputModule;
+}
+
+/** Renders `render: "prerender"` routes from the Node build into .meeko/output/node/prerender. */
+export async function prerenderProject(projectRoot: string): Promise<string[]> {
+  const root = resolve(projectRoot);
+  const output = await importNodeOutput(root);
+  const app = await output.createNodeApp({ prerendering: true }) as InternalServerApp;
+  const outputRoot = resolve(root, ".meeko/output/node/prerender");
+  try {
+    await rm(outputRoot, { recursive: true, force: true });
+    return await prerenderRoutes({
+      routes: app.manifest.routes,
+      handler: (request) => app[renderPage](request),
+      loadRoute: async (key) => {
+        const module = await output.load(key) as Record<string, unknown>;
+        return (module.route ?? module.default ?? module) as PageRoute;
+      },
+      outputRoot,
+    });
+  } finally {
+    await app.close();
+  }
 }

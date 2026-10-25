@@ -12,12 +12,27 @@ import { generateServerContracts } from "./framework/contracts-generate.js";
 import { checkApp, generateAppTypes } from "./framework/check-app.js";
 import { prerenderProject } from "./framework/prerender.js";
 import { generateTypeScriptAutoImports } from "./autoimports-ts.js";
-import { buildProject, startProject } from "./framework/project.js";
+import { assertBuildAdapter, buildProject, startProject } from "./framework/project.js";
 import { checkFrameworkProject, prepareFrameworkTypes } from "./framework/check-project.js";
 
-const usage = "Usage: meeko dev [project-directory]\n       meeko check [project-directory | component.meeko] [--json]\n       meeko build [project-directory]\n       meeko start [project-directory]\n       meeko check-app <project-directory>\n       meeko compile <component.meeko> <output.ts>\n       meeko types <component.meeko>\n       meeko routes <project-directory>\n       meeko prerender <project-directory>\n       meeko init <directory>\n       meeko init-framework <directory>\n       meeko lsp --stdio\n       meeko --help | --version\n";
-const [command, input, output] = process.argv.slice(2);
-const projectCommand = command === "dev" || command === "build" || command === "start";
+const usage = "Usage: meeko dev [project-directory]\n       meeko check [project-directory | component.meeko] [--json]\n       meeko build [project-directory] [--adapter <node|cloudflare|deno|bun>]\n       meeko start [project-directory]\n       meeko preview [project-directory]\n       meeko check-app <project-directory>\n       meeko compile <component.meeko> <output.ts>\n       meeko types <component.meeko>\n       meeko routes <project-directory>\n       meeko prerender <project-directory>\n       meeko init <directory>\n       meeko init-framework <directory>\n       meeko lsp --stdio\n       meeko --help | --version\n";
+const argv = process.argv.slice(2);
+// `meeko build` accepts `--adapter <name>` or `--adapter=<name>` anywhere after the command.
+let adapter: string | undefined;
+let invalidAdapter = false;
+if (argv[0] === "build") {
+  for (let index = 1; index < argv.length; index++) {
+    const argument = argv[index]!;
+    if (argument !== "--adapter" && !argument.startsWith("--adapter=")) continue;
+    const value = argument === "--adapter" ? argv[index + 1] : argument.slice("--adapter=".length);
+    if (adapter !== undefined || !value || value.startsWith("-")) invalidAdapter = true;
+    else adapter = value;
+    argv.splice(index, argument === "--adapter" && value ? 2 : 1);
+    index--;
+  }
+}
+const [command, input, output] = argv;
+const projectCommand = command === "dev" || command === "build" || command === "start" || command === "preview";
 const legacyCommand = command === "compile" || command === "check-app" || command === "types" || command === "init" || command === "init-framework" || command === "routes" || command === "prerender";
 if ((command === "--help" || command === "-h" || command === "help") && input === undefined) {
   process.stdout.write(usage);
@@ -27,7 +42,7 @@ if ((command === "--help" || command === "-h" || command === "help") && input ==
 } else if (command === "lsp") {
   const { runLanguageServer } = await import("./language-server/server.js");
   runLanguageServer(process.argv.slice(3));
-} else if ((!projectCommand && !legacyCommand && command !== "check") || (!projectCommand && command !== "check" && !input) || (command === "compile" && !output) || (command === "check" && output !== undefined && output !== "--json") || (command !== "compile" && command !== "check" && output !== undefined)) {
+} else if (invalidAdapter ||(!projectCommand && !legacyCommand && command !== "check") || (!projectCommand && command !== "check" && !input) || (command === "compile" && !output) || (command === "check" && output !== undefined && output !== "--json") || (command !== "compile" && command !== "check" && output !== undefined)) {
   process.stderr.write(usage);
   process.exitCode = 1;
 } else {
@@ -38,10 +53,13 @@ if ((command === "--help" || command === "-h" || command === "help") && input ==
         await prepareFrameworkTypes(root);
         await startProject(root, false);
       }
-      else if (command === "start") await startProject(root, true);
+      // The Node build runs in Node itself, so preview and start share one host.
+      else if (command === "start" || command === "preview") await startProject(root, true);
       else {
+        const requested = adapter === undefined ? undefined : assertBuildAdapter(adapter);
         await checkFrameworkProject(root);
-        await buildProject(root);
+        const result = await buildProject(root, requested === undefined ? {} : { adapter: requested });
+        process.stdout.write(`${result.output}\n`);
       }
     } else if (command === "check" && (!input || (await stat(input).catch(() => undefined))?.isDirectory())) {
       if (output) throw new Error("--json is available only for a .meeko component");

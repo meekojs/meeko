@@ -1,6 +1,7 @@
 /** Vite entry modules generated for a framework application. */
-export const clientEntrySource = `import { mountClientApp, type ClientComponent, type RouteRecord, type RouteMiddleware } from "@meekojs/meeko/framework";
+export const clientEntrySource = `import { mountClientApp, type ClientComponent, type RouteMiddleware } from "@meekojs/meeko/framework";
 import { modules as pages } from "virtual:meeko-client-pages";
+import { routes } from "virtual:meeko-manifest/client";
 
 const middlewareModules = import.meta.glob(["/app/middleware/**/*.ts", "!/app/middleware/**/*.test.ts", "!/app/middleware/**/*.spec.ts", "!/app/middleware/**/*.d.ts", "!/app/middleware/**/*.server.ts", "!/app/middleware/**/*.client.ts"], { eager: true });
 const loadMiddleware = async (): Promise<RouteMiddleware[]> => Object.entries(middlewareModules)
@@ -16,9 +17,7 @@ import.meta.glob("/app/styles/main.css", { eager: true });
 
 const root = document.getElementById("app");
 const payload = document.getElementById("meeko-payload")?.textContent;
-const routesText = document.getElementById("meeko-routes")?.textContent;
-if (!root || !payload || !routesText) throw new Error("Missing Meeko SSR data");
-const routes = JSON.parse(routesText) as RouteRecord[];
+if (!root || !payload) throw new Error("Missing Meeko SSR data");
 
 const hydrationStart = performance.now();
 await mountClientApp({
@@ -32,88 +31,92 @@ await mountClientApp({
 performance.measure("meeko-hydration", { start: hydrationStart, end: performance.now() });
 `;
 
-export const serverEntrySource = `import { createFrameworkHandler, createLocalServerFetch, createRequestContext, createServerDispatcher, createSocketHub, discoverServerManifest, loadSocketChannels, type FrameworkHandlerOptions, type ServerMiddleware } from "@meekojs/meeko/server";
-import type { RouteRecord, RouteMiddleware } from "@meekojs/meeko/framework";
-import { modules as pages } from "virtual:meeko-server-pages";
-import { modules as routeModules } from "virtual:meeko-server-routes";
-import { createSessionManager } from "../../server/session.js";
+/** Adapter-neutral application entry: the baked manifest plus its module map. */
+export const serverEntrySource = `import { createServerApp, type ServerApp, type ServerAppOptions } from "@meekojs/meeko/server";
+import { load, manifest, runtime } from "virtual:meeko-server-app";
 
-const handlers = import.meta.glob(["/server/api/**/*.ts", "/server/rpc/**/*.ts", "/server/socket/**/*.ts"], { eager: true });
-const routeMiddlewareModules = import.meta.glob(["/app/middleware/**/*.ts", "!/app/middleware/**/*.test.ts", "!/app/middleware/**/*.spec.ts", "!/app/middleware/**/*.d.ts", "!/app/middleware/**/*.server.ts", "!/app/middleware/**/*.client.ts"], { eager: true });
-const serverMiddlewareModules = import.meta.glob(["/server/middleware/**/*.ts", "!/server/middleware/**/*.test.ts", "!/server/middleware/**/*.spec.ts", "!/server/middleware/**/*.d.ts", "!/server/middleware/**/*.client.ts"], { eager: true });
+export { load, manifest };
 
-function keyFor(root: string, file: string): string {
-  return "/" + file.slice(root.length).replaceAll("\\\\", "/").replace(/^\\//, "");
+export type AppHostOptions = Omit<ServerAppOptions, "manifest" | "load" | "runtime">;
+
+export function createApp(options: AppHostOptions): Promise<ServerApp> {
+  return createServerApp({ ...options, manifest, load, runtime });
+}
+`;
+
+/** Node adapter entry; \`meeko build\` bundles it to .meeko/output/node/index.mjs. */
+export const nodeEntrySource = `import { readFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { createNodeAssetReader, serveNode } from "@meekojs/meeko/node";
+import type { PrerenderSource, PrerenderedPage } from "@meekojs/meeko/server";
+import { nodeServer } from "virtual:meeko-server-app";
+import { createApp, load, manifest } from "./entry-server.ts";
+
+export { load, manifest };
+
+const output = dirname(fileURLToPath(import.meta.url));
+
+interface PrerenderIndex { readonly pages?: Record<string, { file: string; headOffset: number; etag: string; payload?: string }> }
+
+async function prerenderSource(): Promise<PrerenderSource | undefined> {
+  let index: PrerenderIndex;
+  try { index = JSON.parse(await readFile(join(output, "prerender", "manifest.json"), "utf8")) as PrerenderIndex; }
+  catch (error) {
+    if ((error as { code?: unknown }).code === "ENOENT") return undefined;
+    throw error;
+  }
+  const pages = index.pages ?? {};
+  const cache = new Map<string, Promise<PrerenderedPage>>();
+  const read = (file: string) => readFile(join(output, "prerender", ...file.split("/")), "utf8");
+  return {
+    get(pathname) {
+      if (!Object.hasOwn(pages, pathname)) return Promise.resolve(undefined);
+      let page = cache.get(pathname);
+      if (!page) {
+        const entry = pages[pathname]!;
+        page = (async () => {
+          const html = await read(entry.file);
+          const payload = entry.payload ? await read(entry.payload) : undefined;
+          return { html, headOffset: entry.headOffset, etag: entry.etag, ...(payload === undefined ? {} : { payload }) };
+        })();
+        cache.set(pathname, page);
+      }
+      return page;
+    },
+  };
 }
 
-export const loadPage = async (root: string, file: string): Promise<Awaited<ReturnType<FrameworkHandlerOptions["loadPage"]>>> => {
-  const key = keyFor(root, file);
-  const module = pages[key];
-  if (!module) throw new Error("Page module missing: " + key);
-  return module as Awaited<ReturnType<FrameworkHandlerOptions["loadPage"]>>;
-};
-
-export const loadRoute = async (root: string, file: string): Promise<Awaited<ReturnType<NonNullable<FrameworkHandlerOptions["loadRoute"]>>>> => {
-  const key = keyFor(root, file);
-  const module = routeModules[key] as Record<string, unknown> | undefined;
-  if (!module) throw new Error("Route module missing: " + key);
-  return (module.route ?? module.default ?? module) as Awaited<ReturnType<NonNullable<FrameworkHandlerOptions["loadRoute"]>>>;
-};
-
-export async function createAppRuntime(
-  root: string,
-  routes: readonly RouteRecord[],
-  clientEntry: string,
-  production: boolean,
-  loadDevModule?: (file: string) => Promise<Record<string, unknown>>,
-) {
-  const sessions = createSessionManager(production);
-  const manifest = await discoverServerManifest(root);
-  const load = async (file: string) => {
-    if (loadDevModule) return loadDevModule(file);
-    const module = handlers[keyFor(root, file)];
-    if (!module) throw new Error("Server handler missing: " + file);
-    return module;
-  };
-  const services = {};
-  const loadMiddleware = async (): Promise<RouteMiddleware[]> => Promise.all(Object.keys(routeMiddlewareModules).sort().map(async (key) => {
-    const module = loadDevModule ? await loadDevModule(root + key) : routeMiddlewareModules[key] as Record<string, unknown>;
-    const middleware = (module as { default?: unknown }).default;
-    if (typeof middleware !== "function") throw new Error(key + ": route middleware requires a default function export");
-    return middleware as RouteMiddleware;
-  }));
-  const serverMiddleware: ServerMiddleware[] = Object.keys(serverMiddlewareModules).sort().map((key) => async (request, next) => {
-    const module = loadDevModule ? await loadDevModule(root + key) : serverMiddlewareModules[key] as Record<string, unknown>;
-    const middleware = (module as { default?: unknown }).default;
-    if (typeof middleware !== "function") throw new Error(key + ": server middleware requires a default function export");
-    return (middleware as ServerMiddleware)(request, next);
-  });
-  const reportError = (error: unknown, requestId: string): void => {
-    console.error("[meeko] request error " + requestId + " (" + (error instanceof Error ? error.name : "UnknownError") + ")");
-    if (!production) console.error(error);
-  };
-  const pageHandler = createFrameworkHandler({
-    routes,
-    onError: reportError,
-    loadPage: async (file) => {
-      if (!loadDevModule) return loadPage(root, file);
-      const module = await loadDevModule(file);
-      if (typeof module.renderWithState !== "function") throw new Error("Invalid page module: " + file);
-      return module as unknown as Awaited<ReturnType<FrameworkHandlerOptions["loadPage"]>>;
+/** Creates the built application; \`prerendering\` is used by \`meeko build\`. */
+export async function createNodeApp(options: { readonly prerendering?: boolean } = {}) {
+  const prerender = options.prerendering ? undefined : await prerenderSource();
+  return createApp({
+    production: true,
+    prerendering: options.prerendering === true,
+    platform: {
+      name: "node",
+      env: process.env,
+      waitUntil(promise) {
+        void Promise.resolve(promise).catch((error: unknown) => console.error("[meeko] background task failed", error));
+      },
     },
-    loadRoute: async (file) => {
-      if (!loadDevModule) return loadRoute(root, file);
-      const module = await loadDevModule(file);
-      return (module.route ?? module.default ?? module) as Awaited<ReturnType<NonNullable<FrameworkHandlerOptions["loadRoute"]>>>;
-    },
-    clientEntry,
-    loadMiddleware,
-    createContext: async (request) => createRequestContext(request, services, await sessions.load(request)),
-    serverFetch: createLocalServerFetch({ manifest, sessions, load, onError: reportError }),
+    assets: createNodeAssetReader({ root: join(output, "client"), assets: manifest.assets ?? {} }),
+    ...(prerender ? { prerender } : {}),
+    ...(process.env.PUBLIC_ORIGIN ? { publicOrigin: process.env.PUBLIC_ORIGIN } : {}),
   });
-  const endpointHandler = createServerDispatcher({ manifest, sessions, services, load, onError: reportError });
-  const channels = await loadSocketChannels(manifest, load);
-  const socketHub = createSocketHub({ channels, sessions, services });
-  return { pageHandler, endpointHandler, socketHub, sessions, manifest, serverMiddleware };
 }
+
+/** Serves the built application; HOST, PORT and PUBLIC_ORIGIN override the build configuration. */
+export async function start() {
+  const app = await createNodeApp();
+  const server = await serveNode(app, {
+    host: process.env.HOST || nodeServer.host,
+    port: process.env.PORT ? Number(process.env.PORT) : nodeServer.port,
+    handleSignals: true,
+  });
+  process.stdout.write(server.url + "\\n");
+  return server;
+}
+
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) await start();
 `;

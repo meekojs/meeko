@@ -30,11 +30,11 @@ test("page contract checks data from an indirectly declared loader", async () =>
       "export const route = definePage(options);",
       "",
     ].join("\n"));
-    await writeFile(join(root, "server", "session.ts"), [
-      'import { MemorySessionStore, SessionManager } from "@meekojs/meeko/server";',
-      "export function createSessionManager(_production: boolean) {",
-      "  return new SessionManager({ store: new MemorySessionStore(), production: false });",
-      "}",
+    await writeFile(join(root, "server", "runtime.ts"), [
+      'import { defineServerRuntime, MemorySessionStore, SessionManager } from "@meekojs/meeko/server";',
+      "export default defineServerRuntime(() => ({",
+      "  sessions: new SessionManager({ store: new MemorySessionStore(), production: false }),",
+      "}));",
       "",
     ].join("\n"));
     await assert.rejects(checkFrameworkProject(root), /Page app\/pages\/index\.meeko props do not match loader app\/pages\/index\.route\.ts/);

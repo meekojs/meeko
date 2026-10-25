@@ -4,7 +4,8 @@ import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { connect } from "node:net";
 import test from "node:test";
-import { ApiError, toNodeListener } from "../src/node.js";
+import { ApiError } from "../src/framework-server.js";
+import { toNodeListener } from "../src/node.js";
 
 test("Node listener normalizes uncaught HTTP errors without leaking private details", async () => {
   const observed: { error: unknown; requestId: string }[] = [];

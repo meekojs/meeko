@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { createRouteManifest } from "./router.js";
 import type { RouteRecord } from "./router.js";
-import { discoverRoutes } from "./server.js";
+import { discoverRoutes } from "./routes-discovery.js";
 
 export interface RouteLayer {
   /** Stable identifier used in diagnostics and generated manifests. */

@@ -227,7 +227,7 @@ test("unavailable Redis is a sanitized HTTP error and never creates an anonymous
   const created = await manager.load(new Request("https://example.test/"));
   const record = await created.create({ userId: "a" });
   client.failGet = true;
-  const dispatch = createServerDispatcher({ manifest: { api: [], rpc: [] }, sessions: manager, services: {} });
+  const dispatch = createServerDispatcher({ manifest: { api: [], rpc: [] }, sessions: manager, services: {}, load: async () => ({}) });
   const response = await dispatch(new Request("https://example.test/api/missing", { headers: { cookie: `${manager.cookieName}=${record.id}` } }));
   assert.equal(response.status, 500);
   const body = await response.json() as { code: string; requestId: string };

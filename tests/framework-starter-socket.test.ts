@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { connect, createServer } from "node:net";
 import { ServerResponse } from "node:http";
 import { once } from "node:events";
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { chromium } from "playwright-core";
@@ -39,7 +39,7 @@ test("starter preserves an occupied-port error and reports failed startup cleanu
   const signalsBefore = { int: process.listenerCount("SIGINT"), term: process.listenerCount("SIGTERM") };
   try {
     await initFrameworkProject(root);
-    await writeFile(join(root, "server", "session.ts"), `import { MemorySessionStore, SessionManager } from "@meekojs/meeko/server";
+    await writeFile(join(root, "server", "runtime.ts"), `import { defineServerRuntime, MemorySessionStore, SessionManager } from "@meekojs/meeko/server";
 
 class FailingSessionStore extends MemorySessionStore {
   override async close(): Promise<void> {
@@ -48,9 +48,9 @@ class FailingSessionStore extends MemorySessionStore {
   }
 }
 
-export function createSessionManager() {
-  return new SessionManager({ store: new FailingSessionStore(), production: false });
-}
+export default defineServerRuntime(() => ({
+  sessions: new SessionManager({ store: new FailingSessionStore(), production: false }),
+}));
 `);
     await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
     await symlink(repository, join(root, "node_modules", "@meekojs", "meeko"), "junction");
@@ -84,7 +84,7 @@ export function createSessionManager() {
   }
 });
 
-test("production asset fallback reports its write failure with the original request ID", { timeout: 45_000 }, async () => {
+test("production asset write failure is reported once per observer with one request ID", { timeout: 45_000 }, async () => {
   const projectRoot = resolve(".meeko");
   await mkdir(projectRoot, { recursive: true });
   const root = await mkdtemp(join(projectRoot, "starter-asset-failure-"));
@@ -97,11 +97,11 @@ test("production asset fallback reports its write failure with the original requ
   let logs = "";
   try {
     await initFrameworkProject(root);
-    await writeFile(join(root, "server", "session.ts"), `import { MemorySessionStore, SessionManager } from "@meekojs/meeko/server";
+    await writeFile(join(root, "server", "runtime.ts"), `import { defineServerRuntime, MemorySessionStore, SessionManager } from "@meekojs/meeko/server";
 
-export function createSessionManager(production: boolean) {
+export default defineServerRuntime(({ production }) => {
   const memory = new MemorySessionStore();
-  return new SessionManager({ store: {
+  return { sessions: new SessionManager({ store: {
     persistent: true,
     get: (id) => memory.get(id),
     set: (record) => memory.set(record),
@@ -109,15 +109,16 @@ export function createSessionManager(production: boolean) {
     replace: (oldId, record) => memory.replace(oldId, record),
     revokeFamily: (familyId) => memory.revokeFamily(familyId),
     close: () => memory.close(),
-  }, production });
-}
+  }, production }) };
+});
 `);
     await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
     await symlink(repository, join(root, "node_modules", "@meekojs", "meeko"), "junction");
     await symlink(join(repository, "node_modules", "vite"), join(root, "node_modules", "vite"), "junction");
     await prepareFrameworkTypes(root);
     await buildProject(root);
-    await mkdir(join(root, ".meeko", "output", "client", "broken.js"));
+    const asset = (await readdir(join(root, ".meeko", "output", "node", "client", "assets"))).find((file) => file.endsWith(".js"));
+    assert.ok(asset, "the client build must list a JavaScript asset");
     process.env.PORT = String(port);
     process.stderr.write = ((chunk: string | Uint8Array) => {
       logs += typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk);
@@ -125,7 +126,7 @@ export function createSessionManager(production: boolean) {
     }) as typeof process.stderr.write;
     ServerResponse.prototype.writeHead = function () { throw new Error("asset fallback write failed"); } as typeof ServerResponse.prototype.writeHead;
     server = await startProject(root, true);
-    await assert.rejects(fetch(`http://127.0.0.1:${port}/broken.js`));
+    await assert.rejects(fetch(`http://127.0.0.1:${port}/assets/${asset}`));
     await new Promise<void>((resolve) => setImmediate(resolve));
     const requestIds = [...logs.matchAll(/\[meeko\] request error ([0-9a-f-]{36})/g)].map((match) => match[1]);
     assert.equal(requestIds.length, 2, logs);

@@ -37,7 +37,10 @@ test("framework starter creates routable SSR/client sources and refuses overwrit
     assert.deepEqual(tsconfig.references.map(({ path }) => path), [
       "./.meeko/tsconfig.app.json", "./.meeko/tsconfig.server.json", "./.meeko/tsconfig.shared.json",
     ]);
-    for (const file of ["app/entry-client.ts", "server/entry.ts", "server.mjs", "vite.config.ts", "vite.server.config.ts", "tsconfig.app.json", "tsconfig.server.json", "tsconfig.shared.json"]) {
+    const runtime = await readFile(join(target, "server/runtime.ts"), "utf8");
+    assert.match(runtime, /export default defineServerRuntime\(\(\{ production, prerendering \}\) =>/);
+    assert.match(runtime, /if \(production && !prerendering\) throw new Error\("Configure a persistent SessionStore in server\/runtime\.ts/);
+    for (const file of ["server/session.ts", "app/entry-client.ts", "server/entry.ts", "server.mjs", "vite.config.ts", "vite.server.config.ts", "tsconfig.app.json", "tsconfig.server.json", "tsconfig.shared.json"]) {
       await assert.rejects(readFile(join(target, file), "utf8"), /ENOENT/);
     }
     await assert.rejects(initFrameworkProject(target), /Destination is not empty/);

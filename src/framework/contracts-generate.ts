@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
-import { discoverServerManifest } from "../framework-server/discovery.js";
+import { discoverServerManifest } from "../framework-server/manifest-discovery.js";
 import type { ApiEndpoint, RpcEndpoint } from "../framework-server/discovery.js";
 import { generateSocketContracts } from "./socket-contracts-generate.js";
 import { standardSchemaTypes } from "./standard-schema-types.js";

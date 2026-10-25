@@ -26,8 +26,16 @@
       "default": "./dist/framework.js"
     },
     "./server": {
+      "types": "./dist/framework-server.d.ts",
+      "default": "./dist/framework-server.js"
+    },
+    "./node": {
       "types": "./dist/node.d.ts",
       "default": "./dist/node.js"
+    },
+    "./build": {
+      "types": "./dist/build.d.ts",
+      "default": "./dist/build.js"
     },
     "./internal": {
       "types": "./dist/internal.d.ts",

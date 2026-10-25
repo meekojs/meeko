@@ -2,6 +2,7 @@ import { createRequestContext, type RequestContext } from "./context.js";
 import { ApiError, type Schema } from "./contracts.js";
 import { serializeJson } from "../server.js";
 import type { SessionManager } from "./sessions.js";
+import type { ServerPlatform } from "./platform.js";
 
 type Output<S> = S extends Schema<unknown, infer O> ? O : never;
 type SchemaMap = Readonly<Record<string, Schema>>;
@@ -68,6 +69,8 @@ export interface SocketHubOptions<TServices = unknown> {
   maxMessageBytes?: number;
   maxBufferBytes?: number;
   pubsub?: SocketPubSub;
+  /** Runtime exposed through `RequestContext.platform` in channel callbacks. */
+  platform?: ServerPlatform;
 }
 
 export interface SocketHub {
@@ -105,7 +108,7 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
     const session = await options.sessions.load(request);
     if (definition.auth === "required" && !session.current) throw new ApiError("UNAUTHENTICATED", 401);
     const services = typeof options.services === "function" ? await (options.services as (request: Request) => TServices | Promise<TServices>)(request) : options.services;
-    const context = createRequestContext(request, services, session);
+    const context = createRequestContext(request, services, session, options.platform);
     if (definition.authorize && !(await definition.authorize({ context, ...(roomId === undefined ? {} : { roomId }) }))) throw new ApiError("FORBIDDEN", 403);
     return { definition, services };
   };
@@ -121,7 +124,7 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
         const checked = await validate(schema, payload);
         const fresh = await options.sessions.load(request);
         if (definition.auth === "required" && !fresh.current) failAndClose(new ApiError("UNAUTHENTICATED", 401), 1008, "Session expired");
-        const sendContext = createRequestContext(request, services, fresh);
+        const sendContext = createRequestContext(request, services, fresh, options.platform);
         if (definition.authorize && !(await definition.authorize({ context: sendContext, ...(roomId === undefined ? {} : { roomId }) }))) throw new ApiError("FORBIDDEN", 403);
         if (definition.authorizeSend && !(await definition.authorizeSend({ event, payload: checked, context: sendContext, ...(roomId === undefined ? {} : { roomId }) }))) throw new ApiError("FORBIDDEN", 403);
         const message = serializeJson({ event, payload: checked });
@@ -173,7 +176,7 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
           // Re-read storage and policy for every event, including after a session revocation.
           const fresh = await options.sessions.load(request);
           if (definition.auth === "required" && !fresh.current) failAndClose(new ApiError("UNAUTHENTICATED", 401), 1008, "Session expired");
-          const eventContext = createRequestContext(request, services, fresh);
+          const eventContext = createRequestContext(request, services, fresh, options.platform);
           if (definition.authorize && !(await definition.authorize({ context: eventContext, ...(roomId === undefined ? {} : { roomId }) }))) throw new ApiError("FORBIDDEN", 403);
           if (definition.authorizeEvent && !(await definition.authorizeEvent({ event, payload, context: eventContext, ...(roomId === undefined ? {} : { roomId }) }))) throw new ApiError("FORBIDDEN", 403);
           const handler = definition.handlers?.[event];

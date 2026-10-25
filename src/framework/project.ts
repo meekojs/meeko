@@ -1,44 +1,30 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
-import { mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
-import { extname, isAbsolute, relative, resolve, sep } from "node:path";
-import { pathToFileURL } from "node:url";
 import type { Server } from "node:http";
+import { extname, join, relative, resolve, sep } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { ViteDevServer } from "vite";
-import { serializeJson } from "../server.js";
+import { escapeHtml } from "../server.js";
 import { attachNodeWebSocketServer, toNodeListener } from "../node.js";
-import { errorResponse, reportServerError } from "../framework-server/contracts.js";
-import { composeServerMiddleware } from "../framework-server/middleware.js";
-import type { ServerMiddleware } from "../framework-server/middleware.js";
-import { discoverConfiguredRoutes } from "./config.js";
+import type { ServerApp, ServerAppOptions } from "../framework-server/app.js";
+import type { AssetManifest, AssetRecord } from "../framework-server/assets.js";
+import { reportServerError } from "../framework-server/contracts.js";
+import { buildDataFile, frameworkClientEntry, frameworkNodeEntry, frameworkServerEntry } from "./app-manifest.js";
+import type { BuildAppData } from "./app-manifest.js";
+import { loadMeekoConfig } from "./config.js";
+import type { MeekoAdapterName } from "./config-type.js";
 import { prerenderProject } from "./prerender.js";
-import { clientEntrySource, serverEntrySource } from "./project-templates.js";
+import { clientEntrySource, nodeEntrySource, serverEntrySource } from "./project-templates.js";
+import { assertNoLegacySessionFile } from "./runtime-migration.js";
 import { stylesheetLinks } from "./styles.js";
-import type { RouteRecord } from "./router.js";
 
-export const frameworkClientEntry = ".meeko/generated/entry-client.ts";
-export const frameworkServerEntry = ".meeko/generated/entry-server.ts";
-const clientManifestFile = ".meeko/output/client/.vite/manifest.json";
-const serverBundleFile = ".meeko/output/server/entry.js";
+export { frameworkClientEntry, frameworkServerEntry } from "./app-manifest.js";
 
-interface AppRuntime {
-  readonly pageHandler: (request: Request) => Promise<Response>;
-  readonly endpointHandler: (request: Request) => Promise<Response>;
-  readonly socketHub: Parameters<typeof attachNodeWebSocketServer>[0]["hub"];
-  readonly sessions: { close(): Promise<void> };
-  readonly manifest: { readonly socket?: readonly unknown[] };
-  readonly serverMiddleware: readonly ServerMiddleware[];
-}
-
-interface AppEntry {
-  createAppRuntime(
-    root: string,
-    routes: readonly RouteRecord[],
-    clientEntry: string,
-    production: boolean,
-    loadDevModule?: (file: string) => Promise<Record<string, unknown>>,
-  ): Promise<AppRuntime>;
-}
+const clientOutput = ".meeko/output/client";
+const nodeOutput = ".meeko/output/node";
+const adapters: readonly MeekoAdapterName[] = ["node", "cloudflare", "deno", "bun"];
 
 /** Writes framework-owned Vite entries; no application file is overwritten. */
 export async function prepareProject(projectRoot: string): Promise<void> {
@@ -48,186 +34,212 @@ export async function prepareProject(projectRoot: string): Promise<void> {
   await Promise.all([
     writeFile(resolve(root, frameworkClientEntry), clientEntrySource, "utf8"),
     writeFile(resolve(root, frameworkServerEntry), serverEntrySource, "utf8"),
+    writeFile(resolve(root, frameworkNodeEntry), nodeEntrySource, "utf8"),
   ]);
 }
 
-/** Builds both Vite targets and prerenders routes with the same generated entries. */
-export async function buildProject(projectRoot: string): Promise<void> {
+const contentTypes: Readonly<Record<string, string>> = {
+  ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8", ".map": "application/json; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8", ".txt": "text/plain; charset=utf-8", ".xml": "application/xml; charset=utf-8",
+  ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+  ".webp": "image/webp", ".avif": "image/avif", ".ico": "image/x-icon", ".wasm": "application/wasm",
+  ".woff": "font/woff", ".woff2": "font/woff2", ".ttf": "font/ttf", ".otf": "font/otf", ".pdf": "application/pdf",
+  ".mp4": "video/mp4", ".webm": "video/webm", ".mp3": "audio/mpeg", ".wav": "audio/wav",
+};
+
+async function listFiles(directory: string): Promise<string[]> {
+  const found: string[] = [];
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const file = join(directory, entry.name);
+    if (entry.isDirectory()) found.push(...await listFiles(file));
+    else if (entry.isFile()) found.push(file);
+  }
+  return found;
+}
+
+/** Lists the public client build, which already contains Vite's copy of `public/`. */
+async function assetManifest(directory: string): Promise<AssetManifest> {
+  const assets: Record<string, AssetRecord> = {};
+  for (const file of (await listFiles(directory)).sort()) {
+    const path = relative(directory, file).split(sep);
+    if (path[0] === ".vite") continue;
+    const content = await readFile(file);
+    const key = `/${path.map(encodeURIComponent).join("/")}`;
+    assets[key] = {
+      type: contentTypes[extname(file).toLowerCase()] ?? "application/octet-stream",
+      etag: `"${createHash("sha256").update(content).digest("base64url").slice(0, 27)}"`,
+      size: content.byteLength,
+      ...(path[0] === "assets" ? { immutable: true } : {}),
+    };
+  }
+  return assets;
+}
+
+type ViteManifest = Record<string, { file?: string; css?: string[]; imports?: string[] }>;
+
+async function clientAssets(root: string): Promise<BuildAppData["client"]> {
+  const manifest = JSON.parse(await readFile(resolve(root, clientOutput, ".vite/manifest.json"), "utf8")) as ViteManifest;
+  const entry = manifest[frameworkClientEntry];
+  if (!entry?.file) throw new Error(`Missing ${frameworkClientEntry} in the Vite client manifest`);
+  const css = new Set(entry.css ?? []);
+  const preload = new Set<string>();
+  const visit = (key: string): void => {
+    const chunk = manifest[key];
+    if (!chunk?.file || preload.has(chunk.file)) return;
+    preload.add(chunk.file);
+    for (const file of chunk.css ?? []) css.add(file);
+    for (const child of chunk.imports ?? []) visit(child);
+  };
+  for (const key of entry.imports ?? []) visit(key);
+  return { entry: `/${entry.file}`, css: [...css].map((file) => `/${file}`), preload: [...preload].map((file) => `/${file}`) };
+}
+
+/** Validates an adapter name and confirms this version can build it. */
+export function assertBuildAdapter(adapter: string): MeekoAdapterName {
+  if (!adapters.includes(adapter as MeekoAdapterName)) throw new Error(`Unknown adapter ${adapter}; use node, cloudflare, deno or bun`);
+  if (adapter !== "node") throw new Error(`The ${adapter} adapter cannot be built by this Meeko version; build with --adapter node`);
+  return adapter;
+}
+
+export interface BuildProjectOptions {
+  /** Overrides `MeekoConfig.server.adapter`. */
+  readonly adapter?: MeekoAdapterName;
+}
+
+export interface BuildProjectResult {
+  readonly adapter: MeekoAdapterName;
+  /** Directory runnable without the application's source tree. */
+  readonly output: string;
+}
+
+/** Builds the client, the adapter server bundle and its prerendered pages. */
+export async function buildProject(projectRoot: string, options: BuildProjectOptions = {}): Promise<BuildProjectResult> {
   const root = resolve(projectRoot);
+  const config = await loadMeekoConfig(root);
+  const adapter = assertBuildAdapter(options.adapter ?? config.server?.adapter ?? "node");
+  assertNoLegacySessionFile(root);
   await prepareProject(root);
   const { build } = await import("vite");
   const { meeko } = await import("../vite.js");
   await build({
-    root, configFile: false, plugins: [meeko()],
+    root, configFile: false, plugins: [meeko()], logLevel: "warn",
     build: {
-      outDir: ".meeko/output/client", manifest: true,
+      outDir: clientOutput, manifest: true, emptyOutDir: true,
       rollupOptions: { input: frameworkClientEntry },
     },
   });
+  const server = config.server?.adapter === "node" ? config.server : undefined;
+  const data: BuildAppData = {
+    client: await clientAssets(root),
+    assets: await assetManifest(resolve(root, clientOutput)),
+    node: { host: server?.host ?? "127.0.0.1", port: server?.port ?? 4173 },
+  };
+  await mkdir(resolve(root, ".meeko/build"), { recursive: true });
+  await writeFile(resolve(root, buildDataFile), JSON.stringify(data, null, 2) + "\n", "utf8");
+  const output = resolve(root, nodeOutput);
   await build({
-    root, configFile: false, plugins: [meeko()],
+    root, configFile: false, plugins: [meeko()], logLevel: "warn",
     ssr: { external: ["@meekojs/meeko"] },
     build: {
-      ssr: frameworkServerEntry,
-      outDir: ".meeko/output/server",
-      rollupOptions: { output: { entryFileNames: "entry.js" } },
+      ssr: frameworkNodeEntry,
+      outDir: nodeOutput, emptyOutDir: true,
+      rollupOptions: { output: { entryFileNames: "index.mjs", chunkFileNames: "chunks/[name]-[hash].mjs" } },
     },
   });
+  await cp(resolve(root, clientOutput), join(output, "client"), {
+    recursive: true,
+    filter: (source) => relative(resolve(root, clientOutput), source).split(sep)[0] !== ".vite",
+  });
   await prerenderProject(root);
+  return { adapter, output };
 }
 
-function portableRoutes(root: string, routes: readonly RouteRecord[]): unknown[] {
-  const relativeFile = (file: string): string => {
-    const path = relative(root, file);
-    if (path === ".." || path.startsWith(`..${sep}`) || isAbsolute(path) || resolve(file) === root) {
-      throw new Error(`Route file escaped project: ${file}`);
-    }
-    return "/" + path.replaceAll("\\", "/");
-  };
-  return routes.map((route) => ({
-    id: route.id,
-    file: relativeFile(route.file),
-    layouts: route.layouts.map(relativeFile),
-    ...(route.error ? { error: relativeFile(route.error) } : {}),
-  }));
-}
+interface NodeStartModule { start(): Promise<{ readonly server: Server }> }
 
-async function readAsset(assetRoot: string, pathname: string): Promise<{ status: number; body?: Buffer } | null> {
-  const file = resolve(assetRoot, "." + pathname);
-  if (!file.startsWith(assetRoot + sep)) return { status: 403 };
-  let actual: string;
-  try { actual = await realpath(file); }
-  catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-    throw error;
-  }
-  const actualRoot = await realpath(assetRoot);
-  if (!actual.startsWith(actualRoot + sep)) return { status: 403 };
-  return { status: 200, body: await readFile(actual) };
-}
-
-/** Starts the package-owned Node 24 HTTP host for development or production. */
+/** Starts the package-owned Node 24 HTTP host for development or the built Node output. */
 export async function startProject(projectRoot: string, production: boolean): Promise<Server> {
   const root = resolve(projectRoot);
-  const port = Number(process.env.PORT || 4173);
-  if (!production) await prepareProject(root);
+  if (production) {
+    const entry = resolve(root, nodeOutput, "index.mjs");
+    if (!existsSync(entry)) throw new Error(`Missing production build at ${entry}; run meeko build`);
+    const output = await import(pathToFileURL(entry).href) as Partial<NodeStartModule>;
+    if (typeof output.start !== "function") throw new Error(`${entry} is not a Meeko Node build; run meeko build`);
+    return (await output.start()).server;
+  }
+  return startDevelopment(root);
+}
+
+async function startDevelopment(root: string): Promise<Server> {
+  assertNoLegacySessionFile(root);
+  const config = await loadMeekoConfig(root);
+  const server = config.server?.adapter === "node" ? config.server : undefined;
+  const port = Number(process.env.PORT || server?.port || 4173);
+  const host = process.env.HOST || server?.host || "127.0.0.1";
+  await prepareProject(root);
   let vite: ViteDevServer | undefined;
-  let runtime: AppRuntime | undefined;
+  let app: ServerApp | undefined;
   let socketServer: ReturnType<typeof attachNodeWebSocketServer> | undefined;
   const reportError = (error: unknown, requestId: string): void => {
+    if (app) { app.reportError(error, requestId); return; }
     reportServerError(error, requestId, (failure, id) => {
       process.stderr.write(`[meeko] request error ${id} (${failure instanceof Error ? failure.name : "UnknownError"})\n`);
-      if (!production) console.error(failure);
+      console.error(failure);
     });
   };
   try {
-    if (!production) {
-      const { createServer: createViteServer } = await import("vite");
-      const { meeko } = await import("../vite.js");
-      vite = await createViteServer({
-        root, configFile: false, plugins: [meeko()],
-        server: {
-          middlewareMode: true,
-          // Middleware mode opens a separate Vite WebSocket server. Derive its
-          // port from the app port so concurrent projects do not share 24678.
-          hmr: { host: "127.0.0.1", port: process.env.MEEKO_HMR_PORT
-            ? Number(process.env.MEEKO_HMR_PORT)
-            : ((port + 32767) % 65535) + 1 },
-        },
-        appType: "custom",
-      });
-    }
-    const clientRoot = resolve(root, ".meeko/output/client");
-    const publicRoot = resolve(root, "public");
-    const routes = await discoverConfiguredRoutes(root);
-    let clientEntry = "/" + frameworkClientEntry;
-    let productionStyles = "";
-    if (production) {
-      const manifest = JSON.parse(await readFile(resolve(root, clientManifestFile), "utf8")) as Record<string, { file?: string; css?: string[] }>;
-      const entry = manifest[frameworkClientEntry];
-      if (!entry?.file) throw new Error(`Missing ${frameworkClientEntry} in Vite client manifest`);
-      clientEntry = "/" + entry.file;
-      productionStyles = stylesheetLinks((entry.css ?? []).map((file) => "/" + file));
-    }
+    const { createServer: createViteServer } = await import("vite");
+    const { meeko } = await import("../vite.js");
+    vite = await createViteServer({
+      root, configFile: false, plugins: [meeko()],
+      server: {
+        middlewareMode: true,
+        // Middleware mode opens a separate Vite WebSocket server. Derive its
+        // port from the app port so concurrent projects do not share 24678.
+        hmr: { host: "127.0.0.1", port: process.env.MEEKO_HMR_PORT
+          ? Number(process.env.MEEKO_HMR_PORT)
+          : ((port + 32767) % 65535) + 1 },
+      },
+      appType: "custom",
+    });
     const globalCss = resolve(root, "app/styles/main.css");
-    const serverEntry = production
-      ? await import(pathToFileURL(resolve(root, serverBundleFile)).href) as AppEntry
-      : await vite!.ssrLoadModule("/" + frameworkServerEntry) as AppEntry;
-    const loadDevModule = vite
-      ? (file: string) => vite!.ssrLoadModule("/" + relative(root, file).replaceAll("\\", "/")) as Promise<Record<string, unknown>>
-      : undefined;
-    const appRuntime = await serverEntry.createAppRuntime(root, routes, clientEntry, production, loadDevModule);
-    runtime = appRuntime;
-    const portable = portableRoutes(root, routes);
-    const decorated = composeServerMiddleware(appRuntime.serverMiddleware, async (request: Request): Promise<Response> => {
-      const pathname = new URL(request.url).pathname;
-      if (pathname.startsWith("/api/") || pathname.startsWith("/_meeko/rpc/")) return appRuntime.endpointHandler(request);
-      const result = await appRuntime.pageHandler(request);
-      if (result.status !== 200 || !(result.headers.get("content-type") ?? "").includes("text/html")) return result;
-      const developmentStyles = !production && (await stat(globalCss).catch((error: NodeJS.ErrnoException) => {
-        if (error.code === "ENOENT") return undefined;
-        throw error;
-      }))?.isFile() ? stylesheetLinks(["/app/styles/main.css?direct"]) : "";
-      let html = (await result.text())
-        .replace("</head>", `${production ? productionStyles : developmentStyles}</head>`)
-        .replace("</body>", `<script id="meeko-routes" type="application/json">${serializeJson(portable)}</script></body>`);
-      if (vite) html = await vite.transformIndexHtml(pathname, html);
-      return new Response(request.method === "HEAD" ? null : html, { status: result.status, headers: result.headers });
+    const entry = await vite.ssrLoadModule(`/${frameworkServerEntry}`) as { createApp(options: Omit<ServerAppOptions, "manifest" | "load" | "runtime">): Promise<ServerApp> };
+    const publicOrigin = process.env.PUBLIC_ORIGIN || undefined;
+    app = await entry.createApp({
+      production: false,
+      platform: {
+        name: "node", env: process.env,
+        waitUntil(promise) { void Promise.resolve(promise).catch((error: unknown) => reportError(error, randomUUID())); },
+      },
+      ...(publicOrigin ? { publicOrigin } : {}),
+      document: {
+        // Vite's client and the unbundled global stylesheet replace the production manifest links.
+        head: ({ nonce }) => `<script type="module"${nonce ? ` nonce="${escapeHtml(nonce)}"` : ""} src="/@vite/client"></script>`
+          + (existsSync(globalCss) ? stylesheetLinks(["/app/styles/main.css?direct"]) : ""),
+      },
     });
-    const pageListener = toNodeListener(decorated, { onError: reportError });
-    const types: Record<string, string> = { ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png" };
-    const server = createServer((request, response) => {
-      let pathname: string;
-      try { pathname = new URL(request.url || "/", "http://localhost").pathname; }
-      catch { pageListener(request, response); return; }
-      if (production && /\.[a-z0-9]+$/i.test(pathname)) {
-        void (async () => {
-          const asset = await readAsset(clientRoot, pathname) ?? await readAsset(publicRoot, pathname);
-          if (!asset || asset.status !== 200) { response.writeHead(asset?.status ?? 404); response.end(); return; }
-          response.writeHead(200, { "content-type": types[extname(pathname)] || "application/octet-stream" });
-          response.end(asset.body);
-        })().catch(async (error: unknown) => {
-          const requestId = randomUUID();
-          reportError(error, requestId);
-          const destroySafely = (cause: unknown, previous?: unknown): void => {
-            try { response.destroy(cause instanceof Error ? cause : undefined); }
-            catch (destroyError) {
-              if (!Object.is(destroyError, error) && !Object.is(destroyError, cause) && !Object.is(destroyError, previous)) {
-                reportError(destroyError, requestId);
-              }
-            }
-          };
-          try {
-            if (response.headersSent) { destroySafely(error); return; }
-            const failure = errorResponse(error, requestId);
-            const failureHeaders: Record<string, string | string[]> = {};
-            failure.headers.forEach((value, name) => { failureHeaders[name] = value; });
-            const cookies = failure.headers.getSetCookie();
-            if (cookies.length) failureHeaders["set-cookie"] = cookies;
-            response.writeHead(failure.status, failureHeaders);
-            response.end(await failure.text());
-          } catch (failure) {
-            if (!Object.is(failure, error)) reportError(failure, requestId);
-            destroySafely(failure, error);
-          }
-        });
-        return;
-      }
-      if (vite) {
-        vite.middlewares(request, response, () => pageListener(request, response));
-        return;
-      }
-      pageListener(request, response);
+    const running = app;
+    const origin = running.publicOrigin;
+    const listener = toNodeListener((request) => running.fetch(request), { onError: reportError, ...(origin ? { publicOrigin: origin } : {}) });
+    const devServer = vite;
+    const httpServer = createServer((request, response) => {
+      // Vite cannot route a malformed target; the Meeko listener answers it with INVALID_URL.
+      try { new URL(request.url || "/", "http://localhost"); }
+      catch { listener(request, response); return; }
+      devServer.middlewares(request, response, () => listener(request, response));
     });
-    socketServer = appRuntime.manifest.socket?.length ? attachNodeWebSocketServer({
-      server, hub: appRuntime.socketHub,
-      publicOrigin: process.env.PUBLIC_ORIGIN || `http://127.0.0.1:${port}`,
+    const visibleHost = host === "0.0.0.0" ? "127.0.0.1" : host;
+    socketServer = running.socket ? attachNodeWebSocketServer({
+      server: httpServer, hub: running.socket.hub,
+      publicOrigin: origin ?? `http://${visibleHost.includes(":") ? `[${visibleHost}]` : visibleHost}:${port}`,
+      pathnamePrefix: running.socket.pathnamePrefix,
+      ...(running.socket.maxMessageBytes === undefined ? {} : { maxMessageBytes: running.socket.maxMessageBytes }),
       onError: (error) => reportError(error, randomUUID()),
     }) : undefined;
     await new Promise<void>((done, fail) => {
-      server.once("error", fail);
-      server.listen(port, "127.0.0.1", () => {
-        server.off("error", fail);
+      httpServer.once("error", fail);
+      httpServer.listen(port, host, () => {
+        httpServer.off("error", fail);
         done();
       });
     });
@@ -240,9 +252,9 @@ export async function startProject(projectRoot: string, production: boolean): Pr
       void (async () => {
         const steps: Array<() => Promise<unknown>> = [
           () => socketServer?.close() ?? Promise.resolve(),
-          () => new Promise<void>((done, fail) => server.close((error) => error ? fail(error) : done())),
-          () => appRuntime.sessions.close(),
-          () => vite?.close() ?? Promise.resolve(),
+          () => new Promise<void>((done, fail) => httpServer.close((error) => error ? fail(error) : done())),
+          () => running.close(),
+          () => devServer.close(),
         ];
         for (const close of steps) {
           try { await close(); }
@@ -252,10 +264,10 @@ export async function startProject(projectRoot: string, production: boolean): Pr
     };
     process.once("SIGINT", shutdown);
     process.once("SIGTERM", shutdown);
-    process.stdout.write(`http://127.0.0.1:${port}\n`);
-    return server;
+    process.stdout.write(`http://${visibleHost.includes(":") ? `[${visibleHost}]` : visibleHost}:${port}\n`);
+    return httpServer;
   } catch (error) {
-    const cleanup = await Promise.allSettled([socketServer?.close(), runtime?.sessions.close(), vite?.close()]);
+    const cleanup = await Promise.allSettled([socketServer?.close(), app?.close(), vite?.close()]);
     for (const result of cleanup) {
       if (result.status === "rejected") reportError(result.reason, randomUUID());
     }

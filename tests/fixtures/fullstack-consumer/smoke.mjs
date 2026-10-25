@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import WebSocket from "ws";
 
@@ -26,17 +26,37 @@ assert.equal(deniedRoute.status, 403);
 assert.equal(await deniedRoute.text(), "Route denied");
 assert.equal(deniedRoute.headers.get("x-meeko-fixture-middleware"), "active");
 assert.equal((await (await get("/status.txt")).text()).trim(), "public asset");
-const privateDir = resolve(".meeko/private-static-test");
-const publicLink = resolve("public/private-static-test");
-await mkdir(privateDir, { recursive: true });
-await writeFile(resolve(privateDir, "secret.txt"), "private content");
-await symlink(privateDir, publicLink, "junction");
+// Only files listed in the build manifest are served, even inside the client output.
+const unlisted = resolve(".meeko/output/node/client/unlisted-static-test.txt");
+await writeFile(unlisted, "private content");
 try {
-  assert.equal((await get("/private-static-test/secret.txt")).status, 403);
+  assert.equal((await get("/unlisted-static-test.txt")).status, 404);
 } finally {
-  await rm(publicLink, { recursive: true, force: true });
-  await rm(privateDir, { recursive: true, force: true });
+  await rm(unlisted, { force: true });
 }
+const asset = await get("/status.txt");
+const assetTag = asset.headers.get("etag");
+assert.ok(assetTag);
+assert.equal(asset.headers.get("cache-control"), "public, max-age=0, must-revalidate");
+assert.equal((await fetch(`${origin}/status.txt`, { headers: { "if-none-match": assetTag } })).status, 304);
+const head = await fetch(`${origin}/status.txt`, { method: "HEAD" });
+assert.equal(head.status, 200);
+assert.equal(head.headers.get("content-length"), asset.headers.get("content-length"));
+// The prerendered home page still runs server middleware and carries the session CSRF token.
+const anonymousHome = await get("/");
+const homeTag = anonymousHome.headers.get("etag");
+assert.ok(homeTag);
+assert.equal(anonymousHome.headers.get("cache-control"), "public, max-age=0, must-revalidate");
+assert.doesNotMatch(await anonymousHome.text(), /meeko-csrf-token/);
+const revalidated = await fetch(`${origin}/`, { headers: { "if-none-match": homeTag } });
+assert.equal(revalidated.status, 304);
+assert.equal(revalidated.headers.get("x-meeko-fixture-middleware"), "active");
+const aliceHome = await get("/", alice.cookie);
+assert.equal(aliceHome.headers.get("cache-control"), "private, no-store");
+assert.equal(aliceHome.headers.get("x-meeko-fixture-middleware"), "active");
+const aliceHtml = await aliceHome.text();
+assert.ok(aliceHtml.includes(`<meta name="meeko-csrf-token" content="${alice.csrf}">`), "prerendered page lacks the session CSRF token");
+assert.doesNotMatch(aliceHtml, /id="meeko-routes"/);
 assert.equal((await get("/dashboard")).status, 302);
 const [aDashboard, bDashboard] = await Promise.all([get("/dashboard", alice.cookie), get("/dashboard", bob.cookie)]);
 assert.match(await aDashboard.text(), /alice/);
@@ -59,4 +79,4 @@ ws.send(JSON.stringify({ event: "message", payload: { text: "Hola", roomId: "gen
 const message = await new Promise((resolve, reject) => { ws.once("message", resolve); ws.once("error", reject); });
 assert.deepEqual(JSON.parse(String(message)), { event: "message", payload: { text: "Hola", roomId: "general" } });
 ws.close();
-console.log("Full-stack HTTP, middleware, static path boundary, concurrent sessions, RPC, CSRF, layer and WebSocket: OK");
+console.log("Full-stack HTTP, middleware, asset manifest boundary, prerender, concurrent sessions, RPC, CSRF, layer and WebSocket: OK");

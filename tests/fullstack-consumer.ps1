@@ -48,6 +48,12 @@ try {
   if ($privateHits) {
     throw "Private server code reached the client bundle: $(($privateHits | Select-Object -First 3 | ForEach-Object { $_.Path + ':' + $_.Matches[0].Value }) -join ', ')"
   }
+  # The Node build must run without the application sources it was built from.
+  $sources = Join-Path $run 'consumer-sources'
+  New-Item -ItemType Directory -Path $sources -Force | Out-Null
+  foreach ($name in @('app', 'server', 'shared', 'layers', 'public', 'meeko.config.ts')) {
+    Move-Item -LiteralPath (Join-Path $consumer $name) -Destination (Join-Path $sources $name)
+  }
 
   $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
   $listener.Start()
@@ -75,6 +81,9 @@ try {
   } finally { Pop-Location }
   & node (Join-Path $PSScriptRoot 'fullstack-browser.mjs')
   if ($LASTEXITCODE -ne 0) { throw 'External Chrome smoke failed.' }
+  foreach ($entry in Get-ChildItem -LiteralPath $sources) {
+    Move-Item -LiteralPath $entry.FullName -Destination (Join-Path $consumer $entry.Name)
+  }
   if ($Benchmark) {
     & npm run vite:build --prefix $repo
     if ($LASTEXITCODE -ne 0) { throw 'Minimal app build for benchmark failed.' }

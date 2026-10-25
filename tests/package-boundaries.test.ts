@@ -40,7 +40,7 @@ test("importing the Node entry does not load the optional ws transport", () => {
 });
 
 test("published entry source maps carry their sources without local absolute paths", async () => {
-  for (const entry of ["index", "framework", "node"]) {
+  for (const entry of ["index", "framework", "framework-server", "node", "build"]) {
     const output = await readFile(resolve(`dist/${entry}.js`), "utf8");
     assert.match(output, new RegExp(`sourceMappingURL=${entry}\\.js\\.map`));
     const map = JSON.parse(await readFile(resolve(`dist/${entry}.js.map`), "utf8")) as {

@@ -98,12 +98,14 @@ const props = defineProps<Props>();
 header { margin-bottom: 2rem; }
 </style>
 `,
-  "server/session.ts": `import { MemorySessionStore, SessionManager } from "@meekojs/meeko/server";
+  "server/runtime.ts": `import { defineServerRuntime, MemorySessionStore, SessionManager } from "@meekojs/meeko/server";
 
-export function createSessionManager(production: boolean) {
-  if (production) throw new Error("Configure a persistent SessionStore in server/session.ts before production startup");
-  return new SessionManager({ store: new MemorySessionStore(), production: false });
-}
+// Created once per server process. \`meeko build\` also calls it with
+// \`prerendering: true\` to render pages declared with render: "prerender".
+export default defineServerRuntime(({ production, prerendering }) => {
+  if (production && !prerendering) throw new Error("Configure a persistent SessionStore in server/runtime.ts before production startup");
+  return { sessions: new SessionManager({ store: new MemorySessionStore(), production: false }) };
+});
 `,
   "README.md": `# Meeko framework starter
 
@@ -114,7 +116,7 @@ npm install
 npm run dev
 \`\`\`
 
-Routes live in \`app/pages\`. \`app/layouts/default.meeko\` keeps the shared shell during client navigation. Put shared route guards in \`app/middleware\` with \`defineRouteMiddleware\`, and Node request middleware in \`server/middleware\` with \`defineServerMiddleware\`; see the framework guide for their execution and security boundaries. Global styles in \`app/styles/main.css\` load automatically; component styles stay in \`<style>\` blocks. Run \`npm run check\` for types, then \`npm run build\` and \`npm start\` for production SSR. Generated files live under \`.meeko/\`.
+Routes live in \`app/pages\`. \`app/layouts/default.meeko\` keeps the shared shell during client navigation. Put shared route guards in \`app/middleware\` with \`defineRouteMiddleware\`, and server request middleware in \`server/middleware\` with \`defineServerMiddleware\`; see the framework guide for their execution and security boundaries. \`server/runtime.ts\` creates the sessions and services shared by pages, API, RPC and Socket channels; replace its memory store with a persistent \`SessionStore\` before production. Global styles in \`app/styles/main.css\` load automatically; component styles stay in \`<style>\` blocks. Run \`npm run check\` for types, then \`npm run build\` and \`npm start\` for production SSR. The build in \`.meeko/output/node\` runs without the application sources; \`HOST\`, \`PORT\` and \`PUBLIC_ORIGIN\` configure it. Generated files live under \`.meeko/\`.
 `,
 };
 

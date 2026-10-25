@@ -76,7 +76,7 @@ npm run build
 npm start
 ```
 
-`check` genera contratos y comprueba tipos; `build` produce cliente, servidor y prerender. `start` sirve SSR de producción con Node 24 y requiere configurar sesiones persistentes. La [guía del framework](https://github.com/meekojs/meeko/blob/main/docs/framework.md) explica configuración, autoimports, rutas, middleware, despliegue y seguridad. Los comandos simplificados del proyecto están disponibles desde `0.1.0`.
+`check` genera contratos y comprueba tipos; `build` produce en `.meeko/output/node/` el cliente, el servidor Node y las páginas prerenderizadas, ejecutables sin las fuentes de la aplicación. `start` sirve SSR de producción con Node 24 y requiere configurar sesiones persistentes en `server/runtime.ts`. La [guía del framework](https://github.com/meekojs/meeko/blob/main/docs/framework.md) explica configuración, autoimports, rutas, middleware, despliegue y seguridad. Los comandos simplificados del proyecto están disponibles desde `0.1.0`.
 
 ## Estructura
 
@@ -88,7 +88,7 @@ npm start
 | `src/check.ts` | Comprueba tipos con TypeScript 7 y ubica diagnósticos en `.meeko`. |
 | `src/types.ts` | Genera declaraciones para imports `.meeko` en proyectos TypeScript. |
 | `src/server.ts` | Escapado de contenido dinámico para HTML. |
-| `src/cli.ts` | CLI `meeko`: comandos de proyecto (`dev`, `check`, `build`, `start`), de componente (`compile`, `types`), de generación (`routes`, `prerender`), starters (`init`, `init-framework`), servidor de lenguaje (`lsp`), `--help` y `--version`. |
+| `src/cli.ts` | CLI `meeko`: comandos de proyecto (`dev`, `check`, `build --adapter`, `start`, `preview`), de componente (`compile`, `types`), de generación (`routes`, `prerender`), starters (`init`, `init-framework`), servidor de lenguaje (`lsp`), `--help` y `--version`. |
 | `src/language-server` | Servidor de lenguaje (`meeko lsp --stdio`, bin `meeko-language-server`) para VS Code y cualquier editor LSP. |
 | `src/vite.ts` | Plugin de Vite para transformar `.meeko` en cliente y SSR. |
 | `src/devtools.ts` | Instrumentación de instancias y señales sólo durante desarrollo. |

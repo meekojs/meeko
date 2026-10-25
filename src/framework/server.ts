@@ -1,81 +1,16 @@
-import { randomUUID } from "node:crypto";
-import { lstat, readdir, stat } from "node:fs/promises";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { escapeHtml, serializeJson } from "../server.js";
 import type { RequestContext } from "../framework-server/context.js";
 import { withRequestContext } from "../framework-server/context.js";
 import type { ServerFetch } from "../framework-server/context.js";
 import { ApiError, errorResponse, normalizeServerError, observeServerError } from "../framework-server/contracts.js";
+import { etagMatches } from "../framework-server/assets.js";
 import { PAYLOAD_VERSION, PageInputError, pageSearchObject, validatePageInputs } from "./page.js";
 import { runRouteMiddleware } from "./middleware.js";
 import type { RouteMiddleware } from "./middleware.js";
 import type { PageHead, PageRender, PageSchema } from "./page.js";
 import { StateStore, withStateStore } from "./state.js";
-import { createRouteManifest, matchRoute } from "./router.js";
+import { matchRoute } from "./router.js";
 import type { RouteRecord } from "./router.js";
-
-function routeId(relativeFile: string): string {
-  const parts = relativeFile.slice(0, -".meeko".length).split(sep);
-  if (parts.at(-1) === "index") parts.pop();
-  const visible = parts.filter((part) => !/^\([^/()]+\)$/.test(part));
-  return visible.length ? `/${visible.join("/")}` : "/";
-}
-
-/** Discovers pages once; the returned manifest is safe to serialize for the browser. */
-export async function discoverRoutes(projectRoot: string): Promise<readonly RouteRecord[]> {
-  const pagesRoot = resolve(projectRoot, "app", "pages");
-  const files = new Set<string>();
-  async function walk(directory: string): Promise<void> {
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
-      const path = join(directory, entry.name);
-      if (entry.isDirectory()) await walk(path);
-      else if (entry.isFile()) files.add(path);
-    }
-  }
-  await walk(pagesRoot);
-  const appShell = resolve(projectRoot, "app", "app.meeko");
-  const defaultLayout = resolve(projectRoot, "app", "layouts", "default.meeko");
-  let hasAppShell = false;
-  try { hasAppShell = (await stat(appShell)).isFile(); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-  let hasDefaultLayout = false;
-  try { hasDefaultLayout = (await lstat(defaultLayout)).isFile(); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-  if (hasDefaultLayout && files.has(join(pagesRoot, "+layout.meeko"))) {
-    throw new Error(`Both ${defaultLayout} and ${join(pagesRoot, "+layout.meeko")} define the root layout`);
-  }
-  const routes: RouteRecord[] = [];
-  for (const file of files) {
-    if (!file.endsWith(".meeko") || basename(file).startsWith("+")) continue;
-    const directory = dirname(file);
-    const layouts: string[] = hasAppShell ? [appShell] : [];
-    if (hasDefaultLayout) layouts.push(defaultLayout);
-    let cursor = pagesRoot;
-    const relativeDirectory = relative(pagesRoot, directory);
-    if (files.has(join(cursor, "+layout.meeko"))) layouts.push(join(cursor, "+layout.meeko"));
-    if (relativeDirectory) for (const segment of relativeDirectory.split(sep)) {
-      cursor = join(cursor, segment);
-      if (files.has(join(cursor, "+layout.meeko"))) layouts.push(join(cursor, "+layout.meeko"));
-    }
-    let error: string | undefined;
-    let errorCursor = directory;
-    while (errorCursor.startsWith(pagesRoot)) {
-      const candidate = join(errorCursor, "+error.meeko");
-      if (files.has(candidate)) { error = candidate; break; }
-      if (errorCursor === pagesRoot) break;
-      errorCursor = dirname(errorCursor);
-    }
-    const sidecar = file.slice(0, -".meeko".length) + ".route.ts";
-    routes.push({
-      id: routeId(relative(pagesRoot, file)),
-      file,
-      layouts,
-      ...(error ? { error } : {}),
-      ...(files.has(sidecar) ? { sidecar } : {}),
-    });
-  }
-  return createRouteManifest(routes);
-}
 
 export interface PageModule {
   css?: string;
@@ -138,18 +73,72 @@ function documentParts(options: DocumentOptions | undefined, request: Request): 
   return { head: markup(options?.head), bodyEnd: markup(options?.bodyEnd), nonceAttribute: nonce ? ` nonce="${escapeHtml(nonce)}"` : "" };
 }
 
+/** Every Meeko document starts with this markup; the CSRF meta tag follows it. */
+export const DOCUMENT_HEAD_PREFIX = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,">';
+
+/** HTML produced at build time for one prerendered URL. */
+export interface PrerenderedPage {
+  readonly html: string;
+  /** Offset inside `<head>` where the per-request CSRF meta tag is inserted. */
+  readonly headOffset: number;
+  readonly etag: string;
+  /** Navigation payload served to client-side navigations of the same URL. */
+  readonly payload?: string;
+}
+
+/** Build output that a host reads by pathname; absent pages fall back to SSR. */
+export interface PrerenderSource {
+  get(pathname: string): Promise<PrerenderedPage | undefined>;
+}
+
+/** Internal handler options used by `createServerApp`. */
+export interface PageHandlerOptions extends FrameworkHandlerOptions<unknown> {
+  readonly prerendered?: PrerenderSource;
+}
+
 /** A typed sidecar may narrow callback arguments after its schemas validate them. */
 type TypedPageRoute = Omit<PageRoute, "load" | "head"> & {
   load?: (context: never) => Promise<unknown> | unknown;
   head?: (context: never) => PageHead;
 };
 
+function wantsPayload(request: Request): boolean {
+  return request.headers.get("accept")?.split(",").some((value) => value.trim().startsWith("application/meeko+json")) ?? false;
+}
+
+function routeRender(route: RouteRecord, sidecar: PageRoute | undefined): PageRender {
+  if (route.render !== undefined && sidecar?.render !== undefined && route.render !== sidecar.render) {
+    throw new Error(`Route ${route.id} declares render "${sidecar.render}" but its manifest says "${route.render}"; rebuild the application`);
+  }
+  return route.render ?? sidecar?.render ?? "ssr";
+}
+
+function prerenderedResponse(page: PrerenderedPage, request: Request, context: RequestContext | undefined): Response {
+  const session = context?.session;
+  const head = request.method === "HEAD";
+  if (session?.current || session?.cookieHeader) {
+    if (!Number.isSafeInteger(page.headOffset) || page.headOffset < 0 || page.headOffset > page.html.length) throw new Error("Invalid prerender head offset");
+    const csrfMeta = session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(session.current.csrfToken)}">` : "";
+    const html = page.html.slice(0, page.headOffset) + csrfMeta + page.html.slice(page.headOffset);
+    return new Response(head ? null : html, {
+      status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store" },
+    });
+  }
+  const headers = { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=0, must-revalidate", etag: page.etag, vary: "cookie" };
+  if (etagMatches(request.headers.get("if-none-match"), page.etag)) return new Response(null, { status: 304, headers });
+  return new Response(head ? null : page.html, { status: 200, headers });
+}
+
 /** Portable Fetch handler. Node adapters can pass their Request directly. */
 export function createFrameworkHandler(options: FrameworkHandlerOptions): (request: Request) => Promise<Response>;
 export function createFrameworkHandler<Route extends TypedPageRoute>(options: FrameworkHandlerOptions<Route>): (request: Request) => Promise<Response>;
 export function createFrameworkHandler(options: FrameworkHandlerOptions<unknown>): (request: Request) => Promise<Response> {
+  return createPageHandler(options);
+}
+
+export function createPageHandler(options: PageHandlerOptions): (request: Request) => Promise<Response> {
   return async (request) => {
-    const fallbackRequestId = randomUUID();
+    const fallbackRequestId = crypto.randomUUID();
     if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, {
       status: 405, headers: { Allow: "GET, HEAD", "x-request-id": fallbackRequestId, "cache-control": "no-store" },
     });
@@ -179,6 +168,13 @@ export function createFrameworkHandler(options: FrameworkHandlerOptions<unknown>
       url, match, signal: request.signal, phase: "server", request,
     });
     if (middlewareResponse) return finish(middlewareResponse);
+    if (options.prerendered && match.route.render === "prerender" && url.search === "" && !options.document?.nonce) {
+      const page = await options.prerendered.get(url.pathname);
+      if (page && !wantsPayload(request)) return finish(prerenderedResponse(page, request, requestContext));
+      if (page?.payload !== undefined) return finish(new Response(request.method === "HEAD" ? null : page.payload, {
+        status: 200, headers: { "content-type": "application/meeko+json; charset=utf-8", "cache-control": "no-store" },
+      }));
+    }
     const sidecar = match.route.sidecar && options.loadRoute ? await options.loadRoute(match.route.sidecar) as PageRoute : undefined;
     const validated = await validatePageInputs(sidecar, match.params, pageSearchObject(url.searchParams));
     const context: PageRequestContext = {
@@ -215,18 +211,18 @@ export function createFrameworkHandler(options: FrameworkHandlerOptions<unknown>
     const nonceAttribute = host.nonceAttribute;
     const styleTags = [...new Set(styles)].map((css) => `<style${nonceAttribute}>${css.replaceAll("<", "\\3C ")}</style>`).join("");
     const payload = serializeJson({
-      v: PAYLOAD_VERSION, route: match.route.id, render: sidecar?.render ?? "ssr",
+      v: PAYLOAD_VERSION, route: match.route.id, render: routeRender(match.route, sidecar),
       props, state: rendered.state, sharedState: stateStore.snapshot(),
       head: head.title === undefined ? {} : { title: head.title },
     });
-    if (request.headers.get("accept")?.split(",").some((value) => value.trim().startsWith("application/meeko+json"))) {
+    if (wantsPayload(request)) {
       return finish(new Response(request.method === "HEAD" ? null : payload, {
         status: 200, headers: { "content-type": "application/meeko+json; charset=utf-8", "cache-control": "no-store" },
       }));
     }
     const script = options.clientEntry ? `<script type="module"${nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
     const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
-    const document = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,">${csrfMeta}${styleTags}${title}${host.head}</head><body><div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
+    const document = `${DOCUMENT_HEAD_PREFIX}${csrfMeta}${styleTags}${title}${host.head}</head><body><div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
     return finish(new Response(request.method === "HEAD" ? null : document, {
       status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
     }));
@@ -240,7 +236,7 @@ export function createFrameworkHandler(options: FrameworkHandlerOptions<unknown>
         observeServerError(failure, requestId, options.onError);
       };
       if (known.status >= 500) report(error);
-      if (request.headers.get("accept")?.split(",").some((value) => value.trim().startsWith("application/meeko+json"))) {
+      if (wantsPayload(request)) {
         return finish(errorResponse(known, requestId));
       }
       if (error instanceof PageInputError) return finish(new Response(error.code, {

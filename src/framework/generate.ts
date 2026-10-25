@@ -57,14 +57,20 @@ export async function generateRoutes(projectRoot: string): Promise<GeneratedRout
     layouts: route.layouts.map((layout) => portable(root, layout)),
     ...(route.error ? { error: portable(root, route.error) } : {}),
     ...(route.sidecar ? { sidecar: portable(root, route.sidecar) } : {}),
+    ...(route.render ? { render: route.render } : {}),
   }));
   await mkdir(join(root, ".meeko", "types"), { recursive: true });
   await mkdir(join(root, ".meeko", "manifests"), { recursive: true });
   await writeFile(types, declarations, "utf8");
   await writeFile(virtualTypes, [
     'declare module "virtual:meeko-client-pages" { export const modules: Record<string, () => Promise<unknown>>; }',
-    'declare module "virtual:meeko-server-pages" { export const modules: Record<string, unknown>; }',
-    'declare module "virtual:meeko-server-routes" { export const modules: Record<string, unknown>; }',
+    'declare module "virtual:meeko-manifest/client" { export const routes: readonly import("@meekojs/meeko/framework").RouteRecord[]; }',
+    'declare module "virtual:meeko-server-app" {',
+    '  export const manifest: import("@meekojs/meeko/server").AppManifest;',
+    '  export const runtime: import("@meekojs/meeko/server").ServerRuntimeDefinition<any, any> | undefined;',
+    '  export const nodeServer: { readonly host: string; readonly port: number };',
+    '  export function load(key: string): Promise<unknown>;',
+    '}',
     "",
   ].join("\n"), "utf8");
   await writeFile(manifest, `${JSON.stringify({ version: 1, routes: portableRoutes }, null, 2)}\n`, "utf8");

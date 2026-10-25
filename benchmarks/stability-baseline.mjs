@@ -87,7 +87,7 @@ async function bundleSize(directory) {
 }
 
 async function main() {
-  if (!(await stat(join(consumer, ".meeko", "output", "server", "entry.js")).catch(() => undefined))) {
+  if (!(await stat(join(consumer, ".meeko", "output", "node", "index.mjs")).catch(() => undefined))) {
     throw new Error("Build the external full-stack consumer before benchmarking");
   }
   const sourceFile = join(consumer, "app", "pages", "users", "index.meeko");
@@ -111,12 +111,11 @@ async function main() {
   process.chdir(consumer);
   let runtime;
   try {
-    const serverApi = await import(pathToFileURL(join(consumer, "node_modules", "@meekojs", "meeko", "dist", "node.js")).href);
-    const entry = await import(pathToFileURL(join(consumer, ".meeko", "output", "server", "entry.js")).href);
-    const routes = await serverApi.discoverConfiguredRoutes(consumer);
-    runtime = await entry.createAppRuntime(consumer, routes, "/app/entry-client.ts", true);
-    const request = () => new Request(`${origin}/`);
-    const render = async () => { const response = await runtime.pageHandler(request()); if (response.status !== 200) throw new Error(`SSR ${response.status}`); await response.text(); };
+    const entry = await import(pathToFileURL(join(consumer, ".meeko", "output", "node", "index.mjs")).href);
+    runtime = await entry.createNodeApp();
+    // A search parameter bypasses the prerendered copy of `/`, so this measures SSR.
+    const request = () => new Request(`${origin}/?benchmark=ssr`);
+    const render = async () => { const response = await runtime.fetch(request()); if (response.status !== 200) throw new Error(`SSR ${response.status}`); await response.text(); };
     const ssrMs = await repeated(render, 100);
     globalThis.gc?.();
     const heapBefore = process.memoryUsage().heapUsed;
@@ -126,18 +125,18 @@ async function main() {
     const heapAfter = process.memoryUsage().heapUsed;
     const memory = { heapBeforeBytes: heapBefore, heapAfterBytes: heapAfter, heapDeltaBytes: heapAfter - heapBefore, peakRssBytes: peakRss, requests: 500 };
     const apiMs = await repeated(async () => {
-      const response = await runtime.endpointHandler(new Request(`${origin}/api/users`));
+      const response = await runtime.fetch(new Request(`${origin}/api/users`));
       if (response.status !== 200) throw new Error(`API ${response.status}`);
       await response.text();
     }, 100);
-    const login = await runtime.endpointHandler(new Request(`${origin}/api/auth/login`, {
+    const login = await runtime.fetch(new Request(`${origin}/api/auth/login`, {
       method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ user: "benchmark" }),
     }));
     if (login.status !== 200) throw new Error(`Benchmark login ${login.status}`);
     const cookie = login.headers.get("set-cookie")?.split(";")[0];
     const token = (await login.json()).csrfToken;
     const rpcMs = await repeated(async () => {
-      const response = await runtime.endpointHandler(new Request(`${origin}/_meeko/rpc/users/get`, {
+      const response = await runtime.fetch(new Request(`${origin}/_meeko/rpc/users/get`, {
         method: "POST", headers: { origin, cookie, "x-meeko-csrf": token, "content-type": "application/json" }, body: JSON.stringify({ id: "benchmark" }),
       }));
       if (response.status !== 200) throw new Error(`RPC ${response.status}`);
@@ -238,7 +237,7 @@ async function main() {
     console.log(`Benchmark baseline: ${output}`);
     console.log(JSON.stringify(report.metrics));
   } finally {
-    await runtime?.sessions.close();
+    await runtime?.close();
     process.chdir(oldCwd);
   }
 }

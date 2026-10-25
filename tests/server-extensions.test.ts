@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import type { IncomingMessage } from "node:http";
 import { PassThrough } from "node:stream";
 import test from "node:test";
-import { createNodeSocketUpgradeHandler, createSocketHub, defineApiRoute, defineRpc, defineSocketChannel, generateOpenApi, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
+import { createNodeSocketUpgradeHandler } from "../src/node.ts";
+import { createSocketHub, defineApiRoute, defineRpc, defineSocketChannel, generateOpenApi, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
 import type { Schema, ServerManifest } from "../src/framework-server.ts";
 
 const stringSchema: Schema<string> = { "~standard": { version: 1, validate(value) { return typeof value === "string" ? { value } : { issues: [{}] }; } } };
