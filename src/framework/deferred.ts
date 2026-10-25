@@ -16,6 +16,13 @@ export interface DeferOptions {
 }
 
 /**
+ * Starts deferred work when the loader returns. `signal` aborts when the value
+ * stops being awaited: timeout, client disconnect, session revocation, a
+ * cancelled stream, a `HEAD` request or, in the browser, leaving the route.
+ */
+export type DeferredFactory<T> = (signal: AbortSignal) => PromiseLike<T> | T;
+
+/**
  * A loader value that may arrive after the page. Reading `status`, `value` or
  * `error` inside a template or effect subscribes to its settlement.
  */
@@ -34,7 +41,7 @@ export const DEFAULT_DEFER_TIMEOUT_MS = 10_000;
 
 // Symbol.for keeps detection working when two copies of Meeko share a process.
 const brand = Symbol.for("meeko.deferred");
-/** @internal The source promise and timeout of a server-created value. */
+/** @internal The source work and timeout of a value created with `defer`. */
 export const deferredSource = Symbol.for("meeko.deferred.source");
 /** @internal Settles a value once; later calls are ignored. */
 export const deferredSettle = Symbol.for("meeko.deferred.settle");
@@ -46,7 +53,8 @@ interface DeferredSnapshot {
 }
 
 export interface DeferredSourceRecord {
-  readonly promise: Promise<unknown>;
+  /** Starts the work once; later calls return the same promise. */
+  readonly start: (signal: AbortSignal) => Promise<unknown>;
   readonly timeoutMs: number;
 }
 
@@ -79,19 +87,26 @@ class DeferredValue<T> implements DeferredInternals<T> {
 }
 
 /**
- * Lets a `render: "stream"` page send its HTML before `promise` settles. With
+ * Lets a `render: "stream"` page send its HTML before the value settles. With
  * `render: "ssr"` or `"prerender"` the server awaits it before rendering, so
- * the HTML always contains the settled value.
+ * the HTML always contains the settled value. A factory receives an
+ * `AbortSignal` that aborts when the value stops being awaited; a promise that
+ * is already running is only abandoned.
  */
-export function defer<T>(promise: PromiseLike<T> | T, options: DeferOptions = {}): Deferred<T> {
+export function defer<T>(factory: DeferredFactory<T>, options?: DeferOptions): Deferred<T>;
+export function defer<T>(promise: PromiseLike<T> | T, options?: DeferOptions): Deferred<T>;
+export function defer<T>(source: DeferredFactory<T> | PromiseLike<T> | T, options: DeferOptions = {}): Deferred<T> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_DEFER_TIMEOUT_MS;
   if (typeof timeoutMs !== "number" || !Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     throw new RangeError("defer timeoutMs must be a positive finite number of milliseconds");
   }
-  const source = Promise.resolve(promise);
-  // The host observes the outcome later; an early rejection is not unhandled.
-  source.catch(() => {});
-  return new DeferredValue<T>({ promise: source, timeoutMs });
+  let started: Promise<unknown> | undefined;
+  const start = typeof source === "function"
+    ? (signal: AbortSignal): Promise<unknown> => started ??= new Promise((resolve) => resolve((source as DeferredFactory<T>)(signal)))
+    : (): Promise<unknown> => started ??= Promise.resolve(source);
+  // A running promise is observed by the host later; an early rejection is not unhandled.
+  if (typeof source !== "function") void start(new AbortController().signal).catch(() => {});
+  return new DeferredValue<T>({ start, timeoutMs });
 }
 
 /** @internal A value whose outcome comes from the server payload or a streamed chunk. */
@@ -122,6 +137,8 @@ export function extractDeferred(value: unknown, path: DeferredPath = []): { valu
   const ancestors = new Set<object>();
   const visit = (current: unknown, at: DeferredPath): unknown => {
     if (isDeferred(current)) {
+      // The browser refuses this key when it places the value; fail at render instead.
+      if (at.includes("__proto__")) throw new TypeError(`A deferred value cannot be placed under a "__proto__" key: ${at.join(".")}`);
       found.push({ path: at, deferred: current });
       return null;
     }
@@ -149,9 +166,11 @@ export function extractDeferred(value: unknown, path: DeferredPath = []): { valu
   return { value: visit(value, path), found };
 }
 
-const unsafeKeys = new Set(["__proto__", "constructor", "prototype"]);
-
-/** Puts a deferred value at a payload path that holds `null`; returns false for an invalid path. */
+/**
+ * Puts a deferred value at a payload path that holds `null`; returns false for
+ * an invalid path. Every step must be an own property, so `constructor` and
+ * `prototype` are ordinary keys; `__proto__` is refused on both sides.
+ */
 export function placeDeferred(root: Record<string, unknown>, path: DeferredPath, value: Deferred<unknown>): boolean {
   if (path.length === 0) return false;
   let container: unknown = root;
@@ -160,11 +179,11 @@ export function placeDeferred(root: Record<string, unknown>, path: DeferredPath,
     if (typeof container !== "object" || container === null) return false;
     if (Array.isArray(container)) {
       if (typeof key !== "number" || !Number.isInteger(key) || key < 0 || key >= container.length) return false;
-    } else if (typeof key !== "string" || unsafeKeys.has(key) || !Object.hasOwn(container, key)) return false;
+    } else if (typeof key !== "string" || key === "__proto__" || !Object.hasOwn(container, key)) return false;
     const target = container as Record<string | number, unknown>;
     if (index === path.length - 1) {
       if (target[key] !== null) return false;
-      target[key] = value;
+      Object.defineProperty(target, key, { value, enumerable: true, writable: true, configurable: true });
       return true;
     }
     container = target[key];

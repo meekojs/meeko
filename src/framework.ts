@@ -13,7 +13,7 @@ export { definePage, PageInputError } from "./framework/page.js";
 export type { ClientPageDefinition, ClientPageLoadContext, PageDefinition, PageHead, PageLoadContext, PageRender, PageSchema } from "./framework/page.js";
 export { StateStore, useState } from "./framework/state.js";
 export { defer } from "./framework/deferred.js";
-export type { DeferOptions, Deferred, DeferredError, DeferredStatus } from "./framework/deferred.js";
+export type { DeferOptions, Deferred, DeferredError, DeferredFactory, DeferredStatus } from "./framework/deferred.js";
 export { defineRouteMiddleware } from "./framework/middleware.js";
 export type { RouteMiddleware, RouteMiddlewareContext } from "./framework/middleware.js";
 export { ClientError, createApiClient, createBrowserClientOptions, createPublicServerManifest, createRpcClient } from "./framework/clients.js";

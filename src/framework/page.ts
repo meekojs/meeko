@@ -47,8 +47,12 @@ export interface PageHead {
   readonly title?: string;
 }
 
-/** Version of the SSR hydration and navigation payload. */
-export const PAYLOAD_VERSION = 1;
+/**
+ * Version of the SSR hydration and navigation payload. Version 2 added the
+ * `deferred` list, `null` placeholders at deferred paths and the ndjson
+ * navigation stream of `render: "stream"` routes.
+ */
+export const PAYLOAD_VERSION = 2;
 
 export interface PageDefinition<P extends PageSchema | undefined, S extends PageSchema | undefined, D, C = unknown> {
   readonly params?: P;

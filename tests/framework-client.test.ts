@@ -81,7 +81,7 @@ test("hydration rejects malformed or mismatched payloads", async () => {
   }), SyntaxError);
   await assert.rejects(mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { v: 1, route: "/b", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 2, route: "/b", props: { params: {}, search: {} }, state: {} },
     loadPage: async () => { throw new Error("should not load"); },
     browser: browser as unknown as Window,
   }), /hydration mismatch/);
@@ -197,14 +197,14 @@ test("a failed page load does not seed state from its discarded server payload",
   const app = await mountClientApp({
     routes,
     root: root as unknown as Element,
-    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 2, route: "/start", props: { params: {}, search: {} }, state: {} },
     loadPage: async (file) => {
       if (file === "broken.meeko") throw new Error("page import failed");
       return start;
     },
     serverData: true,
     fetch: async () => new Response(JSON.stringify({
-      v: 1, route: "/broken", props: { params: {}, search: {} }, state: {}, sharedState: { serverOnly: "discarded" },
+      v: 2, route: "/broken", props: { params: {}, search: {} }, state: {}, sharedState: { serverOnly: "discarded" },
     })),
     browser: browser as unknown as Window,
   });
@@ -235,11 +235,11 @@ test("a failed page render rolls back state from its discarded server payload", 
   };
   const app = await mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 2, route: "/start", props: { params: {}, search: {} }, state: {} },
     loadPage: async (file) => file === "broken.meeko" ? broken : start,
     serverData: true,
     fetch: async () => new Response(JSON.stringify({
-      v: 1, route: "/broken", props: { params: {}, search: {} }, state: {}, sharedState: { serverOnly: "discarded" },
+      v: 2, route: "/broken", props: { params: {}, search: {} }, state: {}, sharedState: { serverOnly: "discarded" },
     }), { headers: { "x-meeko-csrf-token": "discarded" } }),
     browser: browser as unknown as Window,
   });
@@ -268,11 +268,11 @@ test("a discarded route response cannot overwrite the current CSRF token", async
   let resolveOld!: (response: Response) => void;
   const oldResponse = new Promise<Response>((resolve) => { resolveOld = resolve; });
   const response = (route: string, token: string) => new Response(JSON.stringify({
-    v: 1, route, props: { params: {}, search: {} }, state: {}, sharedState: {},
+    v: 2, route, props: { params: {}, search: {} }, state: {}, sharedState: {},
   }), { headers: { "x-meeko-csrf-token": token } });
   const app = await mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 2, route: "/start", props: { params: {}, search: {} }, state: {} },
     loadPage: async () => page,
     serverData: true,
     fetch: async (input) => new URL(String(input)).pathname === "/old" ? oldResponse : response("/new", "new-token"),
@@ -302,7 +302,7 @@ test("a malformed route payload cannot change the CSRF token", async () => {
   };
   const app = await mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 2, route: "/start", props: { params: {}, search: {} }, state: {} },
     loadPage: async () => page,
     serverData: true,
     fetch: async () => new Response("{", { headers: { "x-meeko-csrf-token": "discarded" } }),
@@ -328,7 +328,7 @@ test("a rejected client loader cannot change application state", async () => {
   };
   const app = await mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {}, sharedState: { owner: "current" } },
+    payload: { v: 2, route: "/start", props: { params: {}, search: {} }, state: {}, sharedState: { owner: "current" } },
     loadPage: async () => page,
     loadRoute: async () => ({ load: ({ state }) => {
       state.get("owner", () => "missing").value = "discarded";
@@ -363,7 +363,7 @@ test("a canceled client loader cannot overwrite a later navigation", async () =>
   const gate = new Promise<void>((resolve) => { finish = resolve; });
   const app = await mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {}, sharedState: { owner: "current" } },
+    payload: { v: 2, route: "/start", props: { params: {}, search: {} }, state: {}, sharedState: { owner: "current" } },
     loadPage: async () => page,
     loadRoute: async () => ({ load: async ({ state }) => {
       state.get("owner", () => "missing").value = "stale";
@@ -399,7 +399,7 @@ test("a successful client loader commits state used by the next page", async () 
   };
   const app = await mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {}, sharedState: { owner: "current" } },
+    payload: { v: 2, route: "/start", props: { params: {}, search: {} }, state: {}, sharedState: { owner: "current" } },
     loadPage: async () => page,
     loadRoute: async () => ({ load: ({ state }) => {
       state.get("owner", () => "missing").value = "next";
@@ -434,7 +434,7 @@ test("a failed next-page render restores changes made by its client loader", asy
   };
   const app = await mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {}, sharedState: { owner: "current" } },
+    payload: { v: 2, route: "/start", props: { params: {}, search: {} }, state: {}, sharedState: { owner: "current" } },
     loadPage: async (file) => file === "broken.meeko" ? broken : start,
     loadRoute: async () => ({ load: ({ state }) => {
       state.get("owner", () => "missing").value = "discarded";
@@ -705,7 +705,7 @@ test("mounted app requests the previous page after a committed DOM swap meets a 
   });
   const app = await mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 2, route: "/start", props: { params: {}, search: {} }, state: {} },
     loadPage: async (file) => file === "next.meeko" ? component("Next") : component("Start"),
     browser,
   });
@@ -735,7 +735,7 @@ test("client navigation handles a throwing error observer for guards and link cl
   const app = await mountClientApp({
     routes,
     root: root as unknown as Element,
-    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 2, route: "/start", props: { params: {}, search: {} }, state: {} },
     loadPage: async (file) => file === "broken.meeko" ? Promise.reject(new Error("page load failed")) : ({
       renderWithState: () => ({ html: "<p>Start</p>", state: {} }),
       renderToString: () => "<p>Start</p>",
@@ -780,7 +780,7 @@ test("navigation errors use each mounted app's active component observer", async
     });
     const app = await mountClientApp({
       routes, root: root as unknown as Element,
-      payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
+      payload: { v: 2, route: "/start", props: { params: {}, search: {} }, state: {} },
       loadPage: async (file) => {
         if (file === "broken.meeko") throw new Error("route failed");
         return page(file === "next.meeko" ? "next" : "start");
@@ -829,7 +829,7 @@ test("a component without an ancestor observer never reports to an unrelated com
   const app = await mountClientApp({
     routes: createRouteManifest([{ id: "/start", file: "start.meeko", layouts: [] }]),
     root: root as unknown as Element,
-    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 2, route: "/start", props: { params: {}, search: {} }, state: {} },
     loadPage: async () => page,
     browser: browser as unknown as Window,
   });
@@ -872,7 +872,7 @@ test("the application observer receives event, effect, cleanup and navigation fa
   };
   const app = await mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 2, route: "/start", props: { params: {}, search: {} }, state: {} },
     loadPage: async (file) => {
       if (file === "broken.meeko") throw new Error("navigation failed");
       return page;
@@ -1053,7 +1053,7 @@ test("a malformed link does not throw from the browser click callback", async ()
   const app = await mountClientApp({
     routes: createRouteManifest([{ id: "/start", file: "start.meeko", layouts: [] }]),
     root: root as unknown as Element,
-    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 2, route: "/start", props: { params: {}, search: {} }, state: {} },
     loadPage: async () => ({
       renderWithState: () => ({ html: "<p>Start</p>", state: {} }),
       renderToString: () => "<p>Start</p>",

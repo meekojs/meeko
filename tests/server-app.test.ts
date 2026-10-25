@@ -157,7 +157,7 @@ test("createServerApp serves SSR, API, RPC and server middleware from a baked ma
 
 test("prerendered pages pass through middleware and carry the session CSRF token", async () => {
   const html = `${DOCUMENT_HEAD_PREFIX}<title>Home</title></head><body><div id="app">static home</div></body></html>`;
-  const stored: PrerenderedPage = { html, headOffset: DOCUMENT_HEAD_PREFIX.length, etag: "\"home-v1\"", payload: "{\"v\":1,\"route\":\"/\"}" };
+  const stored: PrerenderedPage = { html, headOffset: DOCUMENT_HEAD_PREFIX.length, etag: "\"home-v1\"", payload: "{\"v\":2,\"route\":\"/\"}" };
   const requested: string[] = [];
   const { app, rendered } = await fixture({ prerender: { get: async (pathname) => { requested.push(pathname); return pathname === "/" ? stored : undefined; } } });
   const anonymous = await app.fetch(new Request("http://local.test/"));

@@ -230,9 +230,11 @@ type BrowserGlobals = Window & { MutationObserver: typeof MutationObserver };
 
 /**
  * Reads `<script type="application/json" data-meeko-deferred>` chunks already
- * in the document and those the parser adds to `<body>` later. A chunk whose
- * text is still arriving is retried when it changes. The parsed document ends
- * at DOMContentLoaded; then `end` runs.
+ * in the document and those the parser adds to `<body>` later. Only direct
+ * children of `<body>` after `#meeko-payload` count: the server writes them
+ * there, while page content (including injected markup) lives inside the app
+ * root. A chunk whose text is still arriving is retried when it changes. The
+ * parsed document ends at DOMContentLoaded; then `end` runs.
  */
 function watchDeferredChunks(browser: Window, receive: (line: DeferredLine) => void, end: () => void, report: (error: unknown) => void): () => void {
   const document = browser.document;
@@ -258,8 +260,14 @@ function watchDeferredChunks(browser: Window, receive: (line: DeferredLine) => v
     try { receive(readDeferredLine(parsed)); }
     catch (error) { report(error); }
   };
+  const isChunk = (element: Element): boolean => element.tagName === "SCRIPT"
+    && element.getAttribute("type") === "application/json" && element.hasAttribute("data-meeko-deferred");
   const scan = (): void => {
-    for (const script of document.querySelectorAll("script[data-meeko-deferred]")) consume(script);
+    let afterPayload = false;
+    for (let element = document.body?.firstElementChild ?? null; element; element = element.nextElementSibling) {
+      if (afterPayload) { if (isChunk(element)) consume(element); }
+      else afterPayload = element.tagName === "SCRIPT" && element.id === "meeko-payload";
+    }
   };
   const body = new Observer(scan);
   const stop = (): void => {
@@ -320,18 +328,34 @@ function clientDeferredError(error: unknown): DeferredError {
   return { code: "INTERNAL_ERROR", status: 500 };
 }
 
-/** Settles deferred values returned by a loader that runs in the browser. */
-function driveClientDeferred(data: unknown, report: (error: unknown) => void): void {
+/**
+ * Settles deferred values returned by a loader that runs in the browser.
+ * `signal` aborts when the route is left; a factory's signal also aborts on
+ * its timeout.
+ */
+function driveClientDeferred(data: unknown, report: (error: unknown) => void, signal: AbortSignal): void {
   for (const { deferred } of extractDeferred(data).found) {
     const source = deferred[deferredSource];
     if (!source) continue;
-    const settle = (outcome: DeferredOutcome): void => {
+    const work = new AbortController();
+    let settled = false;
+    const settle = (outcome: DeferredOutcome, abandoned?: { readonly reason: unknown }): void => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+      if (abandoned) work.abort(abandoned.reason);
       try { deferred[deferredSettle](outcome); }
       catch (error) { report(error); }
     };
-    const timer = setTimeout(() => settle({ status: "rejected", error: { code: "DEFERRED_TIMEOUT", status: 504 } }), source.timeoutMs);
-    source.promise.then(
+    const onAbort = (): void => settle({ status: "rejected", error: clientDeferredError(signal.reason) }, { reason: signal.reason });
+    const timer = setTimeout(() => settle(
+      { status: "rejected", error: { code: "DEFERRED_TIMEOUT", status: 504 } },
+      { reason: new DOMException(`Deferred value did not settle within ${source.timeoutMs} ms`, "TimeoutError") },
+    ), source.timeoutMs);
+    if (signal.aborted) { onAbort(); continue; }
+    signal.addEventListener("abort", onAbort, { once: true });
+    source.start(work.signal).then(
       (value) => settle(value === undefined ? { status: "resolved" } : { status: "resolved", value }),
       (error: unknown) => settle({ status: "rejected", error: clientDeferredError(error) }),
     );
@@ -458,11 +482,20 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     if (!lines || !signal) { receiver.end(); return; }
     void (async () => {
       try {
-        for await (const text of lines) receiver.receive(readDeferredLine(JSON.parse(text)));
-        if (!signal.aborted) receiver.end();
+        for await (const text of lines) {
+          let line: DeferredLine;
+          try { line = readDeferredLine(JSON.parse(text)); }
+          catch (error) {
+            reportDeferred(error);
+            continue;
+          }
+          receiver.receive(line);
+        }
       } catch (error) {
+        // The read failed mid-way (network, server write): what never arrived is incomplete.
         if (!signal.aborted) reportDeferred(error);
       }
+      if (!signal.aborted) receiver.end();
     })();
   };
   const renderRoute = async (context: NavigationContext, initialLoad: boolean): Promise<void | boolean> => {
@@ -495,13 +528,24 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     let lines: AsyncGenerator<string> | undefined;
     let navigationDeferred: ReadonlyMap<number, DeferredInternals> | undefined;
     const route = context.match.route;
+    /** Aborted when this navigation is superseded before its commit, or by the next commit or dispose. */
+    const routeWork = (): AbortSignal => {
+      if (!stream.control) {
+        const control = new AbortController();
+        stream.control = control;
+        const supersede = (): void => control.abort(context.signal.reason);
+        if (context.signal.aborted) supersede();
+        else context.signal.addEventListener("abort", supersede, { once: true });
+      }
+      return stream.control.signal;
+    };
     const runSidecar = async (sidecar: ClientRoute | undefined, onLoaderError?: (error: unknown) => void): Promise<void> => {
       const validated = await validatePageInputs(sidecar, context.match.params, pageSearchObject(context.url.searchParams));
       loaderDraft = sidecar?.load ? stateStore.navigationDraft() : undefined;
       const routeContext = { ...context, ...validated, state: loaderDraft?.state ?? stateStore };
       try {
         const data = sidecar?.load ? await sidecar.load(routeContext) : undefined;
-        driveClientDeferred(data, reportDeferred);
+        if (data !== undefined) driveClientDeferred(data, reportDeferred, routeWork());
         props = {
           params: validated.params,
           search: validated.search,
@@ -538,12 +582,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       if ((response.headers.get("content-type") ?? "").startsWith("application/meeko+ndjson")) {
         if (!response.body) throw new Error("Empty Meeko navigation stream");
         // Superseded before the commit (navigation signal) or after it (next commit or dispose).
-        const control = new AbortController();
-        stream.control = control;
-        const supersede = (): void => control.abort(context.signal.reason);
-        if (context.signal.aborted) supersede();
-        else context.signal.addEventListener("abort", supersede, { once: true });
-        lines = ndjsonLines(response.body, control.signal);
+        lines = ndjsonLines(response.body, routeWork());
         const line = await lines.next();
         if (line.done) throw new Error("Empty Meeko navigation stream");
         payload = readPayload(line.value);

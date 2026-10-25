@@ -7,14 +7,14 @@ import { mountClientApp } from "../src/framework/client.ts";
 import type { ClientComponent } from "../src/framework/client.ts";
 import { defer } from "../src/framework/deferred.ts";
 import type { Deferred } from "../src/framework/deferred.ts";
-import { definePage } from "../src/framework/page.ts";
+import { definePage, PAYLOAD_VERSION } from "../src/framework/page.ts";
 import { createRouteManifest } from "../src/framework/router.ts";
 import { extractRouteRender } from "../src/framework/routes-discovery.ts";
 import { createFrameworkHandler } from "../src/framework/server.ts";
-import type { FrameworkHandlerOptions, PageRoute } from "../src/framework/server.ts";
+import type { FrameworkHandlerOptions, PageRequestContext, PageRoute } from "../src/framework/server.ts";
 import { StateStore, useState } from "../src/framework/state.ts";
 import { ApiError, createRequestContext, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
-import type { RequestContext } from "../src/framework-server.ts";
+import type { RequestContext, SessionRecord } from "../src/framework-server.ts";
 
 type Slow = { text: string };
 
@@ -35,10 +35,14 @@ function slowPage(observe?: (phase: string, status: string) => void): ClientComp
     renderWithState: (props) => ({ html: render(props), state: {} }),
     renderToString: render,
     hydrateScope: (scope: DomScope, props) => {
-      const data = props.data as { slow?: Deferred<Slow> };
+      const data = props.data as { slow?: Deferred<Slow>; fast?: Deferred<Slow> };
       observe?.("hydrate", describeDeferred(data.slow));
       const target = scope.root.querySelector("#slow")!;
-      return effect(() => { target.textContent = describeDeferred(data.slow); });
+      const fast = scope.root.querySelector("#fast")!;
+      return effect(() => {
+        target.textContent = describeDeferred(data.slow);
+        fast.textContent = describeDeferred(data.fast);
+      });
     },
   };
 }
@@ -167,18 +171,25 @@ test("stream sends the document and payload before deferred chunks, in settle or
 test("ssr and prerender await deferred values inline before rendering", async () => {
   for (const render of ["ssr", "prerender"] as const) {
     const routes = createRouteManifest([{ id: "/inline", file: "inline.meeko", layouts: [], sidecar: "inline.route.ts", render }]);
+    // A prerendered page cannot store a failure: only ssr renders the rejection inline.
+    const rejected = render === "ssr";
     const fetch = createFrameworkHandler({
       routes,
       loadPage: async () => slowPage(),
-      loadRoute: async () => ({ render, load: () => ({ title: "Inline", slow: defer(later(10, { text: "ready" })), fast: defer(Promise.reject(new ApiError("GONE", 410))) }) }),
+      loadRoute: async () => ({ render, load: () => ({
+        title: "Inline", slow: defer(later(10, { text: "ready" })),
+        fast: rejected ? defer(Promise.reject(new ApiError("GONE", 410))) : defer(later(1, { text: "quick" })),
+      }) }),
     });
     const response = await fetch(new Request("https://example.test/inline"));
     const html = await response.text();
-    assert.match(html, /<p id="slow">ready<\/p><p id="fast">error:GONE:410<\/p>/, render);
+    assert.match(html, new RegExp(`<p id="slow">ready</p><p id="fast">${rejected ? "error:GONE:410" : "quick"}</p>`), render);
     assert.doesNotMatch(html, /data-meeko-deferred/);
     assert.deepEqual(payloadOf(html).deferred, [
       { id: 0, path: ["data", "slow"], status: "resolved", value: { text: "ready" } },
-      { id: 1, path: ["data", "fast"], status: "rejected", error: { code: "GONE", status: 410 } },
+      rejected
+        ? { id: 1, path: ["data", "fast"], status: "rejected", error: { code: "GONE", status: 410 } }
+        : { id: 1, path: ["data", "fast"], status: "resolved", value: { text: "quick" } },
     ]);
     const navigation = await fetch(new Request("https://example.test/inline", { headers: { accept: "application/meeko+json" } }));
     assert.match(navigation.headers.get("content-type") ?? "", /^application\/meeko\+json/);
@@ -257,8 +268,7 @@ test("HEAD on a stream route sends final headers without a body and aborts defer
   assert.deepEqual(reported, []);
 });
 
-async function sessionHandler(sidecar: (sessions: SessionManager<unknown>) => PageRoute, onError?: (error: unknown) => void) {
-  const store = new MemorySessionStore();
+async function sessionHandler(sidecar: (sessions: SessionManager<unknown>) => PageRoute, onError?: (error: unknown) => void, store = new MemorySessionStore()) {
   const sessions = new SessionManager({ store, secure: false });
   const record = await (await sessions.load(new Request("https://example.test/"))).create({ user: "alice" });
   const cookie = `${sessions.cookieName}=${record.id}`;
@@ -283,19 +293,59 @@ test("a session revoked before the first byte answers 401 instead of streaming",
   assert.doesNotMatch(body, /Private|secret|meeko-payload/);
 });
 
-test("cookies cannot change after the first chunk: a late session write fails its deferred value", async () => {
-  const reported: unknown[] = [];
-  const { fetch, cookie } = await sessionHandler(() => ({
+test("a session change inside a deferred value after the first byte fails only that value and keeps the stored session", async () => {
+  for (const change of ["rotate", "revoke", "create"] as const) {
+    const reported: unknown[] = [];
+    const { fetch, cookie, record, sessions } = await sessionHandler(() => ({
+      load: ({ context }: { context?: RequestContext }) => ({
+        title: "Cookies",
+        slow: defer(later(5, undefined).then(async () => {
+          const session = context!.session;
+          if (change === "rotate") await session.rotate();
+          else if (change === "revoke") await session.revoke();
+          else await session.create({ user: "mallory" });
+          return { text: "changed" };
+        })),
+        fast: defer(later(25, { text: "unrelated" })),
+      }),
+    } as PageRoute), (error) => reported.push(error));
+    const response = await fetch(new Request("https://example.test/stream", { headers: { cookie } }));
+    assert.equal(response.headers.get("set-cookie"), null, change);
+    const html = (await chunks(response)).join("");
+    const lines = deferredChunks(html).map((chunk) => chunk.line).sort((a, b) => Number(a.deferred) - Number(b.deferred));
+    assert.deepEqual(lines, [
+      { deferred: 0, error: { code: "SESSION_LOCKED", status: 500 } },
+      { deferred: 1, value: { text: "unrelated" } },
+    ], change);
+    // The browser keeps its cookie, so the stored session must survive.
+    assert.equal((await sessions.store.get(record.id))?.id, record.id, change);
+    assert.equal((reported[0] as { code?: string }).code, "SESSION_LOCKED", change);
+  }
+});
+
+test("a session rotation started before the first byte is awaited and its cookie is sent", async () => {
+  class SlowReplaceStore extends MemorySessionStore {
+    override async replace(previousId: string, next: SessionRecord): Promise<boolean> {
+      await later(20, undefined);
+      return super.replace(previousId, next);
+    }
+  }
+  const { fetch, cookie, record, sessions } = await sessionHandler(() => ({
     load: ({ context }: { context?: RequestContext }) => ({
-      title: "Cookies",
-      slow: defer(later(5, undefined).then(async () => { await context!.session.rotate(); return { text: "rotated" }; })),
+      title: "Race",
+      // The rotation is still writing the store when the page is ready to stream.
+      slow: defer(context!.session.rotate().then((rotated) => ({ text: rotated.id }))),
     }),
-  } as PageRoute), (error) => reported.push(error));
+  } as PageRoute), undefined, new SlowReplaceStore());
   const response = await fetch(new Request("https://example.test/stream", { headers: { cookie } }));
-  assert.equal(response.headers.get("set-cookie"), null);
+  assert.equal(response.status, 200);
   const html = (await chunks(response)).join("");
-  assert.deepEqual(deferredChunks(html).map((chunk) => chunk.line), [{ deferred: 0, error: { code: "INTERNAL_ERROR", status: 500 } }]);
-  assert.match(String((reported[0] as Error).message), /after the response headers/);
+  const [line] = deferredChunks(html).map((chunk) => chunk.line);
+  const rotatedId = (line!.value as Slow | undefined)?.text;
+  assert.ok(rotatedId, JSON.stringify(line));
+  assert.match(response.headers.get("set-cookie") ?? "", new RegExp(`${sessions.cookieName}=${rotatedId};`));
+  assert.equal(await sessions.store.get(record.id), undefined);
+  assert.equal((await sessions.store.get(rotatedId))?.id, rotatedId);
 });
 
 test("navigation to a stream route answers application/meeko+ndjson, payload first", async () => {
@@ -470,5 +520,342 @@ test("leaving a stream route cancels the pending ndjson read", async () => {
   for (let attempt = 0; attempt < 50 && !cancelled; attempt++) await later(2, undefined);
   assert.equal(cancelled, true);
   slow.resolve({ text: "ignored" });
+  app.dispose();
+});
+
+async function until(check: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 100 && !check(); attempt++) await later(2, undefined);
+}
+
+test("an ndjson stream that fails mid-way applies valid lines, reports bad ones and ends the rest as DEFERRED_INCOMPLETE", async () => {
+  const slow = gate<Slow>();
+  const fast = gate<Slow>();
+  const { fetch, routes, modules } = handler({ load: () => ({ title: "Broken", slow: defer(slow.promise), fast: defer(fast.promise) }) });
+  const browser = new HappyWindow({ url: "https://example.test/plain" });
+  browser.document.write(await (await fetch(new Request("https://example.test/plain"))).text());
+  const errors: unknown[] = [];
+  const app = await mountClientApp({
+    routes, root: browser.document.getElementById("app") as unknown as Element,
+    payload: browser.document.getElementById("meeko-payload")!.textContent!,
+    loadPage: async (file) => modules[file]!,
+    serverData: true,
+    fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await fetch(new Request(input, init));
+      if (!response.headers.get("content-type")?.includes("ndjson")) return response;
+      const reader = response.body!.getReader();
+      const payloadLine = new TextDecoder().decode((await reader.read()).value!);
+      await reader.cancel();
+      const encoder = new TextEncoder();
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(encoder.encode(`${payloadLine}{broken\n{"deferred":1,"value":{"text":"fast line"}}\n`));
+          setTimeout(() => controller.error(new Error("network lost")), 5);
+        },
+      });
+      return new Response(body, { headers: response.headers });
+    }) as typeof globalThis.fetch,
+    browser: browser as unknown as Window,
+    onNavigationError: (error) => errors.push(error),
+  });
+  assert.equal(await app.navigate("https://example.test/stream"), true);
+  await until(() => browser.document.getElementById("slow")!.textContent !== "pending");
+  assert.equal(browser.document.getElementById("fast")!.textContent, "fast line");
+  assert.equal(browser.document.getElementById("slow")!.textContent, "error:DEFERRED_INCOMPLETE:502");
+  assert.ok(errors.some((error) => error instanceof SyntaxError), String(errors));
+  assert.ok(errors.some((error) => (error as Error).message === "network lost"), String(errors));
+  app.dispose();
+});
+
+test("head runs after the render, sees its state and cannot change what was rendered", async () => {
+  for (const render of ["ssr", "stream"] as const) {
+    const routes = createRouteManifest([{ id: "/head", file: "head.meeko", layouts: [], sidecar: "head.route.ts", render }]);
+    const fetch = createFrameworkHandler({
+      routes,
+      loadPage: async () => ({
+        renderWithState: () => {
+          useState("user", () => "alice");
+          const theme = useState("theme", () => "from-render");
+          return { html: `<p id="theme">${theme.value}</p>`, state: {} };
+        },
+      }),
+      loadRoute: async () => ({
+        render,
+        load: () => ({ slow: defer(later(1, { text: "x" })) }),
+        head: ({ state }: PageRequestContext) => {
+          state.get("theme", () => "from-head");
+          return { title: String(state.get("user", () => "nobody").value) };
+        },
+      }),
+    });
+    const html = (await chunks(await fetch(new Request("https://example.test/head")))).join("");
+    assert.match(html, /<title>alice<\/title>/, render);
+    assert.match(html, /<p id="theme">from-render<\/p>/, render);
+    assert.deepEqual(payloadOf(html).sharedState, { user: "alice", theme: "from-render" }, render);
+  }
+});
+
+test("a prerendered route with a rejected deferred value fails instead of storing the error", async () => {
+  const reported: unknown[] = [];
+  const routes = createRouteManifest([{ id: "/inline", file: "inline.meeko", layouts: [], sidecar: "inline.route.ts", render: "prerender" }]);
+  const fetch = createFrameworkHandler({
+    routes,
+    loadPage: async () => slowPage(),
+    loadRoute: async () => ({ render: "prerender", load: () => ({ title: "Inline", slow: defer(later(1, { text: "ready" })), fast: defer(Promise.reject(new ApiError("GONE", 410))) }) }),
+    onError: (error) => reported.push(error),
+  });
+  const response = await fetch(new Request("https://example.test/inline"));
+  assert.equal(response.status, 500);
+  assert.doesNotMatch(await response.text(), /meeko-payload/);
+  assert.match(String((reported[0] as Error).message), /\/inline.*data\.fast.*GONE/);
+});
+
+test("a deferred factory receives a signal that aborts when the client disconnects, without onError", async () => {
+  const reported: unknown[] = [];
+  let aborted: unknown;
+  let loaderSignal: AbortSignal | undefined;
+  const { fetch } = handler({
+    load: ({ signal }) => {
+      loaderSignal = signal;
+      return {
+        title: "Gone",
+        slow: defer((work: AbortSignal) => new Promise<Slow>((_, reject) => {
+          work.addEventListener("abort", () => { aborted = work.reason; reject(work.reason); }, { once: true });
+        })),
+      };
+    },
+  }, { onError: (error) => reported.push(error) });
+  const response = await fetch(new Request("https://example.test/stream"));
+  const reader = response.body!.getReader();
+  await reader.read();
+  await reader.cancel(new Error("client left"));
+  await until(() => aborted !== undefined);
+  assert.equal((aborted as Error | undefined)?.message, "client left");
+  assert.equal(loaderSignal?.aborted, true);
+  await later(5, undefined);
+  assert.deepEqual(reported, []);
+});
+
+test("a deferred factory's signal aborts with DEFERRED_TIMEOUT when its time runs out", async () => {
+  let aborted: unknown;
+  const { fetch } = handler({
+    load: () => ({
+      title: "Slow",
+      slow: defer((work: AbortSignal) => new Promise<Slow>(() => {
+        work.addEventListener("abort", () => { aborted = work.reason; }, { once: true });
+      }), { timeoutMs: 20 }),
+    }),
+  });
+  const html = (await chunks(await fetch(new Request("https://example.test/stream")))).join("");
+  assert.deepEqual(deferredChunks(html).map((chunk) => chunk.line), [{ deferred: 0, error: { code: "DEFERRED_TIMEOUT", status: 504 } }]);
+  assert.equal((aborted as { code?: string } | undefined)?.code, "DEFERRED_TIMEOUT");
+});
+
+test("a HEAD request aborts the loader signal and deferred factories", async () => {
+  let aborted = false;
+  let loaderSignal: AbortSignal | undefined;
+  const { fetch } = handler({
+    load: ({ signal }) => {
+      loaderSignal = signal;
+      return { title: "Head", slow: defer((work: AbortSignal) => new Promise<Slow>(() => { work.addEventListener("abort", () => { aborted = true; }); })) };
+    },
+  });
+  const response = await fetch(new Request("https://example.test/stream", { method: "HEAD" }));
+  assert.equal(response.body, null);
+  await until(() => aborted);
+  assert.equal(aborted, true);
+  assert.equal(loaderSignal?.aborted, true);
+});
+
+test("the payload format is version 2 and a version 1 payload is refused", async () => {
+  assert.equal(PAYLOAD_VERSION, 2);
+  const { fetch, routes, modules } = handler({ load: () => ({ title: "V", slow: defer(later(1, { text: "x" })) }) });
+  const html = (await chunks(await fetch(new Request("https://example.test/stream")))).join("");
+  assert.equal(payloadOf(html).v, 2);
+  const browser = new HappyWindow({ url: "https://example.test/plain" });
+  await assert.rejects(mountClientApp({
+    routes, root: browser.document.body as unknown as Element,
+    payload: { v: 1, route: "/plain", props: { params: {}, search: {} }, state: {} },
+    loadPage: async (file) => modules[file]!,
+    browser: browser as unknown as Window,
+  }), /Unsupported Meeko payload version 1/);
+});
+
+test("deferred values under constructor or prototype keys hydrate", async () => {
+  for (const slug of ["prototype", "constructor"]) {
+    const routes = createRouteManifest([{ id: "/posts/[slug]", file: "post.meeko", layouts: [], sidecar: "post.route.ts", render: "stream" }]);
+    const describe = (props: Record<string, unknown>): string => {
+      const posts = (props.data as { posts: Record<string, Deferred<Slow>> }).posts;
+      const key = (props.params as { slug: string }).slug;
+      return describeDeferred(Object.hasOwn(posts, key) ? posts[key] : undefined);
+    };
+    const page: ClientComponent = {
+      renderWithState: (props) => ({ html: `<p id="slow">${describe(props)}</p>`, state: {} }),
+      renderToString: (props) => `<p id="slow">${describe(props)}</p>`,
+      hydrateScope: (scope, props) => {
+        const target = scope.root.querySelector("#slow")!;
+        return effect(() => { target.textContent = describe(props); });
+      },
+    };
+    const fetch = createFrameworkHandler({
+      routes,
+      loadPage: async () => page,
+      loadRoute: async () => ({ render: "stream", load: ({ params }: PageRequestContext) => ({ posts: { [String(params.slug)]: defer(later(1, { text: `keyed ${String(params.slug)}` })) } }) }),
+    });
+    const html = (await chunks(await fetch(new Request(`https://example.test/posts/${slug}`)))).join("");
+    assert.deepEqual(payloadOf(html).deferred, [{ id: 0, path: ["data", "posts", slug], status: "pending" }]);
+    const browser = new HappyWindow({ url: `https://example.test/posts/${slug}` });
+    browser.document.write(html);
+    const app = await mountClientApp({
+      routes, root: browser.document.getElementById("app") as unknown as Element,
+      payload: browser.document.getElementById("meeko-payload")!.textContent!,
+      loadPage: async () => page,
+      browser: browser as unknown as Window,
+    });
+    assert.equal(browser.document.getElementById("slow")!.textContent, `keyed ${slug}`);
+    app.dispose();
+  }
+});
+
+test("a deferred value under a __proto__ key fails the render with 500", async () => {
+  const reported: unknown[] = [];
+  const { fetch } = handler({
+    load: () => {
+      const data: Record<string, unknown> = { title: "Proto" };
+      Object.defineProperty(data, "__proto__", { value: { slow: defer(later(1, { text: "x" })) }, enumerable: true, writable: true, configurable: true });
+      return data;
+    },
+  }, { onError: (error) => reported.push(error) });
+  const response = await fetch(new Request("https://example.test/stream"));
+  assert.equal(response.status, 500);
+  assert.doesNotMatch(await response.text(), /meeko-payload/);
+  assert.match(String((reported[0] as Error).message), /__proto__/);
+});
+
+test("deferred blocks outside <body> after the payload are ignored, also when added later", async () => {
+  const { fetch } = handler({ load: () => ({ title: "Spoof", slow: defer(later(1, { text: "real" })) }) });
+  const html = (await chunks(await fetch(new Request("https://example.test/stream")))).join("");
+  const spoof = (id: number) => `<script type="application/json" data-meeko-deferred="${id}">{"deferred":${id},"value":{"text":"spoofed"}}</script>`;
+  // User content rendered inside #app may contain a forged block before the real one.
+  const forged = html.replace('<div id="app">', `<div id="app">${spoof(0)}`);
+  const { browser, routes, modules } = await bootStream("https://example.test/stream", forged);
+  const errors: unknown[] = [];
+  const app = await mountClientApp({
+    routes, root: browser.document.getElementById("app") as unknown as Element,
+    payload: browser.document.getElementById("meeko-payload")!.textContent!,
+    loadPage: async (file) => modules[file]!,
+    browser: browser as unknown as Window,
+    onNavigationError: (error) => errors.push(error),
+  });
+  assert.equal(browser.document.getElementById("slow")!.textContent, "real");
+  app.dispose();
+
+  // While the document is still loading, a forged block added inside #app is not read either.
+  const slow = gate<Slow>();
+  const fast = gate<Slow>();
+  const live = handler({ load: () => ({ title: "Spoof", slow: defer(slow.promise), fast: defer(fast.promise) }) });
+  const response = await live.fetch(new Request("https://example.test/stream"));
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  const first = decoder.decode((await reader.read()).value!);
+  const loading = await bootStream("https://example.test/stream", first, { loading: true });
+  const liveApp = await mountClientApp({
+    routes: loading.routes, root: loading.browser.document.getElementById("app") as unknown as Element,
+    payload: loading.browser.document.getElementById("meeko-payload")!.textContent!,
+    loadPage: async (file) => loading.modules[file]!,
+    browser: loading.browser as unknown as Window,
+    onNavigationError: (error) => errors.push(error),
+  });
+  const document = loading.browser.document;
+  const container = document.createElement("div");
+  container.innerHTML = spoof(0);
+  document.getElementById("app")!.append(container.firstChild!);
+  fast.resolve({ text: "fast real" });
+  const fastChunk = decoder.decode((await reader.read()).value!).match(/data-meeko-deferred="1">(.*?)<\/script>/)![1]!;
+  const script = document.createElement("script");
+  script.setAttribute("type", "application/json");
+  script.setAttribute("data-meeko-deferred", "1");
+  script.textContent = fastChunk;
+  document.body.append(script);
+  await until(() => document.getElementById("fast")!.textContent !== "pending");
+  assert.equal(document.getElementById("fast")!.textContent, "fast real");
+  assert.equal(document.getElementById("slow")!.textContent, "pending");
+  slow.resolve({ text: "ignored" });
+  await reader.cancel();
+  liveApp.dispose();
+  assert.deepEqual(errors, []);
+});
+
+test("a session revoked mid-stream sends SESSION_REVOKED 401 lines and aborts the loader signal without onError", async () => {
+  const reported: unknown[] = [];
+  const slow = gate<Slow>();
+  let loaderSignal: AbortSignal | undefined;
+  const { fetch, cookie, record, sessions } = await sessionHandler(() => ({
+    load: ({ signal }: { signal: AbortSignal }) => {
+      loaderSignal = signal;
+      return { title: "Revoked", slow: defer(slow.promise) };
+    },
+  } as PageRoute), (error) => reported.push(error));
+  const response = await fetch(new Request("https://example.test/stream", { headers: { cookie } }));
+  assert.equal(response.status, 200);
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let html = decoder.decode((await reader.read()).value!);
+  await sessions.store.revokeFamily!(record.familyId ?? record.id);
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    html += decoder.decode(value, { stream: true });
+  }
+  assert.deepEqual(deferredChunks(html).map((chunk) => chunk.line), [{ deferred: 0, error: { code: "SESSION_REVOKED", status: 401 } }]);
+  assert.equal(loaderSignal?.aborted, true);
+  assert.deepEqual(reported, []);
+  slow.resolve({ text: "too late" });
+});
+
+test("a deferred value with </script> and U+2028 stays inside its data block", async () => {
+  const text = "</script><script>alert(1)</script>\u2028\u2029&<!--";
+  const { fetch, routes, modules } = handler({ load: () => ({ title: "Escape", slow: defer(later(1, { text })) }) });
+  const html = (await chunks(await fetch(new Request("https://example.test/stream")))).join("");
+  const block = html.slice(html.indexOf('data-meeko-deferred="0">'));
+  assert.doesNotMatch(block.slice("data-meeko-deferred=\"0\">".length, block.indexOf("</script>")), /<|\u2028|\u2029/);
+  assert.deepEqual(deferredChunks(html).map((chunk) => chunk.line), [{ deferred: 0, value: { text } }]);
+  const browser = new HappyWindow({ url: "https://example.test/stream" });
+  browser.document.write(html);
+  const app = await mountClientApp({
+    routes, root: browser.document.getElementById("app") as unknown as Element,
+    payload: browser.document.getElementById("meeko-payload")!.textContent!,
+    loadPage: async (file) => modules[file]!,
+    browser: browser as unknown as Window,
+  });
+  assert.equal(browser.document.getElementById("slow")!.textContent, text);
+  assert.equal(browser.document.querySelectorAll("script[data-meeko-deferred]").length, 1);
+  app.dispose();
+});
+
+test("a browser loader's deferred factory is aborted when the route is left", async () => {
+  let aborted: unknown;
+  const { fetch, routes, modules } = handler({ load: () => ({ title: "Plain" }) });
+  const browser = new HappyWindow({ url: "https://example.test/plain" });
+  browser.document.write(await (await fetch(new Request("https://example.test/plain"))).text());
+  const app = await mountClientApp({
+    routes, root: browser.document.getElementById("app") as unknown as Element,
+    payload: browser.document.getElementById("meeko-payload")!.textContent!,
+    loadPage: async (file) => modules[file]!,
+    loadRoute: async () => ({
+      load: () => ({
+        title: "Browser",
+        slow: defer((work: AbortSignal) => new Promise<Slow>(() => {
+          work.addEventListener("abort", () => { aborted = work.reason ?? true; }, { once: true });
+        })),
+      }),
+    }),
+    browser: browser as unknown as Window,
+  });
+  assert.equal(await app.navigate("https://example.test/stream"), true);
+  assert.equal(browser.document.getElementById("slow")!.textContent, "pending");
+  assert.equal(aborted, undefined);
+  assert.equal(await app.navigate("https://example.test/plain"), true);
+  await until(() => aborted !== undefined);
+  assert.notEqual(aborted, undefined);
   app.dispose();
 });

@@ -42,6 +42,9 @@ function headOffset(pathname: string, html: string): number {
   return close;
 }
 
+/** The navigation payload embedded in a Meeko document; `serializeJson` escapes every `<` inside it. */
+const embeddedPayload = /<script id="meeko-payload" type="application\/json">([^<]*)<\/script>/;
+
 /** Writes only fully resolved, successful HTML responses to the prerender output. */
 export async function prerenderRoutes(options: PrerenderOptions): Promise<string[]> {
   const outputRoot = resolve(options.outputRoot);
@@ -86,12 +89,19 @@ export async function prerenderRoutes(options: PrerenderOptions): Promise<string
     await writeFile(output, html, "utf8");
     outputs.push(output);
     const file = [...parts, "index.html"].join("/");
-    const navigation = await options.handler(new Request(new URL(pathname, origin), { headers: { accept: "application/meeko+json" } }));
+    // The payload of the stored document comes from the same loader run as its
+    // HTML; only a document without one asks the handler a second time.
+    let navigationPayload = rendered.match(embeddedPayload)?.[1];
+    if (navigationPayload === undefined) {
+      const navigation = await options.handler(new Request(new URL(pathname, origin), { headers: { accept: "application/meeko+json" } }));
+      if (navigation.status === 200 && (navigation.headers.get("content-type") ?? "").startsWith("application/meeko+json")) navigationPayload = await navigation.text();
+      else await navigation.body?.cancel();
+    }
     let payload: string | undefined;
-    if (navigation.status === 200 && (navigation.headers.get("content-type") ?? "").startsWith("application/meeko+json")) {
+    if (navigationPayload !== undefined) {
       payload = [...parts, "index.meeko.json"].join("/");
-      await writeFile(resolve(outputRoot, ...parts, "index.meeko.json"), await navigation.text(), "utf8");
-    } else await navigation.body?.cancel();
+      await writeFile(resolve(outputRoot, ...parts, "index.meeko.json"), navigationPayload, "utf8");
+    }
     pages[pathname] = { file, headOffset: headOffset(pathname, html), etag: contentTag(html), ...(payload ? { payload } : {}) };
   }
   const index: PrerenderIndex = { version: 1, pages };

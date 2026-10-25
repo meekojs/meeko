@@ -1,4 +1,4 @@
-import { SessionRevokedError } from "./contracts.js";
+import { ApiError, SessionRevokedError } from "./contracts.js";
 import type { Unsubscribe } from "./socket.js";
 
 export interface SessionRecord<T = unknown> {
@@ -206,8 +206,22 @@ function revocationRegistry(manager: SessionManager<any>): RevocationRegistry {
  */
 const signalControllers = new WeakMap<AbortSignal, AbortController>();
 
+/**
+ * @internal Fixes the cookie of a response whose headers are about to be sent:
+ * waits for create/rotate/revoke calls in flight, then makes later calls fail
+ * with `SESSION_LOCKED` before they touch the store.
+ */
+export const lockSessionCookie = Symbol("meeko.session.lockCookie");
+
+function sessionLockedError(): ApiError {
+  return new ApiError("SESSION_LOCKED", 500, "SESSION_LOCKED: the session cookie was already sent with the response headers; create, rotate or revoke the session in the loader, before any deferred work");
+}
+
 export class SessionHandle<T = unknown> {
   private pendingCookie?: string;
+  private cookieLocked = false;
+  /** Settled forms of the create/rotate/revoke calls still writing the store. */
+  private readonly mutations = new Set<Promise<void>>();
   private readonly revocation = new AbortController();
   private watched: { readonly familyId: string; readonly ref: WeakRef<AbortController> | undefined } | undefined;
   constructor(private readonly manager: SessionManager<T>, public current?: SessionRecord<T>) {
@@ -221,6 +235,47 @@ export class SessionHandle<T = unknown> {
    */
   get signal(): AbortSignal { return this.revocation.signal; }
   async create(data: T): Promise<SessionRecord<T>> {
+    return this.mutate(() => this.write(data));
+  }
+  async rotate(): Promise<SessionRecord<T>> {
+    return this.mutate(async () => {
+      if (!this.current) throw new Error("No active session to rotate");
+      return this.write(this.current.data);
+    });
+  }
+  async revoke(): Promise<void> {
+    return this.mutate(async () => {
+      if (this.current) {
+        if (!this.manager.store.revokeFamily) throw new Error("Session storage does not support atomic family revocation");
+        const familyId = this.current.familyId ?? this.current.id;
+        // The revoking request keeps running so that it can clear the cookie.
+        this.unwatch();
+        try { await this.manager.store.revokeFamily(familyId); }
+        catch (error) {
+          this.watch();
+          throw error;
+        }
+        revocationRegistry(this.manager).revoke(familyId);
+      }
+      this.current = undefined;
+      this.pendingCookie = this.manager.serializeCookie("", 0);
+    });
+  }
+  /** @internal Resolves once no session change is in flight; later changes fail with `SESSION_LOCKED`. */
+  async [lockSessionCookie](): Promise<void> {
+    this.cookieLocked = true;
+    while (this.mutations.size) await Promise.all(this.mutations);
+  }
+  /** Runs one store change unless the cookie is locked, and tracks it until it settles. */
+  private mutate<R>(work: () => Promise<R>): Promise<R> {
+    if (this.cookieLocked) return Promise.reject(sessionLockedError());
+    const running = work();
+    const settled = running.then(() => {}, () => {});
+    this.mutations.add(settled);
+    void settled.then(() => { this.mutations.delete(settled); });
+    return running;
+  }
+  private async write(data: T): Promise<SessionRecord<T>> {
     const previous = this.current;
     const now = Date.now();
     const record = { id: token(), familyId: previous?.familyId ?? previous?.id ?? token(), csrfToken: token(), data, createdAt: now, expiresAt: now + this.manager.ttlMs };
@@ -232,26 +287,6 @@ export class SessionHandle<T = unknown> {
     this.watch();
     this.pendingCookie = this.manager.serializeCookie(record.id, this.manager.ttlMs);
     return record;
-  }
-  async rotate(): Promise<SessionRecord<T>> {
-    if (!this.current) throw new Error("No active session to rotate");
-    return this.create(this.current.data);
-  }
-  async revoke(): Promise<void> {
-    if (this.current) {
-      if (!this.manager.store.revokeFamily) throw new Error("Session storage does not support atomic family revocation");
-      const familyId = this.current.familyId ?? this.current.id;
-      // The revoking request keeps running so that it can clear the cookie.
-      this.unwatch();
-      try { await this.manager.store.revokeFamily(familyId); }
-      catch (error) {
-        this.watch();
-        throw error;
-      }
-      revocationRegistry(this.manager).revoke(familyId);
-    }
-    this.current = undefined;
-    this.pendingCookie = this.manager.serializeCookie("", 0);
   }
   /**
    * Re-reads the store and throws `SessionRevokedError` (`401 SESSION_REVOKED`)

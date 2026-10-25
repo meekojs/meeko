@@ -3,6 +3,7 @@ import type { RequestContext } from "../framework-server/context.js";
 import { withRequestContext } from "../framework-server/context.js";
 import type { ServerFetch } from "../framework-server/context.js";
 import { ApiError, errorResponse, normalizeServerError, observeServerError } from "../framework-server/contracts.js";
+import { lockSessionCookie } from "../framework-server/sessions.js";
 import { etagMatches } from "../framework-server/assets.js";
 import { PAYLOAD_VERSION, PageInputError, pageSearchObject, validatePageInputs } from "./page.js";
 import { runRouteMiddleware } from "./middleware.js";
@@ -162,7 +163,8 @@ function wireOutcome(outcome: ServerOutcome): Record<string, unknown> {
 
 /**
  * Races a deferred value against its timeout and the request signal (client
- * disconnect, session revocation or an aborted response). Never rejects.
+ * disconnect, session revocation or an aborted response). A factory's signal
+ * aborts with the same reason when either wins. Never rejects.
  */
 function settleOnServer(deferred: DeferredInternals, signal: AbortSignal): Promise<ServerOutcome> {
   const source = deferred[deferredSource];
@@ -173,18 +175,24 @@ function settleOnServer(deferred: DeferredInternals, signal: AbortSignal): Promi
   }
   return new Promise((resolve) => {
     let settled = false;
-    const finish = (outcome: ServerOutcome): void => {
+    const work = new AbortController();
+    const finish = (outcome: ServerOutcome, abandoned?: { readonly reason: unknown }): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       signal.removeEventListener("abort", onAbort);
+      if (abandoned) work.abort(abandoned.reason);
       resolve(outcome);
     };
-    const onAbort = (): void => finish(rejectedOutcome(signal.reason));
-    const timer = setTimeout(() => finish(rejectedOutcome(new ApiError("DEFERRED_TIMEOUT", 504, `Deferred value did not settle within ${source.timeoutMs} ms`))), source.timeoutMs);
-    if (signal.aborted) onAbort();
-    else signal.addEventListener("abort", onAbort, { once: true });
-    source.promise.then((value) => finish(resolvedOutcome(value)), (error: unknown) => finish(rejectedOutcome(error)));
+    const onAbort = (): void => finish(rejectedOutcome(signal.reason), { reason: signal.reason });
+    const timer = setTimeout(() => {
+      const timeout = new ApiError("DEFERRED_TIMEOUT", 504, `Deferred value did not settle within ${source.timeoutMs} ms`);
+      finish(rejectedOutcome(timeout), { reason: timeout });
+    }, source.timeoutMs);
+    // Work that would never be sent is not started.
+    if (signal.aborted) return onAbort();
+    signal.addEventListener("abort", onAbort, { once: true });
+    source.start(work.signal).then((value) => finish(resolvedOutcome(value)), (error: unknown) => finish(rejectedOutcome(error)));
   });
 }
 
@@ -300,8 +308,11 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     const renderMode = routeRender(match.route, sidecar);
     const clientPage = renderMode === "client";
     const validated = await validatePageInputs(sidecar, match.params, pageSearchObject(url.searchParams));
+    // Client disconnect, session revocation, a cancelled stream or a HEAD
+    // response: the loader and its deferred work stop being awaited.
+    const driverSignal = AbortSignal.any([requestContext?.signal ?? request.signal, deferredWork.signal]);
     const context: PageRequestContext = {
-      request, params: validated.params, search: validated.search, searchParams: url.searchParams, signal: request.signal, state: stateStore,
+      request, params: validated.params, search: validated.search, searchParams: url.searchParams, signal: driverSignal, state: stateStore,
       ...(requestContext ? { context: requestContext } : {}),
     };
     // A client page's loader and head run in the browser; the server only guards and validates.
@@ -311,7 +322,6 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     const requestId = requestContext?.requestId ?? fallbackRequestId;
     // Deferred values replace themselves with null in the payload and travel by path.
     const extracted = data === undefined ? { value: undefined, found: [] } : extractDeferred(data, ["data"]);
-    const driverSignal = AbortSignal.any([requestContext?.signal ?? request.signal, deferredWork.signal]);
     const outcomes = extracted.found.map(({ deferred }) => settleOnServer(deferred, driverSignal));
     const observeOutcome = (outcome: ServerOutcome): void => {
       if (outcome.status !== "rejected" || outcome.error.status < 500) return;
@@ -325,6 +335,14 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     } else {
       // ssr and prerender keep the full HTML: every deferred value settles before rendering.
       const settled = await Promise.all(outcomes);
+      if (renderMode === "prerender") {
+        // Stored HTML would keep a transient failure until the next build.
+        const failed = settled.findIndex((outcome) => outcome.status === "rejected");
+        const outcome = settled[failed];
+        if (outcome?.status === "rejected") {
+          throw new Error(`Prerendered route ${match.route.id} cannot store the rejected deferred value at ${extracted.found[failed]!.path.join(".")} (${outcome.error.code} ${outcome.error.status})`, { cause: outcome.failure });
+        }
+      }
       deferredEntries = settled.map((outcome, id) => {
         extracted.found[id]!.deferred[deferredSettle](outcome);
         observeOutcome(outcome);
@@ -341,7 +359,6 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       search: validated.search,
       ...(data === undefined ? {} : { data: extracted.value }),
     };
-    const head: PageHead = clientPage ? {} : sidecar?.head?.({ ...context, data }) ?? {};
     const styles: string[] = [];
     let module: PageModule = emptyOutlet;
     let input: Record<string, unknown> = {};
@@ -363,6 +380,8 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       input = { outlet };
     }
     const rendered = withStateStore(stateStore, () => module.renderWithState(input));
+    // head reads the state the render produced; anything it adds cannot change that render.
+    const head: PageHead = clientPage ? {} : sidecar?.head?.({ ...context, data }) ?? {};
     // The payload below is the only copy of this state the browser receives.
     stateStore.seal();
     const payload = serializeJson({
@@ -371,9 +390,13 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       head: head.title === undefined ? {} : { title: head.title },
       ...(deferredEntries.length ? { deferred: deferredEntries } : {}),
     });
-    // Status, headers and cookies are final from here on; a session revoked
-    // while the loader ran must not receive a 200 stream.
-    if (streaming) await requestContext?.session.verify();
+    // Status, headers and cookies are final from here on: session changes still
+    // in flight finish first and later ones fail with SESSION_LOCKED. A session
+    // revoked while the loader ran must not receive a 200 stream.
+    if (streaming && requestContext) {
+      await requestContext.session[lockSessionCookie]?.();
+      await requestContext.session.verify();
+    }
     const title = head.title === undefined ? "" : `<title>${escapeHtml(head.title)}</title>`;
     const host = documentParts(options.document, request);
     const nonceAttribute = host.nonceAttribute;
@@ -381,10 +404,14 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     const headRequest = request.method === "HEAD";
     if (streaming) {
       const sentCookie = requestContext?.session.cookieHeader;
+      let cookieChange = false;
       const line = async (id: number): Promise<string> => {
         let outcome = await outcomes[id]!;
-        if (requestContext && requestContext.session.cookieHeader !== sentCookie) {
-          outcome = rejectedOutcome(new Error("The session cookie changed after the response headers were sent; change the session in the loader, before any deferred work"));
+        // Defense in depth for a session object without the lock: the first
+        // value that settles after the change fails, the others still arrive.
+        if (!cookieChange && requestContext && requestContext.session.cookieHeader !== sentCookie) {
+          cookieChange = true;
+          outcome = rejectedOutcome(new ApiError("SESSION_LOCKED", 500, "The session cookie changed after the response headers were sent; change the session in the loader, before any deferred work"));
         }
         observeOutcome(outcome);
         return serializeJson({ deferred: id, ...wireOutcome(outcome) });
