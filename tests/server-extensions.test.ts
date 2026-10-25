@@ -62,3 +62,54 @@ test("Node upgrade preflights before transport and bridges messages without prot
   await new Promise<void>((resolve) => setImmediate(resolve));
   assert.deepEqual(JSON.parse(sent[0]!) as unknown, { event: "message", payload: "hello" });
 });
+
+test("Node upgrade reports a connection close failure without throwing from the transport listener", async () => {
+  const failure = new Error("connection close failed");
+  const observed: unknown[] = [];
+  let disconnected: (() => void) | undefined;
+  const hub: Parameters<typeof createNodeSocketUpgradeHandler>[0]["hub"] = {
+    async preflight() {},
+    async accept() {
+      return { async receive() {}, async emit() {}, close() { throw failure; } };
+    },
+    async broadcast() {},
+  };
+  const handler = createNodeSocketUpgradeHandler({
+    hub,
+    publicOrigin: "https://example.test",
+    upgrade: () => ({
+      peer: { send() {}, close() {} },
+      onMessage() {},
+      onClose(listener) { disconnected = listener; },
+    }),
+    onError(error) { observed.push(error); },
+  });
+  const incoming = { method: "GET", url: "/_meeko/socket/chat", headers: { origin: "https://example.test", upgrade: "websocket" } } as IncomingMessage;
+  assert.equal(await handler(incoming, new PassThrough(), Buffer.alloc(0)), true);
+  assert.ok(disconnected);
+  assert.doesNotThrow(() => disconnected?.());
+  assert.deepEqual(observed, [failure]);
+});
+
+test("Node upgrade contains a rejected asynchronous error observer", async () => {
+  let disconnected: (() => void) | undefined;
+  const hub: Parameters<typeof createNodeSocketUpgradeHandler>[0]["hub"] = {
+    async preflight() {},
+    async accept() { return { async receive() {}, async emit() {}, close() { throw new Error("close failed"); } }; },
+    async broadcast() {},
+  };
+  const handler = createNodeSocketUpgradeHandler({
+    hub,
+    publicOrigin: "https://example.test",
+    upgrade: () => ({
+      peer: { send() {}, close() {} },
+      onMessage() {},
+      onClose(listener) { disconnected = listener; },
+    }),
+    onError: async () => { throw new Error("observer failed"); },
+  });
+  const incoming = { method: "GET", url: "/_meeko/socket/chat", headers: { origin: "https://example.test", upgrade: "websocket" } } as IncomingMessage;
+  assert.equal(await handler(incoming, new PassThrough(), Buffer.alloc(0)), true);
+  disconnected?.();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+});

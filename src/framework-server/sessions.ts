@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 
 export interface SessionRecord<T = unknown> {
   id: string;
+  /** Stable opaque lineage for atomic revocation after one or more rotations. */
+  familyId?: string;
   csrfToken: string;
   data: T;
   createdAt: number;
@@ -16,6 +18,8 @@ export interface SessionStore<T = unknown> {
   delete(id: string): Promise<void>;
   /** Atomically replace an existing id; false means it no longer exists. */
   replace?(previousId: string, record: SessionRecord<T>): Promise<boolean>;
+  /** Atomically revoke the currently active id in this family, even from a stale handle. */
+  revokeFamily?(familyId: string): Promise<void>;
   close?(): Promise<void>;
 }
 
@@ -23,27 +27,49 @@ export class MemorySessionStore<T = unknown> implements SessionStore<T> {
   readonly developmentOnly = true;
   readonly persistent = false;
   private readonly records = new Map<string, SessionRecord<T>>();
+  private readonly families = new Map<string, string>();
   async get(id: string): Promise<SessionRecord<T> | undefined> {
     const record = this.records.get(id);
     if (record && record.expiresAt <= Date.now()) {
-      this.records.delete(id);
+      await this.delete(id);
       return undefined;
     }
+    if (record && this.families.get(record.familyId ?? record.id) !== id) return undefined;
     return record;
   }
-  async set(record: SessionRecord<T>): Promise<void> { this.records.set(record.id, record); }
-  async delete(id: string): Promise<void> { this.records.delete(id); }
+  async set(record: SessionRecord<T>): Promise<void> {
+    const familyId = record.familyId ?? record.id;
+    const existing = this.records.get(record.id);
+    if (existing && (existing.familyId ?? existing.id) !== familyId) throw new Error("Session id cannot change family");
+    const active = this.families.get(familyId);
+    if (active && active !== record.id) throw new Error("Session family already has an active id");
+    this.records.set(record.id, { ...record, familyId });
+    this.families.set(familyId, record.id);
+  }
+  async delete(id: string): Promise<void> {
+    const record = this.records.get(id);
+    this.records.delete(id);
+    if (record && this.families.get(record.familyId ?? record.id) === id) this.families.delete(record.familyId ?? record.id);
+  }
   async replace(previousId: string, record: SessionRecord<T>): Promise<boolean> {
     const previous = this.records.get(previousId);
     if (!previous || previous.expiresAt <= Date.now()) {
-      this.records.delete(previousId);
+      await this.delete(previousId);
       return false;
     }
+    const familyId = previous.familyId ?? previous.id;
+    if (record.familyId !== familyId || this.families.get(familyId) !== previousId) return false;
     this.records.set(record.id, record);
+    this.families.set(familyId, record.id);
     this.records.delete(previousId);
     return true;
   }
-  async close(): Promise<void> { this.records.clear(); }
+  async revokeFamily(familyId: string): Promise<void> {
+    const active = this.families.get(familyId);
+    if (active) this.records.delete(active);
+    this.families.delete(familyId);
+  }
+  async close(): Promise<void> { this.records.clear(); this.families.clear(); }
 }
 
 export interface SessionOptions<T> {
@@ -75,7 +101,7 @@ export class SessionHandle<T = unknown> {
   async create(data: T): Promise<SessionRecord<T>> {
     const previous = this.current;
     const now = Date.now();
-    const record = { id: token(), csrfToken: token(), data, createdAt: now, expiresAt: now + this.manager.ttlMs };
+    const record = { id: token(), familyId: previous?.familyId ?? previous?.id ?? token(), csrfToken: token(), data, createdAt: now, expiresAt: now + this.manager.ttlMs };
     if (previous) {
       if (!this.manager.store.replace) throw new Error("Session storage does not support atomic rotation");
       if (!(await this.manager.store.replace(previous.id, record))) throw new Error("Session has expired or been revoked");
@@ -89,7 +115,10 @@ export class SessionHandle<T = unknown> {
     return this.create(this.current.data);
   }
   async revoke(): Promise<void> {
-    if (this.current) await this.manager.store.delete(this.current.id);
+    if (this.current) {
+      if (!this.manager.store.revokeFamily) throw new Error("Session storage does not support atomic family revocation");
+      await this.manager.store.revokeFamily(this.current.familyId ?? this.current.id);
+    }
     this.current = undefined;
     this.pendingCookie = this.manager.serializeCookie("", 0);
   }
@@ -103,7 +132,7 @@ export class SessionManager<T = unknown> {
   private readonly secure: boolean;
   private readonly sameSite: "Lax" | "Strict" | "None";
   constructor(options: SessionOptions<T>) {
-    if (options.production && (options.store.persistent !== true || !options.store.replace)) throw new Error("Persistent session storage with atomic rotation is required in production");
+    if (options.production && (options.store.persistent !== true || !options.store.replace || !options.store.revokeFamily)) throw new Error("Persistent session storage with atomic rotation and family revocation is required in production");
     this.store = options.store;
     this.ttlMs = options.ttlMs ?? 7 * 24 * 60 * 60 * 1000;
     if (!Number.isSafeInteger(this.ttlMs) || this.ttlMs <= 0) throw new RangeError("Invalid session TTL");

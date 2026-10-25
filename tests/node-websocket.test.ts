@@ -5,6 +5,7 @@ import test from "node:test";
 import WebSocket from "ws";
 import { attachNodeWebSocketServer, createSocketHub, defineSocketChannel, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
 import type { Schema } from "../src/framework-server.ts";
+import type { SocketHub } from "../src/framework-server/socket.ts";
 
 const textSchema: Schema<{ text: string }> = {
   "~standard": {
@@ -84,6 +85,81 @@ test("official Node adapter upgrades real WebSockets and enforces origin, sessio
     await adapter.close();
     await closed;
     assert.equal(server.listenerCount("upgrade"), 0);
+  } finally {
+    await adapter.close();
+    server.close();
+    await once(server, "close");
+  }
+});
+
+test("Node upgrade preserves a client error status across separate module graphs", async () => {
+  class ApiError extends Error {
+    readonly code = "INVALID_ORIGIN";
+    readonly status = 403;
+  }
+  const hub: SocketHub = {
+    async preflight() { throw new ApiError("Invalid origin"); },
+    async accept() { throw new Error("Unexpected upgrade"); },
+    async broadcast() { throw new Error("Unexpected broadcast"); },
+  };
+  const server = createServer((_request, response) => { response.writeHead(404); response.end(); });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const origin = `http://127.0.0.1:${address.port}`;
+  let observed = 0;
+  const adapter = attachNodeWebSocketServer({ server, hub, publicOrigin: origin,
+    onError() { observed++; throw new Error("observer failed"); },
+  });
+  try {
+    const peer = new WebSocket(`ws://127.0.0.1:${address.port}/_meeko/socket/chat`, { headers: { origin } });
+    const status = await new Promise<number>((resolve, reject) => {
+      peer.once("unexpected-response", (_request, response) => { response.resume(); resolve(response.statusCode ?? 0); });
+      peer.once("error", reject);
+    });
+    assert.equal(status, 403);
+    assert.equal(observed, 1);
+  } finally {
+    await adapter.close();
+    server.close();
+    await once(server, "close");
+  }
+});
+
+test("Node message delivery treats a cross-graph policy error as a policy close", async () => {
+  class ApiError extends Error {
+    readonly code = "FORBIDDEN";
+    readonly status = 403;
+  }
+  const hub: SocketHub = {
+    async preflight() {},
+    async accept(_name, _request, peer) {
+      return {
+        async receive() { throw new ApiError("private details"); },
+        async emit() {},
+        close(code?: number) { peer.close(code); },
+      };
+    },
+    async broadcast() {},
+  };
+  const server = createServer((_request, response) => { response.writeHead(404); response.end(); });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const origin = `http://127.0.0.1:${address.port}`;
+  let observed = 0;
+  const adapter = attachNodeWebSocketServer({ server, hub, publicOrigin: origin,
+    onError() { observed++; throw new Error("observer failed"); },
+  });
+  try {
+    const peer = new WebSocket(`ws://127.0.0.1:${address.port}/_meeko/socket/chat`, { headers: { origin } });
+    await once(peer, "open");
+    const closed = once(peer, "close");
+    peer.send(JSON.stringify({ event: "message", payload: "test" }));
+    assert.equal((await closed)[0], 1008);
+    assert.equal(observed, 1);
   } finally {
     await adapter.close();
     server.close();

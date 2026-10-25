@@ -1,6 +1,6 @@
 import { pathToFileURL } from "node:url";
-import { ApiError, dispatchApiRoute, dispatchRpc, errorResponse } from "./contracts.js";
-import type { ApiRouteDefinition, RpcDefinition, Schema } from "./contracts.js";
+import { ApiError, dispatchApiRoute, dispatchRpc, errorResponse, reportServerError } from "./contracts.js";
+import type { ApiRouteDefinition, RpcDefinition, Schema, ServerErrorObserver } from "./contracts.js";
 import type { RequestContext } from "./context.js";
 import type { ApiMethod, ServerManifest } from "./discovery.js";
 import type { SessionManager } from "./sessions.js";
@@ -11,6 +11,7 @@ export interface LocalCallOptions<S> {
   context: RequestContext<S>;
   sessions: SessionManager;
   load?: (file: string) => Promise<unknown>;
+  onError?: ServerErrorObserver;
 }
 
 export interface LocalApiInput {
@@ -76,8 +77,8 @@ export function createLocalCalls<S>(options: LocalCallOptions<S>) {
         if (body !== undefined) headers.set("content-type", "application/json");
         const request = new Request(url, { method, headers, signal: options.context.signal, ...(body === undefined ? {} : { body }) });
         const definition = routeModule(await load(endpoint.file)) as ApiRouteDefinition<Schema | undefined, Schema | undefined, Schema | undefined, Schema | undefined, S>;
-        return dispatchApiRoute(definition, derived(request), options.sessions, input.params ?? {});
-      } catch (error) { return errorResponse(error, options.context.requestId); }
+        return dispatchApiRoute(definition, derived(request), options.sessions, input.params ?? {}, options.onError);
+      } catch (error) { reportServerError(error, options.context.requestId, options.onError); return errorResponse(error, options.context.requestId); }
     },
     async rpc(id: string, input: unknown): Promise<Response> {
       try {
@@ -89,8 +90,8 @@ export function createLocalCalls<S>(options: LocalCallOptions<S>) {
           method: "POST", headers, signal: options.context.signal, body: serializeJson(input),
         });
         const definition = routeModule(await load(endpoint.file)) as RpcDefinition<Schema, Schema, S>;
-        return dispatchRpc(definition, derived(request), options.sessions);
-      } catch (error) { return errorResponse(error, options.context.requestId); }
+        return dispatchRpc(definition, derived(request), options.sessions, options.onError);
+      } catch (error) { reportServerError(error, options.context.requestId, options.onError); return errorResponse(error, options.context.requestId); }
     },
   };
 }

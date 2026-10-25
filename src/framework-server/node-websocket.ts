@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import type { Duplex } from "node:stream";
 import type WebSocket from "ws";
 import { createNodeSocketUpgradeHandler } from "./node-upgrade.js";
+import { observeErrorCallback } from "./contracts.js";
 import type { NodeAcceptedSocket, NodeSocketUpgradeOptions } from "./node-upgrade.js";
 
 export interface NodeWebSocketOptions extends Omit<NodeSocketUpgradeOptions, "upgrade" | "reject"> {
@@ -28,6 +29,7 @@ export function attachNodeWebSocketServer(options: NodeWebSocketOptions): NodeWe
   // Keep the optional server transport out of engine-only and HTTP-only imports.
   const { WebSocket: WebSocketClass, WebSocketServer } = createRequire(import.meta.url)("ws") as typeof import("ws");
   const webSockets = new WebSocketServer({ noServer: true, maxPayload, perMessageDeflate: false });
+  const observeError = (error: unknown): void => observeErrorCallback(error, options.onError);
   const alive = new WeakMap<WebSocket, boolean>();
   let closing = false;
   let closePromise: Promise<void> | undefined;
@@ -38,7 +40,7 @@ export function attachNodeWebSocketServer(options: NodeWebSocketOptions): NodeWe
         webSockets.handleUpgrade(incoming, socket, head, (peer) => {
           alive.set(peer, true);
           peer.on("pong", () => alive.set(peer, true));
-          peer.on("error", (error) => options.onError?.(error));
+          peer.on("error", observeError);
           const pending: Uint8Array[] = [];
           let pendingBytes = 0;
           let messageListener: ((message: string | Uint8Array) => void) | undefined;
@@ -89,7 +91,7 @@ export function attachNodeWebSocketServer(options: NodeWebSocketOptions): NodeWe
     void bridge(incoming, socket, head).then((handled) => {
       if (!handled) socket.destroy();
     }).catch((error: unknown) => {
-      options.onError?.(error);
+      observeError(error);
       socket.destroy();
     });
   };

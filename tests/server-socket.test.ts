@@ -84,3 +84,88 @@ test("outbound delivery rechecks a revoked session", async () => {
   assert.equal(acceptedPeer.sent.length, 0);
   assert.deepEqual(acceptedPeer.closed, [1008]);
 });
+
+test("a failed socket peer does not suppress delivery to other peers", async () => {
+  const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+  const channel = defineSocketChannel({ clientToServer: { message: messageSchema }, serverToClient: { message: messageSchema } });
+  const hub = createSocketHub({ channels: { chat: channel }, sessions, services: {} });
+  const request = new Request("https://example.test/socket/chat", { headers: { origin: "https://example.test" } });
+  const closed: number[] = [];
+  let attempts = 0;
+  await hub.accept("chat", request, {
+    send() { attempts++; throw new Error("peer disconnected during send"); },
+    close(code) { closed.push(code ?? 1000); },
+  }, "room");
+  const healthy = peer();
+  const connection = await hub.accept("chat", request, healthy.socket, "room");
+
+  await assert.rejects(hub.broadcast("chat", "room", "message", { text: "first" }), /peer disconnected during send/);
+  assert.deepEqual(healthy.sent.map((message) => JSON.parse(message) as unknown), [
+    { event: "message", payload: { text: "first" } },
+  ]);
+  assert.deepEqual(closed, [1011]);
+  await hub.broadcast("chat", "room", "message", { text: "second" });
+  assert.equal(attempts, 1);
+  assert.equal(healthy.sent.length, 2);
+  connection.close();
+});
+
+test("socket close still closes the peer and preserves both cleanup failures", async () => {
+  const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+  const channel = defineSocketChannel({ clientToServer: {}, serverToClient: {} });
+  const unsubscribeError = new Error("unsubscribe failed");
+  const closeError = new Error("peer close failed");
+  let releases = 0;
+  let peerCloses = 0;
+  const hub = createSocketHub({
+    channels: { chat: channel }, sessions, services: {},
+    pubsub: {
+      async publish() {},
+      subscribe() { return () => { releases++; throw unsubscribeError; }; },
+    },
+  });
+  const request = new Request("https://example.test/socket/chat", { headers: { origin: "https://example.test" } });
+  const connection = await hub.accept("chat", request, {
+    send() {},
+    close() { peerCloses++; throw closeError; },
+  });
+
+  assert.throws(() => connection.close(), (error: unknown) => {
+    assert.ok(error instanceof AggregateError);
+    assert.deepEqual(error.errors, [unsubscribeError, closeError]);
+    return true;
+  });
+  assert.equal(releases, 1);
+  assert.equal(peerCloses, 1);
+  connection.close();
+  assert.equal(releases, 1);
+  assert.equal(peerCloses, 1);
+});
+
+test("invalid socket messages retain their public error when unsubscribe fails", async () => {
+  const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+  const channel = defineSocketChannel({ clientToServer: {}, serverToClient: {} });
+  const unsubscribeError = new Error("unsubscribe failed");
+  const closed: number[] = [];
+  const hub = createSocketHub({
+    channels: { chat: channel }, sessions, services: {},
+    pubsub: {
+      async publish() {},
+      subscribe() { return () => { throw unsubscribeError; }; },
+    },
+  });
+  const request = new Request("https://example.test/socket/chat", { headers: { origin: "https://example.test" } });
+  const connection = await hub.accept("chat", request, {
+    send() {},
+    close(code) { closed.push(code ?? 1000); },
+  });
+
+  await assert.rejects(connection.receive("{"), (error: unknown) => {
+    assert.ok(error instanceof ApiError);
+    assert.equal(error.code, "INVALID_SOCKET_MESSAGE");
+    assert.equal(error.status, 400);
+    assert.equal(error.cause, unsubscribeError);
+    return true;
+  });
+  assert.deepEqual(closed, [1008]);
+});

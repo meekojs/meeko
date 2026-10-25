@@ -1,4 +1,6 @@
 export { createRequestContext, useRequestState } from "./framework-server/context.js";
+export { defineServerMiddleware, composeServerMiddleware } from "./framework-server/middleware.js";
+export type { ServerMiddleware } from "./framework-server/middleware.js";
 export type { RequestContext, ServerFetch } from "./framework-server/context.js";
 export { createServerClientOptions } from "./framework-server/auto-clients.js";
 export { MemorySessionStore, SessionHandle, SessionManager, SessionSecurityError } from "./framework-server/sessions.js";

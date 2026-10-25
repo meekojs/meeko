@@ -4,8 +4,8 @@ import { join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRequestContext } from "./context.js";
 import type { RequestContext, ServerFetch } from "./context.js";
-import { ApiError, dispatchApiRoute, dispatchRpc, errorResponse } from "./contracts.js";
-import type { ApiRouteDefinition, RpcDefinition, Schema } from "./contracts.js";
+import { ApiError, dispatchApiRoute, dispatchRpc, errorResponse, reportServerError } from "./contracts.js";
+import type { ApiRouteDefinition, RpcDefinition, Schema, ServerErrorObserver } from "./contracts.js";
 import type { SessionManager } from "./sessions.js";
 
 export type ApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -35,6 +35,18 @@ function clientKey(pathname: string): string {
   return parts(pathname).map((part) => part.kind === "static" ? part.value : part.kind === "param" ? `by${part.value[0]!.toUpperCase()}${part.value.slice(1)}` : `by${part.value[0]!.toUpperCase()}${part.value.slice(1)}`).join(".");
 }
 
+/** A callable cannot also be the parent object of another generated client member. */
+function assertCallablePaths(entries: readonly { readonly file: string; readonly path: string }[], label: string): void {
+  const seen = new Map<string, string>();
+  for (const entry of entries) {
+    for (const [previousPath, previousFile] of seen) {
+      if (entry.path !== previousPath && !entry.path.startsWith(`${previousPath}.`) && !previousPath.startsWith(`${entry.path}.`)) continue;
+      throw new Error(`${label}: ${previousFile} (${previousPath}) and ${entry.file} (${entry.path}) cannot both be callable client paths`);
+    }
+    seen.set(entry.path, entry.file);
+  }
+}
+
 async function files(directory: string): Promise<string[]> {
   let entries;
   try { entries = await readdir(directory, { withFileTypes: true }); }
@@ -59,6 +71,7 @@ function apiEndpoint(directory: string, file: string): ApiEndpoint {
   if (!match) throw new Error(`API handler requires a method suffix: ${file}`);
   const route = match[1]!.split("/");
   if (route.at(-1) === "index") route.pop();
+  if (route.length === 0) throw new Error(`API handler cannot target /api because it has no generated client key: ${file}`);
   const pathname = `/api${route.length ? `/${route.join("/")}` : ""}`;
   parts(pathname);
   return { kind: "api", file, pathname, method: match[2]!.toUpperCase() as ApiMethod, clientKey: clientKey(pathname.slice(4)) };
@@ -92,23 +105,14 @@ export async function discoverServerManifest(projectRoot: string): Promise<Serve
     socketNames.set(endpoint.name, endpoint.file);
   }
   const paths = new Map<string, string>();
-  const keys = new Map<string, string>();
   for (const endpoint of api) {
     const pathKey = `${endpoint.method} ${collisionKey(endpoint.pathname)}`;
     const previous = paths.get(pathKey);
     if (previous) throw new Error(`API route collision: ${previous} and ${endpoint.file} both resolve to ${pathKey}`);
     paths.set(pathKey, endpoint.file);
-    const key = `${endpoint.method} ${endpoint.clientKey}`;
-    const keyPrevious = keys.get(key);
-    if (keyPrevious) throw new Error(`API client name collision: ${keyPrevious} and ${endpoint.file} both generate ${key}`);
-    keys.set(key, endpoint.file);
   }
-  const ids = new Map<string, string>();
-  for (const endpoint of rpc) {
-    const previous = ids.get(endpoint.id);
-    if (previous) throw new Error(`RPC collision: ${previous} and ${endpoint.file} both resolve to ${endpoint.id}`);
-    ids.set(endpoint.id, endpoint.file);
-  }
+  assertCallablePaths(api.map((endpoint) => ({ file: endpoint.file, path: `${endpoint.clientKey}.${endpoint.method.toLowerCase()}` })), "API client name collision");
+  assertCallablePaths(rpc.map((endpoint) => ({ file: endpoint.file, path: endpoint.id })), "RPC collision");
   return Object.freeze({ api: Object.freeze(api), rpc: Object.freeze(rpc), socket: Object.freeze(socket) });
 }
 
@@ -170,6 +174,8 @@ export interface ServerDispatcherOptions<S = unknown> {
   sessions: SessionManager;
   services: S | ((request: Request) => S | Promise<S>);
   load?: (file: string) => Promise<unknown>;
+  /** Observes internal failures without exposing their details to clients. */
+  onError?: ServerErrorObserver;
 }
 
 function exportedDefinition(module: unknown): unknown {
@@ -178,7 +184,7 @@ function exportedDefinition(module: unknown): unknown {
 }
 
 /** Dispatches API and RPC through the same request context and security pipeline. */
-function requestDispatcher<S>(options: Pick<ServerDispatcherOptions<S>, "manifest" | "sessions" | "load">): (context: RequestContext<S>) => Promise<Response> {
+function requestDispatcher<S>(options: Pick<ServerDispatcherOptions<S>, "manifest" | "sessions" | "load" | "onError">): (context: RequestContext<S>) => Promise<Response> {
   const api = [...options.manifest.api].sort(compareApi);
   const load = options.load ?? (async (file: string) => import(pathToFileURL(file).href) as Promise<unknown>);
   return async (context) => {
@@ -190,7 +196,7 @@ function requestDispatcher<S>(options: Pick<ServerDispatcherOptions<S>, "manifes
         if (!endpoint) throw new ApiError("NOT_FOUND", 404);
         if (request.method !== "POST") throw new ApiError("METHOD_NOT_ALLOWED", 405);
         const definition = exportedDefinition(await load(endpoint.file)) as RpcDefinition<Schema, Schema, S>;
-        return dispatchRpc(definition, context, options.sessions);
+        return dispatchRpc(definition, context, options.sessions, options.onError);
       }
       let allowed: ApiMethod[] = [];
       for (const endpoint of api) {
@@ -198,7 +204,7 @@ function requestDispatcher<S>(options: Pick<ServerDispatcherOptions<S>, "manifes
         if (!params) continue;
         if (request.method !== endpoint.method) { allowed.push(endpoint.method); continue; }
         const definition = exportedDefinition(await load(endpoint.file)) as ApiRouteDefinition<Schema | undefined, Schema | undefined, Schema | undefined, Schema | undefined, S>;
-        return dispatchApiRoute(definition, context, options.sessions, params);
+        return dispatchApiRoute(definition, context, options.sessions, params, options.onError);
       }
       if (allowed.length) {
         const response = errorResponse(new ApiError("METHOD_NOT_ALLOWED", 405), context.requestId);
@@ -206,7 +212,7 @@ function requestDispatcher<S>(options: Pick<ServerDispatcherOptions<S>, "manifes
         return response;
       }
       throw new ApiError("NOT_FOUND", 404);
-    } catch (error) { return errorResponse(error, context.requestId); }
+    } catch (error) { reportServerError(error, context.requestId, options.onError); return errorResponse(error, context.requestId); }
   };
 }
 
@@ -220,12 +226,12 @@ export function createServerDispatcher<S>(options: ServerDispatcherOptions<S>): 
       const context = createRequestContext(request, services, session);
       requestId = context.requestId;
       return dispatch(context);
-    } catch (error) { return errorResponse(error, requestId); }
+    } catch (error) { reportServerError(error, requestId, options.onError); return errorResponse(error, requestId); }
   };
 }
 
 /** SSR dispatch reuses the original session, services, state and request ID. */
-export function createLocalServerFetch<S>(options: Pick<ServerDispatcherOptions<S>, "manifest" | "sessions" | "load">): ServerFetch {
+export function createLocalServerFetch<S>(options: Pick<ServerDispatcherOptions<S>, "manifest" | "sessions" | "load" | "onError">): ServerFetch {
   const dispatch = requestDispatcher(options);
   return async (request, active) => {
     const source = active.request;
