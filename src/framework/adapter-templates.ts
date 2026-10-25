@@ -150,3 +150,41 @@ export async function start() {
 
 if (import.meta.main) await start();
 `;
+
+/**
+ * Cloudflare Workers entry; `meeko build --adapter cloudflare` bundles it to
+ * .meeko/output/cloudflare/worker.js. Only Worker entrypoints are exported.
+ */
+export function cloudflareEntrySource(socketClassName: string): string {
+  return `import { DurableObject } from "cloudflare:workers";
+import {
+  createCloudflareAssetReader, createCloudflarePrerenderSource, createSocketRoomClass, createWorker, DurableObjectSocketPubSub,
+} from "@meekojs/meeko/cloudflare";
+import type { CloudflareAppContext, CloudflareAssetsBinding, DurableObjectNamespaceLike } from "@meekojs/meeko/cloudflare";
+import type { ServerPlatform } from "@meekojs/meeko/server";
+import { createApp, manifest } from "./entry-server.ts";
+
+interface MeekoWorkerEnv {
+  readonly ASSETS: CloudflareAssetsBinding;
+  readonly MEEKO_SOCKET?: DurableObjectNamespaceLike;
+  readonly PUBLIC_ORIGIN?: string;
+}
+
+/** Creates the application once per isolate, from the Worker bindings. */
+function createCloudflareApp({ env, platform }: CloudflareAppContext<MeekoWorkerEnv>) {
+  return createApp({
+    production: true,
+    platform: platform as unknown as ServerPlatform<Readonly<Record<string, string | undefined>>>,
+    assets: createCloudflareAssetReader({ binding: env.ASSETS, assets: manifest.assets ?? {} }),
+    prerender: createCloudflarePrerenderSource({ binding: env.ASSETS }),
+    ...(env.MEEKO_SOCKET ? { defaultSocketPubSub: new DurableObjectSocketPubSub(env.MEEKO_SOCKET) } : {}),
+    ...(typeof env.PUBLIC_ORIGIN === "string" && env.PUBLIC_ORIGIN ? { publicOrigin: env.PUBLIC_ORIGIN } : {}),
+  });
+}
+
+export default createWorker(createCloudflareApp);
+
+/** Durable Object hosting the WebSockets of one Socket room. */
+export const ${socketClassName} = createSocketRoomClass(createCloudflareApp, DurableObject);
+`;
+}

@@ -134,6 +134,8 @@ function cookieValue(header: string | null, name: string): string | undefined {
 
 const recentRevocationMs = 60_000;
 const recentRevocationLimit = 4096;
+/** Registered handles before the first sweep of collected ones. */
+const minimumSweep = 1024;
 
 /**
  * Handles of each session family on this instance, held weakly so a finished
@@ -147,6 +149,9 @@ class RevocationRegistry {
   private readonly finalizer = new FinalizationRegistry<{ readonly familyId: string; readonly ref: WeakRef<AbortController> }>(
     ({ familyId, ref }) => this.forget(familyId, ref),
   );
+  /** Handles currently registered, and the count that triggers the next sweep. */
+  private size = 0;
+  private sweepAt = minimumSweep;
   track(familyId: string, controller: AbortController): WeakRef<AbortController> | undefined {
     const revokedAt = this.recent.get(familyId);
     if (revokedAt !== undefined && Date.now() - revokedAt < recentRevocationMs) {
@@ -157,8 +162,30 @@ class RevocationRegistry {
     let handles = this.families.get(familyId);
     if (!handles) { handles = new Set(); this.families.set(familyId, handles); }
     handles.add(ref);
+    this.size++;
     this.finalizer.register(controller, { familyId, ref }, ref);
+    if (this.size >= this.sweepAt) this.sweep();
     return ref;
+  }
+  /** Handles still registered, collected or not; for tests. */
+  get handleCount(): number { return this.size; }
+  /**
+   * Drops handles whose controllers were collected. Finalizers may run late or
+   * never, and handles that are never untracked (such as the connections of an
+   * evicted Durable Object) would otherwise accumulate for the instance's life.
+   */
+  private sweep(): void {
+    for (const [familyId, handles] of this.families) {
+      for (const ref of handles) {
+        if (ref.deref()) continue;
+        this.finalizer.unregister(ref);
+        handles.delete(ref);
+        this.size--;
+      }
+      if (!handles.size) this.families.delete(familyId);
+    }
+    // Amortized: the next sweep waits for as many new handles as are live now.
+    this.sweepAt = Math.max(minimumSweep, this.size * 2);
   }
   untrack(familyId: string, ref: WeakRef<AbortController> | undefined): void {
     if (!ref) return;
@@ -169,6 +196,7 @@ class RevocationRegistry {
     this.remember(familyId);
     const handles = this.families.get(familyId);
     this.families.delete(familyId);
+    this.size -= handles?.size ?? 0;
     for (const ref of handles ?? []) {
       this.finalizer.unregister(ref);
       ref.deref()?.abort(new SessionRevokedError());
@@ -176,8 +204,8 @@ class RevocationRegistry {
   }
   private forget(familyId: string, ref: WeakRef<AbortController>): void {
     const handles = this.families.get(familyId);
-    if (!handles) return;
-    handles.delete(ref);
+    if (!handles?.delete(ref)) return;
+    this.size--;
     if (!handles.size) this.families.delete(familyId);
   }
   private remember(familyId: string): void {
@@ -215,6 +243,11 @@ export const lockSessionCookie = Symbol("meeko.session.lockCookie");
 
 function sessionLockedError(): ApiError {
   return new ApiError("SESSION_LOCKED", 500, "SESSION_LOCKED: the session cookie was already sent with the response headers; create, rotate or revoke the session in the loader, before any deferred work");
+}
+
+/** Revocation handles a manager still holds, including collected ones not yet swept. Internal; for tests. */
+export function trackedSessionHandles(manager: SessionManager<any>): number {
+  return registries.get(manager)?.handleCount ?? 0;
 }
 
 export class SessionHandle<T = unknown> {

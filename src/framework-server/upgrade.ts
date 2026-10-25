@@ -56,6 +56,85 @@ export function socketPublicOrigin(value: string): URL {
   return origin;
 }
 
+export interface OpenSocketSessionOptions {
+  readonly hub: SocketHub;
+  readonly name: string;
+  /** Handshake request on the public origin; the hub authorizes it again. */
+  readonly request: Request;
+  readonly roomId: string | undefined;
+  readonly peer: SocketPeer;
+  /** Inbound bytes held while the hub authorizes the connection. */
+  readonly maxPendingBytes: number;
+  onError?(error: unknown): void;
+}
+
+/** A transport session plus the outcome of the hub's authorization. */
+export interface OpenedSocketSession extends SocketSession {
+  /** Resolves true once the hub accepted the peer and false when it refused it; never rejects. */
+  readonly ready: Promise<boolean>;
+  /** Resolves once every message received so far has been handled; never rejects. */
+  settled(): Promise<void>;
+}
+
+/**
+ * Connects an upgraded transport to the hub with a serialized receive chain.
+ * Hosts that rebuild connections, such as a woken Durable Object, call it
+ * directly; the hub authorizes the request again.
+ */
+export function openSocketSession(options: OpenSocketSessionOptions): OpenedSocketSession {
+  const { hub, name, request, roomId, peer, maxPendingBytes } = options;
+  const observeError = (error: unknown): void => observeErrorCallback(error, options.onError);
+  let connection: SocketConnection | undefined;
+  let ended = false;
+  let refused = false;
+  let pendingBytes = 0;
+  const closeConnection = (target: SocketConnection): void => {
+    try { target.close(); }
+    catch (error) { observeError(error); }
+  };
+  // Messages that arrive while the hub authorizes the connection wait on
+  // this chain, then run in arrival order like every later message.
+  const ready = hub.accept(name, request, peer, roomId).then((accepted) => {
+    connection = accepted;
+    pendingBytes = 0;
+    if (ended) closeConnection(accepted);
+    return true;
+  }, (error: unknown) => {
+    refused = true;
+    try { peer.close(1008, "Unauthorized"); }
+    catch (closeError) { observeError(closeError); }
+    observeError(error);
+    return false;
+  });
+  let delivery: Promise<unknown> = ready;
+  return {
+    ready,
+    settled: () => delivery.then(() => undefined),
+    receive(message) {
+      if (refused || ended) return;
+      if (!connection) {
+        pendingBytes += typeof message === "string" ? encoder.encode(message).byteLength : message.byteLength;
+        if (pendingBytes > maxPendingBytes) {
+          refused = true;
+          try { peer.close(1009, "Message buffer exceeded"); }
+          catch (error) { observeError(error); }
+          return;
+        }
+      }
+      delivery = delivery.then(() => connection?.receive(message)).catch((error: unknown) => {
+        observeError(error);
+        try { connection?.close(normalizeServerError(error).status < 500 ? 1008 : 1011); }
+        catch (closeError) { observeError(closeError); }
+      });
+    },
+    closed() {
+      if (ended) return;
+      ended = true;
+      if (connection) closeConnection(connection);
+    },
+  };
+}
+
 /**
  * Portable Socket handshake for any runtime: validates the channel path, runs
  * the hub preflight, and after the adapter upgrades the transport, connects it
@@ -68,53 +147,8 @@ export function createSocketUpgradeHandler(options: SocketUpgradeOptions): Socke
   if (!Number.isSafeInteger(maxPendingBytes) || maxPendingBytes <= 0) throw new RangeError("Invalid socket pending buffer limit");
   const hub = options.hub;
   const observeError = (error: unknown): void => observeErrorCallback(error, options.onError);
-
-  const open = (name: string, request: Request, roomId: string | undefined, peer: SocketPeer): SocketSession => {
-    let connection: SocketConnection | undefined;
-    let ended = false;
-    let refused = false;
-    let pendingBytes = 0;
-    const closeConnection = (target: SocketConnection): void => {
-      try { target.close(); }
-      catch (error) { observeError(error); }
-    };
-    // Messages that arrive while the hub authorizes the connection wait on
-    // this chain, then run in arrival order like every later message.
-    let delivery: Promise<void> = hub.accept(name, request, peer, roomId).then((accepted) => {
-      connection = accepted;
-      pendingBytes = 0;
-      if (ended) closeConnection(accepted);
-    }, (error: unknown) => {
-      refused = true;
-      try { peer.close(1008, "Unauthorized"); }
-      catch (closeError) { observeError(closeError); }
-      observeError(error);
-    });
-    return {
-      receive(message) {
-        if (refused || ended) return;
-        if (!connection) {
-          pendingBytes += typeof message === "string" ? encoder.encode(message).byteLength : message.byteLength;
-          if (pendingBytes > maxPendingBytes) {
-            refused = true;
-            try { peer.close(1009, "Message buffer exceeded"); }
-            catch (error) { observeError(error); }
-            return;
-          }
-        }
-        delivery = delivery.then(() => connection?.receive(message)).catch((error: unknown) => {
-          observeError(error);
-          try { connection?.close(normalizeServerError(error).status < 500 ? 1008 : 1011); }
-          catch (closeError) { observeError(closeError); }
-        });
-      },
-      closed() {
-        if (ended) return;
-        ended = true;
-        if (connection) closeConnection(connection);
-      },
-    };
-  };
+  const open = (name: string, request: Request, roomId: string | undefined, peer: SocketPeer): SocketSession =>
+    openSocketSession({ hub, name, request, roomId, peer, maxPendingBytes, onError: observeError });
 
   return async (incoming) => {
     const url = new URL(incoming.url);

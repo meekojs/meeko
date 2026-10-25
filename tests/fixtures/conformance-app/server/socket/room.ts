@@ -1,9 +1,9 @@
 import { defineSocketChannel } from "@meekojs/meeko/server";
 import type { SocketPubSub } from "@meekojs/meeko/server";
-import { ack, sequence, text } from "../../shared/schemas.js";
+import { ack, roomText, sequence, text } from "../../shared/schemas.js";
 
 export default defineSocketChannel({
-  clientToServer: { say: text, seq: sequence },
+  clientToServer: { say: text, seq: sequence, relay: roomText },
   serverToClient: { said: text, ack: ack },
   handlers: {
     // Published through the runtime's pub/sub so every peer in the room receives it.
@@ -15,6 +15,11 @@ export default defineSocketChannel({
     seq: async ({ payload, emit }) => {
       await new Promise((resolve) => setTimeout(resolve, payload.delay));
       await emit("ack", { n: payload.n });
+    },
+    // Publishes to another room, which may live in another instance or Durable Object.
+    relay: async ({ payload, context }) => {
+      const { pubsub } = context.services as { pubsub: SocketPubSub };
+      await pubsub.publish("room", payload.room, { event: "said", payload: { text: payload.text } });
     },
   },
 });

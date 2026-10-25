@@ -42,20 +42,15 @@ test("an unknown command prints usage to stderr and fails", () => {
 test("meeko --help lists build adapters and preview", () => {
   const result = cli("--help");
   assert.match(result.stdout, /meeko build \[project-directory\] \[--adapter <node\|cloudflare\|deno\|bun>\]/);
-  assert.match(result.stdout, /meeko preview \[project-directory\] \[--adapter <node\|bun\|deno>\]/);
+  assert.match(result.stdout, /meeko preview \[project-directory\] \[--adapter <node\|cloudflare\|bun\|deno>\]/);
 });
 
-test("meeko build rejects unknown and unavailable adapters before building", async () => {
+test("meeko build rejects unknown adapters before building", async () => {
   const root = await mkdtemp(join(tmpdir(), "meeko-cli-adapter-"));
   try {
     const unknown = cli("build", root, "--adapter", "lambda");
     assert.equal(unknown.status, 1);
     assert.match(unknown.stderr, /Unknown adapter lambda; use node, cloudflare, deno or bun/);
-    for (const args of [["--adapter", "cloudflare"], ["--adapter=cloudflare"]]) {
-      const unavailable = cli("build", root, ...args);
-      assert.equal(unavailable.status, 1);
-      assert.match(unavailable.stderr, /The cloudflare adapter cannot be built by this Meeko version; build with --adapter node, bun or deno/);
-    }
     const missing = cli("build", root, "--adapter");
     assert.equal(missing.status, 1);
     assert.match(missing.stderr, /^Usage: meeko dev/);
@@ -77,6 +72,12 @@ test("meeko preview requires the adapter output and names a missing runtime", as
       const runtime = cliWithoutPath("preview", root, `--adapter=${adapter}`);
       assert.equal(runtime.status, 1);
       assert.match(runtime.stderr, new RegExp(`${adapter === "bun" ? "Bun" : "Deno"} is not installed or not on PATH`));
+    }
+    // wrangler dev needs the generated configuration next to the Worker bundle.
+    for (const args of [["--adapter", "cloudflare"], ["--adapter=cloudflare"]]) {
+      const missing = cli("preview", root, ...args);
+      assert.equal(missing.status, 1);
+      assert.match(missing.stderr, /Missing production build at .*wrangler\.jsonc; run meeko build --adapter cloudflare/);
     }
   } finally {
     await rm(root, { recursive: true, force: true });

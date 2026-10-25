@@ -17,7 +17,8 @@ import type { BuildAppData } from "./app-manifest.js";
 import { loadMeekoConfig } from "./config.js";
 import type { MeekoAdapterName } from "./config-type.js";
 import { prerenderWithNodeBuild } from "./prerender.js";
-import { bunEntrySource, denoEntrySource } from "./adapter-templates.js";
+import { bunEntrySource, cloudflareEntrySource, denoEntrySource } from "./adapter-templates.js";
+import { cloudflareAssetsDirectory, cloudflarePrerenderDirectory, resolveWrangler, wranglerConfig, wranglerSource } from "./cloudflare-build.js";
 import { clientEntrySource, nodeEntrySource, serverEntrySource } from "./project-templates.js";
 import { assertNoLegacySessionFile } from "./runtime-migration.js";
 import { stylesheetLinks } from "./styles.js";
@@ -41,9 +42,13 @@ export function adapterOutput(adapter: MeekoAdapterName): string {
   return `.meeko/output/${adapter}`;
 }
 
+/** Single-file Worker bundle and its generated Wrangler configuration. */
+const cloudflareAdapter = { entry: ".meeko/generated/entry-cloudflare.ts", file: "worker.js", config: "wrangler.jsonc" } as const;
+
 /** Entry file of an adapter's build output, relative to the project. */
-export function adapterEntry(adapter: "node" | "bun" | "deno"): string {
-  return `${adapterOutput(adapter)}/${adapter === "node" ? "index.mjs" : bundledAdapters[adapter].file}`;
+export function adapterEntry(adapter: MeekoAdapterName): string {
+  const file = adapter === "node" ? "index.mjs" : adapter === "cloudflare" ? cloudflareAdapter.file : bundledAdapters[adapter].file;
+  return `${adapterOutput(adapter)}/${file}`;
 }
 
 /** Writes framework-owned Vite entries; no application file is overwritten. */
@@ -139,10 +144,9 @@ function clientAssets(manifest: ViteManifest): BuildAppData["client"] {
   return { entry: url(entry.file), css: [...css].map(url), preload: [...preload].map(url) };
 }
 
-/** Validates an adapter name and confirms this version can build it. */
+/** Validates an adapter name. */
 export function assertBuildAdapter(adapter: string): MeekoAdapterName {
   if (!adapters.includes(adapter as MeekoAdapterName)) throw new Error(`Unknown adapter ${adapter}; use node, cloudflare, deno or bun`);
-  if (adapter === "cloudflare") throw new Error(`The ${adapter} adapter cannot be built by this Meeko version; build with --adapter node, bun or deno`);
   return adapter as MeekoAdapterName;
 }
 
@@ -212,11 +216,40 @@ export async function buildProject(projectRoot: string, options: BuildProjectOpt
       },
     });
   }
-  await cp(resolve(root, clientOutput), join(output, "client"), {
+  const cloudflare = config.server?.adapter === "cloudflare" ? config.server : undefined;
+  if (adapter === "cloudflare") {
+    // The prerendered pages share the assets directory under a reserved prefix.
+    if (existsSync(resolve(root, clientOutput, "_meeko"))) throw new Error("public/_meeko is reserved for Meeko's Cloudflare output; rename it");
+    const wrangler = await wranglerConfig(root, cloudflare);
+    const className = (wrangler.durable_objects as { bindings: Array<{ class_name: string }> }).bindings[0]!.class_name;
+    await writeFile(resolve(root, cloudflareAdapter.entry), cloudflareEntrySource(className), "utf8");
+    await build({
+      root, configFile: false, plugins: [meeko()], logLevel: "warn",
+      // One self-contained module for workerd; only runtime modules stay external.
+      ssr: {
+        target: "webworker",
+        noExternal: true,
+        resolve: { conditions: ["workerd", "worker", "browser", "module", "development|production"], externalConditions: ["workerd", "worker"] },
+      },
+      build: {
+        ssr: cloudflareAdapter.entry,
+        // public/ is served from assets/ only; a copy next to worker.js would be uploaded with it.
+        outDir: outputDirectory, emptyOutDir: true, copyPublicDir: false,
+        rollupOptions: {
+          external: [/^cloudflare:/, "node:async_hooks"],
+          output: { entryFileNames: cloudflareAdapter.file, codeSplitting: false },
+        },
+      },
+    });
+    await writeFile(join(output, cloudflareAdapter.config), wranglerSource(wrangler), "utf8");
+  }
+  const publicFiles = adapter === "cloudflare" ? cloudflareAssetsDirectory : "client";
+  await cp(resolve(root, clientOutput), join(output, publicFiles), {
     recursive: true,
     filter: (source) => relative(resolve(root, clientOutput), source).split(sep)[0] !== ".vite",
   });
-  await prerenderWithNodeBuild(root, `${nodeTarget}/index.mjs`, `${outputDirectory}/prerender`);
+  const prerenderOutput = adapter === "cloudflare" ? cloudflarePrerenderDirectory : "prerender";
+  await prerenderWithNodeBuild(root, `${nodeTarget}/index.mjs`, `${outputDirectory}/${prerenderOutput}`);
   return { adapter, output };
 }
 
@@ -233,11 +266,27 @@ export async function previewProject(projectRoot: string, adapter?: MeekoAdapter
   const root = resolve(projectRoot);
   const target = adapter ?? (await loadMeekoConfig(root)).server?.adapter ?? "node";
   if (target === "node") { await startProject(root, true); return; }
-  if (target === "cloudflare") throw new Error("The cloudflare adapter cannot be previewed by this Meeko version; use --adapter node, bun or deno");
-  const entry = resolve(root, adapterEntry(target));
-  if (!existsSync(entry)) throw new Error(`Missing production build at ${entry}; run meeko build --adapter ${target}`);
-  const runtime = runtimes[target];
-  const child = spawn(runtime.command, runtime.args(entry), { cwd: root, stdio: "inherit", windowsHide: true });
+  let command: string;
+  let args: string[];
+  let runtime: { readonly name: string; readonly install: string };
+  if (target === "cloudflare") {
+    const config = resolve(root, adapterOutput(target), cloudflareAdapter.config);
+    if (!existsSync(config)) throw new Error(`Missing production build at ${config}; run meeko build --adapter cloudflare`);
+    const wrangler = resolveWrangler(root);
+    if (!wrangler) throw new Error("Wrangler is not installed; add it with pnpm add -D wrangler to preview the cloudflare build");
+    // wrangler dev runs the bundled Worker in workerd with local bindings.
+    command = process.execPath;
+    args = [wrangler, "dev", "--config", config,
+      ...(process.env.PORT ? ["--port", process.env.PORT] : []), ...(process.env.HOST ? ["--ip", process.env.HOST] : [])];
+    runtime = { name: "Wrangler", install: "https://developers.cloudflare.com/workers/wrangler/install-and-update/" };
+  } else {
+    const entry = resolve(root, adapterEntry(target));
+    if (!existsSync(entry)) throw new Error(`Missing production build at ${entry}; run meeko build --adapter ${target}`);
+    runtime = runtimes[target];
+    command = runtimes[target].command;
+    args = runtimes[target].args(entry);
+  }
+  const child = spawn(command, args, { cwd: root, stdio: "inherit", windowsHide: true });
   const forward = (signal: NodeJS.Signals): void => { child.kill(signal); };
   process.on("SIGINT", forward);
   process.on("SIGTERM", forward);

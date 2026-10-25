@@ -18,7 +18,7 @@ import type { ServerPlatform } from "./platform.js";
 import type { ServerRuntime, ServerRuntimeDefinition } from "./runtime.js";
 import { MemorySessionStore, SessionManager } from "./sessions.js";
 import { createSocketHub } from "./socket.js";
-import type { SocketHub } from "./socket.js";
+import type { SocketHub, SocketPubSub } from "./socket.js";
 
 /** Client build files linked from every server-rendered document. */
 export interface ClientAssets {
@@ -64,6 +64,8 @@ export interface ServerAppOptions<Env = Readonly<Record<string, string | undefin
   readonly publicOrigin?: string;
   /** Set by `meeko build` while it renders prerendered pages. */
   readonly prerendering?: boolean;
+  /** Socket broker used when the runtime declares none, such as the Cloudflare Durable Object broker. */
+  readonly defaultSocketPubSub?: SocketPubSub;
 }
 
 export interface ServerAppSocket {
@@ -250,6 +252,7 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
     let socket: ServerAppSocket | undefined;
     if (manifest.server.socket?.length) {
       const channels = await loadSocketChannels(manifest.server, load);
+      const pubsub = runtime.socket?.pubsub ?? options.defaultSocketPubSub;
       const hub = createSocketHub({
         channels, sessions, platform: basePlatform,
         services: (request: Request) => servicesFor(request, currentPlatform()),
@@ -258,7 +261,7 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
         ...(runtime.socket?.maxBufferBytes === undefined ? {} : { maxBufferBytes: runtime.socket.maxBufferBytes }),
         ...(runtime.socket?.maxPendingDeliveries === undefined ? {} : { maxPendingDeliveries: runtime.socket.maxPendingDeliveries }),
         ...(runtime.socket?.sessionRefreshMs === undefined ? {} : { sessionRefreshMs: runtime.socket.sessionRefreshMs }),
-        ...(runtime.socket?.pubsub ? { pubsub: runtime.socket.pubsub } : {}),
+        ...(pubsub ? { pubsub } : {}),
         // Delivery failures belong to this instance, never to the broadcaster.
         onDeliveryError: runtime.socket?.onDeliveryError ?? ((error) => observeServerError(error, crypto.randomUUID(), reportError)),
       });

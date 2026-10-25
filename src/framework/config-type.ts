@@ -9,9 +9,18 @@ export type MeekoServerConfig =
   }
   | {
     readonly adapter: "cloudflare";
-    /** Durable Object class exported for Socket rooms. */
+    /** Worker name in the generated `wrangler.jsonc`. Defaults to the package name. */
+    readonly name?: string;
+    /** Durable Object class exported for Socket rooms. Defaults to `MeekoSocketRoom`. */
     readonly socketClassName?: string;
+    /** Workers compatibility date (`YYYY-MM-DD`). Defaults to the date Meeko is tested with. */
     readonly compatibilityDate?: string;
+    /**
+     * Extra `wrangler.jsonc` fields, such as `d1_databases`, `vars` or `routes`.
+     * `compatibility_flags`, `durable_objects.bindings` and `migrations` are
+     * combined with Meeko's; `main`, `assets`, `no_bundle` and `find_additional_modules` belong to Meeko.
+     */
+    readonly wrangler?: Readonly<Record<string, unknown>>;
   }
   | { readonly adapter: "deno" }
   | { readonly adapter: "bun" };

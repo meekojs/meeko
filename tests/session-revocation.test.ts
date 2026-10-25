@@ -7,6 +7,7 @@ import {
   MemorySessionStore, RedisSessionStore, SessionManager, SessionRevokedError,
 } from "../src/framework-server.ts";
 import type { AppManifest, RedisSessionClient, RedisSubscriberClient, SocketPeer } from "../src/framework-server.ts";
+import { trackedSessionHandles } from "../src/framework-server/sessions.ts";
 
 const origin = "https://example.test";
 const withCookie = (sessions: SessionManager<unknown>, id: string, path = "/") =>
@@ -132,6 +133,34 @@ test("live sockets of a revoked family are closed with 1008 without waiting for 
   await hub.accept("chat", withCookie(sessions, record.id, "/_meeko/socket/chat"), socket);
   await (await sessions.load(withCookie(sessions, record.id))).revoke();
   assert.deepEqual(closed, [[1008, "Session revoked"]]);
+});
+
+test("revocation handles of connections dropped without closing are swept without waiting for finalizers", async () => {
+  setFlagsFromString("--expose-gc");
+  const gc = runInNewContext("gc") as () => void;
+  const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+  const record = await signIn(sessions);
+  const channel = defineSocketChannel({ clientToServer: {}, serverToClient: {}, auth: "required" });
+  // Like a Durable Object evicted with its WebSockets hibernated: the room's
+  // subscriptions disappear with the object and no connection is ever closed.
+  const hub = createSocketHub({ channels: { chat: channel }, sessions, services: {}, pubsub: { publish: async () => {}, subscribe: () => () => {} } });
+  const peer: SocketPeer = { send() {}, close() {} };
+  for (let index = 0; index < 1000; index++) await hub.accept("chat", withCookie(sessions, record.id, "/_meeko/socket/chat"), peer);
+  assert.ok(trackedSessionHandles(sessions) >= 1000);
+  // WeakRef targets survive the job that created them; collect in a new task.
+  await new Promise((resolve) => setImmediate(resolve));
+  gc();
+  // Finalizer callbacks run in a later task, so only the sweep can drop them here.
+  const live = [];
+  for (let index = 0; index < 50; index++) live.push(await hub.accept("chat", withCookie(sessions, record.id, "/_meeko/socket/chat"), peer));
+  assert.ok(trackedSessionHandles(sessions) < 200, `${trackedSessionHandles(sessions)} handles remain`);
+  // Live connections are still closed by a revocation.
+  const closed: number[] = [];
+  const watched = await hub.accept("chat", withCookie(sessions, record.id, "/_meeko/socket/chat"), { send() {}, close(code) { closed.push(code ?? 0); } });
+  await (await sessions.load(withCookie(sessions, record.id))).revoke();
+  assert.deepEqual(closed, [1008]);
+  assert.equal(trackedSessionHandles(sessions), 0);
+  assert.equal(live.length + (watched ? 1 : 0), 51);
 });
 
 test("an API request in flight answers 401 SESSION_REVOKED once its session is revoked", async () => {

@@ -6,9 +6,10 @@ Meeko conserva el motor independiente en `@meekojs/meeko`. El modo de aplicació
 - `@meekojs/meeko/node`: adaptador Node (`serveNode`, `toNodeListener`, `createNodeAssetReader`, `attachNodeWebSocketServer` y `createNodeSocketUpgradeHandler`).
 - `@meekojs/meeko/bun`: adaptador Bun (`createBunServer` y `createBunAssetReader`).
 - `@meekojs/meeko/deno`: adaptador Deno (`serveDeno` y `createDenoAssetReader`).
+- `@meekojs/meeko/cloudflare`: adaptador Cloudflare Workers (`createWorker`, `createSocketRoomClass`, `DurableObjectSocketPubSub`, `D1SessionDriver`, `createCloudflareAssetReader` y `createCloudflarePrerenderSource`).
 - `@meekojs/meeko/build`: herramientas de build que leen el sistema de archivos y cargan TypeScript (`discoverRoutes`, `discoverConfiguredRoutes`, `composeFrameworkRoutes`, `loadMeekoConfig`, `readMeekoConfigSync`, `resolveConfigSources`, `discoverServerManifest`, `prerenderRoutes`, `prerenderProject` y `buildProject`). El servidor de producción no la importa.
 
-Todas las subrutas pertenecen al mismo paquete y versión. Los destinos de servidor publicados son Node 24, Bun y Deno, y la misma suite de conformidad los comprueba (véase [Build, despliegue y verificación](#build-despliegue-y-verificación)). El build y las herramientas de desarrollo siguen ejecutándose con Node. SSR está activo por defecto.
+Todas las subrutas pertenecen al mismo paquete y versión. Los destinos de servidor publicados son Node 24, Bun, Deno y Cloudflare Workers, y la misma suite de conformidad los comprueba (véase [Build, despliegue y verificación](#build-despliegue-y-verificación)). El build y las herramientas de desarrollo siguen ejecutándose con Node. SSR está activo por defecto.
 
 La aplicación generada necesita Node 24 o posterior y TypeScript 7 para comprobar sus declaraciones; el compilador de `.meeko` utiliza internamente TypeScript 6 sólo durante el desarrollo y el build. El paquete es ESM. `vite` es un peer opcional: una aplicación que sólo usa el motor puede importar `@meekojs/meeko` sin iniciar el framework, el servidor, sesiones o Socket. El adaptador Node carga `ws` al activar `attachNodeWebSocketServer`, no al importar el motor. Los comandos simplificados de proyecto descritos a continuación están disponibles desde `0.1.0`.
 
@@ -356,7 +357,7 @@ const send = async () => chat?.emit("message", { text: "Hola", roomId: "general"
 `socket.chat.on(...)` y `socket.chat.emit(...)` ofrecen un registro tipado alternativo. El registro abre conexiones sólo al acceder al canal en navegador. Dentro de `mountClientApp`, cada aplicación conserva su propia conexión por canal y la cierra al desmontarse; los listeners registrados durante el setup se desuscriben al liberar su raíz. Fuera de una aplicación montada, el registro conserva su cliente compartido y el llamador debe liberar sus listeners. `useSocket` requiere una raíz de componente y libera su conexión al desmontar. Durante SSR no se abre ninguna conexión. El cliente usa WebSocket nativo, reconexión con retroceso configurable y entrega a lo sumo una vez: `emit` rechaza si está desconectado, sin cola ni reenvío. Los mensajes entrantes inválidos cierran el canal; un error del transporte se informa una vez por conexión activa y los errores de conexiones reemplazadas se ignoran. Un listener u observador de `state` que falle se informa sin impedir la ejecución de los demás listeners ni salir del callback del transporte. El cliente de bajo nivel acepta `onError(error)` para observar estos fallos; sin callback de aplicación o componente, los registra en la consola.
 El registro `socket` es de alcance de aplicación: cancele listeners con la función que devuelve `on` y cierre el canal cuando ya no se necesite.
 
-`serveNode` conecta `attachNodeWebSocketServer` al mismo servidor HTTP cuando la aplicación declara canales. El adaptador Node usa `ws` para framing y upgrades; Bun usa el WebSocket nativo de `Bun.serve` y Deno `Deno.upgradeWebSocket` (véanse sus límites en [Bun](#bun) y [Deno](#deno)). Los tres comparten `createSocketUpgradeHandler`, que comprueba ruta, Origin y sesión antes del upgrade, y el hub existente valida Origin, sesión, canal, sala, evento y payload; aplica límites de mensaje/buffer, heartbeat y cierre ordenado. Tras un proxy, el mismo `publicOrigin` de `server/runtime.ts` o `PUBLIC_ORIGIN` rige la comprobación de Origin de HTTP y de Socket.
+`serveNode` conecta `attachNodeWebSocketServer` al mismo servidor HTTP cuando la aplicación declara canales. El adaptador Node usa `ws` para framing y upgrades; Bun usa el WebSocket nativo de `Bun.serve` y Deno `Deno.upgradeWebSocket` (véanse sus límites en [Bun](#bun) y [Deno](#deno)), y Cloudflare Workers aloja cada sala en un Durable Object con hibernación (véase [Cloudflare Workers](#cloudflare-workers)). Todos comparten `createSocketUpgradeHandler`, que comprueba ruta, Origin y sesión antes del upgrade, y el hub existente valida Origin, sesión, canal, sala, evento y payload; aplica límites de mensaje/buffer, heartbeat y cierre ordenado. Tras un proxy, el mismo `publicOrigin` de `server/runtime.ts` o `PUBLIC_ORIGIN` rige la comprobación de Origin de HTTP y de Socket.
 
 ### Broadcast y varias instancias
 
@@ -471,7 +472,7 @@ npm run build   # cliente, servidor Node y prerender bajo .meeko/output/node/
 npm start       # Node 24, con store persistente configurado
 ```
 
-`meeko build [directorio] [--adapter <nombre>]` toma el adaptador de `--adapter` o de `server.adapter` en `meeko.config.ts`, con `node` por defecto. `MeekoConfig.server` es una unión discriminada; para Node acepta `{ adapter: "node", host?, port? }`. El build Node escribe `.meeko/output/node/` con `index.mjs`, `chunks/`, `client/` y `prerender/`. Esa carpeta contiene el manifiesto de rutas, endpoints y assets ya resuelto: no lee `app/`, `server/` ni `meeko.config.ts` y no carga TypeScript ni Vite. Sólo necesita las dependencias de `node_modules`, incluida `@meekojs/meeko`. `meeko start` y `meeko preview` ejecutan `index.mjs`; también puede ejecutarse con `node .meeko/output/node/index.mjs`. Para Bun y Deno, `meeko build --adapter bun` o `--adapter deno` (o `server: { adapter: "bun" }` / `{ adapter: "deno" }`) produce una salida autónoma descrita en [Bun](#bun) y [Deno](#deno). El adaptador `cloudflare` aún no puede construirse.
+`meeko build [directorio] [--adapter <nombre>]` toma el adaptador de `--adapter` o de `server.adapter` en `meeko.config.ts`, con `node` por defecto. `MeekoConfig.server` es una unión discriminada; para Node acepta `{ adapter: "node", host?, port? }`. El build Node escribe `.meeko/output/node/` con `index.mjs`, `chunks/`, `client/` y `prerender/`. Esa carpeta contiene el manifiesto de rutas, endpoints y assets ya resuelto: no lee `app/`, `server/` ni `meeko.config.ts` y no carga TypeScript ni Vite. Sólo necesita las dependencias de `node_modules`, incluida `@meekojs/meeko`. `meeko start` y `meeko preview` ejecutan `index.mjs`; también puede ejecutarse con `node .meeko/output/node/index.mjs`. Para Bun y Deno, `meeko build --adapter bun` o `--adapter deno` (o `server: { adapter: "bun" }` / `{ adapter: "deno" }`) produce una salida autónoma descrita en [Bun](#bun) y [Deno](#deno), y `--adapter cloudflare` un Worker descrito en [Cloudflare Workers](#cloudflare-workers).
 
 El servidor escucha en `127.0.0.1:4173` salvo que `server.host`/`server.port` o las variables `HOST` y `PORT` indiquen otra dirección; use `HOST=0.0.0.0` para aceptar tráfico remoto. `PUBLIC_ORIGIN` fija el origen público para las comprobaciones de Origin de HTTP y Socket cuando un proxy termina TLS. `SIGINT` y `SIGTERM` cierran Socket, HTTP, las tareas de `waitUntil` y el runtime, por ese orden. Las respuestas abiertas, como un stream, disponen de `shutdownTimeout` milisegundos (10 000 por defecto) para terminar; después se cortan sus conexiones y el cierre continúa. Si el cliente se desconecta antes o durante el envío, el cuerpo de la respuesta se cancela, lo que libera archivos abiertos y detiene productores de streams. Un request-target que empieza por `//` se interpreta siempre como ruta del origen propio (o de `PUBLIC_ORIGIN`), nunca como otro host.
 
@@ -517,9 +518,147 @@ El build Deno escribe `.meeko/output/deno/` con `main.js`, `chunks/`, `client/` 
 - El búfer saliente se controla con el límite de búfer del hub mediante `bufferedAmount`.
 - `idleTimeout` (60 s) cierra un peer que no responde al ping. Los mensajes binarios se cierran con `1003`.
 
+### Cloudflare Workers
+
+```sh
+npx meeko build --adapter cloudflare
+npx meeko preview --adapter cloudflare   # wrangler dev sobre la salida
+npx wrangler deploy --config .meeko/output/cloudflare/wrangler.jsonc
+```
+
+El build Cloudflare escribe `.meeko/output/cloudflare/` con:
+
+- `worker.js`: un único módulo ES que incluye `@meekojs/meeko` y las dependencias del servidor. Sólo importa `cloudflare:workers` y `node:async_hooks`, que proporciona el runtime.
+- `assets/`: el build cliente y `public/`, más las páginas prerenderizadas bajo `assets/_meeko/prerender/`. El Worker lee esas páginas mediante el binding de assets y nunca las sirve como archivos; `public/_meeko/` queda reservado y detiene el build.
+- `wrangler.jsonc`: la configuración generada. No la edite; se regenera en cada build.
+
+Wrangler no vuelve a empaquetar la salida (`no_bundle: true`), así que se despliega exactamente el código que se probó. Wrangler es una herramienta de despliegue, no una dependencia de ejecución: `meeko preview` usa el de la aplicación o, en su defecto, el de la instalación de Meeko, y si no encuentra ninguno falla con «Wrangler is not installed; add it with pnpm add -D wrangler…». `PORT` y `HOST` se pasan a `wrangler dev` como `--port` e `--ip`. El build y el prerender siguen ejecutándose con Node; durante el prerender, la fábrica de `server/runtime.ts` se ejecuta en Node con `prerendering: true` y sin bindings.
+
+La configuración se declara en `meeko.config.ts`:
+
+```ts
+export default defineMeekoConfig({
+  server: {
+    adapter: "cloudflare",
+    name: "mi-app",                     // por defecto, el nombre del package.json
+    socketClassName: "MeekoSocketRoom", // clase Durable Object de las salas
+    compatibilityDate: "2026-10-19",    // por defecto, la fecha con la que Meeko se prueba
+    wrangler: {                         // campos adicionales de wrangler.jsonc
+      d1_databases: [{ binding: "DB", database_name: "mi-app", database_id: "<id>" }],
+      vars: { PUBLIC_ORIGIN: "https://mi-app.example" },
+    },
+  },
+});
+```
+
+El `wrangler.jsonc` generado contiene:
+
+- `main: "./worker.js"`, `no_bundle: true` y `find_additional_modules: false`, para que los archivos de `assets/` no se suban también como módulos del Worker.
+- `compatibility_flags` con `nodejs_als`, que habilita `AsyncLocalStorage` de `node:async_hooks`, unido a los flags declarados en `server.wrangler.compatibility_flags`. `nodejs_compat` también es válido, porque incluye `AsyncLocalStorage`.
+- `assets` con `directory: "./assets"`, binding `ASSETS`, `run_worker_first: true` y `html_handling`/`not_found_handling` en `"none"`. Todas las peticiones llegan al Worker, que sólo sirve los archivos listados en el manifiesto con el `ETag` y la política de caché de los demás adaptadores.
+- El binding Durable Object `MEEKO_SOCKET` hacia la clase de salas, antepuesto a los bindings de `server.wrangler.durable_objects`, y la migración `meeko-socket-v1` con `new_sqlite_classes`, salvo que sus migraciones ya declaren la clase. Las migraciones de Durable Objects son un historial: no borre ni renombre `meeko-socket-v1` después del primer despliegue.
+
+`main`, `assets`, `no_bundle` y `find_additional_modules` pertenecen a Meeko y no se pueden sobrescribir, ni tampoco el binding `MEEKO_SOCKET`. El resto de campos de `server.wrangler` (`routes`, `vars`, `d1_databases`, `observability`…) se copian tal cual.
+
+En Workers, `env` de `server/runtime.ts` es el objeto de bindings del Worker y `platform` vale `"cloudflare"`. La aplicación se crea una vez por aislado, en la primera petición, y `context.platform.waitUntil` usa `ctx.waitUntil`. La variable `PUBLIC_ORIGIN` fija el origen público; sin ella se usa el origen de la URL enrutada. Ejemplo con D1 para las sesiones:
+
+```ts
+// server/runtime.ts
+import { D1SessionDriver, DurableObjectSocketPubSub } from "@meekojs/meeko/cloudflare";
+import type { D1DatabaseLike, DurableObjectNamespaceLike } from "@meekojs/meeko/cloudflare";
+import { defineServerRuntime, MemorySessionStore, SessionManager, SqlSessionStore } from "@meekojs/meeko/server";
+
+interface Env { readonly DB?: D1DatabaseLike; readonly MEEKO_SOCKET?: DurableObjectNamespaceLike }
+
+export default defineServerRuntime<Env>(({ env, production, prerendering }) => {
+  const store = prerendering || !env.DB ? new MemorySessionStore() : new SqlSessionStore(new D1SessionDriver(env.DB));
+  const pubsub = env.MEEKO_SOCKET ? new DurableObjectSocketPubSub(env.MEEKO_SOCKET) : undefined;
+  return {
+    sessions: new SessionManager({ production: production && !prerendering, store }),
+    services: { pubsub },
+    // Sin pubsub, el Worker usa DurableObjectSocketPubSub(env.MEEKO_SOCKET) por defecto.
+    socket: { maxMessageBytes: 16 * 1024 },
+  };
+});
+```
+
+#### Sesiones en D1
+
+`D1SessionDriver(db, { table? })` implementa `SqlSessionDriver` para `SqlSessionStore`. `replace` es un único `UPDATE … WHERE id = ? AND family_id = ? AND expires_at > ?` que comprueba que haya cambiado exactamente una fila; `revokeFamily` es un `DELETE … WHERE family_id = ?`. `UNIQUE(family_id)` impide un segundo ID activo en la misma familia. `D1SessionDriver.schema(table?)` devuelve el esquema de referencia (con la tabla por defecto `meeko_sessions`):
+
+```sql
+CREATE TABLE IF NOT EXISTS "meeko_sessions" (
+  id TEXT PRIMARY KEY NOT NULL,
+  family_id TEXT NOT NULL UNIQUE,
+  csrf_token TEXT NOT NULL,
+  data_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS "meeko_sessions_expires_at" ON "meeko_sessions" (expires_at);
+```
+
+Aplíquelo como migración D1 antes de desplegar: `npx wrangler d1 migrations create <base> meeko_sessions`, copie el SQL en el archivo creado y ejecute `npx wrangler d1 migrations apply <base> --remote` (o `--local` para `wrangler dev`). Las filas caducadas se borran al leerlas; para limpiar el resto, llame a `driver.deleteExpired()` desde un Cron Trigger. D1 no notifica revocaciones a otros aislados: una conexión abierta en otro aislado detecta la revocación al releer la sesión en su siguiente evento (véase [Revocación durante una petición](#revocación-durante-una-petición)).
+
+#### Redis mediante la API REST de Upstash
+
+Workers no abre conexiones TCP de Redis con el cliente `redis`. `RedisSessionStore` sólo necesita `get`, `set` con `PX`, `del` y `eval`, de modo que un adaptador sobre la API REST de Upstash basta. Guarde la URL y el token como secretos del Worker:
+
+```ts
+import { RedisSessionStore } from "@meekojs/meeko/server";
+import type { RedisSessionClient } from "@meekojs/meeko/server";
+
+/** Cliente mínimo de la API REST de Upstash para RedisSessionStore. */
+function upstashClient(url: string, token: string): RedisSessionClient {
+  const command = async (...args: Array<string | number>): Promise<unknown> => {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify(args),
+    });
+    const body = await response.json() as { result?: unknown; error?: string };
+    if (!response.ok || body.error) throw new Error(`Upstash ${String(args[0])} failed: ${body.error ?? response.status}`);
+    return body.result;
+  };
+  return {
+    get: async (key) => (await command("GET", key)) as string | null,
+    set: (key, value, { PX }) => command("SET", key, value, "PX", PX),
+    del: (key) => command("DEL", key),
+    eval: (script, { keys, arguments: args }) => command("EVAL", script, keys.length, ...keys, ...args),
+  };
+}
+
+// En la fábrica de server/runtime.ts:
+const store = new RedisSessionStore(upstashClient(env.UPSTASH_REDIS_REST_URL, env.UPSTASH_REDIS_REST_TOKEN), { prefix: "mi-app:prod:" });
+```
+
+La API REST no mantiene una suscripción, así que no pase `subscriber`: las revocaciones se detectan al releer la sesión, como con D1.
+
+Workers KV no sirve como store de sesiones: no ofrece operaciones atómicas de comparación ni de borrado por familia y su consistencia es eventual, por lo que no puede garantizar `replace` ni `revokeFamily`. `SessionManager({ production: true })` rechaza los stores que no implementan ambas operaciones.
+
+#### Socket y Durable Objects
+
+El Worker comprueba la ruta, el Origin y la autorización del canal antes del upgrade (las mismas respuestas `400`, `401`, `403` y `404` que el resto de adaptadores) y reenvía la conexión al Durable Object de su sala: `env.MEEKO_SOCKET.idFromName(canal + "\0" + sala)`. Cada par canal/sala es un objeto, que:
+
+- acepta el WebSocket con la API de hibernación (`ctx.acceptWebSocket`), de modo que las conexiones inactivas no mantienen el objeto en memoria;
+- guarda con `serializeAttachment` el canal, la sala, la URL y sólo las cabeceras `cookie`, `origin` y `authorization`. Al despertar reconstruye cada conexión desde ese estado y el hub vuelve a autorizar. Los canales ven esas mismas cabeceras antes y después de hibernar;
+- responde `pong` a un mensaje de texto `ping` sin despertar (configurable con `autoResponse`, o `false` para desactivarlo). Los pings de protocolo los responde siempre el runtime;
+- cierra con `1009` los mensajes mayores que `maxMessageBytes` (por defecto, el límite de Socket de la aplicación o 64 KiB) y con `1003` los binarios.
+
+`DurableObjectSocketPubSub(env.MEEKO_SOCKET)` es el broker por defecto en Workers: `publish` entrega el mensaje a la sala mediante RPC al Durable Object (o directamente si ya se ejecuta en él) y se resuelve cuando la sala lo acepta; la sala reparte el mensaje a sus peers en orden de publicación. Las suscripciones sólo existen dentro del Durable Object de la sala; por eso todo upgrade debe pasar por `createWorker`. Un broadcast desde una API o desde otra sala funciona igual.
+
+Rendimiento: un Durable Object ejecuta su código en un solo hilo, así que todos los mensajes y broadcasts de una sala se procesan en serie en un único lugar. Esto da orden y coherencia, pero limita el caudal de una sala muy concurrida; reparta el tráfico en varias salas (por ejemplo, por documento o por grupo) en lugar de una sala global. Consulte los límites vigentes de Durable Objects en la documentación de Cloudflare.
+
+Para un Worker propio, `@meekojs/meeko/cloudflare` exporta las piezas que usa el build:
+
+- `createWorker(app, { socketBinding?, publicOrigin?, onError? })` devuelve el handler `{ fetch }` del módulo. `app` es un `ServerApp` o una fábrica `({ env, platform }) => ServerApp | Promise<ServerApp>` que se ejecuta una vez por aislado; si falla, el siguiente evento la reintenta.
+- `createSocketRoomClass(app, DurableObject, { maxMessageBytes?, autoResponse?, onError? })` crea la clase de salas. `DurableObject` se importa de `cloudflare:workers` y se pasa como argumento para que el módulo se pueda cargar fuera de Workers.
+- `DurableObjectSocketPubSub`, `socketRoomName(canal, sala)`, `D1SessionDriver`, `createCloudflareAssetReader({ binding, assets })` y `createCloudflarePrerenderSource({ binding, directory? })`.
+- `ServerAppOptions.defaultSocketPubSub` fija el broker cuando `server/runtime.ts` no declara `socket.pubsub`, y `openSocketSession` de `@meekojs/meeko/server` conecta un peer ya aceptado al hub.
+
 ### Conformidad entre adaptadores
 
-`tests/conformance/` construye la misma aplicación de prueba (`tests/fixtures/conformance-app/`) con cada adaptador. Antes de arrancar la salida en su runtime real, retira las fuentes; para Bun y Deno retira también `node_modules`. Las mismas aserciones cubren:
+`tests/conformance/` construye la misma aplicación de prueba (`tests/fixtures/conformance-app/`) con cada adaptador. Antes de arrancar la salida en su runtime real, retira las fuentes; para Bun, Deno y workerd retira también `node_modules`. La variante `workerd` construye con el adaptador `cloudflare` y ejecuta la salida con el mismo runtime local que `wrangler dev` (workerd tras el proxy de Wrangler, mediante `createTestHarness`), con D1 y Durable Objects en memoria. Las mismas aserciones cubren:
 
 - SSR con loader y plataforma, API, RPC, CSRF y Origin;
 - `404`, `405` con `Allow`, y `HEAD`;
@@ -528,16 +667,18 @@ El build Deno escribe `.meeko/output/deno/` con `main.js`, `chunks/`, `client/` 
 - orden del middleware;
 - Socket: ruta, Origin, autenticación, límites de tamaño, validación y binario, orden de mensajes de un peer y broadcast entre dos conexiones de una sala.
 
+La variante `workerd` añade sesiones en D1 (también leídas desde el Durable Object de un canal privado), la hibernación forzada de una sala (`evictDurableObject` con `webSockets: "hibernate"`) seguida de mensajes en ambos sentidos, el auto-response `ping`/`pong` y un broadcast desde la API, y la publicación de una sala a otra por RPC sin fugas a terceras salas.
+
 ```sh
-pnpm run conformance          # node, bun y deno
-pnpm run conformance:bun      # o :node / :deno
+pnpm run conformance          # node, bun, deno y workerd
+pnpm run conformance:bun      # o :node / :deno / :workerd
 ```
 
-Node se ejecuta siempre. Bun y Deno se buscan en `MEEKO_BUN`/`MEEKO_DENO`, después en el `PATH` y por último en una versión instalada con `mise` (`mise where bun`). Si no se encuentran, la suite se omite con un mensaje explícito. `MEEKO_CONFORMANCE_REQUIRE=bun,deno` convierte esa omisión en un fallo; la CI lo usa en sus jobs de Bun y Deno.
+Node se ejecuta siempre. Bun y Deno se buscan en `MEEKO_BUN`/`MEEKO_DENO`, después en el `PATH` y por último en una versión instalada con `mise` (`mise where bun`). Si no se encuentran, la suite se omite con un mensaje explícito. workerd llega con la devDependency `wrangler`; sin ella, su suite también se omite. `MEEKO_CONFORMANCE_REQUIRE=bun,deno,workerd` convierte esa omisión en un fallo; la CI lo usa en sus jobs de Bun, Deno y workerd.
 
 `pwsh -NoProfile -File tests/fullstack-consumer.ps1` instala un tarball local en un proyecto independiente, genera tipos, construye producción, retira las fuentes de la aplicación, arranca el build Node y prueba HTTP, assets, páginas prerenderizadas con CSRF, dos sesiones, RPC/CSRF, WebSocket real y Chrome. También crea `meeko init-framework` desde ese paquete e instala, comprueba tipos y construye el starter generado. El fixture contiene páginas `/`, `/users`, `/users/[id]`, `/dashboard`, `/chat` y `/layer-demo`; sus aserciones TypeScript comprueban entradas y salidas válidas e inválidas de API, RPC, Socket, rutas y `ComponentProps` importado desde una página `.meeko` del paquete instalado.
 
-Antes de preparar una publicación, ejecute `pnpm install --frozen-lockfile`, `pnpm run verify`, `pnpm run e2e`, `pnpm run pilot:e2e`, `pnpm run package:smoke`, `pnpm run conformance` (con Bun y Deno instalados), la prueba Redis anterior, `pwsh -NoProfile -File tests/fullstack-consumer.ps1`, `pnpm pack` y `git diff --check`. La CI ejecuta estas familias de comprobaciones, incluida la conformidad Node, en Windows; Redis y la conformidad de Bun y Deno se ejecutan en Ubuntu. La existencia del workflow no sustituye una ejecución verde de CI. El workflow de publicación repite los gates y sólo responde a una etiqueta de versión; la decisión de crearla corresponde al mantenedor.
+Antes de preparar una publicación, ejecute `pnpm install --frozen-lockfile`, `pnpm run verify`, `pnpm run e2e`, `pnpm run pilot:e2e`, `pnpm run package:smoke`, `pnpm run conformance` (con Bun y Deno instalados; workerd llega con `pnpm install`), la prueba Redis anterior, `pwsh -NoProfile -File tests/fullstack-consumer.ps1`, `pnpm pack` y `git diff --check`. La CI ejecuta estas familias de comprobaciones, incluida la conformidad Node, en Windows; Redis y la conformidad de Bun, Deno y workerd se ejecutan en Ubuntu. La existencia del workflow no sustituye una ejecución verde de CI. El workflow de publicación repite los gates y sólo responde a una etiqueta de versión; la decisión de crearla corresponde al mantenedor.
 
 ### Resolución de problemas de pnpm y Redis
 
@@ -584,13 +725,13 @@ Tras 500 renders SSR, el heap pasó de 87,276,056 a 87,012,304 bytes después de
 
 ## Compatibilidad y versionado
 
-Las entradas públicas soportadas de la versión actual son `@meekojs/meeko`, `/framework`, `/server`, `/node`, `/bun`, `/deno`, `/build`, `/vite` y `/devtools-ui`. `/internal` existe para el código generado por Meeko y no es contrato de consumo directo. La compilación se ofrece mediante la CLI y Vite; la raíz pública expone la reactividad y el runtime de SSR e hidratación, pero no una función `compile`. `defineMeekoConfig`, routing, `definePage`, `useState`, `createApiClient`, `createRpcClient`, `defineSocketChannel`, `attachNodeWebSocketServer`, `RedisSessionStore` y `SqlSessionStore` conservan sus nombres actuales. Los autoimports generados `api`, `rpc`, `socket` y `useSocket` dependen del manifiesto de cada aplicación.
+Las entradas públicas soportadas de la versión actual son `@meekojs/meeko`, `/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare`, `/build`, `/vite` y `/devtools-ui`. `/internal` existe para el código generado por Meeko y no es contrato de consumo directo. La compilación se ofrece mediante la CLI y Vite; la raíz pública expone la reactividad y el runtime de SSR e hidratación, pero no una función `compile`. `defineMeekoConfig`, routing, `definePage`, `useState`, `createApiClient`, `createRpcClient`, `defineSocketChannel`, `attachNodeWebSocketServer`, `RedisSessionStore` y `SqlSessionStore` conservan sus nombres actuales. Los autoimports generados `api`, `rpc`, `socket` y `useSocket` dependen del manifiesto de cada aplicación.
 
-Mientras la versión sea `0.x`, documente cada cambio incompatible y añada una entrada a `CHANGELOG.md` antes de aumentar minor; use patch para correcciones compatibles. En `1.x`, los cambios incompatibles requieren major. Una publicación requiere lockfile reproducible con el pnpm declarado, CI verde, consumidor externo y revisión del tarball. No se aumenta la versión automáticamente. Socket distribuido y adaptador edge siguen siendo experimentales o no implementados.
+Mientras la versión sea `0.x`, documente cada cambio incompatible y añada una entrada a `CHANGELOG.md` antes de aumentar minor; use patch para correcciones compatibles. En `1.x`, los cambios incompatibles requieren major. Una publicación requiere lockfile reproducible con el pnpm declarado, CI verde, consumidor externo y revisión del tarball. No se aumenta la versión automáticamente. El adaptador Cloudflare Workers es nuevo en esta versión y puede ajustarse antes de `1.0`.
 
 ## Límites actuales
 
-- Los adaptadores de servidor publicados son Node 24, Bun y Deno; la suite de conformidad se ejecuta con Bun 1.4.4 y Deno 2.9.8. Todavía no hay adaptador edge (Cloudflare).
+- Los adaptadores de servidor publicados son Node 24, Bun, Deno y Cloudflare Workers; la suite de conformidad se ejecuta con Bun 1.4.4, Deno 2.9.8 y workerd 1.20261019.1 (wrangler 4.152.0). En Workers, Socket requiere Durable Objects, las sesiones requieren D1 o Redis por la API REST de Upstash (KV no es válido) y D1 no notifica revocaciones a otros aislados.
 - Redis tiene una prueba de integración con servidor real configurada en CI; su ejecución local depende de un servidor accesible. El adaptador SQL se probó con SQLite real. Redis Pub/Sub para Socket queda pendiente.
 - Los canales Socket se descubren como archivos con nombre simple bajo `server/socket/`.
 - Cambios en configuración o registro de autoimports fuerzan recarga completa en Vite.

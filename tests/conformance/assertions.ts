@@ -22,13 +22,13 @@ function rawGet(origin: string, path: string): Promise<{ status: number; body: s
   });
 }
 
-interface Message { event: string; payload: Record<string, unknown> }
+export interface Message { event: string; payload: Record<string, unknown> }
 
 function socketUrl(origin: string, channel: string, room?: string): string {
   return `${origin.replace(/^http/, "ws")}/_meeko/socket/${channel}${room === undefined ? "" : `?room=${encodeURIComponent(room)}`}`;
 }
 
-function connect(origin: string, channel: string, options: { room?: string; origin?: string; cookie?: string } = {}): WebSocket {
+export function connect(origin: string, channel: string, options: { room?: string; origin?: string; cookie?: string } = {}): WebSocket {
   return new WebSocket(socketUrl(origin, channel, options.room), {
     headers: { origin: options.origin ?? origin, ...(options.cookie ? { cookie: options.cookie } : {}) },
   });
@@ -43,17 +43,17 @@ function refusal(peer: WebSocket): Promise<number> {
   });
 }
 
-async function opened(peer: WebSocket): Promise<WebSocket> {
+export async function opened(peer: WebSocket): Promise<WebSocket> {
   await once(peer, "open");
   return peer;
 }
 
-function closed(peer: WebSocket): Promise<number> {
+export function closed(peer: WebSocket): Promise<number> {
   return new Promise((resolve) => peer.once("close", (code: number) => resolve(code)));
 }
 
 /** Collects parsed messages until `count` arrive. */
-function messages(peer: WebSocket, count: number, timeoutMs = 10_000): Promise<Message[]> {
+export function messages(peer: WebSocket, count: number, timeoutMs = 10_000): Promise<Message[]> {
   return new Promise((resolve, reject) => {
     const received: Message[] = [];
     const timer = setTimeout(() => reject(new Error(`Received ${received.length} of ${count} socket messages: ${JSON.stringify(received)}`)), timeoutMs);
@@ -69,15 +69,27 @@ function messages(peer: WebSocket, count: number, timeoutMs = 10_000): Promise<M
   });
 }
 
-function send(peer: WebSocket, event: string, payload: unknown): void {
+export function send(peer: WebSocket, event: string, payload: unknown): void {
   peer.send(JSON.stringify({ event, payload }));
+}
+
+/** The running output and login of a suite, for adapter-specific tests. */
+export interface ConformanceContext {
+  server(): RunningOutput;
+  /** Session cookie (`name=value`) and CSRF token created before the suite. */
+  session(): { readonly cookie: string; readonly csrf: string };
+  /** Registers a WebSocket so it is terminated after the suite. */
+  track(peer: WebSocket): WebSocket;
 }
 
 /**
  * Registers the shared conformance suite for one adapter. Every adapter must
  * answer these requests identically; only `platform` names the runtime.
+ * `extra` registers adapter-specific tests against the same running output.
  */
-export function conformanceSuite(adapter: ConformanceAdapter): void {
+export function conformanceSuite(adapter: ConformanceAdapter, extra?: (suite: ConformanceContext) => void): void {
+  // The workerd variant runs the cloudflare adapter.
+  const platform = adapter === "workerd" ? "cloudflare" : adapter;
   const skip = missingRuntime(adapter);
   if (skip) console.log(`# skipping ${adapter} conformance: ${skip}`);
   else console.log(`# ${adapter} conformance runs on ${runtimeVersion(adapter)}`);
@@ -111,7 +123,7 @@ export function conformanceSuite(adapter: ConformanceAdapter): void {
       const html = await response.text();
       assert.match(html, /About conformance/);
       // Text bindings carry hydration markers around the value.
-      assert.match(html, new RegExp(`<p id="platform">(?:<!--meeko:text:\\d+-->)?${adapter}(?:<!--/meeko:text:\\d+-->)?</p>`));
+      assert.match(html, new RegExp(`<p id="platform">(?:<!--meeko:text:\\d+-->)?${platform}(?:<!--/meeko:text:\\d+-->)?</p>`));
       assert.match(html, /<script type="module" src="\/assets\/[^"]+\.js"><\/script>/);
     });
 
@@ -119,13 +131,13 @@ export function conformanceSuite(adapter: ConformanceAdapter): void {
       const response = await fetch(`${origin}/api/trace`);
       assert.equal(response.status, 200);
       assert.equal(response.headers.get("x-conformance-order"), "inner, outer");
-      assert.deepEqual(await response.json(), { trace: "outer,inner", platform: adapter });
+      assert.deepEqual(await response.json(), { trace: "outer,inner", platform });
     });
 
     it("serves API and RPC with JSON contracts", async () => {
       const echo = await fetch(`${origin}/api/echo`, { method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ text: "hi" }) });
       assert.equal(echo.status, 200);
-      assert.deepEqual(await echo.json(), { text: "hi", platform: adapter });
+      assert.deepEqual(await echo.json(), { text: "hi", platform });
       const invalid = await fetch(`${origin}/api/echo`, { method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ text: 1 }) });
       assert.equal(invalid.status, 400);
       assert.equal(((await invalid.json()) as { code: string }).code, "INVALID_BODY");
@@ -209,6 +221,11 @@ export function conformanceSuite(adapter: ConformanceAdapter): void {
         "/index.mjs",
         "/index.js",
         "/main.js",
+        "/worker.js",
+        "/wrangler.jsonc",
+        "/_meeko/prerender/manifest.json",
+        "/_meeko/prerender/index.html",
+        "/assets/_meeko/prerender/manifest.json",
       ];
       for (const path of attempts) {
         const response = await rawGet(origin, path);
@@ -328,5 +345,6 @@ export function conformanceSuite(adapter: ConformanceAdapter): void {
       assert.deepEqual(lines[0]!.deferred, [{ id: 0, path: ["data", "slow"], status: "pending" }]);
       assert.deepEqual(lines.slice(1), [{ deferred: 0, value: { text: "Deferred done" } }]);
     });
+    extra?.({ server: () => server, session: () => ({ cookie, csrf }), track });
   });
 }

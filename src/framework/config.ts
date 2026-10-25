@@ -58,6 +58,20 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
     if (server.port !== undefined && (!Number.isInteger(server.port) || (server.port as number) < 0 || (server.port as number) > 65535)) {
       throw new TypeError(`${file}: server.port must be an integer between 0 and 65535`);
     }
+    if (server.adapter === "cloudflare") {
+      if (server.name !== undefined && (typeof server.name !== "string" || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(server.name))) {
+        throw new TypeError(`${file}: server.name must be a Worker name (lowercase letters, digits and dashes)`);
+      }
+      if (server.socketClassName !== undefined && (typeof server.socketClassName !== "string" || !/^[A-Za-z_$][\w$]*$/.test(server.socketClassName))) {
+        throw new TypeError(`${file}: server.socketClassName must be a JavaScript class name`);
+      }
+      if (server.compatibilityDate !== undefined && (typeof server.compatibilityDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(server.compatibilityDate))) {
+        throw new TypeError(`${file}: server.compatibilityDate must use YYYY-MM-DD`);
+      }
+      if (server.wrangler !== undefined && (!server.wrangler || typeof server.wrangler !== "object" || Array.isArray(server.wrangler))) {
+        throw new TypeError(`${file}: server.wrangler must be an object of wrangler.jsonc fields`);
+      }
+    }
   }
   return config;
 }

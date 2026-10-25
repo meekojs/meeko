@@ -112,6 +112,37 @@ jobs:
           path: .meeko/ci-logs/conformance-deno.log
           if-no-files-found: ignore
 
+  workerd:
+    name: Conformidad workerd
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.14.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: pnpm
+      # wrangler (devDependency) brings workerd; D1 and Durable Objects run locally.
+      - run: pnpm install --frozen-lockfile
+      - name: Cloudflare Workers adapter conformance
+        run: |
+          mkdir -p .meeko/ci-logs
+          set -o pipefail
+          pnpm run conformance:workerd 2>&1 | tee .meeko/ci-logs/conformance-workerd.log
+        env:
+          MEEKO_CONFORMANCE_REQUIRE: workerd
+          WRANGLER_SEND_METRICS: 'false'
+      - name: workerd diagnostic log on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: meeko-publish-conformance-workerd-log
+          path: .meeko/ci-logs/conformance-workerd.log
+          if-no-files-found: ignore
+
   vscode-extension:
     name: VS Code (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -142,7 +173,7 @@ jobs:
         if: runner.os == 'Linux'
 
   publish:
-    needs: [redis-integration, bun, deno, vscode-extension]
+    needs: [redis-integration, bun, deno, workerd, vscode-extension]
     runs-on: windows-latest
     timeout-minutes: 30
     permissions:

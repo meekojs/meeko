@@ -23,8 +23,8 @@ export { createSocketHub, defineSocketChannel, LocalSocketPubSub } from "./frame
 export type { LocalSocketPubSubOptions, SocketChannelDefinition, SocketConnection, SocketDeliveryErrorContext, SocketHub, SocketHubOptions, SocketMessage, SocketPeer, SocketPubSub, Unsubscribe } from "./framework-server/socket.js";
 export { RedisSocketPubSub } from "./framework-server/redis-pubsub.js";
 export type { RedisMessageListener, RedisPublisherClient, RedisSocketPubSubOptions, RedisSubscriberClient } from "./framework-server/redis-pubsub.js";
-export { createSocketUpgradeHandler } from "./framework-server/upgrade.js";
-export type { SocketSession, SocketUpgrade, SocketUpgradeHandler, SocketUpgradeOptions } from "./framework-server/upgrade.js";
+export { createSocketUpgradeHandler, openSocketSession } from "./framework-server/upgrade.js";
+export type { OpenedSocketSession, OpenSocketSessionOptions, SocketSession, SocketUpgrade, SocketUpgradeHandler, SocketUpgradeOptions } from "./framework-server/upgrade.js";
 export { generateOpenApi } from "./framework-server/openapi.js";
 export type { OpenApiOptions } from "./framework-server/openapi.js";
 export { createLocalCalls } from "./framework-server/local.js";

@@ -41,6 +41,10 @@
       "types": "./dist/deno.d.ts",
       "default": "./dist/deno.js"
     },
+    "./cloudflare": {
+      "types": "./dist/cloudflare.d.ts",
+      "default": "./dist/cloudflare.js"
+    },
     "./build": {
       "types": "./dist/build.d.ts",
       "default": "./dist/build.js"
@@ -79,6 +83,7 @@
     "conformance:node": "pnpm run build && tsx --test tests/conformance/node.test.ts",
     "conformance:bun": "pnpm run build && tsx --test tests/conformance/bun.test.ts",
     "conformance:deno": "pnpm run build && tsx --test tests/conformance/deno.test.ts",
+    "conformance:workerd": "pnpm run build && tsx --test tests/conformance/workerd.test.ts",
     "e2e": "pnpm run example:bundle && pnpm run vite:build && tsx --test tests/browser.e2e.ts",
     "benchmark:check": "pnpm run example:compile && node dist/cli.js compile benchmarks/cases/TreeLeaf.meeko benchmarks/cases/TreeLeaf.generated.ts && node dist/cli.js compile benchmarks/cases/TreeBranch.meeko benchmarks/cases/TreeBranch.generated.ts && node dist/cli.js compile benchmarks/cases/Tree.meeko benchmarks/cases/Tree.generated.ts && node dist/cli.js compile benchmarks/cases/List.meeko benchmarks/cases/List.generated.ts && node dist/cli.js compile benchmarks/cases/Navigation.meeko benchmarks/cases/Navigation.generated.ts && tsc -p tsconfig.benchmark.json --noEmit",
     "benchmark": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/run.ts",
@@ -115,7 +120,8 @@
     "redis": "6.3.0",
     "tsx": "^4.20.0",
     "vite": "8.3.5",
-    "vue": "3.5.44"
+    "vue": "3.5.44",
+    "wrangler": "4.152.0"
   },
   "engines": {
     "node": ">=24"
