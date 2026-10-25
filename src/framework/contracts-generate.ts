@@ -4,6 +4,7 @@ import ts from "@typescript/typescript6";
 import { discoverServerManifest } from "../framework-server/discovery.js";
 import type { ApiEndpoint, RpcEndpoint } from "../framework-server/discovery.js";
 import { generateSocketContracts } from "./socket-contracts-generate.js";
+import { standardSchemaTypes } from "./standard-schema-types.js";
 
 export interface GeneratedServerContracts {
   readonly types: string;
@@ -87,12 +88,61 @@ function publicSchema(expression: ts.Expression | undefined, label: string, file
   if (!imported) throw new Error(`${file.fileName}: ${label} must come from shared/`);
   const exported = imported.exported === "*" ? member : imported.exported;
   if (!exported || (imported.exported !== "*" && member)) throw new Error(`${file.fileName}: ${label} must reference one shared export`);
-  const type = checker.getTypeAtLocation(expression);
-  if (type.flags & ts.TypeFlags.Any) throw new Error(`${file.fileName}: ${label} has type any; public schema cannot be inferred`);
+  standardSchemaTypes(expression, checker, () => new Error(`${file.fileName}: ${label} must expose concrete Standard Schema input and output types`));
   validateSharedGraph(imported.file, root, sharedRoot, options, new Set());
   const target = relative(outputDir, imported.file).replaceAll("\\", "/").replace(/\.(?:ts|mts|cts)$/, (suffix) => suffix === ".mts" ? ".mjs" : suffix === ".cts" ? ".cjs" : ".js");
   const specifier = target.startsWith(".") ? target : `./${target}`;
   return `typeof import(${JSON.stringify(specifier)})[${JSON.stringify(exported)}]`;
+}
+
+function schemaInputType(expression: ts.Expression, checker: ts.TypeChecker, invalid: () => Error): ts.Type {
+  return standardSchemaTypes(expression, checker, invalid).input;
+}
+
+function validatePathParams(expression: ts.Expression, pathname: string, checker: ts.TypeChecker, file: ts.SourceFile): void {
+  const expected = [...pathname.matchAll(/\[(?:\.\.\.)?([A-Za-z_$][\w$]*)\]/g)].map((match) => match[1]!);
+  const invalid = () => new Error(`${file.fileName}: params must contain exactly the route parameters as required URL strings`);
+  const inputType = schemaInputType(expression, checker, invalid);
+  const stringType = checker.getStringType();
+  for (const variant of inputType.isUnion() ? inputType.types : [inputType]) {
+    if (variant.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never)
+      || checker.getIndexTypeOfType(variant, ts.IndexKind.String)) throw invalid();
+    const fields = checker.getPropertiesOfType(variant);
+    if (fields.length !== expected.length || fields.some((field) => !expected.includes(field.getName()))) throw invalid();
+    for (const name of expected) {
+      const field = checker.getPropertyOfType(variant, name);
+      if (!field || field.flags & ts.SymbolFlags.Optional) throw invalid();
+      const value = checker.getTypeOfSymbolAtLocation(field, expression);
+      if (value.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never)
+        || !checker.isTypeAssignableTo(value, stringType)) throw invalid();
+    }
+  }
+}
+
+function validateQuery(expression: ts.Expression, checker: ts.TypeChecker, file: ts.SourceFile): void {
+  const invalid = () => new Error(`${file.fileName}: query values must be URL strings or arrays of URL strings`);
+  const inputType = schemaInputType(expression, checker, invalid);
+  const stringType = checker.getStringType();
+  const validValue = (value: ts.Type, arrayAllowed: boolean): boolean => {
+    if (value.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never)) return false;
+    if (value.isUnion()) return value.types.every((part) => validValue(part, arrayAllowed));
+    if (value.flags & ts.TypeFlags.Undefined) return true;
+    if (checker.isTypeAssignableTo(value, stringType)) return true;
+    if (arrayAllowed && (checker.isArrayType(value) || checker.isTupleType(value))) {
+      const item = checker.getIndexTypeOfType(value, ts.IndexKind.Number);
+      return !!item && validValue(item, false);
+    }
+    return false;
+  };
+  for (const variant of inputType.isUnion() ? inputType.types : [inputType]) {
+    if (!(variant.flags & (ts.TypeFlags.Object | ts.TypeFlags.Intersection))
+      || checker.isArrayType(variant) || checker.isTupleType(variant)) throw invalid();
+    for (const field of checker.getPropertiesOfType(variant)) {
+      if (!validValue(checker.getTypeOfSymbolAtLocation(field, expression), true)) throw invalid();
+    }
+    const indexValue = checker.getIndexTypeOfType(variant, ts.IndexKind.String);
+    if (indexValue && !validValue(indexValue, true)) throw invalid();
+  }
 }
 
 function validateSharedGraph(file: string, root: string, sharedRoot: string, options: ts.CompilerOptions, seen: Set<string>): void {
@@ -135,7 +185,10 @@ function shapeFor(endpoint: ApiEndpoint | RpcEndpoint, checker: ts.TypeChecker, 
     return { type: `import("@meekojs/meeko/framework").RpcOperation<__Input<${input}>, __Output<${output}>>` };
   }
   const params = schema("params");
+  if (params && !endpoint.pathname.includes("[")) throw new Error(`${file.fileName}: static API path cannot declare params`);
+  if (params) validatePathParams(objectProperty(contract, "params")!, endpoint.pathname, checker, file);
   const query = schema("query");
+  if (query) validateQuery(objectProperty(contract, "query")!, checker, file);
   const body = schema("body");
   const response = schema("response");
   const content = objectProperty(contract, "contentType");

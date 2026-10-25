@@ -1,4 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "include": ["server/**/*.ts", ".meeko/types/virtual-pages.d.ts", ".meeko/types/autoimports/server.d.ts"]
-}

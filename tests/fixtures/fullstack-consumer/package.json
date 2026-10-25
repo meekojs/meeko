@@ -6,10 +6,10 @@
                     "node":  "\u003e=24"
                 },
     "scripts":  {
-                    "dev":  "node server.mjs",
-                    "check":  "meeko routes . \u0026\u0026 meeko check-app . \u0026\u0026 tsc -p tsconfig.json --noEmit \u0026\u0026 tsc -p tsconfig.shared.json --noEmit \u0026\u0026 tsc -p tsconfig.app.json --noEmit \u0026\u0026 tsc -p tsconfig.server.json --noEmit",
-                    "build":  "npm run check \u0026\u0026 vite build --config vite.config.ts \u0026\u0026 vite build --config vite.server.config.ts \u0026\u0026 meeko prerender .",
-                    "start":  "node server.mjs --production"
+                    "dev":  "meeko dev .",
+                    "check":  "meeko check .",
+                    "build":  "meeko build .",
+                    "start":  "meeko start ."
                 },
     "dependencies":  {
                          "@meekojs/meeko":  "0.0.4",

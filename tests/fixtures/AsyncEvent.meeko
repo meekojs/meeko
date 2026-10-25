@@ -1,0 +1,7 @@
+<script lang="ts">
+async function fail(): Promise<void> {
+  throw new Error("compiled event rejected");
+}
+</script>
+
+<template><button on:click="fail">Run</button></template>

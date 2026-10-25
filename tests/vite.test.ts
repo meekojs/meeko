@@ -11,7 +11,7 @@ test("Vite carga el mismo componente .meeko en el entorno SSR", async () => {
   const server = await createServer({
     configFile: false,
     plugins: [meeko()],
-    server: { middlewareMode: true },
+    server: { middlewareMode: true, hmr: false },
   });
   try {
     const filename = resolve("examples/counter/Counter.meeko");
@@ -66,15 +66,54 @@ test("Vite rejects a transitive server import in the client graph", async () => 
   await writeFile(join(root, "app", "auto.ts"), 'export const count = useCount();');
   await writeFile(join(root, "app", "browser.client.ts"), 'export const browserOnly = true;');
   await writeFile(join(root, "server", "secret.ts"), 'export const secret = "private";');
-  const server = await createServer({ root, configFile: false, plugins: [meeko()], server: { middlewareMode: true } });
+  await mkdir(join(root, "layers", "base", "app", "pages"), { recursive: true });
+  await mkdir(join(root, "layers", "base", "app", "composables"), { recursive: true });
+  await mkdir(join(root, "layers", "base", "server"), { recursive: true });
+  await writeFile(join(root, "meeko.config.ts"), 'export default { extends: ["./layers/base"] };');
+  await writeFile(join(root, "layers", "base", "app", "composables", "count.ts"), 'export const layerCount = () => 1;');
+  await writeFile(join(root, "layers", "base", "app", "auto.ts"), 'export const count = layerCount();');
+  await writeFile(join(root, "layers", "base", "server", "secret.ts"), 'export const layerSecret = "private";');
+  await writeFile(join(root, "app", "layer-import.ts"), 'import { layerSecret } from "../layers/base/server/secret.js"; export const value = layerSecret;');
+  const server = await createServer({ root, configFile: false, plugins: [meeko()], server: { middlewareMode: true, hmr: false } });
   try {
     await assert.rejects(server.transformRequest("/app/entry.ts"), /server-only module/);
     await assert.rejects(server.transformRequest("/app/dynamic.ts"), /server-only module/);
+    await assert.rejects(server.transformRequest("/app/layer-import.ts"), /server-only module/);
+    await assert.rejects(server.transformRequest("/layers/base/server/secret.ts"), /Server-only module/);
     const auto = await server.transformRequest("/app/auto.ts");
     assert.match(auto?.code ?? "", /import.*useCount/);
+    const layerAuto = await server.transformRequest("/layers/base/app/auto.ts");
+    assert.match(layerAuto?.code ?? "", /import.*layerCount/);
     await assert.rejects(server.transformRequest("/app/browser.client.ts", { ssr: true }), /Client-only module/);
   } finally {
     await server.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Vite reloads routes and autoimports in a configured source directory", async () => {
+  const root = await mkdtemp(join(tmpdir(), "meeko-vite-configured-hmr-"));
+  try {
+    await mkdir(join(root, "vendor", "base", "app", "pages"), { recursive: true });
+    await mkdir(join(root, "vendor", "base", "app", "composables"), { recursive: true });
+    await writeFile(join(root, "meeko.config.ts"), 'export default { extends: ["./vendor/base"] };');
+    const sent: unknown[] = [];
+    let invalidations = 0;
+    const plugin = meeko() as unknown as {
+      configResolved(config: { root: string; command: "serve"; build: { ssr: false } }): void;
+      handleHotUpdate(context: { file: string; server: { moduleGraph: { invalidateAll(): void }; ws: { send(message: unknown): void } } }): Promise<unknown> | unknown;
+    };
+    plugin.configResolved({ root, command: "serve", build: { ssr: false } });
+    const server = { moduleGraph: { invalidateAll: () => { invalidations++; } }, ws: { send: (message: unknown) => { sent.push(message); } } };
+    for (const file of [
+      join(root, "vendor", "base", "app", "pages", "index.meeko"),
+      join(root, "vendor", "base", "app", "composables", "useLayer.ts"),
+    ]) {
+      assert.deepEqual(await plugin.handleHotUpdate({ file, server }), []);
+    }
+    assert.equal(invalidations, 2);
+    assert.deepEqual(sent, [{ type: "full-reload" }, { type: "full-reload" }]);
+  } finally {
     await rm(root, { recursive: true, force: true });
   }
 });

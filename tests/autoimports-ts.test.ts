@@ -10,7 +10,11 @@ test("TS autoimports generate isolated client/server/shared declarations and tra
   const root = await mkdtemp(resolve(".meeko/autoimports-ts-test-"));
   const files = {
     "app/composables/count.ts": "export function useCount(): number { return 1; }",
-    "shared/types/labels.ts": "export type Label = string; export type Box<T> = { value: T };",
+    "app/composables/browser.client.ts": "export const browserOnly = 1;",
+    "app/composables/loader.server.ts": "export const serverOnly = 1;",
+    "shared/types/labels.ts": "export type Label = string;",
+    "shared/internal/box.ts": 'interface Hidden { id: string }\ntype HiddenDefault = Hidden & { kind: "default" };\nexport type Box<T extends Hidden = HiddenDefault> = { value: T };',
+    "shared/types/box.ts": 'export type { Box } from "../internal/box.js";',
     "server/utils/secret.ts": "export function getSecret(): string { return 'private'; }",
   };
   for (const [name, source] of Object.entries(files)) {
@@ -24,12 +28,17 @@ test("TS autoimports generate isolated client/server/shared declarations and tra
     const server = await readFile(output.server, "utf8");
     const shared = await readFile(output.shared, "utf8");
     assert.match(client, /const useCount: typeof import/);
-    assert.match(client, /type Label = import/);
-    assert.match(client, /type Box<T> = import\([^\n]+\)\.Box<T>/);
+    assert.match(client, /const browserOnly: typeof import/);
+    assert.doesNotMatch(client, /serverOnly/);
+    assert.match(client, /export import Label = __meeko_type_\d+\.Label/);
+    assert.match(client, /export import Box = __meeko_type_\d+\.Box/);
+    assert.doesNotMatch(client, /T extends Hidden|HiddenDefault/);
     assert.doesNotMatch(client, /getSecret/);
     assert.match(server, /const getSecret: typeof import/);
-    assert.doesNotMatch(server, /useCount/);
-    assert.doesNotMatch(shared, /useCount|getSecret/);
+    assert.match(server, /const useCount: typeof import/);
+    assert.match(server, /const serverOnly: typeof import/);
+    assert.doesNotMatch(server, /browserOnly/);
+    assert.doesNotMatch(shared, /useCount|getSecret|browserOnly|serverOnly/);
     const registry = await discoverAutoImports(root);
     const page = join(root, "app", "pages", "index.ts");
     const code = transformTypeScriptAutoImports("const count = useCount(); type Name = Label;", page, root, registry);
@@ -39,7 +48,9 @@ test("TS autoimports generate isolated client/server/shared declarations and tra
     const explicit = transformTypeScriptAutoImports('import { useCount } from "../composables/count.js"; useCount();', page, root, registry);
     assert.equal(explicit, undefined);
     assert.throws(() => transformTypeScriptAutoImports("getSecret();", page, root, registry), /unavailable in client scope/);
-    assert.throws(() => transformTypeScriptAutoImports("useCount();", join(root, "shared", "utils", "worker.ts"), root, registry), /unavailable in server scope/);
+    assert.throws(() => transformTypeScriptAutoImports("useCount();", join(root, "shared", "utils", "worker.ts"), root, registry), /unavailable in shared scope/);
+    assert.match(transformTypeScriptAutoImports("useCount();", join(root, "app", "pages", "page.server.ts"), root, registry) ?? "", /import \{ useCount as useCount \}/);
+    assert.throws(() => transformTypeScriptAutoImports("browserOnly();", join(root, "app", "pages", "page.server.ts"), root, registry), /unavailable in server scope/);
     assert.equal(typeScriptScope(root, join(root, "app", "pages", "page.test.ts")), undefined);
     assert.equal(typeScriptScope(root, join(root, "app", "pages", "page.server.ts")), "server");
     const sidecar = join(root, "app", "pages", "users", "index.route.ts");
@@ -47,9 +58,9 @@ test("TS autoimports generate isolated client/server/shared declarations and tra
     assert.match(transformTypeScriptAutoImports("getSecret();", sidecar, root, registry) ?? "", /import \{ getSecret as getSecret \}/);
     assert.equal(typeScriptScope(root, join(root, "app", "pages", "page.shared.ts")), "shared");
     const consumer = join(root, "consumer.ts");
-    await writeFile(consumer, `const count: number = useCount();\nconst label: Label = "ok";\nconst box: Box<number> = { value: 1 };\nvoid count; void label; void box;\n`);
+    await writeFile(consumer, `const count: number = useCount();\nconst label: Label = "ok";\nconst box: Box<{ id: string; extra: number }> = { value: { id: "ok", extra: 1 } };\nconst defaultBox: Box = { value: { id: "ok", kind: "default" } };\n// @ts-expect-error the private re-exported generic constraint must remain intact\nconst invalidBox: Box<number> = { value: 1 };\nvoid count; void label; void box; void defaultBox; void invalidBox;\n`);
     await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: {
-      target: "es2022", module: "nodenext", moduleResolution: "nodenext", strict: true, skipLibCheck: true, noEmit: true,
+      target: "es2022", module: "nodenext", moduleResolution: "nodenext", strict: true, skipLibCheck: false, noEmit: true,
     }, files: [consumer, output.client] }));
     const { execFile } = await import("node:child_process");
     const { promisify } = await import("node:util");
@@ -68,6 +79,35 @@ test("TS autoimport declarations reject name collisions in the same scope", asyn
     await writeFile(join(root, "app", "composables", "first.ts"), "export const duplicate = 1;");
     await writeFile(join(root, "shared", "utils", "second.ts"), "export const duplicate = 2;");
     await assert.rejects(generateAutoImportTypes(root), /Ambiguous autoimport duplicate in client scope/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("configured layers and modules transform TypeScript in their own scopes", async () => {
+  await mkdir(resolve(".meeko"), { recursive: true });
+  const root = await mkdtemp(resolve(".meeko/autoimports-sources-test-"));
+  try {
+    await writeFile(join(root, "meeko.config.ts"), 'export default { extends: ["./layers/base"], modules: ["./modules/auth"] };\n');
+    for (const source of ["layers/base", "modules/auth"]) {
+      await mkdir(join(root, source, "app", "pages"), { recursive: true });
+    }
+    const layerUtility = join(root, "layers", "base", "app", "composables", "counter.ts");
+    const moduleUtility = join(root, "modules", "auth", "server", "utils", "secret.ts");
+    await mkdir(dirname(layerUtility), { recursive: true });
+    await mkdir(dirname(moduleUtility), { recursive: true });
+    await writeFile(layerUtility, "export function layerCount(): number { return 1; }\n");
+    await writeFile(moduleUtility, "export function moduleSecret(): string { return 'private'; }\n");
+    const registry = await discoverAutoImports(root);
+    const layerPage = join(root, "layers", "base", "app", "pages", "example.ts");
+    const moduleServer = join(root, "modules", "auth", "server", "utils", "worker.ts");
+    assert.equal(typeScriptScope(root, layerPage), "client");
+    assert.equal(typeScriptScope(root, moduleServer), "server");
+    assert.equal(typeScriptScope(root, join(root, "layers", "base", "app", "pages", "example.server.ts")), "server");
+    assert.equal(typeScriptScope(root, join(root, "unconfigured", "app", "page.ts")), undefined);
+    assert.match(transformTypeScriptAutoImports("layerCount();", layerPage, root, registry) ?? "", /import \{ layerCount as layerCount \}/);
+    assert.match(transformTypeScriptAutoImports("moduleSecret();", moduleServer, root, registry) ?? "", /import \{ moduleSecret as moduleSecret \}/);
+    assert.throws(() => transformTypeScriptAutoImports("moduleSecret();", layerPage, root, registry), /unavailable in client scope/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -13,7 +13,8 @@ test("Socket contracts discover channels and generate only shared schema imports
   await mkdir(join(root, "shared", "schemas"), { recursive: true });
   await mkdir(join(root, "server", "socket"), { recursive: true });
   await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { module: "NodeNext", moduleResolution: "NodeNext", target: "ES2022" } }));
-  await writeFile(join(root, "shared", "schemas", "chat.ts"), "export const chatInput = { '~standard': { version: 1, validate: (value: unknown) => ({ value }) } };\nexport const chatOutput = chatInput;\n");
+  const sharedFile = join(root, "shared", "schemas", "chat.ts");
+  await writeFile(sharedFile, "const schema = <I, O = I>() => ({ '~standard': { version: 1 as const, types: undefined as unknown as { input: I; output: O }, validate: (value: unknown) => ({ value: value as O }) } });\nexport const chatInput = schema<{ text: string }>();\nexport const chatOutput = schema<undefined, { text: string }>();\n");
   const channelFile = join(root, "server", "socket", "chat.ts");
   await writeFile(channelFile, "import { chatInput, chatOutput } from '../../shared/schemas/chat.js';\nexport default defineSocketChannel({ clientToServer: { message: chatInput }, serverToClient: { message: chatOutput } });\n");
   const manifest = await discoverServerManifest(root);
@@ -32,4 +33,17 @@ test("Socket contracts discover channels and generate only shared schema imports
   await writeFile(channelFile, "import { privateSchema } from '../private.js';\nexport default defineSocketChannel({ clientToServer: { message: privateSchema }, serverToClient: {} });\n");
   await writeFile(join(root, "server", "private.ts"), "export const privateSchema = {};\n");
   await assert.rejects(generateSocketContracts(root), /must come from shared\//);
+
+  await writeFile(sharedFile, "const schema = <I, O = I>() => ({ '~standard': { version: 1 as const, types: undefined as unknown as { input: I; output: O }, validate: (value: unknown) => ({ value: value as O }) } });\nexport const safeInput = schema<{ text: string }>();\nexport const unsafeInput = schema<any>();\nexport const unsafeOutput = schema<string, unknown>();\nexport const unsafeNestedInput = schema<{ message: { data: any } }>();\nexport const unsafeNestedOutput = schema<string, readonly { data: never }[]>();\n");
+  await writeFile(channelFile, "import { unsafeInput, unsafeOutput } from '../../shared/schemas/chat.js';\nexport default defineSocketChannel({ clientToServer: { message: unsafeInput }, serverToClient: { message: unsafeOutput } });\n");
+  await assert.rejects(generateSocketContracts(root), /clientToServer\.message must expose concrete Standard Schema input and output types/);
+
+  await writeFile(channelFile, "import { unsafeOutput } from '../../shared/schemas/chat.js';\nexport default defineSocketChannel({ clientToServer: {}, serverToClient: { message: unsafeOutput } });\n");
+  await assert.rejects(generateSocketContracts(root), /serverToClient\.message must expose concrete Standard Schema input and output types/);
+
+  await writeFile(channelFile, "import { unsafeNestedInput, unsafeNestedOutput } from '../../shared/schemas/chat.js';\nexport default defineSocketChannel({ clientToServer: { message: unsafeNestedInput }, serverToClient: { message: unsafeNestedOutput } });\n");
+  await assert.rejects(generateSocketContracts(root), /clientToServer\.message must expose concrete Standard Schema input and output types/);
+
+  await writeFile(channelFile, "import { safeInput, unsafeNestedOutput } from '../../shared/schemas/chat.js';\nexport default defineSocketChannel({ clientToServer: { message: safeInput }, serverToClient: { message: unsafeNestedOutput } });\n");
+  await assert.rejects(generateSocketContracts(root), /serverToClient\.message must expose concrete Standard Schema input and output types/);
 });

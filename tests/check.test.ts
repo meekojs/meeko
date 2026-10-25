@@ -171,6 +171,44 @@ import * as Host from "./Host.meeko";
   }
 });
 
+test("a nested component requires the SSR state transfer contract", async () => {
+  const filename = join(exampleDirectory, "TransferContract.meeko");
+  const source = `<script lang="ts">
+import type { ComponentModule } from "@meekojs/meeko";
+const props = defineProps<{ child: ComponentModule<{ label: string }> }>();
+</script><template><component is="props.child" bind:label="'ok'"></component></template>`;
+  const diagnostics = await checkSource(source, filename);
+  assert.ok(diagnostics.some((diagnostic) => diagnostic.filename === filename &&
+    /renderWithState/.test(diagnostic.message)), JSON.stringify(diagnostics));
+  const valid = source.replaceAll("ComponentModule", "Component");
+  assert.deepEqual(await checkSource(valid, filename), []);
+});
+
+test("un componente requerido no satisface un outlet que omite sus props", async () => {
+  const directory = await mkdtemp(join(exampleDirectory, ".meeko-outlet-variance-test-"));
+  const content = join(directory, "Content.meeko");
+  const host = join(directory, "Host.meeko");
+  const parent = join(directory, "Parent.meeko");
+  const hostSource = `<script lang="ts">
+import type { Component } from "@meekojs/meeko";
+const props = defineProps<{ content: Component<{ label?: string }> }>();
+</script><template><component is="props.content"></component></template>`;
+  const parentSource = `<script lang="ts">
+import * as Content from "./Content.meeko";
+import * as Host from "./Host.meeko";
+</script><template><component is="Host" bind:content="Content"></component></template>`;
+  await writeFile(content, `<script lang="ts">const props = defineProps<{ label: string }>();</script><template><strong>{props.label}</strong></template>`);
+  await writeFile(host, hostSource);
+  await writeFile(parent, parentSource);
+  try {
+    const errors = await checkSource(parentSource, parent);
+    assert.ok(errors.some((diagnostic) => diagnostic.code === "TS2322" && diagnostic.filename === parent &&
+      diagnostic.location.offset >= parentSource.indexOf("bind:content")), JSON.stringify(errors));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("callbacks de componente comprueban parámetros en ambos lados", async () => {
   const directory = await mkdtemp(join(exampleDirectory, ".meeko-callback-test-"));
   const child = join(directory, "Child.meeko");
@@ -191,6 +229,27 @@ const save = (id: number): void => { void id; };
     assert.ok((await checkSource(wrong, parent)).some((diagnostic) => diagnostic.code === "TS2322"));
     const wrongEmit = childSource.replace("props.onSave(1)", "props.onSave('wrong')");
     assert.ok((await checkSource(wrongEmit, child)).some((diagnostic) => diagnostic.code === "TS2345"));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("checkSource atribuye errores de un módulo TypeScript importado a ese archivo", async () => {
+  const directory = await mkdtemp(join(exampleDirectory, ".meeko-import-diagnostic-test-"));
+  const helper = join(directory, "helper.ts");
+  const component = join(directory, "Importing.meeko");
+  const source = `<script lang="ts">import { value } from "./helper.js";</script><template>{value}</template>`;
+  const helperSource = 'export const okay = 1;\nexport const value: number = "wrong";\n';
+  await writeFile(helper, helperSource);
+  await writeFile(component, source);
+  try {
+    const diagnostics = await checkSource(source, component);
+    const error = diagnostics.find((diagnostic) => diagnostic.code === "TS2322");
+    assert.ok(error, JSON.stringify(diagnostics));
+    assert.equal(error.filename, helper);
+    assert.equal(error.location.line, 2);
+    assert.ok(error.location.column > 1);
+    assert.equal(error.location.offset, helperSource.indexOf("value"));
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

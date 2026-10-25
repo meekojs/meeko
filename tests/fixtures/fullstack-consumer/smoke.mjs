@@ -18,8 +18,13 @@ const get = async (path, cookie) => fetch(`${origin}${path}`, { headers: cookie 
 for (const [path, marker] of [["/", "Welcome"], ["/users", "Ada"], ["/layer-demo", "Layer route works"]]) {
   const response = await get(path);
   assert.equal(response.status, 200, path);
+  assert.equal(response.headers.get("x-meeko-fixture-middleware"), "active");
   assert.match(await response.text(), new RegExp(marker));
 }
+const deniedRoute = await get("/users?deny=1");
+assert.equal(deniedRoute.status, 403);
+assert.equal(await deniedRoute.text(), "Route denied");
+assert.equal(deniedRoute.headers.get("x-meeko-fixture-middleware"), "active");
 assert.equal((await (await get("/status.txt")).text()).trim(), "public asset");
 const privateDir = resolve(".meeko/private-static-test");
 const publicLink = resolve("public/private-static-test");
@@ -54,4 +59,4 @@ ws.send(JSON.stringify({ event: "message", payload: { text: "Hola", roomId: "gen
 const message = await new Promise((resolve, reject) => { ws.once("message", resolve); ws.once("error", reject); });
 assert.deepEqual(JSON.parse(String(message)), { event: "message", payload: { text: "Hola", roomId: "general" } });
 ws.close();
-console.log("Full-stack HTTP, static path boundary, concurrent sessions, RPC, CSRF, layer and WebSocket: OK");
+console.log("Full-stack HTTP, middleware, static path boundary, concurrent sessions, RPC, CSRF, layer and WebSocket: OK");

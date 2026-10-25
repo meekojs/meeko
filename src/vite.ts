@@ -8,7 +8,7 @@ import { moduleSpecifiers } from "./compiler/import-graph.js";
 import { sourceMapForCompiled } from "./compiler/sourcemap.js";
 import { discoverAutoImports, transformAutoImports } from "./autoimports.js";
 import { transformTypeScriptAutoImports, typeScriptAutoImportMap } from "./autoimports-ts.js";
-import { discoverConfiguredRoutes } from "./framework/config.js";
+import { discoverConfiguredRoutes, loadMeekoConfig, resolveConfigSources } from "./framework/config.js";
 
 const stylePrefix = "\0virtual:meeko-style:";
 const pageModules = new Map<string, "client" | "server" | "routes">([
@@ -67,7 +67,10 @@ export function meeko(): Plugin {
       const normalizedId = normalizePath(resolve(id));
       const normalizedRoot = normalizePath(root);
       const clientModule = !serverTransform && normalizedId.startsWith(`${normalizedRoot}/`);
-      if (clientModule && (normalizedId.startsWith(`${normalizedRoot}/server/`) || /\.server\.[cm]?[jt]sx?$/.test(id))) {
+      const sources = normalizedId.startsWith(`${normalizedRoot}/`) ? await resolveConfigSources(root) : [];
+      const serverDirectories = sources.map((entry) => `${normalizePath(entry.root)}/server/`);
+      const serverOnly = (moduleId: string): boolean => serverDirectories.some((directory) => moduleId.startsWith(directory));
+      if (clientModule && (serverOnly(normalizedId) || /\.server\.[cm]?[jt]sx?$/.test(id))) {
         throw new Error(`Server-only module reached the client bundle: ${id}`);
       }
       if (serverTransform && normalizedId.startsWith(`${normalizedRoot}/`) && /\.client\.[cm]?[jt]sx?$/.test(id)) {
@@ -77,7 +80,7 @@ export function meeko(): Plugin {
         if (!clientModule) return;
         for (const { value } of moduleSpecifiers(code, id)) {
           const dependency = await this.resolve(value, id, { skipSelf: true });
-          if (dependency && normalizePath(dependency.id).startsWith(`${normalizedRoot}/server/`)) {
+          if (dependency && serverOnly(normalizePath(dependency.id))) {
             throw new Error(`Client module ${id} imports server-only module ${value}`);
           }
         }
@@ -86,7 +89,7 @@ export function meeko(): Plugin {
         if (/\.[cm]?[jt]sx?$/.test(id) && clientModule) await checkBoundary(source);
         if (/\.[cm]?tsx?$/.test(id) && normalizedId.startsWith(`${normalizedRoot}/`)) {
           const registry = await discoverAutoImports(root);
-          const transformed = transformTypeScriptAutoImports(source, id, root, registry);
+          const transformed = transformTypeScriptAutoImports(source, id, root, registry, sources.map((entry) => entry.root));
           if (transformed) {
             await checkBoundary(transformed);
             return { code: transformed, map: typeScriptAutoImportMap(source, transformed, id) };
@@ -112,12 +115,25 @@ export function meeko(): Plugin {
       const generated = `${code}${cssImport}${hotCode}`;
       return transformWithOxc(generated, `${filename}.ts`, { lang: "ts" }, sourceMapForCompiled(generated, source, filename, mappings));
     },
-    handleHotUpdate({ file, server }) {
+    async handleHotUpdate({ file, server }) {
       const normalized = normalizePath(file);
-      const relative = normalized.slice(normalizePath(root).length + 1);
-      const registrySource = /^(?:app\/(?:components|composables|utils|stores)|shared\/(?:types|schemas|utils|constants|enums)|server\/utils)\//.test(relative);
-      const routesSource = /^(?:app\/pages|layers\/|modules\/)/.test(relative) || relative.startsWith("meeko.config.");
-      if (!normalized.startsWith(runtimeDirectory) && !registrySource && !routesSource) return;
+      const normalizedRoot = normalizePath(root);
+      const configFile = normalized.startsWith(`${normalizedRoot}/meeko.config.`);
+      let sourceChanged = false;
+      if (normalized.startsWith(`${normalizedRoot}/`) && !configFile) {
+        const config = await loadMeekoConfig(root);
+        const sources = await resolveConfigSources(root, config);
+        for (const source of sources) {
+          const prefix = `${normalizePath(source.root)}/`;
+          if (!normalized.startsWith(prefix)) continue;
+          const path = normalized.slice(prefix.length);
+          const registrySource = /^(?:app\/(?:components|composables|utils|stores)|shared\/(?:types|schemas|utils|constants|enums)|server\/utils)\//.test(path) ||
+            (config.imports?.serverDirs ?? []).some((directory) => path.startsWith(`${directory.replaceAll("\\", "/").replace(/\/$/, "")}/`));
+          const routesSource = /^(?:app\/(?:pages|layouts|middleware)|server\/middleware)\//.test(path);
+          if (registrySource || routesSource) { sourceChanged = true; break; }
+        }
+      }
+      if (!normalized.startsWith(runtimeDirectory) && !configFile && !sourceChanged) return;
       server.moduleGraph.invalidateAll();
       server.ws.send({ type: "full-reload" });
       return [];

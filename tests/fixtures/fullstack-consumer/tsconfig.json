@@ -10,5 +10,10 @@
     "allowArbitraryExtensions": true,
     "skipLibCheck": true
   },
-  "include": ["vite.config.ts", "vite.server.config.ts"]
+  "files": [],
+  "references": [
+    { "path": "./.meeko/tsconfig.app.json" },
+    { "path": "./.meeko/tsconfig.server.json" },
+    { "path": "./.meeko/tsconfig.shared.json" }
+  ]
 }

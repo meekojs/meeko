@@ -1,20 +1,21 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join, relative, resolve, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
 import { applyAutoImports, discoverAutoImports } from "./autoimports.js";
 import type { AutoImport, ImportScope } from "./autoimports.js";
+import { readMeekoConfigSync } from "./framework/config.js";
 
-export type TypeScriptScope = ImportScope;
+export type TypeScriptScope = Exclude<ImportScope, "app">;
 
 function within(root: string, filename: string): string | undefined {
   const path = relative(resolve(root), resolve(filename));
   return path === ".." || path.startsWith(`..${sep}`) || path.startsWith("/") ? undefined : path.replaceAll("\\", "/");
 }
 
-/** Selects the application scope of a source file without executing it. */
-export function typeScriptScope(root: string, filename: string): TypeScriptScope | undefined {
-  const path = within(root, filename);
-  if (!path || !/\.[cm]?tsx?$/.test(path) || /\.(?:test|spec|d)\.[cm]?tsx?$/.test(path)) return undefined;
+function scopeWithin(sourceRoot: string, filename: string): TypeScriptScope | undefined {
+  const path = within(sourceRoot, filename);
+  if (!path || !/\.[cm]?tsx?$/.test(path) || /\.(?:test|spec|d)\.[cm]?tsx?$/.test(path) ||
+    !/^(?:app|server|shared)\//.test(path)) return undefined;
   if (/\.shared\.[cm]?tsx?$/.test(path)) return "shared";
   if (/\.server\.[cm]?tsx?$/.test(path)) return "server";
   if (/\.route\.[cm]?tsx?$/.test(path) && /(?:^|\/)app\/pages\//.test(path)) return "server";
@@ -22,6 +23,20 @@ export function typeScriptScope(root: string, filename: string): TypeScriptScope
   if (path.startsWith("server/")) return "server";
   if (path.startsWith("app/")) return "client";
   if (path.startsWith("shared/")) return "shared";
+  return undefined;
+}
+
+/** Selects a source scope without executing config; Vite may pass resolved roots for dynamic config. */
+export function typeScriptScope(root: string, filename: string, sourceRoots?: readonly string[]): TypeScriptScope | undefined {
+  const config = sourceRoots ? undefined : readMeekoConfigSync(root);
+  const configured = sourceRoots ?? [
+    ...(config?.extends ?? []),
+    ...(config?.modules ?? []),
+  ].map((entry) => resolve(root, entry));
+  for (const sourceRoot of [...configured, root].sort((a, b) => b.length - a.length)) {
+    const scope = scopeWithin(sourceRoot, filename);
+    if (scope) return scope;
+  }
   return undefined;
 }
 
@@ -33,7 +48,7 @@ function publicSpecifier(outputDirectory: string, entry: AutoImport): string {
 }
 
 function scopeEntries(registry: readonly AutoImport[], scope: TypeScriptScope): AutoImport[] {
-  return registry.filter((entry) => entry.scope === "shared" || (scope !== "shared" && entry.scope === scope));
+  return registry.filter((entry) => entry.scope === "shared" || (scope !== "shared" && (entry.scope === scope || entry.scope === "app")));
 }
 
 function assertNoCollisions(entries: readonly AutoImport[], scope: TypeScriptScope): void {
@@ -45,18 +60,46 @@ function assertNoCollisions(entries: readonly AutoImport[], scope: TypeScriptSco
   }
 }
 
-async function typeDeclaration(entry: AutoImport, specifier: string): Promise<string> {
-  if (entry.specifier) return `  type ${entry.name} = import(${specifier}).${entry.imported};`;
-  const source = await readFile(entry.file, "utf8");
-  const file = ts.createSourceFile(entry.file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const declaration = file.statements.find((statement) =>
-    (ts.isTypeAliasDeclaration(statement) || ts.isInterfaceDeclaration(statement)) && statement.name.text === entry.imported);
-  if (!declaration || (!ts.isTypeAliasDeclaration(declaration) && !ts.isInterfaceDeclaration(declaration)) || !declaration.typeParameters?.length) {
-    return `  type ${entry.name} = import(${specifier}).${entry.imported};`;
+interface TypeTarget {
+  readonly file: string;
+  readonly imported: string;
+}
+
+function projectCompilerOptions(root: string): ts.CompilerOptions {
+  const config = ts.findConfigFile(root, ts.sys.fileExists, "tsconfig.json");
+  if (!config) return {
+    target: ts.ScriptTarget.Latest,
+    module: ts.ModuleKind.NodeNext,
+    moduleResolution: ts.ModuleResolutionKind.NodeNext,
+    noEmit: true,
+    skipLibCheck: true,
+  };
+  const loaded = ts.readConfigFile(config, ts.sys.readFile);
+  if (loaded.error) throw new Error(ts.flattenDiagnosticMessageText(loaded.error.messageText, "\n"));
+  return { ...ts.parseJsonConfigFileContent(loaded.config, ts.sys, dirname(config)).options, noEmit: true };
+}
+
+function typeTargets(root: string, entries: readonly AutoImport[]): Map<string, TypeTarget> {
+  const files = [...new Set(entries.filter((entry) => entry.typeOnly && !entry.specifier).map((entry) => entry.file))];
+  const targets = new Map<string, TypeTarget>();
+  if (files.length === 0) return targets;
+  const program = ts.createProgram({ rootNames: files, options: projectCompilerOptions(root) });
+  const checker = program.getTypeChecker();
+  for (const entry of entries) {
+    if (!entry.typeOnly || entry.specifier) continue;
+    const file = program.getSourceFile(entry.file);
+    const moduleSymbol = file && checker.getSymbolAtLocation(file);
+    const exported = moduleSymbol && checker.getExportsOfModule(moduleSymbol).find((symbol) => symbol.name === entry.imported);
+    if (!exported) continue;
+    const symbol = exported.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(exported) : exported;
+    const declaration = symbol.declarations?.[0];
+    if (!declaration) continue;
+    targets.set(`${entry.file}\0${entry.imported}`, {
+      file: declaration.getSourceFile().fileName,
+      imported: symbol.name,
+    });
   }
-  const parameters = `<${declaration.typeParameters.map((parameter) => parameter.getText(file)).join(", ")}>`;
-  const arguments_ = `<${declaration.typeParameters.map((parameter) => parameter.name.text).join(", ")}>`;
-  return `  type ${entry.name}${parameters} = import(${specifier}).${entry.imported}${arguments_};`;
+  return targets;
 }
 
 /** Produces global editor declarations for isolated app, server and shared TS projects. */
@@ -64,19 +107,37 @@ export async function generateAutoImportTypes(projectRoot: string): Promise<{ cl
   const root = resolve(projectRoot);
   const outputDirectory = join(root, ".meeko", "types", "autoimports");
   const registry = await discoverAutoImports(root);
+  const resolvedTypes = typeTargets(root, registry);
   await mkdir(outputDirectory, { recursive: true });
   const outputs = {} as { client: string; server: string; shared: string };
   for (const scope of ["client", "server", "shared"] as const) {
     const entries = scopeEntries(registry, scope);
     assertNoCollisions(entries, scope);
-    const declarations = await Promise.all(entries.sort((a, b) => a.name.localeCompare(b.name)).map(async (entry) => {
+    const typeModules = new Map<string, string>();
+    const imports: string[] = [];
+    const declarations = entries.sort((a, b) => a.name.localeCompare(b.name)).map((entry) => {
       const specifier = JSON.stringify(publicSpecifier(outputDirectory, entry));
-      if (entry.typeOnly) return typeDeclaration(entry, specifier);
+      if (entry.typeOnly) {
+        const resolvedTarget = resolvedTypes.get(`${entry.file}\0${entry.imported}`);
+        const target = resolvedTarget ?? entry;
+        const targetSpecifier = resolvedTarget
+          ? JSON.stringify(publicSpecifier(outputDirectory, { ...entry, ...resolvedTarget }))
+          : specifier;
+        let namespace = typeModules.get(targetSpecifier);
+        if (!namespace) {
+          namespace = `__meeko_type_${typeModules.size}`;
+          typeModules.set(targetSpecifier, namespace);
+          // A declaration-only namespace alias preserves the original symbol's
+          // generic parameters, including private constraints and defaults.
+          imports.push(`import * as ${namespace} from ${targetSpecifier};`);
+        }
+        return `  export import ${entry.name} = ${namespace}.${target.imported};`;
+      }
       const value = entry.component ? `typeof import(${specifier})` : `typeof import(${specifier})[${JSON.stringify(entry.imported)}]`;
       return `  const ${entry.name}: ${value};`;
-    }));
+    });
     const path = join(outputDirectory, `${scope}.d.ts`);
-    const source = ["// Generated by Meeko. Scope-specific editor declarations.", "export {};", "declare global {", ...declarations, "}", ""].join("\n");
+    const source = ["// Generated by Meeko. Scope-specific editor declarations.", ...imports, "export {};", "declare global {", ...declarations, "}", ""].join("\n");
     let previous: string | undefined;
     try { previous = await readFile(path, "utf8"); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
@@ -87,15 +148,12 @@ export async function generateAutoImportTypes(projectRoot: string): Promise<{ cl
 }
 
 /** Vite can call this for app/shared/server TypeScript before its normal TS transform. */
-export function transformTypeScriptAutoImports(source: string, filename: string, root: string, registry: readonly AutoImport[]): string | undefined {
-  const scope = typeScriptScope(root, filename);
+export function transformTypeScriptAutoImports(source: string, filename: string, root: string, registry: readonly AutoImport[], sourceRoots?: readonly string[]): string | undefined {
+  const scope = typeScriptScope(root, filename, sourceRoots);
   if (!scope) return undefined;
   if (scope === "shared") {
-    // A shared module must resolve identically from both client and server views.
-    const client = applyAutoImports(source, filename, registry, "client");
-    const server = applyAutoImports(source, filename, registry, "server");
-    if (client !== server) throw new Error(`Shared module ${filename} references an app or server autoimport`);
-    return client === source ? undefined : client;
+    const transformed = applyAutoImports(source, filename, registry, "shared");
+    return transformed === source ? undefined : transformed;
   }
   const transformed = applyAutoImports(source, filename, registry, scope);
   return transformed === source ? undefined : transformed;

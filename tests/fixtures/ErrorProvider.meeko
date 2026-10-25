@@ -1,0 +1,13 @@
+<script lang="ts">
+import type { ComponentErrorHandler } from "@meekojs/meeko";
+import * as AsyncEvent from "./AsyncEvent.meeko";
+
+interface Props {
+  onError: ComponentErrorHandler;
+}
+
+const props = defineProps<Props>();
+provideErrorHandler(props.onError);
+</script>
+
+<template><component is="AsyncEvent"></component></template>

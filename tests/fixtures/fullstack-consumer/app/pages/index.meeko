@@ -3,7 +3,7 @@ import { signal } from "@meekojs/meeko";
 
 export interface Props {
   params: Record<string, string>;
-  search: Record<string, string>;
+  search: Record<string, string | string[]>;
   data?: unknown;
 }
 

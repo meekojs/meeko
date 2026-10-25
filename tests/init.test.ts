@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { once } from "node:events";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import test from "node:test";
 
 test("CLI init creates an SSR project and refuses to overwrite it", async () => {
@@ -76,6 +78,62 @@ test("CLI init no transforma un proyecto que ya contiene código", async () => {
     assert.equal(await readFile(join(root, "package.json"), "utf8"), manifest);
     assert.equal(await readFile(join(root, "src", "index.ts"), "utf8"), "export const existing = true;\n");
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("CLI init genera un cierre observado que conserva fallos de servidor y Vite", async () => {
+  const root = await mkdtemp(join(tmpdir(), "meeko-init-shutdown-"));
+  const target = join(root, "starter-app");
+  let child: ReturnType<typeof spawn> | undefined;
+  try {
+    const initialized = spawnSync(process.execPath, [resolve("dist/cli.js"), "init", target], { encoding: "utf8" });
+    assert.equal(initialized.status, 0, initialized.stderr);
+    const viteRoot = join(target, "node_modules", "vite");
+    await mkdir(viteRoot, { recursive: true });
+    await writeFile(join(viteRoot, "package.json"), JSON.stringify({ name: "vite", type: "module", exports: "./index.js" }));
+    await writeFile(join(viteRoot, "index.js"), `
+export async function createServer() {
+  setTimeout(() => process.emit("SIGINT"), 100);
+  return {
+    middlewares(_request, _response, next) { next(); },
+    async ssrLoadModule() { throw new Error("unexpected SSR load"); },
+    async transformIndexHtml(_path, html) { return html; },
+    async close() { throw new Error("fake vite close failure"); },
+  };
+}
+`);
+    const preload = join(root, "fail-server-close.mjs");
+    await writeFile(preload, `
+import http from "node:http";
+import { syncBuiltinESMExports } from "node:module";
+const createServer = http.createServer;
+http.createServer = (...args) => {
+  const server = createServer(...args);
+  const close = server.close.bind(server);
+  server.close = (callback) => close(() => callback?.(new Error("fake server close failure")));
+  return server;
+};
+syncBuiltinESMExports();
+`);
+    child = spawn(process.execPath, ["--import", pathToFileURL(preload).href, join(target, "server.mjs")], {
+      cwd: target,
+      env: { ...process.env, PORT: "0" },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stderr = "";
+    child.stderr!.setEncoding("utf8");
+    child.stderr!.on("data", (chunk: string) => { stderr += chunk; });
+    const timeout = setTimeout(() => child?.kill(), 5_000);
+    const [code] = await once(child, "exit") as [number | null, NodeJS.Signals | null];
+    clearTimeout(timeout);
+    assert.equal(code, 1, stderr);
+    assert.match(stderr, /Meeko server shutdown failed/);
+    assert.match(stderr, /fake server close failure/);
+    assert.match(stderr, /fake vite close failure/);
+    assert.doesNotMatch(stderr, /UnhandledPromiseRejection|triggerUncaughtException/);
+  } finally {
+    if (child?.exitCode === null) child.kill();
     await rm(root, { recursive: true, force: true });
   }
 });

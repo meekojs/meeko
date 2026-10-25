@@ -6,6 +6,7 @@ import { href, matchRoute } from "./router.js";
 import type { RouteRecord } from "./router.js";
 import { createFrameworkHandler } from "./server.js";
 import { discoverConfiguredRoutes } from "./config.js";
+import { stylesheetLinks } from "./styles.js";
 import type { PageModule, PageRoute } from "./server.js";
 
 export interface PrerenderOptions {
@@ -68,14 +69,17 @@ export async function prerenderRoutes(options: PrerenderOptions): Promise<string
 export async function prerenderProject(projectRoot: string): Promise<string[]> {
   const root = resolve(projectRoot);
   const manifestFile = resolve(root, ".meeko/output/client/.vite/manifest.json");
-  let manifest: Record<string, { file?: string }>;
+  let manifest: Record<string, { file?: string; css?: string[] }>;
   try {
     manifest = JSON.parse(await readFile(manifestFile, "utf8")) as Record<string, { file?: string }>;
   } catch {
     throw new Error("Client build manifest is missing; run the client build before prerender");
   }
-  const entry = manifest["app/entry-client.ts"]?.file;
-  if (!entry) throw new Error("Client build manifest has no app/entry-client.ts entry");
+  const entry = manifest[".meeko/generated/entry-client.ts"]?.file
+    ?? manifest["app/entry-client.ts"]?.file;
+  if (!entry) throw new Error("Client build manifest has no Meeko client entry");
+  const entryManifest = manifest[".meeko/generated/entry-client.ts"] ?? manifest["app/entry-client.ts"];
+  const globalStyles = stylesheetLinks((entryManifest?.css ?? []).map((file) => "/" + file));
   const serverBundle = resolve(root, ".meeko/output/server/entry.js");
   let server: {
     loadPage(root: string, file: string): Promise<PageModule>;
@@ -83,8 +87,8 @@ export async function prerenderProject(projectRoot: string): Promise<string[]> {
   };
   try {
     server = await import(pathToFileURL(serverBundle).href) as typeof server;
-  } catch {
-    throw new Error("Server build is missing; run the server build before prerender");
+  } catch (error) {
+    throw new Error(`Cannot load the server build at ${serverBundle}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
   }
   if (typeof server.loadPage !== "function" || typeof server.loadRoute !== "function") {
     throw new Error("Server build does not expose the Meeko prerender loaders");
@@ -102,7 +106,9 @@ export async function prerenderProject(projectRoot: string): Promise<string[]> {
   return await prerenderRoutes({
     routes, handler, loadRoute,
     outputRoot: resolve(root, ".meeko/output/prerender"),
-    transformHtml: (html) => html.replace("</body>", `<script id="meeko-routes" type="application/json">${serializeJson(portable)}</script></body>`),
+    transformHtml: (html) => html
+      .replace("</head>", `${globalStyles}</head>`)
+      .replace("</body>", `<script id="meeko-routes" type="application/json">${serializeJson(portable)}</script></body>`),
   });
 }
 

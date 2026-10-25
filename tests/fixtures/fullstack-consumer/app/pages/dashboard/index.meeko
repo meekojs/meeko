@@ -1,7 +1,7 @@
 <script lang="ts">
 export interface Props {
   params: Record<string, string>;
-  search: Record<string, string>;
+  search: Record<string, string | string[]>;
   data?: { id: string; name: string };
 }
 const props = defineProps<Props>();

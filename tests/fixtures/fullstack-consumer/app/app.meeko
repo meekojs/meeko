@@ -1,8 +1,8 @@
 <script lang="ts">
-import type { ComponentModule } from "@meekojs/meeko";
+import type { Component } from "@meekojs/meeko";
 
 export interface Props {
-  outlet: ComponentModule<Record<string, unknown>>;
+  outlet: Component<Record<string, unknown>>;
 }
 
 const props = defineProps<Props>();

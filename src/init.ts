@@ -128,7 +128,33 @@ const server = createServer(async (request, response) => {
 
 const port = Number(process.env.PORT ?? 4173);
 server.listen(port, "127.0.0.1", () => console.log("http://127.0.0.1:" + port));
-process.on("SIGINT", () => { server.close(); void vite?.close(); });
+let shutdownPromise;
+const closeServer = () => new Promise((resolveClose, rejectClose) => {
+  server.close((error) => error ? rejectClose(error) : resolveClose());
+});
+async function shutdown() {
+  if (shutdownPromise) return shutdownPromise;
+  shutdownPromise = (async () => {
+    const results = await Promise.allSettled([
+      closeServer(),
+      vite?.close() ?? Promise.resolve(),
+    ]);
+    const failures = results.flatMap((result) => result.status === "rejected" ? [result.reason] : []);
+    if (failures.length === 1) throw failures[0];
+    if (failures.length > 1) throw new AggregateError(failures, "Meeko server shutdown failed");
+  })();
+  return shutdownPromise;
+}
+const onSignal = () => {
+  process.off("SIGINT", onSignal);
+  process.off("SIGTERM", onSignal);
+  void shutdown().catch((error) => {
+    try { console.error("Meeko server shutdown failed", error); }
+    finally { process.exitCode = 1; }
+  });
+};
+process.once("SIGINT", onSignal);
+process.once("SIGTERM", onSignal);
 `,
   "README.md": `# Meeko SSR starter
 

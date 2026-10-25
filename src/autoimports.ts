@@ -8,7 +8,7 @@ import { projectRoot } from "./compiler/project-root.js";
 import { parseSfc } from "./compiler/sfc.js";
 import { loadMeekoConfig, readMeekoConfigSync, resolveConfigSources } from "./framework/config.js";
 
-export type ImportScope = "client" | "server" | "shared";
+export type ImportScope = "client" | "server" | "shared" | "app";
 export interface AutoImport {
   name: string;
   imported: string;
@@ -30,7 +30,8 @@ function scopeOf(file: string): ImportScope {
   if (/\.server\.[cm]?tsx?$/.test(file)) return "server";
   if (/\.client\.[cm]?tsx?$/.test(file)) return "client";
   if (file.includes(`${sep}server${sep}`)) return "server";
-  if (file.includes(`${sep}app${sep}`)) return "client";
+  // App modules render on both sides during SSR, but are not available to shared/ sources.
+  if (file.includes(`${sep}app${sep}`)) return "app";
   return "shared";
 }
 
@@ -60,7 +61,7 @@ function filesInSync(path: string): string[] {
 
 function builtins(root: string): AutoImport[] {
   const entries: AutoImport[] = [
-    ...["signal", "computed", "effect", "batch", "onCleanup", "provide", "inject", "createContext"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko", specifier: "@meekojs/meeko", scope: "shared", typeOnly: false, component: false })),
+    ...["signal", "computed", "effect", "batch", "onCleanup", "provide", "inject", "createContext", "provideErrorHandler"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko", specifier: "@meekojs/meeko", scope: "shared", typeOnly: false, component: false })),
     ...["useState", "href"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "shared", typeOnly: false, component: false })),
   ];
   for (const scope of ["client", "server"] as const) {
@@ -74,28 +75,43 @@ function builtins(root: string): AutoImport[] {
   return entries;
 }
 
+function addAutoImport(result: AutoImport[], entry: AutoImport): void {
+  const previous = result.find((candidate) => candidate.name === entry.name
+    && candidate.imported === entry.imported
+    && candidate.file === entry.file
+    && candidate.scope === entry.scope
+    && candidate.component === entry.component);
+  if (!previous) {
+    result.push(entry);
+    return;
+  }
+  // Function overloads and declaration merging describe one exported symbol.
+  // Prefer the value-bearing form when a type and value share that symbol.
+  if (previous.typeOnly && !entry.typeOnly) previous.typeOnly = false;
+}
+
 function addFileImports(result: AutoImport[], root: string, directory: string, file: string, source?: string): void {
   const scope = scopeOf(file);
   if (extname(file) === ".meeko") {
     if (directory !== "app/components") return;
     const path = relative(join(root, directory), file).replace(/\.meeko$/, "");
     const name = path.split(/[\\/]/).map((part) => part.replace(/(^|[-_])(\w)/g, (_, _dash: string, letter: string) => letter.toUpperCase())).join("");
-    result.push({ name, imported: "*", file, scope, typeOnly: false, component: true });
+    addAutoImport(result, { name, imported: "*", file, scope, typeOnly: false, component: true });
     return;
   }
   const ast = ts.createSourceFile(file, source ?? "", ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   for (const statement of ast.statements) {
     const exported = ts.canHaveModifiers(statement) && ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
     if (exported && (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement) || ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement) || ts.isEnumDeclaration(statement)) && statement.name) {
-      result.push({ name: statement.name.text, imported: statement.name.text, file, scope, typeOnly: ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement), component: false });
+      addAutoImport(result, { name: statement.name.text, imported: statement.name.text, file, scope, typeOnly: ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement), component: false });
     }
     if (exported && ts.isVariableStatement(statement)) {
       for (const declaration of statement.declarationList.declarations) if (ts.isIdentifier(declaration.name)) {
-        result.push({ name: declaration.name.text, imported: declaration.name.text, file, scope, typeOnly: false, component: false });
+        addAutoImport(result, { name: declaration.name.text, imported: declaration.name.text, file, scope, typeOnly: false, component: false });
       }
     }
     if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
-      for (const element of statement.exportClause.elements) result.push({ name: element.name.text, imported: element.name.text, file, scope, typeOnly: statement.isTypeOnly || element.isTypeOnly, component: false });
+      for (const element of statement.exportClause.elements) addAutoImport(result, { name: element.name.text, imported: element.name.text, file, scope, typeOnly: statement.isTypeOnly || element.isTypeOnly, component: false });
     }
   }
 }
@@ -208,7 +224,7 @@ function isReference(node: ts.Identifier): boolean {
 }
 
 /** Añade imports ESM para referencias libres del módulo generado. */
-export function applyAutoImports(code: string, filename: string, registry: readonly AutoImport[], target: "client" | "server"): string {
+export function applyAutoImports(code: string, filename: string, registry: readonly AutoImport[], target: "client" | "server" | "shared"): string {
   const ast = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const referenced = new Set<string>();
   const visit = (node: ts.Node, scopes: readonly Set<string>[]): void => {
@@ -221,7 +237,7 @@ export function applyAutoImports(code: string, filename: string, registry: reado
   for (const name of [...referenced].sort()) {
     const candidates = registry.filter((entry) => entry.name === name);
     if (candidates.length === 0) continue;
-    const allowed = candidates.filter((entry) => entry.scope === "shared" || entry.scope === target);
+    const allowed = candidates.filter((entry) => entry.scope === "shared" || entry.scope === target || (target !== "shared" && entry.scope === "app"));
     if (allowed.length === 0) throw new Error(`Autoimport ${name} is unavailable in ${target} scope`);
     if (allowed.length > 1) throw new Error(`Ambiguous autoimport ${name}: ${allowed.map((entry) => entry.file).join(", ")}`);
     const entry = allowed[0]!;
