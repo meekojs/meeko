@@ -194,4 +194,4 @@ Las pruebas E2E se ejecutan con Chrome y con Chromium, Firefox y WebKit de Playw
 
 ## Seguridad
 
-El repositorio todavía no tiene un `SECURITY.md` con un canal privado para informar vulnerabilidades. Mientras no exista, no publique los detalles de una vulnerabilidad en un issue abierto: abra un issue en [meekojs/meeko](https://github.com/meekojs/meeko/issues) pidiendo un canal privado, sin incluir esos detalles.
+Las vulnerabilidades se informan de forma privada desde la pestaña **Security** de [meekojs/meeko](https://github.com/meekojs/meeko/security/advisories/new), nunca en un issue abierto. [SECURITY.md](../SECURITY.md) detalla las versiones con soporte, qué incluir en el informe y los plazos de respuesta.
