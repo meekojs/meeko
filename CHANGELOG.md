@@ -1,5 +1,9 @@
 # Cambios de Meeko
 
+## [1.0.0] - 2026-10-25
+
+Primera versión estable. El código es el de `1.0.0-rc.1`, sin cambios; los cambios respecto a `0.1.0` se recogen en la sección siguiente y en la [guía de migración](docs/migration-1.0.md). Desde esta versión, Meeko sigue SemVer según [docs/stability.md](docs/stability.md).
+
 ## [1.0.0-rc.1] - 2026-10-25
 
 Primera versión estable candidata. Desde 1.0, Meeko sigue SemVer según [docs/stability.md](docs/stability.md); la guía [docs/migration-1.0.md](docs/migration-1.0.md) recoge la migración desde `0.1.0`.
