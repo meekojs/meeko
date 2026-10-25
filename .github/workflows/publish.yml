@@ -41,7 +41,7 @@ jobs:
           MEEKO_REDIS_URL: redis://127.0.0.1:6379
       - name: Redis diagnostic log on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: meeko-publish-redis-log
           path: .meeko/ci-logs/redis.log
@@ -132,7 +132,7 @@ jobs:
           ./tests/fullstack-consumer.ps1 -Tarball $tarballs[0].FullName
       - name: Diagnostic logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: meeko-publish-gate-logs
           path: .meeko/ci-logs/
