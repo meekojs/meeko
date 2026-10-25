@@ -1,4 +1,7 @@
-import type { DevtoolsEvent, DevtoolsHook, DevtoolsInstance } from "../devtools.js";
+import type { DevtoolsEvent, DevtoolsHook, DevtoolsInstance, DevtoolsProtocolVersion, DevtoolsReadSite, DevtoolsSnapshot, DevtoolsWriteSite } from "../devtools.js";
+
+/** Versión del protocolo que entiende este panel; el tipo obliga a revisarlo si el protocolo cambia. */
+const supportedProtocolVersion: DevtoolsProtocolVersion = 1;
 
 /** Opciones de montaje del panel integrado de desarrollo. */
 export interface DevtoolsPanelOptions {
@@ -50,6 +53,16 @@ pre { margin: 4px 0 0; padding: 8px; max-height: 130px; overflow: auto; border-r
 .event-reads li { overflow-wrap: anywhere; }
 .event-reads code { color: #dbeafe; }
 .events li { overflow-wrap: anywhere; }
+.event-write { margin: 4px 0 0; color: #aab7ca; overflow-wrap: anywhere; }
+.event-write code { color: #dbeafe; }
+.editor { display: grid; gap: 6px; margin-top: 12px; }
+.editor label { color: #aab7ca; }
+.editor select, .editor textarea { width: 100%; border: 1px solid #52657d; border-radius: 6px; background: #0a111e; color: #dbeafe; font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace; padding: 6px 8px; }
+.editor textarea { min-height: 72px; resize: vertical; }
+.editor select:focus-visible, .editor textarea:focus-visible { outline: 2px solid #79b8ff; outline-offset: 2px; }
+.editor-message { margin: 0; min-height: 1.45em; }
+.editor-message[data-state="error"] { color: #fca5a5; }
+.editor-message[data-state="ok"] { color: #86efac; }
 .status { padding: 7px 12px; border-top: 1px solid #334155; color: #aab7ca; }
 @media (max-width: 540px) {
   .mobile-switch { display: flex; }
@@ -104,6 +117,32 @@ function eventLabel(event: DevtoolsEvent): string {
   const file = event.file ? ` · ${event.file}` : "";
   const value = event.kind === "signal" && "value" in event ? ` → ${formatValue(event.value).replace(/\s+/g, " ").slice(0, 240)}` : "";
   return `${time} · ${kinds[event.kind]} · ${event.instanceId}${source}${file}${detail}${value}`;
+}
+
+const readKinds: Record<DevtoolsReadSite["kind"], string> = {
+  text: "texto",
+  attribute: "atributo",
+  computed: "computed",
+  if: "if:when",
+  each: "each:of",
+  prop: "prop",
+};
+
+/** Describe la construcción que lee la señal, incluida la prop concreta de un hijo. */
+function readKindLabel(read: DevtoolsReadSite): string {
+  return read.kind === "prop" && read.name ? `prop ${read.name}` : readKinds[read.kind] ?? read.kind;
+}
+
+/** Texto del origen de una escritura conocida. */
+function writeLabel(write: DevtoolsWriteSite): string {
+  return write.kind === "devtools" ? "Escrita desde DevTools" : `Escrita en ${write.file}:${write.line}:${write.column}`;
+}
+
+/** Mensaje para un hook o captura con una versión de protocolo distinta de la admitida. */
+function protocolMismatch(version: unknown): string | undefined {
+  if (version === supportedProtocolVersion) return undefined;
+  if (version === undefined) return `El runtime de la página no declara versión de protocolo (Meeko anterior a 1.0). Este panel admite la versión ${supportedProtocolVersion}; actualiza @meekojs/meeko.`;
+  return `Versión de protocolo DevTools no compatible: la página usa ${typeof version === "number" ? version : JSON.stringify(version)} y este panel admite ${supportedProtocolVersion}. Usa el mismo @meekojs/meeko para el panel y la aplicación.`;
 }
 
 /** Exige un documento conectado a una ventana para registrar eventos del hook. */
@@ -180,6 +219,40 @@ export function mountDevtoolsPanel(options: DevtoolsPanelOptions = {}): Devtools
   let highlightedId: string | null = null;
   let mounted = true;
   let mobileView: "instances" | "detail" = "instances";
+  /** Estado del editor de señales; sobrevive a las reconstrucciones provocadas por cada notificación. */
+  const editor: { instanceId: string; name: string; text: string; dirty: boolean; message: string; state: "" | "ok" | "error" } = {
+    instanceId: "", name: "", text: "", dirty: false, message: "", state: "",
+  };
+
+  /** Valida el JSON escrito y lo envía al runtime; los errores se muestran junto al editor. */
+  function applyEdit(instanceId: string): void {
+    let value: unknown;
+    try {
+      value = JSON.parse(editor.text);
+    } catch (error) {
+      editor.message = `JSON no válido: ${error instanceof Error ? error.message : String(error)}`;
+      editor.state = "error";
+      render();
+      return;
+    }
+    let result: ReturnType<DevtoolsHook["setSignal"]>;
+    try {
+      result = typeof hook?.setSignal === "function"
+        ? hook.setSignal(instanceId, editor.name, value as Parameters<DevtoolsHook["setSignal"]>[2])
+        : { ok: false, error: "el runtime de la página no permite editar señales" };
+    } catch (error) {
+      result = { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+    if (result.ok) {
+      editor.dirty = false;
+      editor.message = `Señal ${editor.name} actualizada.`;
+      editor.state = "ok";
+    } else {
+      editor.message = `No se pudo editar ${editor.name}: ${result.error}`;
+      editor.state = "error";
+    }
+    render();
+  }
 
   /** Cambia la vista móvil y comunica el botón activo a tecnologías de asistencia. */
   function showMobileView(next: "instances" | "detail"): void {
@@ -193,39 +266,58 @@ export function mountDevtoolsPanel(options: DevtoolsPanelOptions = {}): Devtools
   instancesButton.addEventListener("click", () => showMobileView("instances"));
   detailButton.addEventListener("click", () => showMobileView("detail"));
 
-  /** Conserva el foco al reconstruir una fila después de recibir una notificación. */
-  function restoreFocus(id: string | undefined, action: string | undefined): void {
+  /** Conserva el foco y la selección de texto al reconstruir el panel después de una notificación. */
+  function restoreFocus(id: string | undefined, action: string | undefined, selection: [number, number] | undefined): void {
     if (!id || !action) return;
-    for (const button of shadow.querySelectorAll<HTMLButtonElement>("button[data-instance-id]")) {
-      if (button.dataset.instanceId === id && button.dataset.action === action) {
-        button.focus();
+    for (const control of shadow.querySelectorAll<HTMLElement>("[data-instance-id][data-action]")) {
+      if (control.dataset.instanceId === id && control.dataset.action === action) {
+        control.focus();
+        if (selection && control.tagName === "TEXTAREA") (control as HTMLTextAreaElement).setSelectionRange(...selection);
         break;
       }
     }
   }
 
+  /** Muestra un estado sin datos en las tres zonas del panel. */
+  function renderUnavailable(message: string, detail: string): void {
+    status.textContent = message;
+    instancesList.append(element(ownerDocument, "li", "No hay instancias disponibles.", "muted"));
+    detailSection.append(element(ownerDocument, "p", detail));
+    eventsList.append(element(ownerDocument, "li", "Sin eventos.", "muted"));
+  }
+
   /** Reconstruye sólo el contenido variable usando nodos de texto seguros. */
   function render(): void {
     if (!mounted) return;
-    const active = shadow.activeElement as HTMLButtonElement | null;
+    const active = shadow.activeElement as HTMLElement | null;
     const focusId = active?.dataset.instanceId;
     const focusAction = active?.dataset.action;
+    const focusSelection: [number, number] | undefined = active?.tagName === "TEXTAREA"
+      ? [(active as HTMLTextAreaElement).selectionStart, (active as HTMLTextAreaElement).selectionEnd]
+      : undefined;
     instancesList.replaceChildren();
     detailSection.replaceChildren();
     eventsList.replaceChildren();
     if (!hook) {
-      status.textContent = "Hook no disponible. Abre una página Meeko con Vite en desarrollo y pulsa Actualizar.";
-      instancesList.append(element(ownerDocument, "li", "No hay instancias disponibles.", "muted"));
-      detailSection.append(element(ownerDocument, "p", "El runtime de desarrollo aún no está conectado."));
-      eventsList.append(element(ownerDocument, "li", "Sin eventos.", "muted"));
+      renderUnavailable("Hook no disponible. Abre una página Meeko con Vite en desarrollo y pulsa Actualizar.", "El runtime de desarrollo aún no está conectado.");
+      return;
+    }
+    const hookMismatch = protocolMismatch(hook.protocolVersion);
+    if (hookMismatch) {
+      renderUnavailable(hookMismatch, "El panel no lee datos de un protocolo que no conoce.");
       return;
     }
 
-    let snapshot: ReturnType<DevtoolsHook["snapshot"]>;
+    let snapshot: DevtoolsSnapshot;
     try {
       snapshot = hook.snapshot();
     } catch (error) {
       status.textContent = `No se pudo leer el hook: ${error instanceof Error ? error.message : String(error)}`;
+      return;
+    }
+    const snapshotMismatch = protocolMismatch(snapshot.protocolVersion);
+    if (snapshotMismatch) {
+      renderUnavailable(snapshotMismatch, "El panel no lee datos de un protocolo que no conoce.");
       return;
     }
     status.textContent = `${snapshot.instances.length} instancia(s) · ${snapshot.events.length} evento(s)`;
@@ -288,6 +380,7 @@ export function mountDevtoolsPanel(options: DevtoolsPanelOptions = {}): Devtools
       });
       actions.append(highlightButton, breakpointButton);
       detailSection.append(actions, element(ownerDocument, "h3", "Props"), element(ownerDocument, "pre", formatValue(selected.props)), element(ownerDocument, "h3", "Señales"), element(ownerDocument, "pre", formatValue(selected.signals)));
+      appendEditor(selected);
     } else {
       detailSection.append(element(ownerDocument, "p", "Selecciona una instancia para ver props y señales."));
     }
@@ -312,13 +405,18 @@ export function mountDevtoolsPanel(options: DevtoolsPanelOptions = {}): Devtools
       } else {
         row.textContent = label;
       }
+      if (event.kind === "signal" && event.write) {
+        const write = element(ownerDocument, "p", writeLabel(event.write), "event-write");
+        if (event.write.kind === "assignment") write.append(element(ownerDocument, "span", ": "), element(ownerDocument, "code", event.write.expression));
+        row.append(write);
+      }
       if (event.kind === "signal" && event.reads?.length) {
         const sites = element(ownerDocument, "details", undefined, "event-reads");
-        sites.append(element(ownerDocument, "summary", `${event.reads.length} expresión(es) que dependen de la señal`));
+        sites.append(element(ownerDocument, "summary", `${event.reads.length} lectura(s) que dependen de la señal`));
         const list = element(ownerDocument, "ul");
         for (const read of event.reads) {
           const usage = element(ownerDocument, "li");
-          usage.append(element(ownerDocument, "code", `${read.file}:${read.line}:${read.column}`), element(ownerDocument, "span", ` ${read.kind}: `), element(ownerDocument, "code", read.expression));
+          usage.append(element(ownerDocument, "code", `${read.file}:${read.line}:${read.column}`), element(ownerDocument, "span", ` ${readKindLabel(read)}: `), element(ownerDocument, "code", read.expression));
           list.append(usage);
         }
         sites.append(list);
@@ -326,7 +424,66 @@ export function mountDevtoolsPanel(options: DevtoolsPanelOptions = {}): Devtools
       }
       eventsList.append(row);
     }
-    restoreFocus(focusId, focusAction);
+    restoreFocus(focusId, focusAction, focusSelection);
+  }
+
+  /** Editor JSON de las señales editables de la instancia seleccionada. */
+  function appendEditor(selected: DevtoolsInstance): void {
+    const names = Object.keys(selected.signals);
+    if (editor.instanceId !== selected.id) {
+      Object.assign(editor, { instanceId: selected.id, name: names[0] ?? "", text: "", dirty: false, message: "", state: "" });
+    }
+    if (!names.includes(editor.name)) {
+      editor.name = names[0] ?? "";
+      editor.dirty = false;
+    }
+    if (names.length === 0) return;
+    const form = element(ownerDocument, "form", undefined, "editor");
+    form.setAttribute("aria-label", "Editar señal");
+    form.noValidate = true;
+    const nameLabel = element(ownerDocument, "label", "Señal");
+    const select = element(ownerDocument, "select");
+    select.id = "meeko-devtools-edit-name";
+    nameLabel.htmlFor = select.id;
+    select.dataset.instanceId = selected.id;
+    select.dataset.action = "edit-name";
+    for (const name of names) {
+      const option = element(ownerDocument, "option", name);
+      option.value = name;
+      select.append(option);
+    }
+    select.value = editor.name;
+    const valueLabel = element(ownerDocument, "label", "Nuevo valor (JSON)");
+    const textarea = element(ownerDocument, "textarea");
+    textarea.id = "meeko-devtools-edit-value";
+    valueLabel.htmlFor = textarea.id;
+    textarea.spellcheck = false;
+    textarea.dataset.instanceId = selected.id;
+    textarea.dataset.action = "edit-value";
+    if (!editor.dirty) editor.text = JSON.stringify(selected.signals[editor.name], null, 2) ?? "null";
+    textarea.value = editor.text;
+    const hint = element(ownerDocument, "p", "Sustituye el valor completo de la señal. El valor mostrado es una copia acotada.", "muted");
+    const apply = element(ownerDocument, "button", "Aplicar");
+    apply.type = "submit";
+    apply.dataset.instanceId = selected.id;
+    apply.dataset.action = "edit-apply";
+    const message = element(ownerDocument, "p", editor.message, "editor-message");
+    message.setAttribute("role", editor.state === "error" ? "alert" : "status");
+    if (editor.state) message.dataset.state = editor.state;
+    select.addEventListener("change", () => {
+      Object.assign(editor, { name: select.value, dirty: false, message: "", state: "" });
+      render();
+    });
+    textarea.addEventListener("input", () => {
+      editor.text = textarea.value;
+      editor.dirty = true;
+    });
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      applyEdit(selected.id);
+    });
+    form.append(element(ownerDocument, "h3", "Editar señal"), nameLabel, select, valueLabel, textarea, hint, apply, message);
+    detailSection.append(form);
   }
 
   /** Descubre el hook al inicio, al recibir el evento de disponibilidad o al pulsar Actualizar. */

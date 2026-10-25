@@ -1,13 +1,46 @@
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 import { Window } from "happy-dom";
 import { compile } from "../src/compiler.ts";
-import { registerDevtoolsInstance } from "../src/devtools.ts";
-import type { DevtoolsHook } from "../src/devtools.ts";
+import { DEVTOOLS_PROTOCOL_VERSION, devtoolsUpdate, devtoolsWrite, registerDevtoolsInstance } from "../src/devtools.ts";
+import type { DevtoolsAssignmentSite, DevtoolsEvent, DevtoolsHook } from "../src/devtools.ts";
 import { bindAttribute, bindText } from "../src/dom.ts";
 import { enableHotModule, registerHotInstance, replaceHotModule } from "../src/hmr.ts";
 import type { HotComponent, HotState } from "../src/hmr.ts";
-import { createRoot, signal } from "../src/reactivity.ts";
+import { batch, computed, createRoot, effect, signal } from "../src/reactivity.ts";
+
+interface CompiledFixture {
+  renderToString(props: Record<string, never>): string;
+  hydrate(root: Element, props: Record<string, never>): () => void;
+}
+
+const fixtureDirectory = resolve("tests/fixtures/devtools");
+const devtoolsInstrumentation = /trackReadSite|withReadSite|devtoolsWrite|devtoolsUpdate|registerDevtoolsInstance/;
+
+/** Compila los fixtures DevTools contra el runtime fuente para compartir el mismo hook que la prueba. */
+async function loadFixture(hot: boolean): Promise<{ component: CompiledFixture; cleanup: () => Promise<void> }> {
+  const directory = await mkdtemp(join(tmpdir(), "meeko-devtools-"));
+  const runtime = (path: string): string => JSON.stringify(pathToFileURL(resolve(path)).href);
+  for (const name of ["Locations", "Child"]) {
+    const filename = join(fixtureDirectory, `${name}.meeko`);
+    const code = compile(await readFile(filename, "utf8"), filename, { hot }).code
+      .replace(`from "@meekojs/meeko/internal"`, `from ${runtime("src/internal.ts")}`)
+      .replace(`from "@meekojs/meeko"`, `from ${runtime("src/index.ts")}`)
+      .replace(`from "./Child.meeko"`, `from "./Child.ts"`);
+    await writeFile(join(directory, `${name}.ts`), code);
+  }
+  const component = await import(pathToFileURL(join(directory, "Locations.ts")).href) as CompiledFixture;
+  return { component, cleanup: () => rm(directory, { recursive: true, force: true }) };
+}
+
+function assignment(event: DevtoolsEvent | undefined): DevtoolsAssignmentSite {
+  assert.equal(event?.write?.kind, "assignment", JSON.stringify(event));
+  return event!.write as DevtoolsAssignmentSite;
+}
 
 /** Sustituye temporalmente las clases DOM globales durante una prueba de navegador. */
 async function withBrowser<T>(window: Window, run: () => T | Promise<T>): Promise<T> {
@@ -284,4 +317,223 @@ test("a rejecting DevTools subscriber is reported without stopping other subscri
   } finally {
     browser.happyDOM.abort();
   }
+});
+
+test("el hook y cada captura declaran la versión 1 del protocolo", async () => {
+  const browser = new Window();
+  try {
+    await withBrowser(browser, () => {
+      const root = browser.document.createElement("div") as unknown as Element;
+      const release = registerDevtoolsInstance({ componentId: "v", name: "Versioned", file: "Versioned.meeko", scope: { root }, props: {}, bindings: {} });
+      const hook = Reflect.get(browser, "__MEEKO_DEVTOOLS__") as DevtoolsHook;
+      assert.equal(DEVTOOLS_PROTOCOL_VERSION, 1);
+      assert.equal(hook.protocolVersion, 1);
+      assert.equal(hook.snapshot().protocolVersion, 1);
+      release();
+    });
+  } finally {
+    browser.happyDOM.abort();
+  }
+});
+
+test("setSignal edita señales editables, informa errores y marca la escritura como edición de DevTools", async () => {
+  const browser = new Window();
+  try {
+    await withBrowser(browser, () => {
+      const root = browser.document.createElement("div");
+      root.innerHTML = "<!--meeko:text:0-->1";
+      const count = signal<unknown>(1);
+      const doubled = computed(() => Number(count.value) * 2);
+      const release = createRoot((dispose) => {
+        const stopText = bindText({ root: root as unknown as Element }, 0, () => typeof count.value === "number" ? count.value : "object", "Edit.meeko:1:1");
+        const stop = registerDevtoolsInstance({ componentId: "edit", name: "Edit", file: "Edit.meeko", scope: { root: root as unknown as Element }, props: {}, bindings: { count, doubled, helper: () => 1 } });
+        return () => { stopText(); stop(); dispose(); };
+      });
+      const hook = Reflect.get(browser, "__MEEKO_DEVTOOLS__") as DevtoolsHook;
+      const id = hook.snapshot().instances[0]!.id;
+      assert.deepEqual(hook.setSignal(id, "count", 5), { ok: true });
+      assert.equal(count.value, 5);
+      assert.equal(root.textContent, "5");
+      assert.equal(doubled.value, 10);
+      const edited = hook.snapshot().events.at(-1);
+      assert.equal(edited?.kind, "signal");
+      assert.equal(edited?.value, 5);
+      assert.deepEqual(edited?.write, { kind: "devtools" });
+      assert.deepEqual(hook.setSignal(id, "count", { nested: [1, "two", null, true] }), { ok: true });
+      assert.deepEqual(count.value, { nested: [1, "two", null, true] });
+      assert.equal(root.textContent, "object");
+      const before = hook.snapshot().events.length;
+      assert.deepEqual(hook.setSignal(id, "count", count.value as never), { ok: true });
+      assert.equal(hook.snapshot().events.length, before);
+      const failures = [
+        hook.setSignal("missing", "count", 1),
+        hook.setSignal(id, "doubled", 1),
+        hook.setSignal(id, "helper", 1),
+        hook.setSignal(id, "toString", 1),
+        hook.setSignal(id, "count", Number.NaN),
+        hook.setSignal(id, "count", (() => 1) as unknown as number),
+        hook.setSignal(id, "count", new Date() as unknown as string),
+        hook.setSignal(id, "count", [undefined] as unknown as null[]),
+      ];
+      const errors = failures.map((failure) => failure.ok ? "" : failure.error);
+      assert.ok(errors.every((error) => error.length > 0), JSON.stringify(errors));
+      assert.match(errors[0]!, /Unknown Meeko instance/);
+      assert.match(errors[1]!, /no writable signal named "doubled"/);
+      assert.match(errors[3]!, /no writable signal named "toString"/);
+      assert.match(errors[4]!, /Invalid JSON value/);
+      assert.deepEqual(count.value, { nested: [1, "two", null, true] });
+      release();
+      assert.equal(hook.setSignal(id, "count", 1).ok, false);
+    });
+  } finally {
+    browser.happyDOM.abort();
+  }
+});
+
+test("las escrituras instrumentadas se atribuyen sólo a la señal y al valor que escribieron", async () => {
+  const browser = new Window();
+  try {
+    await withBrowser(browser, async () => {
+      const root = browser.document.createElement("div") as unknown as Element;
+      const count = signal(0);
+      const other = signal(0);
+      const release = registerDevtoolsInstance({ componentId: "writes", name: "Writes", file: "Writes.meeko", scope: { root }, props: {}, bindings: { count, other } });
+      const hook = Reflect.get(browser, "__MEEKO_DEVTOOLS__") as DevtoolsHook;
+      const site: DevtoolsAssignmentSite = { kind: "assignment", file: "Writes.meeko", line: 3, column: 5, expression: "count.value = 1" };
+      const last = (name: string) => hook.snapshot().events.filter((event) => event.kind === "signal" && event.detail === name).at(-1);
+      count.value = devtoolsWrite(count, site, 1);
+      assert.deepEqual(last("count")?.write, site);
+      // Una escritura sin cambio no deja un origen pendiente para la siguiente escritura no instrumentada.
+      count.value = devtoolsWrite(count, site, 1);
+      count.value = 2;
+      assert.equal(last("count")?.value, 2);
+      assert.equal(last("count")?.write, undefined);
+      batch(() => { count.value = devtoolsWrite(count, site, 3); });
+      assert.equal(last("count")?.value, 3);
+      assert.deepEqual(last("count")?.write, site);
+      const updateSite: DevtoolsAssignmentSite = { ...site, expression: "count.value++" };
+      assert.equal(devtoolsUpdate(count, updateSite, () => count.value++), 3);
+      assert.equal(count.value, 4);
+      assert.deepEqual(last("count")?.write, updateSite);
+      // Una cascada que escribe otra señal no hereda el origen de la primera.
+      const stopCascade = effect(() => { other.value = count.value * 10; });
+      count.value = devtoolsWrite(count, site, 5);
+      assert.equal(last("other")?.value, 50);
+      assert.equal(last("other")?.write, undefined);
+      assert.deepEqual(last("count")?.write, site);
+      stopCascade();
+      // El origen caduca al terminar la tarea síncrona.
+      count.value = devtoolsWrite(count, site, 6);
+      await Promise.resolve();
+      count.value = 5;
+      count.value = 6;
+      assert.equal(last("count")?.write, undefined);
+      const plain = { value: 1 };
+      assert.equal(devtoolsWrite(plain, site, 2), 2);
+      assert.equal(devtoolsUpdate(plain, site, () => plain.value++), 1);
+      release();
+    });
+  } finally {
+    browser.happyDOM.abort();
+  }
+});
+
+test("una compilación hot registra lecturas de computed, if, each y props y escrituras .value", async () => {
+  const { component, cleanup } = await loadFixture(true);
+  const browser = new Window();
+  try {
+    await withBrowser(browser, async () => {
+      const root = browser.document.createElement("main");
+      browser.document.body.appendChild(root);
+      root.innerHTML = component.renderToString({});
+      const release = component.hydrate(root as unknown as Element, {});
+      const hook = Reflect.get(browser, "__MEEKO_DEVTOOLS__") as DevtoolsHook;
+      const instance = hook.snapshot().instances.find((entry) => entry.name === "Locations");
+      assert.ok(instance);
+      const file = join(fixtureDirectory, "Locations.meeko");
+      const button = (label: string): HTMLButtonElement => [...root.querySelectorAll("button")].find((candidate) => candidate.textContent === label) as unknown as HTMLButtonElement;
+      const lastCount = () => hook.snapshot().events.filter((event) => event.kind === "signal" && event.instanceId === instance.id && event.detail === "count").at(-1);
+
+      button("Inc").click();
+      assert.equal(root.querySelector("p")?.textContent, "4");
+      const increment = lastCount();
+      assert.equal(increment?.value, 2);
+      assert.deepEqual(assignment(increment), { kind: "assignment", file, line: 30, column: 29, expression: "count.value++" });
+      const reads = (increment?.reads ?? []).filter((read) => read.kind !== "text")
+        .map((read) => [read.kind, read.file === file, read.line, read.column, read.expression, read.name ?? null]);
+      assert.deepEqual(reads.sort(), [
+        ["computed", true, 8, 26, "() => count.value * 2", null],
+        ["each", true, 27, 22, "items.value.slice(0, count.value)", null],
+        ["if", true, 26, 19, "visible.value && count.value > 0", null],
+        ["prop", true, 28, 39, "String(count.value)", "label"],
+      ]);
+      assert.equal(root.querySelectorAll("li").length, 2);
+      assert.equal(root.querySelector("em")?.textContent, "2");
+
+      button("Bump").click();
+      assert.equal(lastCount()?.value, 3);
+      assert.deepEqual(assignment(lastCount()), { kind: "assignment", file, line: 11, column: 3, expression: "count.value += 1" });
+
+      button("Reset").click();
+      assert.equal(lastCount()?.value, 0);
+      assert.deepEqual(assignment(lastCount()), { kind: "assignment", file, line: 15, column: 3, expression: "count.value = 0" });
+      assert.equal(root.querySelector("div span"), null);
+      // La condición sigue leyendo `count` aunque su rama quede vacía.
+      assert.ok(lastCount()?.reads?.some((read) => read.kind === "if"));
+
+      button("Load").click();
+      for (let attempt = 0; attempt < 20 && lastCount()?.value !== 5; attempt++) await new Promise<void>((done) => setImmediate(done));
+      assert.equal(lastCount()?.value, 5);
+      assert.deepEqual(assignment(lastCount()), { kind: "assignment", file, line: 19, column: 3, expression: "count.value = await Promise.resolve(5)" });
+
+      assert.deepEqual(hook.setSignal(instance.id, "count", 1), { ok: true });
+      assert.equal(root.querySelector("p")?.textContent, "2");
+      assert.equal(root.querySelector("em")?.textContent, "1");
+      assert.deepEqual(lastCount()?.write, { kind: "devtools" });
+      release();
+    });
+  } finally {
+    browser.happyDOM.abort();
+    await cleanup();
+  }
+});
+
+test("producción y SSR no contienen instrumentación DevTools y generan el mismo HTML", async () => {
+  for (const name of ["Locations", "Child"]) {
+    const filename = join(fixtureDirectory, `${name}.meeko`);
+    const source = await readFile(filename, "utf8");
+    const production = compile(source, filename).code;
+    assert.doesNotMatch(production, devtoolsInstrumentation);
+    assert.doesNotMatch(production, /kind: "(?:assignment|computed|if|each|prop)"/);
+    assert.match(compile(source, filename, { hot: true }).code, devtoolsInstrumentation);
+  }
+  const hot = await loadFixture(true);
+  const production = await loadFixture(false);
+  try {
+    assert.equal(hot.component.renderToString({}), production.component.renderToString({}));
+    assert.equal(Reflect.has(globalThis, "window"), false);
+  } finally {
+    await hot.cleanup();
+    await production.cleanup();
+  }
+});
+
+test("la instrumentación hot conserva await, valores de expresión y destinos no estables", () => {
+  const source = `<script lang="ts">
+const count = signal(1);
+const box = { current: signal(0) };
+function make() { return box.current; }
+async function load(): Promise<number> {
+  count.value += await Promise.resolve(1);
+  make().value = 2;
+  return (count.value = 3) + box.current.value++;
+}
+</script><template><button on:click="() => box.current.value ??= 1">{count.value}</button></template>`;
+  const code = compile(source, "Writes.meeko", { hot: true }).code;
+  assert.ok(code.includes("count.value += await Promise.resolve(1)"));
+  assert.doesNotMatch(code, /devtoolsUpdate\(count, [^;]*await/);
+  assert.ok(code.includes("make().value = 2;"));
+  assert.ok(code.includes(`(count.value = __meeko.devtoolsWrite(count, { kind: "assignment", file: "Writes.meeko", line: 8, column: 11, expression: "count.value = 3" }, 3))`));
+  assert.ok(code.includes(`__meeko.devtoolsUpdate(box.current, { kind: "assignment", file: "Writes.meeko", line: 8, column: 30, expression: "box.current.value++" }, () => (box.current.value++))`));
+  assert.ok(code.includes("box.current.value ??= __meeko.devtoolsWrite(box.current, "));
 });

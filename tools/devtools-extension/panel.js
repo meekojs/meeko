@@ -1,9 +1,14 @@
 // @ts-check
 
-import { commandExpression, groupInstances, normalizeSnapshot, snapshotExpression } from "./protocol.js";
+import {
+  commandExpression, groupInstances, normalizeCommandResult, normalizeSnapshot, parseSignalValue, protocolMismatch,
+  readKindLabel, snapshotExpression, writeLabel,
+} from "./protocol.js";
 
 /** @typedef {import('./protocol.js').DevtoolsSnapshot} DevtoolsSnapshot */
 /** @typedef {import('./protocol.js').DevtoolsInstance} DevtoolsInstance */
+/** @typedef {import('./protocol.js').DevtoolsHook} DevtoolsHook */
+/** @typedef {import('./protocol.js').DevtoolsCommand} DevtoolsCommand */
 
 const connection = required("connection");
 const instanceCount = required("instance-count");
@@ -27,6 +32,10 @@ const selectedEvents = /** @type {HTMLInputElement} */ (required("selected-event
 const signalEvents = /** @type {HTMLInputElement} */ (required("signal-events"));
 const eventList = required("event-list");
 const eventCount = required("event-count");
+const editorForm = /** @type {HTMLFormElement} */ (required("signal-editor"));
+const editName = /** @type {HTMLSelectElement} */ (required("edit-name"));
+const editValue = /** @type {HTMLTextAreaElement} */ (required("edit-value"));
+const editMessage = required("edit-message");
 
 /** @type {DevtoolsSnapshot | null} */
 let snapshot = null;
@@ -36,6 +45,10 @@ let highlightedId = null;
 let timer;
 let inFlight = false;
 let signature = "";
+/** @type {string | null} */
+let mismatch = null;
+/** Estado del editor; el texto escrito no se reemplaza mientras `dirty` sea verdadero. */
+const editor = { instanceId: "", name: "", dirty: false };
 
 /** Obtiene un elemento obligatorio de la interfaz. */
 function required(/** @type {string} */ id) {
@@ -57,12 +70,15 @@ function evaluate(/** @type {string} */ expression) {
   }));
 }
 
-/** Solicita una acción concreta al runtime Meeko. */
-async function command(/** @type {'select'|'highlight'|'setBreakpoint'} */ action, /** @type {unknown[]} */ args) {
-  const result = await evaluate(commandExpression(action, args));
-  if (!result || typeof result !== "object" || !(/** @type {{ok?:boolean}} */ (result)).ok) {
-    throw new Error("Meeko DevTools no está disponible en esta página");
-  }
+/**
+ * Solicita una acción concreta al runtime Meeko.
+ * @template {DevtoolsCommand} K
+ * @param {K} action
+ * @param {Parameters<DevtoolsHook[K]>} args
+ */
+async function command(action, args) {
+  const result = normalizeCommandResult(await evaluate(commandExpression(action, args)));
+  if (!result.ok) throw new Error(result.error === "Meeko DevTools unavailable" ? "Meeko DevTools no está disponible en esta página" : result.error);
   await refresh();
 }
 
@@ -72,6 +88,18 @@ async function refresh() {
   inFlight = true;
   try {
     const raw = await evaluate(snapshotExpression());
+    const nextMismatch = protocolMismatch(raw);
+    if (nextMismatch !== mismatch) {
+      mismatch = nextMismatch;
+      snapshot = null;
+      signature = "";
+      render();
+    }
+    if (mismatch) {
+      setConnection("Protocolo no compatible", true);
+      connection.title = mismatch;
+      return;
+    }
     const next = normalizeSnapshot(raw);
     if (!next) {
       setConnection("Meeko no detectado", true);
@@ -177,10 +205,11 @@ function renderDetails() {
   detailEmpty.hidden = Boolean(selected);
   detailContent.hidden = !selected;
   if (!selected) {
-    emptyTitle.textContent = snapshot ? "Selecciona una instancia" : "Meeko no detectado";
-    emptyDescription.textContent = snapshot
+    editorForm.hidden = true;
+    emptyTitle.textContent = mismatch ? "Versión de protocolo no compatible" : snapshot ? "Selecciona una instancia" : "Meeko no detectado";
+    emptyDescription.textContent = mismatch ?? (snapshot
       ? "Examina sus propiedades, señales y relación con otros componentes."
-      : "Abre una aplicación Meeko con Vite en desarrollo y espera a que se hidrate.";
+      : "Abre una aplicación Meeko con Vite en desarrollo y espera a que se hidrate.");
     return;
   }
   detailName.textContent = selected.name;
@@ -196,6 +225,42 @@ function renderDetails() {
   highlightButton.textContent = highlighted ? "Quitar resaltado" : "Resaltar DOM";
   breakpointButton.setAttribute("aria-pressed", String(selected.breakpoint));
   breakpointButton.textContent = selected.breakpoint ? "Desactivar breakpoint" : "Activar breakpoint";
+  renderEditor(selected);
+}
+
+/** Sincroniza el editor con la instancia seleccionada sin pisar el texto que el usuario está escribiendo. */
+function renderEditor(/** @type {DevtoolsInstance} */ selected) {
+  const names = Object.keys(selected.signals);
+  if (editor.instanceId !== selected.id) {
+    editor.instanceId = selected.id;
+    editor.name = names[0] ?? "";
+    editor.dirty = false;
+    setEditorMessage("", "");
+  }
+  if (!names.includes(editor.name)) {
+    editor.name = names[0] ?? "";
+    editor.dirty = false;
+  }
+  editorForm.hidden = names.length === 0;
+  if (names.length === 0) return;
+  const current = [...editName.options].map((option) => option.value);
+  if (current.join("\u0000") !== names.join("\u0000")) {
+    editName.replaceChildren(...names.map((name) => {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      return option;
+    }));
+  }
+  editName.value = editor.name;
+  if (!editor.dirty) editValue.value = JSON.stringify(selected.signals[editor.name], null, 2) ?? "null";
+}
+
+function setEditorMessage(/** @type {string} */ message, /** @type {''|'ok'|'error'} */ state) {
+  editMessage.textContent = message;
+  editMessage.setAttribute("role", state === "error" ? "alert" : "status");
+  if (state) editMessage.dataset.state = state;
+  else delete editMessage.dataset.state;
 }
 
 function eventTime(/** @type {number} */ at) {
@@ -229,13 +294,18 @@ function renderEvents() {
       ? `${event.detail ?? "Señal"}${Object.hasOwn(event, "value") ? ` → ${valueText(event.value)}` : ""}`
       : event.detail ?? "";
     item.append(time, node("span", event.kind, "event-kind"), source, node("span", detail, "event-detail"));
+    if (event.kind === "signal" && event.write) {
+      const write = node("p", writeLabel(event.write), "event-write");
+      if (event.write.kind === "assignment") write.append(node("span", ": "), node("code", event.write.expression));
+      item.append(write);
+    }
     if (event.kind === "signal" && event.reads?.length) {
       const sites = node("details", "", "event-reads");
-      sites.append(node("summary", `${event.reads.length} expresión(es) que dependen de la señal`));
+      sites.append(node("summary", `${event.reads.length} lectura(s) que dependen de la señal`));
       const list = document.createElement("ul");
       for (const read of event.reads) {
         const row = document.createElement("li");
-        row.append(node("code", `${read.file}:${read.line}:${read.column}`), node("span", ` ${read.kind}: `), node("code", read.expression));
+        row.append(node("code", `${read.file}:${read.line}:${read.column}`), node("span", ` ${readKindLabel(read)}: `), node("code", read.expression));
         list.append(row);
       }
       sites.append(list);
@@ -285,6 +355,33 @@ breakpointButton.addEventListener("click", async () => {
     await command("setBreakpoint", [selected.id, !selected.breakpoint]);
   } catch (error) {
     setConnection(error instanceof Error ? error.message : String(error), true);
+  }
+});
+
+editName.addEventListener("change", () => {
+  editor.name = editName.value;
+  editor.dirty = false;
+  setEditorMessage("", "");
+  renderDetails();
+});
+editValue.addEventListener("input", () => { editor.dirty = true; });
+editorForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const id = snapshot?.selectedId;
+  const name = editor.name;
+  if (!id || !name) return;
+  const parsed = parseSignalValue(editValue.value);
+  if (!parsed.ok) {
+    setEditorMessage(parsed.error, "error");
+    return;
+  }
+  try {
+    await command("setSignal", [id, name, parsed.value]);
+    editor.dirty = false;
+    setEditorMessage(`Señal ${name} actualizada.`, "ok");
+    renderDetails();
+  } catch (error) {
+    setEditorMessage(`No se pudo editar ${name}: ${error instanceof Error ? error.message : String(error)}`, "error");
   }
 });
 

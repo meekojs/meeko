@@ -5,6 +5,7 @@ import postcss from "postcss";
 import selectorParser from "postcss-selector-parser";
 import { extractSourceMappings, markSource } from "./compiler/mapping.js";
 import type { SourceMapping } from "./compiler/mapping.js";
+import { instrumentNode, instrumentTemplateExpression, trackedRead } from "./compiler/devtools.js";
 import { analyzePropsDefaults, PropsDefaultsError } from "./compiler/props.js";
 import { compileError, locate, parseSfc } from "./compiler/sfc.js";
 import type { SfcSection } from "./compiler/sfc.js";
@@ -355,7 +356,7 @@ function scopeSelector(selector: selectorParser.Selector, scopeAttribute: string
   }
 }
 
-function compileScript(section: SfcSection, source: string, filename: string): { imports: string[]; types: string[]; setup: string[]; names: string[]; propsType: string; propsTypeOffset: number | undefined; defaults?: { expression: string; offset: number; keys: readonly string[] } } {
+function compileScript(section: SfcSection, source: string, filename: string, hot: boolean): { imports: string[]; types: string[]; setup: string[]; names: string[]; propsType: string; propsTypeOffset: number | undefined; defaults?: { expression: string; offset: number; keys: readonly string[] } } {
   const file = ts.createSourceFile(filename, section.content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS) as ts.SourceFile & { parseDiagnostics: readonly ts.DiagnosticWithLocation[] };
   const syntaxError = file.parseDiagnostics[0];
   if (syntaxError) {
@@ -369,6 +370,12 @@ function compileScript(section: SfcSection, source: string, filename: string): {
   let propsType: string | undefined;
   let propsTypeOffset: number | undefined;
   let defaults: { expression: string; offset: number; keys: readonly string[] } | undefined;
+  // En desarrollo con `hot`, DevTools registra escrituras `.value` y lecturas de `computed`; producción y SSR sin `hot` no cambian.
+  const setupStatement = (statement: ts.Statement): string => {
+    const original = statement.getText(file);
+    const instrumented = hot ? instrumentNode(file, statement, (position) => section.contentStart + position, { source, filename }, { computed: true }) : undefined;
+    return markSource(instrumented ?? original, section.contentStart + statement.getStart(file), original.length);
+  };
   for (const statement of file.statements) {
     if (ts.isImportDeclaration(statement)) {
       imports.push(markSource(statement.getText(file), section.contentStart + statement.getStart(file)));
@@ -408,18 +415,18 @@ function compileScript(section: SfcSection, source: string, filename: string): {
           }
           setup.push(`const ${name}: ${defaults ? "__MeekoResolvedProps" : markSource(propsType, propsTypeOffset)} = __props;`);
         } else {
-          setup.push(markSource(statement.getText(file), section.contentStart + statement.getStart(file)));
+          setup.push(setupStatement(statement));
         }
       }
       continue;
     }
     if (ts.isFunctionDeclaration(statement) && statement.name) {
       names.push(statement.name.text);
-      setup.push(markSource(statement.getText(file), section.contentStart + statement.getStart(file)));
+      setup.push(setupStatement(statement));
       continue;
     }
     if (ts.isExpressionStatement(statement) && ts.isCallExpression(statement.expression)) {
-      setup.push(markSource(statement.getText(file), section.contentStart + statement.getStart(file)));
+      setup.push(setupStatement(statement));
       continue;
     }
     throw compileError(source, filename, "MEEK018", `Unsupported top-level script statement: ${ts.SyntaxKind[statement.kind]}`, section.contentStart + statement.getStart(file));
@@ -448,7 +455,8 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
   }
   for (const { id, name, expression, offset } of bindings.events) {
     const eventType = templateEventType(name);
-    const handler = markSource(`((__meeko_handler: (event: ${eventType}) => unknown) => __meeko_handler(event as ${eventType}))(${mappedExpression(expression, offset)});`, offset, expression.length);
+    const handlerExpression = hot ? markSource(rewriteLocals(instrumentTemplateExpression(expression, offset, context), locals), offset, expression.length) : mappedExpression(expression, offset);
+    const handler = markSource(`((__meeko_handler: (event: ${eventType}) => unknown) => __meeko_handler(event as ${eventType}))(${handlerExpression});`, offset, expression.length);
     statements.push(`{
       cleanups.push(__meeko.bindEvent(__scope, ${id}, ${quote(name)}, (event: Event) => {
         return ${handler}
@@ -459,14 +467,18 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
   for (const entry of bindings.components) {
     const point = locate(context.source, entry.offset);
     const location = `${basename(context.filename)}:${point.line}:${point.column} (component ${entry.reference})`;
-    const props = entry.props.map((prop) => `${markSource(quote(prop.name), prop.nameOffset, prop.name.length)}: ${mappedExpression(prop.expression, prop.offset)}`);
+    const props = entry.props.map((prop) => {
+      const value = mappedExpression(prop.expression, prop.offset);
+      return `${markSource(quote(prop.name), prop.nameOffset, prop.name.length)}: ${hot ? trackedRead(context, prop.offset, prop.expression, "prop", `(${value})`, prop.name) : value}`;
+    });
     const object = markSource(`{ ${props.join(", ")} }`, entry.offset, 1);
     componentStatements.push(`cleanups.push(__meeko.bindComponent(__scope, ${entry.id}, () => ${arrowExpression(entry.reference, entry.referenceOffset)}, () => (${object}), ${quote(location)}));`);
   }
   statements.unshift(...componentStatements);
   for (const entry of bindings.regions) {
     if (entry.kind === "condition") {
-      statements.push(`cleanups.push(__meeko.bindIf(__scope, ${entry.id}, () => ${arrowExpression(entry.expression, entry.offset)}, () => ${rewriteLocals(entry.render, locals)}, (__scope) => { ${hydrationBody(entry.bindings, context, hot, locals)} }));`);
+      const condition = arrowExpression(entry.expression, entry.offset);
+      statements.push(`cleanups.push(__meeko.bindIf(__scope, ${entry.id}, () => ${hot ? trackedRead(context, entry.offset, entry.expression, "if", condition) : condition}, () => ${rewriteLocals(entry.render, locals)}, (__scope) => { ${hydrationBody(entry.bindings, context, hot, locals)} }));`);
     } else {
       const outerLocals = new Map(locals);
       outerLocals.delete(entry.itemName);
@@ -477,7 +489,8 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
       const innerHydration = hydrationBody(entry.bindings, context, hot, innerLocals);
       // El callback generado sólo usa la señal de índice si aparece en su hidratación.
       const trackIndex = innerHydration.includes("__meeko_index.value");
-      statements.push(`cleanups.push(__meeko.bindFor(__scope, ${entry.id}, () => ${arrowExpression(entry.expression, entry.offset)}, (${entry.itemName}, ${entry.indexName}) => ${arrowExpression(entry.key, entry.keyOffset, outerLocals)}, (${entry.itemName}, ${entry.indexName}) => ${rewriteLocals(entry.render, outerLocals)}, (__meeko_item, __meeko_index, __scope) => { ${innerHydration} }, ${trackIndex}));`);
+      const items = arrowExpression(entry.expression, entry.offset);
+      statements.push(`cleanups.push(__meeko.bindFor(__scope, ${entry.id}, () => ${hot ? trackedRead(context, entry.offset, entry.expression, "each", items) : items}, (${entry.itemName}, ${entry.indexName}) => ${arrowExpression(entry.key, entry.keyOffset, outerLocals)}, (${entry.itemName}, ${entry.indexName}) => ${rewriteLocals(entry.render, outerLocals)}, (__meeko_item, __meeko_index, __scope) => { ${innerHydration} }, ${trackIndex}));`);
     }
   }
   return `const cleanups: Array<() => void> = [];
@@ -509,9 +522,9 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
   const bindingsForTemplate = emptyBindings();
   const context: TemplateContext = { source, filename, templateOffset: template.contentStart, scopeAttribute, nextText: 0, nextEvent: 0, nextAttribute: 0, nextRegion: 0 };
   const html = renderNode(parsed, bindingsForTemplate, context);
-  const scriptParts = compileScript(script, source, filename);
-  const bindings = scriptParts.names.join(", ");
   const hot = options.hot === true;
+  const scriptParts = compileScript(script, source, filename, hot);
+  const bindings = scriptParts.names.join(", ");
   const resolvedProps = scriptParts.defaults ? "__meeko_resolveProps(__inputProps)" : "__inputProps";
   const setupCode = `const __bindings = __setup(${resolvedProps});\n__meeko.restoreSignals(__bindings, __state);\nconst { ${bindings} } = __bindings;`;
   const releaseCode = hot

@@ -62,6 +62,20 @@
                 <pre id="signals-value"></pre>
               </section>
             </div>
+            <form class="editor" id="signal-editor" aria-labelledby="editor-title" novalidate hidden>
+              <h3 id="editor-title">Editar señal</h3>
+              <div class="editor-fields">
+                <label for="edit-name">Señal</label>
+                <select id="edit-name"></select>
+                <label for="edit-value">Nuevo valor (JSON)</label>
+                <textarea id="edit-value" rows="4" spellcheck="false" aria-describedby="edit-hint edit-message"></textarea>
+              </div>
+              <p class="hint" id="edit-hint">Sustituye el valor completo de la señal. El valor mostrado es una copia acotada.</p>
+              <div class="editor-actions">
+                <button type="submit" id="edit-apply">Aplicar</button>
+                <p class="editor-message" id="edit-message" role="status" aria-live="polite"></p>
+              </div>
+            </form>
           </div>
         </main>
       </div>

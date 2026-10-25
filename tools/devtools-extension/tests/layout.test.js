@@ -55,11 +55,20 @@ test("el panel permanece legible y sin desbordamiento horizontal en DevTools est
           { id: "meeko-2", componentId: "counter", name: "Counter", file: "/src/Counter.meeko", props: {}, signals: { count: 2 }, parentId: "meeko-1", childIds: [], status: "mounted", breakpoint: false },
         ];
         let selectedId = "meeko-1";
+        const events = [{ id: 1, at: Date.now(), kind: "signal", instanceId: "meeko-1", detail: "NombreDeSeñalExtremadamenteLargoSinEspaciosParaProbarElAncho", componentName: "Counter", file: "/src/Counter.meeko", value: 2, reads: [{ file: "/src/Counter.meeko", line: 4, column: 10, expression: "count.value", kind: "text" }, { file: "/src/Counter.meeko", line: 5, column: 26, expression: "() => count.value * 2", kind: "computed" }], write: { kind: "assignment", file: "/src/Counter.meeko", line: 16, column: 41, expression: "count.value++" } }];
         window.__MEEKO_DEVTOOLS__ = {
-          snapshot: () => ({ instances, selectedId, events: [{ id: 1, at: Date.now(), kind: "signal", instanceId: "meeko-1", detail: "NombreDeSeñalExtremadamenteLargoSinEspaciosParaProbarElAncho", componentName: "Counter", file: "/src/Counter.meeko", value: 2, reads: [{ file: "/src/Counter.meeko", line: 4, column: 10, expression: "count.value", kind: "text" }] }] }),
+          protocolVersion: 1,
+          snapshot: () => JSON.parse(JSON.stringify({ protocolVersion: 1, instances, selectedId, events })),
           select: (id) => { selectedId = id; },
           highlight: () => {},
           setBreakpoint: (id, enabled) => { const instance = instances.find((item) => item.id === id); if (instance) instance.breakpoint = enabled; },
+          setSignal: (id, name, value) => {
+            const instance = instances.find((item) => item.id === id);
+            if (!instance || !(name in instance.signals)) return { ok: false, error: "no writable signal" };
+            instance.signals[name] = value;
+            events.push({ id: events.length + 1, at: Date.now(), kind: "signal", instanceId: id, detail: name, componentName: "Counter", file: "/src/Counter.meeko", value, write: { kind: "devtools" } });
+            return { ok: true };
+          },
         };
         Object.defineProperty(window, "chrome", {
           configurable: true,
@@ -73,10 +82,29 @@ test("el panel permanece legible y sin desbordamiento horizontal en DevTools est
       assert.equal(await page.locator("#detail-name").textContent(), "Counter");
       assert.equal(await page.locator("#event-list > li").count(), 1);
       assert.match(await page.locator("#event-list > li").innerText(), /Counter.*Counter\.meeko.*→ 2/s);
+      assert.match(await page.locator("#event-list .event-write").innerText(), /Escrita en \/src\/Counter\.meeko:16:41: count\.value\+\+/);
       await page.locator("#event-list details summary").click();
-      assert.match(await page.locator("#event-list details").innerText(), /Counter\.meeko:4:10.*count\.value/s);
+      assert.match(await page.locator("#event-list details").innerText(), /Counter\.meeko:4:10 texto: count\.value.*Counter\.meeko:5:26 computed: \(\) => count\.value \* 2/s);
       await page.locator("#signal-events").check();
       assert.equal(await page.locator("#event-list > li").count(), 1);
+
+      assert.equal(await page.locator("#signal-editor").isVisible(), true);
+      assert.equal(await page.locator("#edit-value").inputValue(), "1");
+      await page.locator("#edit-value").fill("{ nope");
+      await page.locator("#edit-apply").click();
+      assert.match(await page.locator("#edit-message").innerText(), /JSON no válido/);
+      assert.equal(await page.locator("#edit-message").getAttribute("role"), "alert");
+      const messageBox = await page.evaluate(() => {
+        const message = document.getElementById("edit-message")?.getBoundingClientRect();
+        const detail = document.querySelector(".detail")?.getBoundingClientRect();
+        return message && detail ? { top: message.top, bottom: message.bottom, detailTop: detail.top, detailBottom: detail.bottom } : null;
+      });
+      assert.ok(messageBox && messageBox.top >= messageBox.detailTop && messageBox.bottom <= messageBox.detailBottom, `${width}px: el error del editor queda fuera de la vista ${JSON.stringify(messageBox)}`);
+      await page.locator("#edit-value").fill('{"total": 5}');
+      await page.locator("#edit-apply").click();
+      await page.locator("#edit-message", { hasText: "Señal count actualizada." }).waitFor();
+      assert.match(await page.locator("#signals-value").innerText(), /"total": 5/);
+      await page.locator("#event-list .event-write", { hasText: "Escrita desde DevTools" }).waitFor();
       const layout = await page.evaluate(() => ({
         viewport: window.innerWidth,
         document: document.documentElement.scrollWidth,
@@ -91,6 +119,19 @@ test("el panel permanece legible y sin desbordamiento horizontal en DevTools est
       assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("data-instance-id")), "meeko-2");
       await page.close();
     }
+    const legacy = await browser.newPage({ viewport: { width: 400, height: 740 } });
+    await legacy.addInitScript(() => {
+      window.__MEEKO_DEVTOOLS__ = { protocolVersion: 2, snapshot: () => ({ protocolVersion: 2, instances: [], events: [], selectedId: null }) };
+      Object.defineProperty(window, "chrome", {
+        configurable: true,
+        value: { devtools: { inspectedWindow: { eval: (expression, callback) => { callback(window.eval(expression)); } } } },
+      });
+    });
+    await legacy.goto(`http://127.0.0.1:${address.port}/panel.html`);
+    await legacy.locator("#connection", { hasText: "Protocolo no compatible" }).waitFor();
+    assert.equal(await legacy.locator("#empty-title").innerText(), "Versión de protocolo no compatible");
+    assert.match(await legacy.locator("#empty-description").innerText(), /protocolo DevTools 2 y esta extensión admite el 1/);
+    await legacy.close();
   } finally {
     await browser.close();
     server.close();

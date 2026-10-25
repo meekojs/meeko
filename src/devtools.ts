@@ -1,57 +1,20 @@
 import type { DomScope } from "./dom.js";
+import type {
+  DevtoolsAssignmentSite, DevtoolsCommandResult, DevtoolsEvent, DevtoolsHook, DevtoolsInstance,
+  DevtoolsProtocolVersion, DevtoolsReadSite, DevtoolsValue, DevtoolsWriteSite,
+} from "./devtools-protocol.js";
 import { logClientError, observeCallback } from "./error-observer.js";
 import { currentEffectOwner, effect, isWritableSignal, signalReadSites, untrack } from "./reactivity.js";
-import type { EffectSource, Signal } from "./reactivity.js";
+import type { Signal } from "./reactivity.js";
 
-/** Valores seguros para transportar una captura al panel de desarrollo. */
-export type DevtoolsValue = null | boolean | number | string | DevtoolsValue[] | { [key: string]: DevtoolsValue };
+export type {
+  DevtoolsAssignmentSite, DevtoolsCommandResult, DevtoolsEditSite, DevtoolsEvent, DevtoolsEventKind, DevtoolsHook,
+  DevtoolsInstance, DevtoolsProtocolVersion, DevtoolsReadKind, DevtoolsReadSite, DevtoolsSnapshot, DevtoolsValue,
+  DevtoolsWriteSite,
+} from "./devtools-protocol.js";
 
-/** Estado serializable de una instancia hidratada. */
-export interface DevtoolsInstance {
-  id: string;
-  componentId: string;
-  name: string;
-  file: string;
-  props: DevtoolsValue;
-  signals: Record<string, DevtoolsValue>;
-  parentId: string | null;
-  childIds: string[];
-  status: "hydrated";
-  breakpoint: boolean;
-}
-
-/** Cambio reciente del árbol de componentes o de una señal. */
-export interface DevtoolsEvent {
-  id: number;
-  at: number;
-  kind: "mount" | "unmount" | "signal" | "breakpoint" | "select" | "hmr";
-  instanceId: string;
-  detail?: string;
-  /** Identidad del componente conservada incluso después del desmontaje. */
-  componentName?: string;
-  /** Archivo fuente `.meeko` proporcionado por la compilación de desarrollo. */
-  file?: string;
-  /** Valor posterior de una señal, copiado con los mismos límites que una captura. */
-  value?: DevtoolsValue;
-  /** Expresiones de plantilla que dependían de la señal en esta instancia. No son el origen de la escritura. */
-  reads?: EffectSource[];
-}
-
-/** Captura independiente de referencias DOM y de valores no serializables. */
-export interface DevtoolsSnapshot {
-  instances: DevtoolsInstance[];
-  events: DevtoolsEvent[];
-  selectedId: string | null;
-}
-
-/** Interfaz pública que consume una extensión o un panel de desarrollo. */
-export interface DevtoolsHook {
-  snapshot(): DevtoolsSnapshot;
-  subscribe(listener: () => void): () => void;
-  select(id: string | null): void;
-  highlight(id: string | null): void;
-  setBreakpoint(id: string, enabled: boolean): void;
-}
+/** Versión del protocolo que implementa este runtime. */
+export const DEVTOOLS_PROTOCOL_VERSION: DevtoolsProtocolVersion = 1;
 
 /** Datos que entrega un componente compilado cuando se hidrata en desarrollo. */
 export interface DevtoolsRegistration {
@@ -88,6 +51,76 @@ let highlightedId: string | null = null;
 let overlay: HTMLElement | undefined;
 let highlightObserver: MutationObserver | undefined;
 let highlightFrame: number | undefined;
+let installed = false;
+
+interface PendingWrite {
+  site: DevtoolsWriteSite;
+  /** Mientras corre una actualización compuesta cualquier valor nuevo procede de ella. */
+  any: boolean;
+  expected: unknown;
+}
+
+/** Última escritura instrumentada de cada señal; caduca al terminar la tarea síncrona actual. */
+const pendingWrites = new WeakMap<object, PendingWrite>();
+
+function markWrite(target: object, entry: PendingWrite): void {
+  pendingWrites.set(target, entry);
+  queueMicrotask(() => {
+    if (pendingWrites.get(target) === entry) pendingWrites.delete(target);
+  });
+}
+
+function writeSiteFor(target: object, current: unknown): DevtoolsWriteSite | undefined {
+  const entry = pendingWrites.get(target);
+  if (!entry || (!entry.any && !Object.is(entry.expected, current))) return undefined;
+  return entry.site;
+}
+
+/** Comprueba que un valor editado desde un panel sea JSON sin prototipos ni referencias especiales. */
+function jsonError(value: unknown, depth = 0, seen = new Set<object>()): string | undefined {
+  if (value === null || typeof value === "boolean" || typeof value === "string") return undefined;
+  if (typeof value === "number") return Number.isFinite(value) ? undefined : "numbers must be finite";
+  if (typeof value !== "object") return `unsupported ${typeof value} value`;
+  if (depth > 64) return "value is nested too deeply";
+  if (seen.has(value)) return "value contains a circular reference";
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) return "only arrays and plain objects are supported";
+  seen.add(value);
+  try {
+    for (const key of Object.keys(value)) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !("value" in descriptor)) return "accessor properties are not supported";
+      const error = jsonError(descriptor.value, depth + 1, seen);
+      if (error) return error;
+    }
+  } finally {
+    seen.delete(value);
+  }
+  return undefined;
+}
+
+/**
+ * Registra el origen de `signal.value = value` antes de que el setter notifique.
+ * Sólo lo emite el compilador en desarrollo y devuelve `value` sin alterarlo.
+ */
+export function devtoolsWrite<T>(target: unknown, site: DevtoolsAssignmentSite, value: T): T {
+  if (!installed || !isWritableSignal(target)) return value;
+  if (!Object.is(untrack(() => target.value), value)) markWrite(target, { site, any: false, expected: value });
+  return value;
+}
+
+/** Registra el origen de una actualización compuesta (`+=`, `++`, …) de `.value` en desarrollo. */
+export function devtoolsUpdate<T>(target: unknown, site: DevtoolsAssignmentSite, update: () => T): T {
+  if (!installed || !isWritableSignal(target)) return update();
+  const entry: PendingWrite = { site, any: true, expected: undefined };
+  markWrite(target, entry);
+  try {
+    return update();
+  } finally {
+    entry.any = false;
+    entry.expected = untrack(() => target.value);
+  }
+}
 
 /** Copia datos arbitrarios con profundidad y tamaño acotados sin invocar getters. */
 function safeValue(value: unknown, depth = 0, seen = new WeakSet<object>()): DevtoolsValue {
@@ -141,7 +174,7 @@ function notify(): void {
   }
 }
 
-function record(kind: DevtoolsEvent["kind"], instanceId: string, detail?: string, value?: DevtoolsValue, source?: ActiveInstance, reads?: EffectSource[]): void {
+function record(kind: DevtoolsEvent["kind"], instanceId: string, detail?: string, value?: DevtoolsValue, source?: ActiveInstance, reads?: DevtoolsReadSite[], write?: DevtoolsWriteSite): void {
   const event: DevtoolsEvent = { id: nextEvent++, at: Date.now(), kind, instanceId };
   if (detail !== undefined) event.detail = detail;
   const entry = source ?? active.get(instanceId);
@@ -151,6 +184,7 @@ function record(kind: DevtoolsEvent["kind"], instanceId: string, detail?: string
   }
   if (value !== undefined) event.value = value;
   if (reads?.length) event.reads = reads;
+  if (write) event.write = write;
   recent.push(event);
   if (recent.length > 100) recent.shift();
   notify();
@@ -221,6 +255,7 @@ function removeHighlight(): void {
 }
 
 const hook: DevtoolsHook = {
+  protocolVersion: DEVTOOLS_PROTOCOL_VERSION,
   snapshot() {
     return untrack(() => {
       const instances: DevtoolsInstance[] = [];
@@ -246,7 +281,7 @@ const hook: DevtoolsHook = {
       for (const instance of instances) {
         if (instance.parentId) byId.get(instance.parentId)?.childIds.push(instance.id);
       }
-      return { instances, events: recent.map((event) => ({ ...event })), selectedId };
+      return { protocolVersion: DEVTOOLS_PROTOCOL_VERSION, instances, events: recent.map((event) => ({ ...event })), selectedId };
     });
   },
   subscribe(listener) {
@@ -290,6 +325,23 @@ const hook: DevtoolsHook = {
     if (identity) identity.breakpoint = enabled;
     record("breakpoint", id, enabled ? "enabled" : "disabled");
   },
+  setSignal(instanceId, name, value): DevtoolsCommandResult {
+    if (typeof instanceId !== "string" || typeof name !== "string") return { ok: false, error: "Instance ID and signal name must be strings" };
+    const entry = active.get(instanceId);
+    if (!entry) return { ok: false, error: `Unknown Meeko instance: ${instanceId}` };
+    const target = Object.hasOwn(entry.bindings, name) ? entry.bindings[name] : undefined;
+    if (!isWritableSignal(target)) return { ok: false, error: `${entry.name} has no writable signal named ${JSON.stringify(name)}` };
+    const invalid = jsonError(value);
+    if (invalid) return { ok: false, error: `Invalid JSON value: ${invalid}` };
+    if (Object.is(untrack(() => target.value), value)) return { ok: true };
+    markWrite(target, { site: { kind: "devtools" }, any: false, expected: value });
+    try {
+      target.value = value;
+    } catch (error) {
+      return { ok: false, error: `Signal updated, but an observer failed: ${error instanceof Error ? error.message : String(error)}` };
+    }
+    return { ok: true };
+  },
 };
 
 function unregister(entry: ActiveInstance): void {
@@ -304,6 +356,7 @@ function unregister(entry: ActiveInstance): void {
 /** Registra señales y ámbito de una instancia hidratada en Vite desarrollo. */
 export function registerDevtoolsInstance(input: DevtoolsRegistration): () => void {
   if (typeof window === "undefined" || typeof Node === "undefined") return () => {};
+  installed = true;
   if (!window.__MEEKO_DEVTOOLS__) {
     window.__MEEKO_DEVTOOLS__ = hook;
     window.dispatchEvent(new window.Event("meeko:devtools-ready"));
@@ -323,7 +376,7 @@ export function registerDevtoolsInstance(input: DevtoolsRegistration): () => voi
     entry.stopSignals.push(effect(() => {
       const current = signal.value;
       if (initial) { initial = false; return; }
-      record("signal", entry.id, name, safeValue(current), entry, signalReadSites(signal, entry.owner));
+      record("signal", entry.id, name, safeValue(current), entry, signalReadSites(signal, entry.owner), writeSiteFor(signal, current));
       if (entry.breakpoint) {
         debugger;
       }

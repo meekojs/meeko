@@ -40,7 +40,18 @@ async function assertBrowserBehavior(url: string, development: boolean): Promise
       const counter = updated.instances.find((instance) => instance.name === "Counter");
       assert.ok(counter);
       assert.equal(counter.signals.count, 3);
-      assert.ok(updated.events.some((event) => event.kind === "signal" && event.instanceId === counter.id));
+      assert.equal(updated.protocolVersion, 1);
+      const clicked = updated.events.filter((event) => event.kind === "signal" && event.instanceId === counter.id).at(-1);
+      assert.ok(clicked?.write?.kind === "assignment" && clicked.write.expression === "count.value++" && clicked.write.file.endsWith("Counter.meeko"));
+      assert.ok(clicked.reads?.some((read) => read.kind === "computed"));
+      const panel = page.locator("[data-meeko-devtools-panel]");
+      await panel.locator('button[data-action="select"]', { hasText: "Counter" }).click();
+      await panel.locator('textarea[data-action="edit-value"]').fill("7");
+      await panel.locator('button[data-action="edit-apply"]').click();
+      await page.locator("#app button", { hasText: "7 · doble: 14" }).waitFor();
+      assert.match(await panel.locator(".editor-message").innerText(), /Señal count actualizada/);
+      assert.deepEqual(await page.evaluate((id) => window.__MEEKO_DEVTOOLS__!.setSignal(id, "count", 3), counter.id), { ok: true });
+      assert.match(await page.locator("#app button").innerText(), /^3 · doble: 6$/);
     }
 
     await page.locator("#regions button", { hasText: "Prepend" }).click();

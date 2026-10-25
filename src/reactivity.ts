@@ -1,3 +1,4 @@
+import type { DevtoolsReadSite } from "./devtools-protocol.js";
 import { logClientError, observeCallback, observeReturnedPromise } from "./error-observer.js";
 
 /** Señal de solo lectura que registra dependencias al consultar su valor. */
@@ -18,19 +19,15 @@ export function createContext<T>(description?: string): ContextKey<T> {
   return Symbol(description) as ContextKey<T>;
 }
 
-/** Ubicación de una expresión de plantilla que lee una señal durante desarrollo. */
-export interface EffectSource {
-  file: string;
-  line: number;
-  column: number;
-  expression: string;
-  kind: "text" | "attribute";
-}
+/** Ubicación de una expresión que lee una señal durante desarrollo. */
+export type EffectSource = DevtoolsReadSite;
 
 interface Observer {
   run: () => void;
   dependencies: Set<InternalSignal<unknown>>;
   disposed: boolean;
+  /** Lecturas atribuidas a tramos concretos durante la última ejecución; sólo en desarrollo. */
+  readSites?: { owner: Owner | undefined; bySignal: Map<InternalSignal<unknown>, EffectSource[]> } | undefined;
 }
 
 interface Owner {
@@ -114,6 +111,7 @@ export function onCleanup<const F extends () => unknown>(release: SyncCleanupCal
 function detach(observer: Observer): void {
   for (const dependency of observer.dependencies) dependency.subscribers?.delete(observer);
   observer.dependencies.clear();
+  if (observer.readSites) observer.readSites = undefined;
 }
 
 function flush(): void {
@@ -224,16 +222,56 @@ export function captureParentOwner(): <T>(work: () => T) => T {
   };
 }
 
-/** Devuelve expresiones de plantilla actualmente dependientes de una señal en una raíz. */
+/**
+ * Atribuye a `source` las señales que lee `read` dentro del observador activo.
+ * El compilador sólo lo emite en desarrollo; fuera de un observador ejecuta `read` sin coste añadido.
+ */
+export function trackReadSite<T>(source: EffectSource, read: () => T): T {
+  const outer = activeObserver;
+  if (!outer) return read();
+  const probe: Observer = { run() {}, dependencies: new Set(), disposed: false };
+  activeObserver = probe;
+  try {
+    return read();
+  } finally {
+    activeObserver = outer;
+    if (!outer.disposed) {
+      const sites = outer.readSites ??= { owner: activeOwner, bySignal: new Map() };
+      for (const dependency of probe.dependencies) {
+        dependency.subscribers?.delete(probe);
+        (dependency.subscribers ??= new Set()).add(outer);
+        outer.dependencies.add(dependency);
+        const list = sites.bySignal.get(dependency);
+        if (!list) sites.bySignal.set(dependency, [source]);
+        else if (!list.includes(source)) list.push(source);
+      }
+    } else {
+      for (const dependency of probe.dependencies) dependency.subscribers?.delete(probe);
+    }
+  }
+}
+
+/** Crea una vez una lectura atribuida a `source`; el compilador la usa con `computed` en desarrollo. */
+export function withReadSite<A extends unknown[], T>(source: EffectSource, read: (...args: A) => T): (...args: A) => T {
+  return function (this: unknown, ...args: A): T {
+    return trackReadSite(source, () => read.apply(this, args));
+  };
+}
+
+/** Devuelve las expresiones actualmente dependientes de una señal en una raíz. */
 export function signalReadSites(value: Signal<unknown>, owner: object | undefined): EffectSource[] {
   if (!owner || !isWritableSignal(value)) return [];
   const sites = new Map<string, EffectSource>();
-  for (const observer of (value as InternalSignal<unknown>).subscribers ?? []) {
+  const add = (source: EffectSource): void => {
+    const key = `${source.file}\u0000${source.line}\u0000${source.column}\u0000${source.kind}\u0000${source.expression}\u0000${source.name ?? ""}`;
+    if (!sites.has(key)) sites.set(key, source);
+  };
+  const internal = value as InternalSignal<unknown>;
+  for (const observer of internal.subscribers ?? []) {
+    if (observer.disposed) continue;
     const metadata = effectSources.get(observer);
-    if (observer.disposed || metadata?.owner !== owner || !metadata) continue;
-    const source = metadata.source;
-    const key = `${source.file}\u0000${source.line}\u0000${source.column}\u0000${source.kind}\u0000${source.expression}`;
-    sites.set(key, source);
+    if (metadata?.owner === owner) add(metadata.source);
+    if (observer.readSites?.owner === owner) for (const source of observer.readSites.bySignal.get(internal) ?? []) add(source);
   }
   return [...sites.values()];
 }

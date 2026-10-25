@@ -8,6 +8,10 @@
 - `ComponentErrorHandler` recibe un segundo argumento `source: ErrorSource`. Los handlers de un solo parámetro siguen siendo válidos.
 - El payload de hidratación y navegación lleva `v: 1`, `render` y `head`. El cliente rechaza un payload sin versión con un mensaje explícito; servidor y navegador deben salir del mismo build.
 - Se elimina `FrameworkHandlerOptions.renderLayout`. Los layouts se componen siempre mediante el outlet `<component is="props.outlet">`.
+- El protocolo DevTools pasa a la versión 1:
+  - `DevtoolsHook` exige `protocolVersion` y `setSignal`, y `DevtoolsSnapshot` exige `protocolVersion`. Un hook o una captura construidos a mano, por ejemplo en pruebas, deben añadir esos miembros.
+  - `DevtoolsReadSite.kind` admite además `computed`, `if`, `each` y `prop`. Un `switch` exhaustivo sobre `text`/`attribute` debe cubrir los nuevos valores.
+  - El panel integrado y la extensión de Chrome 1.0.0 rechazan, con un mensaje explícito, los runtimes sin `protocolVersion`. Use la extensión 1.0.0 con esta versión de `@meekojs/meeko`, y la extensión anterior con runtimes anteriores.
 
 ### Añadido y corregido
 
@@ -18,6 +22,13 @@
 - Un evento, efecto o limpieza de un componente sin observador antepasado sólo se entrega al `onError` de la aplicación o a la consola, nunca al `provideErrorHandler` de otro componente.
 - Las interpolaciones con entidades HTML (`&copy;`, `&lt;`) o saltos CRLF se ubican en la misma posición en `meeko check` y en VS Code: el compilador analiza el texto fuente y decodifica cada parte como el parser HTML. El analizador trata como división el `/` tras `i++`, `i--` o una propiedad con nombre de palabra clave (`obj.return / 2`) y acepta continuaciones de línea CRLF dentro de cadenas.
 - `meeko --help` y `meeko --version`.
+- DevTools edita señales: `setSignal(instanceId, name, value)` sustituye el valor de una señal editable de una instancia activa por un valor JSON validado y responde `{ ok, error }` en lugar de lanzar. Sólo existe en desarrollo. Los dos paneles añaden el formulario **Editar señal**, con el error visible junto a **Aplicar**, y la línea de tiempo marca esas escrituras como «Escrita desde DevTools».
+- La línea de tiempo de DevTools indica qué escribió cada señal. Sólo la compilación de desarrollo (`hot`) lo instrumenta; el código de producción y el HTML de SSR no cambian. Cubre, en el script `.meeko` y en las expresiones `on:` de la plantilla:
+  - las asignaciones `.value` con `=`, `??=`, `||=` y `&&=`;
+  - las asignaciones compuestas y `++`/`--`.
+- Las lecturas de DevTools se ubican también en `computed(() => …)`, `if:when`, `each:of` y las props de componentes hijos, además de en las expresiones de texto y atributo.
+- Los tipos del protocolo DevTools viven sólo en `src/devtools-protocol.ts`. La extensión de Chrome usa una copia generada (`pnpm run devtools:types`) que su `tsc` con `checkJs` comprueba, y `devtools:check` falla si esa copia queda desactualizada. La raíz exporta los nuevos tipos `DevtoolsReadSite`, `DevtoolsReadKind`, `DevtoolsWriteSite`, `DevtoolsAssignmentSite`, `DevtoolsEditSite`, `DevtoolsCommandResult`, `DevtoolsEventKind` y `DevtoolsProtocolVersion`.
+- La extensión Meeko DevTools para Chrome pasa a la versión 1.0.0, con edición de señales, ubicaciones de escritura y lectura y aviso de protocolo no compatible.
 
 - Las expresiones de texto admiten llaves anidadas: objetos literales, plantillas literales con `${...}`, cadenas que contienen `{` o `}`, comentarios y expresiones regulares. Compilador y VS Code comparten el mismo analizador, por lo que SSR, hidratación, `meeko check` y el editor ubican cada expresión en la misma posición. Una interpolación sin cerrar se informa con `MEEK010` en su llave de apertura, y `{}` se informa como expresión vacía (`MEEK009`).
 - El código generado envuelve entre paréntesis las expresiones devueltas por funciones flecha, de modo que una expresión que empieza por `{`, como `bind:title="{ text: label }.text"`, no se interpreta como bloque.

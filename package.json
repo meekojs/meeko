@@ -63,6 +63,7 @@
     "benchmark": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/run.ts",
     "benchmark:scenarios": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/scenarios.ts",
     "package:smoke": "pwsh -NoProfile -File tests/package-consumer.ps1",
+    "devtools:types": "node tools/devtools-extension/scripts/protocol-types.mjs --write",
     "devtools:check": "node --test tools/devtools-extension/tests/*.test.js && tsc -p tools/devtools-extension/tsconfig.json --noEmit",
     "verify": "pnpm run check && pnpm run test && pnpm run devtools:check && pnpm run example:check && tsc -p tsconfig.test.json --noEmit && pnpm run vite:types && pnpm run benchmark:check && pnpm run vite:build && pnpm run pilot:check"
   },

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { chromium } from "playwright-core";
 import { createServer } from "vite";
+import { commandExpression, normalizeSnapshot } from "../protocol.js";
 
 const extensionRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const repositoryRoot = dirname(dirname(extensionRoot));
@@ -108,6 +109,8 @@ test("la extensión instalada registra su panel y comunica con una app Meeko rea
     const initial = await inspectedWindow(evaluateExtension, "window.__MEEKO_DEVTOOLS__.snapshot()");
     const counter = initial.instances.find((item) => item.name === "Counter");
     assert.ok(counter, "La API real de Chrome debe transportar las instancias Meeko");
+    assert.equal(initial.protocolVersion, 1);
+    assert.equal(await inspectedWindow(evaluateExtension, "window.__MEEKO_DEVTOOLS__.protocolVersion"), 1);
     assert.equal(await inspectedWindow(evaluateExtension, `(() => { const hook = window.__MEEKO_DEVTOOLS__; hook.select(${JSON.stringify(counter.id)}); return hook.snapshot().selectedId; })()`), counter.id);
     assert.equal(await inspectedWindow(evaluateExtension, `(() => { window.__MEEKO_DEVTOOLS__.highlight(${JSON.stringify(counter.id)}); return !!document.querySelector('[data-meeko-devtools-highlight]'); })()`), true);
     assert.equal(await inspectedWindow(evaluateExtension, "(() => { window.__MEEKO_DEVTOOLS__.highlight(null); return !!document.querySelector('[data-meeko-devtools-highlight]'); })()"), false);
@@ -119,6 +122,19 @@ test("la extensión instalada registra su panel y comunica con una app Meeko rea
     const countEvent = updated.events.find((event) => event.kind === "signal" && event.instanceId === counter.id && event.componentName === "Counter" && event.file.endsWith("Counter.meeko") && event.detail === "count" && event.value === 3);
     assert.ok(countEvent);
     assert.ok(countEvent.reads?.some((read) => read.file.endsWith("Counter.meeko") && read.expression === "count.value" && read.kind === "text" && read.line > 0 && read.column > 0));
+    assert.ok(countEvent.reads?.some((read) => read.kind === "computed" && read.expression === "() => count.value * 2"));
+    assert.equal(countEvent.write?.kind, "assignment");
+    assert.equal(countEvent.write?.expression, "count.value++");
+    assert.ok(countEvent.write?.file.endsWith("Counter.meeko") && countEvent.write.line > 0 && countEvent.write.column > 0);
+    assert.equal(normalizeSnapshot(updated)?.protocolVersion, 1);
+
+    const edit = await inspectedWindow(evaluateExtension, commandExpression("setSignal", [counter.id, "count", 10]));
+    assert.deepEqual(edit, { ok: true });
+    await page.locator("#app button", { hasText: "10 · doble: 20" }).waitFor();
+    const rejected = await inspectedWindow(evaluateExtension, commandExpression("setSignal", [counter.id, "doubled", 1]));
+    assert.equal(rejected.ok, false);
+    const edited = await inspectedWindow(evaluateExtension, "window.__MEEKO_DEVTOOLS__.snapshot()");
+    assert.deepEqual(edited.events.filter((event) => event.kind === "signal" && event.instanceId === counter.id).at(-1)?.write, { kind: "devtools" });
   } finally {
     await context?.close();
     await server.close();
