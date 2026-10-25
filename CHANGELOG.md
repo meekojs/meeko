@@ -1,8 +1,8 @@
 # Cambios de Meeko
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-10-25
 
-Este bloque contiene cambios incompatibles respecto de `0.0.4`. De acuerdo con la política SemVer de Meeko para la serie `0.x`, se prepara como `0.1.0`, no como un patch.
+Este bloque contiene cambios incompatibles respecto de `0.0.4`. De acuerdo con la política SemVer de Meeko para la serie `0.x`, se publica como `0.1.0`, no como un patch.
 
 ### Cambios incompatibles y migración
 

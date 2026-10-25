@@ -76,7 +76,7 @@ npm run build
 npm start
 ```
 
-`check` genera contratos y comprueba tipos; `build` produce cliente, servidor y prerender. `start` sirve SSR de producción con Node 24 y requiere configurar sesiones persistentes. La [guía del framework](https://github.com/meekojs/meeko/blob/main/docs/framework.md) explica configuración, autoimports, rutas, middleware, despliegue y seguridad. Los comandos simplificados del proyecto forman parte de `0.1.0` en preparación; todavía no están disponibles en `0.0.4` publicada.
+`check` genera contratos y comprueba tipos; `build` produce cliente, servidor y prerender. `start` sirve SSR de producción con Node 24 y requiere configurar sesiones persistentes. La [guía del framework](https://github.com/meekojs/meeko/blob/main/docs/framework.md) explica configuración, autoimports, rutas, middleware, despliegue y seguridad. Los comandos simplificados del proyecto están disponibles desde `0.1.0`.
 
 ## Estructura
 
