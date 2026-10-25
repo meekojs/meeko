@@ -1,6 +1,57 @@
 # Cambios de Meeko
 
-## [0.0.4] - Unreleased
+## [0.1.0] - Unreleased
+
+Este bloque contiene cambios incompatibles respecto de `0.0.4`. De acuerdo con la política SemVer de Meeko para la serie `0.x`, se prepara como `0.1.0`, no como un patch.
+
+### Cambios incompatibles y migración
+
+- `effect` y `onCleanup` sólo aceptan callbacks síncronos. Inicie el trabajo asíncrono desde un callback síncrono, observe sus errores y gestione explícitamente su cancelación; no devuelva una promesa al runtime reactivo.
+- Los stores persistentes personalizados deben conservar `familyId` e implementar `replace` y `revokeFamily` de forma atómica. Migre registros e índices antes del arranque en producción: `SessionManager({ production: true, ... })` rechaza un store incompleto; en desarrollo, la operación que necesite una capacidad ausente falla de forma explícita.
+- `render: "client"` ya no forma parte del contrato de páginas. Elimínelo para usar SSR, que continúa siendo el valor predeterminado, o use `render: "prerender"` cuando corresponda.
+- Los proyectos generados activan `verbatimModuleSyntax`, `noUncheckedIndexedAccess` y `exactOptionalPropertyTypes`. Use `import type`, compruebe accesos por índice y declare `| undefined` explícitamente cuando la ausencia sea un valor permitido.
+- Los contratos Standard Schema públicos deben resolver a tipos concretos. Sustituya `any`, `unknown`, `never`, parámetros genéricos no resueltos y tipos anidados inseguros por tipos públicos concretos de entrada y salida.
+- Las rutas estáticas ya no aceptan `params`; las rutas API/RPC que forman jerarquías ambiguas o no representables deben renombrarse. Los parámetros dinámicos deben corresponder exactamente con la URL. Las queries públicas deben aceptar texto o listas de texto y modelar como opcionales las claves que puedan faltar; transforme números dentro del schema.
+- Los contratos de componentes, páginas, layouts y errores validan las props que el host realmente suministra. Declare esas props precisas y no ensanche un componente para ocultar requisitos obligatorios.
+- Para migrar un starter full-stack de `0.0.4`, adopte `meeko dev`, `meeko check`, `meeko build` y `meeko start`; compare primero cualquier personalización y después retire `server.mjs`, las entradas cliente/servidor, las configuraciones Vite y los `tsconfig.*` ahora generados bajo `.meeko/`. Puede mover el layout raíz a `app/layouts/default.meeko`, pero no lo conserve a la vez que `app/pages/+layout.meeko`.
+
+### Añadido y corregido
+
+- La revocación de sesiones ahora invalida atómicamente la familia activa después de rotaciones concurrentes en memoria, Redis y SQL. Los drivers SQL personalizados deben migrar `familyId` e implementar `revokeFamily`; los stores de producción antiguos fallan al iniciar. VS Code aplica las mismas opciones estrictas de TypeScript que la CLI, HMR acepta IDs de módulo con caracteres de selector CSS y Socket comunica errores del transporte al observador activo.
+- El descubrimiento rechaza colisiones jerárquicas que convertirían un miembro `api` o `rpc` simultáneamente en función y objeto. El starter independiente observa y conserva los fallos al cerrar HTTP y Vite mediante `SIGINT` o `SIGTERM`.
+- La generación de tipos registra las declaraciones de componentes que administra y elimina las huérfanas tras borrar o renombrar una fuente. La adopción desde versiones anteriores usa el AST del contrato generado y conserva declaraciones ajenas.
+- Los autoimports conservan parámetros, restricciones y defaults de tipos genéricos reexportados y deduplican overloads del mismo símbolo. Los proyectos generados usan las mismas opciones estrictas que CLI y VS Code.
+- API, RPC y Socket rechazan schemas Standard Schema degradados a `any`, `unknown` o `never`, incluidos parámetros genéricos no resueltos y tipos inseguros anidados; el descubrimiento rechaza APIs raíz sin clave y rutas jerárquicas imposibles de representar. Si el arranque falla, los errores adicionales de cierre llegan al observador sin sustituir la causa original.
+- `onCleanup` exige callbacks síncronos en tipos y runtime; un retorno thenable se observa sin `unhandledRejection`, no impide las demás limpiezas y participa en el `AggregateError` de la raíz.
+- VS Code tipa `each:index` como `number`, igual que el compilador. La navegación solicita volver a la URL confirmada si falla `pushState` o `replaceState`, y preserva los errores de recuperación.
+- `+error.meeko` conserva el contexto SSR de la petición, incluso en peticiones concurrentes; el cliente ignora tokens CSRF de respuestas anteriores a un cambio de sesión o navegación, y VS Code comprueba los tipos de `on:event` y `each:key` como el CLI.
+- HMR restaura listeners y todas las raíces del módulo si falla su limpieza o una actualización posterior, mientras el adaptador Node conserva el `requestId` ya enviado al cliente cuando falla un stream de respuesta.
+- El outlet del starter y los contratos de layout validan con mayor precisión el `Component`, sus props y la transferencia de estado SSR; los reemplazos de componentes y listas conservan la región previa cuando falla su hidratación o movimiento, y Socket intenta cerrar el peer aunque falle la desuscripción.
+- `provideErrorHandler` permite observar errores de eventos por raíz de componentes con autoimport y tipo `unknown`; HMR conserva el contexto padre al reemplazar o restaurar una instancia.
+- La navegación y los canales Socket de una aplicación montada consultan su observador activo; `socket` autoimportado conserva conexiones por aplicación y libera listeners al desmontar componentes. HMR preserva el fallo original si también falla el rollback.
+- Los scripts `.meeko` admiten llamadas de expresión durante el setup para registrar hooks sin declaraciones artificiales.
+- Tipado de defaults de `defineProps`, props de componentes hijos y contratos entre páginas y sidecars de ruta.
+- Hidratación de expresiones de texto inicialmente vacías sin perder eventos, verificada con el componente de login original en Chrome.
+- Comprobación TypeScript por ámbito de las fuentes de app, shared, servidor, layers y módulos configurados.
+- Errores de servidor normalizados con `requestId` en páginas, API, RPC y WebSocket; cierre más robusto de recursos Node.
+- Los fallos de limpieza de raíces y componentes compilados conservan también el error original; los fallos de navegación cliente por historial y clic se observan sin rechazos pendientes.
+- Los contratos de páginas, layouts y páginas de error rechazan props inseguras; el editor muestra esos diagnósticos sobre `defineProps` al abrir o guardar el proyecto.
+- Los componentes recibidos como props comprueban también si sus props obligatorias pueden omitirse; el editor actualiza diagnósticos y colores al guardar módulos TypeScript importados.
+- Las rutas sin parámetros rechazan `params` en TypeScript; el editor vuelve a comprobar contratos de páginas cuando cambia un tipo importado por un sidecar.
+- Las navegaciones descartadas no conservan estado provisional ni tokens CSRF, y los observadores reactivos pendientes terminan de ejecutarse aunque otro falle.
+- Socket comunica fallos de listeners, observadores de estado y reconexión, ignora mensajes de conexiones reemplazadas y continúa un broadcast hacia peers sanos si uno falla.
+- Los observadores de errores de navegación y servidor pueden ser asíncronos sin producir rechazos sin manejar; si fallan, Meeko informa el fallo sin sustituir la respuesta original.
+- Los handlers `on:event` asíncronos ya entregan su promesa al runtime para registrar rechazos; los errores de TypeScript de módulos `.ts` importados señalan su archivo y posición reales.
+- Eventos, navegación, Socket y DevTools comparten una captura interna de callbacks síncronos y asíncronos; los E2E fallan también ante errores de consola.
+- `effect` rechaza callbacks que devuelven promesas en tipos y runtime; un rechazo asíncrono concurrente queda observado y registrado. Las aplicaciones que usaban `effect(async () => ...)` deben iniciar el trabajo asíncrono desde un callback síncrono y manejar su cancelación.
+- Los contratos API rechazan `params` que no coincidan con la ruta y valores de `query` incompatibles con el transporte URL.
+- La limpieza de listas libera todos los hijos aunque falle un release o una hidratación posterior; el middleware HTTP propaga fallos de `next()` aunque su autor no lo espere.
+- El adaptador HTTP Node conserva varias cookies `Set-Cookie` y detiene el streaming cuando el cliente se desconecta.
+- Comandos de proyecto generados por Meeko, layouts en `app/layouts`, middleware de rutas y HTTP, y validación ampliada del consumidor externo.
+- CI selecciona el tarball generado por el build en lugar de fijar el nombre de una versión publicada.
+- El workflow de publicación exige ahora las pruebas de la extensión VS Code sobre el SHA del tag.
+
+## [0.0.4] - 2026-10-24
 
 ### Framework full-stack
 
