@@ -13,3 +13,5 @@ node_modules/vscode-html-languageservice/**
 node_modules/vscode-languageserver-textdocument/**
 node_modules/vscode-languageserver-types/**
 node_modules/vscode-uri/**
+node_modules/typescript/dist/**
+node_modules/typescript/vendor/**
