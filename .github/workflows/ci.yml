@@ -27,6 +27,11 @@ jobs:
           New-Item -ItemType Directory -Force .meeko/ci-logs | Out-Null
           pnpm run verify 2>&1 | Tee-Object -FilePath .meeko/ci-logs/verify.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Node adapter conformance
+        shell: pwsh
+        run: |
+          pnpm run conformance:node 2>&1 | Tee-Object -FilePath .meeko/ci-logs/conformance-node.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - run: node node_modules/playwright-core/cli.js install chromium firefox webkit
       - name: Browser E2E
         shell: pwsh
@@ -104,6 +109,70 @@ jobs:
         with:
           name: meeko-redis-log
           path: .meeko/ci-logs/redis.log
+          if-no-files-found: ignore
+
+  bun:
+    name: Conformidad Bun
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.4
+      - run: pnpm install --frozen-lockfile
+      - name: Bun adapter conformance
+        run: |
+          mkdir -p .meeko/ci-logs
+          set -o pipefail
+          pnpm run conformance:bun 2>&1 | tee .meeko/ci-logs/conformance-bun.log
+        env:
+          MEEKO_CONFORMANCE_REQUIRE: bun
+      - name: Bun diagnostic log on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: meeko-conformance-bun-log
+          path: .meeko/ci-logs/conformance-bun.log
+          if-no-files-found: ignore
+
+  deno:
+    name: Conformidad Deno
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: 2.9.8
+      - run: pnpm install --frozen-lockfile
+      - name: Deno adapter conformance
+        run: |
+          mkdir -p .meeko/ci-logs
+          set -o pipefail
+          pnpm run conformance:deno 2>&1 | tee .meeko/ci-logs/conformance-deno.log
+        env:
+          MEEKO_CONFORMANCE_REQUIRE: deno
+      - name: Deno diagnostic log on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: meeko-conformance-deno-log
+          path: .meeko/ci-logs/conformance-deno.log
           if-no-files-found: ignore
 
   vscode-extension:

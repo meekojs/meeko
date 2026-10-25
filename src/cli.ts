@@ -12,15 +12,15 @@ import { generateServerContracts } from "./framework/contracts-generate.js";
 import { checkApp, generateAppTypes } from "./framework/check-app.js";
 import { prerenderProject } from "./framework/prerender.js";
 import { generateTypeScriptAutoImports } from "./autoimports-ts.js";
-import { assertBuildAdapter, buildProject, startProject } from "./framework/project.js";
+import { assertBuildAdapter, buildProject, previewProject, startProject } from "./framework/project.js";
 import { checkFrameworkProject, prepareFrameworkTypes } from "./framework/check-project.js";
 
-const usage = "Usage: meeko dev [project-directory]\n       meeko check [project-directory | component.meeko] [--json]\n       meeko build [project-directory] [--adapter <node|cloudflare|deno|bun>]\n       meeko start [project-directory]\n       meeko preview [project-directory]\n       meeko check-app <project-directory>\n       meeko compile <component.meeko> <output.ts>\n       meeko types <component.meeko>\n       meeko routes <project-directory>\n       meeko prerender <project-directory>\n       meeko init <directory>\n       meeko init-framework <directory>\n       meeko lsp --stdio\n       meeko --help | --version\n";
+const usage = "Usage: meeko dev [project-directory]\n       meeko check [project-directory | component.meeko] [--json]\n       meeko build [project-directory] [--adapter <node|cloudflare|deno|bun>]\n       meeko start [project-directory]\n       meeko preview [project-directory] [--adapter <node|bun|deno>]\n       meeko check-app <project-directory>\n       meeko compile <component.meeko> <output.ts>\n       meeko types <component.meeko>\n       meeko routes <project-directory>\n       meeko prerender <project-directory>\n       meeko init <directory>\n       meeko init-framework <directory>\n       meeko lsp --stdio\n       meeko --help | --version\n";
 const argv = process.argv.slice(2);
-// `meeko build` accepts `--adapter <name>` or `--adapter=<name>` anywhere after the command.
+// `meeko build` and `meeko preview` accept `--adapter <name>` or `--adapter=<name>` anywhere after the command.
 let adapter: string | undefined;
 let invalidAdapter = false;
-if (argv[0] === "build") {
+if (argv[0] === "build" || argv[0] === "preview") {
   for (let index = 1; index < argv.length; index++) {
     const argument = argv[index]!;
     if (argument !== "--adapter" && !argument.startsWith("--adapter=")) continue;
@@ -53,8 +53,9 @@ if ((command === "--help" || command === "-h" || command === "help") && input ==
         await prepareFrameworkTypes(root);
         await startProject(root, false);
       }
-      // The Node build runs in Node itself, so preview and start share one host.
-      else if (command === "start" || command === "preview") await startProject(root, true);
+      else if (command === "start") await startProject(root, true);
+      // Preview runs the output in its runtime: Node in this process, Bun and Deno as a child.
+      else if (command === "preview") await previewProject(root, adapter === undefined ? undefined : assertBuildAdapter(adapter));
       else {
         const requested = adapter === undefined ? undefined : assertBuildAdapter(adapter);
         await checkFrameworkProject(root);

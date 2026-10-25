@@ -21,6 +21,8 @@ export { createLocalServerFetch, createServerDispatcher, loadSocketChannels } fr
 export type { ApiEndpoint, ApiMethod, RpcEndpoint, SocketEndpoint, ServerDispatcherOptions, ServerManifest, ServerModuleLoader } from "./framework-server/discovery.js";
 export { createSocketHub, defineSocketChannel, LocalSocketPubSub } from "./framework-server/socket.js";
 export type { SocketChannelDefinition, SocketConnection, SocketHub, SocketHubOptions, SocketPeer, SocketPubSub } from "./framework-server/socket.js";
+export { createSocketUpgradeHandler } from "./framework-server/upgrade.js";
+export type { SocketSession, SocketUpgrade, SocketUpgradeHandler, SocketUpgradeOptions } from "./framework-server/upgrade.js";
 export { generateOpenApi } from "./framework-server/openapi.js";
 export type { OpenApiOptions } from "./framework-server/openapi.js";
 export { createLocalCalls } from "./framework-server/local.js";

@@ -33,6 +33,18 @@ export function findAsset(assets: AssetManifest, pathname: string, request: Requ
   return Object.hasOwn(assets, pathname) ? assets[pathname] : undefined;
 }
 
+/**
+ * Locates a manifest key under an output directory. Keys are percent-encoded
+ * build paths, so URL roots resolve them directly and path roots decode them.
+ */
+export function assetLocation(root: string | URL, pathname: string): string | URL {
+  if (root instanceof URL) {
+    const directory = root.href.endsWith("/") ? root : new URL(`${root.href}/`);
+    return new URL(`.${pathname}`, directory);
+  }
+  return [root.replace(/[\\/]+$/, ""), ...pathname.split("/").filter(Boolean).map(decodeURIComponent)].join("/");
+}
+
 /** Builds the shared response for a listed asset: validators, HEAD and cache policy. */
 export function assetResponse(record: AssetRecord, request: Request, body: () => BodyInit | null): Response {
   const headers = new Headers({

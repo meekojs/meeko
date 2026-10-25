@@ -6,7 +6,7 @@ import { createNodeSocketUpgradeHandler } from "./node-upgrade.js";
 import { observeErrorCallback } from "./contracts.js";
 import type { NodeAcceptedSocket, NodeSocketUpgradeOptions } from "./node-upgrade.js";
 
-export interface NodeWebSocketOptions extends Omit<NodeSocketUpgradeOptions, "upgrade" | "reject"> {
+export interface NodeWebSocketOptions extends Omit<NodeSocketUpgradeOptions, "upgrade" | "reject" | "maxPendingBytes"> {
   /** The same HTTP server used by the Fetch handler. */
   server: HttpServer;
   /** Maximum WebSocket frame payload, enforced before decoding. Defaults to 64 KiB. */
@@ -80,6 +80,7 @@ export function attachNodeWebSocketServer(options: NodeWebSocketOptions): NodeWe
     hub: options.hub,
     publicOrigin: options.publicOrigin,
     ...(options.pathnamePrefix ? { pathnamePrefix: options.pathnamePrefix } : {}),
+    maxPendingBytes: maxPayload,
     upgrade,
     reject(_incoming, socket, status) {
       if (!socket.destroyed) socket.end(`HTTP/1.1 ${status} ${STATUS_CODES[status] ?? "Error"}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);

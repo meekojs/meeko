@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
@@ -15,7 +16,8 @@ import { buildDataFile, frameworkClientEntry, frameworkNodeEntry, frameworkServe
 import type { BuildAppData } from "./app-manifest.js";
 import { loadMeekoConfig } from "./config.js";
 import type { MeekoAdapterName } from "./config-type.js";
-import { prerenderProject } from "./prerender.js";
+import { prerenderWithNodeBuild } from "./prerender.js";
+import { bunEntrySource, denoEntrySource } from "./adapter-templates.js";
 import { clientEntrySource, nodeEntrySource, serverEntrySource } from "./project-templates.js";
 import { assertNoLegacySessionFile } from "./runtime-migration.js";
 import { stylesheetLinks } from "./styles.js";
@@ -24,7 +26,25 @@ export { frameworkClientEntry, frameworkServerEntry } from "./app-manifest.js";
 
 const clientOutput = ".meeko/output/client";
 const nodeOutput = ".meeko/output/node";
+/** Node server used only to prerender pages for adapters other than Node. */
+const prerenderServer = ".meeko/build/node";
 const adapters: readonly MeekoAdapterName[] = ["node", "cloudflare", "deno", "bun"];
+
+/** Self-contained bundles for runtimes that do not read node_modules. */
+const bundledAdapters = {
+  bun: { entry: ".meeko/generated/entry-bun.ts", source: bunEntrySource, file: "index.js" },
+  deno: { entry: ".meeko/generated/entry-deno.ts", source: denoEntrySource, file: "main.js" },
+} as const;
+
+/** Directory written by `meeko build` for an adapter. */
+export function adapterOutput(adapter: MeekoAdapterName): string {
+  return `.meeko/output/${adapter}`;
+}
+
+/** Entry file of an adapter's build output, relative to the project. */
+export function adapterEntry(adapter: "node" | "bun" | "deno"): string {
+  return `${adapterOutput(adapter)}/${adapter === "node" ? "index.mjs" : bundledAdapters[adapter].file}`;
+}
 
 /** Writes framework-owned Vite entries; no application file is overwritten. */
 export async function prepareProject(projectRoot: string): Promise<void> {
@@ -122,8 +142,8 @@ function clientAssets(manifest: ViteManifest): BuildAppData["client"] {
 /** Validates an adapter name and confirms this version can build it. */
 export function assertBuildAdapter(adapter: string): MeekoAdapterName {
   if (!adapters.includes(adapter as MeekoAdapterName)) throw new Error(`Unknown adapter ${adapter}; use node, cloudflare, deno or bun`);
-  if (adapter !== "node") throw new Error(`The ${adapter} adapter cannot be built by this Meeko version; build with --adapter node`);
-  return adapter;
+  if (adapter === "cloudflare") throw new Error(`The ${adapter} adapter cannot be built by this Meeko version; build with --adapter node, bun or deno`);
+  return adapter as MeekoAdapterName;
 }
 
 export interface BuildProjectOptions {
@@ -162,22 +182,81 @@ export async function buildProject(projectRoot: string, options: BuildProjectOpt
   };
   await mkdir(resolve(root, ".meeko/build"), { recursive: true });
   await writeFile(resolve(root, buildDataFile), JSON.stringify(data, null, 2) + "\n", "utf8");
-  const output = resolve(root, nodeOutput);
+  // The Node server also renders prerendered pages for the other adapters.
+  const nodeTarget = adapter === "node" ? nodeOutput : prerenderServer;
   await build({
     root, configFile: false, plugins: [meeko()], logLevel: "warn",
     ssr: { external: ["@meekojs/meeko"] },
     build: {
       ssr: frameworkNodeEntry,
-      outDir: nodeOutput, emptyOutDir: true,
+      outDir: nodeTarget, emptyOutDir: true,
       rollupOptions: { output: { entryFileNames: "index.mjs", chunkFileNames: "chunks/[name]-[hash].mjs" } },
     },
   });
+  const outputDirectory = adapterOutput(adapter);
+  const output = resolve(root, outputDirectory);
+  if (adapter === "bun" || adapter === "deno") {
+    const target = bundledAdapters[adapter];
+    await writeFile(resolve(root, target.entry), target.source, "utf8");
+    await build({
+      root, configFile: false, plugins: [meeko()], logLevel: "warn",
+      // Bundle every dependency, including Meeko itself; only runtime built-ins stay external.
+      ssr: {
+        noExternal: true,
+        resolve: { conditions: [adapter, "module", "node", "development|production"], externalConditions: [adapter, "node", "module-sync"] },
+      },
+      build: {
+        ssr: target.entry,
+        outDir: outputDirectory, emptyOutDir: true,
+        rollupOptions: { output: { entryFileNames: target.file, chunkFileNames: "chunks/[name]-[hash].js" } },
+      },
+    });
+  }
   await cp(resolve(root, clientOutput), join(output, "client"), {
     recursive: true,
     filter: (source) => relative(resolve(root, clientOutput), source).split(sep)[0] !== ".vite",
   });
-  await prerenderProject(root);
+  await prerenderWithNodeBuild(root, `${nodeTarget}/index.mjs`, `${outputDirectory}/prerender`);
   return { adapter, output };
+}
+
+const runtimes = {
+  bun: { command: "bun", args: (entry: string) => [entry], name: "Bun", install: "https://bun.sh" },
+  deno: { command: "deno", args: (entry: string) => ["run", "-A", entry], name: "Deno", install: "https://deno.com" },
+} as const;
+
+/**
+ * Runs a build output in its real runtime. Node runs in this process; Bun and
+ * Deno run as a child process whose exit code becomes this process's.
+ */
+export async function previewProject(projectRoot: string, adapter?: MeekoAdapterName): Promise<void> {
+  const root = resolve(projectRoot);
+  const target = adapter ?? (await loadMeekoConfig(root)).server?.adapter ?? "node";
+  if (target === "node") { await startProject(root, true); return; }
+  if (target === "cloudflare") throw new Error("The cloudflare adapter cannot be previewed by this Meeko version; use --adapter node, bun or deno");
+  const entry = resolve(root, adapterEntry(target));
+  if (!existsSync(entry)) throw new Error(`Missing production build at ${entry}; run meeko build --adapter ${target}`);
+  const runtime = runtimes[target];
+  const child = spawn(runtime.command, runtime.args(entry), { cwd: root, stdio: "inherit", windowsHide: true });
+  const forward = (signal: NodeJS.Signals): void => { child.kill(signal); };
+  process.on("SIGINT", forward);
+  process.on("SIGTERM", forward);
+  try {
+    await new Promise<void>((done, fail) => {
+      child.once("error", (error: NodeJS.ErrnoException) => {
+        fail(error.code === "ENOENT"
+          ? new Error(`${runtime.name} is not installed or not on PATH; install it from ${runtime.install} to preview the ${target} build`)
+          : error);
+      });
+      child.once("exit", (code, signal) => {
+        process.exitCode = code ?? (signal ? 1 : 0);
+        done();
+      });
+    });
+  } finally {
+    process.off("SIGINT", forward);
+    process.off("SIGTERM", forward);
+  }
 }
 
 interface NodeStartModule { start(): Promise<{ readonly server: Server }> }

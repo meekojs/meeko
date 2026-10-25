@@ -1,12 +1,18 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 
 function cli(...args: string[]) {
   return spawnSync(process.execPath, [resolve("dist/cli.js"), ...args], { encoding: "utf8" });
+}
+
+function cliWithoutPath(...args: string[]) {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of Object.keys(env)) if (key.toLowerCase() === "path") delete env[key];
+  return spawnSync(process.execPath, [resolve("dist/cli.js"), ...args], { encoding: "utf8", env: { ...env, PATH: "" } });
 }
 
 test("meeko --version prints the package version", async () => {
@@ -36,7 +42,7 @@ test("an unknown command prints usage to stderr and fails", () => {
 test("meeko --help lists build adapters and preview", () => {
   const result = cli("--help");
   assert.match(result.stdout, /meeko build \[project-directory\] \[--adapter <node\|cloudflare\|deno\|bun>\]/);
-  assert.match(result.stdout, /meeko preview \[project-directory\]/);
+  assert.match(result.stdout, /meeko preview \[project-directory\] \[--adapter <node\|bun\|deno>\]/);
 });
 
 test("meeko build rejects unknown and unavailable adapters before building", async () => {
@@ -45,14 +51,33 @@ test("meeko build rejects unknown and unavailable adapters before building", asy
     const unknown = cli("build", root, "--adapter", "lambda");
     assert.equal(unknown.status, 1);
     assert.match(unknown.stderr, /Unknown adapter lambda; use node, cloudflare, deno or bun/);
-    for (const args of [["--adapter", "deno"], ["--adapter=deno"]]) {
+    for (const args of [["--adapter", "cloudflare"], ["--adapter=cloudflare"]]) {
       const unavailable = cli("build", root, ...args);
       assert.equal(unavailable.status, 1);
-      assert.match(unavailable.stderr, /The deno adapter cannot be built by this Meeko version; build with --adapter node/);
+      assert.match(unavailable.stderr, /The cloudflare adapter cannot be built by this Meeko version; build with --adapter node, bun or deno/);
     }
     const missing = cli("build", root, "--adapter");
     assert.equal(missing.status, 1);
     assert.match(missing.stderr, /^Usage: meeko dev/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("meeko preview requires the adapter output and names a missing runtime", async () => {
+  const root = await mkdtemp(join(tmpdir(), "meeko-cli-preview-adapter-"));
+  try {
+    for (const [adapter, file] of [["bun", "index.js"], ["deno", "main.js"]] as const) {
+      const missing = cli("preview", root, "--adapter", adapter);
+      assert.equal(missing.status, 1);
+      assert.match(missing.stderr, new RegExp(`Missing production build at .*${file.replace(".", "\\.")}; run meeko build --adapter ${adapter}`));
+      const output = join(root, ".meeko", "output", adapter);
+      await mkdir(output, { recursive: true });
+      await writeFile(join(output, file), "", "utf8");
+      const runtime = cliWithoutPath("preview", root, `--adapter=${adapter}`);
+      assert.equal(runtime.status, 1);
+      assert.match(runtime.stderr, new RegExp(`${adapter === "bun" ? "Bun" : "Deno"} is not installed or not on PATH`));
+    }
   } finally {
     await rm(root, { recursive: true, force: true });
   }

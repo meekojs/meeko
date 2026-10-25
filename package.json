@@ -33,6 +33,14 @@
       "types": "./dist/node.d.ts",
       "default": "./dist/node.js"
     },
+    "./bun": {
+      "types": "./dist/bun.d.ts",
+      "default": "./dist/bun.js"
+    },
+    "./deno": {
+      "types": "./dist/deno.d.ts",
+      "default": "./dist/deno.js"
+    },
     "./build": {
       "types": "./dist/build.d.ts",
       "default": "./dist/build.js"
@@ -67,6 +75,10 @@
     "pilot:build": "tsx examples/pilot/build.ts",
     "pilot:serve": "node examples/pilot/.output/server/http.js",
     "pilot:e2e": "node --import tsx --test --test-force-exit tests/pilot.e2e.ts",
+    "conformance": "pnpm run build && tsx --test --test-concurrency=1 tests/conformance/*.test.ts",
+    "conformance:node": "pnpm run build && tsx --test tests/conformance/node.test.ts",
+    "conformance:bun": "pnpm run build && tsx --test tests/conformance/bun.test.ts",
+    "conformance:deno": "pnpm run build && tsx --test tests/conformance/deno.test.ts",
     "e2e": "pnpm run example:bundle && pnpm run vite:build && tsx --test tests/browser.e2e.ts",
     "benchmark:check": "pnpm run example:compile && node dist/cli.js compile benchmarks/cases/TreeLeaf.meeko benchmarks/cases/TreeLeaf.generated.ts && node dist/cli.js compile benchmarks/cases/TreeBranch.meeko benchmarks/cases/TreeBranch.generated.ts && node dist/cli.js compile benchmarks/cases/Tree.meeko benchmarks/cases/Tree.generated.ts && node dist/cli.js compile benchmarks/cases/List.meeko benchmarks/cases/List.generated.ts && node dist/cli.js compile benchmarks/cases/Navigation.meeko benchmarks/cases/Navigation.generated.ts && tsc -p tsconfig.benchmark.json --noEmit",
     "benchmark": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/run.ts",

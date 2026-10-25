@@ -1,0 +1,15 @@
+<script lang="ts">
+export interface Props {
+  params: Record<string, string>;
+  search: Record<string, string | string[]>;
+  data: { trace: string; platform: string };
+}
+const props = defineProps<Props>();
+</script>
+
+<template>
+  <section>
+    <h1>About conformance</h1>
+    <p id="platform">{props.data.platform}</p>
+  </section>
+</template>

@@ -105,8 +105,8 @@ interface NodeOutputModule {
 }
 
 /** Imports the built Node application without serving it. */
-export async function importNodeOutput(projectRoot: string): Promise<NodeOutputModule> {
-  const entry = resolve(projectRoot, ".meeko/output/node/index.mjs");
+export async function importNodeOutput(projectRoot: string, server = ".meeko/output/node/index.mjs"): Promise<NodeOutputModule> {
+  const entry = resolve(projectRoot, server);
   try { await access(entry); }
   catch { throw new Error(`Missing production build at ${entry}; run meeko build`); }
   // A query keeps repeated builds in one process from reusing a cached entry.
@@ -119,10 +119,15 @@ export async function importNodeOutput(projectRoot: string): Promise<NodeOutputM
 
 /** Renders `render: "prerender"` routes from the Node build into .meeko/output/node/prerender. */
 export async function prerenderProject(projectRoot: string): Promise<string[]> {
+  return prerenderWithNodeBuild(projectRoot, ".meeko/output/node/index.mjs", ".meeko/output/node/prerender");
+}
+
+/** Renders prerendered routes with a built Node server into an adapter's output directory. */
+export async function prerenderWithNodeBuild(projectRoot: string, server: string, prerenderOutput: string): Promise<string[]> {
   const root = resolve(projectRoot);
-  const output = await importNodeOutput(root);
+  const output = await importNodeOutput(root, server);
   const app = await output.createNodeApp({ prerendering: true }) as InternalServerApp;
-  const outputRoot = resolve(root, ".meeko/output/node/prerender");
+  const outputRoot = resolve(root, prerenderOutput);
   try {
     await rm(outputRoot, { recursive: true, force: true });
     return await prerenderRoutes({
