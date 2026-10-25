@@ -256,6 +256,8 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
         ...(runtime.socket?.allowedOrigins ? { allowedOrigins: runtime.socket.allowedOrigins } : {}),
         ...(runtime.socket?.maxMessageBytes === undefined ? {} : { maxMessageBytes: runtime.socket.maxMessageBytes }),
         ...(runtime.socket?.maxBufferBytes === undefined ? {} : { maxBufferBytes: runtime.socket.maxBufferBytes }),
+        ...(runtime.socket?.maxPendingDeliveries === undefined ? {} : { maxPendingDeliveries: runtime.socket.maxPendingDeliveries }),
+        ...(runtime.socket?.sessionRefreshMs === undefined ? {} : { sessionRefreshMs: runtime.socket.sessionRefreshMs }),
         ...(runtime.socket?.pubsub ? { pubsub: runtime.socket.pubsub } : {}),
         // Delivery failures belong to this instance, never to the broadcaster.
         onDeliveryError: runtime.socket?.onDeliveryError ?? ((error) => observeServerError(error, crypto.randomUUID(), reportError)),

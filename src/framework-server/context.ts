@@ -31,15 +31,39 @@ export function currentRequest(): ActiveRequest {
   return active;
 }
 
+/** Combined signal of each request signal and session revocation signal, built once per pair. */
+const combinedSignals = new WeakMap<AbortSignal, WeakMap<AbortSignal, AbortSignal>>();
+/**
+ * `AbortSignal.any` holds its sources weakly. Each combined signal keeps its
+ * revocation signal, and through it the session's controller, alive so that a
+ * callback retaining only `context.signal` still observes the revocation.
+ */
+const revocationSources = new WeakMap<AbortSignal, AbortSignal>();
+
+function combinedSignal(request: AbortSignal, revocation: AbortSignal): AbortSignal {
+  let byRevocation = combinedSignals.get(request);
+  if (!byRevocation) { byRevocation = new WeakMap(); combinedSignals.set(request, byRevocation); }
+  let signal = byRevocation.get(revocation);
+  if (!signal) {
+    signal = AbortSignal.any([request, revocation]);
+    byRevocation.set(revocation, signal);
+    revocationSources.set(signal, revocation);
+  }
+  return signal;
+}
+
 /**
  * Without an adapter platform, the context receives a detached platform with an
  * empty environment. `signal` aborts when the client disconnects or, with
- * `SessionRevokedError`, when the session's family is revoked.
+ * `SessionRevokedError`, when the session's family is revoked; it is combined
+ * on first access.
  */
 export function createRequestContext<TServices, TEnv = unknown>(request: Request, services: TServices, session: SessionHandle, platform?: ServerPlatform<TEnv>): RequestContext<TServices, TEnv> {
   const revocation = (session as Partial<SessionHandle> | undefined)?.signal;
+  let signal: AbortSignal | undefined;
   return {
-    request, requestId: crypto.randomUUID(), signal: revocation ? AbortSignal.any([request.signal, revocation]) : request.signal, services, session, state: new Map(),
+    request, requestId: crypto.randomUUID(), services, session, state: new Map(),
+    get signal() { return signal ??= revocation ? combinedSignal(request.signal, revocation) : request.signal; },
     platform: platform ?? defaultPlatform() as ServerPlatform<TEnv>,
   };
 }

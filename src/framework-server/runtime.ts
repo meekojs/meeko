@@ -32,6 +32,10 @@ export interface ServerRuntime<Services = unknown, Env = unknown> {
     /** Maximum inbound and outbound message size. Defaults to 64 KiB. */
     readonly maxMessageBytes?: number;
     readonly maxBufferBytes?: number;
+    /** Broker deliveries a peer may have waiting before it is closed with `1013`. Defaults to 256. */
+    readonly maxPendingDeliveries?: number;
+    /** Milliseconds a delivery may reuse the peer's last session read. Defaults to 1000. */
+    readonly sessionRefreshMs?: number;
   };
   /**
    * Public origin of the application, such as `https://example.com` behind a

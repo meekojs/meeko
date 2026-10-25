@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { setFlagsFromString } from "node:v8";
+import { runInNewContext } from "node:vm";
 import {
   ApiError, createRequestContext, createServerApp, createSocketHub, defineApiRoute, defineServerRuntime, defineSocketChannel,
   MemorySessionStore, RedisSessionStore, SessionManager, SessionRevokedError,
@@ -160,4 +162,97 @@ test("an API request in flight answers 401 SESSION_REVOKED once its session is r
   assert.equal(answered.status, 401);
   assert.equal(((await answered.json()) as { code: string }).code, "SESSION_REVOKED");
   await app.close();
+});
+
+setFlagsFromString("--expose-gc");
+const collectGarbage = runInNewContext("gc") as () => void;
+
+async function forceGc(): Promise<void> {
+  for (let round = 0; round < 6; round++) {
+    await new Promise((resolve) => setImmediate(resolve));
+    collectGarbage();
+  }
+}
+
+test("a revocation aborts RequestContext.signal and SessionHandle.signal even when only the signal is retained", async () => {
+  const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+  const record = await signIn(sessions);
+  // Neither the handle nor the context stays reachable: only their signals do.
+  const contextSignal = await (async () => createRequestContext(withCookie(sessions, record.id), {}, await sessions.load(withCookie(sessions, record.id))).signal)();
+  const sessionSignal = await (async () => (await sessions.load(withCookie(sessions, record.id))).signal)();
+  await forceGc();
+  await (await sessions.load(withCookie(sessions, record.id))).revoke();
+  assert.equal(sessionSignal.aborted, true, "SessionHandle.signal");
+  assert.ok(sessionSignal.reason instanceof SessionRevokedError);
+  assert.equal(contextSignal.aborted, true, "RequestContext.signal");
+  assert.ok(contextSignal.reason instanceof SessionRevokedError);
+});
+
+test("RequestContext.signal is created lazily and reused for the same request and session", async () => {
+  const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+  const record = await signIn(sessions);
+  const request = withCookie(sessions, record.id);
+  const handle = await sessions.load(request);
+  const originalAny = AbortSignal.any;
+  let combined = 0;
+  AbortSignal.any = (signals) => { combined++; return originalAny.call(AbortSignal, signals); };
+  try {
+    const first = createRequestContext(request, {}, handle);
+    const second = createRequestContext(request, {}, handle);
+    assert.equal(combined, 0, "no composite signal until a callback reads it");
+    assert.equal(first.signal, second.signal);
+    assert.equal(combined, 1);
+  } finally {
+    AbortSignal.any = originalAny;
+  }
+});
+
+test("a handle loaded before a revocation notice but registered after it is aborted on registration", async () => {
+  class GatedStore extends MemorySessionStore {
+    hold: Promise<void> | undefined;
+    read: (() => void) | undefined;
+    override async get(id: string) {
+      const record = await super.get(id);
+      const hold = this.hold;
+      this.hold = undefined;
+      if (hold) { this.read?.(); await hold; }
+      return record;
+    }
+  }
+  const store = new GatedStore();
+  const instanceA = new SessionManager({ store, secure: false });
+  const instanceB = new SessionManager({ store, secure: false });
+  const record = await signIn(instanceA);
+  await instanceB.load(new Request(origin));
+  let release!: () => void;
+  store.hold = new Promise((resolve) => { release = resolve; });
+  const readDone = new Promise<void>((resolve) => { store.read = resolve; });
+  const loading = instanceB.load(withCookie(instanceB, record.id));
+  await readDone;
+  await (await instanceA.load(withCookie(instanceA, record.id))).revoke();
+  release();
+  const late = await loading;
+  assert.equal(late.current?.id, record.id, "the record was read before the revocation");
+  assert.equal(late.signal.aborted, true);
+  assert.ok(late.signal.reason instanceof SessionRevokedError);
+  await assert.rejects(late.verify(), SessionRevokedError);
+});
+
+test("a failed revokeFamily keeps the handle watching its family", async () => {
+  class FlakyStore extends MemorySessionStore {
+    failNext = true;
+    override async revokeFamily(familyId: string) {
+      if (this.failNext) { this.failNext = false; throw new Error("store unavailable"); }
+      return super.revokeFamily(familyId);
+    }
+  }
+  const sessions = new SessionManager({ store: new FlakyStore(), secure: false });
+  const record = await signIn(sessions);
+  const handle = await sessions.load(withCookie(sessions, record.id));
+  await assert.rejects(handle.revoke(), /store unavailable/);
+  assert.equal(handle.current?.id, record.id);
+  assert.equal(handle.signal.aborted, false);
+  await (await sessions.load(withCookie(sessions, record.id))).revoke();
+  assert.equal(handle.signal.aborted, true);
+  assert.ok(handle.signal.reason instanceof SessionRevokedError);
 });

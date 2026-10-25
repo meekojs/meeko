@@ -199,11 +199,21 @@ function revocationRegistry(manager: SessionManager<any>): RevocationRegistry {
   return registry;
 }
 
+/**
+ * The registry holds controllers weakly, and a signal does not reference its
+ * controller. This keeps each controller alive while its signal is reachable,
+ * so code that retains only `SessionHandle.signal` still sees the revocation.
+ */
+const signalControllers = new WeakMap<AbortSignal, AbortController>();
+
 export class SessionHandle<T = unknown> {
   private pendingCookie?: string;
   private readonly revocation = new AbortController();
   private watched: { readonly familyId: string; readonly ref: WeakRef<AbortController> | undefined } | undefined;
-  constructor(private readonly manager: SessionManager<T>, public current?: SessionRecord<T>) { this.watch(); }
+  constructor(private readonly manager: SessionManager<T>, public current?: SessionRecord<T>) {
+    signalControllers.set(this.revocation.signal, this.revocation);
+    this.watch();
+  }
   get cookieHeader(): string | undefined { return this.pendingCookie; }
   /**
    * Aborts with `SessionRevokedError` when another request or instance revokes

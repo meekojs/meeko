@@ -260,6 +260,65 @@ test("RedisSocketPubSub supports Redis 7 sharded pub/sub", { skip: !url }, async
   }
 });
 
+test("RedisSocketPubSub keeps the room subscribed when the last peer leaves while another joins, on real Redis", { skip: !url, timeout: 30_000 }, async () => {
+  if (!url) throw new Error("MEEKO_REDIS_URL is required");
+  const publisher = await connectedClient(url);
+  const subscriber = publisher.duplicate();
+  subscriber.on("error", () => {});
+  await subscriber.connect();
+  const prefix = `meeko:test:${randomUUID()}:`;
+  try {
+    const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+    const pubsub = new RedisSocketPubSub({ publisher, subscriber, prefix });
+    const hub = createSocketHub({ channels: { chat: defineSocketChannel({ clientToServer: {}, serverToClient: { message: textSchema } }) }, sessions, services: {}, pubsub });
+    const request = new Request("https://example.test/_meeko/socket/chat", { headers: { origin: "https://example.test" } });
+    const channel = pubsub.channelName("chat", "room");
+    let current = await hub.accept("chat", request, { send() {}, close() {} }, "room");
+    for (let round = 0; round < 5; round++) {
+      const sent: string[] = [];
+      current.close(); // the UNSUBSCRIBE is still in flight when the next peer subscribes
+      current = await hub.accept("chat", request, { send(message) { sent.push(message); }, close() {} }, "room");
+      await hub.broadcast("chat", "room", "message", { text: `round ${round}` });
+      const deadline = Date.now() + 5_000;
+      while (!sent.length) {
+        assert.ok(Date.now() < deadline, `round ${round} was not delivered`);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      assert.deepEqual(sent.map((message) => (JSON.parse(message) as { payload: { text: string } }).payload.text), [`round ${round}`]);
+      assert.deepEqual(await publisher.sendCommand(["PUBSUB", "NUMSUB", channel]), [channel, 1]);
+    }
+    current.close();
+  } finally {
+    await subscriber.quit();
+    await deletePrefix(publisher, prefix);
+    await publisher.quit();
+  }
+});
+
+test("hub.broadcast rejects a message that escaping pushes past maxMessageBytes before reaching real Redis", { skip: !url }, async () => {
+  if (!url) throw new Error("MEEKO_REDIS_URL is required");
+  const publisher = await connectedClient(url);
+  const subscriber = publisher.duplicate();
+  subscriber.on("error", () => {});
+  await subscriber.connect();
+  const prefix = `meeko:test:${randomUUID()}:`;
+  try {
+    const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+    const hub = createSocketHub({ channels: { chat: defineSocketChannel({ clientToServer: {}, serverToClient: { message: textSchema } }) }, sessions, services: {}, pubsub: new RedisSocketPubSub({ publisher, subscriber, prefix }) });
+    const closed: number[] = [];
+    const connection = await hub.accept("chat", new Request("https://example.test/_meeko/socket/chat", { headers: { origin: "https://example.test" } }), { send() {}, close(code) { closed.push(code ?? 1000); } }, "room");
+    await assert.rejects(hub.broadcast("chat", "room", "message", { text: "<".repeat(11_000) }), /SOCKET_LIMIT_EXCEEDED/);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.deepEqual(closed, []);
+    connection.close();
+  } finally {
+    await subscriber.quit();
+    await deletePrefix(publisher, prefix);
+    await publisher.quit();
+  }
+});
+
 test("a revocation on one instance aborts an in-flight request on another through real Redis", { skip: !url, timeout: 30_000 }, async () => {
   if (!url) throw new Error("MEEKO_REDIS_URL is required");
   const prefix = `meeko:test:${randomUUID()}:`;

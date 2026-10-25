@@ -1,7 +1,7 @@
 import { createRequestContext, type RequestContext } from "./context.js";
 import { ApiError, normalizeServerError, observeErrorCallback, SessionRevokedError, type Schema } from "./contracts.js";
 import { serializeJson } from "../server.js";
-import type { SessionManager } from "./sessions.js";
+import type { SessionHandle, SessionManager } from "./sessions.js";
 import type { ServerPlatform } from "./platform.js";
 
 type Output<S> = S extends Schema<unknown, infer O> ? O : never;
@@ -91,8 +91,22 @@ export interface SocketHubOptions<TServices = unknown> {
   sessions: SessionManager;
   services: TServices | ((request: Request) => TServices | Promise<TServices>);
   allowedOrigins?: readonly string[];
+  /** Largest inbound or outbound message, serialized. `broadcast` rejects larger ones. Defaults to 64 KiB. */
   maxMessageBytes?: number;
   maxBufferBytes?: number;
+  /**
+   * Broker deliveries waiting for one local peer, counting the one in progress.
+   * A peer that falls further behind is closed with `1013` and reported with
+   * `SOCKET_BACKLOG_EXCEEDED`. Defaults to 256.
+   */
+  maxPendingDeliveries?: number;
+  /**
+   * Milliseconds during which deliveries reuse the peer's last session read
+   * instead of reloading it from the store. A revocation still closes the peer
+   * at once through `SessionHandle.signal`; `0` reloads on every delivery.
+   * Authorization callbacks run on every delivery. Defaults to 1000.
+   */
+  sessionRefreshMs?: number;
   pubsub?: SocketPubSub;
   /** Runtime exposed through `RequestContext.platform` in channel callbacks. */
   platform?: ServerPlatform;
@@ -116,12 +130,16 @@ export interface SocketHub {
   /** Resolves once the connection is subscribed to its channel and room. */
   accept(name: string, request: Request, peer: SocketPeer, roomId?: string): Promise<SocketConnection>;
   /**
-   * Validates the event and resolves once the broker accepts it. Each peer
-   * receives it at most once; a peer that fails is closed and reported through
-   * `onDeliveryError` on the hub that owns it.
+   * Validates the event and resolves once the broker accepts it. Rejects with
+   * `SOCKET_LIMIT_EXCEEDED` (413), before publishing, when the serialized
+   * message exceeds `maxMessageBytes`. Each peer receives it at most once; a
+   * peer that fails is closed and reported through `onDeliveryError` on the
+   * hub that owns it.
    */
   broadcast(name: string, roomId: string, event: string, payload: unknown): Promise<void>;
 }
+
+const encoder = new TextEncoder();
 
 async function validate(schema: Schema, value: unknown): Promise<unknown> {
   const result = await schema["~standard"].validate(value);
@@ -143,7 +161,12 @@ function originAllowed(request: Request, allowedOrigins: readonly string[]): boo
 export function createSocketHub<TServices>(options: SocketHubOptions<TServices>): SocketHub {
   const maxMessageBytes = options.maxMessageBytes ?? 64 * 1024;
   const maxBufferBytes = options.maxBufferBytes ?? 1024 * 1024;
-  if (!Number.isSafeInteger(maxMessageBytes) || maxMessageBytes <= 0 || !Number.isSafeInteger(maxBufferBytes) || maxBufferBytes <= 0) throw new RangeError("Invalid socket limits");
+  const maxPendingDeliveries = options.maxPendingDeliveries ?? 256;
+  const sessionRefreshMs = options.sessionRefreshMs ?? 1000;
+  if (!Number.isSafeInteger(maxMessageBytes) || maxMessageBytes <= 0 || !Number.isSafeInteger(maxBufferBytes) || maxBufferBytes <= 0 ||
+      !Number.isSafeInteger(maxPendingDeliveries) || maxPendingDeliveries <= 0 || !Number.isFinite(sessionRefreshMs) || sessionRefreshMs < 0) {
+    throw new RangeError("Invalid socket limits");
+  }
   const pubsub = options.pubsub ?? new LocalSocketPubSub();
   const getDefinition = (name: string) => channelDefinition(options.channels[name]);
   const authorizeHandshake = async (name: string, request: Request, roomId?: string) => {
@@ -173,13 +196,31 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
       const scope = roomId === undefined ? {} : { roomId };
       let closed = false;
       let release: Unsubscribe | undefined;
+      // Revocations arrive through `signal`; other changes (expiry, rotation, a
+      // deletion without notice) are seen when the session is reloaded.
+      let deliverySession: SessionHandle = session;
+      let deliverySessionAt = Date.now();
+      let reloading: Promise<SessionHandle> | undefined;
+      const remember = (fresh: SessionHandle): SessionHandle => {
+        deliverySession = fresh;
+        deliverySessionAt = Date.now();
+        return fresh;
+      };
+      const sessionForDelivery = (): Promise<SessionHandle> => {
+        const now = Date.now();
+        const expiresAt = deliverySession.current?.expiresAt;
+        if (!deliverySession.signal.aborted && now - deliverySessionAt < sessionRefreshMs && (expiresAt === undefined || expiresAt > now)) {
+          return Promise.resolve(deliverySession);
+        }
+        return reloading ??= options.sessions.load(request).then(remember).finally(() => { reloading = undefined; });
+      };
       // `broadcast` deliveries skip peers refused by `authorizeSend`; direct emits fail.
       const deliver = async (event: string, payload: unknown, broadcast: boolean): Promise<void> => {
         if (closed) throw new ApiError("SOCKET_DISCONNECTED", 409);
         const schema = definition.serverToClient[event];
         if (!schema) throw new ApiError("UNKNOWN_SOCKET_EVENT", 404);
         const checked = await validate(schema, payload);
-        const fresh = await options.sessions.load(request);
+        const fresh = await sessionForDelivery();
         if (definition.auth === "required" && !fresh.current) failAndClose(new ApiError("UNAUTHENTICATED", 401), 1008, "Session expired");
         const sendContext = createRequestContext(request, services, fresh, options.platform);
         if (definition.authorize && !(await definition.authorize({ context: sendContext, ...scope }))) throw new ApiError("FORBIDDEN", 403);
@@ -188,7 +229,8 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
           throw new ApiError("FORBIDDEN", 403);
         }
         const message = serializeJson({ event, payload: checked });
-        const messageBytes = new TextEncoder().encode(message).byteLength;
+        const messageBytes = encoder.encode(message).byteLength;
+        // `broadcast` already rejects oversized messages; this protects receivers with a smaller limit.
         if (messageBytes > maxMessageBytes || (peer.bufferedAmount ?? 0) + messageBytes > maxBufferBytes) {
           failAndClose(new ApiError("SOCKET_LIMIT_EXCEEDED", 413), 1009, "Message too large");
         }
@@ -203,11 +245,23 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
       const emit = (event: string, payload: unknown): Promise<void> => deliver(event, payload, false);
       // Broker deliveries run one at a time per peer, in arrival order, and never reject.
       let queue: Promise<void> = Promise.resolve();
+      let pending = 0;
       const receiveBroadcast = ({ event, payload }: SocketMessage): Promise<void> => {
+        if (closed) return Promise.resolve();
+        if (pending >= maxPendingDeliveries) {
+          // A peer that cannot keep up is dropped instead of buffering without bound.
+          const error = new ApiError("SOCKET_BACKLOG_EXCEEDED", 503);
+          try { close(1013, "Delivery backlog exceeded"); }
+          catch (closeError) { error.cause = closeError; }
+          reportDelivery(error, { channel: name, room, event });
+          return Promise.resolve();
+        }
+        pending++;
         queue = queue.then(async () => {
-          if (closed) return;
-          try { await deliver(event, payload, true); }
-          catch (error) {
+          try {
+            if (closed) return;
+            await deliver(event, payload, true);
+          } catch (error) {
             if (closed && error instanceof ApiError && error.code === "SOCKET_DISCONNECTED") return;
             // A malformed message is not the peer's fault; every other failure closes it.
             const messageFault = error instanceof ApiError && (error.code === "INVALID_SOCKET_PAYLOAD" || error.code === "UNKNOWN_SOCKET_EVENT");
@@ -216,6 +270,8 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
               catch (closeError) { reportDelivery(closeError, { channel: name, room, event }); }
             }
             reportDelivery(error, { channel: name, room, event });
+          } finally {
+            pending--;
           }
         });
         return queue;
@@ -251,10 +307,12 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
         throw error;
       }
       release = await pubsub.subscribe(name, room, receiveBroadcast);
-      if (session.signal.aborted) {
+      // A delivery during `subscribe` may already have closed the peer, before `release` existed.
+      if (closed || session.signal.aborted) {
+        const disconnected = closed;
         closed = true;
         unsubscribe();
-        throw new SessionRevokedError();
+        throw disconnected ? new ApiError("SOCKET_DISCONNECTED", 409) : new SessionRevokedError();
       }
       // Revoking the handshake session's family closes the connection immediately.
       session.signal.addEventListener("abort", onRevoked, { once: true });
@@ -263,7 +321,7 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
         close,
         async receive(raw) {
           if (closed) throw new ApiError("SOCKET_DISCONNECTED", 409);
-          const bytes = typeof raw === "string" ? new TextEncoder().encode(raw) : raw;
+          const bytes = typeof raw === "string" ? encoder.encode(raw) : raw;
           if (bytes.byteLength > maxMessageBytes) failAndClose(new ApiError("SOCKET_LIMIT_EXCEEDED", 413), 1009, "Message too large");
           let envelope: unknown;
           try { envelope = JSON.parse(typeof raw === "string" ? raw : new TextDecoder("utf-8", { fatal: true }).decode(raw)) as unknown; }
@@ -276,7 +334,7 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
           if (!schema) failAndClose(new ApiError("UNKNOWN_SOCKET_EVENT", 404), 1008, "Unknown event");
           const payload = await validate(schema, (envelope as { payload: unknown }).payload);
           // Re-read storage and policy for every event, including after a session revocation.
-          const fresh = await options.sessions.load(request);
+          const fresh = remember(await options.sessions.load(request));
           if (definition.auth === "required" && !fresh.current) failAndClose(new ApiError("UNAUTHENTICATED", 401), 1008, "Session expired");
           const eventContext = createRequestContext(request, services, fresh, options.platform);
           if (definition.authorize && !(await definition.authorize({ context: eventContext, ...(roomId === undefined ? {} : { roomId }) }))) throw new ApiError("FORBIDDEN", 403);
@@ -292,7 +350,8 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
       const schema = definition.serverToClient[event];
       if (!schema) throw new ApiError("UNKNOWN_SOCKET_EVENT", 404);
       const checked = await validate(schema, payload);
-      serializeJson({ event, payload: checked });
+      // Escaping can grow a payload past the limit; rejecting here spares every peer a `1009` close.
+      if (encoder.encode(serializeJson({ event, payload: checked })).byteLength > maxMessageBytes) throw new ApiError("SOCKET_LIMIT_EXCEEDED", 413);
       await pubsub.publish(name, roomId, { event, payload: checked });
     },
   };

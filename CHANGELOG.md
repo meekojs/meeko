@@ -25,7 +25,8 @@
 
 - Cambia el contrato de broadcast de Socket:
   - `hub.broadcast()` se resuelve cuando el broker acepta el mensaje y ya no rechaza por fallos de entrega a los peers.
-  - Un peer que falla se cierra (`1008`, `1009` o `1011`) y su error llega a `SocketHubOptions.onDeliveryError(error, { channel, room, event })` de la instancia que tiene ese peer. `createServerApp` lo conecta por defecto al `onError` del runtime.
+  - `hub.broadcast()` rechaza por tamaño: si el mensaje serializado con `serializeJson` (que escribe `<`, `>` y `&` con 6 bytes) supera `maxMessageBytes`, rechaza con `SOCKET_LIMIT_EXCEEDED` (413) antes de publicar, en lugar de cerrar con `1009` a todos los peers de la sala.
+  - Un peer que falla se cierra (`1008`, `1009`, `1011`, o `1013` si su cola de entregas se llena) y su error llega a `SocketHubOptions.onDeliveryError(error, { channel, room, event })` de la instancia que tiene ese peer. `createServerApp` lo conecta por defecto al `onError` del runtime.
   - `LocalSocketPubSub.publish` deja de agregar errores de sus listeners y los envía a `onListenerError`.
   - En un broadcast, `authorizeSend` que devuelve `false` omite a ese peer sin cerrarlo.
   - Quien dependía del rechazo de `broadcast` debe observar `onDeliveryError` o `onError`.
@@ -49,6 +50,10 @@
   - `SessionHandle.signal` y `RequestContext.signal` se abortan con `SessionRevokedError`, exportado y equivalente a `ApiError` `SESSION_REVOKED` con estado `401`.
   - Los sockets de la familia revocada se cierran con `1008`.
   - `SessionHandle.verify()` relee el store antes de efectos irreversibles.
+  - `SessionHandle.signal` y `RequestContext.signal` se abortan aunque el código sólo conserve la señal; `RequestContext.signal` se combina al leerla por primera vez.
+- Contrapresión de Socket con brokers asíncronos como Redis, configurable en `SocketHubOptions` y en `socket` de `server/runtime.ts`:
+  - `maxPendingDeliveries` (256 por defecto) limita las entregas pendientes de cada peer; un peer que lo supera se cierra con `1013` y se informa con `SOCKET_BACKLOG_EXCEEDED` (503) a `onDeliveryError`.
+  - `sessionRefreshMs` (1000 ms por defecto) hace que las entregas de broadcast reutilicen la última lectura de la sesión durante ese intervalo; las revocaciones siguen cerrando el peer al instante y `authorize`/`authorizeSend` se ejecutan en cada entrega. Con `0` se relee en cada entrega, como antes.
 - `mountClientApp({ onError })` observa los fallos de la aplicación (navegación, Socket, y eventos, efectos o limpiezas sin un `provideErrorHandler` más cercano) junto con su `ErrorSource`. `provideErrorHandler` recibe también los rechazos de `effect` y `onCleanup` que devuelven una promesa por error.
 - La navegación cliente es transaccional: la vista nueva se hidrata junto a la actual y la anterior sólo se retira tras una hidratación correcta; un outlet restaura su página anterior. Sólo si también falla esa restauración se recarga la última URL confirmada.
 - La navegación actualiza `document.title` con el `head` de la página siguiente.
