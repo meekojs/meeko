@@ -44,6 +44,20 @@ function originOf(value: string): string {
   return url.origin;
 }
 
+/**
+ * Resolves a request-target against its origin. Origin-form targets are
+ * assigned as path and query, so `//other.example/x` stays on `base` instead of
+ * being read as a scheme-relative URL of another host.
+ */
+function requestUrl(target: string, base: string): URL {
+  if (!target.startsWith("/")) return new URL(target, base);
+  const url = new URL(base);
+  const query = target.indexOf("?");
+  url.pathname = query < 0 ? target : target.slice(0, query);
+  url.search = query < 0 ? "" : target.slice(query);
+  return url;
+}
+
 /** Adapts a portable Fetch handler to Node 24's HTTP server callback. */
 export function toNodeListener(handler: (request: Request) => Promise<Response> | Response, options: NodeListenerOptions = {}): (request: IncomingMessage, response: ServerResponse) => void {
   const publicOrigin = options.publicOrigin ? originOf(options.publicOrigin) : undefined;
@@ -59,7 +73,7 @@ export function toNodeListener(handler: (request: Request) => Promise<Response> 
       const protocol = incoming.socket instanceof TLSSocket ? "https" : "http";
       let url: URL;
       try {
-        url = new URL(incoming.url ?? "/", publicOrigin ?? `${protocol}://${authority}`);
+        url = requestUrl(incoming.url || "/", publicOrigin ?? `${protocol}://${authority}`);
         if (publicOrigin && url.origin !== publicOrigin) throw new TypeError("Absolute request target outside publicOrigin");
       }
       catch { throw new ApiError("INVALID_URL", 400); }
@@ -78,10 +92,15 @@ export function toNodeListener(handler: (request: Request) => Promise<Response> 
       if (candidateRequestId && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateRequestId)) {
         responseRequestId = candidateRequestId;
       }
-      if (controller.signal.aborted || outgoing.destroyed) return;
+      // An unsent body may hold a file handle or a running producer.
+      const discard = async (): Promise<void> => { await result.body?.cancel().catch(() => {}); };
+      if (controller.signal.aborted || outgoing.destroyed) { await discard(); return; }
       outgoing.writeHead(result.status, nodeResponseHeaders(result.headers));
-      if (method === "HEAD" || !result.body) { outgoing.end(); return; }
+      if (method === "HEAD" || !result.body) { await discard(); outgoing.end(); return; }
       const reader = result.body.getReader();
+      // A client that leaves while the producer is idle must still stop it.
+      const cancelOnAbort = (): void => { void reader.cancel().catch(() => {}); };
+      controller.signal.addEventListener("abort", cancelOnAbort, { once: true });
       try {
         while (true) {
           if (controller.signal.aborted || outgoing.destroyed) { await reader.cancel(); return; }
@@ -90,7 +109,10 @@ export function toNodeListener(handler: (request: Request) => Promise<Response> 
           if (controller.signal.aborted || outgoing.destroyed) { await reader.cancel(); return; }
           outgoing.write(chunk.value);
         }
-      } finally { reader.releaseLock(); }
+      } finally {
+        controller.signal.removeEventListener("abort", cancelOnAbort);
+        reader.releaseLock();
+      }
       if (!controller.signal.aborted && !outgoing.destroyed) outgoing.end();
       } finally {
         incoming.off("aborted", abort);
@@ -160,6 +182,11 @@ export interface ServeNodeOptions {
   readonly onError?: (error: unknown, requestId: string) => void;
   /** Close gracefully on SIGINT and SIGTERM. */
   readonly handleSignals?: boolean;
+  /**
+   * Milliseconds that open responses, such as streams, may keep running after
+   * `close()` before their connections are cut. Defaults to 10 000.
+   */
+  readonly shutdownTimeout?: number;
 }
 
 export interface NodeServer {
@@ -196,6 +223,10 @@ export async function serveNode(app: ServerApp, options: ServeNodeOptions = {}):
   const host = options.host ?? "127.0.0.1";
   const port = options.port ?? 4173;
   if (!Number.isSafeInteger(port) || port < 0 || port > 65535) throw new RangeError(`Invalid port: ${port}`);
+  const shutdownTimeout = options.shutdownTimeout ?? 10_000;
+  if (!Number.isFinite(shutdownTimeout) || shutdownTimeout < 0 || shutdownTimeout > 2_147_483_647) {
+    throw new RangeError(`Invalid shutdownTimeout: ${shutdownTimeout}`);
+  }
   const report = options.onError ?? ((error: unknown, requestId: string) => app.reportError(error, requestId));
   const publicOrigin = options.publicOrigin ?? app.publicOrigin;
   const nodePlatform = createNodePlatform((error) => report(error, randomUUID()));
@@ -204,6 +235,7 @@ export async function serveNode(app: ServerApp, options: ServeNodeOptions = {}):
     onError: report, ...(publicOrigin ? { publicOrigin } : {}),
   }));
   let socketServer: NodeWebSocketServer | undefined;
+  let url: string;
   try {
     await new Promise<void>((done, fail) => {
       server.once("error", fail);
@@ -212,22 +244,27 @@ export async function serveNode(app: ServerApp, options: ServeNodeOptions = {}):
         done();
       });
     });
+    const address = server.address();
+    const actualPort = address && typeof address !== "string" ? address.port : port;
+    url = `http://${urlHost(host)}:${actualPort}`;
+    if (app.socket) {
+      socketServer = attachNodeWebSocketServer({
+        server, hub: app.socket.hub,
+        publicOrigin: publicOrigin ?? url,
+        pathnamePrefix: app.socket.pathnamePrefix,
+        ...(app.socket.maxMessageBytes === undefined ? {} : { maxMessageBytes: app.socket.maxMessageBytes }),
+        onError: (error) => report(error, randomUUID()),
+      });
+    }
   } catch (error) {
+    // A partial start must not keep the port bound or the application open.
+    if (server.listening) {
+      server.closeAllConnections();
+      await new Promise<void>((done) => server.close(() => done()));
+    }
     try { await app.close(); }
     catch (cleanupError) { report(cleanupError, randomUUID()); }
     throw error;
-  }
-  const address = server.address();
-  const actualPort = address && typeof address !== "string" ? address.port : port;
-  const url = `http://${urlHost(host)}:${actualPort}`;
-  if (app.socket) {
-    socketServer = attachNodeWebSocketServer({
-      server, hub: app.socket.hub,
-      publicOrigin: publicOrigin ?? url,
-      pathnamePrefix: app.socket.pathnamePrefix,
-      ...(app.socket.maxMessageBytes === undefined ? {} : { maxMessageBytes: app.socket.maxMessageBytes }),
-      onError: (error) => report(error, randomUUID()),
-    });
   }
   let closing: Promise<void> | undefined;
   const onSignal = (): void => { void close().catch(() => {}); };
@@ -240,7 +277,14 @@ export async function serveNode(app: ServerApp, options: ServeNodeOptions = {}):
       const failures: unknown[] = [];
       const steps: Array<() => Promise<unknown>> = [
         () => socketServer?.close() ?? Promise.resolve(),
-        () => new Promise<void>((done, fail) => server.close((error) => error ? fail(error) : done())),
+        () => new Promise<void>((done, fail) => {
+          // Open responses get a grace period; then their connections are cut.
+          const deadline = setTimeout(() => server.closeAllConnections(), shutdownTimeout);
+          server.close((error) => {
+            clearTimeout(deadline);
+            if (error) fail(error); else done();
+          });
+        }),
         () => nodePlatform.settle(),
         () => app.close(),
       ];

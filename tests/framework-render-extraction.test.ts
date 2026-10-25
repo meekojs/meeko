@@ -43,6 +43,19 @@ test("render extraction rejects values it cannot read at build time", () => {
     /re-exported route options cannot be read at build time/);
 });
 
+test("render extraction rejects computed keys and spreads that may set render at run time", () => {
+  assert.throws(() => extractRouteRender(file, `${header}export const route = definePage({ ["render"]: "prerender" });\n`),
+    /index\.route\.ts: computed route option keys cannot be read at build time; write render as a plain property/);
+  assert.throws(() => extractRouteRender(file, `${header}const key = "render";\nexport const route = definePage({ [key]: "prerender" } as never);\n`),
+    /computed route option keys cannot be read at build time/);
+  assert.throws(() => extractRouteRender(file, `${header}const key = "render";\nexport const route = definePage({ render: "ssr", [key]: "prerender" } as never);\n`),
+    /computed route option keys cannot be read at build time/);
+  assert.throws(() => extractRouteRender(file, `${header}const base = { render: "prerender" as const };\nexport const route = definePage({ render: "ssr", ...base });\n`),
+    /declare render after any spread; spread route options cannot be read at build time/);
+  // A later explicit render overrides earlier dynamic members at run time.
+  assert.equal(extractRouteRender(file, `${header}const key = "load";\nexport const route = definePage({ [key]: () => ({}), render: "prerender" } as never);\n`), "prerender");
+});
+
 test("route discovery records the extracted render mode in the manifest", async () => {
   const root = await mkdtemp(join(tmpdir(), "meeko-render-extraction-"));
   try {

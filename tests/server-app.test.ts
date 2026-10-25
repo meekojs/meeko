@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import type { Server } from "node:http";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,7 +12,8 @@ import {
   createServerApp, defineApiRoute, defineRpc, defineServerMiddleware, defineServerRuntime, defineSocketChannel,
   MemorySessionStore, SessionManager,
 } from "../src/framework-server.ts";
-import type { AppManifest, PrerenderedPage, Schema, ServerApp, ServerAppOptions, ServerPlatform } from "../src/framework-server.ts";
+import type { AppManifest, PrerenderedPage, Schema, ServerApp, ServerAppOptions, ServerPlatform, SocketHub } from "../src/framework-server.ts";
+import { prerenderRoutes } from "../src/framework/prerender.ts";
 import { DOCUMENT_HEAD_PREFIX } from "../src/framework/server.ts";
 import { createNodeAssetReader, serveNode, toNodeListener } from "../src/node.ts";
 
@@ -354,6 +357,242 @@ test("the Node asset reader serves only manifest files with validators, HEAD and
       assert.equal(await get(unlisted), null, unlisted);
     }
     assert.equal(await get("/status.txt", { method: "POST", body: "x" }), null);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+function rawRequest(port: number, text: string, untilHeaders = false): Promise<string> {
+  return new Promise<string>((done, fail) => {
+    const socket = connect(port, "127.0.0.1", () => socket.write(text));
+    let reply = "";
+    socket.setEncoding("utf8");
+    socket.on("data", (chunk: string) => {
+      reply += chunk;
+      if (untilHeaders && reply.includes("\r\n\r\n")) { socket.destroy(); done(reply); }
+    });
+    socket.once("end", () => done(reply));
+    socket.once("error", fail);
+  });
+}
+
+async function listening(server: Server): Promise<number> {
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  return address.port;
+}
+
+function within<T>(promise: Promise<T>, milliseconds: number, message: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  return Promise.race([
+    promise,
+    new Promise<never>((_done, fail) => { timer = setTimeout(() => fail(new Error(message)), milliseconds); }),
+  ]).finally(() => clearTimeout(timer));
+}
+
+test("request targets starting with // keep the request origin in the Node listener", async () => {
+  for (const publicOrigin of [undefined, "https://app.example"]) {
+    const seen: string[] = [];
+    const server = createServer(toNodeListener((request) => {
+      seen.push(request.url);
+      return new Response("ok");
+    }, publicOrigin ? { publicOrigin } : {}));
+    const port = await listening(server);
+    try {
+      const reply = await rawRequest(port, `GET //evil.example/api/x?y=1 HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nConnection: close\r\n\r\n`);
+      assert.match(reply, /^HTTP\/1\.1 200 OK/, String(publicOrigin));
+      assert.deepEqual(seen, [`${publicOrigin ?? `http://127.0.0.1:${port}`}//evil.example/api/x?y=1`]);
+    } finally {
+      server.close();
+      await once(server, "close");
+    }
+  }
+});
+
+test("a // request target cannot satisfy the Origin check of another host", async () => {
+  const { app } = await fixture();
+  const server = await serveNode(app, { port: 0 });
+  try {
+    const port = Number(new URL(server.url).port);
+    const reply = await rawRequest(port, `POST //evil.example/api/login HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nOrigin: http://evil.example\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`);
+    // The pathname stays //evil.example/api/login: a page path, never the login API.
+    assert.match(reply, /^HTTP\/1\.1 405 /);
+    assert.doesNotMatch(reply, /set-cookie/i);
+  } finally {
+    await server.close();
+  }
+});
+
+test("app.fetch keeps a // pathname under publicOrigin and without it", async () => {
+  for (const publicOrigin of [undefined, "https://app.example"]) {
+    const seen: string[] = [];
+    const { app } = await fixture({
+      ...(publicOrigin ? { publicOrigin } : {}),
+      assets: { get: async (_pathname, request) => { seen.push(request.url); return null; } },
+    });
+    const forged = await app.fetch(new Request("http://local.test//evil.example/api/login", { method: "POST", headers: { origin: "https://evil.example" } }));
+    assert.equal(forged.status, 405, String(publicOrigin));
+    assert.equal(forged.headers.get("set-cookie"), null);
+    assert.deepEqual(seen, [`${publicOrigin ?? "http://local.test"}//evil.example/api/login`]);
+    await app.close();
+  }
+});
+
+test("toNodeListener cancels the response body when the client leaves before headers or mid-stream", async () => {
+  const cancelled: string[] = [];
+  let entered!: () => void;
+  const handlerEntered = new Promise<void>((done) => { entered = done; });
+  let cancelledEarly!: () => void;
+  const early = new Promise<void>((done) => { cancelledEarly = done; });
+  let cancelledLate!: () => void;
+  const late = new Promise<void>((done) => { cancelledLate = done; });
+  const server = createServer(toNodeListener(async (request) => {
+    if (new URL(request.url).pathname === "/early") {
+      entered();
+      await new Promise<void>((done) => request.signal.addEventListener("abort", () => done(), { once: true }));
+      return new Response(new ReadableStream<Uint8Array>({
+        pull(controller) { controller.enqueue(new Uint8Array(8)); },
+        cancel() { cancelled.push("early"); cancelledEarly(); },
+      }));
+    }
+    // The producer sends one chunk, then never resolves its next pull.
+    return new Response(new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new TextEncoder().encode("first")); },
+      pull() { return new Promise<void>(() => {}); },
+      cancel() { cancelled.push("late"); cancelledLate(); },
+    }));
+  }));
+  const port = await listening(server);
+  try {
+    const socket = connect(port, "127.0.0.1", () => socket.write(`GET /early HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\n\r\n`));
+    await handlerEntered;
+    socket.destroy();
+    await within(early, 2_000, "the body returned after the abort was not cancelled");
+    const reply = await rawRequest(port, `GET /late HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\n\r\n`, true);
+    assert.match(reply, /^HTTP\/1\.1 200 OK/);
+    await within(late, 2_000, "the pending stream was not cancelled after the client left");
+    assert.deepEqual(cancelled.sort(), ["early", "late"]);
+  } finally {
+    server.closeAllConnections();
+    server.close();
+    await once(server, "close");
+  }
+});
+
+function stubApp(overrides: Partial<ServerApp> = {}): ServerApp {
+  return { manifest, fetch: async () => new Response("ok"), reportError: () => {}, close: async () => {}, ...overrides };
+}
+
+test("serveNode ends held-open streaming responses after the shutdown timeout", async () => {
+  let cancelled!: () => void;
+  const streamCancelled = new Promise<void>((done) => { cancelled = done; });
+  let closedApp = false;
+  const app = stubApp({
+    fetch: async () => new Response(new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new TextEncoder().encode("first")); },
+      pull() { return new Promise<void>(() => {}); },
+      cancel() { cancelled(); },
+    })),
+    close: async () => { closedApp = true; },
+  });
+  const server = await serveNode(app, { port: 0, shutdownTimeout: 100 });
+  const response = await fetch(server.url);
+  const reader = response.body!.getReader();
+  assert.equal(new TextDecoder().decode((await reader.read()).value), "first");
+  const started = Date.now();
+  await within(server.close(), 5_000, "close waited for the open stream");
+  assert.ok(Date.now() - started >= 90, "open responses get the grace period first");
+  await assert.rejects(reader.read());
+  assert.equal(closedApp, true);
+  await within(streamCancelled, 2_000, "the cut stream was not cancelled");
+  await assert.rejects(serveNode(stubApp(), { port: 0, shutdownTimeout: -1 }), /Invalid shutdownTimeout: -1/);
+});
+
+test("serveNode releases the port and closes the application when Socket setup fails after listen", async () => {
+  const probe = createServer();
+  const port = await listening(probe);
+  probe.close();
+  await once(probe, "close");
+  let closed = 0;
+  const app = stubApp({
+    close: async () => { closed += 1; },
+    socket: { hub: {} as SocketHub, pathnamePrefix: "/_meeko/socket", maxMessageBytes: 0 },
+  });
+  await assert.rejects(serveNode(app, { port }), /Invalid socket message limit/);
+  assert.equal(closed, 1);
+  const reuse = createServer();
+  reuse.listen(port, "127.0.0.1");
+  await once(reuse, "listening");
+  reuse.close();
+  await once(reuse, "close");
+});
+
+test("Socket background tasks are awaited on close and report failures to the observer", async () => {
+  const observed: unknown[] = [];
+  const finished: string[] = [];
+  let started!: () => void;
+  const taskStarted = new Promise<void>((done) => { started = done; });
+  const table: Record<string, unknown> = {
+    ...modules([]),
+    "/server/socket/chat.ts": { default: defineSocketChannel({
+      clientToServer: { message: textSchema }, serverToClient: { message: textSchema },
+      handlers: { message: ({ context }) => {
+        context.platform.waitUntil(new Promise((done) => setTimeout(done, 150)).then(() => {
+          finished.push("task");
+          throw new Error("background failed");
+        }));
+        started();
+      } },
+    }) },
+  };
+  const runtime = defineServerRuntime(() => ({
+    sessions: new SessionManager({ store: new MemorySessionStore(), secure: false }),
+    onError: (error: unknown) => { observed.push(error); },
+  }));
+  const logged: unknown[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => { logged.push(args); };
+  try {
+    // Without a platform the detached default would only log the failure to the console.
+    const app = await createServerApp({ manifest, production: false, runtime, load: async (key) => table[key] });
+    const server = await serveNode(app, { port: 0 });
+    const peer = new WebSocket(`${server.url.replace("http:", "ws:")}/_meeko/socket/chat`, { headers: { origin: server.url } });
+    await once(peer, "open");
+    peer.send(JSON.stringify({ event: "message", payload: { text: "background" } }));
+    await taskStarted;
+    await server.close();
+    assert.deepEqual(finished, ["task"]);
+    assert.equal(observed.length, 1);
+    assert.equal((observed[0] as Error).message, "background failed");
+    assert.deepEqual(logged, []);
+  } finally {
+    console.error = original;
+  }
+});
+
+test("prerendered HTML with non-ASCII head content receives the CSRF meta tag before </head>", async () => {
+  const root = await mkdtemp(join(tmpdir(), "meeko-prerender-utf16-"));
+  try {
+    const title = "Café ñandú 🐱 日本";
+    await prerenderRoutes({
+      routes: manifest.routes,
+      outputRoot: root,
+      handler: async (request) => request.headers.get("accept") === "application/meeko+json"
+        ? new Response("{}", { headers: { "content-type": "application/meeko+json" } })
+        : new Response(`<!doctype html><html><head><title>${title}</title></head><body>${title}</body></html>`, { headers: { "content-type": "text/html; charset=utf-8" } }),
+    });
+    const index = JSON.parse(await readFile(join(root, "manifest.json"), "utf8")) as { pages: Record<string, { file: string; headOffset: number; etag: string }> };
+    const entry = index.pages["/"]!;
+    // Adapters read the stored file as a string: the offset counts UTF-16 code units, not bytes.
+    const html = await readFile(join(root, entry.file), "utf8");
+    assert.notEqual(Buffer.byteLength(html.slice(0, entry.headOffset)), entry.headOffset);
+    const { app } = await fixture({ prerender: { get: async (pathname) => pathname === "/" ? { html, headOffset: entry.headOffset, etag: entry.etag } : undefined } });
+    const { cookie, csrf } = await login(app);
+    const personal = await (await app.fetch(new Request("http://local.test/", { headers: { cookie } }))).text();
+    assert.equal(personal, `<!doctype html><html><head><title>${title}</title><meta name="meeko-csrf-token" content="${csrf}"></head><body>${title}</body></html>`);
+    await app.close();
   } finally {
     await rm(root, { recursive: true, force: true });
   }

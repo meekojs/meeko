@@ -58,28 +58,51 @@ async function listFiles(directory: string): Promise<string[]> {
   return found;
 }
 
-/** Lists the public client build, which already contains Vite's copy of `public/`. */
-async function assetManifest(directory: string): Promise<AssetManifest> {
+/**
+ * URL pathname of a build file exactly as WHATWG URL serializes it, which is
+ * what `new URL(request.url).pathname` yields for a browser request. `%`, `?`,
+ * `#`, `\`, spaces and control characters in names are data, not URL syntax.
+ */
+export function assetKey(segments: readonly string[]): string {
+  const escaped = segments.map((segment) => segment.replace(/[%?#\\ \u0000-\u001f\u007f]/g, (character) => encodeURIComponent(character)));
+  return new URL(`/${escaped.join("/")}`, "http://meeko.invalid").pathname;
+}
+
+type ViteManifest = Record<string, { file?: string; css?: string[]; assets?: string[]; imports?: string[] }>;
+
+/**
+ * Lists the public client build, which already contains Vite's copy of
+ * `public/`. Only files emitted by Vite (listed in its manifest, so content
+ * hashed) are immutable; copied `public/` files keep the same URL across edits.
+ */
+export async function assetManifest(directory: string, viteManifest: ViteManifest): Promise<AssetManifest> {
+  const hashed = new Set<string>();
+  for (const chunk of Object.values(viteManifest)) {
+    for (const file of [chunk.file, ...chunk.css ?? [], ...chunk.assets ?? []]) {
+      if (file) hashed.add(assetKey(file.split("/")));
+    }
+  }
   const assets: Record<string, AssetRecord> = {};
   for (const file of (await listFiles(directory)).sort()) {
     const path = relative(directory, file).split(sep);
     if (path[0] === ".vite") continue;
     const content = await readFile(file);
-    const key = `/${path.map(encodeURIComponent).join("/")}`;
+    const key = assetKey(path);
     assets[key] = {
       type: contentTypes[extname(file).toLowerCase()] ?? "application/octet-stream",
       etag: `"${createHash("sha256").update(content).digest("base64url").slice(0, 27)}"`,
       size: content.byteLength,
-      ...(path[0] === "assets" ? { immutable: true } : {}),
+      ...(hashed.has(key) ? { immutable: true } : {}),
     };
   }
   return assets;
 }
 
-type ViteManifest = Record<string, { file?: string; css?: string[]; imports?: string[] }>;
+async function readViteManifest(root: string): Promise<ViteManifest> {
+  return JSON.parse(await readFile(resolve(root, clientOutput, ".vite/manifest.json"), "utf8")) as ViteManifest;
+}
 
-async function clientAssets(root: string): Promise<BuildAppData["client"]> {
-  const manifest = JSON.parse(await readFile(resolve(root, clientOutput, ".vite/manifest.json"), "utf8")) as ViteManifest;
+function clientAssets(manifest: ViteManifest): BuildAppData["client"] {
   const entry = manifest[frameworkClientEntry];
   if (!entry?.file) throw new Error(`Missing ${frameworkClientEntry} in the Vite client manifest`);
   const css = new Set(entry.css ?? []);
@@ -92,7 +115,8 @@ async function clientAssets(root: string): Promise<BuildAppData["client"]> {
     for (const child of chunk.imports ?? []) visit(child);
   };
   for (const key of entry.imports ?? []) visit(key);
-  return { entry: `/${entry.file}`, css: [...css].map((file) => `/${file}`), preload: [...preload].map((file) => `/${file}`) };
+  const url = (file: string): string => assetKey(file.split("/"));
+  return { entry: url(entry.file), css: [...css].map(url), preload: [...preload].map(url) };
 }
 
 /** Validates an adapter name and confirms this version can build it. */
@@ -130,9 +154,10 @@ export async function buildProject(projectRoot: string, options: BuildProjectOpt
     },
   });
   const server = config.server?.adapter === "node" ? config.server : undefined;
+  const viteManifest = await readViteManifest(root);
   const data: BuildAppData = {
-    client: await clientAssets(root),
-    assets: await assetManifest(resolve(root, clientOutput)),
+    client: clientAssets(viteManifest),
+    assets: await assetManifest(resolve(root, clientOutput), viteManifest),
     node: { host: server?.host ?? "127.0.0.1", port: server?.port ?? 4173 },
   };
   await mkdir(resolve(root, ".meeko/build"), { recursive: true });

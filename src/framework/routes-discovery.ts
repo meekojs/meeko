@@ -86,15 +86,22 @@ export function extractRouteRender(file: string, source: string): PageRender | u
     throw new Error(`${file}: export definePage({ ... }) or an object literal so Meeko can read render at build time`);
   }
   let render: PageRender | undefined;
+  // Members after the last explicit render that could set it at run time.
   let spread = false;
+  let computed = false;
   for (const property of object.properties) {
     if (ts.isSpreadAssignment(property)) { spread = true; continue; }
+    if (property.name && ts.isComputedPropertyName(property.name)) { computed = true; continue; }
     const name = property.name ? propertyName(property.name) : undefined;
     if (name !== "render") continue;
     if (!ts.isPropertyAssignment(property)) throw new Error(`${file}: render must be a string literal so Meeko can read it at build time`);
     render = literalRender(file, property.initializer);
+    spread = false;
+    computed = false;
   }
+  if (computed) throw new Error(`${file}: computed route option keys cannot be read at build time; write render as a plain property`);
   if (spread && render === undefined) throw new Error(`${file}: declare render explicitly; spread route options cannot be read at build time`);
+  if (spread) throw new Error(`${file}: declare render after any spread; spread route options cannot be read at build time`);
   return render;
 }
 

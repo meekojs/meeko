@@ -72,16 +72,17 @@ async function prerenderSource(): Promise<PrerenderSource | undefined> {
   return {
     get(pathname) {
       if (!Object.hasOwn(pages, pathname)) return Promise.resolve(undefined);
-      let page = cache.get(pathname);
-      if (!page) {
-        const entry = pages[pathname]!;
-        page = (async () => {
-          const html = await read(entry.file);
-          const payload = entry.payload ? await read(entry.payload) : undefined;
-          return { html, headOffset: entry.headOffset, etag: entry.etag, ...(payload === undefined ? {} : { payload }) };
-        })();
-        cache.set(pathname, page);
-      }
+      const cached = cache.get(pathname);
+      if (cached) return cached;
+      const entry = pages[pathname]!;
+      const page = (async () => {
+        const html = await read(entry.file);
+        const payload = entry.payload ? await read(entry.payload) : undefined;
+        return { html, headOffset: entry.headOffset, etag: entry.etag, ...(payload === undefined ? {} : { payload }) };
+      })();
+      cache.set(pathname, page);
+      // A failed read is retried by the next request instead of being cached.
+      page.catch(() => { if (cache.get(pathname) === page) cache.delete(pathname); });
       return page;
     },
   };
@@ -96,9 +97,8 @@ export async function createNodeApp(options: { readonly prerendering?: boolean }
     platform: {
       name: "node",
       env: process.env,
-      waitUntil(promise) {
-        void Promise.resolve(promise).catch((error: unknown) => console.error("[meeko] background task failed", error));
-      },
+      // createServerApp tracks these tasks for close() and reports their failures.
+      waitUntil() {},
     },
     assets: createNodeAssetReader({ root: join(output, "client"), assets: manifest.assets ?? {} }),
     ...(prerender ? { prerender } : {}),

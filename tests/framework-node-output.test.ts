@@ -2,11 +2,44 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { mkdtemp, mkdir, readFile, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { prepareFrameworkTypes } from "../src/framework/check-project.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
-import { buildProject } from "../src/framework/project.ts";
+import { assetManifest, buildProject } from "../src/framework/project.ts";
+import { createNodeAssetReader } from "../src/node.ts";
+
+test("asset keys match the URL pathname browsers request and only Vite build files are immutable", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "meeko-asset-keys-"));
+  try {
+    await mkdir(join(directory, "assets"));
+    await mkdir(join(directory, ".vite"));
+    // File name -> the href an author writes for it.
+    const links: Record<string, string> = {
+      "a@2x.png": "/a@2x.png", "a+b.txt": "/a+b.txt", "a b.txt": "/a b.txt", "café ñ.txt": "/café ñ.txt",
+      "100%.txt": "/100%25.txt", "q#x.txt": "/q%23x.txt", "assets/plain.png": "/assets/plain.png", "assets/entry-abc.js": "/assets/entry-abc.js",
+    };
+    for (const name of Object.keys(links)) await writeFile(join(directory, ...name.split("/")), `content of ${name}`);
+    await writeFile(join(directory, ".vite", "manifest.json"), "{}");
+    const assets = await assetManifest(directory, { ".meeko/generated/entry-client.ts": { file: "assets/entry-abc.js" } });
+    assert.deepEqual(Object.keys(assets).sort(), [
+      "/100%25.txt", "/a%20b.txt", "/a+b.txt", "/a@2x.png", "/assets/entry-abc.js", "/assets/plain.png", "/caf%C3%A9%20%C3%B1.txt", "/q%23x.txt",
+    ]);
+    const reader = createNodeAssetReader({ root: directory, assets });
+    for (const [name, link] of Object.entries(links)) {
+      const request = new Request(new URL(link, "http://local.test"));
+      const response = await reader.get(new URL(request.url).pathname, request);
+      assert.equal(response?.status, 200, name);
+      assert.equal(await response?.text(), `content of ${name}`);
+    }
+    assert.equal(assets["/assets/entry-abc.js"]?.immutable, true);
+    assert.equal(assets["/assets/plain.png"]?.immutable, undefined, "public/assets files are not content-hashed");
+    assert.equal(assets["/a@2x.png"]?.immutable, undefined);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 async function files(directory: string): Promise<string[]> {
   const found: string[] = [];
@@ -66,6 +99,10 @@ export default defineApiRoute({ contentType: "response", async handler({ context
   return Response.json({ csrf: session.csrfToken });
 } });
 `);
+  await mkdir(join(root, "public", "assets"), { recursive: true });
+  await writeFile(join(root, "public", "logo@2x.png"), "logo");
+  await writeFile(join(root, "public", "café menu.txt"), "menu");
+  await writeFile(join(root, "public", "assets", "plain.txt"), "unhashed");
   await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
   await symlink(repository, join(root, "node_modules", "@meekojs", "meeko"), "junction");
   await symlink(join(repository, "node_modules", "vite"), join(root, "node_modules", "vite"), "junction");
@@ -99,6 +136,11 @@ export default defineApiRoute({ contentType: "response", async handler({ context
       else if (Date.now() - start > 20_000) { clearInterval(timer); fail(new Error(`Node output did not listen: ${logs}`)); }
     }, 25);
   });
+  // A failed prerender read is not cached: the next request reads the file again.
+  const stored = join(result.output, "prerender", "index.html");
+  await rename(stored, `${stored}.away`);
+  assert.equal((await fetch(origin)).status, 500);
+  await rename(`${stored}.away`, stored);
   const home = await fetch(origin);
   assert.equal(home.status, 200, logs);
   assert.equal(home.headers.get("x-output-middleware"), "active");
@@ -117,6 +159,14 @@ export default defineApiRoute({ contentType: "response", async handler({ context
   assert.equal(script.headers.get("cache-control"), "public, max-age=31536000, immutable");
   assert.equal((await fetch(origin, { headers: { "if-none-match": etag } })).status, 304);
   assert.equal((await fetch(`${origin}/.vite/manifest.json`)).status, 404);
+  const logo = await fetch(`${origin}/logo@2x.png`);
+  assert.equal(logo.status, 200);
+  assert.equal(await logo.text(), "logo");
+  assert.equal(await (await fetch(`${origin}/café menu.txt`)).text(), "menu");
+  const plain = await fetch(`${origin}/assets/plain.txt`);
+  assert.equal(plain.status, 200);
+  assert.equal(plain.headers.get("cache-control"), "public, max-age=0, must-revalidate", "public/assets files are not content-hashed");
+  await plain.body?.cancel();
   const login = await fetch(`${origin}/api/auth/login`, { method: "POST", headers: { origin } });
   assert.equal(login.status, 200, logs);
   const cookie = login.headers.get("set-cookie")!.split(";")[0]!;

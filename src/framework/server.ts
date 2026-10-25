@@ -79,7 +79,10 @@ export const DOCUMENT_HEAD_PREFIX = '<!doctype html><html><head><meta charset="u
 /** HTML produced at build time for one prerendered URL. */
 export interface PrerenderedPage {
   readonly html: string;
-  /** Offset inside `<head>` where the per-request CSRF meta tag is inserted. */
+  /**
+   * Offset inside `<head>` where the per-request CSRF meta tag is inserted,
+   * in UTF-16 code units of `html` (a JavaScript string index), never in bytes.
+   */
   readonly headOffset: number;
   readonly etag: string;
   /** Navigation payload served to client-side navigations of the same URL. */

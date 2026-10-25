@@ -81,7 +81,10 @@ export interface ServerApp {
   readonly publicOrigin?: string;
   /** Sends a transport failure to the same observer as request failures. */
   reportError(error: unknown, requestId: string): void;
-  /** Closes the runtime's sessions and resources. */
+  /**
+   * Waits for background tasks registered on the application's platform, such
+   * as those of Socket callbacks, then closes the runtime's sessions and resources.
+   */
   close(): Promise<void>;
 }
 
@@ -138,13 +141,29 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
   if (!manifest || manifest.version !== 1) throw new TypeError("Unsupported Meeko application manifest; rebuild the application");
   if (typeof options.load !== "function") throw new TypeError("createServerApp requires a module loader");
   const load = options.load;
-  const basePlatform: ServerPlatform<Env> = options.platform ?? createDetachedPlatform({} as Env);
+  const hostPlatform: ServerPlatform<Env> = options.platform ?? createDetachedPlatform({} as Env);
+  // Background work started outside a request, such as in Socket callbacks,
+  // is tracked so close() waits for it and failures reach the error observer.
+  const background = new Set<Promise<unknown>>();
+  let reportBackground: (error: unknown) => void = (error) => observeServerError(error, crypto.randomUUID(), defaultObserver(options.production));
+  const basePlatform: ServerPlatform<Env> = {
+    name: hostPlatform.name,
+    env: hostPlatform.env,
+    waitUntil(promise) {
+      const tracked: Promise<unknown> = Promise.resolve(promise)
+        .catch((error: unknown) => reportBackground(error))
+        .finally(() => background.delete(tracked));
+      background.add(tracked);
+      hostPlatform.waitUntil(tracked);
+    },
+  };
   const runtime = await createRuntime(options, basePlatform);
   const sessions = runtime.sessions;
   let closing: Promise<void> | undefined;
   const close = (): Promise<void> => {
     closing ??= (async () => {
       const failures: unknown[] = [];
+      while (background.size) await Promise.allSettled([...background]);
       try { await sessions.close(); }
       catch (error) { failures.push(error); }
       try { await runtime.close?.(); }
@@ -158,6 +177,7 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
     const configuredOrigin = options.publicOrigin ?? runtime.publicOrigin;
     const publicOrigin = configuredOrigin ? normalizeOrigin(configuredOrigin) : undefined;
     const reportError: ServerErrorObserver = runtime.onError ?? defaultObserver(options.production);
+    reportBackground = (error) => observeServerError(error, crypto.randomUUID(), reportError);
     const platformStore = new AsyncLocalStorage<ServerPlatform>();
     const currentPlatform = (): ServerPlatform => platformStore.getStore() ?? basePlatform;
     const servicesFor = async (request: Request, platform: ServerPlatform): Promise<unknown> => {
@@ -221,7 +241,11 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
       if (!publicOrigin) return request;
       const url = new URL(request.url);
       if (url.origin === publicOrigin) return request;
-      return new Request(new URL(url.pathname + url.search, publicOrigin), request);
+      // Assigned fields keep a `//host/...` pathname on the public origin.
+      const target = new URL(publicOrigin);
+      target.pathname = url.pathname;
+      target.search = url.search;
+      return new Request(target, request);
     };
     let socket: ServerAppSocket | undefined;
     if (manifest.server.socket?.length) {
