@@ -204,7 +204,7 @@ const user = href(routes, "/users/[id]", { params: { id: "1" } });
 
   after(async () => {
     await client?.close();
-    if (root) await rm(root, { recursive: true, force: true });
+    if (root) await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   });
 
   test("announces every capability and registers file watchers", async () => {
@@ -444,7 +444,7 @@ describe("Meeko language server configuration and contracts", () => {
         const diagnostics = await untrusted.waitForDiagnostics(uri, () => true);
         assert.ok(diagnostics.some((item) => item.code === "TS2304"), JSON.stringify(diagnostics));
       } finally { await untrusted.close(); }
-    } finally { await rm(root, { recursive: true, force: true }); }
+    } finally { await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
   });
 
   test("project page contracts run on save only in trusted workspaces, with the props type as range", async () => {
@@ -475,7 +475,7 @@ describe("Meeko language server configuration and contracts", () => {
         await new Promise((resolve) => setTimeout(resolve, 2500));
         assert.ok(!untrusted.diagnostics.get(uri)?.some((item) => item.code === "MEEK_LAYOUT_PROPS"));
       } finally { await untrusted.close(); }
-    } finally { await rm(root, { recursive: true, force: true }); }
+    } finally { await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
   });
 });
 
@@ -509,7 +509,7 @@ describe("meeko lsp --stdio", () => {
     } finally {
       client.connection.dispose();
       child.kill();
-      await rm(root, { recursive: true, force: true });
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     }
   });
 
