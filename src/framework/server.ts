@@ -109,12 +109,27 @@ function wantsPayload(request: Request): boolean {
   return request.headers.get("accept")?.split(",").some((value) => value.trim().startsWith("application/meeko+json")) ?? false;
 }
 
+/**
+ * The manifest render is read from the sidecar at build time. A different
+ * runtime value means the server runs a stale build, and a client page served
+ * as SSR (or the reverse) would hydrate the wrong tree.
+ */
 function routeRender(route: RouteRecord, sidecar: PageRoute | undefined): PageRender {
-  if (route.render !== undefined && sidecar?.render !== undefined && route.render !== sidecar.render) {
-    throw new Error(`Route ${route.id} declares render "${sidecar.render}" but its manifest says "${route.render}"; rebuild the application`);
+  const declared = sidecar?.render;
+  const stale = sidecar !== undefined && (route.render !== undefined
+    ? (declared ?? "ssr") !== route.render
+    : declared === "client");
+  if (stale) {
+    throw new Error(`Route ${route.id} declares render "${declared ?? "ssr"}" but its manifest says "${route.render ?? "ssr"}"; rebuild the application`);
   }
-  return route.render ?? sidecar?.render ?? "ssr";
+  return route.render ?? declared ?? "ssr";
 }
+
+/** Outlet of a `render: "client"` page during SSR: its region stays empty until the browser commits the page. */
+const emptyOutlet: PageModule = {
+  renderWithState: () => ({ html: "", state: {} }),
+  renderToString: () => "",
+};
 
 function prerenderedResponse(page: PrerenderedPage, request: Request, context: RequestContext | undefined): Response {
   const session = context?.session;
@@ -179,22 +194,29 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       }));
     }
     const sidecar = match.route.sidecar && options.loadRoute ? await options.loadRoute(match.route.sidecar) as PageRoute : undefined;
+    const renderMode = routeRender(match.route, sidecar);
+    const clientPage = renderMode === "client";
     const validated = await validatePageInputs(sidecar, match.params, pageSearchObject(url.searchParams));
     const context: PageRequestContext = {
       request, params: validated.params, search: validated.search, searchParams: url.searchParams, signal: request.signal, state: stateStore,
       ...(requestContext ? { context: requestContext } : {}),
     };
-    const data = sidecar?.load ? await sidecar.load(context) : undefined;
+    // A client page's loader and head run in the browser; the server only guards and validates.
+    const data = !clientPage && sidecar?.load ? await sidecar.load(context) : undefined;
     if (data instanceof Response) return finish(data);
     const props: Record<string, unknown> = {
       params: validated.params,
       search: validated.search,
       ...(data === undefined ? {} : { data }),
     };
-    let module = await options.loadPage(match.route.file);
     const styles: string[] = [];
-    if (module.css) styles.push(module.css);
-    let input = props;
+    let module: PageModule = emptyOutlet;
+    let input: Record<string, unknown> = {};
+    if (!clientPage) {
+      module = await options.loadPage(match.route.file);
+      if (module.css) styles.push(module.css);
+      input = props;
+    }
     for (const layout of [...match.route.layouts].reverse()) {
       const child = module;
       const childInput = input;
@@ -208,13 +230,13 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       input = { outlet };
     }
     const rendered = withStateStore(stateStore, () => module.renderWithState(input));
-    const head: PageHead = sidecar?.head?.({ ...context, data }) ?? {};
+    const head: PageHead = clientPage ? {} : sidecar?.head?.({ ...context, data }) ?? {};
     const title = head.title === undefined ? "" : `<title>${escapeHtml(head.title)}</title>`;
     const host = documentParts(options.document, request);
     const nonceAttribute = host.nonceAttribute;
     const styleTags = [...new Set(styles)].map((css) => `<style${nonceAttribute}>${css.replaceAll("<", "\\3C ")}</style>`).join("");
     const payload = serializeJson({
-      v: PAYLOAD_VERSION, route: match.route.id, render: routeRender(match.route, sidecar),
+      v: PAYLOAD_VERSION, route: match.route.id, render: renderMode,
       props, state: rendered.state, sharedState: stateStore.snapshot(),
       head: head.title === undefined ? {} : { title: head.title },
     });

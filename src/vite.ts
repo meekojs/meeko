@@ -9,14 +9,27 @@ import { sourceMapForCompiled } from "./compiler/sourcemap.js";
 import { discoverAutoImports, transformAutoImports } from "./autoimports.js";
 import { transformTypeScriptAutoImports, typeScriptAutoImportMap } from "./autoimports-ts.js";
 import { discoverConfiguredRoutes, loadMeekoConfig, resolveConfigSources } from "./framework/config.js";
-import { clientRoutesSource, readBuildAppData, serverAppSource } from "./framework/app-manifest.js";
+import { clientRoutesSource, clientSidecarsSource, readBuildAppData, serverAppSource } from "./framework/app-manifest.js";
 
 const stylePrefix = "\0virtual:meeko-style:";
 const clientPagesModule = "virtual:meeko-client-pages";
 const clientRoutesModule = "virtual:meeko-manifest/client";
+const clientSidecarsModule = "virtual:meeko-client-routes";
 const serverAppModule = "virtual:meeko-server-app";
-const virtualModules = new Set([clientPagesModule, clientRoutesModule, serverAppModule]);
+const virtualModules = new Set([clientPagesModule, clientRoutesModule, clientSidecarsModule, serverAppModule]);
 const runtimeDirectory = `${normalizePath(dirname(fileURLToPath(import.meta.url)))}/`;
+
+/** Maps each specifier inserted by an autoimport transform to the names it provides. */
+function autoimportedSpecifiers(prefix: string): Map<string, string[]> {
+  const result = new Map<string, string[]>();
+  for (const line of prefix.split("\n")) {
+    const match = /^import (?:type )?(?:\{ \S+ as (\S+) \}|\* as (\S+)) from ("(?:[^"\\]|\\.)*");$/.exec(line.trim());
+    if (!match) continue;
+    const specifier = JSON.parse(match[3]!) as string;
+    result.set(specifier, [...result.get(specifier) ?? [], (match[1] ?? match[2])!]);
+  }
+  return result;
+}
 
 /** Transforma componentes .meeko para Vite, tanto en cliente como en SSR. */
 export function meeko(): Plugin {
@@ -40,6 +53,7 @@ export function meeko(): Plugin {
     async load(id) {
       const virtual = id.startsWith("\0") ? id.slice(1) : undefined;
       if (virtual === clientRoutesModule) return clientRoutesSource(root);
+      if (virtual === clientSidecarsModule) return clientSidecarsSource(root);
       if (virtual === serverAppModule) return serverAppSource(root, ssrBuild && !isDev ? await readBuildAppData(root) : undefined);
       if (virtual === clientPagesModule) {
         const routes = await discoverConfiguredRoutes(root);
@@ -69,12 +83,16 @@ export function meeko(): Plugin {
       if (serverTransform && normalizedId.startsWith(`${normalizedRoot}/`) && /\.client\.[cm]?[jt]sx?$/.test(id)) {
         throw new Error(`Client-only module reached the server bundle: ${id}`);
       }
-      const checkBoundary = async (code: string): Promise<void> => {
+      const checkBoundary = async (code: string, original?: string): Promise<void> => {
         if (!clientModule) return;
+        const autoimported = original === undefined ? new Map<string, string[]>() : autoimportedSpecifiers(code.slice(0, code.length - original.length));
         for (const { value } of moduleSpecifiers(code, id)) {
           const dependency = await this.resolve(value, id, { skipSelf: true });
           if (dependency && serverOnly(normalizePath(dependency.id))) {
-            throw new Error(`Client module ${id} imports server-only module ${value}`);
+            const names = autoimported.get(value);
+            throw new Error(names
+              ? `Client module ${id} imports server-only module ${value} through autoimport ${names.join(", ")}`
+              : `Client module ${id} imports server-only module ${value}`);
           }
         }
       };
@@ -82,9 +100,18 @@ export function meeko(): Plugin {
         if (/\.[cm]?[jt]sx?$/.test(id) && clientModule) await checkBoundary(source);
         if (/\.[cm]?tsx?$/.test(id) && normalizedId.startsWith(`${normalizedRoot}/`)) {
           const registry = await discoverAutoImports(root);
-          const transformed = transformTypeScriptAutoImports(source, id, root, registry, sources.map((entry) => entry.root));
+          // Only `render: "client"` sidecars reach the browser graph; they get browser autoimports.
+          const clientSidecar = clientModule && /\.route\.[cm]?tsx?$/.test(id) && /\/app\/pages\//.test(normalizedId);
+          let transformed: string | undefined;
+          try {
+            transformed = transformTypeScriptAutoImports(source, id, root, registry, sources.map((entry) => entry.root), clientSidecar ? "client" : undefined);
+          } catch (error) {
+            const name = clientSidecar && error instanceof Error ? /^Autoimport (\S+) is unavailable/.exec(error.message)?.[1] : undefined;
+            if (name) throw new Error(`Client route sidecar ${id} uses autoimport ${name}, which is not available in the browser; render: "client" sidecars must call API or RPC endpoints instead`, { cause: error });
+            throw error;
+          }
           if (transformed) {
-            await checkBoundary(transformed);
+            await checkBoundary(transformed, source);
             return { code: transformed, map: typeScriptAutoImportMap(source, transformed, id) };
           }
         }
@@ -98,7 +125,7 @@ export function meeko(): Plugin {
       const hotCode = isDev ? `\nif (import.meta.hot) {\n  __meeko.enableHotModule(__hotId);\n  import.meta.hot.accept((next) => { if (next) __meeko.replaceHotModule(__hotId, next); });\n}\n` : "";
       const registry = await discoverAutoImports(root);
       const code = transformAutoImports(source, filename, result.code, registry, serverTransform ? "server" : "client");
-      await checkBoundary(code);
+      await checkBoundary(code, result.code);
       const shifted = code.length - result.code.length;
       const mappings = result.mappings.map((mapping) => ({
         ...mapping,

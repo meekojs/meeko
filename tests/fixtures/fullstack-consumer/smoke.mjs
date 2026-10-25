@@ -21,6 +21,15 @@ for (const [path, marker] of [["/", "Welcome"], ["/users", "Ada"], ["/layer-demo
   assert.equal(response.headers.get("x-meeko-fixture-middleware"), "active");
   assert.match(await response.text(), new RegExp(marker));
 }
+// A render: "client" page: server middleware and the layout run on the server, its loader in the browser.
+const notes = await get("/notes");
+assert.equal(notes.status, 200);
+assert.equal(notes.headers.get("x-meeko-fixture-middleware"), "active");
+const notesHtml = await notes.text();
+assert.match(notesHtml, /class="app-shell/);
+assert.match(notesHtml, /"render":"client"/);
+assert.doesNotMatch(notesHtml, /Ada|<title>/, "a client page must not render loader data or head on the server");
+assert.doesNotMatch(notesHtml, /id="notes-data"/, "the page outlet must be empty in the server HTML");
 const deniedRoute = await get("/users?deny=1");
 assert.equal(deniedRoute.status, 403);
 assert.equal(await deniedRoute.text(), "Route denied");

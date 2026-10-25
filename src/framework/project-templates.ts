@@ -1,6 +1,7 @@
 /** Vite entry modules generated for a framework application. */
-export const clientEntrySource = `import { mountClientApp, type ClientComponent, type RouteMiddleware } from "@meekojs/meeko/framework";
+export const clientEntrySource = `import { mountClientApp, type ClientComponent, type ClientRoute, type RouteMiddleware } from "@meekojs/meeko/framework";
 import { modules as pages } from "virtual:meeko-client-pages";
+import { modules as clientRoutes } from "virtual:meeko-client-routes";
 import { routes } from "virtual:meeko-manifest/client";
 
 const middlewareModules = import.meta.glob(["/app/middleware/**/*.ts", "!/app/middleware/**/*.test.ts", "!/app/middleware/**/*.spec.ts", "!/app/middleware/**/*.d.ts", "!/app/middleware/**/*.server.ts", "!/app/middleware/**/*.client.ts"], { eager: true });
@@ -26,6 +27,13 @@ await mountClientApp({
     const load = pages[file];
     if (!load) throw new Error("Page module missing: " + file);
     return await load() as ClientComponent;
+  },
+  // Only render: "client" sidecars are bundled; other routes fetch their data from the server.
+  async loadClientRoute(file) {
+    const load = clientRoutes[file];
+    if (!load) throw new Error("Client route module missing: " + file);
+    const module = await load() as { route?: ClientRoute; default?: ClientRoute };
+    return module.route ?? module.default ?? (module as ClientRoute);
   },
 });
 performance.measure("meeko-hydration", { start: hydrationStart, end: performance.now() });

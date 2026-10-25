@@ -147,10 +147,15 @@ export async function generateAutoImportTypes(projectRoot: string): Promise<{ cl
   return outputs;
 }
 
-/** Vite can call this for app/shared/server TypeScript before its normal TS transform. */
-export function transformTypeScriptAutoImports(source: string, filename: string, root: string, registry: readonly AutoImport[], sourceRoots?: readonly string[]): string | undefined {
-  const scope = typeScriptScope(root, filename, sourceRoots);
-  if (!scope) return undefined;
+/**
+ * Vite can call this for app/shared/server TypeScript before its normal TS transform.
+ * `scope` overrides the path-based scope, e.g. for a `render: "client"` sidecar
+ * transformed for the browser bundle.
+ */
+export function transformTypeScriptAutoImports(source: string, filename: string, root: string, registry: readonly AutoImport[], sourceRoots?: readonly string[], scopeOverride?: TypeScriptScope): string | undefined {
+  const detected = typeScriptScope(root, filename, sourceRoots);
+  if (!detected) return undefined;
+  const scope = scopeOverride ?? detected;
   if (scope === "shared") {
     const transformed = applyAutoImports(source, filename, registry, "shared");
     return transformed === source ? undefined : transformed;

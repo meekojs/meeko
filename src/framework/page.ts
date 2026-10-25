@@ -25,8 +25,20 @@ export interface PageLoadContext<P extends PageSchema | undefined, S extends Pag
   readonly context?: C;
 }
 
-/** How a page reaches the browser. */
-export type PageRender = "ssr" | "prerender";
+/**
+ * How a page reaches the browser. `"client"` renders the layouts on the server
+ * and runs the page loader, `head` and page render in the browser.
+ */
+export type PageRender = "ssr" | "prerender" | "client";
+
+/** Loader context of a `render: "client"` page; it runs in the browser, without a request. */
+export interface ClientPageLoadContext<P extends PageSchema | undefined, S extends PageSchema | undefined> {
+  readonly url: URL;
+  readonly params: Params<P>;
+  readonly search: Search<S>;
+  readonly signal: AbortSignal;
+  readonly state: StateStore;
+}
 
 /** Document metadata produced by a page `head` callback. */
 export interface PageHead {
@@ -39,13 +51,38 @@ export const PAYLOAD_VERSION = 1;
 export interface PageDefinition<P extends PageSchema | undefined, S extends PageSchema | undefined, D, C = unknown> {
   readonly params?: P;
   readonly search?: S;
-  readonly render?: PageRender;
+  readonly render?: Exclude<PageRender, "client">;
   readonly prerenderEntries?: readonly Readonly<Record<string, string>>[] | (() => Promise<readonly Readonly<Record<string, string>>[]>);
   readonly load?: (args: PageLoadContext<P, S, C>) => Promise<D> | D;
   readonly head?: (args: PageLoadContext<P, S, C> & { data: D }) => PageHead;
 }
 
+/**
+ * A page rendered in the browser. Its sidecar enters the client bundle, so it
+ * must not import server-only modules; data must come from guarded API or RPC
+ * endpoints.
+ */
+export interface ClientPageDefinition<P extends PageSchema | undefined, S extends PageSchema | undefined, D> {
+  readonly params?: P;
+  readonly search?: S;
+  readonly render: "client";
+  readonly prerenderEntries?: never;
+  readonly load?: (args: ClientPageLoadContext<P, S>) => Promise<D> | D;
+  /** Runs in the browser after `load`; its title is applied when the page commits. */
+  readonly head?: (args: ClientPageLoadContext<P, S> & { data: D }) => PageHead;
+}
+
 /** Captures route schemas and keeps loader/head inference in one declaration. */
+export function definePage<
+  const P extends PageSchema | undefined = undefined,
+  const S extends PageSchema | undefined = undefined,
+  D = unknown,
+>(definition: ClientPageDefinition<P, S, D> & { readonly load: NonNullable<ClientPageDefinition<P, S, D>["load"]> }): ClientPageDefinition<P, S, D> & { readonly load: NonNullable<ClientPageDefinition<P, S, D>["load"]> };
+export function definePage<
+  const P extends PageSchema | undefined = undefined,
+  const S extends PageSchema | undefined = undefined,
+  D = unknown,
+>(definition: ClientPageDefinition<P, S, D>): ClientPageDefinition<P, S, D>;
 export function definePage<
   const P extends PageSchema | undefined = undefined,
   const S extends PageSchema | undefined = undefined,
@@ -59,8 +96,9 @@ export function definePage<
   C = unknown,
 >(definition: PageDefinition<P, S, D, C>): PageDefinition<P, S, D, C>;
 export function definePage(definition: unknown): unknown {
-  if (typeof definition === "object" && definition !== null && "render" in definition && definition.render === "client") {
-    throw new TypeError('render: "client" is not supported; use SSR or prerender');
+  if (typeof definition === "object" && definition !== null && "render" in definition && definition.render === "client"
+    && "prerenderEntries" in definition && definition.prerenderEntries !== undefined) {
+    throw new TypeError('render: "client" cannot be prerendered; remove prerenderEntries or use render: "prerender"');
   }
   return definition;
 }

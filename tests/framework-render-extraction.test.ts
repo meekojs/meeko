@@ -31,8 +31,8 @@ test("render extraction rejects values it cannot read at build time", () => {
     /render must be a string literal/);
   assert.throws(() => extractRouteRender(file, `${header}export const route = definePage({ render() { return "ssr"; } } as never);\n`),
     /render must be a string literal/);
-  assert.throws(() => extractRouteRender(file, `${header}export const route = definePage({ render: "client" } as never);\n`),
-    /unsupported render mode "client"; use "ssr" or "prerender"/);
+  assert.throws(() => extractRouteRender(file, `${header}export const route = definePage({ render: "edge" } as never);\n`),
+    /unsupported render mode "edge"; use "ssr", "prerender" or "client"/);
   assert.throws(() => extractRouteRender(file, `${header}import { options } from "./options.js";\nexport const route = definePage(options);\n`),
     /export definePage\(\{ \.\.\. \}\) or an object literal so Meeko can read render at build time/);
   assert.throws(() => extractRouteRender(file, `${header}let options = { render: "ssr" as const };\nexport const route = definePage(options);\n`),

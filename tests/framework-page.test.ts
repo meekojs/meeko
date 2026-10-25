@@ -5,12 +5,6 @@ import type { PageSchema } from "../src/framework/page.ts";
 import { createRouteManifest } from "../src/framework/router.ts";
 import { createFrameworkHandler } from "../src/framework/server.ts";
 
-test("definePage rejects an unavailable client-only render mode", () => {
-  // @ts-expect-error Client-only rendering is not part of the supported route contract.
-  const unsupported = () => definePage({ render: "client" });
-  assert.throws(unsupported, /render: "client" is not supported/);
-});
-
 const paramsSchema: PageSchema<unknown, { id: number }> = {
   "~standard": {
     version: 1,

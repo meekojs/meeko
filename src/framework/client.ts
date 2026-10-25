@@ -4,13 +4,19 @@ import { createAppErrorChannel, provideAppErrorChannel } from "../component-erro
 import type { ComponentErrorHandler } from "../component-errors.js";
 import { finishWithCleanup, signal } from "../reactivity.js";
 import type { Signal } from "../reactivity.js";
-import { PAYLOAD_VERSION, pageSearchObject, validatePageInputs } from "./page.js";
+import { PAYLOAD_VERSION, PageInputError, pageSearchObject, validatePageInputs } from "./page.js";
 import type { PageHead, PageRender, PageSchema } from "./page.js";
+import { ClientError } from "./clients.js";
 import { runRouteMiddleware } from "./middleware.js";
+import { provideNavigation } from "./navigation.js";
+import type { NavigationState } from "./navigation.js";
 import type { RouteMiddleware } from "./middleware.js";
 import { createNavigator, matchRoute, reportNavigationError } from "./router.js";
 import type { NavigationContext, Navigator, RouteRecord } from "./router.js";
 import { hydrateWithStateStore, StateStore, withStateStore } from "./state.js";
+
+export { useNavigation } from "./navigation.js";
+export type { NavigationState } from "./navigation.js";
 
 /** The public shape emitted by the .meeko compiler. */
 export interface ClientComponent {
@@ -39,6 +45,12 @@ export interface ClientAppOptions {
   readonly payload: string | unknown;
   readonly loadPage: (file: string) => Promise<ClientComponent>;
   readonly loadRoute?: (file: string) => Promise<ClientRoute>;
+  /**
+   * Loads the browser sidecar of a `render: "client"` route. These routes
+   * always take their data from this loader, also with `serverData`; it
+   * defaults to `loadRoute`.
+   */
+  readonly loadClientRoute?: (file: string) => Promise<ClientRoute>;
   /** Runs the same route guards as SSR before a browser navigation fetch. */
   readonly loadMiddleware?: () => Promise<readonly RouteMiddleware[]>;
   /** Fetches public loader data from the SSR handler during browser navigation. */
@@ -68,7 +80,21 @@ interface HydrationPayload {
   head: PageHead;
 }
 
-const pageRenders: readonly string[] = ["ssr", "prerender"] satisfies readonly PageRender[];
+const pageRenders: readonly string[] = ["ssr", "prerender", "client"] satisfies readonly PageRender[];
+
+/** Outlet of a client page until its loader resolves; the server rendered it empty. */
+const emptyOutlet: Component<Record<string, unknown>> = {
+  renderWithState: () => ({ html: "", state: {} }),
+  renderToString: () => "",
+  hydrateScope: () => () => {},
+};
+
+/** Props of `+error.meeko`, with the same public messages as the server error page. */
+function errorPageProps(error: unknown): { status: number; message: string } {
+  if (error instanceof PageInputError) return { status: 400, message: error.code };
+  if (error instanceof ClientError && error.status >= 400 && error.status < 500) return { status: error.status, message: error.code };
+  return { status: 500, message: "Internal Server Error" };
+}
 
 interface LayoutInstance {
   file: string;
@@ -132,8 +158,9 @@ async function createTree(
   props: Record<string, unknown>,
   loadPage: ClientAppOptions["loadPage"],
   fromLayout: number,
+  leaf: string | Component<Record<string, unknown>> = route.file,
 ): Promise<{ component: Component<Record<string, unknown>>; layouts: LayoutInstance[] }> {
-  let component = bind(await loadPage(route.file), props);
+  let component = typeof leaf === "string" ? bind(await loadPage(leaf), props) : leaf;
   const layouts: LayoutInstance[] = [];
   for (let index = route.layouts.length - 1; index >= fromLayout; index--) {
     const file = route.layouts[index]!;
@@ -165,11 +192,17 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     if (handler) return handler(error, "navigation");
     reportNavigationError(browser, error);
   });
+  const pending = signal(false);
+  const navigationState: NavigationState = { pending: { get value() { return pending.value; } } };
   const hydrateApp = (hydrate: () => () => void) => hydrateWithStateStore(stateStore, () => {
     provideAppErrorChannel(errorChannel);
+    provideNavigation(navigationState);
     return hydrate();
   });
-  const first = await createTree(initial.route, payload.props, options.loadPage, 0);
+  // A client page arrives with its layouts around an empty outlet; the page
+  // itself commits below through the regular navigation path.
+  const clientFirst = payload.render === "client";
+  const first = await createTree(initial.route, payload.props, options.loadPage, 0, clientFirst ? emptyOutlet : initial.route.file);
   let layouts = first.layouts;
   let release = hydrateApp(() => first.component.hydrateScope({ root: options.root }, {}, payload.state));
   let disposed = false;
@@ -184,8 +217,11 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     }
     throw error;
   };
-  const navigator = createNavigator(options.routes, async (context) => {
-    if (options.loadMiddleware) {
+  // Server middleware already guarded the first load of a client page.
+  let initialClientLoad = clientFirst;
+  let navigationCount = 0;
+  const renderRoute = async (context: NavigationContext, initialLoad: boolean): Promise<void | boolean> => {
+    if (options.loadMiddleware && !initialLoad) {
       const response = await runRouteMiddleware(await options.loadMiddleware(), {
         url: context.url, match: context.match, signal: context.signal, phase: "client",
       });
@@ -200,12 +236,45 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         return false;
       }
     }
-    let props: Record<string, unknown>;
+    let props: Record<string, unknown> = {};
     let serverSharedState: Record<string, unknown> | undefined;
     let serverCsrfToken: string | null = null;
     let loaderDraft: ReturnType<StateStore["navigationDraft"]> | undefined;
     let head: PageHead = {};
-    if (options.serverData && !options.loadRoute) {
+    let errorPage: string | undefined;
+    const route = context.match.route;
+    const runSidecar = async (sidecar: ClientRoute | undefined, onLoaderError?: (error: unknown) => void): Promise<void> => {
+      const validated = await validatePageInputs(sidecar, context.match.params, pageSearchObject(context.url.searchParams));
+      loaderDraft = sidecar?.load ? stateStore.navigationDraft() : undefined;
+      const routeContext = { ...context, ...validated, state: loaderDraft?.state ?? stateStore };
+      try {
+        const data = sidecar?.load ? await sidecar.load(routeContext) : undefined;
+        props = {
+          params: validated.params,
+          search: validated.search,
+          ...(data === undefined ? {} : { data }),
+        };
+        head = sidecar?.head?.({ ...routeContext, data }) ?? {};
+      } catch (error) {
+        if (!onLoaderError || context.signal.aborted || disposed) throw error;
+        onLoaderError(error);
+      }
+    };
+    if (route.render === "client") {
+      const loadSidecar = options.loadClientRoute ?? options.loadRoute;
+      if (!route.sidecar || !loadSidecar) throw new Error(`Route ${route.id} renders in the browser but its client sidecar cannot be loaded`);
+      const sidecar = await loadSidecar(route.sidecar);
+      if (context.signal.aborted || disposed) return;
+      // A failed browser loader shows the nearest +error.meeko inside the route's layouts.
+      await runSidecar(sidecar, route.error ? (error) => {
+        const failure = errorPageProps(error);
+        if (failure.status >= 500) reportNavigationError(browser, error, observeNavigationError);
+        loaderDraft = undefined;
+        props = failure;
+        head = {};
+        errorPage = route.error;
+      } : undefined);
+    } else if (options.serverData && !options.loadRoute) {
       const response = await (options.fetch ?? fetch)(context.url.href, {
         headers: { accept: "application/meeko+json" }, credentials: "same-origin", signal: context.signal,
       });
@@ -218,23 +287,12 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       props = payload.props;
       head = payload.head;
     } else {
-      const sidecar = context.match.route.sidecar && options.loadRoute
-        ? await options.loadRoute(context.match.route.sidecar)
-        : undefined;
-      const validated = await validatePageInputs(sidecar, context.match.params, pageSearchObject(context.url.searchParams));
-      loaderDraft = sidecar?.load ? stateStore.navigationDraft() : undefined;
-      const routeContext = { ...context, ...validated, state: loaderDraft?.state ?? stateStore };
-      const data = sidecar?.load ? await sidecar.load(routeContext) : undefined;
-      props = {
-        params: validated.params,
-        search: validated.search,
-        ...(data === undefined ? {} : { data }),
-      };
-      head = sidecar?.head?.({ ...routeContext, data }) ?? {};
+      const sidecar = route.sidecar && options.loadRoute ? await options.loadRoute(route.sidecar) : undefined;
+      await runSidecar(sidecar);
     }
     if (context.signal.aborted || disposed) return;
     const retained = Math.min(context.retainedLayouts, layouts.length);
-    const next = await createTree(context.match.route, props, options.loadPage, retained);
+    const next = await createTree(route, props, options.loadPage, retained, errorPage ?? route.file);
     if (context.signal.aborted || disposed) return;
     const commit = () => {
       if (retained) {
@@ -297,6 +355,14 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     if (serverSharedState) stateStore.seedForNavigation(serverSharedState, commitWithToken);
     else if (loaderDraft) loaderDraft.commit(commitWithToken);
     else commitWithToken();
+  };
+  const navigator = createNavigator(options.routes, async (context) => {
+    const token = ++navigationCount;
+    const initialLoad = initialClientLoad;
+    initialClientLoad = false;
+    pending.value = true;
+    try { return await renderRoute(context, initialLoad); }
+    finally { if (token === navigationCount) pending.value = false; }
   }, browser, observeNavigationError);
   const onClick = (event: MouseEvent) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -312,6 +378,12 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     void navigator.navigate(url.href).catch((error: unknown) => reportNavigationError(browser, error, observeNavigationError));
   };
   browser.document.addEventListener("click", onClick);
+  if (clientFirst) {
+    // Every layout is retained, so the commit fills the deepest empty outlet
+    // (or the empty root without layouts) exactly like a later navigation.
+    try { await navigator.navigate(browser.location.href, { replace: true }); }
+    catch (error) { reportNavigationError(browser, error, observeNavigationError); }
+  }
   return {
     navigate: navigator.navigate,
     state: stateStore,

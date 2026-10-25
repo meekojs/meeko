@@ -5,7 +5,7 @@ import { createRouteManifest } from "./router.js";
 import type { RouteRecord } from "./router.js";
 import type { PageRender } from "./page.js";
 
-const renderModes: readonly PageRender[] = ["ssr", "prerender"];
+const renderModes: readonly PageRender[] = ["ssr", "prerender", "client"];
 
 function routeId(relativeFile: string): string {
   const parts = relativeFile.slice(0, -".meeko".length).split(sep);
@@ -35,7 +35,10 @@ function literalRender(file: string, value: ts.Expression): PageRender {
     throw new Error(`${file}: render must be a string literal so Meeko can read it at build time`);
   }
   const render = expression.text as PageRender;
-  if (!renderModes.includes(render)) throw new Error(`${file}: unsupported render mode "${expression.text}"; use ${renderModes.map((mode) => `"${mode}"`).join(" or ")}`);
+  if (!renderModes.includes(render)) {
+    const modes = renderModes.map((mode) => `"${mode}"`);
+    throw new Error(`${file}: unsupported render mode "${expression.text}"; use ${modes.slice(0, -1).join(", ")} or ${modes.at(-1)}`);
+  }
   return render;
 }
 
@@ -89,10 +92,12 @@ export function extractRouteRender(file: string, source: string): PageRender | u
   // Members after the last explicit render that could set it at run time.
   let spread = false;
   let computed = false;
+  let prerenderEntries = false;
   for (const property of object.properties) {
     if (ts.isSpreadAssignment(property)) { spread = true; continue; }
     if (property.name && ts.isComputedPropertyName(property.name)) { computed = true; continue; }
     const name = property.name ? propertyName(property.name) : undefined;
+    if (name === "prerenderEntries") prerenderEntries = true;
     if (name !== "render") continue;
     if (!ts.isPropertyAssignment(property)) throw new Error(`${file}: render must be a string literal so Meeko can read it at build time`);
     render = literalRender(file, property.initializer);
@@ -102,6 +107,9 @@ export function extractRouteRender(file: string, source: string): PageRender | u
   if (computed) throw new Error(`${file}: computed route option keys cannot be read at build time; write render as a plain property`);
   if (spread && render === undefined) throw new Error(`${file}: declare render explicitly; spread route options cannot be read at build time`);
   if (spread) throw new Error(`${file}: declare render after any spread; spread route options cannot be read at build time`);
+  if (render === "client" && prerenderEntries) {
+    throw new Error(`${file}: render: "client" cannot be prerendered; remove prerenderEntries or use render: "prerender"`);
+  }
   return render;
 }
 

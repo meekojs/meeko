@@ -28,14 +28,19 @@ export function moduleKey(root: string, file: string): string {
   return `/${path}`;
 }
 
-/** Route records whose files are module keys instead of absolute paths. */
-export function portableRoutes(root: string, routes: readonly RouteRecord[], options: { sidecars: boolean }): RouteRecord[] {
+/**
+ * Route records whose files are module keys instead of absolute paths.
+ * `sidecars: "client"` keeps only the sidecars of `render: "client"` routes,
+ * which are the only ones the browser may import.
+ */
+export function portableRoutes(root: string, routes: readonly RouteRecord[], options: { sidecars: boolean | "client" }): RouteRecord[] {
+  const keepSidecar = (route: RouteRecord): boolean => options.sidecars === "client" ? route.render === "client" : options.sidecars;
   return routes.map((route) => ({
     id: route.id,
     file: moduleKey(root, route.file),
     layouts: route.layouts.map((layout) => moduleKey(root, layout)),
     ...(route.error ? { error: moduleKey(root, route.error) } : {}),
-    ...(options.sidecars && route.sidecar ? { sidecar: moduleKey(root, route.sidecar) } : {}),
+    ...(route.sidecar && keepSidecar(route) ? { sidecar: moduleKey(root, route.sidecar) } : {}),
     ...(route.render ? { render: route.render } : {}),
   }));
 }
@@ -114,8 +119,21 @@ export async function serverAppSource(projectRoot: string, build: BuildAppData |
 /** Source of `virtual:meeko-manifest/client`: routes for client navigation. */
 export async function clientRoutesSource(projectRoot: string): Promise<string> {
   const root = resolve(projectRoot);
-  const routes = portableRoutes(root, await discoverConfiguredRoutes(root), { sidecars: false });
+  const routes = portableRoutes(root, await discoverConfiguredRoutes(root), { sidecars: "client" });
   return `export const routes = ${serializeJson(routes)};\n`;
+}
+
+/**
+ * Source of `virtual:meeko-client-routes`: lazy imports of `render: "client"`
+ * sidecars only. They join the client graph, where the Vite boundary check
+ * rejects server-only imports.
+ */
+export async function clientSidecarsSource(projectRoot: string): Promise<string> {
+  const root = resolve(projectRoot);
+  const routes = portableRoutes(root, await discoverConfiguredRoutes(root), { sidecars: "client" });
+  const keys = [...new Set(routes.flatMap((route) => route.sidecar ? [route.sidecar] : []))].sort();
+  const entries = keys.map((key) => `${JSON.stringify(key)}: () => import(${JSON.stringify(key)})`);
+  return `export const modules = {${entries.join(",")}};\n`;
 }
 
 /** Reads the client build data written by `meeko build`. */

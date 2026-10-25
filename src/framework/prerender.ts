@@ -49,7 +49,11 @@ export async function prerenderRoutes(options: PrerenderOptions): Promise<string
   const urls = new Map<string, string>();
   for (const route of options.routes) {
     const sidecar = route.sidecar && options.loadRoute ? await options.loadRoute(route.sidecar) : undefined;
-    if ((route.render ?? sidecar?.render) !== "prerender") continue;
+    const render = route.render ?? sidecar?.render;
+    if (render === "client" && sidecar?.prerenderEntries !== undefined) {
+      throw new Error(`Route ${route.id} uses render: "client" and cannot be prerendered; remove prerenderEntries or use render: "prerender"`);
+    }
+    if (render !== "prerender") continue;
     const dynamic = hasParams(route.id);
     const entries = dynamic
       ? typeof sidecar?.prerenderEntries === "function" ? await sidecar.prerenderEntries() : sidecar?.prerenderEntries

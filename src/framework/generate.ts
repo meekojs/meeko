@@ -65,6 +65,7 @@ export async function generateRoutes(projectRoot: string): Promise<GeneratedRout
   await writeFile(virtualTypes, [
     'declare module "virtual:meeko-client-pages" { export const modules: Record<string, () => Promise<unknown>>; }',
     'declare module "virtual:meeko-manifest/client" { export const routes: readonly import("@meekojs/meeko/framework").RouteRecord[]; }',
+    'declare module "virtual:meeko-client-routes" { export const modules: Record<string, () => Promise<unknown>>; }',
     'declare module "virtual:meeko-server-app" {',
     '  export const manifest: import("@meekojs/meeko/server").AppManifest;',
     '  export const runtime: import("@meekojs/meeko/server").ServerRuntimeDefinition<any, any> | undefined;',

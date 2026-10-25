@@ -10,7 +10,7 @@ const props = defineProps<Props>();
 
 <template>
   <div class="app-shell">
-    <header><a href="/">Meeko</a><a href="/users">Users</a><a href="/dashboard">Dashboard</a><a href="/chat">Chat</a><a href="/layer-demo">Layer</a></header>
+    <header><a href="/">Meeko</a><a href="/users">Users</a><a href="/dashboard">Dashboard</a><a href="/chat">Chat</a><a href="/notes">Notes</a><a href="/layer-demo">Layer</a></header>
     <main><component is="props.outlet"></component></main>
   </div>
 </template>
