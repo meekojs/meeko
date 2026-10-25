@@ -2,18 +2,18 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
-import { checkFrameworkPageContracts } from "../../../src/framework/page-contracts-check.js";
-import { createEditorModel } from "../src/model.js";
+import { checkFrameworkPageContracts } from "../src/framework/page-contracts-check.ts";
+import { createEditorModel } from "../src/language-server/model.ts";
 
 test("project contract errors point to defineProps in the source component", async () => {
-  const parent = resolve("../../.meeko");
+  const parent = resolve(".meeko");
   await mkdir(parent, { recursive: true });
   const root = await mkdtemp(join(parent, "editor-contract-"));
   try {
     await mkdir(join(root, "app", "pages"), { recursive: true });
     await mkdir(join(root, "app", "layouts"), { recursive: true });
     await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
-    await symlink(resolve("../.."), join(root, "node_modules", "@meekojs", "meeko"), "junction");
+    await symlink(resolve("."), join(root, "node_modules", "@meekojs", "meeko"), "junction");
     await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}\n');
     await writeFile(join(root, "app", "pages", "index.meeko"), "<script lang=\"ts\"></script><template><p>Home</p></template>\n");
     const file = join(root, "app", "layouts", "default.meeko");
@@ -35,13 +35,13 @@ test("project contract errors point to defineProps in the source component", asy
 });
 
 test("page contract check follows a type imported by its route sidecar", async () => {
-  const parent = resolve("../../.meeko");
+  const parent = resolve(".meeko");
   await mkdir(parent, { recursive: true });
   const root = await mkdtemp(join(parent, "editor-contract-dependency-"));
   try {
     await mkdir(join(root, "app", "pages"), { recursive: true });
     await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
-    await symlink(resolve("../.."), join(root, "node_modules", "@meekojs", "meeko"), "junction");
+    await symlink(resolve("."), join(root, "node_modules", "@meekojs", "meeko"), "junction");
     await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}\n');
     await writeFile(join(root, "contract-data.ts"), "export type Data = string;\n");
     const page = join(root, "app", "pages", "index.meeko");

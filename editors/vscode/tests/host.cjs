@@ -21,10 +21,15 @@ exports.run = async function run() {
   assert.equal(extension.packageJSON.icon, "./icons/meeko-logo.png");
   assert.ok(existsSync(path.join(extension.extensionPath, "icons", "meeko-logo.png")), "El logo debe estar empaquetado");
   assert.equal(extension.packageJSON.contributes.languages[0].icon.dark, "./icons/meeko-logo.png");
-  await extension.activate();
+  const api = await extension.activate();
+  assert.ok(existsSync(path.join(extension.extensionPath, "dist", "server.js")), "El servidor incluido debe estar empaquetado");
+  assert.equal(api?.server?.source, "workspace", `Con confianza se usa el servidor de @meekojs/meeko del proyecto: ${JSON.stringify(api?.server)}`);
+  assert.match(api.server.module, /node_modules[\\/]@meekojs[\\/]meeko[\\/]dist[\\/]language-server[\\/]main\.js$/);
 
   const diagnostics = await waitForDiagnostics(uri, "TS2322");
   assert.ok(diagnostics.some((item) => item.source === "Meeko"));
+  const mismatch = diagnostics.find((item) => item.code === "TS2322");
+  assert.equal(document.getText(mismatch.range), "bad", "El diagnóstico debe cubrir el identificador completo");
 
   const layoutUri = vscode.Uri.file(path.join(process.env.MEEKO_HOST_CONSUMER, "app", "layouts", "default.meeko"));
   const layoutDocument = await vscode.workspace.openTextDocument(layoutUri);
@@ -87,6 +92,19 @@ exports.run = async function run() {
 
   const completions = await vscode.commands.executeCommand("vscode.executeCompletionItemProvider", uri, document.positionAt(use + "count.".length));
   assert.ok(completions.items.some((item) => item.label === "value"), "Completado de señal");
+
+  const references = await vscode.commands.executeCommand("vscode.executeReferenceProvider", uri, position);
+  assert.ok(references.filter((item) => item.uri.toString() === uri.toString()).length >= 3, `Referencias en script y plantilla: ${references.length}`);
+
+  const symbols = await vscode.commands.executeCommand("vscode.executeDocumentSymbolProvider", uri);
+  assert.deepEqual(symbols.map((item) => item.name), ["<script>", "<template>", "<style>"]);
+  assert.ok(symbols[0].children.some((item) => item.name === "count"), "Símbolos del script");
+
+  const folding = await vscode.commands.executeCommand("vscode.executeFoldingRangeProvider", uri);
+  assert.ok(folding?.some((range) => range.start === 0), "Plegado de la sección script");
+
+  const help = await vscode.commands.executeCommand("vscode.executeSignatureHelpProvider", uri, document.positionAt(source.indexOf("signal(0)") + "signal(".length));
+  assert.ok(help?.signatures?.length, "Ayuda de firma de signal");
 
   const formatting = await vscode.commands.executeCommand("vscode.executeFormatDocumentProvider", uri, { tabSize: 2, insertSpaces: true });
   assert.ok(formatting?.length, "Formato de la sección TypeScript");

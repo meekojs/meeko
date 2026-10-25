@@ -88,14 +88,15 @@ npm start
 | `src/check.ts` | Comprueba tipos con TypeScript 7 y ubica diagnósticos en `.meeko`. |
 | `src/types.ts` | Genera declaraciones para imports `.meeko` en proyectos TypeScript. |
 | `src/server.ts` | Escapado de contenido dinámico para HTML. |
-| `src/cli.ts` | CLI `meeko`: comandos de proyecto (`dev`, `check`, `build`, `start`), de componente (`compile`, `types`), de generación (`routes`, `prerender`), starters (`init`, `init-framework`), `--help` y `--version`. |
+| `src/cli.ts` | CLI `meeko`: comandos de proyecto (`dev`, `check`, `build`, `start`), de componente (`compile`, `types`), de generación (`routes`, `prerender`), starters (`init`, `init-framework`), servidor de lenguaje (`lsp`), `--help` y `--version`. |
+| `src/language-server` | Servidor de lenguaje (`meeko lsp --stdio`, bin `meeko-language-server`) para VS Code y cualquier editor LSP. |
 | `src/vite.ts` | Plugin de Vite para transformar `.meeko` en cliente y SSR. |
 | `src/devtools.ts` | Instrumentación de instancias y señales sólo durante desarrollo. |
 | `src/devtools-ui` | Panel de inspección dentro de la página. |
 | `examples/counter` | Componente de referencia tipado. |
 | `examples/vite` | Aplicación Vite sin generación manual de componentes. |
 | `examples/nested` | Composición de componentes con rangos de hidratación y props tipadas. |
-| `editors/vscode` | Extensión local con resaltado, diagnósticos y operaciones semánticas. |
+| `editors/vscode` | Extensión de VS Code: resaltado y cliente del servidor de lenguaje. |
 | `benchmarks` | Comparativa repetible de Meeko y Vue en SSR y Chrome. |
 | `tests` | Pruebas de SSR, hidratación y reactividad. |
 | `tools/devtools-extension` | Panel local de Chrome DevTools. |
@@ -138,7 +139,7 @@ node dist/cli.js compile ruta/Componente.meeko ruta/Componente.generated.ts
 node dist/cli.js types ruta/Componente.meeko
 ```
 
-`check` devuelve errores de sintaxis y tipos con línea y columna del `.meeko`; `--json` entrega diagnósticos estructurados para editores. `compile` ejecuta la misma comprobación y no escribe el módulo si encuentra errores. `types` genera declaraciones del componente y sus imports `.meeko` para que TypeScript compruebe las props del consumidor. La verificación usa TypeScript 7 y resuelve imports desde el directorio del componente.
+`check` devuelve errores de sintaxis y tipos con línea y columna del `.meeko`; `--json` entrega diagnósticos estructurados para editores. `compile` ejecuta la misma comprobación y no escribe el módulo si encuentra errores. `types` genera declaraciones del componente y sus imports `.meeko` para que TypeScript compruebe las props del consumidor. La verificación usa TypeScript 7 y resuelve imports desde el directorio del componente, incluidos los alias `paths` y `baseUrl` del `tsconfig.json` de la raíz del paquete, como el editor.
 
 La aplicación debe pasar **las mismas props** al render y a `hydrate`. `renderWithState(props)` entrega HTML y señales editables serializables; el ejemplo SSR transfiere ambos junto con las props mediante `serializeJson` y llama `hydrate(root, props, state)`. Meeko comprueba que el texto existente coincida durante la hidratación y devuelve una función que desconecta eventos y observadores. El HTML dinámico se escapa en el servidor.
 
@@ -160,8 +161,8 @@ Los errores de sintaxis de script, plantilla y CSS, así como los errores de tip
 
 Los nombres e identificadores de código se escriben en inglés. La API pública y sus contratos llevan JSDoc en español.
 
-La [extensión local de VS Code](https://github.com/meekojs/meeko/blob/main/editors/vscode/README.md) comparte los diagnósticos del CLI y ofrece completado, navegación, hover, renombrado y formato en script y plantilla. El VSIX se validó en un host VS Code aislado con un proyecto consumidor externo; su README explica cómo repetir la prueba y las limitaciones actuales.
+El servidor de lenguaje de Meeko (`meeko lsp --stdio` o `meeko-language-server --stdio`) comparte los diagnósticos del CLI y ofrece completado, navegación, referencias, hover, renombrado entre archivos, ayuda de firma, símbolos, plegado, formato y acciones rápidas en script y plantilla. La [extensión de VS Code](https://github.com/meekojs/meeko/blob/main/editors/vscode/README.md) es un cliente de ese servidor y usa el del proyecto cuando está instalado; [docs/editors.md](https://github.com/meekojs/meeko/blob/main/docs/editors.md) explica cómo configurarlo en Neovim, Helix, Zed, JetBrains y Sublime Text. El VSIX se validó en un host VS Code aislado con un proyecto consumidor externo; su README explica cómo repetir la prueba y las limitaciones actuales.
 
 ## Alcance actual
 
-Esta base todavía no implementa un servidor de lenguaje independiente ni streaming. El compilador rechaza varias construcciones no soportadas. Estas capacidades necesitan conservar el mismo contrato de SSR e hidratación antes de añadirse.
+Esta base todavía no implementa streaming SSR. El compilador rechaza varias construcciones no soportadas. Estas capacidades necesitan conservar el mismo contrato de SSR e hidratación antes de añadirse.

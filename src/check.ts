@@ -1,11 +1,13 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire as createModuleRequire } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { compileWithAutoImports } from "./autoimports.js";
+import type { AutoImport } from "./autoimports.js";
 import { originalOffset } from "./compiler/mapping.js";
 import type { SourceMapping } from "./compiler/mapping.js";
 import { moduleSpecifiers } from "./compiler/import-graph.js";
@@ -30,7 +32,13 @@ interface GeneratedEntry {
   mappings: SourceMapping[];
 }
 
-async function compileGraph(source: string, filename: string): Promise<{ root: GeneratedEntry; entries: Map<string, GeneratedEntry>; tempDirectory: string }> {
+/** Ajustes de `checkSource` para herramientas que no deben ejecutar la configuración del proyecto. */
+export interface CheckSourceOptions {
+  /** Registro de autoimports por raíz de proyecto; por defecto se carga la configuración como el CLI. */
+  readonly autoImports?: (projectRoot: string) => readonly AutoImport[] | Promise<readonly AutoImport[]>;
+}
+
+async function compileGraph(source: string, filename: string, options: CheckSourceOptions): Promise<{ root: GeneratedEntry; entries: Map<string, GeneratedEntry>; tempDirectory: string }> {
   const byOriginal = new Map<string, GeneratedEntry>();
   const byGenerated = new Map<string, GeneratedEntry>();
   const nonce = randomUUID();
@@ -40,7 +48,8 @@ async function compileGraph(source: string, filename: string): Promise<{ root: G
     const previous = byOriginal.get(original);
     if (previous) return previous;
     const target = relative(rootDirectory, original).split(/[\\/]/)[0] === "server" ? "server" : "client";
-    const compiled = await compileWithAutoImports(content, original, {}, target);
+    const registry = options.autoImports ? await options.autoImports(projectRoot(original)) : undefined;
+    const compiled = await compileWithAutoImports(content, original, {}, target, registry);
     const entry: GeneratedEntry = {
       original, source: content, code: compiled.code,
       generated: join(generatedDirectory, relative(rootDirectory, original) + ".ts"),
@@ -87,6 +96,29 @@ async function compileGraph(source: string, filename: string): Promise<{ root: G
   return { root, entries: byGenerated, tempDirectory: generatedDirectory };
 }
 
+/** Resolution options of the project tsconfig that `meeko check` shares with the language server. */
+const resolutionOptions = ["types", "typeRoots", "customConditions", "resolveJsonModule", "allowImportingTsExtensions"] as const;
+
+/**
+ * Reads the module resolution options of `<root>/tsconfig.json` (the file the editor uses for hover
+ * and navigation) so a `paths` alias that the editor resolves is not reported by `meeko check`.
+ * Type-checking flags stay fixed. TypeScript 7 has no `baseUrl`: it becomes a `*` mapping.
+ */
+async function projectResolutionOptions(root: string): Promise<Record<string, unknown> | undefined> {
+  if (!existsSync(join(root, "tsconfig.json"))) return undefined;
+  const { resolveProjectCompilerOptions } = await import("./language-server/model.js");
+  const { options } = resolveProjectCompilerOptions(root);
+  const baseUrl = typeof options.baseUrl === "string" ? options.baseUrl : undefined;
+  const pathsBase = baseUrl ?? (typeof options["pathsBasePath"] === "string" ? options["pathsBasePath"] : root);
+  const absolute = (target: string): string => resolve(pathsBase, target).replaceAll("\\", "/");
+  const paths: Record<string, string[]> = {};
+  for (const [pattern, targets] of Object.entries(options.paths ?? {})) paths[pattern] = targets.map(absolute);
+  if (baseUrl && !paths["*"]) paths["*"] = [absolute("*")];
+  const resolution: Record<string, unknown> = Object.keys(paths).length > 0 ? { paths } : {};
+  for (const key of resolutionOptions) if (options[key] !== undefined) resolution[key] = options[key];
+  return Object.keys(resolution).length > 0 ? resolution : undefined;
+}
+
 function generatedOffset(code: string, line: number, column: number): number {
   const lines = code.split("\n");
   let offset = 0;
@@ -105,11 +137,11 @@ function parseTypeScriptOutput(output: string): Array<{ file: string; line: numb
 }
 
 /** Comprueba un componente con TypeScript 7 y devuelve errores ubicados en el .meeko original. */
-export async function checkSource(source: string, filename: string): Promise<CompileDiagnostic[]> {
+export async function checkSource(source: string, filename: string, options: CheckSourceOptions = {}): Promise<CompileDiagnostic[]> {
   const absolute = resolve(filename);
   let graph: Awaited<ReturnType<typeof compileGraph>>;
   try {
-    graph = await compileGraph(source, absolute);
+    graph = await compileGraph(source, absolute, options);
   } catch (error) {
     if (error instanceof MeekoCompileError) return [error.diagnostic];
     throw error;
@@ -121,12 +153,17 @@ export async function checkSource(source: string, filename: string): Promise<Com
       await mkdir(dirname(entry.generated), { recursive: true });
       await writeFile(entry.generated, entry.code, { encoding: "utf8", flag: "wx" });
     }
+    // Options such as `paths` only exist in a tsconfig, so they go into a temporary one; the
+    // command-line flags below still override every type-checking option.
+    const resolution = await projectResolutionOptions(projectRoot(absolute));
+    const project = resolution ? join(graph.tempDirectory, "tsconfig.json") : undefined;
+    if (project) await writeFile(project, JSON.stringify({ compilerOptions: resolution, files: [graph.root.generated] }), { encoding: "utf8", flag: "wx" });
     try {
       const result = await execFileAsync(tscExecutable, [
-        ...(nativeTscPath ? [] : [tscPath]), "--ignoreConfig", "--noEmit", "--pretty", "false", "--strict", "--skipLibCheck",
+        ...(nativeTscPath ? [] : [tscPath]), ...(project ? ["--project", project] : ["--ignoreConfig"]), "--noEmit", "--pretty", "false", "--strict", "--skipLibCheck",
         "--noUncheckedIndexedAccess", "--exactOptionalPropertyTypes", "--verbatimModuleSyntax",
         "--module", "nodenext", "--moduleResolution", "nodenext", "--target", "es2022",
-        "--lib", "es2022,dom", graph.root.generated,
+        "--lib", "es2022,dom", ...(project ? [] : [graph.root.generated]),
       ], { cwd: dirname(absolute), maxBuffer: 8 * 1024 * 1024, windowsHide: true });
       output = result.stdout + result.stderr;
     } catch (error) {

@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
-import { checkSource } from "../../../src/check.js";
-import { createEditorModel } from "../src/model.js";
+import { checkSource } from "../src/check.ts";
+import { createEditorModel } from "../src/language-server/model.ts";
 
-const filename = resolve("../../examples/regions/Regions.meeko");
+const filename = resolve("examples/regions/Regions.meeko");
 const source = readFileSync(filename, "utf8");
 
 test("mapea referencias de script y plantilla para renombrado", () => {
@@ -42,7 +42,7 @@ test("conserva el ámbito de los elementos de lista", () => {
 });
 
 test("editor resolves the typed component error observer autoimport", () => {
-  const filename = resolve("../../examples/counter/ErrorObserverEditor.meeko");
+  const filename = resolve("examples/counter/ErrorObserverEditor.meeko");
   const valid = '<script lang="ts">provideErrorHandler((error) => { const value: unknown = error; void value; });</script><template><button>Run</button></template>';
   const model = createEditorModel(valid, filename);
   try {
@@ -204,7 +204,7 @@ test("formatea un componente mínimo con error de tipos", () => {
 });
 
 test("defineProps defaults mantiene el tipo resuelto en script y plantilla", () => {
-  const defaultsFile = resolve("../../tests/fixtures/PropsDefaults.meeko");
+  const defaultsFile = resolve("tests/fixtures/PropsDefaults.meeko");
   const defaultsSource = readFileSync(defaultsFile, "utf8");
   const model = createEditorModel(defaultsSource, defaultsFile);
   try {
@@ -286,7 +286,7 @@ function value(): string {
 });
 
 test("el editor actualiza tipos de un modulo importado sin editar el componente", () => {
-  const parent = resolve("../../.meeko");
+  const parent = resolve(".meeko");
   mkdirSync(parent, { recursive: true });
   const root = mkdtempSync(join(parent, "editor-dependency-"));
   try {

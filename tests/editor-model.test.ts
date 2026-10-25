@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
-import { createEditorModel } from "../editors/vscode/src/model.ts";
+import { createEditorModel } from "../src/language-server/model.ts";
 
 test("editor positions follow the compiler template AST", () => {
   const source = `<script lang="ts">const options = [{ name: "A" }]; const selected = options[0];</script>

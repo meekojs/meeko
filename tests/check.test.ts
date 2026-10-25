@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { join, relative, resolve } from "node:path";
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { dirname, join, relative, resolve } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 import { checkSource } from "../src/check.ts";
@@ -252,5 +252,48 @@ test("checkSource atribuye errores de un módulo TypeScript importado a ese arch
     assert.equal(error.location.offset, helperSource.indexOf("value"));
   } finally {
     await rm(directory, { recursive: true, force: true });
+  }
+});
+
+async function aliasProject(prefix: string, tsconfig: object, files: Record<string, string>): Promise<string> {
+  await mkdir(resolve(".meeko"), { recursive: true });
+  const root = await mkdtemp(resolve(".meeko", prefix));
+  await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}\n');
+  await writeFile(join(root, "tsconfig.json"), `${JSON.stringify(tsconfig)}\n`);
+  await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
+  await symlink(resolve("."), join(root, "node_modules", "@meekojs", "meeko"), "junction");
+  for (const [name, content] of Object.entries(files)) {
+    await mkdir(dirname(join(root, name)), { recursive: true });
+    await writeFile(join(root, name), content);
+  }
+  return root;
+}
+
+test("checkSource y CLI check resuelven alias paths y baseUrl del tsconfig del proyecto como el editor", async () => {
+  const component = `<script lang="ts">import { answer } from "@lib/answer.js";\nconst text: string = answer;</script>\n<template>{text}</template>`;
+  const fromBase = `<script lang="ts">import { answer } from "shared/answer.js";\nconst text: string = answer;</script>\n<template>{text}</template>`;
+  const paths = await aliasProject("check-paths-", { compilerOptions: { paths: { "@lib/*": ["./lib/*"] } } }, {
+    "lib/answer.ts": "export const answer = 42;\n",
+    "Alias.meeko": component,
+  });
+  const base = await aliasProject("check-base-url-", { compilerOptions: { baseUrl: "./src", ignoreDeprecations: "6.0" } }, {
+    "src/shared/answer.ts": "export const answer = 42;\n",
+    "Base.meeko": fromBase,
+  });
+  try {
+    for (const [source, file] of [[component, join(paths, "Alias.meeko")], [fromBase, join(base, "Base.meeko")]] as const) {
+      const diagnostics = await checkSource(source, file);
+      // The alias resolves: the only error is the real type mismatch, not TS2307.
+      assert.deepEqual(diagnostics.map((item) => `${item.code}:${item.location.line}`), ["TS2322:2"], JSON.stringify(diagnostics));
+      await assert.rejects(execFileAsync(process.execPath, [resolve("dist/cli.js"), "check", file, "--json"]), (error: unknown) => {
+        const cli = JSON.parse((error as { stdout?: string }).stdout ?? "") as Array<{ code: string }>;
+        assert.deepEqual(cli.map((item) => item.code), ["TS2322"]);
+        return true;
+      });
+    }
+    assert.deepEqual(await readdir(join(paths, ".meeko", "check")).catch(() => []), []);
+  } finally {
+    await rm(paths, { recursive: true, force: true });
+    await rm(base, { recursive: true, force: true });
   }
 });

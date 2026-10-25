@@ -2,20 +2,27 @@
   "name": "meeko-language",
   "publisher": "meekojs",
   "displayName": "Meeko Language",
-  "description": "Syntax, diagnostics and TypeScript editing for .meeko components",
+  "description": "Syntax highlighting and the Meeko language server for .meeko components",
   "icon": "./icons/meeko-logo.png",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "license": "MIT",
   "private": true,
   "repository": { "type": "git", "url": "https://github.com/meekojs/meeko" },
   "homepage": "https://github.com/meekojs/meeko",
   "bugs": { "url": "https://github.com/meekojs/meeko/issues" },
-  "keywords": ["meeko", "typescript", "components", "syntax", "diagnostics"],
+  "keywords": ["meeko", "typescript", "components", "syntax", "diagnostics", "lsp"],
   "type": "module",
   "main": "./dist/extension.js",
   "engines": { "vscode": "^1.140.0" },
   "activationEvents": ["onLanguage:meeko"],
   "categories": ["Programming Languages"],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "In restricted mode Meeko uses its bundled language server, reads the project configuration statically and skips project page-contract checks.",
+      "restrictedConfigurations": ["meeko.languageServer.preferWorkspace"]
+    }
+  },
   "scripts": {
     "build": "node build.mjs",
     "check": "tsc -p tsconfig.json --noEmit",
@@ -26,12 +33,25 @@
   },
   "dependencies": {
     "@typescript/typescript6": "6.0.2",
-    "typescript": "7.0.2",
-    "vscode-css-languageservice": "6.3.10",
-    "vscode-html-languageservice": "5.6.2",
-    "vscode-languageserver-textdocument": "1.0.16"
+    "typescript": "7.0.2"
   },
   "contributes": {
+    "configuration": {
+      "title": "Meeko",
+      "properties": {
+        "meeko.languageServer.preferWorkspace": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use the language server of the workspace's @meekojs/meeko package, so the editor matches the project's compiler. The bundled server is used when it is missing, disabled or the workspace is not trusted."
+        },
+        "meeko.trace.server": {
+          "type": "string",
+          "enum": ["off", "messages", "verbose"],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the Meeko language server."
+        }
+      }
+    },
     "configurationDefaults": {
       "[meeko]": { "editor.semanticHighlighting.enabled": true }
     },
@@ -63,6 +83,7 @@
     "@vscode/test-electron": "3.1.0",
     "esbuild": "0.28.2",
     "tsx": "^4.20.0",
+    "vscode-languageclient": "11.0.0",
     "vscode-oniguruma": "2.0.1",
     "vscode-textmate": "9.3.2"
   }

@@ -257,9 +257,9 @@ export function transformAutoImports(source: string, filename: string, code: str
 }
 
 /** Compile result shared by Vite, CLI checks and declaration generation. */
-export async function compileWithAutoImports(source: string, filename: string, options: CompileOptions = {}, target: "client" | "server" = "client"): Promise<CompileResult> {
+export async function compileWithAutoImports(source: string, filename: string, options: CompileOptions = {}, target: "client" | "server" = "client", knownRegistry?: readonly AutoImport[]): Promise<CompileResult> {
   const compiled = compile(source, filename, options);
-  const registry = await discoverAutoImports(projectRoot(filename));
+  const registry = knownRegistry ?? await discoverAutoImports(projectRoot(filename));
   const code = transformAutoImports(source, filename, compiled.code, registry, target);
   const offset = code.length - compiled.code.length;
   return {
