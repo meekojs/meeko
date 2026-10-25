@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   redis-integration:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       redis:
         image: redis:7-alpine
@@ -54,7 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [windows-latest, ubuntu-24.04, macos-latest]
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
