@@ -66,6 +66,31 @@ function normalize(node: ParsedNode, template: SfcSection): TemplateNode {
   return result;
 }
 
+/**
+ * Decodifica un tramo crudo de un nodo de texto como lo hace el parser HTML: entidades y saltos
+ * CRLF. Compilador y editor analizan el texto crudo para que sus posiciones coincidan con la
+ * fuente, y decodifican sólo el contenido de cada parte.
+ */
+export function decodeTemplateText(raw: string): string {
+  const normalized = raw.replace(/\r\n?/g, "\n");
+  if (!normalized.includes("&")) return normalized;
+  return (parseFragment(normalized).childNodes as Array<{ value?: string }>).map((node) => node.value ?? "").join("");
+}
+
+/**
+ * Devuelve la posición absoluta donde empieza el valor de un atributo, con o sin comillas.
+ * Es `undefined` si el atributo no tiene `=`. Compilador y editor la comparten para mapear directivas.
+ */
+export function attributeValueStart(source: string, attribute: Pick<TemplateAttribute, "start" | "end">): number | undefined {
+  const raw = source.slice(attribute.start, attribute.end);
+  const equals = raw.indexOf("=");
+  if (equals < 0) return undefined;
+  let index = equals + 1;
+  while (index < raw.length && /\s/.test(raw[index]!)) index++;
+  if (raw[index] === '"' || raw[index] === "'") index++;
+  return attribute.start + index;
+}
+
 /** Analiza HTML y entrega un AST independiente del parser con posiciones originales. */
 export function parseTemplate(source: string, template: SfcSection, filename: string): TemplateNode {
   const errors: Array<{ code: string; startOffset: number }> = [];

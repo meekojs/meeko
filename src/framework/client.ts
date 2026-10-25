@@ -1,9 +1,11 @@
+import { hasRegionRecoveryFailure } from "../dom.js";
 import type { Component, DomScope } from "../dom.js";
 import { createAppErrorChannel, provideAppErrorChannel } from "../component-errors.js";
+import type { ComponentErrorHandler } from "../component-errors.js";
 import { finishWithCleanup, signal } from "../reactivity.js";
 import type { Signal } from "../reactivity.js";
-import { pageSearchObject, validatePageInputs } from "./page.js";
-import type { PageSchema } from "./page.js";
+import { PAYLOAD_VERSION, pageSearchObject, validatePageInputs } from "./page.js";
+import type { PageHead, PageRender, PageSchema } from "./page.js";
 import { runRouteMiddleware } from "./middleware.js";
 import type { RouteMiddleware } from "./middleware.js";
 import { createNavigator, matchRoute, reportNavigationError } from "./router.js";
@@ -21,12 +23,15 @@ export interface ClientRoute {
   /** Client-safe loader. Server-only sidecars must not be passed to loadRoute. */
   params?: PageSchema;
   search?: PageSchema;
-  load?: (context: NavigationContext & {
-    params: Readonly<Record<string, unknown>>;
-    search: Readonly<Record<string, unknown>>;
-    state: StateStore;
-  }) => Promise<unknown> | unknown;
+  load?: (context: ClientRouteContext) => Promise<unknown> | unknown;
+  head?: (context: ClientRouteContext & { data: unknown }) => PageHead;
 }
+
+type ClientRouteContext = NavigationContext & {
+  params: Readonly<Record<string, unknown>>;
+  search: Readonly<Record<string, unknown>>;
+  state: StateStore;
+};
 
 export interface ClientAppOptions {
   readonly routes: readonly RouteRecord[];
@@ -40,6 +45,11 @@ export interface ClientAppOptions {
   readonly serverData?: boolean;
   readonly fetch?: typeof fetch;
   readonly onNavigationError?: (error: unknown) => void;
+  /**
+   * Observes browser failures of this application: navigation, Socket clients,
+   * and component events, effects or cleanups without a nearer `provideErrorHandler`.
+   */
+  readonly onError?: ComponentErrorHandler;
   readonly browser?: Window;
 }
 
@@ -51,10 +61,14 @@ export interface ClientApp {
 
 interface HydrationPayload {
   route: string;
+  render: PageRender;
   props: Record<string, unknown>;
   state: Record<string, unknown>;
   sharedState: Record<string, unknown>;
+  head: PageHead;
 }
+
+const pageRenders: readonly string[] = ["ssr", "prerender"] satisfies readonly PageRender[];
 
 interface LayoutInstance {
   file: string;
@@ -67,12 +81,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function readPayload(value: unknown): HydrationPayload {
   const parsed: unknown = typeof value === "string" ? JSON.parse(value) : value;
+  if (isRecord(parsed) && parsed.v !== PAYLOAD_VERSION) {
+    throw new TypeError(`Unsupported Meeko payload version ${String(parsed.v)}; the server and browser bundles must come from the same build`);
+  }
   if (!isRecord(parsed) || typeof parsed.route !== "string" || !isRecord(parsed.props) || !isRecord(parsed.state)) {
     throw new TypeError("Invalid Meeko hydration payload");
   }
   if (!isRecord(parsed.props.params) || !isRecord(parsed.props.search)) throw new TypeError("Invalid Meeko route props");
   if (parsed.sharedState !== undefined && !isRecord(parsed.sharedState)) throw new TypeError("Invalid Meeko shared state");
-  return { route: parsed.route, props: parsed.props, state: parsed.state, sharedState: parsed.sharedState ?? {} };
+  const render = parsed.render ?? "ssr";
+  if (typeof render !== "string" || !pageRenders.includes(render)) throw new TypeError("Invalid Meeko page render mode");
+  const head = parsed.head ?? {};
+  if (!isRecord(head) || (head.title !== undefined && typeof head.title !== "string")) throw new TypeError("Invalid Meeko page head");
+  return {
+    route: parsed.route, render: render as PageRender, props: parsed.props, state: parsed.state,
+    sharedState: parsed.sharedState ?? {}, head: head.title === undefined ? {} : { title: head.title },
+  };
 }
 
 function applyCsrfToken(browser: Window, token: string): () => void {
@@ -135,10 +159,10 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   if (!initial || initial.route.id !== payload.route) throw new Error("Meeko route hydration mismatch");
   if (JSON.stringify(initial.params) !== JSON.stringify(payload.props.params)) throw new Error("Meeko route parameters do not match SSR");
   const stateStore = new StateStore(payload.sharedState);
-  const errorChannel = createAppErrorChannel();
+  const errorChannel = createAppErrorChannel(options.onError);
   const observeNavigationError = options.onNavigationError ?? ((error: unknown) => {
     const handler = errorChannel.current();
-    if (handler) return handler(error);
+    if (handler) return handler(error, "navigation");
     reportNavigationError(browser, error);
   });
   const hydrateApp = (hydrate: () => () => void) => hydrateWithStateStore(stateStore, () => {
@@ -180,6 +204,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     let serverSharedState: Record<string, unknown> | undefined;
     let serverCsrfToken: string | null = null;
     let loaderDraft: ReturnType<StateStore["navigationDraft"]> | undefined;
+    let head: PageHead = {};
     if (options.serverData && !options.loadRoute) {
       const response = await (options.fetch ?? fetch)(context.url.href, {
         headers: { accept: "application/meeko+json" }, credentials: "same-origin", signal: context.signal,
@@ -191,18 +216,21 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       if (context.signal.aborted || disposed) return;
       serverSharedState = payload.sharedState;
       props = payload.props;
+      head = payload.head;
     } else {
       const sidecar = context.match.route.sidecar && options.loadRoute
         ? await options.loadRoute(context.match.route.sidecar)
         : undefined;
       const validated = await validatePageInputs(sidecar, context.match.params, pageSearchObject(context.url.searchParams));
       loaderDraft = sidecar?.load ? stateStore.navigationDraft() : undefined;
-      const data = sidecar?.load ? await sidecar.load({ ...context, ...validated, state: loaderDraft!.state }) : undefined;
+      const routeContext = { ...context, ...validated, state: loaderDraft?.state ?? stateStore };
+      const data = sidecar?.load ? await sidecar.load(routeContext) : undefined;
       props = {
         params: validated.params,
         search: validated.search,
         ...(data === undefined ? {} : { data }),
       };
+      head = sidecar?.head?.({ ...routeContext, data }) ?? {};
     }
     if (context.signal.aborted || disposed) return;
     const retained = Math.min(context.retainedLayouts, layouts.length);
@@ -210,25 +238,51 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     if (context.signal.aborted || disposed) return;
     const commit = () => {
       if (retained) {
+        const outlet = layouts[retained - 1]!.outlet;
+        const previous = outlet.value;
         try {
-          withStateStore(stateStore, () => { layouts[retained - 1]!.outlet.value = next.component; });
+          withStateStore(stateStore, () => { outlet.value = next.component; });
         } catch (error) {
-          recoverCommitFailure(error);
+          // The outlet binding restores and rehydrates its previous page; only
+          // a failed restoration leaves a region that needs a full reload.
+          if (hasRegionRecoveryFailure(error)) recoverCommitFailure(error);
+          try { withStateStore(stateStore, () => { outlet.value = previous; }); }
+          catch (restoreError) { recoverCommitFailure(new AggregateError([error, restoreError], "Meeko navigation could not restore the previous outlet")); }
+          throw error;
         }
         layouts = [...layouts.slice(0, retained), ...next.layouts];
         stableUrl = context.url.href;
         return;
       }
       const rendered = withStateStore(stateStore, () => next.component.renderWithState({}));
+      // Hydrate the next view after the committed one, between private markers,
+      // so a failure leaves the visible route and its bindings untouched.
+      const document = options.root.ownerDocument;
+      const start = document.createComment("meeko:navigation");
+      const end = document.createComment("/meeko:navigation");
+      options.root.append(start, end);
+      let nextRelease: () => void;
       try {
-        release();
-        options.root.innerHTML = rendered.html;
-        release = hydrateApp(() => next.component.hydrateScope({ root: options.root }, {}, rendered.state));
+        const range = document.createRange();
+        range.selectNodeContents(options.root);
+        options.root.insertBefore(range.createContextualFragment(rendered.html), end);
+        nextRelease = hydrateApp(() => next.component.hydrateScope({ root: options.root, start, end }, {}, rendered.state));
       } catch (error) {
-        recoverCommitFailure(error);
+        for (let node: ChildNode | null = start; node;) {
+          const following: ChildNode | null = node === end ? null : node.nextSibling;
+          node.remove();
+          node = following;
+        }
+        throw error;
       }
+      const previousRelease = release;
+      release = nextRelease;
       layouts = next.layouts;
       stableUrl = context.url.href;
+      while (options.root.firstChild && options.root.firstChild !== start) options.root.firstChild.remove();
+      // The new route is committed; a cleanup failure of the old one is observed, not rolled back.
+      try { previousRelease(); }
+      catch (error) { reportNavigationError(browser, error, observeNavigationError); }
     };
     const commitWithToken = () => {
       const restoreToken = serverCsrfToken === null ? undefined : applyCsrfToken(browser, serverCsrfToken);
@@ -238,6 +292,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         catch (restoreError) { throw new AggregateError([error, restoreError], "Meeko navigation and CSRF recovery failed"); }
         throw error;
       }
+      if (head.title !== undefined) browser.document.title = head.title;
     };
     if (serverSharedState) stateStore.seedForNavigation(serverSharedState, commitWithToken);
     else if (loaderDraft) loaderDraft.commit(commitWithToken);

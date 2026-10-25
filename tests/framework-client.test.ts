@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Window as HappyWindow } from "happy-dom";
-import { bindComponent, renderComponent } from "../src/dom.ts";
+import { bindComponent, bindEvent, renderComponent } from "../src/dom.ts";
+import { createRoot, effect, onCleanup, signal } from "../src/reactivity.ts";
 import { provideErrorHandler } from "../src/component-errors.ts";
 import type { Component, DomScope } from "../src/dom.ts";
 import { mountClientApp } from "../src/framework/client.ts";
@@ -80,7 +81,7 @@ test("hydration rejects malformed or mismatched payloads", async () => {
   }), SyntaxError);
   await assert.rejects(mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { route: "/b", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 1, route: "/b", props: { params: {}, search: {} }, state: {} },
     loadPage: async () => { throw new Error("should not load"); },
     browser: browser as unknown as Window,
   }), /hydration mismatch/);
@@ -196,14 +197,14 @@ test("a failed page load does not seed state from its discarded server payload",
   const app = await mountClientApp({
     routes,
     root: root as unknown as Element,
-    payload: { route: "/start", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
     loadPage: async (file) => {
       if (file === "broken.meeko") throw new Error("page import failed");
       return start;
     },
     serverData: true,
     fetch: async () => new Response(JSON.stringify({
-      route: "/broken", props: { params: {}, search: {} }, state: {}, sharedState: { serverOnly: "discarded" },
+      v: 1, route: "/broken", props: { params: {}, search: {} }, state: {}, sharedState: { serverOnly: "discarded" },
     })),
     browser: browser as unknown as Window,
   });
@@ -234,11 +235,11 @@ test("a failed page render rolls back state from its discarded server payload", 
   };
   const app = await mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { route: "/start", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
     loadPage: async (file) => file === "broken.meeko" ? broken : start,
     serverData: true,
     fetch: async () => new Response(JSON.stringify({
-      route: "/broken", props: { params: {}, search: {} }, state: {}, sharedState: { serverOnly: "discarded" },
+      v: 1, route: "/broken", props: { params: {}, search: {} }, state: {}, sharedState: { serverOnly: "discarded" },
     }), { headers: { "x-meeko-csrf-token": "discarded" } }),
     browser: browser as unknown as Window,
   });
@@ -267,11 +268,11 @@ test("a discarded route response cannot overwrite the current CSRF token", async
   let resolveOld!: (response: Response) => void;
   const oldResponse = new Promise<Response>((resolve) => { resolveOld = resolve; });
   const response = (route: string, token: string) => new Response(JSON.stringify({
-    route, props: { params: {}, search: {} }, state: {}, sharedState: {},
+    v: 1, route, props: { params: {}, search: {} }, state: {}, sharedState: {},
   }), { headers: { "x-meeko-csrf-token": token } });
   const app = await mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { route: "/start", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
     loadPage: async () => page,
     serverData: true,
     fetch: async (input) => new URL(String(input)).pathname === "/old" ? oldResponse : response("/new", "new-token"),
@@ -301,7 +302,7 @@ test("a malformed route payload cannot change the CSRF token", async () => {
   };
   const app = await mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { route: "/start", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
     loadPage: async () => page,
     serverData: true,
     fetch: async () => new Response("{", { headers: { "x-meeko-csrf-token": "discarded" } }),
@@ -327,7 +328,7 @@ test("a rejected client loader cannot change application state", async () => {
   };
   const app = await mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { route: "/start", props: { params: {}, search: {} }, state: {}, sharedState: { owner: "current" } },
+    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {}, sharedState: { owner: "current" } },
     loadPage: async () => page,
     loadRoute: async () => ({ load: ({ state }) => {
       state.get("owner", () => "missing").value = "discarded";
@@ -362,7 +363,7 @@ test("a canceled client loader cannot overwrite a later navigation", async () =>
   const gate = new Promise<void>((resolve) => { finish = resolve; });
   const app = await mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { route: "/start", props: { params: {}, search: {} }, state: {}, sharedState: { owner: "current" } },
+    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {}, sharedState: { owner: "current" } },
     loadPage: async () => page,
     loadRoute: async () => ({ load: async ({ state }) => {
       state.get("owner", () => "missing").value = "stale";
@@ -398,7 +399,7 @@ test("a successful client loader commits state used by the next page", async () 
   };
   const app = await mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { route: "/start", props: { params: {}, search: {} }, state: {}, sharedState: { owner: "current" } },
+    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {}, sharedState: { owner: "current" } },
     loadPage: async () => page,
     loadRoute: async () => ({ load: ({ state }) => {
       state.get("owner", () => "missing").value = "next";
@@ -433,7 +434,7 @@ test("a failed next-page render restores changes made by its client loader", asy
   };
   const app = await mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { route: "/start", props: { params: {}, search: {} }, state: {}, sharedState: { owner: "current" } },
+    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {}, sharedState: { owner: "current" } },
     loadPage: async (file) => file === "broken.meeko" ? broken : start,
     loadRoute: async () => ({ load: ({ state }) => {
       state.get("owner", () => "missing").value = "discarded";
@@ -704,7 +705,7 @@ test("mounted app requests the previous page after a committed DOM swap meets a 
   });
   const app = await mountClientApp({
     routes, root: root as unknown as Element,
-    payload: { route: "/start", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
     loadPage: async (file) => file === "next.meeko" ? component("Next") : component("Start"),
     browser,
   });
@@ -734,7 +735,7 @@ test("client navigation handles a throwing error observer for guards and link cl
   const app = await mountClientApp({
     routes,
     root: root as unknown as Element,
-    payload: { route: "/start", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
     loadPage: async (file) => file === "broken.meeko" ? Promise.reject(new Error("page load failed")) : ({
       renderWithState: () => ({ html: "<p>Start</p>", state: {} }),
       renderToString: () => "<p>Start</p>",
@@ -779,7 +780,7 @@ test("navigation errors use each mounted app's active component observer", async
     });
     const app = await mountClientApp({
       routes, root: root as unknown as Element,
-      payload: { route: "/start", props: { params: {}, search: {} }, state: {} },
+      payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
       loadPage: async (file) => {
         if (file === "broken.meeko") throw new Error("route failed");
         return page(file === "next.meeko" ? "next" : "start");
@@ -806,8 +807,100 @@ test("navigation errors use each mounted app's active component observer", async
   }
 });
 
+test("a component without an ancestor observer never reports to an unrelated component's observer", async () => {
+  const browser = new HappyWindow({ url: "https://example.test/start" });
+  const root = browser.document.createElement("main");
+  root.innerHTML = '<section></section><button data-meeko-e-0="">Run</button>';
+  browser.document.body.append(root);
+  const logs: unknown[][] = [];
+  const originalError = console.error;
+  console.error = (...args: unknown[]) => { logs.push(args); };
+  const widget: string[] = [];
+  const page: ClientComponent = {
+    renderWithState: () => ({ html: "", state: {} }),
+    renderToString: () => "",
+    hydrateScope: (scope) => {
+      // A sibling widget root registers its own observer first.
+      const releaseWidget = createRoot((dispose) => { provideErrorHandler((error) => { widget.push(String(error)); }); return dispose; });
+      const stopEvent = bindEvent(scope, 0, "click", () => { throw new Error("unowned event failed"); });
+      return () => { stopEvent(); releaseWidget(); };
+    },
+  };
+  const app = await mountClientApp({
+    routes: createRouteManifest([{ id: "/start", file: "start.meeko", layouts: [] }]),
+    root: root as unknown as Element,
+    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
+    loadPage: async () => page,
+    browser: browser as unknown as Window,
+  });
+  try {
+    root.querySelector("button")!.dispatchEvent(new browser.MouseEvent("click", { bubbles: true }));
+    assert.deepEqual(widget, []);
+    assert.match(String(logs[0]?.[0]), /Meeko component event failed/);
+  } finally {
+    console.error = originalError;
+    app.dispose();
+    browser.happyDOM.abort();
+  }
+});
+
+test("the application observer receives event, effect, cleanup and navigation failures with their source", async () => {
+  const browser = new HappyWindow({ url: "https://example.test/start" });
+  const root = browser.document.createElement("main");
+  root.innerHTML = '<button data-meeko-e-0="">Run</button>';
+  browser.document.body.append(root);
+  const logs: unknown[][] = [];
+  browser.console.error = (...args: unknown[]) => { logs.push(args); };
+  const originalError = console.error;
+  console.error = (...args: unknown[]) => { logs.push(args); };
+  const seen: string[] = [];
+  const routes = createRouteManifest([
+    { id: "/start", file: "start.meeko", layouts: [] },
+    { id: "/broken", file: "broken.meeko", layouts: [] },
+  ]);
+  const page: ClientComponent = {
+    renderWithState: () => ({ html: "", state: {} }),
+    renderToString: () => "",
+    hydrateScope: (scope) => {
+      const stopEvent = bindEvent(scope, 0, "click", async () => { throw new Error("event failed"); });
+      const trigger = signal(0);
+      effect(() => (trigger.value > 0 ? Promise.reject(new Error("effect failed")) : undefined) as unknown as void);
+      onCleanup((() => Promise.reject(new Error("cleanup failed"))) as unknown as () => void);
+      queueMicrotask(() => { try { trigger.value = 1; } catch { /* the effect detaches synchronously */ } });
+      return stopEvent;
+    },
+  };
+  const app = await mountClientApp({
+    routes, root: root as unknown as Element,
+    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
+    loadPage: async (file) => {
+      if (file === "broken.meeko") throw new Error("navigation failed");
+      return page;
+    },
+    browser: browser as unknown as Window,
+    onError: (error, source) => { seen.push(`${source}:${(error as Error).message}`); },
+  });
+  try {
+    root.querySelector("button")!.dispatchEvent(new browser.MouseEvent("click", { bubbles: true }));
+    await new Promise<void>((done) => setImmediate(done));
+    await assert.rejects(app.navigate("/broken"), /navigation failed/);
+    browser.history.pushState({}, "", "/broken");
+    browser.dispatchEvent(new browser.PopStateEvent("popstate"));
+    await new Promise<void>((done) => setImmediate(done));
+  } finally {
+    assert.throws(() => app.dispose(), /cleanup callbacks must be synchronous/);
+    await new Promise<void>((done) => setImmediate(done));
+    console.error = originalError;
+    browser.happyDOM.abort();
+  }
+  assert.deepEqual(seen.sort(), [
+    "cleanup:cleanup failed", "effect:effect failed", "event:event failed", "navigation:navigation failed",
+  ]);
+  assert.deepEqual(logs, []);
+});
+
 for (const retainedLayout of [false, true]) {
-  test(`failed ${retainedLayout ? "retained outlet" : "root"} hydration requests a full reload of the last stable route`, async () => {
+  test(`failed ${retainedLayout ? "retained outlet" : "root"} hydration keeps the last stable route live without a reload`, async () => {
     const browser = new HappyWindow({ url: "https://example.test/start" });
     const requested: string[] = [];
     Object.defineProperty(browser.location, "replace", {
@@ -861,42 +954,67 @@ for (const retainedLayout of [false, true]) {
     await assert.rejects(app.navigate("/load-error"), /page load failed/);
     assert.deepEqual(requested, []);
     await assert.rejects(app.navigate("/broken"), /page hydration failed/);
-    assert.deepEqual(requested, ["https://example.test/stable"]);
+    assert.deepEqual(requested, []);
+    assert.equal(browser.location.pathname, "/stable");
+    assert.equal(browser.document.getElementById("app")!.textContent, "stable");
+    assert.equal(await app.navigate("/start"), true);
+    assert.equal(browser.document.getElementById("app")!.textContent, "start");
     app.dispose();
     browser.happyDOM.abort();
   });
 }
 
-test("failed reload keeps both the hydration error and recovery error", async () => {
+test("an outlet that cannot restore its previous page reloads, keeping both failures if the reload is denied", async () => {
   const browser = new HappyWindow({ url: "https://example.test/start" });
+  let reloadDenied = false;
+  const requested: string[] = [];
   Object.defineProperty(browser.location, "replace", {
-    value: () => { throw new Error("browser denied navigation"); },
+    value: (url: string) => {
+      requested.push(url);
+      if (reloadDenied) throw new Error("browser denied navigation");
+    },
   });
-  const root = browser.document.createElement("div");
   const routes = createRouteManifest([
-    { id: "/start", file: "start.meeko", layouts: [] },
-    { id: "/broken", file: "broken.meeko", layouts: [] },
+    { id: "/start", file: "start.meeko", layouts: ["layout.meeko"] },
+    { id: "/broken", file: "broken.meeko", layouts: ["layout.meeko"] },
   ]);
-  const page = (broken: boolean): ClientComponent => ({
-    renderWithState: () => ({ html: "<p>Page</p>", state: {} }),
-    renderToString: () => "<p>Page</p>",
+  let startHydrations = 0;
+  const page = (name: string): ClientComponent => ({
+    renderWithState: () => ({ html: `<p>${name}</p>`, state: {} }),
+    renderToString: () => `<p>${name}</p>`,
     hydrateScope: () => {
-      if (broken) throw new Error("original hydration error");
+      if (name === "broken") throw new Error("original hydration error");
+      if (++startHydrations > 1) throw new Error("restoration failed");
       return () => {};
     },
   });
+  const layout: ClientComponent = {
+    renderWithState: (props) => ({
+      html: `<section>${renderComponent(0, props.outlet as Component<Record<string, unknown>>, {}, true)}</section>`,
+      state: {},
+    }),
+    renderToString: (props) => `<section>${renderComponent(0, props.outlet as Component<Record<string, unknown>>, {}, false)}</section>`,
+    hydrateScope: (scope, props) => bindComponent(scope, 0, () => props.outlet as Component<Record<string, unknown>>, () => ({}), "layout"),
+  };
+  const modules: Record<string, ClientComponent> = { "start.meeko": page("start"), "broken.meeko": page("broken"), "layout.meeko": layout };
+  const server = createFrameworkHandler({ routes, loadPage: async (file) => modules[file]! });
+  browser.document.write(await (await server(new Request("https://example.test/start"))).text());
   const app = await mountClientApp({
-    routes, root: root as unknown as Element,
-    payload: { route: "/start", props: { params: {}, search: {} }, state: {} },
-    loadPage: async (file) => page(file === "broken.meeko"),
+    routes,
+    root: browser.document.getElementById("app") as unknown as Element,
+    payload: browser.document.getElementById("meeko-payload")!.textContent!,
+    loadPage: async (file) => modules[file]!,
     browser: browser as unknown as Window,
   });
+  reloadDenied = true;
   await assert.rejects(app.navigate("/broken"), (error: unknown) => {
     assert.ok(error instanceof AggregateError);
-    assert.match(String(error.errors[0]), /original hydration error/);
+    assert.match(String((error.errors[0] as AggregateError).errors[0]), /original hydration error/);
+    assert.match(String((error.errors[0] as AggregateError).errors[1]), /restoration failed/);
     assert.match(String(error.errors[1]), /browser denied navigation/);
     return true;
   });
+  assert.deepEqual(requested, ["https://example.test/start"]);
   app.dispose();
   browser.happyDOM.abort();
 });
@@ -935,7 +1053,7 @@ test("a malformed link does not throw from the browser click callback", async ()
   const app = await mountClientApp({
     routes: createRouteManifest([{ id: "/start", file: "start.meeko", layouts: [] }]),
     root: root as unknown as Element,
-    payload: { route: "/start", props: { params: {}, search: {} }, state: {} },
+    payload: { v: 1, route: "/start", props: { params: {}, search: {} }, state: {} },
     loadPage: async () => ({
       renderWithState: () => ({ html: "<p>Start</p>", state: {} }),
       renderToString: () => "<p>Start</p>",

@@ -1,0 +1,24 @@
+<script lang="ts">
+import { signal } from "@meekojs/meeko";
+
+const count = signal(1);
+const label = "a}b";
+const items = signal([{ id: 1, name: "one" }, { id: 2, name: "two" }]);
+function increment(): void {
+  count.value++;
+}
+</script>
+
+<template>
+  <section>
+    <p class="object">{ { doubled: count.value * 2 }.doubled }</p>
+    <p class="template">{ `${count.value}px {${label}}` }</p>
+    <p class="string">{ "}" + label + '{' }</p>
+    <p class="comment">{ count.value /* } */ }</p>
+    <p class="attribute" if:when="{ show: true }.show" bind:title="{ text: `n${count.value}` }.text">attribute</p>
+    <ul>
+      <li each:of=items.value each:as="item" each:key="item.id">{ `${item.id}:${ { name: item.name }.name }-${count.value}` }</li>
+    </ul>
+    <button type="button" on:click=increment>+</button>
+  </section>
+</template>

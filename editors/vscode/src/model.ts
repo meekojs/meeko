@@ -5,9 +5,10 @@ import { applyAutoImports, discoverAutoImportsSync } from "../../../src/autoimpo
 import { projectRoot } from "../../../src/compiler/project-root.js";
 import { analyzePropsDefaults, PropsDefaultsError } from "../../../src/compiler/props.js";
 import { templateEventType } from "../../../src/compiler/events.js";
+import { scanInterpolations } from "../../../src/compiler/interpolation.js";
 import { parseSfc } from "../../../src/compiler/sfc.js";
-import { parseTemplate } from "../../../src/compiler/template.js";
-import type { TemplateNode, TemplateAttribute } from "../../../src/compiler/template.js";
+import { attributeValueStart, decodeTemplateText, parseTemplate } from "../../../src/compiler/template.js";
+import type { TemplateNode } from "../../../src/compiler/template.js";
 
 /** Tramo equivalente entre el componente y el archivo TypeScript virtual. */
 export interface SourceSpan {
@@ -136,13 +137,9 @@ export function createEditorModel(source: string, filename: string): EditorModel
     }
 
     if (node.nodeName === "#text") {
-      const original = source.slice(node.start, node.end);
-      const matches = original.matchAll(/\{([^{}]+)\}/g);
-      for (const match of matches) {
-        const value = match[1];
-        if (value !== undefined && match.index !== undefined) {
-          expression(value, node.start + match.index + 1);
-        }
+      // El CLI informa de interpolaciones vacías o sin cerrar; aquí sólo se modelan las válidas.
+      for (const segment of scanInterpolations(source.slice(node.start, node.end)).segments) {
+        if (segment.expression) expression(decodeTemplateText(segment.expression), node.start + segment.expressionStart);
       }
     }
     for (const child of node.childNodes ?? []) visit(child);
@@ -226,11 +223,4 @@ export function createEditorModel(source: string, filename: string): EditorModel
 
 function validIdentifier(value: string): boolean {
   return /^[A-Za-z_$][\w$]*$/.test(value);
-}
-
-/** Encuentra el inicio del valor literal de un atributo en la plantilla. */
-function attributeValueStart(source: string, attribute: TemplateAttribute): number | undefined {
-  const raw = source.slice(attribute.start, attribute.end);
-  const match = /=\s*(["'])/.exec(raw);
-  return match && match.index !== undefined ? attribute.start + match.index + match[0].length : undefined;
 }

@@ -54,7 +54,7 @@ test("sitúa errores de script, plantilla y CSS en el archivo original", () => {
     { source: `<script lang="ts">const value = 1;</script>\n<template>\n{value(}\n</template>`, code: "MEEK020", line: 3 },
     { source: `<script lang="ts">const value = 1;</script>\n<template>\n{value\n</template>`, code: "MEEK010", line: 3 },
     { source: `<script lang="ts">const value = 1;</script>\n<template></template>\n<style scoped>\nbutton { color: ;\n</style>`, code: "MEEK019", line: 4 },
-    { source: `<script lang="ts">const value = 1;</script>\n<template></template>\n<style scoped>\n:global(button) { color: red; }\n</style>`, code: "MEEK019", line: 4 },
+    { source: `<script lang="ts">const value = 1;</script>\n<template></template>\n<style scoped>\n:global button { color: red; }\n</style>`, code: "MEEK019", line: 4 },
   ];
   for (const { source, code, line } of cases) {
     assert.throws(() => compile(source, "Broken.meeko"), (error: unknown) => {
@@ -64,6 +64,37 @@ test("sitúa errores de script, plantilla y CSS en el archivo original", () => {
       return true;
     });
   }
+});
+
+test("las expresiones de texto admiten llaves anidadas, cadenas, plantillas y comentarios", () => {
+  const expressions = ["{ value: count }.value", "`${count}px {` + label + \"}\"", "\"}\" + label", "count /* } */"];
+  const source = `<script lang="ts">const count = 2; const label = "x";</script>\n<template>${expressions.map((expression) => `<p>{ ${expression} }</p>`).join("")}</template>`;
+  const result = compile(source, "Nested.meeko");
+  for (const expression of expressions) {
+    const offset = source.indexOf(expression);
+    const spans = result.mappings.filter((mapping) => mapping.originalStart === offset && mapping.originalLength === expression.length);
+    const generated = spans.map((span) => result.code.slice(span.generatedStart, span.generatedEnd));
+    assert.ok(generated.filter((text) => text === expression).length >= 3, expression);
+    for (const text of generated) assert.ok(text === expression || text === `(${expression})`, text);
+  }
+  assert.doesNotMatch(result.code, /escapeHtml\("\{ "\)/);
+});
+
+test("una interpolación sin cerrar se señala en su llave de apertura", () => {
+  const cases = [
+    `<script lang="ts">const value = 1;</script>\n<template>\n<p>{ { value }</p>\n</template>`,
+    `<script lang="ts">const value = 1;</script>\n<template>\n<p>{ "}" </p>\n</template>`,
+    `<script lang="ts">const value = 1;</script>\n<template>\n<p>{ \`\${value}</p>\n</template>`,
+  ];
+  for (const source of cases) {
+    assert.throws(() => compile(source, "Unclosed.meeko"), (error: unknown) => {
+      assert.ok(error instanceof MeekoCompileError, String(error));
+      assert.equal(error.diagnostic.code, "MEEK010");
+      assert.deepEqual(error.diagnostic.location, { offset: source.indexOf("<p>{") + 3, line: 3, column: 4 });
+      return true;
+    });
+  }
+  assert.throws(() => compile(`<script lang="ts">const value = 1;</script><template><p>{}</p></template>`, "Empty.meeko"), /MEEK009/);
 });
 
 test("una lista sin clave falla antes de generar el módulo", () => {

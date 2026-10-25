@@ -25,13 +25,24 @@ export interface PageLoadContext<P extends PageSchema | undefined, S extends Pag
   readonly context?: C;
 }
 
+/** How a page reaches the browser. */
+export type PageRender = "ssr" | "prerender";
+
+/** Document metadata produced by a page `head` callback. */
+export interface PageHead {
+  readonly title?: string;
+}
+
+/** Version of the SSR hydration and navigation payload. */
+export const PAYLOAD_VERSION = 1;
+
 export interface PageDefinition<P extends PageSchema | undefined, S extends PageSchema | undefined, D, C = unknown> {
   readonly params?: P;
   readonly search?: S;
-  readonly render?: "ssr" | "prerender";
+  readonly render?: PageRender;
   readonly prerenderEntries?: readonly Readonly<Record<string, string>>[] | (() => Promise<readonly Readonly<Record<string, string>>[]>);
   readonly load?: (args: PageLoadContext<P, S, C>) => Promise<D> | D;
-  readonly head?: (args: PageLoadContext<P, S, C> & { data: D }) => { title?: string };
+  readonly head?: (args: PageLoadContext<P, S, C> & { data: D }) => PageHead;
 }
 
 /** Captures route schemas and keeps loader/head inference in one declaration. */

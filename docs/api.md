@@ -56,13 +56,27 @@ El argumento debe ser un **objeto literal con propiedades nombradas**. Los valor
 
 La plantilla acepta texto `{expression}`, eventos `on:event="handler"`, atributos dinámicos `bind:name="expression"`, condiciones `if:when="expression"` y listas con `each:of`, `each:as` y `each:key`. `each:index` nombra el índice y su valor predeterminado es `index`. Las claves son cadenas o números finitos y deben ser únicas entre hermanos. Los atributos booleanos se agregan o eliminan según el valor de la expresión.
 
+Una expresión de texto puede contener llaves propias de JavaScript: objetos literales (`{ { total: count.value }.total }`), plantillas literales con `${...}`, cadenas que incluyen `{` o `}`, comentarios y expresiones regulares. La expresión termina en la llave que equilibra la de apertura; si no existe, el compilador informa `MEEK010` en la llave de apertura. Los valores de directivas pueden escribirse sin comillas cuando HTML lo permite, por ejemplo `on:click=increment` o `each:of=items`; CLI y VS Code los ubican igual que los valores entre comillas.
+
+### Estilos con ámbito y `:global(...)`
+
+`<style scoped>` añade el atributo `data-meeko-s-<hash>` al último compuesto de cada selector, antes de un pseudoelemento si lo hay (`.card::before` se convierte en `.card[data-meeko-s-…]::before`). `:global(<selector>)` emite el selector interno sin el atributo de ámbito:
+
+| Fuente | Resultado |
+| --- | --- |
+| `.card :global(.icon)` | `.card[data-meeko-s-…] .icon` |
+| `:global(body) .card` | `body .card[data-meeko-s-…]` |
+| `:global(html.dark)` | `html.dark`, sin atributo de ámbito |
+
+Un compuesto que contiene `:global(...)` no se limita; el atributo se añade al último compuesto local del selector, y un selector completamente global no lo recibe. `:global` sin paréntesis o vacío, una lista de selectores dentro de `:global(...)` y un `:global(...)` anidado en otra pseudoclase, como `:not(...)`, fallan con `MEEK019` en su posición. Las reglas dentro de `@keyframes` no se modifican.
+
 CLI y VS Code comprueban el tipo del evento que recibe `on:event` y que `each:key` devuelve `string | number`; ambos ubican el diagnóstico en la expresión de la plantilla. Los eventos conocidos usan su tipo de `GlobalEventHandlersEventMap` y los demás reciben `Event`. El documento virtual de VS Code aplica las mismas opciones estrictas de acceso indexado, props opcionales exactas e imports de tipo que `meeko check`.
 
 `each:index` tiene tipo `number` tanto en el componente compilado como en el documento virtual de VS Code; no se infiere como el literal inicial `0`.
 
 Los handlers de `on:event` pueden ser asíncronos. Meeko observa su promesa y entrega los fallos síncronos o rechazos al observador más cercano, sin dejar un rechazo no manejado ni detener otros listeners. La limpieza del componente elimina sus listeners. Si no hay observador, Meeko registra el fallo en consola.
 
-Dentro del script de un componente, `provideErrorHandler((error) => { ... })` registra un observador para sus eventos y los de sus hijos. Se autoimporta como una función ESM real y `error` tiene tipo `unknown`, por lo que debe refinarse antes de leer sus propiedades. Un componente descendiente puede registrar otro observador para su propia rama. El contexto está aislado por raíz; un observador asíncrono que rechace se registra junto al error original. En una aplicación montada, la navegación y los canales Socket creados dentro de la aplicación también utilizan el observador activo; sus opciones explícitas `onNavigationError` y `onError` tienen prioridad. El servidor usa su propio observador con `requestId`.
+Dentro del script de un componente, `provideErrorHandler((error, source) => { ... })` registra un observador para sus eventos y los de sus hijos, y también para los rechazos de un `effect` u `onCleanup` que devolvió por error una promesa. Se autoimporta como una función ESM real; `error` tiene tipo `unknown`, por lo que debe refinarse antes de leer sus propiedades, y `source` es un `ErrorSource` (`"event"`, `"effect"`, `"cleanup"`, `"navigation"` o `"socket"`). Un componente descendiente puede registrar otro observador para su propia rama. El contexto está aislado por raíz; un observador asíncrono que rechace se registra junto al error original. En una aplicación montada, la navegación y los canales Socket creados dentro de la aplicación también utilizan el observador activo; sus opciones explícitas `onNavigationError` y `onError` tienen prioridad. El servidor usa su propio observador con `requestId`.
 
 ```html
 <script lang="ts">
@@ -138,7 +152,7 @@ Si el render o la hidratación falla, Meeko libera todos los efectos y recursos 
 
 Los observadores creados durante `hydrate` pertenecen a esa instancia. Durante HMR de Vite se conservan por nombre las señales editables del script; los valores derivados se calculan otra vez. Este estado en memoria de HMR es independiente de la transferencia JSON entre servidor y navegador.
 
-La superficie principal para aplicaciones es `@meekojs/meeko` (`signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `provideErrorHandler` y `serializeJson`), junto con los submódulos documentados `@meekojs/meeko/vite` y `@meekojs/meeko/devtools-ui`. El compilador importa sus funciones de DOM, HMR y registro de DevTools desde `@meekojs/meeko/internal`. Esta ruta es un contrato entre el compilador y su runtime de la **misma versión**; no está destinada a imports manuales. Los exports internos antiguos permanecen temporalmente en la raíz para no romper módulos generados con `0.0.1`, pero no tienen garantía de estabilidad.
+La raíz `@meekojs/meeko` exporta exactamente `signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `createContext`, `provide`, `inject`, `provideErrorHandler` y `serializeJson`, más los tipos de señales, contexto, componentes, `HotState` y DevTools. Los submódulos documentados son `@meekojs/meeko/vite` y `@meekojs/meeko/devtools-ui`. El compilador importa sus funciones de DOM, HMR y registro de DevTools desde `@meekojs/meeko/internal`. Esta ruta es un contrato entre el compilador y su runtime de la **misma versión**; no está destinada a imports manuales. Los helpers internos ya no se reexportan desde la raíz: un módulo compilado con una versión anterior a `0.0.2` debe volver a compilarse.
 
 ## Herramientas
 
@@ -154,4 +168,4 @@ La superficie principal para aplicaciones es `@meekojs/meeko` (`signal`, `comput
 
 ## Antes de publicar
 
-La licencia MIT y el nombre `@meekojs/meeko` ya están definidos. `pnpm run package:smoke` instala el tarball en un consumidor fuera del monorepo y comprueba CLI, SSR, tipos y Vite. Antes de declarar estable la API se ampliarán las pruebas de compatibilidad y se decidirá cuándo retirar de la raíz los exports internos heredados. La extensión de VS Code ya se empaquetó y probó en un host aislado con un proyecto consumidor externo.
+La licencia MIT y el nombre `@meekojs/meeko` ya están definidos. `pnpm run package:smoke` instala el tarball en un consumidor fuera del monorepo y comprueba CLI, SSR, tipos y Vite. `tests/package-boundaries.test.ts` fija la lista exacta de exports de la raíz. La extensión de VS Code ya se empaquetó y probó en un host aislado con un proyecto consumidor externo.

@@ -88,7 +88,7 @@ npm start
 | `src/check.ts` | Comprueba tipos con TypeScript 7 y ubica diagnósticos en `.meeko`. |
 | `src/types.ts` | Genera declaraciones para imports `.meeko` en proyectos TypeScript. |
 | `src/server.ts` | Escapado de contenido dinámico para HTML. |
-| `src/cli.ts` | Comandos `meeko check` y `meeko compile`. |
+| `src/cli.ts` | CLI `meeko`: comandos de proyecto (`dev`, `check`, `build`, `start`), de componente (`compile`, `types`), de generación (`routes`, `prerender`), starters (`init`, `init-framework`), `--help` y `--version`. |
 | `src/vite.ts` | Plugin de Vite para transformar `.meeko` en cliente y SSR. |
 | `src/devtools.ts` | Instrumentación de instancias y señales sólo durante desarrollo. |
 | `src/devtools-ui` | Panel de inspección dentro de la página. |
@@ -164,4 +164,4 @@ La [extensión local de VS Code](https://github.com/meekojs/meeko/blob/main/edit
 
 ## Alcance actual
 
-Esta base todavía no implementa `:global` en CSS, un servidor de lenguaje independiente ni streaming. El compilador rechaza varias construcciones no soportadas. Estas capacidades necesitan conservar el mismo contrato de SSR e hidratación antes de añadirse.
+Esta base todavía no implementa un servidor de lenguaje independiente ni streaming. El compilador rechaza varias construcciones no soportadas. Estas capacidades necesitan conservar el mismo contrato de SSR e hidratación antes de añadirse.

@@ -89,7 +89,12 @@ try {
   }
   Write-Output 'External full-stack consumer and generated starter: installation, types, build, SSR, API, RPC, sessions, Socket and Chrome OK.'
 } finally {
-  if ($serverProcess -and !$serverProcess.HasExited) { Stop-Process -Id $serverProcess.Id -Force }
+  if ($serverProcess -and !$serverProcess.HasExited) {
+    # `node` can resolve to a version-manager shim; stop the real server it launched as well.
+    if ($IsWindows) { & taskkill.exe /PID $serverProcess.Id /T /F 2>&1 | Out-Null }
+    else { Stop-Process -Id $serverProcess.Id -Force }
+    $serverProcess.WaitForExit(10000) | Out-Null
+  }
   foreach ($name in @('PORT', 'MEEKO_TEST_PORT', 'MEEKO_BENCH_CONSUMER', 'MEEKO_BENCH_OUTPUT', 'npm_config_cache')) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
   $resolvedScratch = [System.IO.Path]::GetFullPath($scratch).TrimEnd('\') + '\'
   $resolvedRun = [System.IO.Path]::GetFullPath($run)

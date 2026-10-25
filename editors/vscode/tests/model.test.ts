@@ -304,3 +304,57 @@ test("el editor actualiza tipos de un modulo importado sin editar el componente"
     } finally { model.dispose(); }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("editor and CLI map nested text interpolations to the same source positions", async () => {
+  const component = '<script lang="ts">const count = 1; const label = "x";</script><template><p>{ { value: count }.missing }</p><p>{ `${count}px {` + label + "}" }</p><p>{ count /* } */ + unknownName }</p></template>';
+  const missing = component.indexOf("missing");
+  const unknown = component.indexOf("unknownName");
+  const model = createEditorModel(component, filename);
+  try {
+    assert.deepEqual(model.service.getSyntacticDiagnostics(model.virtualFilename).map((item) => String(item.messageText)), []);
+    const diagnostics = model.service.getSemanticDiagnostics(model.virtualFilename);
+    assert.deepEqual(diagnostics.map((item) => [item.code, model.toSource(item.start ?? -1)]), [[2339, missing], [2304, unknown]]);
+    for (const value of ["{ value: count }.missing", "`${count}px {` + label + \"}\""]) {
+      const generated = model.toGenerated(component.indexOf(value));
+      assert.notEqual(generated, undefined, value);
+      assert.equal(model.code.slice(generated!, generated! + value.length), value);
+    }
+  } finally { model.dispose(); }
+  const cli = await checkSource(component, filename);
+  assert.deepEqual([...new Set(cli.map((item) => `${item.code}:${item.location.offset}`))], [`TS2339:${missing}`, `TS2304:${unknown}`]);
+});
+
+test("editor and CLI agree on text interpolations after entities and CRLF", async () => {
+  const component = '<script lang="ts">const a = 1; const b = 2;</script><template><p>&copy; {missingAfterEntity}</p>\r\n<p>{ a &lt; b ? "yes" : "no" }</p>\r\n<p>x\r\n{missingAfterCrlf}</p></template>';
+  const first = component.indexOf("missingAfterEntity");
+  const second = component.indexOf("missingAfterCrlf");
+  const model = createEditorModel(component, filename);
+  try {
+    assert.deepEqual(model.service.getSyntacticDiagnostics(model.virtualFilename).map((item) => String(item.messageText)), []);
+    const diagnostics = model.service.getSemanticDiagnostics(model.virtualFilename);
+    assert.deepEqual(diagnostics.map((item) => [item.code, model.toSource(item.start ?? -1)]), [[2304, first], [2304, second]]);
+  } finally { model.dispose(); }
+  const cli = await checkSource(component, filename);
+  assert.deepEqual([...new Set(cli.map((item) => `${item.code}:${item.location.offset}`))], [`TS2304:${first}`, `TS2304:${second}`]);
+});
+
+test("editor maps unquoted directive values like the compiler", async () => {
+  const component = '<script lang="ts">const items = [1, 2]; const run = (event: KeyboardEvent): void => { void event.key; };</script><template><ul><li each:of=items each:as="item" each:key=item bind:title=missingTitle>{item}</li></ul><button on:click=run>Run</button></template>';
+  const model = createEditorModel(component, filename);
+  try {
+    const items = component.indexOf("items", component.indexOf("<template>"));
+    const generated = model.toGenerated(items);
+    assert.notEqual(generated, undefined);
+    assert.equal(model.code.slice(generated!, generated! + "items".length), "items");
+    const diagnostics = model.service.getSemanticDiagnostics(model.virtualFilename);
+    assert.deepEqual(diagnostics.map((item) => [item.code, model.toSource(item.start ?? -1)]), [
+      [2304, component.indexOf("missingTitle")],
+      [2345, component.indexOf("on:click=run") + "on:click=".length],
+    ]);
+  } finally { model.dispose(); }
+  const cli = await checkSource(component, filename);
+  assert.deepEqual([...new Set(cli.map((item) => `${item.code}:${item.location.offset}`))].sort(), [
+    `TS2304:${component.indexOf("missingTitle")}`,
+    `TS2345:${component.indexOf("on:click=run") + "on:click=".length}`,
+  ]);
+});

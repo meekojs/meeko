@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import test from "node:test";
 import { Window } from "happy-dom";
+import { createServer } from "vite";
+import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
+import { MeekoCompileError } from "../src/compiler/sfc.ts";
+import { meeko } from "../src/vite.ts";
 import { batch, computed, createContext, createRoot, effect, inject, provide, signal } from "../src/reactivity.ts";
 import { escapeHtml, serializeJson } from "../src/server.ts";
 import { bindAttribute, bindComponent, bindFor, bindText, renderFor } from "../src/dom.ts";
@@ -365,5 +370,74 @@ test("el compilador rechaza secciones incompatibles de forma explícita", async 
   assert.match(result.code, /export function hydrate/);
   assert.match(result.css, /button\[data-meeko-s-[a-f0-9]{8}\]/);
   assert.match(result.code, /data-meeko-s-[a-f0-9]{8}/);
-  assert.throws(() => compile(source.replace("button {", ":global(button) {")), /:global/);
+  assert.throws(() => compile(source.replace("button {", ":global button {")), /:global/);
+});
+
+test("los estilos con ámbito admiten :global(...) sin limitar el selector interno", () => {
+  const styled = (rules: string): string =>
+    compile(`<script lang="ts">const value = 1;</script><template><p>{value}</p></template><style scoped>${rules}</style>`, "Global.meeko").css;
+  const scope = /\[(data-meeko-s-[a-f0-9]{8})\]/.exec(styled(".probe {}"))?.[1];
+  assert.ok(scope);
+  const cases: Array<[string, string]> = [
+    [".card :global(.icon) { color: red; }", `.card[${scope}] .icon { color: red; }`],
+    [":global(body) .card { color: red; }", `body .card[${scope}] { color: red; }`],
+    [":global(html.dark) { color: red; }", "html.dark { color: red; }"],
+    [":global( .theme > .app ) .card { color: red; }", `.theme > .app .card[${scope}] { color: red; }`],
+    [".card :global(.icon)::before { content: \"\"; }", `.card[${scope}] .icon::before { content: ""; }`],
+    [".card:hover::before { content: \"\"; }", `.card:hover[${scope}]::before { content: ""; }`],
+    [".card:hover :global(.icon) { color: red; }", `.card:hover[${scope}] .icon { color: red; }`],
+    [".card > :global(.icon) .label { color: red; }", `.card > .icon .label[${scope}] { color: red; }`],
+    [".a, :global(.b) { color: red; }", `.a[${scope}], .b { color: red; }`],
+    ["@media (min-width: 1px) { :global(body) .card { color: red; } }", `@media (min-width: 1px) { body .card[${scope}] { color: red; } }`],
+    ["@keyframes spin { from { opacity: 0; } }", "@keyframes spin { from { opacity: 0; } }"],
+  ];
+  for (const [input, expected] of cases) assert.equal(styled(input), expected, input);
+});
+
+test("los estilos con ámbito rechazan :global sin selector o en posiciones ambiguas", () => {
+  const prefix = `<script lang="ts">const value = 1;</script><template><p>{value}</p></template><style scoped>\n`;
+  const cases: Array<[string, RegExp]> = [
+    [":global .card { color: red; }", /:global\(<selector>\)/],
+    [".card :global { color: red; }", /:global\(<selector>\)/],
+    [":global() { color: red; }", /:global\(<selector>\)/],
+    [":global(.a, .b) { color: red; }", /single selector/],
+    [".card:not(:global(.b)) { color: red; }", /top level/],
+  ];
+  for (const [rules, message] of cases) {
+    const source = `${prefix}${rules}\n</style>`;
+    assert.throws(() => compile(source, "Global.meeko"), (error: unknown) => {
+      assert.ok(error instanceof MeekoCompileError, String(error));
+      assert.equal(error.diagnostic.code, "MEEK019");
+      assert.match(error.diagnostic.message, message);
+      assert.equal(error.diagnostic.location.offset, source.indexOf(":global"), rules);
+      return true;
+    });
+  }
+});
+
+test("SSR e hidratación coinciden con expresiones de texto anidadas", { timeout: 35_000 }, async () => {
+  const fixture = resolve("tests/fixtures/NestedInterpolation.meeko");
+  assert.deepEqual(await checkSource(await readFile(fixture, "utf8"), fixture), []);
+  const server = await createServer({ configFile: false, plugins: [meeko()], server: { middlewareMode: true, hmr: false } });
+  const browser = new Window();
+  try {
+    const component = await server.ssrLoadModule(fixture) as {
+      renderToString(props: Record<string, never>): string;
+      hydrate(root: Element, props: Record<string, never>): () => void;
+    };
+    const root = browser.document.createElement("main");
+    const html = component.renderToString({});
+    root.innerHTML = html;
+    const text = (selector: string): string[] => [...root.querySelectorAll(selector)].map((node) => node.textContent);
+    const snapshot = (): Array<string | null> => [...text(".object"), ...text(".template"), ...text(".string"), ...text(".comment"), ...text("li"), root.querySelector(".attribute")?.getAttribute("title") ?? null];
+    assert.deepEqual(snapshot(), ["2", "1px {a}b}", "}a}b{", "1", "1:one-1", "2:two-1", "n1"]);
+    const release = component.hydrate(root as unknown as Element, {});
+    assert.equal(root.innerHTML, html);
+    root.querySelector("button")!.click();
+    assert.deepEqual(snapshot(), ["4", "2px {a}b}", "}a}b{", "2", "1:one-2", "2:two-2", "n2"]);
+    release();
+  } finally {
+    browser.happyDOM.abort();
+    await server.close();
+  }
 });

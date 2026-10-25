@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 import { build } from "esbuild";
 
 test("engine and framework browser bundles exclude server transports", async () => {
@@ -17,6 +18,14 @@ test("engine and framework browser bundles exclude server transports", async () 
   });
   const inputs = Object.keys(result.metafile.inputs).map((input) => input.replaceAll("\\", "/"));
   assert.ok(!inputs.some((input) => /(?:^|\/)(?:ws|framework-server)(?:\/|$)/.test(input)), inputs.join("\n"));
+});
+
+test("the root entry exposes only the documented public runtime", async () => {
+  const root = await import(pathToFileURL(resolve("dist/index.js")).href);
+  assert.deepEqual(Object.keys(root).sort(), [
+    "batch", "computed", "createContext", "createRoot", "effect", "inject",
+    "onCleanup", "provide", "provideErrorHandler", "serializeJson", "signal", "untrack",
+  ]);
 });
 
 test("importing the Node entry does not load the optional ws transport", () => {

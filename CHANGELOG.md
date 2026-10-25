@@ -1,5 +1,29 @@
 # Cambios de Meeko
 
+## [Unreleased]
+
+### Cambios incompatibles y migración
+
+- La raíz `@meekojs/meeko` sólo exporta la API pública documentada: `signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `createContext`, `provide`, `inject`, `provideErrorHandler`, `serializeJson` y sus tipos. Los helpers de DOM, SSR, HMR y DevTools (`bind*`, `render*`, `keyToken`, `withStateSnapshot`, `escapeHtml`, `attributeValue`, `renderAttribute`, `enableHotModule`, `registerHot*`, `replaceHot*`, `restoreSignals`, `snapshotSignals`, `registerDevtoolsInstance`) quedan sólo en `@meekojs/meeko/internal`, que es lo que importa el código generado desde `0.0.2`. Vuelva a compilar los módulos generados con `0.0.1`.
+- `ComponentErrorHandler` recibe un segundo argumento `source: ErrorSource`. Los handlers de un solo parámetro siguen siendo válidos.
+- El payload de hidratación y navegación lleva `v: 1`, `render` y `head`. El cliente rechaza un payload sin versión con un mensaje explícito; servidor y navegador deben salir del mismo build.
+- Se elimina `FrameworkHandlerOptions.renderLayout`. Los layouts se componen siempre mediante el outlet `<component is="props.outlet">`.
+
+### Añadido y corregido
+
+- `mountClientApp({ onError })` observa los fallos de la aplicación (navegación, Socket, y eventos, efectos o limpiezas sin un `provideErrorHandler` más cercano) junto con su `ErrorSource`. `provideErrorHandler` recibe también los rechazos de `effect` y `onCleanup` que devuelven una promesa por error.
+- La navegación cliente es transaccional: la vista nueva se hidrata junto a la actual y la anterior sólo se retira tras una hidratación correcta; un outlet restaura su página anterior. Sólo si también falla esa restauración se recarga la última URL confirmada.
+- La navegación actualiza `document.title` con el `head` de la página siguiente.
+- `FrameworkHandlerOptions.document` añade marcado del host a `<head>` y al final de `<body>`, también en la página `+error.meeko`, y aplica un `nonce` CSP por petición a los estilos y al script de entrada. `head` y `bodyEnd` pueden ser funciones que reciben la petición y su nonce.
+- Un evento, efecto o limpieza de un componente sin observador antepasado sólo se entrega al `onError` de la aplicación o a la consola, nunca al `provideErrorHandler` de otro componente.
+- Las interpolaciones con entidades HTML (`&copy;`, `&lt;`) o saltos CRLF se ubican en la misma posición en `meeko check` y en VS Code: el compilador analiza el texto fuente y decodifica cada parte como el parser HTML. El analizador trata como división el `/` tras `i++`, `i--` o una propiedad con nombre de palabra clave (`obj.return / 2`) y acepta continuaciones de línea CRLF dentro de cadenas.
+- `meeko --help` y `meeko --version`.
+
+- Las expresiones de texto admiten llaves anidadas: objetos literales, plantillas literales con `${...}`, cadenas que contienen `{` o `}`, comentarios y expresiones regulares. Compilador y VS Code comparten el mismo analizador, por lo que SSR, hidratación, `meeko check` y el editor ubican cada expresión en la misma posición. Una interpolación sin cerrar se informa con `MEEK010` en su llave de apertura, y `{}` se informa como expresión vacía (`MEEK009`).
+- El código generado envuelve entre paréntesis las expresiones devueltas por funciones flecha, de modo que una expresión que empieza por `{`, como `bind:title="{ text: label }.text"`, no se interpreta como bloque.
+- VS Code mapea los valores de directivas sin comillas, como `on:click=handler` o `each:of=items`, con la misma lógica que el compilador; sus diagnósticos, navegación y renombrado ya no se omiten.
+- `<style scoped>` admite `:global(<selector>)`: el selector interno se emite sin el atributo de ámbito, que se añade al último compuesto local (`.card :global(.icon)` produce `.card[data-meeko-s-…] .icon`). `:global` sin selector, con una lista de selectores o anidado en otra pseudoclase falla con `MEEK019` en su posición.
+
 ## [0.1.0] - 2026-10-25
 
 Este bloque contiene cambios incompatibles respecto de `0.0.4`. De acuerdo con la política SemVer de Meeko para la serie `0.x`, se publica como `0.1.0`, no como un patch.

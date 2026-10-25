@@ -134,6 +134,15 @@ function sameProps<Props extends object>(first: Props, second: Props): boolean {
   return firstKeys.length === secondKeys.length && firstKeys.every((key) => Object.hasOwn(second, key) && Object.is(first[key as keyof Props], second[key as keyof Props]));
 }
 
+/** A region update failed and restoring its previous content failed too. */
+export class RegionRecoveryError extends AggregateError {}
+
+/** Whether a failure left a region that could not be restored, possibly nested in aggregates. */
+export function hasRegionRecoveryFailure(error: unknown): boolean {
+  return error instanceof RegionRecoveryError
+    || (error instanceof AggregateError && error.errors.some(hasRegionRecoveryFailure));
+}
+
 /** Renderiza un hijo entre comentarios de ámbito sin añadir un elemento visual. */
 export function renderComponent<Props extends object>(id: number, component: Component<Props>, props: Props, transferState: boolean): string;
 export function renderComponent<Props extends object>(id: number, component: ComponentModule<Props>, props: Props, transferState?: false): string;
@@ -196,7 +205,7 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
       } catch (rollbackError) {
         release = () => {};
         stop();
-        throw new AggregateError([error, rollbackError], `Meeko component update and recovery failed in ${location}`);
+        throw new RegionRecoveryError([error, rollbackError], `Meeko component update and recovery failed in ${location}`);
       }
       throw error;
     }

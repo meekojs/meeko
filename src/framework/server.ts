@@ -6,10 +6,10 @@ import type { RequestContext } from "../framework-server/context.js";
 import { withRequestContext } from "../framework-server/context.js";
 import type { ServerFetch } from "../framework-server/context.js";
 import { ApiError, errorResponse, normalizeServerError, observeServerError } from "../framework-server/contracts.js";
-import { PageInputError, pageSearchObject, validatePageInputs } from "./page.js";
+import { PAYLOAD_VERSION, PageInputError, pageSearchObject, validatePageInputs } from "./page.js";
 import { runRouteMiddleware } from "./middleware.js";
 import type { RouteMiddleware } from "./middleware.js";
-import type { PageSchema } from "./page.js";
+import type { PageHead, PageRender, PageSchema } from "./page.js";
 import { StateStore, withStateStore } from "./state.js";
 import { createRouteManifest, matchRoute } from "./router.js";
 import type { RouteRecord } from "./router.js";
@@ -87,8 +87,8 @@ export interface PageRoute {
   params?: PageSchema;
   search?: PageSchema;
   load?: (context: PageRequestContext) => Promise<unknown> | unknown;
-  head?: (context: PageRequestContext & { data: unknown }) => { title?: string };
-  render?: "ssr" | "prerender";
+  head?: (context: PageRequestContext & { data: unknown }) => PageHead;
+  render?: PageRender;
   prerenderEntries?: readonly Readonly<Record<string, string>>[] | (() => Promise<readonly Readonly<Record<string, string>>[]>);
 }
 
@@ -115,15 +115,33 @@ export interface FrameworkHandlerOptions<Route = PageRoute> {
   readonly serverFetch?: ServerFetch;
   /** Receives internal page failures with the request ID; never sent to the browser. */
   readonly onError?: (error: unknown, requestId: string) => void;
-  /** Optional host layout renderer; default composition uses <component is="props.outlet"/>. */
-  readonly renderLayout?: (file: string, children: string, context: PageRequestContext) => Promise<string> | string;
   readonly clientEntry?: string;
+  /** Host additions to every HTML document this handler renders. */
+  readonly document?: DocumentOptions;
+}
+
+/** Trusted host markup, either fixed or derived from the request and its CSP nonce. */
+export type DocumentMarkup = string | ((context: { readonly request: Request; readonly nonce: string | undefined }) => string);
+
+export interface DocumentOptions {
+  /** Trusted HTML appended to `<head>`, such as stylesheets and modulepreload links. */
+  readonly head?: DocumentMarkup;
+  /** Trusted HTML appended before `</body>`, after the client entry. */
+  readonly bodyEnd?: DocumentMarkup;
+  /** A per-request CSP nonce applied to Meeko's `<style>` tags and client entry script. */
+  readonly nonce?: (request: Request) => string | undefined;
+}
+
+function documentParts(options: DocumentOptions | undefined, request: Request): { head: string; bodyEnd: string; nonceAttribute: string } {
+  const nonce = options?.nonce?.(request);
+  const markup = (value: DocumentMarkup | undefined): string => typeof value === "function" ? value({ request, nonce }) : value ?? "";
+  return { head: markup(options?.head), bodyEnd: markup(options?.bodyEnd), nonceAttribute: nonce ? ` nonce="${escapeHtml(nonce)}"` : "" };
 }
 
 /** A typed sidecar may narrow callback arguments after its schemas validate them. */
 type TypedPageRoute = Omit<PageRoute, "load" | "head"> & {
   load?: (context: never) => Promise<unknown> | unknown;
-  head?: (context: never) => { title?: string };
+  head?: (context: never) => PageHead;
 };
 
 /** Portable Fetch handler. Node adapters can pass their Request directly. */
@@ -178,41 +196,37 @@ export function createFrameworkHandler(options: FrameworkHandlerOptions<unknown>
     const styles: string[] = [];
     if (module.css) styles.push(module.css);
     let input = props;
-    let rendered: ReturnType<PageModule["renderWithState"]>;
-    if (options.renderLayout) {
-      rendered = withStateStore(stateStore, () => module.renderWithState(input));
-      for (const layout of [...match.route.layouts].reverse()) {
-        const layoutModule = await options.loadPage(layout);
-        if (layoutModule.css) styles.unshift(layoutModule.css);
-        rendered = { html: await options.renderLayout(layout, rendered.html, context), state: rendered.state };
-      }
-    } else {
-      for (const layout of [...match.route.layouts].reverse()) {
-        const child = module;
-        const childInput = input;
-        const outlet = {
-          renderWithState: () => child.renderWithState(childInput),
-          renderToString: () => child.renderToString?.(childInput) ?? child.renderWithState(childInput).html,
-          hydrateScope: () => { throw new Error("Server outlet cannot hydrate"); },
-        };
-        module = await options.loadPage(layout);
-        if (module.css) styles.unshift(module.css);
-        input = { outlet };
-      }
-      rendered = withStateStore(stateStore, () => module.renderWithState(input));
+    for (const layout of [...match.route.layouts].reverse()) {
+      const child = module;
+      const childInput = input;
+      const outlet = {
+        renderWithState: () => child.renderWithState(childInput),
+        renderToString: () => child.renderToString?.(childInput) ?? child.renderWithState(childInput).html,
+        hydrateScope: () => { throw new Error("Server outlet cannot hydrate"); },
+      };
+      module = await options.loadPage(layout);
+      if (module.css) styles.unshift(module.css);
+      input = { outlet };
     }
-    const head = sidecar?.head?.({ ...context, data });
-    const title = head?.title ? `<title>${escapeHtml(head.title)}</title>` : "";
-    const styleTags = [...new Set(styles)].map((css) => `<style>${css.replaceAll("<", "\\3C ")}</style>`).join("");
-    const payload = serializeJson({ route: match.route.id, props, state: rendered.state, sharedState: stateStore.snapshot() });
+    const rendered = withStateStore(stateStore, () => module.renderWithState(input));
+    const head: PageHead = sidecar?.head?.({ ...context, data }) ?? {};
+    const title = head.title === undefined ? "" : `<title>${escapeHtml(head.title)}</title>`;
+    const host = documentParts(options.document, request);
+    const nonceAttribute = host.nonceAttribute;
+    const styleTags = [...new Set(styles)].map((css) => `<style${nonceAttribute}>${css.replaceAll("<", "\\3C ")}</style>`).join("");
+    const payload = serializeJson({
+      v: PAYLOAD_VERSION, route: match.route.id, render: sidecar?.render ?? "ssr",
+      props, state: rendered.state, sharedState: stateStore.snapshot(),
+      head: head.title === undefined ? {} : { title: head.title },
+    });
     if (request.headers.get("accept")?.split(",").some((value) => value.trim().startsWith("application/meeko+json"))) {
       return finish(new Response(request.method === "HEAD" ? null : payload, {
         status: 200, headers: { "content-type": "application/meeko+json; charset=utf-8", "cache-control": "no-store" },
       }));
     }
-    const script = options.clientEntry ? `<script type="module" src="${escapeHtml(options.clientEntry)}"></script>` : "";
+    const script = options.clientEntry ? `<script type="module"${nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
     const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
-    const document = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,">${csrfMeta}${styleTags}${title}</head><body><div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}</body></html>`;
+    const document = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,">${csrfMeta}${styleTags}${title}${host.head}</head><body><div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
     return finish(new Response(request.method === "HEAD" ? null : document, {
       status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
     }));
@@ -240,7 +254,8 @@ export function createFrameworkHandler(options: FrameworkHandlerOptions<unknown>
             const errorRendered = withStateStore(stateStore, () => errorPage.renderWithState({
               status: known.status, message: known.status >= 500 ? "Internal Server Error" : known.code,
             }));
-            const document = `<!doctype html><html><head><meta charset="utf-8"><title>Error</title></head><body><div id="app">${errorRendered.html}</div></body></html>`;
+            const host = documentParts(options.document, request);
+            const document = `<!doctype html><html><head><meta charset="utf-8"><title>Error</title>${host.head}</head><body><div id="app">${errorRendered.html}</div>${host.bodyEnd}</body></html>`;
             return finish(new Response(request.method === "HEAD" ? null : document, {
               status: known.status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
             }));

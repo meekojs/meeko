@@ -188,10 +188,31 @@ export function createSocketClient<C extends SocketContract>(url: string, contra
   };
 }
 
+function appSocketObserver(channel: NonNullable<ReturnType<typeof currentAppErrorChannel>>): (error: unknown) => void {
+  return (error) => {
+    const handler = channel.current();
+    if (handler) return handler(error, "socket");
+    logClientError("Meeko socket client error", error);
+  };
+}
+
+/** The nearest component observer, else the mounted application's own observer. */
+function contextualSocketObserver(): ((error: unknown) => void) | undefined {
+  const nearest = currentComponentErrorHandler();
+  if (nearest) return (error) => nearest(error, "socket");
+  const channel = currentAppErrorChannel();
+  if (!channel) return undefined;
+  return (error) => {
+    const handler = channel.application();
+    if (handler) return handler(error, "socket");
+    logClientError("Meeko socket client error", error);
+  };
+}
+
 /** Binds socket lifetime to a Meeko root; SSR never opens a connection. */
 export function useSocket<C extends SocketContract>(url: string, contract: C, options: SocketClientOptions = {}): SocketClient<C> {
   if (typeof window === "undefined") throw new Error("useSocket() is only available in the browser");
-  const onError = options.onError ?? currentComponentErrorHandler();
+  const onError = options.onError ?? contextualSocketObserver();
   const client = createSocketClient(url, contract, onError ? { ...options, onError } : options);
   try { onCleanup(() => client.close()); }
   catch (error) { client.close(); throw error; }
@@ -212,11 +233,7 @@ export function createSocketRegistry<C extends Record<string, SocketContract>>(c
         if (channel) {
           let scoped = appClients.get(channel);
           if (!scoped) {
-            const onError = options.onError ?? ((error: unknown) => {
-              const handler = channel.current();
-              if (handler) return handler(error);
-              logClientError("Meeko socket client error", error);
-            });
+            const onError = options.onError ?? appSocketObserver(channel);
             scoped = createSocketClient(socketUrl(name, options), contracts[name]!, { ...options, onError });
             appClients.set(channel, scoped);
             const owned = scoped;
@@ -228,7 +245,7 @@ export function createSocketRegistry<C extends Record<string, SocketContract>>(c
         if (owner) {
           let scoped = rootClients.get(owner);
           if (!scoped) {
-            const onError = options.onError ?? currentComponentErrorHandler();
+            const onError = options.onError ?? contextualSocketObserver();
             scoped = createSocketClient(socketUrl(name, options), contracts[name]!, onError ? { ...options, onError } : options);
             rootClients.set(owner, scoped);
             const owned = scoped;

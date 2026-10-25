@@ -1,4 +1,4 @@
-import { logClientError, observeReturnedPromise } from "./error-observer.js";
+import { logClientError, observeCallback, observeReturnedPromise } from "./error-observer.js";
 
 /** Señal de solo lectura que registra dependencias al consultar su valor. */
 export interface ReadonlySignal<T> {
@@ -81,6 +81,28 @@ export function findContext<T>(key: ContextKey<T>): T | undefined {
   return undefined;
 }
 
+/** Receives a rejection from asynchronous work that an effect or cleanup returned by mistake. */
+export type AsyncFailureReporter = (error: unknown, source: "effect" | "cleanup") => void;
+
+const asyncFailureReporterKey = createContext<AsyncFailureReporter>("asynchronous failure reporter");
+
+/** Routes asynchronous effect and cleanup rejections from the active root to an observer. */
+export function provideAsyncFailureReporter(reporter: AsyncFailureReporter): void {
+  provide(asyncFailureReporterKey, reporter);
+}
+
+// Resolved while the owner context is still intact: the rejection arrives after
+// a root may already have been disposed and its context cleared.
+function asyncFailureReport(owner: Owner | undefined, source: "effect" | "cleanup", label: string): (error: unknown) => void {
+  for (let current = owner; current; current = current.parent) {
+    if (!current.context.has(asyncFailureReporterKey)) continue;
+    const reporter = current.context.get(asyncFailureReporterKey) as AsyncFailureReporter;
+    return (error) => observeCallback(() => reporter(error, source),
+      (observerError) => logClientError(`${label}; its error observer failed`, observerError, error));
+  }
+  return (error) => logClientError(label, error);
+}
+
 type SyncCleanupCallback<F extends () => unknown> = [Extract<ReturnType<F>, PromiseLike<unknown>>] extends [never] ? F : never;
 
 /** Registers a synchronous external-resource release with the current component root. */
@@ -160,7 +182,7 @@ export function effect<const F extends () => unknown>(fn: SyncEffectCallback<F>,
       activeOwner = owner;
       try {
         const result: unknown = fn();
-        if (observeReturnedPromise(result, (error) => logClientError("Meeko asynchronous effect rejected", error))) {
+        if (observeReturnedPromise(result, asyncFailureReport(owner, "effect", "Meeko asynchronous effect rejected"))) {
           stop();
           throw new TypeError("Meeko effect callbacks must be synchronous");
         }
@@ -256,7 +278,7 @@ export function createRoot<T>(fn: (dispose: () => void) => T): T {
     for (const child of [...owner.children]) {
       try {
         const result = child();
-        if (observeReturnedPromise(result, (error) => logClientError("Meeko asynchronous cleanup rejected", error))) {
+        if (observeReturnedPromise(result, asyncFailureReport(owner, "cleanup", "Meeko asynchronous cleanup rejected"))) {
           failures.push(new TypeError("Meeko cleanup callbacks must be synchronous"));
         }
       } catch (error) { failures.push(error); }

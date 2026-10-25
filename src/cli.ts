@@ -15,11 +15,17 @@ import { generateTypeScriptAutoImports } from "./autoimports-ts.js";
 import { buildProject, startProject } from "./framework/project.js";
 import { checkFrameworkProject, prepareFrameworkTypes } from "./framework/check-project.js";
 
+const usage = "Usage: meeko dev [project-directory]\n       meeko check [project-directory | component.meeko] [--json]\n       meeko build [project-directory]\n       meeko start [project-directory]\n       meeko check-app <project-directory>\n       meeko compile <component.meeko> <output.ts>\n       meeko types <component.meeko>\n       meeko routes <project-directory>\n       meeko prerender <project-directory>\n       meeko init <directory>\n       meeko init-framework <directory>\n       meeko --help | --version\n";
 const [command, input, output] = process.argv.slice(2);
 const projectCommand = command === "dev" || command === "build" || command === "start";
 const legacyCommand = command === "compile" || command === "check-app" || command === "types" || command === "init" || command === "init-framework" || command === "routes" || command === "prerender";
-if ((!projectCommand && !legacyCommand && command !== "check") || (!projectCommand && command !== "check" && !input) || (command === "compile" && !output) || (command === "check" && output !== undefined && output !== "--json") || (command !== "compile" && command !== "check" && output !== undefined)) {
-  process.stderr.write("Usage: meeko dev [project-directory]\n       meeko check [project-directory | component.meeko] [--json]\n       meeko build [project-directory]\n       meeko start [project-directory]\n       meeko check-app <project-directory>\n       meeko compile <component.meeko> <output.ts>\n       meeko types <component.meeko>\n       meeko routes <project-directory>\n       meeko prerender <project-directory>\n       meeko init <directory>\n       meeko init-framework <directory>\n");
+if ((command === "--help" || command === "-h" || command === "help") && input === undefined) {
+  process.stdout.write(usage);
+} else if ((command === "--version" || command === "-v") && input === undefined) {
+  const metadata = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
+  process.stdout.write(`${metadata.version}\n`);
+} else if ((!projectCommand && !legacyCommand && command !== "check") || (!projectCommand && command !== "check" && !input) || (command === "compile" && !output) || (command === "check" && output !== undefined && output !== "--json") || (command !== "compile" && command !== "check" && output !== undefined)) {
+  process.stderr.write(usage);
   process.exitCode = 1;
 } else {
   try {

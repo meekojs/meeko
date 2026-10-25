@@ -8,7 +8,8 @@ import type { SourceMapping } from "./compiler/mapping.js";
 import { analyzePropsDefaults, PropsDefaultsError } from "./compiler/props.js";
 import { compileError, locate, parseSfc } from "./compiler/sfc.js";
 import type { SfcSection } from "./compiler/sfc.js";
-import { parseTemplate } from "./compiler/template.js";
+import { scanInterpolations } from "./compiler/interpolation.js";
+import { attributeValueStart, decodeTemplateText, parseTemplate } from "./compiler/template.js";
 import { templateEventType } from "./compiler/events.js";
 import type { TemplateNode } from "./compiler/template.js";
 
@@ -114,14 +115,8 @@ function validateExpression(expression: string, source: string, filename: string
 function attributeValueOffset(node: TemplateNode, name: string, context: TemplateContext): number {
   const position = node.sourceCodeLocation?.attrs?.[name];
   if (!position) return context.templateOffset + (node.sourceCodeLocation?.startOffset ?? 0);
-  const raw = context.source.slice(context.templateOffset + position.startOffset, context.templateOffset + position.endOffset);
-  const equals = raw.indexOf("=");
-  if (equals < 0) return context.templateOffset + position.startOffset;
-  const after = raw.slice(equals + 1);
-  const whitespace = after.length - after.trimStart().length;
-  const quoteStart = equals + 1 + whitespace;
-  const quoted = raw[quoteStart] === '"' || raw[quoteStart] === "'";
-  return context.templateOffset + position.startOffset + quoteStart + (quoted ? 1 : 0);
+  const start = context.templateOffset + position.startOffset;
+  return attributeValueStart(context.source, { start, end: context.templateOffset + position.endOffset }) ?? start;
 }
 
 function rewriteLocals(expression: string, locals: ReadonlyMap<string, string>): string {
@@ -159,33 +154,32 @@ function rewriteLocals(expression: string, locals: ReadonlyMap<string, string>):
   return result;
 }
 
-function textParts(value: string, bindings: TemplateBindings, context: TemplateContext, offset: number): string[] {
+/** `raw` is the source text of a text node, so every offset is a source position. */
+function textParts(raw: string, bindings: TemplateBindings, context: TemplateContext, offset: number): string[] {
   const parts: string[] = [];
-  const pattern = /\{([^{}]+)\}/g;
+  const scan = scanInterpolations(raw);
   let cursor = 0;
-  for (const match of value.matchAll(pattern)) {
-    const index = match.index;
-    const staticPart = value.slice(cursor, index);
+  for (const segment of scan.segments) {
+    const staticPart = decodeTemplateText(raw.slice(cursor, segment.start));
     if (staticPart) parts.push(`__meeko.escapeHtml(${quote(staticPart)})`);
-    const rawExpression = match[1] ?? "";
-    const expression = rawExpression.trim();
-    if (!expression) throw compileError(context.source, context.filename, "MEEK009", "Empty template expression", offset + index);
-    validateExpression(expression, context.source, context.filename, offset + index + 1 + rawExpression.indexOf(expression));
+    const expression = decodeTemplateText(segment.expression);
+    if (!expression) throw compileError(context.source, context.filename, "MEEK009", "Empty template expression", offset + segment.start);
+    const expressionOffset = offset + segment.expressionStart;
+    validateExpression(expression, context.source, context.filename, expressionOffset);
     const id = context.nextText++;
-    const expressionOffset = offset + index + 1 + rawExpression.indexOf(expression);
     bindings.texts.push({ id, expression, offset: expressionOffset });
     parts.push(`${quote(`<!--meeko:text:${id}-->`)} + __meeko.escapeHtml(${markSource(expression, expressionOffset)}) + ${quote(`<!--/meeko:text:${id}-->`)}`);
-    cursor = index + match[0].length;
+    cursor = segment.end;
   }
-  const tail = value.slice(cursor);
-  if (tail.includes("{")) throw compileError(context.source, context.filename, "MEEK010", "Unclosed template expression", offset + cursor + tail.indexOf("{"));
+  if (scan.unterminated !== undefined) throw compileError(context.source, context.filename, "MEEK010", "Unclosed template expression", offset + scan.unterminated);
+  const tail = decodeTemplateText(raw.slice(cursor));
   if (tail) parts.push(`__meeko.escapeHtml(${quote(tail)})`);
   return parts;
 }
 
 function renderNode(node: TemplateNode, bindings: TemplateBindings, context: TemplateContext): string {
   if (node.nodeName === "#text") {
-    return textParts(node.value ?? "", bindings, context, context.templateOffset + (node.sourceCodeLocation?.startOffset ?? 0)).join(" + ") || quote("");
+    return textParts(context.source.slice(node.start, node.end), bindings, context, node.start).join(" + ") || quote("");
   }
   if (node.nodeName === "#comment") return quote(`<!--${node.value ?? ""}-->`);
   if (!node.tagName) return (node.childNodes ?? []).map((child) => renderNode(child, bindings, context)).join(" + ") || quote("");
@@ -219,7 +213,7 @@ function renderNode(node: TemplateNode, bindings: TemplateBindings, context: Tem
     validateExpression(list!.value, context.source, context.filename, offset);
     validateExpression(key, context.source, context.filename, keyOffset);
     bindings.regions.push({ kind: "list", id, expression: list!.value, offset, key, keyOffset, itemName, indexName, render: html, bindings: inner });
-    return `__meeko.renderFor(${id}, ${markSource(list!.value, offset)}, (${itemName}, ${indexName}) => ${markSource(key, keyOffset)}, (${itemName}, ${indexName}) => ${html})`;
+    return `__meeko.renderFor(${id}, ${markSource(list!.value, offset)}, (${itemName}, ${indexName}) => ${markSource(`(${markSource(key, keyOffset)})`, keyOffset, key.length)}, (${itemName}, ${indexName}) => ${html})`;
   }
   if (attrsList.some((attribute) => attribute.name.startsWith("each:") || attribute.name.startsWith("if:"))) {
     throw compileError(context.source, context.filename, "MEEK024", "Incomplete template directive", position);
@@ -314,17 +308,51 @@ function scopeCss(css: string, scopeAttribute: string): string {
       if (parent.type === "atrule" && /keyframes$/i.test((parent as postcss.AtRule).name)) return;
       parent = parent.parent;
     }
-    if (rule.selector.includes(":global")) throw rule.error(":global is not supported in scoped styles yet", { index: rule.selector.indexOf(":global") });
+    const fail = (message: string, node: selectorParser.Node): never => {
+      throw rule.error(message, { index: node.sourceIndex });
+    };
     rule.selector = selectorParser((selectors) => {
-      selectors.each((selector) => {
-        const pseudoElement = selector.nodes.find((node) => node.type === "pseudo" && node.value.startsWith("::"));
-        const attribute = selectorParser.attribute({ attribute: scopeAttribute, value: undefined, raws: {} });
-        if (pseudoElement) selector.insertBefore(pseudoElement, attribute);
-        else selector.append(attribute);
-      });
+      selectors.each((selector) => scopeSelector(selector, scopeAttribute, fail));
     }).processSync(rule.selector);
   });
   return root.toString();
+}
+
+function isGlobalPseudo(node: selectorParser.Node): node is selectorParser.Pseudo {
+  return node.type === "pseudo" && node.value.toLowerCase() === ":global";
+}
+
+/**
+ * Añade el atributo de ámbito al último compuesto local del selector y desenvuelve `:global(...)`.
+ * Un compuesto que contiene `:global(...)` no se limita; si todo el selector es global, no recibe atributo.
+ */
+function scopeSelector(selector: selectorParser.Selector, scopeAttribute: string, fail: (message: string, node: selectorParser.Node) => never): void {
+  const globals: selectorParser.Pseudo[] = [];
+  selector.walkPseudos((pseudo) => {
+    if (!isGlobalPseudo(pseudo)) return;
+    if (pseudo.parent !== selector) fail(":global(<selector>) must be used at the top level of a selector, not inside another pseudo-class", pseudo);
+    if (pseudo.nodes.length > 1) fail(":global(...) accepts a single selector; write one :global(<selector>) per selector in the list", pseudo);
+    if (!pseudo.nodes[0]?.nodes.some((node) => node.type !== "comment")) fail(":global requires a selector argument; use :global(<selector>)", pseudo);
+    globals.push(pseudo);
+  });
+  const compounds: Array<Array<selectorParser.Selector["nodes"][number]>> = [[]];
+  for (const node of selector.nodes) {
+    if (node.type === "combinator") compounds.push([]);
+    else if (node.type !== "comment") compounds.at(-1)!.push(node);
+  }
+  const scoped = compounds.filter((compound) => compound.length > 0 && !compound.some(isGlobalPseudo)).at(-1);
+  if (scoped) {
+    const attribute = selectorParser.attribute({ attribute: scopeAttribute, value: undefined, raws: {} });
+    const pseudoElement = scoped.find((node) => node.type === "pseudo" && node.value.startsWith("::"));
+    if (pseudoElement) selector.insertBefore(pseudoElement, attribute);
+    else selector.insertAfter(scoped.at(-1)!, attribute);
+  }
+  for (const pseudo of globals) {
+    const inner = pseudo.nodes[0]!.nodes.slice();
+    inner[0]!.rawSpaceBefore = pseudo.rawSpaceBefore;
+    inner.at(-1)!.rawSpaceAfter = pseudo.rawSpaceAfter;
+    pseudo.replaceWith(...inner);
+  }
 }
 
 function compileScript(section: SfcSection, source: string, filename: string): { imports: string[]; types: string[]; setup: string[]; names: string[]; propsType: string; propsTypeOffset: number | undefined; defaults?: { expression: string; offset: number; keys: readonly string[] } } {
@@ -403,17 +431,20 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
   const statements: string[] = [];
   const mappedExpression = (expression: string, offset: number, expressionLocals = locals): string =>
     markSource(rewriteLocals(expression, expressionLocals), offset, expression.length);
+  // Los paréntesis evitan que `() => { ... }.value` se lea como bloque; su tramo externo conserva la ubicación.
+  const arrowExpression = (expression: string, offset: number, expressionLocals = locals): string =>
+    markSource(`(${mappedExpression(expression, offset, expressionLocals)})`, offset, expression.length);
   for (const { id, expression, offset } of bindings.texts) {
     const point = locate(context.source, offset);
     const location = `${basename(context.filename)}:${point.line}:${point.column} (text ${id})`;
     const source = hot ? `, { file: ${quote(context.filename)}, line: ${point.line}, column: ${point.column}, expression: ${quote(expression)}, kind: "text" }` : "";
-    statements.push(`cleanups.push(__meeko.bindText(__scope, ${id}, () => ${mappedExpression(expression, offset)}, ${quote(location)}${source}));`);
+    statements.push(`cleanups.push(__meeko.bindText(__scope, ${id}, () => ${arrowExpression(expression, offset)}, ${quote(location)}${source}));`);
   }
   for (const { id, name, expression, offset } of bindings.attributes) {
     const point = locate(context.source, offset);
     const location = `${basename(context.filename)}:${point.line}:${point.column} (attribute ${name})`;
     const source = hot ? `, { file: ${quote(context.filename)}, line: ${point.line}, column: ${point.column}, expression: ${quote(expression)}, kind: "attribute" }` : "";
-    statements.push(`cleanups.push(__meeko.bindAttribute(__scope, ${id}, ${quote(name)}, () => ${mappedExpression(expression, offset)}, ${quote(location)}${source}));`);
+    statements.push(`cleanups.push(__meeko.bindAttribute(__scope, ${id}, ${quote(name)}, () => ${arrowExpression(expression, offset)}, ${quote(location)}${source}));`);
   }
   for (const { id, name, expression, offset } of bindings.events) {
     const eventType = templateEventType(name);
@@ -430,12 +461,12 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
     const location = `${basename(context.filename)}:${point.line}:${point.column} (component ${entry.reference})`;
     const props = entry.props.map((prop) => `${markSource(quote(prop.name), prop.nameOffset, prop.name.length)}: ${mappedExpression(prop.expression, prop.offset)}`);
     const object = markSource(`{ ${props.join(", ")} }`, entry.offset, 1);
-    componentStatements.push(`cleanups.push(__meeko.bindComponent(__scope, ${entry.id}, () => ${mappedExpression(entry.reference, entry.referenceOffset)}, () => (${object}), ${quote(location)}));`);
+    componentStatements.push(`cleanups.push(__meeko.bindComponent(__scope, ${entry.id}, () => ${arrowExpression(entry.reference, entry.referenceOffset)}, () => (${object}), ${quote(location)}));`);
   }
   statements.unshift(...componentStatements);
   for (const entry of bindings.regions) {
     if (entry.kind === "condition") {
-      statements.push(`cleanups.push(__meeko.bindIf(__scope, ${entry.id}, () => ${mappedExpression(entry.expression, entry.offset)}, () => ${rewriteLocals(entry.render, locals)}, (__scope) => { ${hydrationBody(entry.bindings, context, hot, locals)} }));`);
+      statements.push(`cleanups.push(__meeko.bindIf(__scope, ${entry.id}, () => ${arrowExpression(entry.expression, entry.offset)}, () => ${rewriteLocals(entry.render, locals)}, (__scope) => { ${hydrationBody(entry.bindings, context, hot, locals)} }));`);
     } else {
       const outerLocals = new Map(locals);
       outerLocals.delete(entry.itemName);
@@ -446,7 +477,7 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
       const innerHydration = hydrationBody(entry.bindings, context, hot, innerLocals);
       // El callback generado sólo usa la señal de índice si aparece en su hidratación.
       const trackIndex = innerHydration.includes("__meeko_index.value");
-      statements.push(`cleanups.push(__meeko.bindFor(__scope, ${entry.id}, () => ${mappedExpression(entry.expression, entry.offset)}, (${entry.itemName}, ${entry.indexName}) => ${mappedExpression(entry.key, entry.keyOffset, outerLocals)}, (${entry.itemName}, ${entry.indexName}) => ${rewriteLocals(entry.render, outerLocals)}, (__meeko_item, __meeko_index, __scope) => { ${innerHydration} }, ${trackIndex}));`);
+      statements.push(`cleanups.push(__meeko.bindFor(__scope, ${entry.id}, () => ${arrowExpression(entry.expression, entry.offset)}, (${entry.itemName}, ${entry.indexName}) => ${arrowExpression(entry.key, entry.keyOffset, outerLocals)}, (${entry.itemName}, ${entry.indexName}) => ${rewriteLocals(entry.render, outerLocals)}, (__meeko_item, __meeko_index, __scope) => { ${innerHydration} }, ${trackIndex}));`);
     }
   }
   return `const cleanups: Array<() => void> = [];
