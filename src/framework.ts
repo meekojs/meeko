@@ -10,6 +10,8 @@ export type { ClientApp, ClientAppOptions, ClientComponent, ClientRoute } from "
 export { definePage, PageInputError } from "./framework/page.js";
 export type { PageDefinition, PageLoadContext, PageSchema } from "./framework/page.js";
 export { StateStore, useState } from "./framework/state.js";
+export { defineRouteMiddleware } from "./framework/middleware.js";
+export type { RouteMiddleware, RouteMiddlewareContext } from "./framework/middleware.js";
 export { ClientError, createApiClient, createBrowserClientOptions, createPublicServerManifest, createRpcClient } from "./framework/clients.js";
 export type { ApiClient, ApiOperation, ClientOptions, PublicApiEndpoint, PublicRpcEndpoint, PublicServerManifest, RpcClient, RpcOperation } from "./framework/clients.js";
 export { createSocketClient, createSocketRegistry, useSocket, useSocketChannel } from "./framework/socket.js";
@@ -21,7 +23,7 @@ export interface GeneratedRoutes {}
 type RouteKey = keyof GeneratedRoutes extends never ? string : keyof GeneratedRoutes & string;
 type RouteParams<K extends string> = K extends keyof GeneratedRoutes ? GeneratedRoutes[K] : Record<string, string>;
 type HrefOptions<K extends string> = (keyof RouteParams<K> extends never
-  ? { params?: RouteParams<K> }
+  ? { params?: never }
   : { params: RouteParams<K> }) & {
   search?: Readonly<Record<string, string | number | boolean | null | undefined>>;
 };

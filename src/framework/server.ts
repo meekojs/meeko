@@ -1,10 +1,14 @@
-import { readdir, stat } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { lstat, readdir, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { escapeHtml, serializeJson } from "../server.js";
 import type { RequestContext } from "../framework-server/context.js";
 import { withRequestContext } from "../framework-server/context.js";
 import type { ServerFetch } from "../framework-server/context.js";
+import { ApiError, errorResponse, normalizeServerError, observeServerError } from "../framework-server/contracts.js";
 import { PageInputError, pageSearchObject, validatePageInputs } from "./page.js";
+import { runRouteMiddleware } from "./middleware.js";
+import type { RouteMiddleware } from "./middleware.js";
 import type { PageSchema } from "./page.js";
 import { StateStore, withStateStore } from "./state.js";
 import { createRouteManifest, matchRoute } from "./router.js";
@@ -30,14 +34,22 @@ export async function discoverRoutes(projectRoot: string): Promise<readonly Rout
   }
   await walk(pagesRoot);
   const appShell = resolve(projectRoot, "app", "app.meeko");
+  const defaultLayout = resolve(projectRoot, "app", "layouts", "default.meeko");
   let hasAppShell = false;
   try { hasAppShell = (await stat(appShell)).isFile(); }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  let hasDefaultLayout = false;
+  try { hasDefaultLayout = (await lstat(defaultLayout)).isFile(); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  if (hasDefaultLayout && files.has(join(pagesRoot, "+layout.meeko"))) {
+    throw new Error(`Both ${defaultLayout} and ${join(pagesRoot, "+layout.meeko")} define the root layout`);
+  }
   const routes: RouteRecord[] = [];
   for (const file of files) {
     if (!file.endsWith(".meeko") || basename(file).startsWith("+")) continue;
     const directory = dirname(file);
     const layouts: string[] = hasAppShell ? [appShell] : [];
+    if (hasDefaultLayout) layouts.push(defaultLayout);
     let cursor = pagesRoot;
     const relativeDirectory = relative(pagesRoot, directory);
     if (files.has(join(cursor, "+layout.meeko"))) layouts.push(join(cursor, "+layout.meeko"));
@@ -76,7 +88,7 @@ export interface PageRoute {
   search?: PageSchema;
   load?: (context: PageRequestContext) => Promise<unknown> | unknown;
   head?: (context: PageRequestContext & { data: unknown }) => { title?: string };
-  render?: "ssr" | "prerender" | "client";
+  render?: "ssr" | "prerender";
   prerenderEntries?: readonly Readonly<Record<string, string>>[] | (() => Promise<readonly Readonly<Record<string, string>>[]>);
 }
 
@@ -92,40 +104,64 @@ export interface PageRequestContext {
   readonly context?: RequestContext;
 }
 
-export interface FrameworkHandlerOptions {
+export interface FrameworkHandlerOptions<Route = PageRoute> {
   readonly routes: readonly RouteRecord[];
   readonly loadPage: (file: string) => Promise<PageModule>;
-  readonly loadRoute?: (file: string) => Promise<PageRoute>;
+  readonly loadRoute?: (file: string) => Promise<Route>;
+  /** Isomorphic route middleware, evaluated before the route sidecar loader. */
+  readonly loadMiddleware?: () => Promise<readonly RouteMiddleware[]>;
   readonly createContext?: (request: Request) => RequestContext | Promise<RequestContext>;
   /** Optional in-process dispatcher for automatic API/RPC calls during SSR. */
   readonly serverFetch?: ServerFetch;
+  /** Receives internal page failures with the request ID; never sent to the browser. */
+  readonly onError?: (error: unknown, requestId: string) => void;
   /** Optional host layout renderer; default composition uses <component is="props.outlet"/>. */
   readonly renderLayout?: (file: string, children: string, context: PageRequestContext) => Promise<string> | string;
   readonly clientEntry?: string;
 }
 
+/** A typed sidecar may narrow callback arguments after its schemas validate them. */
+type TypedPageRoute = Omit<PageRoute, "load" | "head"> & {
+  load?: (context: never) => Promise<unknown> | unknown;
+  head?: (context: never) => { title?: string };
+};
+
 /** Portable Fetch handler. Node adapters can pass their Request directly. */
-export function createFrameworkHandler(options: FrameworkHandlerOptions): (request: Request) => Promise<Response> {
+export function createFrameworkHandler(options: FrameworkHandlerOptions): (request: Request) => Promise<Response>;
+export function createFrameworkHandler<Route extends TypedPageRoute>(options: FrameworkHandlerOptions<Route>): (request: Request) => Promise<Response>;
+export function createFrameworkHandler(options: FrameworkHandlerOptions<unknown>): (request: Request) => Promise<Response> {
   return async (request) => {
-    if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, { status: 405, headers: { Allow: "GET, HEAD" } });
-    const url = new URL(request.url);
-    const match = matchRoute(options.routes, url.pathname);
-    if (!match) return new Response("Not Found", { status: 404 });
+    const fallbackRequestId = randomUUID();
+    if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, {
+      status: 405, headers: { Allow: "GET, HEAD", "x-request-id": fallbackRequestId, "cache-control": "no-store" },
+    });
     const stateStore = new StateStore();
+    let errorRoute: string | undefined;
     let requestContext: RequestContext | undefined;
     const finish = (response: Response): Response => {
-      if (!requestContext) return response;
       const headers = new Headers(response.headers);
-      headers.set("x-request-id", requestContext.requestId);
-      headers.set("x-meeko-csrf-token", requestContext.session.current?.csrfToken ?? "");
-      if (requestContext.session.cookieHeader) headers.append("set-cookie", requestContext.session.cookieHeader);
+      headers.set("x-request-id", requestContext?.requestId ?? fallbackRequestId);
+      if (requestContext) {
+        headers.set("x-meeko-csrf-token", requestContext.session.current?.csrfToken ?? "");
+        if (requestContext.session.cookieHeader) headers.append("set-cookie", requestContext.session.cookieHeader);
+      }
       return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
     };
     try {
+    const url = new URL(request.url);
+    const match = matchRoute(options.routes, url.pathname);
+    if (!match) return finish(new Response("Not Found", {
+      status: 404, headers: { "cache-control": "no-store" },
+    }));
+    errorRoute = match.route.error;
     requestContext = await options.createContext?.(request);
     if (requestContext && requestContext.request !== request) throw new TypeError("Request context belongs to another request");
     const render = async (): Promise<Response> => {
-    const sidecar = match.route.sidecar && options.loadRoute ? await options.loadRoute(match.route.sidecar) : undefined;
+    const middlewareResponse = options.loadMiddleware && await runRouteMiddleware(await options.loadMiddleware(), {
+      url, match, signal: request.signal, phase: "server", request,
+    });
+    if (middlewareResponse) return finish(middlewareResponse);
+    const sidecar = match.route.sidecar && options.loadRoute ? await options.loadRoute(match.route.sidecar) as PageRoute : undefined;
     const validated = await validatePageInputs(sidecar, match.params, pageSearchObject(url.searchParams));
     const context: PageRequestContext = {
       request, params: validated.params, search: validated.search, searchParams: url.searchParams, signal: request.signal, state: stateStore,
@@ -184,24 +220,42 @@ export function createFrameworkHandler(options: FrameworkHandlerOptions): (reque
     return requestContext ? await withRequestContext(requestContext, options.serverFetch, render) : await render();
     } catch (error) {
       if (error instanceof Response) return finish(error);
+      const known = error instanceof PageInputError ? new ApiError(error.code, 400) : normalizeServerError(error);
+      const requestId = requestContext?.requestId ?? fallbackRequestId;
+      const report = (failure: unknown): void => {
+        observeServerError(failure, requestId, options.onError);
+      };
+      if (known.status >= 500) report(error);
+      if (request.headers.get("accept")?.split(",").some((value) => value.trim().startsWith("application/meeko+json"))) {
+        return finish(errorResponse(known, requestId));
+      }
       if (error instanceof PageInputError) return finish(new Response(error.code, {
         status: 400, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
       }));
-      if (match.route.error) {
+      const errorFile = errorRoute;
+      if (errorFile) {
         try {
-          const errorPage = await options.loadPage(match.route.error);
-          const errorRendered = withStateStore(stateStore, () => errorPage.renderWithState({
-            status: 500, message: "Internal Server Error",
-          }));
-          const document = `<!doctype html><html><head><meta charset="utf-8"><title>Error</title></head><body><div id="app">${errorRendered.html}</div></body></html>`;
-          return finish(new Response(request.method === "HEAD" ? null : document, {
-            status: 500, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
-          }));
-        } catch {
+          const renderError = async (): Promise<Response> => {
+            const errorPage = await options.loadPage(errorFile);
+            const errorRendered = withStateStore(stateStore, () => errorPage.renderWithState({
+              status: known.status, message: known.status >= 500 ? "Internal Server Error" : known.code,
+            }));
+            const document = `<!doctype html><html><head><meta charset="utf-8"><title>Error</title></head><body><div id="app">${errorRendered.html}</div></body></html>`;
+            return finish(new Response(request.method === "HEAD" ? null : document, {
+              status: known.status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+            }));
+          };
+          return requestContext
+            ? await withRequestContext(requestContext, options.serverFetch, renderError)
+            : await renderError();
+        } catch (failure) {
+          report(failure);
           // The error route failed; keep private errors out of the response.
         }
       }
-      return finish(new Response(request.method === "HEAD" ? null : "Internal Server Error", { status: 500 }));
+      return finish(new Response(request.method === "HEAD" ? null : known.status >= 500 ? "Internal Server Error" : known.code, {
+        status: known.status, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+      }));
     }
   };
 }

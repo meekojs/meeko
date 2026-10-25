@@ -5,7 +5,8 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { createNavigator, createRouteManifest, href, matchRoute } from "../src/framework/router.ts";
 import { createFrameworkHandler, discoverRoutes } from "../src/framework/server.ts";
-import { createRequestContext, MemorySessionStore, SessionManager, useRequestState } from "../src/framework-server.ts";
+import { currentRequest } from "../src/framework-server/context.ts";
+import { ApiError, createRequestContext, MemorySessionStore, SessionManager, useRequestState } from "../src/framework-server.ts";
 
 test("file routes discover groups, layouts, errors, sidecars, and resolve specificity", async () => {
   const root = await mkdtemp(join(tmpdir(), "meeko-routes-"));
@@ -46,6 +47,27 @@ test("file routes discover groups, layouts, errors, sidecars, and resolve specif
   }
 });
 
+test("app/layouts/default.meeko wraps every page and rejects a second root layout", async () => {
+  const root = await mkdtemp(join(tmpdir(), "meeko-default-layout-"));
+  const paths = ["app/app.meeko", "app/layouts/default.meeko", "app/pages/index.meeko", "app/pages/users/index.meeko"];
+  try {
+    for (const file of paths) {
+      const path = join(root, file);
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, "");
+    }
+    const routes = await discoverRoutes(root);
+    assert.deepEqual(routes.map((route) => route.id).sort(), ["/", "/users"]);
+    for (const route of routes) {
+      assert.deepEqual(route.layouts, [join(root, "app/app.meeko"), join(root, "app/layouts/default.meeko")]);
+    }
+    await writeFile(join(root, "app/pages/+layout.meeko"), "");
+    await assert.rejects(discoverRoutes(root), /Both .*default\.meeko.*\+layout\.meeko.*root layout/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("route collisions include route groups and parameter names", () => {
   const base = { file: "a.meeko", layouts: [] };
   assert.throws(() => createRouteManifest([
@@ -67,8 +89,13 @@ test("Fetch SSR shares route match, loader data and safe payload", async () => {
   assert.match(html, /<h1>alice<\/h1>/);
   assert.match(html, /"route":"\/users\/\[id\]"/);
   assert.match(html, /src="\/client.js"/);
-  assert.equal((await handler(new Request("https://example.test/nope"))).status, 404);
-  assert.equal((await handler(new Request("https://example.test/users/alice", { method: "POST" }))).status, 405);
+  const missing = await handler(new Request("https://example.test/nope"));
+  assert.equal(missing.status, 404);
+  assert.match(missing.headers.get("x-request-id") ?? "", /^[0-9a-f-]{36}$/);
+  const disallowed = await handler(new Request("https://example.test/users/alice", { method: "POST" }));
+  assert.equal(disallowed.status, 405);
+  assert.equal(disallowed.headers.get("allow"), "GET, HEAD");
+  assert.match(disallowed.headers.get("x-request-id") ?? "", /^[0-9a-f-]{36}$/);
 });
 
 test("compiled layout outlet composes page SSR without leaking its module in payload", async () => {
@@ -155,6 +182,102 @@ test("nearest error route handles failures without exposing exception details", 
   const html = await response.text();
   assert.match(html, /Unavailable/);
   assert.doesNotMatch(html, /private database password/);
+});
+
+test("error route keeps each SSR request context and correlation ID", async () => {
+  const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+  const alice = await (await sessions.load(new Request("https://example.test/"))).create({ user: "alice" });
+  const bob = await (await sessions.load(new Request("https://example.test/"))).create({ user: "bob" });
+  const routes = createRouteManifest([{ id: "/", file: "page.meeko", layouts: [], error: "+error.meeko" }]);
+  const observed: { error: unknown; requestId: string }[] = [];
+  const handler = createFrameworkHandler({
+    routes,
+    createContext: async (request) => createRequestContext(request, {}, await sessions.load(request)),
+    loadPage: async (file) => {
+      if (file !== "+error.meeko") return { renderWithState: () => { throw new Error("private render failure"); } };
+      const loadedFor = currentRequest().context.request;
+      return { renderWithState: () => {
+        const context = currentRequest().context;
+        assert.equal(context.request, loadedFor);
+        const user = (context.session.current?.data as { user: string }).user;
+        return { html: `<h1>${user}:${context.requestId}</h1>`, state: {} };
+      } };
+    },
+    onError(error, requestId) { observed.push({ error, requestId }); },
+  });
+  const [aliceResponse, bobResponse] = await Promise.all([
+    handler(new Request("https://example.test/", { headers: { cookie: `meeko.sid=${alice.id}` } })),
+    handler(new Request("https://example.test/", { headers: { cookie: `meeko.sid=${bob.id}` } })),
+  ]);
+  assert.equal(aliceResponse.status, 500);
+  assert.equal(bobResponse.status, 500);
+  const aliceHtml = await aliceResponse.text();
+  const bobHtml = await bobResponse.text();
+  assert.match(aliceHtml, new RegExp(`alice:${aliceResponse.headers.get("x-request-id")}`));
+  assert.match(bobHtml, new RegExp(`bob:${bobResponse.headers.get("x-request-id")}`));
+  assert.doesNotMatch(aliceHtml, /bob|private render failure/);
+  assert.doesNotMatch(bobHtml, /alice|private render failure/);
+  assert.deepEqual(new Set(observed.map(({ requestId }) => requestId)),
+    new Set([aliceResponse.headers.get("x-request-id"), bobResponse.headers.get("x-request-id")]));
+  assert.equal(observed.length, 2);
+});
+
+test("page failures preserve public status and correlation IDs without exposing private details", async () => {
+  const routes = createRouteManifest([{ id: "/", file: "page.meeko", layouts: [] }]);
+  const observed: { error: unknown; requestId: string }[] = [];
+  const forbidden = createFrameworkHandler({
+    routes,
+    loadPage: async () => { throw new ApiError("FORBIDDEN", 403, "private policy details"); },
+  });
+  const json = await forbidden(new Request("https://example.test/", { headers: { accept: "application/meeko+json" } }));
+  assert.equal(json.status, 403);
+  const body = await json.json() as { code: string; status: number; requestId: string };
+  assert.deepEqual({ code: body.code, status: body.status }, { code: "FORBIDDEN", status: 403 });
+  assert.equal(json.headers.get("x-request-id"), body.requestId);
+  assert.doesNotMatch(JSON.stringify(body), /private/);
+
+  const unavailable = createFrameworkHandler({
+    routes,
+    createContext: async () => { throw new Error("private storage details"); },
+    loadPage: async () => { throw new Error("page should not load"); },
+    onError(error, requestId) { observed.push({ error, requestId }); },
+  });
+  const response = await unavailable(new Request("https://example.test/"));
+  assert.equal(response.status, 500);
+  assert.equal(await response.text(), "Internal Server Error");
+  assert.match(response.headers.get("x-request-id") ?? "", /^[0-9a-f-]{36}$/);
+  assert.equal(observed[0]?.requestId, response.headers.get("x-request-id"));
+  assert.ok(observed[0]?.error instanceof Error);
+});
+
+test("a rejected page error observer cannot create an unhandled rejection", async () => {
+  const routes = createRouteManifest([{ id: "/", file: "page.meeko", layouts: [] }]);
+  const handler = createFrameworkHandler({
+    routes,
+    loadPage: async () => { throw new Error("private page failure"); },
+    onError: async () => { throw new Error("page observer failure"); },
+  });
+  const response = await handler(new Request("https://example.test/"));
+  assert.equal(response.status, 500);
+  assert.equal(await response.text(), "Internal Server Error");
+  await new Promise<void>((resolve) => setImmediate(resolve));
+});
+
+test("an invalid route manifest is normalized before loading a page", async () => {
+  const observed: { error: unknown; requestId: string }[] = [];
+  const handler = createFrameworkHandler({
+    routes: [{ id: "missing-leading-slash", file: "page.meeko", layouts: [] }],
+    loadPage: async () => { throw new Error("page should not load"); },
+    onError(error, requestId) { observed.push({ error, requestId }); },
+  });
+  const response = await handler(new Request("https://example.test/", { headers: { accept: "application/meeko+json" } }));
+  assert.equal(response.status, 500);
+  const body = await response.json() as { code: string; status: number; requestId: string };
+  assert.deepEqual({ code: body.code, status: body.status }, { code: "INTERNAL_ERROR", status: 500 });
+  assert.equal(response.headers.get("x-request-id"), body.requestId);
+  assert.equal(observed[0]?.requestId, body.requestId);
+  assert.match(String(observed[0]?.error), /Route must start with/);
+  assert.doesNotMatch(JSON.stringify(body), /missing-leading-slash/);
 });
 
 test("browser navigation retains matching layout identities and releases its listener", async () => {

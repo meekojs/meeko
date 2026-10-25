@@ -1,9 +1,12 @@
 import type { Component, DomScope } from "../dom.js";
-import { signal } from "../reactivity.js";
+import { createAppErrorChannel, provideAppErrorChannel } from "../component-errors.js";
+import { finishWithCleanup, signal } from "../reactivity.js";
 import type { Signal } from "../reactivity.js";
 import { pageSearchObject, validatePageInputs } from "./page.js";
 import type { PageSchema } from "./page.js";
-import { createNavigator, matchRoute } from "./router.js";
+import { runRouteMiddleware } from "./middleware.js";
+import type { RouteMiddleware } from "./middleware.js";
+import { createNavigator, matchRoute, reportNavigationError } from "./router.js";
 import type { NavigationContext, Navigator, RouteRecord } from "./router.js";
 import { hydrateWithStateStore, StateStore, withStateStore } from "./state.js";
 
@@ -31,6 +34,8 @@ export interface ClientAppOptions {
   readonly payload: string | unknown;
   readonly loadPage: (file: string) => Promise<ClientComponent>;
   readonly loadRoute?: (file: string) => Promise<ClientRoute>;
+  /** Runs the same route guards as SSR before a browser navigation fetch. */
+  readonly loadMiddleware?: () => Promise<readonly RouteMiddleware[]>;
   /** Fetches public loader data from the SSR handler during browser navigation. */
   readonly serverData?: boolean;
   readonly fetch?: typeof fetch;
@@ -68,6 +73,26 @@ function readPayload(value: unknown): HydrationPayload {
   if (!isRecord(parsed.props.params) || !isRecord(parsed.props.search)) throw new TypeError("Invalid Meeko route props");
   if (parsed.sharedState !== undefined && !isRecord(parsed.sharedState)) throw new TypeError("Invalid Meeko shared state");
   return { route: parsed.route, props: parsed.props, state: parsed.state, sharedState: parsed.sharedState ?? {} };
+}
+
+function applyCsrfToken(browser: Window, token: string): () => void {
+  const meta = browser.document.querySelector<HTMLMetaElement>('meta[name="meeko-csrf-token"]');
+  const previous = meta?.getAttribute("content") ?? null;
+  let created: HTMLMetaElement | undefined;
+  if (token && meta) meta.content = token;
+  else if (token) {
+    created = browser.document.createElement("meta");
+    created.name = "meeko-csrf-token";
+    created.content = token;
+    browser.document.head.append(created);
+  } else meta?.remove();
+  return () => {
+    if (meta) {
+      if (!meta.isConnected) browser.document.head.append(meta);
+      if (previous === null) meta.removeAttribute("content");
+      else meta.setAttribute("content", previous);
+    } else created?.remove();
+  };
 }
 
 function bind(component: ClientComponent, props: Record<string, unknown>): Component<Record<string, unknown>> {
@@ -110,39 +135,69 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   if (!initial || initial.route.id !== payload.route) throw new Error("Meeko route hydration mismatch");
   if (JSON.stringify(initial.params) !== JSON.stringify(payload.props.params)) throw new Error("Meeko route parameters do not match SSR");
   const stateStore = new StateStore(payload.sharedState);
+  const errorChannel = createAppErrorChannel();
+  const observeNavigationError = options.onNavigationError ?? ((error: unknown) => {
+    const handler = errorChannel.current();
+    if (handler) return handler(error);
+    reportNavigationError(browser, error);
+  });
+  const hydrateApp = (hydrate: () => () => void) => hydrateWithStateStore(stateStore, () => {
+    provideAppErrorChannel(errorChannel);
+    return hydrate();
+  });
   const first = await createTree(initial.route, payload.props, options.loadPage, 0);
   let layouts = first.layouts;
-  let release = hydrateWithStateStore(stateStore, () => first.component.hydrateScope({ root: options.root }, {}, payload.state));
+  let release = hydrateApp(() => first.component.hydrateScope({ root: options.root }, {}, payload.state));
   let disposed = false;
+  let stableUrl = browser.location.href;
+  const recoverCommitFailure = (error: unknown): never => {
+    // A failed outlet update or hydration can leave live scopes attached to a
+    // partially replaced tree. Recreate the last committed route with SSR.
+    try {
+      browser.location.replace(stableUrl);
+    } catch (recoveryError) {
+      throw new AggregateError([error, recoveryError], "Meeko navigation failed and could not restore the previous route");
+    }
+    throw error;
+  };
   const navigator = createNavigator(options.routes, async (context) => {
+    if (options.loadMiddleware) {
+      const response = await runRouteMiddleware(await options.loadMiddleware(), {
+        url: context.url, match: context.match, signal: context.signal, phase: "client",
+      });
+      if (context.signal.aborted || disposed) return false;
+      if (response) {
+        const location = response.headers.get("location");
+        if (response.status >= 300 && response.status < 400 && location) {
+          const target = new URL(location, context.url);
+          if (target.href === context.url.href) throw new Error("Route middleware redirected to the same URL");
+          browser.location.assign(target.href);
+        } else reportNavigationError(browser, new Error(`Route middleware blocked navigation: HTTP ${response.status}`), observeNavigationError);
+        return false;
+      }
+    }
     let props: Record<string, unknown>;
+    let serverSharedState: Record<string, unknown> | undefined;
+    let serverCsrfToken: string | null = null;
+    let loaderDraft: ReturnType<StateStore["navigationDraft"]> | undefined;
     if (options.serverData && !options.loadRoute) {
       const response = await (options.fetch ?? fetch)(context.url.href, {
         headers: { accept: "application/meeko+json" }, credentials: "same-origin", signal: context.signal,
       });
       if (!response.ok) throw new Error(`Route data request failed: HTTP ${response.status}`);
-      const csrf = response.headers.get("x-meeko-csrf-token");
-      if (csrf !== null) {
-        const meta = browser.document.querySelector<HTMLMetaElement>('meta[name="meeko-csrf-token"]');
-        if (csrf && meta) meta.content = csrf;
-        else if (csrf) {
-          const next = browser.document.createElement("meta");
-          next.name = "meeko-csrf-token";
-          next.content = csrf;
-          browser.document.head.append(next);
-        } else meta?.remove();
-      }
+      serverCsrfToken = response.headers.get("x-meeko-csrf-token");
       const payload = readPayload(await response.text());
       if (payload.route !== context.match.route.id) throw new Error("Meeko route data mismatch");
       if (context.signal.aborted || disposed) return;
-      stateStore.seed(payload.sharedState);
+      serverSharedState = payload.sharedState;
       props = payload.props;
     } else {
       const sidecar = context.match.route.sidecar && options.loadRoute
         ? await options.loadRoute(context.match.route.sidecar)
         : undefined;
       const validated = await validatePageInputs(sidecar, context.match.params, pageSearchObject(context.url.searchParams));
-      const data = sidecar?.load ? await sidecar.load({ ...context, ...validated, state: stateStore }) : undefined;
+      loaderDraft = sidecar?.load ? stateStore.navigationDraft() : undefined;
+      const data = sidecar?.load ? await sidecar.load({ ...context, ...validated, state: loaderDraft!.state }) : undefined;
       props = {
         params: validated.params,
         search: validated.search,
@@ -153,27 +208,53 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     const retained = Math.min(context.retainedLayouts, layouts.length);
     const next = await createTree(context.match.route, props, options.loadPage, retained);
     if (context.signal.aborted || disposed) return;
-    if (retained) {
-      withStateStore(stateStore, () => { layouts[retained - 1]!.outlet.value = next.component; });
-      layouts = [...layouts.slice(0, retained), ...next.layouts];
-      return;
-    }
-    const rendered = withStateStore(stateStore, () => next.component.renderWithState({}));
-    release();
-    options.root.innerHTML = rendered.html;
-    release = hydrateWithStateStore(stateStore, () => next.component.hydrateScope({ root: options.root }, {}, rendered.state));
-    layouts = next.layouts;
-  }, browser);
+    const commit = () => {
+      if (retained) {
+        try {
+          withStateStore(stateStore, () => { layouts[retained - 1]!.outlet.value = next.component; });
+        } catch (error) {
+          recoverCommitFailure(error);
+        }
+        layouts = [...layouts.slice(0, retained), ...next.layouts];
+        stableUrl = context.url.href;
+        return;
+      }
+      const rendered = withStateStore(stateStore, () => next.component.renderWithState({}));
+      try {
+        release();
+        options.root.innerHTML = rendered.html;
+        release = hydrateApp(() => next.component.hydrateScope({ root: options.root }, {}, rendered.state));
+      } catch (error) {
+        recoverCommitFailure(error);
+      }
+      layouts = next.layouts;
+      stableUrl = context.url.href;
+    };
+    const commitWithToken = () => {
+      const restoreToken = serverCsrfToken === null ? undefined : applyCsrfToken(browser, serverCsrfToken);
+      try { commit(); }
+      catch (error) {
+        try { restoreToken?.(); }
+        catch (restoreError) { throw new AggregateError([error, restoreError], "Meeko navigation and CSRF recovery failed"); }
+        throw error;
+      }
+    };
+    if (serverSharedState) stateStore.seedForNavigation(serverSharedState, commitWithToken);
+    else if (loaderDraft) loaderDraft.commit(commitWithToken);
+    else commitWithToken();
+  }, browser, observeNavigationError);
   const onClick = (event: MouseEvent) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const target = event.target;
     if (!target || !("closest" in target) || typeof target.closest !== "function") return;
     const anchor = target.closest("a[href]") as HTMLAnchorElement | null;
     if (!anchor || anchor.hasAttribute("download") || (anchor.target && anchor.target !== "_self")) return;
-    const url = new URL(anchor.href, browser.location.href);
+    let url: URL;
+    try { url = new URL(anchor.href, browser.location.href); }
+    catch { return; }
     if (url.origin !== browser.location.origin || !matchRoute(options.routes, url.pathname)) return;
     event.preventDefault();
-    void navigator.navigate(url.href).catch((error: unknown) => { options.onNavigationError?.(error); });
+    void navigator.navigate(url.href).catch((error: unknown) => reportNavigationError(browser, error, observeNavigationError));
   };
   browser.document.addEventListener("click", onClick);
   return {
@@ -184,7 +265,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       disposed = true;
       navigator.dispose();
       browser.document.removeEventListener("click", onClick);
-      release();
+      finishWithCleanup(release, () => errorChannel.clear());
     },
   };
 }

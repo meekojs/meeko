@@ -1,6 +1,5 @@
 /** Browser-safe subset of Standard Schema v1, implemented by Valibot schemas. */
 import type { StateStore } from "./state.js";
-import type { PageRoute } from "./server.js";
 
 export interface PageSchema<I = unknown, O = I> {
   readonly "~standard": {
@@ -29,7 +28,7 @@ export interface PageLoadContext<P extends PageSchema | undefined, S extends Pag
 export interface PageDefinition<P extends PageSchema | undefined, S extends PageSchema | undefined, D, C = unknown> {
   readonly params?: P;
   readonly search?: S;
-  readonly render?: "ssr" | "prerender" | "client";
+  readonly render?: "ssr" | "prerender";
   readonly prerenderEntries?: readonly Readonly<Record<string, string>>[] | (() => Promise<readonly Readonly<Record<string, string>>[]>);
   readonly load?: (args: PageLoadContext<P, S, C>) => Promise<D> | D;
   readonly head?: (args: PageLoadContext<P, S, C> & { data: D }) => { title?: string };
@@ -41,8 +40,18 @@ export function definePage<
   const S extends PageSchema | undefined = undefined,
   D = unknown,
   C = unknown,
->(definition: PageDefinition<P, S, D, C>): PageDefinition<P, S, D, C> & PageRoute {
-  return definition as PageDefinition<P, S, D, C> & PageRoute;
+>(definition: PageDefinition<P, S, D, C> & { readonly load: NonNullable<PageDefinition<P, S, D, C>["load"]> }): PageDefinition<P, S, D, C> & { readonly load: NonNullable<PageDefinition<P, S, D, C>["load"]> };
+export function definePage<
+  const P extends PageSchema | undefined = undefined,
+  const S extends PageSchema | undefined = undefined,
+  D = unknown,
+  C = unknown,
+>(definition: PageDefinition<P, S, D, C>): PageDefinition<P, S, D, C>;
+export function definePage(definition: unknown): unknown {
+  if (typeof definition === "object" && definition !== null && "render" in definition && definition.render === "client") {
+    throw new TypeError('render: "client" is not supported; use SSR or prerender');
+  }
+  return definition;
 }
 
 export class PageInputError extends Error {

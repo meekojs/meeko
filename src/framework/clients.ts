@@ -80,15 +80,23 @@ export interface ClientOptions {
 
 /** Reads the current document token at call time, including after client navigation. */
 export function createBrowserClientOptions(): ClientOptions {
+  const currentCsrfToken = (): string | undefined => typeof document === "undefined"
+    ? undefined
+    : document.querySelector('meta[name="meeko-csrf-token"]')?.getAttribute("content") ?? undefined;
   return {
-    csrfToken: () => typeof document === "undefined"
-      ? undefined
-      : document.querySelector('meta[name="meeko-csrf-token"]')?.getAttribute("content") ?? undefined,
+    csrfToken: currentCsrfToken,
     fetch: async (input, init) => {
+      const sourceDocument = typeof document === "undefined" ? undefined : document;
+      const csrfTokenAtStart = currentCsrfToken();
       const response = await fetch(input, init);
       const token = response.headers.get("x-meeko-csrf-token");
-      if (token && typeof document !== "undefined") {
+      // Navigation or a newer response may have rotated or cleared the token.
+      if (token !== null && sourceDocument && document === sourceDocument && currentCsrfToken() === csrfTokenAtStart) {
         let meta = document.querySelector('meta[name="meeko-csrf-token"]');
+        if (!token) {
+          meta?.remove();
+          return response;
+        }
         if (!meta) {
           meta = document.createElement("meta");
           meta.setAttribute("name", "meeko-csrf-token");

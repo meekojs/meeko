@@ -13,7 +13,7 @@ import { createRequestContext, withRequestContext } from "../src/framework-serve
 import { createServerClientOptions } from "../src/framework-server/auto-clients.ts";
 import { MemorySessionStore, SessionManager } from "../src/framework-server/sessions.ts";
 import { createLocalServerFetch } from "../src/framework-server/discovery.ts";
-import { defineApiRoute, defineRpc } from "../src/framework-server/contracts.ts";
+import { defineApiRoute, defineRpc, dispatchApiRoute } from "../src/framework-server/contracts.ts";
 import type { Schema, ServerManifest } from "../src/framework-server.ts";
 
 const execFileAsync = promisify(execFile);
@@ -47,14 +47,16 @@ export default defineSocketChannel({ clientToServer: { message: user }, serverTo
     assert.equal(registry.filter((entry) => entry.name === "api").length, 2);
     assert.equal(registry.filter((entry) => entry.name === "socket").length, 2);
     assert.equal(registry.find((entry) => entry.name === "privateService")?.scope, "server");
-    assert.equal(registry.find((entry) => entry.name === "layerGreeting")?.scope, "client");
-    assert.equal(discoverAutoImportsSync(root).find((entry) => entry.name === "layerGreeting")?.scope, "client");
+    assert.equal(registry.find((entry) => entry.name === "layerGreeting")?.scope, "app");
+    assert.equal(discoverAutoImportsSync(root).find((entry) => entry.name === "layerGreeting")?.scope, "app");
     const clientImport = applyAutoImports("const users = api.users.get(); const result = rpc.users.get({ id: '1' });", join(root, "app", "pages", "index.meeko"), registry, "client");
     assert.match(clientImport, /clients\.client\.js/);
     assert.doesNotMatch(clientImport, /clients\.server\.js|server\/services/);
     const serverImport = applyAutoImports("const users = api.users.get(); const service = privateService();", join(root, "server", "entry.ts"), registry, "server");
     assert.match(serverImport, /clients\.server\.js/);
     assert.match(serverImport, /privateService/);
+    assert.match(applyAutoImports("layerGreeting();", join(root, "server", "entry.ts"), registry, "server"), /layerGreeting/);
+    assert.throws(() => applyAutoImports("layerGreeting();", join(root, "shared", "utils", "source.ts"), registry, "shared"), /unavailable in shared scope/);
     assert.throws(() => applyAutoImports("privateService()", join(root, "app", "entry-client.ts"), registry, "client"), /unavailable in client scope/);
     const clientFile = await readFile(join(root, ".meeko/generated/clients.client.ts"), "utf8");
     assert.doesNotMatch(clientFile, /@meekojs\/meeko\/server|server\/api|server\/rpc|server\/services/);
@@ -144,18 +146,98 @@ test("browser automatic clients use the current CSRF meta token for authenticate
     const tokens: Array<string | null> = [];
     globalThis.fetch = async (_input, init) => {
       tokens.push(new Headers(init?.headers).get("x-meeko-csrf"));
-      return Response.json("pong", { headers: { "x-meeko-csrf-token": "second" } });
+      return Response.json("pong", { headers: { "x-meeko-csrf-token": tokens.length === 1 ? "second" : "" } });
     };
     const rpc = createRpcClient<{ ping: { input: string; output: string } }>({ rpc: [{ id: "ping", pathname: "/_meeko/rpc/ping" }] }, createBrowserClientOptions());
     assert.equal(await rpc.ping("first"), "pong");
     assert.equal(window.document.querySelector('meta[name="meeko-csrf-token"]')?.getAttribute("content"), "second");
     assert.equal(await rpc.ping("second"), "pong");
-    assert.deepEqual(tokens, ["first", "second"]);
+    assert.equal(window.document.querySelector('meta[name="meeko-csrf-token"]'), null);
+    assert.equal(await rpc.ping("after logout"), "pong");
+    assert.deepEqual(tokens, ["first", "second", null]);
   } finally {
     globalThis.document = previous;
     globalThis.fetch = previousFetch;
     await window.happyDOM.close();
   }
+});
+
+test("a stale API response cannot restore a CSRF token after logout", async () => {
+  const previousDocument = globalThis.document;
+  const previousFetch = globalThis.fetch;
+  const browser = new Window({ url: "https://meeko.test/" });
+  globalThis.document = browser.document as unknown as Document;
+  browser.document.head.innerHTML = '<meta name="meeko-csrf-token" content="first">';
+  const pending: Array<(response: Response) => void> = [];
+  globalThis.fetch = async () => new Promise<Response>((resolve) => { pending.push(resolve); });
+  try {
+    const api = createApiClient<{
+      users: { get: { params: undefined; query: undefined; body: undefined; output: string } };
+      session: { post: { params: undefined; query: undefined; body: undefined; output: string } };
+    }>({ api: [
+      { clientKey: "users", pathname: "/api/users", method: "GET" },
+      { clientKey: "session", pathname: "/api/session", method: "POST" },
+    ] }, createBrowserClientOptions());
+    const stale = api.users.get();
+    const logout = api.session.post();
+    assert.equal(pending.length, 2);
+    pending[1]!(Response.json("logged out", { headers: { "x-meeko-csrf-token": "" } }));
+    assert.equal(await logout, "logged out");
+    assert.equal(browser.document.querySelector('meta[name="meeko-csrf-token"]') === null, true);
+    pending[0]!(Response.json("old data", { headers: { "x-meeko-csrf-token": "first" } }));
+    assert.equal(await stale, "old data");
+    assert.equal(browser.document.querySelector('meta[name="meeko-csrf-token"]') === null, true);
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.fetch = previousFetch;
+    await browser.happyDOM.abort();
+  }
+});
+
+test("an API response cannot overwrite a token changed by navigation", async () => {
+  const previousDocument = globalThis.document;
+  const previousFetch = globalThis.fetch;
+  const browser = new Window({ url: "https://meeko.test/" });
+  globalThis.document = browser.document as unknown as Document;
+  browser.document.head.innerHTML = '<meta name="meeko-csrf-token" content="first">';
+  let finish: ((response: Response) => void) | undefined;
+  globalThis.fetch = async () => new Promise<Response>((resolve) => { finish = resolve; });
+  try {
+    const api = createApiClient<{
+      users: { get: { params: undefined; query: undefined; body: undefined; output: string } };
+    }>({ api: [{ clientKey: "users", pathname: "/api/users", method: "GET" }] }, createBrowserClientOptions());
+    const pending = api.users.get();
+    browser.document.querySelector('meta[name="meeko-csrf-token"]')!.setAttribute("content", "navigation-token");
+    finish!(Response.json("old data", { headers: { "x-meeko-csrf-token": "first" } }));
+    assert.equal(await pending, "old data");
+    assert.equal(browser.document.querySelector('meta[name="meeko-csrf-token"]')?.getAttribute("content"), "navigation-token");
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.fetch = previousFetch;
+    await browser.happyDOM.abort();
+  }
+});
+
+test("revoking a session clears the CSRF token in the API response", async () => {
+  const stringSchema: Schema<string> = { "~standard": { version: 1, validate(value) {
+    return typeof value === "string" ? { value } : { issues: [{}] };
+  } } };
+  const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+  const anonymous = await sessions.load(new Request("https://meeko.test/"));
+  const record = await anonymous.create({ user: "alice" });
+  const request = new Request("https://meeko.test/api/logout", { method: "POST", headers: {
+    cookie: `meeko.sid=${record.id}`, origin: "https://meeko.test", "x-meeko-csrf": record.csrfToken,
+  } });
+  const context = createRequestContext(request, {}, await sessions.load(request));
+  const route = defineApiRoute({ response: stringSchema, auth: "required", handler: async ({ context: active }) => {
+    await active.session.revoke();
+    return "signed out";
+  } });
+  const response = await dispatchApiRoute(route, context, sessions);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("x-meeko-csrf-token"), "");
+  assert.match(response.headers.get("set-cookie") ?? "", /Max-Age=0/);
+  assert.equal((await sessions.load(request)).current, undefined);
 });
 
 test("in-process automatic clients use the HTTP contract pipeline and original SSR session", async () => {

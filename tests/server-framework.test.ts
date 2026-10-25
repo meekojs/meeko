@@ -66,3 +66,77 @@ test("RPC and request state use the same isolated request context", async () => 
   assert.equal(await (await dispatchRpc(rpc, context2, sessions)).json(), "A:1");
   assert.notEqual(context1.state, context2.state);
 });
+
+test("API preserves a safe error code and request ID across Vite module graphs", async () => {
+  class ApiError extends Error {
+    readonly code = "FORBIDDEN";
+    readonly status = 403;
+  }
+  const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+  const request = new Request("http://localhost/api/private");
+  const context = createRequestContext(request, {}, await sessions.load(request));
+  const route = defineApiRoute({ response: stringSchema, handler() { throw new ApiError("private details"); } });
+  const response = await dispatchApiRoute(route, context, sessions);
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { code: "FORBIDDEN", status: 403, requestId: context.requestId });
+  assert.equal(response.headers.get("x-request-id"), context.requestId);
+
+  const unknown = defineApiRoute({ response: stringSchema, handler() { throw new Error("private details"); } });
+  const sanitized = await dispatchApiRoute(unknown, context, sessions);
+  assert.equal(sanitized.status, 500);
+  assert.deepEqual(await sanitized.json(), { code: "INTERNAL_ERROR", status: 500, requestId: context.requestId });
+});
+
+test("API preserves an immutable redirect response and adds request metadata", async () => {
+  const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+  const request = new Request("http://localhost/api/redirect");
+  const session = await sessions.load(request);
+  const record = await session.create({ userId: "redirect-user" });
+  const context = createRequestContext(request, {}, session);
+  const route = defineApiRoute({
+    contentType: "response",
+    handler: () => Response.redirect("http://localhost/destination", 302),
+  });
+  const response = await dispatchApiRoute(route, context, sessions);
+  assert.equal(response.status, 302);
+  assert.equal(response.headers.get("location"), "http://localhost/destination");
+  assert.equal(response.headers.get("x-request-id"), context.requestId);
+  assert.match(response.headers.get("set-cookie") ?? "", new RegExp(`meeko\\.sid=${record.id}`));
+  assert.equal(response.headers.get("x-meeko-csrf-token"), record.csrfToken);
+});
+
+test("a rejected API error observer does not escape after a sanitized response", async () => {
+  const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+  const request = new Request("http://localhost/api/failure");
+  const context = createRequestContext(request, {}, await sessions.load(request));
+  const route = defineApiRoute({ response: stringSchema, handler() { throw new Error("private failure"); } });
+  const response = await dispatchApiRoute(route, context, sessions, {}, async () => { throw new Error("observer failure"); });
+  assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), { code: "INTERNAL_ERROR", status: 500, requestId: context.requestId });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+});
+
+test("production fallback records observer failure without private error details", async () => {
+  const previousEnvironment = process.env.NODE_ENV;
+  const previousLogger = console.error;
+  const logged: unknown[][] = [];
+  process.env.NODE_ENV = "production";
+  console.error = (...args: unknown[]) => { logged.push(args); };
+  try {
+    const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+    const request = new Request("http://localhost/api/failure");
+    const context = createRequestContext(request, {}, await sessions.load(request));
+    const route = defineApiRoute({ response: stringSchema, handler() { throw new Error("private database password"); } });
+    const response = await dispatchApiRoute(route, context, sessions, {}, async () => { throw new Error("private observer token"); });
+    assert.equal(response.status, 500);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.match(String(logged[0]?.[0]), /Meeko server error observer failed/);
+    assert.match(String(logged[0]?.[0]), new RegExp(context.requestId));
+    assert.deepEqual(logged[0]?.[1], { original: "Error", observer: "Error" });
+    assert.doesNotMatch(JSON.stringify(logged), /private database password|private observer token/);
+  } finally {
+    console.error = previousLogger;
+    if (previousEnvironment === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousEnvironment;
+  }
+});

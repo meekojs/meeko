@@ -1,5 +1,7 @@
-import { onCleanup, signal } from "../reactivity.js";
+import { currentEffectOwner, onCleanup, signal } from "../reactivity.js";
 import type { ReadonlySignal } from "../reactivity.js";
+import { logClientError, observeCallback } from "../error-observer.js";
+import { currentAppErrorChannel, currentComponentErrorHandler } from "../component-errors.js";
 import { serializeJson } from "../server.js";
 
 export interface SocketSchema<I = unknown, O = I> {
@@ -35,6 +37,8 @@ export interface SocketClientOptions {
   readonly maxRetryMs?: number;
   readonly maxMessageBytes?: number;
   readonly webSocketFactory?: (url: string) => WebSocket;
+  /** Receives invalid inbound messages and consumer listener failures. */
+  readonly onError?: (error: unknown) => void;
 }
 
 export interface SocketRegistryOptions extends SocketClientOptions {
@@ -76,18 +80,53 @@ export function createSocketClient<C extends SocketContract>(url: string, contra
   let retry: ReturnType<typeof setTimeout> | undefined;
   let attempts = 0;
   let closed = false;
+  const reportError = (error: unknown) => {
+    if (!options.onError) { logClientError("Meeko socket client error", error); return; }
+    observeCallback(() => options.onError!(error),
+      (observerError) => logClientError("Meeko socket error observer failed", error, observerError));
+  };
+  const setState = (next: "connecting" | "open" | "closed") => {
+    try { state.value = next; }
+    catch (error) { reportError(error); }
+  };
+  const closePeer = (peer: WebSocket | undefined, code: number, reason: string) => {
+    try { peer?.close(code, reason); }
+    catch (error) { reportError(error); }
+  };
+  const scheduleRetry = () => {
+    if (closed) return;
+    const delay = Math.min((options.retryMs ?? 500) * 2 ** attempts++, options.maxRetryMs ?? 30_000);
+    retry = setTimeout(() => {
+      retry = undefined;
+      try { connect(); }
+      catch (error) {
+        reportError(error);
+        setState("closed");
+        scheduleRetry();
+      }
+    }, delay);
+  };
 
   const connect = () => {
     if (closed) return;
-    state.value = "connecting";
+    setState("connecting");
     const peer = factory(url);
     socket = peer;
-    peer.addEventListener("open", () => { if (peer === socket) { attempts = 0; state.value = "open"; } });
+    let transportErrorReported = false;
+    peer.addEventListener("open", () => { if (peer === socket) { attempts = 0; setState("open"); } });
+    peer.addEventListener("error", () => {
+      if (peer !== socket || closed || transportErrorReported) return;
+      transportErrorReported = true;
+      reportError(new Error("Socket transport error"));
+    });
     peer.addEventListener("message", (message) => {
-      if (peer !== socket || typeof message.data !== "string" || new TextEncoder().encode(message.data).byteLength > maxBytes) {
+      if (peer !== socket || closed) return;
+      if (typeof message.data !== "string" || new TextEncoder().encode(message.data).byteLength > maxBytes) {
+        reportError(new RangeError("Socket message too large or not text"));
         closed = true;
-        state.value = "closed";
-        peer.close(1009, "Message too large");
+        setState("closed");
+        listeners.clear();
+        closePeer(peer, 1009, "Message too large");
         return;
       }
       void (async () => {
@@ -96,15 +135,25 @@ export function createSocketClient<C extends SocketContract>(url: string, contra
         const schema = contract.serverToClient[decoded.event];
         if (!schema) throw new TypeError("Unknown socket event");
         const value = await validate(schema, decoded.payload);
-        for (const listener of listeners.get(decoded.event) ?? []) listener(value);
-      })().catch(() => { closed = true; state.value = "closed"; peer.close(1008, "Invalid event"); });
+        if (peer !== socket || closed) return;
+        for (const listener of listeners.get(decoded.event) ?? []) {
+          if (peer !== socket || closed) return;
+          observeCallback(() => listener(value), reportError);
+        }
+      })().catch((error: unknown) => {
+        if (peer !== socket || closed) return;
+        reportError(error);
+        closed = true;
+        setState("closed");
+        listeners.clear();
+        closePeer(peer, 1008, "Invalid event");
+      });
     });
     peer.addEventListener("close", (event) => {
       if (peer !== socket || closed) return;
-      state.value = "closed";
-      if ([1008, 1009].includes((event as CloseEvent).code)) { closed = true; return; }
-      const delay = Math.min((options.retryMs ?? 500) * 2 ** attempts++, options.maxRetryMs ?? 30_000);
-      retry = setTimeout(connect, delay);
+      setState("closed");
+      if ([1008, 1009].includes((event as CloseEvent).code)) { closed = true; listeners.clear(); return; }
+      scheduleRetry();
     });
   };
   connect();
@@ -124,15 +173,17 @@ export function createSocketClient<C extends SocketContract>(url: string, contra
       const set = listeners.get(event) ?? new Set();
       set.add(listener as (value: unknown) => void);
       listeners.set(event, set);
-      return () => { set.delete(listener as (value: unknown) => void); if (set.size === 0) listeners.delete(event); };
+      const unsubscribe = () => { set.delete(listener as (value: unknown) => void); if (set.size === 0) listeners.delete(event); };
+      if (currentEffectOwner()) onCleanup(unsubscribe);
+      return unsubscribe;
     },
     close() {
-      if (closed) return;
+      if (closed) { listeners.clear(); return; }
       closed = true;
       if (retry) clearTimeout(retry);
-      socket?.close(1000, "Client closed");
+      closePeer(socket, 1000, "Client closed");
       listeners.clear();
-      state.value = "closed";
+      setState("closed");
     },
   };
 }
@@ -140,7 +191,8 @@ export function createSocketClient<C extends SocketContract>(url: string, contra
 /** Binds socket lifetime to a Meeko root; SSR never opens a connection. */
 export function useSocket<C extends SocketContract>(url: string, contract: C, options: SocketClientOptions = {}): SocketClient<C> {
   if (typeof window === "undefined") throw new Error("useSocket() is only available in the browser");
-  const client = createSocketClient(url, contract, options);
+  const onError = options.onError ?? currentComponentErrorHandler();
+  const client = createSocketClient(url, contract, onError ? { ...options, onError } : options);
   try { onCleanup(() => client.close()); }
   catch (error) { client.close(); throw error; }
   return client;
@@ -151,9 +203,39 @@ export function createSocketRegistry<C extends Record<string, SocketContract>>(c
   const result: Record<string, unknown> = Object.create(null);
   for (const name of Object.keys(contracts)) {
     let client: SocketClient<SocketContract> | undefined;
+    const appClients = new WeakMap<NonNullable<ReturnType<typeof currentAppErrorChannel>>, SocketClient<SocketContract>>();
+    const rootClients = new WeakMap<object, SocketClient<SocketContract>>();
     Object.defineProperty(result, name, {
       enumerable: true,
       get() {
+        const channel = currentAppErrorChannel();
+        if (channel) {
+          let scoped = appClients.get(channel);
+          if (!scoped) {
+            const onError = options.onError ?? ((error: unknown) => {
+              const handler = channel.current();
+              if (handler) return handler(error);
+              logClientError("Meeko socket client error", error);
+            });
+            scoped = createSocketClient(socketUrl(name, options), contracts[name]!, { ...options, onError });
+            appClients.set(channel, scoped);
+            const owned = scoped;
+            channel.track(() => { owned.close(); appClients.delete(channel); });
+          }
+          return scoped;
+        }
+        const owner = currentEffectOwner();
+        if (owner) {
+          let scoped = rootClients.get(owner);
+          if (!scoped) {
+            const onError = options.onError ?? currentComponentErrorHandler();
+            scoped = createSocketClient(socketUrl(name, options), contracts[name]!, onError ? { ...options, onError } : options);
+            rootClients.set(owner, scoped);
+            const owned = scoped;
+            onCleanup(() => { owned.close(); rootClients.delete(owner); });
+          }
+          return scoped;
+        }
         if (!client) client = createSocketClient(socketUrl(name, options), contracts[name]!, options);
         return client;
       },

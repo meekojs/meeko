@@ -5,6 +5,12 @@ import type { PageSchema } from "../src/framework/page.ts";
 import { createRouteManifest } from "../src/framework/router.ts";
 import { createFrameworkHandler } from "../src/framework/server.ts";
 
+test("definePage rejects an unavailable client-only render mode", () => {
+  // @ts-expect-error Client-only rendering is not part of the supported route contract.
+  const unsupported = () => definePage({ render: "client" });
+  assert.throws(unsupported, /render: "client" is not supported/);
+});
+
 const paramsSchema: PageSchema<unknown, { id: number }> = {
   "~standard": {
     version: 1,
@@ -27,6 +33,15 @@ const searchSchema: PageSchema<unknown, { tab: string }> = {
     },
   },
 };
+
+if (false) {
+  createFrameworkHandler({
+    routes: [],
+    loadPage: async () => ({ renderWithState: () => ({ html: "", state: {} }) }),
+    // @ts-expect-error The handler cannot accept a non-route from loadRoute.
+    loadRoute: async () => 42,
+  });
+}
 
 test("definePage validates external params/search before loader and keeps typed output", async () => {
   let calls = 0;

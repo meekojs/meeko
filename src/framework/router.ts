@@ -1,3 +1,5 @@
+import { observeCallback } from "../error-observer.js";
+
 /** A route manifest is shared by the server renderer and browser navigator. */
 export interface RouteRecord {
   readonly id: string;
@@ -133,12 +135,24 @@ export interface Navigator {
   dispose(): void;
 }
 
+/** Browser events cannot return a navigation promise, so surface failures safely. */
+export function reportNavigationError(browser: Window, error: unknown, observer?: (error: unknown) => void): void {
+  const logger = (browser as Window & { console?: { error(...args: unknown[]): void } }).console ?? console;
+  const reportObserverFailure = (observerError: unknown) => {
+    try { logger.error("Meeko navigation error observer failed", observerError, error); }
+    catch { /* A broken console must not produce an unhandled rejection. */ }
+  };
+  if (observer) observeCallback(() => observer(error), reportObserverFailure);
+  else observeCallback(() => logger.error("Meeko navigation failed", error), () => {});
+}
+
 /**
  * The host owns actual DOM outlet rendering. Its callback receives layout
  * identity so it can retain matching layout instances and release exited ones.
  */
-export function createNavigator(routes: readonly RouteRecord[], render: (context: NavigationContext) => Promise<void> | void, browser: Window = window): Navigator {
+export function createNavigator(routes: readonly RouteRecord[], render: (context: NavigationContext) => Promise<void | boolean> | void | boolean, browser: Window = window, onError?: (error: unknown) => void): Navigator {
   let current = matchRoute(routes, browser.location.pathname);
+  let currentUrl = browser.location.href;
   let pending: AbortController | undefined;
   let disposed = false;
   const navigate = async (to: string, options: { replace?: boolean } = {}): Promise<boolean> => {
@@ -146,7 +160,19 @@ export function createNavigator(routes: readonly RouteRecord[], render: (context
     const url = new URL(to, browser.location.href);
     if (url.origin !== browser.location.origin) throw new TypeError("External navigation is not a Meeko route");
     const match = matchRoute(routes, url.pathname);
-    if (!match) return false;
+    if (!match) {
+      if (options.replace && browser.location.href === url.href) {
+        try { browser.history.replaceState(null, "", currentUrl); }
+        catch (historyError) {
+          try { browser.location.replace(currentUrl); }
+          catch (recoveryError) {
+            throw new AggregateError([historyError, recoveryError], "Meeko history and URL recovery failed");
+          }
+          throw historyError;
+        }
+      }
+      return false;
+    }
     pending?.abort();
     const controller = new AbortController();
     pending = controller;
@@ -156,16 +182,55 @@ export function createNavigator(routes: readonly RouteRecord[], render: (context
         && retainedLayouts < current.route.layouts.length
         && retainedLayouts < match.route.layouts.length) retainedLayouts++;
     }
-    await render({ url, match, signal: controller.signal, retainedLayouts });
+    let result: void | boolean;
+    try { result = await render({ url, match, signal: controller.signal, retainedLayouts }); }
+    catch (error) {
+      if (pending === controller) pending = undefined;
+      if (options.replace && !controller.signal.aborted && !disposed && browser.location.href === url.href) {
+        try { browser.history.replaceState(null, "", currentUrl); }
+        catch (historyError) {
+          try { browser.location.replace(currentUrl); }
+          catch (recoveryError) {
+            throw new AggregateError([error, historyError, recoveryError], "Meeko navigation and URL recovery failed");
+          }
+          throw new AggregateError([error, historyError], "Meeko navigation and history recovery failed");
+        }
+      }
+      throw error;
+    }
+    if (result === false) {
+      if (pending === controller) pending = undefined;
+      if (options.replace && !controller.signal.aborted && browser.location.href === url.href) {
+        try { browser.history.replaceState(null, "", currentUrl); }
+        catch (historyError) {
+          try { browser.location.replace(currentUrl); }
+          catch (recoveryError) {
+            throw new AggregateError([historyError, recoveryError], "Meeko history and URL recovery failed");
+          }
+          throw historyError;
+        }
+      }
+      return false;
+    }
     if (controller.signal.aborted || disposed) return false;
-    if (options.replace) browser.history.replaceState(null, "", url);
-    else browser.history.pushState(null, "", url);
+    try {
+      if (options.replace) browser.history.replaceState(null, "", url);
+      else browser.history.pushState(null, "", url);
+    } catch (error) {
+      if (pending === controller) pending = undefined;
+      try { browser.location.replace(currentUrl); }
+      catch (recoveryError) {
+        throw new AggregateError([error, recoveryError], "Meeko history update and navigation recovery failed");
+      }
+      throw error;
+    }
     current = match;
+    currentUrl = url.href;
     pending = undefined;
     return true;
   };
   const onPop = () => {
-    void navigate(browser.location.href, { replace: true });
+    void navigate(browser.location.href, { replace: true }).catch((error: unknown) => reportNavigationError(browser, error, onError));
   };
   browser.addEventListener("popstate", onPop);
   return {
