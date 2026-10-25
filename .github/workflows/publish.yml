@@ -47,8 +47,37 @@ jobs:
           path: .meeko/ci-logs/redis.log
           if-no-files-found: ignore
 
+  vscode-extension:
+    name: VS Code (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
+        working-directory: editors/vscode
+      - run: pnpm run package:vsix
+        working-directory: editors/vscode
+      - run: pnpm run test:host:isolated
+        working-directory: editors/vscode
+        if: runner.os != 'Linux'
+      - run: xvfb-run -a pnpm run test:host:isolated
+        working-directory: editors/vscode
+        if: runner.os == 'Linux'
+
   publish:
-    needs: redis-integration
+    needs: [redis-integration, vscode-extension]
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -97,7 +126,10 @@ jobs:
         shell: pwsh
         env:
           MEEKO_BROWSER_CHANNEL: chromium
-        run: ./tests/fullstack-consumer.ps1 -Tarball .meeko/ci-artifacts/meekojs-meeko-0.0.4.tgz
+        run: |
+          $tarballs = @(Get-ChildItem -LiteralPath .meeko/ci-artifacts -Filter '*.tgz' -File)
+          if ($tarballs.Count -ne 1) { throw "Expected one Meeko tarball, found $($tarballs.Count)." }
+          ./tests/fullstack-consumer.ps1 -Tarball $tarballs[0].FullName
       - name: Diagnostic logs on failure
         if: failure()
         uses: actions/upload-artifact@v4

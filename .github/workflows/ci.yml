@@ -49,7 +49,10 @@ jobs:
         shell: pwsh
         env:
           MEEKO_BROWSER_CHANNEL: chromium
-        run: ./tests/fullstack-consumer.ps1 -Tarball .meeko/ci-artifacts/meekojs-meeko-0.0.4.tgz
+        run: |
+          $tarballs = @(Get-ChildItem -LiteralPath .meeko/ci-artifacts -Filter '*.tgz' -File)
+          if ($tarballs.Count -ne 1) { throw "Expected one Meeko tarball, found $($tarballs.Count)." }
+          ./tests/fullstack-consumer.ps1 -Tarball $tarballs[0].FullName
       - name: Diagnostic logs on failure
         if: failure()
         uses: actions/upload-artifact@v4

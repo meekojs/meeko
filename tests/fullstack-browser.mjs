@@ -11,6 +11,7 @@ try {
   page.on("console", (message) => { if (message.type() === "error") errors.push(`${message.text()} @ ${message.location().url}`); });
   page.on("response", (response) => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
   assert.equal((await page.goto(`${origin}/`))?.status(), 200);
+  await page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length === 1);
   await page.locator(".app-shell").evaluate((element) => element.setAttribute("data-kept", "yes"));
   await page.locator('a[href="/users"]').click();
   await page.waitForURL(`${origin}/users`);

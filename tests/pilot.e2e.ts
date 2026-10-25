@@ -47,7 +47,11 @@ async function assertPilotFlow(base: string, production: boolean, engine: PilotB
     const page = await browser.newPage();
     page.setDefaultTimeout(browserTimeoutMs);
     const errors: string[] = [];
+    const consoleErrors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") consoleErrors.push(`${message.text()} @ ${message.location().url}`);
+    });
     await page.goto(base, { waitUntil: "networkidle", timeout: browserTimeoutMs });
     await page.waitForFunction(() => document.documentElement.dataset.hydrated === "true");
     assert.equal(await page.locator(".task-list li").count(), 2);
@@ -77,6 +81,7 @@ async function assertPilotFlow(base: string, production: boolean, engine: PilotB
     assert.equal(await page.locator(".task-list li").count(), 1);
     assert.match(await page.locator(".task-list li").first().innerText(), /Documentar el motor/);
 
+    assert.deepEqual(consoleErrors, []);
     await page.route("**/api/tasks", (route) => route.abort());
     await page.getByRole("button", { name: "Sincronizar API" }).click();
     await page.getByRole("alert").getByText("No se pudieron sincronizar las tareas. Inténtalo de nuevo.").waitFor();

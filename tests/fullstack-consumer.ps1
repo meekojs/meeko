@@ -5,6 +5,7 @@ $scratch = Join-Path $repo '.meeko'
 New-Item -ItemType Directory -Path $scratch -Force | Out-Null
 $run = Join-Path $scratch ('fullstack-run-' + [guid]::NewGuid().ToString('N'))
 $consumer = Join-Path $run 'consumer'
+$starter = Join-Path $run 'starter'
 $serverProcess = $null
 
 try {
@@ -28,6 +29,18 @@ try {
   $manifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $manifestPath -Encoding utf8
   & npm install --prefix $consumer --no-audit --no-fund
   if ($LASTEXITCODE -ne 0) { throw 'Clean external consumer installation failed.' }
+  & node (Join-Path $consumer 'node_modules/@meekojs/meeko/dist/cli.js') init-framework $starter
+  if ($LASTEXITCODE -ne 0) { throw 'Packaged framework starter generation failed.' }
+  $starterManifestPath = Join-Path $starter 'package.json'
+  $starterManifest = Get-Content -LiteralPath $starterManifestPath -Raw | ConvertFrom-Json
+  $starterManifest.dependencies.'@meekojs/meeko' = $tarball
+  $starterManifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $starterManifestPath -Encoding utf8
+  & npm install --prefix $starter --no-audit --no-fund
+  if ($LASTEXITCODE -ne 0) { throw 'Clean packaged framework starter installation failed.' }
+  & npm run check --prefix $starter
+  if ($LASTEXITCODE -ne 0) { throw 'Packaged framework starter typecheck failed.' }
+  & npm run build --prefix $starter
+  if ($LASTEXITCODE -ne 0) { throw 'Packaged framework starter production build failed.' }
   & npm run build --prefix $consumer
   if ($LASTEXITCODE -ne 0) { throw 'External consumer check or production build failed.' }
   $clientAssets = Get-ChildItem -LiteralPath (Join-Path $consumer '.meeko/output/client') -Recurse -File -Filter '*.js'
@@ -44,7 +57,7 @@ try {
   $env:MEEKO_TEST_PORT = [string]$port
   $out = Join-Path $run 'server.stdout.log'
   $err = Join-Path $run 'server.stderr.log'
-  $serverProcess = Start-Process -FilePath (Get-Command node).Source -ArgumentList @('server.mjs', '--production') -WorkingDirectory $consumer -WindowStyle Hidden -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+  $serverProcess = Start-Process -FilePath (Get-Command node).Source -ArgumentList @('node_modules/@meekojs/meeko/dist/cli.js', 'start', '.') -WorkingDirectory $consumer -WindowStyle Hidden -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
   $ready = $false
   $lastHealthError = ''
   for ($attempt = 0; $attempt -lt 50; $attempt++) {
@@ -74,7 +87,7 @@ try {
     } finally { $ErrorActionPreference = $previousErrorAction }
     if ($LASTEXITCODE -ne 0) { throw 'Stability benchmark failed.' }
   }
-  Write-Output 'External full-stack consumer: installation, types, build, SSR, API, RPC, sessions, Socket and Chrome OK.'
+  Write-Output 'External full-stack consumer and generated starter: installation, types, build, SSR, API, RPC, sessions, Socket and Chrome OK.'
 } finally {
   if ($serverProcess -and !$serverProcess.HasExited) { Stop-Process -Id $serverProcess.Id -Force }
   foreach ($name in @('PORT', 'MEEKO_TEST_PORT', 'MEEKO_BENCH_CONSUMER', 'MEEKO_BENCH_OUTPUT', 'npm_config_cache')) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }

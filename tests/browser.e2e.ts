@@ -15,6 +15,9 @@ async function assertBrowserBehavior(url: string, development: boolean): Promise
     const page = await browser.newPage();
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(`${message.text()} @ ${message.location().url}`);
+    });
     await page.goto(url, { waitUntil: "networkidle" });
     if (development) {
       await page.waitForFunction(() => Boolean(window.__MEEKO_DEVTOOLS__));
@@ -113,6 +116,9 @@ test("la página SSR hidrata y vuelve a crear estado al navegar", async () => {
     const page = await browser.newPage();
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(`${message.text()} @ ${message.location().url}`);
+    });
     await page.goto(url, { waitUntil: "networkidle" });
     assert.match(await page.locator("#app button").innerText(), /^2 · doble: 4$/);
     await page.locator("#app button").click();

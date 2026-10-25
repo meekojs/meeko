@@ -15,8 +15,8 @@ try {
   Set-Content -LiteralPath (Join-Path $consumer 'Counter.meeko') -Encoding utf8 -Value @'
 <script lang="ts">
 import { signal } from "@meekojs/meeko";
-interface Props { initial: number }
-const props = defineProps<Props>();
+interface Props { initial?: number }
+const props = defineProps<Props>({ initial: 4 });
 const count = signal(props.initial);
 </script>
 <template>
@@ -26,7 +26,7 @@ const count = signal(props.initial);
   Set-Content -LiteralPath (Join-Path $consumer 'main.ts') -Encoding utf8 -Value @'
 import { hydrate } from "./Counter.meeko";
 const root = document.getElementById("app");
-if (root) hydrate(root, { initial: 4 });
+if (root) hydrate(root, {});
 '@
   Set-Content -LiteralPath (Join-Path $consumer 'index.html') -Encoding utf8 -Value '<!doctype html><html><body><main id="app"></main><script type="module" src="/main.ts"></script></body></html>'
   Set-Content -LiteralPath (Join-Path $consumer 'vite.config.mjs') -Encoding utf8 -Value @'
@@ -38,7 +38,7 @@ export default defineConfig({ plugins: [meeko()] });
   Set-Content -LiteralPath (Join-Path $consumer 'smoke.mjs') -Encoding utf8 -Value @'
 import { renderToString } from "./Counter.generated.ts";
 import { mountDevtoolsPanel } from "@meekojs/meeko/devtools-ui";
-if (!renderToString({ initial: 4 }).includes("meeko:text:0-->4")) {
+if (!renderToString({}).includes("meeko:text:0-->4")) {
   throw new Error("SSR del paquete instalado produjo un resultado inesperado");
 }
 if (typeof mountDevtoolsPanel !== "function") {

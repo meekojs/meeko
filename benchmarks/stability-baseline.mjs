@@ -163,9 +163,16 @@ async function main() {
       for (let i = 0; i < warmups + rounds; i++) {
         const pathname = i % 2 === 0 ? "/users" : "/";
         const elapsed = await page.evaluate(async (path) => {
+          const link = document.querySelector(`a[href="${path}"]`);
+          if (!(link instanceof HTMLAnchorElement)) throw new Error(`Missing route link: ${path}`);
+          const selector = path === "/users" ? "#users-data" : "h1";
           const start = performance.now();
-          await window.__meekoTestApp.navigate(path);
-          return performance.now() - start;
+          link.click();
+          while (performance.now() - start < 10_000) {
+            if (location.pathname === path && document.querySelector(selector)) return performance.now() - start;
+            await new Promise((done) => setTimeout(done, 0));
+          }
+          throw new Error(`Client navigation did not render ${path}; current route: ${location.pathname}`);
         }, pathname);
         if (i >= warmups) navigation.push(elapsed);
       }
@@ -222,7 +229,7 @@ async function main() {
         "HMR measures file write through visible browser update in the official Vite example's development mode.",
         "SSR and dispatcher timings use in-process Fetch handlers from the production server bundle.",
         "Hydration duration uses marks around mountClientApp in the external fixture.",
-        "Client navigation uses mountClientApp.navigate with serverData enabled.",
+        "Client navigation measures a real link click through the new route DOM with serverData enabled.",
         "Minimal app size is the existing examples/vite production asset set; full-stack size is the tarball-installed fixture asset set.",
       ],
     };
