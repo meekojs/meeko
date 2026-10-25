@@ -11,7 +11,7 @@ Meeko conserva el motor independiente en `@meekojs/meeko`. El modo de aplicació
 
 Todas las subrutas pertenecen al mismo paquete y versión. Los destinos de servidor publicados son Node 24, Bun, Deno y Cloudflare Workers, y la misma suite de conformidad los comprueba (véase [Build, despliegue y verificación](#build-despliegue-y-verificación)). El build y las herramientas de desarrollo siguen ejecutándose con Node. SSR está activo por defecto.
 
-La aplicación generada necesita Node 24 o posterior y TypeScript 7 para comprobar sus declaraciones; el compilador de `.meeko` utiliza internamente TypeScript 6 sólo durante el desarrollo y el build. El paquete es ESM. `vite` es un peer opcional: una aplicación que sólo usa el motor puede importar `@meekojs/meeko` sin iniciar el framework, el servidor, sesiones o Socket. El adaptador Node carga `ws` al activar `attachNodeWebSocketServer`, no al importar el motor. Los comandos simplificados de proyecto descritos a continuación están disponibles desde `0.1.0`.
+La aplicación generada necesita Node 24 o posterior y TypeScript 7 para comprobar sus declaraciones; el compilador de `.meeko` utiliza internamente TypeScript 6 sólo durante el desarrollo y el build. El paquete es ESM. `vite` es un peer opcional: una aplicación que sólo usa el motor puede importar `@meekojs/meeko` sin iniciar el framework, el servidor, sesiones o Socket. El adaptador Node carga `ws` al activar `attachNodeWebSocketServer`, no al importar el motor.
 
 ## Crear una aplicación
 
@@ -721,19 +721,19 @@ La prueba Redis requiere que `MEEKO_REDIS_URL` apunte a un servidor de pruebas a
 
 La entrada cliente generada registra `meeko-hydration` en el navegador. El benchmark actual mide navegación desde el clic de un enlace hasta que aparece la nueva ruta; el baseline histórico medía una llamada directa a `mountClientApp.navigate`. Por ese cambio de método, no compare las cifras de navegación entre ambas ejecuciones como si fueran una regresión del runtime. El JSON histórico permanece intacto.
 
-| Métrica | Mediana o tamaño | p10â€“p90 |
+| Métrica | Mediana o tamaño | p10–p90 |
 | --- | ---: | ---: |
-| Compilación fría | 9.40 ms | 9.08â€“9.45 ms |
-| Compilación tras edición | 0.87 ms | 0.53â€“1.14 ms |
-| HMR visible | 28.63 ms | 27.19â€“29.11 ms |
-| SSR por petición | 0.040 ms | 0.032â€“0.060 ms |
-| Hidratación | 11.10 ms | 10.70â€“11.20 ms |
-| Navegación cliente | 1.90 ms | 1.80â€“2.10 ms |
-| Dispatcher API | 0.019 ms | 0.017â€“0.019 ms |
-| Dispatcher RPC | 0.049 ms | 0.044â€“0.054 ms |
-| Bundle motor | 19,134 B; gzip 7,222 B | â€” |
-| Bundle mínimo | 21,314 B; gzip 6,438 B | â€” |
-| Bundle full-stack | 36,063 B; gzip 14,897 B | â€” |
+| Compilación fría | 9.40 ms | 9.08–9.45 ms |
+| Compilación tras edición | 0.87 ms | 0.53–1.14 ms |
+| HMR visible | 28.63 ms | 27.19–29.11 ms |
+| SSR por petición | 0.040 ms | 0.032–0.060 ms |
+| Hidratación | 11.10 ms | 10.70–11.20 ms |
+| Navegación cliente | 1.90 ms | 1.80–2.10 ms |
+| Dispatcher API | 0.019 ms | 0.017–0.019 ms |
+| Dispatcher RPC | 0.049 ms | 0.044–0.054 ms |
+| Bundle motor | 19,134 B; gzip 7,222 B | — |
+| Bundle mínimo | 21,314 B; gzip 6,438 B | — |
+| Bundle full-stack | 36,063 B; gzip 14,897 B | — |
 
 Tras 500 renders SSR, el heap pasó de 87,276,056 a 87,012,304 bytes después de GC; RSS máximo observado: 224,952,320 bytes. Esta muestra no prueba ausencia de fugas y debe compararse sólo bajo condiciones equivalentes.
 
@@ -741,12 +741,12 @@ Tras 500 renders SSR, el heap pasó de 87,276,056 a 87,012,304 bytes después de
 
 Las entradas públicas soportadas de la versión actual son `@meekojs/meeko`, `/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare`, `/build`, `/vite` y `/devtools-ui`. `/internal` existe para el código generado por Meeko y no es contrato de consumo directo. La compilación se ofrece mediante la CLI y Vite; la raíz pública expone la reactividad y el runtime de SSR e hidratación, pero no una función `compile`. `defineMeekoConfig`, routing, `definePage`, `useState`, `createApiClient`, `createRpcClient`, `defineSocketChannel`, `attachNodeWebSocketServer`, `RedisSessionStore` y `SqlSessionStore` conservan sus nombres actuales. Los autoimports generados `api`, `rpc`, `socket` y `useSocket` dependen del manifiesto de cada aplicación.
 
-Mientras la versión sea `0.x`, documente cada cambio incompatible y añada una entrada a `CHANGELOG.md` antes de aumentar minor; use patch para correcciones compatibles. En `1.x`, los cambios incompatibles requieren major. Una publicación requiere lockfile reproducible con el pnpm declarado, CI verde, consumidor externo y revisión del tarball. No se aumenta la versión automáticamente. El adaptador Cloudflare Workers es nuevo en esta versión y puede ajustarse antes de `1.0`.
+Meeko sigue SemVer desde `1.0`: el contrato público, lo que no es público y la política de deprecación están en [stability.md](stability.md). Una publicación requiere lockfile reproducible con el pnpm declarado, CI verde, consumidor externo y revisión del tarball. No se aumenta la versión automáticamente.
 
 ## Límites actuales
 
 - Los adaptadores de servidor publicados son Node 24, Bun, Deno y Cloudflare Workers; la suite de conformidad se ejecuta con Bun 1.4.4, Deno 2.9.8 y workerd 1.20261019.1 (wrangler 4.152.0). En Workers, Socket requiere Durable Objects, las sesiones requieren D1 o Redis por la API REST de Upstash (KV no es válido) y D1 no notifica revocaciones a otros aislados.
-- Redis tiene una prueba de integración con servidor real configurada en CI; su ejecución local depende de un servidor accesible. El adaptador SQL se probó con SQLite real. Redis Pub/Sub para Socket queda pendiente.
+- Redis tiene una prueba de integración con servidor real configurada en CI; su ejecución local depende de un servidor accesible. El adaptador SQL se probó con SQLite real. `RedisSocketPubSub` se prueba en la misma integración con dos procesos.
 - Los canales Socket se descubren como archivos con nombre simple bajo `server/socket/`.
 - Cambios en configuración o registro de autoimports fuerzan recarga completa en Vite.
 - `server/runtime.ts` del starter requiere un store de sesiones persistente antes de servir producción.

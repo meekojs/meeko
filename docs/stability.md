@@ -22,7 +22,7 @@ Lo que se enumera a continuación sólo cambia de forma incompatible en una vers
 
 ### Entradas del paquete
 
-Las subrutas declaradas en `exports` de `package.json`, con los símbolos y tipos que documentan esta guía, [api.md](api.md), [framework.md](framework.md), [devtools.md](devtools.md) y [editors.md](editors.md):
+Las subrutas declaradas en `exports` de `package.json` y **todos** los símbolos y tipos que exportan, estén o no descritos en esta guía, [api.md](api.md), [framework.md](framework.md), [devtools.md](devtools.md) y [editors.md](editors.md); su referencia exacta son las declaraciones `.d.ts` publicadas. Las funciones de bajo nivel para hosts propios (por ejemplo `matchRoute`, `createNavigator`, `createSocketHub`, `dispatchApiRoute`, `dispatchRpc` o `createRequestContext`) también forman parte del contrato:
 
 | Entrada | Contenido |
 | --- | --- |
@@ -158,7 +158,6 @@ Un minor sólo puede añadir campos opcionales a estos formatos. Debe aceptar lo
   - Los módulos virtuales de Vite (`virtual:meeko-*`).
   - El JavaScript que emite el compilador.
   - Una entrada propia que importe esos módulos debe fijar la versión exacta de Meeko.
-- **Los exports sin documentar.** Un símbolo que exporta una subruta pública, pero que esta documentación no describe, se considera de bajo nivel. Puede cambiar en un minor, con su entrada en el CHANGELOG. Si su aplicación depende de uno, abra un issue para documentarlo.
 - **La presentación.** El texto de mensajes de error y diagnósticos, el HTML y los estilos de los paneles DevTools, la salida de consola y el formato de los logs.
 - **El repositorio.** Los ejemplos, pruebas, benchmarks y scripts no se publican en npm.
 - **El rendimiento.** Las cifras de rendimiento y tamaño, que pueden mejorar o variar entre versiones.
