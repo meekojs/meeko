@@ -141,24 +141,14 @@ El paquete [npm `0.1.0`](https://www.npmjs.com/package/@meekojs/meeko/v/0.1.0) s
 
 ## Versión 1.0.0-rc.1
 
-**Estado: en preparación.** Esta sección es la lista de pasos. Cuando ocurra cada uno, se completará con su commit, sus enlaces de CI y sus resultados; hasta entonces, nada de lo que sigue debe leerse como ya hecho.
 
-1. **Versión.**
-   - Cambiar `version` a `1.0.0-rc.1` en `package.json` y la dependencia `@meekojs/meeko` del fixture `tests/fixtures/fullstack-consumer/package.json`.
-   - Mover el bloque `## [Unreleased]` del [CHANGELOG](../CHANGELOG.md) a `## [1.0.0-rc.1] - <fecha>`.
-   - Comprobar que la [guía de migración](migration-1.0.md) y la [política de estabilidad](stability.md) coinciden con el código.
-2. **Gates locales**, en una copia limpia del commit:
-   - `pnpm install --frozen-lockfile` y `pnpm run verify`;
-   - `pnpm run e2e`, `pnpm run pilot:e2e` y `pnpm run package:smoke`;
-   - `pnpm run conformance`, con Bun y Deno instalados y `MEEKO_CONFORMANCE_REQUIRE=bun,deno,workerd`;
-   - la prueba Redis de [framework.md](framework.md#sesiones-y-seguridad) y `pwsh -NoProfile -File tests/fullstack-consumer.ps1`;
-   - `pnpm -C editors/vscode run test:host:isolated`, `npm pack --dry-run --json` (sólo `dist/`, `README.md`, `LICENSE` y `package.json`) y `git diff --check`.
-3. **CI.** Tras subir el commit a `main`, comprobar que `ci.yml` pasa en todos sus jobs (Windows, Redis, Bun, Deno, workerd y la matriz de la extensión de VS Code) y que el commit remoto coincide con el probado.
-4. **Validación en `diegootayza`** con la versión candidata instalada desde el tarball:
-   - `meeko check`, `meeko build` y `meeko start` con el adaptador Node;
-   - la página de login sin el parche provisional;
-   - una prueba en Chrome.
-5. **Etiqueta**, con la confirmación del mantenedor: crear y subir `v1.0.0-rc.1` sobre el commit aprobado.
-6. **npm.** `publish.yml` repite los gates y publica con `npm publish --tag next`. Después, comprobar con `npm view @meekojs/meeko dist-tags` que `next` apunta a `1.0.0-rc.1` y que `latest` sigue en `0.1.0`, y que la versión tiene procedencia.
-7. **Release de GitHub.** El job `github-release` la crea como prerelease, con los seis VSIX, el ZIP de Chrome DevTools y `SHA256SUMS.txt`. Revisar sus adjuntos.
-8. **Periodo de prueba.** Durante el periodo de prueba de la rc sólo se admiten correcciones que no cambien la API. Si alguna la cambiara, se publicaría `1.0.0-rc.2` siguiendo estos mismos pasos.
+El paquete [npm `1.0.0-rc.1`](https://www.npmjs.com/package/@meekojs/meeko/v/1.0.0-rc.1) salió del commit `d8d7910` y coincide con la etiqueta [`v1.0.0-rc.1`](https://github.com/meekojs/meeko/releases/tag/v1.0.0-rc.1). Se publicó en el dist-tag `next`; `latest` sigue en `0.1.0`.
+
+- **Versión.** `d001132` cambió `package.json` y el fixture del consumidor; `d8d7910` fechó el CHANGELOG y añadió [SECURITY.md](../SECURITY.md), con el informe privado de vulnerabilidades de GitHub activado en el repositorio.
+- **Gates locales** sobre `d001132`: instalación congelada, `verify` (458/458 y 10/10 de DevTools), conformidad en Node, Bun 1.4.4, Deno 2.9.8 y workerd 1.20261019.1 (66/66), `e2e`, `pilot:e2e`, `package:smoke`, el consumidor full-stack, Redis real 8.10.2 (7/7), `npm pack --dry-run` (285 archivos, sólo `dist/`, `README.md`, `LICENSE` y `package.json`) y `git diff --check`.
+- **CI.** [La verificación de `d8d7910`](https://github.com/meekojs/meeko/actions/runs/40193004578) pasó en Windows, Redis, Bun, Deno, workerd y la extensión de VS Code en Windows, Ubuntu y macOS.
+- **Validación en `diegootayza`.** La aplicación enlaza el checkout local (`link:`), así que se validó contra el código de esta versión, no contra el tarball. Se migró `server/session.ts` a `server/runtime.ts` y el outlet a `Component`. `meeko check` y `meeko build` pasaron. Con `meeko dev`, Chrome hidrató sin errores, la navegación cliente funcionó y el formulario de login interceptó el envío con la respuesta de error de la aplicación. `meeko start` en producción no se probó, porque exige el origen HTTPS y el Redis de producción. La página de login conserva su parche provisional; la corrección del motor ya estaba verificada por separado. La validación encontró que una navegación cliente redirigida por el servidor fallaba con «route data mismatch»; se corrigió en `925ebd6` antes de la rc.
+- **Publicación.** [El workflow de publicación](https://github.com/meekojs/meeko/actions/runs/40193558287) repitió los gates y publicó mediante OIDC con procedencia SLSA. `npm view` confirmó la versión, el `gitHead` y la procedencia. La [prerelease de GitHub](https://github.com/meekojs/meeko/releases/tag/v1.0.0-rc.1) contiene los seis VSIX, el ZIP de Chrome DevTools y `SHA256SUMS.txt`.
+- **Instalación desde npm.** En un proyecto vacío, `@meekojs/meeko@next` instaló la `1.0.0-rc.1`, `meeko init-framework` creó la aplicación con esa versión fijada y `meeko check` y `meeko build` pasaron. `meeko start` se detuvo con el aviso esperado de configurar un store de sesiones persistente.
+
+Durante el periodo de prueba de la rc sólo se admiten correcciones que no cambien la API. Si alguna la cambiara, se publicaría `1.0.0-rc.2` siguiendo los mismos pasos.
