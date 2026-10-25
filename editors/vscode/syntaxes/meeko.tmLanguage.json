@@ -6,10 +6,20 @@
     { "include": "#style" }
   ],
   "repository": {
+    "sectionAttributes": {
+      "patterns": [
+        { "name": "entity.other.attribute-name.meeko", "match": "\\b(?:lang|scoped)\\b" },
+        { "name": "string.quoted.double.html", "begin": "\"", "end": "\"" },
+        { "name": "string.quoted.single.html", "begin": "'", "end": "'" }
+      ]
+    },
     "script": {
       "begin": "(<)(script)(\\b[^>]*>)",
       "end": "(</)(script)(>)",
-      "beginCaptures": { "2": { "name": "entity.name.tag.meeko" } },
+      "beginCaptures": {
+        "2": { "name": "entity.name.tag.meeko" },
+        "3": { "patterns": [{ "include": "#sectionAttributes" }] }
+      },
       "endCaptures": { "2": { "name": "entity.name.tag.meeko" } },
       "contentName": "meta.embedded.block.typescript",
       "patterns": [{ "include": "source.ts" }]
@@ -21,17 +31,67 @@
       "endCaptures": { "2": { "name": "entity.name.tag.meeko" } },
       "contentName": "meta.embedded.block.html",
       "patterns": [
-        { "name": "entity.other.attribute-name.directive.meeko", "match": "\\b(?:bind|on|if|each):[\\w-]+" },
+        { "include": "#interpolation" },
+        { "include": "#htmlTag" },
         { "include": "text.html.basic" }
       ]
     },
     "style": {
       "begin": "(<)(style)(\\b[^>]*>)",
       "end": "(</)(style)(>)",
-      "beginCaptures": { "2": { "name": "entity.name.tag.meeko" } },
+      "beginCaptures": {
+        "2": { "name": "entity.name.tag.meeko" },
+        "3": { "patterns": [{ "include": "#sectionAttributes" }] }
+      },
       "endCaptures": { "2": { "name": "entity.name.tag.meeko" } },
       "contentName": "meta.embedded.block.css",
       "patterns": [{ "include": "source.css" }]
+    },
+    "htmlTag": {
+      "begin": "(<)([A-Za-z][\\w.:-]*)",
+      "end": "(/?>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.tag.html" }
+      },
+      "endCaptures": { "1": { "name": "punctuation.definition.tag.end.html" } },
+      "patterns": [
+        { "include": "#expressionAttribute" },
+        { "name": "string.quoted.double.html", "begin": "\"", "end": "\"" },
+        { "name": "string.quoted.single.html", "begin": "'", "end": "'" },
+        { "name": "entity.other.attribute-name.html", "match": "\\b[\\w:-]+\\b" }
+      ]
+    },
+    "expressionAttribute": {
+      "begin": "\\b((?:bind|on|if|each):[\\w-]+|is)(\\s*=\\s*)([\"'])",
+      "end": "\\3",
+      "beginCaptures": {
+        "1": { "name": "entity.other.attribute-name.directive.meeko" },
+        "2": { "name": "keyword.operator.assignment.meeko" },
+        "3": { "name": "punctuation.definition.string.begin.html" }
+      },
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.html" } },
+      "contentName": "meta.embedded.inline.typescript",
+      "patterns": [{ "include": "source.ts" }]
+    },
+    "interpolation": {
+      "begin": "(\\{)",
+      "end": "(\\})",
+      "beginCaptures": { "1": { "name": "punctuation.section.embedded.begin.meeko" } },
+      "endCaptures": { "1": { "name": "punctuation.section.embedded.end.meeko" } },
+      "contentName": "meta.embedded.inline.typescript",
+      "patterns": [
+        { "include": "#nestedBraces" },
+        { "include": "source.ts" }
+      ]
+    },
+    "nestedBraces": {
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        { "include": "#nestedBraces" },
+        { "include": "source.ts" }
+      ]
     }
   }
 }

@@ -1,7 +1,10 @@
 import { dirname, resolve } from "node:path";
+import { statSync } from "node:fs";
 import ts from "@typescript/typescript6";
 import { applyAutoImports, discoverAutoImportsSync } from "../../../src/autoimports.js";
 import { projectRoot } from "../../../src/compiler/project-root.js";
+import { analyzePropsDefaults, PropsDefaultsError } from "../../../src/compiler/props.js";
+import { templateEventType } from "../../../src/compiler/events.js";
 import { parseSfc } from "../../../src/compiler/sfc.js";
 import { parseTemplate } from "../../../src/compiler/template.js";
 import type { TemplateNode, TemplateAttribute } from "../../../src/compiler/template.js";
@@ -37,7 +40,26 @@ export function createEditorModel(source: string, filename: string): EditorModel
     generatedStart: 0,
     generatedEnd: code.length,
   });
-  code += "\ndeclare function defineProps<T>(): T;\nfunction __meeko_template() {\n";
+  const scriptFile = ts.createSourceFile(filename, document.script.content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  let defaultKeys: readonly string[] = [];
+  for (const statement of scriptFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      const call = declaration.initializer;
+      if (!call || !ts.isCallExpression(call) || !ts.isIdentifier(call.expression) || call.expression.text !== "defineProps") continue;
+      try { defaultKeys = analyzePropsDefaults(call)?.keys ?? []; }
+      catch (error) { if (!(error instanceof PropsDefaultsError)) throw error; }
+    }
+  }
+  const defaultKeysType = defaultKeys.map((key) => JSON.stringify(key)).join(" | ");
+  const defaultKeysOfProps = `Extract<${defaultKeysType}, keyof T>`;
+  const defaultPick = `Pick<T, ${defaultKeysOfProps}>`;
+  const resolvedDefaults = `{ [K in keyof ${defaultPick}]-?: Exclude<${defaultPick}[K], undefined> }`;
+  const propsReturn = defaultKeysType
+    ? `T extends unknown ? Omit<T, ${defaultKeysOfProps}> & ${resolvedDefaults} : never`
+    : "T";
+  const defaultsParameter = defaultKeysType ? `Partial<T> & ${resolvedDefaults}` : "Partial<T>";
+  code += `\ndeclare function defineProps<T>(defaults?: ${defaultsParameter}): ${propsReturn};\nfunction __meeko_template() {\n`;
 
   /** Agrega una expresión conservando su posición original. */
   const expression = (value: string, sourceStart: number): void => {
@@ -46,6 +68,12 @@ export function createEditorModel(source: string, filename: string): EditorModel
     code += value;
     spans.push({ sourceStart, sourceEnd: sourceStart + value.length, generatedStart, generatedEnd: code.length });
     code += ");\n";
+  };
+
+  const mapped = (value: string, sourceStart: number): void => {
+    const generatedStart = code.length;
+    code += value;
+    spans.push({ sourceStart, sourceEnd: sourceStart + value.length, generatedStart, generatedEnd: code.length });
   };
 
   const root = parseTemplate(source, document.template, filename);
@@ -67,14 +95,44 @@ export function createEditorModel(source: string, filename: string): EditorModel
         generatedStart,
         generatedEnd: code.length,
       });
-      code += `)) {\nconst ${validIdentifier(index) ? index : "index"} = 0;\n`;
+      code += `)) {\nconst ${validIdentifier(index) ? index : "index"}: number = 0;\n`;
     }
 
-    for (const attr of attrs) {
-      if (!/^(?:bind|on|if|each):/.test(attr.name) && !(node.tagName === "component" && attr.name === "is")) continue;
-      if (["each:of", "each:as", "each:index"].includes(attr.name)) continue;
-      const start = attributeValueStart(source, attr);
-      if (start !== undefined) expression(attr.value, start);
+    if (node.tagName === "component" && attrs.some((attr) => attr.name === "is")) {
+      const reference = attrs.find((attr) => attr.name === "is")!;
+      code += "void ((";
+      mapped(reference.value, attributeValueStart(source, reference) ?? reference.start);
+      code += ") satisfies import(\"@meekojs/meeko\").Component<never>);\n";
+      code += "void ((";
+      mapped(reference.value, attributeValueStart(source, reference) ?? reference.start);
+      code += ").renderToString(";
+      mapped("{", attributeValueStart(source, reference) ?? reference.start);
+      code += " ";
+      for (const attribute of attrs) {
+        const rawName = /^[^\s=]+/.exec(source.slice(attribute.start, attribute.end))?.[0] ?? attribute.name;
+        if (!rawName.startsWith("bind:")) continue;
+        mapped(rawName.slice(5), attribute.start + 5);
+        code += ": ";
+        mapped(attribute.value, attributeValueStart(source, attribute) ?? attribute.start);
+        code += ", ";
+      }
+      code += "}));\n";
+    } else {
+      for (const attr of attrs) {
+        if (!/^(?:bind|on|if|each):/.test(attr.name) && !(node.tagName === "component" && attr.name === "is")) continue;
+        if (["each:of", "each:as", "each:index"].includes(attr.name)) continue;
+        const start = attributeValueStart(source, attr);
+        if (start === undefined) continue;
+        if (attr.name.startsWith("on:")) {
+          code += `void (((__meeko_handler: (event: ${templateEventType(attr.name.slice(3))}) => unknown) => __meeko_handler)(`;
+          mapped(attr.value, start);
+          code += "));\n";
+        } else if (attr.name === "each:key") {
+          code += "void (((__meeko_key: string | number) => __meeko_key)(";
+          mapped(attr.value, start);
+          code += "));\n";
+        } else expression(attr.value, start);
+      }
     }
 
     if (node.nodeName === "#text") {
@@ -113,13 +171,22 @@ export function createEditorModel(source: string, filename: string): EditorModel
       module: ts.ModuleKind.NodeNext,
       moduleResolution: ts.ModuleResolutionKind.NodeNext,
       strict: true,
+      noUncheckedIndexedAccess: true,
+      exactOptionalPropertyTypes: true,
+      verbatimModuleSyntax: true,
       skipLibCheck: true,
       noEmit: true,
       rootDirs: [rootDirectory, resolve(rootDirectory, ".meeko/types")],
       allowArbitraryExtensions: true,
     }),
     getScriptFileNames: () => [virtualFilename],
-    getScriptVersion: () => "1",
+    getScriptVersion: (file) => {
+      if (file === virtualFilename) return "1";
+      try {
+        const stat = statSync(file);
+        return `${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}`;
+      } catch { return "missing"; }
+    },
     getScriptSnapshot: (file) => {
       const content = file === virtualFilename ? code : ts.sys.readFile(file);
       return content === undefined ? undefined : ts.ScriptSnapshot.fromString(content);

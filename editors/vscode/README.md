@@ -1,6 +1,8 @@
 # Extensión de VS Code para Meeko
 
-La extensión reconoce archivos `.meeko`, resalta las secciones TypeScript, HTML y CSS y muestra los mismos diagnósticos de compilación y tipos que `meeko check`. El análisis semántico usa un archivo TypeScript virtual: las referencias del `<script>` y las expresiones del `<template>` comparten completado, navegación, hover y renombrado. El formato de documento delega cada sección al formateador de TypeScript, HTML o CSS instalado en VS Code.
+La extensión reconoce archivos `.meeko`, resalta las secciones TypeScript, HTML y CSS y muestra los mismos diagnósticos de compilación y tipos que `meeko check`. El análisis semántico usa un archivo TypeScript virtual: las referencias del `<script>` y las expresiones del `<template>` comparten completado, navegación, hover, renombrado y color semántico. Así, una constante conserva su clasificación al usarse en interpolaciones y directivas. El formato utiliza TypeScript y los servicios de lenguaje HTML y CSS integrados en la extensión, sin abrir documentos temporales al guardar.
+
+`defineProps<Props>({ count: 0 })` ofrece defaults tipados en el editor: la prop puede omitirse al usar el componente y se reconoce como definida dentro de su script y plantilla. El compilador y el modelo semántico del editor comparten el análisis AST de esas claves.
 
 ## Primeros pasos
 
@@ -8,7 +10,9 @@ La extensión reconoce archivos `.meeko`, resalta las secciones TypeScript, HTML
 2. Abre tu proyecto Meeko y un archivo con extensión `.meeko`.
 3. Usa completado, hover, ir a definición, renombrado y **Format Document** desde el editor.
 
-Consulta el panel **Problemas** para ver los diagnósticos de compilación y TypeScript. El canal de salida **Meeko** muestra los fallos internos del comprobador.
+Consulta el panel **Problemas** para ver los diagnósticos de compilación y TypeScript. En un workspace confiable, al abrir o guardar una página, un layout o su sidecar, la extensión comprueba los contratos de props del proyecto y señala los errores `MEEK_PAGE_PROPS`, `MEEK_LAYOUT_PROPS` y `MEEK_ERROR_PROPS` sobre `defineProps` en el `.meeko`. Esta comprobación de proyecto usa los archivos guardados y no se ejecuta por cada pulsación. El canal de salida **Meeko** muestra los fallos internos del comprobador.
+
+Al guardar un módulo TypeScript o JavaScript del mismo proyecto, la extensión vuelve a comprobar los componentes `.meeko` abiertos, actualiza sus tokens semánticos y recalcula los contratos de páginas y layouts abiertos. Esto permite ver un cambio de tipo de una dependencia, incluso del resultado de un loader, sin editar otra vez el componente.
 
 La extensión incluye sus herramientas de análisis. Para crear y ejecutar una aplicación, consulta el [repositorio de Meeko](https://github.com/meekojs/meeko). Puedes reportar problemas en [GitHub Issues](https://github.com/meekojs/meeko/issues).
 
@@ -41,12 +45,12 @@ pnpm run test:host:isolated
 
 `package:vsix` genera un VSIX para el sistema y arquitectura del equipo. `-Target` también admite `win32-x64`, `win32-arm64`, `linux-x64`, `linux-arm64`, `darwin-x64` y `darwin-arm64`, de modo que se pueden preparar paquetes para otros equipos desde Windows. Cada archivo se guarda en `artifacts/meeko-language-<versión>-<target>.vsix`; no se publica ni instala automáticamente. El script requiere PowerShell 7, aísla la instalación de TypeScript 6/7 y verifica que el VSIX contenga exactamente el ejecutable nativo de TypeScript 7 para su destino. [VS Code distribuye extensiones con binarios nativos por plataforma](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#platform-specific-extensions).
 
-`test:host:isolated` prueba el VSIX de la **plataforma anfitriona** en un VS Code real: extrae el paquete, instala Meeko en un proyecto consumidor temporal y comprueba diagnósticos, navegación, hover, renombrado, completado y formato. En Windows busca la instalación habitual de VS Code; en macOS y Linux intenta encontrar `code` en `PATH`. Si no lo encuentra, `@vscode/test-electron` descarga la versión estable en una carpeta temporal. Puedes indicar otra instalación con `pwsh -NoProfile -File tests/prepare-host.ps1 -VSCodeExecutable <ruta>`. La matriz de CI ejecuta esta prueba en Windows, Linux y macOS (con `xvfb-run` en Linux). No se generan VSIX para Alpine ni para web, que necesitarían soporte adicional del ejecutable TypeScript 7 y del host de extensión.
+`test:host:isolated` prueba el VSIX de la **plataforma anfitriona** en un VS Code real: extrae el paquete, instala Meeko en un proyecto consumidor temporal y comprueba diagnósticos, navegación, hover, renombrado, completado y formato al guardar. En Windows busca la instalación habitual de VS Code; en macOS y Linux intenta encontrar `code` en `PATH`. Si no lo encuentra, `@vscode/test-electron` descarga la versión estable en una carpeta temporal. Puedes indicar otra instalación con `pwsh -NoProfile -File tests/prepare-host.ps1 -VSCodeExecutable <ruta>`. La matriz de CI ejecuta esta prueba en Windows, Linux y macOS (con `xvfb-run` en Linux). No se generan VSIX para Alpine ni para web, que necesitarían soporte adicional del ejecutable TypeScript 7 y del host de extensión.
 
 ## Alcance actual
 
 - Las referencias semánticas abarcan declaraciones del script, expresiones de texto y de directivas, incluso las variables locales de listas. El renombrado se limita al componente abierto; no reescribe otros archivos.
 - El modelo virtual requiere que las secciones estén sintácticamente cerradas. Mientras se escribe un archivo incompleto, los diagnósticos siguen disponibles, pero las funciones semánticas pueden pausarse hasta que vuelva a ser válido.
 - La interpolación de texto anidada y los valores de atributos sin comillas todavía no tienen correspondencia semántica completa. El compilador y `meeko check` siguen siendo la fuente de verdad para validar esos casos.
-- El formato depende de que VS Code tenga proveedores para TypeScript, HTML y CSS. Una sección sin proveedor conserva su texto.
+- El formato de HTML y CSS se ejecuta en memoria; no crea pestañas ni documentos temporales.
 - Generar un VSIX cruzado confirma su contenido, pero no sustituye la prueba del host de destino. La matriz de CI comprueba la extensión en Windows, Linux y macOS.
