@@ -143,7 +143,7 @@ test("stream sends the document and payload before deferred chunks, in settle or
   const response = await fetch(new Request("https://example.test/stream"));
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "text/html; charset=utf-8");
-  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(response.headers.get("cache-control"), "no-store, no-transform");
   assert.equal(response.headers.get("x-accel-buffering"), "no");
   const parts = await chunks(response);
   const first = parts[0]!;
@@ -263,7 +263,7 @@ test("HEAD on a stream route sends final headers without a body and aborts defer
   assert.equal(response.status, 200);
   assert.equal(response.body, null);
   assert.equal(response.headers.get("x-accel-buffering"), "no");
-  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(response.headers.get("cache-control"), "no-store, no-transform");
   await later(10, undefined);
   assert.deepEqual(reported, []);
 });

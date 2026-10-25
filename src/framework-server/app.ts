@@ -72,6 +72,10 @@ export interface ServerAppSocket {
   readonly hub: SocketHub;
   readonly pathnamePrefix: string;
   readonly maxMessageBytes?: number;
+  /** The hub's broker; absent when it uses its own `LocalSocketPubSub`. */
+  readonly pubsub?: SocketPubSub;
+  /** Name of the session cookie, for hosts that keep only it with a connection. */
+  readonly sessionCookieName?: string;
 }
 
 /** A portable application: adapters translate their requests to `fetch`. */
@@ -268,6 +272,8 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
       socket = {
         hub, pathnamePrefix: "/_meeko/socket",
         ...(runtime.socket?.maxMessageBytes === undefined ? {} : { maxMessageBytes: runtime.socket.maxMessageBytes }),
+        ...(pubsub ? { pubsub } : {}),
+        ...(typeof sessions.cookieName === "string" ? { sessionCookieName: sessions.cookieName } : {}),
       };
     }
     const run = (platform: ServerPlatform, handler: () => Promise<Response>): Promise<Response> =>

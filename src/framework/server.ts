@@ -128,8 +128,12 @@ function routeRender(route: RouteRecord, sidecar: PageRoute | undefined): PageRe
   return route.render ?? declared ?? "ssr";
 }
 
-/** Stream responses must reach the browser as written, never cached or buffered by a proxy. */
-const streamHeaders = { "cache-control": "no-store", "x-accel-buffering": "no" } as const;
+/**
+ * Stream responses must reach the browser as written, never cached or buffered
+ * by a proxy. `no-transform` also turns off CDN compression and body rewriting,
+ * such as Cloudflare's, which may hold part of the body before forwarding it.
+ */
+const streamHeaders = { "cache-control": "no-store, no-transform", "x-accel-buffering": "no" } as const;
 
 /** Server outcome of a deferred value; `failure` is the private cause of a rejection. */
 type ServerOutcome =

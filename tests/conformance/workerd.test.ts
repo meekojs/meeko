@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { it } from "node:test";
 import type WebSocket from "ws";
 import { conformanceSuite, connect, messages, opened, send } from "./assertions.ts";
@@ -87,6 +89,51 @@ conformanceSuite("workerd", ({ server, session, track }) => {
     });
     assert.equal(response.status, 200);
     assert.deepEqual(await Promise.all(both), [[said("from api")], [said("from api")]]);
+  });
+
+  it("bundles the Worker into one module next to its configuration and assets", async () => {
+    const { output } = server();
+    // .wrangler holds the local runtime's state, created when the output runs.
+    assert.deepEqual((await readdir(output)).filter((name) => name !== ".wrangler").sort(), ["assets", "worker.js", "wrangler.jsonc"]);
+    const worker = await readFile(join(output, "worker.js"), "utf8");
+    // codeSplitting: false leaves no relative chunk imports, static or dynamic.
+    assert.doesNotMatch(worker, /\bimport\s*\(\s*["'`]\.{1,2}\//);
+    assert.doesNotMatch(worker, /\bfrom\s*["']\.{1,2}\//);
+  });
+
+  it("keeps only the session cookie with a connection, whatever else the Cookie header carries", async () => {
+    const { origin } = server();
+    // Far over the 16 KiB WebSocket attachment limit if the whole header were kept.
+    const crowded = `${Array.from({ length: 36 }, (_, index) => `pref${index}=${"x".repeat(500)}`).join("; ")}; ${session().cookie}`;
+    const peer = await opened(track(connect(origin, "private", { cookie: crowded })));
+    const reply = messages(peer, 1);
+    send(peer, "say", { text: "crowded cookie" });
+    assert.deepEqual(await reply, [said("crowded cookie")]);
+  });
+
+  it("publishes inside a room whose Durable Object name exceeds 1,024 bytes", async () => {
+    const { origin, workerd } = server();
+    // The runtime leaves ctx.id.name undefined for such names; the room learns
+    // it from its connections, also after waking from hibernation.
+    const room = "long-".repeat(220);
+    const first = await opened(track(connect(origin, "room", { room })));
+    const second = await opened(track(connect(origin, "room", { room })));
+    let both = [messages(first, 1), messages(second, 1)];
+    send(first, "say", { text: "long name" });
+    assert.deepEqual(await Promise.all(both), [[said("long name")], [said("long name")]]);
+
+    await workerd!.hibernate("room", room);
+    both = [messages(first, 1), messages(second, 1)];
+    send(second, "say", { text: "long name after wake" });
+    assert.deepEqual(await Promise.all(both), [[said("long name after wake")], [said("long name after wake")]]);
+
+    await workerd!.hibernate("room", room);
+    both = [messages(first, 1), messages(second, 1)];
+    const response = await fetch(`${origin}/api/broadcast`, {
+      method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ room, text: "long name from api" }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await Promise.all(both), [[said("long name from api")], [said("long name from api")]]);
   });
 
   it("publishes from one room's Durable Object to another without leaking", async () => {

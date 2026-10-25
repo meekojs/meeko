@@ -51,13 +51,11 @@ export async function wranglerConfig(root: string, config: CloudflareConfig | un
   if (bindings.some((binding) => binding?.name === cloudflareSocketBinding)) {
     throw new TypeError(`server.wrangler.durable_objects.bindings cannot redefine ${cloudflareSocketBinding}`);
   }
-  const migrations = list(extra.migrations, "migrations") as Array<Record<string, unknown>>;
-  // Durable Object migrations are append-only history; keep the room class's once.
-  const declared = migrations.some((migration) => ["new_sqlite_classes", "new_classes"].some((key) =>
-    Array.isArray(migration?.[key]) && (migration[key] as unknown[]).includes(className)));
+  const classes = durableObjectClasses(extra, className);
   delete extra.compatibility_flags;
   delete extra.durable_objects;
   delete extra.migrations;
+  delete extra.exports;
   return {
     name: config?.name ?? workerName(await packageName(root)),
     main: "./worker.js",
@@ -77,8 +75,57 @@ export async function wranglerConfig(root: string, config: CloudflareConfig | un
     },
     ...extra,
     durable_objects: { ...durableObjects, bindings: [{ name: cloudflareSocketBinding, class_name: className }, ...bindings] },
-    migrations: declared ? migrations : [{ tag: "meeko-socket-v1", new_sqlite_classes: [className] }, ...migrations],
+    ...classes,
   };
+}
+
+const socketMigrationTag = "meeko-socket-v1";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+/** Whether a legacy migration creates the class, or renames or transfers another class into it. */
+function createsClass(migration: Record<string, unknown>, className: string): boolean {
+  const named = (key: string) => Array.isArray(migration[key]) && (migration[key] as unknown[]).includes(className);
+  const target = (key: string) => Array.isArray(migration[key]) && (migration[key] as unknown[]).some((entry) => isRecord(entry) && entry.to === className);
+  return named("new_sqlite_classes") || named("new_classes") || target("renamed_classes") || target("transferred_classes");
+}
+
+/**
+ * Declares the Socket room class without touching a deployed history. Workers
+ * use either the declarative `exports` map or the legacy `migrations` array.
+ * `exports` entries are reconciled by name, so a missing one is added. Legacy
+ * migrations are an ordered history recorded by tag: Meeko's own migration is
+ * only generated for a Worker without one, and an existing history must
+ * declare the class itself, appended at its end.
+ */
+function durableObjectClasses(extra: Record<string, unknown>, className: string): { migrations: unknown[] } | { exports: Record<string, unknown> } {
+  const migrations = list(extra.migrations, "migrations");
+  if (extra.exports !== undefined && !isRecord(extra.exports)) throw new TypeError("server.wrangler.exports must be an object");
+  const exportsMap = (extra.exports ?? {}) as Record<string, unknown>;
+  const exportedObjects = Object.values(exportsMap).some((entry) => isRecord(entry) && entry.type === "durable-object");
+  if (exportedObjects || exportsMap[className] !== undefined) {
+    if (migrations.length) {
+      throw new TypeError("server.wrangler cannot combine Durable Object exports with migrations; Cloudflare accepts only one of them per Worker");
+    }
+    const own = exportsMap[className];
+    if (own === undefined) return { exports: { ...exportsMap, [className]: { type: "durable-object", storage: "sqlite" } } };
+    if (!isRecord(own) || own.type !== "durable-object" || (own.state !== undefined && own.state !== "created")) {
+      throw new TypeError(`server.wrangler.exports.${className} must be a live Durable Object entry, such as { "type": "durable-object", "storage": "sqlite" }`);
+    }
+    return { exports: exportsMap };
+  }
+  if (!migrations.length) return { ...(extra.exports === undefined ? {} : { exports: exportsMap }), migrations: [{ tag: socketMigrationTag, new_sqlite_classes: [className] }] };
+  if (migrations.some((migration) => isRecord(migration) && createsClass(migration, className))) {
+    return { ...(extra.exports === undefined ? {} : { exports: exportsMap }), migrations };
+  }
+  const tags = new Set(migrations.map((migration) => isRecord(migration) ? migration.tag : undefined));
+  const tag = tags.has(socketMigrationTag) ? `${socketMigrationTag}-${migrations.length + 1}` : socketMigrationTag;
+  throw new TypeError(
+    `server.wrangler.migrations does not create the Socket room class ${className}. Durable Object migrations are an ordered history ` +
+    `that Meeko does not rewrite; append { "tag": "${tag}", "new_sqlite_classes": ["${className}"] } at the end of server.wrangler.migrations.`,
+  );
 }
 
 /** Serializes the generated configuration with a provenance comment. */

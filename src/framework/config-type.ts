@@ -17,8 +17,11 @@ export type MeekoServerConfig =
     readonly compatibilityDate?: string;
     /**
      * Extra `wrangler.jsonc` fields, such as `d1_databases`, `vars` or `routes`.
-     * `compatibility_flags`, `durable_objects.bindings` and `migrations` are
-     * combined with Meeko's; `main`, `assets`, `no_bundle` and `find_additional_modules` belong to Meeko.
+     * `compatibility_flags` and `durable_objects.bindings` are combined with
+     * Meeko's. The Socket room class gets Meeko's migration only when there are
+     * no `migrations`; an existing history must create it itself, and an
+     * `exports` map gets its entry. `main`, `assets`, `no_bundle` and
+     * `find_additional_modules` belong to Meeko.
      */
     readonly wrangler?: Readonly<Record<string, unknown>>;
   }

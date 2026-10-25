@@ -307,10 +307,14 @@ export function conformanceSuite(adapter: ConformanceAdapter, extra?: (suite: Co
     it("streams render: stream pages without buffering: the first byte precedes the deferred value", async () => {
       const delay = 1_500;
       const started = performance.now();
-      const response = await fetch(`${origin}/stream?delay=${delay}`);
+      // Measures the server's own streaming. Wrangler's local runtime emulates
+      // Cloudflare's text/html compression without honouring no-transform, and
+      // its gzip encoder only writes when the body ends, so a negotiated
+      // encoding would measure that emulation instead (docs/framework.md, Cloudflare).
+      const response = await fetch(`${origin}/stream?delay=${delay}`, { headers: { "accept-encoding": "identity" } });
       assert.equal(response.status, 200, server.logs());
       assert.match(response.headers.get("content-type") ?? "", /^text\/html/);
-      assert.equal(response.headers.get("cache-control"), "no-store");
+      assert.equal(response.headers.get("cache-control"), "no-store, no-transform");
       assert.equal(response.headers.get("x-accel-buffering"), "no");
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();

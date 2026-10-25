@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { assetResponse, etagMatches, findAsset } from "./framework-server/assets.js";
 import type { AssetManifest, AssetReader } from "./framework-server/assets.js";
 import type { ServerApp } from "./framework-server/app.js";
-import { errorResponse, observeErrorCallback } from "./framework-server/contracts.js";
+import { ApiError, errorResponse, observeErrorCallback } from "./framework-server/contracts.js";
 import { fetchApp, positiveInteger, publicOriginOf, rebaseRequest } from "./framework-server/fetch-host.js";
 import { createDetachedPlatform } from "./framework-server/platform.js";
 import type { ServerPlatform } from "./framework-server/platform.js";
@@ -83,12 +83,36 @@ export type CloudflareApp<Env> = ServerApp | ((context: CloudflareAppContext<Env
 
 const apps = new WeakMap<object, Promise<ServerApp>>();
 
+/** Marks `DurableObjectSocketPubSub` instances, also across copies of this module. */
+const durableObjectBroker = Symbol.for("meeko.cloudflare.durable-object-socket-pubsub");
+
+/**
+ * Socket peers live in room Durable Objects, so only the Durable Object broker
+ * reaches them; any other broker would deliver to subscribers of one isolate.
+ */
+function assertWorkersBroker(instance: ServerApp): ServerApp {
+  const socket = instance.socket;
+  if (socket && (socket.pubsub as { [durableObjectBroker]?: unknown } | undefined)?.[durableObjectBroker] !== true) {
+    throw new TypeError(
+      "Socket channels on Cloudflare Workers require DurableObjectSocketPubSub: leave runtime.socket.pubsub unset and bind MEEKO_SOCKET, " +
+      "or set it to new DurableObjectSocketPubSub(env.MEEKO_SOCKET). Other brokers cannot reach the WebSockets held by Socket room Durable Objects.",
+    );
+  }
+  return instance;
+}
+
 /** One application per factory and isolate; a failed start is retried by the next event. */
 function resolveApp<Env>(app: CloudflareApp<Env>, env: Env): Promise<ServerApp> {
-  if (typeof app !== "function") return Promise.resolve(app);
+  if (typeof app !== "function") return Promise.resolve(app).then(assertWorkersBroker);
   let pending = apps.get(app);
   if (!pending) {
-    pending = Promise.resolve().then(() => app({ env, platform: createDetachedPlatform(env, "cloudflare") }));
+    pending = Promise.resolve().then(() => app({ env, platform: createDetachedPlatform(env, "cloudflare") })).then(async (instance) => {
+      try { return assertWorkersBroker(instance); }
+      catch (error) {
+        await instance.close().catch(() => undefined);
+        throw error;
+      }
+    });
     apps.set(app, pending);
     pending.catch(() => { if (apps.get(app) === pending) apps.delete(app); });
   }
@@ -127,16 +151,17 @@ export interface CloudflareWorker<Env> {
 export function createWorker<Env = Record<string, unknown>>(app: CloudflareApp<Env>, options: CloudflareWorkerOptions = {}): CloudflareWorker<Env> {
   const binding = options.socketBinding ?? "MEEKO_SOCKET";
   const configuredOrigin = options.publicOrigin ? publicOriginOf(options.publicOrigin) : undefined;
-  const handshakes = new WeakMap<ServerApp, Map<string, SocketUpgradeHandler>>();
-  const handshakeFor = (instance: ServerApp, origin: string, report: (error: unknown) => void): SocketUpgradeHandler => {
-    let byOrigin = handshakes.get(instance);
-    if (!byOrigin) { byOrigin = new Map(); handshakes.set(instance, byOrigin); }
-    let handshake = byOrigin.get(origin);
-    if (!handshake) {
-      const socket = instance.socket!;
-      handshake = createSocketUpgradeHandler({ hub: socket.hub, publicOrigin: origin, pathnamePrefix: socket.pathnamePrefix, onError: report });
-      byOrigin.set(origin, handshake);
-    }
+  // Only a configured origin is cached: one derived from each request's URL
+  // could grow the cache without bound under a wildcard route.
+  const handshakes = new WeakMap<ServerApp, SocketUpgradeHandler>();
+  const handshakeFor = (instance: ServerApp, origin: string | undefined, request: Request, report: (error: unknown) => void): SocketUpgradeHandler => {
+    const socket = instance.socket!;
+    const create = (publicOrigin: string) =>
+      createSocketUpgradeHandler({ hub: socket.hub, publicOrigin, pathnamePrefix: socket.pathnamePrefix, onError: report });
+    // Workers receive the routed public URL, so it names the origin when none is configured.
+    if (origin === undefined) return create(new URL(request.url).origin);
+    let handshake = handshakes.get(instance);
+    if (!handshake) { handshake = create(origin); handshakes.set(instance, handshake); }
     return handshake;
   };
   return {
@@ -154,8 +179,7 @@ export function createWorker<Env = Record<string, unknown>>(app: CloudflareApp<E
       const origin = configuredOrigin ?? instance.publicOrigin;
       if (instance.socket && request.headers.has("upgrade")) {
         try {
-          // Workers receive the routed public URL, so it names the origin when none is configured.
-          const decision = await handshakeFor(instance, origin ?? new URL(request.url).origin, (error) => report(error, crypto.randomUUID()))(request);
+          const decision = await handshakeFor(instance, origin, request, (error) => report(error, crypto.randomUUID()))(request);
           if (decision.action === "reject") return new Response(null, { status: decision.status });
           if (decision.action === "upgrade") {
             const rooms = (env as Record<string, unknown> | undefined)?.[binding] as DurableObjectNamespaceLike | undefined;
@@ -178,7 +202,14 @@ type RoomListener = (message: SocketMessage) => void | Promise<void>;
 /** Subscriptions of one Durable Object instance; a woken instance starts empty. */
 class RoomSubscriptions {
   private readonly listeners = new Map<string, Set<RoomListener>>();
-  constructor(readonly name: string | undefined, readonly dispatch: (channel: string, room: string, message: SocketMessage) => void) {}
+  /**
+   * Durable Object name of the room: `ctx.id.name`, or learned from its first
+   * connection or publication when the runtime omits it (names over 1,024 bytes).
+   */
+  name: string | undefined;
+  constructor(name: string | undefined, readonly dispatch: (channel: string, room: string, message: SocketMessage) => void) {
+    this.name = name;
+  }
   subscribe(channel: string, room: string, listener: RoomListener): Unsubscribe {
     const key = socketRoomName(channel, room);
     let listeners = this.listeners.get(key);
@@ -216,11 +247,14 @@ function socketMessage(value: unknown): SocketMessage {
  * `createWorker` forwards every Socket upgrade.
  */
 export class DurableObjectSocketPubSub implements SocketPubSub {
+  /** Lets the Cloudflare adapter recognize this broker. */
+  readonly [durableObjectBroker] = true;
   constructor(private readonly namespace: DurableObjectNamespaceLike) {
     if (!namespace || typeof namespace.idFromName !== "function" || typeof namespace.get !== "function") {
       throw new TypeError("DurableObjectSocketPubSub requires a Durable Object namespace binding");
     }
   }
+  /** Rejects with `SOCKET_BACKLOG_EXCEEDED` (503) when the room holds too many undelivered publications. */
   async publish(channel: string, room: string, message: SocketMessage): Promise<void> {
     const checked = socketMessage(message);
     const name = socketRoomName(channel, room);
@@ -245,6 +279,27 @@ export interface SocketRoomOptions {
    * Defaults to `ping` answered with `pong`. Protocol ping frames are always answered.
    */
   readonly autoResponse?: { readonly request: string; readonly response: string } | false;
+  /**
+   * Extra request headers kept with each connection (lowercase names), which
+   * channel code sees through `context.request` before and after hibernation.
+   * By default only the session cookie, `origin` and `authorization` are kept;
+   * `"cookie"` keeps the whole Cookie header. Everything kept is stored in the
+   * WebSocket attachment, limited to 16,384 bytes: an upgrade whose state does
+   * not fit is refused with 431 before the WebSocket is accepted.
+   */
+  readonly keepHeaders?: readonly string[];
+  /**
+   * Publications a room accepts before they are delivered. Beyond it a publish
+   * rejects with `SOCKET_BACKLOG_EXCEEDED` (503) and is not delivered. Defaults to 1024.
+   */
+  readonly maxPendingPublications?: number;
+  /**
+   * Milliseconds publications wait for a connection rebuilt after the room
+   * hibernated, counted from the start of its rebuild; once it passes, the
+   * connection receives only later publications. Connections still being
+   * authorized after their upgrade are never waited for. Defaults to 5000.
+   */
+  readonly rebuildTimeoutMs?: number;
   /** Defaults to the application's error observer. */
   readonly onError?: (error: unknown, requestId: string) => void;
 }
@@ -258,14 +313,39 @@ interface SocketAttachment {
   readonly headers: Readonly<Record<string, string>>;
 }
 
-/** Request headers kept across hibernation; channel code sees only these. */
-const keptHeaders = ["cookie", "origin", "authorization"] as const;
+/** Largest serialized WebSocket attachment accepted by Durable Objects. */
+const attachmentLimitBytes = 16_384;
+/** Request headers kept across hibernation besides the session cookie. */
+const defaultKeptHeaders = ["origin", "authorization"] as const;
+const headerName = /^[!#$%&'*+.^_`|~0-9a-z-]+$/;
 
 function attachmentOf(value: unknown): SocketAttachment | undefined {
   const candidate = value as Partial<SocketAttachment> | null;
   if (!candidate || candidate.v !== 1 || typeof candidate.name !== "string" || typeof candidate.url !== "string" ||
       (candidate.room !== null && typeof candidate.room !== "string") || !candidate.headers || typeof candidate.headers !== "object") return undefined;
   return candidate as SocketAttachment;
+}
+
+/** Upper bound of a string in V8's serialization: one byte per Latin-1 character, two otherwise. */
+function serializedStringBytes(value: string): number {
+  return 5 + (/[^\u0000-ÿ]/.test(value) ? value.length * 2 : value.length);
+}
+
+/** Upper bound of the attachment's structured-clone size. */
+function attachmentBytes(attachment: SocketAttachment): number {
+  let total = 64;
+  for (const value of [attachment.name, attachment.room ?? "", attachment.url]) total += serializedStringBytes(value);
+  for (const [name, value] of Object.entries(attachment.headers)) total += serializedStringBytes(name) + serializedStringBytes(value);
+  return total;
+}
+
+/** `name=value` of one cookie in a Cookie header, as sent. */
+function cookiePair(header: string | null, name: string): string | undefined {
+  for (const part of (header ?? "").split(";")) {
+    const separator = part.indexOf("=");
+    if (separator >= 0 && part.slice(0, separator).trim() === name) return `${name}=${part.slice(separator + 1).trim()}`;
+  }
+  return undefined;
 }
 
 /** Instance shape of the Socket room class; its public methods are Durable Object handlers and RPC. */
@@ -293,6 +373,10 @@ function closeQuietly(socket: CloudflareWebSocket, code: number, reason: string)
  * room with the Hibernation API:
  * `export const MeekoSocketRoom = createSocketRoomClass(app, DurableObject)`,
  * with `DurableObject` imported from `cloudflare:workers`.
+ *
+ * Workers WebSockets do not report `bufferedAmount`, so the hub's
+ * `maxBufferBytes` is not enforced here; `maxMessageBytes` and
+ * `maxPendingDeliveries` still bound each peer.
  */
 export function createSocketRoomClass<Env = Record<string, unknown>>(
   app: CloudflareApp<Env>,
@@ -301,13 +385,25 @@ export function createSocketRoomClass<Env = Record<string, unknown>>(
 ): MeekoSocketRoomClass<Env> {
   if (typeof base !== "function") throw new TypeError("createSocketRoomClass requires DurableObject from cloudflare:workers");
   const autoResponse = options.autoResponse === undefined ? { request: "ping", response: "pong" } : options.autoResponse;
+  const keepHeaders = [...new Set(options.keepHeaders ?? [])];
+  for (const name of keepHeaders) {
+    if (typeof name !== "string" || !headerName.test(name)) throw new TypeError(`keepHeaders must list lowercase header names: ${String(name)}`);
+  }
+  const keepCookie = keepHeaders.includes("cookie");
+  const keptHeaders = [...new Set<string>([...defaultKeptHeaders, ...keepHeaders])].filter((name) => name !== "cookie");
+  const maxPendingPublications = positiveInteger(options.maxPendingPublications ?? 1024, "maxPendingPublications");
+  const rebuildTimeoutMs = options.rebuildTimeoutMs ?? 5_000;
+  if (!Number.isFinite(rebuildTimeoutMs) || rebuildTimeoutMs < 0) throw new RangeError("rebuildTimeoutMs must be a non-negative number");
   abstract class Base extends (base as abstract new (ctx: DurableObjectStateLike, env: Env) => object) {}
   class SocketRoom extends Base implements MeekoSocketRoom {
     readonly #ctx: DurableObjectStateLike;
     readonly #env: Env;
     readonly #sessions = new Map<CloudflareWebSocket, Promise<OpenedSocketSession | undefined>>();
     readonly #subscriptions: RoomSubscriptions;
+    /** Authorization of connections rebuilt after hibernation; publications wait for them, up to a timeout. */
+    readonly #rebuilds = new Set<Promise<unknown>>();
     #fanout: Promise<void> = Promise.resolve();
+    #pendingPublications = 0;
 
     constructor(ctx: DurableObjectStateLike, env: Env) {
       super(ctx, env);
@@ -326,6 +422,12 @@ export function createSocketRoomClass<Env = Record<string, unknown>>(
       else reportStartup(error, requestId);
     }
 
+    /** Checks a room name against this object's, learning it when the runtime did not provide one. */
+    #claim(name: string): boolean {
+      if (this.#subscriptions.name === undefined) this.#subscriptions.name = name;
+      return this.#subscriptions.name === name;
+    }
+
     async fetch(request: Request): Promise<Response> {
       const instance = await resolveApp(app, this.#env);
       const socket = instance.socket;
@@ -336,28 +438,37 @@ export function createSocketRoomClass<Env = Record<string, unknown>>(
       if (!channelName.test(name)) return new Response(null, { status: 404 });
       if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") return new Response(null, { status: 426 });
       const room = url.searchParams.get("room");
-      const expected = this.#ctx.id?.name;
-      if (expected !== undefined && expected !== socketRoomName(name, room ?? "")) return new Response(null, { status: 400 });
+      if (!this.#claim(socketRoomName(name, room ?? ""))) return new Response(null, { status: 400 });
       const headers: Record<string, string> = {};
       for (const header of keptHeaders) {
         const value = request.headers.get(header);
         if (value !== null) headers[header] = value;
       }
+      const cookie = keepCookie ? request.headers.get("cookie") ?? undefined
+        : socket.sessionCookieName ? cookiePair(request.headers.get("cookie"), socket.sessionCookieName) : undefined;
+      if (cookie !== undefined) headers.cookie = cookie;
       const attachment: SocketAttachment = { v: 1, name, room, url: url.href, headers };
+      const size = attachmentBytes(attachment);
+      if (size > attachmentLimitBytes) {
+        this.#report(new RangeError(
+          `Socket connection state needs up to ${size} bytes, over the ${attachmentLimitBytes}-byte limit of a Durable Object WebSocket attachment; ` +
+          "keep fewer or smaller headers with SocketRoomOptions.keepHeaders, or use a shorter room name",
+        ), instance);
+        return new Response(null, { status: 431 });
+      }
       const Pair = (globalThis as Partial<WorkersGlobals>).WebSocketPair;
       if (!Pair) throw new Error("WebSocketPair is not available; Socket rooms run on Cloudflare Workers");
       const pair = new Pair();
       const client = pair[0];
       const server = pair[1];
-      this.#ctx.acceptWebSocket(server);
+      // Stored before accepting, so a state the runtime refuses never opens a connection.
       try { server.serializeAttachment(attachment); }
       catch (error) {
         this.#report(error, instance);
-        closeQuietly(server, 1011, "Connection state too large");
-        return new Response(null, { status: 101, webSocket: client } as ResponseInit);
+        return new Response(null, { status: 431 });
       }
-      const session = Promise.resolve(this.#open(server, attachment, instance));
-      this.#sessions.set(server, session);
+      this.#ctx.acceptWebSocket(server);
+      this.#sessions.set(server, Promise.resolve(this.#open(server, attachment, instance)));
       return new Response(null, { status: 101, webSocket: client } as ResponseInit);
     }
 
@@ -394,6 +505,10 @@ export function createSocketRoomClass<Env = Record<string, unknown>>(
         session = (async () => {
           const attachment = attachmentOf(socket.deserializeAttachment());
           if (!attachment) { closeQuietly(socket, 1011, "Missing connection state"); return undefined; }
+          if (!this.#claim(socketRoomName(attachment.name, attachment.room ?? ""))) {
+            closeQuietly(socket, 1011, "Connection state of another room");
+            return undefined;
+          }
           return this.#open(socket, attachment, await resolveApp(app, this.#env));
         })();
         this.#sessions.set(socket, session);
@@ -401,17 +516,36 @@ export function createSocketRoomClass<Env = Record<string, unknown>>(
           this.#report(error);
           closeQuietly(socket, 1011, "Connection failed");
         });
+        // Publications wait for this connection until it is authorized, at most rebuildTimeoutMs.
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const rebuilt: Promise<unknown> = Promise.race([
+          session.then((opened) => opened?.ready, () => undefined),
+          new Promise<void>((resolve) => { timer = setTimeout(resolve, rebuildTimeoutMs); }),
+        ]);
+        this.#rebuilds.add(rebuilt);
+        void rebuilt.then(() => {
+          clearTimeout(timer);
+          this.#rebuilds.delete(rebuilt);
+        });
       }
       return session;
     }
 
     async webSocketMessage(socket: CloudflareWebSocket, message: string | ArrayBuffer): Promise<void> {
       if (typeof message !== "string") { closeQuietly(socket, 1003, "Text messages required"); return; }
-      const instance = await resolveApp(app, this.#env);
+      let instance: ServerApp;
+      try { instance = await resolveApp(app, this.#env); }
+      catch (error) {
+        // A room that cannot start would otherwise leave the peer waiting forever.
+        this.#report(error);
+        closeQuietly(socket, 1011, "Socket unavailable");
+        return;
+      }
       const limit = this.#limit(instance);
       // Workers have no frame limit option; enforce the Socket limit on every message.
       if (message.length > limit || encoder.encode(message).byteLength > limit) { closeQuietly(socket, 1009, "Message too large"); return; }
-      const session = await this.#session(socket);
+      // A failed rebuild is reported and closes the socket in #session.
+      const session = await this.#session(socket).catch(() => undefined);
       if (!session) return;
       currentRoom.run(this.#subscriptions, () => session.receive(message));
       await session.settled();
@@ -433,27 +567,37 @@ export function createSocketRoomClass<Env = Record<string, unknown>>(
     }
 
     async meekoPublish(channel: string, room: string, message: SocketMessage): Promise<void> {
-      const expected = this.#ctx.id?.name;
-      if (expected !== undefined && expected !== socketRoomName(channel, room)) throw new Error("Socket message sent to another room");
+      if (!this.#claim(socketRoomName(channel, room))) throw new Error("Socket message sent to another room");
       this.#dispatch(channel, room, socketMessage(message));
     }
 
     /**
-     * Delivers to every peer of the room in publish order. Hibernated peers are
-     * reconnected first, so a woken room does not miss its own broadcasts.
+     * Delivers to the room's subscribed peers in publish order. Peers that
+     * hibernated are rebuilt first and waited for, up to `rebuildTimeoutMs`,
+     * so a woken room does not miss its own broadcasts; peers still being
+     * authorized after their upgrade receive later publications only.
      */
     #dispatch(channel: string, room: string, message: SocketMessage): void {
+      if (this.#pendingPublications >= maxPendingPublications) {
+        throw new ApiError("SOCKET_BACKLOG_EXCEEDED", 503, `SOCKET_BACKLOG_EXCEEDED: the Socket room already holds ${maxPendingPublications} undelivered publications`);
+      }
+      this.#pendingPublications++;
+      for (const socket of this.#ctx.getWebSockets()) {
+        if (socket.readyState === 1 && !this.#sessions.has(socket)) void this.#session(socket).catch(() => undefined);
+      }
       const deliveries = this.#fanout.then(async () => {
-        const sessions = await Promise.all(this.#ctx.getWebSockets()
-          .filter((socket) => socket.readyState === 1)
-          .map((socket) => this.#session(socket).catch(() => undefined)));
-        await Promise.all(sessions.map((session) => session?.ready));
+        await this.#rebuilt();
         return this.#subscriptions.deliver(channel, room, message);
-      });
+      }).finally(() => { this.#pendingPublications--; });
       this.#fanout = deliveries.then(() => undefined, (error: unknown) => this.#report(error));
       this.#ctx.waitUntil(deliveries.then((started) => Promise.allSettled(started).then((results) => {
         for (const result of results) if (result.status === "rejected") this.#report(result.reason);
       }), () => undefined));
+    }
+
+    /** Waits for connections rebuilt after hibernation; each is waited for at most `rebuildTimeoutMs` after it starts. */
+    async #rebuilt(): Promise<void> {
+      if (this.#rebuilds.size) await Promise.all([...this.#rebuilds]);
     }
   }
   return SocketRoom;
