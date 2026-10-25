@@ -1,6 +1,8 @@
 # Cambios de Meeko
 
-## [Unreleased]
+## [1.0.0-rc.1] - Unreleased
+
+Primera versión estable candidata. Desde 1.0, Meeko sigue SemVer según [docs/stability.md](docs/stability.md); la guía [docs/migration-1.0.md](docs/migration-1.0.md) recoge la migración desde `0.1.0`.
 
 ### Cambios incompatibles y migración
 
