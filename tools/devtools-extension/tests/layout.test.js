@@ -117,6 +117,17 @@ test("el panel permanece legible y sin desbordamiento horizontal en DevTools est
       await page.locator(".instance-button").first().focus();
       await page.keyboard.press("ArrowDown");
       assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("data-instance-id")), "meeko-2");
+      // With the instance filter on, an instance without events shows the empty message across the row.
+      await page.locator("#selected-events").check();
+      await page.locator('.instance-button[data-instance-id="meeko-2"]').click();
+      await page.locator("#event-list > li.list-empty", { hasText: "Sin eventos registrados." }).waitFor();
+      const emptyBox = await page.evaluate(() => {
+        const item = document.querySelector("#event-list > li.list-empty");
+        const range = document.createRange();
+        if (item) range.selectNodeContents(item);
+        return { text: range.getBoundingClientRect().width, lines: range.getClientRects().length };
+      });
+      assert.ok(emptyBox.lines === 1 && emptyBox.text > 120, `${width}px: el mensaje vacío se parte en una columna estrecha ${JSON.stringify(emptyBox)}`);
       await page.close();
     }
     const legacy = await browser.newPage({ viewport: { width: 400, height: 740 } });
