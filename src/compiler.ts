@@ -5,9 +5,11 @@ import postcss from "postcss";
 import selectorParser from "postcss-selector-parser";
 import { extractSourceMappings, markSource } from "./compiler/mapping.js";
 import type { SourceMapping } from "./compiler/mapping.js";
+import { analyzePropsDefaults, PropsDefaultsError } from "./compiler/props.js";
 import { compileError, locate, parseSfc } from "./compiler/sfc.js";
 import type { SfcSection } from "./compiler/sfc.js";
 import { parseTemplate } from "./compiler/template.js";
+import { templateEventType } from "./compiler/events.js";
 import type { TemplateNode } from "./compiler/template.js";
 
 interface DynamicText {
@@ -325,7 +327,7 @@ function scopeCss(css: string, scopeAttribute: string): string {
   return root.toString();
 }
 
-function compileScript(section: SfcSection, source: string, filename: string): { imports: string[]; types: string[]; setup: string[]; names: string[]; propsType: string; propsTypeOffset: number | undefined } {
+function compileScript(section: SfcSection, source: string, filename: string): { imports: string[]; types: string[]; setup: string[]; names: string[]; propsType: string; propsTypeOffset: number | undefined; defaults?: { expression: string; offset: number; keys: readonly string[] } } {
   const file = ts.createSourceFile(filename, section.content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS) as ts.SourceFile & { parseDiagnostics: readonly ts.DiagnosticWithLocation[] };
   const syntaxError = file.parseDiagnostics[0];
   if (syntaxError) {
@@ -338,6 +340,7 @@ function compileScript(section: SfcSection, source: string, filename: string): {
   const names: string[] = [];
   let propsType: string | undefined;
   let propsTypeOffset: number | undefined;
+  let defaults: { expression: string; offset: number; keys: readonly string[] } | undefined;
   for (const statement of file.statements) {
     if (ts.isImportDeclaration(statement)) {
       imports.push(markSource(statement.getText(file), section.contentStart + statement.getStart(file)));
@@ -364,7 +367,18 @@ function compileScript(section: SfcSection, source: string, filename: string): {
           propsType = typeArgument?.getText(file);
           if (!propsType) throw compileError(source, filename, "MEEK017", "defineProps requires a type argument", section.contentStart + declaration.getStart(file));
           propsTypeOffset = section.contentStart + typeArgument!.getStart(file);
-          setup.push(`const ${name}: ${markSource(propsType, propsTypeOffset)} = __props;`);
+          try {
+            const analyzed = analyzePropsDefaults(declaration.initializer);
+            if (analyzed) defaults = {
+              expression: analyzed.argument.getText(file),
+              offset: section.contentStart + analyzed.argument.getStart(file),
+              keys: analyzed.keys,
+            };
+          } catch (error) {
+            if (!(error instanceof PropsDefaultsError)) throw error;
+            throw compileError(source, filename, error.code, error.message, section.contentStart + error.node.getStart(file));
+          }
+          setup.push(`const ${name}: ${defaults ? "__MeekoResolvedProps" : markSource(propsType, propsTypeOffset)} = __props;`);
         } else {
           setup.push(markSource(statement.getText(file), section.contentStart + statement.getStart(file)));
         }
@@ -376,9 +390,13 @@ function compileScript(section: SfcSection, source: string, filename: string): {
       setup.push(markSource(statement.getText(file), section.contentStart + statement.getStart(file)));
       continue;
     }
+    if (ts.isExpressionStatement(statement) && ts.isCallExpression(statement.expression)) {
+      setup.push(markSource(statement.getText(file), section.contentStart + statement.getStart(file)));
+      continue;
+    }
     throw compileError(source, filename, "MEEK018", `Unsupported top-level script statement: ${ts.SyntaxKind[statement.kind]}`, section.contentStart + statement.getStart(file));
   }
-  return { imports, types, setup, names, propsType: propsType ?? "Record<string, never>", propsTypeOffset };
+  return { imports, types, setup, names, propsType: propsType ?? "Record<string, never>", propsTypeOffset, ...(defaults ? { defaults } : {}) };
 }
 
 function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot: boolean, locals: ReadonlyMap<string, string> = new Map()): string {
@@ -398,12 +416,11 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
     statements.push(`cleanups.push(__meeko.bindAttribute(__scope, ${id}, ${quote(name)}, () => ${mappedExpression(expression, offset)}, ${quote(location)}${source}));`);
   }
   for (const { id, name, expression, offset } of bindings.events) {
-    const eventType = ["click", "input", "change", "submit", "keydown", "keyup", "focus", "blur"].includes(name)
-      ? `GlobalEventHandlersEventMap[${quote(name)}]` : "Event";
-    const handler = markSource(`((__meeko_handler: (event: ${eventType}) => void) => __meeko_handler(event as ${eventType}))(${mappedExpression(expression, offset)});`, offset, expression.length);
+    const eventType = templateEventType(name);
+    const handler = markSource(`((__meeko_handler: (event: ${eventType}) => unknown) => __meeko_handler(event as ${eventType}))(${mappedExpression(expression, offset)});`, offset, expression.length);
     statements.push(`{
       cleanups.push(__meeko.bindEvent(__scope, ${id}, ${quote(name)}, (event: Event) => {
-        ${handler}
+        return ${handler}
       }));
     }`);
   }
@@ -435,8 +452,8 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
   return `const cleanups: Array<() => void> = [];
   try {
     ${statements.join("\n")}
-    return () => { for (const cleanup of cleanups.reverse()) cleanup(); };
-  } catch (error) { for (const cleanup of cleanups.reverse()) cleanup(); throw error; }`;
+    return () => __meeko.releaseAll(cleanups);
+  } catch (error) { __meeko.releaseAll(cleanups, { error }); }`;
 }
 
 /** Compila una parte tipada de .meeko para SSR e hidratación del HTML existente. */
@@ -464,16 +481,39 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
   const scriptParts = compileScript(script, source, filename);
   const bindings = scriptParts.names.join(", ");
   const hot = options.hot === true;
-  const setupCode = `const __bindings = __setup(__inputProps);\n__meeko.restoreSignals(__bindings, __state);\nconst { ${bindings} } = __bindings;`;
+  const resolvedProps = scriptParts.defaults ? "__meeko_resolveProps(__inputProps)" : "__inputProps";
+  const setupCode = `const __bindings = __setup(${resolvedProps});\n__meeko.restoreSignals(__bindings, __state);\nconst { ${bindings} } = __bindings;`;
   const releaseCode = hot
-    ? `const __cleanup = () => { __release(); dispose(); };\nconst __component = { renderToString, hydrate, hydrateScope, css };\nconst __snapshot = () => __meeko.snapshotSignals(__bindings);\nconst __devtoolsStop = __meeko.registerDevtoolsInstance({ componentId: __hotId, name: ${quote(basename(filename, ".meeko"))}, file: ${quote(filename)}, scope: __scope, props: __inputProps, bindings: __bindings });\nconst __dispose = () => { try { __cleanup(); } finally { __devtoolsStop(); } };\nconst __stop = __hotRoot ? __meeko.registerHotInstance(__hotId, __hotRoot, __inputProps, __component, __snapshot, __dispose) : __scope.start ? __meeko.registerHotScope(__hotId, __scope, __inputProps, __component, __snapshot, __dispose) : __dispose;\nreturn __meeko.withStateSnapshot(__stop, __snapshot);`
-    : `return __meeko.withStateSnapshot(() => { __release(); dispose(); }, () => __meeko.snapshotSignals(__bindings));`;
+    ? `const __cleanup = () => __meeko.finishWithCleanup(__release, dispose);\nconst __component = { renderToString, hydrate, hydrateScope, css };\nconst __snapshot = () => __meeko.snapshotSignals(__bindings);\nconst __devtoolsStop = __meeko.registerDevtoolsInstance({ componentId: __hotId, name: ${quote(basename(filename, ".meeko"))}, file: ${quote(filename)}, scope: __scope, props: __inputProps, bindings: __bindings });\nconst __dispose = () => __meeko.finishWithCleanup(__cleanup, __devtoolsStop);\nconst __stop = __hotRoot ? __meeko.registerHotInstance(__hotId, __hotRoot, __inputProps, __component, __snapshot, __dispose) : __scope.start ? __meeko.registerHotScope(__hotId, __scope, __inputProps, __component, __snapshot, __dispose) : __dispose;\nreturn __meeko.withStateSnapshot(__stop, __snapshot);`
+    : `return __meeko.withStateSnapshot(() => __meeko.finishWithCleanup(__release, dispose), () => __meeko.snapshotSignals(__bindings));`;
   const hotIdExport = hot ? `export const __hotId = ${quote(componentId)};\n` : "";
   const stateParam = ", __state?: __meeko.HotState";
   const scopeHotRootParam = hot ? ", __hotRoot?: Element" : "";
   const scopeForward = hot ? "__scope, __inputProps, __state, root" : "__scope, __inputProps, __state";
   const propsType = scriptParts.propsTypeOffset === undefined ? scriptParts.propsType : markSource(scriptParts.propsType, scriptParts.propsTypeOffset);
-  const markedCode = `// Generated by Meeko. Edit the .meeko source instead.\nimport * as __meeko from "@meekojs/meeko/internal";\n${scriptParts.imports.join("\n")}\n${scriptParts.types.join("\n")}\nfunction __setup(__props: ${propsType}) {\n${scriptParts.setup.join("\n")}\nreturn { ${bindings} };\n}\nexport type ComponentProps = ${propsType};\nexport const css = ${quote(css)};\n${hotIdExport}export function renderWithState(__inputProps: ComponentProps): { html: string; state: __meeko.HotState } {\nreturn __meeko.createRoot((dispose) => {\nconst __meeko_transfer = true;\nconst __bindings = __setup(__inputProps);\nconst { ${bindings} } = __bindings;\ntry {\nconst html = ${html};\nconst state = __meeko.snapshotSignals(__bindings);\n__meeko.serializeJson(state);\nreturn { html, state };\n} finally { dispose(); }\n});\n}\nexport function renderToString(__inputProps: ComponentProps${stateParam}): string {\nreturn __meeko.createRoot((dispose) => {\nconst __meeko_transfer = false;\n${setupCode}\ntry { return ${html}; } finally { dispose(); }\n});\n}\nexport function hydrate(root: Element, __inputProps: ComponentProps${stateParam}): () => void {\nconst __scope: __meeko.DomScope = { root };\nreturn hydrateScope(${scopeForward});\n}\nexport function hydrateScope(__scope: __meeko.DomScope, __inputProps: ComponentProps${stateParam}${scopeHotRootParam}): () => void {\nreturn __meeko.createRoot((dispose) => {\nconst __meeko_transfer = false;\n${setupCode}\nconst __release = (() => { ${hydrationBody(bindingsForTemplate, context, hot)} })();\n${releaseCode}\n});\n}\n`;
+  const defaults = scriptParts.defaults;
+  const defaultKeys = defaults?.keys.map(quote).join(" | ") || "never";
+  const propsDeclaration = defaults ? `type __MeekoDeclaredProps = ${propsType};
+type __MeekoDefaultKeys = Extract<${defaultKeys}, keyof __MeekoDeclaredProps>;
+type __MeekoDefaultPick = Pick<__MeekoDeclaredProps, __MeekoDefaultKeys>;
+type __MeekoDefaultValues = { [K in keyof __MeekoDefaultPick]-?: Exclude<__MeekoDefaultPick[K], undefined> };
+type __MeekoResolvedPropsOf<T> = T extends unknown ? Omit<T, __MeekoDefaultKeys> & __MeekoDefaultValues : never;
+type __MeekoResolvedProps = __MeekoResolvedPropsOf<__MeekoDeclaredProps>;
+type __MeekoInputPropsOf<T> = T extends unknown ? Omit<T, __MeekoDefaultKeys> & { [K in keyof __MeekoDefaultPick]?: __MeekoDefaultPick[K] | undefined } : never;
+export type ComponentProps = __MeekoInputPropsOf<__MeekoDeclaredProps>;
+function __meeko_defaultProps() {
+  return (${markSource(defaults.expression, defaults.offset)} satisfies Partial<__MeekoDeclaredProps> & __MeekoDefaultValues & Record<Exclude<${defaultKeys}, keyof __MeekoDeclaredProps>, never>);
+}
+function __meeko_resolveProps(input: ComponentProps): __MeekoResolvedProps {
+  const defaults = __meeko_defaultProps();
+  const resolved = { ...defaults, ...input } as __MeekoResolvedProps;
+  const mutable = resolved as unknown as Record<string, unknown>;
+  for (const key of Object.keys(defaults)) {
+    if (mutable[key] === undefined) mutable[key] = defaults[key as keyof typeof defaults];
+  }
+  return resolved;
+}` : `export type ComponentProps = ${propsType};`;
+  const markedCode = `// Generated by Meeko. Edit the .meeko source instead.\nimport * as __meeko from "@meekojs/meeko/internal";\n${scriptParts.imports.join("\n")}\n${scriptParts.types.join("\n")}\n${propsDeclaration}\nfunction __setup(__props: ${defaults ? "__MeekoResolvedProps" : propsType}) {\n${scriptParts.setup.join("\n")}\nreturn { ${bindings} };\n}\nexport const css = ${quote(css)};\n${hotIdExport}export function renderWithState(__inputProps: ComponentProps): { html: string; state: __meeko.HotState } {\nreturn __meeko.createRoot((dispose) => {\nconst __meeko_transfer = true;\nconst __bindings = __setup(${resolvedProps});\nconst { ${bindings} } = __bindings;\nreturn __meeko.finishWithCleanup(() => {\nconst html = ${html};\nconst state = __meeko.snapshotSignals(__bindings);\n__meeko.serializeJson(state);\nreturn { html, state };\n}, dispose);\n});\n}\nexport function renderToString(__inputProps: ComponentProps${stateParam}): string {\nreturn __meeko.createRoot((dispose) => {\nconst __meeko_transfer = false;\n${setupCode}\nreturn __meeko.finishWithCleanup(() => ${html}, dispose);\n});\n}\nexport function hydrate(root: Element, __inputProps: ComponentProps${stateParam}): () => void {\nconst __scope: __meeko.DomScope = { root };\nreturn hydrateScope(${scopeForward});\n}\nexport function hydrateScope(__scope: __meeko.DomScope, __inputProps: ComponentProps${stateParam}${scopeHotRootParam}): () => void {\nreturn __meeko.createRoot((dispose) => {\nconst __meeko_transfer = false;\n${setupCode}\nconst __release = (() => { ${hydrationBody(bindingsForTemplate, context, hot)} })();\n${releaseCode}\n});\n}\n`;
   const { code, mappings } = extractSourceMappings(markedCode);
   return { code, css, mappings };
 }

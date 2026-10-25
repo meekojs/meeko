@@ -1,0 +1,24 @@
+<script lang="ts">
+import { signal } from "@meekojs/meeko";
+
+interface Props {
+  required: string;
+  label?: string;
+  readonly count: number;
+  tags?: string[];
+}
+
+const props = defineProps<Props>({ label: "Default", count: 1, tags: [] });
+const tagCount = signal(props.tags.length);
+function addTag(): void {
+  props.tags.push("x");
+  tagCount.value = props.tags.length;
+}
+</script>
+
+<template>
+  <section>
+    <p>{props.required}: {props.label} ({props.count}) {tagCount.value}</p>
+    <button type="button" on:click="addTag">Add</button>
+  </section>
+</template>

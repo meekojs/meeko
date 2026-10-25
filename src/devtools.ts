@@ -1,4 +1,5 @@
 import type { DomScope } from "./dom.js";
+import { logClientError, observeCallback } from "./error-observer.js";
 import { currentEffectOwner, effect, isWritableSignal, signalReadSites, untrack } from "./reactivity.js";
 import type { EffectSource, Signal } from "./reactivity.js";
 
@@ -136,7 +137,7 @@ function safeValue(value: unknown, depth = 0, seen = new WeakSet<object>()): Dev
 
 function notify(): void {
   for (const listener of [...listeners]) {
-    try { untrack(listener); } catch { /* Un panel externo no debe romper la aplicación. */ }
+    observeCallback(() => untrack(listener), (error) => logClientError("Meeko DevTools subscriber failed", error));
   }
 }
 

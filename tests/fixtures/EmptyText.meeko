@@ -1,0 +1,13 @@
+<script lang="ts">
+import { signal } from "@meekojs/meeko";
+
+const feedback = signal("");
+</script>
+
+<template>
+  <form on:submit="(event) => { event.preventDefault(); feedback.value = 'Saved'; }">
+    <p>{feedback.value}</p>
+    <button type="submit">Save</button>
+  </form>
+  <aside>{feedback.value} tail</aside>
+</template>

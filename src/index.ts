@@ -1,5 +1,7 @@
 export { batch, computed, createContext, createRoot, effect, inject, onCleanup, provide, signal, untrack } from "./reactivity.js";
 export type { ContextKey, ReadonlySignal, Signal } from "./reactivity.js";
+export { provideErrorHandler } from "./component-errors.js";
+export type { ComponentErrorHandler } from "./component-errors.js";
 export { attributeValue, escapeHtml, renderAttribute, serializeJson } from "./server.js";
 export { bindAttribute, bindComponent, bindEvent, bindFor, bindIf, bindText, keyToken, renderComponent, renderFor, renderIf, withStateSnapshot } from "./dom.js";
 export type { Component, ComponentModule, ComponentRelease, DomScope } from "./dom.js";

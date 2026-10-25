@@ -1,4 +1,6 @@
-import { createRoot, effect, signal } from "./reactivity.js";
+import { batch, createRoot, effect, finishWithCleanup, signal } from "./reactivity.js";
+import { observeCallback } from "./error-observer.js";
+import { componentErrorReporter } from "./component-errors.js";
 import type { EffectSource, Signal } from "./reactivity.js";
 import { attributeValue, serializeJson } from "./server.js";
 
@@ -11,20 +13,33 @@ export interface DomScope {
 
 /** Contrato de un módulo de componente compilado para composición sin wrapper. */
 export interface ComponentModule<Props extends object> {
-  renderToString(props: Props, state?: Record<string, unknown>): string;
-  renderWithState?(props: Props): { html: string; state: Record<string, unknown> };
-  hydrateScope(scope: DomScope, props: Props, state?: Record<string, unknown>): ComponentRelease;
+  readonly renderToString: (props: Props, state?: Record<string, unknown>) => string;
+  readonly renderWithState?: (props: Props) => { html: string; state: Record<string, unknown> };
+  readonly hydrateScope: (scope: DomScope, props: Props, state?: Record<string, unknown>) => ComponentRelease;
 }
 
 /** Componente compilado que puede transferir su estado durante SSR. */
 export type Component<Props extends object> = ComponentModule<Props> & {
-  renderWithState(props: Props): { html: string; state: Record<string, unknown> };
+  readonly renderWithState: (props: Props) => { html: string; state: Record<string, unknown> };
 };
 
 /** Función de limpieza que puede exponer el estado editable de su instancia. */
 export interface ComponentRelease {
   (): void;
   snapshot?: () => Record<string, unknown>;
+}
+
+/** Releases every compiled binding and preserves the failure that triggered cleanup. */
+export function releaseAll(cleanups: Array<() => void>, cause: { error: unknown }): never;
+export function releaseAll(cleanups: Array<() => void>): void;
+export function releaseAll(cleanups: Array<() => void>, cause?: { error: unknown }): void {
+  const failures: unknown[] = cause ? [cause.error] : [];
+  while (cleanups.length) {
+    try { cleanups.pop()!(); }
+    catch (error) { failures.push(error); }
+  }
+  if (failures.length > 1) throw new AggregateError(failures, "Meeko hydration cleanup failed");
+  if (failures.length === 1) throw failures[0];
 }
 
 /** Añade una lectura de estado a la limpieza de un componente compilado. */
@@ -92,6 +107,19 @@ function clearRegion(scope: DomScope): void {
   }
 }
 
+function cloneRegion(scope: DomScope): DocumentFragment {
+  if (!scope.start || !scope.end) throw new Error("Expected a bounded Meeko region");
+  const range = scope.start.ownerDocument.createRange();
+  range.setStartAfter(scope.start);
+  range.setEndBefore(scope.end);
+  return range.cloneContents();
+}
+
+function restoreRegion(scope: DomScope, content: DocumentFragment): void {
+  clearRegion(scope);
+  scope.end!.parentNode!.insertBefore(content, scope.end!);
+}
+
 function insertHtml(end: Comment, html: string): void {
   const parent = end.parentNode;
   if (!parent) throw new Error("Detached Meeko region");
@@ -107,6 +135,8 @@ function sameProps<Props extends object>(first: Props, second: Props): boolean {
 }
 
 /** Renderiza un hijo entre comentarios de ámbito sin añadir un elemento visual. */
+export function renderComponent<Props extends object>(id: number, component: Component<Props>, props: Props, transferState: boolean): string;
+export function renderComponent<Props extends object>(id: number, component: ComponentModule<Props>, props: Props, transferState?: false): string;
 export function renderComponent<Props extends object>(id: number, component: ComponentModule<Props>, props: Props, transferState = false): string {
   if (transferState) {
     if (!component.renderWithState) throw new TypeError(`Component ${id} cannot transfer SSR state`);
@@ -142,18 +172,34 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
   let component = resolveComponent();
   let props = read();
   let release = component.hydrateScope(inner, props, state);
-  const stop = effect(() => {
+  let stop = () => {};
+  stop = effect(() => {
     const nextComponent = resolveComponent();
     const next = read();
     if (nextComponent === component && sameProps(props, next)) return;
-    const state = nextComponent === component ? release.snapshot?.() : undefined;
+    const previousState = release.snapshot?.();
+    const state = nextComponent === component ? previousState : undefined;
     const html = nextComponent.renderToString(next, state);
-    release();
-    clearRegion(inner);
-    insertHtml(inner.end!, html);
-    release = nextComponent.hydrateScope(inner, next, state);
-    component = nextComponent;
-    props = next;
+    const previous = cloneRegion(inner);
+    try {
+      release();
+      clearRegion(inner);
+      insertHtml(inner.end!, html);
+      const nextRelease = nextComponent.hydrateScope(inner, next, state);
+      release = nextRelease;
+      component = nextComponent;
+      props = next;
+    } catch (error) {
+      try {
+        restoreRegion(inner, previous);
+        release = component.hydrateScope(inner, props, previousState);
+      } catch (rollbackError) {
+        release = () => {};
+        stop();
+        throw new AggregateError([error, rollbackError], `Meeko component update and recovery failed in ${location}`);
+      }
+      throw error;
+    }
   });
   return () => { stop(); release(); };
 }
@@ -161,9 +207,15 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
 /** Conecta un texto reactivo al marcador SSR y comprueba su valor inicial. */
 export function bindText(scope: DomScope, id: number, read: () => unknown, location: string, source?: EffectSource): () => void {
   const marker = findComment(scope, `meeko:text:${id}`);
-  const text = marker.nextSibling;
-  if (!text || text.nodeType !== 3) throw new Error(`Missing text node in ${location}`);
   const initial = String(read());
+  let text = marker.nextSibling;
+  // HTML parsing drops empty text nodes. Restore only that empty SSR case so
+  // adjacent static text stays untouched and the reactive expression can bind.
+  if (initial === "" && (!text || text.nodeType !== 3 || text.textContent !== "")) {
+    text = marker.ownerDocument.createTextNode("");
+    marker.parentNode!.insertBefore(text, marker.nextSibling);
+  }
+  if (!text || text.nodeType !== 3) throw new Error(`Missing text node in ${location}`);
   if (text.textContent !== initial) throw new Error(`Hydration mismatch in ${location}`);
   let first = true;
   return effect(() => {
@@ -196,8 +248,13 @@ export function bindAttribute(scope: DomScope, id: number, name: string, read: (
 /** Conecta un evento al elemento SSR y entrega su función de limpieza. */
 export function bindEvent(scope: DomScope, id: number, name: string, handler: (event: Event) => void): () => void {
   const target = findElement(scope, `data-meeko-e-${id}`);
-  target.addEventListener(name, handler);
-  return () => target.removeEventListener(name, handler);
+  const report = componentErrorReporter();
+  const listener = (event: Event) => observeCallback(
+    () => handler(event),
+    report,
+  );
+  target.addEventListener(name, listener);
+  return () => target.removeEventListener(name, listener);
 }
 
 /** Genera los límites estables de una condición en SSR. */
@@ -211,17 +268,36 @@ export function bindIf(scope: DomScope, id: number, read: () => unknown, render:
   let active = Boolean(read());
   if (!active && inner.start?.nextSibling !== inner.end) throw new Error(`Hydration mismatch in condition ${id}`);
   let release = active ? hydrate(inner) : undefined;
-  const stop = effect(() => {
+  let stop = () => {};
+  stop = effect(() => {
     const next = Boolean(read());
     if (next === active) return;
-    release?.();
-    release = undefined;
-    clearRegion(inner);
     if (next) {
-      insertHtml(inner.end!, render());
-      release = hydrate(inner);
+      const html = render();
+      try {
+        clearRegion(inner);
+        insertHtml(inner.end!, html);
+        release = hydrate(inner);
+        active = true;
+      } catch (error) {
+        try { clearRegion(inner); }
+        catch (cleanupError) {
+          stop();
+          throw new AggregateError([error, cleanupError], `Meeko condition ${id} update and cleanup failed`);
+        }
+        throw error;
+      }
+      return;
     }
-    active = next;
+    const failures: unknown[] = [];
+    try { release?.(); }
+    catch (error) { failures.push(error); }
+    release = undefined;
+    try { clearRegion(inner); }
+    catch (error) { failures.push(error); stop(); }
+    active = false;
+    if (failures.length === 1) throw failures[0];
+    if (failures.length > 1) throw new AggregateError(failures, `Meeko condition ${id} update failed`);
   });
   return () => { stop(); release?.(); };
 }
@@ -260,8 +336,10 @@ interface ListEntry<T> {
 function moveRange(start: Comment, end: Comment, before: Node): void {
   const parent = before.parentNode;
   if (!parent) throw new Error("Detached Meeko list");
+  if (start.parentNode !== parent || end.parentNode !== parent) throw new Error("Detached Meeko list row");
   const document = before.ownerDocument;
   if (!document) throw new Error("Missing document for Meeko list");
+  const originalNext = end.nextSibling;
   const fragment = document.createDocumentFragment();
   for (let node: Node | null = start; node;) {
     const next: Node | null = node.nextSibling;
@@ -269,7 +347,25 @@ function moveRange(start: Comment, end: Comment, before: Node): void {
     if (node === end) break;
     node = next;
   }
-  parent.insertBefore(fragment, before);
+  try { parent.insertBefore(fragment, before); }
+  catch (error) {
+    try { parent.insertBefore(fragment, originalNext); }
+    catch (restoreError) {
+      throw new AggregateError([error, restoreError], "Meeko list move and restoration failed");
+    }
+    throw error;
+  }
+}
+
+function removeRange(start: Comment, end: Comment): void {
+  const parent = start.parentNode;
+  if (!parent || end.parentNode !== parent) throw new Error("Detached Meeko list row");
+  for (let node: Node | null = start; node;) {
+    const next: Node | null = node.nextSibling;
+    parent.removeChild(node);
+    if (node === end) break;
+    node = next;
+  }
 }
 
 /** Encuentra las posiciones que ya mantienen el orden relativo de la lista anterior. */
@@ -305,30 +401,36 @@ export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>,
   const initial = [...read()];
   let currentKeys: string[] = [];
   let cursor = outer.start!.nextSibling;
-  for (let index = 0; index < initial.length; index++) {
-    const item = initial[index]!;
-    const key = keyToken(keyOf(item, index));
-    if (entries.has(key)) throw new Error(`Duplicate Meeko list key ${key}`);
-    const startData = `meeko:item:${id}:${key}`;
-    const endData = `/meeko:item:${id}:${key}`;
-    if (!cursor || cursor.nodeType !== 8 || (cursor as Comment).data !== startData) throw new Error(`Hydration mismatch in list ${id} at key ${key}`);
-    const start = cursor as Comment;
-    let end = start.nextSibling;
-    while (end && (end.nodeType !== 8 || (end as Comment).data !== endData)) end = end.nextSibling;
-    if (!end) throw new Error(`Missing end marker for list key ${key}`);
-    const value = signal(item);
-    const position = trackIndex ? signal(index) : undefined;
-    const release = createRoot((dispose) => {
-      const cleanup = hydrate(value, position as Signal<number>, { root: scope.root, start, end: end as Comment });
-      return () => { cleanup(); dispose(); };
-    });
-    entries.set(key, { key, start, end: end as Comment, value, index: position, release });
-    currentKeys.push(key);
-    cursor = end.nextSibling;
+  try {
+    for (let index = 0; index < initial.length; index++) {
+      const item = initial[index]!;
+      const key = keyToken(keyOf(item, index));
+      if (entries.has(key)) throw new Error(`Duplicate Meeko list key ${key}`);
+      const startData = `meeko:item:${id}:${key}`;
+      const endData = `/meeko:item:${id}:${key}`;
+      if (!cursor || cursor.nodeType !== 8 || (cursor as Comment).data !== startData) throw new Error(`Hydration mismatch in list ${id} at key ${key}`);
+      const start = cursor as Comment;
+      let end = start.nextSibling;
+      while (end && (end.nodeType !== 8 || (end as Comment).data !== endData)) end = end.nextSibling;
+      if (!end) throw new Error(`Missing end marker for list key ${key}`);
+      const value = signal(item);
+      const position = trackIndex ? signal(index) : undefined;
+      const release = createRoot((dispose) => {
+        const cleanup = hydrate(value, position as Signal<number>, { root: scope.root, start, end: end as Comment });
+        return () => finishWithCleanup(cleanup, dispose);
+      });
+      entries.set(key, { key, start, end: end as Comment, value, index: position, release });
+      currentKeys.push(key);
+      cursor = end.nextSibling;
+    }
+    if (cursor !== outer.end) throw new Error(`Hydration mismatch in list ${id}: extra nodes`);
+  } catch (error) {
+    try { releaseAll([...entries.values()].map((entry) => entry.release), { error }); }
+    finally { entries.clear(); }
   }
-  if (cursor !== outer.end) throw new Error(`Hydration mismatch in list ${id}: extra nodes`);
   let initialItems: T[] | undefined = initial;
-  const stop = effect(() => {
+  let stop = () => {};
+  stop = effect(() => {
     const items = [...read()];
     if (initialItems) {
       const previous = initialItems;
@@ -342,46 +444,93 @@ export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>,
     const oldPositions = new Map(currentKeys.map((key, index) => [key, index]));
     const oldIndices = nextKeys.map((key) => oldPositions.get(key) ?? -1);
     const stable = stableListPositions(oldIndices);
-    for (const [key, entry] of entries) {
-      if (nextKeySet.has(key)) continue;
-      entry.release();
-      let node: Node | null = entry.start;
-      while (node) {
-        const next: Node | null = node.nextSibling;
-        node.parentNode?.removeChild(node);
-        if (node === entry.end) break;
-        node = next;
-      }
-      entries.delete(key);
-    }
-    let before: Node = outer.end!;
-    for (let index = items.length - 1; index >= 0; index--) {
-      const item = items[index]!;
-      const key = nextKeys[index]!;
-      let entry = entries.get(key);
-      if (!entry) {
-        const html = `<!--meeko:item:${id}:${key}-->${render(item, index)}<!--/meeko:item:${id}:${key}-->`;
-        insertHtml(before as Comment, html);
-        const end = before.previousSibling as Comment;
+    const newRows = items.flatMap((item, index) => entries.has(nextKeys[index]!) ? [] : [{
+      key: nextKeys[index]!, index, item,
+      html: `<!--meeko:item:${id}:${nextKeys[index]}-->${render(item, index)}<!--/meeko:item:${id}:${nextKeys[index]}-->`,
+    }]);
+    const staged = new Map<string, ListEntry<T>>();
+    const inserted: Array<{ start: Comment; end: Comment }> = [];
+    let moving = false;
+    try {
+      for (const row of newRows) {
+        const marker = outer.end!;
+        insertHtml(marker, row.html);
+        const end = marker.previousSibling as Comment;
         let start: Node | null = end.previousSibling;
-        while (start && (start.nodeType !== 8 || (start as Comment).data !== `meeko:item:${id}:${key}`)) start = start.previousSibling;
-        if (!start) throw new Error(`Missing new list marker for ${key}`);
-        const value = signal(item);
-        const position = trackIndex ? signal(index) : undefined;
+        while (start && (start.nodeType !== 8 || (start as Comment).data !== `meeko:item:${id}:${row.key}`)) start = start.previousSibling;
+        if (!start) throw new Error(`Missing new list marker for ${row.key}`);
+        inserted.push({ start: start as Comment, end });
+        const value = signal(row.item);
+        const position = trackIndex ? signal(row.index) : undefined;
         const release = createRoot((dispose) => {
           const cleanup = hydrate(value, position as Signal<number>, { root: scope.root, start: start as Comment, end });
-          return () => { cleanup(); dispose(); };
+          return () => finishWithCleanup(cleanup, dispose);
         });
-        entry = { key, start: start as Comment, end, value, index: position, release };
-        entries.set(key, entry);
-      } else {
-        entry.value.value = item;
-        if (entry.index) entry.index.value = index;
+        staged.set(row.key, { key: row.key, start: start as Comment, end, value, index: position, release });
       }
-      if (oldIndices[index] !== -1 && !stable.has(index) && entry.end.nextSibling !== before) moveRange(entry.start, entry.end, before);
-      before = entry.start;
+      moving = true;
+      let before: Node = outer.end!;
+      for (let index = items.length - 1; index >= 0; index--) {
+        const key = nextKeys[index]!;
+        const entry = entries.get(key) ?? staged.get(key)!;
+        if ((oldIndices[index] === -1 || !stable.has(index)) && entry.end.nextSibling !== before) {
+          moveRange(entry.start, entry.end, before);
+        }
+        before = entry.start;
+      }
+    } catch (error) {
+      const failures: unknown[] = [error];
+      for (const entry of [...staged.values()].reverse()) {
+        try { entry.release(); }
+        catch (cleanupError) { failures.push(cleanupError); }
+      }
+      for (const row of inserted.reverse()) {
+        try { removeRange(row.start, row.end); }
+        catch (cleanupError) { failures.push(cleanupError); }
+      }
+      if (moving) {
+        let before: Node = outer.end!;
+        for (let index = currentKeys.length - 1; index >= 0; index--) {
+          const entry = entries.get(currentKeys[index]!)!;
+          try {
+            if (entry.end.nextSibling !== before) moveRange(entry.start, entry.end, before);
+            before = entry.start;
+          } catch (restoreError) { failures.push(restoreError); }
+        }
+      }
+      if (failures.length > 1) {
+        stop();
+        throw new AggregateError(failures, `Meeko list ${id} update and cleanup failed`);
+      }
+      throw error;
     }
+    const failures: unknown[] = [];
+    for (const [key, entry] of entries) {
+      if (nextKeySet.has(key)) continue;
+      try { entry.release(); }
+      catch (error) { failures.push(error); }
+      try { removeRange(entry.start, entry.end); }
+      catch (error) { failures.push(error); stop(); }
+      entries.delete(key);
+    }
+    for (const [key, entry] of staged) entries.set(key, entry);
     currentKeys = nextKeys;
+    try {
+      batch(() => {
+        for (let index = 0; index < items.length; index++) {
+          const entry = entries.get(nextKeys[index]!)!;
+          if (staged.has(entry.key)) continue;
+          entry.value.value = items[index]!;
+          if (entry.index) entry.index.value = index;
+        }
+      });
+    } catch (error) { failures.push(error); }
+    if (failures.length === 1) throw failures[0];
+    if (failures.length > 1) throw new AggregateError(failures, `Meeko list ${id} update failed`);
   });
-  return () => { stop(); for (const entry of entries.values()) entry.release(); entries.clear(); };
+  return () => {
+    stop();
+    try { releaseAll([...entries.values()].map((entry) => entry.release)); }
+    finally { entries.clear(); }
+  };
 }

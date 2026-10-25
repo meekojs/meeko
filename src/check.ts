@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createRequire as createModuleRequire } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
@@ -13,7 +14,13 @@ import { compileError, MeekoCompileError, locate } from "./compiler/sfc.js";
 import type { CompileDiagnostic } from "./compiler/sfc.js";
 
 const execFileAsync = promisify(execFile);
-const tscPath = join(dirname(fileURLToPath(import.meta.resolve("typescript/package.json"))), "bin", "tsc");
+const typescriptPackage = fileURLToPath(import.meta.resolve("typescript/package.json"));
+const tscPath = join(dirname(typescriptPackage), "bin", "tsc");
+// The JS launcher spawns tsc.exe without windowsHide, which flashes a terminal in VS Code.
+const nativeTscPath = process.platform === "win32"
+  ? join(dirname(createModuleRequire(typescriptPackage).resolve(`@typescript/typescript-win32-${process.arch}/package.json`)), "lib", "tsc.exe")
+  : undefined;
+const tscExecutable = nativeTscPath && nativeTscPath.length >= 248 ? `\\\\?\\${nativeTscPath}` : nativeTscPath ?? process.execPath;
 
 interface GeneratedEntry {
   original: string;
@@ -115,12 +122,12 @@ export async function checkSource(source: string, filename: string): Promise<Com
       await writeFile(entry.generated, entry.code, { encoding: "utf8", flag: "wx" });
     }
     try {
-      const result = await execFileAsync(process.execPath, [
-        tscPath, "--ignoreConfig", "--noEmit", "--pretty", "false", "--strict", "--skipLibCheck",
+      const result = await execFileAsync(tscExecutable, [
+        ...(nativeTscPath ? [] : [tscPath]), "--ignoreConfig", "--noEmit", "--pretty", "false", "--strict", "--skipLibCheck",
         "--noUncheckedIndexedAccess", "--exactOptionalPropertyTypes", "--verbatimModuleSyntax",
         "--module", "nodenext", "--moduleResolution", "nodenext", "--target", "es2022",
         "--lib", "es2022,dom", graph.root.generated,
-      ], { cwd: dirname(absolute), maxBuffer: 8 * 1024 * 1024 });
+      ], { cwd: dirname(absolute), maxBuffer: 8 * 1024 * 1024, windowsHide: true });
       output = result.stdout + result.stderr;
     } catch (error) {
       const failure = error as Error & { stdout?: string; stderr?: string };
@@ -133,10 +140,30 @@ export async function checkSource(source: string, filename: string): Promise<Com
 
   const typed = parseTypeScriptOutput(output);
   if (typed.length === 0 && output.trim()) throw new Error(`TypeScript 7 check failed: ${output.trim()}`);
-  return typed.map((diagnostic) => {
-    const entry = graph.entries.get(resolve(dirname(absolute), diagnostic.file));
-    const offset = entry ? originalOffset(entry.mappings, generatedOffset(entry.code, diagnostic.line, diagnostic.column)) : undefined;
-    const message = entry && offset !== undefined ? diagnostic.message : `Generated TypeScript: ${diagnostic.message}`;
-    return { code: diagnostic.code, message, filename: entry?.original ?? absolute, location: locate(entry?.source ?? source, offset ?? 0) };
-  });
+  return Promise.all(typed.map(async (diagnostic) => {
+    const reported = resolve(dirname(absolute), diagnostic.file);
+    const entry = graph.entries.get(reported);
+    if (entry) {
+      const offset = originalOffset(entry.mappings, generatedOffset(entry.code, diagnostic.line, diagnostic.column));
+      return {
+        code: diagnostic.code,
+        message: offset === undefined ? `Generated TypeScript: ${diagnostic.message}` : diagnostic.message,
+        filename: entry.original,
+        location: locate(entry.source, offset ?? 0),
+      };
+    }
+    // TypeScript also checks .ts dependencies imported by the .meeko graph.
+    // Their positions already refer to the original file, not generated code.
+    let imported: string;
+    try { imported = await readFile(reported, "utf8"); }
+    catch {
+      return { code: diagnostic.code, message: `Generated TypeScript: ${diagnostic.message}`, filename: absolute, location: locate(source, 0) };
+    }
+    return {
+      code: diagnostic.code,
+      message: diagnostic.message,
+      filename: reported,
+      location: locate(imported, generatedOffset(imported, diagnostic.line, diagnostic.column)),
+    };
+  }));
 }

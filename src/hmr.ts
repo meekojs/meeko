@@ -1,4 +1,4 @@
-import { isWritableSignal } from "./reactivity.js";
+import { captureParentOwner, isWritableSignal } from "./reactivity.js";
 import type { DomScope } from "./dom.js";
 
 /** Valores de señales transferidos en memoria entre versiones de un componente. */
@@ -18,11 +18,13 @@ interface HotInstance {
   component: HotComponent;
   snapshot: () => HotState;
   dispose: () => void;
+  withParent: <T>(work: () => T) => T;
 }
 
 interface HotSlot {
   current: HotInstance;
   stop: () => void;
+  forget: () => void;
 }
 
 const enabled = new Set<string>();
@@ -53,7 +55,7 @@ export function enableHotModule(id: string): void {
 
 function registerHotTarget<Props>(id: string, key: Element | Comment, target: HotInstance["target"], props: Props, component: HotComponent<Props>, snapshot: () => HotState, dispose: () => void): () => void {
   if (!enabled.has(id)) return dispose;
-  const entry: HotInstance = { target, props, component: component as HotComponent, snapshot, dispose };
+  const entry: HotInstance = { target, props, component: component as HotComponent, snapshot, dispose, withParent: captureParentOwner() };
   let group = instances.get(id);
   if (!group) {
     group = new Map();
@@ -66,10 +68,14 @@ function registerHotTarget<Props>(id: string, key: Element | Comment, target: Ho
   }
   const slot: HotSlot = {
     current: entry,
-    stop: () => {
+    forget: () => {
       if (group.get(key) !== slot) return;
       group.delete(key);
       if (group.size === 0) instances.delete(id);
+    },
+    stop: () => {
+      if (group.get(key) !== slot) return;
+      slot.forget();
       slot.current.dispose();
     },
   };
@@ -106,7 +112,9 @@ function replaceScope(scope: DomScope, html: string): void {
 /** Aplica CSS nuevo después de la hoja virtual cargada por Vite. */
 export function replaceHotStyle(id: string, css: string): void {
   if (typeof document === "undefined") return;
-  let style = document.querySelector<HTMLStyleElement>(`style[data-meeko-hot="${id}"]`);
+  // Module IDs are file paths and may contain CSS selector metacharacters.
+  let style = [...document.querySelectorAll<HTMLStyleElement>("style[data-meeko-hot]")]
+    .find((candidate) => candidate.dataset.meekoHot === id);
   if (!style) {
     style = document.createElement("style");
     style.dataset.meekoHot = id;
@@ -126,29 +134,63 @@ export function replaceHotModule(id: string, next: unknown): void {
     const entry = slot.current;
     const state = entry.snapshot();
     const previous = entry.target.kind === "root" ? entry.target.root.innerHTML : scopeRange(entry.target.scope).cloneContents();
-    return { slot, entry, state, html: component.renderToString(entry.props, state), previous };
+    return { slot, entry, state, html: entry.withParent(() => component.renderToString(entry.props, state)), previous };
   });
-  for (const { slot, entry, state, html, previous } of prepared) {
-    entry.dispose();
-    if (entry.target.kind === "root") entry.target.root.innerHTML = html;
-    else replaceScope(entry.target.scope, html);
+  type Prepared = (typeof prepared)[number];
+  const committed: Prepared[] = [];
+  const rollback = ({ slot, entry, state, previous }: Prepared, failures: unknown[]): void => {
+    const partial = slot.current !== entry ? slot.current : undefined;
+    if (partial) {
+      try { partial.dispose(); }
+      catch (cleanupError) { failures.push(cleanupError); }
+    }
     try {
-      if (entry.target.kind === "root") component.hydrate(entry.target.root, entry.props, state);
-      else {
-        if (!component.hydrateScope) throw new Error("Updated Meeko child component has no hydrateScope export");
-        component.hydrateScope(entry.target.scope, entry.props, state);
-      }
-      if (slot.current === entry) throw new Error("Updated Meeko component did not register its hydrated instance");
-    } catch (error) {
       if (entry.target.kind === "root") entry.target.root.innerHTML = previous as string;
       else {
         const range = scopeRange(entry.target.scope);
         range.deleteContents();
         range.insertNode(previous as DocumentFragment);
       }
-      if (entry.target.kind === "root") entry.component.hydrate(entry.target.root, entry.props, state);
-      else entry.component.hydrateScope?.(entry.target.scope, entry.props, state);
-      throw error;
+      if (entry.target.kind === "root") {
+        const { root } = entry.target;
+        entry.withParent(() => entry.component.hydrate(root, entry.props, state));
+      } else {
+        const { scope } = entry.target;
+        entry.withParent(() => entry.component.hydrateScope?.(scope, entry.props, state));
+      }
+      if (slot.current === entry || slot.current === partial) throw new Error("Restored Meeko component did not register its hydrated instance");
+    } catch (rollbackError) {
+      failures.push(rollbackError);
+      if (slot.current !== entry && slot.current !== partial) {
+        try { slot.current.dispose(); }
+        catch (cleanupError) { failures.push(cleanupError); }
+      }
+      slot.forget();
+    }
+  };
+  for (const item of prepared) {
+    const { slot, entry, state, html } = item;
+    try {
+      entry.dispose();
+      if (entry.target.kind === "root") entry.target.root.innerHTML = html;
+      else replaceScope(entry.target.scope, html);
+      if (entry.target.kind === "root") {
+        const { root } = entry.target;
+        entry.withParent(() => component.hydrate(root, entry.props, state));
+      }
+      else {
+        if (!component.hydrateScope) throw new Error("Updated Meeko child component has no hydrateScope export");
+        const { scope } = entry.target;
+        entry.withParent(() => component.hydrateScope!(scope, entry.props, state));
+      }
+      if (slot.current === entry) throw new Error("Updated Meeko component did not register its hydrated instance");
+      committed.push(item);
+    } catch (error) {
+      const failures: unknown[] = [error];
+      rollback(item, failures);
+      for (const previous of committed.reverse()) rollback(previous, failures);
+      if (failures.length === 1) throw error;
+      throw new AggregateError(failures, "Meeko hot replacement and recovery failed");
     }
   }
   replaceHotStyle(id, component.css ?? "");

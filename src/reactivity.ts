@@ -1,3 +1,5 @@
+import { logClientError, observeReturnedPromise } from "./error-observer.js";
+
 /** Señal de solo lectura que registra dependencias al consultar su valor. */
 export interface ReadonlySignal<T> {
   readonly value: T;
@@ -33,7 +35,7 @@ interface Observer {
 
 interface Owner {
   observers: Set<Observer>;
-  children: Set<() => void>;
+  children: Set<() => unknown>;
   parent: Owner | undefined;
   context: Map<symbol, unknown>;
 }
@@ -71,8 +73,18 @@ export function inject<T>(key: ContextKey<T>): T {
   throw new Error(`Missing Meeko context${key.description ? `: ${key.description}` : ""}`);
 }
 
-/** Registers an external resource to be released with the current component root. */
-export function onCleanup(release: () => void): void {
+/** Looks up optional context without creating a process-wide fallback. */
+export function findContext<T>(key: ContextKey<T>): T | undefined {
+  for (let owner = activeOwner; owner; owner = owner.parent) {
+    if (owner.context.has(key)) return owner.context.get(key) as T;
+  }
+  return undefined;
+}
+
+type SyncCleanupCallback<F extends () => unknown> = [Extract<ReturnType<F>, PromiseLike<unknown>>] extends [never] ? F : never;
+
+/** Registers a synchronous external-resource release with the current component root. */
+export function onCleanup<const F extends () => unknown>(release: SyncCleanupCallback<F>): void {
   if (!activeOwner) throw new Error("onCleanup() requires an active component root");
   activeOwner.children.add(release);
 }
@@ -85,17 +97,28 @@ function detach(observer: Observer): void {
 function flush(): void {
   if (flushing || batchDepth > 0) return;
   flushing = true;
+  const failures: unknown[] = [];
   try {
     let iterations = 0;
     while (pending.size > 0) {
-      if (++iterations > 1000) throw new Error("Reactive update cycle exceeded 1000 iterations");
+      if (++iterations > 1000) {
+        pending.clear();
+        failures.push(new Error("Reactive update cycle exceeded 1000 iterations"));
+        break;
+      }
       const observers = [...pending];
       pending.clear();
-      for (const observer of observers) if (!observer.disposed) observer.run();
+      for (const observer of observers) {
+        if (observer.disposed) continue;
+        try { observer.run(); }
+        catch (error) { failures.push(error); }
+      }
     }
   } finally {
     flushing = false;
   }
+  if (failures.length === 1) throw failures[0];
+  if (failures.length > 1) throw new AggregateError(failures, "Meeko reactive observers failed");
 }
 
 /** Crea un valor observable. Las escrituras iguales no notifican cambios. */
@@ -122,7 +145,9 @@ export function signal<T>(initial: T): Signal<T> {
 }
 
 /** Ejecuta una función cuando cambian las señales leídas por ella. */
-export function effect(fn: () => void, source?: EffectSource): () => void {
+type SyncEffectCallback<F extends () => unknown> = [Extract<ReturnType<F>, PromiseLike<unknown>>] extends [never] ? F : never;
+
+export function effect<const F extends () => unknown>(fn: SyncEffectCallback<F>, source?: EffectSource): () => void {
   const owner = activeOwner;
   const observer: Observer = {
     dependencies: new Set(),
@@ -134,7 +159,11 @@ export function effect(fn: () => void, source?: EffectSource): () => void {
       activeObserver = observer;
       activeOwner = owner;
       try {
-        fn();
+        const result: unknown = fn();
+        if (observeReturnedPromise(result, (error) => logClientError("Meeko asynchronous effect rejected", error))) {
+          stop();
+          throw new TypeError("Meeko effect callbacks must be synchronous");
+        }
       } finally {
         activeObserver = previous;
         activeOwner = previousOwner;
@@ -143,18 +172,34 @@ export function effect(fn: () => void, source?: EffectSource): () => void {
   };
   if (source) effectSources.set(observer, { owner, source });
   owner?.observers.add(observer);
-  observer.run();
-  return () => {
+  function stop(): void {
     observer.disposed = true;
     pending.delete(observer);
     detach(observer);
     owner?.observers.delete(observer);
-  };
+  }
+  try { observer.run(); }
+  catch (error) {
+    stop();
+    throw error;
+  }
+  return stop;
 }
 
 /** Identidad opaca de la raíz reactiva activa; permite aislar instancias anidadas. */
 export function currentEffectOwner(): object | undefined {
   return activeOwner;
+}
+
+/** Captures the parent of a component root for a later HMR replacement. */
+export function captureParentOwner(): <T>(work: () => T) => T {
+  const parent = activeOwner?.parent;
+  return <T>(work: () => T): T => {
+    const previous = activeOwner;
+    activeOwner = parent;
+    try { return work(); }
+    finally { activeOwner = previous; }
+  };
 }
 
 /** Devuelve expresiones de plantilla actualmente dependientes de una señal en una raíz. */
@@ -184,12 +229,10 @@ export function computed<T>(fn: () => T): ReadonlySignal<T> {
 /** Agrupa varias escrituras en una sola ronda de notificaciones. */
 export function batch<T>(fn: () => T): T {
   batchDepth++;
-  try {
-    return fn();
-  } finally {
+  return finishWithCleanup(fn, () => {
     batchDepth--;
     flush();
-  }
+  });
 }
 
 /** Lee señales sin registrar dependencias en el observador activo. */
@@ -211,7 +254,12 @@ export function createRoot<T>(fn: (dispose: () => void) => T): T {
   const dispose = () => {
     const failures: unknown[] = [];
     for (const child of [...owner.children]) {
-      try { child(); } catch (error) { failures.push(error); }
+      try {
+        const result = child();
+        if (observeReturnedPromise(result, (error) => logClientError("Meeko asynchronous cleanup rejected", error))) {
+          failures.push(new TypeError("Meeko cleanup callbacks must be synchronous"));
+        }
+      } catch (error) { failures.push(error); }
     }
     owner.children.clear();
     for (const observer of owner.observers) {
@@ -229,9 +277,28 @@ export function createRoot<T>(fn: (dispose: () => void) => T): T {
   try {
     return fn(dispose);
   } catch (error) {
-    dispose();
+    try { dispose(); }
+    catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], "Meeko root setup and cleanup failed");
+    }
     throw error;
   } finally {
     activeOwner = previous;
   }
+}
+
+/** Runs cleanup on either outcome without losing an earlier failure. */
+export function finishWithCleanup<T>(work: () => T, cleanup: () => void): T {
+  let failed = false;
+  let failure: unknown;
+  let value!: T;
+  try { value = work(); }
+  catch (error) { failed = true; failure = error; }
+  try { cleanup(); }
+  catch (error) {
+    if (failed) throw new AggregateError([failure, error], "Meeko work and cleanup failed");
+    throw error;
+  }
+  if (failed) throw failure;
+  return value;
 }

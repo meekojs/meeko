@@ -26,7 +26,7 @@ test("componentes anidados e instancias hermanas hidratan sin colisionar marcado
     root.innerHTML = component.renderToString({ initial: "Start" });
     const findButton = (label: string): HTMLButtonElement => {
       const button = [...root.querySelectorAll("button")].find((candidate) => candidate.textContent?.startsWith(label));
-      assert.ok(button, `Missing button ${label}`);
+      assert.ok(button, `Missing button ${label}; found ${[...root.querySelectorAll("button")].map((candidate) => candidate.textContent).join(" | ")}`);
       return button as unknown as HTMLButtonElement;
     };
     const first = findButton("Start:");
@@ -113,6 +113,32 @@ test("el estado SSR de un hijo anidado se transfiere sin depender del valor alea
     const before = root.textContent;
     const release = component.hydrate(root as unknown as Element, { label: "Nested" }, rendered.state);
     assert.equal(root.textContent, before);
+    release();
+  } finally {
+    window.happyDOM.abort();
+    await server.close();
+  }
+});
+
+test("la hidratación restaura texto dinámico vacío y enlaza el formulario", async () => {
+  const server = await createServer({ configFile: false, plugins: [meeko()], server: { middlewareMode: true, hmr: false } });
+  const component = await server.ssrLoadModule(resolve("tests/fixtures/EmptyText.meeko")) as {
+    renderWithState(props: Record<string, never>): { html: string; state: Record<string, unknown> };
+    hydrate(root: Element, props: Record<string, never>, state?: Record<string, unknown>): () => void;
+  };
+  const window = new Window();
+  try {
+    const rendered = component.renderWithState({});
+    const root = window.document.createElement("main");
+    root.innerHTML = rendered.html;
+    assert.equal(root.querySelector("p")?.textContent, "");
+    assert.equal(root.querySelector("aside")?.textContent?.trim(), "tail");
+    const release = component.hydrate(root as unknown as Element, {}, rendered.state);
+    const form = root.querySelector("form")!;
+    const submit = new window.Event("submit", { bubbles: true, cancelable: true });
+    assert.equal(form.dispatchEvent(submit), false);
+    assert.equal(root.querySelector("p")?.textContent, "Saved");
+    assert.equal(root.querySelector("aside")?.textContent, "Saved tail");
     release();
   } finally {
     window.happyDOM.abort();

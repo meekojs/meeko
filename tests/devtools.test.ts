@@ -253,3 +253,35 @@ test("una captura suscrita no conecta señales de instancias distintas", async (
     browser.happyDOM.abort();
   }
 });
+
+test("a rejecting DevTools subscriber is reported without stopping other subscribers", async () => {
+  const browser = new Window();
+  try {
+    await withBrowser(browser, async () => {
+      const root = browser.document.createElement("div") as unknown as Element;
+      const release = registerDevtoolsInstance({ componentId: "subscriber", name: "Subscriber", file: "Subscriber.meeko", scope: { root }, props: {}, bindings: {} });
+      const hook = Reflect.get(browser, "__MEEKO_DEVTOOLS__") as DevtoolsHook;
+      const id = hook.snapshot().instances[0]!.id;
+      const logged: unknown[][] = [];
+      const originalError = console.error;
+      console.error = (...args: unknown[]) => { logged.push(args); };
+      let notifications = 0;
+      const stopFailing = hook.subscribe(async () => { throw new Error("subscriber rejected"); });
+      const stopHealthy = hook.subscribe(() => { notifications++; });
+      try {
+        hook.select(id);
+        await new Promise<void>((done) => setImmediate(done));
+        assert.equal(notifications, 1);
+        assert.match(String(logged[0]?.[0]), /Meeko DevTools subscriber failed/);
+        assert.match(String(logged[0]?.[1]), /subscriber rejected/);
+      } finally {
+        stopFailing();
+        stopHealthy();
+        console.error = originalError;
+        release();
+      }
+    });
+  } finally {
+    browser.happyDOM.abort();
+  }
+});

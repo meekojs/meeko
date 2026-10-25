@@ -5,6 +5,9 @@ import { compileWithAutoImports } from "./autoimports.js";
 import { moduleSpecifiers, replaceModuleSpecifiers } from "./compiler/import-graph.js";
 import { projectRoot } from "./compiler/project-root.js";
 
+/** Stable ownership marker for generated component declarations. */
+export const componentTypeDeclarationMarker = "// @meeko-generated component-declaration v1";
+
 /** Genera declaraciones TypeScript para un componente y sus imports .meeko relativos. */
 export async function generateTypes(source: string, filename: string): Promise<string[]> {
   if (!filename.endsWith(".meeko")) throw new TypeError("Type generation requires a .meeko input file");
@@ -21,7 +24,7 @@ export async function generateTypes(source: string, filename: string): Promise<s
     });
     const error = result.diagnostics?.find((diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error);
     if (error) throw new Error(ts.flattenDiagnosticMessageText(error.messageText, "\n"));
-    declarations.set(path, result.outputText);
+    declarations.set(path, `${componentTypeDeclarationMarker}\n${result.outputText}`);
     for (const { value: specifier } of moduleSpecifiers(generated, path)) {
       if (!specifier.endsWith(".meeko")) continue;
       if (!specifier.startsWith(".")) continue;
