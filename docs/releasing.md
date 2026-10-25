@@ -152,3 +152,13 @@ El paquete [npm `1.0.0-rc.1`](https://www.npmjs.com/package/@meekojs/meeko/v/1.0
 - **Instalación desde npm.** En un proyecto vacío, `@meekojs/meeko@next` instaló la `1.0.0-rc.1`, `meeko init-framework` creó la aplicación con esa versión fijada y `meeko check` y `meeko build` pasaron. `meeko start` se detuvo con el aviso esperado de configurar un store de sesiones persistente.
 
 Durante el periodo de prueba de la rc sólo se admiten correcciones que no cambien la API. Si alguna la cambiara, se publicaría `1.0.0-rc.2` siguiendo los mismos pasos.
+
+## Versión 1.0.0
+
+El paquete [npm `1.0.0`](https://www.npmjs.com/package/@meekojs/meeko/v/1.0.0) salió del commit `3e39f21` y coincide con la etiqueta [`v1.0.0`](https://github.com/meekojs/meeko/releases/tag/v1.0.0). Es la primera versión estable y se publicó en el dist-tag `latest`. El código es el de `1.0.0-rc.1`; entre ambas sólo cambiaron la documentación de esta página, la versión y el CHANGELOG. El mantenedor decidió publicarla sin agotar el periodo de prueba de la rc.
+
+- **Gates locales** sobre `3e39f21`: `verify` (458/458 y 10/10 de DevTools), conformidad en Node, Bun, Deno y workerd (66/66), `e2e`, `pilot:e2e`, `package:smoke`, el consumidor full-stack, `npm pack --dry-run` (285 archivos) y `git diff --check`.
+- **CI.** [La verificación de `3e39f21`](https://github.com/meekojs/meeko/actions/runs/40198651720) pasó en todos sus jobs.
+- **Publicación.** [El workflow de publicación](https://github.com/meekojs/meeko/actions/runs/40199343334) repitió los gates y publicó mediante OIDC con procedencia SLSA. `npm view` confirmó la versión, el `gitHead` y `latest: 1.0.0`. La [release de GitHub](https://github.com/meekojs/meeko/releases/tag/v1.0.0) es la más reciente y contiene los seis VSIX, el ZIP de Chrome DevTools y `SHA256SUMS.txt`.
+- **Instalación desde npm.** En un proyecto vacío, `@meekojs/meeko` instaló la `1.0.0`; `meeko init-framework`, `meeko check` y `meeko build` pasaron.
+- **Pendiente.** El dist-tag `next` sigue en `1.0.0-rc.1` porque moverlo requiere una sesión de npm del mantenedor (`npm dist-tag add @meekojs/meeko@1.0.0 next`). Las extensiones no se han publicado en sus tiendas: sus workflows esperan los secretos descritos arriba.
