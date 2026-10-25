@@ -45,3 +45,11 @@ El paquete [npm `0.0.2`](https://www.npmjs.com/package/@meekojs/meeko/v/0.0.2) s
 ## Versión 0.0.3
 
 El paquete [npm `0.0.3`](https://www.npmjs.com/package/@meekojs/meeko/v/0.0.3) salió del commit `2b71e9c` y coincide con la etiqueta [`v0.0.3`](https://github.com/meekojs/meeko/releases/tag/v0.0.3). La [CI de `main`](https://github.com/meekojs/meeko/actions/runs/40059687018) pasó en cuatro trabajos antes de etiquetar. El [workflow de publicación](https://github.com/meekojs/meeko/actions/runs/40059931166) pasó y publicó mediante OIDC con procedencia firmada. Se instaló después desde npm en un proyecto pnpm preexistente, donde `meeko init .`, el chequeo de tipos, la compilación de cliente y servidor y la respuesta SSR de producción funcionaron.
+
+## Versión 0.0.4
+
+El paquete [npm `0.0.4`](https://www.npmjs.com/package/@meekojs/meeko/v/0.0.4) salió del commit `fd99fac` y coincide con la etiqueta `v0.0.4`. La [CI de `main`](https://github.com/meekojs/meeko/actions/runs/40078268533) pasó antes de etiquetar. El [workflow de publicación](https://github.com/meekojs/meeko/actions/runs/40078864386) pasó y publicó mediante OIDC con procedencia firmada. Es la primera versión con el framework full-stack.
+
+## Versión 0.1.0
+
+El paquete [npm `0.1.0`](https://www.npmjs.com/package/@meekojs/meeko/v/0.1.0) salió del commit `b492cf1` y coincide con la etiqueta [`v0.1.0`](https://github.com/meekojs/meeko/releases/tag/v0.1.0). Contiene cambios incompatibles respecto de `0.0.4`, documentados con su migración en el [CHANGELOG](../CHANGELOG.md). La [CI de `main`](https://github.com/meekojs/meeko/actions/runs/40168927109) pasó antes de etiquetar. El [workflow de publicación](https://github.com/meekojs/meeko/actions/runs/40169193614) repitió los gates y publicó mediante OIDC con procedencia SLSA firmada. Se instaló después desde npm en un proyecto vacío, donde la reactividad, las subrutas `framework` y `server` y los comandos `dev`, `check`, `build` y `start` de la CLI respondieron.
