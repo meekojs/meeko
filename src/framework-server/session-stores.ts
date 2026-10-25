@@ -1,5 +1,8 @@
 import { serializeJson } from "../server.js";
+import { RedisChannelSubscriptions } from "./redis-pubsub.js";
+import type { RedisSubscriberClient } from "./redis-pubsub.js";
 import type { SessionRecord, SessionStore } from "./sessions.js";
+import type { Unsubscribe } from "./socket.js";
 
 /** Small interface compatible with Redis clients that support SET PX. */
 export interface RedisSessionClient {
@@ -15,6 +18,12 @@ export interface RedisSessionStoreOptions {
   prefix: string;
   /** Close the Redis client when this store owns its connection. */
   closeClient?: boolean;
+  /**
+   * Dedicated subscriber connection (for example `client.duplicate()`). With it
+   * the store receives revocations published by every instance on
+   * `<prefix>revoked`. The application owns and closes this client.
+   */
+  subscriber?: RedisSubscriberClient;
 }
 
 function decodeRecord<T>(value: string, id: string): SessionRecord<T> {
@@ -35,9 +44,27 @@ function decodeRecord<T>(value: string, id: string): SessionRecord<T> {
 /** Persistent store with Redis-managed expiration and explicit connection ownership. */
 export class RedisSessionStore<T = unknown> implements SessionStore<T> {
   readonly persistent = true;
+  /** Present only with a `subscriber` client. */
+  readonly subscribeRevocations?: (listener: (familyId: string) => void) => Promise<Unsubscribe>;
   constructor(private readonly client: RedisSessionClient, private readonly options: RedisSessionStoreOptions) {
     if (!options.prefix || !options.prefix.endsWith(":") || /\s/.test(options.prefix)) throw new TypeError("Session Redis prefix must be nonempty, contain no whitespace, and end with ':'");
+    const subscriber = options.subscriber;
+    if (subscriber) {
+      const subscriptions = new RedisChannelSubscriptions<(familyId: string) => void>(
+        (channel, listener) => subscriber.subscribe(channel, listener),
+        (channel, listener) => subscriber.unsubscribe(channel, listener),
+        (familyId, listeners) => {
+          if (!familyId) return;
+          for (const listener of listeners) {
+            try { listener(familyId); }
+            catch (error) { console.error("[meeko] Session revocation listener failed", error); }
+          }
+        },
+      );
+      this.subscribeRevocations = (listener) => subscriptions.add(this.revocationChannel(), listener);
+    }
   }
+  private revocationChannel(): string { return `${this.options.prefix}revoked`; }
   private key(id: string): string { return `${this.options.prefix}${id}`; }
   private familyKey(id: string): string { return `${this.options.prefix}family:${id}`; }
   async get(id: string): Promise<SessionRecord<T> | undefined> {
@@ -85,8 +112,8 @@ export class RedisSessionStore<T = unknown> implements SessionStore<T> {
   }
   async revokeFamily(familyId: string): Promise<void> {
     await this.client.eval(
-      "-- meeko:session:revoke-family\nlocal active = redis.call('GET', KEYS[1]) if active then redis.call('DEL', ARGV[1] .. active) redis.call('DEL', KEYS[1]) else redis.call('DEL', ARGV[1] .. ARGV[2]) end return 1",
-      { keys: [this.familyKey(familyId)], arguments: [this.options.prefix, familyId] },
+      "-- meeko:session:revoke-family\nlocal active = redis.call('GET', KEYS[1]) if active then redis.call('DEL', ARGV[1] .. active) redis.call('DEL', KEYS[1]) else redis.call('DEL', ARGV[1] .. ARGV[2]) end redis.call('PUBLISH', ARGV[3], ARGV[2]) return 1",
+      { keys: [this.familyKey(familyId)], arguments: [this.options.prefix, familyId, this.revocationChannel()] },
     );
   }
   async close(): Promise<void> { if (this.options.closeClient) await this.client.quit?.(); }

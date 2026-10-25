@@ -70,46 +70,6 @@ test("socket pub/sub releases listeners and enforces message limits", async () =
   assert.deepEqual(b.closed, [1009]);
 });
 
-test("outbound delivery rechecks a revoked session", async () => {
-  const store = new MemorySessionStore();
-  const sessions = new SessionManager({ store, secure: false });
-  const handle = await sessions.load(new Request("https://example.test/"));
-  const record = await handle.create({ user: "alice" });
-  const channel = defineSocketChannel({ clientToServer: { message: messageSchema }, serverToClient: { message: messageSchema }, auth: "required" });
-  const hub = createSocketHub({ channels: { chat: channel }, sessions, services: {} });
-  const acceptedPeer = peer();
-  await hub.accept("chat", new Request("https://example.test/socket/chat", { headers: { origin: "https://example.test", cookie: `meeko.sid=${record.id}` } }), acceptedPeer.socket, "room");
-  await store.delete(record.id);
-  await assert.rejects(hub.broadcast("chat", "room", "message", { text: "later" }), (error: unknown) => error instanceof ApiError && error.code === "UNAUTHENTICATED");
-  assert.equal(acceptedPeer.sent.length, 0);
-  assert.deepEqual(acceptedPeer.closed, [1008]);
-});
-
-test("a failed socket peer does not suppress delivery to other peers", async () => {
-  const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
-  const channel = defineSocketChannel({ clientToServer: { message: messageSchema }, serverToClient: { message: messageSchema } });
-  const hub = createSocketHub({ channels: { chat: channel }, sessions, services: {} });
-  const request = new Request("https://example.test/socket/chat", { headers: { origin: "https://example.test" } });
-  const closed: number[] = [];
-  let attempts = 0;
-  await hub.accept("chat", request, {
-    send() { attempts++; throw new Error("peer disconnected during send"); },
-    close(code) { closed.push(code ?? 1000); },
-  }, "room");
-  const healthy = peer();
-  const connection = await hub.accept("chat", request, healthy.socket, "room");
-
-  await assert.rejects(hub.broadcast("chat", "room", "message", { text: "first" }), /peer disconnected during send/);
-  assert.deepEqual(healthy.sent.map((message) => JSON.parse(message) as unknown), [
-    { event: "message", payload: { text: "first" } },
-  ]);
-  assert.deepEqual(closed, [1011]);
-  await hub.broadcast("chat", "room", "message", { text: "second" });
-  assert.equal(attempts, 1);
-  assert.equal(healthy.sent.length, 2);
-  connection.close();
-});
-
 test("socket close still closes the peer and preserves both cleanup failures", async () => {
   const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
   const channel = defineSocketChannel({ clientToServer: {}, serverToClient: {} });

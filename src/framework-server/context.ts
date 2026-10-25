@@ -7,6 +7,7 @@ import type { ServerPlatform } from "./platform.js";
 export interface RequestContext<TServices = unknown, TEnv = unknown> {
   readonly request: Request;
   readonly requestId: string;
+  /** Aborts when the client disconnects or, with `SessionRevokedError`, when the session is revoked. */
   readonly signal: AbortSignal;
   readonly services: TServices;
   readonly session: SessionHandle;
@@ -30,10 +31,15 @@ export function currentRequest(): ActiveRequest {
   return active;
 }
 
-/** Without an adapter platform, the context receives a detached platform with an empty environment. */
+/**
+ * Without an adapter platform, the context receives a detached platform with an
+ * empty environment. `signal` aborts when the client disconnects or, with
+ * `SessionRevokedError`, when the session's family is revoked.
+ */
 export function createRequestContext<TServices, TEnv = unknown>(request: Request, services: TServices, session: SessionHandle, platform?: ServerPlatform<TEnv>): RequestContext<TServices, TEnv> {
+  const revocation = (session as Partial<SessionHandle> | undefined)?.signal;
   return {
-    request, requestId: crypto.randomUUID(), signal: request.signal, services, session, state: new Map(),
+    request, requestId: crypto.randomUUID(), signal: revocation ? AbortSignal.any([request.signal, revocation]) : request.signal, services, session, state: new Map(),
     platform: platform ?? defaultPlatform() as ServerPlatform<TEnv>,
   };
 }

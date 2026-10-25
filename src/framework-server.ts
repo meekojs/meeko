@@ -15,12 +15,14 @@ export { MemorySessionStore, SessionHandle, SessionManager, SessionSecurityError
 export type { SessionOptions, SessionRecord, SessionStore } from "./framework-server/sessions.js";
 export { RedisSessionStore, SqlSessionStore } from "./framework-server/session-stores.js";
 export type { RedisSessionClient, RedisSessionStoreOptions, SqlSessionDriver, SqlSessionRow, SqlSessionStoreOptions } from "./framework-server/session-stores.js";
-export { ApiError, defineApiRoute, defineRpc, dispatchApiRoute, dispatchRpc, errorResponse, executeApiRoute, executeRpc } from "./framework-server/contracts.js";
+export { ApiError, SessionRevokedError, defineApiRoute, defineRpc, dispatchApiRoute, dispatchRpc, errorResponse, executeApiRoute, executeRpc } from "./framework-server/contracts.js";
 export type { ApiRouteDefinition, RpcDefinition, Schema, ServerErrorObserver } from "./framework-server/contracts.js";
 export { createLocalServerFetch, createServerDispatcher, loadSocketChannels } from "./framework-server/discovery.js";
 export type { ApiEndpoint, ApiMethod, RpcEndpoint, SocketEndpoint, ServerDispatcherOptions, ServerManifest, ServerModuleLoader } from "./framework-server/discovery.js";
 export { createSocketHub, defineSocketChannel, LocalSocketPubSub } from "./framework-server/socket.js";
-export type { SocketChannelDefinition, SocketConnection, SocketHub, SocketHubOptions, SocketPeer, SocketPubSub } from "./framework-server/socket.js";
+export type { LocalSocketPubSubOptions, SocketChannelDefinition, SocketConnection, SocketDeliveryErrorContext, SocketHub, SocketHubOptions, SocketMessage, SocketPeer, SocketPubSub, Unsubscribe } from "./framework-server/socket.js";
+export { RedisSocketPubSub } from "./framework-server/redis-pubsub.js";
+export type { RedisMessageListener, RedisPublisherClient, RedisSocketPubSubOptions, RedisSubscriberClient } from "./framework-server/redis-pubsub.js";
 export { createSocketUpgradeHandler } from "./framework-server/upgrade.js";
 export type { SocketSession, SocketUpgrade, SocketUpgradeHandler, SocketUpgradeOptions } from "./framework-server/upgrade.js";
 export { generateOpenApi } from "./framework-server/openapi.js";

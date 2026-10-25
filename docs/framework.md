@@ -311,7 +311,48 @@ const send = async () => chat?.emit("message", { text: "Hola", roomId: "general"
 `socket.chat.on(...)` y `socket.chat.emit(...)` ofrecen un registro tipado alternativo. El registro abre conexiones sólo al acceder al canal en navegador. Dentro de `mountClientApp`, cada aplicación conserva su propia conexión por canal y la cierra al desmontarse; los listeners registrados durante el setup se desuscriben al liberar su raíz. Fuera de una aplicación montada, el registro conserva su cliente compartido y el llamador debe liberar sus listeners. `useSocket` requiere una raíz de componente y libera su conexión al desmontar. Durante SSR no se abre ninguna conexión. El cliente usa WebSocket nativo, reconexión con retroceso configurable y entrega a lo sumo una vez: `emit` rechaza si está desconectado, sin cola ni reenvío. Los mensajes entrantes inválidos cierran el canal; un error del transporte se informa una vez por conexión activa y los errores de conexiones reemplazadas se ignoran. Un listener u observador de `state` que falle se informa sin impedir la ejecución de los demás listeners ni salir del callback del transporte. El cliente de bajo nivel acepta `onError(error)` para observar estos fallos; sin callback de aplicación o componente, los registra en la consola.
 El registro `socket` es de alcance de aplicación: cancele listeners con la función que devuelve `on` y cierre el canal cuando ya no se necesite.
 
-`serveNode` conecta `attachNodeWebSocketServer` al mismo servidor HTTP cuando la aplicación declara canales. El adaptador Node usa `ws` para framing y upgrades; Bun usa el WebSocket nativo de `Bun.serve` y Deno `Deno.upgradeWebSocket` (véanse sus límites en [Bun](#bun) y [Deno](#deno)). Los tres comparten `createSocketUpgradeHandler`, que comprueba ruta, Origin y sesión antes del upgrade, y el hub existente valida Origin, sesión, canal, sala, evento y payload; aplica límites de mensaje/buffer, heartbeat y cierre ordenado. Un peer que falla durante un broadcast se cierra y se desuscribe; el hub intenta entregar a los demás y comunica el fallo al emisor. Tras un proxy, el mismo `publicOrigin` de `server/runtime.ts` o `PUBLIC_ORIGIN` rige la comprobación de Origin de HTTP y de Socket. `LocalSocketPubSub` cubre una instancia; `SocketPubSub` permite un adaptador distribuido futuro, pero Redis Pub/Sub aún no está implementado.
+`serveNode` conecta `attachNodeWebSocketServer` al mismo servidor HTTP cuando la aplicación declara canales. El adaptador Node usa `ws` para framing y upgrades; Bun usa el WebSocket nativo de `Bun.serve` y Deno `Deno.upgradeWebSocket` (véanse sus límites en [Bun](#bun) y [Deno](#deno)). Los tres comparten `createSocketUpgradeHandler`, que comprueba ruta, Origin y sesión antes del upgrade, y el hub existente valida Origin, sesión, canal, sala, evento y payload; aplica límites de mensaje/buffer, heartbeat y cierre ordenado. Tras un proxy, el mismo `publicOrigin` de `server/runtime.ts` o `PUBLIC_ORIGIN` rige la comprobación de Origin de HTTP y de Socket.
+
+### Broadcast y varias instancias
+
+`hub.broadcast(channel, room, event, payload)` valida el evento y el payload, y se resuelve cuando el broker acepta el mensaje. No espera a que lleguen a los peers ni informa de sus fallos al emisor. Sólo rechaza si el evento no existe, el payload no cumple su schema o el broker no acepta la publicación.
+
+- **Entrega a lo sumo una vez por peer.** No hay cola ni reenvío: un mensaje publicado mientras una instancia está desconectada del broker se pierde. Cada peer recibe los mensajes de una instancia en el orden de llegada.
+- **Comprobaciones en el receptor.** Cada instancia receptora vuelve a validar el payload con el schema y relee la sesión, `authorize` y `authorizeSend` antes de enviar a cada peer local.
+- **`authorizeSend` filtra.** Si devuelve `false`, ese peer no recibe el broadcast y sigue conectado. En un `emit` directo, el mismo rechazo lanza `FORBIDDEN`.
+- **Un peer que falla se cierra.** Puede fallar por sesión caducada, `authorize` rechazado, límite de tamaño o error de envío. El peer se cierra con `1008` (fallo de política), `1009` (tamaño) o `1011` (error interno) y se desuscribe. El error llega a `SocketHubOptions.onDeliveryError(error, { channel, room, event })` de la instancia que tiene ese peer. Un payload que no cumple el schema en el receptor se descarta y se informa sin cerrar al peer.
+- **Observador por defecto.** `createServerApp` envía `onDeliveryError` al `onError` del runtime con un ID nuevo; `socket.onDeliveryError` de `server/runtime.ts` lo sustituye. Sin observador, el hub usa `console.error`.
+
+`LocalSocketPubSub` cubre una sola instancia, y su `publish` también espera los intentos de entrega locales. Para varias instancias o procesos, use `RedisSocketPubSub`:
+
+```ts
+// server/runtime.ts
+import { createClient } from "redis";
+import { defineServerRuntime, RedisSessionStore, RedisSocketPubSub, SessionManager } from "@meekojs/meeko/server";
+
+export default defineServerRuntime(async ({ env, production, prerendering }) => {
+  const redis = createClient({ url: env.REDIS_URL });
+  await redis.connect();
+  const subscriber = redis.duplicate(); // conexión dedicada en modo suscriptor
+  await subscriber.connect();
+  return {
+    sessions: new SessionManager({ store: new RedisSessionStore(redis, { prefix: "app:prod:session:", subscriber }), production: production && !prerendering }),
+    socket: { pubsub: new RedisSocketPubSub({ publisher: redis, subscriber, prefix: "app:prod:" }) },
+    close: async () => { await subscriber.quit(); await redis.quit(); },
+  };
+});
+```
+
+- **Clientes.** `publisher` y `subscriber` siguen la interfaz de node-redis 4 o posterior (`publish`, `subscribe(channel, listener)`, `unsubscribe(channel, listener)`); el suscriptor necesita su propia conexión. La aplicación abre y cierra ambos clientes.
+- **Canales Redis.** Cada par canal/sala usa el canal `<prefix>socket:<canal>:<sala>`, con canal y sala codificados con `encodeURIComponent`. Cada instancia se suscribe una sola vez por sala mientras tenga peers locales en ella y se desuscribe al irse el último. `hub.accept` se resuelve cuando Redis confirma la suscripción.
+- **Formato.** El mensaje viaja como `{ v: 1, event, payload }`, serializado con `serializeJson`. `publish` rechaza con `SOCKET_LIMIT_EXCEEDED` (413) los mensajes de más de `maxMessageBytes` (1 MiB por defecto) antes de enviarlos a Redis. El receptor descarta los mensajes mal formados o con otra versión y los informa a `onError` de `RedisSocketPubSub` (por defecto, `console.error`).
+- **Redis Cluster.** Con Redis 7 o posterior, `sharded: true` usa `SPUBLISH`/`SSUBSCRIBE`/`SUNSUBSCRIBE`, que en un clúster mantienen cada sala dentro de su shard. Los clientes deben ofrecer `sPublish`, `sSubscribe` y `sUnsubscribe`.
+
+Una implementación propia de `SocketPubSub` debe cumplir el mismo contrato:
+
+- `publish(channel, room, { event, payload })` se resuelve cuando el broker acepta el mensaje.
+- `subscribe(channel, room, listener)` devuelve, o promete, una función `Unsubscribe` que puede ser asíncrona.
+- Los listeners del hub nunca rechazan, así que el broker no debe agregar sus errores.
 
 ## Runtime de servidor
 
@@ -338,7 +379,8 @@ export default defineServerRuntime(async ({ env, production, prerendering }) => 
 - `services` puede ser un objeto compartido o una función por petición; llega a páginas, API, RPC y Socket como `RequestContext.services`.
 - `RequestContext.platform` expone `{ name, env, waitUntil(promise) }`. En Node, `serveNode` espera las tareas registradas con `waitUntil` antes de cerrar la aplicación. Las tareas registradas fuera de una petición HTTP, como en callbacks de Socket, quedan a cargo de la aplicación: `app.close()` las espera y sus fallos llegan al observador `onError` del runtime en lugar de la consola.
 - `publicOrigin` es el origen público de la aplicación, por ejemplo `https://example.com` tras un proxy que termina TLS. HTTP y Socket comparan `Origin` con ese valor; `PUBLIC_ORIGIN` lo sustituye en el build Node.
-- `onError` recibe los fallos internos con su ID de petición; sin él, Meeko registra el nombre del error y el ID, y en desarrollo también el error completo.
+- `onError` recibe los fallos internos con su ID de petición; sin él, Meeko registra el nombre del error y el ID, y en desarrollo también el error completo. También recibe los fallos de entrega de Socket, salvo que `socket.onDeliveryError` los observe por separado.
+- `socket.pubsub` elige el broker de broadcast; véase [Broadcast y varias instancias](#broadcast-y-varias-instancias).
 - `close` se ejecuta después de cerrar las sesiones, al detener el servidor.
 
 `createServerApp({ manifest, load, runtime, production })` de `@meekojs/meeko/server` crea la misma aplicación a partir de un manifiesto y un cargador de módulos, y expone `fetch(request, platform?)`, `socket`, `publicOrigin`, `reportError` y `close()`. El entry generado por `meeko build` la usa; un host propio puede servirla con `serveNode(app, { host, port, publicOrigin, handleSignals, shutdownTimeout })` de `@meekojs/meeko/node`. Si el servidor arranca pero falla la conexión de Socket, `serveNode` libera el puerto y cierra la aplicación antes de propagar el error.
@@ -354,6 +396,17 @@ Todo `SessionStore` persistente personalizado debe almacenar `familyId` y garant
 **Migración de drivers SQL existentes:** añada una columna de familia a la tabla (por ejemplo, `family_id`), rellene las filas existentes con `family_id = id` y cree un índice único sobre ella. `read` y `write` deben transferir `SqlSessionRow.familyId`; `replace` debe comprobar la misma familia y sustituir la fila en una transacción; `revokeFamily(familyId)` debe borrar la fila activa por familia. Migre el esquema antes de iniciar la nueva versión. Un driver antiguo sin `revokeFamily` falla al construir `SqlSessionStore`; no se admite silenciosamente en producción.
 
 Para Redis, instale `redis` en la aplicación, cree el cliente con `createClient({ url: process.env.REDIS_URL })`, llame `connect()` antes de servir tráfico y páselo a `RedisSessionStore` con un prefijo propio. El host debe cerrar su cliente con `quit()` al detenerse; `SessionManager.close()` cierra el store, pero no se apropia de clientes externos. La prueba de integración `tests/redis.integration.ts` usa un namespace aleatorio y sólo borra sus propias claves. Se ejecuta contra un Redis real con `MEEKO_REDIS_URL=redis://127.0.0.1:6379 pnpm exec tsx --test tests/redis.integration.ts`; CI dispone de un servicio Redis dedicado. La prueba local requiere un Redis accesible y no usa bases ajenas.
+
+### Revocación durante una petición
+
+Revocar una familia también detiene el trabajo que ya había pasado la autenticación:
+
+- **Peticiones en curso.** `SessionHandle.signal` se aborta con `SessionRevokedError` cuando se revoca la familia de su sesión, y `RequestContext.signal` combina esa señal con la de la petición (`AbortSignal.any`). Pase `context.signal` a `fetch`, consultas y otras operaciones cancelables. `SessionRevokedError` es un `ApiError` con código `SESSION_REVOKED` y estado `401`; si escapa del handler, la respuesta es ese `401`. La petición que llama a `revoke()` no se aborta, porque debe enviar la cookie vacía.
+- **Sockets abiertos.** Las conexiones Socket cuya sesión de handshake pertenece a la familia revocada se cierran de inmediato con `1008` ("Session revoked"), sin esperar a otro evento.
+- **Otras instancias.** Dentro de la misma instancia, `revoke()` aborta siempre. Para alcanzar a otras instancias, el store implementa `subscribeRevocations(listener)`, que devuelve, o promete, un `Unsubscribe`. `RedisSessionStore` la ofrece cuando recibe `subscriber` (una conexión dedicada, por ejemplo `client.duplicate()`). El script de `revokeFamily` publica el `familyId` en `<prefix>revoked` en la misma operación atómica que borra la sesión. `MemorySessionStore` avisa a los `SessionManager` del mismo proceso que lo comparten. `SqlSessionStore` no tiene notificación: sin ella, las demás instancias sólo detectan la revocación al releer el store.
+- **Inicio de la suscripción.** `SessionManager` se suscribe en la primera llamada a `load` y espera la confirmación antes de autenticar. Si la suscripción falla, `load` rechaza esa petición y la siguiente lo reintenta. `SessionManager.close()` cancela la suscripción.
+
+La notificación es asíncrona: entre el borrado en el store y la llegada del aviso, otra instancia puede seguir ejecutando código. Antes de un efecto irreversible (un pago, un envío, un borrado), llame `await context.session.verify()`. Relee el store y lanza `SessionRevokedError` si la sesión fue revocada, reemplazada por una rotación o caducó; sin sesión no hace nada.
 
 Un almacenamiento caído propaga error y no concede acceso. No se debe usar un store en memoria en producción. `Secure` requiere HTTPS en despliegue; configure el proxy y `PUBLIC_ORIGIN` acorde al origen público.
 
@@ -489,6 +542,6 @@ Mientras la versión sea `0.x`, documente cada cambio incompatible y añada una 
 - Los canales Socket se descubren como archivos con nombre simple bajo `server/socket/`.
 - Cambios en configuración o registro de autoimports fuerzan recarga completa en Vite.
 - `server/runtime.ts` del starter requiere un store de sesiones persistente antes de servir producción.
-- La revocación por familia invalida el ID activo ante rotaciones concurrentes, pero las peticiones que ya pasaron autenticación pueden continuar ejecutándose. Si la aplicación requiere orden estricto entre operaciones en curso, debe coordinar esas operaciones. Meeko evita que una respuesta anterior restaure un token CSRF ya cambiado.
+- La revocación por familia invalida el ID activo ante rotaciones concurrentes, aborta `RequestContext.signal` de las peticiones en curso de esa familia y cierra sus sockets. En otras instancias, esto requiere un store con `subscribeRevocations`. El aborto es cooperativo: el código que no observa `context.signal` sigue ejecutándose hasta su siguiente comprobación, y el aviso entre instancias llega con la latencia del broker. Llame `context.session.verify()` antes de efectos irreversibles. Si la aplicación requiere orden estricto entre operaciones en curso, debe coordinarlas. Meeko evita que una respuesta anterior restaure un token CSRF ya cambiado.
 - La navegación cliente es transaccional. Sin layouts compartidos, la vista nueva se hidrata junto a la actual entre marcadores privados y la anterior sólo se retira y libera después de una hidratación correcta. Con un layout conservado, el outlet restaura e hidrata de nuevo su página anterior si falla la nueva. En ambos casos la ruta visible, su URL y su estado siguen activos y `navigate()` rechaza con el error original. Sólo si también falla esa restauración, Meeko solicita una carga completa de la última URL confirmada. Durante la hidratación de la vista nueva, la anterior sigue en el documento: un `id` repetido entre ambas páginas puede resolver al elemento antiguo hasta el commit.
 - Si la API de historial del navegador falla después de renderizar, Meeko solicita recargar la última URL confirmada y propaga el error original. Si también falla esa recuperación, conserva ambas causas en `AggregateError`.

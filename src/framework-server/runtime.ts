@@ -1,7 +1,7 @@
 import type { ServerErrorObserver } from "./contracts.js";
 import type { PlatformName, ServerPlatform } from "./platform.js";
 import type { SessionManager } from "./sessions.js";
-import type { SocketPubSub } from "./socket.js";
+import type { SocketDeliveryErrorContext, SocketPubSub } from "./socket.js";
 
 /** Values available while the application runtime is created. */
 export interface ServerRuntimeContext<Env = Readonly<Record<string, string | undefined>>> {
@@ -24,7 +24,10 @@ export interface ServerRuntime<Services = unknown, Env = unknown> {
   /** Exposed as `RequestContext.services` to pages, API, RPC and Socket channels. */
   readonly services?: ServerServices<Services, Env>;
   readonly socket?: {
+    /** Broker between instances, such as `RedisSocketPubSub`. Defaults to `LocalSocketPubSub`. */
     readonly pubsub?: SocketPubSub;
+    /** Failed deliveries to local peers. Defaults to `onError` with a new request ID. */
+    readonly onDeliveryError?: (error: unknown, context: SocketDeliveryErrorContext) => void;
     readonly allowedOrigins?: readonly string[];
     /** Maximum inbound and outbound message size. Defaults to 64 KiB. */
     readonly maxMessageBytes?: number;

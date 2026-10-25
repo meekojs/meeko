@@ -1,5 +1,5 @@
 import { createRequestContext, type RequestContext } from "./context.js";
-import { ApiError, type Schema } from "./contracts.js";
+import { ApiError, normalizeServerError, observeErrorCallback, SessionRevokedError, type Schema } from "./contracts.js";
 import { serializeJson } from "../server.js";
 import type { SessionManager } from "./sessions.js";
 import type { ServerPlatform } from "./platform.js";
@@ -27,31 +27,56 @@ export function defineSocketChannel<C extends SchemaMap, S extends SchemaMap, TS
   return definition;
 }
 
-export interface SocketPubSub {
-  publish(channel: string, room: string, message: { event: string; payload: unknown }): Promise<void>;
-  subscribe(channel: string, room: string, listener: (message: { event: string; payload: unknown }) => void | Promise<void>): () => void;
+/** Event and payload carried between instances; payloads are validated again on delivery. */
+export interface SocketMessage {
+  readonly event: string;
+  readonly payload: unknown;
 }
 
+/** Releases a subscription; may finish asynchronously. */
+export type Unsubscribe = () => void | Promise<void>;
+
+/**
+ * Broker between hubs. `publish` resolves once the broker accepts the message;
+ * delivery to each subscribed peer happens at most once and its failures never
+ * reach the publisher. `subscribe` resolves once the broker is listening.
+ */
+export interface SocketPubSub {
+  publish(channel: string, room: string, message: SocketMessage): Promise<void>;
+  subscribe(channel: string, room: string, listener: (message: SocketMessage) => void | Promise<void>): Unsubscribe | Promise<Unsubscribe>;
+}
+
+export interface LocalSocketPubSubOptions {
+  /** Receives a listener failure; defaults to `console.error`. Hub listeners never fail. */
+  onListenerError?(error: unknown): void;
+}
+
+/** Single-instance broker; `publish` also waits for local delivery attempts. */
 export class LocalSocketPubSub implements SocketPubSub {
-  private readonly listeners = new Map<string, Set<(message: { event: string; payload: unknown }) => void | Promise<void>>>();
-  async publish(channel: string, room: string, message: { event: string; payload: unknown }): Promise<void> {
-    const errors: unknown[] = [];
-    for (const listener of this.listeners.get(`${channel}\0${room}`) ?? []) {
+  private readonly listeners = new Map<string, Set<(message: SocketMessage) => void | Promise<void>>>();
+  constructor(private readonly options: LocalSocketPubSubOptions = {}) {}
+  async publish(channel: string, room: string, message: SocketMessage): Promise<void> {
+    const listeners = [...this.listeners.get(`${channel}\0${room}`) ?? []];
+    await Promise.all(listeners.map(async (listener) => {
       try { await listener(message); }
-      catch (error) { errors.push(error); }
-    }
-    if (errors.length === 1) throw errors[0];
-    if (errors.length > 1) throw new AggregateError(errors, "Socket delivery failed for multiple peers");
+      catch (error) { this.report(error); }
+    }));
   }
-  subscribe(channel: string, room: string, listener: (message: { event: string; payload: unknown }) => void | Promise<void>): () => void {
+  subscribe(channel: string, room: string, listener: (message: SocketMessage) => void | Promise<void>): Unsubscribe {
     const key = `${channel}\0${room}`;
     let listeners = this.listeners.get(key);
     if (!listeners) { listeners = new Set(); this.listeners.set(key, listeners); }
     listeners.add(listener);
     return () => {
       listeners!.delete(listener);
-      if (!listeners!.size) this.listeners.delete(key);
+      if (!listeners!.size && this.listeners.get(key) === listeners) this.listeners.delete(key);
     };
+  }
+  private report(error: unknown): void {
+    try {
+      if (this.options.onListenerError) this.options.onListenerError(error);
+      else console.error("[meeko] Socket listener failed", error);
+    } catch { /* Observer failures cannot stop delivery to other listeners. */ }
   }
 }
 
@@ -71,11 +96,30 @@ export interface SocketHubOptions<TServices = unknown> {
   pubsub?: SocketPubSub;
   /** Runtime exposed through `RequestContext.platform` in channel callbacks. */
   platform?: ServerPlatform;
+  /**
+   * Receives a failed delivery to a local peer, which is closed, and failed
+   * asynchronous unsubscriptions (without `event`). Never reaches the
+   * broadcaster. Defaults to `console.error`.
+   */
+  onDeliveryError?(error: unknown, context: SocketDeliveryErrorContext): void;
+}
+
+/** Where a delivery failed; `event` is absent for unsubscription failures. */
+export interface SocketDeliveryErrorContext {
+  readonly channel: string;
+  readonly room: string;
+  readonly event?: string;
 }
 
 export interface SocketHub {
   preflight(name: string, request: Request, roomId?: string): Promise<void>;
+  /** Resolves once the connection is subscribed to its channel and room. */
   accept(name: string, request: Request, peer: SocketPeer, roomId?: string): Promise<SocketConnection>;
+  /**
+   * Validates the event and resolves once the broker accepts it. Each peer
+   * receives it at most once; a peer that fails is closed and reported through
+   * `onDeliveryError` on the hub that owns it.
+   */
   broadcast(name: string, roomId: string, event: string, payload: unknown): Promise<void>;
 }
 
@@ -110,14 +154,27 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
     const services = typeof options.services === "function" ? await (options.services as (request: Request) => TServices | Promise<TServices>)(request) : options.services;
     const context = createRequestContext(request, services, session, options.platform);
     if (definition.authorize && !(await definition.authorize({ context, ...(roomId === undefined ? {} : { roomId }) }))) throw new ApiError("FORBIDDEN", 403);
-    return { definition, services };
+    return { definition, services, session };
+  };
+  const reportDelivery = (error: unknown, context: SocketDeliveryErrorContext): void => {
+    const observer = options.onDeliveryError;
+    if (observer) observeErrorCallback(error, (failure) => observer(failure, context));
+    else {
+      try { console.error(`[meeko] Socket delivery failed (${context.channel}${context.event ? `:${context.event}` : ""})`, error); }
+      catch { /* Logging cannot interrupt delivery to other peers. */ }
+    }
   };
   return {
     async preflight(name, request, roomId) { await authorizeHandshake(name, request, roomId); },
     async accept(name: string, request: Request, peer: SocketPeer, roomId?: string): Promise<SocketConnection> {
-      const { definition, services } = await authorizeHandshake(name, request, roomId);
+      const { definition, services, session } = await authorizeHandshake(name, request, roomId);
+      if (session.signal.aborted) throw new SessionRevokedError();
+      const room = roomId ?? "";
+      const scope = roomId === undefined ? {} : { roomId };
       let closed = false;
-      const emit = async (event: string, payload: unknown): Promise<void> => {
+      let release: Unsubscribe | undefined;
+      // `broadcast` deliveries skip peers refused by `authorizeSend`; direct emits fail.
+      const deliver = async (event: string, payload: unknown, broadcast: boolean): Promise<void> => {
         if (closed) throw new ApiError("SOCKET_DISCONNECTED", 409);
         const schema = definition.serverToClient[event];
         if (!schema) throw new ApiError("UNKNOWN_SOCKET_EVENT", 404);
@@ -125,13 +182,17 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
         const fresh = await options.sessions.load(request);
         if (definition.auth === "required" && !fresh.current) failAndClose(new ApiError("UNAUTHENTICATED", 401), 1008, "Session expired");
         const sendContext = createRequestContext(request, services, fresh, options.platform);
-        if (definition.authorize && !(await definition.authorize({ context: sendContext, ...(roomId === undefined ? {} : { roomId }) }))) throw new ApiError("FORBIDDEN", 403);
-        if (definition.authorizeSend && !(await definition.authorizeSend({ event, payload: checked, context: sendContext, ...(roomId === undefined ? {} : { roomId }) }))) throw new ApiError("FORBIDDEN", 403);
+        if (definition.authorize && !(await definition.authorize({ context: sendContext, ...scope }))) throw new ApiError("FORBIDDEN", 403);
+        if (definition.authorizeSend && !(await definition.authorizeSend({ event, payload: checked, context: sendContext, ...scope }))) {
+          if (broadcast) return;
+          throw new ApiError("FORBIDDEN", 403);
+        }
         const message = serializeJson({ event, payload: checked });
         const messageBytes = new TextEncoder().encode(message).byteLength;
         if (messageBytes > maxMessageBytes || (peer.bufferedAmount ?? 0) + messageBytes > maxBufferBytes) {
           failAndClose(new ApiError("SOCKET_LIMIT_EXCEEDED", 413), 1009, "Message too large");
         }
+        if (closed) throw new ApiError("SOCKET_DISCONNECTED", 409);
         try { await peer.send(message); }
         catch (error) {
           try { close(1011, "Send failed"); }
@@ -139,12 +200,45 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
           throw error;
         }
       };
-      const release = pubsub.subscribe(name, roomId ?? "", ({ event, payload }) => emit(event, payload));
+      const emit = (event: string, payload: unknown): Promise<void> => deliver(event, payload, false);
+      // Broker deliveries run one at a time per peer, in arrival order, and never reject.
+      let queue: Promise<void> = Promise.resolve();
+      const receiveBroadcast = ({ event, payload }: SocketMessage): Promise<void> => {
+        queue = queue.then(async () => {
+          if (closed) return;
+          try { await deliver(event, payload, true); }
+          catch (error) {
+            if (closed && error instanceof ApiError && error.code === "SOCKET_DISCONNECTED") return;
+            // A malformed message is not the peer's fault; every other failure closes it.
+            const messageFault = error instanceof ApiError && (error.code === "INVALID_SOCKET_PAYLOAD" || error.code === "UNKNOWN_SOCKET_EVENT");
+            if (!messageFault && !closed) {
+              try { close(normalizeServerError(error).status < 500 ? 1008 : 1011, "Delivery failed"); }
+              catch (closeError) { reportDelivery(closeError, { channel: name, room, event }); }
+            }
+            reportDelivery(error, { channel: name, room, event });
+          }
+        });
+        return queue;
+      };
+      const onRevoked = (): void => {
+        try { close(1008, "Session revoked"); }
+        catch (error) { reportDelivery(error, { channel: name, room }); }
+      };
+      const unsubscribe = (): void => {
+        const current = release;
+        release = undefined;
+        if (!current) return;
+        const pending = current();
+        if (pending && typeof (pending as Promise<void>).then === "function") {
+          void (pending as Promise<void>).then(undefined, (error: unknown) => reportDelivery(error, { channel: name, room }));
+        }
+      };
       const close = (code?: number, reason?: string): void => {
         if (closed) return;
         closed = true;
+        session.signal.removeEventListener("abort", onRevoked);
         const failures: unknown[] = [];
-        try { release(); }
+        try { unsubscribe(); }
         catch (error) { failures.push(error); }
         try { peer.close(code, reason); }
         catch (error) { failures.push(error); }
@@ -156,6 +250,14 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
         catch (cleanupError) { error.cause = cleanupError; }
         throw error;
       }
+      release = await pubsub.subscribe(name, room, receiveBroadcast);
+      if (session.signal.aborted) {
+        closed = true;
+        unsubscribe();
+        throw new SessionRevokedError();
+      }
+      // Revoking the handshake session's family closes the connection immediately.
+      session.signal.addEventListener("abort", onRevoked, { once: true });
       return {
         emit,
         close,

@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { createInterface } from "node:readline";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { createClient } from "redis";
+import {
+  createServerApp, createSocketHub, defineApiRoute, defineServerRuntime, defineSocketChannel, MemorySessionStore, RedisSocketPubSub, SessionRevokedError,
+} from "../src/framework-server.ts";
+import type { Schema } from "../src/framework-server.ts";
 import { RedisSessionStore } from "../src/framework-server/session-stores.ts";
 import { SessionManager } from "../src/framework-server/sessions.ts";
 import type { SessionRecord } from "../src/framework-server/sessions.ts";
@@ -131,5 +138,170 @@ test("RedisSessionStore rejects a closed connection and recovers with a replacem
     await recoveredStore.delete(id);
   } finally {
     if (replacement.isOpen) await replacement.quit();
+  }
+});
+
+async function connectedClient(redisUrl: string) {
+  const client = createClient({ url: redisUrl, socket: { reconnectStrategy: false } });
+  client.on("error", () => { /* Failures surface at the awaiting call site. */ });
+  await client.connect();
+  return client;
+}
+
+async function deletePrefix(client: Awaited<ReturnType<typeof connectedClient>>, prefix: string): Promise<void> {
+  // Only keys inside this test's random namespace are touched.
+  for await (const batch of client.scanIterator({ MATCH: `${prefix}*`, COUNT: 100 })) {
+    for (const key of [batch].flat()) if (key.startsWith(prefix)) await client.del(key);
+  }
+}
+
+const textSchema: Schema<{ text: string }> = { "~standard": { version: 1, validate(value) {
+  return value && typeof value === "object" && typeof (value as { text?: unknown }).text === "string" ? { value: value as { text: string } } : { issues: [{}] };
+} } };
+
+test("RedisSocketPubSub delivers broadcasts between two server processes on real Redis", { skip: !url, timeout: 30_000 }, async () => {
+  if (!url) throw new Error("MEEKO_REDIS_URL is required");
+  const prefix = `meeko:test:${randomUUID()}:`;
+  const publisher = await connectedClient(url);
+  const subscriber = publisher.duplicate();
+  subscriber.on("error", () => {});
+  await subscriber.connect();
+  const child = spawn(process.execPath, ["--import", "tsx", fileURLToPath(new URL("./fixtures/redis-socket-instance.ts", import.meta.url))], {
+    env: { ...process.env, MEEKO_REDIS_URL: url, MEEKO_TEST_PREFIX: prefix },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const lines: string[] = [];
+  let stderr = "";
+  createInterface({ input: child.stdout }).on("line", (line) => lines.push(line));
+  child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
+  const waitFor = async (predicate: () => boolean, label: string) => {
+    const deadline = Date.now() + 15_000;
+    while (!predicate()) {
+      if (child.exitCode !== null) throw new Error(`Instance exited early (${child.exitCode}): ${stderr.slice(0, 500)}`);
+      if (Date.now() > deadline) throw new Error(`Timed out waiting for ${label}: ${lines.join(" | ")} ${stderr.slice(0, 500)}`);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  };
+  const texts = (messages: readonly string[]) => messages.map((message) => (JSON.parse(message) as { payload: { text: string } }).payload.text);
+  try {
+    await waitFor(() => lines.includes("ready"), "the second instance");
+    const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+    const deliveryErrors: unknown[] = [];
+    const hub = createSocketHub({
+      channels: { chat: defineSocketChannel({ clientToServer: {}, serverToClient: { message: textSchema } }) },
+      sessions, services: {}, pubsub: new RedisSocketPubSub({ publisher, subscriber, prefix }),
+      onDeliveryError: (error) => { deliveryErrors.push(error); },
+    });
+    const localSent: string[] = [];
+    const otherRoom: string[] = [];
+    const request = new Request("https://example.test/_meeko/socket/chat", { headers: { origin: "https://example.test" } });
+    const local = await hub.accept("chat", request, { send(message) { localSent.push(message); }, close() {} }, "room 1");
+    const unrelated = await hub.accept("chat", request, { send(message) { otherRoom.push(message); }, close() {} }, "room 2");
+    for (const text of ["one", "two", "three"]) await hub.broadcast("chat", "room 1", "message", { text });
+    await assert.rejects(hub.broadcast("chat", "room 1", "message", { text: 3 }), /INVALID_SOCKET_PAYLOAD/);
+    const remote = () => lines.filter((line) => line.startsWith("message ")).map((line) => line.slice("message ".length));
+    await waitFor(() => remote().length === 3 && localSent.length === 3, "cross-process delivery");
+    assert.deepEqual(texts(remote()), ["one", "two", "three"]);
+    assert.deepEqual(texts(localSent), ["one", "two", "three"]);
+    assert.deepEqual(otherRoom, []);
+    assert.deepEqual(deliveryErrors, []);
+
+    // A raw publish that bypasses the sender's schema is re-validated by every receiver.
+    await publisher.publish(`${prefix}socket:chat:room%201`, JSON.stringify({ v: 1, event: "message", payload: { text: 4 } }));
+    await waitFor(() => lines.some((line) => line.startsWith("delivery-error")) && deliveryErrors.length === 1, "receiver validation");
+    assert.equal(remote().length, 3);
+    local.close();
+    unrelated.close();
+  } finally {
+    child.stdin.end();
+    await new Promise((resolve) => { if (child.exitCode !== null) resolve(undefined); else child.once("exit", resolve); });
+    await subscriber.quit();
+    await deletePrefix(publisher, prefix);
+    await publisher.quit();
+  }
+});
+
+test("RedisSocketPubSub supports Redis 7 sharded pub/sub", { skip: !url }, async (context) => {
+  if (!url) throw new Error("MEEKO_REDIS_URL is required");
+  const publisher = await connectedClient(url);
+  const major = Number(/redis_version:(\d+)/.exec(await publisher.info("server"))?.[1] ?? 0);
+  if (major < 7) { await publisher.quit(); context.skip("Redis < 7 has no sharded pub/sub"); return; }
+  const subscriber = publisher.duplicate();
+  subscriber.on("error", () => {});
+  await subscriber.connect();
+  const receiverPublisher = publisher.duplicate();
+  receiverPublisher.on("error", () => {});
+  await receiverPublisher.connect();
+  const receiverSubscriber = publisher.duplicate();
+  receiverSubscriber.on("error", () => {});
+  await receiverSubscriber.connect();
+  const prefix = `meeko:test:${randomUUID()}:`;
+  try {
+    const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+    const channels = { chat: defineSocketChannel({ clientToServer: {}, serverToClient: { message: textSchema } }) };
+    const sender = createSocketHub({ channels, sessions, services: {}, pubsub: new RedisSocketPubSub({ publisher, subscriber, prefix, sharded: true }) });
+    const receiver = createSocketHub({ channels, sessions, services: {}, pubsub: new RedisSocketPubSub({ publisher: receiverPublisher, subscriber: receiverSubscriber, prefix, sharded: true }) });
+    const sent: string[] = [];
+    const connection = await receiver.accept("chat", new Request("https://example.test/_meeko/socket/chat", { headers: { origin: "https://example.test" } }), { send(message) { sent.push(message); }, close() {} }, "room");
+    await sender.broadcast("chat", "room", "message", { text: "sharded" });
+    const deadline = Date.now() + 5_000;
+    while (!sent.length) {
+      assert.ok(Date.now() < deadline, "sharded message was not delivered");
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.equal((JSON.parse(sent[0]!) as { payload: { text: string } }).payload.text, "sharded");
+    connection.close();
+  } finally {
+    await receiverSubscriber.quit();
+    await receiverPublisher.quit();
+    await subscriber.quit();
+    await deletePrefix(publisher, prefix);
+    await publisher.quit();
+  }
+});
+
+test("a revocation on one instance aborts an in-flight request on another through real Redis", { skip: !url, timeout: 30_000 }, async () => {
+  if (!url) throw new Error("MEEKO_REDIS_URL is required");
+  const prefix = `meeko:test:${randomUUID()}:`;
+  const clientA = await connectedClient(url);
+  const clientB = await connectedClient(url);
+  const subscriberB = clientB.duplicate();
+  subscriberB.on("error", () => {});
+  await subscriberB.connect();
+  let started!: () => void;
+  const running = new Promise<void>((resolve) => { started = resolve; });
+  const sessionsA = new SessionManager({ store: new RedisSessionStore(clientA, { prefix }), production: true, secure: false });
+  const sessionsB = new SessionManager({ store: new RedisSessionStore(clientB, { prefix, subscriber: subscriberB }), production: true, secure: false });
+  const app = await createServerApp({
+    production: false,
+    manifest: {
+      version: 1, routes: [], routeMiddleware: [], serverMiddleware: [],
+      client: { entry: "/assets/entry.js", css: [], preload: [] },
+      server: { api: [{ kind: "api", file: "/server/api/transfer.get.ts", pathname: "/api/transfer", method: "GET", clientKey: "transfer" }], rpc: [], socket: [] },
+    },
+    load: async () => ({ default: defineApiRoute({ contentType: "response", async handler({ context }) {
+      started();
+      await new Promise((_resolve, reject) => context.signal.addEventListener("abort", () => reject(context.signal.reason as Error), { once: true }));
+      return new Response("unreachable");
+    } }) }),
+    runtime: defineServerRuntime(() => ({ sessions: sessionsB, onError: () => {} })),
+  });
+  try {
+    const record = await (await sessionsA.load(new Request("https://example.test/"))).create({ user: "ada" });
+    const cookie = `${sessionsB.cookieName}=${record.id}`;
+    const pending = app.fetch(new Request("https://example.test/api/transfer", { headers: { cookie } }));
+    await running;
+    const stale = await sessionsB.load(new Request("https://example.test/", { headers: { cookie } }));
+    await (await sessionsA.load(new Request("https://example.test/", { headers: { cookie } }))).revoke();
+    const response = await pending;
+    assert.equal(response.status, 401);
+    assert.equal(((await response.json()) as { code: string }).code, "SESSION_REVOKED");
+    await assert.rejects(stale.verify(), (error: unknown) => error instanceof SessionRevokedError);
+  } finally {
+    await app.close();
+    await subscriberB.quit();
+    await deletePrefix(clientA, prefix);
+    await clientA.quit();
+    await clientB.quit();
   }
 });

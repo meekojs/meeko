@@ -23,10 +23,32 @@
 - El servidor compara el `render` del sidecar con el del manifiesto aunque el sidecar lo omita: un manifiesto con `render: "prerender"` y un sidecar sin `render` (o con otro valor) responden con error hasta reconstruir. Un manifiesto escrito a mano sin `render` sigue aceptando sidecars `"ssr"` y `"prerender"`.
 - La entrada cliente generada importa `virtual:meeko-client-routes`; `.meeko/types/virtual-pages.d.ts` lo declara. Regenere los tipos con `meeko check` si su proyecto incluye una entrada propia.
 
+- Cambia el contrato de broadcast de Socket:
+  - `hub.broadcast()` se resuelve cuando el broker acepta el mensaje y ya no rechaza por fallos de entrega a los peers.
+  - Un peer que falla se cierra (`1008`, `1009` o `1011`) y su error llega a `SocketHubOptions.onDeliveryError(error, { channel, room, event })` de la instancia que tiene ese peer. `createServerApp` lo conecta por defecto al `onError` del runtime.
+  - `LocalSocketPubSub.publish` deja de agregar errores de sus listeners y los envía a `onListenerError`.
+  - En un broadcast, `authorizeSend` que devuelve `false` omite a ese peer sin cerrarlo.
+  - Quien dependía del rechazo de `broadcast` debe observar `onDeliveryError` o `onError`.
+- `SocketPubSub.subscribe` puede devolver `Unsubscribe | Promise<Unsubscribe>`, y `Unsubscribe` puede ser asíncrona. El hub espera la suscripción antes de resolver `accept`. Un broker propio debe aceptar esa firma, y quien llame a `subscribe` directamente debe esperar el resultado con `await`.
+- `RequestContext.signal` ya no es `request.signal` sin más: combina esa señal con la revocación de la sesión y puede abortarse con `SessionRevokedError` aunque el cliente siga conectado.
+
 ### Añadido y corregido
 
 - Páginas `render: "client"`: el servidor ejecuta los middlewares, valida `params` y `search` y renderiza sólo los layouts con el outlet vacío; el navegador ejecuta `load` y `head` con el nuevo `ClientPageLoadContext` (`url`, `params`, `search`, `signal`, `state`) y renderiza la página. La navegación entre páginas SSR y de cliente funciona en ambos sentidos y conserva los layouts comunes. Sólo los sidecars `"client"` entran al bundle cliente, mediante `virtual:meeko-client-routes` y la nueva opción `mountClientApp({ loadClientRoute })`; importar código de servidor desde ellos detiene el build. Declarar `prerenderEntries` con `render: "client"` es un error. Sus datos deben llegar por API o RPC con guardas propias, y el HTML inicial no incluye datos ni `<title>` de la página.
 - `useNavigation()` devuelve `{ pending }`, una señal de sólo lectura que indica si hay una navegación en curso (tipo `NavigationState`). `@meekojs/meeko/framework` exporta además los tipos `ClientPageDefinition`, `ClientPageLoadContext`, `PageHead` y `PageRender`.
+- `RedisSocketPubSub({ publisher, subscriber, prefix, maxMessageBytes?, sharded?, onError? })` en `@meekojs/meeko/server` distribuye los broadcasts de Socket entre instancias mediante Redis pub/sub:
+  - usa un canal Redis por canal y sala, con conteo de referencias por instancia;
+  - envía un sobre versionado `{ v: 1, event, payload }`;
+  - limita el tamaño antes de publicar;
+  - el receptor vuelve a validar el schema y la autorización;
+  - `sharded: true` activa el pub/sub con shards de Redis 7.
+
+  Tipos nuevos: `RedisPublisherClient`, `RedisSubscriberClient`, `RedisMessageListener`, `RedisSocketPubSubOptions`, `SocketMessage`, `SocketDeliveryErrorContext`, `Unsubscribe` y `LocalSocketPubSubOptions`. `ServerRuntime.socket.onDeliveryError` sustituye al observador por defecto.
+- Revocación durante una petición:
+  - `SessionStore.subscribeRevocations?` es una capacidad opcional. `RedisSessionStore` la ofrece con la opción `subscriber`: el script de `revokeFamily` publica en `<prefix>revoked`. `MemorySessionStore` notifica dentro del proceso.
+  - `SessionHandle.signal` y `RequestContext.signal` se abortan con `SessionRevokedError`, exportado y equivalente a `ApiError` `SESSION_REVOKED` con estado `401`.
+  - Los sockets de la familia revocada se cierran con `1008`.
+  - `SessionHandle.verify()` relee el store antes de efectos irreversibles.
 - `mountClientApp({ onError })` observa los fallos de la aplicación (navegación, Socket, y eventos, efectos o limpiezas sin un `provideErrorHandler` más cercano) junto con su `ErrorSource`. `provideErrorHandler` recibe también los rechazos de `effect` y `onCleanup` que devuelven una promesa por error.
 - La navegación cliente es transaccional: la vista nueva se hidrata junto a la actual y la anterior sólo se retira tras una hidratación correcta; un outlet restaura su página anterior. Sólo si también falla esa restauración se recarga la última URL confirmada.
 - La navegación actualiza `document.title` con el `head` de la página siguiente.

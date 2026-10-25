@@ -22,6 +22,17 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * The session family was revoked or its id replaced. It is the abort reason of
+ * `RequestContext.signal` and answers `401 SESSION_REVOKED`.
+ */
+export class SessionRevokedError extends ApiError {
+  constructor() {
+    super("SESSION_REVOKED", 401, "Session revoked");
+    this.name = "SessionRevokedError";
+  }
+}
+
 /** Preserve public errors loaded through separate Vite module graphs; hide all others. */
 export function normalizeServerError(error: unknown): ApiError {
   if (error instanceof SessionSecurityError) return new ApiError(error.code, 403);
@@ -29,7 +40,7 @@ export function normalizeServerError(error: unknown): ApiError {
     const code = (error as Error & { code?: unknown }).code;
     if (code === "INVALID_ORIGIN" || code === "INVALID_CSRF") return new ApiError(code, 403);
   }
-  if (error instanceof Error && (error instanceof ApiError || error.name === "ApiError" || error.constructor.name === "ApiError")) {
+  if (error instanceof Error && (error instanceof ApiError || error.name === "ApiError" || error.constructor.name === "ApiError" || error.name === "SessionRevokedError")) {
     const candidate = error as Error & { code?: unknown; status?: unknown };
     if (typeof candidate.code === "string" && candidate.code.length > 0
       && typeof candidate.status === "number" && Number.isInteger(candidate.status)

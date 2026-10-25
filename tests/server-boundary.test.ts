@@ -61,8 +61,8 @@ test("the ./bun and ./deno adapters bundle for a neutral platform without ws, th
 test("server, node, bun, deno and build subpaths expose exactly their documented runtime values", async () => {
   const server = await import(pathToFileURL(await entry("./server")).href);
   assert.deepEqual(Object.keys(server).sort(), [
-    "ApiError", "LocalSocketPubSub", "MemorySessionStore", "RedisSessionStore", "SessionHandle", "SessionManager",
-    "SessionSecurityError", "SqlSessionStore", "composeServerMiddleware", "createFrameworkHandler", "createLocalCalls",
+    "ApiError", "LocalSocketPubSub", "MemorySessionStore", "RedisSessionStore", "RedisSocketPubSub", "SessionHandle", "SessionManager",
+    "SessionRevokedError", "SessionSecurityError", "SqlSessionStore", "composeServerMiddleware", "createFrameworkHandler", "createLocalCalls",
     "createLocalServerFetch", "createRequestContext", "createServerApp", "createServerClientOptions", "createServerDispatcher",
     "createSocketHub", "createSocketUpgradeHandler", "defineApiRoute", "defineRpc", "defineServerMiddleware", "defineServerRuntime", "defineSocketChannel",
     "dispatchApiRoute", "dispatchRpc", "errorResponse", "executeApiRoute", "executeRpc", "generateOpenApi",

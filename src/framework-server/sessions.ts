@@ -1,3 +1,6 @@
+import { SessionRevokedError } from "./contracts.js";
+import type { Unsubscribe } from "./socket.js";
+
 export interface SessionRecord<T = unknown> {
   id: string;
   /** Stable opaque lineage for atomic revocation after one or more rotations. */
@@ -18,6 +21,12 @@ export interface SessionStore<T = unknown> {
   replace?(previousId: string, record: SessionRecord<T>): Promise<boolean>;
   /** Atomically revoke the currently active id in this family, even from a stale handle. */
   revokeFamily?(familyId: string): Promise<void>;
+  /**
+   * Notifies `revokeFamily` calls from every instance sharing the store, so
+   * in-flight requests and live sockets of that family stop. Resolves once
+   * notifications are flowing.
+   */
+  subscribeRevocations?(listener: (familyId: string) => void): Unsubscribe | Promise<Unsubscribe>;
   close?(): Promise<void>;
 }
 
@@ -26,6 +35,7 @@ export class MemorySessionStore<T = unknown> implements SessionStore<T> {
   readonly persistent = false;
   private readonly records = new Map<string, SessionRecord<T>>();
   private readonly families = new Map<string, string>();
+  private readonly revocationListeners = new Set<(familyId: string) => void>();
   async get(id: string): Promise<SessionRecord<T> | undefined> {
     const record = this.records.get(id);
     if (record && record.expiresAt <= Date.now()) {
@@ -66,6 +76,15 @@ export class MemorySessionStore<T = unknown> implements SessionStore<T> {
     const active = this.families.get(familyId);
     if (active) this.records.delete(active);
     this.families.delete(familyId);
+    for (const listener of [...this.revocationListeners]) {
+      try { listener(familyId); }
+      catch (error) { console.error("[meeko] Session revocation listener failed", error); }
+    }
+  }
+  /** Notifies managers sharing this store within the same process. */
+  subscribeRevocations(listener: (familyId: string) => void): Unsubscribe {
+    this.revocationListeners.add(listener);
+    return () => { this.revocationListeners.delete(listener); };
   }
   async close(): Promise<void> { this.records.clear(); this.families.clear(); }
 }
@@ -113,10 +132,84 @@ function cookieValue(header: string | null, name: string): string | undefined {
   return undefined;
 }
 
+const recentRevocationMs = 60_000;
+const recentRevocationLimit = 4096;
+
+/**
+ * Handles of each session family on this instance, held weakly so a finished
+ * request leaves nothing behind. Families revoked in the last minute stay
+ * remembered: a revoked family never becomes active again, and a handle
+ * loaded just before the notification arrived is aborted on registration.
+ */
+class RevocationRegistry {
+  private readonly families = new Map<string, Set<WeakRef<AbortController>>>();
+  private readonly recent = new Map<string, number>();
+  private readonly finalizer = new FinalizationRegistry<{ readonly familyId: string; readonly ref: WeakRef<AbortController> }>(
+    ({ familyId, ref }) => this.forget(familyId, ref),
+  );
+  track(familyId: string, controller: AbortController): WeakRef<AbortController> | undefined {
+    const revokedAt = this.recent.get(familyId);
+    if (revokedAt !== undefined && Date.now() - revokedAt < recentRevocationMs) {
+      controller.abort(new SessionRevokedError());
+      return undefined;
+    }
+    const ref = new WeakRef(controller);
+    let handles = this.families.get(familyId);
+    if (!handles) { handles = new Set(); this.families.set(familyId, handles); }
+    handles.add(ref);
+    this.finalizer.register(controller, { familyId, ref }, ref);
+    return ref;
+  }
+  untrack(familyId: string, ref: WeakRef<AbortController> | undefined): void {
+    if (!ref) return;
+    this.finalizer.unregister(ref);
+    this.forget(familyId, ref);
+  }
+  revoke(familyId: string): void {
+    this.remember(familyId);
+    const handles = this.families.get(familyId);
+    this.families.delete(familyId);
+    for (const ref of handles ?? []) {
+      this.finalizer.unregister(ref);
+      ref.deref()?.abort(new SessionRevokedError());
+    }
+  }
+  private forget(familyId: string, ref: WeakRef<AbortController>): void {
+    const handles = this.families.get(familyId);
+    if (!handles) return;
+    handles.delete(ref);
+    if (!handles.size) this.families.delete(familyId);
+  }
+  private remember(familyId: string): void {
+    const now = Date.now();
+    this.recent.delete(familyId);
+    this.recent.set(familyId, now);
+    for (const [family, revokedAt] of this.recent) {
+      if (this.recent.size <= recentRevocationLimit && now - revokedAt < recentRevocationMs) break;
+      this.recent.delete(family);
+    }
+  }
+}
+
+const registries = new WeakMap<SessionManager<any>, RevocationRegistry>();
+
+function revocationRegistry(manager: SessionManager<any>): RevocationRegistry {
+  let registry = registries.get(manager);
+  if (!registry) { registry = new RevocationRegistry(); registries.set(manager, registry); }
+  return registry;
+}
+
 export class SessionHandle<T = unknown> {
   private pendingCookie?: string;
-  constructor(private readonly manager: SessionManager<T>, public current?: SessionRecord<T>) {}
+  private readonly revocation = new AbortController();
+  private watched: { readonly familyId: string; readonly ref: WeakRef<AbortController> | undefined } | undefined;
+  constructor(private readonly manager: SessionManager<T>, public current?: SessionRecord<T>) { this.watch(); }
   get cookieHeader(): string | undefined { return this.pendingCookie; }
+  /**
+   * Aborts with `SessionRevokedError` when another request or instance revokes
+   * this session's family. `RequestContext.signal` includes it.
+   */
+  get signal(): AbortSignal { return this.revocation.signal; }
   async create(data: T): Promise<SessionRecord<T>> {
     const previous = this.current;
     const now = Date.now();
@@ -126,6 +219,7 @@ export class SessionHandle<T = unknown> {
       if (!(await this.manager.store.replace(previous.id, record))) throw new Error("Session has expired or been revoked");
     } else await this.manager.store.set(record);
     this.current = record;
+    this.watch();
     this.pendingCookie = this.manager.serializeCookie(record.id, this.manager.ttlMs);
     return record;
   }
@@ -136,10 +230,40 @@ export class SessionHandle<T = unknown> {
   async revoke(): Promise<void> {
     if (this.current) {
       if (!this.manager.store.revokeFamily) throw new Error("Session storage does not support atomic family revocation");
-      await this.manager.store.revokeFamily(this.current.familyId ?? this.current.id);
+      const familyId = this.current.familyId ?? this.current.id;
+      // The revoking request keeps running so that it can clear the cookie.
+      this.unwatch();
+      try { await this.manager.store.revokeFamily(familyId); }
+      catch (error) {
+        this.watch();
+        throw error;
+      }
+      revocationRegistry(this.manager).revoke(familyId);
     }
     this.current = undefined;
     this.pendingCookie = this.manager.serializeCookie("", 0);
+  }
+  /**
+   * Re-reads the store and throws `SessionRevokedError` (`401 SESSION_REVOKED`)
+   * when this session was revoked, replaced by a rotation or expired. Call it
+   * before irreversible side effects; without a session it does nothing.
+   */
+  async verify(): Promise<void> {
+    if (this.revocation.signal.aborted) throw new SessionRevokedError();
+    const current = this.current;
+    if (!current) return;
+    const stored = await this.manager.store.get(current.id);
+    if (!stored || stored.id !== current.id || stored.expiresAt <= Date.now()) throw new SessionRevokedError();
+  }
+  private watch(): void {
+    const familyId = this.current ? this.current.familyId ?? this.current.id : undefined;
+    if (familyId === this.watched?.familyId) return;
+    this.unwatch();
+    if (familyId !== undefined) this.watched = { familyId, ref: revocationRegistry(this.manager).track(familyId, this.revocation) };
+  }
+  private unwatch(): void {
+    if (this.watched) revocationRegistry(this.manager).untrack(this.watched.familyId, this.watched.ref);
+    this.watched = undefined;
   }
 }
 
@@ -168,7 +292,23 @@ export class SessionManager<T = unknown> {
     if (this.secure) parts.push("Secure");
     return parts.join("; ");
   }
+  private revocations: Promise<Unsubscribe> | undefined;
+  /** Subscribes once to the store's revocations; a failed attempt is retried by the next load. */
+  private listenForRevocations(): Promise<Unsubscribe> | undefined {
+    const store = this.store;
+    if (!store.subscribeRevocations) return undefined;
+    const registry = revocationRegistry(this);
+    const subscription = this.revocations ??= Promise.resolve()
+      .then(() => store.subscribeRevocations!((familyId) => registry.revoke(familyId)))
+      .catch((error: unknown) => {
+        if (this.revocations === subscription) this.revocations = undefined;
+        throw error;
+      });
+    return subscription;
+  }
   async load(request: Request): Promise<SessionHandle<T>> {
+    // Revocations from other instances must be flowing before a request is authenticated.
+    await this.listenForRevocations();
     const id = cookieValue(request.headers.get("cookie"), this.cookieName);
     const record = id ? await this.store.get(id) : undefined;
     if (record && record.expiresAt <= Date.now()) {
@@ -177,7 +317,21 @@ export class SessionManager<T = unknown> {
     }
     return new SessionHandle(this, record);
   }
-  async close(): Promise<void> { await this.store.close?.(); }
+  async close(): Promise<void> {
+    const subscription = this.revocations;
+    this.revocations = undefined;
+    const failures: unknown[] = [];
+    // A subscription that never started was already reported by `load`.
+    const unsubscribe = subscription ? await subscription.catch(() => undefined) : undefined;
+    if (unsubscribe) {
+      try { await unsubscribe(); }
+      catch (error) { failures.push(error); }
+    }
+    try { await this.store.close?.(); }
+    catch (error) { failures.push(error); }
+    if (failures.length === 1) throw failures[0];
+    if (failures.length > 1) throw new AggregateError(failures, "Session revocation unsubscribe and store close failed");
+  }
   /** Apply both Origin and token checks to authenticated cookie mutations. */
   assertMutationAllowed(request: Request, session: SessionHandle<T>, mutating = !["GET", "HEAD", "OPTIONS"].includes(request.method)): void {
     if (!session.current || !mutating) return;
