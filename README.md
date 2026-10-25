@@ -6,16 +6,19 @@
 
 Este proyecto está dedicado a mi gatita Meeko. Su carita inspira el logo que lo acompaña.
 
-**Meeko** es un motor experimental de componentes para TypeScript. Los archivos `.meeko` combinan lógica tipada, plantilla y estilos; el compilador produce HTML para SSR y conecta la reactividad al HTML existente durante la hidratación.
+**Meeko** es un motor de componentes para TypeScript y un framework full-stack. Los archivos `.meeko` combinan lógica tipada, plantilla y estilos. El compilador produce HTML para SSR y, durante la hidratación, conecta la reactividad al HTML existente.
 
 El código se distribuye bajo la [licencia MIT](https://github.com/meekojs/meeko/blob/main/LICENSE). El paquete público se llama `@meekojs/meeko`; la CLI se invoca como `meeko` y el plugin de Vite se importa desde `@meekojs/meeko/vite`.
 
-El proyecto está en etapa temprana. Ya funciona el recorrido completo de un contador renderizado en servidor, hidratado en navegador y actualizado por señales. La sintaxis y las API públicas pueden cambiar antes de la primera versión estable.
+A partir de 1.0, Meeko sigue SemVer. La [política de estabilidad](https://github.com/meekojs/meeko/blob/main/docs/stability.md) define qué es API pública: subrutas, CLI, convenciones de archivos y formatos de red. También fija cómo se depreca una API y qué entornos se admiten. La [guía de migración](https://github.com/meekojs/meeko/blob/main/docs/migration-1.0.md) explica cómo actualizar desde `0.1.0`.
 
 - [Arquitectura y contratos](https://github.com/meekojs/meeko/blob/main/docs/architecture.md)
-- [API y límites de compatibilidad](https://github.com/meekojs/meeko/blob/main/docs/api.md)
+- [API del motor de componentes](https://github.com/meekojs/meeko/blob/main/docs/api.md)
 - [Aplicaciones full-stack con Meeko](https://github.com/meekojs/meeko/blob/main/docs/framework.md)
-- [Plan de desarrollo y criterios de aceptación](https://github.com/meekojs/meeko/blob/main/docs/roadmap.md)
+- [Política de estabilidad 1.x](https://github.com/meekojs/meeko/blob/main/docs/stability.md)
+- [Migrar de 0.1.0 a 1.0](https://github.com/meekojs/meeko/blob/main/docs/migration-1.0.md)
+- [Editores y servidor de lenguaje](https://github.com/meekojs/meeko/blob/main/docs/editors.md)
+- [Plan de desarrollo](https://github.com/meekojs/meeko/blob/main/docs/roadmap.md)
 - [Comparativa reproducible con Vue](https://github.com/meekojs/meeko/blob/main/docs/benchmarks.md)
 - [DevTools para depurar componentes](https://github.com/meekojs/meeko/blob/main/docs/devtools.md)
 - [Aplicación piloto SSR](https://github.com/meekojs/meeko/blob/main/examples/pilot/README.md)
@@ -25,8 +28,8 @@ El proyecto está en etapa temprana. Ya funciona el recorrido completo de un con
 
 ## Requisitos
 
-- Node.js 24 o superior, gestionado localmente con `mise`.
-- `pnpm`.
+- Node.js 24 o superior para la CLI, el build, Vite y el servidor de lenguaje. En este repositorio se gestiona con `mise`.
+- `pnpm` para desarrollar este repositorio.
 - TypeScript **7.0.2 estable** para compilar y comprobar los tipos. `@typescript/typescript6` se usa únicamente como analizador sintáctico del formato `.meeko`, porque TypeScript 7.0 todavía no ofrece una API programática estable para lenguajes incrustados.
 
 ## Instalación en una aplicación
@@ -45,6 +48,8 @@ import { meeko } from "@meekojs/meeko/vite";
 export default defineConfig({ plugins: [meeko()] });
 ```
 
+Las aplicaciones construidas se ejecutan en Node 24, Bun, Deno o Cloudflare Workers; la [política de estabilidad](https://github.com/meekojs/meeko/blob/main/docs/stability.md#entornos-soportados) indica las versiones probadas.
+
 El paquete incluye TypeScript 7 y la CLI `meeko`. Puedes comprobar un componente con `pnpm exec meeko check ruta/Componente.meeko`. Vite es opcional si sólo usas el compilador y SSR.
 
 ### Crear una aplicación SSR
@@ -60,11 +65,20 @@ npm run dev
 
 Abre `http://127.0.0.1:4173`. `npm run check` genera los tipos del componente y ejecuta TypeScript 7. `npm run build` compila cliente y servidor; `npm start` sirve la versión compilada con SSR. La CLI no sobrescribe archivos de aplicación existentes.
 
-Desde `0.0.3`, si ya ejecutaste `pnpm add @meekojs/meeko` en una carpeta sin código, puedes inicializarla directamente con `pnpm exec meeko init .`. Se conservan el manifiesto, los lockfiles, el workspace y `node_modules`; la CLI rechaza archivos de aplicación o scripts que entrarían en conflicto. Después ejecuta `pnpm install` y `pnpm run dev`. Para actualizar desde `0.0.2`, usa `pnpm add @meekojs/meeko@0.0.3` antes de `init .`.
+Si ya ejecutaste `pnpm add @meekojs/meeko` en una carpeta sin código, puedes inicializarla directamente con `pnpm exec meeko init .`. Se conservan el manifiesto, los lockfiles, el workspace y `node_modules`; la CLI rechaza archivos de aplicación o scripts que entrarían en conflicto. Después ejecuta `pnpm install` y `pnpm run dev`. El proyecto generado fija la versión exacta de `@meekojs/meeko`, porque el código compilado y su runtime deben coincidir.
 
 ### Crear una aplicación full-stack
 
-Meeko Engine permite usar componentes `.meeko` de forma independiente. Meeko Framework añade rutas por archivos, layouts, middleware de `app/` y `server/`, SSR, estado por petición, API, RPC, sesiones y WebSocket con el mismo compilador y runtime. En este checkout, crea una aplicación con:
+Meeko Engine permite usar componentes `.meeko` de forma independiente. Meeko Framework añade, con el mismo compilador y runtime:
+
+- rutas por archivos, layouts y middleware de `app/` y `server/`;
+- SSR, streaming SSR con valores `defer`, prerender y páginas `render: "client"`;
+- estado por petición;
+- API y RPC tipados;
+- sesiones con revocación;
+- WebSocket, con broadcast entre instancias mediante Redis o Durable Objects.
+
+Crea una aplicación con:
 
 ```powershell
 pnpm exec meeko init-framework my-app
@@ -76,7 +90,14 @@ npm run build
 npm start
 ```
 
-`check` genera contratos y comprueba tipos; `build` produce en `.meeko/output/node/` el cliente, el servidor Node y las páginas prerenderizadas, ejecutables sin las fuentes de la aplicación. `start` sirve SSR de producción con Node 24 y requiere configurar sesiones persistentes en `server/runtime.ts`. La [guía del framework](https://github.com/meekojs/meeko/blob/main/docs/framework.md) explica configuración, autoimports, rutas, middleware, despliegue y seguridad. Los comandos simplificados del proyecto están disponibles desde `0.1.0`.
+Cada script tiene su función:
+
+- `check` genera los contratos y comprueba los tipos.
+- `build` produce en `.meeko/output/node/` el cliente, el servidor Node y las páginas prerenderizadas, que se ejecutan sin las fuentes de la aplicación.
+- `meeko build --adapter bun`, `--adapter deno` o `--adapter cloudflare` generan en su lugar una salida autónoma para Bun, Deno o Cloudflare Workers.
+- `start` sirve SSR de producción con Node 24 y requiere configurar sesiones persistentes en `server/runtime.ts`.
+
+La [guía del framework](https://github.com/meekojs/meeko/blob/main/docs/framework.md) explica configuración, autoimports, rutas, middleware, despliegue y seguridad.
 
 ## Estructura
 
@@ -87,19 +108,27 @@ npm start
 | `src/compiler.ts` | Genera un módulo TypeScript con SSR, hidratación y mapeos al archivo fuente. |
 | `src/check.ts` | Comprueba tipos con TypeScript 7 y ubica diagnósticos en `.meeko`. |
 | `src/types.ts` | Genera declaraciones para imports `.meeko` en proyectos TypeScript. |
-| `src/server.ts` | Escapado de contenido dinámico para HTML. |
+| `src/server.ts` | Escapado de contenido dinámico para HTML y `serializeJson`. |
+| `src/dom.ts`, `src/hmr.ts` | Runtime de hidratación, regiones, listas y HMR. |
+| `src/internal.ts` | Entrada `@meekojs/meeko/internal` que importa el código generado. |
 | `src/cli.ts` | CLI `meeko`: comandos de proyecto (`dev`, `check`, `build --adapter`, `start`, `preview`), de componente (`compile`, `types`), de generación (`routes`, `prerender`), starters (`init`, `init-framework`), servidor de lenguaje (`lsp`), `--help` y `--version`. |
+| `src/framework.ts`, `src/framework` | Framework: configuración, rutas, páginas, streaming, navegación, clientes API/RPC/Socket y generación del build. |
+| `src/framework-server.ts`, `src/framework-server` | Núcleo de servidor portable (`@meekojs/meeko/server`): aplicación, runtime, contratos, sesiones, middleware y Socket. |
+| `src/node.ts`, `src/bun.ts`, `src/deno.ts`, `src/cloudflare.ts` | Adaptadores de Node, Bun, Deno y Cloudflare Workers. |
+| `src/build.ts` | Herramientas de build para Node (`@meekojs/meeko/build`). |
 | `src/language-server` | Servidor de lenguaje (`meeko lsp --stdio`, bin `meeko-language-server`) para VS Code y cualquier editor LSP. |
 | `src/vite.ts` | Plugin de Vite para transformar `.meeko` en cliente y SSR. |
-| `src/devtools.ts` | Instrumentación de instancias y señales sólo durante desarrollo. |
+| `src/devtools.ts`, `src/devtools-protocol.ts` | Instrumentación de desarrollo y tipos del protocolo DevTools 1. |
 | `src/devtools-ui` | Panel de inspección dentro de la página. |
 | `examples/counter` | Componente de referencia tipado. |
+| `examples/attributes`, `examples/regions`, `examples/primitives` | Atributos dinámicos, condiciones y listas anidadas, y listas de valores primitivos. |
 | `examples/vite` | Aplicación Vite sin generación manual de componentes. |
 | `examples/nested` | Composición de componentes con rangos de hidratación y props tipadas. |
+| `examples/pilot` | Aplicación piloto SSR. |
 | `editors/vscode` | Extensión de VS Code: resaltado y cliente del servidor de lenguaje. |
 | `benchmarks` | Comparativa repetible de Meeko y Vue en SSR y Chrome. |
-| `tests` | Pruebas de SSR, hidratación y reactividad. |
-| `tools/devtools-extension` | Panel local de Chrome DevTools. |
+| `tests` | Pruebas unitarias, E2E y de consumidor externo, y la suite de conformidad de adaptadores (`tests/conformance`). |
+| `tools/devtools-extension` | Extensión Meeko DevTools para Chrome. |
 
 ## Desarrollo
 
@@ -125,7 +154,14 @@ pnpm run vite:build
 
 El plugin `@meekojs/meeko/vite` transforma imports de `.meeko` en cliente y SSR y procesa el CSS del componente. En desarrollo, HMR sustituye las instancias hidratadas sin recargar la página, conserva las señales editables que mantienen su nombre y aplica cambios de CSS. Un cambio en el runtime del motor provoca una recarga completa.
 
-El ejemplo Vite muestra [Meeko DevTools](https://github.com/meekojs/meeko/blob/main/docs/devtools.md) durante el desarrollo: permite seleccionar cada instancia, revisar props y señales, seguir eventos y activar un punto de parada cuando cambia una señal. También hay un panel local para Chrome DevTools. La funcionalidad se incorpora al paquete a partir de `0.0.2`.
+El ejemplo Vite muestra [Meeko DevTools](https://github.com/meekojs/meeko/blob/main/docs/devtools.md) durante el desarrollo. Con él puedes:
+
+- seleccionar cada instancia y revisar sus props y señales;
+- editar una señal;
+- seguir en la línea de tiempo dónde se lee y se escribe cada señal;
+- activar un punto de parada cuando cambia una señal.
+
+La extensión Meeko DevTools para Chrome ofrece el mismo panel dentro de Chrome DevTools.
 
 `vite:types` genera declaraciones `.d.meeko.ts` para los imports de la aplicación y comprueba el consumidor con TypeScript 7 y `allowArbitraryExtensions`. Las declaraciones del ejemplo se regeneran; no se versionan.
 
@@ -163,6 +199,11 @@ Los nombres e identificadores de código se escriben en inglés. La API pública
 
 El servidor de lenguaje de Meeko (`meeko lsp --stdio` o `meeko-language-server --stdio`) comparte los diagnósticos del CLI y ofrece completado, navegación, referencias, hover, renombrado entre archivos, ayuda de firma, símbolos, plegado, formato y acciones rápidas en script y plantilla. La [extensión de VS Code](https://github.com/meekojs/meeko/blob/main/editors/vscode/README.md) es un cliente de ese servidor y usa el del proyecto cuando está instalado; [docs/editors.md](https://github.com/meekojs/meeko/blob/main/docs/editors.md) explica cómo configurarlo en Neovim, Helix, Zed, JetBrains y Sublime Text. El VSIX se validó en un host VS Code aislado con un proyecto consumidor externo; su README explica cómo repetir la prueba y las limitaciones actuales.
 
-## Alcance actual
+## Alcance de 1.0
 
-Las páginas pueden renderizarse con `render: "ssr"`, `"stream"` (streaming SSR con valores `defer`), `"prerender"` o `"client"`; véase [docs/framework.md](https://github.com/meekojs/meeko/blob/main/docs/framework.md). El compilador rechaza varias construcciones no soportadas. Estas capacidades necesitan conservar el mismo contrato de SSR e hidratación antes de añadirse.
+- **Render.** Las páginas pueden renderizarse con `render: "ssr"`, `"stream"` (streaming SSR con valores `defer`), `"prerender"` o `"client"`.
+- **Despliegue.** Los destinos son Node, Bun, Deno y Cloudflare Workers. Una suite de conformidad común comprueba los cuatro.
+- **Socket.** Los broadcasts se distribuyen entre instancias con Redis o, en Workers, con Durable Objects.
+- **Sesiones.** Revocar una sesión aborta las peticiones en curso y cierra sus sockets.
+
+Lo explica [docs/framework.md](https://github.com/meekojs/meeko/blob/main/docs/framework.md). El compilador rechaza con diagnósticos las construcciones que no soporta. Las ampliaciones previstas después de 1.0 están en el [plan de desarrollo](https://github.com/meekojs/meeko/blob/main/docs/roadmap.md).

@@ -1,6 +1,12 @@
 # Publicación de Meeko
 
-El repositorio público es `meekojs/meeko` y el paquete npm es `@meekojs/meeko`. La CLI conserva el nombre `meeko`. La primera versión `0.0.1` es experimental: las versiones `0.x` pueden cambiar la API; cada cambio incompatible se documentará antes de publicar una nueva versión.
+El repositorio público es `meekojs/meeko` y el paquete npm es `@meekojs/meeko`. La CLI conserva el nombre `meeko`. Desde `1.0.0` las versiones siguen la [política de estabilidad](stability.md):
+
+- un patch sólo corrige;
+- un minor añade API o depreca con un reemplazo documentado;
+- sólo una major rompe compatibilidad o retira lo deprecado.
+
+Cada cambio se anota en el [CHANGELOG](../CHANGELOG.md) antes de publicar. Las versiones `0.x` anteriores podían cambiar la API en un minor.
 
 ## Verificación previa
 
@@ -132,3 +138,27 @@ El paquete [npm `0.0.4`](https://www.npmjs.com/package/@meekojs/meeko/v/0.0.4) s
 ## Versión 0.1.0
 
 El paquete [npm `0.1.0`](https://www.npmjs.com/package/@meekojs/meeko/v/0.1.0) salió del commit `b492cf1` y coincide con la etiqueta [`v0.1.0`](https://github.com/meekojs/meeko/releases/tag/v0.1.0). Contiene cambios incompatibles respecto de `0.0.4`, documentados con su migración en el [CHANGELOG](../CHANGELOG.md). La [CI de `main`](https://github.com/meekojs/meeko/actions/runs/40168927109) pasó antes de etiquetar. El [workflow de publicación](https://github.com/meekojs/meeko/actions/runs/40169193614) repitió los gates y publicó mediante OIDC con procedencia SLSA firmada. Se instaló después desde npm en un proyecto vacío, donde la reactividad, las subrutas `framework` y `server` y los comandos `dev`, `check`, `build` y `start` de la CLI respondieron.
+
+## Versión 1.0.0-rc.1
+
+**Estado: en preparación.** Esta sección es la lista de pasos. Cuando ocurra cada uno, se completará con su commit, sus enlaces de CI y sus resultados; hasta entonces, nada de lo que sigue debe leerse como ya hecho.
+
+1. **Versión.**
+   - Cambiar `version` a `1.0.0-rc.1` en `package.json` y la dependencia `@meekojs/meeko` del fixture `tests/fixtures/fullstack-consumer/package.json`.
+   - Mover el bloque `## [Unreleased]` del [CHANGELOG](../CHANGELOG.md) a `## [1.0.0-rc.1] - <fecha>`.
+   - Comprobar que la [guía de migración](migration-1.0.md) y la [política de estabilidad](stability.md) coinciden con el código.
+2. **Gates locales**, en una copia limpia del commit:
+   - `pnpm install --frozen-lockfile` y `pnpm run verify`;
+   - `pnpm run e2e`, `pnpm run pilot:e2e` y `pnpm run package:smoke`;
+   - `pnpm run conformance`, con Bun y Deno instalados y `MEEKO_CONFORMANCE_REQUIRE=bun,deno,workerd`;
+   - la prueba Redis de [framework.md](framework.md#sesiones-y-seguridad) y `pwsh -NoProfile -File tests/fullstack-consumer.ps1`;
+   - `pnpm -C editors/vscode run test:host:isolated`, `npm pack --dry-run --json` (sólo `dist/`, `README.md`, `LICENSE` y `package.json`) y `git diff --check`.
+3. **CI.** Tras subir el commit a `main`, comprobar que `ci.yml` pasa en todos sus jobs (Windows, Redis, Bun, Deno, workerd y la matriz de la extensión de VS Code) y que el commit remoto coincide con el probado.
+4. **Validación en `diegootayza`** con la versión candidata instalada desde el tarball:
+   - `meeko check`, `meeko build` y `meeko start` con el adaptador Node;
+   - la página de login sin el parche provisional;
+   - una prueba en Chrome.
+5. **Etiqueta**, con la confirmación del mantenedor: crear y subir `v1.0.0-rc.1` sobre el commit aprobado.
+6. **npm.** `publish.yml` repite los gates y publica con `npm publish --tag next`. Después, comprobar con `npm view @meekojs/meeko dist-tags` que `next` apunta a `1.0.0-rc.1` y que `latest` sigue en `0.1.0`, y que la versión tiene procedencia.
+7. **Release de GitHub.** El job `github-release` la crea como prerelease, con los seis VSIX, el ZIP de Chrome DevTools y `SHA256SUMS.txt`. Revisar sus adjuntos.
+8. **Periodo de prueba.** Durante el periodo de prueba de la rc sólo se admiten correcciones que no cambien la API. Si alguna la cambiara, se publicaría `1.0.0-rc.2` siguiendo estos mismos pasos.

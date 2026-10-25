@@ -1,6 +1,6 @@
 # API de Meeko
 
-Meeko está en la serie experimental `0.x`. Esta página describe el contrato que ejercitan los ejemplos y las pruebas actuales; la sintaxis puede cambiar antes de una versión estable.
+Esta página describe el contrato público del motor de componentes, que ejercitan los ejemplos y las pruebas. La [política de estabilidad](stability.md) indica qué cubre SemVer en la serie 1.x.
 
 Esta guía cubre el motor de componentes independiente. Las convenciones de `app/`, rutas, middleware, API, RPC, Socket y sesiones están en la [guía del framework](framework.md).
 
@@ -152,7 +152,7 @@ Si el render o la hidratación falla, Meeko libera todos los efectos y recursos 
 
 Los observadores creados durante `hydrate` pertenecen a esa instancia. Durante HMR de Vite se conservan por nombre las señales editables del script; los valores derivados se calculan otra vez. Este estado en memoria de HMR es independiente de la transferencia JSON entre servidor y navegador.
 
-La raíz `@meekojs/meeko` exporta exactamente `signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `createContext`, `provide`, `inject`, `provideErrorHandler` y `serializeJson`, más los tipos de señales, contexto, componentes, `HotState` y DevTools. Los submódulos documentados son `@meekojs/meeko/vite` y `@meekojs/meeko/devtools-ui`. El compilador importa sus funciones de DOM, HMR y registro de DevTools desde `@meekojs/meeko/internal`. Esta ruta es un contrato entre el compilador y su runtime de la **misma versión**; no está destinada a imports manuales. Los helpers internos ya no se reexportan desde la raíz: un módulo compilado con una versión anterior a `0.0.2` debe volver a compilarse.
+La raíz `@meekojs/meeko` exporta exactamente `signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `createContext`, `provide`, `inject`, `provideErrorHandler` y `serializeJson`, más los tipos de señales, contexto, componentes, `HotState` y DevTools. Este motor documenta además `@meekojs/meeko/vite` y `@meekojs/meeko/devtools-ui`. Las subrutas del framework y de los adaptadores (`/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare` y `/build`) se describen en la [guía del framework](framework.md). El compilador importa sus funciones de DOM, HMR y registro de DevTools desde `@meekojs/meeko/internal`. Esa ruta es un contrato entre el compilador y su runtime de la **misma versión exacta**, y no está destinada a imports manuales. Un módulo generado debe compilarse con la misma versión del paquete que lo ejecuta, así que hay que volver a compilarlo al actualizar Meeko.
 
 ## Herramientas
 
@@ -160,12 +160,12 @@ La raíz `@meekojs/meeko` exporta exactamente `signal`, `computed`, `effect`, `b
 
 ## Compatibilidad y límites
 
-- Node.js 24 o posterior y TypeScript 7.0.2 para el flujo de desarrollo actual.
-- La API pública aún puede cambiar durante la serie `0.x`; el paquete se distribuye como `@meekojs/meeko` bajo licencia MIT.
+- Node.js 24 o posterior y TypeScript 7.0.2 para la CLI, el build, Vite y el servidor de lenguaje. Los entornos de ejecución y navegadores admitidos se listan en la [política de estabilidad](stability.md#entornos-soportados).
+- La API pública sigue SemVer durante la serie 1.x: los cambios incompatibles requieren una versión major y las deprecaciones se anuncian en un minor (véase la [política de estabilidad](stability.md)). El paquete se distribuye como `@meekojs/meeko` bajo licencia MIT.
 - El parser acepta el subconjunto de TypeScript y HTML descrito arriba; informa las construcciones no soportadas mediante diagnósticos.
 - La hidratación requiere que el servidor y el navegador obtengan los mismos valores iniciales y el mismo orden de listas.
 - No se ofrecen garantías de compatibilidad con plugins de Vue. El streaming SSR (`render: "stream"` con `defer` de `@meekojs/meeko/framework`) se describe en [framework.md](framework.md).
 
-## Antes de publicar
+## Verificación del paquete
 
-La licencia MIT y el nombre `@meekojs/meeko` ya están definidos. `pnpm run package:smoke` instala el tarball en un consumidor fuera del monorepo y comprueba CLI, SSR, tipos y Vite. `tests/package-boundaries.test.ts` fija la lista exacta de exports de la raíz. La extensión de VS Code ya se empaquetó y probó en un host aislado con un proyecto consumidor externo.
+`pnpm run package:smoke` instala el tarball en un consumidor fuera del monorepo y comprueba CLI, SSR, tipos y Vite. `tests/package-boundaries.test.ts` fija la lista exacta de exports de la raíz. La extensión de VS Code se empaqueta y prueba en un host aislado con un proyecto consumidor externo. Los pasos de cada publicación están en [releasing.md](releasing.md).

@@ -64,7 +64,7 @@ El hook expone:
 | `setBreakpoint(id, enabled)` | Activa o desactiva el punto de parada de una instancia. |
 | `setSignal(instanceId, name, value)` | Sustituye el valor de una señal editable y devuelve `{ ok: true }` o `{ ok: false, error }`. |
 
-La versión sólo cambia con incompatibilidades. Los dos paneles rechazan un hook o una captura con otra versión, o sin ella (runtimes anteriores a 1.0), y muestran un mensaje que indica la versión encontrada y la admitida. Nunca leen datos de un protocolo que no conocen. El panel integrado viaja en el mismo paquete que el runtime. La extensión de Chrome necesita un `@meekojs/meeko` que implemente el protocolo 1.
+La versión sólo cambia con incompatibilidades y, según la [política de estabilidad](stability.md#devtools-y-editor), sólo en una versión major de Meeko. Dentro del protocolo 1 pueden aparecer campos o tipos de evento nuevos. Los dos paneles rechazan un hook o una captura con otra versión, o sin ella (runtimes anteriores a 1.0), y muestran un mensaje que indica la versión encontrada y la admitida. Nunca leen datos de un protocolo que no conocen. El panel integrado viaja en el mismo paquete que el runtime. La extensión de Chrome necesita un `@meekojs/meeko` que implemente el protocolo 1.
 
 `src/devtools-protocol.ts` es la única fuente de los tipos. La extensión usa una copia generada en `tools/devtools-extension/types/protocol.d.ts`, que su `tsc` con `checkJs` comprueba sobre `protocol.js` y `panel.js`. Para regenerarla después de cambiar el protocolo:
 

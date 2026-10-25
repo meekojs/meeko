@@ -8,15 +8,15 @@ web
 
 ## Users
 
-Desarrolladores que escriben componentes `.meeko` con TypeScript y necesitan probar SSR, hidratación y reactividad durante el desarrollo local.
+Desarrolladores que escriben componentes `.meeko` con TypeScript y aplicaciones full-stack con SSR, hidratación y reactividad, desplegadas en Node, Bun, Deno o Cloudflare Workers.
 
 ## Product Purpose
 
-Meeko es un motor experimental de componentes tipados, con SSR desde el inicio. Compila archivos `.meeko` y actualiza el DOM mediante señales. DevTools permite examinar y depurar cada instancia de componente mientras se desarrolla una aplicación.
+Meeko es un motor de componentes tipados y un framework full-stack, con SSR desde el inicio. Compila archivos `.meeko` y actualiza el DOM mediante señales. DevTools permite examinar y depurar cada instancia de componente mientras se desarrolla una aplicación.
 
 ## Operating Context
 
-El paquete público es `@meekojs/meeko`. El proyecto usa TypeScript 7, ofrece un plugin de Vite y una extensión local para VS Code. El usuario pidió que DevTools funcione tanto dentro de la página como en un panel de Chrome DevTools.
+El paquete público es `@meekojs/meeko`. El proyecto usa TypeScript 7 y ofrece un plugin de Vite, un servidor de lenguaje para VS Code y otros editores LSP, y adaptadores de servidor para Node, Bun, Deno y Cloudflare Workers. El usuario pidió que DevTools funcione tanto dentro de la página como en un panel de Chrome DevTools.
 
 ## Capabilities and Constraints
 
@@ -24,7 +24,7 @@ El paquete público es `@meekojs/meeko`. El proyecto usa TypeScript 7, ofrece un
 - El motor ofrece renderizado en servidor, hidratación, composición y señales reactivas.
 - DevTools debe identificar instancias individuales, mostrar props y señales, y permitir pausar cuando cambie una señal de la instancia seleccionada.
 - La instrumentación de DevTools pertenece al modo de desarrollo; el renderizado de producción no debe incluirla.
-- La primera versión pública del motor es experimental (`0.0.1`). La API puede evolucionar durante la serie `0.x`.
+- Desde 1.0, la API pública sigue SemVer según `docs/stability.md`: los cambios incompatibles requieren una versión major y lo deprecado se mantiene hasta la siguiente.
 
 ## Brand Commitments
 

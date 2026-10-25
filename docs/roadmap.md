@@ -1,82 +1,49 @@
 # Plan de desarrollo
 
-Estado: motor experimental. Cada etapa se considera terminada cuando sus criterios se comprueban en el código actual, las pruebas y, donde corresponda, un navegador real.
+Meeko 1.0 completa el alcance previsto para la primera versión estable. Desde ahí, la [política de estabilidad](stability.md) rige qué puede cambiar en cada versión. Este plan resume lo entregado y enumera las ampliaciones previstas para la serie 1.x. Ninguna tiene fecha comprometida. Los detalles de cada versión están en el [CHANGELOG](../CHANGELOG.md), y la preparación de la publicación, en [releasing.md](releasing.md).
 
-## 1. Parser y diagnósticos
+## Entregado en 1.0
 
-- [x] Analizar secciones y plantilla con un AST propio y posiciones de inicio y fin.
-- [x] Rechazar secciones duplicadas, HTML inválido y expresiones incompletas con diagnósticos en `.meeko`.
-- [x] Conservar segmentos de mapeo desde código generado hasta archivo original para errores de TypeScript.
+- **Motor de componentes**:
+  - parser con AST propio y diagnósticos ubicados en el `.meeko`;
+  - atributos, condiciones, listas con claves y componentes anidados;
+  - `<style scoped>` con `:global(...)`;
+  - SSR, hidratación con transferencia de estado y señales;
+  - plugin de Vite con HMR.
 
-**Aceptación:** un error en script, plantilla o estilo señala la ubicación correcta del `.meeko` y el CLI falla sin emitir un módulo incompleto.
+  La raíz del paquete sólo expone la API pública documentada.
+- **Editor.** El servidor de lenguaje (`meeko lsp --stdio`, `meeko-language-server`) ofrece los mismos diagnósticos que `meeko check`, además de completado, navegación, renombrado entre archivos, formato y acciones rápidas. La extensión de VS Code 1.0.0 es su cliente, y [editors.md](editors.md) documenta Neovim, Helix, Zed, JetBrains y Sublime Text.
+- **DevTools.** El protocolo 1 lo comparten el panel integrado y la extensión de Chrome 1.0.0. Permite editar señales y muestra en la línea de tiempo dónde se lee y se escribe cada una ([devtools.md](devtools.md)).
+- **Framework full-stack**:
+  - rutas por archivos, layouts, middleware y autoimports;
+  - API, RPC y Socket tipados con Standard Schema;
+  - estado por petición, sellado tras el render.
+- **Modos de render.** `"ssr"`, `"stream"` (streaming SSR con `defer`), `"prerender"` y `"client"`, con navegación transaccional entre ellos.
+- **Servidor portable.** `@meekojs/meeko/server` sólo usa Web APIs. Lo acompañan los adaptadores Node, Bun, Deno y Cloudflare Workers, una salida de build autónoma por adaptador y una suite de conformidad común que se ejecuta en CI.
+- **Sesiones y Socket distribuidos.** La revocación aborta las peticiones en curso y cierra los sockets de la familia. Los broadcasts se distribuyen con Redis o Durable Objects, con colas acotadas por peer.
+- **Publicación.** El paquete se publica en npm con procedencia (OIDC), y las prereleases van al dist-tag `next`. Hay workflows para Visual Studio Marketplace, Open VSX y Chrome Web Store.
 
-## 2. Plantillas completas
+## Después de 1.0
 
-- [x] Atributos dinámicos y booleanos con escape SSR y actualización reactiva.
-- [x] Condiciones con límites de región deterministas entre servidor y navegador.
-- [x] Listas con claves obligatorias, inserción, eliminación y reordenamiento sin perder el estado de elementos conservados.
-- [x] Tipos precisos de props, eventos y variables locales de listas.
+Todas estas ampliaciones son aditivas. Pueden llegar en un minor sin romper aplicaciones existentes.
 
-**Aceptación:** cada construcción tiene pruebas de salida SSR, hidratación sin reemplazar nodos, actualización y eliminación de observadores.
+- **Enviar el HTML antes del loader.** Hoy una página `"stream"` espera al loader crítico antes del primer byte. La ampliación enviaría antes el inicio del documento (`<head>`, estilos y entrada cliente).
+- **Shell SPA puramente estático.** Una aplicación cuyas páginas son todas `render: "client"` podría servirse como archivos estáticos, sin servidor que ejecute middleware ni layouts.
+- **Rendimiento de hidratación de listas.** La [comparativa con Vue](benchmarks.md#escenarios-ampliados-árbol-lista-y-navegación) muestra la hidratación de listas por encima de Vue, y también falta acelerar el montaje completo de vistas. Es trabajo de rendimiento: no cambia la API.
+- **Middleware de layers y módulos.** Hoy el descubrimiento de `app/middleware` y `server/middleware` se limita al proyecto raíz.
+- **Contenido inline en `<component>`.** Es una sintaxis para pasar contenido dentro de la etiqueta, como alternativa a una prop `Component<Props>`.
+- **Extensiones en las tiendas.** Falta dar de alta las cuentas y secretos que necesitan los workflows ya preparados ([releasing.md](releasing.md#publicación-en-las-tiendas-de-extensiones)).
 
-## 3. SSR e hidratación robustos
+## Etapas anteriores
 
-- [x] Instancias múltiples, componentes anidados y marcadores aislados por raíz.
-- [x] Transferencia de estado serializable y comprobación explícita de datos no serializables.
-- [x] Diagnósticos de hidratación que indiquen componente y ubicación.
-- [x] Pruebas de aislamiento entre peticiones concurrentes.
+Las versiones `0.0.1` a `0.1.0` construyeron este alcance por etapas:
 
-**Aceptación:** dos componentes con el mismo código en una página funcionan independientemente y una petición no puede leer estado de otra.
+1. parser y diagnósticos;
+2. plantillas completas;
+3. SSR e hidratación robustos;
+4. tipado y editor;
+5. integración con Vite y comparativas;
+6. DevTools;
+7. framework full-stack.
 
-## 4. Tipado y editor
-
-- [x] Verificación directa de `.meeko` con diagnósticos en el archivo fuente.
-- [x] Autocompletado, navegación, renombrado y hover en script y plantilla.
-- [x] Formateo consistente y resaltado validado en la extensión VS Code dentro de un host real.
-
-**Aceptación:** el editor y el CLI muestran los mismos errores y las refactorizaciones conservan referencias entre plantilla y script.
-
-## 5. Integración y rendimiento
-
-- [x] Plugin Vite que transforma `.meeko` para cliente y servidor con HMR.
-- [x] Pruebas E2E en navegador real: primera carga, hidratación, navegación y actualización.
-- [x] Comparativas reproducibles frente a Vue con funciones y configuración equivalentes: tamaño comprimido, tiempo de carga, actualización y memoria.
-- [x] Documentación de API, límites de compatibilidad y preparación de publicación.
-
-**Aceptación:** una aplicación de ejemplo se ejecuta en desarrollo y producción sin pasos manuales de generación; las cifras de rendimiento incluyen scripts y condiciones de medición reproducibles.
-
-## Próxima etapa: publicación y adopción
-
-- [x] Elegir licencia MIT y preparar el paquete público `@meekojs/meeko` con versión experimental `0.0.1`.
-- [x] Probar el paquete como dependencia de una aplicación externa con CLI, SSR, tipos y Vite.
-- [x] Revisar las exportaciones internas de DOM/HMR: el compilador usa `@meekojs/meeko/internal` y los exports antiguos de la raíz se conservan por compatibilidad durante `0.x`.
-- [x] Publicar el repositorio en GitHub y la primera versión del paquete en npm.
-- [x] Preparar y comprobar la extensión de VS Code para Windows, Linux y macOS en x64/arm64. Las pruebas de host corrieron en Windows x64, Linux x64 y macOS arm64; las demás variantes se comprobaron por contenido del VSIX y binario nativo.
-- [x] Ampliar la comparativa a árboles, listas grandes y navegación, con condiciones y resultados reproducibles. La lista muestra una oportunidad clara de optimización.
-- [x] Decidir el alcance de `0.0.2`: `:global` en CSS, streaming SSR y un servidor de lenguaje independiente se posponen. Se evaluarán por separado antes de una versión estable.
-- [x] Servidor de lenguaje independiente: `meeko lsp --stdio` y el bin `meeko-language-server`, con la extensión de VS Code como cliente y guía para otros editores en [editors.md](editors.md).
-
-## DevTools experimental
-
-- [x] Instrumentar instancias hidratadas, props, señales, árbol, eventos y limpieza en desarrollo.
-- [x] Ofrecer selección, resaltado y puntos de parada por instancia en un panel integrado.
-- [x] Ofrecer un panel local de Chrome DevTools que consuma el mismo hook.
-- [x] Verificar el runtime, las interfaces y el ejemplo en Chrome.
-- [x] Publicar `0.0.2` en npm con DevTools y adjuntar el ZIP de Chrome y los seis VSIX a la versión de GitHub. Las extensiones todavía no están publicadas en sus tiendas.
-
-**Aceptación:** la [guía de DevTools](devtools.md) documenta el uso y los límites; SSR y producción no exponen el hook de desarrollo.
-
-## Desarrollo de 0.0.3
-
-- [x] Optimizar el movimiento de listas con claves y comparar 1.000 filas en ambos órdenes de ejecución.
-- [x] Evitar escrituras DOM iniciales redundantes y asignar señales de índice y conjuntos de suscriptores sólo cuando se usan.
-- [x] Separar en el benchmark la navegación que reutiliza nodos de la que monta una vista nueva.
-- [x] Crear un piloto SSR con rutas, formulario, lista, componentes anidados y datos asíncronos; verificar desarrollo y producción en Chromium, Firefox y WebKit.
-- [x] Generar una aplicación SSR independiente con `meeko init` y compilarla desde un tarball instalado fuera del repositorio.
-- [x] Mostrar en ambos paneles DevTools las expresiones `.meeko` que leen cada señal, con archivo, línea y columna.
-- [x] Preparar el workflow OIDC para publicaciones futuras y documentar el límite actual entre runtime y herramientas.
-- [x] Publicar `0.0.2` en npm y crear su etiqueta y [versión en GitHub](https://github.com/meekojs/meeko/releases/tag/v0.0.2) tras completar la autorización de npm.
-- [x] Vincular el Trusted Publisher en npm para `meekojs/meeko` y `publish.yml`. Falta comprobar el flujo en la primera publicación automática de una versión posterior.
-- [x] Medir el coste de instalación en frío y el arranque SSR de un consumidor publicado. El [primer ensayo](benchmarks.md#consumidor-instalado-desde-npm) no decide aún si se separan runtime y compilador.
-
-La [comparativa actual](benchmarks.md) muestra una reducción del heap de listas, aunque su hidratación sigue por encima de Vue en las dos corridas. También queda por acelerar el montaje completo de vistas. Las cifras locales no sustituyen mediciones de una aplicación desplegada.
+El [CHANGELOG](../CHANGELOG.md) y las secciones por versión de [releasing.md](releasing.md) registran qué incluyó cada una y cómo se verificó.

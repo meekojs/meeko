@@ -23,6 +23,11 @@ El ejemplo de `examples/counter` ejercita el contrato en un servidor HTTP. Cada 
 | Runtime reactivo | Registrar dependencias, agrupar actualizaciones y liberar observadores por instancia. |
 | Runtime de navegador | Reclamar nodos existentes, conectar eventos y aplicar cambios precisos. |
 | Integración de herramientas | Mostrar diagnósticos en `.meeko`, transformar archivos en Vite y mantener HMR. |
+| Framework | Rutas, páginas, modos de render, navegación y clientes API/RPC/Socket (`src/framework`). |
+| Núcleo de servidor | Aplicación portable sobre Web APIs: runtime, contratos, sesiones, middleware y Socket (`src/framework-server`). |
+| Adaptadores | Conectar el núcleo con Node, Bun, Deno y Cloudflare Workers (`src/node.ts`, `src/bun.ts`, `src/deno.ts`, `src/cloudflare.ts`). |
+
+La [guía del framework](framework.md) describe el framework, el servidor y los adaptadores.
 
 El parser de secciones vive en `src/compiler/sfc.ts`; `src/compiler/template.ts` construye un AST propio de HTML. Ambos conservan límites de inicio y fin en el archivo original. El generador de `src/compiler.ts` usa esas posiciones para errores de sintaxis y devuelve segmentos de mapeo para el script y las expresiones. `src/check.ts` verifica el módulo mediante TypeScript 7 y presenta los errores en el `.meeko` original. Un error en código auxiliar generado sin segmento se identifica como tal y se sitúa al inicio del archivo para no atribuirle una ubicación falsa.
 
@@ -42,10 +47,10 @@ Los módulos generados importan el runtime desde `@meekojs/meeko/internal`. Esta
 
 ## TypeScript
 
-El proyecto utiliza TypeScript 7.0.2 estable para la compilación y la verificación de tipos. El parser de scripts usa temporalmente `@typescript/typescript6`, aislado como dependencia del compilador, porque TypeScript 7.0 no expone una API programática estable. El módulo generado se comprueba con TypeScript 7. `meeko types` emite declaraciones `.d.meeko.ts` para que un consumidor con `allowArbitraryExtensions` compruebe imports y props. La extensión local de VS Code usa los mapeos de origen y un documento TypeScript virtual para ofrecer diagnósticos y operaciones semánticas sobre `.meeko`.
+El proyecto utiliza TypeScript 7.0.2 estable para la compilación y la verificación de tipos. El parser de scripts usa temporalmente `@typescript/typescript6`, aislado como dependencia del compilador, porque TypeScript 7.0 no expone una API programática estable. El módulo generado se comprueba con TypeScript 7. `meeko types` emite declaraciones `.d.meeko.ts` para que un consumidor con `allowArbitraryExtensions` compruebe imports y props. El servidor de lenguaje de `src/language-server` usa los mapeos de origen y un documento TypeScript virtual para ofrecer diagnósticos y operaciones semánticas sobre `.meeko`. Lo usan la extensión de VS Code y [otros editores](editors.md).
 
 ## Límite entre runtime y herramientas
 
 El bundle del navegador sólo incorpora los módulos usados por la aplicación; [las mediciones](benchmarks.md) registran su tamaño comprimido por separado. La instalación de `@meekojs/meeko` sí incluye el compilador, TypeScript 7, el analizador TypeScript 6, parse5 y PostCSS porque la CLI y el plugin Vite pertenecen al mismo paquete. El coste de instalación y el tamaño del JS servido son métricas distintas.
 
-Durante la serie experimental mantenemos un paquete: el código generado y `@meekojs/meeko/internal` deben tener exactamente la misma versión. Separar el compilador y el runtime antes de fijar ese contrato añadiría una segunda versión que coordinar en cada build. Mediremos instalación en frío, arranque SSR y bundle en consumidores externos antes de decidir la separación. Si el coste de instalación resulta relevante, la división conservará una ruta de compatibilidad para los módulos `.meeko` ya compilados y tendrá pruebas de consumo desde paquetes publicados.
+En la serie 1.x Meeko se publica como un único paquete. El código generado y `@meekojs/meeko/internal` deben tener exactamente la misma versión, y `meeko init` fija esa versión exacta en los proyectos que crea. Separar compilador y runtime añadiría una segunda versión que coordinar en cada build, sin un beneficio medido que lo justifique. La [política de estabilidad](stability.md#un-solo-paquete) recoge esta decisión. Si en el futuro el coste de instalación aconsejara dividir el paquete, la división conservaría una ruta de compatibilidad para los módulos `.meeko` ya compilados y tendría pruebas de consumo desde paquetes publicados.
