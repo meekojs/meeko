@@ -575,6 +575,21 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       const response = await (options.fetch ?? fetch)(context.url.href, {
         headers: { accept: "application/meeko+json" }, credentials: "same-origin", signal: context.signal,
       });
+      // A loader or middleware redirect: follow it instead of this navigation. A browser fetch
+      // reports a followed redirect; a custom fetch may hand back the 3xx response itself.
+      const location = response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
+      const redirect = response.redirected && response.url ? new URL(response.url) : location ? new URL(location, context.url) : undefined;
+      if (redirect) {
+        void response.body?.cancel().catch(() => {});
+        if (context.signal.aborted || disposed) return false;
+        if (redirect.href === context.url.href) throw new Error("Route data redirected to the same URL");
+        if (redirect.origin === browser.location.origin && matchRoute(options.routes, redirect.pathname)) {
+          queueMicrotask(() => {
+            if (!disposed) navigator.navigate(redirect.href).catch((error: unknown) => reportNavigationError(browser, error, observeNavigationError));
+          });
+        } else browser.location.assign(redirect.href);
+        return false;
+      }
       if (!response.ok) throw new Error(`Route data request failed: HTTP ${response.status}`);
       serverCsrfToken = response.headers.get("x-meeko-csrf-token");
       let payload: HydrationPayload;

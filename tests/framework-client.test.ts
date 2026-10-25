@@ -139,6 +139,82 @@ test("client rejects invalid route input before navigation and preserves request
   browser.happyDOM.abort();
 });
 
+test("a redirected server data request navigates to its target instead of failing", async () => {
+  const browser = new HappyWindow({ url: "https://example.test/start" });
+  const assigned: string[] = [];
+  Object.defineProperty(browser.location, "assign", { value: (url: string) => { assigned.push(url); } });
+  const routes = createRouteManifest([
+    { id: "/start", file: "start.meeko", layouts: [] },
+    { id: "/private", file: "private.meeko", layouts: [], sidecar: "private.route.ts" },
+    { id: "/login", file: "login.meeko", layouts: [] },
+  ]);
+  const page = (name: string): ClientComponent => ({
+    renderWithState: () => ({ html: `<p>${name}</p>`, state: {} }),
+    renderToString: () => `<p>${name}</p>`,
+    hydrateScope: () => () => {},
+  });
+  const modules: Record<string, ClientComponent> = { "start.meeko": page("Start"), "private.meeko": page("Private"), "login.meeko": page("Login") };
+  const server = createFrameworkHandler({
+    routes,
+    loadPage: async (file) => modules[file]!,
+    loadRoute: async () => ({ load: () => Response.redirect("https://example.test/login?next=%2Fprivate", 302) }),
+  });
+  browser.document.write(await (await server(new Request("https://example.test/start"))).text());
+  const errors: unknown[] = [];
+  let followed = true;
+  const app = await mountClientApp({
+    routes,
+    root: browser.document.getElementById("app") as unknown as Element,
+    payload: browser.document.getElementById("meeko-payload")!.textContent!,
+    loadPage: async (file) => modules[file]!,
+    serverData: true,
+    // A browser fetch follows the redirect; a custom fetch may return the 3xx itself.
+    fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await server(new Request(input, init));
+      const location = response.headers.get("location");
+      if (!followed || !location) return response;
+      const target = await server(new Request(new URL(location, String(input)), init));
+      Object.defineProperty(target, "redirected", { value: true });
+      Object.defineProperty(target, "url", { value: new URL(location, String(input)).href });
+      return target;
+    }) as typeof fetch,
+    onNavigationError: (error) => { errors.push(error); },
+    browser: browser as unknown as Window,
+  });
+  try {
+    for (const follow of [true, false]) {
+      followed = follow;
+      assert.equal(await app.navigate("/start"), true);
+      assert.equal(await app.navigate("/private"), false);
+      await new Promise<void>((done) => setTimeout(done, 20));
+      assert.equal(browser.location.pathname + browser.location.search, "/login?next=%2Fprivate", `follow=${follow}`);
+      assert.equal(browser.document.getElementById("app")!.textContent, "Login");
+    }
+    // A redirect to a page the app does not route is a full load.
+    followed = false;
+    const external = createFrameworkHandler({
+      routes, loadPage: async (file) => modules[file]!,
+      loadRoute: async () => ({ load: () => Response.redirect("https://accounts.example.test/sign-in", 302) }),
+    });
+    const outside = await mountClientApp({
+      routes,
+      root: browser.document.getElementById("app") as unknown as Element,
+      payload: await (await external(new Request("https://example.test/login", { headers: { accept: "application/meeko+json" } }))).text(),
+      loadPage: async (file) => modules[file]!,
+      serverData: true,
+      fetch: ((input: RequestInfo | URL, init?: RequestInit) => external(new Request(input, init))) as typeof fetch,
+      browser: browser as unknown as Window,
+    });
+    assert.equal(await outside.navigate("/private"), false);
+    assert.deepEqual(assigned, ["https://accounts.example.test/sign-in"]);
+    outside.dispose();
+    assert.deepEqual(errors, []);
+  } finally {
+    app.dispose();
+    browser.happyDOM.abort();
+  }
+});
+
 test("client navigation fetches server loader data without importing a private sidecar", async () => {
   const browser = new HappyWindow({ url: "https://example.test/start" });
   const routes = createRouteManifest([
