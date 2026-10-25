@@ -40,6 +40,13 @@
 - VS Code mapea los valores de directivas sin comillas, como `on:click=handler` o `each:of=items`, con la misma lógica que el compilador; sus diagnósticos, navegación y renombrado ya no se omiten.
 - `<style scoped>` admite `:global(<selector>)`: el selector interno se emite sin el atributo de ámbito, que se añade al último compuesto local (`.card :global(.icon)` produce `.card[data-meeko-s-…] .icon`). `:global` sin selector, con una lista de selectores o anidado en otra pseudoclase falla con `MEEK019` en su posición.
 
+### Publicación
+
+- Una versión con sufijo de prerelease (`1.0.0-rc.1`) se publica en npm con el dist-tag `next` y no mueve `latest`. La publicación sigue usando OIDC sin token de npm.
+- La etiqueta `v<versión>` adjunta a su release de GitHub los seis VSIX de VS Code, el ZIP de Chrome DevTools y `SHA256SUMS.txt`, y crea la release como prerelease cuando la versión lo es. Sólo ese job tiene `contents: write`, e `id-token: write` queda limitado al job de npm.
+- Nuevos workflows `publish-vscode.yml` (etiquetas `vscode-v*`, Visual Studio Marketplace y Open VSX) y `publish-devtools.yml` (etiquetas `devtools-v*`, API v2 de Chrome Web Store). Comprueban la versión de la etiqueta y ejecutan las pruebas de la extensión antes de publicar, y omiten cada tienda sin fallar mientras falten sus secretos (`VSCE_PAT`, `OVSX_PAT`, `CHROME_EXTENSION_ID`, `CHROME_PUBLISHER_ID`, `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET`, `CHROME_REFRESH_TOKEN`). [docs/releasing.md](docs/releasing.md) explica el alta de cada cuenta.
+- `package-zip.ps1 -RootLayout` genera el ZIP de Chrome DevTools con `manifest.json` en la raíz, como exige Chrome Web Store; sin el switch conserva la carpeta `meeko-devtools/`.
+
 ## [0.1.0] - 2026-10-25
 
 Este bloque contiene cambios incompatibles respecto de `0.0.4`. De acuerdo con la política SemVer de Meeko para la serie `0.x`, se publica como `0.1.0`, no como un patch.

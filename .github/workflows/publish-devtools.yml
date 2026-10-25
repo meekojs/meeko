@@ -1,0 +1,152 @@
+name: Publicar Meeko DevTools en Chrome Web Store
+
+# Sólo se ejecuta cuando el mantenedor sube una etiqueta `devtools-v<versión>`. La extensión
+# tiene versión propia, independiente del paquete npm. La publicación se omite (sin fallar)
+# mientras falte cualquiera de los secretos CHROME_EXTENSION_ID, CHROME_PUBLISHER_ID,
+# CHROME_CLIENT_ID, CHROME_CLIENT_SECRET y CHROME_REFRESH_TOKEN.
+on:
+  push:
+    tags:
+      - 'devtools-v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-devtools-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Comprobar versión
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Comprobar versión de la etiqueta
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content -LiteralPath tools/devtools-extension/manifest.json -Raw | ConvertFrom-Json).version
+          if ($env:GITHUB_REF_NAME -ne "devtools-v$version") {
+            throw "La etiqueta $env:GITHUB_REF_NAME no coincide con tools/devtools-extension/manifest.json ($version)."
+          }
+          # Chrome sólo admite de uno a cuatro enteros separados por puntos.
+          if ($version -notmatch '^\d+(\.\d+){0,3}$') {
+            throw "La versión $version no es válida para Chrome Web Store."
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+  check:
+    name: Pruebas de la extensión
+    needs: version
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.14.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Protocolo, tipos generados, layout del panel y `tsc` con checkJs.
+      - run: pnpm run devtools:check
+      # La prueba instalada usa la app Vite de ejemplo, que importa `@meekojs/meeko/vite` desde dist.
+      - run: pnpm run build
+      - run: node node_modules/playwright-core/cli.js install chromium
+      - name: Extensión instalada en Chrome for Testing
+        run: node --test tools/devtools-extension/tests/installed.e2e.js
+
+  publish:
+    name: Chrome Web Store
+    needs: [version, check]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Detectar secretos de Chrome Web Store
+        id: store
+        shell: pwsh
+        env:
+          HAS_CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID != '' }}
+          HAS_CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID != '' }}
+          HAS_CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID != '' }}
+          HAS_CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET != '' }}
+          HAS_CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN != '' }}
+        run: |
+          $names = @('CHROME_EXTENSION_ID', 'CHROME_PUBLISHER_ID', 'CHROME_CLIENT_ID', 'CHROME_CLIENT_SECRET', 'CHROME_REFRESH_TOKEN')
+          $missing = @($names | Where-Object { [Environment]::GetEnvironmentVariable("HAS_$_") -ne 'true' })
+          $ready = $missing.Count -eq 0
+          "ready=$($ready.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          if ($missing.Count -eq $names.Count) {
+            Write-Output '::notice title=Chrome Web Store omitido::No hay secretos de Chrome Web Store; no se publica.'
+          } elseif (!$ready) {
+            Write-Output "::warning title=Chrome Web Store omitido::Configuración incompleta; faltan $($missing -join ', '). No se publica."
+          }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.store.outputs.ready == 'true'
+      - name: Empaquetar el ZIP para la tienda
+        if: steps.store.outputs.ready == 'true'
+        shell: pwsh
+        env:
+          DEVTOOLS_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP "meeko-devtools-$env:DEVTOOLS_VERSION-store.zip"
+          pwsh -NoProfile -File tools/devtools-extension/package-zip.ps1 -OutputPath $zip -RootLayout
+          if ($LASTEXITCODE -ne 0) { throw 'Falló el ZIP de Chrome DevTools.' }
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            $entry = $archive.GetEntry('manifest.json')
+            if (!$entry) { throw 'El ZIP de la tienda no tiene manifest.json en la raíz.' }
+            $reader = [System.IO.StreamReader]::new($entry.Open())
+            try { $manifest = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
+            if ($manifest.version -ne $env:DEVTOOLS_VERSION) { throw "El ZIP contiene la versión $($manifest.version), no $env:DEVTOOLS_VERSION." }
+          } finally {
+            $archive.Dispose()
+          }
+      - name: Subir y publicar con la API v2 de Chrome Web Store
+        if: steps.store.outputs.ready == 'true'
+        shell: pwsh
+        env:
+          DEVTOOLS_VERSION: ${{ needs.version.outputs.version }}
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
+          CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP "meeko-devtools-$env:DEVTOOLS_VERSION-store.zip"
+          $token = (Invoke-RestMethod -Method Post -Uri 'https://oauth2.googleapis.com/token' -Body @{
+            client_id     = $env:CHROME_CLIENT_ID
+            client_secret = $env:CHROME_CLIENT_SECRET
+            refresh_token = $env:CHROME_REFRESH_TOKEN
+            grant_type    = 'refresh_token'
+          }).access_token
+          if (!$token) { throw 'Google no devolvió un access token; revisa CHROME_CLIENT_ID, CHROME_CLIENT_SECRET y CHROME_REFRESH_TOKEN.' }
+          Write-Output "::add-mask::$token"
+          $headers = @{ Authorization = "Bearer $token" }
+          $item = "publishers/$env:CHROME_PUBLISHER_ID/items/$env:CHROME_EXTENSION_ID"
+
+          $upload = Invoke-RestMethod -Method Post -Headers $headers -ContentType 'application/zip' -InFile $zip `
+            -Uri "https://chromewebstore.googleapis.com/upload/v2/${item}:upload"
+          $state = $upload.uploadState
+          for ($attempt = 0; $state -eq 'IN_PROGRESS' -and $attempt -lt 30; $attempt++) {
+            Start-Sleep -Seconds 10
+            $state = (Invoke-RestMethod -Method Get -Headers $headers -Uri "https://chromewebstore.googleapis.com/v2/${item}:fetchStatus").lastAsyncUploadState
+          }
+          if ($state -ne 'SUCCEEDED') { throw "La subida terminó en estado '$state'." }
+          if ($upload.crxVersion -and $upload.crxVersion -ne $env:DEVTOOLS_VERSION) {
+            throw "Chrome Web Store recibió la versión $($upload.crxVersion), no $env:DEVTOOLS_VERSION."
+          }
+          Write-Output "Subida ${env:DEVTOOLS_VERSION}: $state"
+
+          $publish = Invoke-RestMethod -Method Post -Headers $headers -ContentType 'application/json' -Body '{}' `
+            -Uri "https://chromewebstore.googleapis.com/v2/${item}:publish"
+          Write-Output "Envío a revisión: $($publish.state)"
+          foreach ($warning in @($publish.warningInfo.warnings)) {
+            if ($warning) { Write-Output "::warning title=Chrome Web Store::$($warning.reason): $($warning.description)" }
+          }

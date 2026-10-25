@@ -5,9 +5,10 @@ on:
     tags:
       - 'v*'
 
+# Mínimo privilegio: cada job amplía sólo lo que necesita. `id-token: write` queda
+# limitado a `publish` (npm Trusted Publishing) y `contents: write` a `github-release`.
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   redis-integration:
@@ -80,6 +81,9 @@ jobs:
     needs: [redis-integration, vscode-extension]
     runs-on: windows-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -91,12 +95,17 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: pnpm
       - name: Comprobar versión de la etiqueta
+        id: version
         shell: pwsh
         run: |
           $packageVersion = node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version"
           if ($env:GITHUB_REF_NAME -ne "v$packageVersion") {
             throw "La etiqueta $env:GITHUB_REF_NAME no coincide con package.json ($packageVersion)."
           }
+          # Una prerelease (1.0.0-rc.1) se publica en `next` y nunca mueve `latest`.
+          $distTag = if ($packageVersion.Contains('-')) { 'next' } else { 'latest' }
+          "dist-tag=$distTag" >> $env:GITHUB_OUTPUT
+          Write-Output "npm dist-tag: $distTag"
       - run: pnpm install --frozen-lockfile
       - name: Verify package and DevTools
         shell: pwsh
@@ -139,6 +148,96 @@ jobs:
           if-no-files-found: ignore
       - name: Publicar con identidad OIDC
         shell: pwsh
+        env:
+          NPM_DIST_TAG: ${{ steps.version.outputs.dist-tag }}
         run: |
+          if ($env:NPM_DIST_TAG -notin @('latest', 'next')) { throw "dist-tag inesperado: '$env:NPM_DIST_TAG'." }
           npm install --global npm@11.19.0
-          npm publish --access public
+          npm publish --access public --tag $env:NPM_DIST_TAG
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  github-release:
+    name: Release de GitHub con VSIX y ZIP
+    needs: publish
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.14.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Leer versiones
+        id: version
+        shell: pwsh
+        run: |
+          $packageVersion = node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version"
+          if ($env:GITHUB_REF_NAME -ne "v$packageVersion") {
+            throw "La etiqueta $env:GITHUB_REF_NAME no coincide con package.json ($packageVersion)."
+          }
+          $vscodeVersion = node -p "JSON.parse(require('node:fs').readFileSync('editors/vscode/package.json', 'utf8')).version"
+          $devtoolsVersion = node -p "JSON.parse(require('node:fs').readFileSync('tools/devtools-extension/manifest.json', 'utf8')).version"
+          "package=$packageVersion" >> $env:GITHUB_OUTPUT
+          "prerelease=$($packageVersion.Contains('-').ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "vscode=$vscodeVersion" >> $env:GITHUB_OUTPUT
+          "devtools=$devtoolsVersion" >> $env:GITHUB_OUTPUT
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
+        working-directory: editors/vscode
+      - name: Empaquetar los seis VSIX y el ZIP de Chrome
+        shell: pwsh
+        env:
+          VSCODE_VERSION: ${{ steps.version.outputs.vscode }}
+          DEVTOOLS_VERSION: ${{ steps.version.outputs.devtools }}
+        run: |
+          $assets = Join-Path $env:RUNNER_TEMP 'release-assets'
+          New-Item -ItemType Directory -Force $assets | Out-Null
+          foreach ($target in @('win32-x64', 'win32-arm64', 'linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64')) {
+            pwsh -NoProfile -File editors/vscode/package-vsix.ps1 -Target $target
+            if ($LASTEXITCODE -ne 0) { throw "Falló el VSIX $target." }
+            $vsix = "editors/vscode/artifacts/meeko-language-$env:VSCODE_VERSION-$target.vsix"
+            if (!(Test-Path -LiteralPath $vsix -PathType Leaf)) { throw "Falta $vsix." }
+            Copy-Item -LiteralPath $vsix -Destination $assets
+          }
+          pwsh -NoProfile -File tools/devtools-extension/package-zip.ps1 -OutputPath (Join-Path $assets "meeko-devtools-$env:DEVTOOLS_VERSION.zip")
+          if ($LASTEXITCODE -ne 0) { throw 'Falló el ZIP de Chrome DevTools.' }
+          $lines = Get-ChildItem -LiteralPath $assets -File | Sort-Object Name | ForEach-Object {
+            "$((Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant())  $($_.Name)"
+          }
+          Set-Content -LiteralPath (Join-Path $assets 'SHA256SUMS.txt') -Value $lines -Encoding utf8NoBOM
+          Get-ChildItem -LiteralPath $assets -File | Format-Table Name, Length
+      - name: Crear o actualizar la release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_VERSION: ${{ steps.version.outputs.package }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+          VSCODE_VERSION: ${{ steps.version.outputs.vscode }}
+          DEVTOOLS_VERSION: ${{ steps.version.outputs.devtools }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $assets = @(Get-ChildItem -LiteralPath (Join-Path $env:RUNNER_TEMP 'release-assets') -File | ForEach-Object FullName)
+          if ($assets.Count -ne 8) { throw "Se esperaban 8 archivos (6 VSIX, ZIP y SHA256SUMS); hay $($assets.Count)." }
+          gh release view $tag --repo $env:GITHUB_REPOSITORY --json tagName 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            # Release ya creada (a mano o en un intento anterior): sólo se reemplazan los adjuntos.
+            gh release upload $tag @assets --clobber --repo $env:GITHUB_REPOSITORY
+          } else {
+            $distTag = if ($env:PRERELEASE -eq 'true') { 'next' } else { 'latest' }
+            $notes = @(
+              "Paquete npm: [@meekojs/meeko@$env:PACKAGE_VERSION](https://www.npmjs.com/package/@meekojs/meeko/v/$env:PACKAGE_VERSION) (dist-tag ``$distTag``).",
+              '',
+              "Adjuntos: extensión de VS Code ``meeko-language`` $env:VSCODE_VERSION (seis VSIX: win32, linux y darwin en x64/arm64) y Meeko DevTools para Chrome $env:DEVTOOLS_VERSION (ZIP), con sus sumas en ``SHA256SUMS.txt``. Las extensiones tienen versión propia y se publican en sus tiendas con las etiquetas ``vscode-v*`` y ``devtools-v*``.",
+              '',
+              "Cambios: [CHANGELOG.md](https://github.com/$env:GITHUB_REPOSITORY/blob/$tag/CHANGELOG.md)."
+            ) -join "`n"
+            $arguments = @('release', 'create', $tag) + $assets + @('--repo', $env:GITHUB_REPOSITORY, '--verify-tag', '--title', $tag, '--notes', $notes)
+            $arguments += if ($env:PRERELEASE -eq 'true') { '--prerelease' } else { '--latest' }
+            gh @arguments
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

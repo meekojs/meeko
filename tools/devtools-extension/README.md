@@ -16,7 +16,7 @@ Para crear un ZIP con sólo los archivos necesarios de la extensión desde la ra
 pwsh -NoProfile -File tools/devtools-extension/package-zip.ps1
 ```
 
-El resultado aparece en `tools/devtools-extension/artifacts/meeko-devtools-1.0.0.zip`, contiene la carpeta `meeko-devtools/` y muestra su SHA-256. Para escribirlo fuera del repositorio, pasa `-OutputPath <ruta>.zip`. El empaquetador rechaza un nombre de archivo ya existente para evitar reemplazos accidentales. El ZIP no incluye pruebas, scripts, `tsconfig.json` ni las declaraciones de tipos. La versión de esta extensión es independiente de la versión del paquete npm.
+El resultado aparece en `tools/devtools-extension/artifacts/meeko-devtools-1.0.0.zip`, contiene la carpeta `meeko-devtools/` y muestra su SHA-256. Para escribirlo fuera del repositorio, pasa `-OutputPath <ruta>.zip`. El empaquetador rechaza un nombre de archivo ya existente para evitar reemplazos accidentales. Con `-RootLayout` los archivos quedan en la raíz del ZIP, sin la carpeta `meeko-devtools/`, como exige Chrome Web Store; la publicación en la tienda sólo ocurre al subir una etiqueta `devtools-v<versión>` (ver [docs/releasing.md](../../docs/releasing.md)). El ZIP no incluye pruebas, scripts, `tsconfig.json` ni las declaraciones de tipos. La versión de esta extensión es independiente de la versión del paquete npm.
 
 ## Funciones
 

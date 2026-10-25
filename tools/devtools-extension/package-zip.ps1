@@ -1,5 +1,8 @@
 param(
-  [string]$OutputPath
+  [string]$OutputPath,
+  # Chrome Web Store exige manifest.json en la raíz del ZIP. Sin este switch los archivos
+  # quedan dentro de `meeko-devtools/`, la forma cómoda para descomprimir y cargar a mano.
+  [switch]$RootLayout
 )
 
 $ErrorActionPreference = 'Stop'
@@ -7,7 +10,8 @@ $extensionRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $manifest = Get-Content -LiteralPath (Join-Path $extensionRoot 'manifest.json') -Raw | ConvertFrom-Json
 
 if (-not $OutputPath) {
-  $OutputPath = Join-Path $extensionRoot "artifacts/meeko-devtools-$($manifest.version).zip"
+  $suffix = if ($RootLayout) { '-store' } else { '' }
+  $OutputPath = Join-Path $extensionRoot "artifacts/meeko-devtools-$($manifest.version)$suffix.zip"
 }
 $resolvedOutput = [System.IO.Path]::GetFullPath($OutputPath)
 if (Test-Path -LiteralPath $resolvedOutput) {
@@ -32,6 +36,7 @@ foreach ($file in $files) {
   }
 }
 
+$entryPrefix = if ($RootLayout) { '' } else { 'meeko-devtools/' }
 $outputDirectory = Split-Path -Parent $resolvedOutput
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 $archive = [System.IO.Compression.ZipFile]::Open($resolvedOutput, [System.IO.Compression.ZipArchiveMode]::Create)
@@ -40,7 +45,7 @@ try {
     [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
       $archive,
       (Join-Path $extensionRoot $file),
-      "meeko-devtools/$file",
+      "$entryPrefix$file",
       [System.IO.Compression.CompressionLevel]::Optimal
     ) | Out-Null
   }
