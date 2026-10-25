@@ -77,7 +77,9 @@ test("el panel permanece legible y sin desbordamiento horizontal en DevTools est
           } } } },
         });
       });
-      await page.goto(`http://127.0.0.1:${address.port}/panel.html`);
+      // The panel's readiness is the rendered instance list below, not the window load event,
+      // which slow CI runners can delay past the navigation timeout.
+      await page.goto(`http://127.0.0.1:${address.port}/panel.html`, { waitUntil: "domcontentloaded" });
       await page.locator(".instance-button").first().waitFor();
       assert.equal(await page.locator("#detail-name").textContent(), "Counter");
       assert.equal(await page.locator("#event-list > li").count(), 1);
