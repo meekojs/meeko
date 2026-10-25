@@ -9,6 +9,8 @@ import { runRouteMiddleware } from "./middleware.js";
 import type { RouteMiddleware } from "./middleware.js";
 import type { PageHead, PageRender, PageSchema } from "./page.js";
 import { StateStore, withStateStore } from "./state.js";
+import { deferredSettle, deferredSource, extractDeferred } from "./deferred.js";
+import type { DeferredInternals, DeferredOutcome } from "./deferred.js";
 import { matchRoute } from "./router.js";
 import type { RouteRecord } from "./router.js";
 
@@ -125,6 +127,105 @@ function routeRender(route: RouteRecord, sidecar: PageRoute | undefined): PageRe
   return route.render ?? declared ?? "ssr";
 }
 
+/** Stream responses must reach the browser as written, never cached or buffered by a proxy. */
+const streamHeaders = { "cache-control": "no-store", "x-accel-buffering": "no" } as const;
+
+/** Server outcome of a deferred value; `failure` is the private cause of a rejection. */
+type ServerOutcome =
+  | { readonly status: "resolved"; readonly value?: unknown }
+  | { readonly status: "rejected"; readonly error: { readonly code: string; readonly status: number }; readonly failure: unknown };
+
+function rejectedOutcome(failure: unknown): ServerOutcome {
+  const known = normalizeServerError(failure);
+  return { status: "rejected", error: { code: known.code, status: known.status }, failure };
+}
+
+/** A resolved value must survive the payload serializer, or it becomes a 500. */
+function resolvedOutcome(value: unknown): ServerOutcome {
+  if (value === undefined) return { status: "resolved" };
+  try { serializeJson(value); }
+  catch (error) { return rejectedOutcome(error); }
+  return { status: "resolved", value };
+}
+
+/** Public fields of an outcome, as sent in the payload and in deferred chunks. */
+function publicOutcome(outcome: ServerOutcome): DeferredOutcome {
+  if (outcome.status === "rejected") return { status: "rejected", error: outcome.error };
+  return "value" in outcome ? { status: "resolved", value: outcome.value } : { status: "resolved" };
+}
+
+/** Wire form of a settled value: `{ value }`, `{}` for undefined, or `{ error: { code, status } }`. */
+function wireOutcome(outcome: ServerOutcome): Record<string, unknown> {
+  if (outcome.status === "rejected") return { error: outcome.error };
+  return "value" in outcome ? { value: outcome.value } : {};
+}
+
+/**
+ * Races a deferred value against its timeout and the request signal (client
+ * disconnect, session revocation or an aborted response). Never rejects.
+ */
+function settleOnServer(deferred: DeferredInternals, signal: AbortSignal): Promise<ServerOutcome> {
+  const source = deferred[deferredSource];
+  if (!source) {
+    if (deferred.status === "resolved") return Promise.resolve(resolvedOutcome(deferred.value));
+    if (deferred.status === "rejected") return Promise.resolve({ status: "rejected", error: deferred.error!, failure: new ApiError(deferred.error!.code, deferred.error!.status) });
+    return Promise.resolve(rejectedOutcome(new Error("A deferred value without a source cannot settle on the server; create it with defer()")));
+  }
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (outcome: ServerOutcome): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+      resolve(outcome);
+    };
+    const onAbort = (): void => finish(rejectedOutcome(signal.reason));
+    const timer = setTimeout(() => finish(rejectedOutcome(new ApiError("DEFERRED_TIMEOUT", 504, `Deferred value did not settle within ${source.timeoutMs} ms`))), source.timeoutMs);
+    if (signal.aborted) onAbort();
+    else signal.addEventListener("abort", onAbort, { once: true });
+    source.promise.then((value) => finish(resolvedOutcome(value)), (error: unknown) => finish(rejectedOutcome(error)));
+  });
+}
+
+/**
+ * Sends `first` at once, each piece as soon as it settles, then `last`. A
+ * cancelled body (client gone, write failure in the adapter) or a failed piece
+ * calls `abort`, which stops the remaining deferred work.
+ */
+function streamBody(first: string, pieces: readonly Promise<string>[], last: string, abort: (reason: unknown, failed: boolean) => void): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  let open = true;
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode(first));
+      void (async () => {
+        try {
+          await Promise.all(pieces.map(async (piece) => {
+            const text = await piece;
+            if (open) controller.enqueue(encoder.encode(text));
+          }));
+          if (!open) return;
+          controller.enqueue(encoder.encode(last));
+          open = false;
+          controller.close();
+        } catch (error) {
+          if (!open) return;
+          open = false;
+          abort(error, true);
+          try { controller.error(error); }
+          catch { /* The consumer already released the stream. */ }
+        }
+      })();
+    },
+    cancel(reason) {
+      if (!open) return;
+      open = false;
+      abort(reason, false);
+    },
+  });
+}
+
 /** Outlet of a `render: "client"` page during SSR: its region stays empty until the browser commits the page. */
 const emptyOutlet: PageModule = {
   renderWithState: () => ({ html: "", state: {} }),
@@ -161,6 +262,8 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       status: 405, headers: { Allow: "GET, HEAD", "x-request-id": fallbackRequestId, "cache-control": "no-store" },
     });
     const stateStore = new StateStore();
+    // Aborts timers and listeners of deferred values that will never be sent.
+    const deferredWork = new AbortController();
     let errorRoute: string | undefined;
     let requestContext: RequestContext | undefined;
     const finish = (response: Response): Response => {
@@ -204,11 +307,41 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     // A client page's loader and head run in the browser; the server only guards and validates.
     const data = !clientPage && sidecar?.load ? await sidecar.load(context) : undefined;
     if (data instanceof Response) return finish(data);
+    const streaming = renderMode === "stream";
+    const requestId = requestContext?.requestId ?? fallbackRequestId;
+    // Deferred values replace themselves with null in the payload and travel by path.
+    const extracted = data === undefined ? { value: undefined, found: [] } : extractDeferred(data, ["data"]);
+    const driverSignal = AbortSignal.any([requestContext?.signal ?? request.signal, deferredWork.signal]);
+    const outcomes = extracted.found.map(({ deferred }) => settleOnServer(deferred, driverSignal));
+    const observeOutcome = (outcome: ServerOutcome): void => {
+      if (outcome.status !== "rejected" || outcome.error.status < 500) return;
+      // A client that left, or a HEAD request, is not a server failure.
+      if (request.signal.aborted || deferredWork.signal.aborted) return;
+      observeServerError(outcome.failure, requestId, options.onError);
+    };
+    let deferredEntries: Record<string, unknown>[];
+    if (streaming) {
+      deferredEntries = extracted.found.map(({ path }, id) => ({ id, path, status: "pending" }));
+    } else {
+      // ssr and prerender keep the full HTML: every deferred value settles before rendering.
+      const settled = await Promise.all(outcomes);
+      deferredEntries = settled.map((outcome, id) => {
+        extracted.found[id]!.deferred[deferredSettle](outcome);
+        observeOutcome(outcome);
+        return { id, path: extracted.found[id]!.path, ...publicOutcome(outcome) };
+      });
+    }
     const props: Record<string, unknown> = {
       params: validated.params,
       search: validated.search,
       ...(data === undefined ? {} : { data }),
     };
+    const payloadProps: Record<string, unknown> = {
+      params: validated.params,
+      search: validated.search,
+      ...(data === undefined ? {} : { data: extracted.value }),
+    };
+    const head: PageHead = clientPage ? {} : sidecar?.head?.({ ...context, data }) ?? {};
     const styles: string[] = [];
     let module: PageModule = emptyOutlet;
     let input: Record<string, unknown> = {};
@@ -230,30 +363,69 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       input = { outlet };
     }
     const rendered = withStateStore(stateStore, () => module.renderWithState(input));
-    const head: PageHead = clientPage ? {} : sidecar?.head?.({ ...context, data }) ?? {};
+    // The payload below is the only copy of this state the browser receives.
+    stateStore.seal();
+    const payload = serializeJson({
+      v: PAYLOAD_VERSION, route: match.route.id, render: renderMode,
+      props: payloadProps, state: rendered.state, sharedState: stateStore.snapshot(),
+      head: head.title === undefined ? {} : { title: head.title },
+      ...(deferredEntries.length ? { deferred: deferredEntries } : {}),
+    });
+    // Status, headers and cookies are final from here on; a session revoked
+    // while the loader ran must not receive a 200 stream.
+    if (streaming) await requestContext?.session.verify();
     const title = head.title === undefined ? "" : `<title>${escapeHtml(head.title)}</title>`;
     const host = documentParts(options.document, request);
     const nonceAttribute = host.nonceAttribute;
     const styleTags = [...new Set(styles)].map((css) => `<style${nonceAttribute}>${css.replaceAll("<", "\\3C ")}</style>`).join("");
-    const payload = serializeJson({
-      v: PAYLOAD_VERSION, route: match.route.id, render: renderMode,
-      props, state: rendered.state, sharedState: stateStore.snapshot(),
-      head: head.title === undefined ? {} : { title: head.title },
-    });
+    const headRequest = request.method === "HEAD";
+    if (streaming) {
+      const sentCookie = requestContext?.session.cookieHeader;
+      const line = async (id: number): Promise<string> => {
+        let outcome = await outcomes[id]!;
+        if (requestContext && requestContext.session.cookieHeader !== sentCookie) {
+          outcome = rejectedOutcome(new Error("The session cookie changed after the response headers were sent; change the session in the loader, before any deferred work"));
+        }
+        observeOutcome(outcome);
+        return serializeJson({ deferred: id, ...wireOutcome(outcome) });
+      };
+      const body = (first: string, piece: (text: string, id: number) => string, last: string): ReadableStream<Uint8Array> | null => {
+        if (headRequest) {
+          deferredWork.abort(new DOMException("A HEAD response has no body", "AbortError"));
+          return null;
+        }
+        return streamBody(first, outcomes.map((_, id) => line(id).then((text) => piece(text, id))), last, (reason, failed) => {
+          if (failed) observeServerError(reason, requestId, options.onError);
+          deferredWork.abort(reason);
+        });
+      };
+      if (wantsPayload(request)) {
+        return finish(new Response(body(`${payload}\n`, (text) => `${text}\n`, ""), {
+          status: 200, headers: { "content-type": "application/meeko+ndjson; charset=utf-8", ...streamHeaders },
+        }));
+      }
+      const script = options.clientEntry ? `<script type="module" async${nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
+      const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
+      const opening = `${DOCUMENT_HEAD_PREFIX}${csrfMeta}${styleTags}${title}${host.head}</head><body><div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}`;
+      return finish(new Response(body(opening, (text, id) => `<script type="application/json" data-meeko-deferred="${id}">${text}</script>`, `${host.bodyEnd}</body></html>`), {
+        status: 200, headers: { "content-type": "text/html; charset=utf-8", ...streamHeaders },
+      }));
+    }
     if (wantsPayload(request)) {
-      return finish(new Response(request.method === "HEAD" ? null : payload, {
+      return finish(new Response(headRequest ? null : payload, {
         status: 200, headers: { "content-type": "application/meeko+json; charset=utf-8", "cache-control": "no-store" },
       }));
     }
     const script = options.clientEntry ? `<script type="module"${nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
     const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
     const document = `${DOCUMENT_HEAD_PREFIX}${csrfMeta}${styleTags}${title}${host.head}</head><body><div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
-    return finish(new Response(request.method === "HEAD" ? null : document, {
+    return finish(new Response(headRequest ? null : document, {
       status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
     }));
     };
     return requestContext ? await withRequestContext(requestContext, options.serverFetch, render) : await render();
     } catch (error) {
+      deferredWork.abort(error);
       if (error instanceof Response) return finish(error);
       const known = error instanceof PageInputError ? new ApiError(error.code, 400) : normalizeServerError(error);
       const requestId = requestContext?.requestId ?? fallbackRequestId;
@@ -272,7 +444,8 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
         try {
           const renderError = async (): Promise<Response> => {
             const errorPage = await options.loadPage(errorFile);
-            const errorRendered = withStateStore(stateStore, () => errorPage.renderWithState({
+            // A failure after the render sealed the page state still renders its error page.
+            const errorRendered = withStateStore(stateStore.sealed ? new StateStore() : stateStore, () => errorPage.renderWithState({
               status: known.status, message: known.status >= 500 ? "Internal Server Error" : known.code,
             }));
             const host = documentParts(options.document, request);

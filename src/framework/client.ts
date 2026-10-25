@@ -14,6 +14,8 @@ import type { RouteMiddleware } from "./middleware.js";
 import { createNavigator, matchRoute, reportNavigationError } from "./router.js";
 import type { NavigationContext, Navigator, RouteRecord } from "./router.js";
 import { hydrateWithStateStore, StateStore, withStateStore } from "./state.js";
+import { createDeferred, deferredSettle, deferredSource, extractDeferred, placeDeferred } from "./deferred.js";
+import type { DeferredError, DeferredInternals, DeferredOutcome } from "./deferred.js";
 
 export { useNavigation } from "./navigation.js";
 export type { NavigationState } from "./navigation.js";
@@ -78,9 +80,10 @@ interface HydrationPayload {
   state: Record<string, unknown>;
   sharedState: Record<string, unknown>;
   head: PageHead;
+  deferred: readonly PayloadDeferred[];
 }
 
-const pageRenders: readonly string[] = ["ssr", "prerender", "client"] satisfies readonly PageRender[];
+const pageRenders: readonly string[] = ["ssr", "stream", "prerender", "client"] satisfies readonly PageRender[];
 
 /** Outlet of a client page until its loader resolves; the server rendered it empty. */
 const emptyOutlet: Component<Record<string, unknown>> = {
@@ -122,7 +125,217 @@ function readPayload(value: unknown): HydrationPayload {
   return {
     route: parsed.route, render: render as PageRender, props: parsed.props, state: parsed.state,
     sharedState: parsed.sharedState ?? {}, head: head.title === undefined ? {} : { title: head.title },
+    deferred: readDeferredEntries(parsed.deferred),
   };
+}
+
+/** A deferred value listed in the payload; `outcome` is absent while it is pending. */
+interface PayloadDeferred {
+  readonly id: number;
+  readonly path: readonly (string | number)[];
+  readonly outcome: DeferredOutcome | undefined;
+}
+
+/** One settled value from a streamed `<script data-meeko-deferred>` or ndjson line. */
+interface DeferredLine {
+  readonly id: number;
+  readonly outcome: DeferredOutcome;
+}
+
+/** A stream that ended before sending a value, for example after a failed write on the server. */
+const incompleteDeferred: DeferredError = { code: "DEFERRED_INCOMPLETE", status: 502 };
+
+function readDeferredError(value: unknown): DeferredError {
+  if (!isRecord(value) || typeof value.code !== "string" || typeof value.status !== "number" || !Number.isInteger(value.status)) {
+    throw new TypeError("Invalid Meeko deferred error");
+  }
+  return { code: value.code, status: value.status };
+}
+
+function readDeferredEntries(value: unknown): PayloadDeferred[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new TypeError("Invalid Meeko deferred list");
+  return value.map((entry: unknown) => {
+    if (!isRecord(entry) || typeof entry.id !== "number" || !Number.isSafeInteger(entry.id) || entry.id < 0 || !Array.isArray(entry.path)
+      || !entry.path.every((key: unknown) => typeof key === "string" || (typeof key === "number" && Number.isSafeInteger(key)))) {
+      throw new TypeError("Invalid Meeko deferred entry");
+    }
+    let outcome: DeferredOutcome | undefined;
+    if (entry.status === "resolved") outcome = "value" in entry ? { status: "resolved", value: entry.value } : { status: "resolved" };
+    else if (entry.status === "rejected") outcome = { status: "rejected", error: readDeferredError(entry.error) };
+    else if (entry.status !== "pending") throw new TypeError("Invalid Meeko deferred status");
+    return { id: entry.id, path: entry.path as (string | number)[], outcome };
+  });
+}
+
+function readDeferredLine(value: unknown): DeferredLine {
+  if (!isRecord(value) || typeof value.deferred !== "number" || !Number.isSafeInteger(value.deferred)) throw new TypeError("Invalid Meeko deferred chunk");
+  const outcome: DeferredOutcome = "error" in value ? { status: "rejected", error: readDeferredError(value.error) }
+    : "value" in value ? { status: "resolved", value: value.value } : { status: "resolved" };
+  return { id: value.deferred, outcome };
+}
+
+/** Puts a deferred value at each payload path; settled entries arrive settled. */
+function placePayloadDeferred(props: Record<string, unknown>, entries: readonly PayloadDeferred[]): Map<number, DeferredInternals> {
+  const values = new Map<number, DeferredInternals>();
+  for (const entry of entries) {
+    if (values.has(entry.id)) throw new TypeError(`Duplicate Meeko deferred id ${entry.id}`);
+    const value = createDeferred(entry.outcome);
+    if (!placeDeferred(props, entry.path, value)) throw new TypeError(`Invalid Meeko deferred path ${JSON.stringify(entry.path)}`);
+    values.set(entry.id, value);
+  }
+  return values;
+}
+
+/**
+ * Collects streamed values and applies them only after `open()`, once the
+ * page that reads them has hydrated or committed. `end()` rejects whatever
+ * never arrived.
+ */
+function deferredReceiver(values: ReadonlyMap<number, DeferredInternals>, report: (error: unknown) => void) {
+  let ready = false;
+  let ended = false;
+  const queue: DeferredLine[] = [];
+  const settle = (value: DeferredInternals, outcome: DeferredOutcome): void => {
+    try { value[deferredSettle](outcome); }
+    catch (error) { report(error); }
+  };
+  const apply = (line: DeferredLine): void => {
+    const target = values.get(line.id);
+    if (!target) report(new TypeError(`Unknown Meeko deferred id ${line.id}`));
+    else settle(target, line.outcome);
+  };
+  const finish = (): void => {
+    for (const value of values.values()) if (value.status === "pending") settle(value, { status: "rejected", error: incompleteDeferred });
+  };
+  return {
+    receive(line: DeferredLine): void {
+      if (ready) apply(line);
+      else queue.push(line);
+    },
+    open(): void {
+      if (ready) return;
+      ready = true;
+      for (const line of queue.splice(0)) apply(line);
+      if (ended) finish();
+    },
+    end(): void {
+      ended = true;
+      if (ready) finish();
+    },
+  };
+}
+
+type BrowserGlobals = Window & { MutationObserver: typeof MutationObserver };
+
+/**
+ * Reads `<script type="application/json" data-meeko-deferred>` chunks already
+ * in the document and those the parser adds to `<body>` later. A chunk whose
+ * text is still arriving is retried when it changes. The parsed document ends
+ * at DOMContentLoaded; then `end` runs.
+ */
+function watchDeferredChunks(browser: Window, receive: (line: DeferredLine) => void, end: () => void, report: (error: unknown) => void): () => void {
+  const document = browser.document;
+  const Observer = (browser as BrowserGlobals).MutationObserver;
+  const seen = new WeakSet<Element>();
+  const waiting = new Map<Element, MutationObserver>();
+  let stopped = false;
+  const consume = (script: Element): void => {
+    if (stopped || seen.has(script)) return;
+    let parsed: unknown;
+    try { parsed = JSON.parse(script.textContent ?? ""); }
+    catch {
+      if (!waiting.has(script)) {
+        const observer = new Observer(() => consume(script));
+        observer.observe(script, { childList: true, characterData: true, subtree: true });
+        waiting.set(script, observer);
+      }
+      return;
+    }
+    seen.add(script);
+    waiting.get(script)?.disconnect();
+    waiting.delete(script);
+    try { receive(readDeferredLine(parsed)); }
+    catch (error) { report(error); }
+  };
+  const scan = (): void => {
+    for (const script of document.querySelectorAll("script[data-meeko-deferred]")) consume(script);
+  };
+  const body = new Observer(scan);
+  const stop = (): void => {
+    if (stopped) return;
+    stopped = true;
+    body.disconnect();
+    for (const observer of waiting.values()) observer.disconnect();
+    waiting.clear();
+    document.removeEventListener("DOMContentLoaded", complete);
+  };
+  const complete = (): void => {
+    scan();
+    if (stopped) return;
+    for (const script of waiting.keys()) report(new TypeError(`Invalid Meeko deferred chunk ${script.getAttribute("data-meeko-deferred") ?? ""}`));
+    stop();
+    end();
+  };
+  body.observe(document.body ?? document.documentElement, { childList: true });
+  scan();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", complete, { once: true });
+  else complete();
+  return stop;
+}
+
+/** Splits an ndjson body into lines; aborting `signal` cancels the read. */
+async function* ndjsonLines(body: ReadableStream<Uint8Array>, signal: AbortSignal): AsyncGenerator<string> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  const cancel = (): void => { void reader.cancel(signal.reason).catch(() => {}); };
+  if (signal.aborted) cancel();
+  else signal.addEventListener("abort", cancel, { once: true });
+  let buffer = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done || signal.aborted) break;
+      buffer += decoder.decode(value, { stream: true });
+      for (let newline = buffer.indexOf("\n"); newline >= 0; newline = buffer.indexOf("\n")) {
+        const line = buffer.slice(0, newline);
+        buffer = buffer.slice(newline + 1);
+        if (line.trim()) yield line;
+      }
+    }
+    buffer += decoder.decode();
+    if (buffer.trim() && !signal.aborted) yield buffer;
+  } finally {
+    signal.removeEventListener("abort", cancel);
+    if (!signal.aborted) void reader.cancel().catch(() => {});
+  }
+}
+
+/** Public shape of a browser-side failure, as `{ code, status }`. */
+function clientDeferredError(error: unknown): DeferredError {
+  if (typeof error === "object" && error !== null) {
+    const { code, status } = error as { code?: unknown; status?: unknown };
+    if (typeof code === "string" && code && typeof status === "number" && Number.isInteger(status) && status >= 400 && status <= 599) return { code, status };
+  }
+  return { code: "INTERNAL_ERROR", status: 500 };
+}
+
+/** Settles deferred values returned by a loader that runs in the browser. */
+function driveClientDeferred(data: unknown, report: (error: unknown) => void): void {
+  for (const { deferred } of extractDeferred(data).found) {
+    const source = deferred[deferredSource];
+    if (!source) continue;
+    const settle = (outcome: DeferredOutcome): void => {
+      clearTimeout(timer);
+      try { deferred[deferredSettle](outcome); }
+      catch (error) { report(error); }
+    };
+    const timer = setTimeout(() => settle({ status: "rejected", error: { code: "DEFERRED_TIMEOUT", status: 504 } }), source.timeoutMs);
+    source.promise.then(
+      (value) => settle(value === undefined ? { status: "resolved" } : { status: "resolved", value }),
+      (error: unknown) => settle({ status: "rejected", error: clientDeferredError(error) }),
+    );
+  }
 }
 
 function applyCsrfToken(browser: Window, token: string): () => void {
@@ -202,9 +415,28 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   // A client page arrives with its layouts around an empty outlet; the page
   // itself commits below through the regular navigation path.
   const clientFirst = payload.render === "client";
-  const first = await createTree(initial.route, payload.props, options.loadPage, 0, clientFirst ? emptyOutlet : initial.route.file);
+  const reportDeferred = (error: unknown): void => reportNavigationError(browser, error, observeNavigationError);
+  // Streamed values hydrate pending, exactly as the server rendered them, and
+  // are applied only after hydrateScope returns.
+  const initialDeferred = placePayloadDeferred(payload.props, payload.deferred);
+  const initialReceiver = deferredReceiver(initialDeferred, reportDeferred);
+  let stopChunks = (): void => {};
+  if ([...initialDeferred.values()].some((value) => value.status === "pending")) {
+    stopChunks = watchDeferredChunks(browser, initialReceiver.receive, initialReceiver.end, reportDeferred);
+  }
+  let first: Awaited<ReturnType<typeof createTree>>;
+  let release: () => void;
+  try {
+    first = await createTree(initial.route, payload.props, options.loadPage, 0, clientFirst ? emptyOutlet : initial.route.file);
+    release = hydrateApp(() => first.component.hydrateScope({ root: options.root }, {}, payload.state));
+  } catch (error) {
+    stopChunks();
+    throw error;
+  }
   let layouts = first.layouts;
-  let release = hydrateApp(() => first.component.hydrateScope({ root: options.root }, {}, payload.state));
+  initialReceiver.open();
+  /** The ndjson read of the committed stream route; the next commit cancels it. */
+  let activeStream: AbortController | undefined;
   let disposed = false;
   let stableUrl = browser.location.href;
   const recoverCommitFailure = (error: unknown): never => {
@@ -220,7 +452,25 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   // Server middleware already guarded the first load of a client page.
   let initialClientLoad = clientFirst;
   let navigationCount = 0;
+  const consumeStream = (lines: AsyncGenerator<string> | undefined, values: ReadonlyMap<number, DeferredInternals>, signal: AbortSignal | undefined): void => {
+    const receiver = deferredReceiver(values, reportDeferred);
+    receiver.open();
+    if (!lines || !signal) { receiver.end(); return; }
+    void (async () => {
+      try {
+        for await (const text of lines) receiver.receive(readDeferredLine(JSON.parse(text)));
+        if (!signal.aborted) receiver.end();
+      } catch (error) {
+        if (!signal.aborted) reportDeferred(error);
+      }
+    })();
+  };
   const renderRoute = async (context: NavigationContext, initialLoad: boolean): Promise<void | boolean> => {
+    const stream: { control?: AbortController; committed?: boolean } = {};
+    try { return await renderRouteData(context, initialLoad, stream); }
+    finally { if (!stream.committed) stream.control?.abort(); }
+  };
+  const renderRouteData = async (context: NavigationContext, initialLoad: boolean, stream: { control?: AbortController; committed?: boolean }): Promise<void | boolean> => {
     if (options.loadMiddleware && !initialLoad) {
       const response = await runRouteMiddleware(await options.loadMiddleware(), {
         url: context.url, match: context.match, signal: context.signal, phase: "client",
@@ -242,6 +492,8 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     let loaderDraft: ReturnType<StateStore["navigationDraft"]> | undefined;
     let head: PageHead = {};
     let errorPage: string | undefined;
+    let lines: AsyncGenerator<string> | undefined;
+    let navigationDeferred: ReadonlyMap<number, DeferredInternals> | undefined;
     const route = context.match.route;
     const runSidecar = async (sidecar: ClientRoute | undefined, onLoaderError?: (error: unknown) => void): Promise<void> => {
       const validated = await validatePageInputs(sidecar, context.match.params, pageSearchObject(context.url.searchParams));
@@ -249,6 +501,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       const routeContext = { ...context, ...validated, state: loaderDraft?.state ?? stateStore };
       try {
         const data = sidecar?.load ? await sidecar.load(routeContext) : undefined;
+        driveClientDeferred(data, reportDeferred);
         props = {
           params: validated.params,
           search: validated.search,
@@ -280,9 +533,24 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       });
       if (!response.ok) throw new Error(`Route data request failed: HTTP ${response.status}`);
       serverCsrfToken = response.headers.get("x-meeko-csrf-token");
-      const payload = readPayload(await response.text());
+      let payload: HydrationPayload;
+      // A stream route answers ndjson: the payload line commits, later lines settle deferred values.
+      if ((response.headers.get("content-type") ?? "").startsWith("application/meeko+ndjson")) {
+        if (!response.body) throw new Error("Empty Meeko navigation stream");
+        // Superseded before the commit (navigation signal) or after it (next commit or dispose).
+        const control = new AbortController();
+        stream.control = control;
+        const supersede = (): void => control.abort(context.signal.reason);
+        if (context.signal.aborted) supersede();
+        else context.signal.addEventListener("abort", supersede, { once: true });
+        lines = ndjsonLines(response.body, control.signal);
+        const line = await lines.next();
+        if (line.done) throw new Error("Empty Meeko navigation stream");
+        payload = readPayload(line.value);
+      } else payload = readPayload(await response.text());
       if (payload.route !== context.match.route.id) throw new Error("Meeko route data mismatch");
       if (context.signal.aborted || disposed) return;
+      navigationDeferred = placePayloadDeferred(payload.props, payload.deferred);
       serverSharedState = payload.sharedState;
       props = payload.props;
       head = payload.head;
@@ -355,6 +623,11 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     if (serverSharedState) stateStore.seedForNavigation(serverSharedState, commitWithToken);
     else if (loaderDraft) loaderDraft.commit(commitWithToken);
     else commitWithToken();
+    // The previous route is gone: stop reading its stream, then read this one's.
+    stream.committed = true;
+    activeStream?.abort();
+    activeStream = stream.control;
+    if (navigationDeferred) consumeStream(lines, navigationDeferred, stream.control?.signal);
   };
   const navigator = createNavigator(options.routes, async (context) => {
     const token = ++navigationCount;
@@ -391,6 +664,8 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       if (disposed) return;
       disposed = true;
       navigator.dispose();
+      stopChunks();
+      activeStream?.abort();
       browser.document.removeEventListener("click", onClick);
       finishWithCleanup(release, () => errorChannel.clear());
     },

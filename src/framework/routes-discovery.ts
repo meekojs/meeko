@@ -5,7 +5,7 @@ import { createRouteManifest } from "./router.js";
 import type { RouteRecord } from "./router.js";
 import type { PageRender } from "./page.js";
 
-const renderModes: readonly PageRender[] = ["ssr", "prerender", "client"];
+const renderModes: readonly PageRender[] = ["ssr", "stream", "prerender", "client"];
 
 function routeId(relativeFile: string): string {
   const parts = relativeFile.slice(0, -".meeko".length).split(sep);

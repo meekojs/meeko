@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { createServer as createHttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
 import { createServer, preview } from "vite";
 import { createExampleServer } from "../examples/counter/server.ts";
+import { startConformanceOutput } from "./conformance/harness.ts";
 
 async function assertBrowserBehavior(url: string, development: boolean): Promise<void> {
   const browser = await chromium.launch({
@@ -142,5 +146,70 @@ test("la página SSR hidrata y vuelve a crear estado al navegar", async () => {
   } finally {
     await browser?.close();
     await new Promise<void>((resolveDone, reject) => server.close((error) => error ? reject(error) : resolveDone()));
+  }
+});
+
+test("una página render: stream es interactiva antes del diferido y respeta una CSP estricta", { timeout: 240_000 }, async () => {
+  // Builds the conformance fixture with the Node adapter, then serves its
+  // output in-process with a CSP nonce and no 'unsafe-inline'.
+  const built = await startConformanceOutput("node");
+  type ServerModule = typeof import("../src/framework-server.ts");
+  type NodeModule = typeof import("../src/node.ts");
+  const { createServerApp } = await import(pathToFileURL(resolve("dist/framework-server.js")).href) as ServerModule;
+  const { createNodeAssetReader, toNodeListener } = await import(pathToFileURL(resolve("dist/node.js")).href) as NodeModule;
+  const output = await import(pathToFileURL(join(built.output, "index.mjs")).href) as Pick<Parameters<ServerModule["createServerApp"]>[0], "load" | "manifest">;
+  const nonce = randomUUID().replaceAll("-", "");
+  const policy = `default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'nonce-${nonce}'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'`;
+  const app = await createServerApp({
+    manifest: output.manifest, load: output.load, production: false,
+    assets: createNodeAssetReader({ root: join(built.output, "client"), assets: output.manifest.assets ?? {} }),
+    document: { nonce: () => nonce },
+  });
+  const server = createHttpServer(toNodeListener(async (request) => {
+    const response = await app.fetch(request);
+    const headers = new Headers(response.headers);
+    headers.set("content-security-policy", policy);
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  }));
+  await new Promise<void>((resolveReady) => server.listen(0, "127.0.0.1", resolveReady));
+  const { port } = server.address() as AddressInfo;
+  const delay = 4_000;
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  try {
+    browser = await chromium.launch({
+      ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: "chrome" as const }),
+      headless: true,
+    });
+    const page = await browser.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(`${message.text()} @ ${message.location().url}`);
+    });
+    await page.addInitScript(() => {
+      const violations: string[] = [];
+      (window as unknown as { __cspViolations: string[] }).__cspViolations = violations;
+      document.addEventListener("securitypolicyviolation", (event) => violations.push(`${event.violatedDirective} ${event.blockedURI}`));
+    });
+    await page.goto(`http://127.0.0.1:${port}/stream?delay=${delay}`, { waitUntil: "commit" });
+    await page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length > 0, undefined, { timeout: delay });
+    assert.equal(await page.locator("#stream-pending").innerText(), "Loading slow data");
+    await page.locator("#stream-count").click();
+    assert.equal(await page.locator("#stream-count").innerText(), "Count: 1");
+    const interactiveAt = await page.evaluate(() => performance.now());
+    assert.ok(interactiveAt < delay, `the page became interactive after ${interactiveAt} ms`);
+    assert.equal(await page.locator("#stream-value").count(), 0, "the deferred value arrived before the page was interactive");
+    await page.locator("#stream-value", { hasText: "Deferred done" }).waitFor({ timeout: delay + 10_000 });
+    assert.equal(await page.locator("#stream-pending").count(), 0);
+    // Local state survives the deferred update.
+    assert.equal(await page.locator("#stream-count").innerText(), "Count: 1");
+    assert.ok(await page.evaluate(() => performance.now()) >= delay - 50);
+    assert.deepEqual(await page.evaluate(() => (window as unknown as { __cspViolations: string[] }).__cspViolations), []);
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser?.close();
+    await new Promise<void>((resolveDone, reject) => server.close((error) => error ? reject(error) : resolveDone()));
+    await app.close();
+    await built.stop();
   }
 });

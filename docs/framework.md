@@ -164,6 +164,7 @@ La comprobación del loader cubre tanto `definePage({ load() { /* ... */ } })` c
 | Modo | HTML del servidor | Loader y `head` | Uso |
 | --- | --- | --- | --- |
 | `"ssr"` (por defecto) | Página completa en cada petición | Servidor | Contenido indexable o personalizado |
+| `"stream"` | Página sin los valores `defer`, que llegan después por la misma respuesta | Servidor | Páginas con datos lentos y secundarios |
 | `"prerender"` | Página completa generada en `meeko build` | Servidor, durante el build | Contenido estático |
 | `"client"` | Sólo los layouts, con el outlet vacío | Navegador | Paneles y vistas interactivas sin requisitos de SEO |
 
@@ -188,6 +189,45 @@ Compromisos de `"client"`:
 - **Seguridad de los datos.** El sidecar es público: no puede contener secretos ni comprobar permisos. Los datos llegan por API o RPC, y cada endpoint debe aplicar sus propias guardas (sesión, CSRF, autorización y validación). El middleware de ruta protege la navegación, pero no los datos.
 - **Prerender.** Una página `"client"` no se puede prerenderizar: declarar `prerenderEntries` junto a `render: "client"` detiene `meeko check`/`meeko build` con un error explícito.
 - **Build coherente.** El servidor compara el `render` del sidecar con el del manifiesto del build y responde con error si difieren; vuelva a ejecutar `meeko build` (o reinicie `meeko dev`) al cambiar el modo de una ruta.
+
+### Streaming SSR (`render: "stream"`)
+
+Un loader marca con `defer` los datos que pueden llegar después de la página. `defer(promise, { timeoutMs })` devuelve un `Deferred<T>` con `status` (`"pending"`, `"resolved"` o `"rejected"`), `value` y `error` (`{ code, status }`). Leer esos campos en una plantilla o un `effect` se suscribe al resultado, porque están respaldados por señales.
+
+```ts
+// app/pages/posts/[id].route.ts
+import { defer, definePage } from "@meekojs/meeko/framework";
+
+export const route = definePage({
+  render: "stream",
+  load: async ({ params }) => ({
+    post: await api.posts.get({ params }),          // crítico: entra en el HTML inicial
+    comments: defer(api.comments.list({ params }), { timeoutMs: 5_000 }),
+  }),
+  head: ({ data }) => ({ title: data.post.title }),
+});
+```
+
+```html
+<p if:when="props.data.comments.status === 'pending'">Cargando comentarios…</p>
+<ul if:when="props.data.comments.status === 'resolved'">…</ul>
+<p if:when="props.data.comments.status === 'rejected'">No se pudieron cargar ({props.data.comments.error?.code}).</p>
+```
+
+**Fase 0, antes del primer byte.** El servidor resuelve la ruta, crea el contexto y la sesión, ejecuta el middleware, valida `params` y `search`, espera el loader crítico (todo lo que no está en `defer`), calcula `head` y renderiza de forma síncrona la página y todos sus layouts con los diferidos en `pending`. Después sella el estado (`StateStore.seal()`: una escritura posterior lanza `STATE_SEALED` y el valor diferido que la provocó se rechaza con `500`) y llama a `context.session.verify()`; una sesión revocada mientras corría el loader responde `401` en lugar de un `200` parcial. Estado, cabeceras, cookies, token CSRF y `<title>` quedan fijados ahí: no se puede redirigir ni cambiar la sesión desde trabajo diferido. Una rotación de sesión dentro de un `defer` no envía `Set-Cookie`; ese valor se rechaza con `500` y el fallo llega a `onError`.
+
+**Fase 1, el stream.** La respuesta lleva `cache-control: no-store` y `x-accel-buffering: no`. Primero se envía el documento hasta `#app`, el payload `#meeko-payload` (con `deferred: [{ id, path, status: "pending" }]` y `null` en cada `path`) y la entrada cliente con `<script type="module" async>`, que respeta el nonce CSP del host. Por cada valor que se resuelve, en el orden en que se resuelve, sigue un `<script type="application/json" data-meeko-deferred="N">{"deferred":N,"value":…}</script>` (o `"error":{"code","status"}`), y al final `</body></html>`. Son bloques de datos, no scripts ejecutables, así que una CSP estricta sin `'unsafe-inline'` no necesita excepciones.
+
+**Errores y cancelación.** Un rechazo se serializa sólo como `{ code, status }` con las mismas reglas que la API: un `ApiError` conserva su código y estado; cualquier otro error se convierte en `INTERNAL_ERROR`/`500` y su causa privada se envía a `onError` con el `requestId` de la respuesta. Un valor que no termina en `timeoutMs` (10 s por defecto) se rechaza con `DEFERRED_TIMEOUT`/`504`. Los diferidos siguen `RequestContext.signal`: si el cliente se desconecta o falla una escritura del adaptador, el stream se cancela y los diferidos pendientes se abortan; si se revoca la sesión, los que quedan se envían como `SESSION_REVOKED`/`401`. Una petición `HEAD` recibe las cabeceras finales sin cuerpo y aborta los diferidos.
+
+**Navegador.** El cliente hidrata con todos los diferidos en `pending`, como los renderizó el servidor, y aplica los valores ya llegados sólo cuando termina la hidratación. Encuentra los bloques que ya estaban en el documento y los que añade el parser después mediante un `MutationObserver` sobre `<body>`. Si el documento termina sin el bloque de algún valor (por ejemplo, porque falló una escritura), ese valor se rechaza con `DEFERRED_INCOMPLETE`/`502`. En una navegación cliente a una ruta `"stream"`, Meeko pide `accept: application/meeko+json` y el servidor responde `application/meeko+ndjson`: la primera línea es el payload, con el que se confirma la ruta, y cada línea siguiente es `{ "deferred": id, "value" | "error" }`. Navegar a otra ruta cancela la lectura pendiente. Las demás rutas siguen respondiendo `application/meeko+json`.
+
+**`stream` frente a `ssr`.** Con `render: "ssr"` o `"prerender"`, un `defer` se espera dentro del servidor antes de renderizar: el HTML siempre contiene el valor resuelto (o su error) y es seguro para SEO, así que una página puede pasar de un modo a otro sin cambiar la plantilla. Use `"stream"` cuando una parte secundaria de la página (comentarios, recomendaciones, métricas) es lenta y no debe retrasar el primer pintado ni la interactividad. Compromisos:
+
+- **SEO.** El contenido diferido no está en el HTML inicial del SSR, sino en bloques de datos posteriores que sólo se muestran al ejecutar JavaScript. Lo que deba indexarse tiene que ir en el loader crítico o en una página `"ssr"`.
+- **Proxies y CDN.** Un proxy, balanceador o CDN que almacena la respuesta completa antes de reenviarla anula el streaming: el usuario espera igual que con `"ssr"`. Meeko envía `x-accel-buffering: no` (respetado por nginx) y `cache-control: no-store`; otros intermediarios, la compresión con buffer o funciones serverless sin respuestas en streaming deben configurarse aparte. Los adaptadores Node, Bun y Deno escriben cada bloque en cuanto se produce; la suite de conformidad comprueba que el primer byte llega antes que el valor diferido.
+- **Cabeceras finales.** Redirecciones, cookies, CSRF y `<title>` dependen sólo de los datos críticos. Mover algo a `defer` lo saca de esas decisiones.
+- **Loaders en el navegador.** Un sidecar `"client"` (o un host que usa `loadRoute`) también puede devolver `defer`: el navegador aplica el mismo `timeoutMs` y el valor se actualiza cuando su promesa termina.
 
 ### Estado de navegación
 

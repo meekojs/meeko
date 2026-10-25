@@ -286,5 +286,47 @@ export function conformanceSuite(adapter: ConformanceAdapter): void {
       assert.deepEqual(await secondReceived, expected);
       assert.equal(leaked, 0);
     });
+
+    it("streams render: stream pages without buffering: the first byte precedes the deferred value", async () => {
+      const delay = 1_500;
+      const started = performance.now();
+      const response = await fetch(`${origin}/stream?delay=${delay}`);
+      assert.equal(response.status, 200, server.logs());
+      assert.match(response.headers.get("content-type") ?? "", /^text\/html/);
+      assert.equal(response.headers.get("cache-control"), "no-store");
+      assert.equal(response.headers.get("x-accel-buffering"), "no");
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let html = "";
+      let firstByte: number | undefined;
+      let payloadAt: number | undefined;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        firstByte ??= performance.now() - started;
+        html += decoder.decode(value, { stream: true });
+        if (payloadAt === undefined && html.includes('id="meeko-payload"')) {
+          payloadAt = performance.now() - started;
+          assert.doesNotMatch(html, /data-meeko-deferred/, "the deferred chunk arrived with the document");
+        }
+      }
+      const total = performance.now() - started;
+      assert.ok(firstByte !== undefined && firstByte < delay, `time to first byte ${firstByte} ms is not below the ${delay} ms deferred delay`);
+      assert.ok(payloadAt !== undefined && payloadAt < delay, `the payload arrived after ${payloadAt} ms`);
+      assert.ok(total >= delay - 50, `the response ended after ${total} ms, before the deferred value`);
+      assert.match(html, /<script type="module" async src="\/assets\/[^"]+\.js"><\/script>/);
+      assert.match(html, /<script type="application\/json" data-meeko-deferred="0">\{"deferred":0,"value":\{"text":"Deferred done"\}\}<\/script>/);
+      assert.ok(html.endsWith("</body></html>"));
+    });
+
+    it("answers stream navigations with application/meeko+ndjson", async () => {
+      const response = await fetch(`${origin}/stream?delay=10`, { headers: { accept: "application/meeko+json" } });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("content-type"), "application/meeko+ndjson; charset=utf-8");
+      const lines = (await response.text()).split("\n").filter(Boolean).map((line) => JSON.parse(line) as Record<string, unknown>);
+      assert.equal(lines[0]!.render, "stream");
+      assert.deepEqual(lines[0]!.deferred, [{ id: 0, path: ["data", "slow"], status: "pending" }]);
+      assert.deepEqual(lines.slice(1), [{ deferred: 0, value: { text: "Deferred done" } }]);
+    });
   });
 }

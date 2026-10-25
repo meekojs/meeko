@@ -8,18 +8,54 @@ function assertKey(key: string): void {
   if (!key || key === "__proto__" || key === "constructor" || key === "prototype") throw new TypeError("Invalid state key");
 }
 
+/** A server request wrote state after its HTML and payload were produced. */
+export class StateSealedError extends Error {
+  readonly code = "STATE_SEALED";
+  constructor(key: string) {
+    super(`STATE_SEALED: Meeko state "${key}" cannot change after the page was rendered; the browser already received it`);
+    this.name = "StateSealedError";
+  }
+}
+
+/** Replaces the setter of a store signal, keeping its identity and its reads. */
+function sealSignal(key: string, target: Signal<unknown>): void {
+  const descriptor = Object.getOwnPropertyDescriptor(target, "value");
+  if (!descriptor?.get || !descriptor.configurable) return;
+  Object.defineProperty(target, "value", {
+    get: descriptor.get,
+    set() { throw new StateSealedError(key); },
+    enumerable: descriptor.enumerable ?? true,
+    configurable: false,
+  });
+}
+
 export class StateStore {
   private readonly values = new Map<string, Signal<unknown>>();
+  #sealed = false;
 
   constructor(initial: Readonly<Record<string, unknown>> = {}) {
     serializeJson(initial);
     for (const [key, value] of Object.entries(initial)) { assertKey(key); this.values.set(key, signal(value)); }
   }
 
+  /** True once the server has transferred this store to the browser. */
+  get sealed(): boolean { return this.#sealed; }
+
+  /**
+   * Freezes a server request's state after its synchronous render: new keys,
+   * seeds and writes throw `STATE_SEALED`, because the payload already left.
+   */
+  seal(): void {
+    if (this.#sealed) return;
+    this.#sealed = true;
+    for (const [key, value] of this.values) sealSignal(key, value);
+  }
+
   get<T>(key: string, factory: () => T): Signal<T> {
     assertKey(key);
     let value = this.values.get(key);
     if (!value) {
+      if (this.#sealed) throw new StateSealedError(key);
       value = signal(factory());
       this.values.set(key, value);
     }
@@ -31,6 +67,7 @@ export class StateStore {
     serializeJson(values);
     const entries = Object.entries(values);
     for (const [key] of entries) assertKey(key);
+    if (this.#sealed && entries.length) throw new StateSealedError(entries[0]![0]);
     for (const [key, value] of entries) {
       if (!this.values.has(key)) this.values.set(key, signal(value));
     }

@@ -164,7 +164,7 @@ La raíz `@meekojs/meeko` exporta exactamente `signal`, `computed`, `effect`, `b
 - La API pública aún puede cambiar durante la serie `0.x`; el paquete se distribuye como `@meekojs/meeko` bajo licencia MIT.
 - El parser acepta el subconjunto de TypeScript y HTML descrito arriba; informa las construcciones no soportadas mediante diagnósticos.
 - La hidratación requiere que el servidor y el navegador obtengan los mismos valores iniciales y el mismo orden de listas.
-- No se ofrecen todavía streaming SSR ni garantías de compatibilidad con plugins de Vue.
+- No se ofrecen garantías de compatibilidad con plugins de Vue. El streaming SSR (`render: "stream"` con `defer` de `@meekojs/meeko/framework`) se describe en [framework.md](framework.md).
 
 ## Antes de publicar
 

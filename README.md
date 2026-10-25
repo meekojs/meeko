@@ -165,4 +165,4 @@ El servidor de lenguaje de Meeko (`meeko lsp --stdio` o `meeko-language-server -
 
 ## Alcance actual
 
-Esta base todavía no implementa streaming SSR. El compilador rechaza varias construcciones no soportadas. Estas capacidades necesitan conservar el mismo contrato de SSR e hidratación antes de añadirse.
+Las páginas pueden renderizarse con `render: "ssr"`, `"stream"` (streaming SSR con valores `defer`), `"prerender"` o `"client"`; véase [docs/framework.md](https://github.com/meekojs/meeko/blob/main/docs/framework.md). El compilador rechaza varias construcciones no soportadas. Estas capacidades necesitan conservar el mismo contrato de SSR e hidratación antes de añadirse.

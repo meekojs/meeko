@@ -26,10 +26,12 @@ export interface PageLoadContext<P extends PageSchema | undefined, S extends Pag
 }
 
 /**
- * How a page reaches the browser. `"client"` renders the layouts on the server
- * and runs the page loader, `head` and page render in the browser.
+ * How a page reaches the browser. `"stream"` sends the server-rendered HTML
+ * before its `defer` values settle and streams them afterwards. `"client"`
+ * renders the layouts on the server and runs the page loader, `head` and page
+ * render in the browser.
  */
-export type PageRender = "ssr" | "prerender" | "client";
+export type PageRender = "ssr" | "stream" | "prerender" | "client";
 
 /** Loader context of a `render: "client"` page; it runs in the browser, without a request. */
 export interface ClientPageLoadContext<P extends PageSchema | undefined, S extends PageSchema | undefined> {

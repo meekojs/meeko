@@ -1,0 +1,23 @@
+<script lang="ts">
+import { signal } from "@meekojs/meeko";
+import type { Deferred } from "@meekojs/meeko/framework";
+
+export interface Props {
+  params: Record<string, string>;
+  search: Record<string, string | string[]>;
+  data: { title: string; slow: Deferred<{ text: string }> };
+}
+
+const props = defineProps<Props>();
+const count = signal(0);
+</script>
+
+<template>
+  <section>
+    <h1>{props.data.title}</h1>
+    <button id="stream-count" type="button" on:click="() => count.value++">Count: {count.value}</button>
+    <p id="stream-pending" if:when="props.data.slow.status === 'pending'">Loading slow data</p>
+    <p id="stream-value" if:when="props.data.slow.status === 'resolved'">{props.data.slow.value?.text}</p>
+    <p id="stream-error" if:when="props.data.slow.status === 'rejected'">{props.data.slow.error?.code}</p>
+  </section>
+</template>
