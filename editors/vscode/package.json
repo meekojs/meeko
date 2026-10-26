@@ -4,7 +4,7 @@
   "displayName": "Meeko Language",
   "description": "Syntax highlighting and the Meeko language server for .meeko components",
   "icon": "./icons/meeko-logo.png",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "license": "MIT",
   "private": true,
   "repository": { "type": "git", "url": "https://github.com/meekojs/meeko" },
