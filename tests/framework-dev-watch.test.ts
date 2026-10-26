@@ -100,8 +100,15 @@ test("Vite neither watches nor scans stale .meeko files and still watches the ge
   assert.deepEqual(scanned, ["scan-probe/root"]);
   const watcher = server.watcher as typeof server.watcher & { _readyEmitted?: boolean };
   if (!watcher._readyEmitted) await once(watcher, "ready");
-  const watched = Object.fromEntries(Object.entries(watcher.getWatched()).map(([directory, entries]) => [normalizePath(directory), entries]));
   const meekoDirectory = normalizePath(join(root, ".meeko"));
+  const listing = () => Object.fromEntries(Object.entries(watcher.getWatched()).map(([directory, entries]) => [normalizePath(directory), entries]));
+  // On a slow runner chokidar can still be adding `.meeko/generated` after `ready`;
+  // an edit written before that would never produce an event.
+  for (let waited = 0; !(listing()[`${meekoDirectory}/generated`]?.includes("entry.ts")) && waited < 10_000; waited += 50) {
+    await new Promise((done) => setTimeout(done, 50));
+  }
+  const watched = listing();
+  assert.ok(watched[`${meekoDirectory}/generated`]?.includes("entry.ts"), JSON.stringify(watched));
   // The listing of `.meeko` can still be filling in right after `ready` on a slow
   // runner; only `generated` may appear in it, and the change event below proves it is watched.
   assert.ok((watched[meekoDirectory] ?? []).every((entry) => entry === "generated"), JSON.stringify(watched));
