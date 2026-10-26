@@ -41,6 +41,21 @@ export type SocketUpgradeHandler = (request: Request) => Promise<SocketUpgrade>;
 
 const channelName = /^[A-Za-z_$][\w$-]*$/;
 const encoder = new TextEncoder();
+const loopbackHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/**
+ * A loopback public origin also answers to its other loopback names on the same
+ * scheme and port, so a page opened at `localhost` reaches a server listening on
+ * `127.0.0.1`. Non-loopback origins never take their identity from a header.
+ */
+function loopbackAlias(origin: URL, header: string | null): URL | undefined {
+  if (!header || !loopbackHosts.has(origin.hostname)) return undefined;
+  let candidate: URL;
+  try { candidate = new URL(header); }
+  catch { return undefined; }
+  // Rebuild from the serialized origin so credentials in the header never reach the request URL.
+  return candidate.protocol === origin.protocol && candidate.port === origin.port && loopbackHosts.has(candidate.hostname) ? new URL(candidate.origin) : undefined;
+}
 
 /** Validates a Socket pathname prefix and returns it. */
 export function socketPathnamePrefix(value: string | undefined): string {
@@ -157,7 +172,8 @@ export function createSocketUpgradeHandler(options: SocketUpgradeOptions): Socke
     if (!channelName.test(name)) return { action: "reject", status: 400 };
     if (incoming.method !== "GET" || incoming.headers.get("upgrade")?.toLowerCase() !== "websocket") return { action: "reject", status: 400 };
     // Origin checks compare against the request URL, so it carries the public origin.
-    const request = new Request(new URL(url.pathname + url.search, origin), { headers: incoming.headers });
+    const base = loopbackAlias(origin, incoming.headers.get("origin")) ?? origin;
+    const request = new Request(new URL(url.pathname + url.search, base), { headers: incoming.headers });
     const roomId = url.searchParams.get("room") ?? undefined;
     try { await hub.preflight(name, request, roomId); }
     catch (error) {

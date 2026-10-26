@@ -87,6 +87,92 @@ test("hidratar texto y atributos iguales al SSR no muta el DOM", () => {
   window.happyDOM.abort();
 });
 
+test("los atributos de formulario enlazados actualizan la propiedad viva tras editar el control", () => {
+  const window = new Window();
+  const root = window.document.createElement("main");
+  root.innerHTML = '<input data-meeko-a-0="" value=""><input type="checkbox" data-meeko-a-1=""><select><option value="a">A</option><option value="b" data-meeko-a-2="">B</option></select>';
+  const text = signal("");
+  const checked = signal(false);
+  const selected = signal(false);
+  const scope = { root: root as unknown as Element };
+  const stops = [
+    bindAttribute(scope, 0, "value", () => text.value, "Form.meeko:1:1"),
+    bindAttribute(scope, 1, "checked", () => checked.value, "Form.meeko:1:2"),
+    bindAttribute(scope, 2, "selected", () => selected.value, "Form.meeko:1:3"),
+  ];
+  const input = root.querySelector("input") as unknown as HTMLInputElement;
+  const checkbox = root.querySelector("input[type=checkbox]") as unknown as HTMLInputElement;
+  const option = root.querySelector("option[value=b]") as unknown as HTMLOptionElement;
+  // The user edits each control, which detaches it from its attribute.
+  input.value = "typed";
+  checkbox.checked = true;
+  option.selected = true;
+  text.value = "reset";
+  text.value = "";
+  checked.value = true;
+  checked.value = false;
+  selected.value = true;
+  selected.value = false;
+  assert.equal(input.value, "");
+  assert.equal(input.getAttribute("value"), "");
+  assert.equal(checkbox.checked, false);
+  assert.equal(option.selected, false);
+  text.value = "next";
+  assert.equal(input.value, "next");
+  for (const stop of stops) stop();
+  window.happyDOM.abort();
+});
+
+test("bind:value aplica el valor inicial a textarea y select sin pisar lo que el usuario ya cambió", () => {
+  const window = new Window();
+  const markup = '<textarea data-meeko-a-0="" value="hola"></textarea><select data-meeko-a-1="" value="b"><option value="a">A</option><option value="b">B</option><option value="c">C</option></select>';
+  const pristine = window.document.createElement("main");
+  pristine.innerHTML = markup;
+  const edited = window.document.createElement("main");
+  edited.innerHTML = markup;
+  (edited.querySelector("textarea") as unknown as HTMLTextAreaElement).value = "escrito";
+  (edited.querySelector("select") as unknown as HTMLSelectElement).value = "c";
+  const text = signal("hola");
+  const choice = signal("b");
+  const stops = [pristine, edited].flatMap((root) => {
+    const scope = { root: root as unknown as Element };
+    return [
+      bindAttribute(scope, 0, "value", () => text.value, "Form.meeko:1:1"),
+      bindAttribute(scope, 1, "value", () => choice.value, "Form.meeko:1:2"),
+    ];
+  });
+  assert.equal((pristine.querySelector("textarea") as unknown as HTMLTextAreaElement).value, "hola");
+  assert.equal((pristine.querySelector("select") as unknown as HTMLSelectElement).value, "b");
+  assert.equal((edited.querySelector("textarea") as unknown as HTMLTextAreaElement).value, "escrito");
+  assert.equal((edited.querySelector("select") as unknown as HTMLSelectElement).value, "c");
+  for (const stop of stops) stop();
+  window.happyDOM.abort();
+});
+
+test("bind:value no reescribe un input cuyo valor ya coincide, para conservar el cursor", () => {
+  const window = new Window();
+  const root = window.document.createElement("main");
+  root.innerHTML = '<input data-meeko-a-0="" value="">';
+  const input = root.querySelector("input") as unknown as HTMLInputElement;
+  const text = signal("");
+  const stop = bindAttribute({ root: root as unknown as Element }, 0, "value", () => text.value, "Form.meeko:1:1");
+  const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), "value")!;
+  let writes = 0;
+  Object.defineProperty(input, "value", {
+    configurable: true,
+    get() { return descriptor.get!.call(this); },
+    set(value: string) { writes++; descriptor.set!.call(this, value); },
+  });
+  input.value = "abc";
+  writes = 0;
+  text.value = "abc";
+  assert.equal(writes, 0);
+  text.value = "";
+  assert.equal(writes, 1);
+  stop();
+  window.happyDOM.abort();
+});
+
 test("la transferencia de estado rechaza datos que JSON cambiaría silenciosamente", () => {
   assert.throws(() => serializeJson({ value: Number.NaN }), /Non-finite number at \$\.value/);
   assert.throws(() => serializeJson({ value: undefined }), /Non-serializable value at \$\.value/);

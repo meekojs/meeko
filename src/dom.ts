@@ -247,11 +247,49 @@ export function bindAttribute(scope: DomScope, id: number, name: string, read: (
     const next = attributeValue(name, read());
     if (first) {
       first = false;
-      if (target.getAttribute(name) === next) return;
+      if (target.getAttribute(name) === next) {
+        // `textarea` and `select` never read a `value` attribute, so SSR cannot
+        // show it; apply it once unless the user already changed the control.
+        if (name === "value" && pristineValueControl(target)) syncFormState(target, name, next);
+        return;
+      }
     }
     if (next === null) target.removeAttribute(name);
     else target.setAttribute(name, next);
+    syncFormState(target, name, next);
   }, source);
+}
+
+/** A `textarea` or single `select` whose value the user has not changed yet. */
+function pristineValueControl(target: Element): boolean {
+  if (target.localName === "textarea") {
+    const control = target as HTMLTextAreaElement;
+    return control.value === control.defaultValue;
+  }
+  if (target.localName !== "select" || (target as HTMLSelectElement).multiple) return false;
+  const select = target as HTMLSelectElement;
+  const options = Array.from(select.options);
+  // Without a `selected` attribute a single select shows its first option.
+  // `defaultSelected` reflects the `selected` attribute; read it directly for minimal DOMs.
+  const initial = options.filter((option) => option.hasAttribute("selected")).at(-1) ?? options[0];
+  return select.selectedIndex === (initial ? options.indexOf(initial) : -1);
+}
+
+/**
+ * Once the user edits a form control, the browser stops reading its `value`,
+ * `checked` or `selected` attribute; the live property must follow the binding.
+ */
+function syncFormState(target: Element, name: string, next: string | null): void {
+  const tag = target.localName;
+  if (name === "value" && (tag === "input" || tag === "textarea" || (tag === "select" && !(target as HTMLSelectElement).multiple))) {
+    const control = target as HTMLInputElement;
+    // Leave an equal value alone so typing keeps the caret where it is.
+    if (control.value !== (next ?? "")) control.value = next ?? "";
+  } else if (name === "checked" && tag === "input") {
+    (target as HTMLInputElement).checked = next !== null;
+  } else if (name === "selected" && tag === "option") {
+    (target as HTMLOptionElement).selected = next !== null;
+  }
 }
 
 /** Conecta un evento al elemento SSR y entrega su función de limpieza. */

@@ -93,6 +93,90 @@ test("official Node adapter upgrades real WebSockets and enforces origin, sessio
   }
 });
 
+test("a loopback public origin accepts its other loopback names on the same port only", async () => {
+  const store = new MemorySessionStore<{ user: string }>();
+  const sessions = new SessionManager({ store, secure: false });
+  const session = await (await sessions.load(new Request("http://localhost/"))).create({ user: "alice" });
+  const hub = createSocketHub({
+    channels: {
+      chat: defineSocketChannel({
+        clientToServer: { message: textSchema },
+        serverToClient: { message: textSchema },
+        auth: "required",
+        handlers: { message: ({ payload, emit }) => emit("message", payload) },
+      }),
+    },
+    sessions,
+    services: {},
+  });
+  const server = createServer((_request, response) => { response.writeHead(404); response.end(); });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const adapter = attachNodeWebSocketServer({ server, hub, publicOrigin: `http://127.0.0.1:${address.port}` });
+  const connect = (origin: string) => new WebSocket(`ws://127.0.0.1:${address.port}/_meeko/socket/chat`, {
+    headers: { origin, cookie: `meeko.sid=${session.id}` },
+  });
+  const status = (peer: WebSocket) => new Promise<number>((resolve, reject) => {
+    peer.once("unexpected-response", (_request, response) => { response.resume(); resolve(response.statusCode ?? 0); });
+    peer.once("open", () => { peer.close(); resolve(101); });
+    peer.once("error", reject);
+  });
+  try {
+    assert.equal(await status(connect(`http://localhost:${address.port}`)), 101);
+    assert.equal(await status(connect(`http://[::1]:${address.port}`)), 101);
+    assert.equal(await status(connect(`http://localhost:${address.port + 1}`)), 403);
+    assert.equal(await status(connect(`https://localhost:${address.port}`)), 403);
+    assert.equal(await status(connect(`http://localhost.evil.test:${address.port}`)), 403);
+    // Credentials in the header are refused as an origin mismatch, not a server error.
+    assert.equal(await status(connect(`http://user:secret@localhost:${address.port}`)), 403);
+  } finally {
+    await adapter.close();
+    server.close();
+    await once(server, "close");
+  }
+});
+
+test("a public origin outside loopback never accepts a loopback Origin", async () => {
+  const store = new MemorySessionStore<{ user: string }>();
+  const sessions = new SessionManager({ store, secure: false });
+  const session = await (await sessions.load(new Request("http://localhost/"))).create({ user: "alice" });
+  const hub = createSocketHub({
+    channels: {
+      chat: defineSocketChannel({
+        clientToServer: { message: textSchema },
+        serverToClient: { message: textSchema },
+        auth: "required",
+        handlers: { message: ({ payload, emit }) => emit("message", payload) },
+      }),
+    },
+    sessions,
+    services: {},
+  });
+  const server = createServer((_request, response) => { response.writeHead(404); response.end(); });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const adapter = attachNodeWebSocketServer({ server, hub, publicOrigin: "https://example.com" });
+  try {
+    const peer = new WebSocket(`ws://127.0.0.1:${address.port}/_meeko/socket/chat`, {
+      headers: { origin: `http://localhost:${address.port}`, cookie: `meeko.sid=${session.id}` },
+    });
+    const status = await new Promise<number>((resolve, reject) => {
+      peer.once("unexpected-response", (_request, response) => { response.resume(); resolve(response.statusCode ?? 0); });
+      peer.once("open", () => { peer.close(); resolve(101); });
+      peer.once("error", reject);
+    });
+    assert.equal(status, 403);
+  } finally {
+    await adapter.close();
+    server.close();
+    await once(server, "close");
+  }
+});
+
 test("Node upgrade preserves a client error status across separate module graphs", async () => {
   class ApiError extends Error {
     readonly code = "INVALID_ORIGIN";

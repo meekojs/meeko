@@ -1,5 +1,13 @@
 # Cambios de Meeko
 
+## [1.0.1] - 2026-10-25
+
+### Correcciones
+
+- `bind:value`, `bind:checked` y `bind:selected` actualizan también la propiedad viva de `input`, `textarea`, `select` y `option`. Antes sólo cambiaban el atributo, que el navegador ignora una vez que el usuario edita el control, así que asignar el signal desde código no limpiaba el campo y el signal quedaba desincronizado de lo que se veía. Al hidratar, un `textarea` o un `select` simple que el usuario aún no cambió toma el valor enlazado; un `select multiple` no se modifica.
+  - Cambio de comportamiento: el control pasa a reflejar siempre el signal. Si el manejador de `input` guarda un valor transformado (por ejemplo, `Number(value)` o `value.trim()`), el campo muestra ese valor transformado mientras el usuario escribe. Guarde el texto tal cual en un signal de tipo `string` y conviértalo donde se use.
+- El handshake de Socket acepta los otros nombres de loopback (`localhost`, `127.0.0.1`, `[::1]`) con el mismo esquema y puerto cuando el origen público es de loopback. Antes, una página abierta en `http://localhost:4173` recibía `403 INVALID_ORIGIN` de un servidor que escuchaba en `127.0.0.1:4173`, aunque sus peticiones HTTP sí funcionaban. Los orígenes que no son de loopback siguen sin tomar su identidad de una cabecera.
+
 ## [1.0.0] - 2026-10-25
 
 Primera versión estable. El código es el de `1.0.0-rc.1`, sin cambios; los cambios respecto a `0.1.0` se recogen en la sección siguiente y en la [guía de migración](docs/migration-1.0.md). Desde esta versión, Meeko sigue SemVer según [docs/stability.md](docs/stability.md).
