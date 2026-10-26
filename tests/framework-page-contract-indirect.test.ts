@@ -37,7 +37,7 @@ test("page contract checks data from an indirectly declared loader", async () =>
       "}));",
       "",
     ].join("\n"));
-    await assert.rejects(checkFrameworkProject(root), /Page app\/pages\/index\.meeko props do not match loader app\/pages\/index\.route\.ts/);
+    await assert.rejects(checkFrameworkProject(root), /Las props de la página app\/pages\/index\.meeko no coinciden con el loader app\/pages\/index\.route\.ts/);
     await writeFile(join(root, "app", "pages", "index.meeko"), [
       '<script lang="ts">',
       "export interface Props { params: Record<string, string>; data?: { name: string } }",
@@ -84,7 +84,7 @@ test("page contracts and meeko check understand render: client sidecars", async 
       "}));",
       "",
     ].join("\n"));
-    await assert.rejects(checkFrameworkProject(root), /Page app\/pages\/index\.meeko props do not match loader app\/pages\/index\.route\.ts/);
+    await assert.rejects(checkFrameworkProject(root), /Las props de la página app\/pages\/index\.meeko no coinciden con el loader app\/pages\/index\.route\.ts/);
     await writeFile(join(root, "app", "pages", "index.meeko"), pageSource("{ path: string; aborted: boolean }"));
     await checkFrameworkProject(root);
     // A browser loader has no Request: the server-only context is a type error.

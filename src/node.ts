@@ -18,12 +18,25 @@ export type { NodeWebSocketOptions, NodeWebSocketServer } from "./framework-serv
 export { createNodeSocketUpgradeHandler } from "./framework-server/node-upgrade.js";
 export type { NodeAcceptedSocket, NodeSocketUpgradeOptions } from "./framework-server/node-upgrade.js";
 
+/**
+ * Opciones de {@link toNodeListener}.
+ *
+ * @example
+ * ```ts
+ * import type { NodeListenerOptions } from "@meekojs/meeko/node";
+ *
+ * const options: NodeListenerOptions = {
+ *   publicOrigin: "https://example.com",
+ *   onError: (error, requestId) => console.error("[node]", requestId, error),
+ * };
+ * ```
+ */
 export interface NodeListenerOptions {
-  /** Receives uncaught handler or response-stream failures with a correlation ID. */
+  /** Recibe los fallos no capturados del handler o del stream de respuesta con un ID de correlación. */
   onError?: (error: unknown, requestId: string) => void;
   /**
-   * Public origin used for request URLs instead of the Host header, for example
-   * `https://example.com` behind a TLS proxy.
+   * Origen público con el que se construyen las URL de las peticiones en lugar de la cabecera
+   * `Host`, por ejemplo `https://example.com` tras un proxy TLS.
    */
   publicOrigin?: string;
 }
@@ -58,7 +71,24 @@ function requestUrl(target: string, base: string): URL {
   return url;
 }
 
-/** Adapts a portable Fetch handler to Node 24's HTTP server callback. */
+/**
+ * Adapta un handler Fetch portable al callback del servidor HTTP de Node 24. Envía por separado
+ * varias cabeceras `Set-Cookie`, cancela el cuerpo si el cliente se desconecta y trata un
+ * request-target que empieza por `//` como ruta del origen propio.
+ *
+ * @param handler Handler Fetch, como `app.fetch`.
+ * @param options Origen público y observador de errores.
+ * @returns El listener para `http.createServer`.
+ * @throws {TypeError} Si `publicOrigin` no es una URL HTTP(S).
+ * @example
+ * ```ts
+ * import { createServer } from "node:http";
+ * import { toNodeListener } from "@meekojs/meeko/node";
+ *
+ * const server = createServer(toNodeListener((request) => app.fetch(request), { publicOrigin: "https://example.com" }));
+ * server.listen(3000);
+ * ```
+ */
 export function toNodeListener(handler: (request: Request) => Promise<Response> | Response, options: NodeListenerOptions = {}): (request: IncomingMessage, response: ServerResponse) => void {
   const publicOrigin = options.publicOrigin ? originOf(options.publicOrigin) : undefined;
   return (incoming, outgoing) => {
@@ -146,13 +176,42 @@ export function toNodeListener(handler: (request: Request) => Promise<Response> 
   };
 }
 
+/**
+ * Opciones de {@link createNodeAssetReader}.
+ *
+ * @example
+ * ```ts
+ * import type { NodeAssetReaderOptions } from "@meekojs/meeko/node";
+ *
+ * const options: NodeAssetReaderOptions = { root: ".meeko/output/node/client", assets: manifest.assets ?? {} };
+ * ```
+ */
 export interface NodeAssetReaderOptions {
-  /** Directory holding the files listed in `assets`. */
+  /** Carpeta que contiene los archivos listados en `assets`. */
   readonly root: string;
+  /** Manifiesto de los archivos públicos. */
   readonly assets: AssetManifest;
 }
 
-/** Serves only manifest-listed build files from disk, streamed with validators. */
+/**
+ * Sirve desde el disco sólo los archivos del build listados en el manifiesto, en streaming y con
+ * `ETag`, `HEAD` y `304`. Cualquier otra ruta devuelve `null` y nunca se lee.
+ *
+ * @param options Carpeta y manifiesto de archivos.
+ * @returns El lector de archivos.
+ * @example
+ * ```ts
+ * import { fileURLToPath } from "node:url";
+ * import { createServerApp } from "@meekojs/meeko/server";
+ * import { createNodeAssetReader } from "@meekojs/meeko/node";
+ *
+ * const root = fileURLToPath(new URL("./client/", import.meta.url));
+ * const app = await createServerApp({
+ *   manifest, load, runtime, production: true,
+ *   assets: createNodeAssetReader({ root, assets: manifest.assets ?? {} }),
+ * });
+ * ```
+ */
 export function createNodeAssetReader(options: NodeAssetReaderOptions): AssetReader {
   return {
     async get(pathname, request) {
@@ -169,31 +228,58 @@ export function createNodeAssetReader(options: NodeAssetReaderOptions): AssetRea
   };
 }
 
+/**
+ * Opciones de {@link serveNode}.
+ *
+ * @example
+ * ```ts
+ * import type { ServeNodeOptions } from "@meekojs/meeko/node";
+ *
+ * const options: ServeNodeOptions = {
+ *   host: process.env.HOST ?? "127.0.0.1",
+ *   port: Number(process.env.PORT ?? 4173),
+ *   publicOrigin: process.env.PUBLIC_ORIGIN,
+ *   handleSignals: true,
+ *   shutdownTimeout: 5_000,
+ * };
+ * ```
+ */
 export interface ServeNodeOptions {
-  /** Interface to bind. Defaults to 127.0.0.1; use 0.0.0.0 to accept remote traffic. */
+  /** Interfaz en la que escucha. Por defecto, `127.0.0.1`; use `0.0.0.0` para aceptar tráfico remoto. */
   readonly host?: string;
-  /** Defaults to 4173; 0 selects a free port. */
+  /** Puerto; 4173 por defecto y `0` elige uno libre. */
   readonly port?: number;
-  /** Overrides the application's `publicOrigin` for HTTP and Socket origin checks. */
+  /** Sustituye al `publicOrigin` de la aplicación en las comprobaciones de Origin de HTTP y Socket. */
   readonly publicOrigin?: string;
-  /** Platform passed to each request. Defaults to Node with `process.env`. */
+  /** Plataforma que recibe cada petición. Por defecto, Node con `process.env`. */
   readonly platform?: ServerPlatform;
-  /** Defaults to the application's error observer. */
+  /** Observador de errores; por defecto, el de la aplicación. */
   readonly onError?: (error: unknown, requestId: string) => void;
-  /** Close gracefully on SIGINT and SIGTERM. */
+  /** Cierra de forma ordenada ante `SIGINT` y `SIGTERM`. */
   readonly handleSignals?: boolean;
   /**
-   * Milliseconds that open responses, such as streams, may keep running after
-   * `close()` before their connections are cut. Defaults to 10 000.
+   * Milisegundos que las respuestas abiertas, como un stream, pueden seguir tras `close()` antes de
+   * cortar sus conexiones. Por defecto, 10 000.
    */
   readonly shutdownTimeout?: number;
 }
 
+/**
+ * Servidor Node en marcha que devuelve {@link serveNode}.
+ *
+ * @example
+ * ```ts
+ * const node = await serveNode(app, { port: 0 });
+ * console.log(`Escuchando en ${node.url}`);
+ * await node.close();
+ * ```
+ */
 export interface NodeServer {
+  /** Servidor HTTP de Node. */
   readonly server: Server;
-  /** Local URL the server listens on. */
+  /** URL local en la que escucha. */
   readonly url: string;
-  /** Stops Socket peers and HTTP, waits for background tasks, then closes the application. */
+  /** Cierra los peers de Socket y HTTP, espera las tareas en segundo plano y cierra la aplicación. */
   close(): Promise<void>;
 }
 
@@ -218,7 +304,25 @@ function urlHost(host: string): string {
   return visible.includes(":") ? `[${visible}]` : visible;
 }
 
-/** Serves a Meeko application, including its Socket channels, with Node's HTTP server. */
+/**
+ * Sirve una aplicación de Meeko con el servidor HTTP de Node, incluidos sus canales Socket (con
+ * `ws`). Si el servidor arranca pero falla la conexión de Socket, libera el puerto y cierra la
+ * aplicación antes de propagar el error.
+ *
+ * @param app Aplicación de `createServerApp`.
+ * @param options Dirección, origen público, señales y cierre.
+ * @returns El servidor en marcha.
+ * @example
+ * ```ts
+ * import { createServerApp } from "@meekojs/meeko/server";
+ * import { serveNode } from "@meekojs/meeko/node";
+ *
+ * const app = await createServerApp({ manifest, load, runtime, production: true });
+ * const server = await serveNode(app, { host: "0.0.0.0", port: 3000, publicOrigin: "https://example.com", handleSignals: true });
+ * console.log(server.url);
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#build-despliegue-y-verificación
+ */
 export async function serveNode(app: ServerApp, options: ServeNodeOptions = {}): Promise<NodeServer> {
   const host = options.host ?? "127.0.0.1";
   const port = options.port ?? 4173;

@@ -56,7 +56,7 @@ test("framework project check generates scoped TS projects and reports server ty
     const shell = (props: string) => `<script lang="ts">const props = defineProps<${props}>();</script><template><p>Shell</p></template>`;
     for (const unsafe of ["never", "any", "unknown"]) {
       await writeFile(join(root, "app", "pages", "index.meeko"), shell(unsafe));
-      await assert.rejects(checkFrameworkProject(root), /Page .* props cannot be any, never or unknown/);
+      await assert.rejects(checkFrameworkProject(root), /Las props de la página .* no pueden ser any, never ni unknown/);
     }
     await writeFile(join(root, "app", "pages", "index.meeko"), [
       '<script lang="ts">',
@@ -69,9 +69,9 @@ test("framework project check generates scoped TS projects and reports server ty
     for (const file of ["app/app.meeko", "app/layouts/default.meeko"]) {
       await mkdir(join(root, file, ".."), { recursive: true });
       await writeFile(join(root, file), shell("never"));
-      await assert.rejects(checkFrameworkProject(root), /Layout .* props cannot be any, never or unknown/);
+      await assert.rejects(checkFrameworkProject(root), /Las props del layout .* no pueden ser any, never ni unknown/);
       await writeFile(join(root, file), shell("{ outlet: object; missing: string }"));
-      await assert.rejects(checkFrameworkProject(root), /Layout .* props do not match the values supplied by Meeko/);
+      await assert.rejects(checkFrameworkProject(root), /Las props del layout .* no coinciden con los valores que aporta Meeko/);
       await writeFile(join(root, file), shell("{ outlet: object }"));
       await checkFrameworkProject(root);
     }
@@ -79,13 +79,13 @@ test("framework project check generates scoped TS projects and reports server ty
     await writeFile(join(root, "app", "pages", "users", "index.meeko"), shell("Record<string, never>"));
     const nestedLayout = join(root, "app", "pages", "users", "+layout.meeko");
     await writeFile(nestedLayout, shell("{ outlet: object; missing: string }"));
-    await assert.rejects(checkFrameworkProject(root), /Layout .*users.*\+layout\.meeko props do not match the values supplied by Meeko/);
+    await assert.rejects(checkFrameworkProject(root), /Las props del layout .*users.*\+layout\.meeko no coinciden con los valores que aporta Meeko/);
     await writeFile(nestedLayout, shell("{ outlet: object }"));
     const errorPage = join(root, "app", "pages", "+error.meeko");
     await writeFile(errorPage, shell("unknown"));
-    await assert.rejects(checkFrameworkProject(root), /Error page .* props cannot be any, never or unknown/);
+    await assert.rejects(checkFrameworkProject(root), /Las props de la página de error .* no pueden ser any, never ni unknown/);
     await writeFile(errorPage, shell("{ status: string; message: string }"));
-    await assert.rejects(checkFrameworkProject(root), /Error page .*\+error\.meeko props do not match the values supplied by Meeko/);
+    await assert.rejects(checkFrameworkProject(root), /Las props de la página de error .*\+error\.meeko no coinciden con los valores que aporta Meeko/);
     await writeFile(errorPage, shell("{ status: number; message: string }"));
     await checkFrameworkProject(root);
     const appConfig = await readFile(join(root, ".meeko", "tsconfig.app.json"), "utf8");
@@ -162,7 +162,7 @@ test("framework project check generates scoped TS projects and reports server ty
       "<template><p>Hello</p></template>",
       "",
     ].join("\n"));
-    await assert.rejects(checkFrameworkProject(root), /Page app\/pages\/index\.meeko props do not match loader app\/pages\/index\.route\.ts/);
+    await assert.rejects(checkFrameworkProject(root), /Las props de la página app\/pages\/index\.meeko no coinciden con el loader app\/pages\/index\.route\.ts/);
     await writeFile(join(root, "app", "pages", "index.meeko"), [
       '<script lang="ts">',
       "export interface Props { params: Record<string, string>; data: { name: string } }",
@@ -185,7 +185,7 @@ test("framework project check generates scoped TS projects and reports server ty
       "<template><p>Hello</p></template>",
       "",
     ].join("\n"));
-    await assert.rejects(checkFrameworkProject(root), /Page app\/pages\/index\.meeko props do not match loader app\/pages\/index\.route\.ts/);
+    await assert.rejects(checkFrameworkProject(root), /Las props de la página app\/pages\/index\.meeko no coinciden con el loader app\/pages\/index\.route\.ts/);
     await writeFile(join(root, "app", "pages", "index.route.ts"), [
       'import { definePage } from "@meekojs/meeko/framework";',
       'export const route = definePage({ load: () => ({ name: "Ada" }) });',
@@ -207,7 +207,7 @@ test("framework project check generates scoped TS projects and reports server ty
       "<template><p>Hello</p></template>",
       "",
     ].join("\n"));
-    await assert.rejects(checkFrameworkProject(root), /Page app\/pages\/\[id\]\.meeko props do not match loader app\/pages\/\[id\]\.route\.ts/);
+    await assert.rejects(checkFrameworkProject(root), /Las props de la página app\/pages\/\[id\]\.meeko no coinciden con el loader app\/pages\/\[id\]\.route\.ts/);
     await writeFile(join(root, "app", "pages", "[id].meeko"), [
       '<script lang="ts">',
       "export interface Props { params: { id: string }; data: { name: string } }",

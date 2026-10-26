@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { RouteMiddleware } from "../framework/middleware.js";
-import type { RouteRecord } from "../framework/router.js";
-import { createPageHandler } from "../framework/server.js";
+import type { ErrorPageRecord, RouteRecord } from "../framework/router.js";
+import { createPageHandler, withRouteManifest } from "../framework/server.js";
 import type { DocumentMarkup, DocumentOptions, PageHandlerOptions, PageModule, PageRoute, PrerenderSource } from "../framework/server.js";
 import { escapeHtml } from "../server.js";
 import type { AssetManifest, AssetReader } from "./assets.js";
@@ -20,76 +20,178 @@ import { MemorySessionStore, SessionManager } from "./sessions.js";
 import { createSocketHub } from "./socket.js";
 import type { SocketHub, SocketPubSub } from "./socket.js";
 
-/** Client build files linked from every server-rendered document. */
+/**
+ * Archivos del build cliente que enlaza cada documento renderizado en el servidor.
+ *
+ * @example
+ * ```ts
+ * import type { ClientAssets } from "@meekojs/meeko/server";
+ *
+ * const client: ClientAssets = {
+ *   entry: "/assets/entry-client-4f2a.js",
+ *   css: ["/assets/main-91bc.css"],
+ *   preload: ["/assets/runtime-0d3e.js"],
+ * };
+ * ```
+ */
 export interface ClientAssets {
-  /** URL of the client entry module. */
+  /** URL del módulo de entrada del cliente. */
   readonly entry: string;
+  /** Hojas de estilo enlazadas en `<head>`. */
   readonly css: readonly string[];
-  /** Static imports of the entry, announced with `modulepreload`. */
+  /** Imports estáticos de la entrada, anunciados con `modulepreload`. */
   readonly preload: readonly string[];
 }
 
 /**
- * Everything the server needs to route requests, baked at build time. Files
- * are project-relative module keys such as `/app/pages/index.meeko`.
+ * Todo lo que el servidor necesita para enrutar peticiones, fijado en el build. Los archivos son
+ * claves de módulo relativas al proyecto, como `/app/pages/index.meeko`.
+ *
+ * @example
+ * ```ts
+ * import type { AppManifest } from "@meekojs/meeko/server";
+ *
+ * const manifest: AppManifest = {
+ *   version: 1,
+ *   routes: [{ id: "/", file: "/app/pages/index.meeko", layouts: ["/app/app.meeko"] }],
+ *   errorPage: { file: "/app/error.meeko", layouts: ["/app/app.meeko"] },
+ *   server: { api: [], rpc: [], socket: [] },
+ *   routeMiddleware: [],
+ *   serverMiddleware: ["/server/middleware/10-headers.ts"],
+ *   client: { entry: "/assets/entry.js", css: [], preload: [] },
+ * };
+ * ```
  */
 export interface AppManifest {
+  /** Versión del formato. */
   readonly version: 1;
+  /** Manifiesto de rutas. */
   readonly routes: readonly RouteRecord[];
+  /**
+   * `app/error.meeko` y sus layouts raíz; renderiza las URL sin ruta.
+   * @since 1.1.0
+   */
+  readonly errorPage?: ErrorPageRecord | undefined;
+  /** Endpoints de API, procedimientos RPC y canales Socket. */
   readonly server: ServerManifest;
+  /** Módulos de `app/middleware`, en orden de ejecución. */
   readonly routeMiddleware: readonly string[];
+  /** Módulos de `server/middleware`, en orden de ejecución. */
   readonly serverMiddleware: readonly string[];
+  /** Archivos del build cliente. */
   readonly client: ClientAssets;
-  /** Public build files; development hosts serve files through Vite instead. */
+  /** Archivos públicos del build; en desarrollo los sirve Vite. */
   readonly assets?: AssetManifest;
 }
 
-/** Resolves a manifest key to its module. */
+/**
+ * Resuelve una clave del manifiesto a su módulo.
+ *
+ * @example
+ * ```ts
+ * import type { AppModuleLoader } from "@meekojs/meeko/server";
+ *
+ * const modules = import.meta.glob(["/app/**", "/server/**"]);
+ * const load: AppModuleLoader = (key) => modules[key]?.() ?? Promise.reject(new Error(`Unknown module ${key}`));
+ * ```
+ */
 export type AppModuleLoader = (key: string) => Promise<unknown>;
 
+/**
+ * Opciones de {@link createServerApp}.
+ *
+ * @typeParam Env Tipo de las variables o bindings del entorno.
+ * @example
+ * ```ts
+ * import { createServerApp } from "@meekojs/meeko/server";
+ * import type { ServerAppOptions } from "@meekojs/meeko/server";
+ * import { load, manifest, runtime } from "virtual:meeko-server-app";
+ *
+ * const options: ServerAppOptions = {
+ *   manifest, load, runtime,
+ *   production: true,
+ *   platform: { name: "node", env: process.env, waitUntil: () => {} },
+ *   publicOrigin: "https://example.com",
+ * };
+ * const app = await createServerApp(options);
+ * ```
+ */
 export interface ServerAppOptions<Env = Readonly<Record<string, string | undefined>>> {
+  /** Manifiesto fijado en el build. */
   readonly manifest: AppManifest;
+  /** Cargador de módulos por clave del manifiesto. */
   readonly load: AppModuleLoader;
-  /** Default export of `server/runtime.ts`; without it only development memory sessions exist. */
+  /** Export por defecto de `server/runtime.ts`; sin él sólo hay sesiones en memoria de desarrollo. */
   readonly runtime?: ServerRuntimeDefinition<Env, any> | undefined;
+  /** Modo producción: exige un runtime con store persistente y oculta los detalles de los errores. */
   readonly production: boolean;
-  /** Platform passed to the runtime factory and used when `fetch` receives none. */
+  /** Plataforma que recibe la fábrica del runtime y que se usa cuando `fetch` no recibe otra. */
   readonly platform?: ServerPlatform<Env>;
+  /** Lector de los archivos públicos del build. */
   readonly assets?: AssetReader;
-  /** Prerendered pages; listed URLs skip the loader and renderer. */
+  /** Páginas prerenderizadas; sus URL se sirven sin loader ni render. */
   readonly prerender?: PrerenderSource;
-  /** Host additions to every HTML document. */
+  /** Añadidos del host a cada documento HTML. */
   readonly document?: DocumentOptions;
-  /** Overrides `ServerRuntime.publicOrigin`. */
+  /** Sustituye a `ServerRuntime.publicOrigin`. */
   readonly publicOrigin?: string;
-  /** Set by `meeko build` while it renders prerendered pages. */
+  /** Lo activa `meeko build` mientras prerenderiza páginas. */
   readonly prerendering?: boolean;
-  /** Socket broker used when the runtime declares none, such as the Cloudflare Durable Object broker. */
+  /** Broker de Socket si el runtime no declara ninguno, como el de Durable Objects en Cloudflare. */
   readonly defaultSocketPubSub?: SocketPubSub;
 }
 
+/**
+ * Socket de una aplicación con canales: lo que necesita un adaptador para aceptar conexiones.
+ *
+ * @example
+ * ```ts
+ * if (app.socket) {
+ *   const { hub, pathnamePrefix } = app.socket;
+ *   await hub.broadcast("chat", "general", "message", { text: "Mantenimiento en 5 minutos" });
+ *   console.log(`Socket en ${pathnamePrefix}/<canal>`);
+ * }
+ * ```
+ */
 export interface ServerAppSocket {
+  /** Hub que valida y reparte los mensajes. */
   readonly hub: SocketHub;
+  /** Prefijo de las rutas de los canales, `/_meeko/socket`. */
   readonly pathnamePrefix: string;
+  /** Tamaño máximo de un mensaje entrante en bytes. */
   readonly maxMessageBytes?: number;
-  /** The hub's broker; absent when it uses its own `LocalSocketPubSub`. */
+  /** Broker del hub; no existe cuando usa su propio `LocalSocketPubSub`. */
   readonly pubsub?: SocketPubSub;
-  /** Name of the session cookie, for hosts that keep only it with a connection. */
+  /** Nombre de la cookie de sesión, para hosts que sólo conservan esa cookie con la conexión. */
   readonly sessionCookieName?: string;
 }
 
-/** A portable application: adapters translate their requests to `fetch`. */
+/**
+ * Aplicación portable: cada adaptador traduce sus peticiones a `fetch`. La crea
+ * {@link createServerApp}.
+ *
+ * @example
+ * ```ts
+ * const response = await app.fetch(new Request("http://localhost/api/health"));
+ * console.log(response.status);
+ * await app.close();
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#runtime-de-servidor
+ */
 export interface ServerApp {
+  /** Atiende una petición: middleware, assets, páginas, API y RPC. */
   fetch(request: Request, platform?: ServerPlatform): Promise<Response>;
-  /** Present when the application declares Socket channels. */
+  /** Existe cuando la aplicación declara canales Socket. */
   readonly socket?: ServerAppSocket;
+  /** Manifiesto de la aplicación. */
   readonly manifest: AppManifest;
+  /** Origen público con el que se comprueba `Origin`. */
   readonly publicOrigin?: string;
-  /** Sends a transport failure to the same observer as request failures. */
+  /** Envía un fallo del transporte al mismo observador que los fallos de las peticiones. */
   reportError(error: unknown, requestId: string): void;
   /**
-   * Waits for background tasks registered on the application's platform, such
-   * as those of Socket callbacks, then closes the runtime's sessions and resources.
+   * Espera las tareas en segundo plano registradas en la plataforma de la aplicación, como las de
+   * los callbacks de Socket, y después cierra las sesiones y los recursos del runtime.
    */
   close(): Promise<void>;
 }
@@ -141,7 +243,26 @@ async function loadDefault<T>(load: AppModuleLoader, key: string, label: string)
   return module.default as T;
 }
 
-/** Creates the portable application from a baked manifest and a module loader. */
+/**
+ * Crea la aplicación portable a partir del manifiesto fijado en el build y un cargador de módulos.
+ * Llama una vez a la fábrica de `server/runtime.ts`. La entrada que genera `meeko build` la usa; un
+ * host propio la sirve con un adaptador como `serveNode`.
+ *
+ * @param options Manifiesto, cargador, runtime y plataforma.
+ * @returns La aplicación.
+ * @throws {TypeError} Si el manifiesto es de otra versión, falta el cargador o el runtime no devuelve `sessions`.
+ * @throws {Error} En producción sin `server/runtime.ts`.
+ * @example
+ * ```ts
+ * import { createServerApp } from "@meekojs/meeko/server";
+ * import { serveNode } from "@meekojs/meeko/node";
+ * import { load, manifest, runtime } from "virtual:meeko-server-app";
+ *
+ * const app = await createServerApp({ manifest, load, runtime, production: true });
+ * const server = await serveNode(app, { port: 3000, handleSignals: true });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#runtime-de-servidor
+ */
 export async function createServerApp<Env = Readonly<Record<string, string | undefined>>>(options: ServerAppOptions<Env>): Promise<ServerApp> {
   const manifest = options.manifest;
   if (!manifest || manifest.version !== 1) throw new TypeError("Unsupported Meeko application manifest; rebuild the application");
@@ -217,6 +338,7 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
     };
     const pageOptions: PageHandlerOptions = {
       routes: manifest.routes,
+      ...(manifest.errorPage ? { errorPage: manifest.errorPage } : {}),
       loadPage: async (key) => {
         const module = await load(key) as PageModule | undefined;
         if (!module || typeof module.renderWithState !== "function") throw new Error(`Invalid page module: ${key}`);
@@ -276,15 +398,16 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
         ...(typeof sessions.cookieName === "string" ? { sessionCookieName: sessions.cookieName } : {}),
       };
     }
+    // href(id) in API, RPC and server middleware uses this application's manifest.
     const run = (platform: ServerPlatform, handler: () => Promise<Response>): Promise<Response> =>
-      platformStore.run(platform, async () => {
+      platformStore.run(platform, () => withRouteManifest(manifest.routes, async () => {
         try { return await handler(); }
         catch (error) {
           const requestId = crypto.randomUUID();
           observeServerError(error, requestId, reportError);
           return errorResponse(error, requestId);
         }
-      });
+      }));
     const app: InternalServerApp = {
       fetch(request, platform = basePlatform) {
         return run(platform, async () => {

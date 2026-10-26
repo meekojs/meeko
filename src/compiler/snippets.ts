@@ -1,0 +1,51 @@
+import ts from "@typescript/typescript6";
+
+/** `const name = defineSnippets<T>()` accepted by the compiler. */
+export interface SnippetsDeclaration {
+  readonly declaration: ts.VariableDeclaration & { readonly name: ts.Identifier };
+  readonly typeArgument: ts.TypeNode;
+}
+
+export class SnippetsError extends Error {
+  constructor(readonly code: string, message: string, readonly node: ts.Node) {
+    super(message);
+  }
+}
+
+/** Whether `node` is the identifier of a `defineSnippets` reference, not a property name. */
+function isMacroReference(node: ts.Node): node is ts.Identifier {
+  if (!ts.isIdentifier(node) || node.text !== "defineSnippets") return false;
+  const parent = node.parent;
+  if (ts.isPropertyAccessExpression(parent) && parent.name === node) return false;
+  if ((ts.isPropertyAssignment(parent) || ts.isPropertySignature(parent) || ts.isPropertyDeclaration(parent) || ts.isMethodDeclaration(parent)) && parent.name === node) return false;
+  return true;
+}
+
+/**
+ * Finds the only `defineSnippets` of a script. It must be called once, in its own top-level
+ * `const` with a simple name, with one type argument and no runtime arguments.
+ */
+export function analyzeSnippets(file: ts.SourceFile): SnippetsDeclaration | undefined {
+  let found: SnippetsDeclaration | undefined;
+  const visit = (node: ts.Node): void => {
+    if (isMacroReference(node)) {
+      const call = node.parent;
+      const declaration = ts.isCallExpression(call) && call.expression === node ? call.parent : undefined;
+      const list = declaration && ts.isVariableDeclaration(declaration) ? declaration.parent : undefined;
+      const valid = declaration !== undefined && ts.isVariableDeclaration(declaration) && declaration.initializer === call
+        && ts.isIdentifier(declaration.name)
+        && list !== undefined && ts.isVariableDeclarationList(list) && (list.flags & ts.NodeFlags.Const) !== 0 && list.declarations.length === 1
+        && ts.isVariableStatement(list.parent) && ts.isSourceFile(list.parent.parent);
+      if (!valid || found) {
+        throw new SnippetsError("MEEK059", "defineSnippets debe aparecer una sola vez, en su propia declaración const de nivel superior con un nombre simple", node);
+      }
+      const typed = call as ts.CallExpression;
+      if (typed.typeArguments?.length !== 1) throw new SnippetsError("MEEK060", "defineSnippets necesita un argumento de tipo, como defineSnippets<{ default: [] }>()", typed);
+      if (typed.arguments.length > 0) throw new SnippetsError("MEEK060", "defineSnippets no admite argumentos en tiempo de ejecución; declara los snippets en su argumento de tipo", typed.arguments[0]!);
+      found = { declaration: declaration as SnippetsDeclaration["declaration"], typeArgument: typed.typeArguments[0]! };
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return found;
+}

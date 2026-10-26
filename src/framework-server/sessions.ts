@@ -1,36 +1,95 @@
 import { ApiError, SessionRevokedError } from "./contracts.js";
 import type { Unsubscribe } from "./socket.js";
 
+/**
+ * Registro de una sesión en el store. El ID es opaco y aleatorio; `familyId` se conserva al rotar.
+ *
+ * @typeParam T Datos de la aplicación en la sesión.
+ * @example
+ * ```ts
+ * const handle = context.session;
+ * const record = await handle.create({ userId: "u_123" });
+ * console.log(record.id !== record.familyId, new Date(record.expiresAt));
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#sesiones-y-seguridad
+ */
 export interface SessionRecord<T = unknown> {
+  /** ID opaco de la sesión, el valor de la cookie. */
   id: string;
-  /** Stable opaque lineage for atomic revocation after one or more rotations. */
+  /** Linaje opaco y estable para revocar de forma atómica tras una o varias rotaciones. */
   familyId?: string;
+  /** Token CSRF de la sesión; cambia en cada rotación. */
   csrfToken: string;
+  /** Datos de la aplicación. */
   data: T;
+  /** Fecha de creación, en milisegundos desde la época. */
   createdAt: number;
+  /** Fecha de caducidad, en milisegundos desde la época. */
   expiresAt: number;
 }
 
+/**
+ * Almacén de sesiones. En producción `SessionManager` exige `persistent: true`, `replace` atómico y
+ * `revokeFamily`. Meeko incluye `MemorySessionStore` (desarrollo), `RedisSessionStore` y
+ * `SqlSessionStore`.
+ *
+ * @typeParam T Datos de la aplicación en la sesión.
+ * @example
+ * ```ts
+ * import type { SessionRecord, SessionStore } from "@meekojs/meeko/server";
+ *
+ * class LoggingStore<T> implements SessionStore<T> {
+ *   readonly persistent = true;
+ *   constructor(private readonly inner: Required<SessionStore<T>>) {}
+ *   get(id: string) { return this.inner.get(id); }
+ *   set(record: SessionRecord<T>) { return this.inner.set(record); }
+ *   delete(id: string) { return this.inner.delete(id); }
+ *   replace(previousId: string, record: SessionRecord<T>) { return this.inner.replace(previousId, record); }
+ *   async revokeFamily(familyId: string) { console.info("revoke", familyId); await this.inner.revokeFamily(familyId); }
+ * }
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#sesiones-y-seguridad
+ */
 export interface SessionStore<T = unknown> {
-  /** Explicitly acknowledge that records survive application process restarts. */
+  /** Declara de forma explícita que los registros sobreviven a los reinicios del proceso. */
   readonly persistent?: boolean;
+  /** Lee la sesión activa con ese ID, o `undefined` si no existe, caducó o ya no es la activa de su familia. */
   get(id: string): Promise<SessionRecord<T> | undefined>;
+  /** Guarda una sesión nueva. */
   set(record: SessionRecord<T>): Promise<void>;
+  /** Borra una sesión. */
   delete(id: string): Promise<void>;
-  /** Atomically replace an existing id; false means it no longer exists. */
+  /** Sustituye de forma atómica un ID existente de la misma familia; `false` si ya no existe. */
   replace?(previousId: string, record: SessionRecord<T>): Promise<boolean>;
-  /** Atomically revoke the currently active id in this family, even from a stale handle. */
+  /** Revoca de forma atómica el ID activo de la familia, aunque el handle sea anterior a una rotación. */
   revokeFamily?(familyId: string): Promise<void>;
   /**
-   * Notifies `revokeFamily` calls from every instance sharing the store, so
-   * in-flight requests and live sockets of that family stop. Resolves once
-   * notifications are flowing.
+   * Notifica las llamadas a `revokeFamily` de todas las instancias que comparten el store, para que
+   * se detengan las peticiones en curso y los sockets de esa familia. Se resuelve cuando las
+   * notificaciones ya llegan.
    */
   subscribeRevocations?(listener: (familyId: string) => void): Unsubscribe | Promise<Unsubscribe>;
+  /** Libera los recursos propios del store. */
   close?(): Promise<void>;
 }
 
+/**
+ * Store de sesiones en memoria, sólo para desarrollo: no es persistente y `SessionManager` lo
+ * rechaza en producción. Avisa de las revocaciones a los gestores del mismo proceso.
+ *
+ * @typeParam T Datos de la aplicación en la sesión.
+ * @example
+ * ```ts
+ * import { defineServerRuntime, MemorySessionStore, SessionManager } from "@meekojs/meeko/server";
+ *
+ * export default defineServerRuntime(({ production, prerendering }) => ({
+ *   sessions: new SessionManager({ store: new MemorySessionStore(), production: production && !prerendering }),
+ * }));
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#sesiones-y-seguridad
+ */
 export class MemorySessionStore<T = unknown> implements SessionStore<T> {
+  /** Marca el store como exclusivo de desarrollo. */
   readonly developmentOnly = true;
   readonly persistent = false;
   private readonly records = new Map<string, SessionRecord<T>>();
@@ -81,7 +140,7 @@ export class MemorySessionStore<T = unknown> implements SessionStore<T> {
       catch (error) { console.error("[meeko] Session revocation listener failed", error); }
     }
   }
-  /** Notifies managers sharing this store within the same process. */
+  /** Avisa a los gestores que comparten este store dentro del mismo proceso. */
   subscribeRevocations(listener: (familyId: string) => void): Unsubscribe {
     this.revocationListeners.add(listener);
     return () => { this.revocationListeners.delete(listener); };
@@ -89,13 +148,39 @@ export class MemorySessionStore<T = unknown> implements SessionStore<T> {
   async close(): Promise<void> { this.records.clear(); this.families.clear(); }
 }
 
+/**
+ * Opciones de {@link SessionManager}.
+ *
+ * @typeParam T Datos de la aplicación en la sesión.
+ * @example
+ * ```ts
+ * import { SessionManager } from "@meekojs/meeko/server";
+ * import type { SessionOptions } from "@meekojs/meeko/server";
+ *
+ * const options: SessionOptions<{ userId: string }> = {
+ *   store,
+ *   production: true,
+ *   ttlMs: 24 * 60 * 60 * 1000,
+ *   sameSite: "Strict",
+ *   allowedOrigins: ["https://admin.example.com"],
+ * };
+ * const sessions = new SessionManager(options);
+ * ```
+ */
 export interface SessionOptions<T> {
+  /** Store de las sesiones. */
   store: SessionStore<T>;
+  /** Exige un store persistente con `replace` y `revokeFamily`. */
   production?: boolean;
+  /** Duración de la sesión en milisegundos; 7 días por defecto. */
   ttlMs?: number;
+  /** Cookie `Secure`; `true` por defecto. */
   secure?: boolean;
+  /** Atributo `SameSite` de la cookie; `"Lax"` por defecto. `"None"` exige `secure`. */
   sameSite?: "Lax" | "Strict" | "None";
+  /** Nombre de la cookie; por defecto `__Host-meeko.sid`, o `meeko.sid` sin `secure`. */
   cookieName?: string;
+  /** Orígenes adicionales aceptados en las mutaciones autenticadas. */
   allowedOrigins?: readonly string[];
 }
 
@@ -250,6 +335,30 @@ export function trackedSessionHandles(manager: SessionManager<any>): number {
   return registries.get(manager)?.handleCount ?? 0;
 }
 
+/**
+ * Sesión de una petición, en `RequestContext.session`: lee la sesión actual y la crea, rota o
+ * revoca. Los cambios se envían en la cookie de la respuesta. Tras el primer byte de una respuesta
+ * en streaming, `create`, `rotate` y `revoke` fallan con `SESSION_LOCKED`.
+ *
+ * @typeParam T Datos de la aplicación en la sesión.
+ * @example
+ * ```ts
+ * // server/rpc/auth/login.ts
+ * import { defineRpc } from "@meekojs/meeko/server";
+ *
+ * export default defineRpc({
+ *   input: loginInput,
+ *   output: loginOutput,
+ *   handler: async ({ input, context }) => {
+ *     const user = await verifyPassword(input.email, input.password);
+ *     // Sustituye la sesión anónima, si la hay, con un ID y un token CSRF nuevos.
+ *     await context.session.create({ userId: user.id });
+ *     return { ok: true };
+ *   },
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#sesiones-y-seguridad
+ */
 export class SessionHandle<T = unknown> {
   private pendingCookie?: string;
   private cookieLocked = false;
@@ -257,25 +366,44 @@ export class SessionHandle<T = unknown> {
   private readonly mutations = new Set<Promise<void>>();
   private readonly revocation = new AbortController();
   private watched: { readonly familyId: string; readonly ref: WeakRef<AbortController> | undefined } | undefined;
+  /**
+   * @param manager Gestor que creó el handle.
+   * @param current Sesión activa, si la petición trae una válida.
+   */
   constructor(private readonly manager: SessionManager<T>, public current?: SessionRecord<T>) {
     signalControllers.set(this.revocation.signal, this.revocation);
     this.watch();
   }
+  /** Cabecera `Set-Cookie` pendiente tras crear, rotar o revocar, o `undefined`. */
   get cookieHeader(): string | undefined { return this.pendingCookie; }
   /**
-   * Aborts with `SessionRevokedError` when another request or instance revokes
-   * this session's family. `RequestContext.signal` includes it.
+   * Se aborta con `SessionRevokedError` cuando otra petición u otra instancia revoca la familia de
+   * esta sesión. `RequestContext.signal` la incluye.
    */
   get signal(): AbortSignal { return this.revocation.signal; }
+  /**
+   * Crea una sesión nueva con `data`, con ID, familia y token CSRF aleatorios, y prepara la cookie.
+   * Si ya hay una sesión, la sustituye de forma atómica conservando su familia.
+   */
   async create(data: T): Promise<SessionRecord<T>> {
     return this.mutate(() => this.write(data));
   }
+  /**
+   * Cambia el ID y el token CSRF de la sesión actual conservando sus datos y su familia, por
+   * ejemplo tras iniciar sesión.
+   * @throws {Error} Si no hay sesión, ha caducado o fue revocada.
+   */
   async rotate(): Promise<SessionRecord<T>> {
     return this.mutate(async () => {
       if (!this.current) throw new Error("No active session to rotate");
       return this.write(this.current.data);
     });
   }
+  /**
+   * Revoca toda la familia de la sesión, también en las demás peticiones e instancias, y vacía la
+   * cookie. La petición que llama no se aborta.
+   * @throws {Error} Si el store no implementa `revokeFamily`.
+   */
   async revoke(): Promise<void> {
     return this.mutate(async () => {
       if (this.current) {
@@ -322,9 +450,9 @@ export class SessionHandle<T = unknown> {
     return record;
   }
   /**
-   * Re-reads the store and throws `SessionRevokedError` (`401 SESSION_REVOKED`)
-   * when this session was revoked, replaced by a rotation or expired. Call it
-   * before irreversible side effects; without a session it does nothing.
+   * Relee el store y lanza `SessionRevokedError` (`401 SESSION_REVOKED`) si esta sesión fue
+   * revocada, sustituida por una rotación o caducó. Llámelo antes de efectos irreversibles; sin
+   * sesión no hace nada.
    */
   async verify(): Promise<void> {
     if (this.revocation.signal.aborted) throw new SessionRevokedError();
@@ -345,13 +473,47 @@ export class SessionHandle<T = unknown> {
   }
 }
 
+/**
+ * Gestor de sesiones de la aplicación: cookies opacas `HttpOnly`, host-only y `Secure` por defecto,
+ * rotación y revocación por familia, y comprobación de Origin y CSRF en las mutaciones
+ * autenticadas. Se declara en `server/runtime.ts`.
+ *
+ * @typeParam T Datos de la aplicación en la sesión.
+ * @example
+ * ```ts
+ * // server/runtime.ts
+ * import { createClient } from "redis";
+ * import { defineServerRuntime, RedisSessionStore, SessionManager } from "@meekojs/meeko/server";
+ *
+ * export default defineServerRuntime(async ({ env, production, prerendering }) => {
+ *   const redis = createClient({ url: env.REDIS_URL });
+ *   await redis.connect();
+ *   return {
+ *     sessions: new SessionManager({ store: new RedisSessionStore(redis, { prefix: "app:prod:session:" }), production: production && !prerendering }),
+ *     close: async () => { await redis.quit(); },
+ *   };
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#sesiones-y-seguridad
+ */
 export class SessionManager<T = unknown> {
+  /** Store de las sesiones. */
   readonly store: SessionStore<T>;
+  /** Duración de las sesiones en milisegundos. */
   readonly ttlMs: number;
+  /** Nombre de la cookie de sesión. */
   readonly cookieName: string;
+  /** Orígenes adicionales aceptados en las mutaciones autenticadas. */
   readonly allowedOrigins: readonly string[];
   private readonly secure: boolean;
   private readonly sameSite: "Lax" | "Strict" | "None";
+  /**
+   * @param options Store, modo producción y política de la cookie.
+   * @throws {Error} En producción con un store no persistente o sin `replace` y `revokeFamily`, o con
+   * una combinación de cookie inválida (`SameSite=None` o `__Host-` sin `Secure`).
+   * @throws {RangeError} Si `ttlMs` no es un entero positivo.
+   * @throws {TypeError} Si el nombre de la cookie no es válido.
+   */
   constructor(options: SessionOptions<T>) {
     if (options.production && (options.store.persistent !== true || !options.store.replace || !options.store.revokeFamily)) throw new Error("Persistent session storage with atomic rotation and family revocation is required in production");
     this.store = options.store;
@@ -365,6 +527,7 @@ export class SessionManager<T = unknown> {
     if (this.cookieName.startsWith("__Host-") && !this.secure) throw new Error("__Host- cookies require Secure");
     this.allowedOrigins = options.allowedOrigins ?? [];
   }
+  /** Serializa la cabecera `Set-Cookie` de la sesión con la política del gestor; `ttlMs` 0 la borra. */
   serializeCookie(value: string, ttlMs: number): string {
     const parts = [`${this.cookieName}=${value}`, "Path=/", "HttpOnly", `SameSite=${this.sameSite}`, `Max-Age=${Math.floor(ttlMs / 1000)}`];
     if (this.secure) parts.push("Secure");
@@ -384,6 +547,11 @@ export class SessionManager<T = unknown> {
       });
     return subscription;
   }
+  /**
+   * Lee la cookie de la petición y devuelve su {@link SessionHandle}, sin sesión si falta, no es
+   * válida o caducó. La primera llamada se suscribe a las revocaciones del store y espera la
+   * confirmación; si falla, rechaza y la siguiente lo reintenta.
+   */
   async load(request: Request): Promise<SessionHandle<T>> {
     // Revocations from other instances must be flowing before a request is authenticated.
     await this.listenForRevocations();
@@ -395,6 +563,7 @@ export class SessionManager<T = unknown> {
     }
     return new SessionHandle(this, record);
   }
+  /** Cancela la suscripción a revocaciones y cierra el store; no cierra clientes externos como Redis. */
   async close(): Promise<void> {
     const subscription = this.revocations;
     this.revocations = undefined;
@@ -410,7 +579,11 @@ export class SessionManager<T = unknown> {
     if (failures.length === 1) throw failures[0];
     if (failures.length > 1) throw new AggregateError(failures, "Session revocation unsubscribe and store close failed");
   }
-  /** Apply both Origin and token checks to authenticated cookie mutations. */
+  /**
+   * Comprueba Origin y el token `x-meeko-csrf` en las mutaciones autenticadas con cookie. Las
+   * peticiones sin sesión o de lectura pasan.
+   * @throws {SessionSecurityError} `INVALID_ORIGIN` o `INVALID_CSRF`.
+   */
   assertMutationAllowed(request: Request, session: SessionHandle<T>, mutating = !["GET", "HEAD", "OPTIONS"].includes(request.method)): void {
     if (!session.current || !mutating) return;
     const origin = request.headers.get("origin");
@@ -420,6 +593,23 @@ export class SessionManager<T = unknown> {
   }
 }
 
+/**
+ * Una mutación autenticada no superó la comprobación de Origin o de CSRF. Las respuestas de API y
+ * RPC la convierten en `403` con su código.
+ *
+ * @example
+ * ```ts
+ * import { SessionSecurityError } from "@meekojs/meeko/server";
+ *
+ * try {
+ *   sessions.assertMutationAllowed(request, session);
+ * } catch (error) {
+ *   if (error instanceof SessionSecurityError) return new Response(error.code, { status: 403 });
+ *   throw error;
+ * }
+ * ```
+ */
 export class SessionSecurityError extends Error {
+  /** @param code `INVALID_ORIGIN` o `INVALID_CSRF`. */
   constructor(public readonly code: "INVALID_ORIGIN" | "INVALID_CSRF") { super(code); }
 }

@@ -1,0 +1,236 @@
+<script lang="ts">
+import { computed, signal } from "@meekojs/meeko";
+import type { SearchResult } from "../utils/search.js";
+
+const dialog = useElementRef("dialog");
+const input = useElementRef("input");
+const query = signal("");
+const results = signal<readonly SearchResult[]>([]);
+const status = signal<"idle" | "loading" | "ready" | "empty" | "unavailable">("idle");
+/** Index of the highlighted link among every result and section link. */
+const active = signal(0);
+/** URLs of every link of the results in order: each page, then its sections. */
+const order = computed(() => results.value.flatMap((result) => [result.url, ...result.sections.map((section) => section.url)]));
+const activeUrl = computed(() => order.value[active.value]);
+let request = 0;
+let timer: ReturnType<typeof setTimeout> | undefined;
+
+function open(): void {
+  const element = dialog.value;
+  if (!element || element.open) return;
+  preloadSearch();
+  element.showModal();
+  input.value?.select();
+}
+
+function close(): void {
+  dialog.value?.close();
+}
+
+/** The link of the results at `index`, in the order of `order`. */
+function link(index: number): HTMLAnchorElement | undefined {
+  return dialog.value?.querySelectorAll<HTMLAnchorElement>("a[data-result]")[index];
+}
+
+function move(step: number): void {
+  const count = order.value.length;
+  if (!count) return;
+  active.value = (active.value + step + count) % count;
+  link(active.value)?.scrollIntoView({ block: "nearest" });
+}
+
+function onKeydown(event: KeyboardEvent): void {
+  if (event.key === "ArrowDown") { event.preventDefault(); move(1); }
+  else if (event.key === "ArrowUp") { event.preventDefault(); move(-1); }
+  else if (event.key === "Enter") {
+    const target = link(active.value);
+    if (target) { event.preventDefault(); target.click(); }
+  }
+}
+
+/** A click on the backdrop, outside the panel, closes the dialog. */
+function onDialogClick(event: MouseEvent): void {
+  if (event.target === dialog.value) close();
+}
+
+async function run(text: string, id: number): Promise<void> {
+  try {
+    const found = await searchDocs(text);
+    if (id !== request) return;
+    results.value = found;
+    active.value = 0;
+    status.value = found.length ? "ready" : "empty";
+  } catch {
+    if (id === request) status.value = "unavailable";
+  }
+}
+
+effect(() => {
+  const text = query.value.trim();
+  const id = ++request;
+  if (timer !== undefined) clearTimeout(timer);
+  if (!text) {
+    results.value = [];
+    status.value = "idle";
+    return;
+  }
+  status.value = "loading";
+  timer = setTimeout(() => { void run(text, id); }, 120);
+});
+
+onMounted(() => {
+  const onShortcut = (event: KeyboardEvent): void => {
+    const target = event.target as HTMLElement | null;
+    const typing = target?.isContentEditable || /^(?:input|textarea|select)$/i.test(target?.tagName ?? "");
+    if ((event.key === "k" || event.key === "K") && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      open();
+    } else if (event.key === "/" && !typing && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      open();
+    }
+  };
+  document.addEventListener("keydown", onShortcut);
+  return () => {
+    document.removeEventListener("keydown", onShortcut);
+    if (timer !== undefined) clearTimeout(timer);
+  };
+});
+</script>
+
+<template>
+  <button type="button" class="search-trigger" on:click="open" aria-label="Buscar en la documentación">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+    <span class="label">Buscar</span>
+    <kbd>/</kbd>
+  </button>
+  <dialog ref:dialog class="search" aria-label="Buscar en la documentación" on:click="onDialogClick" on:keydown="onKeydown">
+    <div class="panel">
+      <div class="field">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+        <input ref:input id="meeko-search" name="q" type="search" model="query" placeholder="Buscar: signals, defineModel, prerender…" autocomplete="off" spellcheck="false" aria-label="Texto de búsqueda" />
+        <button type="button" class="close" on:click="close">Esc</button>
+      </div>
+      <p class="hint" if:when="status.value === 'idle'">Escribe para buscar en toda la documentación. Abre la búsqueda con <kbd>/</kbd> o <kbd>Ctrl</kbd> <kbd>K</kbd>.</p>
+      <p class="hint" if:when="status.value === 'loading'">Buscando…</p>
+      <p class="hint" if:when="status.value === 'empty'">Sin resultados para «{query.value.trim()}».</p>
+      <p class="hint" if:when="status.value === 'unavailable'">El índice de búsqueda se genera con <code>pnpm run build</code>; no existe en <code>meeko dev</code>.</p>
+      <ol class="results" if:when="status.value === 'ready'">
+        <li each:of="results.value" each:as="result" each:key="result.url">
+          <a data-result bind:href="result.url" on:click="close" bind:class="activeUrl.value === result.url ? 'page active' : 'page'">
+            <strong>{result.title}</strong>
+            <span class="excerpt" html="result.excerpt"></span>
+          </a>
+          <ul class="sections" if:when="result.sections.length > 0">
+            <li each:of="result.sections" each:as="section" each:key="section.url">
+              <a data-result bind:href="section.url" on:click="close" bind:class="activeUrl.value === section.url ? 'active' : undefined">
+                <strong>{section.title}</strong>
+                <span class="excerpt" html="section.excerpt"></span>
+              </a>
+            </li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+  </dialog>
+</template>
+
+<style scoped>
+.search-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 11rem;
+  height: 38px;
+  padding: 0 0.5rem 0 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.search-trigger:hover { border-color: var(--accent); color: var(--ink); }
+.search-trigger .label { flex: 1; text-align: left; }
+svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+kbd {
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--muted);
+  font: 600 0.75rem/1.4 var(--font-mono);
+}
+.search {
+  width: min(42rem, calc(100vw - 2rem));
+  max-height: min(36rem, calc(100dvh - 4rem));
+  margin: 8vh auto auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg);
+  color: var(--ink);
+  box-shadow: var(--shadow-lg);
+}
+.search::backdrop { background: rgb(22 16 13 / 0.45); backdrop-filter: blur(3px); }
+.panel { display: flex; flex-direction: column; max-height: inherit; }
+.field {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+.field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1.05rem;
+}
+.close {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  font: 600 0.75rem var(--font-mono);
+  padding: 0.2rem 0.45rem;
+  cursor: pointer;
+}
+.hint { margin: 0; padding: 1.25rem 1rem; color: var(--muted); font-size: 0.92rem; }
+.hint code { font-size: 0.85em; }
+.results { margin: 0; padding: 0.5rem; overflow-y: auto; list-style: none; }
+.results li { margin: 0; }
+.sections { margin: 0 0 0.35rem 1rem; padding: 0 0 0 0.6rem; border-left: 2px solid var(--line); list-style: none; }
+a {
+  display: block;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  color: var(--ink);
+  text-decoration: none;
+}
+a strong { display: block; font-size: 0.95rem; }
+a:hover, a.active { background: var(--accent-soft); }
+.excerpt { display: block; margin-top: 0.15rem; color: var(--muted); font-size: 0.85rem; line-height: 1.45; }
+.excerpt :global(mark) { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1px; }
+@media (max-width: 640px) {
+  .search-trigger { min-width: 0; width: 38px; padding: 0; justify-content: center; }
+  .search-trigger .label, .search-trigger kbd { display: none; }
+  .search { margin-top: 1rem; }
+}
+</style>

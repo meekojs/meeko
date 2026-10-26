@@ -1,11 +1,15 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
+import { discoverAutoImports } from "../autoimports.js";
+import { autoImportCompilerHost, autoImportSourceReader } from "../autoimports-ts.js";
+import { resolveConfigSources } from "./config.js";
 import { discoverServerManifest } from "../framework-server/manifest-discovery.js";
 import { standardSchemaTypes } from "./standard-schema-types.js";
 
 interface ImportedSymbol { file: string; exported: string; }
 interface SchemaReference { file: string; exported: string; }
+type ReadSource = (file: string) => string | undefined;
 
 function inside(parent: string, child: string): boolean {
   const path = relative(parent, child);
@@ -26,16 +30,17 @@ function resolveImport(specifier: string, importer: string, options: ts.Compiler
   return target;
 }
 
-function validateSharedGraph(file: string, root: string, shared: string, options: ts.CompilerOptions, seen: Set<string>): void {
+function validateSharedGraph(file: string, root: string, shared: string, options: ts.CompilerOptions, seen: Set<string>, read: ReadSource): void {
   if (seen.has(file)) return;
   seen.add(file);
   if (!inside(shared, file)) throw new Error(`${file}: public Socket schema must stay inside shared/`);
-  const source = ts.sys.readFile(file);
+  // Autoimported dependencies appear as the imports that the Vite transform adds.
+  const source = read(file);
   if (source === undefined) throw new Error(`${file}: Socket schema file missing`);
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
   const check = (specifier: string): void => {
     const target = resolveImport(specifier, file, options);
-    if (inside(root, target) && !relative(root, target).split(sep).includes("node_modules")) validateSharedGraph(target, root, shared, options, seen);
+    if (inside(root, target) && !relative(root, target).split(sep).includes("node_modules")) validateSharedGraph(target, root, shared, options, seen, read);
   };
   for (const statement of ast.statements) {
     if ((ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) && statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) check(statement.moduleSpecifier.text);
@@ -53,7 +58,7 @@ function property(object: ts.ObjectLiteralExpression, name: string): ts.Expressi
   return ts.isPropertyAssignment(entry) ? entry.initializer : ts.isShorthandPropertyAssignment(entry) ? entry.name : undefined;
 }
 
-function publicSchemas(file: string, root: string, options: ts.CompilerOptions, program: ts.Program, checker: ts.TypeChecker): { clientToServer: Record<string, SchemaReference>; serverToClient: Record<string, SchemaReference> } {
+function publicSchemas(file: string, root: string, options: ts.CompilerOptions, program: ts.Program, checker: ts.TypeChecker, read: ReadSource): { clientToServer: Record<string, SchemaReference>; serverToClient: Record<string, SchemaReference> } {
   const ast = program.getSourceFile(file);
   if (!ast) throw new Error(`${file}: Socket channel file missing`);
   const imports = new Map<string, ImportedSymbol>();
@@ -95,7 +100,7 @@ function publicSchemas(file: string, root: string, options: ts.CompilerOptions, 
       const exported = imported.exported === "*" ? member : imported.exported;
       if (!exported || (member && imported.exported !== "*")) throw new Error(`${file}: ${name}.${event} must reference one shared export`);
       standardSchemaTypes(value, checker, () => new Error(`${file}: ${name}.${event} must expose concrete Standard Schema input and output types`));
-      validateSharedGraph(imported.file, root, shared, options, seen);
+      validateSharedGraph(imported.file, root, shared, options, seen, read);
       if (result[event]) throw new Error(`${file}: duplicate Socket event ${name}.${event}`);
       result[event] = { file: imported.file, exported };
     }
@@ -110,9 +115,16 @@ export async function generateSocketContracts(projectRoot: string): Promise<{ fi
   const manifest = await discoverServerManifest(root);
   const output = join(root, ".meeko", "generated", "socket-contracts.ts");
   const options = compilerOptions(root);
-  const program = ts.createProgram((manifest.socket ?? []).map((endpoint) => endpoint.file), { ...options, noEmit: true });
+  const files = (manifest.socket ?? []).map((endpoint) => endpoint.file);
+  // Channels and shared schemas are read as Vite runs them, so an autoimported schema
+  // resolves to its shared/ file instead of an unknown global.
+  const read = files.length > 0
+    ? autoImportSourceReader(root, await discoverAutoImports(root), (await resolveConfigSources(root)).map((source) => source.root))
+    : (file: string) => ts.sys.readFile(file);
+  const programOptions = { ...options, noEmit: true };
+  const program = ts.createProgram({ rootNames: files, options: programOptions, host: autoImportCompilerHost(programOptions, read) });
   const checker = program.getTypeChecker();
-  const channels = (manifest.socket ?? []).map((endpoint) => ({ name: endpoint.name, schemas: publicSchemas(endpoint.file, root, options, program, checker) }));
+  const channels = (manifest.socket ?? []).map((endpoint) => ({ name: endpoint.name, schemas: publicSchemas(endpoint.file, root, options, program, checker, read) }));
   const sources = [...new Set(channels.flatMap(({ schemas }) => [...Object.values(schemas.clientToServer), ...Object.values(schemas.serverToClient)].map((entry) => entry.file)))].sort();
   const aliases = new Map(sources.map((file, index) => [file, `__schema${index}`]));
   const lines = sources.map((file) => {

@@ -1,34 +1,90 @@
 import { signal } from "../reactivity.js";
 import type { Signal } from "../reactivity.js";
 
-/** Lifecycle of a value returned with `defer`. */
+/**
+ * Estado de un valor devuelto con `defer`. Puede ganar miembros en un minor: un `switch`
+ * exhaustivo necesita rama por defecto.
+ *
+ * @example
+ * ```ts
+ * import type { DeferredStatus } from "@meekojs/meeko/framework";
+ *
+ * const labels: Record<DeferredStatus, string> = { pending: "Cargando…", resolved: "Listo", rejected: "Error" };
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#streaming-ssr-render-stream
+ */
 export type DeferredStatus = "pending" | "resolved" | "rejected";
 
-/** Public failure of a deferred value; private details stay in the server's `onError`. */
+/**
+ * Fallo público de un valor diferido. Los detalles privados se quedan en el `onError` del
+ * servidor: un `ApiError` conserva su código y estado, y cualquier otro error llega como
+ * `INTERNAL_ERROR`/`500`. Un plazo agotado es `DEFERRED_TIMEOUT`/`504`.
+ *
+ * @example
+ * ```html
+ * <p if:when="props.data.comments.status === 'rejected'">
+ *   No se pudieron cargar ({props.data.comments.error?.code}).
+ * </p>
+ * ```
+ */
 export interface DeferredError {
+  /** Código público, como `DEFERRED_TIMEOUT` o `SESSION_REVOKED`. */
   readonly code: string;
+  /** Estado HTTP equivalente. */
   readonly status: number;
 }
 
+/**
+ * Opciones de {@link defer}.
+ *
+ * @example
+ * ```ts
+ * import { defer } from "@meekojs/meeko/framework";
+ *
+ * const comments = defer((signal) => fetch("/api/comments", { signal }).then((r) => r.json()), { timeoutMs: 5_000 });
+ * ```
+ */
 export interface DeferOptions {
-  /** Milliseconds, counted from when the loader returns; defaults to 10 000. */
+  /** Plazo en milisegundos, contado desde que el loader devuelve; 10 000 por defecto. */
   readonly timeoutMs?: number;
 }
 
 /**
- * Starts deferred work when the loader returns. `signal` aborts when the value
- * stops being awaited: timeout, client disconnect, session revocation, a
- * cancelled stream, a `HEAD` request or, in the browser, leaving the route.
+ * Fábrica de un valor diferido: Meeko la llama cuando el loader devuelve. `signal` se aborta cuando
+ * el valor deja de esperarse: plazo agotado, cliente desconectado, sesión revocada, stream
+ * cancelado, petición `HEAD` o, en el navegador, al salir de la ruta.
+ *
+ * @example
+ * ```ts
+ * import type { DeferredFactory } from "@meekojs/meeko/framework";
+ *
+ * const loadComments: DeferredFactory<string[]> = async (signal) => {
+ *   const response = await fetch("https://api.example.com/comments", { signal });
+ *   return response.json();
+ * };
+ * ```
  */
 export type DeferredFactory<T> = (signal: AbortSignal) => PromiseLike<T> | T;
 
 /**
- * A loader value that may arrive after the page. Reading `status`, `value` or
- * `error` inside a template or effect subscribes to its settlement.
+ * Valor del loader que puede llegar después de la página. Leer `status`, `value` o `error` en una
+ * plantilla o un `effect` se suscribe a su resultado.
+ *
+ * @example
+ * ```html
+ * <p if:when="props.data.comments.status === 'pending'">Cargando comentarios…</p>
+ * <ul if:when="props.data.comments.status === 'resolved'">
+ *   <li each:of="props.data.comments.value ?? []" each:as="comment">{comment.text}</li>
+ * </ul>
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#streaming-ssr-render-stream
  */
 export interface Deferred<T> {
+  /** `"pending"` hasta que el valor se resuelve o se rechaza. */
   readonly status: DeferredStatus;
+  /** Valor resuelto, o `undefined` mientras no lo está. */
   readonly value: T | undefined;
+  /** Fallo público si se rechazó. */
   readonly error: DeferredError | undefined;
 }
 
@@ -87,13 +143,40 @@ class DeferredValue<T> implements DeferredInternals<T> {
 }
 
 /**
- * Lets a `render: "stream"` page send its HTML before the value settles. With
- * `render: "ssr"` or `"prerender"` the server awaits it before rendering, so
- * the HTML always contains the settled value. A factory receives an
- * `AbortSignal` that aborts when the value stops being awaited; a promise that
- * is already running is only abandoned.
+ * Marca un dato del loader que puede llegar después de la página. Con `render: "stream"` el HTML
+ * se envía antes de que el valor se resuelva y el valor llega después por la misma respuesta. Con
+ * `"ssr"` o `"prerender"` el servidor lo espera antes de renderizar, así que el HTML siempre lo
+ * contiene. Una fábrica recibe un `AbortSignal` que se aborta cuando el valor deja de esperarse.
+ *
+ * @param factory Fábrica que Meeko llama cuando el loader devuelve.
+ * @param options `timeoutMs`, 10 000 por defecto.
+ * @returns El valor diferido, con `status`, `value` y `error` reactivos.
+ * @throws {RangeError} Si `timeoutMs` no es un número finito positivo.
+ * @example
+ * ```ts
+ * // app/pages/posts/[id].route.ts
+ * import { defer, definePage } from "@meekojs/meeko/framework";
+ *
+ * export const route = definePage({
+ *   render: "stream",
+ *   load: async ({ params }) => ({
+ *     post: await api.posts.get({ params }),
+ *     comments: defer((signal) => api.comments.list({ params, signal }), { timeoutMs: 5_000 }),
+ *   }),
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#streaming-ssr-render-stream
  */
 export function defer<T>(factory: DeferredFactory<T>, options?: DeferOptions): Deferred<T>;
+/**
+ * Marca una promesa ya iniciada como dato diferido. Meeko sólo puede dejar de esperarla, no
+ * cancelarla; use una fábrica para poder abortar el trabajo.
+ *
+ * @param promise Promesa o valor.
+ * @param options `timeoutMs`, 10 000 por defecto.
+ * @returns El valor diferido.
+ * @throws {RangeError} Si `timeoutMs` no es un número finito positivo.
+ */
 export function defer<T>(promise: PromiseLike<T> | T, options?: DeferOptions): Deferred<T>;
 export function defer<T>(source: DeferredFactory<T> | PromiseLike<T> | T, options: DeferOptions = {}): Deferred<T> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_DEFER_TIMEOUT_MS;

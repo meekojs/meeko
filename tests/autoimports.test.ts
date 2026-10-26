@@ -34,14 +34,17 @@ test("autoimports discover nested exports and enforce client/server scope", asyn
     const ssrCode = applyAutoImports("const count = useCount(); const card = UsersCard;", filename, registry, "server");
     assert.match(ssrCode, /import \{ useCount as useCount \}/);
     assert.match(ssrCode, /import \* as UsersCard/);
-    assert.throws(() => applyAutoImports("browserOnly;", filename, registry, "server"), /unavailable in server scope/);
+    assert.throws(() => applyAutoImports("browserOnly;", filename, registry, "server"), /no está disponible en el ámbito server/);
     assert.doesNotMatch(applyAutoImports('import { useCount } from "../composables/count.js"; useCount();', filename, registry, "client"), /as useCount/);
     assert.doesNotMatch(applyAutoImports('const useCount = () => 2; useCount();', filename, registry, "client"), /as useCount/);
     assert.match(applyAutoImports('function inner() { const useCount = () => 2; return useCount(); } const outer = useCount();', filename, registry, "client"), /as useCount/);
-    assert.throws(() => applyAutoImports("secret;", filename, registry, "client"), /unavailable in client scope/);
+    assert.throws(() => applyAutoImports("secret;", filename, registry, "client"), /no está disponible en el ámbito client/);
     assert.match(applyAutoImports("secret;", filename, registry, "server"), /secret\.js/);
     assert.match(applyAutoImports("const state = signal(0);", filename, registry, "client"), /from "@meekojs\/meeko"/);
     assert.match(applyAutoImports("provideErrorHandler((error) => console.error(error));", filename, registry, "client"), /import \{ provideErrorHandler as provideErrorHandler \} from "@meekojs\/meeko"/);
+    // Without generated clients, `useSocket` resolves to `useSocketClient`, not to its deprecated alias.
+    assert.equal(registry.filter((entry) => entry.name === "useSocket").length, 1);
+    assert.match(applyAutoImports('const chat = useSocket("ws://example.test/chat", contract);', filename, registry, "client"), /import \{ useSocketClient as useSocket \} from "@meekojs\/meeko\/framework"/);
     assert.match(applyAutoImports('const value = format("value");', join(root, "app", "pages", "typed.ts"), registry, "client"), /import \{ format as format \}/);
     const component = '<script lang="ts">const count = useCount();</script><template><p>{count}</p></template>';
     const compiled = await compileWithAutoImports(component, filename);

@@ -2,26 +2,60 @@ import { serializeJson } from "../server.js";
 import { ApiError } from "./contracts.js";
 import type { SocketMessage, SocketPubSub, Unsubscribe } from "./socket.js";
 
-/** Listener signature used by node-redis 4+ for `subscribe` and `sSubscribe`. */
+/**
+ * Firma del listener de `subscribe` y `sSubscribe` en node-redis 4 o posterior.
+ *
+ * @example
+ * ```ts
+ * import type { RedisMessageListener } from "@meekojs/meeko/server";
+ *
+ * const listener: RedisMessageListener = (message, channel) => console.log(channel, message.length);
+ * await subscriber.subscribe("app:prod:revoked", listener);
+ * ```
+ */
 export type RedisMessageListener = (message: string, channel: string) => unknown;
 
-/** Publishing side of a Redis client, structurally compatible with node-redis 4+. */
+/**
+ * Lado publicador de un cliente Redis, compatible por estructura con node-redis 4 o posterior.
+ *
+ * @example
+ * ```ts
+ * import { createClient } from "redis";
+ * import type { RedisPublisherClient } from "@meekojs/meeko/server";
+ *
+ * const publisher: RedisPublisherClient = createClient({ url: process.env.REDIS_URL });
+ * ```
+ */
 export interface RedisPublisherClient {
+  /** `PUBLISH` de un mensaje en un canal. */
   publish(channel: string, message: string): Promise<unknown>;
-  /** Redis 7 sharded pub/sub (`SPUBLISH`); required only with `sharded: true`. */
+  /** Pub/sub fragmentado de Redis 7 (`SPUBLISH`); sólo hace falta con `sharded: true`. */
   sPublish?(channel: string, message: string): Promise<unknown>;
 }
 
 /**
- * Dedicated subscriber connection, structurally compatible with node-redis 4+.
- * node-redis requires a separate client (for example `client.duplicate()`) in
- * subscriber mode.
+ * Conexión suscriptora dedicada, compatible por estructura con node-redis 4 o posterior, que exige
+ * un cliente aparte en modo suscriptor (por ejemplo, `client.duplicate()`).
+ *
+ * @example
+ * ```ts
+ * import { createClient } from "redis";
+ * import type { RedisSubscriberClient } from "@meekojs/meeko/server";
+ *
+ * const redis = createClient({ url: process.env.REDIS_URL });
+ * const connection = redis.duplicate();
+ * await connection.connect();
+ * const subscriber: RedisSubscriberClient = connection;
+ * ```
  */
 export interface RedisSubscriberClient {
+  /** `SUBSCRIBE` a un canal con un listener. */
   subscribe(channel: string, listener: RedisMessageListener): Promise<unknown>;
+  /** `UNSUBSCRIBE` de ese listener. */
   unsubscribe(channel: string, listener: RedisMessageListener): Promise<unknown>;
-  /** Redis 7 sharded pub/sub (`SSUBSCRIBE`); required only with `sharded: true`. */
+  /** Pub/sub fragmentado de Redis 7 (`SSUBSCRIBE`); sólo hace falta con `sharded: true`. */
   sSubscribe?(channel: string, listener: RedisMessageListener): Promise<unknown>;
+  /** `SUNSUBSCRIBE`; sólo hace falta con `sharded: true`. */
   sUnsubscribe?(channel: string, listener: RedisMessageListener): Promise<unknown>;
 }
 
@@ -72,18 +106,28 @@ export class RedisChannelSubscriptions<L> {
   }
 }
 
+/**
+ * Opciones de {@link RedisSocketPubSub}.
+ *
+ * @example
+ * ```ts
+ * import type { RedisSocketPubSubOptions } from "@meekojs/meeko/server";
+ *
+ * const options: RedisSocketPubSubOptions = { publisher: redis, subscriber, prefix: "app:prod:", sharded: true };
+ * ```
+ */
 export interface RedisSocketPubSubOptions {
-  /** Regular connection used for `PUBLISH`. */
+  /** Conexión normal que se usa para `PUBLISH`. */
   readonly publisher: RedisPublisherClient;
-  /** Dedicated connection in subscriber mode. */
+  /** Conexión dedicada en modo suscriptor. */
   readonly subscriber: RedisSubscriberClient;
-  /** Unique per application and environment; must end with `:`. */
+  /** Prefijo único por aplicación y entorno; termina en `:`. */
   readonly prefix: string;
-  /** Largest serialized envelope accepted by `publish`. Defaults to 1 MiB. */
+  /** Mensaje serializado más grande que acepta `publish`. Por defecto, 1 MiB. */
   readonly maxMessageBytes?: number;
-  /** Use Redis 7 sharded pub/sub (`SPUBLISH`/`SSUBSCRIBE`), recommended on Redis Cluster. */
+  /** Usa el pub/sub fragmentado de Redis 7 (`SPUBLISH`/`SSUBSCRIBE`), recomendado en Redis Cluster. */
   readonly sharded?: boolean;
-  /** Receives malformed envelopes and listener failures; defaults to `console.error`. */
+  /** Recibe los mensajes mal formados y los fallos de los listeners; por defecto, `console.error`. */
   readonly onError?: (error: unknown, context: { readonly channel: string; readonly room: string }) => void;
 }
 
@@ -101,16 +145,41 @@ function decodeEnvelope(raw: string): SocketMessage {
 }
 
 /**
- * Distributes Socket broadcasts between server instances through Redis
- * pub/sub. Each (channel, room) maps to one Redis channel, subscribed once per
- * instance while it has local peers. Delivery is at most once: messages
- * published while an instance is disconnected are lost.
+ * Reparte los broadcasts de Socket entre instancias del servidor con el pub/sub de Redis. Cada par
+ * canal/sala es un canal Redis (`<prefix>socket:<canal>:<sala>`), al que cada instancia se suscribe
+ * una vez mientras tenga peers locales. La entrega es como mucho una vez: los mensajes publicados
+ * mientras una instancia está desconectada se pierden.
+ *
+ * @example
+ * ```ts
+ * // server/runtime.ts
+ * import { createClient } from "redis";
+ * import { defineServerRuntime, RedisSocketPubSub, SessionManager } from "@meekojs/meeko/server";
+ *
+ * export default defineServerRuntime(async ({ env, production }) => {
+ *   const redis = createClient({ url: env.REDIS_URL });
+ *   await redis.connect();
+ *   const subscriber = redis.duplicate();
+ *   await subscriber.connect();
+ *   return {
+ *     sessions: new SessionManager({ store, production }),
+ *     socket: { pubsub: new RedisSocketPubSub({ publisher: redis, subscriber, prefix: "app:prod:" }) },
+ *     close: async () => { await subscriber.quit(); await redis.quit(); },
+ *   };
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#broadcast-y-varias-instancias
  */
 export class RedisSocketPubSub implements SocketPubSub {
   private readonly prefix: string;
   private readonly maxMessageBytes: number;
   private readonly publishChannel: (channel: string, message: string) => Promise<unknown>;
   private readonly subscriptions: RedisChannelSubscriptions<{ readonly listener: (message: SocketMessage) => void | Promise<void>; readonly channel: string; readonly room: string }>;
+  /**
+   * @param options Clientes, prefijo y límites.
+   * @throws {TypeError} Si el prefijo no es válido o, con `sharded`, faltan los métodos fragmentados.
+   * @throws {RangeError} Si `maxMessageBytes` no es un entero positivo.
+   */
   constructor(private readonly options: RedisSocketPubSubOptions) {
     if (!options.prefix || !options.prefix.endsWith(":") || /\s/.test(options.prefix)) throw new TypeError("Socket Redis prefix must be nonempty, contain no whitespace, and end with ':'");
     this.prefix = options.prefix;
@@ -127,17 +196,20 @@ export class RedisSocketPubSub implements SocketPubSub {
       this.subscriptions = new RedisChannelSubscriptions((channel, listener) => subscriber.subscribe(channel, listener), (channel, listener) => subscriber.unsubscribe(channel, listener), (raw, listeners) => this.dispatch(raw, listeners));
     }
   }
-  /** Redis channel carrying one Socket channel and room. */
+  /** Canal Redis de un par canal/sala de Socket. */
   channelName(channel: string, room: string): string {
     return `${this.prefix}socket:${encodeURIComponent(channel)}:${encodeURIComponent(room)}`;
   }
-  /** Resolves once Redis accepts the message; remote peers receive it afterwards. */
+  /**
+   * Se resuelve cuando Redis acepta el mensaje; los peers remotos lo reciben después.
+   * @throws {ApiError} `SOCKET_LIMIT_EXCEEDED` (413) si el mensaje serializado supera `maxMessageBytes`.
+   */
   async publish(channel: string, room: string, message: SocketMessage): Promise<void> {
     const envelope = serializeJson({ v: 1, event: message.event, payload: message.payload });
     if (encoder.encode(envelope).byteLength > this.maxMessageBytes) throw new ApiError("SOCKET_LIMIT_EXCEEDED", 413);
     await this.publishChannel(this.channelName(channel, room), envelope);
   }
-  /** Resolves after Redis confirms the subscription, so no later broadcast is missed. */
+  /** Se resuelve cuando Redis confirma la suscripción, así que no se pierde ningún broadcast posterior. */
   async subscribe(channel: string, room: string, listener: (message: SocketMessage) => void | Promise<void>): Promise<Unsubscribe> {
     return this.subscriptions.add(this.channelName(channel, room), { listener, channel, room });
   }

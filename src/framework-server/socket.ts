@@ -7,53 +7,181 @@ import type { ServerPlatform } from "./platform.js";
 type Output<S> = S extends Schema<unknown, infer O> ? O : never;
 type SchemaMap = Readonly<Record<string, Schema>>;
 
+/**
+ * Conexión WebSocket ya aceptada por el adaptador, tal como la ve el hub.
+ *
+ * @example
+ * ```ts
+ * import type { SocketPeer } from "@meekojs/meeko/server";
+ *
+ * function peerOf(socket: WebSocket): SocketPeer {
+ *   return {
+ *     send: (message) => socket.send(message),
+ *     close: (code, reason) => socket.close(code, reason),
+ *     get bufferedAmount() { return socket.bufferedAmount; },
+ *   };
+ * }
+ * ```
+ */
 export interface SocketPeer {
+  /** Envía un mensaje de texto. */
   send(message: string): void | Promise<void>;
+  /** Cierra la conexión con un código y un motivo. */
   close(code?: number, reason?: string): void;
+  /** Bytes salientes pendientes, para aplicar `maxBufferBytes`. */
   readonly bufferedAmount?: number;
 }
 
+/**
+ * Definición de un canal Socket de `server/socket/<nombre>.ts`: schemas por dirección, guardas y
+ * handlers de los eventos del cliente. Se declara con {@link defineSocketChannel}.
+ *
+ * @typeParam C Schemas de los eventos que envía el cliente.
+ * @typeParam S Schemas de los eventos que envía el servidor.
+ * @typeParam TServices Tipo de los servicios.
+ * @example
+ * ```ts
+ * import type { Schema, SocketChannelDefinition } from "@meekojs/meeko/server";
+ *
+ * type Chat = SocketChannelDefinition<{ message: Schema<{ text: string }> }, { message: Schema<{ text: string }> }>;
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#websocket
+ */
 export interface SocketChannelDefinition<C extends SchemaMap, S extends SchemaMap, TServices = unknown> {
+  /** Schemas de los eventos que envía el cliente; deben venir de `shared/`. */
   clientToServer: C;
+  /** Schemas de los eventos que envía el servidor; deben venir de `shared/`. */
   serverToClient: S;
+  /** `"required"` rechaza el handshake sin sesión con `401`. */
   auth?: "required" | "optional";
+  /** Autoriza el handshake y cada entrega; `false` responde `403`. */
   authorize?: (args: { context: RequestContext<TServices>; roomId?: string }) => boolean | Promise<boolean>;
+  /** Autoriza cada evento entrante. */
   authorizeEvent?: (args: { event: keyof C & string; payload: unknown; context: RequestContext<TServices>; roomId?: string }) => boolean | Promise<boolean>;
+  /** Filtra cada envío a un peer: con `false` no lo recibe y sigue conectado. */
   authorizeSend?: (args: { event: keyof S & string; payload: unknown; context: RequestContext<TServices>; roomId?: string }) => boolean | Promise<boolean>;
+  /** Handlers de los eventos del cliente, con el payload validado y `emit` hacia ese cliente. */
   handlers?: { [K in keyof C]?: (args: { payload: Output<C[K]>; context: RequestContext<TServices>; roomId?: string; emit: <E extends keyof S & string>(event: E, payload: Output<S[E]>) => Promise<void> }) => void | Promise<void> };
 }
 
+/**
+ * Declara un canal Socket, el export por defecto de `server/socket/<nombre>.ts`. El generador
+ * emite un contrato público con sus schemas, sin importar los handlers, para `socket` y `useSocket`.
+ *
+ * @param definition Schemas, guardas y handlers.
+ * @returns La misma definición, con sus tipos inferidos.
+ * @example
+ * ```ts
+ * // server/socket/chat.ts
+ * import { defineSocketChannel } from "@meekojs/meeko/server";
+ * import { chatInput, chatMessage } from "../../shared/schemas/chat.js";
+ *
+ * export default defineSocketChannel({
+ *   clientToServer: { message: chatInput },
+ *   serverToClient: { message: chatMessage },
+ *   auth: "required",
+ *   authorize: ({ context, roomId }) => !!context.session.current && roomId === "general",
+ *   handlers: { message: async ({ payload, emit }) => emit("message", payload) },
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#websocket
+ */
 export function defineSocketChannel<C extends SchemaMap, S extends SchemaMap, TServices = unknown>(definition: SocketChannelDefinition<C, S, TServices>): SocketChannelDefinition<C, S, TServices> {
   return definition;
 }
 
-/** Event and payload carried between instances; payloads are validated again on delivery. */
+/**
+ * Evento y payload que viajan entre instancias; el payload se vuelve a validar al entregarlo.
+ *
+ * @example
+ * ```ts
+ * import type { SocketMessage } from "@meekojs/meeko/server";
+ *
+ * await pubsub.publish("chat", "general", { event: "message", payload: { text: "Hola" } } satisfies SocketMessage);
+ * ```
+ */
 export interface SocketMessage {
+  /** Nombre del evento del servidor. */
   readonly event: string;
+  /** Payload sin validar. */
   readonly payload: unknown;
 }
 
-/** Releases a subscription; may finish asynchronously. */
+/**
+ * Cancela una suscripción; puede terminar de forma asíncrona.
+ *
+ * @example
+ * ```ts
+ * import type { Unsubscribe } from "@meekojs/meeko/server";
+ *
+ * const stop: Unsubscribe = await pubsub.subscribe("chat", "general", (message) => console.log(message.event));
+ * await stop();
+ * ```
+ */
 export type Unsubscribe = () => void | Promise<void>;
 
 /**
- * Broker between hubs. `publish` resolves once the broker accepts the message;
- * delivery to each subscribed peer happens at most once and its failures never
- * reach the publisher. `subscribe` resolves once the broker is listening.
+ * Broker entre hubs. `publish` se resuelve cuando el broker acepta el mensaje; la entrega a cada
+ * peer suscrito ocurre como mucho una vez y sus fallos nunca llegan al emisor. `subscribe` se
+ * resuelve cuando el broker ya escucha. Los listeners del hub nunca rechazan.
+ *
+ * @example
+ * ```ts
+ * import type { SocketMessage, SocketPubSub } from "@meekojs/meeko/server";
+ *
+ * class LoggingPubSub implements SocketPubSub {
+ *   constructor(private readonly inner: SocketPubSub) {}
+ *   async publish(channel: string, room: string, message: SocketMessage): Promise<void> {
+ *     console.info("publish", channel, room, message.event);
+ *     await this.inner.publish(channel, room, message);
+ *   }
+ *   subscribe(channel: string, room: string, listener: (message: SocketMessage) => void | Promise<void>) {
+ *     return this.inner.subscribe(channel, room, listener);
+ *   }
+ * }
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#broadcast-y-varias-instancias
  */
 export interface SocketPubSub {
+  /** Publica un mensaje en el par canal/sala; se resuelve cuando el broker lo acepta. */
   publish(channel: string, room: string, message: SocketMessage): Promise<void>;
+  /** Escucha el par canal/sala; se resuelve cuando el broker ya escucha. */
   subscribe(channel: string, room: string, listener: (message: SocketMessage) => void | Promise<void>): Unsubscribe | Promise<Unsubscribe>;
 }
 
+/**
+ * Opciones de {@link LocalSocketPubSub}.
+ *
+ * @example
+ * ```ts
+ * import { LocalSocketPubSub } from "@meekojs/meeko/server";
+ *
+ * const pubsub = new LocalSocketPubSub({ onListenerError: (error) => console.warn("socket listener", error) });
+ * ```
+ */
 export interface LocalSocketPubSubOptions {
-  /** Receives a listener failure; defaults to `console.error`. Hub listeners never fail. */
+  /** Recibe el fallo de un listener; por defecto, `console.error`. Los listeners del hub nunca fallan. */
   onListenerError?(error: unknown): void;
 }
 
-/** Single-instance broker; `publish` also waits for local delivery attempts. */
+/**
+ * Broker de una sola instancia, el que usa el hub por defecto. `publish` también espera los intentos
+ * de entrega locales. Para varias instancias, use `RedisSocketPubSub`.
+ *
+ * @example
+ * ```ts
+ * import { LocalSocketPubSub } from "@meekojs/meeko/server";
+ *
+ * const pubsub = new LocalSocketPubSub();
+ * const stop = pubsub.subscribe("chat", "general", (message) => console.log(message.payload));
+ * await pubsub.publish("chat", "general", { event: "message", payload: { text: "Hola" } });
+ * stop();
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#broadcast-y-varias-instancias
+ */
 export class LocalSocketPubSub implements SocketPubSub {
   private readonly listeners = new Map<string, Set<(message: SocketMessage) => void | Promise<void>>>();
+  /** @param options Observador de los fallos de los listeners. */
   constructor(private readonly options: LocalSocketPubSubOptions = {}) {}
   async publish(channel: string, room: string, message: SocketMessage): Promise<void> {
     const listeners = [...this.listeners.get(`${channel}\0${room}`) ?? []];
@@ -80,61 +208,119 @@ export class LocalSocketPubSub implements SocketPubSub {
   }
 }
 
+/**
+ * Conexión aceptada por el hub, que el adaptador alimenta con los mensajes del peer.
+ *
+ * @example
+ * ```ts
+ * const connection = await hub.accept("chat", request, peerOf(socket), "general");
+ * socket.addEventListener("message", (event) => void connection.receive(event.data as string));
+ * socket.addEventListener("close", () => connection.close());
+ * ```
+ */
 export interface SocketConnection {
+  /** Procesa un mensaje del cliente en JSON (texto o bytes UTF-8); uno demasiado grande cierra con `1009` y uno inválido con `1008`. */
   receive(message: string | Uint8Array): Promise<void>;
+  /** Valida y envía un evento del servidor a este peer. */
   emit(event: string, payload: unknown): Promise<void>;
+  /** Cierra la conexión y la desuscribe de su sala. */
   close(code?: number, reason?: string): void;
 }
 
+/**
+ * Opciones de {@link createSocketHub}.
+ *
+ * @typeParam TServices Tipo de los servicios.
+ * @example
+ * ```ts
+ * import type { SocketHubOptions } from "@meekojs/meeko/server";
+ *
+ * const options: SocketHubOptions = {
+ *   channels,
+ *   sessions,
+ *   services: {},
+ *   maxMessageBytes: 16 * 1024,
+ *   onDeliveryError: (error, { channel, room, event }) => console.warn(channel, room, event, error),
+ * };
+ * ```
+ */
 export interface SocketHubOptions<TServices = unknown> {
+  /** Definiciones de los canales por nombre, como las de `loadSocketChannels`. */
   channels: Readonly<Record<string, unknown>>;
+  /** Gestor de sesiones. */
   sessions: SessionManager;
+  /** Servicios compartidos o una función que los crea en cada handshake. */
   services: TServices | ((request: Request) => TServices | Promise<TServices>);
+  /** Orígenes adicionales aceptados en el handshake. */
   allowedOrigins?: readonly string[];
-  /** Largest inbound or outbound message, serialized. `broadcast` rejects larger ones. Defaults to 64 KiB. */
+  /** Mensaje entrante o saliente más grande, serializado; `broadcast` rechaza los mayores. Por defecto, 64 KiB. */
   maxMessageBytes?: number;
+  /** Bytes salientes pendientes por peer antes de cerrarlo; 1 MiB por defecto. */
   maxBufferBytes?: number;
   /**
-   * Broker deliveries waiting for one local peer, counting the one in progress.
-   * A peer that falls further behind is closed with `1013` and reported with
-   * `SOCKET_BACKLOG_EXCEEDED`. Defaults to 256.
+   * Entregas del broker en espera para un peer local, contando la que está en curso. Un peer más
+   * retrasado se cierra con `1013` y se informa con `SOCKET_BACKLOG_EXCEEDED`. Por defecto, 256.
    */
   maxPendingDeliveries?: number;
   /**
-   * Milliseconds during which deliveries reuse the peer's last session read
-   * instead of reloading it from the store. A revocation still closes the peer
-   * at once through `SessionHandle.signal`; `0` reloads on every delivery.
-   * Authorization callbacks run on every delivery. Defaults to 1000.
+   * Milisegundos durante los que las entregas reutilizan la última lectura de sesión del peer en
+   * lugar de releer el store. Una revocación cierra el peer al momento mediante
+   * `SessionHandle.signal`; `0` relee en cada entrega. La autorización se ejecuta en cada entrega.
+   * Por defecto, 1000.
    */
   sessionRefreshMs?: number;
+  /** Broker entre instancias; por defecto, `LocalSocketPubSub`. */
   pubsub?: SocketPubSub;
-  /** Runtime exposed through `RequestContext.platform` in channel callbacks. */
+  /** Runtime que se expone en `RequestContext.platform` en los callbacks del canal. */
   platform?: ServerPlatform;
   /**
-   * Receives a failed delivery to a local peer, which is closed, and failed
-   * asynchronous unsubscriptions (without `event`). Never reaches the
-   * broadcaster. Defaults to `console.error`.
+   * Recibe las entregas fallidas a un peer local, que se cierra, y las desuscripciones asíncronas
+   * fallidas (sin `event`). Nunca llega al emisor. Por defecto, `console.error`.
    */
   onDeliveryError?(error: unknown, context: SocketDeliveryErrorContext): void;
 }
 
-/** Where a delivery failed; `event` is absent for unsubscription failures. */
+/**
+ * Dónde falló una entrega; `event` no existe en los fallos de desuscripción.
+ *
+ * @example
+ * ```ts
+ * import type { SocketDeliveryErrorContext } from "@meekojs/meeko/server";
+ *
+ * const describe = ({ channel, room, event }: SocketDeliveryErrorContext): string =>
+ *   event ? `${channel}/${room}: ${event}` : `${channel}/${room}: desuscripción`;
+ * ```
+ */
 export interface SocketDeliveryErrorContext {
+  /** Canal. */
   readonly channel: string;
+  /** Sala. */
   readonly room: string;
+  /** Evento que no se pudo entregar. */
   readonly event?: string;
 }
 
+/**
+ * Hub de Socket: autoriza handshakes, acepta conexiones y reparte broadcasts. El host hace el
+ * upgrade HTTP y le pasa el peer conectado.
+ *
+ * @example
+ * ```ts
+ * // Un broadcast desde una API o una tarea programada.
+ * await hub.broadcast("chat", "general", "message", { text: "Mantenimiento en 5 minutos" });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#broadcast-y-varias-instancias
+ */
 export interface SocketHub {
+  /** Comprueba canal, Origin, sesión y autorización antes del upgrade; rechaza con `ApiError`. */
   preflight(name: string, request: Request, roomId?: string): Promise<void>;
-  /** Resolves once the connection is subscribed to its channel and room. */
+  /** Acepta un peer; se resuelve cuando la conexión ya está suscrita a su canal y sala. */
   accept(name: string, request: Request, peer: SocketPeer, roomId?: string): Promise<SocketConnection>;
   /**
-   * Validates the event and resolves once the broker accepts it. Rejects with
-   * `SOCKET_LIMIT_EXCEEDED` (413), before publishing, when the serialized
-   * message exceeds `maxMessageBytes`. Each peer receives it at most once; a
-   * peer that fails is closed and reported through `onDeliveryError` on the
-   * hub that owns it.
+   * Valida el evento y se resuelve cuando el broker lo acepta. Rechaza con
+   * `SOCKET_LIMIT_EXCEEDED` (413), antes de publicar, si el mensaje serializado supera
+   * `maxMessageBytes`. Cada peer lo recibe como mucho una vez; un peer que falla se cierra y se
+   * informa con `onDeliveryError` en el hub que lo tiene.
    */
   broadcast(name: string, roomId: string, event: string, payload: unknown): Promise<void>;
 }
@@ -157,7 +343,27 @@ function originAllowed(request: Request, allowedOrigins: readonly string[]): boo
   return !!origin && (origin === new URL(request.url).origin || allowedOrigins.includes(origin));
 }
 
-/** The host performs the HTTP upgrade, then passes its connected peer here. */
+/**
+ * Crea el hub de Socket de un host propio. El host hace el upgrade HTTP y pasa el peer conectado a
+ * `hub.accept`. El hub valida Origin, sesión, canal, sala, evento y payload, y aplica los límites
+ * de mensaje, búfer y cola.
+ *
+ * @param options Canales, sesiones, servicios, límites y broker.
+ * @returns El hub.
+ * @throws {RangeError} Si algún límite no es válido.
+ * @example
+ * ```ts
+ * import { createSocketHub, loadSocketChannels } from "@meekojs/meeko/server";
+ *
+ * const hub = createSocketHub({
+ *   channels: await loadSocketChannels(manifest, load),
+ *   sessions,
+ *   services: {},
+ *   pubsub,
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#websocket
+ */
 export function createSocketHub<TServices>(options: SocketHubOptions<TServices>): SocketHub {
   const maxMessageBytes = options.maxMessageBytes ?? 64 * 1024;
   const maxBufferBytes = options.maxBufferBytes ?? 1024 * 1024;

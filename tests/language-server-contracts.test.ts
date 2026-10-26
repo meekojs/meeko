@@ -28,7 +28,7 @@ test("project contract errors point to defineProps in the source component", asy
     assert.equal(errors[0]!.filename, file);
     assert.equal(errors[0]!.code, "MEEK_LAYOUT_PROPS");
     assert.equal(errors[0]!.offset, source.indexOf("{ outlet:"));
-    assert.match(errors[0]!.message, /Layout app\/layouts\/default\.meeko props do not match/);
+    assert.match(errors[0]!.message, /Las props del layout app\/layouts\/default\.meeko no coinciden/);
     await writeFile(file, source.replace("; missing: string", ""));
     assert.deepEqual(await checkFrameworkPageContracts(root), []);
   } finally { await rm(root, { recursive: true, force: true }); }

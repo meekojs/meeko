@@ -1,0 +1,50 @@
+<script server lang="ts">
+import { definePage } from "@meekojs/meeko/framework";
+import { isOwner } from "../../server/auth.js";
+
+export const route = definePage({
+  load: ({ request, context }) => {
+    if (isOwner(context)) return Response.redirect(new URL("/dashboard", request.url));
+    return {};
+  },
+  head: () => ({ title: "Acceso · Meeko" }),
+});
+</script>
+
+<script lang="ts">
+import { signal } from "@meekojs/meeko";
+
+const username = signal("");
+const pending = signal(false);
+const feedback = signal("");
+
+async function signIn(event: Event): Promise<void> {
+  event.preventDefault();
+  try {
+    await api.auth.login.post({ body: { username: username.value.trim(), password: "" } });
+  } catch (error) {
+    const status = typeof error === "object" && error !== null && "status" in error ? error.status : undefined;
+    feedback.value = status === 429
+      ? "Demasiados intentos. Espera cinco minutos antes de volver a probar."
+      : "No se pudo iniciar sesión. Revisa la conexión e inténtalo de nuevo.";
+  }
+}
+</script>
+
+<template>
+  <section class="login-panel" aria-label="Inicio de sesión">
+    <form method="post" action="/login" on:submit="signIn">
+      <label for="login-username">Usuario</label>
+      <input id="login-username" name="username" type="text" autocomplete="username" required maxlength="64" bind:value="username.value" on:input="(event: Event) => username.value = (event.target as HTMLInputElement).value">
+      <button class="action action--primary login-submit" type="submit" bind:disabled="pending.value">{pending.value ? "Verificando…" : "Entrar al dashboard"}</button>
+      <p class="login-feedback" role="status" aria-live="polite">{feedback.value}</p>
+    </form>
+  </section>
+</template>
+
+<style scoped>
+@layer components {
+  .login-panel { display: flex; flex-direction: column; border: 1px solid var(--line); background: var(--surface); }
+}
+@media (max-width: 55rem) { .login-panel { grid-template-columns: 1fr; } }
+</style>

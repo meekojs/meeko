@@ -185,6 +185,39 @@ test("createWorker checks Socket upgrades and forwards them to the room Durable 
   assert.equal(socketRoomName("room", "a"), "room\0a");
 });
 
+test("createWorker closes Socket auth refusals with 4401/4403 without waking the room", async () => {
+  await withWorkersGlobals(async () => {
+    const servers: FakeSocket[] = [];
+    (globalThis as Record<string, unknown>).WebSocketPair = class {
+      0 = new FakeSocket();
+      1 = new FakeSocket();
+      constructor() { servers.push(this[1]); }
+    };
+    for (const [policy, code, reason] of [
+      [{ auth: "required" as const }, 4401, "Autenticación requerida"],
+      [{ authorize: () => false }, 4403, "Acceso denegado"],
+    ] as const) {
+      const rooms = namespace();
+      const env = { MEEKO_SOCKET: rooms };
+      const worker = createWorker<typeof env>(({ env: bindings, platform }) => createServerApp({
+        manifest, production: false, platform,
+        defaultSocketPubSub: new DurableObjectSocketPubSub(bindings.MEEKO_SOCKET),
+        load: async () => ({ default: defineSocketChannel({ clientToServer: { say: text }, serverToClient: { said: text }, ...policy }) }),
+      }));
+      const upgrade = (origin: string) => new Request("https://example.com/_meeko/socket/room?room=a", { headers: { upgrade: "websocket", origin } });
+      const response = await worker.fetch(upgrade("https://example.com"), env, context()) as Response & { webSocket?: FakeSocket };
+      assert.equal(response.status, 101);
+      assert.ok(response.webSocket instanceof FakeSocket);
+      assert.deepEqual(servers.at(-1)?.closed, { code, reason });
+      // A foreign Origin keeps its HTTP refusal and never upgrades.
+      const pairs = servers.length;
+      assert.equal((await worker.fetch(upgrade("https://evil.test"), env, context())).status, 403);
+      assert.equal(servers.length, pairs);
+      assert.equal(rooms.calls.length, 0, "the room's Durable Object is never woken");
+    }
+  });
+});
+
 test("DurableObjectSocketPubSub publishes through the room's RPC and subscribes only inside a room", async () => {
   const rooms = namespace();
   const pubsub = new DurableObjectSocketPubSub(rooms);

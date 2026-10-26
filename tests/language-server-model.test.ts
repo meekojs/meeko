@@ -358,3 +358,31 @@ test("editor maps unquoted directive values like the compiler", async () => {
     `TS2345:${component.indexOf("on:click=run") + "on:click=".length}`,
   ]);
 });
+
+test("editor types defineEmits and on:event on PascalCase tags and <component>", () => {
+  const child = `<script lang="ts">
+const emit = defineEmits<{ save: [id: number]; close: [] }>();
+function go(): void { emit("save", 1); emit("nope"); emit("save", "x"); }
+</script><template><button on:click="() => emit('close')">x</button></template>`;
+  const model = createEditorModel(child, filename, { registry: [] });
+  try {
+    const diagnostics = model.service.getSemanticDiagnostics(model.virtualFilename);
+    assert.deepEqual(diagnostics.map((item) => [item.code, model.toSource(item.start ?? -1)]), [[2345, child.indexOf('"nope"')], [2345, child.indexOf('"x"')]]);
+    assert.match(model.code, /type __MeekoEmits = \{ save: \[id: number\]; close: \[\] \};/);
+    assert.match(model.code, /export type ComponentProps = \(__MeekoDeclaredProps\) & __MeekoEmitPropsOf<__MeekoEmits>;/);
+  } finally { model.dispose(); }
+
+  const parent = `<script lang="ts">
+const Child = {} as { renderToString(props: { id: number; onSave?: ((id: number) => void) | undefined }): string; renderWithState(props: { id: number }): never; hydrateScope(): () => void };
+function bad(id: string): void { void id; }
+</script><template><Child bind:id="1" on:save="bad" /><Child bind:id="1" on:nope="() => {}"></Child><component is="Child" bind:id="2" on:save="(id) => id.toFixed()"></component></template>`;
+  const editor = createEditorModel(parent, filename, { registry: [] });
+  try {
+    const diagnostics = editor.service.getSemanticDiagnostics(editor.virtualFilename);
+    assert.deepEqual(diagnostics.map((item) => [item.code, editor.toSource(item.start ?? -1)]), [[2322, parent.indexOf("on:save")], [2353, parent.indexOf("on:nope")]]);
+    assert.deepEqual(editor.componentTags?.map((tag) => [tag.name, tag.start, tag.closeStart]), [
+      ["Child", parent.indexOf("<Child") + 1, undefined],
+      ["Child", parent.indexOf("<Child", parent.indexOf("on:save")) + 1, parent.indexOf("</Child>") + 2],
+    ]);
+  } finally { editor.dispose(); }
+});

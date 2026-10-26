@@ -1,3 +1,6 @@
+import { normalizeHtmlContent } from "./html-content.js";
+import type { HtmlContentNamespace } from "./html-content.js";
+
 /** Escapa texto dinámico antes de insertarlo en HTML generado por SSR. */
 export function escapeHtml(value: unknown): string {
   return String(value)
@@ -6,6 +9,24 @@ export function escapeHtml(value: unknown): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+/**
+ * Contenido de la directiva `html="expresión"`: el HTML de la expresión **sin escapar**; `null` y
+ * `undefined` dejan el elemento vacío. Es inseguro con contenido no confiable, que podría ejecutar
+ * scripts en la página (XSS).
+ *
+ * Con `tag`, el HTML se normaliza en el contexto de ese elemento para que no salga de él al
+ * analizar el documento: se cierran las etiquetas abiertas, se descartan los cierres sobrantes y
+ * el contenido que el navegador sacaría del elemento (un `<div>` dentro de un `<p>`) deja el
+ * elemento vacío, para que el navegador lo llene al hidratar. Véase `normalizeHtmlContent`.
+ *
+ * @throws {TypeError} Si el valor no es una cadena, `null` ni `undefined`.
+ */
+export function rawHtml(value: string | null | undefined, tag?: string, namespace?: HtmlContentNamespace): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value !== "string") throw new TypeError(`html="..." expects a string of HTML, null or undefined, not ${typeof value}`);
+  return tag === undefined ? value : normalizeHtmlContent(value, tag, namespace);
 }
 
 const booleanAttributes = new Set(["allowfullscreen", "async", "autofocus", "autoplay", "checked", "controls", "default", "defer", "disabled", "formnovalidate", "hidden", "inert", "ismap", "loop", "multiple", "muted", "nomodule", "novalidate", "open", "playsinline", "readonly", "required", "reversed", "selected"]);
@@ -56,7 +77,27 @@ function assertSerializable(value: unknown, path: string, ancestors: WeakSet<obj
   }
 }
 
-/** Serializa estado y props transferibles al navegador, rechazando valores ambiguos. */
+/**
+ * Serializa props y estado para enviarlos al navegador dentro de una etiqueta `<script>`. Comprueba
+ * que el valor se represente fielmente en JSON (rechaza `undefined`, funciones, números no finitos,
+ * ciclos, accesores, `toJSON`, arrays dispersos e instancias de clase) y escapa `<`, `>`, `&`,
+ * U+2028 y U+2029.
+ *
+ * @param value Valor que se envía.
+ * @returns JSON seguro para insertar en HTML.
+ * @throws {TypeError} Si el valor no se puede representar fielmente en JSON.
+ * @example
+ * ```ts
+ * import { serializeJson } from "@meekojs/meeko";
+ * import { renderWithState } from "./Counter.meeko";
+ *
+ * const props = { initial: 1 };
+ * const { html, state } = renderWithState(props);
+ * const page = `<div id="counter">${html}</div>
+ * <script type="application/json" id="counter-state">${serializeJson({ props, state })}</script>`;
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#módulo-generado
+ */
 export function serializeJson(value: unknown): string {
   assertSerializable(value, "$", new WeakSet());
   const json = JSON.stringify(value);

@@ -2,15 +2,37 @@ import type { ApiRouteDefinition, RpcDefinition, Schema } from "./contracts.js";
 import type { ServerManifest, ServerModuleLoader } from "./discovery.js";
 import { serializeJson } from "../server.js";
 
+/**
+ * Opciones de {@link generateOpenApi}.
+ *
+ * @example
+ * ```ts
+ * import { pathToFileURL } from "node:url";
+ * import { toJsonSchema } from "@valibot/to-json-schema";
+ * import type { OpenApiOptions, Schema } from "@meekojs/meeko/server";
+ * import * as schemas from "./shared/schemas/user.js";
+ *
+ * const options: OpenApiOptions = {
+ *   manifest,
+ *   info: { title: "Mi API", version: "1.0.0" },
+ *   publicSchemas: schemas,
+ *   toJsonSchema: (schema: Schema) => toJsonSchema(schema as never),
+ *   load: (file) => import(pathToFileURL(file).href),
+ * };
+ * ```
+ */
 export interface OpenApiOptions {
+  /** Manifiesto con los endpoints. */
   manifest: ServerManifest;
+  /** `info.title` e `info.version` del documento. */
   info: { title: string; version: string };
-  /** Only schemas explicitly exported from shared/schemas belong here. */
+  /** Registro de schemas públicos por nombre; sólo los que exporta `shared/schemas`. */
   publicSchemas: Readonly<Record<string, Schema>>;
-  /** For Valibot, supply a converter from @valibot/to-json-schema. */
+  /** Convierte un schema en JSON Schema; para Valibot, el conversor de `@valibot/to-json-schema`. */
   toJsonSchema(schema: Schema): unknown;
-  /** Resolves each manifest file key to its handler module. */
+  /** Resuelve cada clave del manifiesto a su módulo de handler. */
   load: ServerModuleLoader;
+  /** Nombre de la cookie de sesión del esquema de seguridad; por defecto, `__Host-meeko.sid`. */
   cookieName?: string;
 }
 
@@ -37,7 +59,26 @@ function publicPath(pathname: string): string {
     .replace(/\[([A-Za-z_$][\w$]*)\]/g, "{$1}");
 }
 
-/** Generates OpenAPI only from a caller-provided public schema registry. */
+/**
+ * Genera un documento OpenAPI de los endpoints de API y RPC usando sólo el registro de schemas
+ * públicos que pasa el llamador. Un schema que no se puede representar, una ruta catch-all o un
+ * schema fuera del registro producen un error explícito.
+ *
+ * @param options Manifiesto, información, schemas públicos, conversor y cargador.
+ * @returns El documento OpenAPI como objeto JSON.
+ * @throws {TypeError} Si falta el cargador.
+ * @throws {Error} Si un schema o una ruta no se pueden representar.
+ * @example
+ * ```ts
+ * import { writeFile } from "node:fs/promises";
+ * import { discoverServerManifest } from "@meekojs/meeko/build";
+ * import { generateOpenApi } from "@meekojs/meeko/server";
+ *
+ * const document = await generateOpenApi({ ...options, manifest: await discoverServerManifest(process.cwd()) });
+ * await writeFile("openapi.json", JSON.stringify(document, null, 2));
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#build-despliegue-y-verificación
+ */
 export async function generateOpenApi(options: OpenApiOptions): Promise<Record<string, unknown>> {
   if (typeof options.load !== "function") throw new TypeError("OpenAPI generation requires a module loader");
   const load = options.load;

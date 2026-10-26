@@ -49,6 +49,10 @@
       "types": "./dist/build.d.ts",
       "default": "./dist/build.js"
     },
+    "./prettier": {
+      "types": "./dist/prettier.d.ts",
+      "default": "./dist/prettier.js"
+    },
     "./internal": {
       "types": "./dist/internal.d.ts",
       "default": "./dist/internal.js"
@@ -66,7 +70,7 @@
     "prepack": "tsc -p tsconfig.build.json",
     "build": "tsc -p tsconfig.build.json",
     "check": "tsc -p tsconfig.json --noEmit",
-    "test": "pnpm run build && pnpm run example:compile && tsx --test --test-concurrency=1 tests/*.test.ts",
+    "test": "node scripts/clean-test-tmp.mjs && pnpm run build && pnpm run example:compile && tsx --test --test-concurrency=1 tests/*.test.ts",
     "example:compile": "node dist/cli.js compile examples/counter/Counter.meeko examples/counter/Counter.generated.ts && node dist/cli.js compile examples/attributes/Attributes.meeko examples/attributes/Attributes.generated.ts && node dist/cli.js compile examples/regions/Regions.meeko examples/regions/Regions.generated.ts && node dist/cli.js compile examples/primitives/Primitives.meeko examples/primitives/Primitives.generated.ts",
     "example:bundle": "pnpm run build && pnpm run example:compile && esbuild examples/counter/client.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=examples/counter/client.bundle.js",
     "example:check": "tsc -p examples/counter/tsconfig.json --noEmit",
@@ -84,7 +88,7 @@
     "conformance:bun": "pnpm run build && tsx --test tests/conformance/bun.test.ts",
     "conformance:deno": "pnpm run build && tsx --test tests/conformance/deno.test.ts",
     "conformance:workerd": "pnpm run build && tsx --test tests/conformance/workerd.test.ts",
-    "e2e": "pnpm run example:bundle && pnpm run vite:build && tsx --test tests/browser.e2e.ts",
+    "e2e": "pnpm run example:bundle && pnpm run vite:build && tsx --test tests/browser.e2e.ts tests/editor-bridge.e2e.ts",
     "benchmark:check": "pnpm run example:compile && node dist/cli.js compile benchmarks/cases/TreeLeaf.meeko benchmarks/cases/TreeLeaf.generated.ts && node dist/cli.js compile benchmarks/cases/TreeBranch.meeko benchmarks/cases/TreeBranch.generated.ts && node dist/cli.js compile benchmarks/cases/Tree.meeko benchmarks/cases/Tree.generated.ts && node dist/cli.js compile benchmarks/cases/List.meeko benchmarks/cases/List.generated.ts && node dist/cli.js compile benchmarks/cases/Navigation.meeko benchmarks/cases/Navigation.generated.ts && tsc -p tsconfig.benchmark.json --noEmit",
     "benchmark": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/run.ts",
     "benchmark:scenarios": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/scenarios.ts",
@@ -98,6 +102,7 @@
     "parse5": "^8.0.0",
     "postcss": "^8.5.31",
     "postcss-selector-parser": "^7.1.7",
+    "prettier": "^3.9.10",
     "typescript": "7.0.2",
     "vscode-css-languageservice": "6.3.10",
     "vscode-html-languageservice": "5.6.2",

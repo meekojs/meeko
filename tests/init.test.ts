@@ -47,7 +47,7 @@ test("CLI init reutiliza el directorio preparado por pnpm sin perder sus archivo
     const cli = resolve("dist/cli.js");
     const result = spawnSync(process.execPath, [cli, "init", "."], { cwd: root, encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /Next: pnpm install && pnpm run dev/);
+    assert.match(result.stdout, /Siguiente paso: pnpm install && pnpm run dev/);
     const updated = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as typeof manifest & {
       private: boolean; scripts: Record<string, string>; devDependencies: Record<string, string>;
     };

@@ -2,9 +2,11 @@ import { access, mkdir, readFile, readdir, realpath, unlink, writeFile } from "n
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
 import { checkSource } from "../check.js";
+import { MeekoCompileError } from "../compiler/sfc.js";
 import type { CompileDiagnostic } from "../compiler/sfc.js";
 import { componentTypeDeclarationMarker, generateTypes } from "../types.js";
 import { resolveConfigSources } from "./config.js";
+import { assertRouteBlockPlacement } from "./route-block.js";
 
 const componentTypesManifest = "component-types.json";
 const componentTypeSuffix = ".d.meeko.ts";
@@ -34,11 +36,11 @@ async function readTypeOwnership(file: string): Promise<readonly string[] | unde
   }
   let value: unknown;
   try { value = JSON.parse(source) as unknown; }
-  catch (error) { throw new Error(`Invalid Meeko component type ownership manifest: ${file}`, { cause: error }); }
+  catch (error) { throw new Error(`Manifiesto de tipos de componentes de Meeko no válido: ${file}`, { cause: error }); }
   if (!value || typeof value !== "object" || (value as Partial<ComponentTypesOwnership>).version !== 1 ||
       !Array.isArray((value as Partial<ComponentTypesOwnership>).files) ||
       (value as Partial<ComponentTypesOwnership>).files!.some((entry) => typeof entry !== "string" || !entry)) {
-    throw new Error(`Invalid Meeko component type ownership manifest: ${file}`);
+    throw new Error(`Manifiesto de tipos de componentes de Meeko no válido: ${file}`);
   }
   return (value as ComponentTypesOwnership).files;
 }
@@ -115,18 +117,18 @@ async function reconcileOwnedTypes(projectRoot: string, outputs: readonly string
   await mkdir(typesRoot, { recursive: true });
   const actualRoot = await realpath(root);
   const actualTypesRoot = await realpath(typesRoot);
-  if (!inside(actualRoot, actualTypesRoot)) throw new Error(`Meeko type directory escapes project root: ${typesRoot}`);
+  if (!inside(actualRoot, actualTypesRoot)) throw new Error(`La carpeta de tipos de Meeko sale de la raíz del proyecto: ${typesRoot}`);
   const previous = recorded ?? await adoptGeneratedTypes(root, typesRoot);
   for (const path of previous) {
     const target = resolve(typesRoot, path);
     if (path.includes("\\") || ownedTypePath(typesRoot, target) !== path) {
-      throw new Error(`Invalid owned Meeko component type path: ${path}`);
+      throw new Error(`Ruta de tipo de componente de Meeko no válida: ${path}`);
     }
     if (current.has(path)) continue;
     let actualTarget: string;
     try { actualTarget = await realpath(target); }
     catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") continue; throw error; }
-    if (!inside(actualTypesRoot, actualTarget)) throw new Error(`Owned Meeko component type escapes generated directory: ${target}`);
+    if (!inside(actualTypesRoot, actualTarget)) throw new Error(`Un tipo de componente de Meeko sale de la carpeta generada: ${target}`);
     await unlink(target);
   }
   const body = `${JSON.stringify({ version: 1, files: [...current].sort() } satisfies ComponentTypesOwnership, null, 2)}\n`;
@@ -164,7 +166,17 @@ async function appMeekoFiles(projectRoot: string): Promise<string[]> {
 /** Checks every discovered application component, including new pages and layouts. */
 export async function checkApp(projectRoot: string): Promise<CompileDiagnostic[]> {
   const diagnostics: CompileDiagnostic[] = [];
-  for (const file of await appMeekoFiles(projectRoot)) diagnostics.push(...await checkSource(await readFile(file, "utf8"), file));
+  const sourceRoots = (await resolveConfigSources(projectRoot)).map((source) => source.root);
+  for (const file of await appMeekoFiles(projectRoot)) {
+    const source = await readFile(file, "utf8");
+    try { assertRouteBlockPlacement(source, file, sourceRoots); }
+    catch (error) {
+      if (!(error instanceof MeekoCompileError)) throw error;
+      diagnostics.push(error.diagnostic);
+      continue;
+    }
+    diagnostics.push(...await checkSource(source, file));
+  }
   return diagnostics;
 }
 

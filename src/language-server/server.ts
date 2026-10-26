@@ -4,18 +4,37 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "@typescript/typescript6";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
-  CodeActionKind, createConnection, DiagnosticSeverity, DidChangeWatchedFilesNotification, TextDocuments, TextDocumentSyncKind,
+  CodeActionKind, CodeLensRefreshRequest, createConnection, DiagnosticSeverity, DidChangeWatchedFilesNotification, RequestType, TextDocuments, TextDocumentSyncKind,
 } from "vscode-languageserver/node";
-import type { Connection, Diagnostic, InitializeResult, SemanticTokens } from "vscode-languageserver/node";
+import type { Connection, Diagnostic, InitializeResult, Range, SemanticTokens, TextDocumentIdentifier } from "vscode-languageserver/node";
 import { projectRoot } from "../compiler/project-root.js";
 import { checkFrameworkPageContracts } from "../framework/page-contracts-check.js";
 import { componentDiagnostics, contractRange, frameworkContractRoot } from "./diagnostics.js";
 import {
-  codeActions, completion, definition, documentSymbols, foldingRanges, formatting, hover, prepareRename, references,
+  codeActions, completion, componentNameCompletion, definition, documentSymbols, foldingRanges, formatting, hover, prepareRename, references,
   rename, resolveCompletion, semanticTokens, semanticTokensLegend, signatureHelp,
 } from "./features.js";
-import type { CompletionData, FeatureContext, LocatedDocument } from "./features.js";
+import type { CompletionData, FeatureContext, LocatedDocument, MeekoFormatSettings } from "./features.js";
+import { codeLenses } from "./lenses.js";
 import { MeekoWorkspace, pathKey } from "./project.js";
+import { executionZones } from "./zones.js";
+import type { ExecutionZoneKind, ExecutionZoneReason } from "./zones.js";
+
+/** A zone of `meeko/executionZones`: whole lines of a component and where they run. */
+export interface ExecutionZoneItem {
+  readonly kind: ExecutionZoneKind;
+  readonly reason: ExecutionZoneReason;
+  readonly range: Range;
+  readonly label: string;
+  readonly detail: string;
+}
+
+/**
+ * `meeko/executionZones`: the lines of a `.meeko` that run only on the server (`<script server>`),
+ * on both sides (the setup) and only in the browser (after the first browser `await` and inside
+ * `onMounted`). It is computed statically, without a running app.
+ */
+export const ExecutionZonesRequest = new RequestType<{ textDocument: TextDocumentIdentifier }, { zones: ExecutionZoneItem[] } | null, void>("meeko/executionZones");
 
 /** Opciones de inicialización que acepta el servidor (`initializationOptions`). */
 export interface LanguageServerInitializationOptions {
@@ -28,6 +47,18 @@ export interface LanguageServerInitializationOptions {
   readonly projectContracts?: boolean;
   /** Espera en milisegundos antes de comprobar un documento editado. Por defecto 300. */
   readonly diagnosticsDelay?: number;
+  /**
+   * Opciones de formato para clientes sin `workspace/configuration`. Si el cliente la admite,
+   * prevalece su sección `meeko.format`.
+   */
+  readonly format?: MeekoFormatSettings;
+}
+
+/** Normaliza la sección `meeko.format`; `undefined` si el cliente no la define. */
+function formatSettingsOf(value: unknown): MeekoFormatSettings | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const indent = (value as { indentSections?: unknown }).indentSections;
+  return typeof indent === "boolean" ? { indentSections: indent } : undefined;
 }
 
 const transports = ["--stdio", "--node-ipc"];
@@ -68,6 +99,10 @@ export function startLanguageServer(connection: Connection): void {
   let delay = 300;
   let semanticRefresh = false;
   let watchedRegistration = false;
+  let configurationSupport = false;
+  let codeLensRefresh = false;
+  let deleteFiles = false;
+  let formatFallback: MeekoFormatSettings = {};
   const log = (message: string): void => connection.console.log(message);
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
   const openVersions = new Map<string, number>();
@@ -100,10 +135,11 @@ export function startLanguageServer(connection: Connection): void {
   const publish = (uri: string): void => {
     if (stopped) return;
     connection.sendDiagnostics({ uri, diagnostics: [...(ownDiagnostics.get(uri) ?? []), ...(contractDiagnostics.get(uri) ?? [])] })
-      .catch((error: unknown) => log(`${uri}: cannot publish diagnostics: ${error instanceof Error ? error.message : String(error)}`));
+      .catch((error: unknown) => log(`${uri}: no se pudieron publicar los diagnósticos: ${error instanceof Error ? error.message : String(error)}`));
   };
 
-  async function withContext<T>(uri: string, run: (context: FeatureContext) => T | undefined): Promise<T | null> {
+  /** Runs a feature on an open component; `app` waits for the application index (routes, API, RPC). */
+  async function withContext<T>(uri: string, run: (context: FeatureContext) => T | undefined, app = false): Promise<T | null> {
     const document = documents.get(uri);
     const filename = uriToPath(uri);
     if (!document || !filename?.endsWith(".meeko")) return null;
@@ -111,7 +147,8 @@ export function startLanguageServer(connection: Connection): void {
     await project.ready();
     const component = project.setDocument(filename, document.getText());
     if (!component) return null;
-    try { return run({ project, component, document, locate }) ?? null; }
+    const index = app ? await project.appIndex() : undefined;
+    try { return run({ project, component, document, locate, ...(index ? { app: index } : {}) }) ?? null; }
     catch (error) {
       log(`${filename}: ${error instanceof Error ? error.stack ?? error.message : String(error)}`);
       return null;
@@ -166,11 +203,11 @@ export function startLanguageServer(connection: Connection): void {
         contractUris.set(key, new Set(grouped.keys()));
       }).catch((error: unknown) => {
         const message = error instanceof Error ? error.message : String(error);
-        log(`${root}: project contract check failed: ${message}`);
+        log(`${root}: falló la comprobación de contratos del proyecto: ${message}`);
         if (trigger && documents.get(trigger.uri)) {
           contractDiagnostics.set(trigger.uri, [{
             range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
-            message: `Project contract check failed: ${message}`, code: "MEEK_PROJECT_CHECK", source: "Meeko", severity: DiagnosticSeverity.Error,
+            message: `Falló la comprobación de contratos del proyecto: ${message}`, code: "MEEK_PROJECT_CHECK", source: "Meeko", severity: DiagnosticSeverity.Error,
           }]);
           publish(trigger.uri);
         }
@@ -192,6 +229,11 @@ export function startLanguageServer(connection: Connection): void {
     if (typeof options.diagnosticsDelay === "number" && options.diagnosticsDelay >= 0) delay = options.diagnosticsDelay;
     semanticRefresh = params.capabilities.workspace?.semanticTokens?.refreshSupport === true;
     watchedRegistration = params.capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration === true;
+    configurationSupport = params.capabilities.workspace?.configuration === true;
+    codeLensRefresh = params.capabilities.workspace?.codeLens?.refreshSupport === true;
+    const workspaceEdit = params.capabilities.workspace?.workspaceEdit;
+    deleteFiles = workspaceEdit?.documentChanges === true && (workspaceEdit.resourceOperations ?? []).includes("delete");
+    formatFallback = formatSettingsOf(options.format) ?? {};
     const version = packageVersion();
     return {
       capabilities: {
@@ -205,7 +247,8 @@ export function startLanguageServer(connection: Connection): void {
         documentSymbolProvider: true,
         foldingRangeProvider: true,
         documentFormattingProvider: true,
-        codeActionProvider: { codeActionKinds: [CodeActionKind.QuickFix] },
+        codeActionProvider: { codeActionKinds: [CodeActionKind.QuickFix, CodeActionKind.RefactorRewrite] },
+        codeLensProvider: { resolveProvider: false },
         semanticTokensProvider: { legend: semanticTokensLegend, full: true },
       },
       serverInfo: { name: "meeko-language-server", ...(version ? { version } : {}) },
@@ -270,16 +313,46 @@ export function startLanguageServer(connection: Connection): void {
     const contractRoot = changedContract ?? (contractDocument && contractRootOf(contractDocument));
     if (contractRoot) scheduleContractCheck(contractRoot, contractDocument);
     if (semanticRefresh) void connection.languages.semanticTokens.refresh();
+    if (codeLensRefresh) void connection.sendRequest(CodeLensRefreshRequest.type).catch(() => undefined);
   });
 
-  connection.onCompletion(({ textDocument, position }) => withContext(textDocument.uri, (context) => completion(context, position)));
+  // Clients without workspace/configuration may push `{ meeko: { format: {...} } }` instead.
+  connection.onDidChangeConfiguration(({ settings }) => {
+    const pushed = formatSettingsOf((settings as { meeko?: { format?: unknown } } | null | undefined)?.meeko?.format);
+    if (pushed) formatFallback = pushed;
+  });
+
+  /** Opciones `meeko.format` vigentes para un documento, pedidas al cliente en cada formateo. */
+  const formatSettingsFor = async (uri: string): Promise<MeekoFormatSettings> => {
+    if (!configurationSupport) return formatFallback;
+    try {
+      const value: unknown = await connection.workspace.getConfiguration({ scopeUri: uri, section: "meeko.format" });
+      return formatSettingsOf(value) ?? formatFallback;
+    } catch (error) {
+      log(`${uri}: no se pudo leer meeko.format: ${error instanceof Error ? error.message : String(error)}`);
+      return formatFallback;
+    }
+  };
+
+  connection.onCompletion(async ({ textDocument, position }) => {
+    // `<A` in the template: the component is usually unparsable while the tag is being typed.
+    const document = documents.get(textDocument.uri);
+    const filename = uriToPath(textDocument.uri);
+    if (document && filename?.endsWith(".meeko")) {
+      const project = workspace.projectFor(filename);
+      await project.ready();
+      const tags = componentNameCompletion(project, document, filename, position);
+      if (tags) return tags;
+    }
+    return withContext(textDocument.uri, (context) => completion(context, position));
+  });
   connection.onCompletionResolve(async (item) => {
     const data = item.data as CompletionData | undefined;
     if (!data?.uri) return item;
     return await withContext(data.uri, (context) => resolveCompletion(context, item)) ?? item;
   });
-  connection.onHover(({ textDocument, position }) => withContext(textDocument.uri, (context) => hover(context, position)));
-  connection.onDefinition(({ textDocument, position }) => withContext(textDocument.uri, (context) => definition(context, position)));
+  connection.onHover(({ textDocument, position }) => withContext(textDocument.uri, (context) => hover(context, position), true));
+  connection.onDefinition(({ textDocument, position }) => withContext(textDocument.uri, (context) => definition(context, position), true));
   connection.onReferences(({ textDocument, position, context: options }) =>
     withContext(textDocument.uri, (context) => references(context, position, options.includeDeclaration)));
   connection.onPrepareRename(({ textDocument, position }) => withContext(textDocument.uri, (context) => prepareRename(context, position)));
@@ -287,9 +360,26 @@ export function startLanguageServer(connection: Connection): void {
   connection.onSignatureHelp(({ textDocument, position }) => withContext(textDocument.uri, (context) => signatureHelp(context, position)));
   connection.onDocumentSymbol(({ textDocument }) => withContext(textDocument.uri, (context) => documentSymbols(context)));
   connection.onFoldingRanges(({ textDocument }) => withContext(textDocument.uri, (context) => foldingRanges(context)));
-  connection.onDocumentFormatting(({ textDocument, options }) => withContext(textDocument.uri, (context) => formatting(context, options)));
+  connection.onDocumentFormatting(async ({ textDocument, options }) => {
+    const settings = await formatSettingsFor(textDocument.uri);
+    // formatting() never rejects: a file that does not compile yields no edits.
+    return withContext(textDocument.uri, (context) => formatting(context, options, settings, { trusted: workspace.options.trusted !== false, log }));
+  });
   connection.onCodeAction(({ textDocument, range, context: request }) =>
-    withContext(textDocument.uri, (context) => codeActions(context, range, request.diagnostics)));
+    withContext(textDocument.uri, (context) => codeActions(context, range, request.diagnostics, { deleteFiles }, request.only)));
+  connection.onCodeLens(({ textDocument }) => withContext(textDocument.uri, (context) => codeLenses(context), true));
+  connection.onRequest(ExecutionZonesRequest, ({ textDocument }) => withContext(textDocument.uri, (context) => ({
+    zones: executionZones(context.component, context.project.sourceRoots()).map((zone): ExecutionZoneItem => ({
+      kind: zone.kind,
+      reason: zone.reason,
+      label: zone.label,
+      detail: zone.detail,
+      range: {
+        start: { line: zone.startLine, character: 0 },
+        end: { line: zone.endLine, character: context.document.getText({ start: { line: zone.endLine, character: 0 }, end: { line: zone.endLine + 1, character: 0 } }).replace(/\r?\n$|\r$/, "").length },
+      },
+    })),
+  })));
   connection.languages.semanticTokens.on(async ({ textDocument }) => {
     const empty: SemanticTokens = { data: [] };
     const document = documents.get(textDocument.uri);
@@ -320,7 +410,7 @@ export function startLanguageServer(connection: Connection): void {
 export function runLanguageServer(argv: readonly string[]): boolean {
   const transport = argv.find((argument) => transports.includes(argument) || argument.startsWith("--socket=") || argument.startsWith("--pipe="));
   if (!transport) {
-    process.stderr.write("Usage: meeko lsp --stdio | --node-ipc | --socket=<port> | --pipe=<name>\n");
+    process.stderr.write("Uso: meeko lsp --stdio | --node-ipc | --socket=<puerto> | --pipe=<nombre>\n");
     process.exitCode = 1;
     return false;
   }

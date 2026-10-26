@@ -1,0 +1,15 @@
+<script lang="ts">
+export interface Props {
+  status: number;
+  message: string;
+}
+
+const props = defineProps<Props>();
+</script>
+
+<template>
+  <section id="app-error">
+    <h1>Error {props.status}</h1>
+    <p id="app-error-message">{props.message}</p>
+  </section>
+</template>

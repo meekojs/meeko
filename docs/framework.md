@@ -7,7 +7,7 @@ Meeko conserva el motor independiente en `@meekojs/meeko`. El modo de aplicació
 - `@meekojs/meeko/bun`: adaptador Bun (`createBunServer` y `createBunAssetReader`).
 - `@meekojs/meeko/deno`: adaptador Deno (`serveDeno` y `createDenoAssetReader`).
 - `@meekojs/meeko/cloudflare`: adaptador Cloudflare Workers (`createWorker`, `createSocketRoomClass`, `DurableObjectSocketPubSub`, `D1SessionDriver`, `createCloudflareAssetReader` y `createCloudflarePrerenderSource`).
-- `@meekojs/meeko/build`: herramientas de build que leen el sistema de archivos y cargan TypeScript (`discoverRoutes`, `discoverConfiguredRoutes`, `composeFrameworkRoutes`, `loadMeekoConfig`, `readMeekoConfigSync`, `resolveConfigSources`, `discoverServerManifest`, `prerenderRoutes`, `prerenderProject` y `buildProject`). El servidor de producción no la importa.
+- `@meekojs/meeko/build`: herramientas de build que leen el sistema de archivos y cargan TypeScript (`discoverRoutes`, `discoverErrorPage`, `discoverConfiguredRoutes`, `composeFrameworkRoutes`, `loadMeekoConfig`, `readMeekoConfigSync`, `resolveConfigSources`, `discoverServerManifest`, `prerenderRoutes`, `prerenderProject` y `buildProject`). El servidor de producción no la importa.
 
 Todas las subrutas pertenecen al mismo paquete y versión. Los destinos de servidor publicados son Node 24, Bun, Deno y Cloudflare Workers, y la misma suite de conformidad los comprueba (véase [Build, despliegue y verificación](#build-despliegue-y-verificación)). El build y las herramientas de desarrollo siguen ejecutándose con Node. SSR está activo por defecto.
 
@@ -67,7 +67,7 @@ export default defineServerRuntime(({ production, prerendering }) => ({
 
 `app/styles/main.css` es opcional y se carga automáticamente como hoja global en desarrollo y en el build. Vite la incluye en el asset CSS de producción; Meeko enlaza ese asset en el HTML SSR y prerenderizado. Los bloques `<style>` de `.meeko` siguen disponibles para estilos locales.
 
-En desarrollo, Vite abre un WebSocket HMR en un puerto derivado de `PORT` para que dos aplicaciones Meeko no compitan por el puerto predeterminado de Vite. `MEEKO_HMR_PORT` permite fijarlo explícitamente cuando el entorno lo exige; el navegador debe poder acceder a ese puerto además del HTTP de la aplicación.
+En desarrollo, Vite abre un WebSocket HMR en un puerto derivado de `PORT` para que dos aplicaciones Meeko no compitan por el puerto predeterminado de Vite. El SSR de desarrollo carga `@meekojs/meeko` desde Node, fuera del module runner de Vite, como el build; así una aplicación que consume Meeko con `link:` mantiene una sola instancia del runtime aunque Vite recargue sus módulos. Si reconstruye un Meeko enlazado, reinicie `meeko dev`. `MEEKO_HMR_PORT` permite fijarlo explícitamente cuando el entorno lo exige; el navegador debe poder acceder a ese puerto además del HTTP de la aplicación.
 
 ## Configuración, módulos y layers
 
@@ -81,13 +81,36 @@ export default defineMeekoConfig({
 });
 ```
 
-Cada fuente declarada aporta su propio `app/pages`, componentes y autoimports. El orden es app, `extends` y `modules`, en el orden escrito. El manifiesto rechaza colisiones de URL; el registro rechaza nombres de autoimport repetidos. El diagnóstico incluye los archivos en conflicto. Las rutas configuradas deben vivir dentro del proyecto. La configuración de rutas se carga con Node. En un workspace de confianza el servidor de lenguaje también la ejecuta, por lo que las listas pueden construirse dinámicamente; en un workspace no confiable (o con `trusted: false`, ver [editores](editors.md)) el editor no ejecuta código del proyecto y sólo reconoce arrays literales de cadenas.
+Cada fuente declarada aporta su propio `app/pages`, componentes y autoimports. El orden es app, `extends` y `modules`, en el orden escrito.
+
+`extends` y `modules` se comportan igual: la única diferencia es el orden y el nombre con que aparecen en los diagnósticos («layer» o «module»). Use `extends` para una base compartida de la que parte la aplicación (diseño, páginas comunes) y `modules` para funciones que se añaden (autenticación, panel de administración). Cada fuente necesita su carpeta `app/pages`. Sus páginas se muestran dentro del shell del proyecto: `app/app.meeko` y el layout raíz de la aplicación (`app/layouts/default.meeko` o `app/pages/+layout.meeko`) envuelven también a las páginas de capas y módulos, y los `+layout.meeko` propios de la capa se anidan dentro. Si el proyecto tiene `app.meeko` o layout raíz, sustituyen a los equivalentes de la capa; si no, se usan los de la capa. Una página de capa que falla usa el `+error.meeko` más cercano de su propio árbol, después el `app/error.meeko` de la capa y, por último, la página de error raíz del proyecto. La `404` de una URL sin ruta siempre usa la del proyecto. Los módulos programáticos (`RouteModule.routes()`) siguen declarando sus propios layouts. El manifiesto rechaza colisiones de URL; el registro rechaza nombres de autoimport repetidos. El diagnóstico incluye los archivos en conflicto. Las rutas configuradas deben vivir dentro del proyecto. La configuración de rutas se carga con Node. En un workspace de confianza el servidor de lenguaje también la ejecuta, por lo que las listas pueden construirse dinámicamente; en un workspace no confiable (o con `trusted: false`, ver [editores](editors.md)) el editor no ejecuta código del proyecto y sólo reconoce arrays literales de cadenas.
 
 El descubrimiento de servidor también rechaza árboles de cliente imposibles. Por ejemplo, no permite que `api.users.get()` sea a la vez una función y el padre de `api.users.get.post()`, ni que un procedimiento `rpc.users()` sea el padre de `rpc.users.get()`. El error se produce al generar el manifiesto e identifica ambos archivos, antes de inicializar el cliente o emitir tipos contradictorios.
 
-`meeko routes .` descubre todas las fuentes, emite `.meeko/manifests/routes.json` y declaraciones de rutas, contratos y autoimports. Vite genera módulos virtuales a partir del mismo descubrimiento para SSR, hidratación y navegación. En desarrollo, editar una página o layout existente actualiza el módulo SSR y recarga el navegador; el servidor conserva el almacén de sesiones. Los sidecars y handlers API/RPC existentes se cargan desde Vite al llamarlos. Al crear o eliminar rutas, endpoints o canales, editar un canal Socket o cambiar `meeko.config.ts`, reinicie `npm run dev` y ejecute `npm run check` para actualizar los manifiestos y tipos.
+`meeko routes .` descubre todas las fuentes, emite `.meeko/manifests/routes.json` y declaraciones de rutas, contratos y autoimports. Vite genera módulos virtuales a partir del mismo descubrimiento para SSR, hidratación y navegación. En desarrollo, editar una página o layout existente actualiza el módulo SSR y recarga el navegador; el servidor conserva el almacén de sesiones. Los sidecars y handlers API/RPC existentes se cargan desde Vite al llamarlos.
+
+Al crear o eliminar una página, un layout, `app/app.meeko`, `app/error.meeko`, un middleware de `app/middleware` o `server/middleware`, o un módulo de `server/api`, `server/rpc` o `server/socket`, en el proyecto o en sus layers y módulos, `meeko dev` vuelve a descubrir las rutas y crea de nuevo la aplicación sin reiniciar el proceso:
+
+- Las peticiones que llegan mientras tanto esperan a la aplicación nueva, y el navegador se recarga.
+- El servidor Socket se vuelve a enganchar a la aplicación nueva; las conexiones abiertas se cierran.
+- La aplicación nueva llama otra vez a `server/runtime.ts`, así que un almacén de sesiones en memoria empieza vacío y las sesiones abiertas se pierden.
+- Si la aplicación nueva no se puede crear (por ejemplo, con dos layouts raíz), Meeko registra el error y sigue sirviendo la anterior hasta que se corrija.
+
+Cuando Vite se reinicia (al cambiar un `.env` o una dependencia de su configuración), `meeko dev` también crea de nuevo la aplicación, con las mismas consecuencias, una vez que el servidor de Vite nuevo está listo. Si coincide con la creación o eliminación de una ruta, crea una sola aplicación.
+
+Editar un canal Socket existente o cambiar `meeko.config.ts` sigue exigiendo reiniciar `npm run dev`. Los tipos y manifiestos de `.meeko/` no se regeneran en `meeko dev`: ejecute `npm run check` para actualizarlos.
+
+El observador de archivos de Vite ignora todo `.meeko/` salvo `.meeko/generated`, las entradas que sirve. Así, `meeko check`, el servidor de lenguaje o un build que escriben en `.meeko/check`, `routes`, `types`, `manifests`, `output`, `build` o en los `tsconfig.*` generados mientras corre `meeko dev` no recargan el navegador, y el escaneo de dependencias de Vite tampoco entra en `.meeko/`.
 
 El `href` tipado no admite `params` en rutas sin parámetros. Para rutas dinámicas exige las claves declaradas en el manifiesto; el runtime comprueba además sus valores y rechaza claves extra.
+
+`href` tiene dos formas con los mismos tipos. `href(id, options)` usa el manifiesto de la aplicación en ejecución: en el servidor, el de la petición en curso (SSR, loaders, `head`, prerender, API, RPC y middleware de servidor); en el navegador, el que recibió `mountClientApp`, desde la hidratación hasta `dispose()`. Es la forma habitual en páginas y layouts:
+
+```ts
+const link = href("/users/[id]", { params: { id: user.id }, search: { tab: "profile" } });
+```
+
+Fuera de una aplicación (por ejemplo, en una prueba unitaria sin app) la forma corta lanza un error; ahí se pasa el manifiesto con `href(routes, id, options)`, que se mantiene igual.
 
 ## Middleware de rutas y servidor
 
@@ -127,7 +150,7 @@ export default defineServerMiddleware(async (request, next) => {
 });
 ```
 
-Este pipeline envuelve páginas SSR y `/api` y `/_meeko/rpc`; los assets estáticos, el servidor de desarrollo Vite y los upgrades WebSocket tienen sus propios handlers. Los archivos `*.test.ts`, `*.spec.ts`, `*.d.ts` y `*.client.ts` se excluyen. El descubrimiento automático de middleware se limita por ahora al proyecto raíz: `extends` y `modules` aportan rutas y autoimports, pero sus carpetas `app/middleware` y `server/middleware` no participan. Editar un archivo de middleware existente invalida módulos y recarga el navegador en desarrollo; al añadir o quitar un archivo, reinicie `npm run dev` para actualizar los globs de entradas generadas. `npm run check` comprueba los tipos en sus ámbitos respectivos.
+Este pipeline envuelve páginas SSR y `/api` y `/_meeko/rpc`; los assets estáticos, el servidor de desarrollo Vite y los upgrades WebSocket tienen sus propios handlers. Los archivos `*.test.ts`, `*.spec.ts`, `*.d.ts` y `*.client.ts` se excluyen. El descubrimiento automático de middleware se limita por ahora al proyecto raíz: `extends` y `modules` aportan rutas y autoimports, pero sus carpetas `app/middleware` y `server/middleware` no participan. Editar un archivo de middleware existente invalida módulos y recarga el navegador en desarrollo; al añadir o quitar uno, `meeko dev` recrea la aplicación sin reiniciar (véase [Configuración, módulos y layers](#configuración-módulos-y-layers)). `npm run check` comprueba los tipos en sus ámbitos respectivos.
 
 Los callbacks `onNavigationError` pueden devolver una promesa: si el observador falla, Meeko registra tanto el fallo del observador como el error de navegación original sin generar un rechazo sin manejar. Los observadores `onError` del servidor tampoco modifican la respuesta cuando lanzan o rechazan; el registro de respaldo incluye el `requestId` disponible y categorías de error, sin mensajes privados.
 
@@ -137,14 +160,82 @@ Si un middleware servidor llama a `next()`, Meeko espera también ese trabajo au
 
 ## Routing, layouts y SSR
 
-`app/pages` admite `index.meeko`, `[id].meeko`, `[...slug].meeko`, grupos `(group)`, `+error.meeko` y sidecars `*.route.ts`. El layout compartido vive en `app/layouts/default.meeko` y recibe `props.outlet`; el navegador lo conserva entre rutas y libera las páginas salientes. Los `+layout.meeko` junto a páginas siguen admitidos para proyectos anteriores y layouts anidados; no se puede combinar uno en la raíz de `app/pages` con `app/layouts/default.meeko`. Un layer o módulo usa las mismas convenciones. `href` comprueba IDs y parámetros a partir del manifiesto generado.
+`app/pages` admite `index.meeko`, `[id].meeko`, `[...slug].meeko`, grupos `(group)`, `+error.meeko` y, para las opciones de ruta, un bloque `<script server>` en la página o un sidecar `*.route.ts`. El layout compartido vive en `app/layouts/default.meeko` y recibe `props.outlet`; el navegador lo conserva entre rutas y libera las páginas salientes. Los `+layout.meeko` junto a páginas siguen admitidos para proyectos anteriores y layouts anidados; no se puede combinar uno en la raíz de `app/pages` con `app/layouts/default.meeko`. Un layer o módulo usa las mismas convenciones. `href` comprueba IDs y parámetros a partir del manifiesto generado.
 
 El tipo del outlet en `app/app.meeko` y en cada layout es `Component<Record<string, unknown>>` importado desde `@meekojs/meeko`. Incluye `renderWithState`, requerido por `<component is="props.outlet">` para transferir el estado SSR; el starter generado usa este contrato.
 
+Las páginas, los layouts, `app/app.meeko` y `app/error.meeko` no pueden ser [componentes genéricos](api.md#componentes-genéricos-generic): Meeko les pasa sus props y no puede elegir sus parámetros de tipo, así que `generic` en su `<script>` da `MEEK100`. Lleve el contenido genérico a un componente de `app/components` y úselo desde la página.
+
 Si una página falla y existe `+error.meeko`, Meeko la carga y renderiza con el mismo contexto de petición y estado SSR. El observador del servidor recibe el fallo original con su `requestId`; el HTML muestra un mensaje público y no incluye detalles privados. Si también falla la página de error, el servidor registra ese segundo fallo y entrega una respuesta segura.
 
-```ts
-// app/pages/users/[id].route.ts: código exclusivo del servidor
+### Página de error de la aplicación (`app/error.meeko`)
+
+`app/error.meeko`, junto a `app/app.meeko`, es la página de error de toda la aplicación. Recibe las mismas props que `+error.meeko`, `{ status: number; message: string }`, y `meeko check` las comprueba igual. Se usa en dos casos:
+
+- **URL sin ruta.** Una petición de página (GET o HEAD con `accept: text/html`, o la navegación con `accept: application/meeko+json`) responde `404` con `app/error.meeko` dentro de los layouts raíz: `app/app.meeko` y `app/layouts/default.meeko` (o `app/pages/+layout.meeko`). Las props son `{ status: 404, message: "NOT_FOUND" }`. Como la página de error de una ruta, el documento se titula `Error` (`<title>` en SSR y `document.title` al navegar a una URL sin ruta). El documento lleva el payload de hidratación, así que el navegador lo hidrata y la navegación posterior funciona. En el navegador, un enlace o `navigate()` a una URL sin ruta carga el documento: esa URL puede pertenecer a middleware de servidor, a un archivo o a una redirección, y consultarla antes con `fetch` ejecutaría dos veces un `GET` con efectos. Si nada más la atiende, el servidor responde con `app/error.meeko`. Por la misma razón, volver con el historial a una entrada sin ruta recarga el documento; la navegación desde la página `404` hacia rutas de la aplicación sí es del cliente.
+- **Página que falla.** El `+error.meeko` más cercano sigue ganando; si no hay ninguno, se usa `app/error.meeko`. Lo mismo vale para el loader de una ruta `render: "client"` en el navegador.
+
+`/api/...`, `/_meeko/...`, los assets y las peticiones que no son de página mantienen sus respuestas `404` (JSON o texto). Sin `app/error.meeko` nada cambia: una URL sin ruta responde `404` en texto plano y el navegador recarga el documento. `app/error.meeko` y `app/pages/+error.meeko` definirían el mismo nivel, por eso tenerlos a la vez es un error de descubrimiento. En un layer o módulo, `app/error.meeko` respalda sus propias páginas; la `404` usa la del proyecto. Un host propio pasa la página con `errorPage` a `createFrameworkHandler` y a `mountClientApp` (`AppManifest.errorPage` en `createServerApp`).
+
+### Código de servidor de la página
+
+Una página declara su código de servidor en un bloque `<script server lang="ts">` dentro del propio `.meeko`, de modo que `app/pages` sólo contiene archivos `.meeko`. El bloque admite dos formas. Pueden convivir en el mismo bloque, salvo `load`, que no se combina con código de nivel superior:
+
+- **Código de nivel superior** (desde `1.1`). El bloque es código de servidor normal: lee la petición, consulta la base de datos, redirige o responde `404`, y cada `export const` es un dato de la página que llega tipado al `<script>` y a la plantilla.
+- **Opciones de ruta.** `export const route = definePage({ params, search, render, prerenderEntries, load, head })`, la forma de `1.0`, que sigue funcionando sin cambios.
+
+#### Código de nivel superior y datos exportados
+
+```html
+<!-- app/pages/users/[id].meeko -->
+<script server lang="ts">
+import { definePage } from "@meekojs/meeko/framework";
+import * as v from "valibot";
+
+export const route = definePage({ params: v.object({ id: v.string() }) });
+
+const { params, context } = usePage();                 // la petición en curso, tipada por route.params
+if (!context.session.current) redirect("/login");
+const row = await db.users.findById(params.id);        // db: un autoimport de server/utils; row no sale del servidor
+if (!row) notFound();
+export const user = { id: row.id, name: row.name };    // se envía a la página
+export const head = { title: `Perfil de ${user.name}` };
+</script>
+
+<script lang="ts">
+const name = signal(user.name);                        // `user` está en ámbito y tipado
+</script>
+
+<template><h1>{user.name}</h1><input model="name"></template>
+```
+
+- **Cuándo se ejecuta.** Las sentencias del bloque que no son imports, tipos ni `export const route` se ejecutan en cada petición: en SSR y en la petición de datos de cada navegación cliente, después del middleware y de validar `params` y `search` con `route`, igual que `load`. Admiten `await` de nivel superior. Los imports, los tipos y las opciones de ruta se evalúan una vez por módulo.
+- **Exports.** Cada `export const` o `export let` (también desestructurado, `export const { a, b } = ...`) salvo `route` y `head` es un campo de datos de la página. Sólo cruzan los nombres exportados: el resto del bloque, sus imports y sus variables privadas no llegan al bundle cliente ni al payload. Un export que es una promesa se espera antes de renderizar.
+- **En la página.** El `<script>` y la plantilla ven cada export como un valor normal, de sólo lectura en profundidad, con el tipo del export ya esperado. No es una señal: llega en el payload y se sustituye en cada navegación, cuando el bloque vuelve a ejecutarse. Para estado editable, cree una señal a partir de él (`signal(user.name)`). Declarar en el `<script>` un nombre que ya exporta el bloque da `MEEK075`. La página no necesita declarar `data` en `defineProps`; si lo declara, `meeko check` comprueba que sea compatible con los exports.
+- **`export const head`.** Fija el `<head>` de la página como `route.head`: un objeto `{ title, description }` o una función sin argumentos que lo devuelve, calculada en el servidor con los valores del bloque. No forma parte de los datos. Declarar a la vez `export const head` y `route.head` da `MEEK072`.
+- **API de la petición.** `usePage()` devuelve `{ url, params, search, request, context, signal }`: `params` y `search` salen de los schemas de `route` o, sin schema, de los segmentos del ID de ruta; `context` es el contexto de la petición (sesión, servicios, plataforma) y `signal` se aborta si el cliente se desconecta, se revoca la sesión o se cancela la respuesta. `redirect(url, status?)` detiene el bloque y responde con una redirección (`302` por defecto; admite `301`, `302`, `303`, `307` y `308`), que una navegación cliente sigue como la de un loader. `notFound()` detiene el bloque y responde `404` con la página de error más cercana (`+error.meeko` o `app/error.meeko`). Las tres se importan de `@meekojs/meeko/framework` o se usan sin import dentro del bloque. Fuera del nivel superior del bloque (dentro de una función, de las opciones de ruta o en el `<script>` del componente) dan `MEEK073`, y en ejecución lanzan un error con ese código.
+- **Serialización.** Los exports viajan en JSON, como los datos de `load`. `meeko check` da un error de tipos en un export que no se puede serializar: funciones, `undefined`, `bigint`, símbolos e instancias de clase como `Date` o `Map`. En ejecución, un valor que `serializeJson` rechaza hace fallar la respuesta con `500`, como un loader.
+- **Estado entre peticiones.** Como el bloque se ejecuta en cada petición, una variable de nivel superior (`const cache = new Map()`) es nueva cada vez. Un valor que deba compartirse entre peticiones vive en un módulo importado.
+
+Meeko considera que un bloque tiene código de nivel superior si exporta con `export const` o `export let` un nombre distinto de `route` (incluido `head`), o si usa `usePage`, `redirect` o `notFound` fuera de cualquier función y fuera de las opciones de ruta. Un bloque sin ninguna de las dos cosas mantiene el comportamiento de `1.0`: se evalúa una vez como módulo y admite `export default`, `export function` o una constante privada usada por `load`. Con código de nivel superior se aplican estas reglas:
+
+| Código | Causa |
+| --- | --- |
+| `MEEK070` | Código de nivel superior y `route.load` a la vez: los exports son los datos de la página. Elija uno. |
+| `MEEK071` | `export function`, `export class`, `export enum`, `export default`, `export { ... }` o `export const route` junto a otras declaraciones en la misma sentencia. |
+| `MEEK072` | `export const head` y `route.head` a la vez. |
+| `MEEK073` | `usePage`, `redirect` o `notFound` fuera del nivel superior del bloque. |
+| `MEEK074` | Código de nivel superior en una página `render: "client"`, cuyo bloque se ejecuta en el navegador. Use `useApi` o `useRpcQuery`, o renderice en el servidor. |
+| `MEEK075` | Un nombre exportado por el bloque se declara también en el `<script>`. |
+| `MEEK076` | Las opciones de ruta leen un nombre declarado por el código de nivel superior, que se ejecuta después y en cada petición. Mueva el valor compartido a un módulo importado. |
+
+El editor da a los exports su tipo en el `<script>` y en la plantilla, y «ir a definición» sobre `user` lleva al `export` del bloque.
+
+#### Opciones de ruta con `definePage`
+
+```html
+<!-- app/pages/users/[id].meeko -->
+<script server lang="ts">
 import { definePage } from "@meekojs/meeko/framework";
 import * as v from "valibot";
 
@@ -153,9 +244,30 @@ export const route = definePage({
   load: async ({ params, signal }) => ({ id: params.id, signalAborted: signal.aborted }),
   head: ({ data }) => ({ title: data.id }),
 });
+</script>
+
+<script lang="ts">
+export interface Props { params: { id: string }; search: Record<string, string | string[]>; data: { id: string; signalAborted: boolean } }
+const props = defineProps<Props>();
+</script>
+
+<template><h1>{props.data.id}</h1></template>
 ```
 
-Los sidecars validan params y search antes del loader. El loader puede devolver un `Response` para redirigir. `meeko check .` compara el `ComponentProps` de cada página con los `params`, `search` y datos que entrega su sidecar; un error de contrato identifica ambos archivos. También comprueba que `app/app.meeko` y los layouts acepten el `outlet` suministrado por Meeko, y que `+error.meeko` acepte `status` y `message`. Estos contratos rechazan props declaradas como `any`, `never` o `unknown`. Los datos del loader son obligatorios para la página cuando el sidecar declara `load`; una query repetida sin schema puede producir `string[]`, además de `string`. El handler SSR crea el estado de `useState` y el contexto de sesión por petición; transfiere sólo props, estado público y datos de ruta serializables. El navegador hidrata ese payload y pide datos al servidor durante la navegación, por lo que un sidecar privado no entra al bundle cliente; sólo los sidecars `render: "client"` son públicos (véase «Modos de render»). `mountClientApp` gestiona historial, cancelación y limpieza. Si un host usa `loadRoute` directamente en cliente, su loader recibe un estado provisional: Meeko aplica sus cambios al confirmar la ruta y los descarta al cancelar o fallar. Las señales de ese estado deben usarse durante `load`, sin conservar referencias después de retornar. Se puede usar `render: "prerender"` con `prerenderEntries` para rutas dinámicas. `meeko build` lee `render` del sidecar sin ejecutarlo: debe ser un literal de texto dentro de `definePage({ ... })`, de un objeto exportado o de una constante local del mismo archivo; un valor calculado, una clave computada (`["render"]` o `[clave]`) que no vaya seguida de un `render` literal, un spread sin `render` explícito posterior o una reexportación detienen el build con el archivo afectado. El build escribe el HTML y el payload de navegación bajo `.meeko/output/node/prerender/` (`meeko prerender .` repite ese paso sobre un build existente). El servidor sirve esas páginas pasando por el middleware de servidor, el contexto de sesión y el middleware de ruta; inserta la meta CSRF de la sesión en `<head>` sin reescribir el documento. Sin sesión responde con `ETag`, `Vary: cookie` y `cache-control: public, max-age=0, must-revalidate`, y devuelve `304` ante `If-None-Match`; con sesión responde `private, no-store`. Una CDN o caché compartida delante del servidor debe respetar `Vary: cookie` o no almacenar respuestas de peticiones con cookie; si ignora `Vary`, configúrela para omitir la caché cuando la petición traiga la cookie de sesión, porque de lo contrario podría entregar la versión anónima a un usuario con sesión y dejarlo sin meta CSRF. `PrerenderedPage.headOffset` del índice `prerender/manifest.json` se mide en unidades de código UTF-16 del HTML almacenado leído como texto (índices de cadena de JavaScript), no en bytes: un adaptador debe leer el archivo como texto UTF-8 y usar el valor tal cual, sin calcularlo a partir de bytes. Una URL con query string, una entrada dinámica no generada o un host con nonce CSP se renderizan con SSR.
+#### Reglas comunes
+
+El bloque es un módulo TypeScript independiente del componente:
+
+- **Sólo servidor.** El componente compilado nunca lo incluye. Se ejecuta en el servidor con los autoimports de `server/utils` y puede importar `server/` y módulos `*.server.*`; sus imports relativos se resuelven desde la carpeta de la página. Sólo una ruta `render: "client"` lo envía al navegador (véase «Modos de render»).
+- **Opciones de ruta.** Igual que un sidecar: `export const route = definePage({ ... })` o, sin código de nivel superior, `export default`. `render` debe ser un literal que `meeko build` pueda leer sin ejecutarlo.
+- **Sólo en páginas.** Un `<script server>` en un componente, un layout, `+layout.meeko` o `+error.meeko` es un error (`MEEK044`). Un segundo bloque da `MEEK004`, sin `lang="ts"` da `MEEK006` y con un valor (`server="..."`) da `MEEK043`.
+- **Comprobación.** `meeko check` comprueba el bloque con TypeScript en el ámbito del servidor y compara su loader, o sus exports, con las props de la página; los errores señalan la línea y columna del `.meeko`.
+
+`head({ data })`, o `export const head`, devuelve el `title` de la página y, desde `1.1`, su `description`. En SSR, `title` va en `<title>` y `description` en `<meta name="description">`, antes del `<head>` del host; en una navegación se aplican a `document.title` y a esa meta. Una página sin `title` o sin `description` deja los que aporta el host en `document.head`, o ninguno, igual en SSR que al navegar.
+
+Como alternativa, las opciones de ruta pueden vivir en un sidecar `*.route.ts` junto a la página (`app/pages/users/[id].route.ts`), la forma disponible desde `1.0`. Un sidecar no admite código de nivel superior. Una página no puede declarar ambos: Meeko detiene el descubrimiento de rutas con un error que nombra los dos.
+
+Las opciones de ruta validan params y search antes del loader y del código de nivel superior. El loader puede devolver un `Response` para redirigir; el código de nivel superior usa `redirect()`. En una navegación cliente, si la petición de datos responde `404` (por `notFound()` o por un `ApiError` con estado `404` del loader), el navegador muestra el `+error.meeko` más cercano, o `app/error.meeko`, con `{ status: 404, message }`, donde `message` es el código público del error (`NOT_FOUND`), igual que el documento SSR. `meeko check .` compara el `ComponentProps` de cada página con los `params`, `search` y datos que entrega su sidecar; un error de contrato identifica ambos archivos. También comprueba que `app/app.meeko` y los layouts acepten el `outlet` suministrado por Meeko, y que `+error.meeko` y `app/error.meeko` acepten `status` y `message`. Estos contratos rechazan props declaradas como `any`, `never` o `unknown`. Los datos del loader son obligatorios para la página cuando el sidecar declara `load`; una query repetida sin schema puede producir `string[]`, además de `string`. El handler SSR crea el estado de `useState` y el contexto de sesión por petición; transfiere sólo props, estado público y datos de ruta serializables. El navegador hidrata ese payload y pide datos al servidor durante la navegación, por lo que un sidecar privado no entra al bundle cliente; sólo los sidecars `render: "client"` son públicos (véase «Modos de render»). `mountClientApp` gestiona historial, cancelación y limpieza. Si un host usa `loadRoute` directamente en cliente, su loader recibe un estado provisional: Meeko aplica sus cambios al confirmar la ruta y los descarta al cancelar o fallar. Las señales de ese estado deben usarse durante `load`, sin conservar referencias después de retornar. Se puede usar `render: "prerender"` con `prerenderEntries` para rutas dinámicas. `meeko build` lee `render` del sidecar sin ejecutarlo: debe ser un literal de texto dentro de `definePage({ ... })`, de un objeto exportado o de una constante local del mismo archivo; un valor calculado, una clave computada (`["render"]` o `[clave]`) que no vaya seguida de un `render` literal, un spread sin `render` explícito posterior o una reexportación detienen el build con el archivo afectado. El build escribe el HTML y el payload de navegación bajo `.meeko/output/node/prerender/` (`meeko prerender .` repite ese paso sobre un build existente). El servidor sirve esas páginas pasando por el middleware de servidor, el contexto de sesión y el middleware de ruta; inserta la meta CSRF de la sesión en `<head>` sin reescribir el documento. Sin sesión responde con `ETag`, `Vary: cookie` y `cache-control: public, max-age=0, must-revalidate`, y devuelve `304` ante `If-None-Match`; con sesión responde `private, no-store`. Una CDN o caché compartida delante del servidor debe respetar `Vary: cookie` o no almacenar respuestas de peticiones con cookie; si ignora `Vary`, configúrela para omitir la caché cuando la petición traiga la cookie de sesión, porque de lo contrario podría entregar la versión anónima a un usuario con sesión y dejarlo sin meta CSRF. `PrerenderedPage.headOffset` del índice `prerender/manifest.json` se mide en unidades de código UTF-16 del HTML almacenado leído como texto (índices de cadena de JavaScript), no en bytes: un adaptador debe leer el archivo como texto UTF-8 y usar el valor tal cual, sin calcularlo a partir de bytes. Una URL con query string, una entrada dinámica no generada o un host con nonce CSP se renderizan con SSR.
 La comprobación del loader cubre tanto `definePage({ load() { /* ... */ } })` como `definePage(options)` cuando el tipo de `options` conserva un `load` obligatorio.
 
 ### Modos de render
@@ -169,8 +281,11 @@ La comprobación del loader cubre tanto `definePage({ load() { /* ... */ } })` c
 | `"prerender"` | Página completa generada en `meeko build` | Servidor, durante el build | Contenido estático |
 | `"client"` | Sólo los layouts, con el outlet vacío | Navegador | Paneles y vistas interactivas sin requisitos de SEO |
 
-```ts
-// app/pages/notes/index.route.ts: se ejecuta en el navegador
+El código de nivel superior de `<script server>` sigue el modo como un loader: con `"ssr"` y `"stream"` se ejecuta en cada petición y con `"prerender"` una vez por entrada durante `meeko build`. En `"stream"`, un export creado con `defer(...)` llega después de la página, como un valor diferido del loader (véase [Streaming SSR](#streaming-ssr-render-stream)). Con `"client"` no se admite (`MEEK074`), porque el bloque se ejecuta en el navegador.
+
+```html
+<!-- app/pages/notes/index.meeko: el bloque se ejecuta en el navegador -->
+<script server lang="ts">
 import { definePage } from "@meekojs/meeko/framework";
 
 export const route = definePage({
@@ -178,7 +293,10 @@ export const route = definePage({
   load: async ({ url, params, search, signal, state }) => api.notes.list({ signal }),
   head: ({ data }) => ({ title: `${data.length} notas` }),
 });
+</script>
 ```
+
+Con `render: "client"` el bloque `<script server>` (o el sidecar) es público: entra en el bundle del navegador con los autoimports de cliente, aunque su etiqueta diga `server`.
 
 Con `render: "client"` el servidor ejecuta el middleware de servidor y de ruta, crea el contexto de sesión y valida `params` y `search` con los schemas del sidecar (una entrada inválida responde `400`). Después renderiza `app/app.meeko` y los layouts con un outlet vacío, sin llamar a `load` ni a `head`, y envía un payload con `render: "client"` y sólo `params` y `search`. Sin layouts, `#app` queda vacío. En el navegador, Meeko hidrata los layouts, ejecuta `load` con `ClientPageLoadContext` (`url`, `params`, `search`, `signal` y `state`, sin `request` ni `context`) y confirma la página por la misma vía transaccional que una navegación; `head` se ejecuta después de `load` y su `title` se aplica a `document.title`. Un fallo del loader muestra el `+error.meeko` más cercano dentro de los layouts, con el mismo mensaje público que el servidor (`500` informa al observador de errores de navegación; un `ClientError` 4xx conserva su estado y código).
 
@@ -235,22 +353,53 @@ El sellado se aplica a todos los modos de render, no sólo a `"stream"`. Una esc
 - **Loaders en el navegador.** Un sidecar `"client"` (o un host que usa `loadRoute`) también puede devolver `defer`: el navegador aplica el mismo `timeoutMs`, el valor se actualiza cuando su promesa termina y la señal de una fábrica se aborta al agotar el plazo o al salir de la ruta.
 - **Claves.** Un valor diferido puede estar bajo cualquier clave propia, incluidas `constructor` y `prototype`, salvo `__proto__`: el servidor responde `500` al renderizar.
 
+### Enlaces, anclas y scroll
+
+`mountClientApp` convierte en navegación cliente los clics en enlaces del mismo origen hacia una ruta de la aplicación, también los del HTML insertado con `html`. Un enlace a un fragmento de la página actual (`#seccion`, o `/docs#seccion` estando en `/docs`) no se intercepta: el navegador desplaza la página y añade la entrada al historial sin volver a pedir ni renderizar la página, y volver atrás o adelante entre esos fragmentos tampoco la renderiza. `app.navigate("#seccion")` hace lo mismo.
+
+Una navegación nueva empieza arriba de la página o, si su URL tiene un fragmento que nombra un elemento (`id` o `name`), en ese elemento, de forma inmediata aunque la página use `scroll-behavior: smooth`. Una navegación por el historial o con `replace` sólo se desplaza al fragmento, si lo hay. Si la petición de datos de una navegación recibe HTML en lugar de un payload (un hosting estático que sirve el `index.html` prerenderizado, un proxy o una CDN), Meeko carga ese documento en vez de fallar.
+
 ### Estado de navegación
 
-`useNavigation()` devuelve `{ pending }`, una señal de sólo lectura que vale `true` desde que empieza una navegación hasta que su página se confirma, falla o se cancela, incluida la primera carga de una página `"client"`. En SSR y fuera de `mountClientApp` vale siempre `false`.
+`useNavigation()` devuelve `{ pending }`, una señal de sólo lectura que vale `true` desde que empieza una navegación hasta que su página se confirma, falla o se cancela, incluida la primera carga de una página `"client"` y la carga de los `await useApi`/`await useRpcQuery` de la página nueva (véase [Navegación y `render: "client"`](#navegación-y-render-client)). En SSR y fuera de `mountClientApp` vale siempre `false`.
 
 ```ts
 import { useNavigation } from "@meekojs/meeko/framework";
 
-const { pending } = useNavigation();
-// <p if:when="pending.value">Cargando…</p>
+const nav = useNavigation();
+// <p if:when="nav.pending.value">Cargando…</p>
 ```
 
 Los componentes recibidos como props mantienen la dirección del contrato: un componente que exige `label` no satisface un outlet que puede renderizarlo sin `label`. `meeko check` diagnostica la expresión que pasa el componente. Al guardar un módulo TypeScript importado por un `.meeko` abierto, la extensión de VS Code vuelve a comprobar sus diagnósticos y tokens semánticos.
 
 ## Autoimports y TypeScript
 
-Meeko analiza exports AST de `app/{components,composables,utils,stores}`, `shared/{types,schemas,utils,constants,enums}` y `server/utils`. Los símbolos de `app/` están disponibles en cliente y SSR, pero no desde `shared/`; los sufijos `.client.ts` y `.server.ts` restringen un módulo a su entorno. `imports.serverDirs` añade directorios privados exclusivos del servidor. Los símbolos del framework `api`, `rpc`, `socket`, `useSocket`, `useState` y `href` también figuran en el registro. Los imports explícitos prevalecen. Una colisión produce error; nunca se elige por orden de archivos.
+Meeko analiza exports AST de `app/{components,composables,utils,stores}`, `shared/{types,schemas,utils,constants,enums}` y `server/utils`. Los símbolos de `app/` están disponibles en cliente y SSR, pero no desde `shared/`; los sufijos `.client.ts` y `.server.ts` restringen un módulo a su entorno. `imports.serverDirs` añade directorios privados exclusivos del servidor. Los símbolos del framework `api`, `rpc`, `socket`, `useSocket`, `useApi`, `useRpcQuery`, `useRpcMutation`, `useState` y `href`, y `onMounted` de la raíz, también figuran en el registro. Los imports explícitos prevalecen. Una colisión produce error; nunca se elige por orden de archivos. Un `enum` o una clase autoimportados sirven también como tipo, con sus miembros (`Scope.App`); si un archivo sólo los usa como tipo, Meeko inserta `import type`. Los schemas de `shared/schemas` pueden llegar por autoimport a los contratos de API, RPC y Socket. `meeko check` comprueba los `.ts` que importa un `.meeko` con los autoimports de su ámbito y con las rutas generadas, igual que los proyectos `tsconfig.*`.
+
+Los `.ts` normales de `app/` (composables, utils, stores) se ejecutan en SSR y en el navegador, como los `.meeko` que los usan, y sus autoimports del framework (`api`, `rpc`, `socket`, `useSocket`, `useApi`…) se resuelven por entorno: el cliente de servidor en SSR y el del navegador en el navegador. Antes de `1.1` usaban siempre el del navegador, y `meeko dev` o `meeko build` fallaban con «Client-only module reached the server bundle». Un `.client.ts` sigue siendo sólo de navegador.
+
+**Módulos `.client.ts` en `app/`.** Un `.meeko` se compila dos veces, para SSR y para el navegador, así que no puede usar un símbolo de un `.client.ts` ni importarlo de forma estática: `meeko check` y el build lo rechazan («unavailable in server scope», «Client-only module reached the server bundle»). Cárguelo con `import()` dentro de un código que sólo se ejecute en el navegador (un manejador de evento o un `effect`) y protéjalo con `import.meta.env.SSR`, que el build de servidor sustituye por `true` y con el que elimina ese import:
+
+```ts
+async function exportCsv(): Promise<void> {
+  if (import.meta.env.SSR) return;
+  const { downloadCsv } = await import("../utils/download.client.js");
+  downloadCsv(rows.value);
+}
+```
+
+Un `.client.ts` sí puede importarse normalmente desde otros `.client.ts`.
+
+**Stores (`app/stores`).** Es una carpeta de autoimports como `app/composables`; Meeko no define una API de store. Un `signal` creado a nivel de módulo vive mientras vive el proceso, así que en el servidor lo comparten todas las peticiones y usuarios. Para estado de la aplicación use `useState(key, init)` dentro de la función del store: es por petición en SSR, se transfiere al navegador en el payload y en el navegador se comparte entre componentes:
+
+```ts
+// app/stores/cart.ts
+export function useCart() {
+  const items = useState("cart:items", (): string[] => []);
+  const add = (id: string): void => { items.value = [...items.value, id]; };
+  return { items, add };
+}
+```
 
 El compilador `.meeko` y la transformación `.ts` insertan imports ESM reales. Las declaraciones por ámbito se regeneran bajo `.meeko/types/autoimports/` sólo cuando cambia el contenido, para autocompletado y navegación a definición. Los tipos genéricos reexportados conservan parámetros, restricciones y defaults; las firmas overload del mismo símbolo se registran una sola vez, mientras una colisión entre orígenes distintos sigue fallando. El servidor de lenguaje usa el mismo registro y las posiciones AST del compilador. Los proyectos app, server y shared generados por `meeko check` aplican también `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess` y `verbatimModuleSyntax`. `shared/` no puede depender de símbolos app o servidor; el bundle cliente rechaza módulos `server/`, incluidos imports transitivos. Los `*.route.ts` pertenecen al ámbito servidor.
 
@@ -329,6 +478,109 @@ Los schemas públicos de API, RPC y Socket deben exponer tipos Standard Schema c
 
 Los errores de API y RPC se normalizan en el servidor: un `ApiError` conserva `code` y `status`, la respuesta añade `requestId` y `x-request-id`, y un fallo desconocido se devuelve como `INTERNAL_ERROR` sin exponer su mensaje. La misma normalización se aplica al despacho local SSR y al transporte Node, incluso cuando Vite carga módulos en grafos distintos. La navegación que solicita `application/meeko+json` recibe el mismo formato; una página HTML de error conserva el estado HTTP y `x-request-id` sin incluir detalles privados. El servidor generado observa los fallos 5xx: en producción registra tipo e ID, y en desarrollo muestra también el error original. Las respuestas 4xx esperadas no se registran como fallos internos.
 
+### Datos en componentes: `useApi`, `useRpcQuery` y `useRpcMutation`
+
+Desde `1.1`, un componente puede pedir sus propios datos con tres composables autoimportados desde los clientes generados. Usan los mismos contratos, tipos, sesión y CSRF que `api.*` y `rpc.*`:
+
+| Composable | Uso | Devuelve |
+| --- | --- | --- |
+| `useApi(ruta, opciones?)` | Lectura de un endpoint `GET` | `{ data, error, pending, refresh }` |
+| `useRpcQuery(procedimiento, input)` | Lectura mediante un procedimiento RPC | `{ data, error, pending, refresh }` |
+| `useRpcMutation(procedimiento)` | Escritura bajo demanda | `{ mutate(input), data, error, pending }` |
+
+`ruta` es la ruta del endpoint tal como la describe `server/api`, con los segmentos dinámicos entre corchetes: `"/api/users"` o `"/api/users/[id]"`. Sólo se admiten endpoints `GET`. `procedimiento` es el ID del procedimiento con puntos: `server/rpc/users/get.ts` es `"users.get"`. El editor completa rutas y procedimientos, y TypeScript comprueba `params`, `query` e `input` contra el contrato. `data`, `error` y `pending` son señales de sólo lectura; `error` es un `Error` o `null`.
+
+```html
+<!-- app/pages/users/[id].meeko -->
+<script lang="ts">
+const props = defineProps<{ params: { id: string }; search: Record<string, string | string[]> }>();
+const tab = signal("profile");
+const user = await useApi("/api/users/[id]", { params: { id: props.params.id } });
+const activity = await useRpcQuery("users.activity", () => ({ id: props.params.id, tab: tab.value }));
+const rename = useRpcMutation("users.rename");
+async function save(name: string): Promise<void> {
+    await rename.mutate({ id: props.params.id, name });
+    await user.refresh();
+}
+</script>
+<template><h1>{user.data.value.name}</h1><p>{activity.data.value.length} eventos</p></template>
+```
+
+#### Con y sin `await`
+
+- **Con `await`.** El componente no se renderiza hasta tener los datos, también en SSR, y `data` deja de ser nulo en su tipo. Un fallo de la petición se trata como un fallo de la página.
+- **Sin `await`.** El componente se renderiza enseguida con `pending` en `true` y `data` en `null`. La petición no se ejecuta en SSR: empieza en el navegador cuando el componente se monta. Es el patrón para mostrar un indicador de carga:
+
+```html
+<script lang="ts">
+const users = useApi("/api/users");
+</script>
+<template>
+    <p if:when="users.pending.value">Cargando…</p>
+    <p if:when="users.error.value">No se pudieron cargar los usuarios.</p>
+    <ul if:when="users.data.value"><li each:of="users.data.value ?? []" each:as="user" each:key="user.id">{user.name}</li></ul>
+</template>
+```
+
+Las opciones de `useApi` y el `input` de `useRpcQuery` pueden contener señales en sus campos, o ser una función que las lee. Cuando el componente ya está montado en el navegador, un cambio de esas señales vuelve a pedir los datos y actualiza `data`, `pending` y `error`; una petición anterior que sigue en curso se cancela. `refresh()` vuelve a pedir los datos con la entrada actual. Un fallo de una recarga o de `refresh()` sólo actualiza `error`: no muestra la página de error.
+
+Las opciones son opcionales cuando el contrato no exige nada. `useApi(ruta)` admite omitirlas si el endpoint no tiene `params` y su `query` no existe o sólo tiene campos opcionales. `useRpcQuery(procedimiento)` admite omitir el `input` si el schema acepta `{}`, y entonces envía `{}`. Lo mismo vale para los clientes generados: `api.users.get()` se llama sin argumentos cuando el endpoint no tiene `params`, ni `query` obligatoria, ni cuerpo. La firma de `rpc.x(input)` no cambia.
+
+```ts
+const stats = await useRpcQuery("stats.summary");          // input opcional: envía {}
+const users = await useApi("/api/users");                  // query opcional
+const page = await api.users.get({ query: { page: "2" } }); // la query sigue disponible
+```
+
+#### SSR e hidratación
+
+En SSR, el servidor renderiza la página y sus layouts, registra las peticiones de cada `await` de datos, las espera y vuelve a renderizar con los datos, hasta que ninguna pasada se suspende. Las pasadas descartadas se liberan, con su estado y sus efectos, y cada una parte del estado que dejó el loader. Las peticiones se despachan localmente por el mismo pipeline que `api.*` y `rpc.*` en SSR, así que conservan la sesión y el contexto de la petición. En una ruta `render: "stream"` se resuelven antes del primer byte, como el loader crítico. `head` se calcula con los datos del loader o del código de nivel superior de `<script server>`, no con los de estos composables: si el `<title>` depende de un dato, cárguelo allí.
+
+Los datos resueltos viajan en el campo `resources` del payload, por clave de petición (método o procedimiento y entrada). Al hidratar, el navegador los lee de ahí de forma síncrona y no repite la petición. La entrada de un `await` de datos debe depender sólo de props, datos de la ruta y estado: si el navegador pide una clave que el servidor no cargó, la hidratación falla con un error `MEEKO_RESOURCE_MISSING` que nombra la petición. Un componente que en cada pasada pide datos nuevos detiene el render tras 10 pasadas con un error.
+
+#### Navegación y `render: "client"`
+
+Antes de confirmar una navegación, el navegador renderiza la página nueva sin mostrarla para descubrir y cargar sus `await` de datos. Mientras tanto la página anterior sigue visible y `useNavigation().pending` vale `true`. Si la navegación pidió el payload al servidor, los datos que este ya resolvió llegan en `resources` y no se piden otra vez. Un fallo muestra el `+error.meeko` más cercano, o `app/error.meeko`, dentro de los layouts, como un fallo del loader. Las rutas `render: "client"` usan el mismo mecanismo, entero en el navegador. En SSR, un fallo de un `await` de datos también muestra la página de error, con el mismo mensaje público que un fallo del loader.
+
+Ese render previo es una pasada en seco. El setup de la página nueva y de los layouts que no se conservan se ejecuta, con un estado provisional que después se descarta, pero:
+
+- ningún `effect` se ejecuta (`computed` sí calcula su valor);
+- `onMounted` no se ejecuta y la continuación tras un `await` de navegador no empieza;
+- `useSocket` y `socket.x` devuelven un cliente que no conecta.
+
+Lo que se repite es el propio código del nivel superior del setup: una petición con `api.*`, una escritura externa o un contador que se incrementa ahí se ejecutan una vez más por navegación. Llévelos a `onMounted` o a un handler.
+
+La pasada se salta si ningún componente del árbol nuevo puede esperar datos. El compilador marca cada módulo con dos datos estáticos: si su script tiene un `await` de datos y qué componentes pinta su plantilla. El navegador recorre esas marcas desde la página y los layouts nuevos y, si ninguno espera datos, confirma la navegación sin pasada previa; el setup se ejecuta entonces una sola vez. Cuentan como que pueden esperar datos un componente elegido en tiempo de ejecución (`<component is>` con una variable del setup, un elemento de `each:` o un parámetro de un snippet) y un módulo sin marcas (escrito a mano o compilado por una versión anterior). El outlet de un layout (`<component is="props.outlet">`) no se recorre, porque el navegador ya comprueba la página. Límite: un componente que no es un layout y pinta con `<component is="props.outlet">` un componente recibido en una prop llamada `outlet` tampoco se recorre; si ese componente espera datos, no se carga antes de confirmar la navegación y se monta tarde, como se describe a continuación, sin error.
+
+#### Componentes que se montan más tarde
+
+Un componente que aparece después de hidratar o confirmar la página (cuando un `if:` pasa a ser verdadero, en una fila nueva de `each:`, al cambiar el componente de `<component is>` o al recibir props nuevas que lo vuelven a renderizar) reutiliza los datos que la aplicación ya cargó. Si hace un `await` de datos que no están en caché:
+
+- Su zona queda vacía, sin error, mientras los datos se cargan.
+- La carga usa pasadas en seco bajo la raíz del componente que lo contiene, con su mismo contexto (`inject`), sin efectos, sin `onMounted` y sin conexiones de socket.
+- Cuando terminan, el componente se renderiza, se hidrata y ejecuta su `onMounted`. Los datos quedan en la caché de la aplicación para los montajes siguientes.
+- Si el componente se libera antes (el `if:` vuelve a ser falso o la fila desaparece), la petición se aborta y no se pinta nada, ni se ejecuta `onMounted`, ni se informa un error.
+- Si la petición falla, la zona queda vacía y el error llega, con la fuente `"mounted"`, al `provideErrorHandler` más cercano o, si no hay ninguno, al `onError` de `mountClientApp`.
+
+Para mostrar un indicador mientras tanto, use el composable sin `await` y lea `pending`, como en el ejemplo anterior. El error `MEEKO_SUSPENDED` sólo aparece al llamar a `renderToString` o `renderWithState` de un componente con un `await` de datos fuera del framework (véase [api.md](api.md#módulo-generado)).
+
+#### Mutaciones
+
+`useRpcMutation(procedimiento)` no hace ninguna petición hasta que se llama `mutate(input)`, nunca en SSR. `mutate` envía el token CSRF como `rpc.*`, actualiza `pending`, `data` y `error` y devuelve la salida del procedimiento, o rechaza con su error. No se puede esperar con `await` en el nivel superior (`MEEK055`): espere `mutate` dentro de un handler.
+
+#### `load` o composables
+
+| Necesidad | Use |
+| --- | --- |
+| Datos de la página que determinan `head`, una redirección, la sesión o el estado HTTP | Código de nivel superior de `<script server>` (o `load`) |
+| Datos lentos y secundarios en una ruta `"stream"` | Un export, o un campo de `load`, con `defer` |
+| Datos que pertenecen a un componente reutilizable o a un layout | `await useApi` / `await useRpcQuery` |
+| Datos que dependen de señales del componente y se recargan al cambiar | `useApi` / `useRpcQuery`, con o sin `await` |
+| Datos que pueden llegar después del primer pintado, con un indicador de carga | `useApi` / `useRpcQuery` sin `await` |
+| Escrituras | `useRpcMutation`, o `api.*`/`rpc.*` en un handler |
+
+Las reglas de nivel superior de estos composables (`MEEK054`, `MEEK055`) se describen en [api.md](api.md#composables-de-nivel-superior-y-await). Un host propio puede crearlos con `createUseApi(manifest, options)`, `createUseRpcQuery(manifest, options)` y `createUseRpcMutation(manifest, options)` de `@meekojs/meeko/framework`, que es lo que hacen los clientes generados; los tipos `DataResource`, `LoadedResource`, `RpcMutation`, `UseApi`, `UseRpcQuery`, `UseRpcMutation`, `ApiQueryContract`, `ApiQueryOptions` y `Reactive` describen su forma.
+
 ## WebSocket
 
 `server/socket/chat.ts` exporta un `defineSocketChannel` con schemas separados para cada dirección. Los schemas expuestos al cliente deben venir de `shared/`. El generador emite un contrato público sin importar handlers privados.
@@ -354,10 +606,44 @@ const unsubscribe = chat?.on("message", (message) => console.log(message.text));
 const send = async () => chat?.emit("message", { text: "Hola", roomId: "general" });
 ```
 
-`socket.chat.on(...)` y `socket.chat.emit(...)` ofrecen un registro tipado alternativo. El registro abre conexiones sólo al acceder al canal en navegador. Dentro de `mountClientApp`, cada aplicación conserva su propia conexión por canal y la cierra al desmontarse; los listeners registrados durante el setup se desuscriben al liberar su raíz. Fuera de una aplicación montada, el registro conserva su cliente compartido y el llamador debe liberar sus listeners. `useSocket` requiere una raíz de componente y libera su conexión al desmontar. Durante SSR no se abre ninguna conexión. El cliente usa WebSocket nativo, reconexión con retroceso configurable y entrega a lo sumo una vez: `emit` rechaza si está desconectado, sin cola ni reenvío. Los mensajes entrantes inválidos cierran el canal; un error del transporte se informa una vez por conexión activa y los errores de conexiones reemplazadas se ignoran. Un listener u observador de `state` que falle se informa sin impedir la ejecución de los demás listeners ni salir del callback del transporte. El cliente de bajo nivel acepta `onError(error)` para observar estos fallos; sin callback de aplicación o componente, los registra en la consola.
+`useSocket` sin `await` sólo puede llamarse en el navegador (en SSR lanza un error), de ahí la comprobación de `window`. Desde `1.1`, `await useSocket(...)` en el nivel superior evita esa comprobación: el setup se divide en ese punto y el resto se ejecuta sólo en el navegador, tras montar el componente y con el socket ya abierto (estado `"open"`). La plantilla sólo puede usar los nombres declarados antes del `await` (`MEEK057`), y si el socket no llega a abrirse, la continuación sigue esperando (véase [api.md](api.md#composables-de-nivel-superior-y-await)):
+
+```html
+<script lang="ts">
+const messages = signal<string[]>([]);
+const chat = await useSocket("chat", { roomId: "general" });
+chat.on("message", (message) => { messages.value = [...messages.value, message.text]; });
+</script>
+<template><p each:of="messages.value" each:as="text">{text}</p></template>
+```
+
+La firma y el contrato de `useSocket` sin `await` no cambian. `socket.chat.on(...)` y `socket.chat.emit(...)` ofrecen un registro tipado alternativo. El registro abre conexiones sólo al acceder al canal en navegador. Dentro de `mountClientApp`, cada aplicación conserva su propia conexión por canal y la cierra al desmontarse; los listeners registrados durante el setup se desuscriben al liberar su raíz. Fuera de una aplicación montada, el registro conserva su cliente compartido y el llamador debe liberar sus listeners. `useSocket` requiere una raíz de componente y libera su conexión al desmontar. Durante SSR no se abre ninguna conexión. En el navegador tampoco la abren el render que produce el HTML de un componente antes de montarlo (bajo un `if:` o al confirmar una navegación) ni las pasadas en seco: ahí `useSocket` y `socket.x` devuelven un cliente que se queda en `"connecting"`, cuyo `emit` rechaza, y la conexión la abre el montaje, una sola vez. El cliente usa WebSocket nativo, reconexión con retroceso configurable y entrega a lo sumo una vez: `emit` rechaza si está desconectado, sin cola ni reenvío. Los mensajes entrantes inválidos cierran el canal; un error del transporte se informa una vez por conexión activa y los errores de conexiones reemplazadas se ignoran. Un listener u observador de `state` que falle se informa sin impedir la ejecución de los demás listeners ni salir del callback del transporte. El cliente de bajo nivel acepta `onError(error)` para observar estos fallos; sin callback de aplicación o componente, los registra en la consola.
 El registro `socket` es de alcance de aplicación: cancele listeners con la función que devuelve `on` y cierre el canal cuando ya no se necesite.
 
-`serveNode` conecta `attachNodeWebSocketServer` al mismo servidor HTTP cuando la aplicación declara canales. El adaptador Node usa `ws` para framing y upgrades; Bun usa el WebSocket nativo de `Bun.serve` y Deno `Deno.upgradeWebSocket` (véanse sus límites en [Bun](#bun) y [Deno](#deno)), y Cloudflare Workers aloja cada sala en un Durable Object con hibernación (véase [Cloudflare Workers](#cloudflare-workers)). Todos comparten `createSocketUpgradeHandler`, que comprueba ruta, Origin y sesión antes del upgrade, y el hub existente valida Origin, sesión, canal, sala, evento y payload; aplica límites de mensaje/buffer, heartbeat y cierre ordenado. Tras un proxy, el mismo `publicOrigin` de `server/runtime.ts` o `PUBLIC_ORIGIN` rige la comprobación de Origin de HTTP y de Socket.
+**Rechazo de autenticación o autorización.** Desde `1.1`, cuando el servidor rechaza la sesión, el cliente no reintenta: su `state` pasa al estado terminal `"unauthorized"`, deja de escuchar y el observador de errores recibe un `ClientError` con `status` `401` (código `UNAUTHENTICATED`) o `403` (`FORBIDDEN`), no el error genérico del transporte. Lo detecta en los códigos de cierre `4401` y `4403`, en el código de política del hub (`1008`, con el motivo `Unauthorized`, `Session expired` o `Session revoked`) y en un handshake rechazado con `401` o `403` cuando la implementación de `WebSocket` expone el estado HTTP, como el paquete `ws` en Node mediante `webSocketFactory`. `close()` pasa un cliente `"unauthorized"` a `"closed"`; para volver a intentarlo, cree otro cliente (en un componente, al volver a montarlo).
+
+**Cierres `4401` y `4403` del handshake.** El `WebSocket` del navegador (y el global de Node) no expone el estado HTTP de un handshake rechazado, así que desde `1.1` los adaptadores de Meeko no responden con `401` ni `403` a un rechazo de sesión o de autorización del canal. Si la comprobación previa del hub rechaza la sesión (un canal `auth: "required"` sin sesión, `401`) o la autorización (`authorize` devuelve `false`, `403`), el servidor acepta el upgrade y cierra en seguida con `4401` (motivo «Autenticación requerida») o `4403` («Acceso denegado»). No llama a ningún handler ni entrega mensajes, y el motivo es un texto fijo, sin datos de la sesión. El cliente llega así a `"unauthorized"` también en el navegador, sin reintentar. Como el upgrade se completa, `state` puede pasar un instante por `"open"` antes del cierre, y un `emit` hecho en ese momento se descarta. Un hub que vuelve a autorizar una conexión ya aceptada, como el Durable Object de una sala al despertar, cierra del mismo modo con `4401` o `4403`.
+
+Los demás rechazos del handshake mantienen su respuesta HTTP, que el navegador ve como un fallo de red y reintenta con retroceso: nombre de canal inválido, método o petición que no es de upgrade (`400`), canal inexistente (`404`), los límites (como `431` en Cloudflare) y el Origin no permitido (`403` `INVALID_ORIGIN`). El Origin es una política de la petición, no la autorización del canal: un origen ajeno nunca completa un upgrade ni llega a la comprobación de la sesión, de modo que tampoco puede distinguir un `4401` de un `4403`.
+
+`serveNode` conecta `attachNodeWebSocketServer` al mismo servidor HTTP cuando la aplicación declara canales. El adaptador Node usa `ws` para framing y upgrades; Bun usa el WebSocket nativo de `Bun.serve` y Deno `Deno.upgradeWebSocket` (véanse sus límites en [Bun](#bun) y [Deno](#deno)), y Cloudflare Workers aloja cada sala en un Durable Object con hibernación (véase [Cloudflare Workers](#cloudflare-workers)). Todos comparten `createSocketUpgradeHandler`, que comprueba ruta, Origin y sesión antes del upgrade y devuelve `{ action: "reject", status, close }` en los rechazos de sesión o autorización. Un adaptador propio que atiende `close` hace el upgrade y cierra con `close.code` y `close.reason`; uno escrito para `1.0`, que lo ignora, sigue respondiendo `status`. El hub existente valida Origin, sesión, canal, sala, evento y payload; aplica límites de mensaje/buffer, heartbeat y cierre ordenado. Tras un proxy, el mismo `publicOrigin` de `server/runtime.ts` o `PUBLIC_ORIGIN` rige la comprobación de Origin de HTTP y de Socket.
+
+### Clientes con URL y contrato explícitos
+
+El autoimport `useSocket("canal", opciones)` cubre los canales de la propia aplicación. Para otra URL o un contrato propio, `@meekojs/meeko/framework` ofrece dos funciones con la firma `(url, contract, options)`:
+
+- `useSocketClient` (desde `1.1`) liga el cliente a la raíz del componente actual, igual que el autoimport: lanza un error en SSR, no conecta en un render que sólo produce HTML, usa el observador de errores más cercano y cierra la conexión al desmontar. Admite `await useSocketClient(...)` en el nivel superior del `<script>`.
+- `createSocketClient` crea un cliente independiente, también fuera de un componente; el llamador lo cierra con `close()`.
+
+```ts
+import { useSocketClient } from "@meekojs/meeko/framework";
+
+// Dentro de <script lang="ts"> de un componente
+const feed = await useSocketClient("wss://feed.example.com/_meeko/socket/prices", pricesContract);
+feed.on("price", (price) => console.log(price.symbol, price.value));
+```
+
+Hasta `1.0` esta función se exportaba como `useSocket` desde `@meekojs/meeko/framework`, con el mismo nombre que el autoimport generado y otra firma. Ese export sigue disponible como alias obsoleto de `useSocketClient` (es la misma función) durante toda la serie 1.x y se retirará en `2.0`. El autoimport `useSocket("canal")` de los clientes generados no está obsoleto. En un proyecto sin clientes generados, el autoimport `useSocket` resuelve a `useSocketClient`.
 
 ### Broadcast y varias instancias
 
@@ -463,6 +749,18 @@ Límites conocidos de la notificación:
 - **Avisos falsificables.** Cualquiera con permiso `PUBLISH` sobre el Redis puede publicar un `familyId` en `<prefix>revoked`. El aviso no borra datos ni concede acceso, pero aborta las peticiones en curso y cierra los sockets de esa familia en todas las instancias (denegación de servicio). Restrinja con ACL de Redis quién puede publicar en ese canal.
 
 Un almacenamiento caído propaga error y no concede acceso. No se debe usar un store en memoria en producción. `Secure` requiere HTTPS en despliegue; configure el proxy y `PUBLIC_ORIGIN` acorde al origen público.
+
+## Limpiar el proyecto
+
+`meeko clean [directorio]` borra todo lo que genera Meeko para dejar el proyecto limpio:
+
+| Comando | Borra | Conserva |
+| --- | --- | --- |
+| `meeko clean` | `.meeko/` (tipos, entradas, manifiestos, builds, `tsconfig.*` generados) y la caché de Vite `node_modules/.vite` | El resto de `node_modules` y todos los archivos de la aplicación |
+| `meeko clean --all` | Lo anterior y `node_modules` | Lockfiles, `.env`, `package.json` y el código |
+| `meeko clean --dry-run` | Nada: muestra qué borraría, con el número de archivos y el tamaño | Todo |
+
+El comando sólo actúa sobre un proyecto Meeko (con `meeko.config.*` o con `@meekojs/meeko` en `dependencies`/`devDependencies`) y rechaza la raíz de una unidad y el directorio del usuario. Borra únicamente esa lista fija de rutas dentro del proyecto y **nunca sigue enlaces**: un symlink o una junction se elimina como enlace sin entrar en su destino, así que es seguro con `link:` de pnpm, donde `node_modules/@meekojs/meeko` apunta a otro repositorio. Si `node_modules` es un enlace, la caché de Vite se omite con un aviso. Un archivo bloqueado se reintenta; si el error persiste, se informa, se sigue con el resto y el comando termina con código 1. Para reinstalar desde cero: `meeko clean --all` y después `pnpm install`.
 
 ## Build, despliegue y verificación
 
@@ -643,7 +941,7 @@ Workers KV no sirve como store de sesiones: no ofrece operaciones atómicas de c
 
 #### Socket y Durable Objects
 
-El Worker comprueba la ruta, el Origin y la autorización del canal antes del upgrade (las mismas respuestas `400`, `401`, `403` y `404` que el resto de adaptadores) y reenvía la conexión al Durable Object de su sala: `env.MEEKO_SOCKET.idFromName(canal + "\0" + sala)`. Cada par canal/sala es un objeto, que:
+El Worker comprueba la ruta, el Origin y la autorización del canal antes del upgrade, con las mismas respuestas que el resto de adaptadores: `400`, `403` `INVALID_ORIGIN` y `404` por HTTP, y los rechazos de sesión o autorización con el cierre `4401` o `4403` (véase [WebSocket](#websocket)), que el propio Worker hace con un `WebSocketPair` sin despertar el Durable Object de la sala. Si los acepta, reenvía la conexión al Durable Object de su sala: `env.MEEKO_SOCKET.idFromName(canal + "\0" + sala)`. Cada par canal/sala es un objeto, que:
 
 - acepta el WebSocket con la API de hibernación (`ctx.acceptWebSocket`), de modo que las conexiones inactivas no mantienen el objeto en memoria;
 - guarda con `serializeAttachment` el canal, la sala, la URL, la cookie de sesión (sólo la cookie con el nombre de `SessionManager`, no el resto de la cabecera `Cookie`) y las cabeceras `origin` y `authorization`. Al despertar reconstruye cada conexión desde ese estado y el hub vuelve a autorizar. Los canales ven esas mismas cabeceras antes y después de hibernar. `keepHeaders` añade otras (en minúsculas; `"cookie"` conserva la cabecera completa). Cloudflare limita ese attachment a 16.384 bytes serializados: Meeko estima el tamaño antes de aceptar el WebSocket y, si no cabe, responde `431` y notifica el error a `onError` en lugar de abrir una conexión que se cerraría con `1011`;
@@ -675,7 +973,7 @@ Para un Worker propio, `@meekojs/meeko/cloudflare` exporta las piezas que usa el
 `tests/conformance/` construye la misma aplicación de prueba (`tests/fixtures/conformance-app/`) con cada adaptador. Antes de arrancar la salida en su runtime real, retira las fuentes; para Bun, Deno y workerd retira también `node_modules`. La variante `workerd` construye con el adaptador `cloudflare` y ejecuta la salida con el mismo runtime local que `wrangler dev` (workerd tras el proxy de Wrangler, mediante `createTestHarness`), con D1 y Durable Objects en memoria. Las mismas aserciones cubren:
 
 - SSR con loader y plataforma, API, RPC, CSRF y Origin;
-- `404`, `405` con `Allow`, y `HEAD`;
+- `404`, `405` con `Allow`, y `HEAD`, incluida la `404` de una página sin ruta con `app/error.meeko` dentro de los layouts;
 - assets con `ETag`/`304` y política de caché, e intentos de traversal (`..`, `%2e%2e`, `%2f`, `%5c`) y de leer archivos del build;
 - páginas prerenderizadas con la meta CSRF de la sesión;
 - orden del middleware;
@@ -739,7 +1037,7 @@ Tras 500 renders SSR, el heap pasó de 87,276,056 a 87,012,304 bytes después de
 
 ## Compatibilidad y versionado
 
-Las entradas públicas soportadas de la versión actual son `@meekojs/meeko`, `/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare`, `/build`, `/vite` y `/devtools-ui`. `/internal` existe para el código generado por Meeko y no es contrato de consumo directo. La compilación se ofrece mediante la CLI y Vite; la raíz pública expone la reactividad y el runtime de SSR e hidratación, pero no una función `compile`. `defineMeekoConfig`, routing, `definePage`, `useState`, `createApiClient`, `createRpcClient`, `defineSocketChannel`, `attachNodeWebSocketServer`, `RedisSessionStore` y `SqlSessionStore` conservan sus nombres actuales. Los autoimports generados `api`, `rpc`, `socket` y `useSocket` dependen del manifiesto de cada aplicación.
+Las entradas públicas soportadas de la versión actual son `@meekojs/meeko`, `/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare`, `/build`, `/vite`, `/devtools-ui` y, desde `1.1`, `/prettier`. `/internal` existe para el código generado por Meeko y no es contrato de consumo directo. La compilación se ofrece mediante la CLI y Vite; la raíz pública expone la reactividad y el runtime de SSR e hidratación, pero no una función `compile`. `defineMeekoConfig`, routing, `definePage`, `useState`, `createApiClient`, `createRpcClient`, `defineSocketChannel`, `attachNodeWebSocketServer`, `RedisSessionStore` y `SqlSessionStore` conservan sus nombres actuales. Los autoimports generados `api`, `rpc`, `socket` y `useSocket` dependen del manifiesto de cada aplicación.
 
 Meeko sigue SemVer desde `1.0`: el contrato público, lo que no es público y la política de deprecación están en [stability.md](stability.md). Una publicación requiere lockfile reproducible con el pnpm declarado, CI verde, consumidor externo y revisión del tarball. No se aumenta la versión automáticamente.
 

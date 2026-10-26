@@ -94,11 +94,12 @@ export async function checkFrameworkPageContracts(projectRoot: string): Promise<
     if (!alias) continue;
     const filename = resolve(root, alias.file);
     const source = await readFile(filename, "utf8");
-    const unsafe = match[3]!.includes("props cannot be any, never or unknown");
-    const title = alias.kind === "MEEK_PAGE_PROPS" ? "Page" : alias.kind === "MEEK_LAYOUT_PROPS" ? "Layout" : "Error page";
-    const message = unsafe ? `${title} ${alias.file} props cannot be any, never or unknown`
-      : alias.kind === "MEEK_PAGE_PROPS" ? `Page ${alias.file} props do not match loader ${alias.sidecar ?? "(no sidecar)"}`
-        : `${title} ${alias.file} props do not match the values supplied by Meeko`;
+    const unsafe = match[3]!.includes("no pueden ser any, never ni unknown");
+    // Whole phrases, so each kind keeps its own article and contraction.
+    const owner = alias.kind === "MEEK_PAGE_PROPS" ? "Las props de la página" : alias.kind === "MEEK_LAYOUT_PROPS" ? "Las props del layout" : "Las props de la página de error";
+    const message = unsafe ? `${owner} ${alias.file} no pueden ser any, never ni unknown`
+      : alias.kind === "MEEK_PAGE_PROPS" ? `${owner} ${alias.file} no coinciden con el loader ${alias.sidecar ?? "(sin sidecar)"}`
+        : `${owner} ${alias.file} no coinciden con los valores que aporta Meeko`;
     diagnostics.push({ filename, offset: contractSourceOffset(source, filename), code: alias.kind, message });
   }
   return diagnostics;

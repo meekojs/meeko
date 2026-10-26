@@ -6,7 +6,8 @@ import type { AssetManifest } from "../framework-server/assets.js";
 import { discoverServerManifest } from "../framework-server/manifest-discovery.js";
 import { serializeJson } from "../server.js";
 import { discoverConfiguredRoutes } from "./config.js";
-import type { RouteRecord } from "./router.js";
+import { discoverErrorPage } from "./routes-discovery.js";
+import type { ErrorPageRecord, RouteRecord } from "./router.js";
 
 export const frameworkClientEntry = ".meeko/generated/entry-client.ts";
 export const frameworkServerEntry = ".meeko/generated/entry-server.ts";
@@ -45,6 +46,13 @@ export function portableRoutes(root: string, routes: readonly RouteRecord[], opt
   }));
 }
 
+/** `app/error.meeko` of the project with module keys, or undefined without one. */
+export async function portableErrorPage(projectRoot: string): Promise<ErrorPageRecord | undefined> {
+  const root = resolve(projectRoot);
+  const page = await discoverErrorPage(root);
+  return page && { file: moduleKey(root, page.file), layouts: page.layouts.map((layout) => moduleKey(root, layout)) };
+}
+
 async function scripts(directory: string, exclude: RegExp): Promise<string[]> {
   let entries;
   try { entries = await readdir(directory, { withFileTypes: true }); }
@@ -74,9 +82,11 @@ export async function discoverAppManifest(projectRoot: string, client: ClientAss
   const server = await discoverServerManifest(root);
   const routeMiddleware = (await scripts(resolve(root, "app", "middleware"), /\.(?:test|spec|d|server|client)\.ts$/)).map((file) => moduleKey(root, file)).sort();
   const serverMiddleware = (await scripts(resolve(root, "server", "middleware"), /\.(?:test|spec|d|client)\.ts$/)).map((file) => moduleKey(root, file)).sort();
+  const errorPage = await portableErrorPage(root);
   const manifest: AppManifest = {
     version: 1,
     routes,
+    ...(errorPage ? { errorPage } : {}),
     server: {
       api: server.api.map((endpoint) => ({ ...endpoint, file: moduleKey(root, endpoint.file) })),
       rpc: server.rpc.map((endpoint) => ({ ...endpoint, file: moduleKey(root, endpoint.file) })),
@@ -91,6 +101,7 @@ export async function discoverAppManifest(projectRoot: string, client: ClientAss
   for (const route of routes) {
     for (const key of [route.file, ...route.layouts, ...(route.error ? [route.error] : []), ...(route.sidecar ? [route.sidecar] : [])]) modules.add(key);
   }
+  if (errorPage) for (const key of [errorPage.file, ...errorPage.layouts]) modules.add(key);
   for (const endpoint of [...manifest.server.api, ...manifest.server.rpc, ...manifest.server.socket ?? []]) modules.add(endpoint.file);
   for (const key of [...routeMiddleware, ...serverMiddleware]) modules.add(key);
   const runtimeFile = findRuntimeFile(root);
@@ -116,11 +127,12 @@ export async function serverAppSource(projectRoot: string, build: BuildAppData |
   ].join("\n");
 }
 
-/** Source of `virtual:meeko-manifest/client`: routes for client navigation. */
+/** Source of `virtual:meeko-manifest/client`: routes and the application error page for client navigation. */
 export async function clientRoutesSource(projectRoot: string): Promise<string> {
   const root = resolve(projectRoot);
   const routes = portableRoutes(root, await discoverConfiguredRoutes(root), { sidecars: "client" });
-  return `export const routes = ${serializeJson(routes)};\n`;
+  const errorPage = await portableErrorPage(root);
+  return `export const routes = ${serializeJson(routes)};\nexport const errorPage = ${errorPage ? serializeJson(errorPage) : "undefined"};\n`;
 }
 
 /**

@@ -3,17 +3,20 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire as createModuleRequire } from "node:module";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
-import { compileWithAutoImports } from "./autoimports.js";
+import { applyAutoImports, compileWithAutoImports, discoverAutoImports } from "./autoimports.js";
 import type { AutoImport } from "./autoimports.js";
 import { originalOffset } from "./compiler/mapping.js";
 import type { SourceMapping } from "./compiler/mapping.js";
-import { moduleSpecifiers } from "./compiler/import-graph.js";
+import { moduleSpecifiers, replaceModuleSpecifiers } from "./compiler/import-graph.js";
 import { projectRoot } from "./compiler/project-root.js";
 import { compileError, MeekoCompileError, locate } from "./compiler/sfc.js";
 import type { CompileDiagnostic } from "./compiler/sfc.js";
+import { UnexposedRefError } from "./element-refs.js";
+import { routeBlockTypeSource } from "./framework/route-block-types.js";
+import { pageRouteId } from "./framework/server-script.js";
 
 const execFileAsync = promisify(execFile);
 const typescriptPackage = fileURLToPath(import.meta.resolve("typescript/package.json"));
@@ -30,12 +33,30 @@ interface GeneratedEntry {
   source: string;
   code: string;
   mappings: SourceMapping[];
+  /** TypeScript copy of the page's `<script server>`, which types the exports the page reads. */
+  server?: { readonly file: string; readonly code: string };
 }
 
 /** Ajustes de `checkSource` para herramientas que no deben ejecutar la configuración del proyecto. */
 export interface CheckSourceOptions {
   /** Registro de autoimports por raíz de proyecto; por defecto se carga la configuración como el CLI. */
   readonly autoImports?: (projectRoot: string) => readonly AutoImport[] | Promise<readonly AutoImport[]>;
+}
+
+function componentTarget(rootDirectory: string, filename: string): "client" | "server" {
+  return relative(rootDirectory, filename).split(/[\\/]/)[0] === "server" ? "server" : "client";
+}
+
+/**
+ * Generated declarations that the `tsconfig.app.json` and `tsconfig.server.json` projects
+ * load: the autoimport globals of the component's scope, which `.ts` modules imported by the
+ * component rely on, and the route ids that type `href`. Only existing files are used, so a
+ * component outside a framework project is checked as before.
+ */
+function generatedDeclarations(rootDirectory: string, filename: string): string[] {
+  const types = join(rootDirectory, ".meeko", "types");
+  return [join(types, "autoimports", `${componentTarget(rootDirectory, filename)}.d.ts`), join(types, "routes.d.ts")]
+    .filter((file) => existsSync(file));
 }
 
 async function compileGraph(source: string, filename: string, options: CheckSourceOptions): Promise<{ root: GeneratedEntry; entries: Map<string, GeneratedEntry>; tempDirectory: string }> {
@@ -47,7 +68,7 @@ async function compileGraph(source: string, filename: string, options: CheckSour
   async function add(original: string, content: string): Promise<GeneratedEntry> {
     const previous = byOriginal.get(original);
     if (previous) return previous;
-    const target = relative(rootDirectory, original).split(/[\\/]/)[0] === "server" ? "server" : "client";
+    const target = componentTarget(rootDirectory, original);
     const registry = options.autoImports ? await options.autoImports(projectRoot(original)) : undefined;
     const compiled = await compileWithAutoImports(content, original, {}, target, registry);
     const entry: GeneratedEntry = {
@@ -57,12 +78,17 @@ async function compileGraph(source: string, filename: string, options: CheckSour
     };
     byOriginal.set(original, entry);
     byGenerated.set(entry.generated, entry);
+    const serverSpecifier = `./${basename(original)}.server.js`;
+    if (entry.code.includes(`from ${JSON.stringify(serverSpecifier)}`)) {
+      entry.server = { file: entry.generated.replace(/\.ts$/, ".server.ts"), code: serverCopy(content, original, entry.generated.replace(/\.ts$/, ".server.ts"), registry ?? await discoverAutoImports(rootDirectory)) };
+    }
     const edits: Array<{ start: number; end: number; text: string }> = [];
     for (const specifier of moduleSpecifiers(entry.code, entry.generated)) {
       const { value, start, end } = specifier;
+      if (entry.server && value === serverSpecifier) continue;
       if (!value.endsWith(".meeko") && !value.startsWith(".")) continue;
       if (value.endsWith(".meeko") && !value.startsWith(".")) {
-        throw compileError(content, original, "MEEK033", "Component imports must use relative .meeko paths", originalOffset(entry.mappings, start) ?? 0);
+        throw compileError(content, original, "MEEK033", "Los imports de componentes deben usar rutas .meeko relativas", originalOffset(entry.mappings, start) ?? 0);
       }
       let destination: string;
       if (value.endsWith(".meeko")) {
@@ -71,7 +97,7 @@ async function compileGraph(source: string, filename: string, options: CheckSour
         try {
           childSource = await readFile(childFilename, "utf8");
         } catch {
-          throw compileError(content, original, "MEEK034", `Component import not found: ${value}`, originalOffset(entry.mappings, start) ?? 0);
+          throw compileError(content, original, "MEEK034", `No se encuentra el componente importado: ${value}`, originalOffset(entry.mappings, start) ?? 0);
         }
         const child = await add(childFilename, childSource);
         destination = child.generated.replace(/\.ts$/, ".js");
@@ -94,6 +120,23 @@ async function compileGraph(source: string, filename: string, options: CheckSour
   }
   const root = await add(filename, source);
   return { root, entries: byGenerated, tempDirectory: generatedDirectory };
+}
+
+/**
+ * The page's `<script server>` as a module beside the compiled page, with its
+ * server autoimports and relative imports resolved from the page's folder. Its
+ * own diagnostics belong to the server TypeScript project, not to this check.
+ */
+function serverCopy(source: string, original: string, file: string, registry: readonly AutoImport[]): string {
+  const block = routeBlockTypeSource(source, original, pageRouteId(original)) ?? "export {};\n";
+  let code = block;
+  try { code = applyAutoImports(block, original, registry, "server"); }
+  catch { /* An unresolved autoimport is reported by the server project. */ }
+  return replaceModuleSpecifiers(code, file, ({ value }) => {
+    if (!value.startsWith(".")) return value;
+    const target = relative(dirname(file), resolve(dirname(original), value)).replaceAll("\\", "/");
+    return target.startsWith(".") ? target : `./${target}`;
+  });
 }
 
 /** Resolution options of the project tsconfig that `meeko check` shares with the language server. */
@@ -136,6 +179,44 @@ function parseTypeScriptOutput(output: string): Array<{ file: string; line: numb
   return diagnostics;
 }
 
+/**
+ * Original span `[start, end)` of the innermost mapping that contains `generated` when that mapping
+ * does not keep the expression's length: the compiler rewrote it, so a position inside it is only
+ * an approximation. `undefined` for a mapping that copies the source verbatim.
+ */
+function rewrittenSpan(mappings: readonly SourceMapping[], generated: number): readonly [number, number] | undefined {
+  const span = mappings
+    .filter((entry) => generated >= entry.generatedStart && generated < entry.generatedEnd)
+    .sort((a, b) => (a.generatedEnd - a.generatedStart) - (b.generatedEnd - b.generatedStart))[0];
+  if (!span || span.generatedEnd - span.generatedStart === span.originalLength) return undefined;
+  return [span.originalStart, span.originalStart + span.originalLength];
+}
+
+/** The type error of `UnexposedRefMessage` that TypeScript reports for `await useElementRef(...)`. */
+const unexposedRefType = /\bMEEK080: /;
+
+/**
+ * `await useElementRef("name")` on a component without `defineExpose` fails as a TypeScript
+ * assignability error whose type carries the MEEK080 text. It is reported as MEEK080, at the
+ * `useElementRef` call of the original source, with the same message as `UnexposedRefError`.
+ */
+function unexposedRefDiagnostic(entry: GeneratedEntry, generated: number, offset: number | undefined): CompileDiagnostic {
+  const ref = /\belementRef<[^>]*>\(\s*("(?:[^"\\]|\\.)*")/.exec(entry.code.slice(Math.max(0, generated - 32), generated + 512));
+  let name: string | undefined;
+  try { name = ref ? JSON.parse(ref[1]!) as string : undefined; }
+  catch { name = undefined; }
+  const quoted = name === undefined ? "[^\"'`]*" : name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const calls = [...entry.source.matchAll(new RegExp(`\\buseElementRef\\s*\\(\\s*(["'\`])(${quoted})\\1`, "g"))];
+  const call = calls.filter((match) => offset !== undefined && match.index <= offset).at(-1) ?? calls[0];
+  const named = name ?? call?.[2] ?? "name";
+  return {
+    code: "MEEK080",
+    message: new UnexposedRefError(named).message.replace(/^MEEK080: /, ""),
+    filename: entry.original,
+    location: locate(entry.source, call?.index ?? offset ?? 0),
+  };
+}
+
 /** Comprueba un componente con TypeScript 7 y devuelve errores ubicados en el .meeko original. */
 export async function checkSource(source: string, filename: string, options: CheckSourceOptions = {}): Promise<CompileDiagnostic[]> {
   const absolute = resolve(filename);
@@ -152,18 +233,21 @@ export async function checkSource(source: string, filename: string, options: Che
     for (const entry of graph.entries.values()) {
       await mkdir(dirname(entry.generated), { recursive: true });
       await writeFile(entry.generated, entry.code, { encoding: "utf8", flag: "wx" });
+      if (entry.server) await writeFile(entry.server.file, entry.server.code, { encoding: "utf8", flag: "wx" });
     }
     // Options such as `paths` only exist in a tsconfig, so they go into a temporary one; the
     // command-line flags below still override every type-checking option.
-    const resolution = await projectResolutionOptions(projectRoot(absolute));
+    const rootDirectory = projectRoot(absolute);
+    const resolution = await projectResolutionOptions(rootDirectory);
+    const files = [graph.root.generated, ...generatedDeclarations(rootDirectory, absolute)];
     const project = resolution ? join(graph.tempDirectory, "tsconfig.json") : undefined;
-    if (project) await writeFile(project, JSON.stringify({ compilerOptions: resolution, files: [graph.root.generated] }), { encoding: "utf8", flag: "wx" });
+    if (project) await writeFile(project, JSON.stringify({ compilerOptions: resolution, files }), { encoding: "utf8", flag: "wx" });
     try {
       const result = await execFileAsync(tscExecutable, [
         ...(nativeTscPath ? [] : [tscPath]), ...(project ? ["--project", project] : ["--ignoreConfig"]), "--noEmit", "--pretty", "false", "--strict", "--skipLibCheck",
         "--noUncheckedIndexedAccess", "--exactOptionalPropertyTypes", "--verbatimModuleSyntax",
         "--module", "nodenext", "--moduleResolution", "nodenext", "--target", "es2022",
-        "--lib", "es2022,dom", ...(project ? [] : [graph.root.generated]),
+        "--lib", "es2022,dom", ...(project ? [] : files),
       ], { cwd: dirname(absolute), maxBuffer: 8 * 1024 * 1024, windowsHide: true });
       output = result.stdout + result.stderr;
     } catch (error) {
@@ -175,26 +259,36 @@ export async function checkSource(source: string, filename: string, options: Che
     await rm(graph.tempDirectory, { recursive: true, force: true });
   }
 
-  const typed = parseTypeScriptOutput(output);
-  if (typed.length === 0 && output.trim()) throw new Error(`TypeScript 7 check failed: ${output.trim()}`);
-  return Promise.all(typed.map(async (diagnostic) => {
+  const serverCopies = new Set([...graph.entries.values()].flatMap((entry) => entry.server ? [entry.server.file] : []));
+  const parsed = parseTypeScriptOutput(output);
+  if (parsed.length === 0 && output.trim()) throw new Error(`Falló la comprobación con TypeScript 7: ${output.trim()}`);
+  // The server TypeScript project reports errors inside `<script server>` on the page itself.
+  const typed = parsed.filter((diagnostic) => !serverCopies.has(resolve(dirname(absolute), diagnostic.file)));
+  // Original span of each error whose position comes from a rewritten expression (approximate).
+  const approximate = new Map<CompileDiagnostic, readonly [number, number]>();
+  const mapped = await Promise.all(typed.map(async (diagnostic): Promise<CompileDiagnostic> => {
     const reported = resolve(dirname(absolute), diagnostic.file);
     const entry = graph.entries.get(reported);
     if (entry) {
-      const offset = originalOffset(entry.mappings, generatedOffset(entry.code, diagnostic.line, diagnostic.column));
-      return {
+      const generated = generatedOffset(entry.code, diagnostic.line, diagnostic.column);
+      const offset = originalOffset(entry.mappings, generated);
+      if (unexposedRefType.test(diagnostic.message)) return unexposedRefDiagnostic(entry, generated, offset);
+      const result: CompileDiagnostic = {
         code: diagnostic.code,
-        message: offset === undefined ? `Generated TypeScript: ${diagnostic.message}` : diagnostic.message,
+        message: offset === undefined ? `TypeScript generado: ${diagnostic.message}` : diagnostic.message,
         filename: entry.original,
         location: locate(entry.source, offset ?? 0),
       };
+      const span = offset === undefined ? undefined : rewrittenSpan(entry.mappings, generated);
+      if (span) approximate.set(result, span);
+      return result;
     }
     // TypeScript also checks .ts dependencies imported by the .meeko graph.
     // Their positions already refer to the original file, not generated code.
     let imported: string;
     try { imported = await readFile(reported, "utf8"); }
     catch {
-      return { code: diagnostic.code, message: `Generated TypeScript: ${diagnostic.message}`, filename: absolute, location: locate(source, 0) };
+      return { code: diagnostic.code, message: `TypeScript generado: ${diagnostic.message}`, filename: absolute, location: locate(source, 0) };
     }
     return {
       code: diagnostic.code,
@@ -203,4 +297,21 @@ export async function checkSource(source: string, filename: string, options: Che
       location: locate(imported, generatedOffset(imported, diagnostic.line, diagnostic.column)),
     };
   }));
+  // The compiler emits a template expression, and the check of each component tag, for several
+  // render paths; each error is reported once. The compiler maps the pieces of an expression it
+  // rewrites (a snippet parameter read from its arguments, for example); as a fallback, a copy whose
+  // position only comes from a rewritten span is dropped when another path places the same error
+  // exactly inside that span.
+  const sameError = (left: CompileDiagnostic, right: CompileDiagnostic): boolean =>
+    left.filename === right.filename && left.code === right.code && left.message === right.message;
+  const seen = new Set<string>();
+  return mapped.filter((item) => {
+    const span = approximate.get(item);
+    if (span && mapped.some((other) => other !== item && !approximate.has(other) && sameError(other, item)
+      && other.location.offset >= span[0] && other.location.offset < span[1])) return false;
+    const key = `${item.filename}:${item.code}:${item.location.offset}:${item.message}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }

@@ -1,0 +1,33 @@
+<script server lang="ts">
+import { definePage } from "@meekojs/meeko/framework";
+import { catalogEntry, docSlugs, navigation, pager } from "../../../server/content/catalog.js";
+import { renderSource } from "../../../server/content/markdown.js";
+
+// Every document is rendered once, in `meeko build`: Markdown to HTML with Shiki highlighting.
+export const route = definePage({
+  render: "prerender",
+  prerenderEntries: docSlugs.map((slug) => ({ slug })),
+});
+
+const { params } = usePage();
+const entry = catalogEntry(params.slug);
+if (!entry) notFound();
+export const doc = await renderSource(entry.source);
+export const nav = navigation();
+export const pages = pager(entry.href);
+export const current = entry.href;
+export const head = { title: `${doc.title} · Meeko`, description: doc.description };
+</script>
+
+<script lang="ts">
+export interface Props {
+  params: { slug: string };
+  search: Record<string, string | string[]>;
+}
+</script>
+
+<template>
+  <DocsLayout bind:nav="nav" bind:current="current" bind:toc="doc.toc" bind:pager="pages" bind:editUrl="doc.editUrl" bind:source="doc.source">
+    <article class="prose" data-pagefind-body html="doc.html" on:click="copyCodeBlock"></article>
+  </DocsLayout>
+</template>

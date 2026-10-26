@@ -1,0 +1,163 @@
+<script lang="ts">
+import { effect, signal } from "@meekojs/meeko";
+import type { Component } from "@meekojs/meeko";
+import type { Theme } from "../../shared/types/theme.js";
+
+export interface Props {
+  outlet: Component<Record<string, unknown>>;
+}
+
+const props = defineProps<Props>();
+const theme = signal<Theme>("system");
+const storageKey = "meeko-theme";
+let mounted = false;
+
+/** Applies the choice to <html> and remembers it; "system" follows prefers-color-scheme. */
+effect(() => {
+  const value = theme.value;
+  if (!mounted) return;
+  const root = document.documentElement;
+  try {
+    if (value === "system") localStorage.removeItem(storageKey);
+    else localStorage.setItem(storageKey, value);
+  } catch { /* Storage may be blocked; the choice still applies to this page. */ }
+  if (value === "system") delete root.dataset.theme;
+  else root.dataset.theme = value;
+});
+
+// The bootstrap script of app.meeko already applied the stored theme before the first paint.
+onMounted(() => {
+  mounted = true;
+  const stored = document.documentElement.dataset.theme;
+  theme.value = stored === "light" || stored === "dark" ? stored : "system";
+});
+
+const home = href("/");
+const guide = href("/docs/[slug]", { params: { slug: "framework" } });
+const api = href("/docs/[slug]", { params: { slug: "api" } });
+const changes = href("/docs/[slug]", { params: { slug: "changelog" } });
+</script>
+
+<template>
+  <a class="skip" href="#contenido">Saltar al contenido</a>
+  <header class="site-header">
+    <div class="bar">
+      <a class="brand" bind:href="home" aria-label="Meeko, inicio">
+        <img src="/brand/meeko-logo.webp" width="34" height="34" alt="" />
+        <span>Meeko</span>
+      </a>
+      <nav class="primary" aria-label="Principal">
+        <a bind:href="guide">Guía</a>
+        <a bind:href="api">API</a>
+        <a bind:href="changes">Cambios</a>
+      </nav>
+      <div class="tools">
+        <SearchDialog />
+        <ThemeToggle model="theme" />
+        <a class="github" href="https://github.com/meekojs/meeko" rel="noopener" aria-label="Meeko en GitHub">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.09 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z" /></svg>
+        </a>
+      </div>
+    </div>
+  </header>
+  <main id="contenido">
+    <component is="props.outlet"></component>
+  </main>
+  <footer class="site-footer">
+    <div class="inner">
+      <p>
+        <img src="/brand/meeko-logo.webp" width="22" height="22" alt="" />
+        <span>Hecho con Meeko: cada página de este sitio es un componente <code>.meeko</code> prerenderizado.</span>
+      </p>
+      <p>
+        <span>Licencia <a href="https://github.com/meekojs/meeko/blob/main/LICENSE" rel="noopener">MIT</a> ·
+        <a href="https://www.npmjs.com/package/@meekojs/meeko" rel="noopener">npm</a> ·
+        <a href="https://github.com/meekojs/meeko" rel="noopener">GitHub</a></span>
+      </p>
+    </div>
+  </footer>
+</template>
+
+<style scoped>
+.skip {
+  position: absolute;
+  left: 1rem;
+  top: -3rem;
+  z-index: 50;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.skip:focus { top: 0.75rem; }
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: var(--header-height);
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in oklab, var(--bg) 86%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+}
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  max-width: 88rem;
+  height: 100%;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--ink);
+  font: 800 1.2rem/1 var(--font-display);
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+.brand img { border-radius: 10px; }
+.primary { display: flex; gap: 0.25rem; }
+.primary a {
+  padding: 0.4rem 0.7rem;
+  border-radius: 8px;
+  color: var(--ink-soft);
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+}
+.primary a:hover { background: var(--surface); color: var(--ink); }
+.tools { display: flex; align-items: center; gap: 0.6rem; margin-left: auto; }
+.github {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  color: var(--ink-soft);
+}
+.github:hover { background: var(--surface); color: var(--ink); }
+.github svg { width: 22px; height: 22px; fill: currentColor; }
+.site-footer { border-top: 1px solid var(--line); background: var(--surface); }
+.inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 2rem;
+  max-width: 88rem;
+  margin: 0 auto;
+  padding: 1.75rem 1.5rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.inner p { display: flex; align-items: center; gap: 0.5rem; margin: 0; }
+.inner a { color: var(--ink-soft); }
+@media (max-width: 860px) {
+  .bar { gap: 0.75rem; padding: 0 1rem; }
+  .primary { display: none; }
+}
+@media (max-width: 400px) {
+  .brand span { display: none; }
+}
+</style>

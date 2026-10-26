@@ -1,3 +1,14 @@
+<script server lang="ts">
+import { definePage } from "@meekojs/meeko/framework";
+
+// Rendered in the browser: the loader calls the public API instead of server code.
+export const route = definePage({
+  render: "client",
+  load: async () => api.users.get(),
+  head: ({ data }) => ({ title: `Notes: ${data.name}` }),
+});
+</script>
+
 <script lang="ts">
 export interface Props {
   params: Record<string, string>;

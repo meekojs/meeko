@@ -1,0 +1,13 @@
+<script lang="ts">
+import type { Component } from "@meekojs/meeko";
+
+export interface Props {
+  outlet: Component<Record<string, unknown>>;
+}
+
+const props = defineProps<Props>();
+</script>
+
+<template>
+  <section class="layer-shell"><component is="props.outlet"></component></section>
+</template>

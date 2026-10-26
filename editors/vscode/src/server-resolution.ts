@@ -34,7 +34,7 @@ interface PackageManifest {
  */
 export function resolveLanguageServer(search: LanguageServerSearch): ResolvedLanguageServer {
   const bundled = (reason: string): ResolvedLanguageServer => ({ module: search.bundled, source: "bundled", reason });
-  if (!search.preferWorkspace) return bundled("the workspace is not trusted or the workspace server is disabled");
+  if (!search.preferWorkspace) return bundled("el workspace no es de confianza o el servidor del workspace está desactivado");
   let outdated: string | undefined;
   for (const folder of search.folders) {
     let directory = resolve(folder);
@@ -49,7 +49,7 @@ export function resolveLanguageServer(search: LanguageServerSearch): ResolvedLan
         if (module && existsSync(module)) {
           return { module, source: "workspace", ...(manifest.version ? { version: manifest.version } : {}) };
         }
-        outdated ??= `@meekojs/meeko ${manifest.version ?? "(unknown version)"} in ${dirname(manifestPath)} has no language server`;
+        outdated ??= `@meekojs/meeko ${manifest.version ?? "(versión desconocida)"} en ${dirname(manifestPath)} no incluye servidor de lenguaje`;
         break;
       }
       const parent = dirname(directory);
@@ -57,5 +57,5 @@ export function resolveLanguageServer(search: LanguageServerSearch): ResolvedLan
       directory = parent;
     }
   }
-  return bundled(outdated ?? "no @meekojs/meeko package was found in the workspace");
+  return bundled(outdated ?? "no se encontró el paquete @meekojs/meeko en el workspace");
 }

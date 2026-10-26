@@ -5,18 +5,48 @@ import type { ApiMethod, ServerManifest, ServerModuleLoader } from "./discovery.
 import type { SessionManager } from "./sessions.js";
 import { serializeJson } from "../server.js";
 
+/**
+ * Opciones de {@link createLocalCalls}.
+ *
+ * @typeParam S Tipo de los servicios.
+ * @example
+ * ```ts
+ * import { pathToFileURL } from "node:url";
+ * import type { LocalCallOptions } from "@meekojs/meeko/server";
+ *
+ * const options: LocalCallOptions<unknown> = { manifest, context, sessions, load: (file) => import(pathToFileURL(file).href) };
+ * ```
+ */
 export interface LocalCallOptions<S> {
+  /** Manifiesto con los endpoints. */
   manifest: ServerManifest;
+  /** Contexto de la petición original, cuyas credenciales se reutilizan. */
   context: RequestContext<S>;
+  /** Gestor de sesiones. */
   sessions: SessionManager;
-  /** Resolves each manifest file key to its handler module. */
+  /** Resuelve cada clave del manifiesto a su módulo de handler. */
   load: ServerModuleLoader;
+  /** Observador de los fallos internos. */
   onError?: ServerErrorObserver;
 }
 
+/**
+ * Entrada de una llamada local a la API con `createLocalCalls().api`.
+ *
+ * @example
+ * ```ts
+ * import type { LocalApiInput } from "@meekojs/meeko/server";
+ *
+ * const input: LocalApiInput = { params: { id: "123" }, query: { tab: "profile" } };
+ * const response = await calls.api("users.byId", "GET", input);
+ * ```
+ */
 export interface LocalApiInput {
+  /** Parámetros de la ruta. */
   params?: Readonly<Record<string, string>>;
+  /** Query string; omite `null` y `undefined`. */
   query?: Readonly<Record<string, string | number | boolean | readonly string[] | null | undefined>>;
+  /** Cuerpo JSON; no se admite en `GET`. */
   body?: unknown;
 }
 
@@ -56,7 +86,24 @@ function routeModule(module: unknown): unknown {
   throw new ApiError("INVALID_HANDLER", 500);
 }
 
-/** Local calls use in-memory Request objects, never a network fetch or global context. */
+/**
+ * Crea funciones para llamar a la API y al RPC de la aplicación dentro del proceso, con objetos
+ * `Request` en memoria y las credenciales de la petición original, sin red ni contexto global. Las
+ * respuestas pasan por las mismas guardas y normalización de errores.
+ *
+ * @param options Manifiesto, contexto, sesiones y cargador.
+ * @returns `{ api(clientKey, method, input?), rpc(id, input) }`, que devuelven un `Response` y nunca rechazan.
+ * @throws {TypeError} Si falta el cargador.
+ * @example
+ * ```ts
+ * import { pathToFileURL } from "node:url";
+ * import { createLocalCalls } from "@meekojs/meeko/server";
+ *
+ * const calls = createLocalCalls({ manifest, context, sessions, load: (file) => import(pathToFileURL(file).href) });
+ * const user = await (await calls.api("users.byId", "GET", { params: { id: "123" } })).json();
+ * const result = await (await calls.rpc("users.get", { id: "123" })).json();
+ * ```
+ */
 export function createLocalCalls<S>(options: LocalCallOptions<S>) {
   if (typeof options.load !== "function") throw new TypeError("Local calls require a module loader");
   const load = options.load;

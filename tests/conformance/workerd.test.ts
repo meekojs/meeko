@@ -98,7 +98,8 @@ conformanceSuite("workerd", ({ server, session, track }) => {
     const worker = await readFile(join(output, "worker.js"), "utf8");
     // codeSplitting: false leaves no relative chunk imports, static or dynamic.
     assert.doesNotMatch(worker, /\bimport\s*\(\s*["'`]\.{1,2}\//);
-    assert.doesNotMatch(worker, /\bfrom\s*["']\.{1,2}\//);
+    // Only real module statements count: JSDoc examples kept in the bundle may show relative imports.
+    assert.doesNotMatch(worker, /^\s*(?:import|export)\b[^\n]*?\bfrom\s*["']\.{1,2}\//m);
   });
 
   it("keeps only the session cookie with a connection, whatever else the Cookie header carries", async () => {

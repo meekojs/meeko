@@ -1,32 +1,105 @@
-import { batch, createRoot, effect, finishWithCleanup, signal } from "./reactivity.js";
+import { batch, createRoot, currentEffectOwner, effect, finishWithCleanup, isWritableSignal, signal, switchOwner, untrack } from "./reactivity.js";
 import { observeCallback } from "./error-observer.js";
 import { componentErrorReporter } from "./component-errors.js";
 import type { EffectSource, Signal } from "./reactivity.js";
-import { attributeValue, serializeJson } from "./server.js";
+import { attributeValue, rawHtml, serializeJson } from "./server.js";
+import { refTarget } from "./element-refs.js";
+import type { ElementRefs } from "./element-refs.js";
+import { isLateSuspension, isPassSuspension, lateRender, loadDeferred } from "./suspense.js";
+import { afterMountBatch, mountBatch } from "./lifecycle.js";
+import { contentNamespace, inertElement } from "./html-content.js";
+import { sameChannels } from "./channels.js";
+import type { NativeModelKind, NativeModelValues } from "./models.js";
+import { snippetOf } from "./snippets.js";
+import type { Snippet, SnippetData } from "./snippets.js";
 
-/** Fragmento de DOM que pertenece a una instancia o a una región dinámica. */
+/**
+ * Fragmento de DOM que pertenece a una instancia o a una región dinámica: los hijos de `root` o,
+ * con marcadores, los nodos entre los comentarios `start` y `end`.
+ *
+ * @example
+ * ```ts
+ * import type { DomScope } from "@meekojs/meeko";
+ * import { hydrateScope } from "./Card.meeko";
+ *
+ * const scope: DomScope = { root: document.querySelector("#card")! };
+ * const release = hydrateScope(scope, { title: "Hola" });
+ * ```
+ */
 export interface DomScope {
+  /** Elemento que contiene la instancia. */
   root: Element;
+  /** Comentario inicial de la región, si no ocupa todo `root`. */
   start?: Comment;
+  /** Comentario final de la región. */
   end?: Comment;
 }
 
-/** Contrato de un módulo de componente compilado para composición sin wrapper. */
+/**
+ * Contrato de un módulo de componente compilado para componerlo sin elemento envolvente. A
+ * diferencia de {@link Component}, `renderWithState` es opcional: sirve para usos de bajo nivel que
+ * renderizan sin transferir estado.
+ *
+ * @typeParam Props Props del componente.
+ * @example
+ * ```ts
+ * import type { ComponentModule } from "@meekojs/meeko";
+ *
+ * function renderAll<P extends object>(module: ComponentModule<P>, list: readonly P[]): string {
+ *   return list.map((props) => module.renderToString(props)).join("");
+ * }
+ * ```
+ */
 export interface ComponentModule<Props extends object> {
+  /** Renderiza el HTML, opcionalmente desde un estado capturado. */
   readonly renderToString: (props: Props, state?: Record<string, unknown>) => string;
+  /** Renderiza el HTML y captura el estado de sus señales. */
   readonly renderWithState?: (props: Props) => { html: string; state: Record<string, unknown> };
+  /** Hidrata el HTML de `scope`; devuelve la función de liberación. */
   readonly hydrateScope: (scope: DomScope, props: Props, state?: Record<string, unknown>) => ComponentRelease;
 }
 
-/** Componente compilado que puede transferir su estado durante SSR. */
+/**
+ * Componente compilado que puede transferir su estado durante SSR. Es el tipo que exige
+ * `<component is>`, y el del `outlet` de `app/app.meeko` y los layouts.
+ *
+ * @typeParam Props Props del componente.
+ * @example
+ * ```html
+ * <!-- Card.meeko -->
+ * <script lang="ts">
+ * import type { Component } from "@meekojs/meeko";
+ * const props = defineProps<{ content: Component<{ label: string }>; label: string }>();
+ * </script>
+ * <template><section><component is="props.content" bind:label="props.label"></component></section></template>
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#componentes-meeko
+ */
 export type Component<Props extends object> = ComponentModule<Props> & {
   readonly renderWithState: (props: Props) => { html: string; state: Record<string, unknown> };
 };
 
-/** Función de limpieza que puede exponer el estado editable de su instancia. */
-export interface ComponentRelease {
+/**
+ * Función que libera una instancia hidratada: observadores, eventos y limpiezas. Puede exponer el
+ * estado editable de la instancia y, desde 1.1, el valor de su `defineExpose`.
+ *
+ * @typeParam Exposed Tipo del valor expuesto.
+ * @example
+ * ```ts
+ * import type { ComponentRelease } from "@meekojs/meeko";
+ * import { hydrateScope } from "./SearchBox.meeko";
+ *
+ * const release: ComponentRelease = hydrateScope({ root: document.querySelector("#search")! }, {});
+ * console.log(release.snapshot?.(), release.exposed);
+ * release();
+ * ```
+ */
+export interface ComponentRelease<Exposed = unknown> {
   (): void;
+  /** Lee el estado editable actual de la instancia. */
   snapshot?: () => Record<string, unknown>;
+  /** Valor del `defineExpose` de la instancia, o `null` si no lo tiene. */
+  readonly exposed?: Exposed;
 }
 
 /** Releases every compiled binding and preserves the failure that triggered cleanup. */
@@ -43,31 +116,52 @@ export function releaseAll(cleanups: Array<() => void>, cause?: { error: unknown
 }
 
 /** Añade una lectura de estado a la limpieza de un componente compilado. */
-export function withStateSnapshot(release: () => void, snapshot: () => Record<string, unknown>): ComponentRelease {
-  return Object.assign(release, { snapshot });
+export function withStateSnapshot<Exposed = null>(release: () => void, snapshot: () => Record<string, unknown>, exposed: Exposed = null as Exposed): ComponentRelease<Exposed> {
+  return Object.assign(release, { snapshot, exposed });
 }
 
 const componentStart = /^meeko:component:\d+(?::.*)?$/;
+const snippetStart = /^meeko:snippet:\d+$/;
 
-function componentEnd(start: Node): Node {
+/**
+ * Kind of a region that a search skips: a child component, whose markers belong to it, or a
+ * snippet that the child renders, whose markers belong to the parent that wrote it.
+ */
+function nestedRegion(data: string): "component" | "snippet" | undefined {
+  if (componentStart.test(data)) return "component";
+  if (snippetStart.test(data)) return "snippet";
+  return undefined;
+}
+
+function regionEnd(start: Node): Node {
+  const kind = nestedRegion((start as Comment).data)!;
+  const end = kind === "component" ? /^\/meeko:component:\d+$/ : /^\/meeko:snippet:\d+$/;
   let depth = 0;
   for (let node: Node | null = start; node; node = node.nextSibling) {
     if (node.nodeType !== 8) continue;
     const data = (node as Comment).data;
-    if (componentStart.test(data)) depth++;
-    else if (/^\/meeko:component:\d+$/.test(data) && --depth === 0) return node;
+    if (nestedRegion(data) === kind) depth++;
+    else if (end.test(data) && --depth === 0) return node;
   }
   throw new Error(`Missing end marker for ${(start as Comment).data}`);
 }
+
+/** Marks an element filled by `html="..."`; its content is the expression's, never Meeko's. */
+const htmlMarker = "data-meeko-h";
 
 function visit(scope: DomScope, callback: (node: Node) => boolean): Node | undefined {
   function siblings(first: Node | null, stop: Node | null = null): Node | undefined {
     for (let node = first; node && node !== stop;) {
       if (callback(node)) return node;
-      if (node.nodeType === 8 && componentStart.test((node as Comment).data)) {
-        const end = componentEnd(node);
+      if (node.nodeType === 8 && nestedRegion((node as Comment).data)) {
+        const end = regionEnd(node);
         if (callback(end)) return end;
         node = end.nextSibling;
+        continue;
+      }
+      // Inserted HTML may imitate Meeko markers; a search never looks inside it.
+      if (node.nodeType === 1 && (node as Element).hasAttribute(htmlMarker)) {
+        node = node.nextSibling;
         continue;
       }
       const found = siblings(node.firstChild);
@@ -123,15 +217,43 @@ function restoreRegion(scope: DomScope, content: DocumentFragment): void {
 function insertHtml(end: Comment, html: string): void {
   const parent = end.parentNode;
   if (!parent) throw new Error("Detached Meeko region");
-  const range = end.ownerDocument.createRange();
-  range.selectNodeContents(parent);
-  parent.insertBefore(range.createContextualFragment(html), end);
+  parent.insertBefore(parseRegionHtml(parent, html), end);
 }
 
-function sameProps<Props extends object>(first: Props, second: Props): boolean {
+const svgNamespace = "http://www.w3.org/2000/svg";
+
+/**
+ * Parses HTML rendered by Meeko in the context of `parent`, for a late mount or a navigation.
+ * The template's own nodes behave as in 1.0; the `<script>` elements inside `html="..."` content
+ * are replaced by inert copies, so they never run, as with `innerHTML` in every other path.
+ */
+export function parseRegionHtml(parent: Node, html: string): DocumentFragment {
+  const document = parent.ownerDocument ?? (parent as Document);
+  const range = document.createRange();
+  range.selectNodeContents(parent);
+  const fragment = range.createContextualFragment(html);
+  for (const element of Array.from(fragment.querySelectorAll(`[${htmlMarker}]`))) {
+    for (const script of Array.from(element.getElementsByTagName("script"))) {
+      // `innerHTML` marks the scripts it parses as already started: they never run once inserted.
+      const holder = script.namespaceURI === svgNamespace ? document.createElementNS(svgNamespace, "svg") : document.createElement("div");
+      holder.innerHTML = script.outerHTML;
+      const copy = holder.firstChild;
+      if (copy) script.replaceWith(copy);
+      else script.remove();
+    }
+  }
+  return fragment;
+}
+
+function sameProps<Props extends object>(first: Props, second: Props, sameFunctions = false): boolean {
   const firstKeys = Object.keys(first);
   const secondKeys = Object.keys(second);
-  return firstKeys.length === secondKeys.length && firstKeys.every((key) => Object.hasOwn(second, key) && Object.is(first[key as keyof Props], second[key as keyof Props]));
+  return firstKeys.length === secondKeys.length && firstKeys.every((key) => {
+    if (!Object.hasOwn(second, key)) return false;
+    const before = first[key as keyof Props];
+    const after = second[key as keyof Props];
+    return Object.is(before, after) || (sameFunctions && typeof before === "function" && typeof after === "function");
+  });
 }
 
 /** A region update failed and restoring its previous content failed too. */
@@ -143,10 +265,40 @@ export function hasRegionRecoveryFailure(error: unknown): boolean {
     || (error instanceof AggregateError && error.errors.some(hasRegionRecoveryFailure));
 }
 
+/** Marks the empty region of a child that mounts once the data it awaits has loaded. */
+const waitingMarker = "meeko:waiting";
+
+/** CSS of the child components that a server document is rendering; see {@link collectStyles}. */
+let renderedStyles: Set<string> | undefined;
+
+/**
+ * @internal Runs a synchronous server render and adds to `styles` the CSS of every child component
+ * it renders, so the document can link it before the client bundle loads.
+ */
+export function collectStyles<T>(styles: Set<string>, render: () => T): T {
+  const previous = renderedStyles;
+  renderedStyles = styles;
+  try { return render(); }
+  finally { renderedStyles = previous; }
+}
+
 /** Renderiza un hijo entre comentarios de ámbito sin añadir un elemento visual. */
 export function renderComponent<Props extends object>(id: number, component: Component<Props>, props: Props, transferState: boolean): string;
 export function renderComponent<Props extends object>(id: number, component: ComponentModule<Props>, props: Props, transferState?: false): string;
 export function renderComponent<Props extends object>(id: number, component: ComponentModule<Props>, props: Props, transferState = false): string {
+  try { return renderComponentHtml(id, component, props, transferState); }
+  catch (error) {
+    // A child waiting for data does not stop its siblings: the pass collects every request, then renders again.
+    if (isPassSuspension(error)) return `<!--meeko:component:${id}--><!--/meeko:component:${id}-->`;
+    // A child that mounts after its page: bindComponent finds the marker and mounts it once its data loads.
+    if (isLateSuspension(error)) return `<!--meeko:component:${id}--><!--${waitingMarker}--><!--/meeko:component:${id}-->`;
+    throw error;
+  }
+}
+
+function renderComponentHtml<Props extends object>(id: number, component: ComponentModule<Props>, props: Props, transferState: boolean): string {
+  const css = (component as { readonly css?: unknown }).css;
+  if (renderedStyles && typeof css === "string" && css) renderedStyles.add(css);
   if (transferState) {
     if (!component.renderWithState) throw new TypeError(`Component ${id} cannot transfer SSR state`);
     const rendered = component.renderWithState(props);
@@ -168,8 +320,38 @@ function componentRegion(scope: DomScope, id: number): { inner: DomScope; state?
   return { inner: { root: scope.root, start, end }, state: parsed as Record<string, unknown> };
 }
 
-/** Hidrata un hijo dentro de su rango y actualiza props reactivas con limpieza previa. */
-export function bindComponent<Props extends object>(scope: DomScope, id: number, input: ComponentModule<Props> | (() => ComponentModule<Props>), read: () => Props, location: string): () => void {
+/** Whether a region holds only the marker of a child that waits for its data. */
+function waitingRegion(inner: DomScope): boolean {
+  const first = inner.start!.nextSibling;
+  return first !== null && first.nodeType === 8 && (first as Comment).data === waitingMarker && first.nextSibling === inner.end;
+}
+
+/**
+ * Props object of a component tag, typed by the component alone; returns `props` unchanged and
+ * never reads `component`. A generic call infers its type argument from an arrow's returned
+ * object with widened literals, so `read: () => ({ variant: "primary" })` would not match a prop
+ * `variant: "primary" | "secondary"`. As a direct argument the object keeps its literal types and
+ * is checked exactly: an unknown prop is an excess property, also beside known ones, a missing
+ * required prop is reported and callbacks get their parameter types.
+ */
+export function componentProps<Props extends object>(component: ComponentModule<Props> | (() => ComponentModule<Props>), props: NoInfer<Props>): Props {
+  void component;
+  return props;
+}
+
+/** Most loads of one deferred mount when its final render still misses data. */
+const deferredAttempts = 3;
+
+/**
+ * Hidrata un hijo dentro de su rango y actualiza props reactivas con limpieza previa.
+ * `expose` receives the `exposed` value of each hydrated instance, with `hydrated` set, and
+ * `null` once it is released.
+ *
+ * A child that awaits data it does not have, because it mounts after its page, leaves its region
+ * empty: the binding loads the data in dry passes, then renders and hydrates it. Releasing the
+ * binding first cancels the load; a failure goes to the nearest error handler.
+ */
+export function bindComponent<Props extends object>(scope: DomScope, id: number, input: ComponentModule<Props> | (() => ComponentModule<Props>), read: () => Props, location: string, expose?: (value: unknown, hydrated?: boolean) => void): () => void {
   let inner: DomScope;
   let state: Record<string, unknown> | undefined;
   try {
@@ -177,40 +359,130 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
   } catch (error) {
     throw new Error(`Hydration mismatch in ${location}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
   }
+  const owner = currentEffectOwner();
+  const report = componentErrorReporter("mounted");
   const resolveComponent = (): ComponentModule<Props> => typeof input === "function" ? input() : input;
+  const unmounted: ComponentRelease = () => {};
   let component = resolveComponent();
   let props = read();
-  let release = component.hydrateScope(inner, props, state);
+  let release: ComponentRelease = unmounted;
+  /** Cancels the deferred mount in progress. */
+  let loading: AbortController | undefined;
+  const publish = (): void => expose?.(release.exposed ?? null, true);
+  const defer = (target: ComponentModule<Props>, targetProps: Props, targetState: Record<string, unknown> | undefined, attempt = 1): void => {
+    const control = new AbortController();
+    loading = control;
+    const render = (): string => target.renderToString(targetProps, targetState);
+    loadDeferred(owner, render, control.signal).then((data) => {
+      if (control.signal.aborted) return;
+      const restore = switchOwner(owner);
+      try {
+        let html: string;
+        try { html = data.read(() => lateRender(render)); }
+        catch (error) {
+          if (!isLateSuspension(error) || attempt >= deferredAttempts) throw error;
+          // Its data changed meanwhile: load again.
+          defer(target, targetProps, targetState, attempt + 1);
+          return;
+        }
+        loading = undefined;
+        insertHtml(inner.end!, html);
+        try { release = data.read(() => target.hydrateScope(inner, targetProps, targetState)); }
+        catch (error) {
+          clearRegion(inner);
+          throw error;
+        }
+        data.keep();
+        publish();
+      } finally { restore(); }
+    }).catch((error: unknown) => {
+      if (control.signal.aborted) return;
+      if (loading === control) loading = undefined;
+      report(error);
+    });
+  };
+  if (waitingRegion(inner)) {
+    clearRegion(inner);
+    defer(component, props, state);
+  } else {
+    release = component.hydrateScope(inner, props, state);
+    publish();
+  }
   let stop = () => {};
-  stop = effect(() => {
+  let first = true;
+  // The onMounted callbacks of a new child run once the whole update has finished.
+  stop = effect(() => mountBatch(() => {
     const nextComponent = resolveComponent();
     const next = read();
-    if (nextComponent === component && sameProps(props, next)) return;
+    // The first run reads the props again only to track them. An inline callback such as
+    // `on:save="(id) => save(id)"` is a new function then, but not a new value: keep the hydrated child.
+    const initial = first;
+    first = false;
+    if (nextComponent === component && sameProps(props, next, initial) && sameChannels(props, next)) return;
+    // The new component or props replace a deferred mount that has not finished.
+    loading?.abort();
+    loading = undefined;
+    const mounted = release !== unmounted;
     const previousState = release.snapshot?.();
     const state = nextComponent === component ? previousState : undefined;
-    const html = nextComponent.renderToString(next, state);
+    let html: string;
+    try { html = lateRender(() => nextComponent.renderToString(next, state)); }
+    catch (error) {
+      if (!isLateSuspension(error)) throw error;
+      // It waits for data: release the current child and leave the region empty until the data loads.
+      const previousRelease = release;
+      release = unmounted;
+      component = nextComponent;
+      props = next;
+      try {
+        if (mounted) expose?.(null);
+        previousRelease();
+      } finally { clearRegion(inner); }
+      defer(nextComponent, next, state);
+      return;
+    }
     const previous = cloneRegion(inner);
     try {
+      if (mounted) expose?.(null);
       release();
+      release = unmounted;
       clearRegion(inner);
       insertHtml(inner.end!, html);
       const nextRelease = nextComponent.hydrateScope(inner, next, state);
       release = nextRelease;
       component = nextComponent;
       props = next;
+      publish();
     } catch (error) {
       try {
         restoreRegion(inner, previous);
-        release = component.hydrateScope(inner, props, previousState);
+        if (mounted) {
+          release = component.hydrateScope(inner, props, previousState);
+          publish();
+        } else defer(component, props, undefined);
       } catch (rollbackError) {
-        release = () => {};
+        release = unmounted;
         stop();
         throw new RegionRecoveryError([error, rollbackError], `Meeko component update and recovery failed in ${location}`);
       }
       throw error;
     }
-  });
-  return () => { stop(); release(); };
+  }));
+  return () => {
+    loading?.abort();
+    loading = undefined;
+    stop();
+    try { release(); }
+    finally { expose?.(null); }
+  };
+}
+
+/** Publishes the element of a `ref:` directive while its region stays hydrated. */
+export function bindElementRef(scope: DomScope, refs: ElementRefs, id: number): () => void {
+  const target = findElement(scope, `data-meeko-r-${id}`);
+  const publish = refTarget(refs, id);
+  publish(target);
+  return () => publish(null);
 }
 
 /** Conecta un texto reactivo al marcador SSR y comprueba su valor inicial. */
@@ -234,6 +506,37 @@ export function bindText(scope: DomScope, id: number, read: () => unknown, locat
       if (text.textContent === next) return;
     }
     text.textContent = next;
+  }, source);
+}
+
+/**
+ * Whether `target` already shows `html`, parsed in the context of `target` as `innerHTML` would,
+ * in an inert document where nothing runs or loads.
+ */
+function sameHtml(target: Element, html: string): boolean {
+  if (target.innerHTML === html) return true;
+  return inertElement(target.ownerDocument, target.localName, contentNamespace(target), html).innerHTML === target.innerHTML;
+}
+
+/**
+ * Conecta `html="expresión"` al elemento SSR. Si su contenido coincide con el HTML de la expresión,
+ * la hidratación no toca el DOM; si difiere, sustituye `innerHTML`. Después lo sustituye cada vez que
+ * cambia el valor. `innerHTML` nunca ejecuta los `<script>` del contenido. Inseguro con contenido
+ * no confiable (XSS).
+ */
+export function bindHtml(scope: DomScope, id: number, read: () => unknown, location: string, source?: EffectSource): () => void {
+  const target = visit(scope, (candidate) => candidate.nodeType === 1 && (candidate as Element).getAttribute(htmlMarker) === String(id)) as Element | undefined;
+  if (!target) throw new Error(`Missing Meeko target ${htmlMarker}="${id}" in ${location}`);
+  let current: string | undefined;
+  return effect(() => {
+    // The SSR render types the value; the browser only checks it.
+    const next = rawHtml(read() as string | null | undefined);
+    if (current === undefined ? sameHtml(target, next) : current === next) {
+      current = next;
+      return;
+    }
+    current = next;
+    target.innerHTML = next;
   }, source);
 }
 
@@ -304,6 +607,86 @@ export function bindEvent(scope: DomScope, id: number, name: string, handler: (e
   return () => target.removeEventListener(name, listener);
 }
 
+/** Whether the user changed a control after SSR and before hydration. */
+function editedControl(target: Element, kind: NativeModelKind): boolean {
+  if (kind === "checkbox" || kind === "radio") {
+    const control = target as HTMLInputElement;
+    return control.checked !== control.defaultChecked;
+  }
+  if (kind === "multiple") {
+    return Array.from((target as HTMLSelectElement).options).some((option) => option.selected !== option.hasAttribute("selected"));
+  }
+  if (kind === "select") return !pristineValueControl(target);
+  const control = target as HTMLInputElement | HTMLTextAreaElement;
+  return control.value !== control.defaultValue;
+}
+
+/** Writes a model value into the live state of its control. */
+function applyModel(target: Element, kind: NativeModelKind, value: unknown, radioValue: string | undefined): void {
+  if (kind === "checkbox") syncFormState(target, "checked", value ? "" : null);
+  else if (kind === "radio") syncFormState(target, "checked", value === radioValue ? "" : null);
+  else if (kind === "multiple") {
+    const selected = Array.isArray(value) ? value.map(String) : [];
+    for (const option of Array.from((target as HTMLSelectElement).options)) syncFormState(option, "selected", selected.includes(option.value) ? "" : null);
+  } else syncFormState(target, "value", value === null || value === undefined ? "" : String(value));
+}
+
+/** Writes the live state of a control into its model signal. */
+function readControl(target: Element, kind: NativeModelKind, model: { value: unknown }): void {
+  if (kind === "checkbox") model.value = (target as HTMLInputElement).checked;
+  else if (kind === "radio") {
+    const control = target as HTMLInputElement;
+    if (control.checked) model.value = control.value;
+  } else if (kind === "multiple") {
+    model.value = Array.from((target as HTMLSelectElement).options).filter((option) => option.selected).map((option) => option.value);
+  } else model.value = (target as HTMLInputElement).value;
+}
+
+/**
+ * Connects `model="signal"` on a native control in both directions. Writes to the signal update
+ * the live property, like a `bind:` attribute after the user edited the control; the control's
+ * event writes the signal. A control edited before hydration keeps the user's value and writes it
+ * to the signal once the hydration batch ends (`afterMountBatch`), before `onMounted`, so the
+ * regions that read the signal hydrate against the SSR value first. `radio` reads the value of the
+ * radio, from its attribute or `bind:value`.
+ */
+export function bindModel<K extends NativeModelKind>(scope: DomScope, id: number, kind: K, read: () => { value: NativeModelValues[K] }, radioValue?: () => unknown): () => void {
+  const target = findElement(scope, `data-meeko-m-${id}`);
+  const report = componentErrorReporter();
+  const writable = (): { value: unknown } => {
+    const model = read();
+    if (!isWritableSignal(model)) throw new TypeError("Meeko model expects a writable signal, not a computed signal or a plain value");
+    return model;
+  };
+  let model = untrack(writable);
+  const edited = editedControl(target, kind);
+  // Writing the restored value mid-hydration would change regions that have not hydrated yet;
+  // it reaches the signal once the whole hydration batch has finished.
+  const cancelRead = edited
+    ? afterMountBatch(() => observeCallback(() => readControl(target, kind, model), report))
+    : () => {};
+  let first = true;
+  const stop = effect(() => {
+    model = writable();
+    const value = model.value;
+    const radio = radioValue ? radioValue() : undefined;
+    const option = radio === null || radio === undefined ? undefined : String(radio);
+    if (first) {
+      first = false;
+      if (edited) return;
+    }
+    applyModel(target, kind, value, option);
+  });
+  const event = kind === "text" ? "input" : "change";
+  const listener = (): void => observeCallback(() => readControl(target, kind, model), report);
+  target.addEventListener(event, listener);
+  return () => {
+    cancelRead();
+    stop();
+    target.removeEventListener(event, listener);
+  };
+}
+
 /** Genera los límites estables de una condición en SSR. */
 export function renderIf(id: number, condition: unknown, render: () => string): string {
   return `<!--meeko:if:${id}-->${condition ? render() : ""}<!--/meeko:if:${id}-->`;
@@ -316,11 +699,11 @@ export function bindIf(scope: DomScope, id: number, read: () => unknown, render:
   if (!active && inner.start?.nextSibling !== inner.end) throw new Error(`Hydration mismatch in condition ${id}`);
   let release = active ? hydrate(inner) : undefined;
   let stop = () => {};
-  stop = effect(() => {
+  stop = effect(() => mountBatch(() => {
     const next = Boolean(read());
     if (next === active) return;
     if (next) {
-      const html = render();
+      const html = lateRender(render);
       try {
         clearRegion(inner);
         insertHtml(inner.end!, html);
@@ -345,8 +728,93 @@ export function bindIf(scope: DomScope, id: number, read: () => unknown, render:
     active = false;
     if (failures.length === 1) throw failures[0];
     if (failures.length > 1) throw new AggregateError(failures, `Meeko condition ${id} update failed`);
-  });
+  }));
   return () => { stop(); release?.(); };
+}
+
+/**
+ * Renders `<render snippet args>`: the parent's snippet content between markers of the child, or
+ * an empty region when the parent did not pass that optional snippet.
+ */
+export function renderSnippet<Args extends readonly unknown[]>(id: number, snippet: Snippet<Args> | undefined, args: NoInfer<Args>): string {
+  const data = snippetOf(snippet);
+  return `<!--meeko:snippet:${id}-->${data ? data.render(...args) : ""}<!--/meeko:snippet:${id}-->`;
+}
+
+function sameArguments(first: readonly unknown[], second: readonly unknown[]): boolean {
+  return first.length === second.length && first.every((value, index) => Object.is(value, second[index]));
+}
+
+/**
+ * Hydrates snippet content in the parent's reactive root, where the snippet was written, while its
+ * nodes stay in the child's region. The child releases it with its region; the parent's root
+ * releases its effects too if it goes first.
+ */
+function hydrateSnippet(data: SnippetData, inner: DomScope, args: Signal<readonly unknown[]>): () => void {
+  if (!data.hydrate) throw new Error("Meeko snippet cannot hydrate: it was created for SSR only");
+  const hydrate = data.hydrate;
+  const restore = switchOwner(data.owner);
+  try {
+    return createRoot((dispose) => {
+      const cleanup = hydrate(args, inner);
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        finishWithCleanup(cleanup, dispose);
+      };
+    });
+  } finally { restore(); }
+}
+
+/**
+ * Hydrates `<render snippet args>` in the child. Changed arguments reach the snippet content as a
+ * signal, without rendering it again; another snippet replaces the region.
+ */
+export function bindSnippet(scope: DomScope, id: number, read: () => unknown, readArgs: () => readonly unknown[]): () => void {
+  const inner = region(scope, "snippet", id);
+  let current: SnippetData | undefined;
+  let release: (() => void) | undefined;
+  const args = signal<readonly unknown[]>(untrack(readArgs));
+  let stopSnippet = () => {};
+  let first = true;
+  stopSnippet = effect(() => mountBatch(() => {
+    const next = snippetOf(read());
+    if (first) {
+      first = false;
+      current = next;
+      if (!next && inner.start?.nextSibling !== inner.end) throw new Error(`Hydration mismatch in snippet ${id}`);
+      if (next) release = hydrateSnippet(next, inner, args);
+      return;
+    }
+    if (next === current) return;
+    const previous = release;
+    release = undefined;
+    current = next;
+    try { previous?.(); }
+    finally { clearRegion(inner); }
+    if (next) {
+      insertHtml(inner.end!, lateRender(() => next.render(...untrack(() => args.value))));
+      release = hydrateSnippet(next, inner, args);
+    }
+  }));
+  let stopArgs = () => {};
+  try {
+    stopArgs = effect(() => {
+      const next = readArgs();
+      if (!sameArguments(untrack(() => args.value), next)) args.value = next;
+    });
+  } catch (error) {
+    stopSnippet();
+    release?.();
+    throw error;
+  }
+  return () => {
+    stopArgs();
+    stopSnippet();
+    release?.();
+    release = undefined;
+  };
 }
 
 /** Convierte una clave de lista en un token seguro para comentarios HTML. */
@@ -354,6 +822,14 @@ export function keyToken(key: unknown): string {
   if (typeof key === "number" && Number.isFinite(key)) return `n${encodeURIComponent(String(key)).replaceAll("-", "%2D")}`;
   if (typeof key === "string") return `s${encodeURIComponent(key).replaceAll("-", "%2D")}`;
   throw new TypeError("Meeko list keys must be strings or finite numbers");
+}
+
+/**
+ * Key of a list without `each:key`: its index. Row `i` keeps its nodes and receives item `i`;
+ * rows are only added or removed at the end.
+ */
+export function indexKey(_item: unknown, index: number): number {
+  return index;
 }
 
 /** Renderiza una lista con límites identificados por claves únicas. */
@@ -477,7 +953,7 @@ export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>,
   }
   let initialItems: T[] | undefined = initial;
   let stop = () => {};
-  stop = effect(() => {
+  stop = effect(() => mountBatch(() => {
     const items = [...read()];
     if (initialItems) {
       const previous = initialItems;
@@ -493,7 +969,7 @@ export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>,
     const stable = stableListPositions(oldIndices);
     const newRows = items.flatMap((item, index) => entries.has(nextKeys[index]!) ? [] : [{
       key: nextKeys[index]!, index, item,
-      html: `<!--meeko:item:${id}:${nextKeys[index]}-->${render(item, index)}<!--/meeko:item:${id}:${nextKeys[index]}-->`,
+      html: `<!--meeko:item:${id}:${nextKeys[index]}-->${lateRender(() => render(item, index))}<!--/meeko:item:${id}:${nextKeys[index]}-->`,
     }]);
     const staged = new Map<string, ListEntry<T>>();
     const inserted: Array<{ start: Comment; end: Comment }> = [];
@@ -574,7 +1050,7 @@ export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>,
     } catch (error) { failures.push(error); }
     if (failures.length === 1) throw failures[0];
     if (failures.length > 1) throw new AggregateError(failures, `Meeko list ${id} update failed`);
-  });
+  }));
   return () => {
     stop();
     try { releaseAll([...entries.values()].map((entry) => entry.release)); }

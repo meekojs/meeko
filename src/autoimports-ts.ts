@@ -12,7 +12,11 @@ function within(root: string, filename: string): string | undefined {
   return path === ".." || path.startsWith(`..${sep}`) || path.startsWith("/") ? undefined : path.replaceAll("\\", "/");
 }
 
-function scopeWithin(sourceRoot: string, filename: string): TypeScriptScope | undefined {
+/**
+ * `app` marks a plain module under `app/` (composables, utils, stores, components): it type-checks
+ * in the browser scope but also runs in the SSR graph, like a `.meeko` component.
+ */
+function scopeWithin(sourceRoot: string, filename: string): ImportScope | undefined {
   const path = within(sourceRoot, filename);
   if (!path || !/\.[cm]?tsx?$/.test(path) || /\.(?:test|spec|d)\.[cm]?tsx?$/.test(path) ||
     !/^(?:app|server|shared)\//.test(path)) return undefined;
@@ -21,13 +25,12 @@ function scopeWithin(sourceRoot: string, filename: string): TypeScriptScope | un
   if (/\.route\.[cm]?tsx?$/.test(path) && /(?:^|\/)app\/pages\//.test(path)) return "server";
   if (/\.client\.[cm]?tsx?$/.test(path)) return "client";
   if (path.startsWith("server/")) return "server";
-  if (path.startsWith("app/")) return "client";
+  if (path.startsWith("app/")) return "app";
   if (path.startsWith("shared/")) return "shared";
   return undefined;
 }
 
-/** Selects a source scope without executing config; Vite may pass resolved roots for dynamic config. */
-export function typeScriptScope(root: string, filename: string, sourceRoots?: readonly string[]): TypeScriptScope | undefined {
+function sourceScope(root: string, filename: string, sourceRoots?: readonly string[]): ImportScope | undefined {
   const config = sourceRoots ? undefined : readMeekoConfigSync(root);
   const configured = sourceRoots ?? [
     ...(config?.extends ?? []),
@@ -38,6 +41,13 @@ export function typeScriptScope(root: string, filename: string, sourceRoots?: re
     if (scope) return scope;
   }
   return undefined;
+}
+
+/** Selects a source scope without executing config; Vite may pass resolved roots for dynamic config. */
+export function typeScriptScope(root: string, filename: string, sourceRoots?: readonly string[]): TypeScriptScope | undefined {
+  const scope = sourceScope(root, filename, sourceRoots);
+  // Plain app/ modules are checked in the browser scope; see `transformTypeScriptAutoImports` for SSR.
+  return scope === "app" ? "client" : scope;
 }
 
 function publicSpecifier(outputDirectory: string, entry: AutoImport): string {
@@ -55,7 +65,7 @@ function assertNoCollisions(entries: readonly AutoImport[], scope: TypeScriptSco
   const symbols = new Map<string, AutoImport>();
   for (const entry of entries) {
     const previous = symbols.get(entry.name);
-    if (previous) throw new Error(`Ambiguous autoimport ${entry.name} in ${scope} scope: ${previous.file}, ${entry.file}`);
+    if (previous) throw new Error(`Autoimport ambiguo ${entry.name} en el ámbito ${scope}: ${previous.file}, ${entry.file}`);
     symbols.set(entry.name, entry);
   }
 }
@@ -115,6 +125,17 @@ export async function generateAutoImportTypes(projectRoot: string): Promise<{ cl
     assertNoCollisions(entries, scope);
     const typeModules = new Map<string, string>();
     const imports: string[] = [];
+    const namespaceFor = (targetSpecifier: string): string => {
+      let namespace = typeModules.get(targetSpecifier);
+      if (!namespace) {
+        namespace = `__meeko_type_${typeModules.size}`;
+        typeModules.set(targetSpecifier, namespace);
+        // A declaration-only namespace alias preserves the original symbol's
+        // generic parameters, including private constraints and defaults.
+        imports.push(`import * as ${namespace} from ${targetSpecifier};`);
+      }
+      return namespace;
+    };
     const declarations = entries.sort((a, b) => a.name.localeCompare(b.name)).map((entry) => {
       const specifier = JSON.stringify(publicSpecifier(outputDirectory, entry));
       if (entry.typeOnly) {
@@ -123,16 +144,11 @@ export async function generateAutoImportTypes(projectRoot: string): Promise<{ cl
         const targetSpecifier = resolvedTarget
           ? JSON.stringify(publicSpecifier(outputDirectory, { ...entry, ...resolvedTarget }))
           : specifier;
-        let namespace = typeModules.get(targetSpecifier);
-        if (!namespace) {
-          namespace = `__meeko_type_${typeModules.size}`;
-          typeModules.set(targetSpecifier, namespace);
-          // A declaration-only namespace alias preserves the original symbol's
-          // generic parameters, including private constraints and defaults.
-          imports.push(`import * as ${namespace} from ${targetSpecifier};`);
-        }
-        return `  export import ${entry.name} = ${namespace}.${target.imported};`;
+        return `  export import ${entry.name} = ${namespaceFor(targetSpecifier)}.${target.imported};`;
       }
+      // Classes, enums and values merged with a type keep every meaning: the value,
+      // the type and, for enums, member types such as `Scope.App`.
+      if (entry.alsoType && !entry.component) return `  export import ${entry.name} = ${namespaceFor(specifier)}.${entry.imported};`;
       const value = entry.component ? `typeof import(${specifier})` : `typeof import(${specifier})[${JSON.stringify(entry.imported)}]`;
       return `  const ${entry.name}: ${value};`;
     });
@@ -151,17 +167,63 @@ export async function generateAutoImportTypes(projectRoot: string): Promise<{ cl
  * Vite can call this for app/shared/server TypeScript before its normal TS transform.
  * `scope` overrides the path-based scope, e.g. for a `render: "client"` sidecar
  * transformed for the browser bundle.
+ *
+ * `ssr` says which graph the module is loaded into. A plain module under `app/` (not
+ * `.client.ts`, `.server.ts` or `.shared.ts`) runs on both sides like a `.meeko` component:
+ * in the SSR graph its framework autoimports (`api`, `rpc`, `useSocket`…) resolve to the
+ * server client, in the browser to the browser client. The names it may use are still the
+ * browser ones, so a server-only autoimport fails in both graphs alike.
  */
-export function transformTypeScriptAutoImports(source: string, filename: string, root: string, registry: readonly AutoImport[], sourceRoots?: readonly string[], scopeOverride?: TypeScriptScope): string | undefined {
-  const detected = typeScriptScope(root, filename, sourceRoots);
+export function transformTypeScriptAutoImports(source: string, filename: string, root: string, registry: readonly AutoImport[], sourceRoots?: readonly string[], scopeOverride?: TypeScriptScope, ssr = false): string | undefined {
+  const detected = sourceScope(root, filename, sourceRoots);
   if (!detected) return undefined;
-  const scope = scopeOverride ?? detected;
-  if (scope === "shared") {
-    const transformed = applyAutoImports(source, filename, registry, "shared");
-    return transformed === source ? undefined : transformed;
-  }
+  let scope: TypeScriptScope;
+  if (scopeOverride) scope = scopeOverride;
+  else if (detected === "app") {
+    if (ssr) {
+      // Validates the names against the browser scope before resolving them for the server.
+      applyAutoImports(source, filename, registry, "client");
+      scope = "server";
+    } else scope = "client";
+  } else scope = detected;
   const transformed = applyAutoImports(source, filename, registry, scope);
   return transformed === source ? undefined : transformed;
+}
+
+/**
+ * Reads project TypeScript with the imports that the Vite transform adds, so analysis that
+ * walks real imports (public contract generation) sees where an autoimported name comes from.
+ * Dependencies and sources outside app/, server/ and shared/ are returned unchanged, and so is
+ * a source whose autoimports cannot be resolved: Vite reports that error when it loads it.
+ */
+export function autoImportSourceReader(root: string, registry: readonly AutoImport[], sourceRoots: readonly string[]): (file: string) => string | undefined {
+  const cache = new Map<string, string | undefined>();
+  return (file) => {
+    const key = resolve(file);
+    if (cache.has(key)) return cache.get(key);
+    const source = ts.sys.readFile(file);
+    let text = source;
+    if (source !== undefined && !/[\\/]node_modules[\\/]/.test(key)) {
+      try { text = transformTypeScriptAutoImports(source, key, root, registry, sourceRoots) ?? source; }
+      catch { text = source; }
+    }
+    cache.set(key, text);
+    return text;
+  };
+}
+
+/** A compiler host whose source files come from `read`, e.g. an `autoImportSourceReader`. */
+export function autoImportCompilerHost(options: ts.CompilerOptions, read: (file: string) => string | undefined): ts.CompilerHost {
+  const host = ts.createCompilerHost(options, true);
+  host.getSourceFile = (fileName, languageVersion, onError) => {
+    const text = read(fileName);
+    if (text === undefined) {
+      onError?.(`File not found: ${fileName}`);
+      return undefined;
+    }
+    return ts.createSourceFile(fileName, text, languageVersion, true);
+  };
+  return host;
 }
 
 /** Maps the unchanged source body after imports inserted at the start of a TS module. */

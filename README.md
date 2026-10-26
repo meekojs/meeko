@@ -10,13 +10,14 @@ Este proyecto está dedicado a mi gatita Meeko. Su carita inspira el logo que lo
 
 El código se distribuye bajo la [licencia MIT](https://github.com/meekojs/meeko/blob/main/LICENSE). El paquete público se llama `@meekojs/meeko`; la CLI se invoca como `meeko` y el plugin de Vite se importa desde `@meekojs/meeko/vite`.
 
-A partir de 1.0, Meeko sigue SemVer. La [política de estabilidad](https://github.com/meekojs/meeko/blob/main/docs/stability.md) define qué es API pública: subrutas, CLI, convenciones de archivos y formatos de red. También fija cómo se depreca una API y qué entornos se admiten. La [guía de migración](https://github.com/meekojs/meeko/blob/main/docs/migration-1.0.md) explica cómo actualizar desde `0.1.0`.
+A partir de 1.0, Meeko sigue SemVer. La [política de estabilidad](https://github.com/meekojs/meeko/blob/main/docs/stability.md) define qué es API pública: subrutas, CLI, convenciones de archivos y formatos de red. También fija cómo se depreca una API y qué entornos se admiten. La [guía de migración](https://github.com/meekojs/meeko/blob/main/docs/migration-1.0.md) explica cómo actualizar desde `0.1.0`, y [Actualizar de 1.0 a 1.1](https://github.com/meekojs/meeko/blob/main/docs/migration-1.1.md) recoge los cambios de comportamiento de `1.1`.
 
 - [Arquitectura y contratos](https://github.com/meekojs/meeko/blob/main/docs/architecture.md)
 - [API del motor de componentes](https://github.com/meekojs/meeko/blob/main/docs/api.md)
 - [Aplicaciones full-stack con Meeko](https://github.com/meekojs/meeko/blob/main/docs/framework.md)
 - [Política de estabilidad 1.x](https://github.com/meekojs/meeko/blob/main/docs/stability.md)
 - [Migrar de 0.1.0 a 1.0](https://github.com/meekojs/meeko/blob/main/docs/migration-1.0.md)
+- [Actualizar de 1.0 a 1.1](https://github.com/meekojs/meeko/blob/main/docs/migration-1.1.md)
 - [Editores y servidor de lenguaje](https://github.com/meekojs/meeko/blob/main/docs/editors.md)
 - [Plan de desarrollo](https://github.com/meekojs/meeko/blob/main/docs/roadmap.md)
 - [Comparativa reproducible con Vue](https://github.com/meekojs/meeko/blob/main/docs/benchmarks.md)
@@ -96,6 +97,7 @@ Cada script tiene su función:
 - `build` produce en `.meeko/output/node/` el cliente, el servidor Node y las páginas prerenderizadas, que se ejecutan sin las fuentes de la aplicación.
 - `meeko build --adapter bun`, `--adapter deno` o `--adapter cloudflare` generan en su lugar una salida autónoma para Bun, Deno o Cloudflare Workers.
 - `start` sirve SSR de producción con Node 24 y requiere configurar sesiones persistentes en `server/runtime.ts`.
+- `meeko clean` borra todo lo que genera Meeko (`.meeko/` y la caché de Vite); `meeko clean --all` también borra `node_modules`. `--dry-run` muestra qué borraría sin tocar nada.
 
 La [guía del framework](https://github.com/meekojs/meeko/blob/main/docs/framework.md) explica configuración, autoimports, rutas, middleware, despliegue y seguridad.
 
@@ -111,7 +113,7 @@ La [guía del framework](https://github.com/meekojs/meeko/blob/main/docs/framewo
 | `src/server.ts` | Escapado de contenido dinámico para HTML y `serializeJson`. |
 | `src/dom.ts`, `src/hmr.ts` | Runtime de hidratación, regiones, listas y HMR. |
 | `src/internal.ts` | Entrada `@meekojs/meeko/internal` que importa el código generado. |
-| `src/cli.ts` | CLI `meeko`: comandos de proyecto (`dev`, `check`, `build --adapter`, `start`, `preview`), de componente (`compile`, `types`), de generación (`routes`, `prerender`), starters (`init`, `init-framework`), servidor de lenguaje (`lsp`), `--help` y `--version`. |
+| `src/cli.ts` | CLI `meeko`: comandos de proyecto (`dev`, `check`, `build --adapter`, `start`, `preview`), de componente (`compile`, `types`), de generación (`routes`, `prerender`), limpieza (`clean`), starters (`init`, `init-framework`), servidor de lenguaje (`lsp`), `--help` y `--version`. |
 | `src/framework.ts`, `src/framework` | Framework: configuración, rutas, páginas, streaming, navegación, clientes API/RPC/Socket y generación del build. |
 | `src/framework-server.ts`, `src/framework-server` | Núcleo de servidor portable (`@meekojs/meeko/server`): aplicación, runtime, contratos, sesiones, middleware y Socket. |
 | `src/node.ts`, `src/bun.ts`, `src/deno.ts`, `src/cloudflare.ts` | Adaptadores de Node, Bun, Deno y Cloudflare Workers. |
@@ -129,6 +131,7 @@ La [guía del framework](https://github.com/meekojs/meeko/blob/main/docs/framewo
 | `benchmarks` | Comparativa repetible de Meeko y Vue en SSR y Chrome. |
 | `tests` | Pruebas unitarias, E2E y de consumidor externo, y la suite de conformidad de adaptadores (`tests/conformance`). |
 | `tools/devtools-extension` | Extensión Meeko DevTools para Chrome. |
+| `site` | Sitio de documentación, hecho con Meeko a partir de estos Markdown. |
 
 ## Desarrollo
 
@@ -189,9 +192,11 @@ Un archivo tiene `<script lang="ts">`, `<template>` y un `<style>` opcional; `sc
 
 `defineProps<Props>({ count: 0 })` declara defaults sin otra macro: `count` será opcional al usar el componente y estará definido dentro de él. Consulta las reglas y límites en la [guía de la API](https://github.com/meekojs/meeko/blob/main/docs/api.md#valores-por-defecto-en-defineprops).
 
-`if:when="expression"` muestra u oculta un elemento. Una lista usa `each:of="items"`, `each:as="item"` y `each:key="item.id"`; `each:index="position"` permite nombrar el índice, que se llama `index` por defecto. Las claves deben ser cadenas o números finitos y no pueden repetirse. Meeko conserva los nodos de las claves existentes al reordenar la lista. [Regions.meeko](https://github.com/meekojs/meeko/blob/main/examples/regions/Regions.meeko) muestra condiciones, listas anidadas, eventos y atributos dinámicos.
+`if:when="expression"` muestra u oculta un elemento. Una lista usa `each:of="items"`, `each:as="item"` y, opcionalmente desde `1.1`, `each:key="item.id"`; `each:index="position"` permite nombrar el índice, que se llama `index` por defecto. Las claves deben ser cadenas o números finitos y no pueden repetirse. Con clave, Meeko conserva los nodos de las claves existentes al reordenar la lista; sin ella, la clave es el índice. [Regions.meeko](https://github.com/meekojs/meeko/blob/main/examples/regions/Regions.meeko) muestra condiciones, listas anidadas, eventos y atributos dinámicos.
 
 Un componente importado en el script se inserta con `<component is="Child" bind:label="expression"></component>`. Las props se comprueban con TypeScript y cada hijo se hidrata dentro de un rango de comentarios, sin un elemento envolvente. `is` también acepta un componente recibido como prop tipada `Component<Props>`; así se puede insertar contenido reutilizable y cambiarlo reactivamente. La comunicación hacia el padre usa callbacks tipados en las props, y `createContext<T>()` permite compartir valores con descendientes. El cierre explícito es obligatorio; la sintaxis autocerrada de HTML no se admite para `<component>`. [Parent.meeko](https://github.com/meekojs/meeko/blob/main/examples/nested/Parent.meeko) muestra hijos y nietos dentro de condiciones y listas.
+
+Desde `1.1`, un componente fijo se escribe como etiqueta (`<AppButton variant="primary" bind:label="x" />`), con props estáticas y `bind:`, eventos con `defineEmits` y `on:`, modelos con `defineModel` y `model`, contenido con `defineSnippets`, `<snippet>` y `<render>`, y un valor público con `defineExpose` que el padre lee con `ref:` y `useElementRef`. Los componentes pueden ser genéricos (`<script lang="ts" generic="T">`), `<script lang="ts">` es opcional, `onMounted` ejecuta código tras montar, `model` enlaza controles de formulario y `html` inserta HTML sin escapar. La [guía de la API](https://github.com/meekojs/meeko/blob/main/docs/api.md) los describe, y el plugin `@meekojs/meeko/prettier` formatea los `.meeko` en la CLI y el editor.
 
 Los errores de sintaxis de script, plantilla y CSS, así como los errores de tipos en declaraciones y expresiones, tienen ubicación en `.meeko`. Los errores atribuibles sólo al código auxiliar generado se identifican explícitamente.
 

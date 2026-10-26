@@ -47,10 +47,10 @@ test("TS autoimports generate isolated client/server/shared declarations and tra
     assert.equal(typeScriptAutoImportMap("const count = useCount(); type Name = Label;", code!, page).sources[0], page);
     const explicit = transformTypeScriptAutoImports('import { useCount } from "../composables/count.js"; useCount();', page, root, registry);
     assert.equal(explicit, undefined);
-    assert.throws(() => transformTypeScriptAutoImports("getSecret();", page, root, registry), /unavailable in client scope/);
-    assert.throws(() => transformTypeScriptAutoImports("useCount();", join(root, "shared", "utils", "worker.ts"), root, registry), /unavailable in shared scope/);
+    assert.throws(() => transformTypeScriptAutoImports("getSecret();", page, root, registry), /no está disponible en el ámbito client/);
+    assert.throws(() => transformTypeScriptAutoImports("useCount();", join(root, "shared", "utils", "worker.ts"), root, registry), /no está disponible en el ámbito shared/);
     assert.match(transformTypeScriptAutoImports("useCount();", join(root, "app", "pages", "page.server.ts"), root, registry) ?? "", /import \{ useCount as useCount \}/);
-    assert.throws(() => transformTypeScriptAutoImports("browserOnly();", join(root, "app", "pages", "page.server.ts"), root, registry), /unavailable in server scope/);
+    assert.throws(() => transformTypeScriptAutoImports("browserOnly();", join(root, "app", "pages", "page.server.ts"), root, registry), /no está disponible en el ámbito server/);
     assert.equal(typeScriptScope(root, join(root, "app", "pages", "page.test.ts")), undefined);
     assert.equal(typeScriptScope(root, join(root, "app", "pages", "page.server.ts")), "server");
     const sidecar = join(root, "app", "pages", "users", "index.route.ts");
@@ -78,7 +78,7 @@ test("TS autoimport declarations reject name collisions in the same scope", asyn
     await mkdir(join(root, "shared", "utils"), { recursive: true });
     await writeFile(join(root, "app", "composables", "first.ts"), "export const duplicate = 1;");
     await writeFile(join(root, "shared", "utils", "second.ts"), "export const duplicate = 2;");
-    await assert.rejects(generateAutoImportTypes(root), /Ambiguous autoimport duplicate in client scope/);
+    await assert.rejects(generateAutoImportTypes(root), /Autoimport ambiguo duplicate en el ámbito client/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -107,7 +107,45 @@ test("configured layers and modules transform TypeScript in their own scopes", a
     assert.equal(typeScriptScope(root, join(root, "unconfigured", "app", "page.ts")), undefined);
     assert.match(transformTypeScriptAutoImports("layerCount();", layerPage, root, registry) ?? "", /import \{ layerCount as layerCount \}/);
     assert.match(transformTypeScriptAutoImports("moduleSecret();", moduleServer, root, registry) ?? "", /import \{ moduleSecret as moduleSecret \}/);
-    assert.throws(() => transformTypeScriptAutoImports("moduleSecret();", layerPage, root, registry), /unavailable in client scope/);
+    assert.throws(() => transformTypeScriptAutoImports("moduleSecret();", layerPage, root, registry), /no está disponible en el ámbito client/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("plain app/ TypeScript resolves framework clients per graph; .client.ts stays in the browser", async () => {
+  await mkdir(resolve(".meeko"), { recursive: true });
+  const root = await mkdtemp(resolve(".meeko/autoimports-ssr-test-"));
+  try {
+    const generated = join(root, ".meeko", "generated");
+    await mkdir(generated, { recursive: true });
+    for (const scope of ["client", "server"]) {
+      await writeFile(join(generated, `clients.${scope}.ts`), "export const api = {}; export const rpc = {}; export const socket = {};\nexport const useSocket = () => undefined; export const useApi = () => undefined;\nexport const useRpcQuery = () => undefined; export const useRpcMutation = () => undefined;\n");
+    }
+    await mkdir(join(root, "server", "utils"), { recursive: true });
+    await writeFile(join(root, "server", "utils", "secret.ts"), "export function getSecret(): string { return 'private'; }\n");
+    const registry = await discoverAutoImports(root);
+    const source = "export function useEcho() { const channel = useSocket('echo'); return { channel, load: () => api.greeting.get() }; }\n";
+    for (const folder of ["composables", "utils", "stores", "components"]) {
+      const file = join(root, "app", folder, "useEcho.ts");
+      assert.equal(typeScriptScope(root, file), "client");
+      const browser = transformTypeScriptAutoImports(source, file, root, registry) ?? "";
+      assert.match(browser, /import \{ useSocket as useSocket \} from "\.\.\/\.\.\/\.meeko\/generated\/clients\.client\.js";/);
+      assert.match(browser, /import \{ api as api \} from "\.\.\/\.\.\/\.meeko\/generated\/clients\.client\.js";/);
+      const ssr = transformTypeScriptAutoImports(source, file, root, registry, undefined, undefined, true) ?? "";
+      assert.match(ssr, /import \{ useSocket as useSocket \} from "\.\.\/\.\.\/\.meeko\/generated\/clients\.server\.js";/);
+      assert.match(ssr, /import \{ api as api \} from "\.\.\/\.\.\/\.meeko\/generated\/clients\.server\.js";/);
+      // Server-only autoimports stay unavailable in the SSR graph, as in the browser.
+      assert.throws(() => transformTypeScriptAutoImports("getSecret();", file, root, registry, undefined, undefined, true), /no está disponible en el ámbito client/);
+    }
+    // A .client.ts module only ever uses the browser client; Vite keeps it out of the SSR graph.
+    const browserOnly = join(root, "app", "composables", "socket.client.ts");
+    assert.match(transformTypeScriptAutoImports(source, browserOnly, root, registry, undefined, undefined, true) ?? "", /clients\.client\.js/);
+    // .server.ts and route sidecars keep the server client in either graph.
+    const serverOnly = join(root, "app", "composables", "loader.server.ts");
+    assert.match(transformTypeScriptAutoImports(source, serverOnly, root, registry) ?? "", /clients\.server\.js/);
+    // An explicit scope (a render: "client" sidecar) wins over the graph.
+    assert.match(transformTypeScriptAutoImports(source, join(root, "app", "pages", "index.route.ts"), root, registry, undefined, "client", true) ?? "", /clients\.client\.js/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

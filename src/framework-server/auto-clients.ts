@@ -1,7 +1,22 @@
 import { currentRequest } from "./context.js";
 import type { ClientOptions } from "../framework/clients.js";
 
-/** Dynamic options prevent a module-level client from retaining any user's credentials. */
+/**
+ * Opciones de cliente para el servidor: leen la URL, las cookies, `authorization`, el token CSRF y
+ * el despacho local de la petición en curso en cada llamada, así que un cliente creado a nivel de
+ * módulo nunca retiene credenciales de otro usuario. Es lo que usan los clientes `api` y `rpc`
+ * generados para SSR.
+ *
+ * @returns Opciones dinámicas ligadas a la petición activa.
+ * @throws {Error} Desde cada llamada del cliente, fuera de una petición de Meeko.
+ * @example
+ * ```ts
+ * import { createApiClient } from "@meekojs/meeko/framework";
+ * import { createServerClientOptions } from "@meekojs/meeko/server";
+ *
+ * export const api = createApiClient<ApiContract>(manifest, createServerClientOptions());
+ * ```
+ */
 export function createServerClientOptions(): ClientOptions {
   return {
     baseUrl: () => currentRequest().context.request.url,

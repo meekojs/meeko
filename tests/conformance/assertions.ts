@@ -43,6 +43,22 @@ function refusal(peer: WebSocket): Promise<number> {
   });
 }
 
+/**
+ * Resolves with the close of an auth refusal: the server completes the upgrade and closes at once
+ * with 4401/4403, which a browser can read. A message sent meanwhile never reaches a handler, and
+ * the server sends none.
+ */
+function denial(peer: WebSocket): Promise<{ code: number; messages: number }> {
+  let received = 0;
+  peer.on("message", () => { received++; });
+  return new Promise((resolve, reject) => {
+    peer.once("unexpected-response", (_request, response) => { response.resume(); reject(new Error(`Socket handshake answered HTTP ${response.statusCode}`)); });
+    peer.once("open", () => peer.send(JSON.stringify({ event: "say", payload: { text: "early" } })));
+    peer.once("close", (code: number) => resolve({ code, messages: received }));
+    peer.once("error", (error) => reject(error));
+  });
+}
+
 export async function opened(peer: WebSocket): Promise<WebSocket> {
   await once(peer, "open");
   return peer;
@@ -177,6 +193,23 @@ export function conformanceSuite(adapter: ConformanceAdapter, extra?: (suite: Co
       await rpc.body?.cancel();
     });
 
+    it("renders app/error.meeko inside the layouts for a page without a route", async () => {
+      const page = await fetch(`${origin}/missing-page`, { headers: { accept: "text/html" } });
+      assert.equal(page.status, 404, server.logs());
+      assert.match(page.headers.get("content-type") ?? "", /^text\/html/);
+      const html = await page.text();
+      assert.match(html, /<div class="site-root">.*<div class="app-shell"[^>]*>.*<section id="app-error">/s);
+      assert.match(html, /Error (?:<!--meeko:text:\d+-->)?404/);
+      assert.match(html, /<script id="meeko-payload" type="application\/json">\{[^<]*"error":true/);
+      assert.match(html, /<script type="module" src="\/assets\/[^"]+\.js"><\/script>/);
+      const navigation = await fetch(`${origin}/missing-page`, { headers: { accept: "application/meeko+json" } });
+      assert.equal(navigation.status, 404);
+      assert.deepEqual(((await navigation.json()) as { props: unknown }).props, { status: 404, message: "NOT_FOUND" });
+      const api = await fetch(`${origin}/api/missing`, { headers: { accept: "text/html" } });
+      assert.equal(api.status, 404);
+      assert.equal(((await api.json()) as { code: string }).code, "NOT_FOUND");
+    });
+
     it("answers HEAD without a body", async () => {
       const page = await fetch(`${origin}/about`, { method: "HEAD" });
       assert.equal(page.status, 200);
@@ -250,9 +283,12 @@ export function conformanceSuite(adapter: ConformanceAdapter, extra?: (suite: Co
       assert.ok((await personal.text()).includes(`<meta name="meeko-csrf-token" content="${csrf}">`));
     });
 
-    it("checks Socket path, Origin and authentication before upgrading", async () => {
+    it("checks Socket path, Origin and authentication before opening a session", async () => {
+      // A foreign Origin never completes an upgrade, even toward a channel that would refuse it later.
       assert.equal(await refusal(track(connect(origin, "room", { room: "a", origin: "http://evil.test" }))), 403);
-      assert.equal(await refusal(track(connect(origin, "private"))), 401);
+      assert.equal(await refusal(track(connect(origin, "private", { origin: "http://evil.test" }))), 403);
+      assert.deepEqual(await denial(track(connect(origin, "private"))), { code: 4401, messages: 0 });
+      assert.deepEqual(await denial(track(connect(origin, "forbidden", { cookie }))), { code: 4403, messages: 0 });
       assert.equal(await refusal(track(connect(origin, "missing"))), 404);
       assert.equal(await refusal(track(connect(origin, "bad.name"))), 400);
       const peer = await opened(track(connect(origin, "private", { cookie })));

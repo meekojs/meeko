@@ -6,6 +6,7 @@ import { resolveConfigSources } from "./config.js";
 import { generateServerContracts } from "./contracts-generate.js";
 import { generateRoutes } from "./generate.js";
 import { generatePageContracts } from "./page-contracts-generate.js";
+import { generateRouteBlockTypes, routeBlockTypesDirectory } from "./route-block-types.js";
 
 export const projectNames = ["app", "server", "shared"] as const;
 
@@ -25,7 +26,7 @@ const generatedIncludes: Record<(typeof projectNames)[number], string[]> = {
   server: [
     "generated/entry-server.ts", "generated/clients.server.ts", "generated/socket-contracts.ts",
     "generated/page-contracts.server.ts", "types/virtual-pages.d.ts", "types/routes.d.ts",
-    "types/**/*.d.meeko.ts", "types/autoimports/server.d.ts",
+    "types/**/*.d.meeko.ts", "types/autoimports/server.d.ts", `${routeBlockTypesDirectory}/**/*.route.ts`,
   ],
   shared: ["types/autoimports/shared.d.ts"],
 };
@@ -75,6 +76,7 @@ export async function prepareFrameworkTypeDeclarations(projectRoot: string): Pro
   await generateRoutes(root);
   await generateServerContracts(root);
   await generateAppTypes(root);
+  await generateRouteBlockTypes(root);
   await generatePageContracts(root);
   await generateTypeScriptAutoImports(root);
   await generateFrameworkTsconfigs(root);

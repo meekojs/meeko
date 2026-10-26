@@ -4,24 +4,60 @@ import type { RedisSubscriberClient } from "./redis-pubsub.js";
 import type { SessionRecord, SessionStore } from "./sessions.js";
 import type { Unsubscribe } from "./socket.js";
 
-/** Small interface compatible with Redis clients that support SET PX. */
+/**
+ * Interfaz mínima de un cliente Redis para {@link RedisSessionStore}: `get`, `set` con `PX`, `del` y
+ * `eval`. node-redis 4 o posterior la cumple; también un adaptador sobre la API REST de Upstash.
+ *
+ * @example
+ * ```ts
+ * import type { RedisSessionClient } from "@meekojs/meeko/server";
+ *
+ * function upstashClient(url: string, token: string): RedisSessionClient {
+ *   const command = async (...args: Array<string | number>): Promise<unknown> => {
+ *     const response = await fetch(url, { method: "POST", headers: { authorization: `Bearer ${token}` }, body: JSON.stringify(args) });
+ *     return ((await response.json()) as { result?: unknown }).result;
+ *   };
+ *   return {
+ *     get: async (key) => (await command("GET", key)) as string | null,
+ *     set: (key, value, { PX }) => command("SET", key, value, "PX", PX),
+ *     del: (key) => command("DEL", key),
+ *     eval: (script, { keys, arguments: args }) => command("EVAL", script, keys.length, ...keys, ...args),
+ *   };
+ * }
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#redis-mediante-la-api-rest-de-upstash
+ */
 export interface RedisSessionClient {
+  /** Lee una clave, o `null` si no existe. */
   get(key: string): Promise<string | null>;
+  /** Escribe una clave con caducidad en milisegundos. */
   set(key: string, value: string, options: { PX: number }): Promise<unknown>;
+  /** Borra una clave. */
   del(key: string): Promise<unknown>;
+  /** Ejecuta un script Lua de forma atómica. */
   eval(script: string, options: { keys: string[]; arguments: string[] }): Promise<unknown>;
+  /** Cierra la conexión; sólo se usa con `closeClient`. */
   quit?(): Promise<unknown>;
 }
 
+/**
+ * Opciones de {@link RedisSessionStore}.
+ *
+ * @example
+ * ```ts
+ * import type { RedisSessionStoreOptions } from "@meekojs/meeko/server";
+ *
+ * const options: RedisSessionStoreOptions = { prefix: "app:prod:session:", subscriber: redis.duplicate() };
+ * ```
+ */
 export interface RedisSessionStoreOptions {
-  /** Use a unique prefix for each application and environment. */
+  /** Prefijo de las claves, único por aplicación y entorno; termina en `:` y no tiene espacios. */
   prefix: string;
-  /** Close the Redis client when this store owns its connection. */
+  /** Cierra el cliente Redis al cerrar el store, cuando el store es dueño de la conexión. */
   closeClient?: boolean;
   /**
-   * Dedicated subscriber connection (for example `client.duplicate()`). With it
-   * the store receives revocations published by every instance on
-   * `<prefix>revoked`. The application owns and closes this client.
+   * Conexión suscriptora dedicada (por ejemplo, `client.duplicate()`). Con ella el store recibe las
+   * revocaciones que cualquier instancia publica en `<prefix>revoked`. La aplicación la abre y la cierra.
    */
   subscriber?: RedisSubscriberClient;
 }
@@ -41,11 +77,41 @@ function decodeRecord<T>(value: string, id: string): SessionRecord<T> {
   return candidate as SessionRecord<T>;
 }
 
-/** Persistent store with Redis-managed expiration and explicit connection ownership. */
+/**
+ * Store de sesiones persistente en Redis: la caducidad la gestiona Redis, `replace` y
+ * `revokeFamily` son scripts atómicos y un índice por familia localiza la sesión activa. La
+ * aplicación abre y cierra el cliente salvo con `closeClient`.
+ *
+ * @typeParam T Datos de la aplicación en la sesión.
+ * @example
+ * ```ts
+ * // server/runtime.ts
+ * import { createClient } from "redis";
+ * import { defineServerRuntime, RedisSessionStore, SessionManager } from "@meekojs/meeko/server";
+ *
+ * export default defineServerRuntime(async ({ env, production, prerendering }) => {
+ *   const redis = createClient({ url: env.REDIS_URL });
+ *   await redis.connect();
+ *   const subscriber = redis.duplicate();
+ *   await subscriber.connect();
+ *   const store = new RedisSessionStore(redis, { prefix: "app:prod:session:", subscriber });
+ *   return {
+ *     sessions: new SessionManager({ store, production: production && !prerendering }),
+ *     close: async () => { await subscriber.quit(); await redis.quit(); },
+ *   };
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#sesiones-y-seguridad
+ */
 export class RedisSessionStore<T = unknown> implements SessionStore<T> {
   readonly persistent = true;
-  /** Present only with a `subscriber` client. */
+  /** Sólo existe con un cliente `subscriber`. */
   readonly subscribeRevocations?: (listener: (familyId: string) => void) => Promise<Unsubscribe>;
+  /**
+   * @param client Cliente Redis conectado.
+   * @param options Prefijo, propiedad del cliente y suscriptor.
+   * @throws {TypeError} Si el prefijo está vacío, tiene espacios o no termina en `:`.
+   */
   constructor(private readonly client: RedisSessionClient, private readonly options: RedisSessionStoreOptions) {
     if (!options.prefix || !options.prefix.endsWith(":") || /\s/.test(options.prefix)) throw new TypeError("Session Redis prefix must be nonempty, contain no whitespace, and end with ':'");
     const subscriber = options.subscriber;
@@ -119,37 +185,106 @@ export class RedisSessionStore<T = unknown> implements SessionStore<T> {
   async close(): Promise<void> { if (this.options.closeClient) await this.client.quit?.(); }
 }
 
-/** A driver can implement these operations using any SQL client and dialect. */
+/**
+ * Fila de sesión que intercambian {@link SqlSessionStore} y su driver, con cualquier cliente y
+ * dialecto SQL.
+ *
+ * @example
+ * ```ts
+ * import type { SqlSessionRow } from "@meekojs/meeko/server";
+ *
+ * const fromDatabase = (row: { id: string; family_id: string; csrf_token: string; data_json: string; created_at: number; expires_at: number }): SqlSessionRow => ({
+ *   id: row.id, familyId: row.family_id, csrfToken: row.csrf_token,
+ *   dataJson: row.data_json, createdAt: row.created_at, expiresAt: row.expires_at,
+ * });
+ * ```
+ */
 export interface SqlSessionRow {
+  /** ID opaco de la sesión, clave primaria. */
   id: string;
-  /** Migrate existing rows by setting family_id = id before deploying this driver. */
+  /** Familia de la sesión, con índice único. Migre las filas existentes con `family_id = id`. */
   familyId: string;
+  /** Token CSRF. */
   csrfToken: string;
+  /** Datos de la sesión serializados en JSON. */
   dataJson: string;
+  /** Creación, en milisegundos desde la época. */
   createdAt: number;
+  /** Caducidad, en milisegundos desde la época. */
   expiresAt: number;
 }
 
+/**
+ * Driver SQL de {@link SqlSessionStore}: la aplicación escribe las sentencias con su cliente. `replace`
+ * y `revokeFamily` deben ser atómicos. `D1SessionDriver` de `@meekojs/meeko/cloudflare` es una
+ * implementación.
+ *
+ * @example
+ * ```ts
+ * import type { SqlSessionDriver } from "@meekojs/meeko/server";
+ *
+ * const driver: SqlSessionDriver = {
+ *   read: (id) => db.get("SELECT * FROM sessions WHERE id = ?", id),
+ *   write: (row) => db.run("INSERT OR REPLACE INTO sessions VALUES (?, ?, ?, ?, ?, ?)", row.id, row.familyId, row.csrfToken, row.dataJson, row.createdAt, row.expiresAt),
+ *   remove: (id) => db.run("DELETE FROM sessions WHERE id = ?", id),
+ *   replace: (previousId, row, now) => db.transaction(() => replaceRow(previousId, row, now)),
+ *   revokeFamily: (familyId) => db.run("DELETE FROM sessions WHERE family_id = ?", familyId),
+ * };
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#sesiones-y-seguridad
+ */
 export interface SqlSessionDriver {
+  /** Lee la fila con ese ID, o `undefined`. */
   read(id: string): Promise<SqlSessionRow | undefined>;
-  /** Insert or update one row, keyed by its opaque id; enforce one active id per family. */
+  /** Inserta o actualiza una fila por su ID opaco; debe imponer un único ID activo por familia. */
   write(row: SqlSessionRow): Promise<void>;
+  /** Borra la fila con ese ID. */
   remove(id: string): Promise<void>;
-  /** Atomically replace an unexpired row of the same family in one transaction. */
+  /** Sustituye en una transacción una fila no caducada de la misma familia; `false` si no existe. */
   replace(previousId: string, row: SqlSessionRow, now: number): Promise<boolean>;
-  /** Delete the active row for this family in one atomic operation, including stale-handle logout. */
+  /** Borra en una operación atómica la fila activa de la familia, también desde un handle anterior. */
   revokeFamily(familyId: string): Promise<void>;
+  /** Cierra la conexión; sólo se usa con `closeDriver`. */
   close?(): Promise<void>;
 }
 
+/**
+ * Opciones de {@link SqlSessionStore}.
+ *
+ * @example
+ * ```ts
+ * import { SqlSessionStore } from "@meekojs/meeko/server";
+ *
+ * const store = new SqlSessionStore(driver, { closeDriver: true });
+ * ```
+ */
 export interface SqlSessionStoreOptions {
-  /** Close the SQL driver when this store owns its connection. */
+  /** Cierra el driver al cerrar el store, cuando el store es dueño de la conexión. */
   closeDriver?: boolean;
 }
 
-/** Generic SQL store. The application supplies SQL statements through its driver. */
+/**
+ * Store de sesiones SQL genérico y persistente: la aplicación aporta las sentencias mediante su
+ * driver. Las filas caducadas se borran al leerlas. No notifica revocaciones a otras instancias.
+ *
+ * @typeParam T Datos de la aplicación en la sesión.
+ * @example
+ * ```ts
+ * import { defineServerRuntime, SessionManager, SqlSessionStore } from "@meekojs/meeko/server";
+ *
+ * export default defineServerRuntime(({ production, prerendering }) => ({
+ *   sessions: new SessionManager({ store: new SqlSessionStore(driver), production: production && !prerendering }),
+ * }));
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#sesiones-y-seguridad
+ */
 export class SqlSessionStore<T = unknown> implements SessionStore<T> {
   readonly persistent = true;
+  /**
+   * @param driver Driver con `replace` y `revokeFamily` atómicos.
+   * @param options Propiedad de la conexión.
+   * @throws {TypeError} Si el driver no implementa `replace` o `revokeFamily`.
+   */
   constructor(private readonly driver: SqlSessionDriver, private readonly options: SqlSessionStoreOptions = {}) {
     if (typeof driver.replace !== "function" || typeof driver.revokeFamily !== "function") throw new TypeError("SQL session driver requires atomic replace and family revocation");
   }

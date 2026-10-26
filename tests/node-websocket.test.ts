@@ -45,16 +45,33 @@ test("official Node adapter upgrades real WebSockets and enforces origin, sessio
   const origin = `http://127.0.0.1:${address.port}`;
   const url = `ws://127.0.0.1:${address.port}/_meeko/socket/chat?room=alice`;
   const adapter = attachNodeWebSocketServer({ server, hub, publicOrigin: origin, heartbeatMs: 30, maxMessageBytes: 256 });
-  const connect = (requestedOrigin: string, cookie?: string) => new WebSocket(url, { headers: { origin: requestedOrigin, ...(cookie ? { cookie } : {}) } });
+  const connect = (requestedOrigin: string, cookie?: string, target = url) => new WebSocket(target, { headers: { origin: requestedOrigin, ...(cookie ? { cookie } : {}) } });
   const rejection = async (peer: WebSocket): Promise<number> => {
     return await new Promise<number>((resolve, reject) => {
       peer.once("unexpected-response", (_request, response) => { response.resume(); resolve(response.statusCode ?? 0); });
+      peer.once("open", () => reject(new Error("Socket handshake unexpectedly succeeded")));
+      peer.once("error", reject);
+    });
+  };
+  /** An auth refusal completes the upgrade and closes at once: resolves with the close, after any message. */
+  const denial = async (peer: WebSocket): Promise<{ code: number; reason: string; messages: number }> => {
+    let messages = 0;
+    peer.on("message", () => { messages++; });
+    return await new Promise((resolve, reject) => {
+      peer.once("unexpected-response", (_request, response) => { response.resume(); reject(new Error(`HTTP ${response.statusCode}`)); });
+      // Sent while the server closes: it never reaches the hub.
+      peer.once("open", () => peer.send(JSON.stringify({ event: "message", payload: { text: "early" } })));
+      peer.once("close", (code: number, reason: Buffer) => resolve({ code, reason: reason.toString(), messages }));
       peer.once("error", reject);
     });
   };
   try {
     assert.equal(await rejection(connect("http://evil.test", `meeko.sid=${session.id}`)), 403);
-    assert.equal(await rejection(connect(origin)), 401);
+    assert.deepEqual(await denial(connect(origin)), { code: 4401, reason: "Autenticación requerida", messages: 0 });
+    const otherRoom = `ws://127.0.0.1:${address.port}/_meeko/socket/chat?room=bob`;
+    assert.deepEqual(await denial(connect(origin, `meeko.sid=${session.id}`, otherRoom)), { code: 4403, reason: "Acceso denegado", messages: 0 });
+    assert.equal(await rejection(connect(origin, undefined, `ws://127.0.0.1:${address.port}/_meeko/socket/missing`)), 404);
+    assert.equal(await rejection(connect(origin, undefined, `ws://127.0.0.1:${address.port}/_meeko/socket/bad.name`)), 400);
     const peer = connect(origin, `meeko.sid=${session.id}`);
     await once(peer, "open");
     const reply = once(peer, "message");

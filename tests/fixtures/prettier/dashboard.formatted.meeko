@@ -1,0 +1,117 @@
+<script server lang="ts">
+import { definePage } from "@meekojs/meeko/framework";
+import { isOwner, ownerName } from "../../server/auth.js";
+
+export const route = definePage({
+  load: ({ request, context }) => {
+    if (!isOwner(context))
+      return Response.redirect(new URL("/login", request.url));
+    return { user: ownerName(), renderedAt: new Date().toISOString() };
+  },
+  head: () => ({ title: "Dashboard · Meeko" }),
+});
+</script>
+
+<script lang="ts">
+import { computed, signal } from "@meekojs/meeko";
+
+export interface Props {
+  data: { user: string; renderedAt: string };
+}
+
+const props = defineProps<Props>();
+const count = signal(1);
+const doubled = computed(() => count.value * 2);
+const pending = signal("");
+const socketOpen = signal(false);
+const activity = signal<
+  Array<{ id: number; time: string; label: string; detail: string }>
+>([]);
+</script>
+
+<template>
+<div class="dashboard">
+  <aside class="dashboard-rail" aria-label="Mapa del dashboard">
+    <div class="rail-bottom">
+      <span class="rail-dot" aria-hidden="true"></span>
+      <span
+        >Sesión privada<br /><strong>{props.data.user}</strong></span
+      >
+    </div>
+  </aside>
+  <div class="dashboard-main">
+    <header class="dashboard-header" id="overview">
+      <div>
+        <h1>El sistema, en vivo.</h1>
+        <p>
+          Una vista para comprobar el recorrido completo: HTML del servidor,
+          estado reactivo y llamadas tipadas que llegan a esta aplicación.
+        </p>
+      </div>
+      <button
+        class="dashboard-signout"
+        type="button"
+        on:click="signOut"
+        bind:disabled="pending.value !== ''"
+      >
+        Cerrar sesión
+      </button>
+    </header>
+
+    <section class="execution-strip" aria-label="Estado de la ejecución">
+      <div>
+        <span>Render inicial</span><strong>SSR</strong
+        ><small>{props.data.renderedAt}</small>
+      </div>
+      <div>
+        <span>Socket</span
+        ><strong>{socketOpen.value ? "Conectado" : "Desconectado"}</strong
+        ><small>Canal con autorización</small>
+      </div>
+    </section>
+
+    <section class="activity-section" aria-labelledby="activity-title">
+      <div class="section-title">
+        <div>
+          <h2 id="activity-title">Actividad de esta vista</h2>
+          <p>Resultados de tus acciones actuales, sin datos inventados.</p>
+        </div>
+      </div>
+      <p class="activity-empty" if:when="activity.value.length === 0">
+        Aún no hay operaciones. Prueba una acción para ver su resultado aquí.
+      </p>
+      <ol class="activity-list">
+        <li each:of="activity.value" each:as="item" each:key="item.id">
+          <span>{item.time}</span>
+          <div>
+            <strong>{item.label}</strong
+            ><small>{item.detail}</small>
+          </div>
+        </li>
+      </ol>
+    </section>
+  </div>
+</div>
+</template>
+
+<style scoped>
+@layer components {
+  .dashboard {
+    display: grid;
+    grid-template-columns: 13.5rem minmax(0, 1fr);
+    gap: clamp(2rem, 4vw, 4rem);
+    padding-block: 2rem 5rem;
+  }
+  .rail-bottom strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .execution-strip span,
+  .runtime-value > span,
+  .runtime-derived span {
+    color: var(--ink-muted);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+  }
+}
+</style>

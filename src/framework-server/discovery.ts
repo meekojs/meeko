@@ -5,13 +5,114 @@ import type { ApiRouteDefinition, RpcDefinition, Schema, ServerErrorObserver } f
 import type { ServerPlatform } from "./platform.js";
 import type { SessionManager } from "./sessions.js";
 
+/**
+ * Método HTTP de un endpoint de API, el sufijo de `server/api/<ruta>.<método>.ts`.
+ *
+ * @example
+ * ```ts
+ * import type { ApiMethod } from "@meekojs/meeko/server";
+ *
+ * const safe = (method: ApiMethod): boolean => method === "GET";
+ * ```
+ */
 export type ApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-export interface ApiEndpoint { readonly kind: "api"; readonly file: string; readonly pathname: string; readonly method: ApiMethod; readonly clientKey: string; }
-export interface RpcEndpoint { readonly kind: "rpc"; readonly file: string; readonly pathname: string; readonly id: string; }
-export interface SocketEndpoint { readonly kind: "socket"; readonly file: string; readonly name: string; readonly pathname: string; }
-/** Endpoint files are opaque keys passed to the host's module loader. */
-export interface ServerManifest { readonly api: readonly ApiEndpoint[]; readonly rpc: readonly RpcEndpoint[]; readonly socket?: readonly SocketEndpoint[]; }
-/** Resolves a manifest key to its module; bundlers supply this from a static module map. */
+/**
+ * Endpoint de API descubierto en `server/api`.
+ *
+ * @example
+ * ```ts
+ * import type { ApiEndpoint } from "@meekojs/meeko/server";
+ *
+ * const endpoint: ApiEndpoint = { kind: "api", file: "/server/api/users/[id].get.ts", pathname: "/api/users/[id]", method: "GET", clientKey: "users.byId" };
+ * ```
+ */
+export interface ApiEndpoint {
+  /** Tipo de entrada. */
+  readonly kind: "api";
+  /** Clave del módulo del handler para el cargador. */
+  readonly file: string;
+  /** Ruta HTTP con los segmentos dinámicos entre corchetes. */
+  readonly pathname: string;
+  /** Método HTTP. */
+  readonly method: ApiMethod;
+  /** Ruta del método en el cliente `api`, separada por puntos. */
+  readonly clientKey: string;
+}
+/**
+ * Procedimiento RPC descubierto en `server/rpc`.
+ *
+ * @example
+ * ```ts
+ * import type { RpcEndpoint } from "@meekojs/meeko/server";
+ *
+ * const procedure: RpcEndpoint = { kind: "rpc", file: "/server/rpc/users/get.ts", pathname: "/_meeko/rpc/users/get", id: "users.get" };
+ * ```
+ */
+export interface RpcEndpoint {
+  /** Tipo de entrada. */
+  readonly kind: "rpc";
+  /** Clave del módulo del handler para el cargador. */
+  readonly file: string;
+  /** Ruta HTTP bajo `/_meeko/rpc`. */
+  readonly pathname: string;
+  /** ID del procedimiento con puntos. */
+  readonly id: string;
+}
+/**
+ * Canal Socket descubierto en `server/socket`.
+ *
+ * @example
+ * ```ts
+ * import type { SocketEndpoint } from "@meekojs/meeko/server";
+ *
+ * const chat: SocketEndpoint = { kind: "socket", file: "/server/socket/chat.ts", name: "chat", pathname: "/_meeko/socket/chat" };
+ * ```
+ */
+export interface SocketEndpoint {
+  /** Tipo de entrada. */
+  readonly kind: "socket";
+  /** Clave del módulo del canal para el cargador. */
+  readonly file: string;
+  /** Nombre del canal. */
+  readonly name: string;
+  /** Ruta del upgrade WebSocket bajo `/_meeko/socket`. */
+  readonly pathname: string;
+}
+/**
+ * Endpoints del servidor: API, RPC y Socket. Los archivos son claves opacas que se pasan al cargador
+ * de módulos del host. Lo produce `discoverServerManifest` de `@meekojs/meeko/build`.
+ *
+ * @example
+ * ```ts
+ * import type { ServerManifest } from "@meekojs/meeko/server";
+ *
+ * const manifest: ServerManifest = {
+ *   api: [{ kind: "api", file: "/server/api/health.get.ts", pathname: "/api/health", method: "GET", clientKey: "health" }],
+ *   rpc: [],
+ *   socket: [],
+ * };
+ * ```
+ */
+export interface ServerManifest {
+  /** Endpoints de API. */
+  readonly api: readonly ApiEndpoint[];
+  /** Procedimientos RPC. */
+  readonly rpc: readonly RpcEndpoint[];
+  /** Canales Socket. */
+  readonly socket?: readonly SocketEndpoint[];
+}
+/**
+ * Resuelve una clave del manifiesto a su módulo. Los bundlers lo proporcionan desde un mapa estático
+ * de módulos; en Node puede ser `import()`.
+ *
+ * @example
+ * ```ts
+ * import { pathToFileURL } from "node:url";
+ * import type { ServerModuleLoader } from "@meekojs/meeko/server";
+ *
+ * const load: ServerModuleLoader = (file) => import(pathToFileURL(file).href);
+ * ```
+ */
 export type ServerModuleLoader = (file: string) => Promise<unknown>;
 type PatternPart = { kind: "static" | "param" | "rest"; value: string };
 
@@ -47,7 +148,24 @@ export function assertCallablePaths(entries: readonly { readonly file: string; r
   }
 }
 
-/** Loads server-only channel definitions; callers pass the result to createSocketHub. */
+/**
+ * Carga las definiciones de los canales Socket del manifiesto, que sólo existen en el servidor. El
+ * resultado se pasa a `createSocketHub`.
+ *
+ * @param manifest Manifiesto con la lista `socket`.
+ * @param load Cargador de módulos.
+ * @returns Las definiciones por nombre de canal.
+ * @throws {TypeError} Si falta el cargador.
+ * @throws {Error} Si un módulo de canal no tiene export por defecto.
+ * @example
+ * ```ts
+ * import { pathToFileURL } from "node:url";
+ * import { createSocketHub, loadSocketChannels } from "@meekojs/meeko/server";
+ *
+ * const channels = await loadSocketChannels(manifest, (file) => import(pathToFileURL(file).href));
+ * const hub = createSocketHub({ channels, sessions, services: {} });
+ * ```
+ */
 export async function loadSocketChannels(manifest: Pick<ServerManifest, "socket">, load: ServerModuleLoader): Promise<Readonly<Record<string, unknown>>> {
   if (typeof load !== "function") throw new TypeError("loadSocketChannels requires a module loader");
   const channels: Record<string, unknown> = Object.create(null);
@@ -101,15 +219,36 @@ function compareApi(a: ApiEndpoint, b: ApiEndpoint): number {
   return a.pathname.localeCompare(b.pathname);
 }
 
+/**
+ * Opciones de {@link createServerDispatcher} y {@link createLocalServerFetch}.
+ *
+ * @typeParam S Tipo de los servicios.
+ * @example
+ * ```ts
+ * import { pathToFileURL } from "node:url";
+ * import type { ServerDispatcherOptions } from "@meekojs/meeko/server";
+ *
+ * const options: ServerDispatcherOptions<{ startedAt: number }> = {
+ *   manifest,
+ *   sessions,
+ *   services: () => ({ startedAt: Date.now() }),
+ *   load: (file) => import(pathToFileURL(file).href),
+ *   onError: (error, requestId) => console.error(requestId, error),
+ * };
+ * ```
+ */
 export interface ServerDispatcherOptions<S = unknown> {
+  /** Manifiesto con los endpoints. */
   manifest: ServerManifest;
+  /** Gestor de sesiones. */
   sessions: SessionManager;
+  /** Servicios compartidos o una función que los crea en cada petición. */
   services: S | ((request: Request) => S | Promise<S>);
-  /** Resolves each manifest file key; required so the dispatcher never touches the filesystem. */
+  /** Resuelve cada clave del manifiesto; obligatorio para que el despachador nunca lea el disco. */
   load: ServerModuleLoader;
-  /** Runtime exposed through `RequestContext.platform`. */
+  /** Runtime que se expone en `RequestContext.platform`. */
   platform?: ServerPlatform;
-  /** Observes internal failures without exposing their details to clients. */
+  /** Observa los fallos internos sin exponer sus detalles a los clientes. */
   onError?: ServerErrorObserver;
 }
 
@@ -152,6 +291,23 @@ export function createContextDispatcher<S>(options: Pick<ServerDispatcherOptions
   };
 }
 
+/**
+ * Crea un handler HTTP que atiende `/api/...` y `/_meeko/rpc/...` para un host propio: carga la
+ * sesión, crea el contexto y despacha con las mismas guardas, validaciones y normalización de
+ * errores que la aplicación. Responde `404` o `405` (con `Allow`) cuando no hay endpoint.
+ *
+ * @param options Manifiesto, sesiones, servicios y cargador.
+ * @returns Un handler `(request) => Promise<Response>` que nunca rechaza.
+ * @throws {TypeError} Si falta el cargador.
+ * @example
+ * ```ts
+ * import { pathToFileURL } from "node:url";
+ * import { createServerDispatcher } from "@meekojs/meeko/server";
+ *
+ * const dispatch = createServerDispatcher({ manifest, sessions, services: {}, load: (file) => import(pathToFileURL(file).href) });
+ * const response = await dispatch(new Request("http://localhost/api/users"));
+ * ```
+ */
 export function createServerDispatcher<S>(options: ServerDispatcherOptions<S>): (request: Request) => Promise<Response> {
   const dispatch = createContextDispatcher(options);
   return async (request) => {
@@ -166,7 +322,26 @@ export function createServerDispatcher<S>(options: ServerDispatcherOptions<S>): 
   };
 }
 
-/** SSR dispatch reuses the original session, services, state and request ID. */
+/**
+ * Crea el despacho local que usan los clientes de servidor durante SSR: atiende las llamadas a API
+ * y RPC por el mismo pipeline sin salir del proceso y reutiliza la sesión, los servicios, el
+ * estado y el `requestId` de la petición original. Rechaza con `403` las peticiones de otro
+ * origen o con otras credenciales.
+ *
+ * @param options Manifiesto, sesiones y cargador.
+ * @returns La {@link ServerFetch} local.
+ * @throws {TypeError} Si falta el cargador.
+ * @example
+ * ```ts
+ * import { pathToFileURL } from "node:url";
+ * import { createLocalServerFetch } from "@meekojs/meeko/server";
+ *
+ * const serverFetch = createLocalServerFetch({ manifest, sessions, load: (file) => import(pathToFileURL(file).href) });
+ * // Mismo origen y mismas credenciales que la petición original.
+ * const request = new Request(new URL("/api/users", context.request.url), { headers: context.request.headers });
+ * const response = await serverFetch(request, context);
+ * ```
+ */
 export function createLocalServerFetch<S>(options: Pick<ServerDispatcherOptions<S>, "manifest" | "sessions" | "load" | "onError">): ServerFetch {
   const dispatch = createContextDispatcher(options);
   return async (request, active) => {

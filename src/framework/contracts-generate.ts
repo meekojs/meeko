@@ -1,8 +1,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
+import { discoverAutoImports } from "../autoimports.js";
+import { autoImportCompilerHost, autoImportSourceReader } from "../autoimports-ts.js";
 import { discoverServerManifest } from "../framework-server/manifest-discovery.js";
 import type { ApiEndpoint, RpcEndpoint } from "../framework-server/discovery.js";
+import { resolveConfigSources } from "./config.js";
 import { generateSocketContracts } from "./socket-contracts-generate.js";
 import { standardSchemaTypes } from "./standard-schema-types.js";
 
@@ -21,6 +24,7 @@ async function writeIfChanged(file: string, source: string): Promise<void> {
 
 type Kind = "api" | "rpc";
 type Imports = Map<string, { file: string; exported: string }>;
+type ReadSource = (file: string) => string | undefined;
 
 function inside(parent: string, child: string): boolean {
   const path = relative(parent, child);
@@ -77,7 +81,7 @@ function definition(file: ts.SourceFile, kind: Kind): ts.ObjectLiteralExpression
   return expression.arguments[0];
 }
 
-function publicSchema(expression: ts.Expression | undefined, label: string, file: ts.SourceFile, imports: Imports, checker: ts.TypeChecker, root: string, sharedRoot: string, options: ts.CompilerOptions, outputDir: string): string | undefined {
+function publicSchema(expression: ts.Expression | undefined, label: string, file: ts.SourceFile, imports: Imports, checker: ts.TypeChecker, root: string, sharedRoot: string, options: ts.CompilerOptions, outputDir: string, read: ReadSource): string | undefined {
   if (!expression) return undefined;
   let local: string;
   let member: string | undefined;
@@ -89,7 +93,7 @@ function publicSchema(expression: ts.Expression | undefined, label: string, file
   const exported = imported.exported === "*" ? member : imported.exported;
   if (!exported || (imported.exported !== "*" && member)) throw new Error(`${file.fileName}: ${label} must reference one shared export`);
   standardSchemaTypes(expression, checker, () => new Error(`${file.fileName}: ${label} must expose concrete Standard Schema input and output types`));
-  validateSharedGraph(imported.file, root, sharedRoot, options, new Set());
+  validateSharedGraph(imported.file, root, sharedRoot, options, new Set(), read);
   const target = relative(outputDir, imported.file).replaceAll("\\", "/").replace(/\.(?:ts|mts|cts)$/, (suffix) => suffix === ".mts" ? ".mjs" : suffix === ".cts" ? ".cjs" : ".js");
   const specifier = target.startsWith(".") ? target : `./${target}`;
   return `typeof import(${JSON.stringify(specifier)})[${JSON.stringify(exported)}]`;
@@ -145,17 +149,18 @@ function validateQuery(expression: ts.Expression, checker: ts.TypeChecker, file:
   }
 }
 
-function validateSharedGraph(file: string, root: string, sharedRoot: string, options: ts.CompilerOptions, seen: Set<string>): void {
+function validateSharedGraph(file: string, root: string, sharedRoot: string, options: ts.CompilerOptions, seen: Set<string>, read: ReadSource): void {
   if (seen.has(file)) return;
   seen.add(file);
   if (!inside(sharedRoot, file)) throw new Error(`${file}: public schema dependency escapes shared/`);
-  const source = ts.sys.readFile(file);
+  // Autoimported dependencies appear as the imports that the Vite transform adds.
+  const source = read(file);
   if (source === undefined) throw new Error(`${file}: public schema dependency not found`);
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
   const checkDependency = (specifier: string): void => {
     const target = resolvedImport(specifier, file, options);
     if (!target) throw new Error(`${file}: unresolved public schema dependency ${specifier}`);
-    if (inside(root, target) && !relative(root, target).split(sep).includes("node_modules")) validateSharedGraph(target, root, sharedRoot, options, seen);
+    if (inside(root, target) && !relative(root, target).split(sep).includes("node_modules")) validateSharedGraph(target, root, sharedRoot, options, seen, read);
   };
   for (const statement of ast.statements) {
     if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) continue;
@@ -170,14 +175,14 @@ function validateSharedGraph(file: string, root: string, sharedRoot: string, opt
   visit(ast);
 }
 
-function shapeFor(endpoint: ApiEndpoint | RpcEndpoint, checker: ts.TypeChecker, program: ts.Program, root: string, options: ts.CompilerOptions, outputDir: string): { type: string; contentType?: "response" } {
+function shapeFor(endpoint: ApiEndpoint | RpcEndpoint, checker: ts.TypeChecker, program: ts.Program, root: string, options: ts.CompilerOptions, outputDir: string, read: ReadSource): { type: string; contentType?: "response" } {
   const file = program.getSourceFile(endpoint.file);
   if (!file) throw new Error(`Handler not found: ${endpoint.file}`);
   const sharedRoot = join(root, "shared");
   const imports = importMap(file, sharedRoot, options);
   const kind: Kind = endpoint.kind;
   const contract = definition(file, kind);
-  const schema = (name: string): string | undefined => publicSchema(objectProperty(contract, name), name, file, imports, checker, root, sharedRoot, options, outputDir);
+  const schema = (name: string): string | undefined => publicSchema(objectProperty(contract, name), name, file, imports, checker, root, sharedRoot, options, outputDir, read);
   if (kind === "rpc") {
     const input = schema("input");
     const output = schema("output");
@@ -213,10 +218,16 @@ export async function generateServerContracts(projectRoot: string): Promise<Gene
   const generatedDir = join(root, ".meeko", "generated");
   const options = optionsFor(root);
   const files = [...discovered.api, ...discovered.rpc].map((entry) => entry.file);
-  const program = ts.createProgram(files, { ...options, noEmit: true });
+  // Handlers and shared schemas are read as Vite runs them, so an autoimported schema
+  // resolves to its shared/ file instead of an unknown global.
+  const read = files.length > 0
+    ? autoImportSourceReader(root, await discoverAutoImports(root), (await resolveConfigSources(root)).map((source) => source.root))
+    : (file: string) => ts.sys.readFile(file);
+  const programOptions = { ...options, noEmit: true };
+  const program = ts.createProgram({ rootNames: files, options: programOptions, host: autoImportCompilerHost(programOptions, read) });
   const checker = program.getTypeChecker();
-  const api = discovered.api.map((endpoint) => ({ endpoint, shape: shapeFor(endpoint, checker, program, root, options, outputDir) }));
-  const rpc = discovered.rpc.map((endpoint) => ({ endpoint, shape: shapeFor(endpoint, checker, program, root, options, outputDir) }));
+  const api = discovered.api.map((endpoint) => ({ endpoint, shape: shapeFor(endpoint, checker, program, root, options, outputDir, read) }));
+  const rpc = discovered.rpc.map((endpoint) => ({ endpoint, shape: shapeFor(endpoint, checker, program, root, options, outputDir, read) }));
   const apiMethods = new Map<string, string[]>();
   for (const { endpoint, shape } of api) {
     const methods = apiMethods.get(endpoint.clientKey) ?? [];
@@ -245,6 +256,7 @@ export async function generateServerContracts(projectRoot: string): Promise<Gene
     "// Generated by Meeko. Contains only public route descriptors and shared contract types.",
     `import { createApiClient, createRpcClient${server ? "" : ", createBrowserClientOptions"} } from "@meekojs/meeko/framework";`,
     'import { createSocketRegistry, useSocketChannel, type SocketRegistryOptions } from "@meekojs/meeko/framework";',
+    'import { createUseApi, createUseRpcMutation, createUseRpcQuery } from "@meekojs/meeko/framework";',
     ...(server ? ['import { createServerClientOptions } from "@meekojs/meeko/server";'] : []),
     'import type { ApiContract, RpcContract } from "../types/server-contracts.js";',
     'import { socketContracts } from "./socket-contracts.js";',
@@ -254,6 +266,9 @@ export async function generateServerContracts(projectRoot: string): Promise<Gene
     "export const rpc = createRpcClient<RpcContract>(manifest, options);",
     "export const socket = createSocketRegistry(socketContracts);",
     "export const useSocket = <K extends keyof typeof socketContracts & string>(name: K, options?: SocketRegistryOptions) => useSocketChannel(socketContracts, name, options);",
+    "export const useApi = createUseApi<ApiContract, typeof manifest>(manifest, options);",
+    "export const useRpcQuery = createUseRpcQuery<RpcContract>(manifest, options);",
+    "export const useRpcMutation = createUseRpcMutation<RpcContract>(manifest, options);",
     "",
   ].join("\n");
   await writeIfChanged(join(generatedDir, "clients.client.ts"), clientSource(false));

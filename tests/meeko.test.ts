@@ -486,8 +486,8 @@ test("los estilos con ámbito rechazan :global sin selector o en posiciones ambi
     [":global .card { color: red; }", /:global\(<selector>\)/],
     [".card :global { color: red; }", /:global\(<selector>\)/],
     [":global() { color: red; }", /:global\(<selector>\)/],
-    [":global(.a, .b) { color: red; }", /single selector/],
-    [".card:not(:global(.b)) { color: red; }", /top level/],
+    [":global(.a, .b) { color: red; }", /un solo selector/],
+    [".card:not(:global(.b)) { color: red; }", /nivel superior/],
   ];
   for (const [rules, message] of cases) {
     const source = `${prefix}${rules}\n</style>`;

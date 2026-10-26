@@ -15,18 +15,18 @@ export class PropsDefaultsError extends Error {
 export function analyzePropsDefaults(call: ts.CallExpression): PropsDefaults | undefined {
   if (call.arguments.length === 0) return undefined;
   if (call.arguments.length !== 1 || !ts.isObjectLiteralExpression(call.arguments[0]!)) {
-    throw new PropsDefaultsError("MEEK040", "defineProps defaults require one object literal", call.arguments[0] ?? call);
+    throw new PropsDefaultsError("MEEK040", "Los valores por defecto de defineProps necesitan un solo objeto literal", call.arguments[0] ?? call);
   }
   const argument = call.arguments[0];
   const keys: string[] = [];
   for (const property of argument.properties) {
     if (!ts.isPropertyAssignment(property) ||
       !(ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))) {
-      throw new PropsDefaultsError("MEEK041", "defineProps defaults require named properties", property);
+      throw new PropsDefaultsError("MEEK041", "Los valores por defecto de defineProps necesitan propiedades con nombre", property);
     }
     const key = property.name.text;
     if (key === "__proto__" || keys.includes(key)) {
-      throw new PropsDefaultsError("MEEK042", `Duplicate or unsafe default prop: ${key}`, property.name);
+      throw new PropsDefaultsError("MEEK042", `Valor por defecto de prop duplicado o inseguro: ${key}`, property.name);
     }
     keys.push(key);
   }

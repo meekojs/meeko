@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
-import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import test from "node:test";
 import { Window as HappyWindow } from "happy-dom";
 import { composeServerMiddleware, defineServerMiddleware } from "../src/framework-server/middleware.ts";
@@ -12,6 +12,7 @@ import { defineRouteMiddleware } from "../src/framework/middleware.ts";
 import { createRouteManifest } from "../src/framework/router.ts";
 import { createFrameworkHandler } from "../src/framework/server.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
+import { repositoryRoot, stopChild, tempProject } from "./helpers/temp-project.ts";
 
 test("server middleware composes in filename order and can stop an HTTP request", async () => {
   const calls: string[] = [];
@@ -115,10 +116,9 @@ test("route middleware runs before the SSR loader and blocks browser navigation"
 });
 
 test("generated starter discovers app and server middleware in development", { timeout: 35_000 }, async (context) => {
-  const base = resolve(".meeko");
-  await mkdir(base, { recursive: true });
-  const root = await mkdtemp(join(base, "starter-middleware-"));
-  const repository = resolve(".");
+  let child: ChildProcess | undefined;
+  const root = await tempProject(context, "starter-middleware", () => stopChild(child));
+  const repository = repositoryRoot;
   await initFrameworkProject(root);
   await mkdir(join(root, "app", "middleware"), { recursive: true });
   await mkdir(join(root, "server", "middleware"), { recursive: true });
@@ -136,21 +136,18 @@ test("generated starter discovers app and server middleware in development", { t
   portServer.close();
   await once(portServer, "close");
   const origin = `http://127.0.0.1:${port}`;
-  const child = spawn(process.execPath, [join(repository, "dist", "cli.js"), "dev", root], {
+  const running = spawn(process.execPath, [join(repository, "dist", "cli.js"), "dev", root], {
     cwd: root, env: { ...process.env, PORT: String(port) }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
   });
   let logs = "";
-  child.stdout?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
-  child.stderr?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
-  context.after(async () => {
-    if (child.exitCode === null) { const exited = once(child, "exit"); child.kill("SIGINT"); await exited; }
-    await rm(root, { recursive: true, force: true });
-  });
+  child = running;
+  running.stdout?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
+  running.stderr?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
   await new Promise<void>((done, fail) => {
     const start = Date.now();
     const timer = setInterval(() => {
       if (logs.includes(origin)) { clearInterval(timer); done(); }
-      else if (child.exitCode !== null) { clearInterval(timer); fail(new Error(logs)); }
+      else if (running.exitCode !== null) { clearInterval(timer); fail(new Error(logs)); }
       else if (Date.now() - start > 20_000) { clearInterval(timer); fail(new Error(`Starter did not listen: ${logs}`)); }
     }, 25);
   });

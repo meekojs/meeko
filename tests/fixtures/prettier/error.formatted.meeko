@@ -1,0 +1,38 @@
+<script lang="ts">
+// Application error page: 404 for URLs without a route, and fallback when a page fails
+// and no +error.meeko is closer. Rendered inside app.meeko and layouts/default.meeko.
+export interface Props {
+  status: number;
+  message: string;
+}
+
+const props = defineProps<Props>();
+</script>
+
+<template>
+<section class="page-heading error-page">
+  <p class="error-page__status">{String(props.status)}</p>
+  <h1>
+    {
+      props.status === 404
+        ? "Esta página no existe."
+        : "Algo falló al cargar esta página."
+    }
+  </h1>
+  <p>
+    Código: <code>{props.message}</code>
+  </p>
+  <p><a href="/">Volver al inicio</a></p>
+</section>
+</template>
+
+<style scoped>
+@layer components {
+  .error-page__status {
+    font-size: clamp(3rem, 10vw, 6rem);
+    font-weight: 700;
+    line-height: 1;
+    color: var(--accent);
+  }
+}
+</style>

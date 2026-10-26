@@ -1,16 +1,17 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { connect, createServer } from "node:net";
 import { ServerResponse } from "node:http";
 import { once } from "node:events";
-import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import test from "node:test";
 import { chromium } from "playwright-core";
 import WebSocket from "ws";
 import { prepareFrameworkTypes } from "../src/framework/check-project.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
 import { buildProject, startProject } from "../src/framework/project.ts";
+import { createTempProject, repositoryRoot, stopChild, tempProject } from "./helpers/temp-project.ts";
 
 async function freePort(): Promise<number> {
   const server = createServer();
@@ -24,10 +25,9 @@ async function freePort(): Promise<number> {
 }
 
 test("starter preserves an occupied-port error and reports failed startup cleanup", { timeout: 30_000 }, async () => {
-  const projectRoot = resolve(".meeko");
-  await mkdir(projectRoot, { recursive: true });
-  const root = await mkdtemp(join(projectRoot, "starter-port-conflict-"));
-  const repository = resolve(".");
+  const project = await createTempProject("starter-port-conflict");
+  const root = project.root;
+  const repository = repositoryRoot;
   const port = await freePort();
   const occupied = createServer();
   occupied.listen(port, "127.0.0.1");
@@ -80,15 +80,14 @@ export default defineServerRuntime(() => ({
     else process.env.MEEKO_HMR_PORT = previousHmrPort;
     occupied.close();
     await once(occupied, "close");
-    await rm(root, { recursive: true, force: true });
+    await project.remove();
   }
 });
 
 test("production asset write failure is reported once per observer with one request ID", { timeout: 45_000 }, async () => {
-  const projectRoot = resolve(".meeko");
-  await mkdir(projectRoot, { recursive: true });
-  const root = await mkdtemp(join(projectRoot, "starter-asset-failure-"));
-  const repository = resolve(".");
+  const project = await createTempProject("starter-asset-failure");
+  const root = project.root;
+  const repository = repositoryRoot;
   const port = await freePort();
   const previousPort = process.env.PORT;
   const originalWriteHead = ServerResponse.prototype.writeHead;
@@ -141,15 +140,14 @@ export default defineServerRuntime(({ production }) => {
     }
     if (previousPort === undefined) delete process.env.PORT;
     else process.env.PORT = previousPort;
-    await rm(root, { recursive: true, force: true });
+    await project.remove();
   }
 });
 
 test("generated starter serves a real Socket channel and shuts its Node transport down", { timeout: 30_000 }, async (context) => {
-  const projectRoot = resolve(".meeko");
-  await mkdir(projectRoot, { recursive: true });
-  const root = await mkdtemp(join(projectRoot, "starter-socket-"));
-  const repository = resolve(".");
+  let child: ChildProcess | undefined;
+  const root = await tempProject(context, "starter-socket", () => stopChild(child));
+  const repository = repositoryRoot;
   const port = await freePort();
   const hmrPort = await freePort();
   const origin = `http://127.0.0.1:${port}`;
@@ -161,24 +159,21 @@ test("generated starter serves a real Socket channel and shuts its Node transpor
   await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
   await symlink(repository, join(root, "node_modules", "@meekojs", "meeko"), "junction");
   await symlink(join(repository, "node_modules", "vite"), join(root, "node_modules", "vite"), "junction");
-  const child = spawn(process.execPath, [join(repository, "dist", "cli.js"), "dev", root], {
+  const running = spawn(process.execPath, [join(repository, "dist", "cli.js"), "dev", root], {
     cwd: root,
     env: { ...process.env, PORT: String(port), MEEKO_HMR_PORT: String(hmrPort), PUBLIC_ORIGIN: origin },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
+  child = running;
   let logs = "";
-  child.stdout?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
-  child.stderr?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
-  context.after(async () => {
-    if (child.exitCode === null) child.kill("SIGINT");
-    await rm(root, { recursive: true, force: true });
-  });
+  running.stdout?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
+  running.stderr?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
   await new Promise<void>((done, fail) => {
     const start = Date.now();
     const timer = setInterval(() => {
       if (logs.includes(origin)) { clearInterval(timer); done(); }
-      else if (child.exitCode !== null) { clearInterval(timer); fail(new Error(`Starter exited before listening: ${logs}`)); }
+      else if (running.exitCode !== null) { clearInterval(timer); fail(new Error(`Starter exited before listening: ${logs}`)); }
       else if (Date.now() - start > 20_000) { clearInterval(timer); fail(new Error(`Starter did not listen: ${logs}`)); }
     }, 25);
   });
@@ -207,31 +202,23 @@ test("generated starter serves a real Socket channel and shuts its Node transpor
   peer.send(JSON.stringify({ event: "message", payload: { text: "from starter" } }));
   assert.deepEqual(JSON.parse(String((await reply)[0])) as unknown, { event: "message", payload: { text: "from starter" } });
   const closed = once(peer, "close");
-  const exited = once(child, "exit");
-  child.kill("SIGINT");
+  const exited = once(running, "exit");
+  running.kill("SIGINT");
   await closed;
   await exited;
   await assert.rejects(fetch(origin));
 });
 
 test("generated starter reloads edited pages in SSR and Chrome development", { timeout: 45_000 }, async (context) => {
-  const projectRoot = resolve(".meeko");
-  await mkdir(projectRoot, { recursive: true });
-  const root = await mkdtemp(join(projectRoot, "starter-hmr-"));
-  const repository = resolve(".");
-  const port = await freePort();
-  const origin = "http://127.0.0.1:" + port;
   let child: ReturnType<typeof spawn> | undefined;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
-  context.after(async () => {
+  const root = await tempProject(context, "starter-hmr", async () => {
     await browser?.close();
-    if (child && child.exitCode === null) {
-      const exited = once(child, "exit");
-      child.kill("SIGINT");
-      await exited;
-    }
-    await rm(root, { recursive: true, force: true });
+    await stopChild(child);
   });
+  const repository = repositoryRoot;
+  const port = await freePort();
+  const origin = "http://127.0.0.1:" + port;
   await initFrameworkProject(root);
   await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
   await symlink(repository, join(root, "node_modules", "@meekojs", "meeko"), "junction");

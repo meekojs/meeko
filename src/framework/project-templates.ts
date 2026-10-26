@@ -2,7 +2,7 @@
 export const clientEntrySource = `import { mountClientApp, type ClientComponent, type ClientRoute, type RouteMiddleware } from "@meekojs/meeko/framework";
 import { modules as pages } from "virtual:meeko-client-pages";
 import { modules as clientRoutes } from "virtual:meeko-client-routes";
-import { routes } from "virtual:meeko-manifest/client";
+import { errorPage, routes } from "virtual:meeko-manifest/client";
 
 const middlewareModules = import.meta.glob(["/app/middleware/**/*.ts", "!/app/middleware/**/*.test.ts", "!/app/middleware/**/*.spec.ts", "!/app/middleware/**/*.d.ts", "!/app/middleware/**/*.server.ts", "!/app/middleware/**/*.client.ts"], { eager: true });
 const loadMiddleware = async (): Promise<RouteMiddleware[]> => Object.entries(middlewareModules)
@@ -13,6 +13,9 @@ const loadMiddleware = async (): Promise<RouteMiddleware[]> => Object.entries(mi
     return middleware as RouteMiddleware;
   });
 
+// app/error.meeko joins the bundle even when no route falls back to it.
+const errorPages = import.meta.glob("/app/error.meeko");
+
 // Optional global stylesheet. Vite includes it in the client bundle when present.
 import.meta.glob("/app/styles/main.css", { eager: true });
 
@@ -22,9 +25,9 @@ if (!root || !payload) throw new Error("Missing Meeko SSR data");
 
 const hydrationStart = performance.now();
 await mountClientApp({
-  root, payload, routes, serverData: true, loadMiddleware,
+  root, payload, routes, errorPage, serverData: true, loadMiddleware,
   async loadPage(file) {
-    const load = pages[file];
+    const load = pages[file] ?? errorPages[file];
     if (!load) throw new Error("Page module missing: " + file);
     return await load() as ClientComponent;
   },

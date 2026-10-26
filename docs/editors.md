@@ -1,6 +1,98 @@
 # Editores
 
-Meeko incluye un servidor de lenguaje ([Language Server Protocol](https://microsoft.github.io/language-server-protocol/)) que da a cualquier editor compatible las mismas funciones que la [extensión de VS Code](../editors/vscode/README.md): diagnósticos de `meeko check`, completado, hover, ir a definición, referencias, renombrado entre archivos `.meeko` y `.ts`, ayuda de firma, símbolos del documento, plegado, formato, tokens semánticos y acciones rápidas (añadir imports, resolver un autoimport ambiguo con un import explícito y quitar `params` de un `href` estático).
+Meeko incluye un servidor de lenguaje ([Language Server Protocol](https://microsoft.github.io/language-server-protocol/)) que da a cualquier editor compatible las mismas funciones que la [extensión de VS Code](../editors/vscode/README.md): diagnósticos de `meeko check`, completado, hover, ir a definición, referencias, renombrado entre archivos `.meeko` y `.ts`, ayuda de firma, símbolos del documento, plegado, formato, tokens semánticos, CodeLens y acciones rápidas (añadir imports, resolver un autoimport ambiguo con un import explícito, quitar `params` de un `href` estático, añadir `each:key` y mover un sidecar a `<script server>`).
+
+El bloque `<script server lang="ts">` de una página se analiza como un módulo TypeScript propio, con los autoimports de servidor (o de cliente si su `render` estático es `"client"`) y posiciones del `.meeko`: diagnósticos de tipos, completado, hover, navegación, referencias, símbolos y formato. Un bloque fuera de `app/pages` de alguna raíz configurada, o en un `+layout` o `+error`, produce `MEEK044` sobre su etiqueta de apertura. Los `export const` de un bloque con código de nivel superior tienen su tipo en el `<script>` y en la plantilla de la página, y «ir a definición» sobre uno de ellos lleva a su `export`.
+
+## Funciones propias de Meeko
+
+Además de las funciones de TypeScript, el servidor entiende la reactividad, los componentes (también los [genéricos](#componentes-genéricos)) y la estructura de la aplicación. Todas se calculan de forma estática, sin la aplicación en marcha; los textos que muestran no forman parte del contrato. La petición `meeko/executionZones` y los modificadores de token propios (`signal`, `computed`, `resource` y `reactive`) son internos de la extensión de VS Code y pueden cambiar en un minor (véase [stability.md](stability.md#fuera-del-contrato)).
+
+### Tokens semánticos de reactividad
+
+Los tipos de token son los de TypeScript. Sobre ellos, el servidor añade modificadores:
+
+| Modificador | Marca |
+| --- | --- |
+| `signal` | Una señal (`signal`, `useState`, `defineModel`, `useElementRef`) declarada en el nivel superior del `<script>`, y cada uso. |
+| `computed` | Un valor `computed` o una señal de sólo lectura, y cada uso. |
+| `resource` | Un recurso de datos (`useApi`, `useRpcQuery`, `useRpcMutation`), y cada uso. |
+| `reactive` | Los tokens de una expresión de la plantilla que lee un valor reactivo. |
+| `modification` | Una escritura de `.value`, o una llamada que vuelve a cargar un recurso (`refresh`, `mutate`). Es el modificador estándar de LSP. |
+
+Lo que decide si un `.value` es reactivo es el tipo, no el nombre: sólo cuenta el `value` de una `Signal` o `ReadonlySignal` de Meeko (incluidas las que devuelven `useElementRef` y los composables). `props.value`, `input.value` o `event.currentTarget.value` son lecturas normales y no se marcan.
+
+Un tema o un cliente puede colorearlos con reglas de token semántico (por ejemplo, `variable.signal` o `*.modification`). La extensión de VS Code trae colores por defecto mediante ámbitos TextMate.
+
+### Hover
+
+Además del tipo de TypeScript, el hover añade:
+
+- **Señales, `computed` y recursos.** Su tipo, la lista de lecturas y escrituras en el script y la plantilla, con enlaces a cada una, y cómo llega su valor al navegador: si se serializa en el estado del componente, si viaja en el payload, si se recalcula en el navegador o si sólo existe en el navegador.
+- **Componentes.** Sobre una etiqueta de componente o el identificador que lo importa: el archivo `.meeko` y sus props, eventos, modelos, snippets y valor expuesto. En la etiqueta de un [componente genérico](api.md#componentes-genéricos-generic), el hover muestra los parámetros de tipo que infieren sus props (`T = User`) y las props, eventos, modelos, snippets y valor expuesto ya resueltos con ellos.
+- **Snippets.** Sobre el `name` de un `<snippet>`: la firma del snippet del hijo, con los tipos de sus parámetros y si es opcional.
+- **Rutas, API y RPC.** Sobre el ID de `href("/users/[id]")`: la página, sus `params`, su modo de render y sus layouts. Sobre `useApi("/api/notes")` o `api.notes.get`: el método, la ruta y el handler, con los schemas de su contrato. Sobre `useRpcQuery("users.get")`, `useRpcMutation(...)` o `rpc.users.get`: el procedimiento, su URL y su handler con sus schemas.
+
+### Ir a definición en rutas, API y RPC
+
+«Ir a definición» sobre el ID de ruta de `href` abre la página, y sobre un endpoint o procedimiento abre su handler en la línea del contrato (`defineApiRoute` o `defineRpc`). Una etiqueta de componente lleva a su `.meeko`. El servidor descubre rutas, endpoints y procedimientos sin ejecutar sus módulos, igual que `meeko routes`; si el descubrimiento falla, usa `.meeko/manifests/routes.json`.
+
+### CodeLens
+
+- **Valores reactivos.** Sobre cada señal, `computed` o recurso declarado en el nivel superior del `<script>`: cuántas lecturas y escrituras tiene y si la plantilla lo usa. Al pulsarlo se listan esas posiciones.
+- **Páginas.** En la primera línea de una página: su ruta, su modo de render y sus layouts. Si su `<script server>` exporta datos desde el código de nivel superior o declara `load`, otra lente muestra el tipo de los datos que envía al navegador (con código de nivel superior, un campo por cada `export const` o `export let`, sin `head`), y avisa si contiene valores que la serialización JSON rechaza (funciones, `bigint`, `Date`, `Map`…) o si el tipo es muy grande. En una página `render: "client"` indica que el loader se ejecuta en el navegador.
+
+La lente se pide con `textDocument/codeLens`. Las lentes de valores reactivos usan el comando `editor.action.showReferences` con los argumentos `[uri, posición, ubicaciones]` en formato LSP; un cliente que no tenga ese comando puede ignorarlo o asociarlo a su propia lista de referencias. Las lentes de página no tienen comando.
+
+### Zonas de ejecución
+
+El servidor indica, por líneas completas, dónde se ejecuta el código de un `.meeko`:
+
+| Zona (`kind`) | Motivo (`reason`) | Líneas |
+| --- | --- | --- |
+| `server` | `server-block` | `<script server>` de una página. |
+| `browser` | `client-route-block` | `<script server>` de una página `render: "client"`, que se ejecuta en el navegador. |
+| `shared` | `setup` | El setup del `<script>`, que se ejecuta en SSR y al hidratar. |
+| `browser` | `client-page` | El setup de una página `render: "client"`. |
+| `browser` | `continuation` | El setup a partir del primer `await` de navegador. |
+| `browser` | `onMounted` | El cuerpo de cada callback de `onMounted`. |
+| `browser` | `browser-function` | Una función del setup que sólo se usa desde código de navegador. |
+| `browser` | `inline-handler` | Una función escrita en un `on:*` de la plantilla que ocupa sus propias líneas. |
+
+**Funciones de navegador.** Una función declarada en el nivel superior del setup (`function guardar() {}` o `const guardar = () => {}`) sale como «Sólo navegador» cuando todos sus usos se ejecutan en el navegador: como manejador `on:*` de la plantilla (también en un componente), dentro de `onMounted`, en la continuación tras el primer `await` de navegador o desde otra función de navegador. El hover de la zona dice por qué (por ejemplo, «Sólo se usa como manejador de `on:click` y en `onMounted`»). La función sigue compartida si también se llama en el nivel superior del setup, dentro de `effect` o `computed`, desde una expresión de la plantilla que se renderiza, se pasa como prop o modelo de un hijo, se publica con `defineExpose` o tiene un uso que el análisis no clasifica. Un manejador que se llama al enlazarse (`on:click="crear(guardar)"`) cuenta como uso compartido, porque en un componente se evalúa durante el SSR.
+
+**Manejadores en la plantilla.** Una función escrita en un `on:*` cuyo atributo ocupa sus propias líneas, como una flecha de varias líneas que empieza en `on:click="() => {` y termina en `}"` (con `>` o `/>` como mucho detrás), también forma una zona de navegador con el nombre del evento en su hover. Una función que comparte línea con otros atributos o con contenido de la plantilla no se marca.
+
+La plantilla (salvo esos manejadores) y los estilos no forman zonas, y las zonas no se solapan: una zona más concreta (una función de navegador, `onMounted`, un manejador) sustituye a la del setup en sus líneas. El análisis es sintáctico y por líneas completas; si no puede clasificar el setup, las funciones se quedan en la zona compartida. Otros clientes las piden con la petición propia `meeko/executionZones`:
+
+```json
+// Petición
+{ "textDocument": { "uri": "file:///app/pages/index.meeko" } }
+// Respuesta
+{ "zones": [{ "kind": "server", "reason": "server-block", "label": "…", "detail": "…",
+  "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 6, "character": 9 } } }] }
+```
+
+`label` es un título corto y `detail` una explicación de un párrafo para un hover. La respuesta es `null` para un documento que el servidor no modela.
+
+### Acciones rápidas
+
+Además de las de imports y `href`:
+
+- **Añadir `each:key`.** En una lista sin clave, propone `each:key="item.id"` (u otra propiedad identificadora del elemento) o el propio elemento si es una cadena o un número.
+- **Mover el sidecar a `<script server>`.** En las primeras líneas de una página con un `x.route.ts` junto a ella, mueve su contenido a un bloque `<script server lang="ts">` y borra el sidecar en una sola edición. Los imports relativos siguen funcionando porque ambos archivos comparten carpeta. Sólo se ofrece si el cliente admite borrar archivos en una edición de workspace (`workspace.workspaceEdit.documentChanges` y `resourceOperations` con `delete`).
+
+### Completado de modelos y snippets
+
+El completado ofrece los modelos del hijo tras `model:` en una etiqueta de componente, los nombres de los snippets del hijo en `<snippet name="…">` y sus parámetros en `params`.
+
+### Componentes genéricos
+
+En el padre, cada etiqueta de un componente con `generic` se comprueba como en `meeko check`: los parámetros de tipo se infieren de sus props, y el hover, el completado y los diagnósticos de sus manejadores `on:`, modelos, snippets y refs usan ese tipo (`T = User`). Dentro del script del componente genérico, el hover y el completado tratan cada parámetro como su restricción, e «ir a definición» sobre `T` lleva al atributo `generic`; los diagnósticos son los de `meeko check`, que compila el componente con los parámetros reales. La gramática de VS Code resalta el valor de `generic` como una lista de parámetros de tipo de TypeScript, también con `>` dentro de una restricción.
+
+### Valores en vivo
+
+Los valores en vivo de las señales no pasan por el servidor de lenguaje: los publica `meeko dev` mediante el [puente del editor](devtools.md#puente-del-editor), que la extensión de VS Code consume (véase su [README](../editors/vscode/README.md#valores-en-vivo)). Cada `meeko dev` escribe su propio descriptor, `.meeko/dev/editor-bridge-<puerto>.json`, y la extensión se conecta a todos los que encuentra, así que funcionan varios servidores de desarrollo a la vez. Una señal que es la misma que otra, como el modelo que un hijo recibe con `defineModel`, lleva el campo `alias` con la señal principal: la extensión la muestra como `open = true (= dialogOpen)`, su hover dice «alias de `dialogOpen`» y editarla edita la principal. Otro editor puede leer el mismo puente, teniendo en cuenta que su protocolo es sólo de desarrollo y no forma parte del contrato público.
 
 ## Arrancar el servidor
 
@@ -30,12 +122,43 @@ Se envían en `initializationOptions` de la petición `initialize`. Todas son op
 | `trusted` | `true` | Con `true`, el servidor ejecuta `meeko.config.*` del proyecto con Node para conocer sus autoimports y comprueba los contratos de páginas y layouts al guardar. Con `false` no ejecuta código del proyecto: lee la configuración de forma estática (sólo listas literales) y omite los contratos. |
 | `projectContracts` | `true` | `false` desactiva la comprobación de contratos de páginas (`MEEK_PAGE_PROPS`, `MEEK_LAYOUT_PROPS`, `MEEK_ERROR_PROPS`) al guardar. |
 | `diagnosticsDelay` | `300` | Milisegundos de espera tras una edición antes de comprobar el componente. |
+| `format` | `{}` | Ajustes de formato para clientes sin `workspace/configuration`, por ejemplo `{ "indentSections": true }`. Si el cliente admite esa petición, prevalece su sección `meeko.format`. |
 
 Fuera de VS Code `trusted` vale `true` porque es el usuario quien configura el servidor para su proyecto, del mismo modo que `meeko check` ejecuta la configuración. Usa `trusted: false` al abrir código de terceros. La extensión de VS Code envía el estado de confianza del workspace.
+
+### Formato con Prettier
+
+El servidor formatea los `.meeko` con [Prettier](https://prettier.io) y el plugin de Meeko (`@meekojs/meeko/prettier`), así que el editor, la CLI de Prettier y la CI dan el mismo resultado:
+
+- **Script, estilo y plantilla.** `<script>` y `<script server>` se formatean como TypeScript y `<style>` como CSS (o SCSS/Less según `lang`). La plantilla se formatea como HTML: los atributos largos van uno por línea, se respetan las etiquetas PascalCase y el autocierre, y los valores de `bind:`, `on:`, `if:when`, `each:of`, `each:key`, `model`, `<component is>` y `<render>` y el texto `{expr}` se formatean como expresiones TypeScript. Una expresión que Prettier no entiende se deja tal cual. `<!-- prettier-ignore -->` excluye el nodo siguiente.
+- **Qué Prettier se usa.** En un workspace de confianza, si el proyecto tiene `prettier`, se usa ese Prettier con su configuración (`.prettierrc`, `.editorconfig`, plugins). Si no, se usa el que incluye Meeko, con las opciones del editor (`tabSize`, `insertSpaces`) y `meeko.format.indentSections`; la configuración del proyecto prevalece sobre ambas. En un workspace no confiable se usa siempre el incluido, sin leer la configuración del proyecto, porque cargarla ejecuta código.
+- **Límites.** Sólo se formatea el documento completo, no un rango. Un archivo que no compila no se formatea.
+
+Para formatear desde la CLI o en CI, añada el plugin a la configuración de Prettier del proyecto:
+
+```json
+{ "plugins": ["@meekojs/meeko/prettier"], "meekoIndentSections": false }
+```
+
+```sh
+npx prettier --check "app/**/*.meeko"
+```
+
+### Ajustes del editor
+
+El servidor pide la sección `meeko.format` con `workspace/configuration` en cada formateo, así que un cambio se aplica sin reiniciarlo. Los clientes sin esa petición pueden enviar `format` en las opciones de inicialización o `{ "meeko": { "format": { ... } } }` con `workspace/didChangeConfiguration`.
+
+| Ajuste | Por defecto | Efecto |
+| --- | --- | --- |
+| `meeko.format.indentSections` | `false` | Indenta un nivel el contenido de cada sección (`<script>`, `<script server>`, `<template>` y `<style>`), como `vueIndentScriptAndStyle` de Prettier más la plantilla. Con `false`, el formato quita esa indentación base. El nivel usa `tabSize` o un tabulador según `insertSpaces`. Equivale a la opción `meekoIndentSections` del plugin; si el proyecto la fija en su configuración de Prettier, prevalece. |
+
+En cada editor, el ajuste va en el objeto de ajustes del servidor como `settings.meeko.format.indentSections`; los ejemplos de cada sección lo muestran.
 
 ### Qué lee el servidor
 
 - El `tsconfig.json` de la raíz del paquete (la carpeta con `package.json` más cercana) define las opciones de hover, completado y navegación, por ejemplo los alias `paths`. `meeko check`, y por tanto los diagnósticos del editor, usan las mismas opciones de resolución (`paths`, `baseUrl`, `types`, `typeRoots`, `customConditions`, `resolveJsonModule`, `allowImportingTsExtensions`) y conservan sus banderas estrictas de tipos.
+- Un import de un `.meeko` del proyecto se resuelve al componente tal como está en el editor, con sus cambios sin guardar, aunque exista su declaración generada `.d.meeko.ts` (junto a él o en `.meeko/types`), que con resolución `NodeNext` TypeScript elegiría primero.
+- Los usos de un símbolo marcado `@deprecated` en su JSDoc, como el alias `useSocket` de `@meekojs/meeko/framework`, se publican como pistas tachadas (`DiagnosticTag.Deprecated`, códigos `TS6385` y `TS6387`) con el motivo de la etiqueta. Los hovers muestran `{@link X}` como el nombre en código, su texto o un enlace.
 - Para detectar cambios guardados en archivos `.ts`, `tsconfig*.json` y `meeko.config.*`, el servidor registra observadores con `workspace/didChangeWatchedFiles` cuando el cliente admite el registro dinámico. Si tu editor no lo admite, vuelve a abrir el componente o reinicia el servidor tras cambiar un módulo importado.
 
 ## Neovim
@@ -50,6 +173,7 @@ vim.lsp.config("meeko", {
   filetypes = { "meeko" },
   root_markers = { "package.json", "tsconfig.json" },
   init_options = { trusted = true },
+  settings = { meeko = { format = { indentSections = true } } },
 })
 vim.lsp.enable("meeko")
 ```
@@ -76,7 +200,16 @@ block-comment-tokens = { start = "<!--", end = "-->" }
 language-servers = ["meeko"]
 ```
 
-Helix envía la tabla `config` como `initializationOptions`. `hx --health meeko` confirma que encuentra el servidor.
+Helix envía la tabla `config` como `initializationOptions` y responde con ella a `workspace/configuration`. Para los ajustes del editor, añade la tabla `meeko` en `config`:
+
+```toml
+[language-server.meeko]
+command = "npx"
+args = ["meeko-language-server", "--stdio"]
+config = { trusted = true, meeko = { format = { indentSections = true } } }
+```
+
+`hx --health meeko` confirma que encuentra el servidor.
 
 ## Zed
 
@@ -113,11 +246,14 @@ Las opciones de inicialización se pueden fijar sin recompilar en `settings.json
 {
   "lsp": {
     "meeko-language-server": {
-      "initialization_options": { "trusted": true }
+      "initialization_options": { "trusted": true },
+      "settings": { "meeko": { "format": { "indentSections": true } } }
     }
   }
 }
 ```
+
+Zed sólo responde `workspace/configuration` con `settings` si la extensión implementa `language_server_workspace_configuration` (por ejemplo, devolviendo `LspSettings::for_worktree("meeko-language-server", worktree)?.settings`). Sin ese método, usa `"initialization_options": { "trusted": true, "format": { "indentSections": true } }`.
 
 ## JetBrains (LSP4IJ)
 
@@ -126,7 +262,7 @@ Los IDE de JetBrains se conectan mediante el plugin [LSP4IJ](https://plugins.jet
 1. Instala LSP4IJ y abre **Settings → Languages & Frameworks → Language Servers**; pulsa **+** para crear un servidor.
 2. En **Server**, nombre `Meeko` y comando `npx meeko-language-server --stdio` (en Windows, `npx.cmd meeko-language-server --stdio`).
 3. En **Mappings → File name patterns**, añade `*.meeko` con el identificador de lenguaje `meeko`.
-4. En **Configuration → Initialization Options**, escribe `{ "trusted": true }`.
+4. En **Configuration → Initialization Options**, escribe `{ "trusted": true }`, y en **Configuration → Server / Configuration** los ajustes del editor, por ejemplo `{ "meeko": { "format": { "indentSections": true } } }`.
 
 Para el resaltado sintáctico, registra la gramática TextMate de la extensión de VS Code en **Settings → Editor → TextMate Bundles** apuntando a la carpeta `editors/vscode` del repositorio o a una extensión VSIX descomprimida.
 
@@ -155,7 +291,8 @@ Después añade el cliente en **Preferences → Package Settings → LSP → Set
       "enabled": true,
       "command": ["npx", "meeko-language-server", "--stdio"],
       "selector": "text.html.meeko",
-      "initializationOptions": { "trusted": true }
+      "initializationOptions": { "trusted": true },
+      "settings": { "meeko.format.indentSections": true }
     }
   }
 }

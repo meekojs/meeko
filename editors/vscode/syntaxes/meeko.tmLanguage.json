@@ -8,13 +8,30 @@
   "repository": {
     "sectionAttributes": {
       "patterns": [
-        { "name": "entity.other.attribute-name.meeko", "match": "\\b(?:lang|scoped)\\b" },
+        {
+          "begin": "(?<![\\w:-])(generic)(\\s*=\\s*)([\"'])",
+          "end": "\\3",
+          "beginCaptures": {
+            "1": { "name": "entity.other.attribute-name.meeko" },
+            "2": { "name": "keyword.operator.assignment.meeko" },
+            "3": { "name": "punctuation.definition.string.begin.html" }
+          },
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.html" } },
+          "contentName": "meta.embedded.inline.typescript",
+          "patterns": [
+            { "name": "storage.modifier.ts", "match": "(?<![\\w$])extends(?![\\w$])" },
+            { "name": "keyword.operator.assignment.ts", "match": "=(?!>)" },
+            { "name": "punctuation.separator.comma.ts", "match": "," },
+            { "include": "source.ts#type" }
+          ]
+        },
+        { "name": "entity.other.attribute-name.meeko", "match": "\\b(?:lang|scoped|server)\\b" },
         { "name": "string.quoted.double.html", "begin": "\"", "end": "\"" },
         { "name": "string.quoted.single.html", "begin": "'", "end": "'" }
       ]
     },
     "script": {
-      "begin": "(<)(script)(\\b[^>]*>)",
+      "begin": "(<)(script)(\\b(?:[^>\"']|\"[^\"]*\"|'[^']*')*>)",
       "end": "(</)(script)(>)",
       "beginCaptures": {
         "2": { "name": "entity.name.tag.meeko" },
@@ -32,6 +49,9 @@
       "contentName": "meta.embedded.block.html",
       "patterns": [
         { "include": "#interpolation" },
+        { "include": "#componentTag" },
+        { "include": "#renderTag" },
+        { "include": "#customElementTag" },
         { "include": "#htmlTag" },
         { "include": "text.html.basic" }
       ]
@@ -47,6 +67,79 @@
       "contentName": "meta.embedded.block.css",
       "patterns": [{ "include": "source.css" }]
     },
+    "componentTag": {
+      "begin": "(</?)([A-Z][\\w$]*)(?=[\\s/>])",
+      "end": "(/?>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.type.class.component.meeko" }
+      },
+      "endCaptures": { "1": { "name": "punctuation.definition.tag.end.html" } },
+      "patterns": [
+        { "include": "#expressionAttribute" },
+        { "name": "string.quoted.double.html", "begin": "\"", "end": "\"" },
+        { "name": "string.quoted.single.html", "begin": "'", "end": "'" },
+        { "name": "entity.other.attribute-name.directive.meeko", "match": "\\bref:[A-Za-z_$][\\w$]*" },
+        { "name": "entity.other.attribute-name.html", "match": "\\b[\\w:-]+\\b" }
+      ]
+    },
+    "renderTag": {
+      "begin": "(<)(render)(?=[\\s/>])",
+      "end": "(/?>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.tag.html" }
+      },
+      "endCaptures": { "1": { "name": "punctuation.definition.tag.end.html" } },
+      "patterns": [
+        { "include": "#renderAttribute" },
+        { "include": "#expressionAttribute" },
+        { "name": "string.quoted.double.html", "begin": "\"", "end": "\"" },
+        { "name": "string.quoted.single.html", "begin": "'", "end": "'" },
+        { "name": "entity.other.attribute-name.html", "match": "\\b[\\w:-]+\\b" }
+      ]
+    },
+    "renderAttribute": {
+      "begin": "(?<![\\w:-])(snippet|args)(\\s*=\\s*)([\"'])",
+      "end": "\\3",
+      "beginCaptures": {
+        "1": { "name": "entity.other.attribute-name.directive.meeko" },
+        "2": { "name": "keyword.operator.assignment.meeko" },
+        "3": { "name": "punctuation.definition.string.begin.html" }
+      },
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.html" } },
+      "contentName": "meta.embedded.inline.typescript",
+      "patterns": [{ "include": "source.ts" }]
+    },
+    "customElementTag": {
+      "comment": "A custom element (a hyphen in the name, except the reserved SVG and MathML ones): html, model, model:name and is are plain HTML attributes, as in the compiler.",
+      "begin": "(<)((?!(?i:annotation-xml|color-profile|font-face|font-face-src|font-face-uri|font-face-format|font-face-name|missing-glyph)(?=[\\s/>]))[A-Za-z][\\w.]*-[\\w.:-]*)",
+      "end": "(/?>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.tag.html" }
+      },
+      "endCaptures": { "1": { "name": "punctuation.definition.tag.end.html" } },
+      "patterns": [
+        { "include": "#customElementExpressionAttribute" },
+        { "name": "string.quoted.double.html", "begin": "\"", "end": "\"" },
+        { "name": "string.quoted.single.html", "begin": "'", "end": "'" },
+        { "name": "entity.other.attribute-name.directive.meeko", "match": "\\bref:[A-Za-z_$][\\w$]*" },
+        { "name": "entity.other.attribute-name.html", "match": "\\b[\\w:-]+\\b" }
+      ]
+    },
+    "customElementExpressionAttribute": {
+      "begin": "(?<![\\w:-])((?:bind|on|if|each):[\\w-]+)(\\s*=\\s*)([\"'])",
+      "end": "\\3",
+      "beginCaptures": {
+        "1": { "name": "entity.other.attribute-name.directive.meeko" },
+        "2": { "name": "keyword.operator.assignment.meeko" },
+        "3": { "name": "punctuation.definition.string.begin.html" }
+      },
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.html" } },
+      "contentName": "meta.embedded.inline.typescript",
+      "patterns": [{ "include": "source.ts" }]
+    },
     "htmlTag": {
       "begin": "(<)([A-Za-z][\\w.:-]*)",
       "end": "(/?>)",
@@ -57,13 +150,27 @@
       "endCaptures": { "1": { "name": "punctuation.definition.tag.end.html" } },
       "patterns": [
         { "include": "#expressionAttribute" },
+        { "include": "#htmlAttribute" },
         { "name": "string.quoted.double.html", "begin": "\"", "end": "\"" },
         { "name": "string.quoted.single.html", "begin": "'", "end": "'" },
+        { "name": "entity.other.attribute-name.directive.meeko", "match": "\\bref:[A-Za-z_$][\\w$]*" },
         { "name": "entity.other.attribute-name.html", "match": "\\b[\\w:-]+\\b" }
       ]
     },
+    "htmlAttribute": {
+      "begin": "(?<![\\w:-])(html)(\\s*=\\s*)([\"'])",
+      "end": "\\3",
+      "beginCaptures": {
+        "1": { "name": "entity.other.attribute-name.directive.meeko" },
+        "2": { "name": "keyword.operator.assignment.meeko" },
+        "3": { "name": "punctuation.definition.string.begin.html" }
+      },
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.html" } },
+      "contentName": "meta.embedded.inline.typescript",
+      "patterns": [{ "include": "source.ts" }]
+    },
     "expressionAttribute": {
-      "begin": "\\b((?:bind|on|if|each):[\\w-]+|is)(\\s*=\\s*)([\"'])",
+      "begin": "(?<![\\w:-])((?:bind|on|if|each|model):[\\w-]+|model|is)(\\s*=\\s*)([\"'])",
       "end": "\\3",
       "beginCaptures": {
         "1": { "name": "entity.other.attribute-name.directive.meeko" },

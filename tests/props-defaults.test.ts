@@ -70,7 +70,8 @@ test("generated ComponentProps makes only defaulted fields optional to TypeScrip
     assert.ok(wrongChildDiagnostics.some((entry) => entry.code === "TS2322" && entry.location.offset >= wrongChild.indexOf("bind:count")), JSON.stringify(wrongChildDiagnostics));
     const missingChild = `<script lang="ts">import * as Card from "./Card.meeko";</script><template><component is="Card"></component></template>`;
     const missingChildDiagnostics = await checkSource(missingChild, join(root, "src", "MissingChild.meeko"));
-    assert.ok(missingChildDiagnostics.some((entry) => entry.code === "TS2769" &&
+    // The tag check of the component reports the missing prop on the tag.
+    assert.ok(missingChildDiagnostics.some((entry) => entry.code === "TS2345" &&
       entry.filename === join(root, "src", "MissingChild.meeko") &&
       entry.location.offset >= missingChild.indexOf("<component") &&
       /required/.test(entry.message)), JSON.stringify(missingChildDiagnostics));

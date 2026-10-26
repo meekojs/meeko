@@ -216,4 +216,59 @@ exports.run = async function run() {
   assert.equal(changedDeclaration.type, "variable");
   assert.deepEqual(changedDeclaration.modifiers, changedUsage.modifiers);
   assert.ok(!changedUsage.modifiers.includes("readonly"), "Una variable mutable no debe conservar el color de constante");
+
+  // Zonas de ejecución, lentes de código y tokens reactivos de una página.
+  const zonesUri = vscode.Uri.file(path.join(process.env.MEEKO_HOST_CONSUMER, "app", "pages", "zones.meeko"));
+  const zonesDocument = await vscode.workspace.openTextDocument(zonesUri);
+  await vscode.window.showTextDocument(zonesDocument);
+  const waitForZones = async (predicate) => {
+    for (let attempt = 0; attempt < 60; attempt++) {
+      const applied = api.executionZones(zonesUri);
+      if (applied && predicate(applied)) return applied;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    throw new Error(`Zonas no aplicadas: ${JSON.stringify(api.executionZones(zonesUri))}`);
+  };
+  const zones = await waitForZones((applied) => applied.length > 0);
+  assert.deepEqual(zones.map((zone) => [zone.kind, zone.range.start.line, zone.range.end.line]), [["server", 0, 3], ["shared", 4, 7], ["browser", 8, 10], ["shared", 11, 11]]);
+  assert.equal(zones[0].label, "Sólo servidor");
+  const zonesSetting = vscode.workspace.getConfiguration("meeko");
+  assert.equal(zonesSetting.get("editor.executionZones"), true);
+  await zonesSetting.update("editor.executionZones", false, vscode.ConfigurationTarget.Global);
+  await waitForZones((applied) => applied.length === 0);
+  await zonesSetting.update("editor.executionZones", undefined, vscode.ConfigurationTarget.Global);
+  await waitForZones((applied) => applied.length === 4);
+
+  let lenses = [];
+  for (let attempt = 0; attempt < 60; attempt++) {
+    lenses = await vscode.commands.executeCommand("vscode.executeCodeLensProvider", zonesUri);
+    if (lenses?.some((lens) => lens.command?.title.startsWith("Ruta /zones"))) break;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  assert.ok(lenses.some((lens) => lens.command?.title === "Ruta /zones · render ssr · layouts: app/layouts/default.meeko"), JSON.stringify(lenses.map((lens) => lens.command?.title)));
+  assert.ok(lenses.some((lens) => lens.command?.title === "Envía al cliente: { title: string; }"), JSON.stringify(lenses.map((lens) => lens.command?.title)));
+  const countLens = lenses.find((lens) => lens.command?.command === "editor.action.showReferences");
+  assert.equal(countLens?.command.title, "1 lectura · 1 escritura · en la plantilla");
+  const [lensUri, lensPosition, lensLocations] = countLens.command.arguments;
+  assert.ok(lensUri instanceof vscode.Uri && lensPosition instanceof vscode.Position, "La lente debe convertir sus argumentos a tipos de VS Code");
+  assert.ok(Array.isArray(lensLocations) && lensLocations.length === 2 && lensLocations.every((item) => item instanceof vscode.Location));
+  await vscode.commands.executeCommand(countLens.command.command, ...countLens.command.arguments);
+
+  const zonesLegend = await vscode.commands.executeCommand("vscode.provideDocumentSemanticTokensLegend", zonesUri);
+  assert.ok(["signal", "computed", "resource", "reactive", "modification"].every((modifier) => zonesLegend.tokenModifiers.includes(modifier)));
+  const zonesTokens = await vscode.commands.executeCommand("vscode.provideDocumentSemanticTokens", zonesUri);
+  const zonesSource = zonesDocument.getText();
+  const reactiveRead = zonesDocument.positionAt(zonesSource.indexOf("count.value}"));
+  const writeValue = zonesDocument.positionAt(zonesSource.indexOf("value = 1"));
+  let line = 0;
+  let character = 0;
+  const found = [];
+  for (let index = 0; index < zonesTokens.data.length; index += 5) {
+    line += zonesTokens.data[index];
+    character = zonesTokens.data[index] === 0 ? character + zonesTokens.data[index + 1] : zonesTokens.data[index + 1];
+    found.push({ line, character, modifiers: zonesLegend.tokenModifiers.filter((_, bit) => (zonesTokens.data[index + 4] & (1 << bit)) !== 0) });
+  }
+  const modifiersAt = (position) => found.find((token) => token.line === position.line && token.character === position.character)?.modifiers ?? [];
+  assert.deepEqual(["signal", "reactive"].filter((modifier) => modifiersAt(reactiveRead).includes(modifier)), ["signal", "reactive"]);
+  assert.ok(modifiersAt(writeValue).includes("modification"), "La escritura de .value debe marcarse");
 };

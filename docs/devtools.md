@@ -52,7 +52,10 @@ El hook y cada captura declaran `protocolVersion: 1`. Los tipos públicos se exp
 - `DevtoolsHook`, `DevtoolsSnapshot`, `DevtoolsInstance`, `DevtoolsEvent`, `DevtoolsEventKind` y `DevtoolsValue`;
 - `DevtoolsReadSite` y `DevtoolsReadKind`, para las lecturas;
 - `DevtoolsWriteSite`, `DevtoolsAssignmentSite` y `DevtoolsEditSite`, para las escrituras;
-- `DevtoolsCommandResult` y `DevtoolsProtocolVersion`.
+- `DevtoolsCommandResult` y `DevtoolsProtocolVersion`;
+- `DevtoolsSignalSite` (desde `1.1`), para la declaración de una señal.
+
+Desde `1.1`, cada `DevtoolsInstance` de la captura puede llevar el campo opcional `signalSites`: un objeto que asocia el nombre de cada señal de `signals` con su declaración en el `.meeko` (`{ file, line, column }`, con línea y columna desde 1). Sólo aparece cuando la compilación de desarrollo conoce esa posición; un cliente del protocolo debe tratarlo como opcional.
 
 El hook expone:
 
@@ -92,6 +95,42 @@ Reglas:
 - `setSignal` responde `{ ok: false, error }` si la instancia ya no está activa, si el nombre no es una señal editable propia o si el valor no es JSON válido.
 - Si un observador lanza al propagar el cambio, el valor ya quedó escrito y la respuesta es `{ ok: false }` con el error.
 - El evento resultante se marca como «Escrita desde DevTools» (`write: { kind: "devtools" }`).
+
+## Puente del editor
+
+Desde `1.1`, `meeko dev` publica los valores de las señales de las páginas abiertas para un editor local, que los muestra junto al código y puede editarlos (véase la [extensión de VS Code](../editors/vscode/README.md#valores-en-vivo)). El puente sólo existe en desarrollo y su protocolo no forma parte del contrato público (véase la [política de estabilidad](stability.md#fuera-del-contrato)).
+
+### Funcionamiento
+
+1. Al escuchar en loopback, `meeko dev` genera un token aleatorio por sesión y escribe un descriptor propio de su puerto, `.meeko/dev/editor-bridge-<puerto>.json` (con permisos `0600` donde el sistema los admite):
+
+   ```json
+   { "protocol": 1, "url": "http://127.0.0.1:4173/__meeko/editor-bridge", "token": "…", "pid": 12345, "root": "/ruta/al/proyecto", "startedAt": "2026-10-26T10:00:00.000Z" }
+   ```
+
+   Varios `meeko dev` del mismo proyecto, en puertos distintos, conviven sin sustituirse el descriptor, y el editor se conecta a todos. Al cerrarse, cada servidor borra el suyo si sigue siendo de su sesión. Al arrancar, borra los descriptores huérfanos de procesos que ya no existen (por ejemplo, de un `meeko dev` terminado a la fuerza), incluido el `.meeko/dev/editor-bridge.json` único de las versiones de desarrollo anteriores.
+2. El editor lee los descriptores y abre `GET <url>/events` en cada uno, un stream SSE con los eventos `hello` (`protocol`, `session`, `root`), `snapshot` (todas las señales) y `update` (señales nuevas o cambiadas y las que desaparecen en `removed`). Si no había otro editor conectado, las pestañas abiertas no estaban enviando valores: el servidor les pide su estado y espera a que todas respondan, o como mucho unos 300 ms, antes de enviar `snapshot`; sin pestañas lo envía al momento. Lo que llega durante esa espera va en la propia instantánea, no en un `update`.
+3. Para editar una señal, el editor envía `POST <url>/command` con `{ "type": "setSignal", "id", "value" }`. El servidor reenvía la orden a la pestaña que tiene la instancia y responde con su resultado, `{ ok: true }` o `{ ok: false, error }`, como `setSignal` del hook.
+4. Entre el navegador y `meeko dev` los mensajes viajan por el WebSocket de HMR de Vite. El navegador sólo envía valores mientras hay al menos un editor conectado.
+
+Cada señal lleva un `id` estable mientras vive la instancia (`pestaña/instancia/nombre`), el componente, el archivo `.meeko`, la línea y columna de su declaración (de `signalSites`) y su valor en JSON, copiado con los mismos límites que DevTools. Si la señal es el mismo objeto que otra de la pestaña, como el modelo que un hijo recibe del padre con `defineModel`, lleva además `alias` con la señal principal (`id`, `instanceId`, `component`, `name`, `file` y su línea y columna). La principal es la que declara la señal, no la que la recibe prestada, o la primera registrada. El editor muestra el alias junto a la principal y envía las ediciones a ella. Un valor de más de 4096 caracteres se recorta y se marca `truncated`; ese texto ya no es JSON válido. El navegador agrupa los cambios cada 100 ms y limita cada mensaje a unos 128 KB. El cuerpo de un comando admite como mucho 1 MB y una orden que la pestaña no responde en 5 s falla.
+
+### Seguridad
+
+Cada petición al puente debe cumplir todas estas condiciones; si no, responde `403` o `401` sin procesarla:
+
+- **Loopback.** La conexión llega desde una dirección de loopback (`127.0.0.0/8` o `::1`).
+- **`Host`.** La cabecera `Host` nombra un host de loopback (`localhost`, `127.x.x.x` o `[::1]`), lo que corta los ataques de DNS rebinding.
+- **Sin `Origin`.** Una petición con cabecera `Origin` se rechaza, aunque venga de loopback. Los editores son procesos locales y no la envían; una página abierta en el navegador siempre la envía, así que ninguna puede usar el puente. Además, el plugin de Vite añade `**/.meeko/dev/**` a `server.fs.deny`, así que ninguna página puede leer el descriptor ni su token.
+- **Token.** La cabecera `Authorization: Bearer <token>` lleva el token del descriptor, que se compara en tiempo constante.
+
+`meeko dev` sólo arranca el puente cuando el servidor escucha en loopback o en todas las interfaces (`0.0.0.0` o `::`); en ese caso el descriptor apunta a `127.0.0.1`. Con otra dirección no hay puente. Para desactivarlo, arranque con `MEEKO_EDITOR_BRIDGE=0`:
+
+```powershell
+$env:MEEKO_EDITOR_BRIDGE = "0"; npm run dev
+```
+
+Si el puente no puede arrancar, `meeko dev` lo informa en la consola y la aplicación sigue funcionando sin valores en vivo.
 
 ## Ubicaciones en la línea de tiempo
 

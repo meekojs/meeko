@@ -5,18 +5,20 @@ import { promisify } from "node:util";
 import { checkApp } from "./check-app.js";
 import { prepareProject } from "./project.js";
 import { assertNoLegacySessionFile } from "./runtime-migration.js";
+import { mapRouteBlockPaths, routeBlockTypeFiles } from "./route-block-types.js";
 import { prepareFrameworkTypeDeclarations, projectNames } from "./type-declarations.js";
 
 const execute = promisify(execFile);
 const require = createRequire(import.meta.url);
 
-async function checkTypeScript(configs: readonly string[]): Promise<void> {
+async function checkTypeScript(configs: readonly string[], routeBlocks: ReadonlyMap<string, string>): Promise<void> {
   const compiler = join(dirname(require.resolve("typescript/package.json")), "bin", "tsc");
   for (const config of configs) {
     try { await execute(process.execPath, [compiler, "-p", config, "--noEmit"]); }
     catch (error) {
       const failure = error as Error & { stdout?: string; stderr?: string };
-      throw new Error(`TypeScript check failed (${config}):\n${failure.stdout ?? ""}${failure.stderr ?? ""}`);
+      // Diagnostics in a `<script server>` copy point at the page, on the same line and column.
+      throw new Error(mapRouteBlockPaths(`Falló la comprobación con TypeScript (${config}):\n${failure.stdout ?? ""}${failure.stderr ?? ""}`, routeBlocks));
     }
   }
 }
@@ -41,5 +43,5 @@ export async function checkFrameworkProject(projectRoot: string): Promise<void> 
     }).join("\n"));
   }
   const configs = projectNames.map((name) => join(root, ".meeko", `tsconfig.${name}.json`));
-  await checkTypeScript(configs);
+  await checkTypeScript(configs, await routeBlockTypeFiles(root));
 }

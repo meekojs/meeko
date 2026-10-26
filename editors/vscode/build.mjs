@@ -21,10 +21,12 @@ await build({
 
 // Bundled fallback of the Meeko language server, used when the workspace has no
 // @meekojs/meeko with `meeko-language-server`. TypeScript stays an installed dependency:
-// the server resolves the native tsc next to this file.
+// the server resolves the native tsc next to this file. Prettier is installed too: it loads
+// its language plugins from its own files, and formatting falls back to it when the
+// workspace has no Prettier.
 await build({
   ...common,
   entryPoints: ["../../src/language-server/main.ts"],
   outfile: "dist/server.js",
-  external: ["@typescript/typescript6"],
+  external: ["@typescript/typescript6", "prettier", "prettier/*"],
 });

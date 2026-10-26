@@ -1,0 +1,242 @@
+<script server lang="ts">
+import { definePage } from "@meekojs/meeko/framework";
+import { navigation, pager } from "../../server/content/catalog.js";
+import { createHighlight } from "../../server/content/highlight.js";
+import { renderSource } from "../../server/content/markdown.js";
+import { githubUrl, readRepositoryFile } from "../../server/content/repository.js";
+
+export const route = definePage({ render: "prerender" });
+
+// The README is the quick start; the hero already shows its title and logo.
+export const readme = await renderSource("README.md", (text) => text.replace(/^# Meeko\n+<p align="center">[\s\S]*?<\/p>\n+/, ""));
+const highlight = await createHighlight();
+const exampleFile = "examples/counter/Counter.meeko";
+export const example = { file: exampleFile, url: githubUrl(exampleFile), html: highlight(readRepositoryFile(exampleFile).trim(), "meeko") };
+export const install = highlight("pnpm add @meekojs/meeko\npnpm exec meeko init-framework mi-app", "shellscript");
+export const version = (JSON.parse(readRepositoryFile("package.json")) as { version: string }).version;
+export const nav = navigation();
+export const pages = pager("/");
+export const head = {
+  title: "Meeko · Componentes .meeko tipados, SSR e hidratación para TypeScript",
+  description: "Meeko es un motor de componentes para TypeScript y un framework full-stack: archivos .meeko tipados, signals, SSR con hidratación, API y RPC tipados y despliegue en Node, Bun, Deno y Cloudflare.",
+};
+</script>
+
+<script lang="ts">
+export interface Props {
+  params: Record<string, string>;
+  search: Record<string, string | string[]>;
+}
+
+const api = href("/docs/[slug]", { params: { slug: "api" } });
+const framework = href("/docs/[slug]", { params: { slug: "framework" } });
+const editors = href("/docs/[slug]", { params: { slug: "editors" } });
+const stability = href("/docs/[slug]", { params: { slug: "stability" } });
+</script>
+
+<template>
+  <section class="hero">
+    <div class="hero-text">
+      <p class="eyebrow"><span class="dot"></span>Meeko {version} · licencia MIT</p>
+      <h1>Componentes <code>.meeko</code> tipados, del servidor al navegador.</h1>
+      <p class="lead">
+        Meeko es un motor de componentes para TypeScript y un framework full-stack. Lógica, plantilla y estilos viven en un archivo;
+        el compilador produce el HTML del servidor y, al hidratar, conecta la reactividad al HTML que ya existe.
+      </p>
+      <p class="actions">
+        <a class="button primary" href="#inicio-rápido">Empezar</a>
+        <a class="button" bind:href="api">Ver la API</a>
+      </p>
+      <div class="install code-block" data-lang="sh" on:click="copyCodeBlock">
+        <div class="code-head"><span class="code-lang">terminal</span><button type="button" class="code-copy" data-copy>Copiar</button></div>
+        <div html="install"></div>
+      </div>
+    </div>
+    <div class="hero-art">
+      <img src="/brand/meeko-logo.webp" width="320" height="320" alt="Carita de Meeko, una gatita de ojos azules, orejas oscuras y pelaje crema" fetchpriority="high" />
+    </div>
+  </section>
+
+  <section class="features" aria-labelledby="features-title">
+    <h2 id="features-title" class="sr-only">Qué ofrece Meeko</h2>
+    <article>
+      <h3><span class="icon">⌘</span>Un archivo <code>.meeko</code> tipado</h3>
+      <p>Script, plantilla y estilos juntos. TypeScript comprueba props, eventos, modelos y cada expresión de la plantilla, con el error en la línea del <code>.meeko</code>.</p>
+      <a bind:href="api">Componentes y API</a>
+    </article>
+    <article>
+      <h3><span class="icon">∿</span>Signals sin DOM virtual</h3>
+      <p><code>signal</code>, <code>computed</code> y <code>effect</code> actualizan sólo el texto o el atributo que cambia. Las listas conservan sus nodos por clave.</p>
+      <a href="/docs/api#reactividad">Reactividad</a>
+    </article>
+    <article>
+      <h3><span class="icon">⇅</span>SSR más hidratación</h3>
+      <p>El servidor envía la página completa y el estado de cada señal; el navegador la hidrata sin volver a pintarla. También streaming, prerender y páginas de cliente.</p>
+      <a href="/docs/framework#modos-de-render">Modos de render</a>
+    </article>
+    <article>
+      <h3><span class="icon">◎</span>Full-stack de serie</h3>
+      <p>Rutas por archivos, layouts, código de servidor en la propia página, API y RPC tipados, sesiones con revocación y WebSocket entre instancias.</p>
+      <a bind:href="framework">Guía del framework</a>
+    </article>
+    <article>
+      <h3><span class="icon">✦</span>Un editor con superpoderes</h3>
+      <p>Servidor de lenguaje con los diagnósticos de <code>meeko check</code>, zonas de ejecución servidor/navegador, hover de señales y valores en vivo desde <code>meeko dev</code>.</p>
+      <a bind:href="editors">Editores</a>
+    </article>
+    <article>
+      <h3><span class="icon">▲</span>Node, Bun, Deno y Cloudflare</h3>
+      <p>Un build autónomo por adaptador, comprobado por la misma suite de conformidad. SemVer desde 1.0, con una política de estabilidad explícita.</p>
+      <a bind:href="stability">Estabilidad 1.x</a>
+    </article>
+  </section>
+
+  <section class="example" aria-labelledby="example-title">
+    <div class="example-text">
+      <h2 id="example-title">Un componente, entero</h2>
+      <p>
+        Este contador es el ejemplo de referencia del repositorio. <code>defineProps</code> tipa sus props, <code>signal</code> y
+        <code>computed</code> llevan el estado y la plantilla lo muestra con <code>{"{"}…{"}"}</code> y <code>on:click</code>.
+        El servidor lo renderiza a HTML y el navegador sólo engancha el clic y los dos textos que cambian.
+      </p>
+      <p><a bind:href="example.url" rel="noopener">Ver <code>{example.file}</code> en GitHub</a></p>
+    </div>
+    <div class="code-block example-code" data-lang="meeko" on:click="copyCodeBlock">
+      <div class="code-head"><span class="code-lang">Counter.meeko</span><button type="button" class="code-copy" data-copy>Copiar</button></div>
+      <div html="example.html"></div>
+    </div>
+  </section>
+
+  <DocsLayout bind:nav="nav" bind:current="'/'" bind:toc="readme.toc" bind:pager="pages" bind:editUrl="readme.editUrl" bind:source="readme.source">
+    <h2 class="quick-start" id="inicio-rápido">Inicio rápido</h2>
+    <article class="prose" data-pagefind-body html="readme.html" on:click="copyCodeBlock"></article>
+  </DocsLayout>
+</template>
+
+<style scoped>
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+  align-items: center;
+  gap: 3rem;
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: 4.5rem 1.5rem 3rem;
+}
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1.1rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: 600 0.82rem var(--font-ui);
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--nose); box-shadow: 0 0 0 3px color-mix(in oklab, var(--nose) 30%, transparent); }
+h1 {
+  margin: 0;
+  font: 800 clamp(2.2rem, 5.2vw, 3.6rem)/1.05 var(--font-display);
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+h1 code {
+  padding: 0 0.15em;
+  border-radius: 0.2em;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  letter-spacing: -0.04em;
+}
+.lead { max-width: 38rem; margin: 1.3rem 0 0; color: var(--ink-soft); font-size: 1.15rem; line-height: 1.65; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1.8rem 0 0; }
+.button {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 0.15s, border-color 0.15s;
+}
+.button:hover { transform: translateY(-1px); border-color: var(--accent); }
+.button.primary { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.install { max-width: 34rem; margin-top: 1.6rem; }
+.hero-art { display: grid; place-items: center; }
+.hero-art img {
+  width: min(100%, 320px);
+  height: auto;
+  filter: drop-shadow(0 24px 40px rgb(60 40 30 / 0.22));
+  animation: float 7s ease-in-out infinite;
+}
+@keyframes float { 50% { transform: translateY(-8px) rotate(-1.5deg); } }
+@media (prefers-reduced-motion: reduce) { .hero-art img { animation: none; } }
+.features {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: 1rem 1.5rem 2.5rem;
+}
+.features article {
+  display: flex;
+  flex-direction: column;
+  padding: 1.35rem 1.4rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.features h3 { display: flex; align-items: center; gap: 0.6rem; margin: 0 0 0.6rem; font: 750 1.08rem/1.3 var(--font-display); }
+.icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 1rem;
+}
+.features p { flex: 1; margin: 0 0 0.9rem; color: var(--ink-soft); font-size: 0.95rem; line-height: 1.6; }
+.features a { color: var(--accent-ink); font-weight: 650; font-size: 0.92rem; text-decoration: none; }
+.features a::after { content: " →"; }
+.features a:hover { text-decoration: underline; }
+.example {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 2.5rem;
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 3.5rem;
+}
+.example h2 { margin: 0 0 0.9rem; font: 800 1.9rem/1.15 var(--font-display); letter-spacing: -0.02em; }
+.example p { color: var(--ink-soft); line-height: 1.7; }
+.example a { color: var(--accent-ink); font-weight: 650; }
+.example-code { margin: 0; }
+.quick-start {
+  margin: 0 0 1.2rem;
+  font: 800 clamp(1.9rem, 4vw, 2.4rem)/1.15 var(--font-display);
+  letter-spacing: -0.02em;
+}
+@media (max-width: 960px) {
+  .hero, .example { grid-template-columns: 1fr; }
+  .hero { padding-top: 3rem; gap: 1.5rem; }
+  .hero-art { order: -1; }
+  .hero-art img { width: 150px; }
+  .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .hero, .features, .example { padding-left: 1.1rem; padding-right: 1.1rem; }
+  .features { grid-template-columns: 1fr; }
+}
+</style>

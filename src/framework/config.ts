@@ -9,9 +9,25 @@ import type { MeekoConfig } from "./config-type.js";
 
 export type { MeekoConfig } from "./config-type.js";
 
+/**
+ * Una fuente de páginas y autoimports del proyecto: la aplicación, un layer de `extends` o un
+ * módulo de `modules`. La devuelve {@link resolveConfigSources}.
+ *
+ * @example
+ * ```ts
+ * import { resolveConfigSources } from "@meekojs/meeko/build";
+ *
+ * for (const source of await resolveConfigSources(process.cwd())) {
+ *   console.log(source.kind, source.name, source.root); // "app" "app" "/ruta/al/proyecto"
+ * }
+ * ```
+ */
 export interface ConfigSource {
+  /** Nombre en los diagnósticos: `"app"` o el nombre de la carpeta del layer o módulo. */
   readonly name: string;
+  /** Carpeta absoluta de la fuente, que contiene `app/pages`. */
   readonly root: string;
+  /** Tipo de fuente. */
   readonly kind: "app" | "layer" | "module";
 }
 
@@ -32,7 +48,22 @@ async function configFile(root: string): Promise<string | undefined> {
   return found[0];
 }
 
-/** Loads the optional project configuration using Node 24's TypeScript support. */
+/**
+ * Carga la configuración opcional del proyecto (`meeko.config.ts`, `.mts`, `.js` o `.mjs`) con el
+ * soporte de TypeScript de Node 24 y valida sus campos. Sin archivo devuelve `{}`.
+ *
+ * @param projectRoot Carpeta del proyecto.
+ * @returns La configuración exportada por defecto.
+ * @throws {Error} Si hay varios archivos de configuración o el archivo no se puede cargar.
+ * @throws {TypeError} Si el export no es un objeto o un campo no es válido.
+ * @example
+ * ```ts
+ * import { loadMeekoConfig } from "@meekojs/meeko/build";
+ *
+ * const config = await loadMeekoConfig(process.cwd());
+ * const adapter = config.server?.adapter ?? "node";
+ * ```
+ */
 export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig> {
   const root = resolve(projectRoot);
   const file = await configFile(root);
@@ -76,8 +107,22 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
   return config;
 }
 
-/** Resolves sources and rejects accidental escape or duplicate names before discovery. */
-/** Reads static server import directories for synchronous editor discovery. */
+/**
+ * Lee `extends`, `modules` e `imports.serverDirs` de la configuración sin ejecutarla, analizando el
+ * archivo. Sólo reconoce arrays literales de cadenas; es lo que usa el editor en un workspace no
+ * confiable. Los demás campos no se leen.
+ *
+ * @param projectRoot Carpeta del proyecto.
+ * @returns Los campos estáticos encontrados, o `{}`.
+ * @throws {TypeError} Si uno de esos campos no es un array literal de cadenas.
+ * @example
+ * ```ts
+ * import { readMeekoConfigSync } from "@meekojs/meeko/build";
+ *
+ * const { extends: layers = [], imports } = readMeekoConfigSync(process.cwd());
+ * const serverDirs = imports?.serverDirs ?? [];
+ * ```
+ */
 export function readMeekoConfigSync(projectRoot: string): MeekoConfig {
   const file = ["meeko.config.ts", "meeko.config.mts", "meeko.config.js", "meeko.config.mjs"]
     .map((name) => resolve(projectRoot, name)).find(existsSync);
@@ -111,6 +156,22 @@ export function readMeekoConfigSync(projectRoot: string): MeekoConfig {
   };
 }
 
+/**
+ * Resuelve las fuentes del proyecto en orden (aplicación, `extends` y `modules`) y rechaza, antes
+ * de descubrir rutas, las que salen del proyecto, no existen, no tienen `app/pages`, se repiten o
+ * tienen un nombre no válido.
+ *
+ * @param projectRoot Carpeta del proyecto.
+ * @param config Configuración ya cargada; si falta, se carga con {@link loadMeekoConfig}.
+ * @returns Las fuentes, empezando por la aplicación.
+ * @throws {Error} Si una fuente no es válida.
+ * @example
+ * ```ts
+ * import { resolveConfigSources } from "@meekojs/meeko/build";
+ *
+ * const layers = (await resolveConfigSources(process.cwd())).filter((source) => source.kind !== "app");
+ * ```
+ */
 export async function resolveConfigSources(projectRoot: string, config?: MeekoConfig): Promise<readonly ConfigSource[]> {
   config ??= await loadMeekoConfig(projectRoot);
   const root = resolve(projectRoot);
@@ -138,6 +199,21 @@ export async function resolveConfigSources(projectRoot: string, config?: MeekoCo
   return result;
 }
 
+/**
+ * Descubre las rutas de la aplicación y de los layers y módulos de `meeko.config.ts` en un solo
+ * manifiesto. Las páginas de layers y módulos usan el shell del proyecto. Una colisión de URL falla.
+ *
+ * @param projectRoot Carpeta del proyecto.
+ * @returns El manifiesto de rutas ordenado.
+ * @throws {Error} Si una fuente no es válida o dos rutas colisionan.
+ * @example
+ * ```ts
+ * import { discoverConfiguredRoutes } from "@meekojs/meeko/build";
+ *
+ * const routes = await discoverConfiguredRoutes(process.cwd());
+ * console.log(routes.map((route) => route.id));
+ * ```
+ */
 export async function discoverConfiguredRoutes(projectRoot: string): Promise<readonly RouteRecord[]> {
   const sources = await resolveConfigSources(projectRoot);
   return composeFrameworkRoutes({

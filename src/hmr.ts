@@ -1,7 +1,21 @@
 import { captureParentOwner, isWritableSignal } from "./reactivity.js";
+import { borrowedKey } from "./models.js";
+import { parseRegionHtml } from "./dom.js";
 import type { DomScope } from "./dom.js";
 
-/** Valores de señales transferidos en memoria entre versiones de un componente. */
+/**
+ * Valores de las señales editables de un componente, por nombre, que HMR transfiere en memoria
+ * entre dos versiones del módulo. Es independiente del estado JSON que viaja del servidor al
+ * navegador.
+ *
+ * @example
+ * ```ts
+ * import type { HotState } from "@meekojs/meeko";
+ *
+ * // Lo que conserva un contador al editar su .meeko durante el desarrollo.
+ * const state: HotState = { count: 3 };
+ * ```
+ */
 export type HotState = Record<string, unknown>;
 
 /** Contrato mínimo de un módulo Meeko reemplazable en desarrollo. */
@@ -33,8 +47,10 @@ const instances = new Map<string, Map<Element | Comment, HotSlot>>();
 /** Copia solo las señales editables de un setup, sin serializarlas. */
 export function snapshotSignals(bindings: Record<string, unknown>): HotState {
   const state: HotState = {};
+  // Models shared by the parent belong to the parent's state, not to this instance's.
+  const borrowed = (bindings as { [borrowedKey]?: ReadonlySet<unknown> })[borrowedKey];
   for (const [name, value] of Object.entries(bindings)) {
-    if (isWritableSignal(value)) state[name] = value.value;
+    if (isWritableSignal(value) && !borrowed?.has(value)) state[name] = value.value;
   }
   return state;
 }
@@ -44,7 +60,7 @@ export function restoreSignals(bindings: Record<string, unknown>, state?: HotSta
   if (!state) return;
   for (const [name, value] of Object.entries(state)) {
     const target = bindings[name];
-    if (isWritableSignal(target)) target.value = value;
+    if (isWritableSignal(target) && !(bindings as { [borrowedKey]?: ReadonlySet<unknown> })[borrowedKey]?.has(target)) target.value = value;
   }
 }
 
@@ -104,7 +120,8 @@ function scopeRange(scope: DomScope): Range {
 
 function replaceScope(scope: DomScope, html: string): void {
   const range = scopeRange(scope);
-  const content = range.createContextualFragment(html);
+  // Same parser as a late mount: the scripts of `html="..."` content never run.
+  const content = parseRegionHtml(scope.start!.parentNode!, html);
   range.deleteContents();
   range.insertNode(content);
 }

@@ -38,7 +38,13 @@ export default defineMeekoConfig({
   ]
 }
 `,
-  "app/pages/index.meeko": `<script lang="ts">
+  "app/pages/index.meeko": `<script server lang="ts">
+import { definePage } from "@meekojs/meeko/framework";
+
+export const route = definePage({ render: "prerender" });
+</script>
+
+<script lang="ts">
 import { signal } from "@meekojs/meeko";
 
 export interface Props {
@@ -57,10 +63,6 @@ const count = signal(0);
     <button type="button" on:click="() => count.value++">Count: {count.value}</button>
   </section>
 </template>
-`,
-  "app/pages/index.route.ts": `import { definePage } from "@meekojs/meeko/framework";
-
-export const route = definePage({ render: "prerender" });
 `,
   "app/app.meeko": `<script lang="ts">
 import type { Component } from "@meekojs/meeko";

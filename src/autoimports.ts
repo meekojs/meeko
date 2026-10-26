@@ -17,6 +17,8 @@ export interface AutoImport {
   typeOnly: boolean;
   component: boolean;
   specifier?: string;
+  /** A value export that also names a type: a class, an enum or a value merged with a type. */
+  alsoType?: boolean;
 }
 
 const directories = [
@@ -61,16 +63,18 @@ function filesInSync(path: string): string[] {
 
 function builtins(root: string): AutoImport[] {
   const entries: AutoImport[] = [
-    ...["signal", "computed", "effect", "batch", "onCleanup", "provide", "inject", "createContext", "provideErrorHandler"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko", specifier: "@meekojs/meeko", scope: "shared", typeOnly: false, component: false })),
+    ...["signal", "computed", "effect", "batch", "onCleanup", "onMounted", "provide", "inject", "createContext", "provideErrorHandler"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko", specifier: "@meekojs/meeko", scope: "shared", typeOnly: false, component: false })),
     ...["useState", "href"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "shared", typeOnly: false, component: false })),
   ];
   for (const scope of ["client", "server"] as const) {
     const file = join(root, ".meeko", "generated", `clients.${scope}.ts`);
     if (!existsSync(file)) continue;
-    for (const name of ["api", "rpc", "socket", "useSocket"]) entries.push({ name, imported: name, file, scope, typeOnly: false, component: false });
+    for (const name of ["api", "rpc", "socket", "useSocket", "useApi", "useRpcQuery", "useRpcMutation"]) entries.push({ name, imported: name, file, scope, typeOnly: false, component: false });
   }
   if (!entries.some((entry) => entry.name === "useSocket")) {
-    entries.push({ name: "useSocket", imported: "useSocket", file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "shared", typeOnly: false, component: false });
+    // Without generated clients, `useSocket` is the framework's `useSocketClient`: the same
+    // function as the deprecated `useSocket` alias, without its deprecation mark.
+    entries.push({ name: "useSocket", imported: "useSocketClient", file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "shared", typeOnly: false, component: false });
   }
   return entries;
 }
@@ -87,6 +91,7 @@ function addAutoImport(result: AutoImport[], entry: AutoImport): void {
   }
   // Function overloads and declaration merging describe one exported symbol.
   // Prefer the value-bearing form when a type and value share that symbol.
+  if (previous.typeOnly !== entry.typeOnly || entry.alsoType) previous.alsoType = true;
   if (previous.typeOnly && !entry.typeOnly) previous.typeOnly = false;
 }
 
@@ -100,10 +105,16 @@ function addFileImports(result: AutoImport[], root: string, directory: string, f
     return;
   }
   const ast = ts.createSourceFile(file, source ?? "", ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  // Classes and enums are values that also name a type, also when a local export list exposes them.
+  const localValueTypes = new Set<string>();
+  for (const statement of ast.statements) {
+    if ((ts.isClassDeclaration(statement) || ts.isEnumDeclaration(statement)) && statement.name) localValueTypes.add(statement.name.text);
+  }
   for (const statement of ast.statements) {
     const exported = ts.canHaveModifiers(statement) && ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
     if (exported && (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement) || ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement) || ts.isEnumDeclaration(statement)) && statement.name) {
-      addAutoImport(result, { name: statement.name.text, imported: statement.name.text, file, scope, typeOnly: ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement), component: false });
+      const valueType = ts.isClassDeclaration(statement) || ts.isEnumDeclaration(statement);
+      addAutoImport(result, { name: statement.name.text, imported: statement.name.text, file, scope, typeOnly: ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement), component: false, ...(valueType ? { alsoType: true } : {}) });
     }
     if (exported && ts.isVariableStatement(statement)) {
       for (const declaration of statement.declarationList.declarations) if (ts.isIdentifier(declaration.name)) {
@@ -111,7 +122,11 @@ function addFileImports(result: AutoImport[], root: string, directory: string, f
       }
     }
     if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
-      for (const element of statement.exportClause.elements) addAutoImport(result, { name: element.name.text, imported: element.name.text, file, scope, typeOnly: statement.isTypeOnly || element.isTypeOnly, component: false });
+      for (const element of statement.exportClause.elements) {
+        const typeOnly = statement.isTypeOnly || element.isTypeOnly;
+        const valueType = !typeOnly && !statement.moduleSpecifier && localValueTypes.has(element.propertyName?.text ?? element.name.text);
+        addAutoImport(result, { name: element.name.text, imported: element.name.text, file, scope, typeOnly, component: false, ...(valueType ? { alsoType: true } : {}) });
+      }
     }
   }
 }
@@ -139,7 +154,7 @@ export function discoverAutoImportsSync(root: string): AutoImport[] {
   for (const entry of [...(config.extends ?? []), ...(config.modules ?? [])]) {
     const sourceRoot = resolve(root, entry);
     const path = relative(root, sourceRoot);
-    if (path === ".." || path.startsWith(`..${sep}`) || isAbsolute(path)) throw new Error(`Configured autoimport source escapes project root: ${entry}`);
+    if (path === ".." || path.startsWith(`..${sep}`) || isAbsolute(path)) throw new Error(`Una fuente de autoimports configurada sale de la raíz del proyecto: ${entry}`);
     sourceRoots.push(sourceRoot);
   }
   for (const sourceRoot of sourceRoots) {
@@ -158,7 +173,7 @@ function configuredDirectories(serverDirs: readonly string[] | undefined): reado
     const directory = raw.replaceAll("\\", "/").replace(/\/$/, "");
     const parts = directory.split("/");
     if (parts[0] !== "server" || parts.length < 2 || parts.some((part) => !part || part === "." || part === "..")) {
-      throw new Error(`Autoimport serverDir must be a relative path under server/: ${raw}`);
+      throw new Error(`serverDir de autoimports debe ser una ruta relativa dentro de server/: ${raw}`);
     }
     result.add(directory);
   }
@@ -223,29 +238,49 @@ function isReference(node: ts.Identifier): boolean {
   return true;
 }
 
+/**
+ * Whether a node starts a type-only position. `ExpressionWithTypeArguments` is a type node
+ * only in `implements` and interface `extends`; a class `extends` and an instantiation
+ * expression evaluate it. `typeof X` in a type is allowed on a type-only import.
+ */
+function startsTypePosition(node: ts.Node): boolean {
+  if (ts.isExpressionWithTypeArguments(node)) {
+    const clause = node.parent;
+    return ts.isHeritageClause(clause) && (clause.token === ts.SyntaxKind.ImplementsKeyword || ts.isInterfaceDeclaration(clause.parent));
+  }
+  return ts.isTypeNode(node);
+}
+
 /** Añade imports ESM para referencias libres del módulo generado. */
 export function applyAutoImports(code: string, filename: string, registry: readonly AutoImport[], target: "client" | "server" | "shared"): string {
   const ast = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const referenced = new Set<string>();
-  const visit = (node: ts.Node, scopes: readonly Set<string>[]): void => {
+  // Names read at runtime; the others only appear in types and need `import type`
+  // under `verbatimModuleSyntax`, which keeps every value import in the output.
+  const values = new Set<string>();
+  const visit = (node: ts.Node, scopes: readonly Set<string>[], inType: boolean): void => {
     const active = introducesScope(node) ? [...scopes, scopeNames(node)] : scopes;
-    if (ts.isIdentifier(node) && isReference(node) && !active.some((scope) => scope.has(node.text))) referenced.add(node.text);
-    ts.forEachChild(node, (child) => visit(child, active));
+    const typePosition = inType || startsTypePosition(node);
+    if (ts.isIdentifier(node) && isReference(node) && !active.some((scope) => scope.has(node.text))) {
+      referenced.add(node.text);
+      if (!typePosition) values.add(node.text);
+    }
+    ts.forEachChild(node, (child) => visit(child, active, typePosition));
   };
-  visit(ast, []);
+  visit(ast, [], false);
   const imports: string[] = [];
   for (const name of [...referenced].sort()) {
     const candidates = registry.filter((entry) => entry.name === name);
     if (candidates.length === 0) continue;
     const allowed = candidates.filter((entry) => entry.scope === "shared" || entry.scope === target || (target !== "shared" && entry.scope === "app"));
-    if (allowed.length === 0) throw new Error(`Autoimport ${name} is unavailable in ${target} scope`);
-    if (allowed.length > 1) throw new Error(`Ambiguous autoimport ${name}: ${allowed.map((entry) => entry.file).join(", ")}`);
+    if (allowed.length === 0) throw new Error(`El autoimport ${name} no está disponible en el ámbito ${target}`);
+    if (allowed.length > 1) throw new Error(`Autoimport ambiguo ${name}: ${allowed.map((entry) => entry.file).join(", ")}`);
     const entry = allowed[0]!;
     let specifier = entry.specifier ?? relative(resolve(filename, ".."), entry.file).replaceAll("\\", "/");
     if (!entry.specifier && !specifier.startsWith(".")) specifier = `./${specifier}`;
     if (!entry.component && !entry.specifier) specifier = specifier.replace(/\.[cm]?ts$/, ".js");
     if (entry.component) imports.push(`import * as ${name} from ${JSON.stringify(specifier)};`);
-    else imports.push(`import ${entry.typeOnly ? "type " : ""}{ ${entry.imported} as ${name} } from ${JSON.stringify(specifier)};`);
+    else imports.push(`import ${entry.typeOnly || !values.has(name) ? "type " : ""}{ ${entry.imported} as ${name} } from ${JSON.stringify(specifier)};`);
   }
   return imports.length ? `${imports.join("\n")}\n${code}` : code;
 }

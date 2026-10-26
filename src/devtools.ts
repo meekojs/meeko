@@ -1,29 +1,53 @@
 import type { DomScope } from "./dom.js";
 import type {
   DevtoolsAssignmentSite, DevtoolsCommandResult, DevtoolsEvent, DevtoolsHook, DevtoolsInstance,
-  DevtoolsProtocolVersion, DevtoolsReadSite, DevtoolsValue, DevtoolsWriteSite,
+  DevtoolsProtocolVersion, DevtoolsReadSite, DevtoolsSignalSite, DevtoolsValue, DevtoolsWriteSite,
 } from "./devtools-protocol.js";
 import { logClientError, observeCallback } from "./error-observer.js";
+import { borrowedKey } from "./models.js";
 import { currentEffectOwner, effect, isWritableSignal, signalReadSites, untrack } from "./reactivity.js";
 import type { Signal } from "./reactivity.js";
 
 export type {
   DevtoolsAssignmentSite, DevtoolsCommandResult, DevtoolsEditSite, DevtoolsEvent, DevtoolsEventKind, DevtoolsHook,
-  DevtoolsInstance, DevtoolsProtocolVersion, DevtoolsReadKind, DevtoolsReadSite, DevtoolsSnapshot, DevtoolsValue,
-  DevtoolsWriteSite,
+  DevtoolsInstance, DevtoolsProtocolVersion, DevtoolsReadKind, DevtoolsReadSite, DevtoolsSignalSite, DevtoolsSnapshot,
+  DevtoolsValue, DevtoolsWriteSite,
 } from "./devtools-protocol.js";
 
 /** Versión del protocolo que implementa este runtime. */
 export const DEVTOOLS_PROTOCOL_VERSION: DevtoolsProtocolVersion = 1;
 
-/** Datos que entrega un componente compilado cuando se hidrata en desarrollo. */
+/**
+ * Datos que entrega un componente compilado al registrarse en DevTools cuando se hidrata en
+ * desarrollo. El compilador genera este registro; una aplicación sólo lo lee.
+ *
+ * @example
+ * ```ts
+ * import type { DevtoolsRegistration } from "@meekojs/meeko";
+ *
+ * const describe = (registration: DevtoolsRegistration): string =>
+ *   `${registration.name} (${registration.file}): ${Object.keys(registration.bindings).join(", ")}`;
+ * ```
+ */
 export interface DevtoolsRegistration {
+  /** Identificador estable del componente compilado. */
   componentId: string;
+  /** Nombre del componente. */
   name: string;
+  /** Archivo `.meeko` de origen. */
   file: string;
+  /** Fragmento de DOM de la instancia. */
   scope: DomScope;
+  /** Props de la instancia. */
   props: unknown;
+  /** Bindings del setup por nombre; las señales editables aparecen en el panel. */
   bindings: Record<string, unknown>;
+  /**
+   * Línea y columna (desde 1) de la declaración de cada binding en `file`; sólo las emite la
+   * compilación `hot`.
+   * @since 1.1.0
+   */
+  sites?: Record<string, { line: number; column: number }>;
 }
 
 declare global {
@@ -43,6 +67,8 @@ interface ActiveInstance extends DevtoolsRegistration {
 const active = new Map<string, ActiveInstance>();
 const identities = new WeakMap<Node, { id: string; breakpoint: boolean }>();
 const listeners = new Set<() => void>();
+/** Observadores internos de cada evento, como el puente del editor; vacío salvo que un editor esté suscrito. */
+const observers = new Set<(event: DevtoolsEvent) => void>();
 const recent: DevtoolsEvent[] = [];
 let nextInstance = 1;
 let nextEvent = 1;
@@ -187,6 +213,9 @@ function record(kind: DevtoolsEvent["kind"], instanceId: string, detail?: string
   if (write) event.write = write;
   recent.push(event);
   if (recent.length > 100) recent.shift();
+  for (const observer of [...observers]) {
+    observeCallback(() => untrack(() => observer(event)), (error) => logClientError("Meeko DevTools observer failed", error));
+  }
   notify();
 }
 
@@ -254,6 +283,11 @@ function removeHighlight(): void {
   highlightedId = null;
 }
 
+function siteOf(entry: DevtoolsRegistration, name: string): DevtoolsSignalSite | undefined {
+  const site = entry.sites && Object.hasOwn(entry.sites, name) ? entry.sites[name] : undefined;
+  return site ? { file: entry.file, line: site.line, column: site.column } : undefined;
+}
+
 const hook: DevtoolsHook = {
   protocolVersion: DEVTOOLS_PROTOCOL_VERSION,
   snapshot() {
@@ -261,8 +295,13 @@ const hook: DevtoolsHook = {
       const instances: DevtoolsInstance[] = [];
       for (const entry of active.values()) {
         const signals: Record<string, DevtoolsValue> = Object.create(null) as Record<string, DevtoolsValue>;
+        const signalSites: Record<string, DevtoolsSignalSite> = Object.create(null) as Record<string, DevtoolsSignalSite>;
+        let sited = false;
         for (const [name, value] of Object.entries(entry.bindings)) {
-          if (isWritableSignal(value)) signals[name] = safeValue(value.value);
+          if (!isWritableSignal(value)) continue;
+          signals[name] = safeValue(value.value);
+          const site = siteOf(entry, name);
+          if (site) { signalSites[name] = site; sited = true; }
         }
         instances.push({
           id: entry.id,
@@ -271,6 +310,7 @@ const hook: DevtoolsHook = {
           file: entry.file,
           props: safeValue(entry.props),
           signals,
+          ...(sited ? { signalSites } : {}),
           parentId: parentOf(entry)?.id ?? null,
           childIds: [],
           status: "hydrated",
@@ -344,9 +384,43 @@ const hook: DevtoolsHook = {
   },
 };
 
+/** Binding de una instancia activa que apunta a una señal editable. */
+interface SignalBinding {
+  entry: ActiveInstance;
+  name: string;
+  /** La instancia recibió la señal de su padre con `defineModel`. */
+  borrowed: boolean;
+}
+
+/** Bindings de cada señal editable en orden de registro; varios indican la misma instancia de signal. */
+const bindingsBySignal = new Map<object, SignalBinding[]>();
+
+function forgetBindings(entry: ActiveInstance): void {
+  for (const value of Object.values(entry.bindings)) {
+    if (!isWritableSignal(value)) continue;
+    const list = bindingsBySignal.get(value);
+    if (!list) continue;
+    const kept = list.filter((binding) => binding.entry !== entry);
+    if (kept.length) bindingsBySignal.set(value, kept);
+    else bindingsBySignal.delete(value);
+  }
+}
+
+/**
+ * Binding principal de una señal compartida: el que no la toma prestada de su padre o, si todos la
+ * comparten, el primero registrado. `undefined` si `entry.name` es el principal o no se comparte.
+ */
+function principalOf(entry: ActiveInstance, name: string, signal: object): SignalBinding | undefined {
+  const list = bindingsBySignal.get(signal);
+  if (!list || list.length < 2) return undefined;
+  const principal = list.find((binding) => !binding.borrowed) ?? list[0]!;
+  return principal.entry === entry && principal.name === name ? undefined : principal;
+}
+
 function unregister(entry: ActiveInstance): void {
   if (active.get(entry.id) !== entry) return;
   for (const stop of entry.stopSignals) stop();
+  forgetBindings(entry);
   active.delete(entry.id);
   if (selectedId === entry.id) selectedId = null;
   if (highlightedId === entry.id) removeHighlight();
@@ -369,9 +443,14 @@ export function registerDevtoolsInstance(input: DevtoolsRegistration): () => voi
   if (existing) unregister(existing);
   const entry: ActiveInstance = { ...input, id: identity.id, key, owner: currentEffectOwner(), breakpoint: identity.breakpoint, stopSignals: [] };
   active.set(entry.id, entry);
+  const borrowed = (input.bindings as { [borrowedKey]?: ReadonlySet<unknown> })[borrowedKey];
   for (const [name, value] of Object.entries(input.bindings)) {
     if (!isWritableSignal(value)) continue;
     const signal = value as Signal<unknown>;
+    const shared = bindingsBySignal.get(signal);
+    const binding: SignalBinding = { entry, name, borrowed: borrowed?.has(signal) ?? false };
+    if (shared) shared.push(binding);
+    else bindingsBySignal.set(signal, [binding]);
     let initial = true;
     entry.stopSignals.push(effect(() => {
       const current = signal.value;
@@ -384,4 +463,71 @@ export function registerDevtoolsInstance(input: DevtoolsRegistration): () => voi
   }
   record(previous ? "hmr" : "mount", entry.id);
   return () => { unregister(entry); };
+}
+
+/** Señal editable de una instancia activa, con su valor copiado como en una captura. */
+export interface DevtoolsLiveSignal {
+  name: string;
+  value: DevtoolsValue;
+  site?: DevtoolsSignalSite;
+  /** Binding principal si esta señal es la misma instancia de signal que la de otro binding. */
+  alias?: DevtoolsLiveAlias;
+}
+
+/** Binding principal de una señal compartida, p. ej. la del padre de un `defineModel`. */
+export interface DevtoolsLiveAlias {
+  instanceId: string;
+  component: string;
+  file: string;
+  name: string;
+  site?: DevtoolsSignalSite;
+}
+
+/** Instancia activa vista por el puente del editor. */
+export interface DevtoolsLiveInstance {
+  id: string;
+  name: string;
+  file: string;
+  signals: DevtoolsLiveSignal[];
+}
+
+/**
+ * Observa cada evento registrado sin pasar por `subscribe`. Uso interno del puente del editor:
+ * mientras nadie observa, el registro de eventos no hace trabajo adicional.
+ */
+export function observeDevtoolsEvents(observer: (event: DevtoolsEvent) => void): () => void {
+  observers.add(observer);
+  return () => { observers.delete(observer); };
+}
+
+/** IDs de las instancias hidratadas activas. */
+export function devtoolsInstanceIds(): string[] {
+  return [...active.keys()];
+}
+
+/** Valores actuales de las señales editables de una instancia, o `undefined` si ya no está activa. */
+export function devtoolsLiveInstance(id: string, names?: ReadonlySet<string>): DevtoolsLiveInstance | undefined {
+  const entry = active.get(id);
+  if (!entry) return undefined;
+  return untrack(() => {
+    const signals: DevtoolsLiveSignal[] = [];
+    for (const [name, value] of Object.entries(entry.bindings)) {
+      if (names && !names.has(name)) continue;
+      if (!isWritableSignal(value)) continue;
+      const site = siteOf(entry, name);
+      const principal = principalOf(entry, name, value);
+      const principalSite = principal ? siteOf(principal.entry, principal.name) : undefined;
+      const alias: DevtoolsLiveAlias | undefined = principal ? {
+        instanceId: principal.entry.id, component: principal.entry.name, file: principal.entry.file, name: principal.name,
+        ...(principalSite ? { site: principalSite } : {}),
+      } : undefined;
+      signals.push({ name, value: safeValue(value.value), ...(site ? { site } : {}), ...(alias ? { alias } : {}) });
+    }
+    return { id: entry.id, name: entry.name, file: entry.file, signals };
+  });
+}
+
+/** Hook instalado por la primera instancia registrada en este navegador. */
+export function devtoolsHook(): DevtoolsHook | undefined {
+  return installed ? hook : undefined;
 }

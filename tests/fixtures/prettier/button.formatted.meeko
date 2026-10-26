@@ -1,0 +1,22 @@
+<script lang="ts">
+export interface Props {
+  type?: "button" | "submit" | "reset";
+  disabled?: boolean;
+  onClick?: (event: Event) => void;
+}
+
+const props = defineProps<Props>({
+  type: "button",
+  disabled: false,
+});
+</script>
+
+<template>
+<button
+  bind:type="props.type"
+  bind:disabled="props.disabled"
+  on:click="(event) => props.onClick?.(event)"
+>
+  xxxx
+</button>
+</template>

@@ -14,11 +14,14 @@ import type { AssetManifest, AssetRecord } from "../framework-server/assets.js";
 import { reportServerError } from "../framework-server/contracts.js";
 import { buildDataFile, frameworkClientEntry, frameworkNodeEntry, frameworkServerEntry } from "./app-manifest.js";
 import type { BuildAppData } from "./app-manifest.js";
-import { loadMeekoConfig } from "./config.js";
+import { loadMeekoConfig, resolveConfigSources } from "./config.js";
+import { createDevAppReloader, isDiscoverySource } from "./dev-watch.js";
 import type { MeekoAdapterName } from "./config-type.js";
 import { prerenderWithNodeBuild } from "./prerender.js";
 import { bunEntrySource, cloudflareEntrySource, denoEntrySource } from "./adapter-templates.js";
 import { cloudflareAssetsDirectory, cloudflarePrerenderDirectory, resolveWrangler, wranglerConfig, wranglerSource } from "./cloudflare-build.js";
+import { editorBridgeHost, startEditorBridge } from "./editor-bridge.js";
+import type { EditorBridge } from "./editor-bridge.js";
 import { clientEntrySource, nodeEntrySource, serverEntrySource } from "./project-templates.js";
 import { assertNoLegacySessionFile } from "./runtime-migration.js";
 import { stylesheetLinks } from "./styles.js";
@@ -146,22 +149,63 @@ function clientAssets(manifest: ViteManifest): BuildAppData["client"] {
 
 /** Validates an adapter name. */
 export function assertBuildAdapter(adapter: string): MeekoAdapterName {
-  if (!adapters.includes(adapter as MeekoAdapterName)) throw new Error(`Unknown adapter ${adapter}; use node, cloudflare, deno or bun`);
+  if (!adapters.includes(adapter as MeekoAdapterName)) throw new Error(`Adaptador desconocido: ${adapter}; usa node, cloudflare, deno o bun`);
   return adapter as MeekoAdapterName;
 }
 
+/**
+ * Opciones de {@link buildProject}.
+ *
+ * @example
+ * ```ts
+ * import { buildProject } from "@meekojs/meeko/build";
+ * import type { BuildProjectOptions } from "@meekojs/meeko/build";
+ *
+ * const options: BuildProjectOptions = { adapter: "deno" };
+ * await buildProject(process.cwd(), options);
+ * ```
+ */
 export interface BuildProjectOptions {
-  /** Overrides `MeekoConfig.server.adapter`. */
+  /** Sustituye a `MeekoConfig.server.adapter`. */
   readonly adapter?: MeekoAdapterName;
 }
 
+/**
+ * Resultado de {@link buildProject}.
+ *
+ * @example
+ * ```ts
+ * import { buildProject } from "@meekojs/meeko/build";
+ *
+ * const { adapter, output } = await buildProject(process.cwd());
+ * console.log(`build ${adapter} en ${output}`);
+ * ```
+ */
 export interface BuildProjectResult {
+  /** Adaptador usado. */
   readonly adapter: MeekoAdapterName;
-  /** Directory runnable without the application's source tree. */
+  /** Carpeta de salida, ejecutable sin las fuentes de la aplicación. */
   readonly output: string;
 }
 
-/** Builds the client, the adapter server bundle and its prerendered pages. */
+/**
+ * Construye el proyecto como `meeko build`: el cliente, el bundle de servidor del adaptador y sus
+ * páginas prerenderizadas, bajo `.meeko/output/<adapter>/`. El adaptador sale de `options`, de
+ * `meeko.config.ts` o, por defecto, `node`. Necesita `vite` instalado.
+ *
+ * @param projectRoot Carpeta del proyecto.
+ * @param options Adaptador que sustituye al de la configuración.
+ * @returns El adaptador y la carpeta de salida.
+ * @throws {Error} Si el adaptador no existe, el proyecto conserva `server/session.ts` o falla el build.
+ * @example
+ * ```ts
+ * import { buildProject } from "@meekojs/meeko/build";
+ *
+ * const result = await buildProject(process.cwd(), { adapter: "cloudflare" });
+ * // result.output: <proyecto>/.meeko/output/cloudflare
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#build-despliegue-y-verificación
+ */
 export async function buildProject(projectRoot: string, options: BuildProjectOptions = {}): Promise<BuildProjectResult> {
   const root = resolve(projectRoot);
   const config = await loadMeekoConfig(root);
@@ -193,7 +237,8 @@ export async function buildProject(projectRoot: string, options: BuildProjectOpt
     ssr: { external: ["@meekojs/meeko"] },
     build: {
       ssr: frameworkNodeEntry,
-      outDir: nodeTarget, emptyOutDir: true,
+      // public/ belongs to the client build, which the server reads from client/.
+      outDir: nodeTarget, emptyOutDir: true, copyPublicDir: false,
       rollupOptions: { output: { entryFileNames: "index.mjs", chunkFileNames: "chunks/[name]-[hash].mjs" } },
     },
   });
@@ -211,7 +256,7 @@ export async function buildProject(projectRoot: string, options: BuildProjectOpt
       },
       build: {
         ssr: target.entry,
-        outDir: outputDirectory, emptyOutDir: true,
+        outDir: outputDirectory, emptyOutDir: true, copyPublicDir: false,
         rollupOptions: { output: { entryFileNames: target.file, chunkFileNames: "chunks/[name]-[hash].js" } },
       },
     });
@@ -219,7 +264,7 @@ export async function buildProject(projectRoot: string, options: BuildProjectOpt
   const cloudflare = config.server?.adapter === "cloudflare" ? config.server : undefined;
   if (adapter === "cloudflare") {
     // The prerendered pages share the assets directory under a reserved prefix.
-    if (existsSync(resolve(root, clientOutput, "_meeko"))) throw new Error("public/_meeko is reserved for Meeko's Cloudflare output; rename it");
+    if (existsSync(resolve(root, clientOutput, "_meeko"))) throw new Error("public/_meeko está reservado para la salida de Cloudflare de Meeko; cámbiale el nombre");
     const wrangler = await wranglerConfig(root, cloudflare);
     const className = (wrangler.durable_objects as { bindings: Array<{ class_name: string }> }).bindings[0]!.class_name;
     await writeFile(resolve(root, cloudflareAdapter.entry), cloudflareEntrySource(className), "utf8");
@@ -271,9 +316,9 @@ export async function previewProject(projectRoot: string, adapter?: MeekoAdapter
   let runtime: { readonly name: string; readonly install: string };
   if (target === "cloudflare") {
     const config = resolve(root, adapterOutput(target), cloudflareAdapter.config);
-    if (!existsSync(config)) throw new Error(`Missing production build at ${config}; run meeko build --adapter cloudflare`);
+    if (!existsSync(config)) throw new Error(`No hay build de producción en ${config}; ejecuta meeko build --adapter cloudflare`);
     const wrangler = resolveWrangler(root);
-    if (!wrangler) throw new Error("Wrangler is not installed; add it with pnpm add -D wrangler to preview the cloudflare build");
+    if (!wrangler) throw new Error("Wrangler no está instalado; añádelo con pnpm add -D wrangler para previsualizar el build de cloudflare");
     // wrangler dev runs the bundled Worker in workerd with local bindings.
     command = process.execPath;
     args = [wrangler, "dev", "--config", config,
@@ -281,7 +326,7 @@ export async function previewProject(projectRoot: string, adapter?: MeekoAdapter
     runtime = { name: "Wrangler", install: "https://developers.cloudflare.com/workers/wrangler/install-and-update/" };
   } else {
     const entry = resolve(root, adapterEntry(target));
-    if (!existsSync(entry)) throw new Error(`Missing production build at ${entry}; run meeko build --adapter ${target}`);
+    if (!existsSync(entry)) throw new Error(`No hay build de producción en ${entry}; ejecuta meeko build --adapter ${target}`);
     runtime = runtimes[target];
     command = runtimes[target].command;
     args = runtimes[target].args(entry);
@@ -294,7 +339,7 @@ export async function previewProject(projectRoot: string, adapter?: MeekoAdapter
     await new Promise<void>((done, fail) => {
       child.once("error", (error: NodeJS.ErrnoException) => {
         fail(error.code === "ENOENT"
-          ? new Error(`${runtime.name} is not installed or not on PATH; install it from ${runtime.install} to preview the ${target} build`)
+          ? new Error(`${runtime.name} no está instalado o no está en el PATH; instálalo desde ${runtime.install} para previsualizar el build de ${target}`)
           : error);
       });
       child.once("exit", (code, signal) => {
@@ -315,9 +360,9 @@ export async function startProject(projectRoot: string, production: boolean): Pr
   const root = resolve(projectRoot);
   if (production) {
     const entry = resolve(root, nodeOutput, "index.mjs");
-    if (!existsSync(entry)) throw new Error(`Missing production build at ${entry}; run meeko build`);
+    if (!existsSync(entry)) throw new Error(`No hay build de producción en ${entry}; ejecuta meeko build`);
     const output = await import(pathToFileURL(entry).href) as Partial<NodeStartModule>;
-    if (typeof output.start !== "function") throw new Error(`${entry} is not a Meeko Node build; run meeko build`);
+    if (typeof output.start !== "function") throw new Error(`${entry} no es un build de Node de Meeko; ejecuta meeko build`);
     return (await output.start()).server;
   }
   return startDevelopment(root);
@@ -333,6 +378,11 @@ async function startDevelopment(root: string): Promise<Server> {
   let vite: ViteDevServer | undefined;
   let app: ServerApp | undefined;
   let socketServer: ReturnType<typeof attachNodeWebSocketServer> | undefined;
+  let bridge: EditorBridge | undefined;
+  /** Rebuilds the app when a discovery source is added or removed; set once the app exists. */
+  let onTreeChange: ((file: string) => void) | undefined;
+  /** Runs a Vite restart once the app's work in flight drains, and rebuilds the app after it; set once the app exists. */
+  let onRestart: ((start: () => Promise<void>) => Promise<void>) | undefined;
   const reportError = (error: unknown, requestId: string): void => {
     if (app) { app.reportError(error, requestId); return; }
     reportServerError(error, requestId, (failure, id) => {
@@ -344,7 +394,45 @@ async function startDevelopment(root: string): Promise<Server> {
     const { createServer: createViteServer } = await import("vite");
     const { meeko } = await import("../vite.js");
     vite = await createViteServer({
-      root, configFile: false, plugins: [meeko()],
+      root, configFile: false,
+      plugins: [meeko(), {
+        name: "meeko:editor-bridge",
+        // A restart (a changed `.env`, `server.restart()`) replaces `server.ws` and runs this
+        // hook again for the new one. Its first client reaches it once `devServer.ws` points to
+        // it: the bridge moves there before that client's first message.
+        configureServer(server) { server.ws.on("connection", () => bridge?.refresh()); },
+      }, {
+        name: "meeko:dev-discovery",
+        // A restart also replaces `server.watcher` and closes the old one with its listeners:
+        // this hook subscribes each new watcher once.
+        configureServer(server) {
+          server.watcher.on("add", (file) => onTreeChange?.(file));
+          server.watcher.on("unlink", (file) => onTreeChange?.(file));
+        },
+      }, {
+        name: "meeko:dev-restart",
+        // A restart also closes the module runner that loaded the app's entry: its pages,
+        // layouts and server modules would fail to load ("Vite module runner has been
+        // closed") until the app is created again on the new runner. Every restart (a
+        // changed `.env` or config dependency, `server.restart()`) goes through
+        // `server.restart`, and Vite copies the new server's properties, this wrapper
+        // included, onto the instance this host holds; so this hook wraps each new server's
+        // method once and the app follows every restart. The wrapper tells the app before
+        // Vite closes anything: requests from then on wait for the new app, and the restart
+        // itself waits for the requests and the app build still running on the old runner.
+        configureServer(server) {
+          const restart = server.restart;
+          server.restart = (forceOptimize) => {
+            const start = (): Promise<void> => restart.call(server, forceOptimize);
+            return onRestart ? onRestart(start) : start();
+          };
+        },
+      }],
+      // One Meeko instance on the server, as in the build: a package linked
+      // outside node_modules (pnpm link:, a workspace) would otherwise run
+      // inlined in Vite's module runner beside the copy this host imported,
+      // with separate reactivity and context state.
+      ssr: { external: ["@meekojs/meeko"] },
       server: {
         middlewareMode: true,
         // Middleware mode opens a separate Vite WebSocket server. Derive its
@@ -356,39 +444,75 @@ async function startDevelopment(root: string): Promise<Server> {
       appType: "custom",
     });
     const globalCss = resolve(root, "app/styles/main.css");
-    const entry = await vite.ssrLoadModule(`/${frameworkServerEntry}`) as { createApp(options: Omit<ServerAppOptions, "manifest" | "load" | "runtime">): Promise<ServerApp> };
-    const publicOrigin = process.env.PUBLIC_ORIGIN || undefined;
-    app = await entry.createApp({
-      production: false,
-      platform: {
-        name: "node", env: process.env,
-        waitUntil(promise) { void Promise.resolve(promise).catch((error: unknown) => reportError(error, randomUUID())); },
-      },
-      ...(publicOrigin ? { publicOrigin } : {}),
-      document: {
-        // Vite's client and the unbundled global stylesheet replace the production manifest links.
-        head: ({ nonce }) => `<script type="module"${nonce ? ` nonce="${escapeHtml(nonce)}"` : ""} src="/@vite/client"></script>`
-          + (existsSync(globalCss) ? stylesheetLinks(["/app/styles/main.css?direct"]) : ""),
-      },
-    });
-    const running = app;
-    const origin = running.publicOrigin;
-    const listener = toNodeListener((request) => running.fetch(request), { onError: reportError, ...(origin ? { publicOrigin: origin } : {}) });
     const devServer = vite;
+    const publicOrigin = process.env.PUBLIC_ORIGIN || undefined;
+    const createDevApp = async (): Promise<ServerApp> => {
+      const entry = await devServer.ssrLoadModule(`/${frameworkServerEntry}`) as { createApp(options: Omit<ServerAppOptions, "manifest" | "load" | "runtime">): Promise<ServerApp> };
+      return entry.createApp({
+        production: false,
+        platform: {
+          name: "node", env: process.env,
+          waitUntil(promise) { void Promise.resolve(promise).catch((error: unknown) => reportError(error, randomUUID())); },
+        },
+        ...(publicOrigin ? { publicOrigin } : {}),
+        document: {
+          // Vite's client and the unbundled global stylesheet replace the production manifest links.
+          head: ({ nonce }) => `<script type="module"${nonce ? ` nonce="${escapeHtml(nonce)}"` : ""} src="/@vite/client"></script>`
+            + (existsSync(globalCss) ? stylesheetLinks(["/app/styles/main.css?direct"]) : ""),
+        },
+      });
+    };
+    app = await createDevApp();
+    const origin = app.publicOrigin;
+    // Requests wait for a pending rebuild (`reloader`, below), so they never meet the old routes or a
+    // closed module runner, and a restart waits for the requests in flight.
+    const listener = toNodeListener((request) => reloader.use((running) => running.fetch(request)), { onError: reportError, ...(origin ? { publicOrigin: origin } : {}) });
     const httpServer = createServer((request, response) => {
+      if (bridge?.handle(request, response)) return;
       // Vite cannot route a malformed target; the Meeko listener answers it with INVALID_URL.
       try { new URL(request.url || "/", "http://localhost"); }
       catch { listener(request, response); return; }
       devServer.middlewares(request, response, () => listener(request, response));
     });
     const visibleHost = host === "0.0.0.0" ? "127.0.0.1" : host;
-    socketServer = running.socket ? attachNodeWebSocketServer({
+    const attachSocket = (running: ServerApp): ReturnType<typeof attachNodeWebSocketServer> | undefined => running.socket ? attachNodeWebSocketServer({
       server: httpServer, hub: running.socket.hub,
       publicOrigin: origin ?? `http://${visibleHost.includes(":") ? `[${visibleHost}]` : visibleHost}:${port}`,
       pathnamePrefix: running.socket.pathnamePrefix,
       ...(running.socket.maxMessageBytes === undefined ? {} : { maxMessageBytes: running.socket.maxMessageBytes }),
       onError: (error) => reportError(error, randomUUID()),
     }) : undefined;
+    socketServer = attachSocket(app);
+    // The app is built again from fresh discovery, on the module runner Vite has now, when
+    // - a page, layout, middleware or server module is added or removed: that changes the
+    //   manifest the app was created with;
+    // - Vite restarts: that closes the module runner the app loads its modules through.
+    // Requests wait for the new app, so the browser's full reload never meets the old routes.
+    // The HTTP server, its public origin, Vite's middleware and the editor bridge stay; the
+    // new app runs `server/runtime.ts` and the server modules again, so what they keep in
+    // memory (sessions in a `MemorySessionStore`, caches, module state) starts empty, and
+    // Socket connections close when the previous Socket server does.
+    const sourceRoots = (await resolveConfigSources(root)).map((source) => source.root);
+    const reloader = createDevAppReloader(app, async (prior, superseded) => {
+      let next: ServerApp;
+      try {
+        devServer.moduleGraph.invalidateAll();
+        next = await createDevApp();
+      } catch (error) {
+        // A broken tree (two root layouts, a bad route file) keeps the previous app until it is fixed.
+        // When a restart began meanwhile, the app is built again after it, which reports what still fails.
+        if (!superseded()) reportError(error, randomUUID());
+        return prior;
+      }
+      app = next;
+      const previousSocket = socketServer;
+      socketServer = attachSocket(next);
+      try { await previousSocket?.close(); await prior.close(); }
+      catch (error) { reportError(error, randomUUID()); }
+      return next;
+    });
+    onTreeChange = (file) => { if (isDiscoverySource(resolve(file), sourceRoots)) reloader.rebuild(); };
+    onRestart = (start) => reloader.restart(start);
     await new Promise<void>((done, fail) => {
       httpServer.once("error", fail);
       httpServer.listen(port, host, () => {
@@ -396,6 +520,17 @@ async function startDevelopment(root: string): Promise<Server> {
         done();
       });
     });
+    // Live values for local editors, only in development and only when this server listens on loopback.
+    const address = httpServer.address();
+    const bridgeHost = address && typeof address !== "string" && process.env.MEEKO_EDITOR_BRIDGE !== "0" ? editorBridgeHost(address.address) : undefined;
+    if (bridgeHost && address && typeof address !== "string") {
+      try {
+        bridge = await startEditorBridge({ root, origin: `http://${bridgeHost}:${address.port}`, hot: () => devServer.ws });
+      } catch (error) {
+        // The application keeps running without live values in the editor.
+        process.stderr.write(`[meeko] editor bridge unavailable: ${error instanceof Error ? error.message : String(error)}\n`);
+      }
+    }
     let stopping = false;
     const shutdown = () => {
       if (stopping) return;
@@ -404,9 +539,11 @@ async function startDevelopment(root: string): Promise<Server> {
       process.off("SIGTERM", shutdown);
       void (async () => {
         const steps: Array<() => Promise<unknown>> = [
+          // Its event streams would keep the HTTP server open.
+          () => bridge?.close() ?? Promise.resolve(),
           () => socketServer?.close() ?? Promise.resolve(),
           () => new Promise<void>((done, fail) => httpServer.close((error) => error ? fail(error) : done())),
-          () => running.close(),
+          async () => (await reloader.current).close(),
           () => devServer.close(),
         ];
         for (const close of steps) {
@@ -420,7 +557,7 @@ async function startDevelopment(root: string): Promise<Server> {
     process.stdout.write(`http://${visibleHost.includes(":") ? `[${visibleHost}]` : visibleHost}:${port}\n`);
     return httpServer;
   } catch (error) {
-    const cleanup = await Promise.allSettled([socketServer?.close(), app?.close(), vite?.close()]);
+    const cleanup = await Promise.allSettled([bridge?.close(), socketServer?.close(), app?.close(), vite?.close()]);
     for (const result of cleanup) {
       if (result.status === "rejected") reportError(result.reason, randomUUID());
     }

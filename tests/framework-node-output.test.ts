@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { once } from "node:events";
 import { mkdtemp, mkdir, readFile, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import test from "node:test";
 import { prepareFrameworkTypes } from "../src/framework/check-project.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
 import { assetManifest, buildProject } from "../src/framework/project.ts";
 import { createNodeAssetReader } from "../src/node.ts";
+import { repositoryRoot, stopChild, tempProject } from "./helpers/temp-project.ts";
 
 test("asset keys match the URL pathname browsers request and only Vite build files are immutable", async () => {
   const directory = await mkdtemp(join(tmpdir(), "meeko-asset-keys-"));
@@ -52,19 +52,9 @@ async function files(directory: string): Promise<string[]> {
 }
 
 test("the built Node output serves prerendered pages and assets without the source tree", { timeout: 60_000 }, async (context) => {
-  const projectRoot = resolve(".meeko");
-  await mkdir(projectRoot, { recursive: true });
-  const root = await mkdtemp(join(projectRoot, "node-output-"));
-  const repository = resolve(".");
   let child: ReturnType<typeof spawn> | undefined;
-  context.after(async () => {
-    if (child && child.exitCode === null) {
-      const exited = once(child, "exit");
-      child.kill("SIGTERM");
-      await exited;
-    }
-    await rm(root, { recursive: true, force: true });
-  });
+  const root = await tempProject(context, "node-output", () => stopChild(child, "SIGTERM"));
+  const repository = repositoryRoot;
   await initFrameworkProject(root);
   await writeFile(join(root, "server", "runtime.ts"), `import { defineServerRuntime, MemorySessionStore, SessionManager } from "@meekojs/meeko/server";
 
@@ -110,6 +100,9 @@ export default defineApiRoute({ contentType: "response", async handler({ context
   const result = await buildProject(root, { adapter: "node" });
   assert.deepEqual(result, { adapter: "node", output: join(root, ".meeko", "output", "node") });
   const output = await files(result.output);
+  // public/ is copied once, into client/; the server bundle beside it has no second copy.
+  assert.ok(output.includes(join(result.output, "client", "logo@2x.png")), "public files are in client/");
+  assert.ok(!output.some((file) => file === join(result.output, "logo@2x.png") || file === join(result.output, "assets", "plain.txt")), "the server output has no copy of public/");
   const bundle = await Promise.all(output.filter((file) => file.endsWith(".mjs")).map((file) => readFile(file, "utf8")));
   assert.ok(bundle.length > 0);
   assert.ok(!bundle.some((code) => /@typescript\/typescript6|from "typescript"|discoverConfiguredRoutes/.test(code)), "the Node output must not load build tooling");

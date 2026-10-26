@@ -151,7 +151,7 @@ test("la sintaxis de composición rechaza referencias, contenido y props no comp
   const cases = [
     { template: `<component bind:label="'x'"></component>`, code: "MEEK030" },
     { template: `<component is="Child"><span>nested</span></component>`, code: "MEEK031" },
-    { template: `<component is="Child" label="x"></component>`, code: "MEEK032" },
+    { template: `<component is="Child" data-label="x"></component>`, code: "MEEK032" },
   ];
   for (const { template, code } of cases) {
     const source = `${script}\n<template>${template}</template>`;

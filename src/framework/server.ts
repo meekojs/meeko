@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { escapeHtml, serializeJson } from "../server.js";
 import type { RequestContext } from "../framework-server/context.js";
 import { withRequestContext } from "../framework-server/context.js";
@@ -5,68 +6,193 @@ import type { ServerFetch } from "../framework-server/context.js";
 import { ApiError, errorResponse, normalizeServerError, observeServerError } from "../framework-server/contracts.js";
 import { lockSessionCookie } from "../framework-server/sessions.js";
 import { etagMatches } from "../framework-server/assets.js";
-import { PAYLOAD_VERSION, PageInputError, pageSearchObject, validatePageInputs } from "./page.js";
+import { ERROR_PAGE_TITLE, PAYLOAD_VERSION, PageInputError, pageSearchObject, payloadHead, validatePageInputs } from "./page.js";
 import { runRouteMiddleware } from "./middleware.js";
 import type { RouteMiddleware } from "./middleware.js";
 import type { PageHead, PageRender, PageSchema } from "./page.js";
 import { StateStore, withStateStore } from "./state.js";
+import { ResourceScope, withResourceScope } from "./resources.js";
+import { renderWithSuspense } from "../suspense.js";
+import { collectStyles } from "../dom.js";
 import { deferredSettle, deferredSource, extractDeferred } from "./deferred.js";
 import type { DeferredInternals, DeferredOutcome } from "./deferred.js";
-import { matchRoute } from "./router.js";
-import type { RouteRecord } from "./router.js";
+import { matchRoute, provideServerRouteManifest } from "./router.js";
+import { providePageScope } from "./page-body.js";
+import type { PageRequest } from "./page-body.js";
+import type { ErrorPageRecord, RouteRecord } from "./router.js";
 
+/** Route manifest of the application handling the current request, for `href(id)`. */
+const requestManifest = new AsyncLocalStorage<readonly RouteRecord[]>();
+provideServerRouteManifest(() => requestManifest.getStore());
+
+/** Page whose top-level `<script server>` code is running, for `usePage()`, `redirect()` and `notFound()`. */
+const runningPage = new AsyncLocalStorage<PageRequest<unknown, unknown>>();
+providePageScope({ run: (page, body) => runningPage.run(page, body), current: () => runningPage.getStore() });
+
+/** Runs `run` with `routes` as the manifest of `href(id)`, across its async work. */
+export function withRouteManifest<T>(routes: readonly RouteRecord[], run: () => T): T {
+  return requestManifest.run(routes, run);
+}
+
+/**
+ * Forma de un módulo `.meeko` compilado que el handler del servidor renderiza como página, layout o
+ * página de error.
+ *
+ * @example
+ * ```ts
+ * import type { PageModule } from "@meekojs/meeko/server";
+ *
+ * const pages = import.meta.glob<PageModule>("/app/pages/*.meeko");
+ * const loadPage = async (file: string): Promise<PageModule> => pages[file]!();
+ * ```
+ */
 export interface PageModule {
+  /** CSS con ámbito del componente. */
   css?: string;
+  /** Renderiza el HTML y captura el estado que se transfiere al navegador. */
   renderWithState(props: Record<string, unknown>): { html: string; state: Record<string, unknown> };
+  /** Renderiza sólo el HTML. */
   renderToString?(props: Record<string, unknown>): string;
 }
 
+/**
+ * Opciones de ruta tal como las carga el servidor desde `<script server>` o un sidecar: la forma sin
+ * tipos genéricos de `definePage`.
+ *
+ * @example
+ * ```ts
+ * import type { PageRoute } from "@meekojs/meeko/server";
+ *
+ * const loadRoute = async (file: string): Promise<PageRoute> => {
+ *   const module = await import(file) as { route?: PageRoute; default?: PageRoute };
+ *   return module.route ?? module.default ?? {};
+ * };
+ * ```
+ */
 export interface PageRoute {
+  /** Schema de los parámetros de la ruta. */
   params?: PageSchema;
+  /** Schema de los parámetros de búsqueda. */
   search?: PageSchema;
+  /** Loader del servidor. */
   load?: (context: PageRequestContext) => Promise<unknown> | unknown;
+  /** Calcula el `title` con los datos del loader. */
   head?: (context: PageRequestContext & { data: unknown }) => PageHead;
+  /** Modo de render. */
   render?: PageRender;
+  /** Parámetros de cada URL que se prerenderiza. */
   prerenderEntries?: readonly Readonly<Record<string, string>>[] | (() => Promise<readonly Readonly<Record<string, string>>[]>);
 }
 
+/**
+ * Contexto que reciben `load` y `head` de una {@link PageRoute} en el servidor.
+ *
+ * @example
+ * ```ts
+ * import type { PageRequestContext } from "@meekojs/meeko/server";
+ *
+ * async function load({ params, searchParams, signal }: PageRequestContext) {
+ *   const page = searchParams.get("page") ?? "1";
+ *   return (await fetch(`https://api.example.com/posts/${String(params.id)}?page=${page}`, { signal })).json();
+ * }
+ * ```
+ */
 export interface PageRequestContext {
+  /** Petición HTTP. */
   readonly request: Request;
+  /** Parámetros de la ruta, validados por su schema. */
   readonly params: Readonly<Record<string, unknown>>;
+  /** Parámetros de búsqueda, validados por su schema. */
   readonly search: Readonly<Record<string, unknown>>;
+  /** Query string sin procesar. */
   readonly searchParams: URLSearchParams;
+  /** Se aborta si el cliente se desconecta, se revoca la sesión o se cancela la respuesta. */
   readonly signal: AbortSignal;
-  /** Public state transferred from this request to its browser app instance. */
+  /** Estado público que se transfiere de esta petición a la aplicación del navegador. */
   readonly state: StateStore;
-  /** Present when the host supplies a per-request context. */
+  /** Existe cuando el host proporciona un contexto por petición. */
   readonly context?: RequestContext;
 }
 
+/**
+ * Opciones de {@link createFrameworkHandler}.
+ *
+ * @typeParam Route Tipo de las opciones de ruta que devuelve `loadRoute`.
+ * @example
+ * ```ts
+ * import type { FrameworkHandlerOptions } from "@meekojs/meeko/server";
+ *
+ * const options: FrameworkHandlerOptions = {
+ *   routes,
+ *   errorPage,
+ *   loadPage,
+ *   loadRoute,
+ *   clientEntry: "/assets/entry-client.js",
+ *   onError: (error, requestId) => console.error(requestId, error),
+ * };
+ * ```
+ */
 export interface FrameworkHandlerOptions<Route = PageRoute> {
+  /** Manifiesto de rutas. */
   readonly routes: readonly RouteRecord[];
+  /**
+   * Página de error de la aplicación (`app/error.meeko`) y sus layouts raíz. Una petición de página
+   * sin ruta la renderiza con estado `404` y payload de hidratación; una ruta sin `error` que falla
+   * la usa como página de error.
+   * @since 1.1.0
+   */
+  readonly errorPage?: ErrorPageRecord | undefined;
+  /** Carga el módulo compilado de una página, un layout o una página de error. */
   readonly loadPage: (file: string) => Promise<PageModule>;
+  /** Carga las opciones de ruta de un sidecar o un bloque `<script server>`. */
   readonly loadRoute?: (file: string) => Promise<Route>;
-  /** Isomorphic route middleware, evaluated before the route sidecar loader. */
+  /** Middleware de ruta isomórfico, que se evalúa antes del loader. */
   readonly loadMiddleware?: () => Promise<readonly RouteMiddleware[]>;
+  /** Crea el contexto de cada petición: sesión, servicios y plataforma. */
   readonly createContext?: (request: Request) => RequestContext | Promise<RequestContext>;
-  /** Optional in-process dispatcher for automatic API/RPC calls during SSR. */
+  /** Despachador local opcional para las llamadas automáticas a API y RPC durante SSR. */
   readonly serverFetch?: ServerFetch;
-  /** Receives internal page failures with the request ID; never sent to the browser. */
+  /** Recibe los fallos internos de las páginas con el ID de la petición; nunca llegan al navegador. */
   readonly onError?: (error: unknown, requestId: string) => void;
+  /** URL de la entrada del cliente que enlaza el documento. */
   readonly clientEntry?: string;
-  /** Host additions to every HTML document this handler renders. */
+  /** Añadidos del host a cada documento HTML que renderiza el handler. */
   readonly document?: DocumentOptions;
 }
 
-/** Trusted host markup, either fixed or derived from the request and its CSP nonce. */
+/**
+ * HTML de confianza del host: fijo o derivado de la petición y su nonce CSP. No se escapa.
+ *
+ * @example
+ * ```ts
+ * import type { DocumentMarkup } from "@meekojs/meeko/server";
+ *
+ * const analytics: DocumentMarkup = ({ nonce }) =>
+ *   `<script${nonce ? ` nonce="${nonce}"` : ""} src="/analytics.js" defer></script>`;
+ * ```
+ */
 export type DocumentMarkup = string | ((context: { readonly request: Request; readonly nonce: string | undefined }) => string);
 
+/**
+ * Añadidos del host al documento HTML que renderiza Meeko.
+ *
+ * @example
+ * ```ts
+ * import type { DocumentOptions } from "@meekojs/meeko/server";
+ *
+ * const document: DocumentOptions = {
+ *   head: '<link rel="stylesheet" href="/fonts.css">',
+ *   bodyEnd: ({ nonce }) => `<script nonce="${nonce ?? ""}">console.log("listo")</script>`,
+ *   nonce: (request) => request.headers.get("x-csp-nonce") ?? undefined,
+ * };
+ * ```
+ */
 export interface DocumentOptions {
-  /** Trusted HTML appended to `<head>`, such as stylesheets and modulepreload links. */
+  /** HTML de confianza que se añade a `<head>`, como hojas de estilo y enlaces `modulepreload`. */
   readonly head?: DocumentMarkup;
-  /** Trusted HTML appended before `</body>`, after the client entry. */
+  /** HTML de confianza que se añade antes de `</body>`, tras la entrada del cliente. */
   readonly bodyEnd?: DocumentMarkup;
-  /** A per-request CSP nonce applied to Meeko's `<style>` tags and client entry script. */
+  /** Nonce CSP por petición, que se aplica a las etiquetas `<style>` de Meeko y a la entrada del cliente. */
   readonly nonce?: (request: Request) => string | undefined;
 }
 
@@ -79,21 +205,55 @@ function documentParts(options: DocumentOptions | undefined, request: Request): 
 /** Every Meeko document starts with this markup; the CSRF meta tag follows it. */
 export const DOCUMENT_HEAD_PREFIX = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,">';
 
-/** HTML produced at build time for one prerendered URL. */
+/**
+ * HTML generado en el build para una URL prerenderizada.
+ *
+ * @example
+ * ```ts
+ * import { readFile } from "node:fs/promises";
+ * import type { PrerenderedPage } from "@meekojs/meeko/server";
+ *
+ * const entry = index.pages["/"]!;
+ * const page: PrerenderedPage = {
+ *   html: await readFile(`prerender/${entry.file}`, "utf8"),
+ *   headOffset: entry.headOffset,
+ *   etag: entry.etag,
+ * };
+ * ```
+ */
 export interface PrerenderedPage {
+  /** Documento completo. */
   readonly html: string;
   /**
-   * Offset inside `<head>` where the per-request CSRF meta tag is inserted,
-   * in UTF-16 code units of `html` (a JavaScript string index), never in bytes.
+   * Posición dentro de `<head>` donde se inserta la meta CSRF de cada petición, en unidades de
+   * código UTF-16 de `html` (un índice de cadena de JavaScript), nunca en bytes.
    */
   readonly headOffset: number;
+  /** `ETag` del documento. */
   readonly etag: string;
-  /** Navigation payload served to client-side navigations of the same URL. */
+  /** Payload de navegación que reciben las navegaciones de cliente a la misma URL. */
   readonly payload?: string;
 }
 
-/** Build output that a host reads by pathname; absent pages fall back to SSR. */
+/**
+ * Salida del build que el host lee por ruta; las páginas que faltan se renderizan con SSR. Cada
+ * adaptador tiene la suya, como `createCloudflarePrerenderSource`.
+ *
+ * @example
+ * ```ts
+ * import type { PrerenderSource } from "@meekojs/meeko/server";
+ *
+ * const prerender: PrerenderSource = {
+ *   async get(pathname) {
+ *     const entry = index.pages[pathname];
+ *     if (!entry) return undefined;
+ *     return { html: await read(entry.file), headOffset: entry.headOffset, etag: entry.etag };
+ *   },
+ * };
+ * ```
+ */
 export interface PrerenderSource {
+  /** Devuelve la página prerenderizada de una ruta, o `undefined` para renderizarla con SSR. */
   get(pathname: string): Promise<PrerenderedPage | undefined>;
 }
 
@@ -111,6 +271,71 @@ type TypedPageRoute = Omit<PageRoute, "load" | "head"> & {
 function wantsPayload(request: Request): boolean {
   return request.headers.get("accept")?.split(",").some((value) => value.trim().startsWith("application/meeko+json")) ?? false;
 }
+
+/**
+ * A document or navigation payload request. API and internal endpoints, and
+ * subresources such as scripts or images, keep the plain 404 of a URL without a route.
+ */
+function wantsPage(request: Request, pathname: string): boolean {
+  if (/^\/(?:api|_meeko)(?:\/|$)/.test(pathname)) return false;
+  if (wantsPayload(request)) return true;
+  return request.headers.get("accept")?.split(",").some((value) => value.trim().toLowerCase().startsWith("text/html")) ?? false;
+}
+
+/** Wraps a page in its layouts (outermost first) and collects their CSS in document order. */
+async function wrapInLayouts(
+  loadPage: (file: string) => Promise<PageModule>,
+  page: PageModule,
+  props: Record<string, unknown>,
+  layouts: readonly string[],
+  styles: string[],
+): Promise<{ module: PageModule; input: Record<string, unknown> }> {
+  let module = page;
+  let input = props;
+  for (const layout of [...layouts].reverse()) {
+    const child = module;
+    const childInput = input;
+    const outlet = {
+      renderWithState: () => child.renderWithState(childInput),
+      renderToString: () => child.renderToString?.(childInput) ?? child.renderWithState(childInput).html,
+      hydrateScope: () => { throw new Error("Server outlet cannot hydrate"); },
+    };
+    module = await loadPage(layout);
+    if (module.css) styles.unshift(module.css);
+    input = { outlet };
+  }
+  return { module, input };
+}
+
+/**
+ * Renders a page tree until its top-level data awaits have loaded. Each pass that suspends is
+ * discarded with its roots and a fresh copy of the request state, so a retried setup starts from
+ * the state the loader left. Returns the state of the pass that completed and the data it read.
+ */
+async function renderPageTree(
+  module: PageModule,
+  input: Record<string, unknown>,
+  initial: StateStore,
+  signal?: AbortSignal,
+): Promise<{ rendered: { html: string; state: Record<string, unknown> }; store: StateStore; resources: Record<string, unknown> | undefined; styles: string[] }> {
+  const scope = new ResourceScope("collect", {}, signal);
+  let baseline: Record<string, unknown> | undefined;
+  let store = initial;
+  // The CSS of the child components of the last pass, the one whose HTML the document sends.
+  const styles = new Set<string>();
+  const rendered = await renderWithSuspense((pass) => {
+    if (pass > 1) store = new StateStore(baseline);
+    else baseline = initial.snapshot();
+    scope.beginPass();
+    styles.clear();
+    return collectStyles(styles, () => withResourceScope(scope, () => withStateStore(store, () => module.renderWithState(input))));
+  }, signal ? { signal } : {});
+  const used = scope.usedData();
+  return { rendered, store, resources: Object.keys(used).length ? used : undefined, styles: [...styles] };
+}
+
+/** Props of the application error page for a URL without a route. */
+const notFoundProps = { status: 404, message: "NOT_FOUND" } as const;
 
 /**
  * The manifest render is read from the sidecar at build time. A different
@@ -260,15 +485,41 @@ function prerenderedResponse(page: PrerenderedPage, request: Request, context: R
   return new Response(head ? null : page.html, { status: 200, headers });
 }
 
-/** Portable Fetch handler. Node adapters can pass their Request directly. */
+/**
+ * Crea un handler Fetch portable que renderiza las páginas: middleware de ruta, validación, loader,
+ * SSR (también `"stream"` y `"client"`), payload de navegación y páginas de error. Es la pieza de
+ * páginas de `createServerApp` para hosts propios; no atiende API, RPC ni archivos.
+ *
+ * @param options Rutas, cargadores, contexto y documento.
+ * @returns Un handler `(request) => Promise<Response>`.
+ * @example
+ * ```ts
+ * import { createFrameworkHandler } from "@meekojs/meeko/server";
+ *
+ * const handlePage = createFrameworkHandler({
+ *   routes,
+ *   errorPage,
+ *   loadPage: async (file) => pages[file]!(),
+ *   loadRoute,
+ *   createContext: async (request) => createRequestContext(request, {}, await sessions.load(request)),
+ *   clientEntry: "/assets/entry-client.js",
+ * });
+ * const response = await handlePage(new Request("http://localhost/users/42", { headers: { accept: "text/html" } }));
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#routing-layouts-y-ssr
+ */
 export function createFrameworkHandler(options: FrameworkHandlerOptions): (request: Request) => Promise<Response>;
+/**
+ * Igual que la forma anterior, con opciones de ruta tipadas cuyos callbacks reciben los argumentos
+ * ya validados por sus schemas.
+ */
 export function createFrameworkHandler<Route extends TypedPageRoute>(options: FrameworkHandlerOptions<Route>): (request: Request) => Promise<Response>;
 export function createFrameworkHandler(options: FrameworkHandlerOptions<unknown>): (request: Request) => Promise<Response> {
   return createPageHandler(options);
 }
 
 export function createPageHandler(options: PageHandlerOptions): (request: Request) => Promise<Response> {
-  return async (request) => {
+  const handle = async (request: Request): Promise<Response> => {
     const fallbackRequestId = crypto.randomUUID();
     if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, {
       status: 405, headers: { Allow: "GET, HEAD", "x-request-id": fallbackRequestId, "cache-control": "no-store" },
@@ -278,6 +529,8 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     const deferredWork = new AbortController();
     let errorRoute: string | undefined;
     let requestContext: RequestContext | undefined;
+    /** The request state of the render that completed; a suspended pass replaces it. */
+    let pageStore = stateStore;
     const finish = (response: Response): Response => {
       const headers = new Headers(response.headers);
       headers.set("x-request-id", requestContext?.requestId ?? fallbackRequestId);
@@ -290,12 +543,49 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     try {
     const url = new URL(request.url);
     const match = matchRoute(options.routes, url.pathname);
-    if (!match) return finish(new Response("Not Found", {
+    const errorPage = options.errorPage;
+    if (!match && !(errorPage && wantsPage(request, url.pathname))) return finish(new Response("Not Found", {
       status: 404, headers: { "cache-control": "no-store" },
     }));
-    errorRoute = match.route.error;
+    // The nearest +error.meeko wins; app/error.meeko backs every other failure.
+    errorRoute = match?.route.error ?? errorPage?.file;
     requestContext = await options.createContext?.(request);
     if (requestContext && requestContext.request !== request) throw new TypeError("Request context belongs to another request");
+    if (!match) {
+      // A URL without a route: app/error.meeko inside the root layouts, hydrated like a page.
+      const renderNotFound = async (): Promise<Response> => {
+        const styles: string[] = [];
+        const page = await options.loadPage(errorPage!.file);
+        if (page.css) styles.push(page.css);
+        const { module, input } = await wrapInLayouts(options.loadPage, page, { ...notFoundProps }, errorPage!.layouts, styles);
+        const { rendered, store, resources, styles: childStyles } = await renderPageTree(module, input, stateStore, request.signal);
+        styles.push(...childStyles);
+        pageStore = store;
+        store.seal();
+        const payload = serializeJson({
+          v: PAYLOAD_VERSION, error: true, render: "ssr",
+          props: notFoundProps, state: rendered.state, sharedState: store.snapshot(), head: { title: ERROR_PAGE_TITLE },
+          ...(resources ? { resources } : {}),
+        });
+        const headRequest = request.method === "HEAD";
+        if (wantsPayload(request)) {
+          return finish(new Response(headRequest ? null : payload, {
+            status: 404, headers: { "content-type": "application/meeko+json; charset=utf-8", "cache-control": "no-store" },
+          }));
+        }
+        const host = documentParts(options.document, request);
+        const styleTags = [...new Set(styles)].map((css) => `<style${host.nonceAttribute}>${css.replaceAll("<", "\\3C ")}</style>`).join("");
+        const script = options.clientEntry ? `<script type="module"${host.nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
+        const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
+        // Titled like the error document of a matched route; the payload head carries the same
+        // title, so hydration still finds the host <title> after it.
+        const document = `${DOCUMENT_HEAD_PREFIX}${csrfMeta}${styleTags}<title>${ERROR_PAGE_TITLE}</title>${host.head}</head><body><div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
+        return finish(new Response(headRequest ? null : document, {
+          status: 404, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+        }));
+      };
+      return requestContext ? await withRequestContext(requestContext, options.serverFetch, renderNotFound) : await renderNotFound();
+    }
     const render = async (): Promise<Response> => {
     const middlewareResponse = options.loadMiddleware && await runRouteMiddleware(await options.loadMiddleware(), {
       url, match, signal: request.signal, phase: "server", request,
@@ -364,35 +654,27 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       ...(data === undefined ? {} : { data: extracted.value }),
     };
     const styles: string[] = [];
-    let module: PageModule = emptyOutlet;
-    let input: Record<string, unknown> = {};
+    let page: PageModule = emptyOutlet;
     if (!clientPage) {
-      module = await options.loadPage(match.route.file);
-      if (module.css) styles.push(module.css);
-      input = props;
+      page = await options.loadPage(match.route.file);
+      if (page.css) styles.push(page.css);
     }
-    for (const layout of [...match.route.layouts].reverse()) {
-      const child = module;
-      const childInput = input;
-      const outlet = {
-        renderWithState: () => child.renderWithState(childInput),
-        renderToString: () => child.renderToString?.(childInput) ?? child.renderWithState(childInput).html,
-        hydrateScope: () => { throw new Error("Server outlet cannot hydrate"); },
-      };
-      module = await options.loadPage(layout);
-      if (module.css) styles.unshift(module.css);
-      input = { outlet };
-    }
-    const rendered = withStateStore(stateStore, () => module.renderWithState(input));
+    const { module, input } = await wrapInLayouts(options.loadPage, page, clientPage ? {} : props, match.route.layouts, styles);
+    // Top-level data awaits load before the HTML, also before the first byte of a stream.
+    const { rendered, store, resources, styles: childStyles } = await renderPageTree(module, input, stateStore, driverSignal);
+    // Child components link their CSS in the document too, not only once the client bundle loads.
+    styles.push(...childStyles);
+    pageStore = store;
     // head reads the state the render produced; anything it adds cannot change that render.
-    const head: PageHead = clientPage ? {} : sidecar?.head?.({ ...context, data }) ?? {};
+    const head: PageHead = clientPage ? {} : sidecar?.head?.({ ...context, state: store, data }) ?? {};
     // The payload below is the only copy of this state the browser receives.
-    stateStore.seal();
+    store.seal();
     const payload = serializeJson({
       v: PAYLOAD_VERSION, route: match.route.id, render: renderMode,
-      props: payloadProps, state: rendered.state, sharedState: stateStore.snapshot(),
-      head: head.title === undefined ? {} : { title: head.title },
+      props: payloadProps, state: rendered.state, sharedState: store.snapshot(),
+      head: payloadHead(head),
       ...(deferredEntries.length ? { deferred: deferredEntries } : {}),
+      ...(resources ? { resources } : {}),
     });
     // Status, headers and cookies are final from here on: session changes still
     // in flight finish first and later ones fail with SESSION_LOCKED. A session
@@ -401,7 +683,8 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       await requestContext.session[lockSessionCookie]?.();
       await requestContext.session.verify();
     }
-    const title = head.title === undefined ? "" : `<title>${escapeHtml(head.title)}</title>`;
+    const title = (head.title === undefined ? "" : `<title>${escapeHtml(head.title)}</title>`)
+      + (head.description === undefined ? "" : `<meta name="description" content="${escapeHtml(head.description)}">`);
     const host = documentParts(options.document, request);
     const nonceAttribute = host.nonceAttribute;
     const styleTags = [...new Set(styles)].map((css) => `<style${nonceAttribute}>${css.replaceAll("<", "\\3C ")}</style>`).join("");
@@ -476,11 +759,11 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
           const renderError = async (): Promise<Response> => {
             const errorPage = await options.loadPage(errorFile);
             // A failure after the render sealed the page state still renders its error page.
-            const errorRendered = withStateStore(stateStore.sealed ? new StateStore() : stateStore, () => errorPage.renderWithState({
+            const { rendered: errorRendered } = await renderPageTree(errorPage, {
               status: known.status, message: known.status >= 500 ? "Internal Server Error" : known.code,
-            }));
+            }, pageStore.sealed ? new StateStore() : pageStore, request.signal);
             const host = documentParts(options.document, request);
-            const document = `<!doctype html><html><head><meta charset="utf-8"><title>Error</title>${host.head}</head><body><div id="app">${errorRendered.html}</div>${host.bodyEnd}</body></html>`;
+            const document = `<!doctype html><html><head><meta charset="utf-8"><title>${ERROR_PAGE_TITLE}</title>${host.head}</head><body><div id="app">${errorRendered.html}</div>${host.bodyEnd}</body></html>`;
             return finish(new Response(request.method === "HEAD" ? null : document, {
               status: known.status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
             }));
@@ -498,4 +781,6 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       }));
     }
   };
+  // href(id) in pages, layouts, loaders and head resolves against this handler's manifest.
+  return (request) => withRouteManifest(options.routes, () => handle(request));
 }

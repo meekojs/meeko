@@ -45,6 +45,19 @@ href(routes, "/docs/[...slug]", { params: { slug: "a/b" } });
 href(routes, "/users/[id]");
 // @ts-expect-error unknown route ID
 href(routes, "/missing");
+const short: string = href("/users/[id]", { params: { id: "123" } });
+href("/");
+href("/", { search: { page: 2 } });
+href("/docs/[...slug]", { params: { slug: "a/b" } });
+// @ts-expect-error dynamic route requires params
+href("/users/[id]");
+// @ts-expect-error static route rejects params
+href("/", { params: { id: "x" } });
+// @ts-expect-error unknown route ID
+href("/missing");
+// @ts-expect-error unknown parameter
+href("/users/[id]", { params: { slug: "x" } });
+void short;
 `);
     const config = join(root, "tsconfig.json");
     await writeFile(config, JSON.stringify({ compilerOptions: {

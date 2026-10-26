@@ -63,7 +63,7 @@ test("app/layouts/default.meeko wraps every page and rejects a second root layou
       assert.deepEqual(route.layouts, [join(root, "app/app.meeko"), join(root, "app/layouts/default.meeko")]);
     }
     await writeFile(join(root, "app/pages/+layout.meeko"), "");
-    await assert.rejects(discoverRoutes(root), /Both .*default\.meeko.*\+layout\.meeko.*root layout/);
+    await assert.rejects(discoverRoutes(root), /default\.meeko y .*\+layout\.meeko definen los dos el layout raíz/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

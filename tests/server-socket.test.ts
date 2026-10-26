@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ApiError, createSocketHub, defineSocketChannel, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
+import { ApiError, createSocketHub, createSocketUpgradeHandler, defineSocketChannel, MemorySessionStore, openSocketSession, SessionManager } from "../src/framework-server.ts";
 import type { Schema, SocketPeer } from "../src/framework-server.ts";
 
 const messageSchema: Schema<{ text: string }> = {
@@ -128,4 +128,67 @@ test("invalid socket messages retain their public error when unsubscribe fails",
     return true;
   });
   assert.deepEqual(closed, [1008]);
+});
+
+test("the Socket handshake turns auth refusals into a 4401/4403 close and keeps HTTP for the rest", async () => {
+  const store = new MemorySessionStore<{ user: string }>();
+  const sessions = new SessionManager({ store, secure: false });
+  const record = await (await sessions.load(new Request("https://example.test/"))).create({ user: "alice" });
+  let handled = 0;
+  const channel = (options: { auth?: "required"; authorize?: () => boolean }) => defineSocketChannel({
+    clientToServer: { message: messageSchema }, serverToClient: { message: messageSchema },
+    ...options,
+    handlers: { message: () => { handled++; } },
+  });
+  const hub = createSocketHub({
+    channels: { private: channel({ auth: "required" }), forbidden: channel({ authorize: () => false }) },
+    sessions, services: {},
+  });
+  const observed: unknown[] = [];
+  const handshake = createSocketUpgradeHandler({ hub, publicOrigin: "https://example.test", onError: (error) => observed.push(error) });
+  const upgrade = (path: string, origin = "https://example.test", cookie?: string) => handshake(new Request(`https://example.test/_meeko/socket/${path}`, {
+    headers: { upgrade: "websocket", origin, ...(cookie ? { cookie } : {}) },
+  }));
+  const cookie = `meeko.sid=${record.id}`;
+
+  assert.deepEqual(await upgrade("private"), { action: "reject", status: 401, close: { code: 4401, reason: "Autenticación requerida" } });
+  assert.deepEqual(await upgrade("forbidden", undefined, cookie), { action: "reject", status: 403, close: { code: 4403, reason: "Acceso denegado" } });
+  // A foreign Origin is a request policy, not the channel's authorization: it never upgrades.
+  assert.deepEqual(await upgrade("private", "https://evil.test", cookie), { action: "reject", status: 403 });
+  assert.deepEqual(await upgrade("missing"), { action: "reject", status: 404 });
+  assert.deepEqual(await upgrade("bad.name"), { action: "reject", status: 400 });
+  assert.equal((await upgrade("private", undefined, cookie)).action, "upgrade");
+  assert.equal(observed.length, 4);
+  // The reason is fixed text: no session id or user data.
+  for (const decision of [await upgrade("private"), await upgrade("forbidden", undefined, cookie)]) {
+    assert.ok(decision.action === "reject" && decision.close);
+    assert.doesNotMatch(decision.close.reason, new RegExp(`${record.id}|alice`));
+  }
+  assert.equal(handled, 0);
+});
+
+test("a Socket session refused by the hub closes with 4401/4403 and never delivers messages", async () => {
+  const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+  let handled = 0;
+  const handlers = { message: () => { handled++; } };
+  const hub = createSocketHub({
+    channels: {
+      private: defineSocketChannel({ clientToServer: { message: messageSchema }, serverToClient: {}, auth: "required", handlers }),
+      forbidden: defineSocketChannel({ clientToServer: { message: messageSchema }, serverToClient: {}, authorize: () => false, handlers }),
+    },
+    sessions, services: {},
+  });
+  const request = new Request("https://example.test/_meeko/socket/chat", { headers: { origin: "https://example.test" } });
+  for (const [name, code] of [["private", 4401], ["forbidden", 4403]] as const) {
+    const closes: Array<[number | undefined, string | undefined]> = [];
+    const session = openSocketSession({
+      hub, name, request, roomId: undefined, maxPendingBytes: 1024,
+      peer: { send() { throw new Error("nothing is sent"); }, close(closeCode, reason) { closes.push([closeCode, reason]); } },
+    });
+    session.receive('{"event":"message","payload":{"text":"early"}}');
+    assert.equal(await session.ready, false);
+    await session.settled();
+    assert.deepEqual(closes.map(([closeCode]) => closeCode), [code]);
+  }
+  assert.equal(handled, 0);
 });

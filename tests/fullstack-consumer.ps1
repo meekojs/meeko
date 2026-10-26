@@ -2,8 +2,10 @@ param([switch]$Benchmark, [string]$Tarball)
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $scratch = Join-Path $repo '.meeko'
-New-Item -ItemType Directory -Path $scratch -Force | Out-Null
-$run = Join-Path $scratch ('fullstack-run-' + [guid]::NewGuid().ToString('N'))
+# Runs live in .meeko/tmp, which `pnpm test` empties, so an interrupted run leaves nothing behind.
+$runs = Join-Path $scratch 'tmp'
+New-Item -ItemType Directory -Path $runs -Force | Out-Null
+$run = Join-Path $runs ('fullstack-run-' + [guid]::NewGuid().ToString('N'))
 $consumer = Join-Path $run 'consumer'
 $starter = Join-Path $run 'starter'
 $serverProcess = $null
@@ -105,9 +107,13 @@ try {
     $serverProcess.WaitForExit(10000) | Out-Null
   }
   foreach ($name in @('PORT', 'MEEKO_TEST_PORT', 'MEEKO_BENCH_CONSUMER', 'MEEKO_BENCH_OUTPUT', 'npm_config_cache')) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
-  $resolvedScratch = [System.IO.Path]::GetFullPath($scratch).TrimEnd('\') + '\'
+  $resolvedRuns = [System.IO.Path]::GetFullPath($runs).TrimEnd('\') + '\'
   $resolvedRun = [System.IO.Path]::GetFullPath($run)
-  if ($resolvedRun.StartsWith($resolvedScratch, [System.StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $resolvedRun)) {
-    Remove-Item -LiteralPath $resolvedRun -Recurse -Force
+  if ($resolvedRun.StartsWith($resolvedRuns, [System.StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $resolvedRun)) {
+    # The stopped server and Chrome can hold files for a moment on Windows.
+    for ($attempt = 1; $attempt -le 10; $attempt++) {
+      try { Remove-Item -LiteralPath $resolvedRun -Recurse -Force -ErrorAction Stop; break }
+      catch { if ($attempt -eq 10) { throw }; Start-Sleep -Milliseconds (100 * $attempt) }
+    }
   }
 }

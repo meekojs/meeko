@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createSocketClient, createSocketRegistry, useSocketChannel } from "../src/framework/socket.ts";
+import { createSocketClient, createSocketRegistry, useSocketChannel, useSocketClient } from "../src/framework/socket.ts";
+import * as framework from "../src/framework.ts";
 import { createRoot, effect } from "../src/reactivity.ts";
 import { createAppErrorChannel, provideAppErrorChannel, provideErrorHandler } from "../src/component-errors.ts";
 
@@ -79,6 +80,39 @@ test("channel registry is lazy during SSR and component sockets close with their
     assert.equal(peers[1]!.closeCode, 1000);
     assert.equal(direct.state.value, "connecting");
     direct.close();
+  } finally {
+    if (previous) Object.defineProperty(globalThis, "window", previous);
+    else Reflect.deleteProperty(globalThis, "window");
+  }
+});
+
+test("the deprecated framework useSocket is the same function as useSocketClient and keeps working", () => {
+  assert.equal(framework.useSocketClient, useSocketClient);
+  assert.equal(framework.useSocket, framework.useSocketClient);
+  assert.equal(framework.createSocketClient, createSocketClient);
+  const contract = { clientToServer: { message: stringSchema }, serverToClient: { message: stringSchema } };
+  assert.throws(() => framework.useSocket("ws://example.test/chat", contract), /only available in the browser/);
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { location: { href: "https://example.test/" } } });
+  const peers: FakeSocket[] = [];
+  const options = {
+    webSocketFactory(): WebSocket {
+      const peer = new FakeSocket();
+      peers.push(peer);
+      return peer as unknown as WebSocket;
+    },
+  };
+  try {
+    const dispose = createRoot((stop) => {
+      const legacy = framework.useSocket("ws://example.test/chat", contract, options);
+      const current = useSocketClient("ws://example.test/chat", contract, options);
+      assert.equal(legacy.state.value, "connecting");
+      assert.equal(current.state.value, "connecting");
+      return stop;
+    });
+    assert.equal(peers.length, 2);
+    dispose();
+    assert.deepEqual(peers.map((peer) => peer.closeCode), [1000, 1000]);
   } finally {
     if (previous) Object.defineProperty(globalThis, "window", previous);
     else Reflect.deleteProperty(globalThis, "window");
@@ -431,3 +465,174 @@ test("a socket state observer failure is reported without escaping the transport
   stop();
   client.close();
 });
+
+/** A real HTTP server that refuses every WebSocket upgrade with `status`. */
+async function refusingServer(status: number): Promise<{ url: string; upgrades: () => number; close: () => Promise<void> }> {
+  const { createServer } = await import("node:http");
+  let upgrades = 0;
+  const server = createServer((_request, response) => { response.statusCode = 404; response.end(); });
+  server.on("upgrade", (_request, socket) => {
+    upgrades++;
+    socket.end(`HTTP/1.1 ${status} Refused\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as { port: number };
+  return {
+    url: `ws://127.0.0.1:${port}/_meeko/socket/chat`,
+    upgrades: () => upgrades,
+    close: () => new Promise((resolve) => server.close(() => resolve())),
+  };
+}
+
+const socketContract = { clientToServer: { message: stringSchema }, serverToClient: { message: stringSchema } };
+
+for (const status of [401, 403]) {
+  test(`a ${status} handshake stops reconnecting and reports an explicit error`, { timeout: 5_000 }, async () => {
+    const { WebSocket: NodeWebSocket } = await import("ws");
+    const server = await refusingServer(status);
+    const errors: unknown[] = [];
+    const client = createSocketClient(server.url, socketContract, {
+      retryMs: 1,
+      onError: (error) => errors.push(error),
+      webSocketFactory: (address) => new NodeWebSocket(address) as unknown as WebSocket,
+    });
+    try {
+      await new Promise<void>((resolve) => {
+        createRoot((dispose) => effect(() => { if (client.state.value === "unauthorized") { resolve(); queueMicrotask(dispose); } }));
+      });
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      assert.equal(server.upgrades(), 1, "no reconnection after the refusal");
+      assert.equal(client.state.value, "unauthorized");
+      assert.equal(errors.length, 1, String(errors));
+      assert.ok(errors[0] instanceof framework.ClientError);
+      assert.equal(errors[0].status, status);
+      assert.equal(errors[0].code, status === 401 ? "UNAUTHENTICATED" : "FORBIDDEN");
+      assert.doesNotMatch(String(errors[0]), /transport error/);
+      await assert.rejects(client.emit("message", "x"), /disconnected/);
+    } finally {
+      client.close();
+      await server.close();
+    }
+  });
+}
+
+test("the hub's authorization close codes are terminal and other closes keep reconnecting", { timeout: 5_000 }, async () => {
+  for (const [code, reason, status] of [[1008, "Unauthorized", 401], [1008, "Session expired", 401], [1008, "Session revoked", 401], [4401, "", 401], [4403, "", 403]] as const) {
+    const peers: FakeSocket[] = [];
+    const errors: unknown[] = [];
+    const client = createSocketClient("ws://localhost/chat", socketContract, {
+      retryMs: 1,
+      onError: (error) => errors.push(error),
+      webSocketFactory: () => { const peer = new FakeSocket(); peers.push(peer); return peer as unknown as WebSocket; },
+    });
+    peers[0]!.open();
+    peers[0]!.dispatchEvent(new CloseEvent("close", { code, reason }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(peers.length, 1, `${code} ${reason}`);
+    assert.equal(client.state.value, "unauthorized", `${code} ${reason}`);
+    assert.equal((errors[0] as { status?: number }).status, status, `${code} ${reason}`);
+    client.close();
+    assert.equal(client.state.value, "closed");
+  }
+  // A network failure, even before the first open, keeps the backoff.
+  const peers: FakeSocket[] = [];
+  const errors: unknown[] = [];
+  const client = createSocketClient("ws://localhost/chat", socketContract, {
+    retryMs: 1,
+    onError: (error) => errors.push(error),
+    webSocketFactory: () => { const peer = new FakeSocket(); peers.push(peer); return peer as unknown as WebSocket; },
+  });
+  peers[0]!.dispatchEvent(new Event("error"));
+  peers[0]!.dispatchEvent(new CloseEvent("close", { code: 1006 }));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.ok(peers.length >= 2);
+  assert.equal(client.state.value, "connecting");
+  assert.match(String(errors[0]), /Socket transport error/);
+  client.close();
+});
+
+test("the autoimport useSocket stops after a 401 handshake", { timeout: 5_000 }, async () => {
+  const { WebSocket: NodeWebSocket } = await import("ws");
+  const server = await refusingServer(401);
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { location: { href: server.url.replace("ws:", "http:") } } });
+  const errors: unknown[] = [];
+  try {
+    let state: (() => string) | undefined;
+    const dispose = createRoot((stop) => {
+      const chat = useSocketChannel({ chat: socketContract }, "chat", {
+        retryMs: 1,
+        onError: (error) => errors.push(error),
+        webSocketFactory: (address) => new NodeWebSocket(address) as unknown as WebSocket,
+      });
+      state = () => chat.state.value;
+      return stop;
+    });
+    for (let index = 0; index < 50 && state!() !== "unauthorized"; index++) await new Promise((resolve) => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.equal(state!(), "unauthorized");
+    assert.equal(server.upgrades(), 1);
+    assert.equal(errors.length, 1);
+    dispose();
+  } finally {
+    if (previous) Object.defineProperty(globalThis, "window", previous);
+    else Reflect.deleteProperty(globalThis, "window");
+    await server.close();
+  }
+});
+
+for (const [status, closeCode] of [[401, 4401], [403, 4403]] as const) {
+  test(`a Meeko server that refuses with ${closeCode} stops a ws client without reconnecting`, { timeout: 5_000 }, async () => {
+    const { createServer } = await import("node:http");
+    const { WebSocket: NodeWebSocket } = await import("ws");
+    const { attachNodeWebSocketServer } = await import("../src/node.ts");
+    const { createSocketHub, defineSocketChannel, MemorySessionStore, SessionManager } = await import("../src/framework-server.ts");
+    let handled = 0;
+    const hub = createSocketHub({
+      channels: {
+        chat: defineSocketChannel({
+          ...socketContract,
+          ...(status === 401 ? { auth: "required" as const } : { authorize: () => false }),
+          handlers: { message: () => { handled++; } },
+        }),
+      },
+      sessions: new SessionManager({ store: new MemorySessionStore(), secure: false }),
+      services: {},
+    });
+    const server = createServer((_request, response) => { response.statusCode = 404; response.end(); });
+    let upgrades = 0;
+    server.on("upgrade", () => { upgrades++; });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as { port: number };
+    const origin = `http://127.0.0.1:${port}`;
+    const adapter = attachNodeWebSocketServer({ server, hub, publicOrigin: origin });
+    const closes: number[] = [];
+    const errors: unknown[] = [];
+    const client = createSocketClient(`ws://127.0.0.1:${port}/_meeko/socket/chat`, socketContract, {
+      retryMs: 1,
+      onError: (error) => errors.push(error),
+      webSocketFactory: (address) => {
+        const peer = new NodeWebSocket(address, { origin });
+        peer.on("close", (code) => closes.push(code));
+        return peer as unknown as WebSocket;
+      },
+    });
+    try {
+      await new Promise<void>((resolve) => {
+        createRoot((dispose) => effect(() => { if (client.state.value === "unauthorized") { resolve(); queueMicrotask(dispose); } }));
+      });
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      assert.equal(upgrades, 1, "no reconnection after the close");
+      assert.deepEqual(closes, [closeCode]);
+      assert.equal(client.state.value, "unauthorized");
+      assert.equal(errors.length, 1, String(errors));
+      assert.ok(errors[0] instanceof framework.ClientError);
+      assert.equal(errors[0].status, status);
+      assert.equal(handled, 0);
+    } finally {
+      client.close();
+      await adapter.close();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+}

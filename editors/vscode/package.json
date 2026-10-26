@@ -14,12 +14,11 @@
   "type": "module",
   "main": "./dist/extension.js",
   "engines": { "vscode": "^1.140.0" },
-  "activationEvents": ["onLanguage:meeko"],
   "categories": ["Programming Languages"],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "In restricted mode Meeko uses its bundled language server, reads the project configuration statically and skips project page-contract checks.",
+      "description": "En modo restringido, Meeko usa su servidor de lenguaje incluido, lee la configuración del proyecto de forma estática, omite la comprobación de los contratos de páginas del proyecto y no se conecta a meeko dev para mostrar valores en vivo.",
       "restrictedConfigurations": ["meeko.languageServer.preferWorkspace"]
     }
   },
@@ -33,6 +32,7 @@
   },
   "dependencies": {
     "@typescript/typescript6": "6.0.2",
+    "prettier": "3.9.10",
     "typescript": "7.0.2"
   },
   "contributes": {
@@ -42,19 +42,103 @@
         "meeko.languageServer.preferWorkspace": {
           "type": "boolean",
           "default": true,
-          "description": "Use the language server of the workspace's @meekojs/meeko package, so the editor matches the project's compiler. The bundled server is used when it is missing, disabled or the workspace is not trusted."
+          "description": "Usa el servidor de lenguaje del paquete @meekojs/meeko del workspace, para que el editor coincida con el compilador del proyecto. Se usa el servidor incluido si ese paquete no está, si este ajuste está desactivado o si el workspace no es de confianza."
+        },
+        "meeko.format.indentSections": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "description": "Al formatear, sangra un nivel el contenido de cada sección (<script>, <script server>, <template> y <style>), como vueIndentScriptAndStyle de Prettier y además la plantilla. Si está desactivado, el formateo quita esa sangría base."
+        },
+        "meeko.editor.executionZones": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Marca dónde se ejecuta el código de un componente .meeko: sólo en el servidor (<script server>), en el servidor y en el navegador (el setup) o sólo en el navegador (después del primer await de navegador y dentro de onMounted). Las zonas se muestran como una barra en el margen y un color de línea tenue; pasa el cursor por la primera línea de una zona para ver la explicación."
+        },
+        "meeko.live.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Se conecta a cada `meeko dev` del workspace mediante .meeko/dev/editor-bridge-<puerto>.json, muestra el valor actual de cada señal junto a su declaración y en el hover, y permite editarlo. Sólo en workspaces de confianza y sólo con un servidor de desarrollo en loopback."
+        },
+        "meeko.live.inlineValues": {
+          "type": "boolean",
+          "default": true,
+          "description": "Muestra el valor en vivo de cada señal al final de la línea de su declaración mientras `meeko dev` se ejecuta. Si está desactivado, el hover sigue mostrando los valores."
         },
         "meeko.trace.server": {
           "type": "string",
           "enum": ["off", "messages", "verbose"],
           "default": "off",
-          "description": "Traces the communication between VS Code and the Meeko language server."
+          "description": "Registra la comunicación entre VS Code y el servidor de lenguaje de Meeko."
         }
       }
+    },
+    "commands": [
+      { "command": "meeko.live.editSignal", "title": "Editar valor de la señal", "category": "Meeko" },
+      { "command": "meeko.live.reconnect", "title": "Reconectar valores en vivo", "category": "Meeko" }
+    ],
+    "menus": {
+      "commandPalette": [
+        { "command": "meeko.live.editSignal", "when": "editorLangId == meeko" }
+      ]
     },
     "configurationDefaults": {
       "[meeko]": { "editor.semanticHighlighting.enabled": true }
     },
+    "semanticTokenModifiers": [
+      { "id": "signal", "description": "Una señal de Meeko (signal, useState, defineModel, useElementRef) y sus usos." },
+      { "id": "computed", "description": "Un valor derivado (computed) o una señal de sólo lectura de Meeko y sus usos." },
+      { "id": "resource", "description": "Un recurso de datos de Meeko (useApi, useRpcQuery, useRpcMutation) y sus usos." },
+      { "id": "reactive", "description": "Un token de una expresión de plantilla que lee un valor reactivo." }
+    ],
+    "semanticTokenScopes": [
+      {
+        "language": "meeko",
+        "scopes": {
+          "variable.signal": ["variable.language.signal.meeko"],
+          "variable.readonly.signal": ["variable.language.signal.meeko"],
+          "variable.signal.reactive": ["variable.language.signal.meeko"],
+          "variable.readonly.signal.reactive": ["variable.language.signal.meeko"],
+          "variable.computed": ["entity.name.function.computed.meeko"],
+          "variable.readonly.computed": ["entity.name.function.computed.meeko"],
+          "variable.computed.reactive": ["entity.name.function.computed.meeko"],
+          "variable.readonly.computed.reactive": ["entity.name.function.computed.meeko"],
+          "variable.resource": ["entity.name.type.resource.meeko"],
+          "variable.readonly.resource": ["entity.name.type.resource.meeko"],
+          "variable.resource.reactive": ["entity.name.type.resource.meeko"],
+          "variable.readonly.resource.reactive": ["entity.name.type.resource.meeko"],
+          "property.modification": ["keyword.control.write.meeko"],
+          "property.modification.reactive": ["keyword.control.write.meeko"],
+          "method.modification": ["keyword.control.write.meeko"],
+          "method.modification.reactive": ["keyword.control.write.meeko"],
+          "variable.reactive": ["markup.italic.reactive.meeko"],
+          "variable.readonly.reactive": ["markup.italic.reactive.meeko"],
+          "property.reactive": ["markup.italic.reactive.meeko"],
+          "property.readonly.reactive": ["markup.italic.reactive.meeko"],
+          "parameter.reactive": ["markup.italic.reactive.meeko"],
+          "function.reactive": ["markup.italic.reactive.meeko"],
+          "method.reactive": ["markup.italic.reactive.meeko"]
+        }
+      }
+    ],
+    "colors": [
+      {
+        "id": "meeko.executionZone.serverBackground",
+        "description": "Fondo de las líneas de un .meeko que se ejecutan sólo en el servidor (<script server>).",
+        "defaults": { "dark": "#A371F710", "light": "#8250DF0C", "highContrast": "#00000000", "highContrastLight": "#00000000" }
+      },
+      {
+        "id": "meeko.executionZone.sharedBackground",
+        "description": "Fondo de las líneas de un .meeko que se ejecutan en el servidor y en el navegador (el setup del componente).",
+        "defaults": { "dark": "#00000000", "light": "#00000000", "highContrast": "#00000000", "highContrastLight": "#00000000" }
+      },
+      {
+        "id": "meeko.executionZone.browserBackground",
+        "description": "Fondo de las líneas de un .meeko que se ejecutan sólo en el navegador (después del primer await de navegador y dentro de onMounted).",
+        "defaults": { "dark": "#39C5CF10", "light": "#1B7C830C", "highContrast": "#00000000", "highContrastLight": "#00000000" }
+      }
+    ],
     "languages": [{
       "id": "meeko",
       "aliases": ["Meeko"],

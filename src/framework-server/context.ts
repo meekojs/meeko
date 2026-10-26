@@ -3,19 +3,59 @@ import type { SessionHandle } from "./sessions.js";
 import { defaultPlatform } from "./platform.js";
 import type { ServerPlatform } from "./platform.js";
 
-/** State belongs to one HTTP request and is never shared between users. */
+/**
+ * Contexto de una petición HTTP: sesión, servicios, plataforma y estado propios de esa petición,
+ * nunca compartidos entre usuarios. Lo reciben los loaders, los handlers de API y RPC y los
+ * canales Socket.
+ *
+ * @typeParam TServices Tipo de `services`.
+ * @typeParam TEnv Tipo del entorno de la plataforma.
+ * @example
+ * ```ts
+ * import { defineApiRoute } from "@meekojs/meeko/server";
+ *
+ * export default defineApiRoute({
+ *   auth: "required",
+ *   handler: async ({ context }) => {
+ *     const response = await fetch("https://api.example.com/report", { signal: context.signal });
+ *     return { requestId: context.requestId, report: await response.json() };
+ *   },
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#revocación-durante-una-petición
+ */
 export interface RequestContext<TServices = unknown, TEnv = unknown> {
+  /** Petición HTTP original. */
   readonly request: Request;
+  /** ID de la petición, que también va en `x-request-id` y llega a `onError`. */
   readonly requestId: string;
-  /** Aborts when the client disconnects or, with `SessionRevokedError`, when the session is revoked. */
+  /** Se aborta si el cliente se desconecta o, con `SessionRevokedError`, si se revoca la sesión. */
   readonly signal: AbortSignal;
+  /** Servicios de `server/runtime.ts`. */
   readonly services: TServices;
+  /** Sesión de la petición: leer, crear, rotar, revocar y verificar. */
   readonly session: SessionHandle;
+  /** Estado propio de la petición; véase {@link useRequestState}. */
   readonly state: Map<string, unknown>;
-  /** Runtime hosting this request, with its environment and background work support. */
+  /** Runtime que atiende la petición, con su entorno y el soporte de trabajo en segundo plano. */
   readonly platform: ServerPlatform<TEnv>;
 }
 
+/**
+ * Despacha una petición por el pipeline HTTP de la aplicación conservando el contexto de la
+ * petición original. La crea {@link createLocalServerFetch} y la usan los clientes de servidor.
+ *
+ * @example
+ * ```ts
+ * import type { ServerFetch } from "@meekojs/meeko/server";
+ *
+ * const logged = (inner: ServerFetch): ServerFetch => async (request, context) => {
+ *   const response = await inner(request, context);
+ *   console.log(context.requestId, request.method, request.url, response.status);
+ *   return response;
+ * };
+ * ```
+ */
 export type ServerFetch = (request: Request, context: RequestContext) => Promise<Response>;
 interface ActiveRequest { readonly context: RequestContext; readonly serverFetch?: ServerFetch }
 const activeRequest = new AsyncLocalStorage<ActiveRequest>();
@@ -53,10 +93,24 @@ function combinedSignal(request: AbortSignal, revocation: AbortSignal): AbortSig
 }
 
 /**
- * Without an adapter platform, the context receives a detached platform with an
- * empty environment. `signal` aborts when the client disconnects or, with
- * `SessionRevokedError`, when the session's family is revoked; it is combined
- * on first access.
+ * Crea el contexto de una petición para un host propio. Sin plataforma de adaptador recibe una
+ * plataforma desacoplada con el entorno vacío. `signal` se aborta si el cliente se desconecta o, con
+ * `SessionRevokedError`, si se revoca la familia de la sesión; se combina en el primer acceso.
+ *
+ * @param request Petición HTTP.
+ * @param services Servicios de la petición.
+ * @param session Sesión cargada con `SessionManager.load`.
+ * @param platform Plataforma del adaptador.
+ * @returns El contexto, con un `requestId` nuevo.
+ * @example
+ * ```ts
+ * import { createRequestContext, dispatchApiRoute } from "@meekojs/meeko/server";
+ * import usersRoute from "./server/api/users/index.get.js";
+ *
+ * const session = await sessions.load(request);
+ * const context = createRequestContext(request, { db }, session);
+ * const response = await dispatchApiRoute(usersRoute, context, sessions);
+ * ```
  */
 export function createRequestContext<TServices, TEnv = unknown>(request: Request, services: TServices, session: SessionHandle, platform?: ServerPlatform<TEnv>): RequestContext<TServices, TEnv> {
   const revocation = (session as Partial<SessionHandle> | undefined)?.signal;
@@ -68,6 +122,29 @@ export function createRequestContext<TServices, TEnv = unknown>(request: Request
   };
 }
 
+/**
+ * Devuelve el valor de `key` en el estado de la petición y lo crea con `factory()` la primera vez.
+ * Sirve para compartir un valor entre middleware, loaders y handlers de una misma petición, como
+ * una caché por petición.
+ *
+ * @param context Contexto de la petición.
+ * @param key Clave del valor.
+ * @param factory Crea el valor si no existe.
+ * @returns El valor de la petición.
+ * @example
+ * ```ts
+ * import { defineRpc, useRequestState } from "@meekojs/meeko/server";
+ *
+ * export default defineRpc({
+ *   input: userParams,
+ *   output: userSchema,
+ *   handler: ({ input, context }) => {
+ *     const cache = useRequestState(context, "users", () => new Map<string, { id: string; name: string }>());
+ *     return cache.get(input.id) ?? { id: input.id, name: "Ada" };
+ *   },
+ * });
+ * ```
+ */
 export function useRequestState<T>(context: RequestContext, key: string, factory: () => T): T {
   if (!context.state.has(key)) context.state.set(key, factory());
   return context.state.get(key) as T;

@@ -41,7 +41,22 @@ function rpcEndpoint(directory: string, file: string): RpcEndpoint {
   return { kind: "rpc", file, id, pathname: `/_meeko/rpc/${route.join("/")}` };
 }
 
-/** Static discovery for build tooling and development; no handler is executed here. */
+/**
+ * Descubre de forma estática los endpoints de `server/api`, los procedimientos de `server/rpc` y
+ * los canales de `server/socket`, para el build y el desarrollo. No ejecuta ningún handler.
+ *
+ * @param projectRoot Carpeta del proyecto.
+ * @returns El manifiesto del servidor, con rutas de archivo absolutas.
+ * @throws {Error} Si un nombre de archivo no es válido o dos endpoints, procedimientos o canales colisionan.
+ * @example
+ * ```ts
+ * import { discoverServerManifest } from "@meekojs/meeko/build";
+ *
+ * const manifest = await discoverServerManifest(process.cwd());
+ * console.log(manifest.api.map((endpoint) => `${endpoint.method} ${endpoint.pathname}`));
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#api-y-rpc
+ */
 export async function discoverServerManifest(projectRoot: string): Promise<ServerManifest> {
   const root = resolve(projectRoot);
   const apiRoot = join(root, "server", "api");

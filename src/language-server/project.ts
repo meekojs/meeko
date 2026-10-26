@@ -1,10 +1,13 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, join, relative, resolve } from "node:path";
 import ts from "@typescript/typescript6";
 import { discoverAutoImports, discoverAutoImportsSync } from "../autoimports.js";
 import type { AutoImport } from "../autoimports.js";
 import { projectRoot } from "../compiler/project-root.js";
-import { createVirtualComponent, diskVersion, resolveProjectCompilerOptions, virtualFilenameOf } from "./model.js";
+import { readMeekoConfigSync, resolveConfigSources } from "../framework/config.js";
+import { emptyAppIndex, loadAppIndex } from "./app-index.js";
+import type { AppIndex } from "./app-index.js";
+import { createVirtualComponent, diskVersion, resolveProjectCompilerOptions, serverVirtualSuffix, virtualFilenameOf } from "./model.js";
 import type { ProjectCompilerOptions, VirtualComponent } from "./model.js";
 
 /** Políticas comunes a todos los proyectos de un servidor de lenguaje. */
@@ -46,25 +49,30 @@ export class MeekoProject {
   private compiler: ProjectCompilerOptions;
   private registry: readonly AutoImport[] = [];
   private registryKey = "";
+  private roots: readonly string[];
   private readonly entries = new Map<string, ComponentEntry>();
   private loading: Promise<void>;
   private counter = 0;
   private scanned = false;
+  private index: Promise<AppIndex> | undefined;
   /** Error de la configuración dinámica, si se tuvo que recurrir a la lectura estática. */
   configError: string | undefined;
 
   constructor(root: string, private readonly options: WorkspaceOptions) {
     this.root = resolve(root);
     this.compiler = resolveProjectCompilerOptions(this.root);
+    this.roots = [this.root];
     const host: ts.LanguageServiceHost = {
       getCompilationSettings: () => this.compiler.options,
       getScriptFileNames: () => [
         ...this.compiler.fileNames,
-        ...[...this.entries.values()].filter((entry) => entry.component).map((entry) => entry.virtualFilename),
+        ...[...this.entries.values()].flatMap((entry) => entry.component
+          ? [entry.virtualFilename, ...(entry.component.server ? [entry.component.server.virtualFilename] : [])]
+          : []),
       ],
       getScriptVersion: (file) => {
-        const entry = this.entries.get(pathKey(file.replace(/\.ts$/, "")));
-        return entry?.component && entry.virtualFilename === file ? String(entry.version) : diskVersion(file);
+        const entry = this.virtualOwner(file);
+        return entry ? String(entry.version) : diskVersion(file);
       },
       getScriptSnapshot: (file) => {
         const content = this.readFile(file);
@@ -80,6 +88,18 @@ export class MeekoProject {
       realpath: (file) => ts.sys.realpath?.(file) ?? file,
       useCaseSensitiveFileNames: () => ts.sys.useCaseSensitiveFileNames,
       getNewLine: () => ts.sys.newLine,
+      // With NodeNext resolution TypeScript prefers the `X.d.meeko.ts` that `meeko dev` or
+      // `meeko types` generate, which may be stale and lack what the editor models (the type
+      // arguments of a generic tag, for example): a component of this project resolves to its
+      // live virtual module instead.
+      resolveModuleNameLiterals: (literals, containingFile, redirectedReference, options, containingSourceFile) => literals.map((literal) => {
+        const resolved = ts.resolveModuleName(
+          literal.text, containingFile, options, host, undefined, redirectedReference,
+          ts.getModeForUsageLocation(containingSourceFile, literal, options),
+        );
+        const owner = resolved.resolvedModule && this.declarationOwner(resolved.resolvedModule.resolvedFileName);
+        return owner ? { ...resolved, resolvedModule: { ...resolved.resolvedModule!, resolvedFileName: owner, extension: ts.Extension.Ts } } : resolved;
+      }),
     };
     this.service = ts.createLanguageService(host, ts.createDocumentRegistry(ts.sys.useCaseSensitiveFileNames, this.root));
     this.loading = this.reloadRegistry();
@@ -138,11 +158,28 @@ export class MeekoProject {
     return this.entries.get(pathKey(filename))?.error;
   }
 
-  /** Componente cuyo archivo virtual tiene este nombre en los resultados de TypeScript. */
+  /**
+   * Documento virtual con este nombre en los resultados de TypeScript: el de un componente
+   * (`x.meeko.ts`) o el de su bloque `<script server>` (`x.meeko.server.ts`).
+   */
   virtualEntry(fileName: string): VirtualComponent | undefined {
-    if (!fileName.endsWith(".meeko.ts")) return undefined;
-    const entry = this.entries.get(pathKey(fileName.slice(0, -3)));
-    return entry?.component && pathKey(entry.virtualFilename) === pathKey(fileName) ? entry.component : undefined;
+    const entry = this.virtualOwner(fileName);
+    if (!entry?.component) return undefined;
+    return fileName.endsWith(`.meeko${serverVirtualSuffix}`) ? entry.component.server : entry.component;
+  }
+
+  /**
+   * Páginas, endpoints API y procedimientos RPC del proyecto, descubiertos como los manifiestos de
+   * `.meeko/manifests`. Se calcula al primer uso y se invalida con cualquier cambio en disco.
+   */
+  appIndex(): Promise<AppIndex> {
+    this.index ??= loadAppIndex(this.root, this.options.trusted).catch(() => emptyAppIndex);
+    return this.index;
+  }
+
+  /** Raíces de código del proyecto (app, capas y módulos) según su configuración. */
+  sourceRoots(): readonly string[] {
+    return this.roots;
   }
 
   /** Texto de un archivo del programa, virtual o real. */
@@ -167,6 +204,7 @@ export class MeekoProject {
         else if (!entry && this.scanned) this.reloadFromDisk(this.entry(path));
       }
     }
+    if (affected) this.index = undefined;
     if (configuration) this.compiler = resolveProjectCompilerOptions(this.root);
     if (configuration || sources) this.loading = this.loading.then(() => this.reloadRegistry());
     return affected;
@@ -174,6 +212,28 @@ export class MeekoProject {
 
   dispose(): void {
     this.service.dispose();
+  }
+
+  /**
+   * Módulo virtual del componente de este proyecto cuya declaración generada `X.d.meeko.ts`
+   * (junto a `X.meeko` o bajo `.meeko/types`) resolvió TypeScript, si existe.
+   */
+  private declarationOwner(fileName: string): string | undefined {
+    if (!fileName.endsWith(".d.meeko.ts")) return undefined;
+    const sibling = `${fileName.slice(0, -".d.meeko.ts".length)}.meeko`;
+    const types = join(this.root, ".meeko", "types");
+    const generated = pathKey(sibling).startsWith(`${pathKey(types)}/`);
+    const virtual = virtualFilenameOf(generated ? join(this.root, relative(types, sibling)) : sibling);
+    return this.virtualEntry(virtual) ? virtual : undefined;
+  }
+
+  /** Entrada del componente al que pertenece un archivo virtual, si existe. */
+  private virtualOwner(fileName: string): ComponentEntry | undefined {
+    const server = fileName.endsWith(`.meeko${serverVirtualSuffix}`);
+    if (!server && !fileName.endsWith(".meeko.ts")) return undefined;
+    const entry = this.entries.get(pathKey(fileName.slice(0, -(server ? serverVirtualSuffix : ".ts").length)));
+    const virtual = server ? entry?.component?.server : entry?.component;
+    return virtual && pathKey(virtual.virtualFilename) === pathKey(fileName) ? entry : undefined;
   }
 
   private entry(filename: string): ComponentEntry {
@@ -241,10 +301,11 @@ export class MeekoProject {
       try { registry = await discoverAutoImports(this.root); }
       catch (error) {
         this.configError = error instanceof Error ? error.message : String(error);
-        this.options.log?.(`${this.root}: dynamic Meeko configuration failed, using the static reader: ${this.configError}`);
+        this.options.log?.(`${this.root}: falló la configuración dinámica de Meeko; se usa el lector estático: ${this.configError}`);
         registry = this.staticRegistry();
       }
     } else registry = this.staticRegistry();
+    this.roots = await this.resolveSourceRoots();
     const key = JSON.stringify(registry);
     if (key === this.registryKey) return;
     this.registry = registry;
@@ -252,12 +313,22 @@ export class MeekoProject {
     for (const entry of this.entries.values()) this.rebuild(entry);
   }
 
+  /** Como `meeko check`: la configuración se ejecuta sólo en un workspace de confianza. */
+  private async resolveSourceRoots(): Promise<readonly string[]> {
+    if (this.options.trusted) {
+      try { return (await resolveConfigSources(this.root)).map((source) => source.root); }
+      catch { /* The static reader below reports the same configuration problem. */ }
+    }
+    try { return (await resolveConfigSources(this.root, readMeekoConfigSync(this.root))).map((source) => source.root); }
+    catch { return [this.root]; }
+  }
+
   private staticRegistry(): readonly AutoImport[] {
     try { return discoverAutoImportsSync(this.root); }
     catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.configError ??= message;
-      this.options.log?.(`${this.root}: static Meeko configuration failed: ${message}`);
+      this.options.log?.(`${this.root}: falló la configuración estática de Meeko: ${message}`);
       return [];
     }
   }

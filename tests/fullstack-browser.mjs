@@ -68,9 +68,24 @@ try {
   await page.locator('a[href="/dashboard"]').click();
   await page.waitForURL(`${origin}/dashboard`);
   assert.equal(await page.locator("#dashboard-user").innerText(), "alice");
+  // The page.goto above loaded a new document; mark its layout instance again.
+  await page.locator(".app-shell").evaluate((element) => element.setAttribute("data-kept", "yes"));
   await page.locator('a[href="/layer-demo"]').click();
   await page.waitForURL(`${origin}/layer-demo`);
   assert.match(await page.locator("#layer-demo").innerText(), /Layer route works/);
+  // A layer page renders inside the project's shell, with its own layout nested inside.
+  assert.equal(await page.locator(".site-root .app-shell .layer-shell #layer-demo").count(), 1);
+  assert.equal(await page.locator(".app-shell").getAttribute("data-kept"), "yes");
+  const layerTitle = await page.title();
+  await page.locator('a[href="/"]').first().click();
+  await page.waitForURL(`${origin}/`);
+  assert.equal(await page.locator(".layer-shell").count(), 0);
+  assert.equal(await page.locator(".app-shell").getAttribute("data-kept"), "yes");
+  // SSR of the layer page: the same shell and the same title as after client navigation.
+  assert.equal((await page.goto(`${origin}/layer-demo`))?.status(), 200);
+  await page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length === 1);
+  assert.equal(await page.locator(".site-root .app-shell .layer-shell #layer-demo").count(), 1);
+  assert.equal(await page.title(), layerTitle);
   assert.deepEqual(errors, []);
   console.log(`${channel} SSR/hydration, persistent layout, navigation, API, dashboard, client page and WebSocket: OK`);
 } finally { await browser.close(); }

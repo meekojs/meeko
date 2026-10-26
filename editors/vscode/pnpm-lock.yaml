@@ -11,6 +11,9 @@ importers:
       '@typescript/typescript6':
         specifier: 6.0.2
         version: 6.0.2
+      prettier:
+        specifier: 3.9.10
+        version: 3.9.10
       typescript:
         specifier: 7.0.2
         version: 7.0.2
@@ -450,6 +453,11 @@ packages:
   pako@1.0.11:
     resolution: {integrity: sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw==}
 
+  prettier@3.9.10:
+    resolution: {integrity: sha512-skGHTH1Yb9QvaTC4hWnRTzEYtCpApF0UMBPz+t/0ZPzP8ihefo/btKd+QA7pUE0fEwA1SbS/NmhyEcstdXOIdA==}
+    engines: {node: '>=14'}
+    hasBin: true
+
   process-nextick-args@2.0.1:
     resolution: {integrity: sha512-3ouUOpQhtgrbOa17J7+uxOTpITYWaGP7/AhoR3+A+/1e9skrzelGi/dXzEYyvbxubEF6Wn2ypscTKiKJFFn1ag==}
 
@@ -821,6 +829,8 @@ snapshots:
       strip-ansi: 7.2.0
 
   pako@1.0.11: {}
+
+  prettier@3.9.10: {}
 
   process-nextick-args@2.0.1: {}
 

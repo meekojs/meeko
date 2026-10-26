@@ -1,21 +1,35 @@
-# Changelog
+# Cambios de Meeko Language
+
+## [1.1.0] - 2026-10-26
+
+- Colores de reactividad: las señales, los valores `computed` y los recursos de datos tienen sus propios modificadores de token semántico (`signal`, `computed`, `resource`); las escrituras de `.value` se marcan con `modification` y las expresiones de la plantilla que leen un valor reactivo, con `reactive`. Lo decide el tipo, no el nombre: `props.value` o `input.value` no se marcan. Los colores por defecto salen de los scopes de TextMate y se pueden cambiar con `editor.semanticTokenColorCustomizations`.
+- Hovers nuevos: las señales, los valores `computed` y los recursos muestran sus lecturas, sus escrituras y cómo llega su valor al navegador; las etiquetas de componente muestran sus props, eventos, modelos, snippets y valor expuesto, y en un componente genérico, los parámetros de tipo que infiere la etiqueta (`T = User`); las rutas de `href(...)`, los endpoints de `useApi`/`api.*` y los procedimientos de `useRpcQuery`/`useRpcMutation`/`rpc.*` muestran su página o handler y su contrato. Ir a definición lleva desde ellos a la página o al handler, y desde un export de `<script server>` usado en la página hasta ese export.
+- CodeLens: lecturas y escrituras de cada señal, valor `computed` y recurso (al hacer clic se listan) y, en las páginas, la ruta, el modo de render, los layouts y el tipo de los datos que la página envía al navegador (los exports del código de nivel superior de `<script server>` o el resultado del loader), con un aviso cuando no se pueden serializar.
+- Zonas de ejecución: una barra en el margen y un color de línea tenue marcan el código que se ejecuta sólo en el servidor, en ambos lados o sólo en el navegador. Las funciones del setup que sólo se usan desde `on:*`, `onMounted` u otro código de navegador, y las flechas de varias líneas de un `on:*`, salen como «Sólo navegador» con el motivo en el hover; las que también se usan en el setup, en `effect`/`computed`, en la plantilla o en `defineExpose` siguen compartidas. Nuevo ajuste `meeko.editor.executionZones` y colores de tema `meeko.executionZone.serverBackground`, `sharedBackground` y `browserBackground`.
+- Formato con Prettier y el plugin `@meekojs/meeko/prettier`: el Prettier del proyecto con su configuración en un workspace de confianza, o el incluido. Nuevo ajuste `meeko.format.indentSections` (por defecto `false`), que indenta el contenido de cada sección.
+- Bloque `<script server>` de las páginas: diagnósticos, completado, hover, navegación, referencias, renombrado, símbolos y formato con los autoimports de servidor.
+- Componentes: completado de las etiquetas en mayúscula (`<AppButton />`) e ir a su `.meeko`, completado de `model:`, de los nombres de `<snippet name>` y de sus `params`, y de los nombres de `useElementRef("…")`.
+- Acciones rápidas: añadir `each:key` a una lista y mover el sidecar `x.route.ts` de una página a un bloque `<script server>`.
+- Valores en vivo: mientras se ejecuta `meeko dev`, el valor actual de cada señal aparece al final de su declaración y en el hover, y se puede editar desde el hover o con el comando `meeko.live.editSignal`. Un elemento de la barra de estado muestra la conexión y reconecta al hacer clic (`meeko.live.reconnect`). Sólo en workspaces de confianza y sólo con un servidor de desarrollo en loopback. La extensión se conecta a todos los descriptores `.meeko/dev/editor-bridge-<puerto>.json`, uno por `meeko dev`, así que funcionan varios servidores a la vez. Una señal compartida, como el modelo que un hijo recibe con `defineModel`, se muestra con su principal (`open = true (= dialogOpen)`), el hover la describe como «alias de `dialogOpen`» y editarla edita la principal. Nuevos ajustes `meeko.live.enabled` y `meeko.live.inlineValues`.
+- Gramática: `<snippet>`, `<render>`, `model`, `model:name`, el atributo `server` de `<script>`, el atributo `generic` (una lista de parámetros de tipo de TypeScript) y la directiva `html="..."`, cuyo valor es TypeScript. El hover de `html` advierte de que inserta HTML sin escapar.
+- Los diagnósticos de Meeko, los hovers y los mensajes del canal de salida «Meeko» están en español. Los códigos (`MEEK0xx`, `MEEK_*`) no cambian.
 
 ## 1.0.0
 
-- The extension is now a thin client of the Meeko language server (`meeko-language-server`), built on `vscode-languageclient`. The same server powers Neovim, Zed, Helix, JetBrains and Sublime Text.
-- In trusted workspaces it starts the language server of the project's `@meekojs/meeko` package, so the editor matches the project's compiler; it falls back to the bundled server when that package is missing, predates the server, the workspace is restricted or `meeko.languageServer.preferWorkspace` is off.
-- Restricted mode never runs project code: bundled server, static `meeko.config.*` reading and no page-contract checks. Granting trust restarts the server, which then executes the project configuration.
-- New: references, signature help, document symbols, folding ranges and code actions (add missing imports, resolve ambiguous autoimports with an explicit import, remove `params` from a static `href`).
-- Rename now crosses files: it rewrites the declaration and every use and import in `.meeko` and `.ts` files.
-- Diagnostics cover the whole affected token instead of one character; multi-line template expressions get semantic tokens on every line.
-- Hover, completion and navigation use the project's `tsconfig.json` (for example `paths` aliases) instead of fixed options, and diagnostics resolve the same aliases.
-- New settings `meeko.languageServer.preferWorkspace` and `meeko.trace.server`.
+- La extensión pasa a ser un cliente ligero del servidor de lenguaje de Meeko (`meeko-language-server`), basado en `vscode-languageclient`. El mismo servidor da soporte a Neovim, Zed, Helix, JetBrains y Sublime Text.
+- En los workspaces de confianza arranca el servidor de lenguaje del paquete `@meekojs/meeko` del proyecto, para que el editor coincida con el compilador del proyecto; recurre al servidor incluido cuando ese paquete no existe, es anterior al servidor, el workspace está restringido o `meeko.languageServer.preferWorkspace` está desactivado.
+- El modo restringido nunca ejecuta código del proyecto: servidor incluido, lectura estática de `meeko.config.*` y sin comprobación de contratos de página. Al conceder la confianza se reinicia el servidor, que entonces ejecuta la configuración del proyecto.
+- Nuevo: referencias, ayuda de firma, símbolos del documento, rangos de plegado y acciones de código (añadir imports que faltan, resolver autoimports ambiguos con un import explícito y quitar `params` de un `href` estático).
+- El renombrado cruza archivos: reescribe la declaración y cada uso e import en archivos `.meeko` y `.ts`.
+- Los diagnósticos cubren todo el token afectado en lugar de un carácter; las expresiones de plantilla de varias líneas tienen tokens semánticos en cada línea.
+- El hover, el completado y la navegación usan el `tsconfig.json` del proyecto (por ejemplo, los alias de `paths`) en lugar de opciones fijas, y los diagnósticos resuelven los mismos alias.
+- Nuevos ajustes `meeko.languageServer.preferWorkspace` y `meeko.trace.server`.
 
 ## 0.0.1
 
-- Initial Marketplace release of Meeko Language.
-- Syntax highlighting for TypeScript, HTML, and CSS in `.meeko` components.
-- Compiler and TypeScript diagnostics.
-- Completion, hover, definition navigation, and component-local rename.
-- Document formatting through installed TypeScript, HTML, and CSS providers.
-- Platform-specific packages for Windows, Linux, and macOS on x64 and ARM64.
+- Primera publicación de Meeko Language en el Marketplace.
+- Resaltado de sintaxis de TypeScript, HTML y CSS en los componentes `.meeko`.
+- Diagnósticos del compilador y de TypeScript.
+- Completado, hover, navegación a la definición y renombrado dentro del componente.
+- Formato del documento mediante los proveedores de TypeScript, HTML y CSS instalados.
+- Paquetes específicos por plataforma para Windows, Linux y macOS en x64 y ARM64.

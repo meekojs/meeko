@@ -22,7 +22,11 @@ export async function generateTypes(source: string, filename: string): Promise<s
       fileName: `${path}.ts`,
       compilerOptions: { declaration: true, emitDeclarationOnly: true },
     });
-    const error = result.diagnostics?.find((diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error);
+    // Codes 9005-9039 are isolated-declaration inferences. Only the setup of a component with
+    // defineExpose reaches the declaration, through ComponentExposed; there TypeScript still
+    // writes the types it infers locally and `any` for the rest, instead of failing.
+    const error = result.diagnostics?.find((diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error
+      && !(diagnostic.code >= 9005 && diagnostic.code <= 9039 && generated.includes("[__meeko.exposedKey]: __meeko_exposed")));
     if (error) throw new Error(ts.flattenDiagnosticMessageText(error.messageText, "\n"));
     declarations.set(path, `${componentTypeDeclarationMarker}\n${result.outputText}`);
     for (const { value: specifier } of moduleSpecifiers(generated, path)) {

@@ -3,13 +3,30 @@ import type { DevtoolsEvent, DevtoolsHook, DevtoolsInstance, DevtoolsProtocolVer
 /** Versión del protocolo que entiende este panel; el tipo obliga a revisarlo si el protocolo cambia. */
 const supportedProtocolVersion: DevtoolsProtocolVersion = 1;
 
-/** Opciones de montaje del panel integrado de desarrollo. */
+/**
+ * Opciones de montaje del panel integrado de desarrollo.
+ *
+ * @example
+ * ```ts
+ * import type { DevtoolsPanelOptions } from "@meekojs/meeko/devtools-ui";
+ *
+ * const options: DevtoolsPanelOptions = { container: document.querySelector("#devtools") ?? document.body };
+ * ```
+ */
 export interface DevtoolsPanelOptions {
   /** Elemento que recibirá el host del Shadow DOM. El valor predeterminado es `document.body`. */
   container?: Element;
 }
 
-/** Control del ciclo de vida del panel. */
+/**
+ * Control del ciclo de vida del panel que devuelve {@link mountDevtoolsPanel}.
+ *
+ * @example
+ * ```ts
+ * const panel = mountDevtoolsPanel();
+ * import.meta.hot?.dispose(() => panel.unmount());
+ * ```
+ */
 export interface DevtoolsPanel {
   /** Reintenta encontrar el hook y actualiza los datos visibles. */
   refresh(): void;
@@ -152,7 +169,25 @@ function requireView(document: Document): Window {
   return view;
 }
 
-/** Monta una interfaz aislada en Shadow DOM para inspeccionar instancias Meeko. */
+/**
+ * Monta el panel de Meeko DevTools en la página, aislado en Shadow DOM: árbol de instancias, props y
+ * señales editables, línea de tiempo, resaltado del DOM y puntos de parada. Lee el hook
+ * `window.__MEEKO_DEVTOOLS__`, que sólo existe en desarrollo; sin él, el panel lo indica y
+ * `refresh()` lo vuelve a buscar.
+ *
+ * @param options Contenedor del panel.
+ * @returns El control del panel.
+ * @throws {Error} Si el contenedor no pertenece a un documento de navegador.
+ * @example
+ * ```ts
+ * if (import.meta.env.DEV) {
+ *   const { mountDevtoolsPanel } = await import("@meekojs/meeko/devtools-ui");
+ *   const panel = mountDevtoolsPanel();
+ *   // panel.unmount() libera la interfaz cuando deje de usarse.
+ * }
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#panel-dentro-de-la-página
+ */
 export function mountDevtoolsPanel(options: DevtoolsPanelOptions = {}): DevtoolsPanel {
   const container = options.container ?? document.body;
   const ownerDocument = container.ownerDocument;

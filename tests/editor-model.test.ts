@@ -43,13 +43,13 @@ test("editor resolves scoped autoimports through the same registry and preserves
       assert.equal(model.toSource(generated!), original);
       assert.equal(model.service.getSemanticDiagnostics(model.virtualFilename).some((item) => item.code === 2304), false);
     } finally { model.dispose(); }
-    assert.throws(() => createEditorModel(source.replace("useCount()", "getSecret()"), filename), /unavailable in client scope/);
+    assert.throws(() => createEditorModel(source.replace("useCount()", "getSecret()"), filename), /no está disponible en el ámbito client/);
     const explicit = createEditorModel(source.replace("const count", 'import { useCount } from "../composables/count.js"; const count'), filename);
     try { assert.equal((explicit.code.match(/import \{ useCount/g) ?? []).length, 1); }
     finally { explicit.dispose(); }
     await mkdir(join(root, "shared", "utils"), { recursive: true });
     await writeFile(join(root, "shared", "utils", "duplicate.ts"), "export function useCount(): number { return 3; }");
-    assert.throws(() => createEditorModel(source, filename), /Ambiguous autoimport useCount/);
+    assert.throws(() => createEditorModel(source, filename), /Autoimport ambiguo useCount/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

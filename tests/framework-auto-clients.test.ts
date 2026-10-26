@@ -56,8 +56,8 @@ export default defineSocketChannel({ clientToServer: { message: user }, serverTo
     assert.match(serverImport, /clients\.server\.js/);
     assert.match(serverImport, /privateService/);
     assert.match(applyAutoImports("layerGreeting();", join(root, "server", "entry.ts"), registry, "server"), /layerGreeting/);
-    assert.throws(() => applyAutoImports("layerGreeting();", join(root, "shared", "utils", "source.ts"), registry, "shared"), /unavailable in shared scope/);
-    assert.throws(() => applyAutoImports("privateService()", join(root, "app", "entry-client.ts"), registry, "client"), /unavailable in client scope/);
+    assert.throws(() => applyAutoImports("layerGreeting();", join(root, "shared", "utils", "source.ts"), registry, "shared"), /no está disponible en el ámbito shared/);
+    assert.throws(() => applyAutoImports("privateService()", join(root, "app", "entry-client.ts"), registry, "client"), /no está disponible en el ámbito client/);
     const clientFile = await readFile(join(root, ".meeko/generated/clients.client.ts"), "utf8");
     assert.doesNotMatch(clientFile, /@meekojs\/meeko\/server|server\/api|server\/rpc|server\/services/);
     assert.match(await readFile(join(root, ".meeko/generated/clients.server.ts"), "utf8"), /createServerClientOptions/);
@@ -92,7 +92,7 @@ privateService();
     const duplicate = join(root, "app", "utils", "duplicate.ts");
     await mkdir(dirname(duplicate), { recursive: true });
     await writeFile(duplicate, `export const layerGreeting = () => "collision";`);
-    await assert.rejects(generateAutoImportTypes(root), /Ambiguous autoimport layerGreeting/);
+    await assert.rejects(generateAutoImportTypes(root), /Autoimport ambiguo layerGreeting/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

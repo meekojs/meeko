@@ -7,7 +7,7 @@ import { after, before, describe, test } from "node:test";
 import { pathToFileURL } from "node:url";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
-  CodeActionRequest, CompletionRequest, CompletionResolveRequest, createConnection, createProtocolConnection, DefinitionRequest,
+  CodeActionRequest, CompletionRequest, CompletionResolveRequest, ConfigurationRequest, createConnection, createProtocolConnection, DefinitionRequest,
   DidChangeTextDocumentNotification, DidChangeWatchedFilesNotification, DidOpenTextDocumentNotification, DidSaveTextDocumentNotification,
   DocumentFormattingRequest, DocumentSymbolRequest, ExitNotification, FileChangeType, FoldingRangeRequest, HoverRequest,
   InitializedNotification, InitializeRequest, PrepareRenameRequest, PublishDiagnosticsNotification, ReferencesRequest,
@@ -41,13 +41,13 @@ class Client {
     connection.listen();
   }
 
-  async initialize(root: string, initializationOptions: LanguageServerInitializationOptions = {}): Promise<InitializeResult> {
+  async initialize(root: string, initializationOptions: LanguageServerInitializationOptions = {}, workspace: { configuration?: boolean } = {}): Promise<InitializeResult> {
     const result = await this.connection.sendRequest(InitializeRequest.type, {
       processId: null,
       rootUri: pathToFileURL(root).href,
       workspaceFolders: [{ uri: pathToFileURL(root).href, name: "fixture" }],
       capabilities: {
-        workspace: { didChangeWatchedFiles: { dynamicRegistration: true }, semanticTokens: { refreshSupport: true } },
+        workspace: { didChangeWatchedFiles: { dynamicRegistration: true }, semanticTokens: { refreshSupport: true }, ...workspace },
         textDocument: { rename: { prepareSupport: true } },
       },
       initializationOptions: { diagnosticsDelay: 0, ...initializationOptions },
@@ -105,14 +105,14 @@ class Client {
   }
 }
 
-async function inProcess(root: string, options: LanguageServerInitializationOptions = {}): Promise<Client> {
+async function inProcess(root: string, options: LanguageServerInitializationOptions = {}, workspace: { configuration?: boolean } = {}): Promise<Client> {
   const toServer = new PassThrough();
   const toClient = new PassThrough();
   const server = createConnection(new StreamMessageReader(toServer), new StreamMessageWriter(toClient));
   startLanguageServer(server);
   server.listen();
   const client = new Client(createProtocolConnection(new StreamMessageReader(toClient), new StreamMessageWriter(toServer)), () => server.dispose());
-  await client.initialize(root, options);
+  await client.initialize(root, options, workspace);
   return client;
 }
 
@@ -192,8 +192,9 @@ declare const routes: readonly RouteRecord[];
 const about = href(routes, "/about", { params: { id: "1" } });
 const tab = href(routes, "/about", { params: { id: "1" }, search: { tab: "a" } });
 const user = href(routes, "/users/[id]", { params: { id: "1" } });
+const short = href("/about", { params: { id: "1" } });
 </script>
-<template><a bind:href="about">{tab}{user}</a></template>
+<template><a bind:href="about">{tab}{user}{short}</a></template>
 `,
       "Ambiguous.meeko": '<script lang="ts">\nconst value = useCount();\n</script>\n<template><p>{value}</p></template>\n',
       "app/composables/count.ts": "export function useCount(): number { return 1; }\n",
@@ -378,9 +379,9 @@ const user = href(routes, "/users/[id]", { params: { id: "1" } });
     const ambiguous = diagnostics.find((item) => item.code === "MEEK_AUTOIMPORT")!;
     assert.equal(client.document(uri).getText(ambiguous.range), "useCount");
     const actions = await client.connection.sendRequest(CodeActionRequest.type, { textDocument: { uri }, range: ambiguous.range, context: { diagnostics: [ambiguous] } }) as CodeAction[];
-    const titles = actions.map((item) => item.title).filter((title) => title.startsWith("Import useCount"));
-    assert.deepEqual(titles.sort(), ["Import useCount from app/composables/count.ts", "Import useCount from shared/utils/count.ts"]);
-    const chosen = actions.find((item) => item.title === "Import useCount from shared/utils/count.ts")!;
+    const titles = actions.map((item) => item.title).filter((title) => title.startsWith("Importar useCount"));
+    assert.deepEqual(titles.sort(), ["Importar useCount desde app/composables/count.ts", "Importar useCount desde shared/utils/count.ts"]);
+    const chosen = actions.find((item) => item.title === "Importar useCount desde shared/utils/count.ts")!;
     const fixed = applyEdits(client.document(uri).getText(), chosen.edit!.changes![uri]!);
     assert.match(fixed, /import \{ useCount \} from "\.\/shared\/utils\/count\.js";/);
     await client.change(uri, fixed);
@@ -395,12 +396,16 @@ const user = href(routes, "/users/[id]", { params: { id: "1" } });
       return { start, end: start };
     };
     const first = await client.connection.sendRequest(CodeActionRequest.type, { textDocument: { uri }, range: at("href(routes, \"/about\", { params"), context: { diagnostics: [] } }) as CodeAction[];
-    const removeAll = first.find((item) => item.title.startsWith("Remove params"));
+    const removeAll = first.find((item) => item.title.startsWith("Quitar params de la ruta estática"));
     assert.ok(removeAll, JSON.stringify(first.map((item) => item.title)));
     assert.match(applyEdits(text, removeAll.edit!.changes![uri]!), /const about = href\(routes, "\/about"\);/);
     const second = await client.connection.sendRequest(CodeActionRequest.type, { textDocument: { uri }, range: at("search: {"), context: { diagnostics: [] } }) as CodeAction[];
-    const removeParams = second.find((item) => item.title.startsWith("Remove params"));
+    const removeParams = second.find((item) => item.title.startsWith("Quitar params de la ruta estática"));
     assert.match(applyEdits(text, removeParams!.edit!.changes![uri]!), /const tab = href\(routes, "\/about", \{ search: \{ tab: "a" \} \}\);/);
+    const short = await client.connection.sendRequest(CodeActionRequest.type, { textDocument: { uri }, range: at("href(\"/about\""), context: { diagnostics: [] } }) as CodeAction[];
+    const removeShort = short.find((item) => item.title.startsWith("Quitar params de la ruta estática"));
+    assert.ok(removeShort, JSON.stringify(short.map((item) => item.title)));
+    assert.match(applyEdits(text, removeShort.edit!.changes![uri]!), /const short = href\("\/about"\);/);
     const dynamic = await client.connection.sendRequest(CodeActionRequest.type, { textDocument: { uri }, range: at("/users/[id]"), context: { diagnostics: [] } }) as CodeAction[];
     assert.ok(!dynamic.some((item) => item.title.includes("/users/[id]")), "dynamic routes keep their params");
   });
@@ -479,6 +484,239 @@ describe("Meeko language server configuration and contracts", () => {
   });
 });
 
+const serverPage = `<script server lang="ts">
+import { definePage } from "@meekojs/meeko/framework";
+const label: number = "wrong";
+export const route = definePage({
+  load: async () => findUser(),
+});
+</script>
+
+<script lang="ts">
+const props = defineProps<{ data: { name: string } }>();
+const count = signal(1);
+</script>
+<template><p>{props.data.name}{count.value}</p></template>
+`;
+
+const bodyPage = `<script server lang="ts">
+const { url } = usePage();
+const row = findUser();
+export const user = { name: row.name, path: url.pathname };
+export const head = { title: user.name };
+</script>
+
+<script lang="ts">
+const label = signal(user.name);
+</script>
+<template><p>{user.path}{label.value}</p></template>
+`;
+
+describe("Meeko language server <script server> blocks", () => {
+  let root: string;
+  let client: Client;
+  const file = (name: string) => join(root, name);
+
+  before(async () => {
+    root = await project("lsp-route-block-", {
+      "server/utils/users.ts": "/** Loads the current user. */\nexport function findUser(): { name: string } { return { name: \"Ada\" }; }\n",
+      "app/pages/index.meeko": serverPage,
+      "app/pages/browser.meeko": `<script server lang="ts">
+import { definePage } from "@meekojs/meeko/framework";
+export const route = definePage({ render: "client", load: async () => findUser() });
+</script>
+<script lang="ts">
+const props = defineProps<{ data: { name: string } }>();
+</script>
+<template><p>{props.data.name}</p></template>
+`,
+      "app/pages/profile.meeko": bodyPage,
+      "app/components/Widget.meeko": `<script server lang="ts">
+export const route = {};
+</script>
+<script lang="ts">
+const text = "widget";
+</script>
+<template><p>{text}</p></template>
+`,
+    });
+    client = await inProcess(root, { projectContracts: false });
+  });
+
+  after(async () => {
+    await client?.close();
+    if (root) await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  });
+
+  test("reports TypeScript errors inside the block at their .meeko line and column", async () => {
+    const uri = await client.open(file("app/pages/index.meeko"));
+    const diagnostics = await client.waitForDiagnostics(uri, (items) => items.some((item) => item.code === "TS2322"));
+    const error = diagnostics.find((item) => item.code === "TS2322")!;
+    assert.deepEqual(error.range, { start: { line: 2, character: 6 }, end: { line: 2, character: 11 } });
+    assert.equal(client.document(uri).getText(error.range), "label");
+    assert.ok(!diagnostics.some((item) => item.code === "MEEK044" || item.code === "MEEK_AUTOIMPORT"), JSON.stringify(diagnostics));
+    assert.equal(diagnostics.length, 1, JSON.stringify(diagnostics));
+
+    await client.change(uri, serverPage.replace('"wrong"', "1"));
+    await client.waitForDiagnostics(uri, (items) => items.length === 0);
+  });
+
+  test("hover, completion and definition use server autoimports inside the block", async () => {
+    const uri = await client.open(file("app/pages/index.meeko"));
+    const page = await client.connection.sendRequest(HoverRequest.type, { textDocument: { uri }, position: client.position(uri, "definePage({", 2) });
+    assert.match((page?.contents as MarkupContent).value, /definePage/);
+    const hover = await client.connection.sendRequest(HoverRequest.type, { textDocument: { uri }, position: client.position(uri, "findUser()", 2) });
+    assert.match((hover?.contents as MarkupContent).value, /findUser\(\): \{\s*name: string;\s*\}[\s\S]*Loads the current user/);
+    assert.deepEqual(hover?.range?.start, client.position(uri, "findUser()"));
+
+    const completions = await client.connection.sendRequest(CompletionRequest.type, { textDocument: { uri }, position: client.position(uri, "findUser()", 4) });
+    const items = Array.isArray(completions) ? completions : completions?.items ?? [];
+    const entry = items.find((item) => item.label === "findUser");
+    assert.ok(entry, "server autoimport completion");
+    const resolved = await client.connection.sendRequest(CompletionResolveRequest.type, entry) as CompletionItem;
+    assert.match(resolved.detail ?? "", /findUser/);
+
+    const definitions = await client.connection.sendRequest(DefinitionRequest.type, { textDocument: { uri }, position: client.position(uri, "findUser()", 2) }) as Location[];
+    assert.ok(definitions.some((item) => item.uri.endsWith("/server/utils/users.ts")), JSON.stringify(definitions));
+    const local = await client.connection.sendRequest(ReferencesRequest.type, { textDocument: { uri }, position: client.position(uri, "label", 1), context: { includeDeclaration: true } }) as Location[];
+    assert.deepEqual(local.map((item) => client.document(uri).getText(item.range)), ["label"]);
+  });
+
+  test("the component script keeps working in a file with a block", async () => {
+    const uri = await client.open(file("app/pages/index.meeko"));
+    const hover = await client.connection.sendRequest(HoverRequest.type, { textDocument: { uri }, position: client.position(uri, "count.value", 2, "<template>") });
+    assert.match((hover?.contents as MarkupContent).value, /const count: Signal<number>/);
+    const definitions = await client.connection.sendRequest(DefinitionRequest.type, { textDocument: { uri }, position: client.position(uri, "props.data", 1, "<template>") }) as Location[];
+    assert.ok(definitions.some((item) => item.uri === uri && client.document(uri).offsetAt(item.range.start) === client.document(uri).getText().indexOf("const props") + "const ".length));
+    // The block's autoimports never leak into the component script, and vice versa.
+    const completions = await client.connection.sendRequest(CompletionRequest.type, { textDocument: { uri }, position: client.position(uri, "signal(1)", 2) });
+    const items = Array.isArray(completions) ? completions : completions?.items ?? [];
+    assert.ok(items.some((item) => item.label === "signal"));
+
+    const symbols = await client.connection.sendRequest(DocumentSymbolRequest.type, { textDocument: { uri } }) as DocumentSymbol[];
+    assert.deepEqual(symbols.map((item) => item.name), ["<script server>", "<script>", "<template>"]);
+    assert.deepEqual(symbols[0]!.children?.map((item) => item.name), ["definePage", "label", "route"]);
+    assert.deepEqual(symbols[1]!.children?.map((item) => item.name), ["props", "count"]);
+  });
+
+  test("exports of top-level server code are typed in the script and template and lead to their export", async () => {
+    const uri = await client.open(file("app/pages/profile.meeko"));
+    await client.waitForDiagnostics(uri, (items) => items.length === 0);
+    const hover = await client.connection.sendRequest(HoverRequest.type, { textDocument: { uri }, position: client.position(uri, "user.name", 1, "<script lang") });
+    assert.match((hover?.contents as MarkupContent).value, /const user: [\s\S]*name: string[\s\S]*path: string/);
+    const exported = client.document(uri).getText().indexOf("export const user") + "export const ".length;
+    for (const position of [client.position(uri, "user.name", 1, "<script lang"), client.position(uri, "user.path", 1, "<template>")]) {
+      const definitions = await client.connection.sendRequest(DefinitionRequest.type, { textDocument: { uri }, position }) as Location[];
+      assert.deepEqual(definitions.map((item) => [item.uri, client.document(uri).offsetAt(item.range.start), client.document(uri).getText(item.range)]), [[uri, exported, "user"]]);
+    }
+    // usePage() in the block is the framework's typed request.
+    const request = await client.connection.sendRequest(HoverRequest.type, { textDocument: { uri }, position: client.position(uri, "url }", 1) });
+    assert.match((request?.contents as MarkupContent).value, /url: URL/);
+    // A wrong use of an export in the client script is a type error there.
+    await client.change(uri, bodyPage.replace("const label = signal(user.name);", "const label: number = user.name;"));
+    const diagnostics = await client.waitForDiagnostics(uri, (items) => items.some((item) => item.code === "TS2322"));
+    assert.equal(client.document(uri).getText(diagnostics.find((item) => item.code === "TS2322")!.range), "label");
+    await client.change(uri, bodyPage);
+  });
+
+  test("a render: \"client\" block resolves autoimports in the client scope", async () => {
+    const uri = await client.open(file("app/pages/browser.meeko"));
+    const diagnostics = await client.waitForDiagnostics(uri, (items) => items.some((item) => item.code === "MEEK_AUTOIMPORT"));
+    const problem = diagnostics.find((item) => item.code === "MEEK_AUTOIMPORT")!;
+    assert.equal(client.document(uri).getText(problem.range), "findUser");
+    assert.match(String(problem.message), /no está disponible en el ámbito client/);
+  });
+
+  test("MEEK044 and MEEK043 mark the opening tag of a misplaced or malformed block", async () => {
+    const uri = await client.open(file("app/components/Widget.meeko"));
+    const diagnostics = await client.waitForDiagnostics(uri, (items) => items.some((item) => item.code === "MEEK044"));
+    const placement = diagnostics.find((item) => item.code === "MEEK044")!;
+    assert.equal(client.document(uri).getText(placement.range), '<script server lang="ts">');
+    assert.match(String(placement.message), /sólo se admite en las páginas de app\/pages/);
+
+    const page = await client.open(file("app/pages/index.meeko"));
+    await client.change(page, serverPage.replace("<script server lang", '<script server="yes" lang'));
+    const malformed = await client.waitForDiagnostics(page, (items) => items.some((item) => item.code === "MEEK043"));
+    assert.equal(client.document(page).getText(malformed.find((item) => item.code === "MEEK043")!.range), '<script server="yes" lang="ts">');
+    await client.change(page, serverPage);
+    await client.waitForDiagnostics(page, (items) => !items.some((item) => item.code === "MEEK043"));
+  });
+
+  test("formatting indents script, server block, template and style only with indentSections", async () => {
+    const source = '<script server lang="ts">\nexport const route={load:()=>({ ok:true })};\n</script>\n<script lang="ts">\nconst count=signal(0);\n</script>\n<template>\n<section>\n<button  class="counter">{count.value}</button>\n<pre>a\n  b</pre>\n</section>\n</template>\n<style>.counter{color:red;}</style>\n';
+    const formatOnce = async (format: Client, uri: string, text: string): Promise<string> => {
+      await format.change(uri, text);
+      const edits = await format.connection.sendRequest(DocumentFormattingRequest.type, { textDocument: { uri }, options: { tabSize: 2, insertSpaces: true } }) ?? [];
+      return applyEdits(text, edits);
+    };
+
+    const plain = await client.open(file("app/pages/format.meeko"), source);
+    const flat = await formatOnce(client, plain, source);
+    assert.ok(flat.includes("\nexport const route = { load: () => ({ ok: true }) };\n"), flat);
+    assert.ok(flat.includes("\nconst count = signal(0);\n"), flat);
+    assert.ok(flat.includes("\n.counter {\n  color: red;\n}\n"), flat);
+    assert.equal(await formatOnce(client, plain, flat), flat, "formatting without indentation is idempotent");
+
+    // A client with workspace/configuration answers the meeko.format section.
+    const configured = await inProcess(root, { projectContracts: false, format: { indentSections: false } }, { configuration: true });
+    const sections: unknown[] = [];
+    configured.connection.onRequest(ConfigurationRequest.type, (params) => {
+      sections.push(...params.items.map((item) => item.section));
+      return params.items.map(() => ({ indentSections: true }));
+    });
+    try {
+      const uri = await configured.open(file("app/pages/format.meeko"), flat);
+      for (const newline of ["\n", "\r\n"]) {
+        const input = flat.replaceAll("\n", newline);
+        const indented = await formatOnce(configured, uri, input);
+        const lines = indented.split(newline);
+        if (newline === "\r\n") assert.ok(!indented.replaceAll("\r\n", "").includes("\n"), "keeps CRLF line endings");
+        assert.ok(lines.includes("  export const route = { load: () => ({ ok: true }) };"), indented);
+        assert.ok(lines.includes("  const count = signal(0);"), indented);
+        assert.ok(lines.includes("  .counter {") && lines.includes("    color: red;") && lines.includes("  }"), indented);
+        assert.ok(lines.includes("  <section>") && lines.includes('    <button class="counter">{count.value}</button>') && lines.includes("  </section>"), indented);
+        // Preformatted content never changes; HTML ignores the line feed Prettier adds after <pre>.
+        assert.ok(indented.includes(`<pre>${newline}a${newline}  b</pre>`), indented);
+        assert.equal(await formatOnce(configured, uri, indented), indented, "formatting with indentation is idempotent");
+        // Turning the option off removes the base indentation again.
+        assert.equal(await formatOnce(client, plain, indented), input);
+      }
+      assert.ok(sections.includes("meeko.format"), JSON.stringify(sections));
+    } finally { await configured.close(); }
+
+    // Without workspace/configuration the initialization options apply.
+    const fallback = await inProcess(root, { projectContracts: false, format: { indentSections: true } });
+    try {
+      const uri = await fallback.open(file("app/pages/format.meeko"), flat);
+      assert.ok((await formatOnce(fallback, uri, flat)).includes("\n  const count = signal(0);\n"));
+    } finally { await fallback.close(); }
+  });
+});
+
+describe("Meeko language server page contracts with <script server>", () => {
+  test("a contract error still points to defineProps of the component script", async () => {
+    const source = `<script server lang="ts">
+import { definePage } from "@meekojs/meeko/framework";
+export const route = definePage({ load: () => ({ name: "Ada" }) });
+</script>
+<script lang="ts">
+const props = defineProps<{ data: { name: number } }>();
+</script>
+<template><p>{props.data.name}</p></template>
+`;
+    const root = await project("lsp-route-block-contract-", { "app/pages/index.meeko": source });
+    try {
+      const trusted = await inProcess(root);
+      try {
+        const uri = await trusted.open(join(root, "app", "pages", "index.meeko"));
+        const diagnostics = await trusted.waitForDiagnostics(uri, (items) => items.some((item) => item.code === "MEEK_PAGE_PROPS"));
+        const contract = diagnostics.find((item) => item.code === "MEEK_PAGE_PROPS")!;
+        assert.equal(trusted.document(uri).getText(contract.range), "{ data: { name: number } }");
+      } finally { await trusted.close(); }
+    } finally { await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
+  });
+});
+
 describe("meeko lsp --stdio", () => {
   test("a spawned server answers initialize, diagnostics and hover over JSON-RPC like meeko check", async () => {
     const root = await project("lsp-stdio-", { "Bad.meeko": badComponent });
@@ -532,5 +770,121 @@ describe("meeko lsp --stdio", () => {
       client.connection.dispose();
       child.kill();
     }
+  });
+});
+
+describe("Meeko language server components with defineEmits and PascalCase tags", () => {
+  let root: string;
+  let client: Client;
+  const file = (name: string) => join(root, name);
+  const child = `<script lang="ts">
+const props = defineProps<{ id: number }>();
+const emit = defineEmits<{ save: [id: number]; close: [] }>();
+</script>
+<template><button on:click="() => emit('save', props.id)">Save</button></template>
+`;
+  const page = (body: string): string => `<script lang="ts">
+const saved: number[] = [];
+</script>
+<template>
+<section>
+${body}
+</section>
+</template>
+`;
+  const valid = page('<SaveButton bind:id="1" on:save="(id) => saved.push(id)" />\n<SaveButton bind:id="2"></SaveButton>');
+
+  before(async () => {
+    // The package resolves to src/ so the test does not depend on a build of dist/.
+    root = await project("lsp-components-", {
+      "tsconfig.json": `${JSON.stringify({ compilerOptions: { strict: true, types: ["node"], paths: { "@meekojs/meeko/internal": ["../../src/internal.ts"], "@meekojs/meeko": ["../../src/index.ts"] } } })}\n`,
+      "app/components/save-button.meeko": child,
+      "app/pages/index.meeko": valid,
+    }, false);
+    client = await inProcess(root, { projectContracts: false });
+  });
+
+  after(async () => {
+    await client?.close();
+    if (root) await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  });
+
+  test("on:event diagnostics cover the directive of a PascalCase tag", async () => {
+    const uri = await client.open(file("app/pages/index.meeko"));
+    await client.waitForDiagnostics(uri, (items) => items.length === 0);
+    await client.change(uri, valid.replace("(id) => saved.push(id)", "(id: string) => saved.push(Number(id))"));
+    const wrong = await client.waitForDiagnostics(uri, (items) => items.some((item) => item.code === "TS2322"));
+    assert.equal(client.document(uri).getText(wrong.find((item) => item.code === "TS2322")!.range), "on:save");
+    await client.change(uri, valid.replace("on:save=", "on:nope="));
+    const unknown = await client.waitForDiagnostics(uri, (items) => items.some((item) => item.code === "TS2353"));
+    assert.equal(client.document(uri).getText(unknown.find((item) => item.code === "TS2353")!.range), "on:nope");
+    await client.change(uri, valid.replace('bind:id="2">', 'bind:id="2" bind:onSave="() => {}" on:save="() => {}">'));
+    const duplicate = await client.waitForDiagnostics(uri, (items) => items.some((item) => item.code === "MEEK048"));
+    assert.match(String(duplicate.find((item) => item.code === "MEEK048")!.message), /bind:onSave y on:save/);
+    await client.change(uri, valid);
+    await client.waitForDiagnostics(uri, (items) => items.length === 0);
+  });
+
+  test("hover and definition of a component tag lead to its .meeko", async () => {
+    const uri = await client.open(file("app/pages/index.meeko"), valid);
+    for (const position of [client.position(uri, "SaveButton", 2), client.position(uri, "/SaveButton", 3)]) {
+      const hover = await client.connection.sendRequest(HoverRequest.type, { textDocument: { uri }, position });
+      const value = (hover?.contents as MarkupContent).value;
+      assert.match(value, /\(componente\) SaveButton/);
+      assert.match(value, /app\/components\/save-button\.meeko/);
+      assert.equal(client.document(uri).getText(hover!.range!), "SaveButton");
+      const definitions = await client.connection.sendRequest(DefinitionRequest.type, { textDocument: { uri }, position }) as Location[];
+      assert.equal(definitions.length, 1, JSON.stringify(definitions));
+      assert.ok(definitions[0]!.uri.endsWith("/app/components/save-button.meeko"), JSON.stringify(definitions));
+    }
+  });
+
+  test("completion offers component names, event names and emit events", async () => {
+    const uri = await client.open(file("app/pages/index.meeko"), valid);
+    await client.waitForDiagnostics(uri, (items) => items.length === 0);
+    const typing = page("<Sa");
+    await client.change(uri, typing);
+    const tags = await client.connection.sendRequest(CompletionRequest.type, { textDocument: { uri }, position: client.position(uri, "<Sa", 3) });
+    const tagItems = Array.isArray(tags) ? tags : tags?.items ?? [];
+    const tag = tagItems.find((item) => item.label === "SaveButton");
+    assert.ok(tag, JSON.stringify(tagItems));
+    assert.equal(tag.detail, "app/components/save-button.meeko");
+
+    const partial = valid.replace("on:save=", "on:s=");
+    await client.change(uri, partial);
+    const events = await client.connection.sendRequest(CompletionRequest.type, { textDocument: { uri }, position: client.position(uri, "on:s=", 4) });
+    const eventItems = Array.isArray(events) ? events : events?.items ?? [];
+    assert.deepEqual(eventItems.map((item) => item.label).sort(), ["close", "save"], JSON.stringify(eventItems));
+    const save = eventItems.find((item) => item.label === "save")!;
+    assert.equal(applyEdits(partial, [save.textEdit as TextEdit]), valid);
+    const resolved = await client.connection.sendRequest(CompletionResolveRequest.type, save) as CompletionItem;
+    assert.match(resolved.detail ?? "", /onSave\?: \(\(id: number\) => void\) \| undefined/);
+    await client.change(uri, valid);
+
+    const childUri = await client.open(file("app/components/save-button.meeko"));
+    const names = await client.connection.sendRequest(CompletionRequest.type, { textDocument: { uri: childUri }, position: client.position(childUri, "emit('save'", 6) });
+    const nameItems = Array.isArray(names) ? names : names?.items ?? [];
+    assert.ok(["save", "close"].every((name) => nameItems.some((item) => item.label === name)), JSON.stringify(nameItems.map((item) => item.label)));
+    const hover = await client.connection.sendRequest(HoverRequest.type, { textDocument: { uri: childUri }, position: client.position(childUri, "emit =", 1) });
+    assert.match((hover?.contents as MarkupContent).value, /save: \[id: number\];/);
+  });
+
+  test("formatting keeps PascalCase tags and their self-closing form", async () => {
+    const compact = page('<div><SaveButton bind:id="1" on:save="(id) => saved.push(id)" /><SaveButton bind:id="2"></SaveButton><p>after</p></div>');
+    const formatWith = async (format: Client): Promise<string> => {
+      const uri = await format.open(file("app/pages/index.meeko"), compact);
+      const edits = await format.connection.sendRequest(DocumentFormattingRequest.type, { textDocument: { uri }, options: { tabSize: 2, insertSpaces: true } }) ?? [];
+      return applyEdits(compact, edits);
+    };
+    // Without whitespace between the two components Prettier keeps them adjacent.
+    const flat = await formatWith(client);
+    assert.ok(flat.includes('\n    <SaveButton bind:id="1" on:save="(id) => saved.push(id)" /><SaveButton\n      bind:id="2"\n    ></SaveButton>\n'), flat);
+    assert.ok(flat.includes("\n    <p>after</p>\n"), flat);
+    const indentedClient = await inProcess(root, { projectContracts: false, format: { indentSections: true } });
+    try {
+      const indented = await formatWith(indentedClient);
+      assert.ok(indented.includes('\n      <SaveButton bind:id="1" on:save="(id) => saved.push(id)" /><SaveButton\n        bind:id="2"\n      ></SaveButton>\n'), indented);
+      assert.ok(indented.includes("\n      <p>after</p>\n"), indented);
+    } finally { await indentedClient.close(); }
   });
 });

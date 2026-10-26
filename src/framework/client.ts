@@ -1,37 +1,76 @@
-import { hasRegionRecoveryFailure } from "../dom.js";
+import { hasRegionRecoveryFailure, parseRegionHtml } from "../dom.js";
 import type { Component, DomScope } from "../dom.js";
 import { createAppErrorChannel, provideAppErrorChannel } from "../component-errors.js";
 import type { ComponentErrorHandler } from "../component-errors.js";
-import { finishWithCleanup, signal } from "../reactivity.js";
+import { finishWithCleanup, runDry, signal } from "../reactivity.js";
 import type { Signal } from "../reactivity.js";
-import { PAYLOAD_VERSION, PageInputError, pageSearchObject, validatePageInputs } from "./page.js";
+import { ERROR_PAGE_TITLE, PAYLOAD_VERSION, PageInputError, pageSearchObject, payloadHead, validatePageInputs } from "./page.js";
 import type { PageHead, PageRender, PageSchema } from "./page.js";
 import { ClientError } from "./clients.js";
 import { runRouteMiddleware } from "./middleware.js";
 import { provideNavigation } from "./navigation.js";
 import type { NavigationState } from "./navigation.js";
 import type { RouteMiddleware } from "./middleware.js";
-import { createNavigator, matchRoute, reportNavigationError } from "./router.js";
-import type { NavigationContext, Navigator, RouteRecord } from "./router.js";
+import { activateRouteManifest, createAppNavigator, matchRoute, reportNavigationError, sameDocument } from "./router.js";
+import type { ErrorPageRecord, NavigationContext, Navigator, RouteMatch, RouteRecord, UnmatchedNavigationContext } from "./router.js";
 import { hydrateWithStateStore, StateStore, withStateStore } from "./state.js";
 import { createDeferred, deferredSettle, deferredSource, extractDeferred, placeDeferred } from "./deferred.js";
+import { provideResourceCache, ResourceCache, ResourceScope, withResourceScope } from "./resources.js";
+import { lateRender, mayAwaitData, renderWithSuspense } from "../suspense.js";
+import { mountBatch } from "../lifecycle.js";
 import type { DeferredError, DeferredInternals, DeferredOutcome } from "./deferred.js";
 
 export { useNavigation } from "./navigation.js";
 export type { NavigationState } from "./navigation.js";
 
-/** The public shape emitted by the .meeko compiler. */
+/**
+ * Forma pública de un módulo `.meeko` compilado que necesita `mountClientApp` para renderizar e
+ * hidratar páginas y layouts.
+ *
+ * @example
+ * ```ts
+ * import type { ClientComponent } from "@meekojs/meeko/framework";
+ * import { modules as pages } from "virtual:meeko-client-pages";
+ *
+ * async function loadPage(file: string): Promise<ClientComponent> {
+ *   const load = pages[file];
+ *   if (!load) throw new Error(`Page module missing: ${file}`);
+ *   return await load() as ClientComponent;
+ * }
+ * ```
+ */
 export interface ClientComponent {
+  /** Renderiza el HTML y captura el estado de sus señales. */
   renderWithState(props: Record<string, unknown>): { html: string; state: Record<string, unknown> };
+  /** Renderiza el HTML, opcionalmente desde un estado capturado. */
   renderToString(props: Record<string, unknown>, state?: Record<string, unknown>): string;
+  /** Hidrata el HTML existente dentro de `scope`; devuelve la función de liberación. */
   hydrateScope(scope: DomScope, props: Record<string, unknown>, state?: Record<string, unknown>): () => void;
 }
 
+/**
+ * Opciones de ruta que se ejecutan en el navegador: las de una ruta `render: "client"` o las de un
+ * host que usa `loadRoute`. Son públicas, así que no pueden contener secretos; un sidecar sólo de
+ * servidor no debe pasarse a `loadRoute`.
+ *
+ * @example
+ * ```ts
+ * import type { ClientRoute } from "@meekojs/meeko/framework";
+ *
+ * export const route: ClientRoute = {
+ *   load: async ({ params, signal }) => (await fetch(`/api/notes/${String(params.id)}`, { signal })).json(),
+ *   head: ({ data }) => ({ title: (data as { title: string }).title }),
+ * };
+ * ```
+ */
 export interface ClientRoute {
-  /** Client-safe loader. Server-only sidecars must not be passed to loadRoute. */
+  /** Schema de los parámetros de la ruta. */
   params?: PageSchema;
+  /** Schema de los parámetros de búsqueda. */
   search?: PageSchema;
+  /** Loader del navegador; recibe la navegación, `params`, `search` y el estado provisional. */
   load?: (context: ClientRouteContext) => Promise<unknown> | unknown;
+  /** Calcula el `title` y la `description` con los datos del loader; se aplican al documento. */
   head?: (context: ClientRouteContext & { data: unknown }) => PageHead;
 }
 
@@ -41,46 +80,98 @@ type ClientRouteContext = NavigationContext & {
   state: StateStore;
 };
 
+/**
+ * Opciones de {@link mountClientApp}. La entrada cliente que genera Meeko las rellena a partir de
+ * los módulos virtuales del plugin de Vite.
+ *
+ * @example
+ * ```ts
+ * import { mountClientApp } from "@meekojs/meeko/framework";
+ * import type { ClientAppOptions, ClientComponent } from "@meekojs/meeko/framework";
+ *
+ * const options: ClientAppOptions = {
+ *   root: document.getElementById("app")!,
+ *   payload: document.getElementById("meeko-payload")?.textContent,
+ *   routes,
+ *   serverData: true,
+ *   loadPage: async (file) => await pages[file]!() as ClientComponent,
+ *   onError: (error, source) => console.error(source, error),
+ * };
+ * const app = await mountClientApp(options);
+ * ```
+ */
 export interface ClientAppOptions {
+  /** Manifiesto de rutas, el mismo que usa el servidor. */
   readonly routes: readonly RouteRecord[];
+  /**
+   * Página de error de la aplicación (`app/error.meeko`) y sus layouts raíz. Hidrata una página
+   * `404` del servidor y respalda las rutas `render: "client"` sin `+error.meeko`.
+   * @since 1.1.0
+   */
+  readonly errorPage?: ErrorPageRecord | undefined;
+  /** Elemento raíz que contiene el HTML SSR (`#app`). */
   readonly root: Element;
+  /** Payload de hidratación de `#meeko-payload`, como texto JSON o ya analizado. */
   readonly payload: string | unknown;
+  /** Carga el módulo compilado de una página o un layout por su archivo. */
   readonly loadPage: (file: string) => Promise<ClientComponent>;
+  /** Carga las opciones de ruta públicas de un sidecar para ejecutar su loader en el navegador. */
   readonly loadRoute?: (file: string) => Promise<ClientRoute>;
   /**
-   * Loads the browser sidecar of a `render: "client"` route. These routes
-   * always take their data from this loader, also with `serverData`; it
-   * defaults to `loadRoute`.
+   * Carga el sidecar de navegador de una ruta `render: "client"`. Estas rutas siempre toman sus
+   * datos de este loader, también con `serverData`; por defecto, `loadRoute`.
    */
   readonly loadClientRoute?: (file: string) => Promise<ClientRoute>;
-  /** Runs the same route guards as SSR before a browser navigation fetch. */
+  /** Carga el middleware de ruta, que se ejecuta como en SSR antes de pedir cada navegación. */
   readonly loadMiddleware?: () => Promise<readonly RouteMiddleware[]>;
-  /** Fetches public loader data from the SSR handler during browser navigation. */
+  /** Pide al handler SSR los datos públicos del loader al navegar (`application/meeko+json`). */
   readonly serverData?: boolean;
+  /** Implementación de `fetch` para las navegaciones; por defecto, la global. */
   readonly fetch?: typeof fetch;
+  /** Observa los fallos de navegación por clic o historial; tiene prioridad sobre `onError`. */
   readonly onNavigationError?: (error: unknown) => void;
   /**
-   * Observes browser failures of this application: navigation, Socket clients,
-   * and component events, effects or cleanups without a nearer `provideErrorHandler`.
+   * Observa los fallos de esta aplicación en el navegador: navegación, clientes Socket y eventos,
+   * efectos o limpiezas de componentes sin un `provideErrorHandler` más cercano.
    */
   readonly onError?: ComponentErrorHandler;
+  /** Ventana del navegador; por defecto, `window`. */
   readonly browser?: Window;
 }
 
+/**
+ * Aplicación montada que devuelve {@link mountClientApp}.
+ *
+ * @example
+ * ```ts
+ * const app = await mountClientApp(options);
+ * await app.navigate("/users/42");
+ * const theme = app.state.get("theme", () => "light");
+ * app.dispose();
+ * ```
+ */
 export interface ClientApp {
+  /** Navega dentro de la aplicación; rechaza con el error original si la navegación falla. */
   navigate: Navigator["navigate"];
+  /** Estado de `useState` compartido por la aplicación. */
   readonly state: StateStore;
+  /** Libera páginas, layouts, listeners y conexiones Socket de la aplicación. */
   dispose(): void;
 }
 
 interface HydrationPayload {
+  /** Empty in an application error page payload (`error: true`), which has no route. */
   route: string;
+  /** The payload renders `app/error.meeko` for a URL without a route; props are `{ status, message }`. */
+  error: boolean;
   render: PageRender;
   props: Record<string, unknown>;
   state: Record<string, unknown>;
   sharedState: Record<string, unknown>;
   head: PageHead;
   deferred: readonly PayloadDeferred[];
+  /** Data of the top-level data awaits that the server rendered, by request key. */
+  resources: Record<string, unknown>;
 }
 
 const pageRenders: readonly string[] = ["ssr", "stream", "prerender", "client"] satisfies readonly PageRender[];
@@ -91,6 +182,9 @@ const emptyOutlet: Component<Record<string, unknown>> = {
   renderToString: () => "",
   hydrateScope: () => () => {},
 };
+
+/** A navigation to a route, or without `match` to a URL that renders the application error page. */
+type RenderContext = UnmatchedNavigationContext & { readonly match?: RouteMatch };
 
 /** Props of `+error.meeko`, with the same public messages as the server error page. */
 function errorPageProps(error: unknown): { status: number; message: string } {
@@ -113,19 +207,28 @@ function readPayload(value: unknown): HydrationPayload {
   if (isRecord(parsed) && parsed.v !== PAYLOAD_VERSION) {
     throw new TypeError(`Unsupported Meeko payload version ${String(parsed.v)}; the server and browser bundles must come from the same build`);
   }
-  if (!isRecord(parsed) || typeof parsed.route !== "string" || !isRecord(parsed.props) || !isRecord(parsed.state)) {
+  const error = isRecord(parsed) && parsed.error === true;
+  if (!isRecord(parsed) || (!error && typeof parsed.route !== "string") || !isRecord(parsed.props) || !isRecord(parsed.state)) {
     throw new TypeError("Invalid Meeko hydration payload");
   }
-  if (!isRecord(parsed.props.params) || !isRecord(parsed.props.search)) throw new TypeError("Invalid Meeko route props");
+  if (error) {
+    if (typeof parsed.props.status !== "number" || !Number.isInteger(parsed.props.status) || typeof parsed.props.message !== "string") {
+      throw new TypeError("Invalid Meeko error page props");
+    }
+  } else if (!isRecord(parsed.props.params) || !isRecord(parsed.props.search)) throw new TypeError("Invalid Meeko route props");
   if (parsed.sharedState !== undefined && !isRecord(parsed.sharedState)) throw new TypeError("Invalid Meeko shared state");
+  if (parsed.resources !== undefined && !isRecord(parsed.resources)) throw new TypeError("Invalid Meeko page data");
   const render = parsed.render ?? "ssr";
-  if (typeof render !== "string" || !pageRenders.includes(render)) throw new TypeError("Invalid Meeko page render mode");
+  if (typeof render !== "string" || !pageRenders.includes(render) || (error && render !== "ssr")) throw new TypeError("Invalid Meeko page render mode");
   const head = parsed.head ?? {};
-  if (!isRecord(head) || (head.title !== undefined && typeof head.title !== "string")) throw new TypeError("Invalid Meeko page head");
+  if (!isRecord(head) || (head.title !== undefined && typeof head.title !== "string") || (head.description !== undefined && typeof head.description !== "string")) {
+    throw new TypeError("Invalid Meeko page head");
+  }
   return {
-    route: parsed.route, render: render as PageRender, props: parsed.props, state: parsed.state,
-    sharedState: parsed.sharedState ?? {}, head: head.title === undefined ? {} : { title: head.title },
+    route: error ? "" : parsed.route as string, error, render: render as PageRender, props: parsed.props, state: parsed.state,
+    sharedState: parsed.sharedState ?? {}, head: payloadHead(head as PageHead),
     deferred: readDeferredEntries(parsed.deferred),
+    resources: (parsed.resources as Record<string, unknown> | undefined) ?? {},
   };
 }
 
@@ -382,6 +485,44 @@ function applyCsrfToken(browser: Window, token: string): () => void {
   };
 }
 
+/**
+ * The title of an SSR document whose page has no `head.title`: the first
+ * `<title>` of the host markup (`DocumentOptions.head`), or none. Meeko writes
+ * a page `<title>` before that markup, so after one the host title is the second.
+ */
+function hostDocumentTitle(document: Document, pageTitle: boolean): string {
+  const element = document.head?.querySelectorAll("title")[pageTitle ? 1 : 0];
+  // Same whitespace handling as document.title.
+  return (element?.textContent ?? "").replace(/[\t\n\f\r ]+/g, " ").replace(/^ | $/g, "");
+}
+
+/**
+ * The description of an SSR document whose page has none: the first description meta of the host
+ * markup, or none. A page description is written before that markup, so the host's is the second.
+ */
+function hostDocumentDescription(document: Document, pageDescription: boolean): string | undefined {
+  return document.head?.querySelectorAll('meta[name="description"]')[pageDescription ? 1 : 0]?.getAttribute("content") ?? undefined;
+}
+
+/** Shows `description` in the first description meta, creating it, or removes that meta. */
+function applyDocumentDescription(document: Document, description: string | undefined): void {
+  const head = document.head;
+  if (!head) return;
+  let meta = head.querySelector('meta[name="description"]');
+  if (description === undefined) {
+    meta?.remove();
+    return;
+  }
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.setAttribute("name", "description");
+    const title = head.querySelector("title");
+    if (title) title.after(meta);
+    else head.append(meta);
+  }
+  if (meta.getAttribute("content") !== description) meta.setAttribute("content", description);
+}
+
 function bind(component: ClientComponent, props: Record<string, unknown>): Component<Record<string, unknown>> {
   return {
     renderWithState: () => component.renderWithState(props),
@@ -391,38 +532,77 @@ function bind(component: ClientComponent, props: Record<string, unknown>): Compo
 }
 
 async function createTree(
-  route: RouteRecord,
+  chain: readonly string[],
   props: Record<string, unknown>,
   loadPage: ClientAppOptions["loadPage"],
   fromLayout: number,
-  leaf: string | Component<Record<string, unknown>> = route.file,
-): Promise<{ component: Component<Record<string, unknown>>; layouts: LayoutInstance[] }> {
-  let component = typeof leaf === "string" ? bind(await loadPage(leaf), props) : leaf;
+  leaf: string | Component<Record<string, unknown>>,
+): Promise<{ component: Component<Record<string, unknown>>; layouts: LayoutInstance[]; modules: unknown[] }> {
+  const page = typeof leaf === "string" ? await loadPage(leaf) : undefined;
+  let component = page ? bind(page, props) : leaf as Component<Record<string, unknown>>;
   const layouts: LayoutInstance[] = [];
-  for (let index = route.layouts.length - 1; index >= fromLayout; index--) {
-    const file = route.layouts[index]!;
+  /** The compiled modules that render the tree, for `mayAwaitData`; an empty outlet renders none. */
+  const modules: unknown[] = page ? [page] : [];
+  for (let index = chain.length - 1; index >= fromLayout; index--) {
+    const file = chain[index]!;
     const outlet = signal(component);
     const layoutProps = Object.defineProperty({}, "outlet", {
       enumerable: true,
       get: () => outlet.value,
     }) as Record<string, unknown>;
-    component = bind(await loadPage(file), layoutProps);
+    const layout = await loadPage(file);
+    modules.push(layout);
+    component = bind(layout, layoutProps);
     layouts.unshift({ file, outlet });
   }
-  return { component, layouts };
+  return { component, layouts, modules };
 }
 
 /**
- * Hydrates the SSR tree and updates only the first changed outlet on navigation.
- * Layout templates render their outlet with <component is="props.outlet"/>.
+ * Hidrata el árbol SSR de la aplicación y gestiona la navegación de cliente: historial, enlaces,
+ * cancelación, middleware de ruta y limpieza. Al navegar sólo sustituye el primer outlet que
+ * cambia; los layouts renderizan su outlet con `<component is="props.outlet">`. La navegación es
+ * transaccional: si falla, la página anterior sigue visible.
+ *
+ * @param options Rutas, raíz, payload y cargadores de módulos.
+ * @returns La aplicación montada.
+ * @throws {TypeError} Si el payload no es válido o viene de otro build.
+ * @throws {Error} Si la ruta o sus parámetros no coinciden con los del SSR, o falla la hidratación.
+ * @example
+ * ```ts
+ * import { mountClientApp } from "@meekojs/meeko/framework";
+ * import type { ClientComponent } from "@meekojs/meeko/framework";
+ * import { modules as pages } from "virtual:meeko-client-pages";
+ * import { errorPage, routes } from "virtual:meeko-manifest/client";
+ *
+ * const app = await mountClientApp({
+ *   root: document.getElementById("app")!,
+ *   payload: document.getElementById("meeko-payload")?.textContent,
+ *   routes,
+ *   errorPage,
+ *   serverData: true,
+ *   loadPage: async (file) => await pages[file]!() as ClientComponent,
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#routing-layouts-y-ssr
  */
 export async function mountClientApp(options: ClientAppOptions): Promise<ClientApp> {
   const browser = options.browser ?? window;
   const payload = readPayload(options.payload);
+  // A page without head.title leaves the title SSR would give it, not the previous page's.
+  const defaultTitle = hostDocumentTitle(browser.document, payload.head.title !== undefined);
+  const defaultDescription = hostDocumentDescription(browser.document, payload.head.description !== undefined);
+  const appError = options.errorPage;
   const initial = matchRoute(options.routes, browser.location.pathname);
-  if (!initial || initial.route.id !== payload.route) throw new Error("Meeko route hydration mismatch");
-  if (JSON.stringify(initial.params) !== JSON.stringify(payload.props.params)) throw new Error("Meeko route parameters do not match SSR");
+  if (payload.error) {
+    // The server rendered app/error.meeko for a URL without a route.
+    if (initial || !appError) throw new Error("Meeko route hydration mismatch");
+  } else {
+    if (!initial || initial.route.id !== payload.route) throw new Error("Meeko route hydration mismatch");
+    if (JSON.stringify(initial.params) !== JSON.stringify(payload.props.params)) throw new Error("Meeko route parameters do not match SSR");
+  }
   const stateStore = new StateStore(payload.sharedState);
+  const resourceCache = new ResourceCache();
   const errorChannel = createAppErrorChannel(options.onError);
   const observeNavigationError = options.onNavigationError ?? ((error: unknown) => {
     const handler = errorChannel.current();
@@ -434,6 +614,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   const hydrateApp = (hydrate: () => () => void) => hydrateWithStateStore(stateStore, () => {
     provideAppErrorChannel(errorChannel);
     provideNavigation(navigationState);
+    provideResourceCache(resourceCache);
     return hydrate();
   });
   // A client page arrives with its layouts around an empty outlet; the page
@@ -450,11 +631,20 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   }
   let first: Awaited<ReturnType<typeof createTree>>;
   let release: () => void;
+  // href(id) resolves against this app's manifest from hydration until dispose.
+  const releaseManifest = activateRouteManifest(options.routes);
   try {
-    first = await createTree(initial.route, payload.props, options.loadPage, 0, clientFirst ? emptyOutlet : initial.route.file);
-    release = hydrateApp(() => first.component.hydrateScope({ root: options.root }, {}, payload.state));
+    first = initial
+      ? await createTree(initial.route.layouts, payload.props, options.loadPage, 0, clientFirst ? emptyOutlet : initial.route.file)
+      : await createTree(appError!.layouts, payload.props, options.loadPage, 0, appError!.file);
+    // Awaited data comes from the payload: hydration stays synchronous and never requests it again.
+    const initialData = new ResourceScope("read", payload.resources);
+    // onMounted callbacks run once the whole tree has hydrated.
+    release = withResourceScope(initialData, () => hydrateApp(() => mountBatch(() => first.component.hydrateScope({ root: options.root }, {}, payload.state))));
+    resourceCache.merge(initialData.loadedData());
   } catch (error) {
     stopChunks();
+    releaseManifest();
     throw error;
   }
   let layouts = first.layouts;
@@ -498,15 +688,16 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       if (!signal.aborted) receiver.end();
     })();
   };
-  const renderRoute = async (context: NavigationContext, initialLoad: boolean): Promise<void | boolean> => {
+  const renderRoute = async (context: RenderContext, initialLoad: boolean): Promise<void | boolean> => {
     const stream: { control?: AbortController; committed?: boolean } = {};
     try { return await renderRouteData(context, initialLoad, stream); }
     finally { if (!stream.committed) stream.control?.abort(); }
   };
-  const renderRouteData = async (context: NavigationContext, initialLoad: boolean, stream: { control?: AbortController; committed?: boolean }): Promise<void | boolean> => {
-    if (options.loadMiddleware && !initialLoad) {
+  const renderRouteData = async (context: RenderContext, initialLoad: boolean, stream: { control?: AbortController; committed?: boolean }): Promise<void | boolean> => {
+    const match = context.match;
+    if (match && options.loadMiddleware && !initialLoad) {
       const response = await runRouteMiddleware(await options.loadMiddleware(), {
-        url: context.url, match: context.match, signal: context.signal, phase: "client",
+        url: context.url, match, signal: context.signal, phase: "client",
       });
       if (context.signal.aborted || disposed) return false;
       if (response) {
@@ -527,7 +718,8 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     let errorPage: string | undefined;
     let lines: AsyncGenerator<string> | undefined;
     let navigationDeferred: ReadonlyMap<number, DeferredInternals> | undefined;
-    const route = context.match.route;
+    let serverData: Record<string, unknown> = {};
+    const route = match?.route;
     /** Aborted when this navigation is superseded before its commit, or by the next commit or dispose. */
     const routeWork = (): AbortSignal => {
       if (!stream.control) {
@@ -540,9 +732,9 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       return stream.control.signal;
     };
     const runSidecar = async (sidecar: ClientRoute | undefined, onLoaderError?: (error: unknown) => void): Promise<void> => {
-      const validated = await validatePageInputs(sidecar, context.match.params, pageSearchObject(context.url.searchParams));
+      const validated = await validatePageInputs(sidecar, match!.params, pageSearchObject(context.url.searchParams));
       loaderDraft = sidecar?.load ? stateStore.navigationDraft() : undefined;
-      const routeContext = { ...context, ...validated, state: loaderDraft?.state ?? stateStore };
+      const routeContext = { ...context, match: match!, ...validated, state: loaderDraft?.state ?? stateStore };
       try {
         const data = sidecar?.load ? await sidecar.load(routeContext) : undefined;
         if (data !== undefined) driveClientDeferred(data, reportDeferred, routeWork());
@@ -557,19 +749,33 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         onLoaderError(error);
       }
     };
-    if (route.render === "client") {
+    if (!route) {
+      // A URL without a route shows app/error.meeko inside the root layouts, as the server answers it.
+      errorPage = appError!.file;
+      props = { status: 404, message: "NOT_FOUND" };
+      if (options.serverData && !options.loadRoute) {
+        // Server middleware, files or redirects may own a URL without a page
+        // route. Probing it with a fetch would run GET side effects twice and
+        // break cross-origin redirects, so the browser loads it as a document;
+        // the server answers app/error.meeko when nothing else does.
+        if (context.signal.aborted || disposed) return false;
+        browser.location.assign(context.url.href);
+        return false;
+      }
+    } else if (route.render === "client") {
       const loadSidecar = options.loadClientRoute ?? options.loadRoute;
       if (!route.sidecar || !loadSidecar) throw new Error(`Route ${route.id} renders in the browser but its client sidecar cannot be loaded`);
       const sidecar = await loadSidecar(route.sidecar);
       if (context.signal.aborted || disposed) return;
-      // A failed browser loader shows the nearest +error.meeko inside the route's layouts.
-      await runSidecar(sidecar, route.error ? (error) => {
+      // A failed browser loader shows the nearest +error.meeko (or app/error.meeko) inside the route's layouts.
+      const routeError = route.error ?? appError?.file;
+      await runSidecar(sidecar, routeError ? (error) => {
         const failure = errorPageProps(error);
         if (failure.status >= 500) reportNavigationError(browser, error, observeNavigationError);
         loaderDraft = undefined;
         props = failure;
         head = {};
-        errorPage = route.error;
+        errorPage = routeError;
       } : undefined);
     } else if (options.serverData && !options.loadRoute) {
       const response = await (options.fetch ?? fetch)(context.url.href, {
@@ -590,33 +796,92 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         } else browser.location.assign(redirect.href);
         return false;
       }
-      if (!response.ok) throw new Error(`Route data request failed: HTTP ${response.status}`);
-      serverCsrfToken = response.headers.get("x-meeko-csrf-token");
-      let payload: HydrationPayload;
-      // A stream route answers ndjson: the payload line commits, later lines settle deferred values.
-      if ((response.headers.get("content-type") ?? "").startsWith("application/meeko+ndjson")) {
-        if (!response.body) throw new Error("Empty Meeko navigation stream");
-        // Superseded before the commit (navigation signal) or after it (next commit or dispose).
-        lines = ndjsonLines(response.body, routeWork());
-        const line = await lines.next();
-        if (line.done) throw new Error("Empty Meeko navigation stream");
-        payload = readPayload(line.value);
-      } else payload = readPayload(await response.text());
-      if (payload.route !== context.match.route.id) throw new Error("Meeko route data mismatch");
-      if (context.signal.aborted || disposed) return;
-      navigationDeferred = placePayloadDeferred(payload.props, payload.deferred);
-      serverSharedState = payload.sharedState;
-      props = payload.props;
-      head = payload.head;
+      // notFound() in top-level server code, or a loader's 404: the nearest error page, as in SSR.
+      const notFoundPage = response.status === 404 ? route.error ?? appError?.file : undefined;
+      if (notFoundPage) {
+        // The public `{ code, status }` of the failure; the server document shows the same code.
+        const failure = await response.json().catch(() => undefined) as { code?: unknown } | undefined;
+        if (context.signal.aborted || disposed) return;
+        serverCsrfToken = response.headers.get("x-meeko-csrf-token");
+        props = { status: 404, message: typeof failure?.code === "string" && failure.code ? failure.code : "NOT_FOUND" };
+        errorPage = notFoundPage;
+      } else {
+        if (!response.ok) throw new Error(`Route data request failed: HTTP ${response.status}`);
+        // A server that does not speak Meeko's protocol (a static host serving the prerendered
+        // index.html, a proxy or a CDN) answers with the document: load it instead of failing.
+        if ((response.headers.get("content-type") ?? "").toLowerCase().startsWith("text/html")) {
+          void response.body?.cancel().catch(() => {});
+          if (context.signal.aborted || disposed) return false;
+          // History navigation already shows this URL: load it in place of its entry.
+          if (browser.location.href === context.url.href) browser.location.replace(context.url.href);
+          else browser.location.assign(context.url.href);
+          return false;
+        }
+        serverCsrfToken = response.headers.get("x-meeko-csrf-token");
+        let payload: HydrationPayload;
+        // A stream route answers ndjson: the payload line commits, later lines settle deferred values.
+        if ((response.headers.get("content-type") ?? "").startsWith("application/meeko+ndjson")) {
+          if (!response.body) throw new Error("Empty Meeko navigation stream");
+          // Superseded before the commit (navigation signal) or after it (next commit or dispose).
+          lines = ndjsonLines(response.body, routeWork());
+          const line = await lines.next();
+          if (line.done) throw new Error("Empty Meeko navigation stream");
+          payload = readPayload(line.value);
+        } else payload = readPayload(await response.text());
+        if (payload.route !== route.id) throw new Error("Meeko route data mismatch");
+        if (context.signal.aborted || disposed) return;
+        navigationDeferred = placePayloadDeferred(payload.props, payload.deferred);
+        serverSharedState = payload.sharedState;
+        serverData = payload.resources;
+        props = payload.props;
+        head = payload.head;
+      }
     } else {
       const sidecar = route.sidecar && options.loadRoute ? await options.loadRoute(route.sidecar) : undefined;
       await runSidecar(sidecar);
     }
     if (context.signal.aborted || disposed) return;
     const retained = Math.min(context.retainedLayouts, layouts.length);
-    const next = await createTree(route, props, options.loadPage, retained, errorPage ?? route.file);
+    let next = await createTree(route ? route.layouts : appError!.layouts, props, options.loadPage, retained, errorPage ?? route!.file);
     if (context.signal.aborted || disposed) return;
-    const commit = () => {
+    // The new page and its components load their top-level data awaits before the commit, while
+    // the previous page stays visible. These passes are dry, like SSR: a throwaway state keeps them
+    // from touching the app, no effect runs, no socket connects and no onMounted or browser
+    // continuation starts. A tree whose compiled modules have no data await skips them.
+    const prepare = async (tree: typeof next): Promise<ResourceScope> => {
+      const scope = new ResourceScope("collect", serverData, context.signal);
+      if (!tree.modules.some((module) => mayAwaitData(module))) return scope;
+      const preview = loaderDraft ? loaderDraft.state.snapshot() : { ...serverSharedState, ...stateStore.snapshot() };
+      await renderWithSuspense(() => {
+        scope.beginPass();
+        return runDry(() => withResourceScope(scope, () => withStateStore(new StateStore(preview), () => tree.component.renderWithState({}))));
+      }, { signal: context.signal });
+      return scope;
+    };
+    let pageData: ResourceScope;
+    try {
+      pageData = await prepare(next);
+    } catch (error) {
+      if (context.signal.aborted || disposed) return;
+      // A failed data await shows the nearest +error.meeko (or app/error.meeko) inside the layouts, like a loader failure.
+      const routeError = errorPage === undefined ? route?.error ?? appError?.file : undefined;
+      if (!routeError) throw error;
+      const failure = errorPageProps(error);
+      if (failure.status >= 500) reportNavigationError(browser, error, observeNavigationError);
+      loaderDraft = undefined;
+      props = failure;
+      head = {};
+      errorPage = routeError;
+      next = await createTree(route ? route.layouts : appError!.layouts, props, options.loadPage, retained, routeError);
+      if (context.signal.aborted || disposed) return;
+      pageData = await prepare(next);
+    }
+    if (context.signal.aborted || disposed) return;
+    const committedData = new ResourceScope("read", Object.fromEntries(pageData.loadedData()));
+    // A region that the loaded data does not cover, such as an if: that an onMounted shows, mounts once its own data loads.
+    // onMounted callbacks of the new tree run once the commit has finished.
+    const commit = () => withResourceScope(committedData, () => lateRender(() => mountBatch(commitTree)));
+    const commitTree = () => {
       if (retained) {
         const outlet = layouts[retained - 1]!.outlet;
         const previous = outlet.value;
@@ -643,9 +908,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       options.root.append(start, end);
       let nextRelease: () => void;
       try {
-        const range = document.createRange();
-        range.selectNodeContents(options.root);
-        options.root.insertBefore(range.createContextualFragment(rendered.html), end);
+        options.root.insertBefore(parseRegionHtml(options.root, rendered.html), end);
         nextRelease = hydrateApp(() => next.component.hydrateScope({ root: options.root, start, end }, {}, rendered.state));
       } catch (error) {
         for (let node: ChildNode | null = start; node;) {
@@ -672,25 +935,30 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         catch (restoreError) { throw new AggregateError([error, restoreError], "Meeko navigation and CSRF recovery failed"); }
         throw error;
       }
-      if (head.title !== undefined) browser.document.title = head.title;
+      // An error page (notFound(), a loader or data failure, or app/error.meeko for a URL without
+      // a route) has the title of its SSR error document.
+      browser.document.title = head.title ?? (errorPage !== undefined ? ERROR_PAGE_TITLE : defaultTitle);
+      applyDocumentDescription(browser.document, head.description ?? defaultDescription);
     };
     if (serverSharedState) stateStore.seedForNavigation(serverSharedState, commitWithToken);
     else if (loaderDraft) loaderDraft.commit(commitWithToken);
     else commitWithToken();
+    resourceCache.merge(pageData.loadedData());
     // The previous route is gone: stop reading its stream, then read this one's.
     stream.committed = true;
     activeStream?.abort();
     activeStream = stream.control;
     if (navigationDeferred) consumeStream(lines, navigationDeferred, stream.control?.signal);
   };
-  const navigator = createNavigator(options.routes, async (context) => {
+  const run = async (context: RenderContext): Promise<void | boolean> => {
     const token = ++navigationCount;
     const initialLoad = initialClientLoad;
     initialClientLoad = false;
     pending.value = true;
     try { return await renderRoute(context, initialLoad); }
     finally { if (token === navigationCount) pending.value = false; }
-  }, browser, observeNavigationError);
+  };
+  const navigator = createAppNavigator(options.routes, run, browser, observeNavigationError, appError ? { layouts: appError.layouts, render: run } : undefined);
   const onClick = (event: MouseEvent) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const target = event.target;
@@ -700,7 +968,10 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     let url: URL;
     try { url = new URL(anchor.href, browser.location.href); }
     catch { return; }
-    if (url.origin !== browser.location.origin || !matchRoute(options.routes, url.pathname)) return;
+    if (url.origin !== browser.location.origin) return;
+    // A fragment of the current page (`#section`) is the browser's: it scrolls without a navigation.
+    if (url.hash && sameDocument(url, new URL(browser.location.href))) return;
+    if (!matchRoute(options.routes, url.pathname)) return;
     event.preventDefault();
     void navigator.navigate(url.href).catch((error: unknown) => reportNavigationError(browser, error, observeNavigationError));
   };
@@ -721,6 +992,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       stopChunks();
       activeStream?.abort();
       browser.document.removeEventListener("click", onClick);
+      releaseManifest();
       finishWithCleanup(release, () => errorChannel.clear());
     },
   };

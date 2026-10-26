@@ -9,6 +9,18 @@ import { prepareFrameworkTypes } from "../../src/framework/check-project.ts";
 import { initFrameworkProject } from "../../src/framework/init.ts";
 import { buildProject } from "../../src/framework/project.ts";
 
+/** Windows antivirus or indexing can briefly hold a just-written file open. */
+async function renameWithRetry(from: string, to: string): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try { return await rename(from, to); }
+    catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (attempt >= 10 || (code !== "EPERM" && code !== "EBUSY" && code !== "EACCES")) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 100 * (attempt + 1)));
+    }
+  }
+}
+
 /** `workerd` builds with the cloudflare adapter and runs under `wrangler dev`'s runtime. */
 export type ConformanceAdapter = "node" | "bun" | "deno" | "workerd";
 
@@ -184,7 +196,7 @@ export async function startConformanceOutput(adapter: ConformanceAdapter): Promi
     await mkdir(moved);
     const sources = ["app", "server", "shared", "public", "meeko.config.ts", ".meeko/generated", ".meeko/build"];
     if (adapter !== "node") sources.push("node_modules");
-    for (const name of sources) await rename(join(root, name), join(moved, name.replaceAll("/", "-")));
+    for (const name of sources) await renameWithRetry(join(root, name), join(moved, name.replaceAll("/", "-")));
     if (adapter === "workerd") {
       workerd = await startWorkerd(result.output);
       const running = workerd;

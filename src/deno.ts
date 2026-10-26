@@ -5,7 +5,7 @@ import { createTrackedPlatform, fetchApp, positiveInteger, publicOriginOf, rebas
 import type { ServerPlatform } from "./framework-server/platform.js";
 import type { SocketPeer } from "./framework-server/socket.js";
 import { createSocketUpgradeHandler } from "./framework-server/upgrade.js";
-import type { SocketSession, SocketUpgrade, SocketUpgradeHandler } from "./framework-server/upgrade.js";
+import type { SocketSession, SocketUpgrade, SocketUpgradeClose, SocketUpgradeHandler } from "./framework-server/upgrade.js";
 
 // Minimal structural views of the Deno namespace, so this entry type-checks without Deno's types.
 
@@ -34,37 +34,83 @@ function denoGlobal(): DenoNamespace {
   return deno;
 }
 
+/**
+ * Opciones de {@link serveDeno}.
+ *
+ * @example
+ * ```ts
+ * import type { ServeDenoOptions } from "@meekojs/meeko/deno";
+ *
+ * const options: ServeDenoOptions = {
+ *   host: Deno.env.get("HOST") ?? "127.0.0.1",
+ *   port: Number(Deno.env.get("PORT") ?? 4173),
+ *   handleSignals: true,
+ * };
+ * ```
+ */
 export interface ServeDenoOptions {
-  /** Interface to bind. Defaults to 127.0.0.1; use 0.0.0.0 to accept remote traffic. */
+  /** Interfaz en la que escucha. Por defecto, `127.0.0.1`; use `0.0.0.0` para aceptar tráfico remoto. */
   readonly host?: string;
-  /** Defaults to 4173; 0 selects a free port. */
+  /** Puerto; 4173 por defecto y `0` elige uno libre. */
   readonly port?: number;
-  /** Overrides the application's `publicOrigin` for HTTP and Socket origin checks. */
+  /** Sustituye al `publicOrigin` de la aplicación en las comprobaciones de Origin de HTTP y Socket. */
   readonly publicOrigin?: string;
-  /** Platform passed to each request. Defaults to Deno with `Deno.env`. */
+  /** Plataforma que recibe cada petición. Por defecto, Deno con `Deno.env`. */
   readonly platform?: ServerPlatform;
-  /** Defaults to the application's error observer. */
+  /** Observador de errores; por defecto, el de la aplicación. */
   readonly onError?: (error: unknown, requestId: string) => void;
-  /** Largest inbound Socket message; larger messages close the peer with 1009. Defaults to the application's Socket limit or 64 KiB. */
+  /** Mensaje de Socket entrante más grande; los mayores cierran el peer con `1009`. Por defecto, el límite de Socket de la aplicación o 64 KiB. */
   readonly maxMessageBytes?: number;
-  /** Seconds without a pong before Deno closes a peer; pings are sent at half this interval. Defaults to 60. */
+  /** Segundos sin `pong` antes de que Deno cierre un peer; los pings se envían a la mitad de ese intervalo. Por defecto, 60. */
   readonly idleTimeout?: number;
-  /** Close gracefully on SIGINT and SIGTERM (SIGINT and SIGBREAK on Windows). */
+  /** Cierra de forma ordenada ante `SIGINT` y `SIGTERM` (`SIGINT` y `SIGBREAK` en Windows). */
   readonly handleSignals?: boolean;
 }
 
+/**
+ * Servidor Deno en marcha que devuelve {@link serveDeno}.
+ *
+ * @example
+ * ```ts
+ * const server = await serveDeno(app, { port: 0 });
+ * console.log(server.url);
+ * await server.close();
+ * await server.finished;
+ * ```
+ */
 export interface DenoServer {
-  /** Local URL the server listens on. */
+  /** URL local en la que escucha. */
   readonly url: string;
-  /** Resolves once the HTTP server has stopped. */
+  /** Se resuelve cuando el servidor HTTP se ha detenido. */
   readonly finished: Promise<void>;
-  /** Stops Socket peers and HTTP, waits for background tasks, then closes the application. */
+  /** Cierra los peers de Socket con `1001` y HTTP, espera las tareas en segundo plano y cierra la aplicación. */
   close(): Promise<void>;
 }
 
 const encoder = new TextEncoder();
 
-/** Serves a Meeko application, including its Socket channels, with `Deno.serve`. */
+/**
+ * Sirve una aplicación de Meeko con `Deno.serve`, incluidos sus canales Socket con
+ * `Deno.upgradeWebSocket`. Sólo funciona en Deno.
+ *
+ * @param app Aplicación de `createServerApp`.
+ * @param options Dirección, origen público, límites de Socket y señales.
+ * @returns El servidor en marcha.
+ * @throws {RangeError} Si el puerto o algún límite no son válidos.
+ * @throws {Error} Fuera del runtime de Deno.
+ * @example
+ * ```ts
+ * import { createServerApp } from "@meekojs/meeko/server";
+ * import { createDenoAssetReader, serveDeno } from "@meekojs/meeko/deno";
+ *
+ * const app = await createServerApp({
+ *   manifest, load, runtime, production: true,
+ *   assets: createDenoAssetReader({ root: new URL("./client/", import.meta.url), assets: manifest.assets ?? {} }),
+ * });
+ * const server = await serveDeno(app, { host: "0.0.0.0", port: 8000, handleSignals: true });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#deno
+ */
 export async function serveDeno(app: ServerApp, options: ServeDenoOptions = {}): Promise<DenoServer> {
   const deno = denoGlobal();
   const host = options.host ?? "127.0.0.1";
@@ -114,6 +160,27 @@ export async function serveDeno(app: ServerApp, options: ServeDenoOptions = {}):
     return response;
   };
 
+  /**
+   * An auth refusal completes the upgrade only to close with 4401/4403, which a browser can read.
+   *
+   * The close waits one macrotask after `open`. A Deno server socket that reads a data frame while
+   * it is CLOSING drops the connection at once, and the close frame it was writing can be lost: the
+   * client then sees 1006. A client that sends as soon as it opens (Meeko's client may emit from its
+   * `open` state) often has that frame already queued when `onopen` runs; read while the socket is
+   * still OPEN, it is discarded here and the close frame reaches the client. `peers` holds the
+   * socket until `onclose`.
+   */
+  const deny = (request: Request, close: SocketUpgradeClose): Response => {
+    const { socket, response } = deno.upgradeWebSocket(request, { idleTimeout });
+    peers.add(socket);
+    socket.onopen = () => {
+      setTimeout(() => { if (socket.readyState === WebSocket.OPEN) socket.close(close.code, close.reason); }, 0);
+    };
+    socket.onmessage = () => { /* A refused connection never reaches the hub. */ };
+    socket.onclose = () => { peers.delete(socket); };
+    return response;
+  };
+
   const handler = async (request: Request): Promise<Response> => {
     await ready;
     if (closing) return new Response(null, { status: 503 });
@@ -124,7 +191,13 @@ export async function serveDeno(app: ServerApp, options: ServeDenoOptions = {}):
         report(error, crypto.randomUUID());
         return new Response(null, { status: 500 });
       }
-      if (decision.action === "reject") return new Response(null, { status: decision.status });
+      if (decision.action === "reject") {
+        if (decision.close) {
+          try { return deny(request, decision.close); }
+          catch (error) { report(error, crypto.randomUUID()); }
+        }
+        return new Response(null, { status: decision.status });
+      }
       if (decision.action === "upgrade") {
         try { return connect(request, decision); }
         catch (error) {
@@ -198,13 +271,36 @@ export async function serveDeno(app: ServerApp, options: ServeDenoOptions = {}):
   return { url, finished: server.finished, close };
 }
 
+/**
+ * Opciones de {@link createDenoAssetReader}.
+ *
+ * @example
+ * ```ts
+ * import type { DenoAssetReaderOptions } from "@meekojs/meeko/deno";
+ *
+ * const options: DenoAssetReaderOptions = { root: new URL("./client/", import.meta.url), assets: manifest.assets ?? {} };
+ * ```
+ */
 export interface DenoAssetReaderOptions {
-  /** Directory holding the files listed in `assets`, as a path or a `file:` URL. */
+  /** Carpeta que contiene los archivos listados en `assets`, como ruta o URL `file:`. */
   readonly root: string | URL;
+  /** Manifiesto de los archivos públicos. */
   readonly assets: AssetManifest;
 }
 
-/** Serves only manifest-listed build files with `Deno.open`, streamed with validators. */
+/**
+ * Sirve con `Deno.open` sólo los archivos del build listados en el manifiesto, en streaming y con
+ * `ETag`, `HEAD` y `304`. Sólo funciona en Deno.
+ *
+ * @param options Carpeta y manifiesto de archivos.
+ * @returns El lector de archivos.
+ * @example
+ * ```ts
+ * import { createDenoAssetReader } from "@meekojs/meeko/deno";
+ *
+ * const assets = createDenoAssetReader({ root: new URL("./client/", import.meta.url), assets: manifest.assets ?? {} });
+ * ```
+ */
 export function createDenoAssetReader(options: DenoAssetReaderOptions): AssetReader {
   return {
     async get(pathname, request) {

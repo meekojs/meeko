@@ -1,19 +1,58 @@
-/** A build output file that the host may serve publicly. */
+/**
+ * Un archivo del build que el host puede servir públicamente.
+ *
+ * @example
+ * ```ts
+ * import type { AssetRecord } from "@meekojs/meeko/server";
+ *
+ * const logo: AssetRecord = { type: "image/png", etag: "\"k3Jd9s\"", size: 5120 };
+ * ```
+ */
 export interface AssetRecord {
-  /** Value of the `content-type` header. */
+  /** Valor de la cabecera `content-type`. */
   readonly type: string;
-  /** Strong validator derived from the file contents. */
+  /** Validador fuerte derivado del contenido. */
   readonly etag: string;
+  /** Tamaño en bytes (`content-length`). */
   readonly size: number;
-  /** Content-hashed files never change under the same URL. */
+  /** Los archivos con hash de contenido nunca cambian bajo la misma URL; se sirven como `immutable`. */
   readonly immutable?: boolean;
 }
 
-/** Public build files keyed by their URL pathname. Unlisted paths are never read. */
+/**
+ * Archivos públicos del build por ruta de URL, tal como la serializa la URL WHATWG. Las rutas que
+ * no figuran nunca se leen del disco.
+ *
+ * @example
+ * ```ts
+ * import type { AssetManifest } from "@meekojs/meeko/server";
+ *
+ * const assets: AssetManifest = {
+ *   "/assets/entry-4f2a.js": { type: "text/javascript", etag: "\"a1\"", size: 20480, immutable: true },
+ *   "/logo@2x.png": { type: "image/png", etag: "\"b2\"", size: 5120 },
+ * };
+ * ```
+ */
 export type AssetManifest = Readonly<Record<string, AssetRecord>>;
 
-/** Serves listed build files; returns null when the request is not a listed asset. */
+/**
+ * Sirve los archivos listados del build. Cada adaptador ofrece uno: `createNodeAssetReader`,
+ * `createBunAssetReader`, `createDenoAssetReader` y `createCloudflareAssetReader`.
+ *
+ * @example
+ * ```ts
+ * import type { AssetReader } from "@meekojs/meeko/server";
+ *
+ * const robots: AssetReader = {
+ *   async get(pathname) {
+ *     if (pathname !== "/robots.txt") return null;
+ *     return new Response("User-agent: *\nAllow: /\n", { headers: { "content-type": "text/plain" } });
+ *   },
+ * };
+ * ```
+ */
 export interface AssetReader {
+  /** Devuelve la respuesta del archivo, con `ETag`, `HEAD` y `304`, o `null` si no es un archivo listado. */
   get(pathname: string, request: Request): Promise<Response | null>;
 }
 

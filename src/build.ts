@@ -3,7 +3,8 @@
  * Server runtimes import `@meekojs/meeko/server` instead; this entry reads the
  * filesystem and loads TypeScript.
  */
-export { discoverRoutes } from "./framework/routes-discovery.js";
+export { discoverErrorPage, discoverRoutes } from "./framework/routes-discovery.js";
+export type { DiscoverRoutesOptions } from "./framework/routes-discovery.js";
 export { composeFrameworkRoutes } from "./framework/modules.js";
 export type { ComposeRoutesOptions, RouteLayer, RouteModule } from "./framework/modules.js";
 export { discoverConfiguredRoutes, loadMeekoConfig, readMeekoConfigSync, resolveConfigSources } from "./framework/config.js";

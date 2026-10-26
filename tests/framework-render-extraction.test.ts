@@ -26,32 +26,32 @@ test("render extraction follows options declared as a local const", () => {
 
 test("render extraction rejects values it cannot read at build time", () => {
   assert.throws(() => extractRouteRender(file, `${header}const mode = "prerender";\nexport const route = definePage({ render: mode });\n`),
-    /index\.route\.ts: render must be a string literal so Meeko can read it at build time/);
+    /index\.route\.ts: render debe ser un literal de texto para que Meeko pueda leerlo durante el build/);
   assert.throws(() => extractRouteRender(file, `${header}export const route = definePage({ render: process.env.MODE as "ssr" });\n`),
-    /render must be a string literal/);
+    /render debe ser un literal de texto/);
   assert.throws(() => extractRouteRender(file, `${header}export const route = definePage({ render() { return "ssr"; } } as never);\n`),
-    /render must be a string literal/);
+    /render debe ser un literal de texto/);
   assert.throws(() => extractRouteRender(file, `${header}export const route = definePage({ render: "edge" } as never);\n`),
-    /unsupported render mode "edge"; use "ssr", "stream", "prerender" or "client"/);
+    /modo de render no admitido: "edge"; usa "ssr", "stream", "prerender" o "client"/);
   assert.throws(() => extractRouteRender(file, `${header}import { options } from "./options.js";\nexport const route = definePage(options);\n`),
-    /export definePage\(\{ \.\.\. \}\) or an object literal so Meeko can read render at build time/);
+    /exporta definePage\(\{ \.\.\. \}\) o un objeto literal para que Meeko pueda leer render durante el build/);
   assert.throws(() => extractRouteRender(file, `${header}let options = { render: "ssr" as const };\nexport const route = definePage(options);\n`),
-    /export definePage\(\{ \.\.\. \}\) or an object literal/);
+    /exporta definePage\(\{ \.\.\. \}\) o un objeto literal/);
   assert.throws(() => extractRouteRender(file, `${header}const base = { render: "prerender" as const };\nexport const route = definePage({ ...base });\n`),
-    /declare render explicitly; spread route options cannot be read at build time/);
+    /declara render de forma explícita; las opciones de ruta con spread no se pueden leer durante el build/);
   assert.throws(() => extractRouteRender(file, "export { route } from \"./shared.route.js\";\n"),
-    /re-exported route options cannot be read at build time/);
+    /las opciones de ruta reexportadas no se pueden leer durante el build/);
 });
 
 test("render extraction rejects computed keys and spreads that may set render at run time", () => {
   assert.throws(() => extractRouteRender(file, `${header}export const route = definePage({ ["render"]: "prerender" });\n`),
-    /index\.route\.ts: computed route option keys cannot be read at build time; write render as a plain property/);
+    /index\.route\.ts: las claves calculadas de las opciones de ruta no se pueden leer durante el build; escribe render como una propiedad normal/);
   assert.throws(() => extractRouteRender(file, `${header}const key = "render";\nexport const route = definePage({ [key]: "prerender" } as never);\n`),
-    /computed route option keys cannot be read at build time/);
+    /las claves calculadas de las opciones de ruta no se pueden leer durante el build/);
   assert.throws(() => extractRouteRender(file, `${header}const key = "render";\nexport const route = definePage({ render: "ssr", [key]: "prerender" } as never);\n`),
-    /computed route option keys cannot be read at build time/);
+    /las claves calculadas de las opciones de ruta no se pueden leer durante el build/);
   assert.throws(() => extractRouteRender(file, `${header}const base = { render: "prerender" as const };\nexport const route = definePage({ render: "ssr", ...base });\n`),
-    /declare render after any spread; spread route options cannot be read at build time/);
+    /declara render después de cualquier spread; las opciones de ruta con spread no se pueden leer durante el build/);
   // A later explicit render overrides earlier dynamic members at run time.
   assert.equal(extractRouteRender(file, `${header}const key = "load";\nexport const route = definePage({ [key]: () => ({}), render: "prerender" } as never);\n`), "prerender");
 });
@@ -68,7 +68,7 @@ test("route discovery records the extracted render mode in the manifest", async 
     assert.equal(routes.find((route) => route.id === "/")?.render, "prerender");
     assert.equal(routes.find((route) => route.id === "/docs")?.render, undefined);
     await writeFile(join(root, "app", "pages", "docs", "index.route.ts"), `${header}const mode = "ssr" as const;\nexport const route = definePage({ render: mode });\n`);
-    await assert.rejects(discoverRoutes(root), /docs[\\/]index\.route\.ts: render must be a string literal/);
+    await assert.rejects(discoverRoutes(root), /docs[\\/]index\.route\.ts: render debe ser un literal de texto/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

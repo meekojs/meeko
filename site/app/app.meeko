@@ -1,0 +1,22 @@
+<script lang="ts">
+import type { Component } from "@meekojs/meeko";
+
+export interface Props {
+  outlet: Component<Record<string, unknown>>;
+}
+
+const props = defineProps<Props>();
+
+// Runs while the browser parses the page, before the first paint: it applies the stored theme so
+// a dark choice never flashes light. The browser runs it once; the hydration leaves it as it is.
+const themeScript = `<script>try{var t=localStorage.getItem("meeko-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}document.documentElement.lang="es"<\/script>`;
+</script>
+
+<template>
+  <div class="theme-boot" html="themeScript"></div>
+  <div class="site-root"><component is="props.outlet"></component></div>
+</template>
+
+<style scoped>
+.theme-boot { display: none; }
+</style>

@@ -77,6 +77,21 @@ import { definePage } from "@meekojs/meeko/framework";
 import type { Data } from "../../contract-data.js";
 export const route = definePage({ load: (): Data => null as unknown as Data });
 '@
+  Set-Content -LiteralPath (Join-Path $consumer 'app/pages/zones.meeko') -Encoding utf8 -Value @'
+<script server lang="ts">
+import { definePage } from "@meekojs/meeko/framework";
+export const route = definePage({ load: () => ({ title: "Zones" }) });
+</script>
+<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const props = defineProps<{ data: { title: string } }>();
+const count = signal(0);
+onMounted(() => {
+  count.value = 1;
+});
+</script>
+<template><p>{props.data.title} {count.value}</p></template>
+'@
   Set-Content -LiteralPath (Join-Path $consumer 'app/layouts/default.meeko') -Encoding utf8 -Value '<script lang="ts">const props = defineProps<{ outlet: object; missing: string }>();</script><template><p>Layout</p></template>'
   $packageName = (& npm pack $repoRoot --pack-destination $testRoot --silent | Select-Object -Last 1)
   if ($LASTEXITCODE -ne 0 -or !$packageName) { throw 'No se pudo empaquetar el motor Meeko.' }

@@ -6,21 +6,59 @@ import { createNodeSocketUpgradeHandler } from "./node-upgrade.js";
 import { observeErrorCallback } from "./contracts.js";
 import type { NodeAcceptedSocket, NodeSocketUpgradeOptions } from "./node-upgrade.js";
 
+/**
+ * Opciones de {@link attachNodeWebSocketServer}.
+ *
+ * @example
+ * ```ts
+ * import type { NodeWebSocketOptions } from "@meekojs/meeko/node";
+ *
+ * const options: NodeWebSocketOptions = { server, hub: app.socket!.hub, publicOrigin: "https://example.com", heartbeatMs: 15_000 };
+ * ```
+ */
 export interface NodeWebSocketOptions extends Omit<NodeSocketUpgradeOptions, "upgrade" | "reject" | "maxPendingBytes"> {
-  /** The same HTTP server used by the Fetch handler. */
+  /** El mismo servidor HTTP que atiende el handler Fetch. */
   server: HttpServer;
-  /** Maximum WebSocket frame payload, enforced before decoding. Defaults to 64 KiB. */
+  /** Payload máximo de un frame WebSocket, que se aplica antes de decodificarlo. Por defecto, 64 KiB. */
   maxMessageBytes?: number;
-  /** Ping interval and idle timeout. Defaults to 30 seconds. */
+  /** Intervalo de ping y tiempo de inactividad. Por defecto, 30 segundos. */
   heartbeatMs?: number;
 }
 
+/**
+ * Servidor WebSocket conectado a un servidor HTTP de Node.
+ *
+ * @example
+ * ```ts
+ * const sockets = attachNodeWebSocketServer({ server, hub: app.socket!.hub, publicOrigin: "https://example.com" });
+ * process.once("SIGTERM", () => void sockets.close().then(() => server.close()));
+ * ```
+ */
 export interface NodeWebSocketServer {
-  /** Detaches the upgrade listener and closes all peers. The HTTP server remains owned by its caller. */
+  /** Quita el listener de `upgrade` y cierra todos los peers; el servidor HTTP sigue siendo del llamador. */
   close(): Promise<void>;
 }
 
-/** Attach Meeko channels to a Node HTTP server using ws for protocol framing. */
+/**
+ * Conecta los canales Socket de Meeko a un servidor HTTP de Node usando `ws` para el protocolo. Carga
+ * `ws` sólo al llamarse, no al importar el adaptador.
+ *
+ * @param options Servidor HTTP, hub, origen público y límites.
+ * @returns El servidor WebSocket, con `close()`.
+ * @throws {RangeError} Si `maxMessageBytes` o `heartbeatMs` no son enteros positivos.
+ * @example
+ * ```ts
+ * import { createServer } from "node:http";
+ * import { attachNodeWebSocketServer, toNodeListener } from "@meekojs/meeko/node";
+ *
+ * const server = createServer(toNodeListener((request) => app.fetch(request)));
+ * const sockets = app.socket
+ *   ? attachNodeWebSocketServer({ server, hub: app.socket.hub, publicOrigin: "https://example.com" })
+ *   : undefined;
+ * server.listen(3000);
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#websocket
+ */
 export function attachNodeWebSocketServer(options: NodeWebSocketOptions): NodeWebSocketServer {
   const maxPayload = options.maxMessageBytes ?? 64 * 1024;
   const heartbeatMs = options.heartbeatMs ?? 30_000;

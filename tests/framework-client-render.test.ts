@@ -149,7 +149,7 @@ test("render extraction accepts client and discovery rejects prerendering it", a
     await writeFile(join(root, "app", "pages", "index.route.ts"), 'export const route = definePage({ render: "client" });\n');
     assert.equal((await discoverRoutes(root))[0]?.render, "client");
     await writeFile(join(root, "app", "pages", "index.route.ts"), 'export const route = definePage({ render: "client", prerenderEntries: [{}] });\n');
-    await assert.rejects(discoverRoutes(root), /index\.route\.ts: render: "client" cannot be prerendered; remove prerenderEntries or use render: "prerender"/);
+    await assert.rejects(discoverRoutes(root), /index\.route\.ts: una página render: "client" no se puede prerenderizar; quita prerenderEntries o usa render: "prerender"/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

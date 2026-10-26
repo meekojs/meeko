@@ -9,60 +9,165 @@ import type { ServerPlatform } from "./framework-server/platform.js";
 import type { SqlSessionDriver, SqlSessionRow } from "./framework-server/session-stores.js";
 import type { SocketMessage, SocketPeer, SocketPubSub, Unsubscribe } from "./framework-server/socket.js";
 import { createSocketUpgradeHandler, openSocketSession, socketPathnamePrefix } from "./framework-server/upgrade.js";
-import type { OpenedSocketSession, SocketUpgradeHandler } from "./framework-server/upgrade.js";
+import type { OpenedSocketSession, SocketUpgradeClose, SocketUpgradeHandler } from "./framework-server/upgrade.js";
 import type { PrerenderedPage, PrerenderSource } from "./framework/server.js";
 
 // Minimal structural views of the Workers runtime, so this entry type-checks
 // and loads without @cloudflare/workers-types or `cloudflare:workers`.
 
-/** The subset of the Workers `ExecutionContext` used by Meeko. */
+/**
+ * Parte del `ExecutionContext` de Workers que usa Meeko. Los tipos `*Like` de esta entrada son
+ * estructurales, para compilar y cargar el módulo sin `@cloudflare/workers-types` ni
+ * `cloudflare:workers`.
+ *
+ * @example
+ * ```ts
+ * import type { CloudflareExecutionContext } from "@meekojs/meeko/cloudflare";
+ *
+ * export default {
+ *   async scheduled(event: unknown, env: Env, ctx: CloudflareExecutionContext) {
+ *     ctx.waitUntil(new D1SessionDriver(env.DB).deleteExpired());
+ *   },
+ * };
+ * ```
+ */
 export interface CloudflareExecutionContext {
+  /** Mantiene vivo un trabajo tras la respuesta. */
   waitUntil(promise: Promise<unknown>): void;
 }
 
+/**
+ * Parte del ID de un Durable Object que usa Meeko.
+ *
+ * @example
+ * ```ts
+ * import { socketRoomName } from "@meekojs/meeko/cloudflare";
+ * import type { DurableObjectIdLike } from "@meekojs/meeko/cloudflare";
+ *
+ * const id: DurableObjectIdLike = env.MEEKO_SOCKET.idFromName(socketRoomName("chat", "general"));
+ * console.log(id.name, id.toString());
+ * ```
+ */
 export interface DurableObjectIdLike {
-  /** Present for ids created with `idFromName`. */
+  /** Nombre, en los IDs creados con `idFromName`. */
   readonly name?: string;
+  /** ID hexadecimal. */
   toString(): string;
 }
 
-/** A Durable Object stub; Socket rooms also expose the `meekoPublish` RPC method. */
+/**
+ * Stub de un Durable Object; las salas de Socket exponen además el método RPC `meekoPublish`.
+ *
+ * @example
+ * ```ts
+ * import type { DurableObjectStubLike } from "@meekojs/meeko/cloudflare";
+ *
+ * const stub: DurableObjectStubLike = env.MEEKO_SOCKET.get(env.MEEKO_SOCKET.idFromName("chat\0general"));
+ * await stub.meekoPublish?.("chat", "general", { event: "message", payload: { text: "Hola" } });
+ * ```
+ */
 export interface DurableObjectStubLike {
+  /** Reenvía una petición HTTP al objeto. */
   fetch(request: Request): Promise<Response>;
+  /** RPC de las salas de Socket; se resuelve cuando la sala acepta el mensaje. */
   meekoPublish?(channel: string, room: string, message: SocketMessage): Promise<void>;
 }
 
-/** The subset of `DurableObjectNamespace` used by Meeko. */
+/**
+ * Parte del `DurableObjectNamespace` que usa Meeko, como el binding `MEEKO_SOCKET`.
+ *
+ * @example
+ * ```ts
+ * import type { DurableObjectNamespaceLike } from "@meekojs/meeko/cloudflare";
+ *
+ * interface Env { readonly MEEKO_SOCKET?: DurableObjectNamespaceLike }
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#cloudflare-workers
+ */
 export interface DurableObjectNamespaceLike {
+  /** ID estable de un objeto por nombre. */
   idFromName(name: string): DurableObjectIdLike;
+  /** Stub del objeto con ese ID. */
   get(id: DurableObjectIdLike): DurableObjectStubLike;
 }
 
-/** Static Assets binding (`env.ASSETS`). */
+/**
+ * Binding de Static Assets (`env.ASSETS`).
+ *
+ * @example
+ * ```ts
+ * import { createCloudflareAssetReader } from "@meekojs/meeko/cloudflare";
+ * import type { CloudflareAssetsBinding } from "@meekojs/meeko/cloudflare";
+ *
+ * interface Env { readonly ASSETS: CloudflareAssetsBinding }
+ * const assets = (env: Env) => createCloudflareAssetReader({ binding: env.ASSETS, assets: manifest.assets ?? {} });
+ * ```
+ */
 export interface CloudflareAssetsBinding {
+  /** Lee un archivo de los assets. */
   fetch(request: Request): Promise<Response>;
 }
 
-/** Server side of a hibernatable WebSocket. */
+/**
+ * Lado servidor de un WebSocket con hibernación.
+ *
+ * @example
+ * ```ts
+ * import type { CloudflareWebSocket } from "@meekojs/meeko/cloudflare";
+ *
+ * const openSockets = (sockets: CloudflareWebSocket[]) => sockets.filter((socket) => socket.readyState === 1).length;
+ * ```
+ */
 export interface CloudflareWebSocket {
-  /** 0 connecting, 1 open, 2 closing, 3 closed. */
+  /** 0 conectando, 1 abierto, 2 cerrando, 3 cerrado. */
   readonly readyState: number;
+  /** Envía un mensaje de texto. */
   send(message: string): void;
+  /** Cierra la conexión. */
   close(code?: number, reason?: string): void;
+  /** Guarda el estado que sobrevive a la hibernación (hasta 16.384 bytes serializados). */
   serializeAttachment(value: unknown): void;
+  /** Lee el estado guardado con `serializeAttachment`. */
   deserializeAttachment(): unknown;
 }
 
-/** The subset of `DurableObjectState` used by Socket rooms. */
+/**
+ * Parte del `DurableObjectState` que usan las salas de Socket.
+ *
+ * @example
+ * ```ts
+ * import type { DurableObjectStateLike } from "@meekojs/meeko/cloudflare";
+ *
+ * const peers = (ctx: DurableObjectStateLike): number => ctx.getWebSockets().length;
+ * ```
+ */
 export interface DurableObjectStateLike {
+  /** ID del objeto. */
   readonly id: DurableObjectIdLike;
+  /** Acepta un WebSocket con la API de hibernación. */
   acceptWebSocket(socket: CloudflareWebSocket, tags?: string[]): void;
+  /** WebSockets aceptados del objeto. */
   getWebSockets(tag?: string): CloudflareWebSocket[];
+  /** Respuesta automática a un mensaje sin despertar el objeto. */
   setWebSocketAutoResponse?(pair?: unknown): void;
+  /** Mantiene vivo un trabajo. */
   waitUntil(promise: Promise<unknown>): void;
 }
 
-/** `DurableObject` from `cloudflare:workers`, passed in so this module loads anywhere. */
+/**
+ * Clase `DurableObject` de `cloudflare:workers`, que se pasa como argumento para que este módulo
+ * se pueda cargar fuera de Workers.
+ *
+ * @example
+ * ```ts
+ * import { DurableObject } from "cloudflare:workers";
+ * import { createSocketRoomClass } from "@meekojs/meeko/cloudflare";
+ * import type { DurableObjectBase } from "@meekojs/meeko/cloudflare";
+ *
+ * const base: DurableObjectBase<Env> = DurableObject;
+ * export const MeekoSocketRoom = createSocketRoomClass(createApp, base);
+ * ```
+ */
 export type DurableObjectBase<Env> = abstract new (ctx: DurableObjectStateLike, env: Env) => object;
 
 interface WorkersGlobals {
@@ -70,15 +175,39 @@ interface WorkersGlobals {
   WebSocketRequestResponsePair?: new (request: string, response: string) => unknown;
 }
 
-/** Values given to an application factory, once per isolate. */
+/**
+ * Lo que recibe la fábrica de la aplicación, una vez por aislado.
+ *
+ * @typeParam Env Bindings y variables del Worker.
+ * @example
+ * ```ts
+ * import type { CloudflareAppContext } from "@meekojs/meeko/cloudflare";
+ *
+ * function createCloudflareApp({ env, platform }: CloudflareAppContext<Env>) {
+ *   return createApp({ production: true, platform, assets: createCloudflareAssetReader({ binding: env.ASSETS, assets: manifest.assets ?? {} }) });
+ * }
+ * ```
+ */
 export interface CloudflareAppContext<Env> {
-  /** Worker bindings and variables. */
+  /** Bindings y variables del Worker. */
   readonly env: Env;
-  /** Platform for the runtime factory and work outside requests. */
+  /** Plataforma para la fábrica del runtime y el trabajo fuera de las peticiones. */
   readonly platform: ServerPlatform<Env>;
 }
 
-/** A built application, or a factory that creates it lazily from the bindings. */
+/**
+ * Una aplicación ya creada, o una fábrica que la crea a partir de los bindings en el primer
+ * evento de cada aislado; si falla, el siguiente evento la reintenta.
+ *
+ * @typeParam Env Bindings y variables del Worker.
+ * @example
+ * ```ts
+ * import type { CloudflareApp } from "@meekojs/meeko/cloudflare";
+ *
+ * const app: CloudflareApp<Env> = ({ env, platform }) => createApp({ production: true, platform });
+ * export default createWorker(app);
+ * ```
+ */
 export type CloudflareApp<Env> = ServerApp | ((context: CloudflareAppContext<Env>) => ServerApp | Promise<ServerApp>);
 
 const apps = new WeakMap<object, Promise<ServerApp>>();
@@ -124,29 +253,87 @@ function reportStartup(error: unknown, requestId: string): void {
   catch { /* A broken console cannot hide the error response. */ }
 }
 
-/** Durable Object name of a Socket room: one object per channel and room. */
+/**
+ * Nombre del Durable Object de una sala de Socket: un objeto por canal y sala.
+ *
+ * @param channel Canal.
+ * @param room Sala.
+ * @returns El nombre que se pasa a `idFromName`.
+ * @example
+ * ```ts
+ * import { socketRoomName } from "@meekojs/meeko/cloudflare";
+ *
+ * const stub = env.MEEKO_SOCKET.get(env.MEEKO_SOCKET.idFromName(socketRoomName("chat", "general")));
+ * ```
+ */
 export function socketRoomName(channel: string, room: string): string {
   return `${channel}\0${room}`;
 }
 
+/**
+ * Opciones de {@link createWorker}.
+ *
+ * @example
+ * ```ts
+ * import type { CloudflareWorkerOptions } from "@meekojs/meeko/cloudflare";
+ *
+ * const options: CloudflareWorkerOptions = { socketBinding: "ROOMS", publicOrigin: "https://example.com" };
+ * ```
+ */
 export interface CloudflareWorkerOptions {
-  /** Durable Object namespace binding of the Socket rooms. Defaults to `MEEKO_SOCKET`. */
+  /** Binding del namespace de Durable Objects de las salas de Socket. Por defecto, `MEEKO_SOCKET`. */
   readonly socketBinding?: string;
-  /** Overrides the application's `publicOrigin` for HTTP and Socket origin checks. */
+  /** Sustituye al `publicOrigin` de la aplicación en las comprobaciones de Origin de HTTP y Socket. */
   readonly publicOrigin?: string;
-  /** Defaults to the application's error observer. */
+  /** Observador de errores; por defecto, el de la aplicación. */
   readonly onError?: (error: unknown, requestId: string) => void;
 }
 
-/** Module Worker handler: `export default createWorker(app)`. */
+/**
+ * Handler de un Worker de módulo: `export default createWorker(app)`.
+ *
+ * @typeParam Env Bindings y variables del Worker.
+ * @example
+ * ```ts
+ * import type { CloudflareWorker } from "@meekojs/meeko/cloudflare";
+ *
+ * const worker: CloudflareWorker<Env> = createWorker(createCloudflareApp);
+ * export default worker;
+ * ```
+ */
 export interface CloudflareWorker<Env> {
+  /** Atiende una petición del Worker. */
   fetch(request: Request, env: Env, ctx: CloudflareExecutionContext): Promise<Response>;
 }
 
 /**
- * Serves a Meeko application from a module Worker. The application is created
- * on the first request with the Worker's bindings; Socket upgrades are checked
- * here (path, Origin, authorization) and forwarded to the room's Durable Object.
+ * Sirve una aplicación de Meeko desde un Worker de módulo. La aplicación se crea en la primera
+ * petición con los bindings del Worker; los upgrades de Socket se comprueban aquí (ruta, Origin y
+ * autorización) y se reenvían al Durable Object de su sala. Sólo admite `DurableObjectSocketPubSub`
+ * como broker.
+ *
+ * @param app Aplicación o fábrica de la aplicación.
+ * @param options Binding de las salas, origen público y observador de errores.
+ * @returns El handler `{ fetch }` del módulo.
+ * @example
+ * ```ts
+ * import { DurableObject } from "cloudflare:workers";
+ * import { createCloudflareAssetReader, createCloudflarePrerenderSource, createSocketRoomClass, createWorker } from "@meekojs/meeko/cloudflare";
+ * import type { CloudflareAppContext } from "@meekojs/meeko/cloudflare";
+ *
+ * function createCloudflareApp({ env, platform }: CloudflareAppContext<Env>) {
+ *   return createApp({
+ *     production: true,
+ *     platform,
+ *     assets: createCloudflareAssetReader({ binding: env.ASSETS, assets: manifest.assets ?? {} }),
+ *     prerender: createCloudflarePrerenderSource({ binding: env.ASSETS }),
+ *   });
+ * }
+ *
+ * export default createWorker(createCloudflareApp);
+ * export const MeekoSocketRoom = createSocketRoomClass(createCloudflareApp, DurableObject);
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#cloudflare-workers
  */
 export function createWorker<Env = Record<string, unknown>>(app: CloudflareApp<Env>, options: CloudflareWorkerOptions = {}): CloudflareWorker<Env> {
   const binding = options.socketBinding ?? "MEEKO_SOCKET";
@@ -180,7 +367,7 @@ export function createWorker<Env = Record<string, unknown>>(app: CloudflareApp<E
       if (instance.socket && request.headers.has("upgrade")) {
         try {
           const decision = await handshakeFor(instance, origin, request, (error) => report(error, crypto.randomUUID()))(request);
-          if (decision.action === "reject") return new Response(null, { status: decision.status });
+          if (decision.action === "reject") return (decision.close && deniedUpgrade(decision.close)) || new Response(null, { status: decision.status });
           if (decision.action === "upgrade") {
             const rooms = (env as Record<string, unknown> | undefined)?.[binding] as DurableObjectNamespaceLike | undefined;
             if (!rooms || typeof rooms.idFromName !== "function") throw new Error(`Socket channels require the ${binding} Durable Object binding`);
@@ -240,21 +427,43 @@ function socketMessage(value: unknown): SocketMessage {
 }
 
 /**
- * Socket broker for Workers: each channel and room is one Durable Object.
- * `publish` resolves once the room accepts the message (an RPC to the room, or
- * directly when called from inside it); the room delivers it to its peers.
- * Subscriptions are only possible inside the room's Durable Object, where
- * `createWorker` forwards every Socket upgrade.
+ * Broker de Socket para Workers, el que se usa por defecto: cada canal y sala es un Durable Object.
+ * `publish` se resuelve cuando la sala acepta el mensaje (por RPC a la sala, o directamente si ya
+ * se ejecuta en ella), y la sala lo reparte a sus peers. Sólo se puede suscribir dentro del Durable
+ * Object de la sala, adonde `createWorker` reenvía cada upgrade.
+ *
+ * @example
+ * ```ts
+ * // server/runtime.ts
+ * import { DurableObjectSocketPubSub } from "@meekojs/meeko/cloudflare";
+ * import type { DurableObjectNamespaceLike } from "@meekojs/meeko/cloudflare";
+ * import { defineServerRuntime, SessionManager } from "@meekojs/meeko/server";
+ *
+ * interface Env { readonly MEEKO_SOCKET?: DurableObjectNamespaceLike }
+ *
+ * export default defineServerRuntime<Env>(({ env, production }) => ({
+ *   sessions: new SessionManager({ store, production }),
+ *   socket: env.MEEKO_SOCKET ? { pubsub: new DurableObjectSocketPubSub(env.MEEKO_SOCKET) } : {},
+ * }));
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#socket-y-durable-objects
  */
 export class DurableObjectSocketPubSub implements SocketPubSub {
-  /** Lets the Cloudflare adapter recognize this broker. */
+  /** Permite que el adaptador de Cloudflare reconozca este broker. */
   readonly [durableObjectBroker] = true;
+  /**
+   * @param namespace Binding del namespace de las salas, normalmente `env.MEEKO_SOCKET`.
+   * @throws {TypeError} Si no es un binding de Durable Objects.
+   */
   constructor(private readonly namespace: DurableObjectNamespaceLike) {
     if (!namespace || typeof namespace.idFromName !== "function" || typeof namespace.get !== "function") {
       throw new TypeError("DurableObjectSocketPubSub requires a Durable Object namespace binding");
     }
   }
-  /** Rejects with `SOCKET_BACKLOG_EXCEEDED` (503) when the room holds too many undelivered publications. */
+  /**
+   * Entrega el mensaje a la sala; se resuelve cuando la sala lo acepta. Rechaza con
+   * `SOCKET_BACKLOG_EXCEEDED` (503) si la sala tiene demasiadas publicaciones sin entregar.
+   */
   async publish(channel: string, room: string, message: SocketMessage): Promise<void> {
     const checked = socketMessage(message);
     const name = socketRoomName(channel, room);
@@ -264,6 +473,10 @@ export class DurableObjectSocketPubSub implements SocketPubSub {
     if (typeof stub.meekoPublish !== "function") throw new TypeError("The Socket Durable Object must be created with createSocketRoomClass");
     await stub.meekoPublish(channel, room, checked);
   }
+  /**
+   * Escucha el par canal/sala dentro del Durable Object de la sala.
+   * @throws {Error} Fuera del Durable Object de la sala.
+   */
   subscribe(channel: string, room: string, listener: RoomListener): Unsubscribe {
     const local = currentRoom.getStore();
     if (!local) throw new Error("DurableObjectSocketPubSub subscribes only inside the Socket room Durable Object; forward upgrades with createWorker");
@@ -271,36 +484,44 @@ export class DurableObjectSocketPubSub implements SocketPubSub {
   }
 }
 
+/**
+ * Opciones de {@link createSocketRoomClass}.
+ *
+ * @example
+ * ```ts
+ * import type { SocketRoomOptions } from "@meekojs/meeko/cloudflare";
+ *
+ * const options: SocketRoomOptions = { keepHeaders: ["accept-language"], maxPendingPublications: 256, autoResponse: false };
+ * ```
+ */
 export interface SocketRoomOptions {
-  /** Largest inbound message; larger messages close the peer with 1009. Defaults to the application's Socket limit or 64 KiB. */
+  /** Mensaje entrante más grande; los mayores cierran el peer con `1009`. Por defecto, el límite de Socket de la aplicación o 64 KiB. */
   readonly maxMessageBytes?: number;
   /**
-   * Text request answered by the runtime without waking the object, or false.
-   * Defaults to `ping` answered with `pong`. Protocol ping frames are always answered.
+   * Mensaje de texto que el runtime responde sin despertar el objeto, o `false`. Por defecto,
+   * `ping` responde `pong`. Los pings del protocolo se responden siempre.
    */
   readonly autoResponse?: { readonly request: string; readonly response: string } | false;
   /**
-   * Extra request headers kept with each connection (lowercase names), which
-   * channel code sees through `context.request` before and after hibernation.
-   * By default only the session cookie, `origin` and `authorization` are kept;
-   * `"cookie"` keeps the whole Cookie header. Everything kept is stored in the
-   * WebSocket attachment, limited to 16,384 bytes: an upgrade whose state does
-   * not fit is refused with 431 before the WebSocket is accepted.
+   * Cabeceras adicionales de la petición (en minúsculas) que se conservan con cada conexión y que
+   * el canal ve en `context.request` antes y después de la hibernación. Por defecto sólo se conservan
+   * la cookie de sesión, `origin` y `authorization`; `"cookie"` conserva la cabecera completa. Todo
+   * va en el attachment del WebSocket, limitado a 16.384 bytes: un upgrade que no cabe se rechaza
+   * con `431` antes de aceptar el WebSocket.
    */
   readonly keepHeaders?: readonly string[];
   /**
-   * Publications a room accepts before they are delivered. Beyond it a publish
-   * rejects with `SOCKET_BACKLOG_EXCEEDED` (503) and is not delivered. Defaults to 1024.
+   * Publicaciones que una sala acepta antes de entregarlas. Por encima, `publish` rechaza con
+   * `SOCKET_BACKLOG_EXCEEDED` (503) y el mensaje no se entrega. Por defecto, 1024.
    */
   readonly maxPendingPublications?: number;
   /**
-   * Milliseconds publications wait for a connection rebuilt after the room
-   * hibernated, counted from the start of its rebuild; once it passes, the
-   * connection receives only later publications. Connections still being
-   * authorized after their upgrade are never waited for. Defaults to 5000.
+   * Milisegundos que las publicaciones esperan a una conexión reconstruida tras hibernar, desde el
+   * inicio de su reconstrucción; pasado ese plazo, la conexión sólo recibe las publicaciones
+   * siguientes. Las conexiones que aún se autorizan tras su upgrade no se esperan. Por defecto, 5000.
    */
   readonly rebuildTimeoutMs?: number;
-  /** Defaults to the application's error observer. */
+  /** Observador de errores; por defecto, el de la aplicación. */
   readonly onError?: (error: unknown, requestId: string) => void;
 }
 
@@ -348,16 +569,45 @@ function cookiePair(header: string | null, name: string): string | undefined {
   return undefined;
 }
 
-/** Instance shape of the Socket room class; its public methods are Durable Object handlers and RPC. */
+/**
+ * Instancia de la clase de salas de Socket; sus métodos públicos son los handlers y el RPC del
+ * Durable Object, que llama el runtime de Workers.
+ *
+ * @example
+ * ```ts
+ * import type { MeekoSocketRoom } from "@meekojs/meeko/cloudflare";
+ *
+ * const room = env.MEEKO_SOCKET.get(env.MEEKO_SOCKET.idFromName("chat\0general")) as unknown as MeekoSocketRoom;
+ * await room.meekoPublish("chat", "general", { event: "message", payload: { text: "Hola" } });
+ * ```
+ */
 export interface MeekoSocketRoom {
+  /** Acepta el upgrade que reenvía `createWorker`. */
   fetch(request: Request): Promise<Response>;
+  /** Handler de hibernación de los mensajes entrantes. */
   webSocketMessage(socket: CloudflareWebSocket, message: string | ArrayBuffer): Promise<void>;
+  /** Handler de hibernación de los cierres. */
   webSocketClose(socket: CloudflareWebSocket, code: number, reason: string, wasClean: boolean): Promise<void>;
+  /** Handler de hibernación de los errores. */
   webSocketError(socket: CloudflareWebSocket, error: unknown): Promise<void>;
-  /** RPC used by `DurableObjectSocketPubSub`; resolves once the room accepts the message. */
+  /** RPC que usa `DurableObjectSocketPubSub`; se resuelve cuando la sala acepta el mensaje. */
   meekoPublish(channel: string, room: string, message: SocketMessage): Promise<void>;
 }
 
+/**
+ * Clase de salas de Socket que devuelve {@link createSocketRoomClass}, para exportarla desde el
+ * Worker con el nombre declarado en `wrangler.jsonc`.
+ *
+ * @typeParam Env Bindings y variables del Worker.
+ * @example
+ * ```ts
+ * import { DurableObject } from "cloudflare:workers";
+ * import { createSocketRoomClass } from "@meekojs/meeko/cloudflare";
+ * import type { MeekoSocketRoomClass } from "@meekojs/meeko/cloudflare";
+ *
+ * export const MeekoSocketRoom: MeekoSocketRoomClass<Env> = createSocketRoomClass(createCloudflareApp, DurableObject);
+ * ```
+ */
 export type MeekoSocketRoomClass<Env> = new (ctx: DurableObjectStateLike, env: Env) => MeekoSocketRoom;
 
 const channelName = /^[A-Za-z_$][\w$-]*$/;
@@ -369,14 +619,46 @@ function closeQuietly(socket: CloudflareWebSocket, code: number, reason: string)
 }
 
 /**
- * Creates the Durable Object class that hosts the WebSockets of one Socket
- * room with the Hibernation API:
- * `export const MeekoSocketRoom = createSocketRoomClass(app, DurableObject)`,
- * with `DurableObject` imported from `cloudflare:workers`.
+ * An auth refusal completes the upgrade in the Worker, without waking the room's Durable Object,
+ * only to close with 4401/4403, which a browser can read. Without `WebSocketPair` the caller keeps
+ * the HTTP status.
+ */
+function deniedUpgrade(close: SocketUpgradeClose): Response | undefined {
+  const Pair = (globalThis as Partial<WorkersGlobals>).WebSocketPair;
+  if (!Pair) return undefined;
+  const pair = new Pair();
+  // A socket of a WebSocketPair outside the hibernation API must be accepted before it closes.
+  const server = pair[1] as CloudflareWebSocket & { accept?(): void };
+  server.accept?.();
+  server.close(close.code, close.reason);
+  return new Response(null, { status: 101, webSocket: pair[0] } as ResponseInit);
+}
+
+/**
+ * Crea la clase Durable Object que aloja los WebSockets de una sala de Socket con la API de
+ * hibernación: `export const MeekoSocketRoom = createSocketRoomClass(app, DurableObject)`, con
+ * `DurableObject` importado de `cloudflare:workers`.
  *
- * Workers WebSockets do not report `bufferedAmount`, so the hub's
- * `maxBufferBytes` is not enforced here; `maxMessageBytes` and
- * `maxPendingDeliveries` still bound each peer.
+ * Los WebSockets de Workers no informan de `bufferedAmount`, así que aquí no se aplica
+ * `maxBufferBytes` del hub; `maxMessageBytes` y `maxPendingDeliveries` siguen limitando cada peer.
+ *
+ * @param app Aplicación o fábrica, la misma que recibe `createWorker`.
+ * @param base Clase `DurableObject` de `cloudflare:workers`.
+ * @param options Límites, cabeceras conservadas y respuesta automática.
+ * @returns La clase de salas.
+ * @throws {TypeError} Si `base` no es una clase o `keepHeaders` tiene nombres no válidos.
+ * @throws {RangeError} Si un límite no es válido.
+ * @example
+ * ```ts
+ * import { DurableObject } from "cloudflare:workers";
+ * import { createSocketRoomClass } from "@meekojs/meeko/cloudflare";
+ *
+ * export const MeekoSocketRoom = createSocketRoomClass(createCloudflareApp, DurableObject, {
+ *   keepHeaders: ["accept-language"],
+ *   rebuildTimeoutMs: 2_000,
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#socket-y-durable-objects
  */
 export function createSocketRoomClass<Env = Record<string, unknown>>(
   app: CloudflareApp<Env>,
@@ -603,15 +885,39 @@ export function createSocketRoomClass<Env = Record<string, unknown>>(
   return SocketRoom;
 }
 
+/**
+ * Opciones de {@link createCloudflareAssetReader}.
+ *
+ * @example
+ * ```ts
+ * import type { CloudflareAssetReaderOptions } from "@meekojs/meeko/cloudflare";
+ *
+ * const options: CloudflareAssetReaderOptions = { binding: env.ASSETS, assets: manifest.assets ?? {} };
+ * ```
+ */
 export interface CloudflareAssetReaderOptions {
-  /** Static Assets binding, usually `env.ASSETS`. */
+  /** Binding de Static Assets, normalmente `env.ASSETS`. */
   readonly binding: CloudflareAssetsBinding;
+  /** Manifiesto de los archivos públicos. */
   readonly assets: AssetManifest;
 }
 
 const assetOrigin = "https://assets.meeko.invalid";
 
-/** Serves only manifest-listed build files from the Static Assets binding, with Meeko's validators and cache policy. */
+/**
+ * Sirve desde el binding de Static Assets sólo los archivos del build listados en el manifiesto,
+ * con el `ETag` y la política de caché de los demás adaptadores.
+ *
+ * @param options Binding y manifiesto de archivos.
+ * @returns El lector de archivos.
+ * @throws {Error} Desde `get`, si un archivo listado falta en los assets.
+ * @example
+ * ```ts
+ * import { createCloudflareAssetReader } from "@meekojs/meeko/cloudflare";
+ *
+ * const assets = createCloudflareAssetReader({ binding: env.ASSETS, assets: manifest.assets ?? {} });
+ * ```
+ */
 export function createCloudflareAssetReader(options: CloudflareAssetReaderOptions): AssetReader {
   return {
     async get(pathname, request) {
@@ -631,15 +937,39 @@ export function createCloudflareAssetReader(options: CloudflareAssetReaderOption
   };
 }
 
+/**
+ * Opciones de {@link createCloudflarePrerenderSource}.
+ *
+ * @example
+ * ```ts
+ * import type { CloudflarePrerenderSourceOptions } from "@meekojs/meeko/cloudflare";
+ *
+ * const options: CloudflarePrerenderSourceOptions = { binding: env.ASSETS, directory: "/_meeko/prerender/" };
+ * ```
+ */
 export interface CloudflarePrerenderSourceOptions {
+  /** Binding de Static Assets. */
   readonly binding: CloudflareAssetsBinding;
-  /** Asset directory holding `manifest.json` and the pages. Defaults to `/_meeko/prerender/`. */
+  /** Carpeta de los assets con `manifest.json` y las páginas; empieza y termina en `/`. Por defecto, `/_meeko/prerender/`. */
   readonly directory?: string;
 }
 
 interface PrerenderIndex { readonly pages?: Record<string, { file: string; headOffset: number; etag: string; payload?: string }> }
 
-/** Prerendered pages stored with the static assets and read through the binding. */
+/**
+ * Páginas prerenderizadas guardadas con los assets y leídas mediante el binding. El índice y cada
+ * página se leen una vez por aislado; una lectura fallida se reintenta en la petición siguiente.
+ *
+ * @param options Binding y carpeta.
+ * @returns La fuente de páginas prerenderizadas.
+ * @throws {TypeError} Si la carpeta no empieza y termina en `/`.
+ * @example
+ * ```ts
+ * import { createCloudflarePrerenderSource } from "@meekojs/meeko/cloudflare";
+ *
+ * const app = await createApp({ production: true, prerender: createCloudflarePrerenderSource({ binding: env.ASSETS }) });
+ * ```
+ */
 export function createCloudflarePrerenderSource(options: CloudflarePrerenderSourceOptions): PrerenderSource {
   const directory = options.directory ?? "/_meeko/prerender/";
   if (!directory.startsWith("/") || !directory.endsWith("/")) throw new TypeError("Prerender directory must start and end with /");
@@ -682,20 +1012,53 @@ export function createCloudflarePrerenderSource(options: CloudflarePrerenderSour
   };
 }
 
-/** The subset of a D1 prepared statement used by `D1SessionDriver`. */
+/**
+ * Parte de una sentencia preparada de D1 que usa `D1SessionDriver`.
+ *
+ * @example
+ * ```ts
+ * import type { D1PreparedStatementLike } from "@meekojs/meeko/cloudflare";
+ *
+ * const statement: D1PreparedStatementLike = env.DB.prepare("SELECT count(*) AS total FROM meeko_sessions");
+ * const row = await statement.first<{ total: number }>();
+ * ```
+ */
 export interface D1PreparedStatementLike {
+  /** Enlaza los parámetros. */
   bind(...values: unknown[]): D1PreparedStatementLike;
+  /** Primera fila, o `null`. */
   first<T = Record<string, unknown>>(): Promise<T | null>;
+  /** Ejecuta la sentencia; `meta.changes` es el número de filas cambiadas. */
   run(): Promise<{ readonly meta: { readonly changes: number } }>;
 }
 
-/** The subset of a D1 database binding used by `D1SessionDriver`. */
+/**
+ * Parte de un binding de base de datos D1 que usa `D1SessionDriver`.
+ *
+ * @example
+ * ```ts
+ * import type { D1DatabaseLike } from "@meekojs/meeko/cloudflare";
+ *
+ * interface Env { readonly DB?: D1DatabaseLike }
+ * ```
+ */
 export interface D1DatabaseLike {
+  /** Prepara una sentencia SQL. */
   prepare(query: string): D1PreparedStatementLike;
 }
 
+/**
+ * Opciones de {@link D1SessionDriver}.
+ *
+ * @example
+ * ```ts
+ * import { D1SessionDriver } from "@meekojs/meeko/cloudflare";
+ *
+ * const driver = new D1SessionDriver(env.DB, { table: "app_sessions" });
+ * ```
+ */
 export interface D1SessionDriverOptions {
-  /** Table created with `D1SessionDriver.schema(table)`. Defaults to `meeko_sessions`. */
+  /** Tabla creada con `D1SessionDriver.schema(table)`. Por defecto, `meeko_sessions`. */
   readonly table?: string;
 }
 
@@ -715,13 +1078,33 @@ function tableName(value: string | undefined): string {
 }
 
 /**
- * `SqlSessionStore` driver for Cloudflare D1. Rotation and family revocation
- * are single atomic statements; `UNIQUE(family_id)` keeps one active id per family.
+ * Driver de `SqlSessionStore` para Cloudflare D1. La rotación y la revocación de familia son
+ * sentencias atómicas únicas; `UNIQUE(family_id)` mantiene un único ID activo por familia. D1 no
+ * notifica revocaciones a otros aislados.
+ *
+ * @example
+ * ```ts
+ * // server/runtime.ts
+ * import { D1SessionDriver } from "@meekojs/meeko/cloudflare";
+ * import type { D1DatabaseLike } from "@meekojs/meeko/cloudflare";
+ * import { defineServerRuntime, MemorySessionStore, SessionManager, SqlSessionStore } from "@meekojs/meeko/server";
+ *
+ * interface Env { readonly DB?: D1DatabaseLike }
+ *
+ * export default defineServerRuntime<Env>(({ env, production, prerendering }) => {
+ *   const store = prerendering || !env.DB ? new MemorySessionStore() : new SqlSessionStore(new D1SessionDriver(env.DB));
+ *   return { sessions: new SessionManager({ production: production && !prerendering, store }) };
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#sesiones-en-d1
  */
 export class D1SessionDriver implements SqlSessionDriver {
   private readonly table: string;
 
-  /** Reference schema; apply it with a D1 migration before deploying. */
+  /**
+   * Esquema de referencia de la tabla; aplíquelo con una migración de D1 antes de desplegar.
+   * @throws {TypeError} Si el nombre de la tabla no es válido.
+   */
   static schema(table?: string): string {
     const name = tableName(table);
     return `CREATE TABLE IF NOT EXISTS "${name}" (
@@ -736,6 +1119,11 @@ CREATE INDEX IF NOT EXISTS "${name}_expires_at" ON "${name}" (expires_at);
 `;
   }
 
+  /**
+   * @param db Binding de la base de datos D1.
+   * @param options Tabla de las sesiones.
+   * @throws {TypeError} Si `db` no es un binding de D1 o la tabla no es válida.
+   */
   constructor(private readonly db: D1DatabaseLike, options: D1SessionDriverOptions = {}) {
     if (!db || typeof db.prepare !== "function") throw new TypeError("D1SessionDriver requires a D1 database binding");
     this.table = tableName(options.table);
@@ -775,7 +1163,7 @@ CREATE INDEX IF NOT EXISTS "${name}_expires_at" ON "${name}" (expires_at);
     await this.db.prepare(`DELETE FROM "${this.table}" WHERE family_id = ?`).bind(familyId).run();
   }
 
-  /** Deletes expired rows, for example from a Cron Trigger; returns how many were removed. */
+  /** Borra las filas caducadas, por ejemplo desde un Cron Trigger; devuelve cuántas borró. */
   async deleteExpired(now: number = Date.now()): Promise<number> {
     const result = await this.db.prepare(`DELETE FROM "${this.table}" WHERE expires_at <= ?`).bind(now).run();
     return result.meta.changes;

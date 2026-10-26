@@ -1,9 +1,63 @@
 import { lstat, readFile, readdir, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
+import { routeBlockId, tryRouteBlockSource } from "./route-block.js";
 import { createRouteManifest } from "./router.js";
-import type { RouteRecord } from "./router.js";
+import type { ErrorPageRecord, RouteRecord } from "./router.js";
 import type { PageRender } from "./page.js";
+
+async function isFile(path: string, follow = true): Promise<boolean> {
+  try { return (await (follow ? stat(path) : lstat(path))).isFile(); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; return false; }
+}
+
+/** Root files around `app/pages`: the app shell, the root layout and the application error page. */
+async function rootFiles(projectRoot: string) {
+  const pagesRoot = resolve(projectRoot, "app", "pages");
+  const appShell = resolve(projectRoot, "app", "app.meeko");
+  const defaultLayout = resolve(projectRoot, "app", "layouts", "default.meeko");
+  const appError = resolve(projectRoot, "app", "error.meeko");
+  const rootLayout = join(pagesRoot, "+layout.meeko");
+  const rootError = join(pagesRoot, "+error.meeko");
+  return {
+    pagesRoot, appShell, defaultLayout, appError, rootLayout, rootError,
+    hasAppShell: await isFile(appShell),
+    hasDefaultLayout: await isFile(defaultLayout, false),
+    hasAppError: await isFile(appError),
+  };
+}
+
+function rootErrorConflict(appError: string, rootError: string): Error {
+  return new Error(`${appError} y ${rootError} definen los dos la página de error raíz`);
+}
+
+/**
+ * Descubre `app/error.meeko` con los layouts raíz que lo envuelven: `app/app.meeko` y
+ * `app/layouts/default.meeko` (o `app/pages/+layout.meeko`).
+ *
+ * @param projectRoot Carpeta del proyecto.
+ * @returns La página de error con rutas absolutas, o `undefined` si no existe `app/error.meeko`.
+ * @throws {Error} Si también existe `app/pages/+error.meeko`, que define el mismo nivel.
+ * @since 1.1.0
+ * @example
+ * ```ts
+ * import { discoverErrorPage, discoverRoutes } from "@meekojs/meeko/build";
+ *
+ * const routes = await discoverRoutes(process.cwd());
+ * const errorPage = await discoverErrorPage(process.cwd());
+ * // Pase errorPage a createFrameworkHandler, mountClientApp o AppManifest.
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#página-de-error-de-la-aplicación-apperrormeeko
+ */
+export async function discoverErrorPage(projectRoot: string): Promise<ErrorPageRecord | undefined> {
+  const root = await rootFiles(projectRoot);
+  if (!root.hasAppError) return undefined;
+  if (await isFile(root.rootError)) throw rootErrorConflict(root.appError, root.rootError);
+  const layouts: string[] = root.hasAppShell ? [root.appShell] : [];
+  if (root.hasDefaultLayout) layouts.push(root.defaultLayout);
+  else if (await isFile(root.rootLayout)) layouts.push(root.rootLayout);
+  return { file: root.appError, layouts };
+}
 
 const renderModes: readonly PageRender[] = ["ssr", "stream", "prerender", "client"];
 
@@ -32,12 +86,12 @@ function propertyName(name: ts.PropertyName): string | undefined {
 function literalRender(file: string, value: ts.Expression): PageRender {
   const expression = unwrap(value);
   if (!ts.isStringLiteral(expression) && !ts.isNoSubstitutionTemplateLiteral(expression)) {
-    throw new Error(`${file}: render must be a string literal so Meeko can read it at build time`);
+    throw new Error(`${file}: render debe ser un literal de texto para que Meeko pueda leerlo durante el build`);
   }
   const render = expression.text as PageRender;
   if (!renderModes.includes(render)) {
     const modes = renderModes.map((mode) => `"${mode}"`);
-    throw new Error(`${file}: unsupported render mode "${expression.text}"; use ${modes.slice(0, -1).join(", ")} or ${modes.at(-1)}`);
+    throw new Error(`${file}: modo de render no admitido: "${expression.text}"; usa ${modes.slice(0, -1).join(", ")} o ${modes.at(-1)}`);
   }
   return render;
 }
@@ -68,7 +122,7 @@ export function extractRouteRender(file: string, source: string): PageRender | u
   }
   const definition = routeExport ?? defaultExport;
   if (!definition) {
-    if (opaque) throw new Error(`${file}: re-exported route options cannot be read at build time; export definePage({ ... }) from this file`);
+    if (opaque) throw new Error(`${file}: las opciones de ruta reexportadas no se pueden leer durante el build; exporta definePage({ ... }) desde este archivo`);
     return namedRender ? literalRender(file, namedRender) : undefined;
   }
   // Options may live in a module-level `const` of the same file.
@@ -86,7 +140,7 @@ export function extractRouteRender(file: string, source: string): PageRender | u
     object = unwrap(constants.get(object.text)!);
   }
   if (!ts.isObjectLiteralExpression(object)) {
-    throw new Error(`${file}: export definePage({ ... }) or an object literal so Meeko can read render at build time`);
+    throw new Error(`${file}: exporta definePage({ ... }) o un objeto literal para que Meeko pueda leer render durante el build`);
   }
   let render: PageRender | undefined;
   // Members after the last explicit render that could set it at run time.
@@ -99,23 +153,84 @@ export function extractRouteRender(file: string, source: string): PageRender | u
     const name = property.name ? propertyName(property.name) : undefined;
     if (name === "prerenderEntries") prerenderEntries = true;
     if (name !== "render") continue;
-    if (!ts.isPropertyAssignment(property)) throw new Error(`${file}: render must be a string literal so Meeko can read it at build time`);
+    if (!ts.isPropertyAssignment(property)) throw new Error(`${file}: render debe ser un literal de texto para que Meeko pueda leerlo durante el build`);
     render = literalRender(file, property.initializer);
     spread = false;
     computed = false;
   }
-  if (computed) throw new Error(`${file}: computed route option keys cannot be read at build time; write render as a plain property`);
-  if (spread && render === undefined) throw new Error(`${file}: declare render explicitly; spread route options cannot be read at build time`);
-  if (spread) throw new Error(`${file}: declare render after any spread; spread route options cannot be read at build time`);
+  if (computed) throw new Error(`${file}: las claves calculadas de las opciones de ruta no se pueden leer durante el build; escribe render como una propiedad normal`);
+  if (spread && render === undefined) throw new Error(`${file}: declara render de forma explícita; las opciones de ruta con spread no se pueden leer durante el build`);
+  if (spread) throw new Error(`${file}: declara render después de cualquier spread; las opciones de ruta con spread no se pueden leer durante el build`);
   if (render === "client" && prerenderEntries) {
-    throw new Error(`${file}: render: "client" cannot be prerendered; remove prerenderEntries or use render: "prerender"`);
+    throw new Error(`${file}: una página render: "client" no se puede prerenderizar; quita prerenderEntries o usa render: "prerender"`);
   }
   return render;
 }
 
-/** Discovers pages once; the returned manifest is safe to serialize for the browser. */
-export async function discoverRoutes(projectRoot: string): Promise<readonly RouteRecord[]> {
-  const pagesRoot = resolve(projectRoot, "app", "pages");
+/**
+ * Opciones de {@link discoverRoutes}.
+ *
+ * @since 1.1.0
+ * @example
+ * ```ts
+ * import { discoverRoutes } from "@meekojs/meeko/build";
+ *
+ * // Páginas de un layer dentro del shell del proyecto.
+ * const routes = await discoverRoutes("layers/base", { shell: process.cwd() });
+ * ```
+ */
+export interface DiscoverRoutesOptions {
+  /**
+   * Proyecto cuyo shell envuelve las páginas descubiertas, para el árbol `app/pages` de un layer o
+   * módulo. Su `app/app.meeko` y su `app/layouts/default.meeko` (o `app/pages/+layout.meeko`) van
+   * primero y sustituyen a los archivos de la fuente con el mismo papel; los `+layout.meeko` de la
+   * fuente se anidan dentro. Sin `+error.meeko` ni `app/error.meeko` en la fuente, sus páginas usan
+   * la página de error raíz del proyecto.
+   */
+  readonly shell?: string;
+}
+
+/** The shell, root layout and root error page that a project lends to its layers and modules. */
+async function projectShell(projectRoot: string): Promise<{ appShell?: string; rootLayout?: string; error?: string }> {
+  const root = await rootFiles(projectRoot);
+  const rootLayout = root.hasDefaultLayout ? root.defaultLayout : await isFile(root.rootLayout) ? root.rootLayout : undefined;
+  const error = root.hasAppError ? root.appError : await isFile(root.rootError) ? root.rootError : undefined;
+  return {
+    ...(root.hasAppShell ? { appShell: root.appShell } : {}),
+    ...(rootLayout ? { rootLayout } : {}),
+    ...(error ? { error } : {}),
+  };
+}
+
+/**
+ * Descubre las páginas de `app/pages` con sus layouts, su `+error.meeko` más cercano y sus opciones
+ * de ruta (`<script server>` o sidecar `*.route.ts`), y lee `render` sin ejecutar código. El
+ * manifiesto resultante se puede serializar para el navegador.
+ *
+ * @param projectRoot Carpeta que contiene `app/pages`.
+ * @param options `shell` para descubrir un layer o módulo dentro del proyecto.
+ * @returns El manifiesto de rutas ordenado, con rutas de archivo absolutas.
+ * @throws {Error} Si hay dos layouts o páginas de error raíz, una página declara sus opciones dos
+ * veces, `render` no es un literal válido o dos rutas colisionan.
+ * @example
+ * ```ts
+ * import { discoverRoutes } from "@meekojs/meeko/build";
+ *
+ * const routes = await discoverRoutes(process.cwd());
+ * for (const route of routes) console.log(route.id, route.render ?? "ssr");
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#routing-layouts-y-ssr
+ */
+export async function discoverRoutes(projectRoot: string, options: DiscoverRoutesOptions = {}): Promise<readonly RouteRecord[]> {
+  const { pagesRoot, appShell, defaultLayout, appError, hasAppShell, hasDefaultLayout, hasAppError } = await rootFiles(projectRoot);
+  const shell = options.shell !== undefined && resolve(options.shell).toLowerCase() !== resolve(projectRoot).toLowerCase()
+    ? await projectShell(options.shell) : undefined;
+  // The project's files win over the source's files of the same role, as in a single application.
+  const shellLayouts: string[] = [];
+  const shellApp = shell?.appShell ?? (hasAppShell ? appShell : undefined);
+  if (shellApp) shellLayouts.push(shellApp);
+  if (shell?.rootLayout) shellLayouts.push(shell.rootLayout);
+  else if (hasDefaultLayout) shellLayouts.push(defaultLayout);
   const files = new Set<string>();
   async function walk(directory: string): Promise<void> {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -125,23 +240,21 @@ export async function discoverRoutes(projectRoot: string): Promise<readonly Rout
     }
   }
   await walk(pagesRoot);
-  const appShell = resolve(projectRoot, "app", "app.meeko");
-  const defaultLayout = resolve(projectRoot, "app", "layouts", "default.meeko");
-  let hasAppShell = false;
-  try { hasAppShell = (await stat(appShell)).isFile(); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-  let hasDefaultLayout = false;
-  try { hasDefaultLayout = (await lstat(defaultLayout)).isFile(); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   if (hasDefaultLayout && files.has(join(pagesRoot, "+layout.meeko"))) {
-    throw new Error(`Both ${defaultLayout} and ${join(pagesRoot, "+layout.meeko")} define the root layout`);
+    throw new Error(`${defaultLayout} y ${join(pagesRoot, "+layout.meeko")} definen los dos el layout raíz`);
   }
+  if (hasAppError && files.has(join(pagesRoot, "+error.meeko"))) throw rootErrorConflict(appError, join(pagesRoot, "+error.meeko"));
   const routes: RouteRecord[] = [];
   for (const file of files) {
-    if (!file.endsWith(".meeko") || basename(file).startsWith("+")) continue;
+    if (!file.endsWith(".meeko")) continue;
+    if (basename(file).startsWith("+")) {
+      if (tryRouteBlockSource(await readFile(file, "utf8"), file) !== undefined) {
+        throw new Error(`${file}: <script server> declara opciones de ruta y sólo se admite en las páginas`);
+      }
+      continue;
+    }
     const directory = dirname(file);
-    const layouts: string[] = hasAppShell ? [appShell] : [];
-    if (hasDefaultLayout) layouts.push(defaultLayout);
+    const layouts: string[] = [...shellLayouts];
     let cursor = pagesRoot;
     const relativeDirectory = relative(pagesRoot, directory);
     if (files.has(join(cursor, "+layout.meeko"))) layouts.push(join(cursor, "+layout.meeko"));
@@ -157,9 +270,18 @@ export async function discoverRoutes(projectRoot: string): Promise<readonly Rout
       if (errorCursor === pagesRoot) break;
       errorCursor = dirname(errorCursor);
     }
-    const sidecar = file.slice(0, -".meeko".length) + ".route.ts";
-    const hasSidecar = files.has(sidecar);
-    const render = hasSidecar ? extractRouteRender(sidecar, await readFile(sidecar, "utf8")) : undefined;
+    // Without a nearer +error.meeko, the source's app/error.meeko handles the
+    // failure, and then the root error page of the project that lends its shell.
+    if (!error) error = hasAppError ? appError : shell?.error;
+    const sidecarFile = file.slice(0, -".meeko".length) + ".route.ts";
+    const block = tryRouteBlockSource(await readFile(file, "utf8"), file);
+    if (block !== undefined && files.has(sidecarFile)) {
+      throw new Error(`${file}: las opciones de ruta están declaradas dos veces; deja <script server> o ${basename(sidecarFile)}`);
+    }
+    const sidecar = block !== undefined ? routeBlockId(file) : files.has(sidecarFile) ? sidecarFile : undefined;
+    const hasSidecar = sidecar !== undefined;
+    const render = block !== undefined ? extractRouteRender(file, block)
+      : hasSidecar ? extractRouteRender(sidecar, await readFile(sidecar, "utf8")) : undefined;
     routes.push({
       id: routeId(relative(pagesRoot, file)),
       file,

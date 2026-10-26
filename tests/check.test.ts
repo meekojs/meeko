@@ -34,7 +34,7 @@ test("checkSource sitúa errores de tipos de script y plantilla en .meeko", asyn
     assert.equal(error.filename, join(exampleDirectory, `TypeCase${index}.meeko`));
     assert.equal(error.location.line, item.line, `Case ${index}: ${JSON.stringify(diagnostics)}`);
     assert.ok(error.location.column > 1);
-    assert.doesNotMatch(error.message, /Generated TypeScript/);
+    assert.doesNotMatch(error.message, /TypeScript generado/);
     if (item.code === "TS2304") assert.equal(error.location.offset, item.source.indexOf("missing"));
   }
 });
@@ -75,12 +75,27 @@ test("checkSource resuelve imports .meeko anidados y comprueba props del hijo", 
   const directory = resolve("examples/nested");
   const badValue = `<script lang="ts">import * as Child from "./Child.meeko";</script>\n<template><component is="Child" bind:label="42"></component></template>`;
   const wrongType = await checkSource(badValue, join(directory, "WrongProps.meeko"));
-  assert.ok(wrongType.some((diagnostic) => /^TS\d+$/.test(diagnostic.code) && diagnostic.location.line === 2 && !diagnostic.message.startsWith("Generated TypeScript")), JSON.stringify(wrongType));
+  assert.ok(wrongType.some((diagnostic) => /^TS\d+$/.test(diagnostic.code) && diagnostic.location.line === 2 && !diagnostic.message.startsWith("TypeScript generado")), JSON.stringify(wrongType));
   const missingProp = `<script lang="ts">import * as Child from "./Child.meeko";</script>\n<template><component is="Child"></component></template>`;
   const missing = await checkSource(missingProp, join(directory, "MissingProps.meeko"));
   assert.ok(missing.some((diagnostic) => /^TS\d+$/.test(diagnostic.code) && diagnostic.location.line === 2), JSON.stringify(missing));
   const names = await readdir(directory);
   assert.equal(names.some((name) => name.includes("__meeko_check_")), false);
+});
+
+test("checkSource informa una sola vez un error dentro de un snippet, en la propiedad", async () => {
+  const directory = await mkdtemp(join(exampleDirectory, ".meeko-snippet-check-"));
+  const child = `<script lang="ts">\nconst snippets = defineSnippets<{ row: [row: { id: string }] }>();\n</script>\n<template><ul><render snippet="snippets.row" args="{ id: 'a' }" /></ul></template>`;
+  const parent = `<script lang="ts">\nimport * as List from "./List.meeko";\n</script>\n<template><List><snippet name="row" params="row">{row.name}</snippet></List></template>`;
+  try {
+    await writeFile(join(directory, "List.meeko"), child);
+    const diagnostics = await checkSource(parent, join(directory, "Parent.meeko"));
+    // The hydration path reads the parameter from the snippet's arguments, a rewritten expression
+    // whose pieces keep their own mapping, so its copy of the error also lands on `name`.
+    assert.deepEqual(diagnostics.map((item) => [item.code, item.location.offset]), [["TS2339", parent.indexOf("name}")]], JSON.stringify(diagnostics));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("CLI types genera declaraciones de imports .meeko para un consumidor TS7", async () => {

@@ -10,19 +10,60 @@ import type { RouteRecord } from "./router.js";
 import { DOCUMENT_HEAD_PREFIX } from "./server.js";
 import type { PageRoute } from "./server.js";
 
+/**
+ * Opciones de {@link prerenderRoutes}.
+ *
+ * @example
+ * ```ts
+ * import { prerenderRoutes } from "@meekojs/meeko/build";
+ * import type { PrerenderOptions } from "@meekojs/meeko/build";
+ *
+ * const options: PrerenderOptions = {
+ *   routes,
+ *   handler: (request) => handler(request),
+ *   loadRoute: (file) => import(file).then((module) => module.route),
+ *   outputRoot: "dist/prerender",
+ *   origin: "https://example.com",
+ * };
+ * await prerenderRoutes(options);
+ * ```
+ */
 export interface PrerenderOptions {
+  /** Manifiesto de rutas; sólo se renderizan las `render: "prerender"`. */
   readonly routes: readonly RouteRecord[];
-  /** Renders one page; it should not run server middleware, which runs again when the page is served. */
+  /** Renderiza una página. No debe ejecutar el middleware de servidor, que vuelve a ejecutarse al servirla. */
   readonly handler: (request: Request) => Promise<Response>;
+  /** Carga las opciones de ruta de un sidecar, para leer `render` y `prerenderEntries`. */
   readonly loadRoute?: (file: string) => Promise<PageRoute>;
+  /** Carpeta de salida del HTML, los payloads y `manifest.json`. */
   readonly outputRoot: string;
+  /** Origen de las peticiones de render; por defecto, `http://meeko.local`. */
   readonly origin?: string;
+  /** Transforma el HTML antes de guardarlo. */
   readonly transformHtml?: (html: string) => string | Promise<string>;
 }
 
-/** Index written next to prerendered HTML and read by adapters at startup. */
+/**
+ * Índice `manifest.json` que se escribe junto al HTML prerenderizado y que leen los adaptadores al
+ * arrancar. `headOffset` se mide en unidades de código UTF-16 del HTML leído como texto, no en bytes.
+ *
+ * @example
+ * ```ts
+ * import { readFile } from "node:fs/promises";
+ * import type { PrerenderIndex } from "@meekojs/meeko/build";
+ *
+ * const index = JSON.parse(await readFile(".meeko/output/node/prerender/manifest.json", "utf8")) as PrerenderIndex;
+ * const home = index.pages["/"];
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#routing-layouts-y-ssr
+ */
 export interface PrerenderIndex {
+  /** Versión del formato. */
   readonly version: 1;
+  /**
+   * Páginas por ruta: archivo HTML, posición donde se inserta la meta CSRF, `ETag` y, si existe,
+   * el payload de navegación `index.meeko.json`.
+   */
   readonly pages: Readonly<Record<string, { readonly file: string; readonly headOffset: number; readonly etag: string; readonly payload?: string }>>;
 }
 
@@ -45,7 +86,26 @@ function headOffset(pathname: string, html: string): number {
 /** The navigation payload embedded in a Meeko document; `serializeJson` escapes every `<` inside it. */
 const embeddedPayload = /<script id="meeko-payload" type="application\/json">([^<]*)<\/script>/;
 
-/** Writes only fully resolved, successful HTML responses to the prerender output. */
+/**
+ * Prerenderiza las rutas `render: "prerender"`: genera sus URL (con `prerenderEntries` en las
+ * dinámicas), las pide a `handler` y escribe sólo respuestas HTML `200` completas, con su payload de
+ * navegación y el índice `manifest.json`.
+ *
+ * @param options Rutas, handler y carpeta de salida.
+ * @returns Las rutas absolutas de los archivos HTML escritos.
+ * @throws {Error} Si una ruta dinámica no tiene `prerenderEntries`, una URL se repite o la tapa otra
+ * ruta, una página no responde HTML `200` o una ruta `render: "client"` declara `prerenderEntries`.
+ * @example
+ * ```ts
+ * import { discoverRoutes, prerenderRoutes } from "@meekojs/meeko/build";
+ *
+ * const files = await prerenderRoutes({
+ *   routes: await discoverRoutes(process.cwd()),
+ *   handler: (request) => app.fetch(request),
+ *   outputRoot: "dist/prerender",
+ * });
+ * ```
+ */
 export async function prerenderRoutes(options: PrerenderOptions): Promise<string[]> {
   const outputRoot = resolve(options.outputRoot);
   const origin = options.origin ?? "http://meeko.local";
@@ -127,7 +187,23 @@ export async function importNodeOutput(projectRoot: string, server = ".meeko/out
   return output as NodeOutputModule;
 }
 
-/** Renders `render: "prerender"` routes from the Node build into .meeko/output/node/prerender. */
+/**
+ * Prerenderiza las rutas `render: "prerender"` con el build Node existente y las escribe en
+ * `.meeko/output/node/prerender`. Es lo que hace `meeko prerender`; el runtime se crea con
+ * `prerendering: true`.
+ *
+ * @param projectRoot Carpeta del proyecto con un build Node.
+ * @returns Las rutas absolutas de los archivos HTML escritos.
+ * @throws {Error} Si falta el build Node o una página no se puede prerenderizar.
+ * @example
+ * ```ts
+ * import { buildProject, prerenderProject } from "@meekojs/meeko/build";
+ *
+ * await buildProject(process.cwd());
+ * // Repite el prerender sobre el build existente.
+ * const files = await prerenderProject(process.cwd());
+ * ```
+ */
 export async function prerenderProject(projectRoot: string): Promise<string[]> {
   return prerenderWithNodeBuild(projectRoot, ".meeko/output/node/index.mjs", ".meeko/output/node/prerender");
 }

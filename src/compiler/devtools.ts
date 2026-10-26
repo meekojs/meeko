@@ -1,6 +1,7 @@
 import ts from "@typescript/typescript6";
 import { markSource } from "./mapping.js";
 import { locate } from "./sfc.js";
+import type { StatementEdit } from "./composables.js";
 
 /** Archivo `.meeko` cuyos desplazamientos describen las ubicaciones emitidas para DevTools. */
 export interface DevtoolsSourceContext {
@@ -92,8 +93,13 @@ interface Insertion {
  * `sourceOffset` convierte una posición de `file` en un desplazamiento del `.meeko`.
  * Devuelve el texto marcado para el mapa de fuentes, o `undefined` si no hay nada que instrumentar.
  */
-export function instrumentNode(file: ts.SourceFile, node: ts.Node, sourceOffset: (position: number) => number, context: DevtoolsSourceContext, options: { computed: boolean }): string | undefined {
+export function instrumentNode(file: ts.SourceFile, node: ts.Node, sourceOffset: (position: number) => number, context: DevtoolsSourceContext, options: { computed: boolean; devtools?: boolean; edits?: readonly StatementEdit[] }): string | undefined {
   const insertions: Insertion[] = [];
+  const removals: Array<{ start: number; end: number }> = [];
+  for (const edit of options.edits ?? []) {
+    if (edit.kind === "insert") insertions.push({ at: edit.at, text: edit.text, depth: edit.depth, closing: edit.closing });
+    else removals.push({ start: edit.start, end: edit.end });
+  }
   const wrap = (target: ts.Node, open: string, close: string, depth: number): void => {
     insertions.push({ at: target.getStart(file), text: open, depth, closing: false });
     insertions.push({ at: target.getEnd(), text: close, depth, closing: true });
@@ -122,22 +128,33 @@ export function instrumentNode(file: ts.SourceFile, node: ts.Node, sourceOffset:
     }
     ts.forEachChild(child, (next) => visit(next, depth + 2));
   };
-  visit(node, 0);
-  if (insertions.length === 0) return undefined;
+  if (options.devtools !== false) visit(node, 0);
+  if (insertions.length === 0 && removals.length === 0) return undefined;
   insertions.sort((left, right) => left.at - right.at
     || Number(right.closing) - Number(left.closing)
     || (left.closing ? right.depth - left.depth : left.depth - right.depth));
+  removals.sort((left, right) => left.start - right.start);
   const start = node.getStart(file);
   const end = node.getEnd();
   const text = file.text;
   const parts: string[] = [];
+  // Original text between two positions, without the removed ranges.
+  const copy = (from: number, to: number): void => {
+    let position = from;
+    for (const removal of removals) {
+      if (removal.end <= position || removal.start >= to) continue;
+      if (removal.start > position) parts.push(markSource(text.slice(position, removal.start), sourceOffset(position)));
+      position = Math.max(position, Math.min(removal.end, to));
+    }
+    if (to > position) parts.push(markSource(text.slice(position, to), sourceOffset(position)));
+  };
   let cursor = start;
   for (const insertion of insertions) {
-    if (insertion.at > cursor) parts.push(markSource(text.slice(cursor, insertion.at), sourceOffset(cursor)));
+    if (insertion.at > cursor) copy(cursor, insertion.at);
     parts.push(insertion.text);
     cursor = Math.max(cursor, insertion.at);
   }
-  if (end > cursor) parts.push(markSource(text.slice(cursor, end), sourceOffset(cursor)));
+  if (end > cursor) copy(cursor, end);
   return parts.join("");
 }
 

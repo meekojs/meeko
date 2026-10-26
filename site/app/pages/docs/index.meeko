@@ -1,0 +1,77 @@
+<script server lang="ts">
+import { definePage } from "@meekojs/meeko/framework";
+import { catalog } from "../../../server/content/catalog.js";
+import { renderSource } from "../../../server/content/markdown.js";
+
+export const route = definePage({ render: "prerender" });
+
+// Each card shows the title and first paragraph of its document.
+const rendered = await Promise.all(catalog.map(async (entry) => {
+  const doc = await renderSource(entry.source);
+  return { href: entry.href, section: entry.section, title: entry.slug === undefined ? "Inicio rápido" : doc.title, description: doc.description };
+}));
+export const sections = [...new Set(rendered.map((item) => item.section))].map((title) => ({
+  title,
+  docs: rendered.filter((item) => item.section === title),
+}));
+export const head = {
+  title: "Documentación · Meeko",
+  description: "Toda la documentación de Meeko: guía del framework, API de componentes, editores, DevTools, estabilidad, arquitectura, migración y cambios.",
+};
+</script>
+
+<script lang="ts">
+export interface Props {
+  params: Record<string, string>;
+  search: Record<string, string | string[]>;
+}
+</script>
+
+<template>
+  <section class="index" data-pagefind-ignore>
+    <h1>Documentación</h1>
+    <p class="lead">Todo lo que necesitas para escribir componentes <code>.meeko</code> y aplicaciones full-stack con Meeko.</p>
+    <section each:of="sections" each:as="section" each:key="section.title">
+      <h2>{section.title}</h2>
+      <ul>
+        <li each:of="section.docs" each:as="doc" each:key="doc.href">
+          <a bind:href="doc.href">
+            <strong>{doc.title}</strong>
+            <span>{doc.description}</span>
+          </a>
+        </li>
+      </ul>
+    </section>
+  </section>
+</template>
+
+<style scoped>
+.index { max-width: 64rem; margin: 0 auto; padding: 3rem 1.5rem 4rem; }
+h1 { margin: 0; font: 800 clamp(2rem, 4.5vw, 2.8rem)/1.1 var(--font-display); letter-spacing: -0.02em; }
+.lead { margin: 0.8rem 0 2rem; color: var(--ink-soft); font-size: 1.1rem; }
+h2 {
+  margin: 2rem 0 0.8rem;
+  color: var(--muted);
+  font: 700 0.78rem/1.4 var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: 0.9rem; margin: 0; padding: 0; list-style: none; }
+a {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  height: 100%;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 0.15s, transform 0.15s;
+}
+a:hover { border-color: var(--accent); transform: translateY(-1px); }
+strong { font: 750 1.02rem/1.3 var(--font-display); }
+span { color: var(--ink-soft); font-size: 0.9rem; line-height: 1.55; }
+@media (max-width: 640px) { .index { padding: 2rem 1.1rem 3rem; } }
+</style>

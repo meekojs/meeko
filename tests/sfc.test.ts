@@ -44,8 +44,29 @@ test("señala secciones duplicadas en la línea original", () => {
 });
 
 test("rechaza secciones faltantes y contenido inesperado", () => {
-  assert.throws(() => parseSfc("<template></template>", "Missing.meeko"), /MEEK005/);
+  assert.throws(() => parseSfc("<style></style>", "Missing.meeko"), /MEEK007/);
+  assert.throws(() => parseSfc("<script lang=\"ts\"></script>", "Missing.meeko"), /MEEK007/);
   assert.throws(() => parseSfc("<script lang=\"ts\"></script><template></template><div></div>", "Extra.meeko"), /MEEK002/);
+});
+
+test("<script lang=\"ts\"> es opcional: sin él hay un script implícito vacío ante la plantilla", () => {
+  const only = parseSfc("<template><p>x</p></template>", "Only.meeko");
+  assert.equal(only.script.implicit, true);
+  assert.equal(only.script.content, "");
+  assert.equal(only.script.start, only.template.start);
+  const source = `<script server lang="ts">
+export const title = "x";
+</script>
+<template><h1>{title}</h1></template>
+<style scoped>h1 { color: red; }</style>`;
+  const server = parseSfc(source, "Server.meeko");
+  assert.equal(server.script.implicit, true);
+  assert.equal(server.script.contentStart, source.indexOf("<template>"));
+  assert.ok(server.server && server.style);
+  assert.equal(parseSfc(`<script lang="ts">const a = 1;</script><template></template>`, "Explicit.meeko").script.implicit, undefined);
+  // An empty script and no script compile to the same component.
+  const withScript = compile(`<script lang="ts"></script><template><p>x</p></template>`, "Same.meeko").code;
+  assert.equal(compile("<template><p>x</p></template>", "Same.meeko").code, withScript);
 });
 
 test("sitúa errores de script, plantilla y CSS en el archivo original", () => {
@@ -97,12 +118,9 @@ test("una interpolación sin cerrar se señala en su llave de apertura", () => {
   assert.throws(() => compile(`<script lang="ts">const value = 1;</script><template><p>{}</p></template>`, "Empty.meeko"), /MEEK009/);
 });
 
-test("una lista sin clave falla antes de generar el módulo", () => {
+test("una lista sin each:key compila con el índice como clave", () => {
   const source = `<script lang="ts">const items = [1, 2];</script>\n<template><li each:of="items" each:as="item">{item}</li></template>`;
-  assert.throws(() => compile(source, "List.meeko"), (error: unknown) => {
-    assert.ok(error instanceof MeekoCompileError);
-    assert.equal(error.diagnostic.code, "MEEK023");
-    assert.equal(error.diagnostic.location.line, 2);
-    return true;
-  });
+  const { code } = compile(source, "List.meeko");
+  assert.match(code, /__meeko\.renderFor\(0, items, __meeko\.indexKey, \(item, index\) =>/);
+  assert.match(code, /__meeko\.bindFor\(__scope, 0, \(\) => \(items\), __meeko\.indexKey, /);
 });

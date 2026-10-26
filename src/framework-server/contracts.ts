@@ -2,7 +2,21 @@ import { serializeJson } from "../server.js";
 import type { RequestContext } from "./context.js";
 import { SessionSecurityError, type SessionManager } from "./sessions.js";
 
-/** Valibot schemas implement this public Standard Schema contract. */
+/**
+ * Contrato público de Standard Schema v1 que validan los contratos de API, RPC y Socket. Los
+ * schemas de Valibot lo implementan; los públicos viven en `shared/`.
+ *
+ * @typeParam I Tipo de entrada.
+ * @typeParam O Tipo de salida, tras validar y transformar.
+ * @example
+ * ```ts
+ * // shared/schemas/user.ts
+ * import * as v from "valibot";
+ * import type { Schema } from "@meekojs/meeko/server";
+ *
+ * export const userSchema: Schema<{ id: string; name: string }> = v.object({ id: v.string(), name: v.string() });
+ * ```
+ */
 export interface Schema<I = unknown, O = I> {
   readonly "~standard": {
     readonly version: 1;
@@ -15,7 +29,34 @@ type Input<S> = S extends Schema<infer I, unknown> ? I : never;
 type Output<S> = S extends Schema<unknown, infer O> ? O : never;
 type OptionalOutput<S> = S extends Schema ? Output<S> : undefined;
 
+/**
+ * Error público de API, RPC, Socket y loaders: conserva `code` y `status` en la respuesta, que
+ * añade `requestId`. Cualquier otro error se responde como `INTERNAL_ERROR`/`500` sin exponer su
+ * mensaje.
+ *
+ * @example
+ * ```ts
+ * import { ApiError, defineRpc } from "@meekojs/meeko/server";
+ * import { findUser } from "../../utils/users.js";
+ *
+ * export default defineRpc({
+ *   input: userParams,
+ *   output: userSchema,
+ *   handler: async ({ input }) => {
+ *     const user = await findUser(input.id);
+ *     if (!user) throw new ApiError("USER_NOT_FOUND", 404);
+ *     return user;
+ *   },
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#api-y-rpc
+ */
 export class ApiError extends Error {
+  /**
+   * @param code Código público, como `USER_NOT_FOUND`.
+   * @param status Estado HTTP entre 400 y 599.
+   * @param message Mensaje interno; no se envía al cliente. Por defecto, el código.
+   */
   constructor(public readonly code: string, public readonly status: number, message = code) {
     super(message);
     this.name = "ApiError";
@@ -23,8 +64,22 @@ export class ApiError extends Error {
 }
 
 /**
- * The session family was revoked or its id replaced. It is the abort reason of
- * `RequestContext.signal` and answers `401 SESSION_REVOKED`.
+ * La familia de la sesión se revocó o su ID fue sustituido. Es el motivo de aborto de
+ * `RequestContext.signal` y responde `401 SESSION_REVOKED`. Lo lanza `SessionHandle.verify()`.
+ *
+ * @example
+ * ```ts
+ * import { SessionRevokedError } from "@meekojs/meeko/server";
+ *
+ * try {
+ *   await context.session.verify();
+ *   await payments.charge(order);
+ * } catch (error) {
+ *   if (error instanceof SessionRevokedError) console.warn("sesión revocada", context.requestId);
+ *   throw error;
+ * }
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#revocación-durante-una-petición
  */
 export class SessionRevokedError extends ApiError {
   constructor() {
@@ -51,6 +106,19 @@ export function normalizeServerError(error: unknown): ApiError {
   return new ApiError("INTERNAL_ERROR", 500);
 }
 
+/**
+ * Observador de los fallos internos del servidor, con el ID de la petición. Su propio fallo no
+ * cambia la respuesta.
+ *
+ * @example
+ * ```ts
+ * import type { ServerErrorObserver } from "@meekojs/meeko/server";
+ *
+ * export const onError: ServerErrorObserver = (error, requestId) => {
+ *   console.error(`[${requestId}]`, error instanceof Error ? error.name : typeof error);
+ * };
+ * ```
+ */
 export type ServerErrorObserver = (error: unknown, requestId: string) => void;
 
 function reportObserverFailure(error: unknown, observerError: unknown, requestId?: string): void {
@@ -78,29 +146,113 @@ export function reportServerError(error: unknown, requestId: string, observer?: 
   observeServerError(error, requestId, observer);
 }
 
+/**
+ * Contrato de un endpoint de `server/api/<ruta>.<método>.ts`: schemas de entrada y respuesta,
+ * autenticación, autorización y handler. Se declara con {@link defineApiRoute}.
+ *
+ * @typeParam P Schema de `params`.
+ * @typeParam Q Schema de `query`.
+ * @typeParam B Schema de `body`.
+ * @typeParam R Schema de la respuesta.
+ * @typeParam S Tipo de los servicios.
+ * @example
+ * ```ts
+ * import type { ApiRouteDefinition, Schema } from "@meekojs/meeko/server";
+ *
+ * type Health = ApiRouteDefinition<undefined, undefined, undefined, Schema<{ ok: boolean }>>;
+ * ```
+ */
 export interface ApiRouteDefinition<P extends Schema | undefined, Q extends Schema | undefined, B extends Schema | undefined, R extends Schema | undefined, S = unknown> {
+  /** Segmentos dinámicos de la ruta, como cadenas obligatorias. */
   params?: P;
+  /** Query string; sus campos aceptan cadenas o listas de cadenas. */
   query?: Q;
+  /** Cuerpo JSON (`application/json`, hasta 1 MiB). */
   body?: B;
+  /** Schema de la respuesta; obligatorio salvo con `contentType: "response"`. */
   response?: R;
+  /** `"required"` responde `401 UNAUTHENTICATED` sin sesión. */
   auth?: "required" | "optional";
+  /** `"response"` deja que el handler devuelva su propio `Response`. */
   contentType?: "json" | "response";
+  /** Devolver `false` responde `403 FORBIDDEN`. */
   authorize?: (context: RequestContext<S>) => boolean | Promise<boolean>;
+  /** Recibe la entrada validada y el contexto; su resultado se valida con `response`. */
   handler: (args: { params: OptionalOutput<P>; query: OptionalOutput<Q>; body: OptionalOutput<B>; context: RequestContext<S> }) => Promise<R extends Schema ? Output<R> : Response> | (R extends Schema ? Output<R> : Response);
 }
 
+/**
+ * Declara un endpoint de API, el export por defecto de `server/api/<ruta>.<método>.ts`. El
+ * servidor valida entrada, salida, sesión, autorización y CSRF; los clientes `api.*` se generan a
+ * partir de sus schemas públicos.
+ *
+ * @param definition Schemas, guardas y handler.
+ * @returns La misma definición, con sus tipos inferidos.
+ * @example
+ * ```ts
+ * // server/api/users/[id].get.ts
+ * import { defineApiRoute } from "@meekojs/meeko/server";
+ * import { userParams, userSchema } from "../../../shared/schemas/user.js";
+ *
+ * export default defineApiRoute({
+ *   params: userParams,
+ *   response: userSchema,
+ *   handler: ({ params }) => ({ id: params.id, name: "Ada" }),
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#api-y-rpc
+ */
 export function defineApiRoute<P extends Schema | undefined = undefined, Q extends Schema | undefined = undefined, B extends Schema | undefined = undefined, R extends Schema | undefined = undefined, S = unknown>(definition: ApiRouteDefinition<P, Q, B, R, S>): ApiRouteDefinition<P, Q, B, R, S> {
   return definition;
 }
 
+/**
+ * Contrato de un procedimiento de `server/rpc/`: schemas de entrada y salida, guardas y handler.
+ * Se declara con {@link defineRpc}.
+ *
+ * @typeParam I Schema de la entrada.
+ * @typeParam O Schema de la salida.
+ * @typeParam S Tipo de los servicios.
+ * @example
+ * ```ts
+ * import type { RpcDefinition, Schema } from "@meekojs/meeko/server";
+ *
+ * type GetUser = RpcDefinition<Schema<{ id: string }>, Schema<{ id: string; name: string }>>;
+ * ```
+ */
 export interface RpcDefinition<I extends Schema, O extends Schema, S = unknown> {
+  /** Schema de la entrada JSON. */
   input: I;
+  /** Schema de la salida. */
   output: O;
+  /** `"required"` responde `401 UNAUTHENTICATED` sin sesión. */
   auth?: "required" | "optional";
+  /** Devolver `false` responde `403 FORBIDDEN`. */
   authorize?: (context: RequestContext<S>) => boolean | Promise<boolean>;
+  /** Recibe la entrada validada y el contexto; su resultado se valida con `output`. */
   handler: (args: { input: Output<I>; context: RequestContext<S> }) => Promise<Input<O> | Output<O>> | Input<O> | Output<O>;
 }
 
+/**
+ * Declara un procedimiento RPC, el export por defecto de `server/rpc/<ruta>.ts`, que se llama con
+ * `POST /_meeko/rpc/<ruta>` y desde `rpc.*`. Siempre comprueba Origin y CSRF.
+ *
+ * @param definition Schemas, guardas y handler.
+ * @returns La misma definición, con sus tipos inferidos.
+ * @example
+ * ```ts
+ * // server/rpc/users/get.ts
+ * import { defineRpc } from "@meekojs/meeko/server";
+ * import { userParams, userSchema } from "../../../shared/schemas/user.js";
+ *
+ * export default defineRpc({
+ *   input: userParams,
+ *   output: userSchema,
+ *   handler: ({ input }) => ({ id: input.id, name: "Ada" }),
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#api-y-rpc
+ */
 export function defineRpc<I extends Schema, O extends Schema, S = unknown>(definition: RpcDefinition<I, O, S>): RpcDefinition<I, O, S> {
   return definition;
 }
@@ -148,6 +300,25 @@ async function guard<S>(definition: { auth?: "required" | "optional"; authorize?
   if (definition.authorize && !(await definition.authorize(context))) throw new ApiError("FORBIDDEN", 403);
 }
 
+/**
+ * Ejecuta un endpoint de API con sus guardas y validaciones y devuelve la respuesta JSON, o lanza
+ * un `ApiError`. Es la pieza de bajo nivel de {@link dispatchApiRoute}, que además normaliza errores.
+ *
+ * @param definition Endpoint declarado con `defineApiRoute`.
+ * @param context Contexto de la petición.
+ * @param sessions Gestor de sesiones, para Origin y CSRF.
+ * @param rawParams Parámetros de la ruta sin validar.
+ * @returns La respuesta del endpoint.
+ * @throws {ApiError} Con `UNAUTHENTICATED`, `FORBIDDEN`, `INVALID_PARAMS`, `INVALID_QUERY`, `INVALID_BODY`,
+ * `UNSUPPORTED_MEDIA_TYPE`, `BODY_TOO_LARGE`, `INVALID_RESPONSE` o los del handler.
+ * @example
+ * ```ts
+ * import { executeApiRoute } from "@meekojs/meeko/server";
+ * import userRoute from "./server/api/users/[id].get.js";
+ *
+ * const response = await executeApiRoute(userRoute, context, sessions, { id: "123" });
+ * ```
+ */
 export async function executeApiRoute<P extends Schema | undefined, Q extends Schema | undefined, B extends Schema | undefined, R extends Schema | undefined, S>(definition: ApiRouteDefinition<P, Q, B, R, S>, context: RequestContext<S>, sessions: SessionManager, rawParams: unknown = {}): Promise<Response> {
   await guard(definition, context, sessions);
   const params = definition.params ? await validate(definition.params, rawParams, "params") : undefined;
@@ -163,6 +334,24 @@ export async function executeApiRoute<P extends Schema | undefined, Q extends Sc
   return new Response(serializeJson(output), { headers: { "content-type": "application/json; charset=utf-8" } });
 }
 
+/**
+ * Ejecuta un procedimiento RPC con sus guardas y validaciones y devuelve su salida validada. Es la
+ * pieza de bajo nivel de {@link dispatchRpc}.
+ *
+ * @param definition Procedimiento declarado con `defineRpc`.
+ * @param rawInput Entrada sin validar.
+ * @param context Contexto de la petición.
+ * @param sessions Gestor de sesiones, para Origin y CSRF.
+ * @returns La salida validada.
+ * @throws {ApiError} Con `UNAUTHENTICATED`, `FORBIDDEN`, `INVALID_INPUT`, `INVALID_OUTPUT` o los del handler.
+ * @example
+ * ```ts
+ * import { executeRpc } from "@meekojs/meeko/server";
+ * import getUser from "./server/rpc/users/get.js";
+ *
+ * const user = await executeRpc(getUser, { id: "123" }, context, sessions);
+ * ```
+ */
 export async function executeRpc<I extends Schema, O extends Schema, S>(definition: RpcDefinition<I, O, S>, rawInput: unknown, context: RequestContext<S>, sessions: SessionManager): Promise<Output<O>> {
   await guard(definition, context, sessions, true);
   const input = await validate(definition.input, rawInput, "input");
@@ -172,6 +361,22 @@ export async function executeRpc<I extends Schema, O extends Schema, S>(definiti
   return output;
 }
 
+/**
+ * Convierte un error en la respuesta JSON pública `{ code, status, requestId }` con la cabecera
+ * `x-request-id`. Un `ApiError` conserva su código y estado; cualquier otro error es
+ * `INTERNAL_ERROR`/`500`, sin su mensaje.
+ *
+ * @param error Error capturado.
+ * @param requestId ID de la petición.
+ * @returns La respuesta de error.
+ * @example
+ * ```ts
+ * import { ApiError, errorResponse } from "@meekojs/meeko/server";
+ *
+ * const response = errorResponse(new ApiError("NOT_FOUND", 404), crypto.randomUUID());
+ * // 404 {"code":"NOT_FOUND","status":404,"requestId":"..."}
+ * ```
+ */
 export function errorResponse(error: unknown, requestId: string): Response {
   const known = normalizeServerError(error);
   return new Response(serializeJson({ code: known.code, status: known.status, requestId }), { status: known.status, headers: { "content-type": "application/json; charset=utf-8", "x-request-id": requestId } });
@@ -189,11 +394,48 @@ function finish(response: Response, context: RequestContext): Response {
   return finished;
 }
 
+/**
+ * Atiende una petición de API para un host propio: ejecuta el endpoint, normaliza los errores en
+ * `{ code, status, requestId }`, informa los fallos 5xx a `onError` y añade `x-request-id`, la
+ * cookie de sesión y el token CSRF. Nunca rechaza.
+ *
+ * @param definition Endpoint declarado con `defineApiRoute`.
+ * @param context Contexto de la petición.
+ * @param sessions Gestor de sesiones.
+ * @param params Parámetros de la ruta sin validar.
+ * @param onError Observador de los fallos internos.
+ * @returns La respuesta final.
+ * @example
+ * ```ts
+ * import { dispatchApiRoute } from "@meekojs/meeko/server";
+ * import userRoute from "./server/api/users/[id].get.js";
+ *
+ * const response = await dispatchApiRoute(userRoute, context, sessions, { id: "123" }, (error, id) => console.error(id, error));
+ * ```
+ */
 export async function dispatchApiRoute<P extends Schema | undefined, Q extends Schema | undefined, B extends Schema | undefined, R extends Schema | undefined, S>(definition: ApiRouteDefinition<P, Q, B, R, S>, context: RequestContext<S>, sessions: SessionManager, params: unknown = {}, onError?: ServerErrorObserver): Promise<Response> {
   try { return finish(await executeApiRoute(definition, context, sessions, params), context); }
   catch (error) { reportServerError(error, context.requestId, onError); return finish(errorResponse(error, context.requestId), context); }
 }
 
+/**
+ * Atiende una petición RPC para un host propio: exige `POST` con JSON, ejecuta el procedimiento,
+ * normaliza los errores, informa los fallos 5xx a `onError` y añade `x-request-id`, la cookie de
+ * sesión y el token CSRF. Nunca rechaza.
+ *
+ * @param definition Procedimiento declarado con `defineRpc`.
+ * @param context Contexto de la petición.
+ * @param sessions Gestor de sesiones.
+ * @param onError Observador de los fallos internos.
+ * @returns La respuesta final.
+ * @example
+ * ```ts
+ * import { dispatchRpc } from "@meekojs/meeko/server";
+ * import getUser from "./server/rpc/users/get.js";
+ *
+ * const response = await dispatchRpc(getUser, context, sessions);
+ * ```
+ */
 export async function dispatchRpc<I extends Schema, O extends Schema, S>(definition: RpcDefinition<I, O, S>, context: RequestContext<S>, sessions: SessionManager, onError?: ServerErrorObserver): Promise<Response> {
   try {
     if (context.request.method !== "POST") throw new ApiError("METHOD_NOT_ALLOWED", 405);

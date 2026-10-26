@@ -1,10 +1,42 @@
 import { logClientError, observeCallback } from "./error-observer.js";
 import { createContext, findContext, onCleanup, provide, provideAsyncFailureReporter } from "./reactivity.js";
 
-/** Where a browser failure was observed. */
-export type ErrorSource = "event" | "effect" | "cleanup" | "navigation" | "socket";
+/**
+ * Dónde se observó un fallo del navegador: un handler `on:` (`"event"`), un `effect`, una
+ * limpieza, `onMounted` o la continuación de un setup con `await` (`"mounted"`, desde 1.1), la
+ * navegación o un cliente Socket. Puede ganar miembros en un minor: un `switch` exhaustivo
+ * necesita rama por defecto.
+ *
+ * @example
+ * ```ts
+ * import type { ErrorSource } from "@meekojs/meeko";
+ *
+ * function label(source: ErrorSource): string {
+ *   switch (source) {
+ *     case "navigation": return "No se pudo abrir la página";
+ *     case "socket": return "Conexión perdida";
+ *     default: return "Algo falló";
+ *   }
+ * }
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#componentes-meeko
+ */
+export type ErrorSource = "event" | "effect" | "cleanup" | "mounted" | "navigation" | "socket";
 
-/** Receives failures from the current root and its descendants. */
+/**
+ * Observador de fallos de la raíz actual y sus descendientes. `error` es `unknown`: refínelo antes
+ * de leer sus propiedades.
+ *
+ * @example
+ * ```ts
+ * import type { ComponentErrorHandler } from "@meekojs/meeko";
+ *
+ * export const reportError: ComponentErrorHandler = (error, source) => {
+ *   const message = error instanceof Error ? error.message : String(error);
+ *   console.error(`[${source}] ${message}`);
+ * };
+ * ```
+ */
 export type ComponentErrorHandler = (error: unknown, source: ErrorSource) => void;
 
 const errorHandlerKey = createContext<ComponentErrorHandler>("component error handler");
@@ -63,7 +95,28 @@ export function currentAppErrorChannel(): AppErrorChannel | undefined {
   return findContext(appErrorChannelKey);
 }
 
-/** Provides an error observer to this component and its descendants. */
+/**
+ * Registra un observador de errores para este componente y sus descendientes: eventos, `effect`,
+ * limpiezas, `onMounted` y, en una aplicación montada, navegación y canales Socket sin observador
+ * propio. Un descendiente puede registrar otro para su rama. Se autoimporta en las aplicaciones.
+ *
+ * @param handler Observador que recibe el error y su origen.
+ * @throws {Error} Sin una raíz de componente activa.
+ * @example
+ * ```html
+ * <script lang="ts">
+ * import { provideErrorHandler } from "@meekojs/meeko";
+ * provideErrorHandler((error, source) => {
+ *   console.error("Fallo en", source, error);
+ * });
+ * async function save(): Promise<void> {
+ *   await fetch("/api/save", { method: "POST" });
+ * }
+ * </script>
+ * <template><button on:click="save">Guardar</button></template>
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#componentes-meeko
+ */
 export function provideErrorHandler(handler: ComponentErrorHandler): void {
   provide(errorHandlerKey, handler);
   provideAsyncFailureReporter(handler);
@@ -73,17 +126,17 @@ export function provideErrorHandler(handler: ComponentErrorHandler): void {
   }
 }
 
-/** Captures the nearest observer while a component binding is created. */
-export function componentErrorReporter(): (error: unknown) => void {
+/** Captures the nearest observer while a component binding or `onMounted` queue is created. */
+export function componentErrorReporter(source: "event" | "mounted" = "event"): (error: unknown) => void {
   const nearest = currentComponentErrorHandler();
   // The application observer is resolved per failure because providers can
   // register after this binding was created.
   const channel = nearest ? undefined : currentAppErrorChannel();
   return (error) => {
     const handler = nearest ?? channel?.application();
-    if (!handler) return logClientError("Meeko component event failed", error);
+    if (!handler) return logClientError(source === "event" ? "Meeko component event failed" : "Meeko onMounted callback failed", error);
     observeCallback(
-      () => handler(error, "event"),
+      () => handler(error, source),
       (observerError) => logClientError("Meeko component error observer failed", observerError, error),
     );
   };

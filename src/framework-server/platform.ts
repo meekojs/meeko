@@ -1,12 +1,43 @@
-/** JavaScript runtimes with a Meeko server adapter. */
+/**
+ * Runtime de JavaScript con adaptador de servidor de Meeko. Puede ganar miembros en un minor.
+ *
+ * @example
+ * ```ts
+ * import { defineServerRuntime, MemorySessionStore, SessionManager } from "@meekojs/meeko/server";
+ * import type { PlatformName } from "@meekojs/meeko/server";
+ *
+ * const edge: readonly PlatformName[] = ["cloudflare", "deno"];
+ * export default defineServerRuntime(({ platform }) => ({
+ *   sessions: new SessionManager({ store: new MemorySessionStore(), production: false }),
+ *   services: { edge: edge.includes(platform) },
+ * }));
+ * ```
+ */
 export type PlatformName = "node" | "cloudflare" | "deno" | "bun";
 
-/** Host facilities exposed to each request through `RequestContext.platform`. */
+/**
+ * Servicios del host que recibe cada petición en `RequestContext.platform`.
+ *
+ * @typeParam Env Tipo de las variables o bindings del entorno.
+ * @example
+ * ```ts
+ * import { defineApiRoute } from "@meekojs/meeko/server";
+ *
+ * export default defineApiRoute({
+ *   handler: ({ context }) => {
+ *     context.platform.waitUntil(fetch("https://metrics.example.com/hit", { method: "POST" }));
+ *     return { platform: context.platform.name };
+ *   },
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#runtime-de-servidor
+ */
 export interface ServerPlatform<Env = unknown> {
+  /** Runtime que ejecuta la aplicación. */
   readonly name: PlatformName;
-  /** Environment variables or runtime bindings supplied by the adapter. */
+  /** Variables de entorno o bindings del runtime que entrega el adaptador. */
   readonly env: Env;
-  /** Keeps background work alive after the response when the host supports it. */
+  /** Mantiene vivo un trabajo en segundo plano tras la respuesta, cuando el host lo permite. */
   waitUntil(promise: Promise<unknown>): void;
 }
 

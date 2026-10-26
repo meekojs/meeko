@@ -2,6 +2,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import ts from "@typescript/typescript6";
 import { discoverConfiguredRoutes } from "./config.js";
+import { discoverErrorPage } from "./routes-discovery.js";
+import { routeBlockFile } from "./route-block.js";
+import { routeBlockTypeFile } from "./route-block-types.js";
+import { MeekoCompileError } from "../compiler/sfc.js";
+import type { ServerScript } from "../compiler/server-script.js";
+import { readServerScript } from "./server-script.js";
 
 function importPath(from: string, target: string): string {
   const path = relative(dirname(from), target).replaceAll("\\", "/");
@@ -32,6 +38,17 @@ async function declaresLoader(file: string | undefined): Promise<boolean> {
   return false;
 }
 
+/** What the page's top-level `<script server>` code declares, if it has any and compiles. */
+async function serverBody(page: string): Promise<ServerScript | undefined> {
+  try {
+    const script = readServerScript(await readFile(page, "utf8"), page)?.script;
+    return script?.body ? script : undefined;
+  } catch (error) {
+    if (error instanceof MeekoCompileError) return undefined;
+    throw error;
+  }
+}
+
 /** Checks that each page accepts its route params, search and loader data. */
 export async function generatePageContracts(projectRoot: string): Promise<string> {
   const root = resolve(projectRoot);
@@ -44,34 +61,54 @@ export async function generatePageContracts(projectRoot: string): Promise<string
     'type __Data<Route> = Route extends { readonly load: (...args: never[]) => infer D } ? Exclude<Awaited<D>, Response> : Route extends import("@meekojs/meeko/framework").PageDefinition<infer P extends import("@meekojs/meeko/framework").PageSchema | undefined, infer S extends import("@meekojs/meeko/framework").PageSchema | undefined, infer D, infer C> ? Exclude<D, Response> : Route extends import("@meekojs/meeko/framework").ClientPageDefinition<infer P extends import("@meekojs/meeko/framework").PageSchema | undefined, infer S extends import("@meekojs/meeko/framework").PageSchema | undefined, infer D> ? D : never;',
     'type __HasLoad<Route, Declared extends boolean> = Declared extends true ? true : Route extends { readonly load: (...args: never[]) => unknown } ? true : false;',
     'type __PageProps<Route, Params, HasLoad extends boolean> = { params: __Schema<Route, "params", Params>; search: __Schema<Route, "search", Record<string, string | string[]>> } & (HasLoad extends false ? {} : [__Data<Route>] extends [never] ? {} : undefined extends __Data<Route> ? { data?: Exclude<__Data<Route>, undefined> } : { data: __Data<Route> });',
+    '// Pages with top-level <script server> code receive its exports, awaited, as data.',
+    'type __BodyData<M> = { [K in Exclude<keyof M, "route" | "head">]: Awaited<M[K]> };',
+    'type __BodyProps<Route, Params, Data> = { params: __Schema<Route, "params", Params>; search: __Schema<Route, "search", Record<string, string | string[]>>; data: Data };',
     'type __UnsafeProps<T> = [T] extends [never] ? true : 0 extends (1 & T) ? true : unknown extends T ? true : false;',
-    'type __Check<Actual, Expected, Page extends string, Sidecar extends string> = __UnsafeProps<Actual> extends true ? `Page ${Page} props cannot be any, never or unknown` : Actual extends Record<string, never> ? true : Expected extends Actual ? true : `Page ${Page} props do not match loader ${Sidecar}`;',
-    'type __CheckShell<Actual, Expected, File extends string, Kind extends string> = __UnsafeProps<Actual> extends true ? `${Kind} ${File} props cannot be any, never or unknown` : Actual extends Record<string, never> ? true : Expected extends Actual ? true : `${Kind} ${File} props do not match the values supplied by Meeko`;',
+    'type __Check<Actual, Expected, Page extends string, Sidecar extends string> = __UnsafeProps<Actual> extends true ? `Las props de la página ${Page} no pueden ser any, never ni unknown` : Actual extends Record<string, never> ? true : Expected extends Actual ? true : `Las props de la página ${Page} no coinciden con el loader ${Sidecar}`;',
+    '// Owner is the whole subject ("Las props del layout"), so each kind keeps its article.',
+    'type __CheckShell<Actual, Expected, File extends string, Owner extends string> = __UnsafeProps<Actual> extends true ? `${Owner} ${File} no pueden ser any, never ni unknown` : Actual extends Record<string, never> ? true : Expected extends Actual ? true : `${Owner} ${File} no coinciden con los valores que aporta Meeko`;',
     'type __RequireTrue<Result extends true> = Result;',
   ];
   const layouts = new Set<string>();
   const errors = new Set<string>();
   for (const [index, route] of routes.entries()) {
     const page = JSON.stringify(displayPath(root, route.file));
-    const sidecar = JSON.stringify(route.sidecar ? displayPath(root, route.sidecar) : "(no sidecar)");
+    const blockPage = route.sidecar ? routeBlockFile(route.sidecar) : undefined;
+    // A `<script server>` block is checked through its generated TypeScript copy.
+    const routeModule = blockPage ? routeBlockTypeFile(root, blockPage) : route.sidecar;
+    const sidecar = JSON.stringify(blockPage ? `${displayPath(root, blockPage)} <script server>` : route.sidecar ? displayPath(root, route.sidecar) : "(no sidecar)");
     const pageType = `import(${JSON.stringify(importPath(output, route.file))}).ComponentProps`;
-    const routeType = route.sidecar ? `typeof import(${JSON.stringify(importPath(output, route.sidecar))}).route` : "undefined";
     const paramsType = `import("@meekojs/meeko/framework").GeneratedRoutes[${JSON.stringify(route.id)}]`;
-    const hasLoad = await declaresLoader(route.sidecar);
-    lines.push(`type __check${index} = __RequireTrue<__Check<${pageType}, __PageProps<${routeType}, ${paramsType}, __HasLoad<${routeType}, ${hasLoad}>>, ${page}, ${sidecar}>>;`);
+    const body = blockPage ? await serverBody(blockPage) : undefined;
+    if (body && routeModule) {
+      const module = `typeof import(${JSON.stringify(importPath(output, routeModule))})`;
+      const routeType = body.route ? `${module}["route"]` : "undefined";
+      lines.push(`type __check${index} = __RequireTrue<__Check<${pageType}, __BodyProps<${routeType}, ${paramsType}, __BodyData<${module}>>, ${page}, ${sidecar}>>;`);
+    } else {
+      const routeType = routeModule ? `typeof import(${JSON.stringify(importPath(output, routeModule))}).route` : "undefined";
+      const hasLoad = await declaresLoader(routeModule);
+      lines.push(`type __check${index} = __RequireTrue<__Check<${pageType}, __PageProps<${routeType}, ${paramsType}, __HasLoad<${routeType}, ${hasLoad}>>, ${page}, ${sidecar}>>;`);
+    }
     for (const layout of route.layouts) layouts.add(layout);
     if (route.error) errors.add(route.error);
+  }
+  // app/error.meeko also renders URLs without a route, inside the root layouts.
+  const appError = await discoverErrorPage(root);
+  if (appError) {
+    errors.add(appError.file);
+    for (const layout of appError.layouts) layouts.add(layout);
   }
   for (const [index, layout] of [...layouts].entries()) {
     const file = JSON.stringify(displayPath(root, layout));
     const props = `import(${JSON.stringify(importPath(output, layout))}).ComponentProps`;
     const supplied = '{ outlet: import("@meekojs/meeko").Component<Record<string, unknown>> }';
-    lines.push(`type __layout${index} = __RequireTrue<__CheckShell<${props}, ${supplied}, ${file}, "Layout">>;`);
+    lines.push(`type __layout${index} = __RequireTrue<__CheckShell<${props}, ${supplied}, ${file}, "Las props del layout">>;`);
   }
   for (const [index, error] of [...errors].entries()) {
     const file = JSON.stringify(displayPath(root, error));
     const props = `import(${JSON.stringify(importPath(output, error))}).ComponentProps`;
-    lines.push(`type __error${index} = __RequireTrue<__CheckShell<${props}, { status: number; message: string }, ${file}, "Error page">>;`);
+    lines.push(`type __error${index} = __RequireTrue<__CheckShell<${props}, { status: number; message: string }, ${file}, "Las props de la página de error">>;`);
   }
   lines.push("export {};", "");
   const source = lines.join("\n");
