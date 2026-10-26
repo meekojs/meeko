@@ -162,3 +162,11 @@ El paquete [npm `1.0.0`](https://www.npmjs.com/package/@meekojs/meeko/v/1.0.0) s
 - **Publicación.** [El workflow de publicación](https://github.com/meekojs/meeko/actions/runs/40199343334) repitió los gates y publicó mediante OIDC con procedencia SLSA. `npm view` confirmó la versión, el `gitHead` y `latest: 1.0.0`. La [release de GitHub](https://github.com/meekojs/meeko/releases/tag/v1.0.0) es la más reciente y contiene los seis VSIX, el ZIP de Chrome DevTools y `SHA256SUMS.txt`.
 - **Instalación desde npm.** En un proyecto vacío, `@meekojs/meeko` instaló la `1.0.0`; `meeko init-framework`, `meeko check` y `meeko build` pasaron.
 - **Pendiente.** El dist-tag `next` sigue en `1.0.0-rc.1` porque moverlo requiere una sesión de npm del mantenedor (`npm dist-tag add @meekojs/meeko@1.0.0 next`). Las extensiones no se han publicado en sus tiendas: sus workflows esperan los secretos descritos arriba.
+
+## Versión 1.0.1
+
+El paquete [npm `1.0.1`](https://www.npmjs.com/package/@meekojs/meeko/v/1.0.1) salió del commit `2c5b89c` y coincide con la etiqueta [`v1.0.1`](https://github.com/meekojs/meeko/releases/tag/v1.0.1). Es un patch con dos correcciones que encontró `diegootayza` al pasar a `1.0.0`: `bind:value`, `bind:checked` y `bind:selected` sincronizan la propiedad viva de los controles de formulario, y el handshake de Socket acepta los alias de loopback del mismo puerto. Una revisión independiente del diff no encontró problemas P0 ni P1; sus observaciones P2 y P3 se corrigieron o se documentaron en el CHANGELOG antes de publicar.
+
+- **Gates locales** sobre `2c5b89c`: instalación congelada, `verify` (463/463 y 10/10 de DevTools), conformidad en Node, Bun, Deno y workerd (66/66), `e2e`, `pilot:e2e`, `package:smoke`, el consumidor full-stack, `npm pack --dry-run` (285 archivos) y `git diff --check`.
+- **CI.** [La verificación de `2c5b89c`](https://github.com/meekojs/meeko/actions/runs/40264782818) pasó en todos sus jobs.
+- **Publicación.** [El workflow de publicación](https://github.com/meekojs/meeko/actions/runs/40265423930) repitió los gates y publicó mediante OIDC con procedencia SLSA. `npm view` confirmó la versión, el `gitHead` y `latest: 1.0.1`. La [release de GitHub](https://github.com/meekojs/meeko/releases/tag/v1.0.1) es la más reciente y contiene los seis VSIX, el ZIP de Chrome DevTools y `SHA256SUMS.txt`.
