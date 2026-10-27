@@ -1,0 +1,56 @@
+name: Identidad de Marketplace
+
+# Ejecución manual para configurar la publicación con Microsoft Entra ID. Inicia sesión con la
+# credencial federada del environment `vscode-marketplace`, muestra en el resumen el ID de perfil
+# de Azure DevOps que hay que añadir como miembro del publisher `meekojs` y comprueba si esa
+# identidad ya puede publicar. No publica nada.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  identity:
+    name: Comprobar identidad
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: vscode-marketplace
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Comprobar secretos
+        shell: pwsh
+        env:
+          HAS_AZURE: ${{ secrets.AZURE_CLIENT_ID != '' && secrets.AZURE_TENANT_ID != '' }}
+        run: |
+          if ($env:HAS_AZURE -ne 'true') { throw 'Faltan los secretos AZURE_CLIENT_ID y AZURE_TENANT_ID (docs/releasing.md).' }
+      - name: Iniciar sesión en Microsoft Entra ID
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: ID de perfil para el publisher
+        shell: pwsh
+        run: |
+          # 499b84ac-… es el recurso de Azure DevOps; el ID del perfil no es secreto.
+          $id = az rest --method get --url 'https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=7.1' `
+            --resource '499b84ac-1321-427f-aa17-267ca6975798' --query id -o tsv
+          if ($LASTEXITCODE -ne 0 -or !$id) { throw 'Azure DevOps no devolvió el perfil de la identidad.' }
+          "### Identidad de Marketplace`n`nAñade este ID como miembro **Contributor** del publisher ``meekojs``:`n`n``$id``" >> $env:GITHUB_STEP_SUMMARY
+          Write-Output "ID de perfil: $id"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Comprobar permiso de publicación
+        shell: pwsh
+        run: |
+          npx --yes '@vscode/vsce@4.0.0' verify-pat --azure-credential meekojs
+          if ($LASTEXITCODE -ne 0) {
+            Write-Output '::warning title=Sin permiso todavía::La identidad aún no puede publicar en meekojs; añádela al publisher con el ID del resumen y vuelve a ejecutar.'
+            exit 0
+          } else {
+            "`nLa identidad **ya puede publicar** en ``meekojs``." >> $env:GITHUB_STEP_SUMMARY
+          }
