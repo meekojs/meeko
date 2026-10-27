@@ -17,7 +17,12 @@ import { devScanIgnored, isDevWatchIgnored, isDiscoverySource } from "./framewor
 import { serverScriptModule } from "./framework/server-script.js";
 import { editorBridgeDirectory } from "./framework/editor-bridge.js";
 
-const stylePrefix = "\0virtual:meeko-style:";
+/**
+ * A component's CSS is the module `Card.meeko?meeko-style=<hash>&lang.css`: a real path, as Vue
+ * names its style blocks, so PostCSS plugins resolve files (Tailwind's `@reference`, a relative
+ * `@import`) from the component's folder. The hash changes with the CSS, for hot updates.
+ */
+const styleQuery = /[?&]meeko-style=([0-9a-f]{64})&lang\.css$/;
 const clientPagesModule = "virtual:meeko-client-pages";
 const clientRoutesModule = "virtual:meeko-manifest/client";
 const clientSidecarsModule = "virtual:meeko-client-routes";
@@ -139,7 +144,6 @@ export function meeko(): Plugin {
       root = config.root;
     },
     async resolveId(id, importer) {
-      if (id.startsWith("virtual:meeko-style:")) return `\0${id}`;
       if (virtualModules.has(id)) return `\0${id}`;
       const page = routeBlockFile(id);
       if (page !== undefined) {
@@ -187,8 +191,8 @@ export function meeko(): Plugin {
         });
         return `export const modules = {${entries.join(",")}};`;
       }
-      if (!id.startsWith(stylePrefix) || !id.endsWith(".css")) return null;
-      return styles.get(id) ?? null;
+      const style = styleQuery.exec(id)?.[1];
+      return style === undefined ? null : styles.get(style) ?? null;
     },
     async transform(source, id, options) {
       const serverTransform = Boolean(options?.ssr || ssrBuild);
@@ -262,9 +266,9 @@ export function meeko(): Plugin {
       assertRouteBlockPlacement(source, filename, sources.map((entry) => entry.root));
       const scopeAttribute = config?.css?.scopeAttribute;
       const result = compile(source, filename, { hot: isDev, ...(scopeAttribute ? { scopeAttribute } : {}) });
-      const styleId = `${stylePrefix}${createHash("sha256").update(filename).update("\0").update(result.css).digest("hex")}.css`;
-      if (result.css) styles.set(styleId, result.css);
-      const cssImport = result.css ? `\nimport ${JSON.stringify(styleId.slice(1))};` : "";
+      const styleHash = createHash("sha256").update(filename).update("\0").update(result.css).digest("hex");
+      if (result.css) styles.set(styleHash, result.css);
+      const cssImport = result.css ? `\nimport ${JSON.stringify(`${filename}?meeko-style=${styleHash}&lang.css`)};` : "";
       const hotCode = isDev ? `\nif (import.meta.hot) {\n  __meeko.enableHotModule(__hotId);\n  __meeko.connectLiveBridge(import.meta.hot);\n  import.meta.hot.accept((next) => { if (next) __meeko.replaceHotModule(__hotId, next); });\n}\n` : "";
       const registry = await discoverAutoImports(root);
       const code = transformAutoImports(source, filename, result.code, registry, serverTransform ? "server" : "client");

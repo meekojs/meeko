@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import test from "node:test";
 import { createServer } from "vite";
 import { meeko } from "../src/vite.ts";
+import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
 
 test("Vite carga el mismo componente .meeko en el entorno SSR", async () => {
   const server = await createServer({
@@ -26,6 +27,30 @@ test("Vite carga el mismo componente .meeko en el entorno SSR", async () => {
     assert.match(module.css, /data-meeko-s-/);
   } finally {
     await server.close();
+  }
+});
+
+test("a component's CSS is a module beside its file, so PostCSS resolves relative imports", async () => {
+  // Tailwind's `@reference` and `@import` resolve from the module id: a virtual id with a null
+  // byte made them fail with "path must be … without null bytes".
+  const project = await createTempProject("vite-style-");
+  const root = project.root;
+  await linkRepositoryPackages(root);
+  const server = await createServer({ root, configFile: false, plugins: [meeko()], server: { middlewareMode: true, hmr: false }, logLevel: "silent" });
+  try {
+    await mkdir(join(root, "components"), { recursive: true });
+    await writeFile(join(root, "components", "tokens.css"), ".tokens { color: rgb(1, 2, 3); }\n");
+    const filename = join(root, "components", "Card.meeko");
+    await writeFile(filename, `<template><p class="card">x</p></template>\n<style scoped>\n@import "./tokens.css";\n.card { color: red; }\n</style>\n`);
+    const component = await server.transformRequest(filename);
+    const id = /import "([^"]*\?meeko-style=[0-9a-f]{64}&lang\.css)"/.exec(component?.code ?? "")?.[1];
+    assert.ok(id, component?.code);
+    const style = await server.transformRequest(id);
+    assert.match(style?.code ?? "", /rgb\(1, 2, 3\)/, "the relative @import is inlined");
+    assert.match(style?.code ?? "", /\.card\[data-meeko-s-[0-9a-f]+\]/);
+  } finally {
+    await server.close();
+    await project.remove();
   }
 });
 
