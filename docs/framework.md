@@ -218,12 +218,12 @@ const name = signal(user.name);                        // `user` está en ámbit
 - **Cuándo se ejecuta.** Las sentencias del bloque que no son imports, tipos ni `export const route` se ejecutan en cada petición: en SSR y en la petición de datos de cada navegación cliente, después del middleware y de validar `params` y `search` con `route`, igual que `load`. Admiten `await` de nivel superior. Los imports, los tipos y las opciones de ruta se evalúan una vez por módulo.
 - **Exports.** Cada `export const` o `export let` (también desestructurado, `export const { a, b } = ...`) salvo `route` y `head` es un campo de datos de la página. Sólo cruzan los nombres exportados: el resto del bloque, sus imports y sus variables privadas no llegan al bundle cliente ni al payload. Un export que es una promesa se espera antes de renderizar.
 - **En la página.** El `<script>` y la plantilla ven cada export como un valor normal, de sólo lectura en profundidad, con el tipo del export ya esperado. No es una señal: llega en el payload y se sustituye en cada navegación, cuando el bloque vuelve a ejecutarse. Para estado editable, cree una señal a partir de él (`signal(user.name)`). Declarar en el `<script>` un nombre que ya exporta el bloque da `MEEK075`. La página no necesita declarar `data` en `defineProps`; si lo declara, `meeko check` comprueba que sea compatible con los exports.
-- **`export const head`.** Fija el `<head>` de la página como `route.head`: un objeto `{ title, description }` o una función sin argumentos que lo devuelve, calculada en el servidor con los valores del bloque. No forma parte de los datos. Declarar a la vez `export const head` y `route.head` da `MEEK072`.
+- **`export const head`.** Fija el `<head>` de la página como `route.head`: un objeto `{ title, description }` o una función sin argumentos que lo devuelve, calculada en el servidor con los valores del bloque. No forma parte de los datos. Declarar a la vez `export const head` y `route.head` da `MEEK072`. Desde `1.2`, `useHead` y `useSeoMeta` en el nivel superior del bloque son una alternativa, y `export const head` gana sobre ellas (véase [Head del documento](#head-del-documento-document-usehead-y-useseometa)).
 - **API de la petición.** `usePage()` devuelve `{ url, params, search, request, context, signal }`: `params` y `search` salen de los schemas de `route` o, sin schema, de los segmentos del ID de ruta; `context` es el contexto de la petición (sesión, servicios, plataforma) y `signal` se aborta si el cliente se desconecta, se revoca la sesión o se cancela la respuesta. `redirect(url, status?)` detiene el bloque y responde con una redirección (`302` por defecto; admite `301`, `302`, `303`, `307` y `308`), que una navegación cliente sigue como la de un loader. `notFound()` detiene el bloque y responde `404` con la página de error más cercana (`+error.meeko` o `app/error.meeko`). Las tres se importan de `@meekojs/meeko/framework` o se usan sin import dentro del bloque. Fuera del nivel superior del bloque (dentro de una función, de las opciones de ruta o en el `<script>` del componente) dan `MEEK073`, y en ejecución lanzan un error con ese código.
 - **Serialización.** Los exports viajan en JSON, como los datos de `load`. `meeko check` da un error de tipos en un export que no se puede serializar: funciones, `undefined`, `bigint`, símbolos e instancias de clase como `Date` o `Map`. En ejecución, un valor que `serializeJson` rechaza hace fallar la respuesta con `500`, como un loader.
 - **Estado entre peticiones.** Como el bloque se ejecuta en cada petición, una variable de nivel superior (`const cache = new Map()`) es nueva cada vez. Un valor que deba compartirse entre peticiones vive en un módulo importado.
 
-Meeko considera que un bloque tiene código de nivel superior si exporta con `export const` o `export let` un nombre distinto de `route` (incluido `head`), o si usa `usePage`, `redirect` o `notFound` fuera de cualquier función y fuera de las opciones de ruta. Un bloque sin ninguna de las dos cosas mantiene el comportamiento de `1.0`: se evalúa una vez como módulo y admite `export default`, `export function` o una constante privada usada por `load`. Con código de nivel superior se aplican estas reglas:
+Meeko considera que un bloque tiene código de nivel superior si exporta con `export const` o `export let` un nombre distinto de `route` (incluido `head`), o si usa `usePage`, `redirect` o `notFound` (desde `1.2`, también `useHead` o `useSeoMeta`) fuera de cualquier función y fuera de las opciones de ruta. Un bloque sin ninguna de las dos cosas mantiene el comportamiento de `1.0`: se evalúa una vez como módulo y admite `export default`, `export function` o una constante privada usada por `load`. Con código de nivel superior se aplican estas reglas:
 
 | Código | Causa |
 | --- | --- |
@@ -269,7 +269,7 @@ El bloque es un módulo TypeScript independiente del componente:
 - **Sólo en páginas.** Un `<script server>` en un componente, un layout, `+layout.meeko` o `+error.meeko` es un error (`MEEK044`). Un segundo bloque da `MEEK004`, sin `lang="ts"` da `MEEK006` y con un valor (`server="..."`) da `MEEK043`.
 - **Comprobación.** `meeko check` comprueba el bloque con TypeScript en el ámbito del servidor y compara su loader, o sus exports, con las props de la página; los errores señalan la línea y columna del `.meeko`.
 
-`head({ data })`, o `export const head`, devuelve el `title` de la página y, desde `1.1`, su `description`. En SSR, `title` va en `<title>` y `description` en `<meta name="description">`, antes del `<head>` del host; en una navegación se aplican a `document.title` y a esa meta. Una página sin `title` o sin `description` deja los que aporta el host en `document.head`, o ninguno, igual en SSR que al navegar.
+`head({ data })`, o `export const head`, devuelve el `title` de la página y, desde `1.1`, su `description`. En SSR, `title` va en `<title>` y `description` en `<meta name="description">`, antes del `<head>` del host; en una navegación se aplican a `document.title` y a esa meta. Una página sin `title` o sin `description` deja los que aporta el host en `document.head`, o ninguno, igual en SSR que al navegar. Desde `1.2`, el `head` de la ruta admite también las etiquetas y atributos de `useHead` (`meta`, `link`, `script`, `style`, `htmlAttrs`, `bodyAttrs` y `titleTemplate` como cadena) y tiene la máxima prioridad frente a `useHead` y a `document` de la configuración; el título y la descripción del host quedan detrás del head que gestiona Meeko (véase [Head del documento](#head-del-documento-document-usehead-y-useseometa)).
 
 Como alternativa, las opciones de ruta pueden vivir en un sidecar `*.route.ts` junto a la página (`app/pages/users/[id].route.ts`), la forma disponible desde `1.0`. Un sidecar no admite código de nivel superior. Una página no puede declarar ambos: Meeko detiene el descubrimiento de rutas con un error que nombra los dos.
 
@@ -424,9 +424,66 @@ const isActive = (href: string): boolean => href === "/" ? route.path.value === 
 
 Los componentes recibidos como props mantienen la dirección del contrato: un componente que exige `label` no satisface un outlet que puede renderizarlo sin `label`. `meeko check` diagnostica la expresión que pasa el componente. Al guardar un módulo TypeScript importado por un `.meeko` abierto, la extensión de VS Code vuelve a comprobar sus diagnósticos y tokens semánticos.
 
+### Head del documento: `document`, `useHead` y `useSeoMeta`
+
+Desde `1.2`, Meeko gestiona el `<head>` de cada documento y los atributos de `<html>` y `<body>` a partir de tres fuentes, que se combinan con una sola regla de prioridad:
+
+- **`document` en `meeko.config.ts`.** El documento común de la aplicación: `lang` y un `head` con etiquetas y atributos. Se renderiza en todos los documentos HTML: SSR, `"stream"`, `"prerender"`, la página `404` de `app/error.meeko`, el documento de error de una ruta que falla y el shell de una ruta `"client"`. Se fija en el build (y también llega al bundle del navegador, porque termina en el HTML), así que debe ser serializable: `titleTemplate` sólo puede ser una cadena y `meeko build` rechaza una función. Los módulos de Meeko añaden su head antes del de la aplicación, que gana.
+- **`useHead(input)`.** En páginas, layouts, `app/app.meeko`, `app/error.meeko`, componentes y composables, en el nivel superior del script o en un composable que éste llama. También en el código de nivel superior de `<script server>`, como alternativa a `export const head` (véase más abajo). `input` puede ser un objeto, un getter o una señal; con un getter o una señal, el navegador actualiza el documento cuando cambian los valores que lee.
+- **`useSeoMeta(input)`.** Atajo tipado sobre `useHead`: `description`, `robots`, `themeColor`, `colorScheme`, `author`, `keywords`, `applicationName`, `referrer` y los campos `twitter*` producen `<meta name>`; los `og*` (`ogTitle`, `ogDescription`, `ogImage`, `ogImageAlt`, `ogImageWidth`, `ogImageHeight`, `ogUrl`, `ogType`, `ogSiteName`, `ogLocale`) producen `<meta property>`; `title` es el título y `canonical`, `<link rel="canonical">`. Un campo `undefined` o `null` no produce nada.
+
+```ts
+// meeko.config.ts
+import { defineMeekoConfig } from "@meekojs/meeko/framework";
+
+export default defineMeekoConfig({
+  document: {
+    lang: "es",
+    head: {
+      titleTemplate: "%s · Mi tienda",
+      link: [{ rel: "icon", href: "/favicon.svg", type: "image/svg+xml" }],
+      // Se ejecuta mientras el navegador lee <head>, antes de pintar; la hidratación no lo repite.
+      script: [{ children: 'document.documentElement.dataset.theme = localStorage.getItem("theme") ?? "light"' }],
+    },
+  },
+});
+```
+
+```html
+<!-- app/pages/products/[id].meeko -->
+<script server lang="ts">
+const { params } = usePage();
+export const product = await findProduct(params.id);
+</script>
+
+<script lang="ts">
+const quantity = signal(1);
+useSeoMeta({
+  title: product.name,
+  description: product.summary,
+  ogImage: product.image,
+  twitterCard: "summary_large_image",
+  canonical: `https://tienda.example/products/${product.id}`,
+});
+useHead(() => ({ title: `${product.name} (${quantity.value})` }));
+</script>
+```
+
+`HeadInput` admite `title`, `titleTemplate` (`"%s · Sitio"` o `(title) => string`), `meta`, `link`, `script` (externo con `src` o en línea con `children`; `async`, `defer`, `module` y `type`), `style` (con `children` y `media`), `htmlAttrs` y `bodyAttrs` (`lang`, `dir`, `class`, `data-*`; un valor `undefined` no aporta nada y los atributos `on*` se rechazan).
+
+**Prioridad.** De menor a mayor: `document` de la configuración, `app/app.meeko`, cada layout (el más interno gana), la página con sus componentes y, por último, el `head` de la ruta (`export const head`, `route.head` o `useHead` en `<script server>`). Dentro de un mismo nivel gana la llamada posterior, de modo que un componente de la página que se monta después (por ejemplo, tras un `if:`) sustituye a lo que fijó la página. El título es el de la entrada de más prioridad que lo fija, y `titleTemplate`, el de la entrada de más prioridad que lo declara; la plantilla se aplica también al título de las páginas de error (`"Error"`). Los atributos de `<html>` y `<body>` se combinan por nombre con la misma prioridad.
+
+**Deduplicación.** Cada etiqueta tiene una clave: `key` si la declara o, si no, su clave natural. En `meta`, `name` (sin distinguir mayúsculas), `property` o `httpEquiv`; en `link`, `rel` y `href`, salvo `rel: "canonical"` y `rel: "icon"`, que son únicos aunque cambie `href`; en `script`, `src` o el código; en `style`, el CSS. Con la misma clave sólo queda la etiqueta de más prioridad, en el lugar donde apareció la primera. Así, un `icon` de `document` sustituye al `<link rel="icon" href="data:,">` que Meeko escribe por defecto, y un `meta name="viewport"` sustituye al viewport por defecto.
+
+**SSR y CSP.** El servidor escribe `<html lang="…">` y los atributos como atributos reales, escapados. Dentro de `<head>`, tras la meta CSRF y los estilos de los componentes, el título y las etiquetas gestionadas van entre los comentarios `<!--meeko:head-->` y `<!--/meeko:head-->`, antes del HTML de confianza del host (`DocumentOptions.head`, que conserva su propio `<title>` como título por defecto). Los valores de los atributos se escapan; el contenido de `script` y `style` en línea no se escapa, pero no puede cerrar su etiqueta: `</` se escribe `<\/` (y `<!--`, `<\!--` en un script), y en los scripts JSON (`application/ld+json`, `application/json`, `importmap`, `speculationrules`) cada `<` se escribe `<`. El nonce CSP de la petición (`DocumentOptions.nonce`) se añade a los `<script>` y `<style>` gestionados. Una página prerenderizada conserva el head y recibe la meta CSRF justo después de `<meta charset>` y de las etiquetas por defecto que la aplicación no sustituyó.
+
+**Navegador.** Al hidratar, Meeko adopta las etiquetas del SSR sin duplicarlas ni volver a ejecutar los scripts. Cuando cambia un getter o una señal de `useHead`, actualiza el título, los atributos y las etiquetas. Al navegar, las entradas de los componentes que se desmontan desaparecen y vuelve lo que habían sustituido (por ejemplo, el `canonical` del layout o la `description` de `app/app.meeko`); al volver atrás, la página restaura las suyas. Las etiquetas nuevas se insertan antes de `<!--/meeko:head-->` con el nonce CSP del documento; un script que cambia es un elemento nuevo, que el navegador ejecuta. El `head` de la ruta viaja en el payload de navegación, igual que `title` y `description` en `1.1`. Fuera de una aplicación de Meeko (por ejemplo, en una prueba unitaria con `renderToString`), `useHead` no hace nada. Un host propio que pasa `DocumentOptions.config` a `createFrameworkHandler` debe pasar el mismo valor a `mountClientApp({ document })`; la entrada que genera Meeko ya lo hace.
+
+**`<script server>`.** `useHead` y `useSeoMeta` en el código de nivel superior hacen que el bloque tenga código de nivel superior, como `usePage`. Sus entradas forman el `head` de la ruta junto con `export const head` (o `route.head`), que gana sobre ellas. Como viajan en el payload, su `titleTemplate` debe ser una cadena.
+
 ## Autoimports y TypeScript
 
-Meeko analiza exports AST de `app/{components,composables,utils,stores}`, `shared/{types,schemas,utils,constants,enums}` y `server/utils`. Los símbolos de `app/` están disponibles en cliente y SSR, pero no desde `shared/`; los sufijos `.client.ts` y `.server.ts` restringen un módulo a su entorno. `imports.serverDirs` añade directorios privados exclusivos del servidor. Los símbolos del framework `api`, `rpc`, `socket`, `useSocket`, `useApi`, `useRpcQuery`, `useRpcMutation`, `useState`, `href` y `useRoute`, desde `1.2` `useForm`, `useStorage` y `useApiMutation`, y `onMounted` de la raíz, también figuran en el registro; un export propio llamado `useRoute`, `useForm`, `useStorage` o `useApiMutation` tiene prioridad sobre el del framework. Los imports explícitos prevalecen. Una colisión produce error; nunca se elige por orden de archivos. Un `enum` o una clase autoimportados sirven también como tipo, con sus miembros (`Scope.App`); si un archivo sólo los usa como tipo, Meeko inserta `import type`. Los schemas de `shared/schemas` pueden llegar por autoimport a los contratos de API, RPC y Socket. `meeko check` comprueba los `.ts` que importa un `.meeko` con los autoimports de su ámbito y con las rutas generadas, igual que los proyectos `tsconfig.*`.
+Meeko analiza exports AST de `app/{components,composables,utils,stores}`, `shared/{types,schemas,utils,constants,enums}` y `server/utils`. Los símbolos de `app/` están disponibles en cliente y SSR, pero no desde `shared/`; los sufijos `.client.ts` y `.server.ts` restringen un módulo a su entorno. `imports.serverDirs` añade directorios privados exclusivos del servidor. Los símbolos del framework `api`, `rpc`, `socket`, `useSocket`, `useApi`, `useRpcQuery`, `useRpcMutation`, `useState`, `href` y `useRoute`, desde `1.2` `useForm`, `useStorage`, `useApiMutation`, `useHead` y `useSeoMeta`, y `onMounted` de la raíz, también figuran en el registro; un export propio llamado `useRoute`, `useForm`, `useStorage`, `useApiMutation`, `useHead` o `useSeoMeta` tiene prioridad sobre el del framework. Los imports explícitos prevalecen. Una colisión produce error; nunca se elige por orden de archivos. Un `enum` o una clase autoimportados sirven también como tipo, con sus miembros (`Scope.App`); si un archivo sólo los usa como tipo, Meeko inserta `import type`. Los schemas de `shared/schemas` pueden llegar por autoimport a los contratos de API, RPC y Socket. `meeko check` comprueba los `.ts` que importa un `.meeko` con los autoimports de su ámbito y con las rutas generadas, igual que los proyectos `tsconfig.*`.
 
 Los `.ts` normales de `app/` (composables, utils, stores) se ejecutan en SSR y en el navegador, como los `.meeko` que los usan, y sus autoimports del framework (`api`, `rpc`, `socket`, `useSocket`, `useApi`…) se resuelven por entorno: el cliente de servidor en SSR y el del navegador en el navegador. Antes de `1.1` usaban siempre el del navegador, y `meeko dev` o `meeko build` fallaban con «Client-only module reached the server bundle». Un `.client.ts` sigue siendo sólo de navegador.
 

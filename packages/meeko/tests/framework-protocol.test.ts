@@ -42,7 +42,8 @@ test("the payload carries its protocol version, render mode and head", async () 
 
 test("document options add host markup and a per-request CSP nonce", async () => {
   const html = await (await server(new Request("https://example.test/a", { headers: { "x-test-nonce": "abc\"123" } }))).text();
-  assert.match(html, /<title>Page A<\/title><link rel="modulepreload" href="\/chunk.js"><\/head>/);
+  // Host markup follows the head that Meeko manages.
+  assert.match(html, /<title>Page A<\/title><!--\/meeko:head--><link rel="modulepreload" href="\/chunk.js"><\/head>/);
   assert.match(html, /<script type="module" nonce="abc&quot;123" src="\/entry.js"><\/script><!--host-end--><\/body>/);
   const plain = await (await server(new Request("https://example.test/a"))).text();
   assert.doesNotMatch(plain, /nonce=/);
@@ -62,7 +63,7 @@ test("document markup reaches error pages and can use the request nonce", async 
     },
   });
   const html = await (await handler(new Request("https://example.test/broken"))).text();
-  assert.match(html, /<title>Error<\/title><script nonce="n1">window.host = 1<\/script><\/head>/);
+  assert.match(html, /<title>Error<\/title><!--\/meeko:head--><script nonce="n1">window.host = 1<\/script><\/head>/);
   assert.match(html, /<!--host-end--><\/body>/);
   assert.doesNotMatch(html, /private failure/);
 });

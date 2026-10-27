@@ -22,6 +22,8 @@ import { fixedRoute, provideRoute, routeSnapshot } from "./navigation.js";
 import type { RouteSnapshot } from "./navigation.js";
 import type { PageRequest } from "./page-body.js";
 import type { ErrorPageRecord, RouteRecord } from "./router.js";
+import { documentHeadEntries, HeadCollector, provideHead, renderHeadDocument, resolveHead, routeHeadInput, withHeadLevel } from "./head.js";
+import type { DocumentConfig, HeadDocument, HeadInput } from "./head.js";
 
 /** Route manifest of the application handling the current request, for `href(id)`. */
 const requestManifest = new AsyncLocalStorage<readonly RouteRecord[]>();
@@ -194,18 +196,37 @@ export interface DocumentOptions {
   readonly head?: DocumentMarkup;
   /** HTML de confianza que se añade antes de `</body>`, tras la entrada del cliente. */
   readonly bodyEnd?: DocumentMarkup;
-  /** Nonce CSP por petición, que se aplica a las etiquetas `<style>` de Meeko y a la entrada del cliente. */
+  /**
+   * Nonce CSP por petición, que se aplica a las etiquetas `<style>` de Meeko, a la entrada del
+   * cliente y, desde `1.2`, a los `<script>` y `<style>` de `useHead` y `document`.
+   */
   readonly nonce?: (request: Request) => string | undefined;
+  /**
+   * Documento de la aplicación: `lang`, atributos de `<html>` y `<body>` y etiquetas de `<head>`,
+   * con la menor prioridad frente a `useHead` y al `head` de las páginas. `createServerApp` lo toma
+   * de `document` de `meeko.config.ts`; un host propio debe pasar el mismo valor a
+   * `mountClientApp({ document })`.
+   * @since 1.2.0
+   */
+  readonly config?: DocumentConfig;
 }
 
-function documentParts(options: DocumentOptions | undefined, request: Request): { head: string; bodyEnd: string; nonceAttribute: string } {
+function documentParts(options: DocumentOptions | undefined, request: Request): { head: string; bodyEnd: string; nonce: string | undefined; nonceAttribute: string } {
   const nonce = options?.nonce?.(request);
   const markup = (value: DocumentMarkup | undefined): string => typeof value === "function" ? value({ request, nonce }) : value ?? "";
-  return { head: markup(options?.head), bodyEnd: markup(options?.bodyEnd), nonceAttribute: nonce ? ` nonce="${escapeHtml(nonce)}"` : "" };
+  return { head: markup(options?.head), bodyEnd: markup(options?.bodyEnd), nonce, nonceAttribute: nonce ? ` nonce="${escapeHtml(nonce)}"` : "" };
 }
 
-/** Every Meeko document starts with this markup; the CSRF meta tag follows it. */
+/**
+ * Every Meeko document without `lang`, HTML attributes or a replaced viewport or icon starts with
+ * this markup; the CSRF meta tag follows it.
+ */
 export const DOCUMENT_HEAD_PREFIX = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,">';
+
+/** The head of a document: `document` of the configuration, the components' `useHead` and the route head. */
+function headDocument(options: DocumentOptions | undefined, nonce: string | undefined, collected: HeadCollector | undefined, route: HeadInput): HeadDocument {
+  return renderHeadDocument(resolveHead([...documentHeadEntries(options?.config, route), ...collected?.entries() ?? []]), nonce);
+}
 
 /**
  * HTML generado en el build para una URL prerenderizada.
@@ -292,9 +313,10 @@ async function wrapInLayouts(
   layouts: readonly string[],
   styles: string[],
 ): Promise<{ module: PageModule; input: Record<string, unknown> }> {
-  let module = page;
+  // useHead of the page and its components outranks its layouts', and a layout's outranks app.meeko's.
+  let module = withHeadLevel(page, layouts.length);
   let input = props;
-  for (const layout of [...layouts].reverse()) {
+  for (const [index, layout] of [...layouts.entries()].reverse()) {
     const child = module;
     const childInput = input;
     const outlet = {
@@ -302,8 +324,9 @@ async function wrapInLayouts(
       renderToString: () => child.renderToString?.(childInput) ?? child.renderWithState(childInput).html,
       hydrateScope: () => { throw new Error("Server outlet cannot hydrate"); },
     };
-    module = await loadPage(layout);
-    if (module.css) styles.unshift(module.css);
+    const loaded = await loadPage(layout);
+    if (loaded.css) styles.unshift(loaded.css);
+    module = withHeadLevel(loaded, index);
     input = { outlet };
   }
   return { module, input };
@@ -320,7 +343,7 @@ async function renderPageTree(
   initial: StateStore,
   route: RouteSnapshot,
   signal?: AbortSignal,
-): Promise<{ rendered: { html: string; state: Record<string, unknown> }; store: StateStore; resources: Record<string, unknown> | undefined; styles: string[] }> {
+): Promise<{ rendered: { html: string; state: Record<string, unknown> }; store: StateStore; resources: Record<string, unknown> | undefined; styles: string[]; head: HeadCollector }> {
   const scope = new ResourceScope("collect", {}, signal);
   // useRoute() in the page, its layouts and app.meeko reads the route of this request.
   const routeState = fixedRoute(route);
@@ -328,18 +351,22 @@ async function renderPageTree(
   let store = initial;
   // The CSS of the child components of the last pass, the one whose HTML the document sends.
   const styles = new Set<string>();
+  // Like the CSS, the useHead entries of the last pass.
+  const head = new HeadCollector();
   const rendered = await renderWithSuspense((pass) => {
     if (pass > 1) store = new StateStore(baseline);
     else baseline = initial.snapshot();
     scope.beginPass();
     styles.clear();
+    head.clear();
     return collectStyles(styles, () => withResourceScope(scope, () => withStateStore(store, () => {
       provideRoute(routeState);
+      provideHead(head);
       return module.renderWithState(input);
     })));
   }, signal ? { signal } : {});
   const used = scope.usedData();
-  return { rendered, store, resources: Object.keys(used).length ? used : undefined, styles: [...styles] };
+  return { rendered, store, resources: Object.keys(used).length ? used : undefined, styles: [...styles], head };
 }
 
 /** Props of the application error page for a URL without a route. */
@@ -569,7 +596,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
         const page = await options.loadPage(errorPage!.file);
         if (page.css) styles.push(page.css);
         const { module, input } = await wrapInLayouts(options.loadPage, page, { ...notFoundProps }, errorPage!.layouts, styles);
-        const { rendered, store, resources, styles: childStyles } = await renderPageTree(module, input, stateStore, route!, request.signal);
+        const { rendered, store, resources, styles: childStyles, head: collected } = await renderPageTree(module, input, stateStore, route!, request.signal);
         styles.push(...childStyles);
         pageStore = store;
         store.seal();
@@ -589,8 +616,9 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
         const script = options.clientEntry ? `<script type="module"${host.nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
         const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
         // Titled like the error document of a matched route; the payload head carries the same
-        // title, so hydration still finds the host <title> after it.
-        const document = `${DOCUMENT_HEAD_PREFIX}${csrfMeta}${styleTags}<title>${ERROR_PAGE_TITLE}</title>${host.head}</head><body><div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
+        // title, so hydration still finds the host <title> after the managed head.
+        const head = headDocument(options.document, host.nonce, collected, routeHeadInput({}, ERROR_PAGE_TITLE));
+        const document = `${head.prefix}${csrfMeta}${styleTags}${head.head}${host.head}</head>${head.bodyOpen}<div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
         return finish(new Response(headRequest ? null : document, {
           status: 404, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
         }));
@@ -673,18 +701,18 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     }
     const { module, input } = await wrapInLayouts(options.loadPage, page, clientPage ? {} : props, match.route.layouts, styles);
     // Top-level data awaits load before the HTML, also before the first byte of a stream.
-    const { rendered, store, resources, styles: childStyles } = await renderPageTree(module, input, stateStore, route, driverSignal);
+    const { rendered, store, resources, styles: childStyles, head: collected } = await renderPageTree(module, input, stateStore, route, driverSignal);
     // Child components link their CSS in the document too, not only once the client bundle loads.
     styles.push(...childStyles);
     pageStore = store;
     // head reads the state the render produced; anything it adds cannot change that render.
-    const head: PageHead = clientPage ? {} : sidecar?.head?.({ ...context, state: store, data }) ?? {};
+    const head: PageHead = payloadHead(clientPage ? {} : sidecar?.head?.({ ...context, state: store, data }) ?? {});
     // The payload below is the only copy of this state the browser receives.
     store.seal();
     const payload = serializeJson({
       v: PAYLOAD_VERSION, route: match.route.id, render: renderMode,
       props: payloadProps, state: rendered.state, sharedState: store.snapshot(),
-      head: payloadHead(head),
+      head,
       ...(deferredEntries.length ? { deferred: deferredEntries } : {}),
       ...(resources ? { resources } : {}),
     });
@@ -695,10 +723,9 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       await requestContext.session[lockSessionCookie]?.();
       await requestContext.session.verify();
     }
-    const title = (head.title === undefined ? "" : `<title>${escapeHtml(head.title)}</title>`)
-      + (head.description === undefined ? "" : `<meta name="description" content="${escapeHtml(head.description)}">`);
     const host = documentParts(options.document, request);
     const nonceAttribute = host.nonceAttribute;
+    const documentHead = (): HeadDocument => headDocument(options.document, host.nonce, collected, routeHeadInput(head));
     const styleTags = [...new Set(styles)].map((css) => `<style${nonceAttribute}>${css.replaceAll("<", "\\3C ")}</style>`).join("");
     const headRequest = request.method === "HEAD";
     if (streaming) {
@@ -732,7 +759,8 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       }
       const script = options.clientEntry ? `<script type="module" async${nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
       const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
-      const opening = `${DOCUMENT_HEAD_PREFIX}${csrfMeta}${styleTags}${title}${host.head}</head><body><div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}`;
+      const parts = documentHead();
+      const opening = `${parts.prefix}${csrfMeta}${styleTags}${parts.head}${host.head}</head>${parts.bodyOpen}<div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}`;
       return finish(new Response(body(opening, (text, id) => `<script type="application/json" data-meeko-deferred="${id}">${text}</script>`, `${host.bodyEnd}</body></html>`), {
         status: 200, headers: { "content-type": "text/html; charset=utf-8", ...streamHeaders },
       }));
@@ -744,7 +772,8 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     }
     const script = options.clientEntry ? `<script type="module"${nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
     const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
-    const document = `${DOCUMENT_HEAD_PREFIX}${csrfMeta}${styleTags}${title}${host.head}</head><body><div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
+    const parts = documentHead();
+    const document = `${parts.prefix}${csrfMeta}${styleTags}${parts.head}${host.head}</head>${parts.bodyOpen}<div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
     return finish(new Response(headRequest ? null : document, {
       status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
     }));
@@ -771,11 +800,12 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
           const renderError = async (): Promise<Response> => {
             const errorPage = await options.loadPage(errorFile);
             // A failure after the render sealed the page state still renders its error page.
-            const { rendered: errorRendered } = await renderPageTree(errorPage, {
+            const { rendered: errorRendered, head: collected } = await renderPageTree(withHeadLevel(errorPage, 0), {
               status: known.status, message: known.status >= 500 ? "Internal Server Error" : known.code,
             }, pageStore.sealed ? new StateStore() : pageStore, route!, request.signal);
             const host = documentParts(options.document, request);
-            const document = `<!doctype html><html><head><meta charset="utf-8"><title>${ERROR_PAGE_TITLE}</title>${host.head}</head><body><div id="app">${errorRendered.html}</div>${host.bodyEnd}</body></html>`;
+            const head = headDocument(options.document, host.nonce, collected, routeHeadInput({}, ERROR_PAGE_TITLE));
+            const document = `${head.prefix}${head.head}${host.head}</head>${head.bodyOpen}<div id="app">${errorRendered.html}</div>${host.bodyEnd}</body></html>`;
             return finish(new Response(request.method === "HEAD" ? null : document, {
               status: known.status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
             }));

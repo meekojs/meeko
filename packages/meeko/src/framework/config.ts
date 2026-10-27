@@ -4,6 +4,7 @@ import { basename, extname, isAbsolute, relative, resolve, sep } from "node:path
 import { pathToFileURL } from "node:url";
 import ts from "@typescript/typescript6";
 import { composeFrameworkRoutes } from "./modules.js";
+import { normalizeDocumentConfig } from "./head.js";
 import type { RouteRecord } from "./router.js";
 import type { MeekoConfig } from "./config-type.js";
 
@@ -87,6 +88,8 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
       throw new TypeError(`${file}: css.scopeAttribute must be "all" or "matched"`);
     }
   }
+  // The build bakes `document` as JSON: a function titleTemplate fails here, not in production.
+  normalizeDocumentConfig(config.document, `${file}: document`);
   const server = config.server as Record<string, unknown> | undefined;
   if (server !== undefined) {
     if (!server || typeof server !== "object" || !["node", "cloudflare", "deno", "bun"].includes(server.adapter as string)) {
