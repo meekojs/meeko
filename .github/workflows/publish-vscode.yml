@@ -72,7 +72,7 @@ jobs:
     name: Marketplace y Open VSX
     needs: [version, test]
     runs-on: windows-latest
-    timeout-minutes: 40
+    timeout-minutes: 90
     steps:
       - name: Detectar secretos de las tiendas
         id: stores
@@ -123,11 +123,44 @@ jobs:
         env:
           # vsce lee el token de VSCE_PAT; nunca se pasa como argumento.
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          VSCODE_VERSION: ${{ needs.version.outputs.version }}
         run: |
           $packages = @(Get-ChildItem -LiteralPath (Join-Path $env:RUNNER_TEMP 'vsix') -Filter '*.vsix' -File | ForEach-Object FullName)
           if ($packages.Count -ne 6) { throw "Se esperaban 6 VSIX; hay $($packages.Count)." }
-          pnpm dlx '@vscode/vsce@4.0.0' publish --skip-duplicate --packagePath @packages
+          $first = @($packages | Where-Object { $_ -like '*-darwin-arm64.vsix' })
+          if ($first.Count -ne 1) { throw 'Falta el VSIX darwin-arm64.' }
+          $rest = @($packages | Where-Object { $_ -ne $first[0] })
+
+          function Wait-MarketplaceTargets([string[]] $expected) {
+            $deadline = (Get-Date).AddMinutes(25)
+            do {
+              $visible = @()
+              try {
+                $json = pnpm dlx '@vscode/vsce@4.0.0' show meekojs.meeko-language --json 2>$null
+                if ($LASTEXITCODE -eq 0) {
+                  $metadata = $json | ConvertFrom-Json
+                  $visible = @($metadata.versions | Where-Object { $_.version -eq $env:VSCODE_VERSION } | ForEach-Object targetPlatform)
+                }
+              } catch {
+                # La primera variante puede no ser visible mientras Marketplace la verifica.
+              }
+              $missing = @($expected | Where-Object { $_ -notin $visible })
+              if ($missing.Count -eq 0) { return }
+              if ((Get-Date) -ge $deadline) {
+                throw "Marketplace no hizo visibles los paquetes: $($missing -join ', ')."
+              }
+              Start-Sleep -Seconds 30
+            } while ($true)
+          }
+
+          # Esperar a que la primera variante sea visible evita perder las demás durante su verificación.
+          pnpm dlx '@vscode/vsce@4.0.0' publish --skip-duplicate --packagePath $first[0]
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Wait-MarketplaceTargets @('darwin-arm64')
+
+          pnpm dlx '@vscode/vsce@4.0.0' publish --skip-duplicate --packagePath @rest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Wait-MarketplaceTargets @('darwin-arm64', 'darwin-x64', 'linux-arm64', 'linux-x64', 'win32-arm64', 'win32-x64')
       - name: Publicar en Open VSX
         if: steps.stores.outputs.ovsx == 'true'
         shell: pwsh
