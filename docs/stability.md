@@ -31,6 +31,7 @@ Las subrutas declaradas en `exports` de `package.json` y **todos** los símbolos
 | `@meekojs/meeko/vite` | Plugin `meeko()` de Vite. |
 | `@meekojs/meeko/server` | Núcleo de servidor portable: `createServerApp`, `defineServerRuntime`, contratos API/RPC, sesiones y stores, middleware, Socket y sus brokers, `createSocketUpgradeHandler` y OpenAPI. |
 | `@meekojs/meeko/node` | Adaptador Node: `serveNode`, `toNodeListener`, `createNodeAssetReader`, `attachNodeWebSocketServer` y `createNodeSocketUpgradeHandler`. |
+| `@meekojs/meeko/password` | Desde `1.2`: `hashPassword`, `verifyPassword` y `needsRehash`, con scrypt de `node:crypto` (Node, Bun y Deno). Es contrato el formato `scrypt$<N>$<r>$<p>$<sal>$<hash>`: un minor puede subir los parámetros por defecto, y `verifyPassword` acepta siempre los hashes escritos antes. |
 | `@meekojs/meeko/bun` | Adaptador Bun: `createBunServer` y `createBunAssetReader`. |
 | `@meekojs/meeko/deno` | Adaptador Deno: `serveDeno` y `createDenoAssetReader`. |
 | `@meekojs/meeko/cloudflare` | Adaptador Cloudflare Workers: `createWorker`, `createSocketRoomClass`, `DurableObjectSocketPubSub`, `socketRoomName`, `D1SessionDriver`, `createCloudflareAssetReader`, `createCloudflarePrerenderSource` y sus tipos estructurales. |
@@ -91,6 +92,7 @@ Los comandos y opciones que muestra `meeko --help`:
 | `meeko compile <componente.meeko> <salida.ts>`, `meeko types <componente.meeko>` | |
 | `meeko init <directorio>`, `meeko init-framework <directorio>` | |
 | `meeko clean [directorio]` (desde `1.1`) | `--all`, `--dry-run`. Son contrato las opciones y qué se borra en cada modo; el texto exacto de la salida no. |
+| `meeko auth hash` (desde `1.2`) | Sin opciones. Lee la contraseña sin eco en una terminal (dos veces) o de stdin en una tubería, y escribe en stdout sólo la línea del hash. |
 | `meeko lsp` | `--stdio`, `--node-ipc`, `--socket=<puerto>` o `--pipe=<nombre>` |
 | `meeko --help` (`-h`), `meeko --version` (`-v`) | |
 

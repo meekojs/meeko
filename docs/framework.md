@@ -4,6 +4,7 @@ Meeko conserva el motor independiente en `@meekojs/meeko`. El modo de aplicació
 
 - `@meekojs/meeko/server`: núcleo portable de la aplicación (`createServerApp`, `defineServerRuntime`, contratos API/RPC, sesiones, middleware, Socket, `createSocketUpgradeHandler` y OpenAPI). Sólo usa Web APIs y `node:async_hooks`; no carga TypeScript, Vite, `ws` ni el sistema de archivos.
 - `@meekojs/meeko/node`: adaptador Node (`serveNode`, `toNodeListener`, `createNodeAssetReader`, `attachNodeWebSocketServer` y `createNodeSocketUpgradeHandler`).
+- `@meekojs/meeko/password` (desde `1.2`): `hashPassword`, `verifyPassword` y `needsRehash` con scrypt; necesita `node:crypto`, así que sirve en Node, Bun y Deno, no en Workers (véase [Contraseñas](#contraseñas)).
 - `@meekojs/meeko/bun`: adaptador Bun (`createBunServer` y `createBunAssetReader`).
 - `@meekojs/meeko/deno`: adaptador Deno (`serveDeno` y `createDenoAssetReader`).
 - `@meekojs/meeko/cloudflare`: adaptador Cloudflare Workers (`createWorker`, `createSocketRoomClass`, `DurableObjectSocketPubSub`, `D1SessionDriver`, `createCloudflareAssetReader` y `createCloudflarePrerenderSource`).
@@ -1594,6 +1595,29 @@ export default defineServerRuntime(async ({ env, production, prerendering }) => 
 
 `createServerApp({ manifest, load, runtime, production })` de `@meekojs/meeko/server` crea la misma aplicación a partir de un manifiesto y un cargador de módulos, y expone `fetch(request, platform?)`, `socket`, `publicOrigin`, `reportError` y `close()`. El entry generado por `meeko build` la usa; un host propio puede servirla con `serveNode(app, { host, port, publicOrigin, handleSignals, shutdownTimeout })` de `@meekojs/meeko/node`. Si el servidor arranca pero falla la conexión de Socket, `serveNode` libera el puerto y cierra la aplicación antes de propagar el error.
 
+## Autenticación
+
+### Contraseñas
+
+`@meekojs/meeko/password` (desde `1.2`) guarda y comprueba contraseñas con scrypt:
+
+- `hashPassword(password)` devuelve `scrypt$<N>$<r>$<p>$<sal>$<hash>`, con N = 2^17, r = 8, p = 1 (128 MiB por cálculo), una sal aleatoria de 16 bytes y una clave de 32, ambas en base64url. El formato describe sus propios parámetros, así que un hash guardado sigue siendo válido aunque cambien los valores por defecto.
+- `verifyPassword(password, hash)` recalcula con los parámetros del hash y compara en tiempo constante (`timingSafeEqual`). Acepta los hashes escritos a mano con el mismo formato, como `scrypt$131072$8$1$…` con una sal de 32 bytes y una clave de 64, sin regenerarlos. Un hash mal formado o con parámetros fuera de los límites (N potencia de dos entre 2^10 y 2^20, `r` hasta 32, `p` hasta 16) lanza `TypeError`: es un fallo de configuración, no una contraseña incorrecta. Una contraseña vacía o de más de 4096 bytes devuelve `false` sin calcular nada.
+- `needsRehash(hash)` indica si el hash usa parámetros más débiles que los actuales; tras un inicio de sesión correcto, guarde `await hashPassword(password)` en su lugar.
+
+Como mucho se calculan dos hashes a la vez por proceso, para acotar la memoria (256 MiB) y no ocupar todos los hilos de `libuv`; combine el inicio de sesión con [`rateLimit`](#límite-de-peticiones-ratelimit). Cuando el usuario no existe, compare igualmente contra un hash fijo para que el tiempo de respuesta no revele qué cuentas existen.
+
+**Por qué una subruta aparte.** Web Crypto, la única criptografía de `@meekojs/meeko/server`, no ofrece funciones de derivación costosas en memoria (scrypt, Argon2), y una implementación en JavaScript sería decenas de veces más lenta, lo que obliga a bajar el coste. `node:crypto` las implementa en código nativo y existe en Node, Bun y Deno, así que `/password` lo importa y `/server` sigue siendo portable (Web APIs y `node:async_hooks`). No vale para Cloudflare Workers: aunque `nodejs_compat` ofrece scrypt, los 128 MiB de un cálculo con estos parámetros agotan la memoria de un aislado; en Workers, delegue la verificación en un servicio externo.
+
+Para obtener un hash sin escribir código:
+
+```sh
+npx meeko auth hash                       # pide la contraseña dos veces, sin mostrarla
+printf '%s' "$PASSWORD" | npx meeko auth hash   # o la lee de stdin
+```
+
+El comando escribe en stdout sólo la línea del hash, lista para `.env` (`ADMIN_PASSWORD_HASH=…`); los avisos van a stderr.
+
 ## Sesiones y seguridad
 
 Las sesiones usan IDs opacos aleatorios en cookies `HttpOnly`, host-only, `Secure` por defecto y `SameSite=Lax` por defecto. Cada sesión nueva recibe también un `familyId` opaco que permanece al rotar su ID. `SessionHandle` permite crear, rotar y revocar; la rotación y la revocación de toda la familia requieren operaciones atómicas en el store. Así, un logout iniciado con un handle anterior invalida el ID activo aunque otra petición ya lo haya rotado. Las mutaciones autenticadas con cookie verifican Origin y `x-meeko-csrf`. Las respuestas SSR y API entregan el token CSRF por meta o cabecera same-origin. La aplicación debe definir verificación de identidad y reglas de autorización; Meeko no guarda secretos de autenticación en el navegador.
@@ -1949,7 +1973,7 @@ Tras 500 renders SSR, el heap pasó de 87,276,056 a 87,012,304 bytes después de
 
 ## Compatibilidad y versionado
 
-Las entradas públicas soportadas de la versión actual son `@meekojs/meeko`, `/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare`, `/build`, `/vite`, `/devtools-ui` y, desde `1.1`, `/prettier`. `/internal` existe para el código generado por Meeko y no es contrato de consumo directo. La compilación se ofrece mediante la CLI y Vite; la raíz pública expone la reactividad y el runtime de SSR e hidratación, pero no una función `compile`. `defineMeekoConfig`, routing, `definePage`, `useState`, `createApiClient`, `createRpcClient`, `defineSocketChannel`, `attachNodeWebSocketServer`, `RedisSessionStore` y `SqlSessionStore` conservan sus nombres actuales. Los autoimports generados `api`, `rpc`, `socket` y `useSocket` dependen del manifiesto de cada aplicación.
+Las entradas públicas soportadas de la versión actual son `@meekojs/meeko`, `/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare`, `/build`, `/vite`, `/devtools-ui`, desde `1.1`, `/prettier` y, desde `1.2`, `/password`. `/internal` existe para el código generado por Meeko y no es contrato de consumo directo. La compilación se ofrece mediante la CLI y Vite; la raíz pública expone la reactividad y el runtime de SSR e hidratación, pero no una función `compile`. `defineMeekoConfig`, routing, `definePage`, `useState`, `createApiClient`, `createRpcClient`, `defineSocketChannel`, `attachNodeWebSocketServer`, `RedisSessionStore` y `SqlSessionStore` conservan sus nombres actuales. Los autoimports generados `api`, `rpc`, `socket` y `useSocket` dependen del manifiesto de cada aplicación.
 
 Meeko sigue SemVer desde `1.0`: el contrato público, lo que no es público y la política de deprecación están en [stability.md](stability.md). Una publicación requiere lockfile reproducible con el pnpm declarado, CI verde, consumidor externo y revisión del tarball. No se aumenta la versión automáticamente.
 

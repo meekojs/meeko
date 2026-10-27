@@ -23,7 +23,7 @@ import { loadProjectEnv } from "./framework/env-file.js";
 import { formatDiagnostic, hasErrors } from "./compiler/sfc.js";
 import type { CompileDiagnostic } from "./compiler/sfc.js";
 
-const usage = "Uso: meeko dev [directorio]\n     meeko check [directorio | componente.meeko] [--json]\n     meeko build [directorio] [--adapter <node|cloudflare|deno|bun>]\n     meeko start [directorio]\n     meeko preview [directorio] [--adapter <node|cloudflare|bun|deno>]\n     meeko clean [directorio] [--all] [--dry-run]\n     meeko check-app <directorio>\n     meeko compile <componente.meeko> <salida.ts>\n     meeko types <componente.meeko>\n     meeko routes <directorio>\n     meeko prerender <directorio>\n     meeko init <directorio>\n     meeko init-framework <directorio>\n     meeko lsp --stdio\n     meeko --help | --version\n\n" +
+const usage = "Uso: meeko dev [directorio]\n     meeko check [directorio | componente.meeko] [--json]\n     meeko build [directorio] [--adapter <node|cloudflare|deno|bun>]\n     meeko start [directorio]\n     meeko preview [directorio] [--adapter <node|cloudflare|bun|deno>]\n     meeko clean [directorio] [--all] [--dry-run]\n     meeko auth hash  (pide una contraseña sin mostrarla, o la lee de stdin, e imprime su hash)\n     meeko check-app <directorio>\n     meeko compile <componente.meeko> <salida.ts>\n     meeko types <componente.meeko>\n     meeko routes <directorio>\n     meeko prerender <directorio>\n     meeko init <directorio>\n     meeko init-framework <directorio>\n     meeko lsp --stdio\n     meeko --help | --version\n\n" +
   "Variables de entorno:\n" +
   "     MEEKO_PORT, MEEKO_HOST  puerto y dirección de dev, start y preview; sustituyen a server.port y\n" +
   "                      server.host de meeko.config.ts (por defecto, 127.0.0.1:4173; preview\n" +
@@ -76,11 +76,12 @@ const helpCommand = command === "--help" || command === "-h" || command === "hel
 const versionCommand = command === "--version" || command === "-v";
 if (command !== "lsp" && !helpCommand && !versionCommand) {
   if (command === undefined) problem ??= "Falta el comando";
-  else if (!projectCommand && !legacyCommand && command !== "check" && command !== "clean") problem ??= `Comando desconocido: ${command}`;
+  else if (!projectCommand && !legacyCommand && command !== "check" && command !== "clean" && command !== "auth") problem ??= `Comando desconocido: ${command}`;
+  if (command === "auth" && input !== "hash") problem ??= input === undefined ? "Falta el subcomando de auth: meeko auth hash" : `Subcomando desconocido de auth: ${input}`;
   // `check` accepts `--json` after the component; every other option was consumed above.
   const option = argv.slice(1).find((argument, index) => argument.startsWith("-") && !(command === "check" && argument === "--json" && index === 1));
   if (option !== undefined) problem ??= command === "check" && option === "--json" ? "--json va después del componente .meeko de check" : `Opción desconocida para ${command}: ${option}`;
-  if (!projectCommand && command !== "check" && command !== "clean" && !input) problem ??= `Falta ${command === "compile" || command === "types" ? "el componente .meeko" : "el directorio"} de ${command}`;
+  if (!projectCommand && command !== "check" && command !== "clean" && command !== "auth" && !input) problem ??= `Falta ${command === "compile" || command === "types" ? "el componente .meeko" : "el directorio"} de ${command}`;
   if (command === "compile" && !output) problem ??= "Falta el archivo de salida de compile";
   const extra = argv[command === "compile" || (command === "check" && output === "--json") ? 3 : 2];
   if (extra !== undefined) problem ??= `Argumento de más para ${command}: ${extra}`;
@@ -129,6 +130,12 @@ if (problem !== undefined) {
         const result = await buildProject(root, requested === undefined ? {} : { adapter: requested });
         process.stdout.write(`${result.output}\n`);
       }
+    } else if (command === "auth") {
+      // Only the hash goes to stdout, so `meeko auth hash >> .env` or a pipe gets a clean line.
+      const { promptPassword } = await import("./password-prompt.js");
+      const { hashPassword } = await import("./password.js");
+      const password = await promptPassword(process.stdin, process.stderr);
+      process.stdout.write(`${await hashPassword(password)}\n`);
     } else if (command === "clean") {
       const result = await cleanProject(input ?? ".", { all: cleanAll, dryRun: cleanDryRun });
       const report = formatCleanResult(result);

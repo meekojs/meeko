@@ -14,6 +14,7 @@ const entries: Readonly<Record<string, string>> = {
   "./vite": "src/vite.ts",
   "./server": "src/framework-server.ts",
   "./node": "src/node.ts",
+  "./password": "src/password.ts",
   "./bun": "src/bun.ts",
   "./deno": "src/deno.ts",
   "./cloudflare": "src/cloudflare.ts",

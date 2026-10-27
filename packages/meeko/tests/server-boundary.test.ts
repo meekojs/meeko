@@ -58,6 +58,21 @@ test("the ./bun, ./deno and ./cloudflare adapters bundle for a neutral platform 
   }
 });
 
+test("the ./password entry needs only node:crypto, which Node, Bun and Deno provide", async () => {
+  const result = await build({
+    entryPoints: [await entry("./password")],
+    bundle: true, format: "esm", platform: "neutral", write: false, metafile: true, outdir: "out",
+    external: ["node:*"], logLevel: "silent",
+  });
+  const output = Object.values(result.metafile.outputs)[0];
+  assert.ok(output);
+  const external = [...new Set(output.imports.filter((item) => item.external).map((item) => item.path))].sort();
+  assert.deepEqual(external, ["node:crypto"]);
+  assert.equal(Object.keys(result.metafile.inputs).length, 1, "the entry imports nothing else from Meeko");
+  const password = await import(pathToFileURL(await entry("./password")).href);
+  assert.deepEqual(Object.keys(password).sort(), ["hashPassword", "needsRehash", "verifyPassword"]);
+});
+
 test("server, node, bun, deno, cloudflare and build subpaths expose exactly their documented runtime values", async () => {
   const server = await import(pathToFileURL(await entry("./server")).href);
   assert.deepEqual(Object.keys(server).sort(), [

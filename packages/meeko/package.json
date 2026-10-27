@@ -33,6 +33,10 @@
       "types": "./dist/node.d.ts",
       "default": "./dist/node.js"
     },
+    "./password": {
+      "types": "./dist/password.d.ts",
+      "default": "./dist/password.js"
+    },
     "./bun": {
       "types": "./dist/bun.d.ts",
       "default": "./dist/bun.js"
