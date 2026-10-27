@@ -298,6 +298,7 @@ async function assertModuleApp(origin: string, logs: () => string, browser: Awai
   const html = (await page.text()).replace(/<!--[\s\S]*?-->/g, "");
   assert.equal(page.status, 200, logs());
   assert.equal(page.headers.get("x-hello-module"), "1", "module server middleware");
+  assert.match(html, /<meta name="generator" content="meeko-module-hello">/, "module head in the server document");
   assert.match(html, /theme:dark/, "app plugin provide");
   assert.match(html, /Page, welcome/, "module autoimports dir");
   assert.match(html, /<span class="hello-badge"[^>]*data-greeting="Hello from config"/, "module component and universal plugin");
@@ -347,7 +348,9 @@ test("a module adds components, autoimports, plugins, middleware, handlers and p
   assert.deepEqual(JSON.parse(await readFile(join(result.output, "hello-build.json"), "utf8")), { adapter: "node", prerendered: ["/"] });
   const client = (await Promise.all(output.filter((file) => file.includes(`${join("client", "assets")}`) && file.endsWith(".js")).map((file) => readFile(file, "utf8")))).join("\n");
   assert.match(client, /helloClient/, "the client plugin is in the client bundle");
-  assert.doesNotMatch(client, /x-hello-module|lastRoute|defineMeekoModule|addPublicFile|meeko-module-hello/, "module setup and server code stay out of the client bundle");
+  assert.doesNotMatch(client, /x-hello-module|lastRoute|defineMeekoModule|addPublicFile|hello:virtual-info/, "module setup and server code stay out of the client bundle");
+  // The head a module adds is document data: client navigation restores it, so it ships as data.
+  assert.match(client, /meeko-module-hello/, "the module head reaches the client document config");
   child = spawn(process.execPath, [join(result.output, "index.mjs")], {
     cwd: root, env: { ...process.env, PORT: "0", HOST: "127.0.0.1" }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
   });
