@@ -6,7 +6,9 @@ const common = {
   format: "esm",
   target: "node20",
   mainFields: ["module", "main"],
-  banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
+  // Bundled CommonJS dependencies call `require`. The import is renamed: bundled modules of the
+  // server import `createRequire` themselves, and a second top-level binding fails to load.
+  banner: { js: "import { createRequire as __meekoCreateRequire } from 'node:module'; const require = __meekoCreateRequire(import.meta.url);" },
   sourcemap: true,
   logLevel: "info",
 };

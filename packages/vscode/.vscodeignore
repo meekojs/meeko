@@ -11,3 +11,17 @@ dist/*.cjs
 node_modules/@vscode/**
 node_modules/typescript/dist/**
 node_modules/typescript/vendor/**
+# The server loads Prettier as ESM and only formats TypeScript, CSS and HTML: the CommonJS copies,
+# the CLI, the types and the other languages are never read.
+node_modules/prettier/index.cjs
+node_modules/prettier/doc.js
+node_modules/prettier/standalone.*
+node_modules/prettier/bin/**
+node_modules/prettier/**/*.d.ts
+node_modules/prettier/plugins/*.js
+node_modules/prettier/plugins/{angular,flow,glimmer,graphql,markdown,meriyah,yaml}.*
+# TypeScript 6 is the editor's model (lib/typescript.js and the lib.*.d.ts); type checks run the
+# native TypeScript 7. Its own compiler, tsserver, translations and types are never loaded.
+node_modules/@typescript/old/lib/{_tsc,_tsserver,_typingsInstaller,tsc,tsserver,tsserverlibrary,typingsInstaller,watchGuard}.js
+node_modules/@typescript/old/lib/{typescript,tsserverlibrary}.d.ts
+node_modules/@typescript/old/lib/{cs,de,es,fr,it,ja,ko,pl,pt-br,ru,tr,zh-cn,zh-tw}/**

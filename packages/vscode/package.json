@@ -82,7 +82,10 @@
     },
     "commands": [
       { "command": "meeko.live.editSignal", "title": "Editar valor de la señal", "category": "Meeko" },
-      { "command": "meeko.live.reconnect", "title": "Reconectar valores en vivo", "category": "Meeko" }
+      { "command": "meeko.live.reconnect", "title": "Reconectar valores en vivo", "category": "Meeko" },
+      { "command": "meeko.newComponent", "title": "Nuevo componente", "category": "Meeko" },
+      { "command": "meeko.newPage", "title": "Nueva página", "category": "Meeko" },
+      { "command": "meeko.newEndpoint", "title": "Nuevo endpoint de API", "category": "Meeko" }
     ],
     "menus": {
       "commandPalette": [

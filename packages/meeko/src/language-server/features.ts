@@ -84,7 +84,7 @@ export function sourceRange(component: VirtualComponent, start: number, length: 
   return undefined;
 }
 
-function toRange(document: TextDocument, start: number, end: number): Range {
+export function toRange(document: TextDocument, start: number, end: number): Range {
   return { start: document.positionAt(start), end: document.positionAt(end) };
 }
 
@@ -263,7 +263,7 @@ function genericTagMarkdown(context: FeatureContext, tag: ComponentTag): string 
  * Parámetros que el hijo da a un `<snippet>`: el tipo contextual de la función que el código
  * virtual escribe para él.
  */
-function snippetParameters(context: FeatureContext, tag: SnippetTag): { optional: boolean; parameters: Array<{ name: string; type: string }> } | undefined {
+export function snippetParameters(context: FeatureContext, tag: SnippetTag): { optional: boolean; parameters: Array<{ name: string; type: string }> } | undefined {
   const located = snippetCall(context, tag);
   if (!located) return undefined;
   const { call, checker } = located;

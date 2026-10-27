@@ -21,6 +21,7 @@ import {
 } from "./embedded.js";
 import { codeLenses } from "./lenses.js";
 import { createComponentActions, listItemActions, propsReadActions } from "./quick-fixes.js";
+import { documentLinks, inlayHints, workspaceSymbols } from "./nav.js";
 import { MeekoWorkspace, pathKey } from "./project.js";
 import { executionZones } from "./zones.js";
 import type { ExecutionZoneKind, ExecutionZoneReason } from "./zones.js";
@@ -269,6 +270,9 @@ export function startLanguageServer(connection: Connection): void {
         textDocumentSync: { openClose: true, change: TextDocumentSyncKind.Incremental, save: { includeText: false } },
         completionProvider: { triggerCharacters: [".", ":", "<", "/", "\""], resolveProvider: true },
         linkedEditingRangeProvider: true,
+        documentLinkProvider: { resolveProvider: false },
+        workspaceSymbolProvider: true,
+        inlayHintProvider: true,
         colorProvider: true,
         hoverProvider: true,
         definitionProvider: true,
@@ -404,6 +408,15 @@ export function startLanguageServer(connection: Connection): void {
     const classes = document && classDefinition(document, position);
     if (classes) return classes;
     return withContext(textDocument.uri, (context) => definition(context, position), true);
+  });
+  connection.onDocumentLinks(({ textDocument }) => withContext(textDocument.uri, (context) => documentLinks(context), true));
+  connection.languages.inlayHint.on(({ textDocument, range }) => withContext(textDocument.uri, (context) => inlayHints(context, range)));
+  connection.onWorkspaceSymbol(({ query }) => {
+    // The projects of the open files, and those of the workspace folders before any file opens.
+    for (const folder of folders) {
+      if (existsSync(join(folder, "app", "pages")) || existsSync(join(folder, "meeko.config.ts"))) workspace.projectFor(join(folder, "app", "app.meeko"));
+    }
+    return workspaceSymbols(workspace.all(), query);
   });
   connection.languages.onLinkedEditingRange(({ textDocument, position }) => {
     const document = documents.get(textDocument.uri);

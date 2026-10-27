@@ -37,6 +37,20 @@ Además del tipo de TypeScript, el hover añade:
 
 «Ir a definición» sobre el ID de ruta de `href` abre la página, y sobre un endpoint o procedimiento abre su handler en la línea del contrato (`defineApiRoute` o `defineRpc`). Una etiqueta de componente lleva a su `.meeko`. El servidor descubre rutas, endpoints y procedimientos sin ejecutar sus módulos, igual que `meeko routes`; si el descubrimiento falla, usa `.meeko/manifests/routes.json`.
 
+Desde `1.2`, las cadenas de `href("…")`, `useApi("…")`, `useApiMutation("…")`, `useRpcQuery("…")` y `useRpcMutation("…")` son además enlaces (Ctrl+clic) a su página o handler, y una ruta que no existe no tiene enlace. La búsqueda de símbolos del workspace (Ctrl+T en VS Code) encuentra componentes, páginas (por su ruta, como `/users/[id]`), endpoints (`GET /api/users`) y procedimientos (`rpc.users.get`); acepta las letras salteadas (`usid` encuentra `/users/[id]`).
+
+### Pistas de tipo
+
+La plantilla no escribe los tipos de lo que declara: el servidor los muestra como pistas en línea después de `each:as` (`each:as="user: User"`) y de cada parámetro de `<snippet params>`, también en los componentes genéricos. Las pistas largas se acortan a 60 caracteres.
+
+### Comandos «Meeko: nuevo…» (VS Code)
+
+- **Nuevo componente:** `AppCard` crea `app/components/App/Card.meeko` si existe la carpeta `App` (si no, `AppCard.meeko`); `App/Card` es una ruta explícita.
+- **Nueva página:** `/users` crea `app/pages/users/index.meeko` y `/users/[id]`, `app/pages/users/[id].meeko`, con su `useHead`.
+- **Nuevo endpoint de API:** pide el método y la ruta (`/users/[id]`, con o sin `/api`) y crea `server/api/users/[id].get.ts` con sus schemas públicos (`params`, `body` en `POST`/`PUT`/`PATCH` y `response`) en `shared/schemas/users.ts`, que añade al archivo si ya existe. Usa valibot o zod según el `package.json` del proyecto.
+
+Usan el proyecto del archivo activo y la indentación de los `.meeko`, y nunca sobrescriben un archivo.
+
 ### CodeLens
 
 - **Valores reactivos.** Sobre cada señal, `computed` o recurso declarado en el nivel superior del `<script>`: cuántas lecturas y escrituras tiene y si la plantilla lo usa. Al pulsarlo se listan esas posiciones.

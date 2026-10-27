@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Comandos «Meeko: Nuevo componente», «Nueva página» y «Nuevo endpoint de API», que crean el archivo con su plantilla (el endpoint, con sus schemas públicos en valibot o zod) sin sobrescribir nada.
+- Navegación: enlaces en las rutas de `href`, `useApi` y `useRpcQuery`, búsqueda de componentes, páginas, endpoints y procedimientos con Ctrl+T y pistas de tipo en `each:as` y `<snippet params>`.
+- VSIX más ligero: de 18,3 MB a 13,3 MB, sin las copias CommonJS ni los lenguajes de Prettier que Meeko no formatea, sin el compilador y las traducciones de TypeScript 6 que el servidor no carga y con el icono a 256 px.
+- Corrección: el servidor de lenguaje incluido en el VSIX no arrancaba («Identifier 'createRequire' has already been declared»), así que un proyecto sin `@meekojs/meeko` o un workspace sin confianza se quedaban sin servidor. Una prueba arranca ahora el servidor empaquetado.
 - Sin cursiva: el modificador `reactive` ya no se asigna a `markup.italic`, que los temas muestran en cursiva, y los valores en vivo al final de la línea tampoco usan cursiva. Para recuperarla, añada `"*.reactive": { "italic": true }` en `rules` de `editor.semanticTokenColorCustomizations`.
 - Acciones rápidas: convertir en `computed` una prop que el setup lee una sola vez (o declararlo con `untrack`), añadir `each:as` a una lista y crear el componente de una etiqueta que no existe.
 - HTML y CSS: completado de etiquetas, atributos, valores y eventos (`on:click`) con la documentación de MDN, CSS en `<style>` con diagnósticos y selector de color, y clases de `<style>` en `class="…"` con ir a definición y aviso de clases sin uso en `<style scoped>`. Lo da el servidor de lenguaje de Meeko 1.2.

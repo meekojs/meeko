@@ -3,6 +3,7 @@ import { after, before, describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import type { Location, MarkupContent } from "vscode-languageserver/node";
 import { definition, hover } from "../src/language-server/features.ts";
+import { documentLinks, inlayHints, workspaceSymbols } from "../src/language-server/nav.ts";
 import { languageProject } from "./language-server-workspace.ts";
 import type { LanguageProject, OpenedComponent } from "./language-server-workspace.ts";
 
@@ -60,6 +61,20 @@ export declare const socket: unknown;
 export declare function useSocket(name: string): unknown;
 `;
 
+const userList = `<script lang="ts">
+interface User { id: string; email: string }
+const users = signal<User[]>([]);
+</script>
+<template><ul><li each:of="users.value" each:as="user" each:key="user.id"><Rows bind:items="[user]"><snippet name="row" params="entry">{entry.email}</snippet></Rows></li></ul></template>
+`;
+
+const rows = `<script lang="ts" generic="T">
+const props = defineProps<{ items: T[] }>();
+const snippets = defineSnippets<{ row: [entry: T] }>();
+</script>
+<template><div each:of="props.items" each:as="item"><render snippet="snippets.row" args="item" /></div></template>
+`;
+
 describe("language server: routes, API and RPC", () => {
   let workspace: LanguageProject;
   let component: OpenedComponent;
@@ -74,6 +89,8 @@ describe("language server: routes, API and RPC", () => {
       "server/rpc/users/get.ts": procedure,
       "shared/notes.ts": "export const NoteQuery = {};\nexport const NoteList = {};\nexport const NoteParams = {};\nexport const Note = {};\n",
       "shared/users.ts": "export const UserInput = {};\nexport const User = {};\n",
+      "app/components/UserList.meeko": userList,
+      "app/components/Rows.meeko": rows,
       ".meeko/generated/clients.client.ts": clients,
       ".meeko/generated/clients.server.ts": clients,
     });
@@ -145,5 +162,28 @@ describe("language server: routes, API and RPC", () => {
       const [target] = definition(component, component.at(needle, delta)) as Location[];
       assert.equal(fileURLToPath(target!.uri).toLowerCase(), workspace.file("server/rpc/users/get.ts").toLowerCase());
     }
+  });
+
+  test("the strings of href, useApi and useRpcQuery link to their page or handler", () => {
+    const links = documentLinks(component);
+    const linked = (needle: string) => links.find((link) => component.document.offsetAt(link.range.start) === component.offset(needle, 1));
+    assert.equal(fileURLToPath(linked("\"/users/[id]\"")!.target!).toLowerCase(), workspace.file("app/pages/users/[id].meeko").toLowerCase());
+    assert.match(linked("\"/api/notes\"")!.target!, /notes\.get\.ts#L\d+,\d+$/);
+    assert.match(linked("\"users.get\"")!.target!, /rpc\/users\/get\.ts/);
+    assert.equal(component.document.getText(linked("\"/users/[id]\"")!.range), "/users/[id]");
+    assert.equal(linked("\"/nowhere\""), undefined, "a route that does not exist has no link");
+  });
+
+  test("workspace symbols list components, pages, endpoints and procedures", async () => {
+    const all = (await workspaceSymbols([workspace.project], "")).map((symbol) => symbol.name);
+    for (const name of ["UserList", "Rows", "/", "/users/[id]", "GET /api/notes", "GET /api/notes/[id]", "rpc.users.get"]) assert.ok(all.includes(name), `${name} in ${JSON.stringify(all)}`);
+    assert.deepEqual((await workspaceSymbols([workspace.project], "usid")).map((symbol) => symbol.name), ["/users/[id]"]);
+  });
+
+  test("inlay hints show the type of each:as items and snippet parameters", async () => {
+    const list = await workspace.open("app/components/UserList.meeko");
+    const whole = { start: { line: 0, character: 0 }, end: list.document.positionAt(list.document.getText().length) };
+    const hints = inlayHints(list, whole).map((hint) => [list.document.offsetAt(hint.position), hint.label]);
+    assert.deepEqual(hints, [[list.offset("user\" each:key", 4), ": User"], [list.offset("entry\">", 5), ": User"]]);
   });
 });
