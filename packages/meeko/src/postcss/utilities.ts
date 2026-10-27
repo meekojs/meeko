@@ -59,6 +59,7 @@ export interface UtilityDeclarations {
  * ```
  */
 export interface UtilityRule {
+  /** Discriminante: una regla con selector. */
   readonly kind: "rule";
   /** Selector de la regla; dentro de otra regla puede usar `&`. */
   readonly selector: string;
@@ -84,6 +85,7 @@ export interface UtilityRule {
  * ```
  */
 export interface UtilityAtRule {
+  /** Discriminante: una at-rule como `@media` o `@supports`. */
   readonly kind: "atrule";
   /** Nombre sin `@`: `media`, `supports`, `container`… */
   readonly name: string;
@@ -112,6 +114,7 @@ export interface UtilityAtRule {
  * ```
  */
 export interface UtilityCss {
+  /** Discriminante: CSS literal que se analiza con PostCSS. */
   readonly kind: "css";
   /** El texto CSS. */
   readonly css: string;

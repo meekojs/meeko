@@ -23,7 +23,7 @@ test("engine and framework browser bundles exclude server transports", async () 
 test("package.json exports exactly the public subpaths", async () => {
   const manifest = JSON.parse(await readFile(resolve("package.json"), "utf8")) as { exports: Record<string, unknown> };
   assert.deepEqual(Object.keys(manifest.exports), [
-    ".", "./vite", "./framework", "./server", "./node", "./bun", "./deno", "./cloudflare",
+    ".", "./vite", "./framework", "./server", "./node", "./password", "./bun", "./deno", "./cloudflare",
     "./build", "./prettier", "./postcss", "./internal", "./devtools-ui",
   ]);
 });
