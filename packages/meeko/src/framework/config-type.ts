@@ -1,4 +1,5 @@
 import type { DocumentConfig } from "./head.js";
+import type { MeekoModuleEntry } from "./module.js";
 
 /**
  * Destino de ejecución de `meeko build`, una unión discriminada por `adapter`. Cada adaptador
@@ -62,19 +63,30 @@ export type MeekoAdapterName = MeekoServerConfig["adapter"];
  * import type { MeekoConfig } from "@meekojs/meeko/framework";
  *
  * const config: MeekoConfig = {
- *   extends: ["./layers/base"],
- *   modules: ["./modules/auth"],
+ *   layers: ["./layers/base"],
+ *   modules: ["@acme/seo", ["./modules/hello", { greeting: "Hola" }]],
  *   imports: { serverDirs: ["server/services"] },
  *   server: { adapter: "node", port: 3000 },
  * };
  * ```
- * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#configuración-módulos-y-layers
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#layers
  */
 export interface MeekoConfig {
-  /** Layers, aplicados después de la aplicación en el orden escrito. Las colisiones de URL fallan. */
+  /**
+   * Layers: carpetas del proyecto con su propio `app/pages`, componentes, autoimports y
+   * `app/plugins`, aplicadas después de la aplicación en el orden escrito. Las colisiones de URL
+   * fallan.
+   * @since 1.2.0
+   */
+  readonly layers?: readonly string[];
+  /** Alias de `layers` que se mantiene: sus carpetas van antes que las de `layers`. */
   readonly extends?: readonly string[];
-  /** Módulos, con la misma convención `app/pages` que los layers; van después de ellos. */
-  readonly modules?: readonly string[];
+  /**
+   * Módulos creados con `defineMeekoModule`: un módulo importado, un nombre de paquete, una ruta a
+   * un módulo o `[módulo, opciones]`, aplicados en orden. Hasta `1.1` eran carpetas con
+   * `app/pages`; esas carpetas siguen funcionando como layers en `1.x`, con un aviso (use `layers`).
+   */
+  readonly modules?: readonly MeekoModuleEntry[];
   /** `serverDirs` añade directorios de autoimports exclusivos del servidor. */
   readonly imports?: { readonly serverDirs?: readonly string[] };
   /** Destino del servidor de producción. Por defecto, `{ adapter: "node" }`. */
@@ -90,7 +102,8 @@ export interface MeekoConfig {
   readonly css?: { readonly scopeAttribute?: "all" | "matched" };
   /**
    * Documento HTML de la aplicación: `lang` de `<html>` y etiquetas y atributos comunes de
-   * `<head>`, con la menor prioridad frente a `useHead` y al `head` de las páginas. Se fija en el
+   * `<head>`, con la menor prioridad frente a `useHead` y al `head` de las páginas. Los módulos
+   * añaden sus entradas con `meeko.addHead`; las de este campo se aplican después. Se fija en el
    * build y llega también al navegador, porque termina en el HTML.
    * @since 1.2.0
    */
@@ -109,12 +122,12 @@ export interface MeekoConfig {
  * import { defineMeekoConfig } from "@meekojs/meeko/framework";
  *
  * export default defineMeekoConfig({
- *   extends: ["./layers/base"],
- *   modules: ["./modules/auth"],
+ *   layers: ["./layers/base"],
+ *   modules: ["@acme/seo"],
  *   imports: { serverDirs: ["server/services", "server/repositories"] },
  * });
  * ```
- * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#configuración-módulos-y-layers
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#layers
  */
 export function defineMeekoConfig<const T extends MeekoConfig>(config: T): T {
   return config;

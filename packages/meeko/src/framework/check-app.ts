@@ -5,7 +5,7 @@ import { checkSource } from "../check.js";
 import { MeekoCompileError } from "../compiler/sfc.js";
 import type { CompileDiagnostic } from "../compiler/sfc.js";
 import { componentTypeDeclarationMarker, generateTypes } from "../types.js";
-import { resolveConfigSources } from "./config.js";
+import { loadConfiguredModules, resolveConfigSources } from "./config.js";
 import { assertRouteBlockPlacement } from "./route-block.js";
 
 const componentTypesManifest = "component-types.json";
@@ -151,7 +151,8 @@ async function appMeekoFiles(projectRoot: string): Promise<string[]> {
       else if (entry.isFile() && entry.name.endsWith(".meeko")) files.push(path);
     }
   }
-  for (const source of await resolveConfigSources(root)) {
+  const { config, modules } = await loadConfiguredModules(root);
+  for (const source of await resolveConfigSources(root, config)) {
     await walk(join(source.root, "app", "pages"));
     await walk(join(source.root, "app", "layouts"));
     await walk(join(source.root, "app", "components"));
@@ -160,7 +161,11 @@ async function appMeekoFiles(projectRoot: string): Promise<string[]> {
       catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
     }
   }
-  return files.sort();
+  // Components of a module inside the project (not an installed package) are project sources too.
+  for (const { dir } of modules.componentsDirs) {
+    if (inside(root, dir) && !relative(root, dir).split(sep).includes("node_modules")) await walk(dir);
+  }
+  return [...new Set(files)].sort();
 }
 
 /** Checks every discovered application component, including new pages and layouts. */

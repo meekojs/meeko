@@ -9,8 +9,8 @@ import { moduleSpecifiers } from "./compiler/import-graph.js";
 import { sourceMapForCompiled } from "./compiler/sourcemap.js";
 import { discoverAutoImports, transformAutoImports } from "./autoimports.js";
 import { transformTypeScriptAutoImports, typeScriptAutoImportMap } from "./autoimports-ts.js";
-import { discoverConfiguredRoutes, loadMeekoConfig, resolveConfigSources } from "./framework/config.js";
-import { clientRoutesSource, clientSidecarsSource, readBuildAppData, serverAppSource } from "./framework/app-manifest.js";
+import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./framework/config.js";
+import { clientPluginsSource, clientRoutesSource, clientSidecarsSource, readBuildAppData, serverAppSource } from "./framework/app-manifest.js";
 import { assertRouteBlockPlacement, isPageFile, routeBlockFile, routeBlockId, routeBlockSource, withoutRouteBlock } from "./framework/route-block.js";
 import { extractRouteRender } from "./framework/routes-discovery.js";
 import { devScanIgnored, isDevWatchIgnored, isDiscoverySource } from "./framework/dev-watch.js";
@@ -22,7 +22,40 @@ const clientPagesModule = "virtual:meeko-client-pages";
 const clientRoutesModule = "virtual:meeko-manifest/client";
 const clientSidecarsModule = "virtual:meeko-client-routes";
 const serverAppModule = "virtual:meeko-server-app";
-const virtualModules = new Set([clientPagesModule, clientRoutesModule, clientSidecarsModule, serverAppModule]);
+const clientPluginsModule = "virtual:meeko-plugins/client";
+const virtualModules = new Set([clientPagesModule, clientRoutesModule, clientSidecarsModule, serverAppModule, clientPluginsModule]);
+/** A module that imports `defineMeekoModule` holds build code: the browser must never load it. */
+const moduleDefinitionImport = /\bimport\s*\{[^}]*\bdefineMeekoModule\b[^}]*\}\s*from\s*["']@meekojs\/meeko\/framework["']/;
+/** This package (its `src/` and `dist/`), whose documentation shows module imports in comments. */
+const packageDirectory = `${normalizePath(resolve(dirname(fileURLToPath(import.meta.url)), ".."))}/`;
+
+/** Source without block and line comments, close enough for an import check. */
+function withoutComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1");
+}
+
+/** Files and directories of the configured modules that only the server may load. */
+interface ModuleBoundary {
+  /** Module entries (setup code), server plugins, server middleware and server handlers. */
+  readonly serverFiles: ReadonlySet<string>;
+  /** `addAutoImportsDir` directories with `scope: "server"`, ending in `/`. */
+  readonly serverDirectories: readonly string[];
+  /** Directories a module owns, ending in `/`: a `.server.ts` file there is server-only. */
+  readonly ownedDirectories: readonly string[];
+}
+
+async function moduleBoundary(root: string): Promise<ModuleBoundary> {
+  const { modules } = await loadConfiguredModules(root);
+  const directory = (path: string): string => `${normalizePath(path).replace(/\/$/, "")}/`;
+  return {
+    serverFiles: new Set([
+      ...modules.entryFiles, ...modules.plugins.filter((plugin) => plugin.mode === "server").map((plugin) => plugin.file),
+      ...modules.serverMiddleware, ...modules.serverHandlers.map((handler) => handler.file),
+    ].map((file) => normalizePath(file))),
+    serverDirectories: modules.autoImportsDirs.filter((entry) => entry.scope === "server").map((entry) => directory(entry.dir)),
+    ownedDirectories: modules.ownedDirectories.map(directory),
+  };
+}
 const runtimeDirectory = `${normalizePath(dirname(fileURLToPath(import.meta.url)))}/`;
 
 /** `server.fs.deny` pattern of the editor bridge descriptors, which hold the session token. */
@@ -92,7 +125,7 @@ export function meeko(): Plugin {
       const path = normalized.slice(prefix.length);
       const registrySource = /^(?:app\/(?:components|composables|utils|stores)|shared\/(?:types|schemas|utils|constants|enums)|server\/utils)\//.test(path) ||
         (config.imports?.serverDirs ?? []).some((directory) => path.startsWith(`${directory.replaceAll("\\", "/").replace(/\/$/, "")}/`));
-      const routesSource = /^(?:app\/(?:pages|layouts|middleware)|server\/middleware)\//.test(path);
+      const routesSource = /^(?:app\/(?:pages|layouts|middleware|plugins)|server\/middleware)\//.test(path);
       if (registrySource || routesSource || (tree && isDiscoverySource(file, [source.root]))) return true;
     }
     return false;
@@ -139,6 +172,10 @@ export function meeko(): Plugin {
       if (virtual === clientRoutesModule) return clientRoutesSource(root);
       if (virtual === clientSidecarsModule) return clientSidecarsSource(root);
       if (virtual === serverAppModule) return serverAppSource(root, ssrBuild && !isDev ? await readBuildAppData(root) : undefined);
+      if (virtual === clientPluginsModule) {
+        if (options?.ssr || ssrBuild) throw new Error(`${clientPluginsModule} belongs to the client bundle`);
+        return clientPluginsSource(root);
+      }
       if (virtual === clientPagesModule) {
         const routes = await discoverConfiguredRoutes(root);
         const unique = [...new Set(routes.flatMap((route) => [route.file, ...route.layouts, ...(route.error ? [route.error] : [])]))];
@@ -161,10 +198,22 @@ export function meeko(): Plugin {
       // Every component this plugin compiles, also one outside the project, follows the project's `css` options.
       const config = normalizedId.startsWith(`${normalizedRoot}/`) || id.endsWith(".meeko") ? await loadMeekoConfig(root) : undefined;
       const sources = normalizedId.startsWith(`${normalizedRoot}/`) ? await resolveConfigSources(root, config) : [];
-      const serverDirectories = sources.map((entry) => `${normalizePath(entry.root)}/server/`);
-      const serverOnly = (moduleId: string): boolean => serverDirectories.some((directory) => moduleId.startsWith(directory));
+      // Module code may live outside the project (a linked package): its boundary applies to any id.
+      const boundary = serverTransform || normalizedId.startsWith(runtimeDirectory) ? undefined : await moduleBoundary(root);
+      const serverDirectories = [...sources.map((entry) => `${normalizePath(entry.root)}/server/`), ...boundary?.serverDirectories ?? []];
+      const serverOnly = (moduleId: string): boolean => serverDirectories.some((directory) => moduleId.startsWith(directory))
+        || (boundary?.serverFiles.has(moduleId.replace(/\?.*$/, "")) ?? false);
       if (clientModule && (serverOnly(normalizedId) || /\.server\.[cm]?[jt]sx?$/.test(id))) {
         throw new Error(`Server-only module reached the client bundle: ${id}`);
+      }
+      if (boundary) {
+        if (serverOnly(normalizedId) || (/\.server\.[cm]?[jt]sx?(?:\?|$)/.test(id) && boundary.ownedDirectories.some((directory) => normalizedId.startsWith(directory)))) {
+          throw new Error(`Server-only module reached the client bundle: ${id}`);
+        }
+        const ownRuntime = normalizedId.startsWith(`${packageDirectory}dist/`) || normalizedId.startsWith(`${packageDirectory}src/`);
+        if (/\.[cm]?[jt]sx?(?:\?|$)/.test(id) && !ownRuntime && moduleDefinitionImport.test(withoutComments(source))) {
+          throw new Error(`Meeko module setup reached the client bundle: ${id}; only meeko.config.ts may import a module created with defineMeekoModule`);
+        }
       }
       if (serverTransform && normalizedId.startsWith(`${normalizedRoot}/`) && /\.client\.[cm]?[jt]sx?$/.test(id)) {
         throw new Error(`Client-only module reached the server bundle: ${id}`);

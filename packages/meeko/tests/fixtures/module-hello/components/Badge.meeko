@@ -1,0 +1,12 @@
+<script lang="ts">
+import { signal } from "@meekojs/meeko";
+
+const greeting = useHelloGreeting();
+const text = useGreetingText("Meeko");
+const clicks = signal(0);
+</script>
+
+<template>
+  <span class="hello-badge" bind:data-greeting="greeting">{greeting} · {text}</span>
+  <button type="button" class="hello-clicks" on:click="() => clicks.value++">Clicks: {clicks.value}</button>
+</template>

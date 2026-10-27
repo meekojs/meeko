@@ -8,6 +8,7 @@ import { serializeJson } from "../server.js";
 import { href, matchRoute } from "./router.js";
 import type { RouteRecord } from "./router.js";
 import { DOCUMENT_HEAD_PREFIX } from "./server.js";
+import { loadConfiguredModules } from "./config.js";
 import type { PageRoute } from "./server.js";
 
 /**
@@ -41,6 +42,12 @@ export interface PrerenderOptions {
   readonly origin?: string;
   /** Transforma el HTML antes de guardarlo. */
   readonly transformHtml?: (html: string) => string | Promise<string>;
+  /**
+   * Recibe las URL (`pathname`) que se van a prerenderizar y puede añadir o quitar entradas; cada URL
+   * que añade debe corresponder a una ruta. `meeko build` lo usa para el hook `prerender:routes`.
+   * @since 1.2.0
+   */
+  readonly extendUrls?: (urls: string[]) => void | Promise<void>;
 }
 
 /**
@@ -140,10 +147,20 @@ export async function prerenderRoutes(options: PrerenderOptions): Promise<string
       urls.set(pathname, route.file);
     }
   }
+  let pathnames = [...urls.keys()];
+  if (options.extendUrls) {
+    const extended = [...pathnames];
+    await options.extendUrls(extended);
+    for (const pathname of extended) {
+      if (typeof pathname !== "string" || !pathname.startsWith("/")) throw new Error(`Invalid prerender URL ${String(pathname)}: use a pathname that starts with /`);
+      if (!urls.has(pathname) && !matchRoute(options.routes, pathname)) throw new Error(`Prerender URL ${pathname} matches no route`);
+    }
+    pathnames = [...new Set(extended)];
+  }
   const outputs: string[] = [];
   const pages: Record<string, PrerenderIndex["pages"][string]> = {};
   await mkdir(outputRoot, { recursive: true });
-  for (const pathname of urls.keys()) {
+  for (const pathname of pathnames) {
     const response = await options.handler(new Request(new URL(pathname, origin)));
     if (response.status !== 200 || !(response.headers.get("content-type") ?? "").includes("text/html")) {
       throw new Error(`Prerender ${pathname} returned HTTP ${response.status} instead of HTML 200`);
@@ -219,12 +236,14 @@ export async function prerenderProject(projectRoot: string): Promise<string[]> {
 /** Renders prerendered routes with a built Node server into an adapter's output directory. */
 export async function prerenderWithNodeBuild(projectRoot: string, server: string, prerenderOutput: string): Promise<string[]> {
   const root = resolve(projectRoot);
+  const { modules } = await loadConfiguredModules(root);
   const output = await importNodeOutput(root, server);
   const app = await output.createNodeApp({ prerendering: true }) as InternalServerApp;
   const outputRoot = resolve(root, prerenderOutput);
   try {
     await rm(outputRoot, { recursive: true, force: true });
     return await prerenderRoutes({
+      extendUrls: (urls) => modules.callHook("prerender:routes", { urls }),
       routes: app.manifest.routes,
       handler: (request) => app[renderPage](request),
       loadRoute: async (key) => {

@@ -7,12 +7,17 @@ import { composeFrameworkRoutes } from "./modules.js";
 import { normalizeDocumentConfig } from "./head.js";
 import type { RouteRecord } from "./router.js";
 import type { MeekoConfig } from "./config-type.js";
+import { isMeekoModule } from "./module.js";
+import { classifyModuleEntry, resolveMeekoModules, resolvedDocument } from "./module-loader.js";
+import type { ResolvedModules } from "./module-loader.js";
 
 export type { MeekoConfig } from "./config-type.js";
 
 /**
- * Una fuente de páginas y autoimports del proyecto: la aplicación, un layer de `extends` o un
- * módulo de `modules`. La devuelve {@link resolveConfigSources}.
+ * Una fuente de páginas y autoimports del proyecto: la aplicación, un layer de `layers` (o
+ * `extends`) o, con `kind: "module"`, un layer que aportan los módulos: el que añade un módulo con
+ * `meeko.addLayer` o una carpeta con `app/pages` listada en `modules`. La devuelve
+ * {@link resolveConfigSources}.
  *
  * @example
  * ```ts
@@ -28,7 +33,7 @@ export interface ConfigSource {
   readonly name: string;
   /** Carpeta absoluta de la fuente, que contiene `app/pages`. */
   readonly root: string;
-  /** Tipo de fuente. */
+  /** Tipo de fuente: `"layer"` para `layers` y `extends`, `"module"` para las que aportan los módulos. */
   readonly kind: "app" | "layer" | "module";
 }
 
@@ -76,9 +81,26 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
   catch (error) { throw new Error(`Cannot load ${file}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
   if (!loaded || typeof loaded !== "object" || Array.isArray(loaded)) throw new TypeError(`${file} must export a Meeko configuration object`);
   const config = loaded as MeekoConfig;
-  for (const [key, entries] of [["extends", config.extends], ["modules", config.modules], ["imports.serverDirs", config.imports?.serverDirs]] as const) {
+  for (const [key, entries] of [["layers", config.layers], ["extends", config.extends], ["imports.serverDirs", config.imports?.serverDirs]] as const) {
     if (entries !== undefined && (!Array.isArray(entries) || entries.some((entry) => typeof entry !== "string" || !entry))) {
       throw new TypeError(`${file}: ${key} must be an array of nonempty paths`);
+    }
+  }
+  const modules = config.modules as unknown;
+  if (modules !== undefined) {
+    const reference = (value: unknown): boolean => (typeof value === "string" && value !== "") || isMeekoModule(value);
+    const options = (value: unknown): boolean => value === undefined || (typeof value === "object" && value !== null && !Array.isArray(value));
+    if (!Array.isArray(modules) || modules.some((entry: unknown) => !(reference(entry)
+      || (Array.isArray(entry) && entry.length >= 1 && entry.length <= 2 && reference(entry[0]) && options(entry[1]))))) {
+      throw new TypeError(`${file}: modules must be an array of modules created with defineMeekoModule, package names or paths, or [module, options]`);
+    }
+  }
+  const document = config.document as Record<string, unknown> | undefined;
+  if (document !== undefined) {
+    if (!document || typeof document !== "object" || Array.isArray(document)) throw new TypeError(`${file}: document must be an object`);
+    if (document.lang !== undefined && typeof document.lang !== "string") throw new TypeError(`${file}: document.lang must be a string`);
+    if (document.head !== undefined && (!document.head || typeof document.head !== "object" || Array.isArray(document.head))) {
+      throw new TypeError(`${file}: document.head must be an object`);
     }
   }
   const css = config.css as Record<string, unknown> | undefined;
@@ -114,13 +136,19 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
       }
     }
   }
+  executedConfigs.add(config);
   return config;
 }
 
+/** Configurations that `loadMeekoConfig` executed: only their modules may run. */
+const executedConfigs = new WeakSet<object>();
+
 /**
- * Lee `extends`, `modules` e `imports.serverDirs` de la configuración sin ejecutarla, analizando el
- * archivo. Sólo reconoce arrays literales de cadenas; es lo que usa el editor en un workspace no
- * confiable. Los demás campos no se leen.
+ * Lee `layers`, `extends`, `modules` e `imports.serverDirs` de la configuración sin ejecutarla,
+ * analizando el archivo; es lo que usa el editor en un workspace no confiable. `layers`, `extends`
+ * e `imports.serverDirs` deben ser arrays literales de cadenas; de `modules` sólo se leen las
+ * cadenas literales, porque un módulo importado no se conoce sin ejecutar la configuración. Los
+ * demás campos no se leen.
  *
  * @param projectRoot Carpeta del proyecto.
  * @returns Los campos estáticos encontrados, o `{}`.
@@ -129,7 +157,7 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
  * ```ts
  * import { readMeekoConfigSync } from "@meekojs/meeko/build";
  *
- * const { extends: layers = [], imports } = readMeekoConfigSync(process.cwd());
+ * const { layers = [], imports } = readMeekoConfigSync(process.cwd());
  * const serverDirs = imports?.serverDirs ?? [];
  * ```
  */
@@ -157,9 +185,15 @@ export function readMeekoConfigSync(projectRoot: string): MeekoConfig {
   };
   const imports = property(config, "imports");
   const serverDirs = imports && ts.isObjectLiteralExpression(imports) ? strings(imports, "serverDirs") : undefined;
+  const layers = strings(config, "layers");
   const extensions = strings(config, "extends");
-  const modules = strings(config, "modules");
+  const moduleList = property(config, "modules");
+  // Imported modules and [module, options] entries need the configuration to run; only strings are known.
+  const modules = moduleList && ts.isArrayLiteralExpression(moduleList)
+    ? moduleList.elements.filter(ts.isStringLiteral).map((entry) => entry.text)
+    : undefined;
   return {
+    ...(layers ? { layers } : {}),
     ...(extensions ? { extends: extensions } : {}),
     ...(modules ? { modules } : {}),
     ...(serverDirs ? { imports: { serverDirs } } : {}),
@@ -167,9 +201,11 @@ export function readMeekoConfigSync(projectRoot: string): MeekoConfig {
 }
 
 /**
- * Resuelve las fuentes del proyecto en orden (aplicación, `extends` y `modules`) y rechaza, antes
- * de descubrir rutas, las que salen del proyecto, no existen, no tienen `app/pages`, se repiten o
- * tienen un nombre no válido.
+ * Resuelve las fuentes del proyecto en orden (aplicación, `extends`, `layers`, las carpetas de
+ * layer listadas en `modules` y los layers que añaden los módulos con `meeko.addLayer`) y rechaza,
+ * antes de descubrir rutas, las que salen del proyecto, no existen, no tienen `app/pages`, se
+ * repiten o tienen un nombre no válido. Los módulos sólo se ejecutan con una configuración que cargó
+ * {@link loadMeekoConfig} (o sin `config`); con la de {@link readMeekoConfigSync}, no.
  *
  * @param projectRoot Carpeta del proyecto.
  * @param config Configuración ya cargada; si falta, se carga con {@link loadMeekoConfig}.
@@ -189,16 +225,30 @@ export async function resolveConfigSources(projectRoot: string, config?: MeekoCo
   const result: ConfigSource[] = [{ name: "app", root, kind: "app" }];
   const names = new Set(["app"]);
   const roots = new Set([actualRoot.toLowerCase()]);
-  for (const [kind, entries] of [["layer", config.extends], ["module", config.modules]] as const) {
+  // A string of modules that is not a module (a folder with app/pages, or a missing path) is
+  // checked as the layer it was before 1.2, with the same errors.
+  const folderModules = (config.modules ?? []).filter((entry): entry is string => typeof entry === "string"
+    && classifyModuleEntry(root, entry).kind !== "module");
+  const moduleLayers = executedConfigs.has(config) ? (await resolveMeekoModules(root, config)).layers : [];
+  for (const [kind, entries, linked] of [
+    ["layer", config.extends, false], ["layer", config.layers, false], ["module", folderModules, false], ["module", moduleLayers, true],
+  ] as const) {
     for (const entry of entries ?? []) {
       const target = resolve(root, entry);
       if (!inside(root, target)) throw new Error(`${kind} ${entry} escapes project root ${root}`);
       let actualTarget: string;
       try { actualTarget = await realpath(target); }
       catch { throw new Error(`${kind} ${entry} does not exist: ${target}`); }
-      if (!inside(actualRoot, actualTarget)) throw new Error(`${kind} ${entry} escapes project root ${root}`);
+      // A module's layer may live in a linked package (pnpm) whose real path is outside the project.
+      if (!linked && !inside(actualRoot, actualTarget)) throw new Error(`${kind} ${entry} escapes project root ${root}`);
       if (roots.has(actualTarget.toLowerCase())) throw new Error(`Duplicate Meeko source root: ${target}`);
-      const name = basename(target, extname(target));
+      let name = basename(target, extname(target));
+      if (linked) {
+        // A module chooses its layer folder, not the project: derive a valid name that is not taken.
+        const base = name.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^[^a-z]+/, "").replace(/-+$/, "") || "layer";
+        name = base;
+        for (let index = 2; names.has(name); index++) name = `${base}-${index}`;
+      }
       if (!/^[a-z][a-z0-9-]*$/.test(name) || names.has(name)) throw new Error(`Invalid or duplicate Meeko source name ${name}: ${target}`);
       try { if (!(await stat(resolve(target, "app", "pages"))).isDirectory()) throw new Error("not a directory"); }
       catch { throw new Error(`${kind} ${entry} has no app/pages directory: ${target}`); }
@@ -210,8 +260,9 @@ export async function resolveConfigSources(projectRoot: string, config?: MeekoCo
 }
 
 /**
- * Descubre las rutas de la aplicación y de los layers y módulos de `meeko.config.ts` en un solo
- * manifiesto. Las páginas de layers y módulos usan el shell del proyecto. Una colisión de URL falla.
+ * Descubre las rutas de la aplicación y de los layers de `meeko.config.ts` (también los que aportan
+ * los módulos) en un solo manifiesto. Las páginas de los layers usan el shell del proyecto. Una
+ * colisión de URL falla.
  *
  * @param projectRoot Carpeta del proyecto.
  * @returns El manifiesto de rutas ordenado.
@@ -230,4 +281,21 @@ export async function discoverConfiguredRoutes(projectRoot: string): Promise<rea
     projectRoot,
     layers: sources.slice(1).map(({ name, root }) => ({ name, root })),
   });
+}
+
+/** The executed configuration of a project and what its modules added. */
+export async function loadConfiguredModules(projectRoot: string): Promise<{ readonly config: MeekoConfig; readonly modules: ResolvedModules }> {
+  const config = await loadMeekoConfig(projectRoot);
+  return { config, modules: await resolveMeekoModules(projectRoot, config) };
+}
+
+/**
+ * The executed configuration with the modules applied: `document` holds the `<head>` entries of
+ * the modules followed by those of `meeko.config.ts` (see `resolvedDocument`). The document
+ * renderer reads `document` from here, not from `loadMeekoConfig`.
+ */
+export async function resolveMeekoConfig(projectRoot: string): Promise<MeekoConfig> {
+  const { config, modules } = await loadConfiguredModules(projectRoot);
+  const document = resolvedDocument(config, modules);
+  return document === undefined ? config : { ...config, document };
 }

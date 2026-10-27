@@ -21,6 +21,7 @@ import type { ServerRuntime, ServerRuntimeDefinition } from "./runtime.js";
 import { MemorySessionStore, SessionManager } from "./sessions.js";
 import { createSocketHub, withSocketHub } from "./socket.js";
 import type { SocketHub, SocketPubSub } from "./socket.js";
+import type { PluginRegistration } from "../framework/plugin.js";
 
 /**
  * Archivos del build cliente que enlaza cada documento renderizado en el servidor.
@@ -78,8 +79,14 @@ export interface AppManifest {
   readonly server: ServerManifest;
   /** Módulos de `app/middleware`, en orden de ejecución. */
   readonly routeMiddleware: readonly string[];
-  /** Módulos de `server/middleware`, en orden de ejecución. */
+  /** Módulos de `server/middleware`, en orden de ejecución; los que añaden los módulos van primero. */
   readonly serverMiddleware: readonly string[];
+  /**
+   * Handlers que añaden los módulos con `meeko.addServerHandler`: ruta exacta y módulo cuyo export
+   * por defecto es `(request) => Response | Promise<Response>`. Se ejecutan después del middleware.
+   * @since 1.2.0
+   */
+  readonly serverHandlers?: readonly { readonly route: string; readonly file: string }[];
   /** Archivos del build cliente. */
   readonly client: ClientAssets;
   /** Archivos públicos del build; en desarrollo los sirve Vite. */
@@ -146,6 +153,13 @@ export interface ServerAppOptions<Env = Readonly<Record<string, string | undefin
   readonly prerendering?: boolean;
   /** Broker de Socket si el runtime no declara ninguno, como el de Durable Objects en Cloudflare. */
   readonly defaultSocketPubSub?: SocketPubSub;
+  /**
+   * Plugins de aplicación del servidor (`*.server.ts` y universales), que se ejecutan una vez por
+   * petición de página antes del render. La entrada que genera Meeko pasa los de `app/plugins` y
+   * los módulos.
+   * @since 1.2.0
+   */
+  readonly plugins?: readonly PluginRegistration[];
 }
 
 /**
@@ -365,13 +379,21 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
       onError: reportError,
       clientEntry: manifest.client.entry,
       document,
+      ...(options.plugins?.length ? { plugins: options.plugins } : {}),
     };
     const pages = createPageHandler(options.prerender ? { ...pageOptions, prerendered: options.prerender } : pageOptions);
     const renderOnly = createPageHandler(pageOptions);
     const serverMiddleware: ServerMiddleware[] = manifest.serverMiddleware.map((key) => async (request, next) =>
       (await loadDefault<ServerMiddleware>(load, key, "server middleware"))(request, next));
+    const serverHandlers = new Map((manifest.serverHandlers ?? []).map(({ route, file }) => [route, file]));
     const decorated = composeServerMiddleware(serverMiddleware, async (request) => {
       const pathname = new URL(request.url).pathname;
+      const handler = serverHandlers.get(pathname);
+      if (handler !== undefined) {
+        const response = await (await loadDefault<(request: Request) => Response | Promise<Response>>(load, handler, "server handler"))(request);
+        if (!(response instanceof Response)) throw new TypeError(`${handler}: a server handler must return a Response`);
+        return response;
+      }
       if (pathname.startsWith("/api/") || pathname.startsWith("/_meeko/rpc/")) return endpoints(request);
       return pages(request);
     });

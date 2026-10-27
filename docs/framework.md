@@ -73,29 +73,38 @@ Si ni `PORT` ni `server.port` fijan el puerto, `meeko dev` usa el primero libre 
 
 El SSR de desarrollo carga `@meekojs/meeko` desde Node, fuera del module runner de Vite, como el build; así una aplicación que consume Meeko con `link:` mantiene una sola instancia del runtime aunque Vite recargue sus módulos. Por eso, cuando `@meekojs/meeko` está enlazado (`link:` de pnpm, `npm link` o un workspace: el paquete se resuelve fuera de todo `node_modules`), `meeko dev` ejecuta el servidor en un proceso hijo y vigila `dist/` y `package.json` del paquete enlazado. Al reconstruirlo, espera a que la compilación termine (400 ms sin cambios), escribe `[meeko] Meeko enlazado cambió; reiniciando meeko dev…`, cierra el servidor anterior (Socket, HTTP, Vite y el descriptor del puente con el editor) y arranca otro proceso en el mismo puerto, con el mismo entorno. Si el nuevo proceso no arranca, por ejemplo porque la compilación quedó a medias, lo informa y vuelve a intentarlo con el siguiente cambio. `Ctrl+C` detiene ambos procesos. Con una instalación normal desde el registro no se vigila nada más; `MEEKO_LINK_WATCH=0` desactiva el reinicio también con un paquete enlazado.
 
-## Configuración, módulos y layers
+## Configuración
 
 ```ts
+// meeko.config.ts
 import { defineMeekoConfig } from "@meekojs/meeko/framework";
+import seo from "@acme/meeko-seo";
 
 export default defineMeekoConfig({
-  extends: ["./layers/base"],
-  modules: ["./modules/auth"],
+  layers: ["./layers/base"],
+  modules: [[seo, { siteUrl: "https://example.com" }], "./modules/hello"],
   imports: { serverDirs: ["server/services", "server/repositories"] },
+  document: { lang: "es", head: { meta: [{ name: "theme-color", content: "#0f172a" }] } },
 });
 ```
 
-Cada fuente declarada aporta su propio `app/pages`, componentes y autoimports. El orden es app, `extends` y `modules`, en el orden escrito.
+`meeko.config.ts` (o `.mts`, `.js`, `.mjs`) se carga con Node y exporta un objeto creado con `defineMeekoConfig`:
+
+- `layers` (desde `1.2`): carpetas que aportan páginas, componentes, autoimports y plugins; véase [Layers](#layers). `extends`, el nombre anterior, sigue funcionando como alias.
+- `modules`: módulos creados con `defineMeekoModule`, que configuran el proyecto desde código; véase [Módulos](#módulos).
+- `imports.serverDirs`: directorios de autoimports exclusivos del servidor, dentro de `server/`.
+- `server`: el adaptador de `meeko build`; véase [Build, despliegue y verificación](#build-despliegue-y-verificación).
+- `document` (desde `1.2`): `lang` y las entradas de `<head>` de todos los documentos. Los módulos añaden las suyas con `meeko.addHead`; las de `document.head` se aplican después, así que el `title` del proyecto gana.
 
 Desde `1.2`, `css: { scopeAttribute: "matched" }` limita el atributo de `<style scoped>` a los elementos que algún selector con ámbito puede seleccionar; con `"all"`, el valor por defecto en `1.x`, va en todos los elementos de la plantilla. `"matched"` pasará a ser el valor por defecto en `2.0`. Véase [Estilos con ámbito](api.md#qué-elementos-reciben-el-atributo), con el caso de las clases que el script añade con la API del DOM.
 
-`extends` y `modules` se comportan igual: la única diferencia es el orden y el nombre con que aparecen en los diagnósticos («layer» o «module»). Use `extends` para una base compartida de la que parte la aplicación (diseño, páginas comunes) y `modules` para funciones que se añaden (autenticación, panel de administración). Cada fuente necesita su carpeta `app/pages`. Sus páginas se muestran dentro del shell del proyecto: `app/app.meeko` y el layout raíz de la aplicación (`app/layouts/default.meeko` o `app/pages/+layout.meeko`) envuelven también a las páginas de capas y módulos, y los `+layout.meeko` propios de la capa se anidan dentro. Si el proyecto tiene `app.meeko` o layout raíz, sustituyen a los equivalentes de la capa; si no, se usan los de la capa. Una página de capa que falla usa el `+error.meeko` más cercano de su propio árbol, después el `app/error.meeko` de la capa y, por último, la página de error raíz del proyecto. La `404` de una URL sin ruta siempre usa la del proyecto. Los módulos programáticos (`RouteModule.routes()`) siguen declarando sus propios layouts. El manifiesto rechaza colisiones de URL; el registro rechaza nombres de autoimport repetidos. El diagnóstico incluye los archivos en conflicto. Las rutas configuradas deben vivir dentro del proyecto. La configuración de rutas se carga con Node. En un workspace de confianza el servidor de lenguaje también la ejecuta, por lo que las listas pueden construirse dinámicamente; en un workspace no confiable (o con `trusted: false`, ver [editores](editors.md)) el editor no ejecuta código del proyecto y sólo reconoce arrays literales de cadenas.
+La configuración se ejecuta en `meeko dev`, `meeko build` y `meeko check`. En un workspace de confianza el servidor de lenguaje también la ejecuta, con sus módulos, por lo que las listas pueden construirse dinámicamente; en un workspace no confiable (o con `trusted: false`, ver [editores](editors.md)) el editor no ejecuta código del proyecto: lee `layers`, `extends` e `imports.serverDirs` como arrays literales de cadenas y, de `modules`, sólo las cadenas literales que son carpetas de layer. Los autoimports y componentes de los módulos no existen para ese editor hasta que se confía en el workspace.
 
 El descubrimiento de servidor también rechaza árboles de cliente imposibles. Por ejemplo, no permite que `api.users.get()` sea a la vez una función y el padre de `api.users.get.post()`, ni que un procedimiento `rpc.users()` sea el padre de `rpc.users.get()`. El error se produce al generar el manifiesto e identifica ambos archivos, antes de inicializar el cliente o emitir tipos contradictorios.
 
 `meeko routes .` descubre todas las fuentes, emite `.meeko/manifests/routes.json` y declaraciones de rutas, contratos y autoimports. Vite genera módulos virtuales a partir del mismo descubrimiento para SSR, hidratación y navegación. En desarrollo, editar una página o layout existente actualiza el módulo SSR y recarga el navegador; el servidor conserva el almacén de sesiones. Los sidecars y handlers API/RPC existentes se cargan desde Vite al llamarlos.
 
-Al crear o eliminar una página, un layout, `app/app.meeko`, `app/error.meeko`, un middleware de `app/middleware` o `server/middleware`, o un módulo de `server/api`, `server/rpc` o `server/socket`, en el proyecto o en sus layers y módulos, `meeko dev` vuelve a descubrir las rutas y crea de nuevo la aplicación sin reiniciar el proceso:
+Al crear o eliminar una página, un layout, `app/app.meeko`, `app/error.meeko`, un middleware de `app/middleware` o `server/middleware`, un plugin de `app/plugins`, o un módulo de `server/api`, `server/rpc` o `server/socket`, en el proyecto o en sus layers, `meeko dev` vuelve a descubrir las rutas y crea de nuevo la aplicación sin reiniciar el proceso:
 
 - Las peticiones que llegan mientras tanto esperan a la aplicación nueva, y el navegador se recarga.
 - El servidor Socket se vuelve a enganchar a la aplicación nueva; las conexiones abiertas se cierran.
@@ -104,7 +113,7 @@ Al crear o eliminar una página, un layout, `app/app.meeko`, `app/error.meeko`, 
 
 Cuando Vite se reinicia (al cambiar un `.env` o una dependencia de su configuración), `meeko dev` también crea de nuevo la aplicación, con las mismas consecuencias, una vez que el servidor de Vite nuevo está listo. Si coincide con la creación o eliminación de una ruta, crea una sola aplicación.
 
-Editar un canal Socket existente o cambiar `meeko.config.ts` sigue exigiendo reiniciar `npm run dev`. Los tipos y manifiestos de `.meeko/` no se regeneran en `meeko dev`: ejecute `npm run check` para actualizarlos.
+Editar un canal Socket existente, cambiar `meeko.config.ts` o editar el código de `setup` de un módulo sigue exigiendo reiniciar `npm run dev` (los archivos de runtime de un módulo, como sus plugins o componentes, se recargan como los del proyecto). Los tipos y manifiestos de `.meeko/` no se regeneran en `meeko dev`: ejecute `npm run check` para actualizarlos.
 
 El observador de archivos de Vite ignora todo `.meeko/` salvo `.meeko/generated`, las entradas que sirve. Así, `meeko check`, el servidor de lenguaje o un build que escriben en `.meeko/check`, `routes`, `types`, `manifests`, `output`, `build` o en los `tsconfig.*` generados mientras corre `meeko dev` no recargan el navegador, y el escaneo de dependencias de Vite tampoco entra en `.meeko/`.
 
@@ -117,6 +126,213 @@ const link = href("/users/[id]", { params: { id: user.id }, search: { tab: "prof
 ```
 
 Fuera de una aplicación (por ejemplo, en una prueba unitaria sin app) la forma corta lanza un error; ahí se pasa el manifiesto con `href(routes, id, options)`, que se mantiene igual.
+
+## Layers
+
+Un layer es una carpeta del proyecto con la misma estructura que la aplicación: su `app/pages`, sus componentes y autoimports (`app/components`, `app/composables`, `app/utils`, `app/stores`, `shared/` y `server/utils`) y, desde `1.2`, sus plugins de `app/plugins`. Use layers para una base compartida (diseño, páginas comunes) o para dividir una aplicación grande por áreas.
+
+```ts
+export default defineMeekoConfig({
+  layers: ["./layers/base", "./layers/admin"],
+});
+```
+
+El orden de las fuentes es: la aplicación, `extends`, `layers`, las carpetas de layer que quedan en `modules` (véase más abajo) y los layers que añaden los módulos con `meeko.addLayer`. Cada layer necesita su carpeta `app/pages` y un nombre de carpeta en minúsculas, dígitos y guiones que no se repita; aparece con ese nombre en los diagnósticos. Las rutas de `layers` y `extends` deben vivir dentro del proyecto, también después de resolver los enlaces.
+
+Las páginas de un layer se muestran dentro del shell del proyecto: `app/app.meeko` y el layout raíz de la aplicación (`app/layouts/default.meeko` o `app/pages/+layout.meeko`) envuelven también a las páginas de los layers, y los `+layout.meeko` propios del layer se anidan dentro. Si el proyecto tiene `app.meeko` o layout raíz, sustituyen a los equivalentes del layer; si no, se usan los del layer. Una página de layer que falla usa el `+error.meeko` más cercano de su propio árbol, después el `app/error.meeko` del layer y, por último, la página de error raíz del proyecto. La `404` de una URL sin ruta siempre usa la del proyecto. Los módulos de rutas programáticos (`RouteModule.routes()` de `composeFrameworkRoutes`) siguen declarando sus propios layouts. El manifiesto rechaza colisiones de URL y el registro rechaza nombres de autoimport repetidos; el diagnóstico incluye los archivos en conflicto.
+
+`extends` es el nombre que tenía `layers` hasta `1.1` y sigue funcionando en `1.x`, sin aviso; sus carpetas van antes que las de `layers`.
+
+### Carpetas en `modules` (deprecado)
+
+Hasta `1.1`, `modules` también listaba carpetas con `app/pages`, que se comportaban como layers. Desde `1.2`, `modules` es para [módulos](#módulos). Una cadena de `modules` que apunta a una carpeta con `app/pages` y sin módulo (sin `package.json` ni `index.ts`) sigue funcionando como layer durante toda la serie `1.x`, en la misma posición que antes. `meeko dev`, `meeko build` y `meeko check` escriben una vez por proceso:
+
+```text
+[meeko] Aviso: "./modules/auth" en modules de meeko.config.ts es una carpeta de layer (tiene app/pages y no es un módulo). Muévela a layers: ["./modules/auth"]; las carpetas en modules dejarán de funcionar en Meeko 2.0.
+```
+
+Para migrar, mueva la cadena de `modules` a `layers`. Una carpeta de layer no admite opciones: `["./modules/auth", { … }]` es un error.
+
+## Módulos
+
+Un módulo configura el proyecto desde código, como los módulos de Nuxt: añade componentes, autoimports, plugins, middleware y handlers de servidor, entradas de `<head>`, archivos públicos y plugins de Vite, y reacciona a los hooks del build. Se crea con `defineMeekoModule` y se lista en `modules`:
+
+```ts
+// meeko.config.ts
+import { defineMeekoConfig } from "@meekojs/meeko/framework";
+import hello from "./modules/hello/index.ts";
+
+export default defineMeekoConfig({
+  modules: [
+    hello,                                  // un módulo importado
+    "@acme/meeko-seo",                      // un paquete, resuelto desde el proyecto
+    ["./modules/theme", { initial: "dark" }], // una ruta y opciones en línea
+  ],
+  hello: { greeting: "Hola" },              // opciones en la clave del módulo (meta.configKey)
+});
+```
+
+Una cadena es un nombre de paquete (con o sin subruta) o una ruta relativa al proyecto: un archivo, o una carpeta con `package.json` (su export `import`/`default`) o con `index.ts`, `index.mts`, `index.js` o `index.mjs`. El export por defecto debe ser el resultado de `defineMeekoModule`. Las opciones se combinan así: `defaults` del módulo, después `config[meta.configKey]` y por último las de `[módulo, opciones]`; los objetos planos se combinan en profundidad y los arrays se sustituyen. Dos módulos con el mismo `meta.name` son un error. Con `meta.compatibility.meeko` (un rango de npm, como `">=1.2"` o `"^1.2.0"`), la carga falla si la versión de Meeko queda fuera.
+
+### Escribir un módulo
+
+El `setup` se ejecuta en Node, una vez por configuración y proceso, al cargar la configuración: en `meeko dev`, `meeko build`, `meeko check` y en el servidor de lenguaje de un workspace de confianza. Nunca llega al navegador. Recibe las opciones combinadas y el objeto `meeko`. Las rutas que recibe `meeko` pueden ser absolutas, URL `file:` (`new URL("./x", import.meta.url)`, lo habitual en un paquete) o relativas a la raíz del proyecto.
+
+```ts
+// modules/theme/index.ts
+import { defineMeekoModule } from "@meekojs/meeko/framework";
+
+export interface ThemeOptions {
+  initial: "light" | "dark";
+  storageKey: string;
+}
+
+// Tipa la clave `theme` de meeko.config.ts.
+declare module "@meekojs/meeko/framework" {
+  interface MeekoConfig {
+    readonly theme?: Partial<ThemeOptions>;
+  }
+}
+
+export default defineMeekoModule<ThemeOptions>({
+  meta: { name: "@acme/meeko-theme", configKey: "theme", compatibility: { meeko: ">=1.2" } },
+  defaults: { initial: "light", storageKey: "theme" },
+  setup(options, meeko) {
+    const here = (path: string) => new URL(path, import.meta.url);
+    // <ThemeToggle /> en cualquier componente, sin import.
+    meeko.addComponentsDir(here("./components"), { prefix: "Theme" });
+    // useTheme() sin import, en componentes y en app/.
+    meeko.addAutoImports({ name: "useTheme", from: here("./runtime/use-theme.ts") });
+    // Publica la señal del tema antes de hidratar; las opciones llegan al plugin.
+    meeko.addPlugin({ src: here("./runtime/theme.plugin.ts"), options: { initial: options.initial, storageKey: options.storageKey } });
+    // Aplica el tema guardado antes de pintar, sin parpadeo.
+    meeko.addHead({
+      script: [{ key: "theme", children: `document.documentElement.dataset.theme = localStorage.getItem(${JSON.stringify(options.storageKey)}) ?? ${JSON.stringify(options.initial)};` }],
+    });
+  },
+});
+```
+
+```ts
+// modules/theme/runtime/use-theme.ts
+import { createContext, inject } from "@meekojs/meeko";
+import type { Signal } from "@meekojs/meeko";
+
+export const themeKey = createContext<Signal<"light" | "dark">>("theme");
+
+export function useTheme(): Signal<"light" | "dark"> {
+  return inject(themeKey);
+}
+```
+
+```ts
+// modules/theme/runtime/theme.plugin.ts
+import { effect, signal } from "@meekojs/meeko";
+import { definePlugin } from "@meekojs/meeko/framework";
+import { themeKey } from "./use-theme.ts";
+
+export default definePlugin<{ initial: "light" | "dark"; storageKey: string }>((app, options) => {
+  // El mismo valor inicial en el servidor y en el navegador, para que la hidratación coincida.
+  const theme = signal(options.initial);
+  app.provide(themeKey, theme);
+  if (app.side === "client") {
+    let first = true;
+    effect(() => {
+      const value = theme.value;
+      // El script de <head> ya aplicó el tema guardado; después, cada cambio se aplica y se guarda.
+      if (first) { first = false; return; }
+      document.documentElement.dataset.theme = value;
+      localStorage.setItem(options.storageKey, value);
+    });
+  }
+});
+```
+
+Un módulo de SEO genera `sitemap.xml` a partir de las rutas y `robots.txt`:
+
+```ts
+import { defineMeekoModule } from "@meekojs/meeko/framework";
+
+export default defineMeekoModule<{ siteUrl: string }>({
+  meta: { name: "@acme/meeko-seo", configKey: "seo" },
+  setup(options, meeko) {
+    let routes: readonly { id: string }[] = [];
+    meeko.hooks.hook("routes:resolved", (context) => { routes = context.routes; });
+    meeko.addPublicFile("robots.txt", `User-agent: *\nAllow: /\nSitemap: ${options.siteUrl}/sitemap.xml\n`);
+    // Una función se evalúa al escribir el build (y en cada petición en dev), con las rutas ya descubiertas.
+    meeko.addPublicFile("sitemap.xml", () => [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+      ...routes.filter((route) => !route.id.includes("[")).map((route) => `<url><loc>${options.siteUrl}${route.id}</loc></url>`),
+      "</urlset>",
+    ].join("\n"));
+  },
+});
+```
+
+Los archivos de runtime de un módulo (plugins, componentes, autoimports, middleware y handlers) los procesa Vite como los del proyecto, pero fuera de las carpetas de la aplicación no reciben autoimports: impórtelos de forma explícita. Los componentes `.meeko` de `addComponentsDir` sí reciben los autoimports del proyecto.
+
+### El objeto `meeko`
+
+| Miembro | Qué hace |
+| --- | --- |
+| `rootDir`, `dev`, `config` | Carpeta del proyecto, `true` en `meeko dev` y la configuración cargada. |
+| `addLayer(dir)` | Añade un layer, después de los de `layers`. Debe tener `app/pages` y estar dentro del proyecto; un paquete instalado en `node_modules` lo está, también con pnpm. |
+| `addComponentsDir(dir, { prefix })` | Autoimporta los `.meeko` de la carpeta y sus subcarpetas, con el nombre en PascalCase tras el prefijo (`components/toggle.meeko` con `prefix: "Theme"` es `ThemeToggle`). |
+| `addAutoImports(entries)` | Autoimporta exports de un paquete o archivo: `{ name, as?, from, type?, scope? }`; `scope` es `"app"` por defecto (componentes y `app/`, en el navegador y en SSR), `"client"`, `"server"` o `"shared"`. |
+| `addAutoImportsDir(dir, { scope })` | Autoimporta los exports de los `.ts` de una carpeta, con ámbito `"app"`, `"server"` o `"shared"`; los sufijos `.client.ts`, `.server.ts` y `.shared.ts` mandan. |
+| `addPlugin({ src, mode?, options? })` | Añade un [plugin de aplicación](#plugins-de-aplicación). `mode` sale del sufijo del archivo o es `"universal"`. `options` debe ser JSON y llega al navegador si el plugin se ejecuta allí. |
+| `addServerMiddleware(file)` | Añade un middleware como los de `server/middleware`; los de los módulos van antes que los del proyecto. |
+| `addServerHandler({ route, handler })` | Atiende una ruta exacta con el export por defecto de `handler`, `(request) => Response`, después del middleware de servidor. |
+| `addPublicFile(path, contents)` | Añade un archivo público. `meeko build` lo escribe en la salida del cliente, antes de calcular el manifiesto de assets; `meeko dev` lo sirve. Choca con un archivo de `public/` del mismo nombre. |
+| `addHead(input)` | Añade entradas a `document.head`: `meta`, `link`, `script` y `style` se concatenan en el orden de los módulos; `title`, `titleTemplate`, `htmlAttrs` y `bodyAttrs` se quedan con el último valor; `document.head` del proyecto se aplica al final. |
+| `addVitePlugin(plugin)` | Añade un plugin de Vite a `meeko dev` y a cada build de `meeko build`, después del de Meeko. |
+| `extendViteConfig(fn)` | Modifica la configuración inline de Vite de cada paso; `fn(config, { command, ssr })` cambia el objeto o devuelve otro. |
+| `hooks.hook(name, fn)` | Registra un [hook](#hooks). |
+| `warn(message)` | Escribe un aviso con el nombre del módulo. |
+
+Un host de Vite propio que sólo usa el plugin `meeko()` recibe los autoimports, componentes, layers y plugins de aplicación de los módulos, pero no sus `addVitePlugin`, `extendViteConfig`, archivos públicos ni hooks: esos los aplican `meeko dev` y `meeko build`.
+
+Meeko no tiene un `runtimeConfig` aparte: un módulo pasa valores a su runtime con las `options` de `addPlugin` (públicas si el plugin llega al navegador), y los secretos se leen en el servidor de las variables de entorno o de `server/runtime.ts`.
+
+### Hooks
+
+| Hook | Cuándo | Contexto |
+| --- | --- | --- |
+| `ready` | Todos los módulos terminaron su `setup`. | — |
+| `routes:resolved` | Antes del build del cliente en `meeko build`; al arrancar y en cada redescubrimiento en `meeko dev`. | `{ routes }`, el manifiesto con rutas de archivo absolutas. |
+| `build:before` | Al empezar `meeko build`. | `{ adapter, output }`, la carpeta absoluta del adaptador. |
+| `prerender:routes` | Antes de prerenderizar, en `meeko build` y `meeko prerender`. | `{ urls }`: los `pathname` que se van a prerenderizar; el hook puede añadir o quitar entradas, que deben corresponder a una ruta. |
+| `build:done` | Al terminar `meeko build`, prerender incluido. | `{ adapter, output }`; el módulo puede escribir más archivos en `output`. |
+
+Los hooks se ejecutan en el orden en que se registraron y Meeko espera a cada uno. `hook()` devuelve una función que lo quita.
+
+### Plugins de aplicación
+
+Los archivos de `app/plugins` (de la aplicación y de sus layers) y los que añaden los módulos se ejecutan al arrancar la aplicación. Cada uno exporta por defecto `definePlugin`:
+
+```ts
+// app/plugins/analytics.client.ts
+import { definePlugin } from "@meekojs/meeko/framework";
+
+export default definePlugin((app) => {
+  effect(() => navigator.sendBeacon("/api/visits", app.route.path.value));
+  app.onError((error, info) => console.error("[app]", info.side, error));
+});
+```
+
+- **Dónde.** `*.client.ts` sólo en el navegador, una vez, antes de la hidratación. `*.server.ts` sólo en el servidor, una vez por petición de página, antes del render (también al prerenderizar; no en las páginas ya prerenderizadas, ni en API, RPC o handlers). Un `.ts` sin sufijo, en los dos. Sólo cuentan los archivos que están directamente en `app/plugins`; las subcarpetas pueden guardar sus auxiliares. Se excluyen `*.test.ts`, `*.spec.ts` y `*.d.ts`.
+- **Orden.** Los de los módulos, en el orden en que los añaden; después los de cada layer y los de la aplicación, por nombre de archivo. Meeko espera a cada `setup`, que puede ser asíncrono.
+- **`app.provide(key, value)`.** Publica un valor para todos los componentes de la aplicación, que lo leen con `inject(key)` (y el composable que lo envuelva): las páginas, layouts, `app.meeko`, la página de error y las páginas a las que se navega en el navegador. En el servidor el valor es de esa petición: no comparta estado mutable entre peticiones. Un componente que se hidrata debe recibir el mismo valor en el servidor y en el navegador; por eso los valores que se renderizan suelen venir de un plugin universal.
+- **`app.onError(handler)`.** En el navegador, el observador recibe lo mismo que `mountClientApp({ onError })` (navegación, Socket y eventos, efectos y limpiezas sin un `provideErrorHandler` más cercano), con `{ side: "client", source }`. En el servidor recibe los fallos del render de esa petición, con `{ side: "server", requestId }`, además del `onError` de `server/runtime.ts`.
+- **`app.route`.** La ruta, como `useRoute()`. En el servidor es la de la petición; en el navegador sigue a la ruta confirmada, así que un `effect` que la lee se repite al navegar. `app.request` es la petición en el servidor y `undefined` en el navegador; `app.side` dice dónde se ejecuta.
+- **Fallos.** Un plugin que lanza en el servidor hace fallar la petición, que muestra la página de error sin los valores de los plugins. En el navegador, la hidratación no llega a empezar y la página se queda con el HTML del servidor.
+
+Un host propio pasa los plugins a `mountClientApp({ plugins })` y a `createServerApp({ plugins })` o `createFrameworkHandler({ plugins })`, como `PluginRegistration`s (`{ plugin, options?, name? }`).
+
+### Límites entre servidor y cliente
+
+El `setup` de un módulo y su entrada nunca llegan al bundle del navegador, y tampoco sus plugins `"server"`, su middleware, sus handlers, sus carpetas de autoimports con `scope: "server"` ni los `*.server.ts` de las carpetas del módulo. El plugin de Vite de Meeko rechaza el build si el grafo del cliente los alcanza (`Server-only module reached the client bundle`), y si un archivo que el navegador carga importa `defineMeekoModule` (`Meeko module setup reached the client bundle`): sólo `meeko.config.ts` debe importar los módulos. Las opciones de un plugin que se ejecuta en el navegador sí viajan en el bundle del cliente.
 
 ## Middleware de rutas y servidor
 
@@ -156,7 +372,7 @@ export default defineServerMiddleware(async (request, next) => {
 });
 ```
 
-Este pipeline envuelve páginas SSR y `/api` y `/_meeko/rpc`; los assets estáticos, el servidor de desarrollo Vite y los upgrades WebSocket tienen sus propios handlers. Los archivos `*.test.ts`, `*.spec.ts`, `*.d.ts` y `*.client.ts` se excluyen. El descubrimiento automático de middleware se limita por ahora al proyecto raíz: `extends` y `modules` aportan rutas y autoimports, pero sus carpetas `app/middleware` y `server/middleware` no participan. Editar un archivo de middleware existente invalida módulos y recarga el navegador en desarrollo; al añadir o quitar uno, `meeko dev` recrea la aplicación sin reiniciar (véase [Configuración, módulos y layers](#configuración-módulos-y-layers)). `npm run check` comprueba los tipos en sus ámbitos respectivos.
+Este pipeline envuelve páginas SSR y `/api` y `/_meeko/rpc`; los assets estáticos, el servidor de desarrollo Vite y los upgrades WebSocket tienen sus propios handlers. Los archivos `*.test.ts`, `*.spec.ts`, `*.d.ts` y `*.client.ts` se excluyen. El descubrimiento automático de middleware se limita por ahora al proyecto raíz: los layers aportan rutas, autoimports y plugins, pero sus carpetas `app/middleware` y `server/middleware` no participan. Un módulo añade middleware de servidor con `meeko.addServerMiddleware`, que se ejecuta antes que el del proyecto (véase [Módulos](#módulos)). Editar un archivo de middleware existente invalida módulos y recarga el navegador en desarrollo; al añadir o quitar uno, `meeko dev` recrea la aplicación sin reiniciar (véase [Configuración](#configuración)). `npm run check` comprueba los tipos en sus ámbitos respectivos.
 
 Los callbacks `onNavigationError` pueden devolver una promesa: si el observador falla, Meeko registra tanto el fallo del observador como el error de navegación original sin generar un rechazo sin manejar. Los observadores `onError` del servidor tampoco modifican la respuesta cuando lanzan o rechazan; el registro de respaldo incluye el `requestId` disponible y categorías de error, sin mensajes privados.
 
@@ -166,7 +382,7 @@ Si un middleware servidor llama a `next()`, Meeko espera también ese trabajo au
 
 ## Routing, layouts y SSR
 
-`app/pages` admite `index.meeko`, `[id].meeko`, `[...slug].meeko`, grupos `(group)`, `+error.meeko` y, para las opciones de ruta, un bloque `<script server>` en la página o un sidecar `*.route.ts`. El layout compartido vive en `app/layouts/default.meeko` y recibe `props.outlet`; el navegador lo conserva entre rutas y libera las páginas salientes. Los `+layout.meeko` junto a páginas siguen admitidos para proyectos anteriores y layouts anidados; no se puede combinar uno en la raíz de `app/pages` con `app/layouts/default.meeko`. Un layer o módulo usa las mismas convenciones. `href` comprueba IDs y parámetros a partir del manifiesto generado.
+`app/pages` admite `index.meeko`, `[id].meeko`, `[...slug].meeko`, grupos `(group)`, `+error.meeko` y, para las opciones de ruta, un bloque `<script server>` en la página o un sidecar `*.route.ts`. El layout compartido vive en `app/layouts/default.meeko` y recibe `props.outlet`; el navegador lo conserva entre rutas y libera las páginas salientes. Los `+layout.meeko` junto a páginas siguen admitidos para proyectos anteriores y layouts anidados; no se puede combinar uno en la raíz de `app/pages` con `app/layouts/default.meeko`. Un layer usa las mismas convenciones. `href` comprueba IDs y parámetros a partir del manifiesto generado.
 
 El tipo del outlet en `app/app.meeko` y en cada layout es `Component<Record<string, unknown>>` importado desde `@meekojs/meeko`. Incluye `renderWithState`, requerido por `<component is="props.outlet">` para transferir el estado SSR; el starter generado usa este contrato.
 
@@ -583,7 +799,7 @@ Los schemas `params` de API deben describir exactamente los segmentos dinámicos
 
 Los schemas públicos de API, RPC y Socket deben exponer tipos Standard Schema concretos: la generación rechaza `any`, `unknown` y `never` tanto en la entrada como en la salida, incluso cuando aparecen anidados, y también parámetros genéricos que no quedan resueltos en el contrato exportado. Concrete esos parámetros y modele explícitamente el tipo público antes de generar clientes. El manifiesto también rechaza nombres que no puedan representarse sin ambigüedad en el cliente. Por ejemplo, `server/api/users/index.get.ts` (`api.users.get()`) no puede coexistir con `server/api/users/get.post.ts` (`api.users.get.post()`), ni `server/rpc/users.ts` con `server/rpc/users/get.ts`. `server/api/index.<method>.ts` se rechaza porque produciría una clave cliente vacía. Cada diagnóstico incluye las rutas en conflicto; no hay sobrescrituras silenciosas.
 
-`meeko check .` genera proyectos TypeScript separados para cliente, servidor y shared. Incluye las fuentes de los layers y módulos declarados en `meeko.config.ts`, aunque sus rutas no usen los nombres convencionales `layers/` o `modules/`. Un archivo `*.server.ts` de `app/` se comprueba en el proyecto servidor y uno `*.shared.ts` en el proyecto shared; los archivos con sufijo de ámbito conservan esa selección también dentro de `shared/` y `server/`.
+`meeko check .` genera proyectos TypeScript separados para cliente, servidor y shared. Incluye las fuentes de los layers declarados en `meeko.config.ts` (también los que añaden los módulos), aunque sus rutas no usen el nombre convencional `layers/`, y los componentes de `addComponentsDir` de los módulos que viven dentro del proyecto fuera de `node_modules`. Un archivo `*.server.ts` de `app/` se comprueba en el proyecto servidor y uno `*.shared.ts` en el proyecto shared; los archivos con sufijo de ámbito conservan esa selección también dentro de `shared/` y `server/`.
 
 Los errores de API y RPC se normalizan en el servidor: un `ApiError` conserva `code` y `status`, la respuesta añade `requestId` y `x-request-id`, y un fallo desconocido se devuelve como `INTERNAL_ERROR` sin exponer su mensaje. La misma normalización se aplica al despacho local SSR y al transporte Node, incluso cuando Vite carga módulos en grafos distintos. La navegación que solicita `application/meeko+json` recibe el mismo formato; una página HTML de error conserva el estado HTTP y `x-request-id` sin incluir detalles privados. El servidor generado observa los fallos 5xx: en producción registra tipo e ID, y en desarrollo muestra también el error original. Las respuestas 4xx esperadas no se registran como fallos internos.
 

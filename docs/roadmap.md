@@ -30,7 +30,7 @@ Todas estas ampliaciones son aditivas. Pueden llegar en un minor sin romper apli
 - **Enviar el HTML antes del loader.** Hoy una página `"stream"` espera al loader crítico antes del primer byte. La ampliación enviaría antes el inicio del documento (`<head>`, estilos y entrada cliente).
 - **Shell SPA puramente estático.** Una aplicación cuyas páginas son todas `render: "client"` podría servirse como archivos estáticos, sin servidor que ejecute middleware ni layouts.
 - **Rendimiento de hidratación de listas.** La [comparativa con Vue](benchmarks.md#escenarios-ampliados-árbol-lista-y-navegación) muestra la hidratación de listas por encima de Vue, y también falta acelerar el montaje completo de vistas. Es trabajo de rendimiento: no cambia la API.
-- **Middleware de layers y módulos.** Hoy el descubrimiento de `app/middleware` y `server/middleware` se limita al proyecto raíz.
+- **Middleware de layers.** Hoy el descubrimiento de `app/middleware` y `server/middleware` se limita al proyecto raíz; desde `1.2`, un módulo puede añadir middleware de servidor con `meeko.addServerMiddleware`.
 - **Contenido inline en `<component>`.** Es una sintaxis para pasar contenido dentro de la etiqueta, como alternativa a una prop `Component<Props>`.
 - **Extensiones en las tiendas.** Falta dar de alta las cuentas y secretos que necesitan los workflows ya preparados ([releasing.md](releasing.md#publicación-en-las-tiendas-de-extensiones)).
 

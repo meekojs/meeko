@@ -1,0 +1,6 @@
+<template>
+  <section class="hello-page">
+    <h1>Hello from the module layer</h1>
+    <HelloBadge />
+  </section>
+</template>

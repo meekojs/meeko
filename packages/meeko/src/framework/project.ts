@@ -4,9 +4,9 @@ import { existsSync, realpathSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { Server } from "node:http";
-import { extname, join, relative, resolve, sep } from "node:path";
+import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { ViteDevServer } from "vite";
+import type { InlineConfig, ViteDevServer } from "vite";
 import { escapeHtml } from "../server.js";
 import { attachNodeWebSocketServer, toNodeListener } from "../node.js";
 import type { ServerApp, ServerAppOptions } from "../framework-server/app.js";
@@ -14,7 +14,9 @@ import type { AssetManifest, AssetRecord } from "../framework-server/assets.js";
 import { reportServerError } from "../framework-server/contracts.js";
 import { buildDataFile, frameworkClientEntry, frameworkNodeEntry, frameworkServerEntry } from "./app-manifest.js";
 import type { BuildAppData } from "./app-manifest.js";
-import { loadMeekoConfig, resolveConfigSources } from "./config.js";
+import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./config.js";
+import { setModuleDevelopmentMode } from "./module-loader.js";
+import type { ResolvedModules } from "./module-loader.js";
 import { createDevAppReloader, isDiscoverySource } from "./dev-watch.js";
 import { supervisedHmrPortEnv, supervisedPortEnv } from "./dev-link.js";
 import { devHmrHost, devPortInUse, resolveDevPorts } from "./dev-port.js";
@@ -210,12 +212,17 @@ export interface BuildProjectResult {
  */
 export async function buildProject(projectRoot: string, options: BuildProjectOptions = {}): Promise<BuildProjectResult> {
   const root = resolve(projectRoot);
-  const config = await loadMeekoConfig(root);
+  const { config, modules } = await loadConfiguredModules(root);
   const adapter = assertBuildAdapter(options.adapter ?? config.server?.adapter ?? "node");
   assertNoLegacySessionFile(root);
+  const outputDirectory = adapterOutput(adapter);
+  const output = resolve(root, outputDirectory);
+  await modules.callHook("build:before", { adapter, output });
   await prepareProject(root);
-  const { build } = await import("vite");
+  await modules.callHook("routes:resolved", { routes: await discoverConfiguredRoutes(root) });
+  const vite = await import("vite");
   const { meeko } = await import("../vite.js");
+  const build = (base: InlineConfig): ReturnType<typeof vite.build> => vite.build(withModules(modules, base, "build"));
   await build({
     root, configFile: false, plugins: [meeko()], logLevel: "warn",
     build: {
@@ -223,6 +230,8 @@ export async function buildProject(projectRoot: string, options: BuildProjectOpt
       rollupOptions: { input: frameworkClientEntry },
     },
   });
+  // Module public files join the client build before its asset manifest is computed.
+  await writeModulePublicFiles(resolve(root, clientOutput), modules);
   const server = config.server?.adapter === "node" ? config.server : undefined;
   const viteManifest = await readViteManifest(root);
   const data: BuildAppData = {
@@ -244,8 +253,6 @@ export async function buildProject(projectRoot: string, options: BuildProjectOpt
       rollupOptions: { output: { entryFileNames: "index.mjs", chunkFileNames: "chunks/[name]-[hash].mjs" } },
     },
   });
-  const outputDirectory = adapterOutput(adapter);
-  const output = resolve(root, outputDirectory);
   if (adapter === "bun" || adapter === "deno") {
     const target = bundledAdapters[adapter];
     await writeFile(resolve(root, target.entry), target.source, "utf8");
@@ -297,7 +304,40 @@ export async function buildProject(projectRoot: string, options: BuildProjectOpt
   });
   const prerenderOutput = adapter === "cloudflare" ? cloudflarePrerenderDirectory : "prerender";
   await prerenderWithNodeBuild(root, `${nodeTarget}/index.mjs`, `${outputDirectory}/${prerenderOutput}`);
+  await modules.callHook("build:done", { adapter, output });
   return { adapter, output };
+}
+
+function safeDecode(pathname: string): string {
+  try { return decodeURIComponent(pathname); }
+  catch { return pathname; }
+}
+
+/**
+ * The inline Vite configuration of a `meeko dev` or `meeko build` step with what the modules add:
+ * their plugins after Meeko's, then each `extendViteConfig` in order.
+ */
+function withModules(modules: ResolvedModules, base: InlineConfig, command: "serve" | "build"): InlineConfig {
+  let config: Record<string, any> = modules.vitePlugins.length ? { ...base, plugins: [...base.plugins ?? [], ...modules.vitePlugins] } : base;
+  const ssr = Boolean((base.build as { ssr?: unknown } | undefined)?.ssr);
+  for (const extend of modules.viteExtenders) config = extend(config, { command, ssr }) ?? config;
+  return config as InlineConfig;
+}
+
+async function publicFileContents(contents: ResolvedModules["publicFiles"] extends ReadonlyMap<string, infer T> ? T : never): Promise<string | Uint8Array> {
+  const value = typeof contents === "function" ? await contents() : contents;
+  if (typeof value !== "string" && !(value instanceof Uint8Array)) throw new TypeError("A module public file must produce a string or bytes");
+  return value;
+}
+
+/** Writes the public files of the modules into the client build; one that `public/` also has is an error. */
+async function writeModulePublicFiles(directory: string, modules: ResolvedModules): Promise<void> {
+  for (const [path, contents] of modules.publicFiles) {
+    const target = join(directory, ...path.split("/"));
+    if (existsSync(target)) throw new Error(`El archivo público ${path} de un módulo choca con public/${path}`);
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, await publicFileContents(contents));
+  }
 }
 
 const runtimes = {
@@ -392,7 +432,9 @@ export async function startProject(projectRoot: string, production: boolean): Pr
 
 async function startDevelopment(root: string): Promise<Server> {
   assertNoLegacySessionFile(root);
-  const config = await loadMeekoConfig(root);
+  // Every module resolution of this process (Vite plugin, autoimports, discovery) runs with dev: true.
+  setModuleDevelopmentMode(true);
+  const { config, modules } = await loadConfiguredModules(root);
   const server = config.server?.adapter === "node" ? config.server : undefined;
   const host = process.env.HOST || server?.host || "127.0.0.1";
   // A port named by PORT or server.port (or the one a supervisor's first server took) is kept, and
@@ -420,9 +462,9 @@ async function startDevelopment(root: string): Promise<Server> {
     });
   };
   try {
-    const { createServer: createViteServer } = await import("vite");
+    const { createServer: createViteServer, searchForWorkspaceRoot } = await import("vite");
     const { meeko } = await import("../vite.js");
-    vite = await createViteServer({
+    vite = await createViteServer(withModules(modules, {
       root, configFile: false,
       plugins: [meeko(), {
         name: "meeko:editor-bridge",
@@ -467,9 +509,11 @@ async function startDevelopment(root: string): Promise<Server> {
         // Middleware mode opens a separate Vite WebSocket server, on a port derived
         // from the app port so concurrent projects do not share 24678.
         hmr: { host: devHmrHost, port: hmrPort },
+        // Module files may live outside the workspace (a linked package); the browser loads their runtime files.
+        ...(modules.ownedDirectories.length ? { fs: { allow: [searchForWorkspaceRoot(root), ...modules.ownedDirectories] } } : {}),
       },
       appType: "custom",
-    });
+    }, "serve"));
     const globalCss = resolve(root, "app/styles/main.css");
     const globalStylesheet = (): string => {
       // Vite names the module by its real path with forward slashes, as the client entry imports it.
@@ -481,6 +525,7 @@ async function startDevelopment(root: string): Promise<Server> {
     const devServer = vite;
     const publicOrigin = process.env.PUBLIC_ORIGIN || undefined;
     const createDevApp = async (): Promise<ServerApp> => {
+      await modules.callHook("routes:resolved", { routes: await discoverConfiguredRoutes(root) });
       const entry = await devServer.ssrLoadModule(`/${frameworkServerEntry}`) as { createApp(options: Omit<ServerAppOptions, "manifest" | "load" | "runtime">): Promise<ServerApp> };
       return entry.createApp({
         production: false,
@@ -504,8 +549,23 @@ async function startDevelopment(root: string): Promise<Server> {
     const httpServer = createServer((request, response) => {
       if (bridge?.handle(request, response)) return;
       // Vite cannot route a malformed target; the Meeko listener answers it with INVALID_URL.
-      try { new URL(request.url || "/", "http://localhost"); }
+      let pathname: string;
+      try { pathname = new URL(request.url || "/", "http://localhost").pathname; }
       catch { listener(request, response); return; }
+      // Public files of the modules, as the build writes them into the client output.
+      const publicFile = modules.publicFiles.size && (request.method === "GET" || request.method === "HEAD")
+        ? modules.publicFiles.get(safeDecode(pathname).replace(/^\/+/, "")) : undefined;
+      if (publicFile !== undefined) {
+        void publicFileContents(publicFile).then((body) => {
+          response.writeHead(200, { "content-type": contentTypes[extname(pathname).toLowerCase()] ?? "application/octet-stream", "cache-control": "no-cache" });
+          response.end(request.method === "HEAD" ? undefined : body);
+        }, (error: unknown) => {
+          reportError(error, randomUUID());
+          response.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
+          response.end("Internal Server Error");
+        });
+        return;
+      }
       devServer.middlewares(request, response, () => listener(request, response));
     });
     const visibleHost = host === "0.0.0.0" ? "127.0.0.1" : host;

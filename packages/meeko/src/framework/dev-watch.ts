@@ -2,10 +2,10 @@ import { isAbsolute, relative } from "node:path";
 
 /**
  * Files whose addition or removal changes what Meeko discovers: routes,
- * layouts, error pages, route middleware and the server API, RPC, Socket and
- * middleware modules. Paths are relative to a source root, with `/`.
+ * layouts, error pages, route middleware, app plugins and the server API, RPC,
+ * Socket and middleware modules. Paths are relative to a source root, with `/`.
  */
-const discoveryPath = /^(?:app\/(?:pages|layouts|middleware)\/|app\/(?:app|error)\.meeko$|server\/(?:api|rpc|socket|middleware)\/)/;
+const discoveryPath = /^(?:app\/(?:pages|layouts|middleware|plugins)\/|app\/(?:app|error)\.meeko$|server\/(?:api|rpc|socket|middleware)\/)/;
 
 /** Whether `file` is a discovery input of one of `sourceRoots` (the project and its layers or modules). */
 export function isDiscoverySource(file: string, sourceRoots: readonly string[]): boolean {

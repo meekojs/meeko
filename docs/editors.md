@@ -119,7 +119,7 @@ Se envían en `initializationOptions` de la petición `initialize`. Todas son op
 
 | Opción | Por defecto | Efecto |
 | --- | --- | --- |
-| `trusted` | `true` | Con `true`, el servidor ejecuta `meeko.config.*` del proyecto con Node para conocer sus autoimports y comprueba los contratos de páginas y layouts al guardar. Con `false` no ejecuta código del proyecto: lee la configuración de forma estática (sólo listas literales) y omite los contratos. |
+| `trusted` | `true` | Con `true`, el servidor ejecuta `meeko.config.*` del proyecto con Node, también el `setup` de sus [módulos](framework.md#módulos), para conocer sus autoimports, componentes y layers, y comprueba los contratos de páginas y layouts al guardar. Con `false` no ejecuta código del proyecto: lee la configuración de forma estática (sólo listas literales; de `modules`, sólo las carpetas de layer), así que los autoimports y componentes de los módulos no existen para el editor, y omite los contratos. |
 | `projectContracts` | `true` | `false` desactiva la comprobación de contratos de páginas (`MEEK_PAGE_PROPS`, `MEEK_LAYOUT_PROPS`, `MEEK_ERROR_PROPS`) al guardar. |
 | `diagnosticsDelay` | `300` | Milisegundos de espera tras una edición antes de comprobar el componente. |
 | `format` | `{}` | Ajustes de formato para clientes sin `workspace/configuration`, por ejemplo `{ "indentSections": true }`. Si el cliente admite esa petición, prevalece su sección `meeko.format`. |

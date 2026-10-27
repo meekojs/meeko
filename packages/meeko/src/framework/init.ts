@@ -13,7 +13,7 @@ body { margin: 0; }
   "meeko.config.ts": `import { defineMeekoConfig } from "@meekojs/meeko/framework";
 
 export default defineMeekoConfig({
-  extends: [],
+  layers: [],
   modules: [],
   imports: { serverDirs: [] },
 });
