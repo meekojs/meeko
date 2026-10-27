@@ -782,7 +782,9 @@ Al migrar código que no usaba esas opciones estrictas, cambie imports usados s�
 
 ## API y RPC
 
-Los archivos `server/api/users/index.get.ts`, `index.post.ts` y `[id].get.ts` crean `/api/users` y `/api/users/:id`. Los procedimientos bajo `server/rpc/users/get.ts` crean `/_meeko/rpc/users/get`. Los schemas públicos residen en `shared/`; Valibot implementa Standard Schema. Los handlers usan `defineApiRoute` y `defineRpc`, y el servidor valida entrada, salida, sesión, autorización y CSRF.
+Los archivos `server/api/users/index.get.ts`, `index.post.ts` y `[id].get.ts` crean `/api/users` y `/api/users/:id`. Los procedimientos bajo `server/rpc/users/get.ts` crean `/_meeko/rpc/users/get`. Los schemas públicos residen en `shared/`. Los handlers usan `defineApiRoute` y `defineRpc`, y el servidor valida entrada, salida, sesión, autorización y CSRF.
+
+**Validador: Standard Schema, Valibot por defecto.** Meeko valida con cualquier biblioteca que implemente [Standard Schema](https://standardschema.dev), como Valibot, Zod o ArkType, en API, RPC, Socket, rutas, `useForm` y `useStorage`. Los ejemplos de esta documentación usan Valibot (`import * as v from "valibot"`, desde la versión 1), el validador recomendado: es pequeño y modular, así que el bundle del navegador sólo incluye las funciones que usan los schemas de `shared/` que comparten servidor y cliente. Elegir otra biblioteca no cambia ninguna API de Meeko; sólo la exportación OpenAPI necesita el conversor a JSON Schema de esa biblioteca (para Valibot, `@valibot/to-json-schema`).
 
 ```sh
 npm install valibot

@@ -47,7 +47,7 @@ La plantilla no escribe los tipos de lo que declara: el servidor los muestra com
 
 - **Nuevo componente:** `AppCard` crea `app/components/App/Card.meeko` si existe la carpeta `App` (si no, `AppCard.meeko`); `App/Card` es una ruta explícita.
 - **Nueva página:** `/users` crea `app/pages/users/index.meeko` y `/users/[id]`, `app/pages/users/[id].meeko`, con su `useHead`.
-- **Nuevo endpoint de API:** pide el método y la ruta (`/users/[id]`, con o sin `/api`) y crea `server/api/users/[id].get.ts` con sus schemas públicos (`params`, `body` en `POST`/`PUT`/`PATCH` y `response`) en `shared/schemas/users.ts`, que añade al archivo si ya existe. Usa valibot o zod según el `package.json` del proyecto.
+- **Nuevo endpoint de API:** pide el método y la ruta (`/users/[id]`, con o sin `/api`) y crea `server/api/users/[id].get.ts` con sus schemas públicos (`params`, `body` en `POST`/`PUT`/`PATCH` y `response`) en `shared/schemas/users.ts`, que añade al archivo si ya existe. Usa valibot, el validador por defecto, o zod si es el que declara el `package.json` del proyecto.
 
 Usan el proyecto del archivo activo y la indentación de los `.meeko`, y nunca sobrescriben un archivo.
 
