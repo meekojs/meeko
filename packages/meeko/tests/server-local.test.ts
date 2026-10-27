@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createLocalCalls, createRequestContext, createServerDispatcher, defineApiRoute, defineRpc, MemorySessionStore, SessionManager, useRequestState } from "../src/framework-server.ts";
 import type { Schema, ServerManifest } from "../src/framework-server.ts";
+import { setSocketAddress } from "../src/framework-server/env.ts";
 
 const paramsSchema: Schema<{ id: string }> = { "~standard": { version: 1, validate(value) { return value && typeof value === "object" && typeof (value as { id?: unknown }).id === "string" ? { value: value as { id: string } } : { issues: [{}] }; } } };
 const inputSchema: Schema<{ value: string }> = { "~standard": { version: 1, validate(value) { return value && typeof value === "object" && typeof (value as { value?: unknown }).value === "string" ? { value: value as { value: string } } : { issues: [{}] }; } } };
@@ -49,4 +50,31 @@ test("HTTP and local API/RPC share auth, CSRF, validation, and per-request state
   assert.equal(await api.json(), "42:ok:1");
   assert.equal(await rpc.json(), "ok");
   assert.equal(await (await calls.api("users.byId", "POST", { params: { id: "42" }, body: { value: "again" } })).json(), "42:again:2");
+});
+
+test("local calls share the HTTP dispatcher's rateLimit counter and count per client address", async () => {
+  const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+  const manifest: ServerManifest = {
+    api: [{ kind: "api", file: "api.ts", pathname: "/api/items/[id]", method: "GET", clientKey: "items.byId" }],
+    rpc: [{ kind: "rpc", file: "rpc.ts", pathname: "/_meeko/rpc/items/get", id: "items.get" }],
+  };
+  const modules = new Map<string, unknown>([
+    ["api.ts", { default: defineApiRoute({ params: paramsSchema, response: outputSchema, rateLimit: { limit: 2, window: "1m" }, handler: ({ params }) => params.id }) }],
+    ["rpc.ts", { default: defineRpc({ input: inputSchema, output: outputSchema, rateLimit: { limit: 1, window: "1m" }, handler: ({ input }) => input.value }) }],
+  ]);
+  const load = async (file: string) => modules.get(file);
+  const http = createServerDispatcher({ manifest, sessions, services: {}, load });
+  const local = async (address: string) => {
+    const request = setSocketAddress(new Request("https://example.test/page"), address);
+    return createLocalCalls({ manifest, sessions, context: createRequestContext(request, {}, await sessions.load(request)), load });
+  };
+  const ada = await local("203.0.113.7");
+  assert.equal((await http(setSocketAddress(new Request("https://example.test/api/items/1"), "203.0.113.7"))).status, 200);
+  assert.equal((await ada.api("items.byId", "GET", { params: { id: "2" } })).status, 200);
+  assert.equal((await ada.api("items.byId", "GET", { params: { id: "3" } })).status, 429, "one counter for HTTP and local calls");
+  const grace = await local("198.51.100.1");
+  assert.equal((await grace.api("items.byId", "GET", { params: { id: "1" } })).status, 200, "another client has its own counter");
+  assert.equal((await ada.rpc("items.get", { value: "a" })).status, 200);
+  assert.equal((await ada.rpc("items.get", { value: "a" })).status, 429);
+  assert.equal((await grace.rpc("items.get", { value: "a" })).status, 200);
 });

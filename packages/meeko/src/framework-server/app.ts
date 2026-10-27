@@ -328,7 +328,8 @@ async function loadDefault<T>(load: AppModuleLoader, key: string, label: string)
  * @param options Manifiesto, cargador, runtime y plataforma.
  * @returns La aplicación.
  * @throws {TypeError} Si el manifiesto es de otra versión, falta el cargador, el runtime devuelve unas
- * `sessions` que no son un `SessionManager` o una variable `MEEKO_SESSION_*` no es válida.
+ * `sessions` que no son un `SessionManager` o una variable `MEEKO_SESSION_*` o `MEEKO_TRUST_PROXY`
+ * del entorno de la plataforma no es válida.
  * @throws {Error} En producción sin un store persistente: ni `sessions` en `server/runtime.ts` ni
  * `MEEKO_REDIS_URL`, o sin el paquete `redis` o sin conexión con su servidor.
  * @example

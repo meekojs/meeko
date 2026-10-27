@@ -1,8 +1,9 @@
-import { ApiError, dispatchApiRoute, dispatchRpc, errorResponse, reportServerError } from "./contracts.js";
+import { ApiError, dispatchApiRoute, dispatchRpc, errorResponse, reportServerError, setRateLimitRoute } from "./contracts.js";
 import type { ApiRouteDefinition, RpcDefinition, Schema, ServerErrorObserver } from "./contracts.js";
 import { idempotencyKeyOf } from "./context.js";
 import type { RequestContext } from "./context.js";
 import type { ApiMethod, ServerManifest, ServerModuleLoader } from "./discovery.js";
+import { copySocketAddress } from "./env.js";
 import type { SessionManager } from "./sessions.js";
 import { serializeJson } from "../server.js";
 
@@ -124,9 +125,12 @@ export function createLocalCalls<S>(options: LocalCallOptions<S>) {
         if ((method === "GET") && Object.hasOwn(input, "body")) throw new ApiError("INVALID_BODY", 400);
         const body = Object.hasOwn(input, "body") ? serializeJson(input.body) : undefined;
         if (body !== undefined) headers.set("content-type", "application/json");
-        const request = new Request(url, { method, headers, signal: options.context.signal, ...(body === undefined ? {} : { body }) });
+        const request = copySocketAddress(options.context.request, new Request(url, { method, headers, signal: options.context.signal, ...(body === undefined ? {} : { body }) }));
         const definition = routeModule(await load(endpoint.file)) as ApiRouteDefinition<Schema | undefined, Schema | undefined, Schema | undefined, Schema | undefined, S>;
-        return dispatchApiRoute(definition, derived(request), options.sessions, input.params ?? {}, options.onError);
+        const context = derived(request);
+        // The same counter as the HTTP dispatcher, so a local call cannot bypass the route's limit.
+        setRateLimitRoute(context, `api ${endpoint.method} ${endpoint.pathname}`);
+        return dispatchApiRoute(definition, context, options.sessions, input.params ?? {}, options.onError);
       } catch (error) { reportServerError(error, options.context.requestId, options.onError); return errorResponse(error, options.context.requestId); }
     },
     async rpc(id: string, input: unknown): Promise<Response> {
@@ -135,11 +139,13 @@ export function createLocalCalls<S>(options: LocalCallOptions<S>) {
         if (!endpoint) throw new ApiError("NOT_FOUND", 404);
         const headers = publicHeaders(options.context.request);
         headers.set("content-type", "application/json");
-        const request = new Request(new URL(endpoint.pathname, options.context.request.url), {
+        const request = copySocketAddress(options.context.request, new Request(new URL(endpoint.pathname, options.context.request.url), {
           method: "POST", headers, signal: options.context.signal, body: serializeJson(input),
-        });
+        }));
         const definition = routeModule(await load(endpoint.file)) as RpcDefinition<Schema, Schema, S>;
-        return dispatchRpc(definition, derived(request), options.sessions, options.onError);
+        const context = derived(request);
+        setRateLimitRoute(context, `rpc ${endpoint.id}`);
+        return dispatchRpc(definition, context, options.sessions, options.onError);
       } catch (error) { reportServerError(error, options.context.requestId, options.onError); return errorResponse(error, options.context.requestId); }
     },
   };

@@ -1,3 +1,5 @@
+import { copySocketAddress } from "./env.js";
+
 /**
  * Middleware de servidor: envuelve las peticiones HTTP de páginas, API y RPC antes de que Meeko cree
  * su contexto. Recibe la petición y `next(request?)`, que sólo se puede llamar una vez, y devuelve
@@ -80,7 +82,8 @@ export function composeServerMiddleware(
         if (called) throw new Error("Server middleware called next() more than once");
         called = true;
         if (!(nextRequest instanceof Request)) throw new TypeError("Server middleware next() requires a Request");
-        downstream = run(index + 1, nextRequest);
+        // A replaced request keeps the client's connection address, so rateLimit still counts per client.
+        downstream = run(index + 1, copySocketAddress(request, nextRequest));
         // A middleware may forget to await next(). Keep its failure observed
         // until this frame can propagate it to the HTTP response path.
         void downstream.catch(() => {});

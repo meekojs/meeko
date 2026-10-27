@@ -1,7 +1,7 @@
 import { assetLocation, assetResponse, etagMatches, findAsset } from "./framework-server/assets.js";
 import type { AssetManifest, AssetReader } from "./framework-server/assets.js";
 import type { ServerApp } from "./framework-server/app.js";
-import { setSocketAddress } from "./framework-server/env.js";
+import { setSocketAddress, trustProxyOf } from "./framework-server/env.js";
 import { createTrackedPlatform, fetchApp, positiveInteger, publicOriginOf, rebaseRequest, visibleHost } from "./framework-server/fetch-host.js";
 import type { ServerPlatform } from "./framework-server/platform.js";
 import type { SocketPeer } from "./framework-server/socket.js";
@@ -99,6 +99,7 @@ const encoder = new TextEncoder();
  * @returns El servidor en marcha.
  * @throws {RangeError} Si el puerto o algún límite no son válidos.
  * @throws {Error} Fuera del runtime de Deno.
+ * @throws {TypeError} Si `MEEKO_TRUST_PROXY` del entorno de la plataforma no es válida.
  * @example
  * ```ts
  * import { createServerApp } from "@meekojs/meeko/server";
@@ -123,6 +124,8 @@ export async function serveDeno(app: ServerApp, options: ServeDenoOptions = {}):
   const idleTimeout = positiveInteger(options.idleTimeout ?? 60, "idleTimeout");
   const denoPlatform = createTrackedPlatform("deno", deno.env.toObject(), (error) => report(error, crypto.randomUUID()));
   const platform = options.platform ?? denoPlatform;
+  // The environment of each request: a mistyped MEEKO_TRUST_PROXY stops startup, not every request.
+  trustProxyOf(platform.env);
   const peers = new Set<WebSocket>();
   let handshake: SocketUpgradeHandler | undefined;
   let closing = false;

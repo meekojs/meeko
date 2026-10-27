@@ -2,6 +2,7 @@ import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import type { SocketHub, SocketPeer } from "./socket.js";
 import { observeErrorCallback } from "./contracts.js";
+import { setSocketAddress } from "./env.js";
 import { createSocketUpgradeHandler, socketPathnamePrefix, socketPublicOrigin } from "./upgrade.js";
 
 /**
@@ -112,7 +113,7 @@ export function createNodeSocketUpgradeHandler(options: NodeSocketUpgradeOptions
     for (const [key, value] of Object.entries(incoming.headers)) {
       if (value !== undefined) headers.set(key, Array.isArray(value) ? value.join(", ") : value);
     }
-    const decision = await handshake(new Request(url, { headers }));
+    const decision = await handshake(setSocketAddress(new Request(url, { headers }), incoming.socket?.remoteAddress));
     if (decision.action === "pass") return false;
     const upgradeSocket = async (): Promise<NodeAcceptedSocket | undefined> => {
       try { return await options.upgrade(incoming, socket, head); }

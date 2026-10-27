@@ -1,4 +1,5 @@
 import { normalizeServerError, observeErrorCallback } from "./contracts.js";
+import { copySocketAddress } from "./env.js";
 import type { SocketConnection, SocketHub, SocketPeer } from "./socket.js";
 
 /**
@@ -330,7 +331,7 @@ export function createSocketUpgradeHandler(options: SocketUpgradeOptions): Socke
     if (incoming.method !== "GET" || incoming.headers.get("upgrade")?.toLowerCase() !== "websocket") return { action: "reject", status: 400 };
     // Origin checks compare against the request URL, so it carries the public origin.
     const base = loopbackAlias(origin, incoming.headers.get("origin")) ?? origin;
-    const request = new Request(new URL(url.pathname + url.search, base), { headers: incoming.headers });
+    const request = copySocketAddress(incoming, new Request(new URL(url.pathname + url.search, base), { headers: incoming.headers }));
     const roomId = url.searchParams.get("room") ?? undefined;
     try { await hub.preflight(name, request, roomId); }
     catch (error) {

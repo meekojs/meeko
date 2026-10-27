@@ -96,10 +96,13 @@ export function setSocketAddress(request: Request, address: string | undefined):
   return request;
 }
 
-/** Carries the connection address of `from` over to a rebased copy of the request. */
+/**
+ * Carries the connection address of `from` over to a copy of the request, such as a rebased one or
+ * the one a server middleware passes to `next()`. An address already recorded on `to` is kept.
+ */
 export function copySocketAddress(from: Request, to: Request): Request {
   const address = socketAddresses.get(from);
-  if (address !== undefined && from !== to) socketAddresses.set(to, address);
+  if (address !== undefined && from !== to && !socketAddresses.has(to)) socketAddresses.set(to, address);
   return to;
 }
 
@@ -149,9 +152,27 @@ export function expandIpv6(address: string): number[] | undefined {
 }
 
 /**
+ * The address of an `X-Forwarded-For` entry, which some proxies (Azure Application Gateway) write
+ * with a port: `1.2.3.4:5678` or `[2001:db8::1]:5678`. Anything else that is not an address yields
+ * `undefined`.
+ */
+export function forwardedAddress(entry: string): string | undefined {
+  const value = entry.trim();
+  const ipv4WithPort = /^(\d{1,3}(?:\.\d{1,3}){3}):\d{1,5}$/.exec(value);
+  if (ipv4WithPort) return normalizeAddress(ipv4WithPort[1]!);
+  if (value.startsWith("[")) {
+    // `[address]` with an optional `:port`, and nothing else after the bracket.
+    const end = value.indexOf("]");
+    if (end < 0 || !/^(?::\d{1,5})?$/.test(value.slice(end + 1))) return undefined;
+  }
+  return normalizeAddress(value);
+}
+
+/**
  * The client address of a request: the connection address, or with `MEEKO_TRUST_PROXY` the
- * `X-Forwarded-For` entry added by the outermost trusted proxy. `X-Forwarded-For` is never read
- * without that variable, because any client can send it.
+ * `X-Forwarded-For` entry added by the outermost trusted proxy, without its port. `X-Forwarded-For`
+ * is never read without that variable, because any client can send it. An entry that is not an
+ * address falls back to the connection address, never to an unknown client.
  */
 export function clientAddressOf(request: Request, env: unknown): string | undefined {
   const socket = socketAddresses.get(request);
@@ -162,7 +183,7 @@ export function clientAddressOf(request: Request, env: unknown): string | undefi
   if (!entries.length) return socket;
   // With n trusted proxies, the nth entry from the right was written by the outermost one.
   const chosen = trust === true ? entries[0]! : entries[Math.max(0, entries.length - trust)]!;
-  return normalizeAddress(chosen);
+  return forwardedAddress(chosen) ?? socket;
 }
 
 /** The bucket of an address for rate limits: IPv4 as is, IPv6 by its /64 network. */

@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { TLSSocket } from "node:tls";
 import { ApiError, errorResponse, observeServerError } from "./framework-server/contracts.js";
-import { setSocketAddress } from "./framework-server/env.js";
+import { setSocketAddress, trustProxyOf } from "./framework-server/env.js";
 import { assetResponse, etagMatches, findAsset } from "./framework-server/assets.js";
 import type { AssetManifest, AssetReader } from "./framework-server/assets.js";
 import type { ServerApp } from "./framework-server/app.js";
@@ -313,6 +313,7 @@ function urlHost(host: string): string {
  * @param app Aplicación de `createServerApp`.
  * @param options Dirección, origen público, señales y cierre.
  * @returns El servidor en marcha.
+ * @throws {TypeError} Si `MEEKO_TRUST_PROXY` del entorno de la plataforma no es válida.
  * @example
  * ```ts
  * import { createServerApp } from "@meekojs/meeko/server";
@@ -336,6 +337,8 @@ export async function serveNode(app: ServerApp, options: ServeNodeOptions = {}):
   const publicOrigin = options.publicOrigin ?? app.publicOrigin;
   const nodePlatform = createNodePlatform((error) => report(error, randomUUID()));
   const platform = options.platform ?? nodePlatform;
+  // The environment of each request: a mistyped MEEKO_TRUST_PROXY stops startup, not every request.
+  trustProxyOf(platform.env);
   const server = createServer(toNodeListener((request) => app.fetch(request, platform), {
     onError: report, ...(publicOrigin ? { publicOrigin } : {}),
   }));

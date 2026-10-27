@@ -1,7 +1,7 @@
 import { assetLocation, assetResponse, etagMatches, findAsset } from "./framework-server/assets.js";
 import type { AssetManifest, AssetReader } from "./framework-server/assets.js";
 import type { ServerApp } from "./framework-server/app.js";
-import { setSocketAddress } from "./framework-server/env.js";
+import { setSocketAddress, trustProxyOf } from "./framework-server/env.js";
 import { fetchApp, positiveInteger, publicOriginOf, rebaseRequest, visibleHost } from "./framework-server/fetch-host.js";
 import { createDetachedPlatform } from "./framework-server/platform.js";
 import type { ServerPlatform } from "./framework-server/platform.js";
@@ -171,6 +171,7 @@ function bunPeer(socket: BunServerWebSocket): SocketPeer {
  * @param options Origen público, plataforma y límites de Socket.
  * @returns `{ fetch, websocket }` para `Bun.serve`.
  * @throws {RangeError} Si algún límite no es un entero positivo.
+ * @throws {TypeError} Si `MEEKO_TRUST_PROXY` del entorno de la plataforma no es válida.
  * @example
  * ```ts
  * import { createServerApp } from "@meekojs/meeko/server";
@@ -188,6 +189,8 @@ export function createBunServer(app: ServerApp, options: BunServerOptions = {}):
   const report = options.onError ?? ((error: unknown, requestId: string) => app.reportError(error, requestId));
   const configuredOrigin = options.publicOrigin ? publicOriginOf(options.publicOrigin) : app.publicOrigin;
   const platform = options.platform ?? createDetachedPlatform((globalThis as { Bun?: BunGlobal }).Bun?.env ?? {}, "bun");
+  // The environment of each request: a mistyped MEEKO_TRUST_PROXY stops startup, not every request.
+  trustProxyOf(platform.env);
   const maxPayloadLength = positiveInteger(options.maxPayloadLength ?? app.socket?.maxMessageBytes ?? 64 * 1024, "maxPayloadLength");
   const backpressureLimit = positiveInteger(options.backpressureLimit ?? 1024 * 1024, "backpressureLimit");
   const idleTimeout = positiveInteger(options.idleTimeout ?? 60, "idleTimeout");

@@ -3,11 +3,12 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 import test from "node:test";
 import {
-  createServerApp, defineApiRoute, defineRpc, MemorySessionStore, RedisSessionStore, SessionManager, SqlSessionStore,
+  createServerApp, defineApiRoute, defineRpc, defineServerMiddleware, MemorySessionStore, RedisSessionStore, SessionManager, SqlSessionStore,
 } from "../src/framework-server.ts";
 import type { AppManifest, Schema, ServerApp, ServerAppOptions, SqlSessionDriver } from "../src/framework-server.ts";
 import { addressBucket, clientAddressOf, normalizeAddress, resetEnvWarnings, setSocketAddress, trustProxyOf } from "../src/framework-server/env.ts";
-import { toNodeListener } from "../src/node.ts";
+import { createBunServer } from "../src/bun.ts";
+import { serveNode, toNodeListener } from "../src/node.ts";
 import { FakeRedis, FakeRedisServer } from "./helpers/fake-redis.ts";
 
 const textSchema: Schema<{ text: string }> = { "~standard": { version: 1, validate(value) {
@@ -123,13 +124,24 @@ test("X-Forwarded-For is ignored unless MEEKO_TRUST_PROXY trusts the proxies in 
   await assert.rejects(app({ env: { MEEKO_TRUST_PROXY: "yes" } }), /MEEKO_TRUST_PROXY must be true, false or the number of trusted proxies/);
 });
 
+test("an invalid MEEKO_TRUST_PROXY in the adapter's request environment stops startup", async () => {
+  // The application starts with a valid environment; the adapter serves requests with another one.
+  const server = await app();
+  const platform = { name: "node" as const, env: { MEEKO_TRUST_PROXY: "yes" }, waitUntil() {} };
+  try {
+    await assert.rejects(serveNode(server, { port: 0, platform }), /MEEKO_TRUST_PROXY must be true, false or the number of trusted proxies/);
+    assert.throws(() => createBunServer(server, { platform: { ...platform, name: "bun" } }), /MEEKO_TRUST_PROXY/);
+  } finally { await server.close(); }
+});
+
 test("client addresses: hop counts, true, normalization and IPv6 /64 buckets", () => {
   const request = (xff?: string, socket?: string) => setSocketAddress(new Request("https://x.test/", { headers: xff ? { "x-forwarded-for": xff } : {} }), socket);
   assert.equal(clientAddressOf(request("1.1.1.1", "10.0.0.1"), {}), "10.0.0.1");
   assert.equal(clientAddressOf(request("1.1.1.1, 2.2.2.2, 3.3.3.3", "10.0.0.1"), { MEEKO_TRUST_PROXY: "2" }), "2.2.2.2");
   assert.equal(clientAddressOf(request("1.1.1.1, 2.2.2.2", "10.0.0.1"), { MEEKO_TRUST_PROXY: "true" }), "1.1.1.1");
   assert.equal(clientAddressOf(request(undefined, "10.0.0.1"), { MEEKO_TRUST_PROXY: "1" }), "10.0.0.1", "no header: the socket");
-  assert.equal(clientAddressOf(request("not-an-ip", "10.0.0.1"), { MEEKO_TRUST_PROXY: "1" }), undefined, "garbage is not an address");
+  assert.equal(clientAddressOf(request("not-an-ip", "10.0.0.1"), { MEEKO_TRUST_PROXY: "1" }), "10.0.0.1", "garbage falls back to the connection, not to the global bucket");
+  assert.equal(clientAddressOf(request("unknown"), { MEEKO_TRUST_PROXY: "1" }), undefined, "no connection address either: unknown");
   assert.equal(normalizeAddress("::ffff:192.0.2.1"), "192.0.2.1");
   assert.equal(normalizeAddress("[2001:DB8::1]"), "2001:db8::1");
   assert.equal(normalizeAddress("fe80::1%eth0"), "fe80::1");
@@ -142,6 +154,19 @@ test("client addresses: hop counts, true, normalization and IPv6 /64 buckets", (
   assert.equal(trustProxyOf({ MEEKO_TRUST_PROXY: "true" }), true);
   assert.equal(trustProxyOf({ MEEKO_TRUST_PROXY: "3" }), 3);
   assert.throws(() => trustProxyOf({ MEEKO_TRUST_PROXY: "-1" }), /MEEKO_TRUST_PROXY/);
+});
+
+test("X-Forwarded-For entries with a port, as Azure Application Gateway writes them, name the client", () => {
+  const request = (xff: string) => setSocketAddress(new Request("https://x.test/", { headers: { "x-forwarded-for": xff } }), "10.0.0.1");
+  const trust = { MEEKO_TRUST_PROXY: "1" };
+  assert.equal(clientAddressOf(request("203.0.113.7:5678"), trust), "203.0.113.7");
+  assert.equal(clientAddressOf(request("9.9.9.9, 203.0.113.7:443"), trust), "203.0.113.7");
+  assert.equal(clientAddressOf(request("[2001:DB8::1]:5678"), trust), "2001:db8::1");
+  assert.equal(clientAddressOf(request("[2001:db8::1]"), trust), "2001:db8::1");
+  assert.equal(clientAddressOf(request("2001:db8::1"), trust), "2001:db8::1", "a bare IPv6 address has no port to strip");
+  assert.equal(clientAddressOf(request("203.0.113.7:port"), trust), "10.0.0.1", "an invalid entry: the connection address");
+  assert.equal(clientAddressOf(request("[2001:db8::1]junk"), trust), "10.0.0.1");
+  assert.equal(clientAddressOf(request("300.0.0.1:80"), trust), "10.0.0.1");
 });
 
 test("a custom key counts per subject, and an invalid limit or empty key is a server fault", async () => {
@@ -159,6 +184,29 @@ test("a custom key counts per subject, and an invalid limit or empty key is a se
     assert.equal(broken.status, 500);
     assert.equal((await broken.json() as { code: string }).code, "INVALID_RATE_LIMIT");
     assert.equal(reported.length, 2, "both faults reach onError");
+  } finally { await server.close(); }
+});
+
+test("a server middleware that passes a new Request to next() keeps the per-client counter", async () => {
+  const calls: string[] = [];
+  const table = routes(calls);
+  table["/replace"] = { default: defineServerMiddleware((request, next) => {
+    const headers = new Headers(request.headers);
+    headers.set("x-trace", "1");
+    return next(new Request(request, { headers }));
+  }) };
+  const server = await createServerApp({
+    manifest: { ...manifest, serverMiddleware: ["/replace"] }, production: false, load: async (key) => table[key],
+    platform: { name: "node", env: {}, waitUntil() {} },
+  });
+  try {
+    const whoami = await server.fetch(get("/api/whoami", "203.0.113.7"));
+    assert.deepEqual(await whoami.json(), { address: "203.0.113.7" }, "the replaced request still knows its client");
+    assert.equal((await server.fetch(post("/api/login", { text: "a" }, "203.0.113.7"))).status, 200);
+    assert.equal((await server.fetch(post("/api/login", { text: "b" }, "203.0.113.7"))).status, 200);
+    assert.equal((await server.fetch(post("/api/login", { text: "c" }, "203.0.113.7"))).status, 429);
+    // Another client is not locked out by the first one: no shared global bucket.
+    assert.equal((await server.fetch(post("/api/login", { text: "d" }, "198.51.100.1"))).status, 200);
   } finally { await server.close(); }
 });
 
