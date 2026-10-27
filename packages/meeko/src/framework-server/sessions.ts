@@ -6,6 +6,44 @@ import type { RateLimitHit } from "./rate-limit.js";
 import type { Unsubscribe } from "./socket.js";
 
 /**
+ * Forma de los datos de sesión de la aplicación (desde `1.2`). Está vacía: la aplicación la
+ * declara una vez con una aumentación de módulo y, a partir de ahí, `context.session.current.data`
+ * y `context.session.create(data)` quedan tipados en páginas, API, RPC, Socket, `authorize` y
+ * `locals`. Sin declaración, los datos son `unknown`. El tipo no valida en ejecución.
+ *
+ * @since 1.2.0
+ * @example
+ * ```ts
+ * // server/types/session.d.ts
+ * export {};
+ * declare module "@meekojs/meeko/server" {
+ *   interface MeekoSession { user: string; role: "owner" | "staff" }
+ * }
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#tipos-de-la-sesión-meekosession
+ */
+// Empty on purpose: applications add their fields through module augmentation.
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface MeekoSession {}
+
+/**
+ * Datos de la sesión de la aplicación (desde `1.2`): {@link MeekoSession} si la aplicación la
+ * declara, o `unknown` si no. Es el tipo de `RequestContext.session.current.data`.
+ *
+ * @since 1.2.0
+ * @example
+ * ```ts
+ * import type { SessionData } from "@meekojs/meeko/server";
+ *
+ * export function ownerOf(data: SessionData): string | undefined {
+ *   return data.role === "owner" ? data.user : undefined;
+ * }
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#tipos-de-la-sesión-meekosession
+ */
+export type SessionData = [keyof MeekoSession] extends [never] ? unknown : MeekoSession;
+
+/**
  * Registro de una sesión en el store. El ID es opaco y aleatorio; `familyId` se conserva al rotar.
  *
  * @typeParam T Datos de la aplicación en la sesión.
@@ -392,7 +430,7 @@ export function trackedSessionHandles(manager: SessionManager<any>): number {
  * revoca. Los cambios se envían en la cookie de la respuesta. Tras el primer byte de una respuesta
  * en streaming, `create`, `rotate` y `revoke` fallan con `SESSION_LOCKED`.
  *
- * @typeParam T Datos de la aplicación en la sesión.
+ * @typeParam T Datos de la aplicación en la sesión; por defecto, {@link SessionData}.
  * @example
  * ```ts
  * // server/rpc/auth/login.ts
@@ -411,7 +449,7 @@ export function trackedSessionHandles(manager: SessionManager<any>): number {
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#sesiones-y-seguridad
  */
-export class SessionHandle<T = unknown> {
+export class SessionHandle<T = SessionData> {
   private pendingCookie?: string;
   private cookieLocked = false;
   /** Settled forms of the create/rotate/revoke calls still writing the store. */

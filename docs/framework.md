@@ -955,7 +955,7 @@ export default defineRpc({
 });
 ```
 
-Declare `locals` antes de `handler` en el objeto: si `locals` usa su parámetro, TypeScript sólo infiere su tipo para el handler cuando aparece antes.
+Declare `locals` antes de `handler` en el objeto: si `locals` usa su parámetro, TypeScript sólo infiere su tipo para el handler cuando aparece antes. Con la sesión tipada mediante [`MeekoSession`](#tipos-de-la-sesión-meekosession), `session.current!.data.userId` no necesita `as`.
 
 ### Estado de la respuesta: `status`
 
@@ -1597,6 +1597,89 @@ export default defineServerRuntime(async ({ env, production, prerendering }) => 
 `createServerApp({ manifest, load, runtime, production })` de `@meekojs/meeko/server` crea la misma aplicación a partir de un manifiesto y un cargador de módulos, y expone `fetch(request, platform?)`, `socket`, `publicOrigin`, `reportError` y `close()`. El entry generado por `meeko build` la usa; un host propio puede servirla con `serveNode(app, { host, port, publicOrigin, handleSignals, shutdownTimeout })` de `@meekojs/meeko/node`. Si el servidor arranca pero falla la conexión de Socket, `serveNode` libera el puerto y cierra la aplicación antes de propagar el error.
 
 ## Autenticación
+
+Desde `1.2`, Meeko se ocupa de las piezas delicadas de un inicio de sesión: cookie opaca `HttpOnly`, `Secure` y host-only, sesiones en Redis entre instancias con revocación, Origin y CSRF, contraseñas con scrypt, límite de intentos y tipos de la sesión. La aplicación sólo decide quién puede entrar. Un panel privado para una cuenta queda así:
+
+**1. Variables** (`.env` en desarrollo, ignorado por git; en producción, las del entorno):
+
+```sh
+MEEKO_PUBLIC_ORIGIN=https://example.com       # el origen exacto tras el proxy HTTPS
+MEEKO_REDIS_URL=rediss://default:…@redis.example.com:6380
+MEEKO_TRUST_PROXY=1                           # un proxy (Traefik, Caddy, nginx) delante
+ADMIN_USERNAME=ada
+ADMIN_PASSWORD_HASH=scrypt$131072$8$1$…       # npx meeko auth hash
+```
+
+Las dos últimas son de la aplicación, sin el prefijo `MEEKO_`, que queda reservado. Instale el cliente Redis con `npm install redis`; en desarrollo las sesiones viven en memoria y no hace falta Redis. No hay `server/runtime.ts`: véase [Sesiones sin configuración](#sesiones-sin-configuración).
+
+**2. El tipo de la sesión**, una sola vez para páginas, API, RPC y Socket:
+
+```ts
+// server/types/session.d.ts
+export {};
+declare module "@meekojs/meeko/server" {
+  interface MeekoSession { user: string; role: "owner" }
+}
+```
+
+**3. Inicio y cierre de sesión:**
+
+```ts
+// server/api/auth/login.post.ts
+import { verifyPassword } from "@meekojs/meeko/password";
+import { loginInput, okResult } from "../../../shared/schemas/auth.js";
+
+export default defineApiRoute({
+  body: loginInput,
+  response: okResult,
+  origin: "required",
+  rateLimit: { limit: 5, window: "5m" },
+  handler: async ({ body, context }) => {
+    const valid = await verifyPassword(body.password, process.env.ADMIN_PASSWORD_HASH ?? "");
+    if (!valid || body.username !== process.env.ADMIN_USERNAME) throw new ApiError("INVALID_CREDENTIALS", 401);
+    await context.session.create({ user: body.username, role: "owner" });
+    return { ok: true as const };
+  },
+});
+```
+
+```ts
+// server/api/auth/logout.post.ts
+export default defineApiRoute({
+  auth: "required",
+  status: 204,
+  handler: async ({ context }) => { await context.session.revoke(); },
+});
+```
+
+`verifyPassword` se ejecuta siempre, también con un usuario incorrecto, para que el tiempo de respuesta no revele cuál de los dos falló. `defineApiRoute` y `ApiError` se autoimportan en `server/`. Desde el navegador, `await api.auth.login.post({ body })` y `await api.auth.logout.post()`: el cliente envía Origin y el token CSRF.
+
+**4. Una página protegida:**
+
+```html
+<!-- app/pages/dashboard.meeko -->
+<script server lang="ts">
+const { context } = usePage();
+const session = context.session.current;
+if (session?.data.role !== "owner") redirect("/login");
+export const user = session.data.user;
+</script>
+
+<template>
+  <h1>Hola, {user}</h1>
+</template>
+```
+
+Lo que hace Meeko por usted en este ejemplo:
+
+- La cookie `__Host-meeko.sid` es opaca, `HttpOnly`, `Secure`, `SameSite=Lax` y host-only; `MEEKO_SESSION_TTL` y `MEEKO_SESSION_SAMESITE` la ajustan. El ID cambia al iniciar sesión y la familia completa se revoca al cerrarla, también en las demás instancias.
+- `origin: "required"` y, aunque falte, el propio `session.create()` impiden el *login CSRF* (véase [Origin en mutaciones anónimas](#origin-en-mutaciones-anónimas)); `auth: "required"` y el token CSRF protegen el cierre de sesión.
+- `rateLimit` cuenta los intentos por IP en Redis, y `MEEKO_TRUST_PROXY` hace que la IP sea la del cliente y no la del proxy.
+- `verifyPassword` compara en tiempo constante y acepta los hashes que ya tenga con el mismo formato.
+
+### Tipos de la sesión: `MeekoSession`
+
+Sin declaración, `context.session.current.data` es `unknown`, como hasta `1.1`, y `session.create(data)` acepta cualquier valor serializable. Desde `1.2`, una aumentación de módulo de la interfaz `MeekoSession` de `@meekojs/meeko/server` fija la forma en toda la aplicación: `RequestContext.session` pasa a ser `SessionHandle<MeekoSession>`, así que `context.session.current?.data` y `create(data)` quedan tipados en el `<script server>` de las páginas (`usePage().context`), en API, RPC y Socket, y en `authorize` y `locals`. El tipo resultante se llama `SessionData`. Declárela en un archivo de `server/`, que comprueba el proyecto TypeScript del servidor, y con `export {}` para que sea un módulo. El tipo no valida en ejecución: si cambia la forma, las sesiones guardadas antes conservan la anterior hasta que caducan o se crean de nuevo.
 
 ### Contraseñas
 

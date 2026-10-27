@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { SessionHandle } from "./sessions.js";
+import type { SessionData, SessionHandle } from "./sessions.js";
 import { clientAddressOf } from "./env.js";
 import { defaultPlatform } from "./platform.js";
 import type { ServerPlatform } from "./platform.js";
@@ -34,8 +34,11 @@ export interface RequestContext<TServices = unknown, TEnv = unknown> {
   readonly signal: AbortSignal;
   /** Servicios de `server/runtime.ts`. */
   readonly services: TServices;
-  /** Sesión de la petición: leer, crear, rotar, revocar y verificar. */
-  readonly session: SessionHandle;
+  /**
+   * Sesión de la petición: leer, crear, rotar, revocar y verificar. Sus datos tienen el tipo de
+   * `MeekoSession` cuando la aplicación lo declara (desde `1.2`), o `unknown`.
+   */
+  readonly session: SessionHandle<SessionData>;
   /** Estado propio de la petición; véase {@link useRequestState}. */
   readonly state: Map<string, unknown>;
   /** Runtime que atiende la petición, con su entorno y el soporte de trabajo en segundo plano. */
@@ -140,7 +143,7 @@ function combinedSignal(request: AbortSignal, revocation: AbortSignal): AbortSig
  * const response = await dispatchApiRoute(usersRoute, context, sessions);
  * ```
  */
-export function createRequestContext<TServices, TEnv = unknown>(request: Request, services: TServices, session: SessionHandle, platform?: ServerPlatform<TEnv>): RequestContext<TServices, TEnv> {
+export function createRequestContext<TServices, TEnv = unknown>(request: Request, services: TServices, session: SessionHandle<any>, platform?: ServerPlatform<TEnv>): RequestContext<TServices, TEnv> {
   const revocation = (session as Partial<SessionHandle> | undefined)?.signal;
   let signal: AbortSignal | undefined;
   const resolvedPlatform = platform ?? defaultPlatform() as ServerPlatform<TEnv>;

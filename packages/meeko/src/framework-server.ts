@@ -12,7 +12,7 @@ export type { ServerMiddleware } from "./framework-server/middleware.js";
 export type { RequestContext, ServerFetch } from "./framework-server/context.js";
 export { createServerClientOptions } from "./framework-server/auto-clients.js";
 export { MemorySessionStore, SessionHandle, SessionManager, SessionSecurityError } from "./framework-server/sessions.js";
-export type { SessionCreateOptions, SessionOptions, SessionRecord, SessionStore } from "./framework-server/sessions.js";
+export type { MeekoSession, SessionCreateOptions, SessionData, SessionOptions, SessionRecord, SessionStore } from "./framework-server/sessions.js";
 export { RedisSessionStore, SqlSessionStore } from "./framework-server/session-stores.js";
 export type { RedisSessionClient, RedisSessionStoreOptions, SqlSessionDriver, SqlSessionRow, SqlSessionStoreOptions } from "./framework-server/session-stores.js";
 export { ApiError, SessionRevokedError, defineApiRoute, defineRpc, dispatchApiRoute, dispatchRpc, errorResponse, executeApiRoute, executeRpc } from "./framework-server/contracts.js";
