@@ -19,6 +19,7 @@ import { assertBuildAdapter, buildProject, developmentServerPorts, previewProjec
 import { findLinkedMeeko, isSupervisedDevelopment, linkWatchEnabled, runSupervisedDevelopment, superviseDevelopment } from "./framework/dev-link.js";
 import { checkFrameworkProject, prepareFrameworkTypes } from "./framework/check-project.js";
 import { cleanProject, formatCleanResult } from "./framework/clean.js";
+import { loadProjectEnv } from "./framework/env-file.js";
 import { formatDiagnostic, hasErrors } from "./compiler/sfc.js";
 import type { CompileDiagnostic } from "./compiler/sfc.js";
 
@@ -31,7 +32,8 @@ const usage = "Uso: meeko dev [directorio]\n     meeko check [directorio | compo
   "                      comprobaciones de Origin de HTTP y Socket tras un proxy\n" +
   "     MEEKO_HMR_PORT   puerto del WebSocket de HMR de dev\n" +
   "     MEEKO_EDITOR_BRIDGE=0  desactiva el puente con el editor de dev\n" +
-  "     MEEKO_LINK_WATCH=0     dev no se reinicia al reconstruir un @meekojs/meeko enlazado\n";
+  "     MEEKO_LINK_WATCH=0     dev no se reinicia al reconstruir un @meekojs/meeko enlazado\n" +
+  "dev, build, start, preview y check leen el .env del proyecto; el entorno real tiene prioridad.\n";
 /** Prints the diagnostics on stderr, warnings included. */
 function writeDiagnostics(diagnostics: readonly CompileDiagnostic[]): void {
   for (const diagnostic of diagnostics) process.stderr.write(`${formatDiagnostic(diagnostic)}\n`);
@@ -99,6 +101,8 @@ if (problem !== undefined) {
   try {
     if (projectCommand) {
       const root = input ?? ".";
+      // Before anything reads the environment: PORT, MEEKO_LINK_WATCH or the app's own variables.
+      loadProjectEnv(root);
       if (command === "dev") {
         // A linked Meeko (pnpm link:, npm link, a workspace) is rebuilt while dev runs: a
         // supervisor restarts the server in a fresh process, which loads the new build.
@@ -132,6 +136,8 @@ if (problem !== undefined) {
       if (result.failures.length > 0) process.exitCode = 1;
     } else if (command === "check" && (!input || (await stat(input).catch(() => undefined))?.isDirectory())) {
       if (output) throw new Error("--json sólo está disponible para un componente .meeko");
+      // meeko.config.ts and the runtime may read the project's variables.
+      loadProjectEnv(input ?? ".");
       warnLegacyLayerEntries(input ?? ".", await loadMeekoConfig(input ?? "."));
       writeDiagnostics(await checkFrameworkProject(input ?? "."));
       process.stdout.write(`${resolve(input ?? ".")}: OK\n`);

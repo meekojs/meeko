@@ -69,6 +69,16 @@ export default defineServerRuntime(({ production, prerendering }) => ({
 
 En desarrollo, Vite abre un WebSocket HMR en un puerto derivado del puerto HTTP para que dos aplicaciones Meeko no compitan por el puerto predeterminado de Vite. `MEEKO_HMR_PORT` permite fijarlo explícitamente cuando el entorno lo exige; el navegador debe poder acceder a ese puerto además del HTTP de la aplicación.
 
+**Variables de entorno y `.env`.** Desde `1.2`, `meeko dev`, `build`, `start`, `preview` y `check` cargan el `.env` de la raíz del proyecto en `process.env`, como Vite y Nuxt en desarrollo. Una variable que el entorno ya define tiene prioridad, así que el entorno real de un despliegue nunca se sustituye. La salida de `meeko build` ejecutada directamente (`node .meeko/output/node/index.mjs`, un contenedor) no lee `.env`: en producción las variables llegan del entorno. Cambiar `.env` exige reiniciar `meeko dev`. Meeko lee estas variables:
+
+| Variable | Comandos | Efecto |
+| --- | --- | --- |
+| `PORT`, `HOST` | `dev`, `start`, `preview` | Puerto y dirección; sustituyen a `server.port` y `server.host`. Por defecto, `127.0.0.1:4173`. |
+| `PUBLIC_ORIGIN` | `dev`, `start`, `preview` y la salida de Node, Bun y Deno | Origen público tras un proxy HTTPS, para las comprobaciones de `Origin` de HTTP y Socket. |
+| `MEEKO_HMR_PORT` | `dev` | Puerto del WebSocket de HMR; sin él, se deriva del puerto HTTP. |
+| `MEEKO_EDITOR_BRIDGE=0` | `dev` | Desactiva el puente con el editor (valores en vivo). |
+| `MEEKO_LINK_WATCH=0` | `dev` | No reinicia `meeko dev` al reconstruir un `@meekojs/meeko` enlazado. |
+
 Si ni `PORT` ni `server.port` fijan el puerto, `meeko dev` usa el primero libre a partir de `4173` (hasta `4192`), como Vite: con otro `meeko dev` ya en `4173`, el segundo escribe `[meeko] El puerto 4173 está en uso; meeko dev usa el 4174` y la URL real, y deriva de ese puerto el del WebSocket HMR y el descriptor del puente con el editor (`.meeko/dev/editor-bridge-4174.json`). Un puerto fijado con `PORT` o `server.port` no cambia: si está ocupado, `meeko dev` termina con `El puerto 4173 de 127.0.0.1 ya está en uso; usa PORT=<otro puerto> o cierra el otro meeko dev`.
 
 El SSR de desarrollo carga `@meekojs/meeko` desde Node, fuera del module runner de Vite, como el build; así una aplicación que consume Meeko con `link:` mantiene una sola instancia del runtime aunque Vite recargue sus módulos. Por eso, cuando `@meekojs/meeko` está enlazado (`link:` de pnpm, `npm link` o un workspace: el paquete se resuelve fuera de todo `node_modules`), `meeko dev` ejecuta el servidor en un proceso hijo y vigila `dist/` y `package.json` del paquete enlazado. Al reconstruirlo, espera a que la compilación termine (400 ms sin cambios), escribe `[meeko] Meeko enlazado cambió; reiniciando meeko dev…`, cierra el servidor anterior (Socket, HTTP, Vite y el descriptor del puente con el editor) y arranca otro proceso en el mismo puerto, con el mismo entorno. Si el nuevo proceso no arranca, por ejemplo porque la compilación quedó a medias, lo informa y vuelve a intentarlo con el siguiente cambio. `Ctrl+C` detiene ambos procesos. Con una instalación normal desde el registro no se vigila nada más; `MEEKO_LINK_WATCH=0` desactiva el reinicio también con un paquete enlazado.
