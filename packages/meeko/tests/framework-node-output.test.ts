@@ -56,6 +56,7 @@ test("the built Node output serves prerendered pages and assets without the sour
   const root = await tempProject(context, "node-output", () => stopChild(child, "SIGTERM"));
   const repository = repositoryRoot;
   await initFrameworkProject(root);
+  await mkdir(join(root, "server"), { recursive: true });
   await writeFile(join(root, "server", "runtime.ts"), `import { defineServerRuntime, MemorySessionStore, SessionManager } from "@meekojs/meeko/server";
 
 export default defineServerRuntime(({ production }) => {

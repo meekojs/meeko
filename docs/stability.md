@@ -164,7 +164,7 @@ La versión de TypeScript que incluye el paquete puede actualizarse en un minor.
 - Desde `1.2`, `app/plugins/*.ts` en la aplicación y sus layers, con los sufijos `.client.ts` (sólo navegador, antes de hidratar) y `.server.ts` (sólo servidor, una vez por petición de página).
 - Los sufijos `.client.ts`, `.server.ts` y `.shared.ts`, y las exclusiones `*.test.ts`, `*.spec.ts` y `*.d.ts`.
 - Los autoimports `api`, `rpc`, `socket`, `useSocket`, `useState`, `href` y `provideErrorHandler`, y desde `1.1` `onMounted`, `useApi`, `useRpcQuery` y `useRpcMutation`, y desde `1.2` `useRoute`, `useForm`, `useStorage`, `useApiMutation`, `useHead` y `useSeoMeta` (un export propio con uno de esos nombres tiene prioridad sobre el del framework). En el código de nivel superior de `<script server>`, `usePage`, `redirect` y `notFound` se pueden usar sin import, y desde `1.2` también `useHead` y `useSeoMeta`.
-- Las variables de entorno `MEEKO_HOST`, `MEEKO_PORT` (con `PORT` como respaldo permanente), `MEEKO_PUBLIC_ORIGIN` y `MEEKO_HMR_PORT`, y el prefijo `MEEKO_`, reservado para las variables que lee Meeko. `HOST` y `PUBLIC_ORIGIN` están obsoletas desde `1.2`.
+- Las variables de entorno `MEEKO_HOST`, `MEEKO_PORT` (con `PORT` como respaldo permanente), `MEEKO_PUBLIC_ORIGIN`, `MEEKO_HMR_PORT` y, desde `1.2`, `MEEKO_REDIS_URL`, `MEEKO_REDIS_PREFIX`, `MEEKO_SESSION_TTL` y `MEEKO_SESSION_SAMESITE`, y el prefijo `MEEKO_`, reservado para las variables que lee Meeko. `HOST` y `PUBLIC_ORIGIN` están obsoletas desde `1.2`.
 
 ### Salidas de build
 

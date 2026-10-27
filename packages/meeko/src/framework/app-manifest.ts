@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { createRequire } from "node:module";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { AppManifest, ClientAssets } from "../framework-server/app.js";
 import type { AssetManifest } from "../framework-server/assets.js";
 import { discoverServerManifest } from "../framework-server/manifest-discovery.js";
@@ -173,19 +174,49 @@ export async function discoverAppManifest(projectRoot: string, client: ClientAss
   return { manifest, modules: [...modules].sort(), ...(runtimeFile ? { runtime: moduleKey(root, runtimeFile) } : {}) };
 }
 
-/** Source of `virtual:meeko-server-app`: the baked manifest and a static module map. */
-export async function serverAppSource(projectRoot: string, build: BuildAppData | undefined): Promise<string> {
+/** `name` of the project's package.json, for the default Redis prefix of the sessions. */
+async function packageName(root: string): Promise<string | undefined> {
+  try {
+    const metadata = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as { name?: unknown };
+    return typeof metadata.name === "string" && metadata.name ? metadata.name : undefined;
+  } catch { return undefined; }
+}
+
+/** Whether the project can import the `redis` package, so the server bundle may load it. */
+export function projectHasRedis(root: string): boolean {
+  try {
+    createRequire(join(root, "package.json")).resolve("redis");
+    return true;
+  } catch {
+    // A package without a require entry still installs its package.json.
+    for (let directory = resolve(root); ; directory = dirname(directory)) {
+      if (existsSync(join(directory, "node_modules", "redis", "package.json"))) return true;
+      if (dirname(directory) === directory) return false;
+    }
+  }
+}
+
+/**
+ * Source of `virtual:meeko-server-app`: the baked manifest and a static module map. `redis: false`
+ * leaves the `redis` package out, as in Workers, which cannot open TCP connections.
+ */
+export async function serverAppSource(projectRoot: string, build: BuildAppData | undefined, options: { readonly redis?: boolean } = {}): Promise<string> {
   const client: ClientAssets = build?.client ?? { entry: `/${frameworkClientEntry}`, css: [], preload: [] };
   const { manifest, modules, runtime } = await discoverAppManifest(projectRoot, client, build?.assets);
   const entries = modules.map((key) => `  ${JSON.stringify(key)}: () => import(${JSON.stringify(key)})`).join(",\n");
   const root = resolve(projectRoot);
   const plugins = pluginRegistrations(root, (await discoverAppPlugins(root)).filter((plugin) => plugin.mode !== "client"));
+  const name = await packageName(root);
+  // Only an installed redis joins the bundle: without it, MEEKO_REDIS_URL fails with a clear error.
+  const redis = options.redis !== false && projectHasRedis(root);
   return [
     runtime ? `import runtimeModule from ${JSON.stringify(runtime)};` : "const runtimeModule = undefined;",
     ...plugins.imports,
     `export const manifest = ${serializeJson(manifest)};`,
     `export const runtime = runtimeModule;`,
     `export const plugins = ${plugins.list};`,
+    `export const appName = ${name === undefined ? "undefined" : JSON.stringify(name)};`,
+    redis ? `export const loadRedis = () => import("redis");` : "export const loadRedis = undefined;",
     `export const nodeServer = ${JSON.stringify(build?.node ?? { host: "127.0.0.1", port: 4173 })};`,
     `const modules = {\n${entries}\n};`,
     "export async function load(key) {",

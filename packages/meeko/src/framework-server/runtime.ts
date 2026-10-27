@@ -72,8 +72,12 @@ export type ServerServices<Services, Env = unknown> =
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#runtime-de-servidor
  */
 export interface ServerRuntime<Services = unknown, Env = unknown> {
-  /** Gestor de sesiones; obligatorio. En producción necesita un store persistente. */
-  readonly sessions: SessionManager<any>;
+  /**
+   * Gestor de sesiones. En producción necesita un store persistente. Desde `1.2` es opcional: sin
+   * él, Meeko usa memoria en desarrollo y, en producción, Redis con `MEEKO_REDIS_URL` (véase
+   * [Autenticación](https://github.com/meekojs/meeko/blob/main/docs/framework.md#autenticación)).
+   */
+  readonly sessions?: SessionManager<any>;
   /** Se expone como `RequestContext.services` a páginas, API, RPC y canales Socket. */
   readonly services?: ServerServices<Services, Env>;
   /** Política de Socket. */

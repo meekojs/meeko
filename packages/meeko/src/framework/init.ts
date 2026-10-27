@@ -4,7 +4,7 @@ import { basename, dirname, join, resolve } from "node:path";
 const allowedEntries = new Set(["package.json", "package-lock.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "yarn.lock", "node_modules", ".npmrc", ".git"]);
 
 const files: Readonly<Record<string, string>> = {
-  ".gitignore": "node_modules/\n.meeko/\n",
+  ".gitignore": "node_modules/\n.meeko/\n.env\n",
   "public/.gitkeep": "",
   "app/styles/main.css": `:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
 * { box-sizing: border-box; }
@@ -78,14 +78,20 @@ const count = signal(0);
 header { margin-bottom: 2rem; }
 </style>
 `,
-  "server/runtime.ts": `import { defineServerRuntime, MemorySessionStore, SessionManager } from "@meekojs/meeko/server";
+  ".env.example": `# Copy to .env (ignored by git). meeko dev, build, start, preview and check read .env;
+# a variable already set in the environment wins. Every variable Meeko reads starts with MEEKO_.
 
-// Created once per server process. \`meeko build\` also calls it with
-// \`prerendering: true\` to render pages declared with render: "prerender".
-export default defineServerRuntime(({ production, prerendering }) => {
-  if (production && !prerendering) throw new Error("Configure a persistent SessionStore in server/runtime.ts before production startup");
-  return { sessions: new SessionManager({ store: new MemorySessionStore(), production: false }) };
-});
+# Port and address of dev, start and preview (default 127.0.0.1:4173). PORT also works.
+# MEEKO_PORT=4173
+# MEEKO_HOST=127.0.0.1
+
+# Production: the exact public HTTPS origin behind your proxy, for the Origin checks.
+# MEEKO_PUBLIC_ORIGIN=https://example.com
+
+# Production sessions: Redis (install it with npm install redis). Development uses memory.
+# MEEKO_REDIS_URL=rediss://user:password@redis.example.com:6380
+# MEEKO_SESSION_TTL=7d
+# MEEKO_SESSION_SAMESITE=Lax
 `,
   "README.md": `# Meeko framework starter
 
@@ -96,7 +102,7 @@ npm install
 npm run dev
 \`\`\`
 
-Routes live in \`app/pages\`. \`app/layouts/default.meeko\` keeps the shared shell during client navigation. Put shared route guards in \`app/middleware\` with \`defineRouteMiddleware\`, and server request middleware in \`server/middleware\` with \`defineServerMiddleware\`; see the framework guide for their execution and security boundaries. \`server/runtime.ts\` creates the sessions and services shared by pages, API, RPC and Socket channels; replace its memory store with a persistent \`SessionStore\` before production. Global styles in \`app/styles/main.css\` load automatically; component styles stay in \`<style>\` blocks. Run \`npm run check\` for types, then \`npm run build\` and \`npm start\` for production SSR. The build in \`.meeko/output/node\` runs without the application sources; \`MEEKO_HOST\`, \`MEEKO_PORT\` (or \`PORT\`) and \`MEEKO_PUBLIC_ORIGIN\` configure it. Generated files live under \`.meeko/\`.
+Routes live in \`app/pages\`. \`app/layouts/default.meeko\` keeps the shared shell during client navigation. Put shared route guards in \`app/middleware\` with \`defineRouteMiddleware\`, and server request middleware in \`server/middleware\` with \`defineServerMiddleware\`; see the framework guide for their execution and security boundaries. Sessions need no setup: development keeps them in memory, and production stores them in Redis when \`MEEKO_REDIS_URL\` is set (see \`.env.example\`); add \`server/runtime.ts\` with \`defineServerRuntime\` for services, Socket policy or your own session store. Global styles in \`app/styles/main.css\` load automatically; component styles stay in \`<style>\` blocks. Run \`npm run check\` for types, then \`npm run build\` and \`npm start\` for production SSR. The build in \`.meeko/output/node\` runs without the application sources; \`MEEKO_HOST\`, \`MEEKO_PORT\` (or \`PORT\`) and \`MEEKO_PUBLIC_ORIGIN\` configure it. Generated files live under \`.meeko/\`.
 `,
 };
 

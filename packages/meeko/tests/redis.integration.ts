@@ -364,3 +364,63 @@ test("a revocation on one instance aborts an in-flight request on another throug
     await clientB.quit();
   }
 });
+
+test("sessions without server/runtime.ts use MEEKO_REDIS_URL in production and revoke across instances on real Redis", { skip: !url, timeout: 30_000 }, async () => {
+  if (!url) throw new Error("MEEKO_REDIS_URL is required");
+  const prefix = `meeko:test:${randomUUID()}:`;
+  const admin = await connectedClient(url);
+  const manifest = {
+    version: 1 as const, routes: [], routeMiddleware: [], serverMiddleware: [],
+    client: { entry: "/assets/entry.js", css: [], preload: [] },
+    server: {
+      api: [
+        { kind: "api" as const, file: "/login", pathname: "/api/login", method: "POST" as const, clientKey: "login.post" },
+        { kind: "api" as const, file: "/logout", pathname: "/api/logout", method: "POST" as const, clientKey: "logout.post" },
+        { kind: "api" as const, file: "/me", pathname: "/api/me", method: "GET" as const, clientKey: "me.get" },
+      ],
+      rpc: [], socket: [],
+    },
+  };
+  const routes: Record<string, unknown> = {
+    "/login": { default: defineApiRoute({ origin: "required", contentType: "response", async handler({ context }) {
+      await context.session.create({ user: "ada" });
+      return new Response(null, { status: 204 });
+    } }) },
+    "/logout": { default: defineApiRoute({ auth: "required", contentType: "response", async handler({ context }) {
+      await context.session.revoke();
+      return new Response(null, { status: 204 });
+    } }) },
+    "/me": { default: defineApiRoute({ auth: "required", contentType: "response", handler: ({ context }) => Response.json(context.session.current?.data) }) },
+  };
+  const options = {
+    manifest, production: true, load: async (key: string) => routes[key],
+    loadRedis: () => import("redis"),
+    platform: { name: "node" as const, env: { MEEKO_REDIS_URL: url, MEEKO_REDIS_PREFIX: prefix, MEEKO_SESSION_TTL: "1h" }, waitUntil() {} },
+  };
+  const first = await createServerApp(options);
+  const second = await createServerApp(options);
+  try {
+    const login = await first.fetch(new Request("https://shop.example/api/login", { method: "POST", headers: { origin: "https://shop.example" } }));
+    assert.equal(login.status, 204, await login.text());
+    const setCookie = login.headers.get("set-cookie") ?? "";
+    assert.match(setCookie, /^__Host-meeko\.sid=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; SameSite=Lax; Max-Age=3600; Secure$/);
+    const cookie = setCookie.split(";")[0]!;
+    const id = cookie.split("=")[1]!;
+    const ttl = await admin.pTTL(`${prefix}${id}`);
+    assert.ok(ttl > 3_500_000 && ttl <= 3_600_000, `TTL ${ttl}`);
+    // Another instance reads the same session from Redis.
+    const me = await second.fetch(new Request("https://shop.example/api/me", { headers: { cookie } }));
+    assert.deepEqual(await me.json(), { user: "ada" });
+    const csrf = me.headers.get("x-meeko-csrf-token") ?? "";
+    const logout = await second.fetch(new Request("https://shop.example/api/logout", { method: "POST", headers: { cookie, origin: "https://shop.example", "x-meeko-csrf": csrf } }));
+    assert.equal(logout.status, 204, await logout.text());
+    assert.equal(await admin.get(`${prefix}${id}`), null);
+    const after = await first.fetch(new Request("https://shop.example/api/me", { headers: { cookie } }));
+    assert.equal(after.status, 401);
+  } finally {
+    await first.close();
+    await second.close();
+    await deletePrefix(admin, prefix);
+    await admin.quit();
+  }
+});

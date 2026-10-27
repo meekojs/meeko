@@ -18,7 +18,9 @@ import type { ServerMiddleware } from "./middleware.js";
 import { createDetachedPlatform } from "./platform.js";
 import type { ServerPlatform } from "./platform.js";
 import type { ServerRuntime, ServerRuntimeDefinition } from "./runtime.js";
-import { MemorySessionStore, SessionManager } from "./sessions.js";
+import type { SessionManager } from "./sessions.js";
+import { createSessionDefaults, warnIgnoredSessionEnv } from "./zero-config.js";
+import type { SessionDefaults } from "./zero-config.js";
 import { createSocketHub, withSocketHub } from "./socket.js";
 import type { SocketHub, SocketPubSub } from "./socket.js";
 import type { PluginRegistration } from "../framework/plugin.js";
@@ -135,10 +137,26 @@ export interface ServerAppOptions<Env = Readonly<Record<string, string | undefin
   readonly manifest: AppManifest;
   /** Cargador de módulos por clave del manifiesto. */
   readonly load: AppModuleLoader;
-  /** Export por defecto de `server/runtime.ts`; sin él sólo hay sesiones en memoria de desarrollo. */
+  /**
+   * Export por defecto de `server/runtime.ts`. Si falta, o no devuelve `sessions`, Meeko crea las
+   * sesiones: en memoria en desarrollo y, en producción, en Redis con `MEEKO_REDIS_URL`.
+   */
   readonly runtime?: ServerRuntimeDefinition<Env, any> | undefined;
-  /** Modo producción: exige un runtime con store persistente y oculta los detalles de los errores. */
+  /** Modo producción: exige un store de sesiones persistente y oculta los detalles de los errores. */
   readonly production: boolean;
+  /**
+   * Nombre de la aplicación (el `name` de `package.json`), para el prefijo Redis por defecto de las
+   * sesiones, `meeko:<nombre>:prod:`. La entrada que genera Meeko lo pasa.
+   * @since 1.2.0
+   */
+  readonly appName?: string | undefined;
+  /**
+   * Importa el paquete `redis` del proyecto para las sesiones de producción con `MEEKO_REDIS_URL`
+   * cuando `server/runtime.ts` no declara `sessions`. La entrada que genera Meeko lo pasa en Node,
+   * Bun y Deno si el proyecto instala `redis`; Workers no lo tiene, porque no abre conexiones TCP.
+   * @since 1.2.0
+   */
+  readonly loadRedis?: (() => Promise<unknown>) | undefined;
   /** Plataforma que recibe la fábrica del runtime y que se usa cuando `fetch` no recibe otra. */
   readonly platform?: ServerPlatform<Env>;
   /** Lector de los archivos públicos del build. */
@@ -244,21 +262,53 @@ function defaultObserver(production: boolean): ServerErrorObserver {
   };
 }
 
-async function createRuntime<Env>(options: ServerAppOptions<Env>, platform: ServerPlatform<Env>): Promise<ServerRuntime<unknown, Env>> {
+/** The runtime with its sessions always present: the app's own, or Meeko's defaults. */
+type ResolvedRuntime<Env> = ServerRuntime<unknown, Env> & { readonly sessions: SessionManager<any> };
+
+async function createRuntime<Env>(options: ServerAppOptions<Env>, platform: ServerPlatform<Env>): Promise<ResolvedRuntime<Env>> {
   const prerendering = options.prerendering === true;
-  if (options.runtime === undefined) {
-    if (options.production && !prerendering) {
-      throw new Error("Production requires server/runtime.ts with a persistent SessionStore; export defineServerRuntime(...) from it");
+  if (options.runtime !== undefined && typeof options.runtime !== "function") throw new TypeError("server/runtime.ts must default-export defineServerRuntime(...)");
+  const runtime: ServerRuntime<unknown, Env> = options.runtime === undefined
+    ? {}
+    : await options.runtime({ env: platform.env, production: options.production, platform: platform.name, prerendering });
+  if (!runtime || typeof runtime !== "object") throw new TypeError("server/runtime.ts must return an object, such as { services } or { sessions: SessionManager }");
+  const sessions = runtime.sessions as Partial<SessionManager> | undefined;
+  if (sessions !== undefined) {
+    if (!sessions || typeof sessions.load !== "function" || typeof sessions.assertMutationAllowed !== "function") {
+      throw new TypeError("server/runtime.ts must return { sessions: SessionManager } or omit sessions");
     }
-    return { sessions: new SessionManager({ store: new MemorySessionStore(), production: false }) };
+    warnIgnoredSessionEnv(platform.env);
+    return runtime as ResolvedRuntime<Env>;
   }
-  if (typeof options.runtime !== "function") throw new TypeError("server/runtime.ts must default-export defineServerRuntime(...)");
-  const runtime = await options.runtime({ env: platform.env, production: options.production, platform: platform.name, prerendering });
-  const sessions = (runtime as Partial<ServerRuntime> | undefined)?.sessions as Partial<SessionManager> | undefined;
-  if (!sessions || typeof sessions.load !== "function" || typeof sessions.assertMutationAllowed !== "function") {
-    throw new TypeError("server/runtime.ts must return { sessions: SessionManager }");
+  // Without sessions from the app: memory in development, Redis from MEEKO_REDIS_URL in production.
+  let defaults: SessionDefaults;
+  try {
+    defaults = await createSessionDefaults({
+      env: platform.env, production: options.production, prerendering, platform: platform.name,
+      appName: options.appName, loadRedis: options.loadRedis,
+    });
+  } catch (error) {
+    // The factory may already hold resources, such as a database pool.
+    try { await runtime.close?.(); }
+    catch (cleanupError) { throw new AggregateError([error, cleanupError], "Meeko session defaults and runtime cleanup failed"); }
+    throw error;
   }
-  return runtime;
+  const ownClose = runtime.close;
+  return {
+    ...runtime,
+    sessions: defaults.sessions,
+    ...(ownClose || defaults.close ? {
+      close: async () => {
+        const failures: unknown[] = [];
+        try { await ownClose?.(); }
+        catch (error) { failures.push(error); }
+        try { await defaults.close?.(); }
+        catch (error) { failures.push(error); }
+        if (failures.length === 1) throw failures[0];
+        if (failures.length > 1) throw new AggregateError(failures, "Meeko runtime cleanup failed");
+      },
+    } : {}),
+  };
 }
 
 async function loadDefault<T>(load: AppModuleLoader, key: string, label: string): Promise<T> {
@@ -269,13 +319,17 @@ async function loadDefault<T>(load: AppModuleLoader, key: string, label: string)
 
 /**
  * Crea la aplicación portable a partir del manifiesto fijado en el build y un cargador de módulos.
- * Llama una vez a la fábrica de `server/runtime.ts`. La entrada que genera `meeko build` la usa; un
- * host propio la sirve con un adaptador como `serveNode`.
+ * Llama una vez a la fábrica de `server/runtime.ts`. Si no hay runtime o no declara `sessions`, crea
+ * las sesiones: en memoria en desarrollo y, desde `1.2`, en Redis con `MEEKO_REDIS_URL` en
+ * producción, con `MEEKO_SESSION_TTL` y `MEEKO_SESSION_SAMESITE`. La entrada que genera
+ * `meeko build` la usa; un host propio la sirve con un adaptador como `serveNode`.
  *
  * @param options Manifiesto, cargador, runtime y plataforma.
  * @returns La aplicación.
- * @throws {TypeError} Si el manifiesto es de otra versión, falta el cargador o el runtime no devuelve `sessions`.
- * @throws {Error} En producción sin `server/runtime.ts`.
+ * @throws {TypeError} Si el manifiesto es de otra versión, falta el cargador, el runtime devuelve unas
+ * `sessions` que no son un `SessionManager` o una variable `MEEKO_SESSION_*` no es válida.
+ * @throws {Error} En producción sin un store persistente: ni `sessions` en `server/runtime.ts` ni
+ * `MEEKO_REDIS_URL`, o sin el paquete `redis` o sin conexión con su servidor.
  * @example
  * ```ts
  * import { createServerApp } from "@meekojs/meeko/server";

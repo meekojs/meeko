@@ -47,14 +47,14 @@ performance.measure("meeko-hydration", { start: hydrationStart, end: performance
 
 /** Adapter-neutral application entry: the baked manifest plus its module map. */
 export const serverEntrySource = `import { createServerApp, type ServerApp, type ServerAppOptions } from "@meekojs/meeko/server";
-import { load, manifest, plugins, runtime } from "virtual:meeko-server-app";
+import { appName, load, loadRedis, manifest, plugins, runtime } from "virtual:meeko-server-app";
 
 export { load, manifest };
 
-export type AppHostOptions = Omit<ServerAppOptions, "manifest" | "load" | "runtime" | "plugins">;
+export type AppHostOptions = Omit<ServerAppOptions, "manifest" | "load" | "runtime" | "plugins" | "appName" | "loadRedis">;
 
 export function createApp(options: AppHostOptions): Promise<ServerApp> {
-  return createServerApp({ ...options, manifest, load, runtime, plugins });
+  return createServerApp({ ...options, manifest, load, runtime, plugins, appName, loadRedis });
 }
 `;
 

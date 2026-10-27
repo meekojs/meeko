@@ -39,6 +39,7 @@ test("starter preserves an occupied-port error and reports failed startup cleanu
   const signalsBefore = { int: process.listenerCount("SIGINT"), term: process.listenerCount("SIGTERM") };
   try {
     await initFrameworkProject(root);
+    await mkdir(join(root, "server"), { recursive: true });
     await writeFile(join(root, "server", "runtime.ts"), `import { defineServerRuntime, MemorySessionStore, SessionManager } from "@meekojs/meeko/server";
 
 class FailingSessionStore extends MemorySessionStore {
@@ -96,6 +97,7 @@ test("production asset write failure is reported once per observer with one requ
   let logs = "";
   try {
     await initFrameworkProject(root);
+    await mkdir(join(root, "server"), { recursive: true });
     await writeFile(join(root, "server", "runtime.ts"), `import { defineServerRuntime, MemorySessionStore, SessionManager } from "@meekojs/meeko/server";
 
 export default defineServerRuntime(({ production }) => {

@@ -313,11 +313,13 @@ test("asset readers run before middleware and the runtime closes once", async ()
   assert.deepEqual(closed, ["sessions", "runtime"]);
 });
 
-test("createServerApp requires a production runtime with sessions", async () => {
+test("createServerApp requires a persistent session store in production", async () => {
   await assert.rejects(createServerApp({ manifest, production: true, load: async () => ({}) }),
-    /Production requires server\/runtime\.ts with a persistent SessionStore/);
-  await assert.rejects(createServerApp({ manifest, production: false, load: async () => ({}), runtime: (() => ({})) as never }),
-    /server\/runtime\.ts must return \{ sessions: SessionManager \}/);
+    /Production requires a persistent session store: set MEEKO_REDIS_URL/);
+  await assert.rejects(createServerApp({ manifest, production: false, load: async () => ({}), runtime: (() => ({ sessions: {} })) as never }),
+    /server\/runtime\.ts must return \{ sessions: SessionManager \} or omit sessions/);
+  await assert.rejects(createServerApp({ manifest, production: false, load: async () => ({}), runtime: (() => undefined) as never }),
+    /server\/runtime\.ts must return an object/);
   await assert.rejects(createServerApp({ manifest: { ...manifest, version: 2 } as never, production: false, load: async () => ({}) }),
     /Unsupported Meeko application manifest/);
   const prerendering = await createServerApp({ manifest: { ...manifest, server: { api: [], rpc: [] } }, production: true, prerendering: true, load: async () => ({}) });

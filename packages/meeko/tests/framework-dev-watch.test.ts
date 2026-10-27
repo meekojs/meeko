@@ -363,6 +363,8 @@ test("meeko dev keeps serving pages across Vite restarts", { timeout: 90_000 }, 
   await writeFile(join(root, ".env"), "MEEKO_TEST_RESTART=1\n");
   // Counts the apps created: the entry imports the runtime once per app.
   const runtimeLoaded = "[meeko-test] runtime loaded";
+  await mkdir(join(root, "server"), { recursive: true });
+  await writeFile(join(root, "server", "runtime.ts"), `import { defineServerRuntime } from "@meekojs/meeko/server";\nexport default defineServerRuntime(() => ({}));\n`);
   await appendFile(join(root, "server", "runtime.ts"), `process.stdout.write(${JSON.stringify(`${runtimeLoaded}\n`)});\n`);
   await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
   await symlink(repository, join(root, "node_modules", "@meekojs", "meeko"), "junction");

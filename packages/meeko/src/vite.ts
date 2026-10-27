@@ -112,6 +112,7 @@ function autoimportedSpecifiers(prefix: string): Map<string, string[]> {
 export function meeko(): Plugin {
   let isDev = false;
   let ssrBuild = false;
+  let workerBuild = false;
   let root = "";
   const styles = new Map<string, string>();
   /**
@@ -141,6 +142,8 @@ export function meeko(): Plugin {
     configResolved(config) {
       isDev = config.command === "serve";
       ssrBuild = Boolean(config.build.ssr);
+      // Workers have no TCP: their bundle never carries the redis package.
+      workerBuild = config.ssr?.target === "webworker";
       root = config.root;
     },
     async resolveId(id, importer) {
@@ -175,7 +178,7 @@ export function meeko(): Plugin {
       const virtual = id.startsWith("\0") ? id.slice(1) : undefined;
       if (virtual === clientRoutesModule) return clientRoutesSource(root);
       if (virtual === clientSidecarsModule) return clientSidecarsSource(root);
-      if (virtual === serverAppModule) return serverAppSource(root, ssrBuild && !isDev ? await readBuildAppData(root) : undefined);
+      if (virtual === serverAppModule) return serverAppSource(root, ssrBuild && !isDev ? await readBuildAppData(root) : undefined, { redis: !workerBuild });
       if (virtual === clientPluginsModule) {
         if (options?.ssr || ssrBuild) throw new Error(`${clientPluginsModule} belongs to the client bundle`);
         return clientPluginsSource(root);

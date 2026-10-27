@@ -71,6 +71,8 @@ export async function generateRoutes(projectRoot: string): Promise<GeneratedRout
     '  export const manifest: import("@meekojs/meeko/server").AppManifest;',
     '  export const plugins: readonly import("@meekojs/meeko/framework").PluginRegistration[];',
     '  export const runtime: import("@meekojs/meeko/server").ServerRuntimeDefinition<any, any> | undefined;',
+    '  export const appName: string | undefined;',
+    '  export const loadRedis: (() => Promise<unknown>) | undefined;',
     '  export const nodeServer: { readonly host: string; readonly port: number };',
     '  export function load(key: string): Promise<unknown>;',
     '}',
