@@ -1,6 +1,9 @@
 import { escapeHtml } from "../server.js";
 
-/** Renders stylesheet URLs from a Vite manifest or the development convention. */
-export function stylesheetLinks(paths: readonly string[]): string {
-  return paths.map((path) => `<link rel="stylesheet" href="${escapeHtml(path)}">`).join("");
+/**
+ * Renders a development stylesheet that the client bundle also imports. Vite's client adopts a link
+ * whose `data-vite-dev-id` names the CSS module: it skips the duplicate `<style>` and hot-swaps the link.
+ */
+export function devStylesheetLink(path: string, moduleId: string): string {
+  return `<link rel="stylesheet" href="${escapeHtml(path)}" data-vite-dev-id="${escapeHtml(moduleId)}">`;
 }

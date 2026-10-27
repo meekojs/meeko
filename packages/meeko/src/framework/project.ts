@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { Server } from "node:http";
@@ -26,7 +26,7 @@ import { editorBridgeHost, startEditorBridge } from "./editor-bridge.js";
 import type { EditorBridge } from "./editor-bridge.js";
 import { clientEntrySource, nodeEntrySource, serverEntrySource } from "./project-templates.js";
 import { assertNoLegacySessionFile } from "./runtime-migration.js";
-import { stylesheetLinks } from "./styles.js";
+import { devStylesheetLink } from "./styles.js";
 
 export { frameworkClientEntry, frameworkServerEntry } from "./app-manifest.js";
 
@@ -471,6 +471,13 @@ async function startDevelopment(root: string): Promise<Server> {
       appType: "custom",
     });
     const globalCss = resolve(root, "app/styles/main.css");
+    const globalStylesheet = (): string => {
+      // Vite names the module by its real path with forward slashes, as the client entry imports it.
+      let moduleId: string;
+      try { moduleId = realpathSync.native(globalCss).replaceAll("\\", "/"); }
+      catch { return ""; }
+      return devStylesheetLink("/app/styles/main.css?direct", moduleId);
+    };
     const devServer = vite;
     const publicOrigin = process.env.PUBLIC_ORIGIN || undefined;
     const createDevApp = async (): Promise<ServerApp> => {
@@ -485,7 +492,7 @@ async function startDevelopment(root: string): Promise<Server> {
         document: {
           // Vite's client and the unbundled global stylesheet replace the production manifest links.
           head: ({ nonce }) => `<script type="module"${nonce ? ` nonce="${escapeHtml(nonce)}"` : ""} src="/@vite/client"></script>`
-            + (existsSync(globalCss) ? stylesheetLinks(["/app/styles/main.css?direct"]) : ""),
+            + globalStylesheet(),
         },
       });
     };

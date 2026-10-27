@@ -192,7 +192,7 @@ test("generated starter serves a real Socket channel and shuts its Node transpor
   assert.match(malformed, /"code":"INVALID_URL","status":400/);
   assert.equal((await fetch(origin)).status, 200, "the host must remain available after an invalid URL");
   const html = await response.text();
-  assert.match(html, /<link rel="stylesheet" href="\/app\/styles\/main\.css\?direct">/);
+  assert.match(html, /<link rel="stylesheet" href="\/app\/styles\/main\.css\?direct" data-vite-dev-id="[^"]+\/app\/styles\/main\.css">/);
   const stylesheet = await fetch(`${origin}/app/styles/main.css?direct`);
   assert.match(stylesheet.headers.get("content-type") ?? "", /text\/css/);
   assert.match(await stylesheet.text(), /box-sizing: border-box/);
@@ -260,6 +260,19 @@ test("generated starter reloads edited pages in SSR and Chrome development", { t
   page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
   await page.goto(origin, { waitUntil: "networkidle" });
   assert.equal(await page.locator("h1").innerText(), "Welcome to Meeko");
+  // The global stylesheet loads once, as the server's link, and its imports update it in place.
+  const globalSheets = () => page.evaluate(() => [...document.styleSheets].filter((sheet) =>
+    sheet.href?.includes("/app/styles/main.css")
+    || (sheet.ownerNode as Element).getAttribute("data-vite-dev-id")?.endsWith("/app/styles/main.css")).length);
+  assert.equal(await globalSheets(), 1);
+  const stylesFile = join(root, "app", "styles", "main.css");
+  await writeFile(join(root, "app", "styles", "probe.css"), "body { color: rgb(1, 2, 3); }\n", "utf8");
+  await writeFile(stylesFile, `@import "./probe.css";\n${await readFile(stylesFile, "utf8")}`, "utf8");
+  await page.waitForFunction(() => getComputedStyle(document.body).color === "rgb(1, 2, 3)", undefined, { timeout: 15_000 });
+  await writeFile(join(root, "app", "styles", "probe.css"), "body { background-color: rgb(4, 5, 6); }\n", "utf8");
+  await page.waitForFunction(() => getComputedStyle(document.body).backgroundColor === "rgb(4, 5, 6)", undefined, { timeout: 15_000 });
+  assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).color), "rgb(1, 2, 3)", "a removed rule must not stay applied");
+  assert.equal(await globalSheets(), 1);
   const pageFile = join(root, "app", "pages", "index.meeko");
   const source = await readFile(pageFile, "utf8");
   await writeFile(pageFile, source.replace("Welcome to Meeko", "Updated in development"), "utf8");
