@@ -1,6 +1,6 @@
 # Cambios de Meeko Language
 
-## [Unreleased]
+## [1.2.0] - 2026-10-27
 
 - Más color: las directivas de control (`if:when`, `each:*`) se ven como palabras clave, los eventos (`on:*`) como funciones y las etiquetas propias de Meeko (`MeekoLink`, `MeekoOutlet`, `component`, `snippet`, `render`) como integradas; las señales tienen su propio color. Las etiquetas de cierre `</snippet>`, `</component>` y las de elementos personalizados ya no salen en rojo.
 - `<MeekoLink>`: `to="` sugiere las rutas del proyecto, y el completado ofrece `to`, `bind:params` y `bind:search`; `<` sugiere `MeekoLink` y, en `app.meeko` y los layouts, `MeekoOutlet`.
