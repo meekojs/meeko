@@ -51,7 +51,10 @@ export interface Signal<T> extends ReadonlySignal<T> {
  * export const themeKey: ContextKey<Signal<"light" | "dark">> = createContext("theme");
  * ```
  */
-export type ContextKey<T> = symbol & { readonly __meekoValue?: (value: T) => T };
+export type ContextKey<T> = symbol & {
+  /** Marca sólo de tipos que fija `T`; nunca existe en tiempo de ejecución. */
+  readonly __meekoValue?: (value: T) => T;
+};
 
 /**
  * Crea una clave de contexto única. El tipo `T` se declara en la clave, no se infiere de un valor

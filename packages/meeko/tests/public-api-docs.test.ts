@@ -35,7 +35,11 @@ const withoutExample: ReadonlyMap<string, string> = new Map([
  *   unless `withoutExample` lists it;
  * - every public member of an exported class has a description, its own or the one it
  *   inherits from the interface it implements (what the editor hover shows). The class
- *   `@example` covers its members.
+ *   `@example` covers its members;
+ * - every property and method of an exported interface, own or inherited from another
+ *   interface of the package, and of the object type literals an exported type alias is made
+ *   of (directly or through a union or an intersection) has a description, its own or the
+ *   inherited one. Members declared outside `src/`, such as those of `Request`, are left out.
  */
 function undocumentedExports(): string[] {
   const parsed = ts.getParsedCommandLineOfConfigFile(resolve("tsconfig.json"), {}, {
@@ -49,6 +53,16 @@ function undocumentedExports(): string[] {
   const checker = program.getTypeChecker();
   const problems: string[] = [];
   const seenExceptions = new Set<string>();
+  const sourceRoot = resolve("src");
+  const documentation = (member: ts.Symbol | undefined): string =>
+    member ? ts.displayPartsToString(member.getDocumentationComment(checker)).trim() : "";
+  /** The object type literals a type alias is made of, through unions, intersections and parentheses. */
+  const typeLiterals = (node: ts.TypeNode): ts.TypeLiteralNode[] => {
+    if (ts.isTypeLiteralNode(node)) return [node];
+    if (ts.isUnionTypeNode(node) || ts.isIntersectionTypeNode(node)) return node.types.flatMap(typeLiterals);
+    if (ts.isParenthesizedTypeNode(node)) return typeLiterals(node.type);
+    return [];
+  };
   for (const [subpath, file] of Object.entries(entries)) {
     const source = program.getSourceFile(resolve(file));
     assert.ok(source, `${file} is not in the program`);
@@ -66,7 +80,24 @@ function undocumentedExports(): string[] {
       } else if (!hasExample) {
         problems.push(`${id}: missing @example`);
       }
+      if (symbol.declarations?.some(ts.isInterfaceDeclaration)) {
+        for (const property of checker.getPropertiesOfType(checker.getDeclaredTypeOfSymbol(symbol))) {
+          // Members keyed by a symbol (`__@name@id`) are left out, as computed class members are.
+          if (property.name.startsWith("__@")) continue;
+          const declarations = property.declarations ?? [];
+          if (!declarations.some((node) => resolve(node.getSourceFile().fileName).toLowerCase().startsWith(sourceRoot.toLowerCase()))) continue;
+          if (!documentation(property)) problems.push(`${id}.${property.name}: missing JSDoc`);
+        }
+      }
       for (const declaration of symbol.declarations ?? []) {
+        if (ts.isTypeAliasDeclaration(declaration)) {
+          for (const literal of typeLiterals(declaration.type)) {
+            for (const member of literal.members) {
+              if (!member.name || ts.isComputedPropertyName(member.name)) continue;
+              if (!documentation(checker.getSymbolAtLocation(member.name))) problems.push(`${id}.${member.name.getText()}: missing JSDoc`);
+            }
+          }
+        }
         if (!ts.isClassDeclaration(declaration)) continue;
         for (const member of declaration.members) {
           // Members keyed by a module-private symbol (`[lockSessionCookie]`) cannot be named by consumers.

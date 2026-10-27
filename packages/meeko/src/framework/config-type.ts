@@ -17,6 +17,7 @@ import type { MeekoModuleEntry } from "./module.js";
  */
 export type MeekoServerConfig =
   | {
+    /** Servidor Node en `.meeko/output/node/`, el que sirve `meeko start`. */
     readonly adapter: "node";
     /** Interfaz en la que escucha `meeko start`. Por defecto, `127.0.0.1`; `HOST` la sustituye. */
     readonly host?: string;
@@ -24,6 +25,7 @@ export type MeekoServerConfig =
     readonly port?: number;
   }
   | {
+    /** Worker de Cloudflare con su `wrangler.jsonc`, en `.meeko/output/cloudflare/`. */
     readonly adapter: "cloudflare";
     /** Nombre del Worker en el `wrangler.jsonc` generado. Por defecto, el nombre del paquete. */
     readonly name?: string;
@@ -40,8 +42,14 @@ export type MeekoServerConfig =
      */
     readonly wrangler?: Readonly<Record<string, unknown>>;
   }
-  | { readonly adapter: "deno" }
-  | { readonly adapter: "bun" };
+  | {
+    /** Servidor Deno en `.meeko/output/deno/`. */
+    readonly adapter: "deno";
+  }
+  | {
+    /** Servidor Bun en `.meeko/output/bun/`. */
+    readonly adapter: "bun";
+  };
 
 /**
  * Nombre de un adaptador de build: `"node"`, `"cloudflare"`, `"deno"` o `"bun"`.

@@ -22,8 +22,18 @@ const pluginBrand: unique symbol = Symbol.for("meeko.app-plugin") as never;
  * ```
  */
 export type PluginErrorInfo =
-  | { readonly side: "client"; readonly source: ErrorSource }
-  | { readonly side: "server"; readonly requestId: string };
+  | {
+    /** Discriminante: el fallo se observó en el navegador. */
+    readonly side: "client";
+    /** Origen del fallo en el navegador: navegación, Socket, eventos, efectos… */
+    readonly source: ErrorSource;
+  }
+  | {
+    /** Discriminante: el fallo se observó en el servidor. */
+    readonly side: "server";
+    /** ID de la petición cuyo render falló, el mismo de la cabecera `x-request-id`. */
+    readonly requestId: string;
+  };
 
 /**
  * Observador de errores que registra un plugin con {@link PluginApp.onError}. `error` es `unknown`:

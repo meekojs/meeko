@@ -84,10 +84,15 @@ export interface DevtoolsReadSite {
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
 export interface DevtoolsAssignmentSite {
+    /** Discriminante: una asignación del código del componente. */
     kind: "assignment";
+    /** Archivo `.meeko`. */
     file: string;
+    /** Línea donde empieza la asignación, desde 1. */
     line: number;
+    /** Columna donde empieza la asignación, desde 1. */
     column: number;
+    /** Texto de la asignación, compactado y recortado a 200 caracteres. */
     expression: string;
 }
 /**
@@ -102,6 +107,7 @@ export interface DevtoolsAssignmentSite {
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
 export interface DevtoolsEditSite {
+    /** Discriminante: una edición desde un panel con `setSignal`. */
     kind: "devtools";
 }
 /**
@@ -130,8 +136,11 @@ export type DevtoolsWriteSite = DevtoolsAssignmentSite | DevtoolsEditSite;
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
 export interface DevtoolsSignalSite {
+    /** Archivo `.meeko` que declara la señal. */
     file: string;
+    /** Línea de la declaración, desde 1. */
     line: number;
+    /** Columna de la declaración, desde 1. */
     column: number;
 }
 /**
@@ -233,9 +242,13 @@ export interface DevtoolsEvent {
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
 export interface DevtoolsSnapshot {
+    /** Versión del protocolo que implementa el runtime. */
     protocolVersion: DevtoolsProtocolVersion;
+    /** Instancias hidratadas activas; cada una enlaza a su padre y a sus hijas por ID. */
     instances: DevtoolsInstance[];
+    /** Copia de los eventos recientes de la línea de tiempo, del más antiguo al más nuevo; guarda hasta 100. */
     events: DevtoolsEvent[];
+    /** Instancia seleccionada con `select`, o `null` si no hay ninguna. */
     selectedId: string | null;
 }
 /**
@@ -249,9 +262,12 @@ export interface DevtoolsSnapshot {
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
 export type DevtoolsCommandResult = {
+    /** La orden se aplicó. */
     ok: true;
 } | {
+    /** La orden se rechazó o falló durante su aplicación. */
     ok: false;
+    /** Motivo legible del fallo. */
     error: string;
 };
 /**

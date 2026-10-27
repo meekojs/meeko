@@ -62,12 +62,17 @@ export interface SocketSession {
  */
 export type SocketUpgrade =
   /** No es una petición de canal Socket; el host la atiende como HTTP normal. */
-  | { readonly action: "pass" }
+  | {
+    /** Discriminante: la petición no se trata como Socket. */
+    readonly action: "pass";
+  }
   /**
    * Responder con este estado HTTP en lugar de hacer el upgrade, salvo que haya `close`.
    */
   | {
+    /** Discriminante: la política rechazó el handshake. */
     readonly action: "reject";
+    /** Estado HTTP del rechazo: `400` si el handshake está mal formado; si no, el del error de la comprobación previa del canal. */
     readonly status: number;
     /**
      * Desde `1.1`, presente sólo cuando el hub rechaza la sesión (`401`) o la autorización del
@@ -80,11 +85,15 @@ export type SocketUpgrade =
   }
   /** Hacer el upgrade del transporte y llamar a `open` cuando la conexión esté lista. */
   | {
+    /** Discriminante: la política aceptó el handshake. */
     readonly action: "upgrade";
+    /** Nombre del canal, tomado de la ruta tras el prefijo de Socket. */
     readonly channel: string;
+    /** Sala pedida con el parámetro `room` de la URL, o `undefined` si no hay ninguno. */
     readonly roomId: string | undefined;
     /** Petición del handshake, reescrita sobre el origen público. */
     readonly request: Request;
+    /** Abre la sesión del canal sobre el transporte ya aceptado; el adaptador le entrega los mensajes. */
     open(peer: SocketPeer): SocketSession;
   };
 

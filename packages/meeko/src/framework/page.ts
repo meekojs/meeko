@@ -17,6 +17,7 @@ import type { HeadInput } from "./head.js";
  * ```
  */
 export interface PageSchema<I = unknown, O = I> {
+  /** Interfaz Standard Schema v1: `validate` devuelve el valor de salida o la lista de `issues`. */
   readonly "~standard": {
     readonly version: 1;
     readonly validate: (value: unknown) =>

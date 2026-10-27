@@ -78,6 +78,7 @@ export interface ComponentModule<Props extends object> {
  * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#componentes-meeko
  */
 export type Component<Props extends object> = ComponentModule<Props> & {
+  /** Renderiza el HTML y captura el estado de sus señales; aquí es obligatorio. */
   readonly renderWithState: (props: Props) => { html: string; state: Record<string, unknown> };
 };
 

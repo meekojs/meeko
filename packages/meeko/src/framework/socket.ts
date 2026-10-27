@@ -22,6 +22,7 @@ import { ClientError } from "./clients.js";
  * ```
  */
 export interface SocketSchema<I = unknown, O = I> {
+  /** Interfaz Standard Schema v1: `validate` devuelve el valor de salida o la lista de `issues`. */
   readonly "~standard": {
     readonly version: 1;
     readonly validate: (value: unknown) => { value: O; issues?: undefined } | { issues: readonly unknown[] } | Promise<{ value: O; issues?: undefined } | { issues: readonly unknown[] }>;
