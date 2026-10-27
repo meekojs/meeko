@@ -3,6 +3,7 @@ import { basename, join, relative, resolve } from "node:path";
 import ts from "@typescript/typescript6";
 import { discoverAutoImports, discoverAutoImportsSync } from "../autoimports.js";
 import type { AutoImport } from "../autoimports.js";
+import { projectDeclarationFiles } from "../compiler/project-declarations.js";
 import { projectRoot } from "../compiler/project-root.js";
 import { readMeekoConfigSync, resolveConfigSources } from "../framework/config.js";
 import { emptyAppIndex, loadAppIndex } from "./app-index.js";
@@ -114,6 +115,8 @@ export class MeekoProject {
       getModuleSpecifierCache: () => this.specifierCache,
       getScriptFileNames: () => [
         ...this.compiler.fileNames,
+        // Augmentations such as MeekoSession reach components only as program roots.
+        ...this.roots.flatMap((root) => projectDeclarationFiles(root)),
         ...[...this.entries.values()].flatMap((entry) => entry.component
           ? [entry.virtualFilename, ...(entry.component.server ? [entry.component.server.virtualFilename] : [])]
           : []),

@@ -15,7 +15,7 @@ import type { Unsubscribe } from "./socket.js";
  * @example
  * ```ts
  * // server/types/session.d.ts
- * export {};
+ * import type {} from "@meekojs/meeko/server";
  * declare module "@meekojs/meeko/server" {
  *   interface MeekoSession { user: string; role: "owner" | "staff" }
  * }

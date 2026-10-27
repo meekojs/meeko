@@ -1616,7 +1616,7 @@ Las dos últimas son de la aplicación, sin el prefijo `MEEKO_`, que queda reser
 
 ```ts
 // server/types/session.d.ts
-export {};
+import type {} from "@meekojs/meeko/server";
 declare module "@meekojs/meeko/server" {
   interface MeekoSession { user: string; role: "owner" }
 }
@@ -1679,7 +1679,7 @@ Lo que hace Meeko por usted en este ejemplo:
 
 ### Tipos de la sesión: `MeekoSession`
 
-Sin declaración, `context.session.current.data` es `unknown`, como hasta `1.1`, y `session.create(data)` acepta cualquier valor serializable. Desde `1.2`, una aumentación de módulo de la interfaz `MeekoSession` de `@meekojs/meeko/server` fija la forma en toda la aplicación: `RequestContext.session` pasa a ser `SessionHandle<MeekoSession>`, así que `context.session.current?.data` y `create(data)` quedan tipados en el `<script server>` de las páginas (`usePage().context`), en API, RPC y Socket, y en `authorize` y `locals`. El tipo resultante se llama `SessionData`. Declárela en un archivo de `server/`, que comprueba el proyecto TypeScript del servidor, y con `export {}` para que sea un módulo. El tipo no valida en ejecución: si cambia la forma, las sesiones guardadas antes conservan la anterior hasta que caducan o se crean de nuevo.
+Sin declaración, `context.session.current.data` es `unknown`, como hasta `1.1`, y `session.create(data)` acepta cualquier valor serializable. Desde `1.2`, una aumentación de módulo de la interfaz `MeekoSession` de `@meekojs/meeko/server` fija la forma en toda la aplicación: `RequestContext.session` pasa a ser `SessionHandle<MeekoSession>`, así que `context.session.current?.data` y `create(data)` quedan tipados en el `<script server>` de las páginas (`usePage().context`), en API, RPC y Socket, y en `authorize` y `locals`. El tipo resultante se llama `SessionData`. Declárela en un archivo `.d.ts` de `server/` (por ejemplo, `server/types/session.d.ts`), que `meeko check` y el editor incluyen en todos los proyectos, y empiece por `import type {} from "@meekojs/meeko/server";`: así el archivo es un módulo y TypeScript carga siempre el módulo que amplía, aunque el código que lee la sesión sólo importe `@meekojs/meeko/framework` (con `export {}` la aumentación se perdería en esos archivos). El tipo no valida en ejecución: si cambia la forma, las sesiones guardadas antes conservan la anterior hasta que caducan o se crean de nuevo.
 
 ### Contraseñas
 

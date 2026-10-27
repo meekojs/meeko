@@ -368,7 +368,7 @@ test("a MeekoSession declaration in server/ types the session in a page's <scrip
     await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
     await symlink(resolve("."), join(root, "node_modules", "@meekojs", "meeko"), "junction");
     await writeFile(join(root, "server", "types", "session.d.ts"), [
-      "export {};",
+      'import type {} from "@meekojs/meeko/server";',
       'declare module "@meekojs/meeko/server" {',
       '  interface MeekoSession { user: string; role: "owner" }',
       "}",
