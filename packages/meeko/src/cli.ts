@@ -17,7 +17,7 @@ import { prerenderProject } from "./framework/prerender.js";
 import { generateTypeScriptAutoImports } from "./autoimports-ts.js";
 import { assertBuildAdapter, buildProject, developmentServerPorts, previewProject, startProject, stopDevelopmentServer } from "./framework/project.js";
 import { findLinkedMeeko, isSupervisedDevelopment, linkWatchEnabled, runSupervisedDevelopment, superviseDevelopment } from "./framework/dev-link.js";
-import { checkFrameworkProject, prepareFrameworkTypes } from "./framework/check-project.js";
+import { checkFrameworkProject, loadCheckedMeekoConfig, prepareFrameworkTypes } from "./framework/check-project.js";
 import { cleanProject, formatCleanResult } from "./framework/clean.js";
 import { loadProjectEnv } from "./framework/env-file.js";
 import { formatDiagnostic, hasErrors } from "./compiler/sfc.js";
@@ -110,7 +110,7 @@ if (problem !== undefined) {
         const start = async () => {
           // Modules run once in this process, already in development mode for the types prepared below.
           setModuleDevelopmentMode(true);
-          warnLegacyLayerEntries(root, await loadMeekoConfig(root));
+          warnLegacyLayerEntries(root, await loadCheckedMeekoConfig(root));
           await prepareFrameworkTypes(root);
           return startProject(root, false);
         };
@@ -123,7 +123,7 @@ if (problem !== undefined) {
       else if (command === "preview") await previewProject(root, adapter === undefined ? undefined : assertBuildAdapter(adapter));
       else {
         const requested = adapter === undefined ? undefined : assertBuildAdapter(adapter);
-        warnLegacyLayerEntries(root, await loadMeekoConfig(root));
+        warnLegacyLayerEntries(root, await loadCheckedMeekoConfig(root));
         writeDiagnostics(await checkFrameworkProject(root));
         const result = await buildProject(root, requested === undefined ? {} : { adapter: requested });
         process.stdout.write(`${result.output}\n`);
@@ -138,7 +138,7 @@ if (problem !== undefined) {
       if (output) throw new Error("--json sólo está disponible para un componente .meeko");
       // meeko.config.ts and the runtime may read the project's variables.
       loadProjectEnv(input ?? ".");
-      warnLegacyLayerEntries(input ?? ".", await loadMeekoConfig(input ?? "."));
+      warnLegacyLayerEntries(input ?? ".", await loadCheckedMeekoConfig(input ?? "."));
       writeDiagnostics(await checkFrameworkProject(input ?? "."));
       process.stdout.write(`${resolve(input ?? ".")}: OK\n`);
     } else if (command === "init" || command === "init-framework") {

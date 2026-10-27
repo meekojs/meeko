@@ -1,4 +1,5 @@
-import { relative, resolve, sep } from "node:path";
+import { existsSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
 import type { TextDocument } from "vscode-languageserver-textdocument";
 import { DiagnosticSeverity, DiagnosticTag } from "vscode-languageserver/node";
@@ -152,16 +153,115 @@ function staticAutoImports(root: string): readonly AutoImport[] {
   catch { return []; }
 }
 
+const configNames = ["meeko.config.ts", "meeko.config.mts", "meeko.config.js", "meeko.config.mjs"];
+
+/** `meeko.config.*` of a project root, if there is one. */
+function projectConfigFile(root: string): string | undefined {
+  return configNames.map((name) => join(root, name)).find((file) => existsSync(file));
+}
+
+/**
+ * A failure of `meeko.config.*` while a component is checked: `loadMeekoConfig` prefixes its
+ * validation errors with the file (`<file>: document.head: …`) and wraps import errors in
+ * `Cannot load <file>: …`.
+ */
+const configFailure = /^(Cannot load )?(.*?[\\/]meeko\.config\.(?:ts|mts|js|mjs))(?::[ \t]+|[ \t]+)([\s\S]*)$/;
+
+function unwrapExpression(node: ts.Expression): ts.Expression {
+  let current = node;
+  while (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isSatisfiesExpression(current) || ts.isNonNullExpression(current) || ts.isTypeAssertionExpression(current)) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function memberName(name: ts.PropertyName): string | undefined {
+  return ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name) || ts.isNoSubstitutionTemplateLiteral(name) ? name.text : undefined;
+}
+
+/**
+ * Range in `meeko.config.*` of what a validation message names: `document.head: titleTemplate must
+ * be a string` marks `titleTemplate` inside `document.head`. Each name of the message that is a
+ * property of the current object literal (or `[n]`, an element of the current array) goes one level
+ * down; the deepest one found is the range. Without one, the `export default` line, or the first one.
+ */
+export function configErrorRange(text: string, filename: string, message: string): [number, number] {
+  const source = ts.createSourceFile(filename, text, ts.ScriptTarget.Latest, true, /\.m?js$/.test(filename) ? ts.ScriptKind.JS : ts.ScriptKind.TS);
+  const exported = source.statements.find(ts.isExportAssignment);
+  const lineEnd = (offset: number): number => offset + Math.max(text.slice(offset).search(/\r?\n|\r|$/), 0);
+  if (!exported) return [0, Math.max(lineEnd(0), 1)];
+  let start = exported.getStart(source);
+  let end = lineEnd(start);
+  let current: ts.Expression | undefined = unwrapExpression(exported.expression);
+  // `export default config`, declared in the same file.
+  if (ts.isIdentifier(current)) {
+    const name = current.text;
+    const declaration = source.statements.filter(ts.isVariableStatement).flatMap((statement) => [...statement.declarationList.declarations])
+      .find((item) => ts.isIdentifier(item.name) && item.name.text === name);
+    current = declaration?.initializer ? unwrapExpression(declaration.initializer) : undefined;
+  }
+  // `defineMeekoConfig({ … })`.
+  if (current && ts.isCallExpression(current)) current = current.arguments[0] ? unwrapExpression(current.arguments[0]) : undefined;
+  for (const token of message.match(/[A-Za-z_$][\w$]*|\[\d+\]/g) ?? []) {
+    if (!current) break;
+    if (ts.isObjectLiteralExpression(current)) {
+      if (token.startsWith("[")) break;
+      const member = current.properties.find((item) => item.name !== undefined && memberName(item.name) === token);
+      if (!member?.name) continue;
+      start = member.name.getStart(source);
+      end = member.name.getEnd();
+      current = ts.isPropertyAssignment(member) ? unwrapExpression(member.initializer) : undefined;
+    } else if (ts.isArrayLiteralExpression(current) && token.startsWith("[")) {
+      const element = current.elements[Number(token.slice(1, -1))];
+      if (!element) break;
+      start = element.getStart(source);
+      end = Math.min(element.getEnd(), lineEnd(start));
+      current = unwrapExpression(element);
+    } else {
+      break;
+    }
+  }
+  return [start, end > start ? end : start + 1];
+}
+
+/**
+ * Receives the diagnostics of a project's `meeko.config.*` found while a component is checked:
+ * its validation error, or `[]` once the configuration loads again.
+ */
+export type ConfigDiagnosticsReporter = (filename: string, diagnostics: Diagnostic[]) => void;
+
+/** The diagnostic of a configuration failure, in the configuration file itself, or `undefined` if the error is another one. */
+function configDiagnostic(message: string, locate: (filename: string) => LocatedDocument | undefined): { filename: string; uri: string; message: string; diagnostic: Diagnostic } | undefined {
+  const failure = configFailure.exec(message);
+  if (!failure) return undefined;
+  const filename = resolve(failure[2]!);
+  const target = locate(filename);
+  if (!target) return undefined;
+  const loadFailure = failure[1] !== undefined;
+  const detail = failure[3]!.trim();
+  const [start, end] = configErrorRange(target.document.getText(), filename, loadFailure ? "" : detail);
+  const text = loadFailure ? `Cannot load the configuration: ${detail}` : detail;
+  return {
+    filename, uri: target.uri, message: text,
+    diagnostic: { range: toRange(target.document, start, end), message: text, code: "MEEK_CONFIG", source: "Meeko", severity: DiagnosticSeverity.Error },
+  };
+}
+
 /**
  * Diagnósticos de `meeko check` para un componente, con el rango completo de cada error.
  * El rango sale del diagnóstico equivalente del servicio TypeScript del editor o, si no
  * existe, del token que empieza en la posición informada por el CLI.
+ *
+ * Un error de `meeko.config.*` no es del componente: con `reportConfig` se entrega en el propio
+ * archivo de configuración, en la propiedad que nombra, y no en cada componente; sin él, se marca
+ * al principio del script con un enlace a esa propiedad.
  */
 export async function componentDiagnostics(
   project: MeekoProject,
   document: TextDocument,
   filename: string,
   locate: (filename: string) => LocatedDocument | undefined,
+  reportConfig?: ConfigDiagnosticsReporter,
 ): Promise<Diagnostic[]> {
   await project.ready();
   const source = document.getText();
@@ -177,16 +277,27 @@ export async function componentDiagnostics(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const placed = placement ? [compileDiagnostic(document, placement)] : [];
+    const config = configDiagnostic(message, locate);
+    if (config && reportConfig) {
+      reportConfig(config.filename, [config.diagnostic]);
+      return [...placed, ...blockDiagnostics];
+    }
+    if (!config) clearConfig(project, reportConfig);
     const autoImport = /^(?:Autoimport ambiguo (\S+?):|El autoimport (\S+) no está disponible)/.exec(message);
     const name = autoImport?.[1] ?? autoImport?.[2];
     const range = (name && component && component.source === source && identifierRange({ component, document }, name))
       || lineRange(document, scriptStart(source, filename));
     return [
-      ...(placement ? [compileDiagnostic(document, placement)] : []),
-      { range, message, code: name ? "MEEK_AUTOIMPORT" : "MEEK_CHECK", source: "Meeko", severity: DiagnosticSeverity.Error },
+      ...placed,
+      {
+        range, message, code: name ? "MEEK_AUTOIMPORT" : "MEEK_CHECK", source: "Meeko", severity: DiagnosticSeverity.Error,
+        ...(config ? { relatedInformation: [{ location: { uri: config.uri, range: config.diagnostic.range }, message: config.message }] } : {}),
+      },
       ...blockDiagnostics,
     ];
   }
+  clearConfig(project, reportConfig);
   if (placement) found = [placement, ...found];
   const typescript = current ? semanticDiagnostics(project, current) : [];
   const own = resolve(filename);
@@ -237,6 +348,13 @@ export async function componentDiagnostics(
     diagnostic.range = toRange(document, offset, end ?? (directive ? offset + directive[0].length : tokenEnd(source, offset)));
     return diagnostic;
   }).concat(blockDiagnostics);
+}
+
+/** The configuration loaded (it runs before the component compiles): its earlier failure is gone. */
+function clearConfig(project: MeekoProject, reportConfig: ConfigDiagnosticsReporter | undefined): void {
+  if (!reportConfig || !project.trusted) return;
+  const file = projectConfigFile(project.root);
+  if (file) reportConfig(file, []);
 }
 
 function compileDiagnostic(document: TextDocument, item: CompileDiagnostic): Diagnostic {

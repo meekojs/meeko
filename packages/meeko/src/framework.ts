@@ -22,7 +22,7 @@ export { useForm } from "./framework/form.js";
 export type { Form } from "./framework/form.js";
 export { useStorage } from "./framework/storage.js";
 export { useHead, useSeoMeta } from "./framework/head.js";
-export type { DocumentConfig, HeadInput, HeadLink, HeadMeta, HeadScript, HeadStyle, SeoMetaInput } from "./framework/head.js";
+export type { DocumentConfig, DocumentHead, HeadInput, HeadLink, HeadMeta, HeadScript, HeadStyle, SeoMetaInput } from "./framework/head.js";
 export type { StorageArea, StorageOptions } from "./framework/storage.js";
 export { defer } from "./framework/deferred.js";
 export type { DeferOptions, Deferred, DeferredError, DeferredFactory, DeferredStatus } from "./framework/deferred.js";

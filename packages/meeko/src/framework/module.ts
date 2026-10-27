@@ -1,4 +1,4 @@
-import type { HeadInput } from "./head.js";
+import type { DocumentHead } from "./head.js";
 import type { MeekoAdapterName, MeekoConfig } from "./config-type.js";
 import type { RouteRecord } from "./router.js";
 
@@ -233,9 +233,10 @@ export interface MeekoModuleContext {
   /**
    * Añade entradas al `<head>` de todos los documentos (`document.head`). Los arrays se concatenan
    * en el orden de los módulos; `title` y `titleTemplate` se quedan con el último valor, y
-   * `document.head` de `meeko.config.ts` se aplica al final.
+   * `document.head` de `meeko.config.ts` se aplica al final. Como en `document.head`,
+   * `titleTemplate` es una cadena y `title` es el título del sitio, que no pasa por la plantilla.
    */
-  addHead(input: HeadInput): void;
+  addHead(input: DocumentHead): void;
   /** Añade un plugin de Vite (u otro valor de `plugins`) a `meeko dev` y `meeko build`. */
   addVitePlugin(plugin: object | readonly object[]): void;
   /**

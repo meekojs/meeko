@@ -3,8 +3,8 @@ import { createRequire } from "node:module";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { MeekoConfig } from "./config-type.js";
-import { resolveDocumentConfig } from "./head.js";
-import type { DocumentConfig, HeadInput } from "./head.js";
+import { normalizeHeadInput, resolveDocumentConfig } from "./head.js";
+import type { DocumentConfig, DocumentHead, HeadInput } from "./head.js";
 import { isMeekoModule } from "./module.js";
 import type { MeekoHooks, MeekoModule, MeekoModuleContext, ModuleAutoImport, ModulePlugin } from "./module.js";
 
@@ -424,9 +424,10 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
         if (typeof contents !== "string" && typeof contents !== "function" && !(contents instanceof Uint8Array)) throw new TypeError(`Meeko module ${name}: public file ${key} needs a string, bytes or a function`);
         publicFiles.set(key, contents);
       },
-      addHead(input: HeadInput) {
+      addHead(input: DocumentHead) {
         if (!input || typeof input !== "object") throw new TypeError(`Meeko module ${name}: addHead requires a head object`);
-        head = mergeHeadInput(head, input);
+        // It joins `document`, which the build bakes as JSON: fail here, naming the module.
+        head = mergeHeadInput(head, normalizeHeadInput(input, `Meeko module ${name}: addHead`, { serializable: true }));
       },
       addVitePlugin(plugin: object | readonly object[]) {
         for (const item of (Array.isArray(plugin) ? plugin : [plugin]) as readonly object[]) vitePlugins.push(item);

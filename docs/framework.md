@@ -309,7 +309,7 @@ Los archivos de runtime de un módulo (plugins, componentes, autoimports, middle
 | `addServerMiddleware(file)` | Añade un middleware como los de `server/middleware`; los de los módulos van antes que los del proyecto. |
 | `addServerHandler({ route, handler })` | Atiende una ruta exacta con el export por defecto de `handler`, `(request) => Response`, después del middleware de servidor. |
 | `addPublicFile(path, contents)` | Añade un archivo público. `meeko build` lo escribe en la salida del cliente, antes de calcular el manifiesto de assets; `meeko dev` lo sirve. Choca con un archivo de `public/` del mismo nombre. |
-| `addHead(input)` | Añade entradas a `document.head`: `meta`, `link`, `script` y `style` se concatenan en el orden de los módulos; `title`, `titleTemplate`, `htmlAttrs` y `bodyAttrs` se quedan con el último valor; `document.head` del proyecto se aplica al final. |
+| `addHead(input)` | Añade entradas a `document.head`: `meta`, `link`, `script` y `style` se concatenan en el orden de los módulos; `title`, `titleTemplate`, `htmlAttrs` y `bodyAttrs` se quedan con el último valor; `document.head` del proyecto se aplica al final. Recibe un `DocumentHead`: `titleTemplate` es una cadena y `title` es el título del sitio, sin plantilla. |
 | `addVitePlugin(plugin)` | Añade un plugin de Vite a `meeko dev` y a cada build de `meeko build`, después del de Meeko. |
 | `extendViteConfig(fn)` | Modifica la configuración inline de Vite de cada paso; `fn(config, { command, ssr })` cambia el objeto o devuelve otro. |
 | `hooks.hook(name, fn)` | Registra un [hook](#hooks). |
@@ -692,7 +692,7 @@ Los componentes recibidos como props mantienen la dirección del contrato: un co
 
 Desde `1.2`, Meeko gestiona el `<head>` de cada documento y los atributos de `<html>` y `<body>` a partir de tres fuentes, que se combinan con una sola regla de prioridad:
 
-- **`document` en `meeko.config.ts`.** El documento común de la aplicación: `lang` y un `head` con etiquetas y atributos. Se renderiza en todos los documentos HTML: SSR, `"stream"`, `"prerender"`, la página `404` de `app/error.meeko`, el documento de error de una ruta que falla y el shell de una ruta `"client"`. Se fija en el build (y también llega al bundle del navegador, porque termina en el HTML), así que debe ser serializable: `titleTemplate` sólo puede ser una cadena y `meeko build` rechaza una función. Los módulos de Meeko añaden su head antes del de la aplicación, que gana.
+- **`document` en `meeko.config.ts`.** El documento común de la aplicación: `lang` y un `head` con etiquetas y atributos. Se renderiza en todos los documentos HTML: SSR, `"stream"`, `"prerender"`, la página `404` de `app/error.meeko`, el documento de error de una ruta que falla y el shell de una ruta `"client"`. Se fija en el build (y también llega al bundle del navegador, porque termina en el HTML), así que debe ser serializable: `titleTemplate` sólo puede ser una cadena (su tipo, `DocumentHead`, no admite una función, así que el editor y `meeko check` la marcan como error de tipos en `meeko.config.ts`) y `meeko build` rechaza una función. Su `title` es el título del sitio: lo muestran, tal cual y sin plantilla, las páginas sin título propio (véase **Título** más abajo). Los módulos de Meeko añaden su head antes del de la aplicación, que gana.
 - **`useHead(input)`.** En páginas, layouts, `app/app.meeko`, `app/error.meeko`, componentes y composables, en el nivel superior del script o en un composable que éste llama. También en el código de nivel superior de `<script server>`, como alternativa a `export const head` (véase más abajo). `input` puede ser un objeto, un getter o una señal; con un getter o una señal, el navegador actualiza el documento cuando cambian los valores que lee.
 - **`useSeoMeta(input)`.** Atajo tipado sobre `useHead`: `description`, `robots`, `themeColor`, `colorScheme`, `author`, `keywords`, `applicationName`, `referrer` y los campos `twitter*` producen `<meta name>`; los `og*` (`ogTitle`, `ogDescription`, `ogImage`, `ogImageAlt`, `ogImageWidth`, `ogImageHeight`, `ogUrl`, `ogType`, `ogSiteName`, `ogLocale`) producen `<meta property>`; `title` es el título y `canonical`, `<link rel="canonical">`. Un campo `undefined` o `null` no produce nada.
 
@@ -704,6 +704,8 @@ export default defineMeekoConfig({
   document: {
     lang: "es",
     head: {
+      // «Zapatillas · Mi tienda» en una página titulada; «Mi tienda» en una sin título.
+      title: "Mi tienda",
       titleTemplate: "%s · Mi tienda",
       link: [{ rel: "icon", href: "/favicon.svg", type: "image/svg+xml" }],
       // Se ejecuta mientras el navegador lee <head>, antes de pintar; la hidratación no lo repite.
@@ -733,9 +735,17 @@ useHead(() => ({ title: `${product.name} (${quantity.value})` }));
 </script>
 ```
 
-`HeadInput` admite `title`, `titleTemplate` (`"%s · Sitio"` o `(title) => string`), `meta`, `link`, `script` (externo con `src` o en línea con `children`; `async`, `defer`, `module` y `type`), `style` (con `children` y `media`), `htmlAttrs` y `bodyAttrs` (`lang`, `dir`, `class`, `data-*`; un valor `undefined` no aporta nada y los atributos `on*` se rechazan).
+`HeadInput` admite `title`, `titleTemplate` (`"%s · Sitio"` o `(title) => string`; en `document.head`, `meeko.addHead` y el `head` de la ruta, sólo la cadena), `meta`, `link`, `script` (externo con `src` o en línea con `children`; `async`, `defer`, `module` y `type`), `style` (con `children` y `media`), `htmlAttrs` y `bodyAttrs` (`lang`, `dir`, `class`, `data-*`; un valor `undefined` no aporta nada y los atributos `on*` se rechazan).
 
-**Prioridad.** De menor a mayor: `document` de la configuración, `app/app.meeko`, cada layout (el más interno gana), la página con sus componentes y, por último, el `head` de la ruta (`export const head`, `route.head` o `useHead` en `<script server>`). Dentro de un mismo nivel gana la llamada posterior, de modo que un componente de la página que se monta después (por ejemplo, tras un `if:`) sustituye a lo que fijó la página. El título es el de la entrada de más prioridad que lo fija, y `titleTemplate`, el de la entrada de más prioridad que lo declara; la plantilla se aplica también al título de las páginas de error (`"Error"`). Los atributos de `<html>` y `<body>` se combinan por nombre con la misma prioridad.
+**Prioridad.** De menor a mayor: `document` de la configuración, `app/app.meeko`, cada layout (el más interno gana), la página con sus componentes y, por último, el `head` de la ruta (`export const head`, `route.head` o `useHead` en `<script server>`). Dentro de un mismo nivel gana la llamada posterior, de modo que un componente de la página que se monta después (por ejemplo, tras un `if:`) sustituye a lo que fijó la página. Los atributos de `<html>` y `<body>` se combinan por nombre con la misma prioridad.
+
+**Título.** `titleTemplate` es el de la entrada de más prioridad que lo declara, y se aplica al título de más prioridad de `app/app.meeko`, los layouts, la página y el `head` de la ruta, también al de las páginas de error (`"Error"`). El `title` de `document.head` (o el que añade un módulo con `meeko.addHead`) es distinto: es el título del sitio y nunca pasa por la plantilla. Una página sin título propio muestra ese título tal cual, y lo mismo una cuyo título ganador es una cadena vacía, en lugar de una plantilla alrededor de nada. Sin título del sitio, una página sin título no tiene `<title>` gestionado (queda el del host, si lo hay) y un título vacío se escribe vacío. La regla es la misma en el SSR, al hidratar y al navegar en el cliente. Con la configuración del ejemplo:
+
+| Título de la página | `<title>` |
+| --- | --- |
+| `"Zapatillas"` | `Zapatillas · Mi tienda` |
+| ninguno | `Mi tienda` |
+| `""` | `Mi tienda` |
 
 **Deduplicación.** Cada etiqueta tiene una clave: `key` si la declara o, si no, su clave natural. En `meta`, `name` (sin distinguir mayúsculas), `property` o `httpEquiv`, junto con su `media` si lo tiene (dos `theme-color` para claro y oscuro conviven); en `link`, `rel` y `href`, salvo `rel: "canonical"` y `rel: "icon"`, que son únicos aunque cambie `href`; en `script`, `src` o el código; en `style`, el CSS. Con la misma clave sólo queda la etiqueta de más prioridad, en el lugar donde apareció la primera. Así, un `icon` de `document` sustituye al `<link rel="icon" href="data:,">` que Meeko escribe por defecto, y un `meta name="viewport"` sustituye al viewport por defecto.
 

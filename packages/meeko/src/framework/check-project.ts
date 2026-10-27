@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { execFile } from "node:child_process";
@@ -5,6 +6,8 @@ import { promisify } from "node:util";
 import { formatDiagnostic, hasErrors } from "../compiler/sfc.js";
 import type { CompileDiagnostic } from "../compiler/sfc.js";
 import { checkApp } from "./check-app.js";
+import { loadMeekoConfig } from "./config.js";
+import type { MeekoConfig } from "./config.js";
 import { prepareProject } from "./project.js";
 import { assertNoLegacySessionFile } from "./runtime-migration.js";
 import { mapRouteBlockPaths, routeBlockTypeFiles } from "./route-block-types.js";
@@ -22,6 +25,54 @@ async function checkTypeScript(configs: readonly string[], routeBlocks: Readonly
       // Diagnostics in a `<script server>` copy point at the page, on the same line and column.
       throw new Error(mapRouteBlockPaths(`Falló la comprobación con TypeScript (${config}):\n${failure.stdout ?? ""}${failure.stderr ?? ""}`, routeBlocks));
     }
+  }
+}
+
+/**
+ * TypeScript errors of `meeko.config.ts` (or `.mts`) itself, as `file:line:column TSxxxx: message`.
+ * No tsconfig of the project includes the configuration, so it is checked on its own.
+ */
+async function configTypeErrors(root: string): Promise<string[]> {
+  const file = ["meeko.config.ts", "meeko.config.mts"].map((name) => join(root, name)).find((candidate) => existsSync(candidate));
+  if (!file) return [];
+  const compiler = join(dirname(require.resolve("typescript/package.json")), "bin", "tsc");
+  let output: string;
+  try {
+    await execute(process.execPath, [
+      compiler, "--noEmit", "--pretty", "false", "--ignoreConfig", "--strict", "--skipLibCheck", "--allowImportingTsExtensions",
+      "--module", "esnext", "--moduleResolution", "bundler", "--target", "es2022", "--lib", "es2022,dom", file,
+    ], { cwd: root, windowsHide: true, maxBuffer: 8 * 1024 * 1024 });
+    return [];
+  } catch (error) {
+    const failure = error as Error & { stdout?: string; stderr?: string };
+    output = `${failure.stdout ?? ""}${failure.stderr ?? ""}`;
+  }
+  const same = (path: string): boolean => process.platform === "win32" ? resolve(root, path).toLowerCase() === file.toLowerCase() : resolve(root, path) === file;
+  const errors: string[] = [];
+  let own = false;
+  for (const line of output.split(/\r?\n/)) {
+    const match = /^(.*)\((\d+),(\d+)\): error (TS\d+): (.*)$/.exec(line);
+    if (match) {
+      own = same(match[1]!);
+      if (own) errors.push(`${file}:${match[2]}:${match[3]} ${match[4]}: ${match[5]}`);
+    } else if (own && line.trim()) {
+      errors[errors.length - 1] += `\n${line}`;
+    }
+  }
+  return errors;
+}
+
+/**
+ * Carga `meeko.config.*` para `meeko check` y `meeko build`. Si su validación falla, el error
+ * empieza por los errores de TypeScript del archivo, con su línea y columna: una función en
+ * `document.head.titleTemplate`, por ejemplo, es un error de tipos antes que de ejecución.
+ */
+export async function loadCheckedMeekoConfig(projectRoot: string): Promise<MeekoConfig> {
+  try { return await loadMeekoConfig(projectRoot); }
+  catch (error) {
+    const typed = await configTypeErrors(resolve(projectRoot)).catch((): string[] => []);
+    if (!typed.length) throw error;
+    throw new Error(`${typed.join("\n")}\n${error instanceof Error ? error.message : String(error)}`, { cause: error });
   }
 }
 

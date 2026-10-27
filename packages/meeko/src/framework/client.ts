@@ -145,7 +145,8 @@ export interface ClientAppOptions {
   /**
    * `document` de `meeko.config.ts`, el mismo que renderiza el servidor: la entrada cliente que
    * genera Meeko lo toma de `virtual:meeko-manifest/client`. `useHead` y la navegación lo usan para
-   * aplicar `titleTemplate` y restaurar sus etiquetas.
+   * aplicar `titleTemplate`, mostrar su `title` (sin plantilla) en las páginas sin título y
+   * restaurar sus etiquetas, con la misma regla que el servidor.
    * @since 1.2.0
    */
   readonly document?: DocumentConfig | undefined;

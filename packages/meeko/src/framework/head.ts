@@ -138,9 +138,15 @@ export interface HeadStyle {
  * ```
  */
 export interface HeadInput {
-  /** Título del documento; gana el de más prioridad. */
+  /**
+   * Título del documento; gana el de más prioridad. Si el que gana es una cadena vacía, se
+   * muestra el `title` de `document.head`, sin plantilla.
+   */
   title?: string;
-  /** Plantilla del título: `%s` es el título, o una función que lo recibe. */
+  /**
+   * Plantilla del título: `%s` es el título, o una función que lo recibe. Se aplica al título de
+   * layouts, páginas, `useHead` y el `head` de la ruta, nunca al `title` de `document.head`.
+   */
   titleTemplate?: string | ((title: string) => string);
   /** Etiquetas `<meta>`. */
   meta?: HeadMeta[];
@@ -157,10 +163,42 @@ export interface HeadInput {
 }
 
 /**
+ * `head` de {@link DocumentConfig} y de `meeko.addHead` en los módulos: lo mismo que
+ * {@link HeadInput}, pero `titleTemplate` sólo puede ser una cadena, porque el documento se fija en
+ * el build como JSON y llega así al navegador. Su `title` es el título del sitio: lo muestran, tal
+ * cual y sin `titleTemplate`, las páginas que no tienen título propio o lo dejan vacío.
+ *
+ * @since 1.2.0
+ * @example
+ * ```ts
+ * import type { DocumentHead } from "@meekojs/meeko/framework";
+ *
+ * // «Precios - Mi Sitio» en una página titulada «Precios»; «Mi Sitio» en una sin título.
+ * const head: DocumentHead = {
+ *   title: "Mi Sitio",
+ *   titleTemplate: "%s - Mi Sitio",
+ *   htmlAttrs: { lang: "es" },
+ * };
+ * ```
+ */
+export interface DocumentHead extends Omit<HeadInput, "titleTemplate"> {
+  /**
+   * Plantilla del título, con `%s` en el lugar del título. Se aplica al título de layouts,
+   * páginas, `useHead` y el `head` de la ruta, no al `title` del documento. Una función no se
+   * admite aquí: no se puede fijar en el build.
+   */
+  titleTemplate?: string;
+}
+
+/**
  * Documento de la aplicación: `document` de `meeko.config.ts`. Se renderiza en cada documento HTML
  * (SSR, stream, prerender, páginas de error y `render: "client"`) con la menor prioridad, así que
- * cualquier `useHead` o `head` de página lo sustituye. Se fija en el build: `titleTemplate` debe
- * ser una cadena.
+ * cualquier `useHead` o `head` de página lo sustituye. Se fija en el build, así que
+ * `head.titleTemplate` debe ser una cadena (véase {@link DocumentHead}).
+ *
+ * `head.title` es el título del sitio y no pasa por `head.titleTemplate`: una página sin título
+ * propio (o con un título vacío) muestra `head.title` tal cual, y una página con título muestra el
+ * suyo con la plantilla. La misma regla se aplica en el servidor y al navegar en el cliente.
  *
  * @since 1.2.0
  * @example
@@ -172,7 +210,9 @@ export interface HeadInput {
  *   document: {
  *     lang: "es",
  *     head: {
- *       titleTemplate: "%s · Meeko",
+ *       // «Precios - Mi Sitio» en /precios; «Mi Sitio» en una página sin título.
+ *       title: "Mi Sitio",
+ *       titleTemplate: "%s - Mi Sitio",
  *       link: [{ rel: "icon", href: "/favicon.svg", type: "image/svg+xml" }],
  *     },
  *   },
@@ -182,8 +222,11 @@ export interface HeadInput {
 export interface DocumentConfig {
   /** Atributo `lang` de `<html>`; `head.htmlAttrs.lang` tiene prioridad. */
   lang?: string;
-  /** Etiquetas y atributos comunes a todos los documentos. */
-  head?: HeadInput;
+  /**
+   * Etiquetas y atributos comunes a todos los documentos. `title` es el título del sitio, sin
+   * plantilla; `titleTemplate`, una cadena con `%s`, se aplica a los títulos de las páginas.
+   */
+  head?: DocumentHead;
 }
 
 /**
@@ -393,7 +436,8 @@ export function normalizeDocumentConfig(value: unknown, label: string): Document
   if (!isRecord(value)) fail(label, "must be an object");
   for (const name of Object.keys(value)) if (name !== "lang" && name !== "head") fail(label, `unknown field ${name}`);
   if (value.lang !== undefined && (typeof value.lang !== "string" || !value.lang)) fail(label, "lang must be a nonempty string");
-  const head = value.head === undefined ? undefined : normalizeHeadInput(value.head, `${label}.head`, { serializable: true });
+  // Serializable: its titleTemplate is a string, as DocumentHead says.
+  const head = value.head === undefined ? undefined : normalizeHeadInput(value.head, `${label}.head`, { serializable: true }) as DocumentHead;
   return { ...(value.lang === undefined ? {} : { lang: value.lang as string }), ...(head ? { head } : {}) };
 }
 
@@ -425,8 +469,9 @@ export function mergeHeadInputs(inputs: readonly (HeadInput | undefined)[]): Hea
  * before the application's own, which wins. Returns `undefined` when there is nothing to render.
  */
 export function resolveDocumentConfig(config: DocumentConfig | undefined, moduleHeads: readonly HeadInput[] = []): DocumentConfig | undefined {
-  const heads = moduleHeads.map((head, index) => normalizeHeadInput(head, `module head ${index}`, { serializable: true }));
-  const head = heads.length ? mergeHeadInputs([...heads, config?.head]) : config?.head;
+  const heads = moduleHeads.map((head, index) => normalizeHeadInput(head, `module head ${index}`, { serializable: true }) as DocumentHead);
+  // The module heads join `document.head`: their title is a site title too, never templated.
+  const head = heads.length ? mergeHeadInputs([...heads, config?.head]) as DocumentHead : config?.head;
   const lang = config?.lang;
   if (lang === undefined && (!head || Object.keys(head).length === 0)) return undefined;
   return { ...(lang === undefined ? {} : { lang }), ...(head && Object.keys(head).length ? { head } : {}) };
@@ -444,7 +489,7 @@ export function mergeDocumentConfigs(base: DocumentConfig | undefined, override:
   if (!base) return override;
   if (!override) return base;
   const lang = override.lang ?? base.lang;
-  return { ...(lang === undefined ? {} : { lang }), head: mergeHeadInputs([base.head, override.head]) };
+  return { ...(lang === undefined ? {} : { lang }), head: mergeHeadInputs([base.head, override.head]) as DocumentHead };
 }
 
 /** A resolved tag: what the server writes and the browser keeps in `<head>`. */
@@ -459,7 +504,10 @@ export interface HeadTag {
 
 /** The winning values of every head entry. */
 export interface ResolvedHead {
-  /** The final title, with its template applied, or `undefined` without one. */
+  /**
+   * The final title, or `undefined` without one: the winning title above the document config with
+   * its template applied or, when there is none or it is empty, the document config's title as is.
+   */
   readonly title: string | undefined;
   readonly htmlAttrs: ReadonlyMap<string, string>;
   readonly bodyAttrs: ReadonlyMap<string, string>;
@@ -533,11 +581,17 @@ function applyTemplate(title: string, template: HeadInput["titleTemplate"]): str
 /**
  * Resolves the head entries of a document: defaults, then entries by level and order. Tags are
  * deduplicated by key, the winner keeping the place where the key first appeared.
+ *
+ * The title of the document config (`CONFIG_LEVEL`) is the site title, the fallback of pages
+ * without one: it is never templated. The template applies to the winning title of the levels
+ * above it (layouts, pages, `useHead`, the route head); an empty one counts as no title, so the
+ * site title shows instead of a template around nothing.
  */
 export function resolveHead(entries: readonly HeadEntry[]): ResolvedHead {
   const sorted = [{ level: DEFAULT_LEVEL, order: -1, input: defaultHead }, ...entries]
     .filter((entry) => entry.input !== undefined)
     .sort((left, right) => left.level - right.level || left.order - right.order);
+  let siteTitle: string | undefined;
   let title: string | undefined;
   let template: HeadInput["titleTemplate"];
   const htmlAttrs = new Map<string, string>();
@@ -546,7 +600,10 @@ export function resolveHead(entries: readonly HeadEntry[]): ResolvedHead {
   for (const entry of sorted) {
     const input = entry.input!;
     const fallback = entry.level === DEFAULT_LEVEL;
-    if (input.title !== undefined) title = input.title;
+    if (input.title !== undefined) {
+      if (entry.level <= CONFIG_LEVEL) siteTitle = input.title;
+      else title = input.title;
+    }
     if (input.titleTemplate !== undefined) template = input.titleTemplate;
     for (const meta of input.meta ?? []) { const tag = metaTag(meta, fallback); tags.set(tag.key, tag); }
     for (const link of input.link ?? []) { const tag = linkTag(link, fallback); tags.set(tag.key, tag); }
@@ -557,7 +614,8 @@ export function resolveHead(entries: readonly HeadEntry[]): ResolvedHead {
   }
   const order = ["meta", "link", "style", "script"];
   return {
-    title: title === undefined ? undefined : applyTemplate(title, template),
+    // Without a page title, the site title as is; an empty page title with no site title stays empty.
+    title: title === undefined || title === "" ? siteTitle ?? title : applyTemplate(title, template),
     htmlAttrs, bodyAttrs,
     tags: [...tags.values()].sort((left, right) => order.indexOf(left.tag) - order.indexOf(right.tag)),
   };
@@ -737,6 +795,10 @@ function reader<T>(source: HeadSource<T>): () => T {
  * posterior. Las etiquetas se deduplican por `key` o por su clave natural: `name`, `property` o
  * `httpEquiv` en `meta`; `rel` y `href` en `link` (`canonical` e `icon` son únicos); `src` o el
  * código en `script`. Fuera de una aplicación de Meeko no hace nada.
+ *
+ * `titleTemplate` se aplica al título ganador de `app/app.meeko`, los layouts, la página y la
+ * ruta. El `title` de `document.head` es el título del sitio: se muestra tal cual, sin plantilla,
+ * cuando ningún nivel superior aporta un título o el que gana es una cadena vacía.
  *
  * @param input Entrada del head, o un getter o una señal que la devuelven.
  * @since 1.2.0

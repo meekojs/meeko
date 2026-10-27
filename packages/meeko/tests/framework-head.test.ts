@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -13,10 +13,13 @@ import { clientRoutesSource, discoverAppManifest } from "../src/framework/app-ma
 import { loadMeekoConfig } from "../src/framework/config.ts";
 import { serverScriptModule } from "../src/framework/server-script.ts";
 import type { ClientComponent, ClientRoute } from "../src/framework/client.ts";
-import type { DocumentConfig } from "../src/framework/head.ts";
+import type { DocumentConfig, DocumentHead, HeadInput } from "../src/framework/head.ts";
+import { defineMeekoConfig } from "../src/framework/config-type.ts";
+import type { MeekoModuleContext } from "../src/framework/module.ts";
 import { createRouteManifest } from "../src/framework/router.ts";
 import type { ErrorPageRecord, RouteRecord } from "../src/framework/router.ts";
-import { createTempProject } from "./helpers/temp-project.ts";
+import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
+import { loadCheckedMeekoConfig } from "../src/framework/check-project.ts";
 
 const fileUrl = (path: string): string => pathToFileURL(resolve(path)).href;
 
@@ -505,6 +508,85 @@ test("head inputs are validated: attribute names, event handlers and serializabl
   ]);
 });
 
+test("the document config title is the site title: never templated, and the fallback of empty page titles", async () => {
+  const { resolveHead, documentHeadEntries, resolveDocumentConfig } = await runtime();
+  const site: DocumentConfig = { head: { title: "Mi Sitio", titleTemplate: "%s - Mi Sitio" } };
+  const title = (config: DocumentConfig | undefined, route: HeadInput | undefined, ...levels: Array<HeadInput | undefined>): string | undefined =>
+    resolveHead([...documentHeadEntries(config, route), ...levels.map((input, level) => ({ level, order: level, input }))]).title;
+  // An untitled page shows the site title as is, not "Mi Sitio - Mi Sitio".
+  assert.equal(title(site, undefined), "Mi Sitio");
+  assert.equal(title(site, undefined, {}, { meta: [{ name: "robots", content: "noindex" }] }), "Mi Sitio");
+  // Titles of app.meeko, layouts, pages and the route are templated.
+  assert.equal(title(site, undefined, undefined, { title: "Precios" }), "Precios - Mi Sitio");
+  assert.equal(title(site, { title: "Ruta" }, { title: "App" }), "Ruta - Mi Sitio");
+  // An empty winning title falls back to the site title, untemplated, also over a layout's title.
+  assert.equal(title(site, undefined, { title: "" }), "Mi Sitio");
+  assert.equal(title(site, { title: "" }, { title: "Blog" }), "Mi Sitio");
+  assert.equal(title(site, undefined, { title: "Blog" }, { title: "" }), "Mi Sitio");
+  // A layout's template (even a function) applies to page titles, never to the site title.
+  const brackets: HeadInput = { titleTemplate: (value) => `[${value}]` };
+  assert.equal(title(site, undefined, brackets), "Mi Sitio");
+  assert.equal(title(site, undefined, brackets, { title: "Precios" }), "[Precios]");
+  // Without a site title: an untitled page has none, an empty title stays empty and untemplated.
+  const templateOnly: DocumentConfig = { head: { titleTemplate: "%s - Mi Sitio" } };
+  assert.equal(title(templateOnly, undefined), undefined);
+  assert.equal(title(templateOnly, undefined, { title: "" }), "");
+  assert.equal(title(templateOnly, undefined, { title: "Precios" }), "Precios - Mi Sitio");
+  // A module's title joins document.head: a site title too, and document.head's own wins.
+  assert.equal(title(resolveDocumentConfig(templateOnly, [{ title: "Módulo" }]), undefined), "Módulo");
+  assert.equal(title(resolveDocumentConfig(site, [{ title: "Módulo" }]), undefined), "Mi Sitio");
+  assert.equal(title(resolveDocumentConfig(templateOnly, [{ title: "Módulo" }]), { title: "Precios" }), "Precios - Mi Sitio");
+});
+
+test("client navigation applies the same title rule to the document", async () => {
+  const { BrowserHead } = await runtime();
+  const browser = new HappyWindow({ url: "https://example.test/" });
+  try {
+    const document = browser.document;
+    const head = new BrowserHead(document as unknown as Document, { head: { title: "Mi Sitio", titleTemplate: "%s - Mi Sitio" } });
+    head.setRoute({});
+    assert.equal(document.title, "Mi Sitio");
+    head.setRoute({ title: "Precios" });
+    assert.equal(document.title, "Precios - Mi Sitio");
+    head.setRoute({ title: "" });
+    assert.equal(document.title, "Mi Sitio");
+    // The route head's empty title wins over a layout's; without it, the layout's is templated.
+    const entry = head.register(1);
+    head.update(entry, { title: "Layout" });
+    assert.equal(document.title, "Mi Sitio");
+    head.setRoute({});
+    assert.equal(document.title, "Layout - Mi Sitio");
+    head.remove(entry);
+    assert.equal(document.title, "Mi Sitio");
+    head.dispose();
+  } finally {
+    await browser.happyDOM.abort();
+  }
+});
+
+// Type-level checks, compiled by `tsc -p tsconfig.test.json` and never run.
+if (false) {
+  const module = undefined as unknown as MeekoModuleContext;
+  defineMeekoConfig({ document: { head: { title: "Mi Sitio", titleTemplate: "%s - Mi Sitio" } } });
+  // @ts-expect-error document is baked into the build as JSON: titleTemplate is only a string.
+  defineMeekoConfig({ document: { head: { titleTemplate: (title: string) => (title ? `${title} - Mi Sitio` : "Mi Sitio") } } });
+  defineMeekoConfig({
+    document: {
+      head: {
+        // @ts-expect-error The method form of the report is a type error at titleTemplate.
+        titleTemplate(title) { return title ? `${title} - Mi Sitio` : "Mi Sitio"; },
+      },
+    },
+  });
+  const head: DocumentHead = { title: "Mi Sitio", titleTemplate: "%s - Mi Sitio" };
+  // A document head is still a head input; useHead keeps the function form.
+  const input: HeadInput = { ...head, titleTemplate: (title) => title };
+  void input;
+  module.addHead({ title: "Módulo", meta: [{ name: "generator", content: "x" }] });
+  // @ts-expect-error A module head joins document: titleTemplate is only a string.
+  module.addHead({ titleTemplate: (title: string) => title });
+}
+
 test("useHead at the top level of <script server> gives the block top-level code", () => {
   const source = '<script server lang="ts">\nuseHead({ meta: [{ name: "robots", content: "noindex" }] });\n</script>\n<template><p>x</p></template>\n';
   assert.ok(serverScriptModule(source, "/app/pages/index.meeko"));
@@ -525,6 +607,31 @@ test("document config is validated and baked into the server and client manifest
     assert.match(await clientRoutesSource(root), /export const documentConfig = \{"lang":"es"/);
     await writeFile(join(root, "meeko.config.mjs"), "export default { document: { head: { titleTemplate: (title) => title } } };\n");
     await assert.rejects(loadMeekoConfig(root), /document\.head: titleTemplate must be a string/);
+  } finally {
+    await project.remove();
+  }
+});
+
+test("meeko check reports a function titleTemplate of document.head as a type error at its line in meeko.config.ts", { timeout: 120_000 }, async () => {
+  const project = await createTempProject("head-config-types");
+  const root = project.root;
+  try {
+    await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}\n');
+    await linkRepositoryPackages(root);
+    const config = "import { defineMeekoConfig } from '@meekojs/meeko/framework'\n\nexport default defineMeekoConfig({\n  document: {\n    head: {\n      title: 'Mi Sitio',\n      titleTemplate(title) {\n        return title ? `${title} - Mi Sitio` : 'Mi Sitio'\n      },\n    },\n  },\n})\n";
+    await writeFile(join(root, "meeko.config.ts"), config);
+    const error = await loadCheckedMeekoConfig(root).then(() => undefined, (failure: unknown) => failure as Error);
+    assert.ok(error, "the configuration does not load");
+    const file = join(root, "meeko.config.ts");
+    // The TypeScript error at titleTemplate (line 7) comes first, then the runtime one.
+    const lines = error.message.split("\n");
+    assert.ok(lines[0]!.startsWith(`${file}:7:7 TS2322: `), error.message);
+    assert.match(error.message, /document\.head: titleTemplate must be a string here, since it is serialized$/);
+    // A valid configuration loads as before.
+    await writeFile(file, config.replace(/titleTemplate\(title\) \{[\s\S]*?\n      \},/, "titleTemplate: '%s - Mi Sitio',"));
+    const later = new Date(Date.now() + 5_000);
+    await utimes(file, later, later);
+    assert.deepEqual((await loadCheckedMeekoConfig(root)).document, { head: { title: "Mi Sitio", titleTemplate: "%s - Mi Sitio" } });
   } finally {
     await project.remove();
   }

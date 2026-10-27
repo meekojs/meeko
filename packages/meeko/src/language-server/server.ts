@@ -135,6 +135,10 @@ export function startLanguageServer(connection: Connection): void {
   const openVersions = new Map<string, number>();
   const ownDiagnostics = new Map<string, Diagnostic[]>();
   const contractDiagnostics = new Map<string, Diagnostic[]>();
+  /** Failures of `meeko.config.*` found by component checks, by the URI of the configuration file. */
+  const configDiagnostics = new Map<string, Diagnostic[]>();
+  /** URI under which each configuration file (by {@link pathKey}) has diagnostics. */
+  const configUris = new Map<string, string>();
   const contractTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const contractVersions = new Map<string, number>();
   const contractRuns = new Map<string, Promise<void>>();
@@ -161,8 +165,26 @@ export function startLanguageServer(connection: Connection): void {
   let stopped = false;
   const publish = (uri: string): void => {
     if (stopped) return;
-    connection.sendDiagnostics({ uri, diagnostics: [...(ownDiagnostics.get(uri) ?? []), ...(contractDiagnostics.get(uri) ?? [])] })
+    connection.sendDiagnostics({ uri, diagnostics: [...(ownDiagnostics.get(uri) ?? []), ...(contractDiagnostics.get(uri) ?? []), ...(configDiagnostics.get(uri) ?? [])] })
       .catch((error: unknown) => log(`${uri}: no se pudieron publicar los diagnósticos: ${error instanceof Error ? error.message : String(error)}`));
+  };
+
+  /** Publishes a configuration failure on `meeko.config.*` itself, once; `[]` clears it. */
+  const reportConfig = (filename: string, diagnostics: Diagnostic[]): void => {
+    const key = pathKey(filename);
+    const previous = configUris.get(key);
+    if (!diagnostics.length) {
+      if (previous === undefined) return;
+      configUris.delete(key);
+      configDiagnostics.delete(previous);
+      publish(previous);
+      return;
+    }
+    const uri = previous ?? locate(filename)?.uri ?? pathToFileURL(filename).href;
+    if (JSON.stringify(configDiagnostics.get(uri)) === JSON.stringify(diagnostics)) return;
+    configUris.set(key, uri);
+    configDiagnostics.set(uri, diagnostics);
+    publish(uri);
   };
 
   /** Runs a feature on an open component; `app` waits for the application index (routes, API, RPC). */
@@ -191,7 +213,7 @@ export function startLanguageServer(connection: Connection): void {
       timers.delete(document.uri);
       const project = workspace.projectFor(filename);
       project.setDocument(filename, document.getText());
-      componentDiagnostics(project, document, filename, locate).then((found) => {
+      componentDiagnostics(project, document, filename, locate, reportConfig).then((found) => {
         if (documents.get(document.uri)?.version !== version) return;
         // CSS errors and unused classes of <style>: read from the text, also when the script fails.
         ownDiagnostics.set(document.uri, [...found, ...styleDiagnostics(document)]);
@@ -335,6 +357,8 @@ export function startLanguageServer(connection: Connection): void {
   connection.onDidChangeWatchedFiles(({ changes }) => {
     const paths = changes.flatMap((change) => uriToPath(change.uri) ?? []).filter((path) => !ignoredChange(path, folders));
     if (!paths.length) return;
+    // A changed configuration is checked again with the open components; none may be open.
+    for (const path of paths) if (configUris.has(pathKey(path))) reportConfig(path, []);
     const projects = workspace.filesChanged(paths);
     if (!projects.length) return;
     const roots = new Set(projects.map((project) => pathKey(project.root)));
