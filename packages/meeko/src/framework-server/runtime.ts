@@ -143,7 +143,7 @@ export type ServerRuntimeDefinition<Env = Readonly<Record<string, string | undef
  *   return {
  *     sessions: new SessionManager({ store: db.sessionStore(), production: production && !prerendering }),
  *     services: (request, { platform }) => ({ db, region: platform.env.REGION }),
- *     publicOrigin: env.PUBLIC_ORIGIN,
+ *     publicOrigin: env.MEEKO_PUBLIC_ORIGIN,
  *     close: () => db.close(),
  *   };
  * });

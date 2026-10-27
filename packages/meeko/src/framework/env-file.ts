@@ -4,7 +4,7 @@ import { parseEnv } from "node:util";
 
 /**
  * Loads `<root>/.env` into `process.env`, as Vite and Nuxt do in development: `meeko dev`, `build`,
- * `start`, `preview` and `check` read it, so `PORT`, `PUBLIC_ORIGIN` or the app's own secrets work
+ * `start`, `preview` and `check` read it, so `MEEKO_PORT`, `MEEKO_PUBLIC_ORIGIN` or the app's own secrets work
  * without exporting them in the shell. A variable that the environment already sets wins, so a
  * deployment's real environment is never overridden. Returns the names it set.
  */

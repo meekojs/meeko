@@ -236,9 +236,9 @@ export function createNodeAssetReader(options: NodeAssetReaderOptions): AssetRea
  * import type { ServeNodeOptions } from "@meekojs/meeko/node";
  *
  * const options: ServeNodeOptions = {
- *   host: process.env.HOST ?? "127.0.0.1",
- *   port: Number(process.env.PORT ?? 4173),
- *   publicOrigin: process.env.PUBLIC_ORIGIN,
+ *   host: process.env.MEEKO_HOST ?? "127.0.0.1",
+ *   port: Number(process.env.MEEKO_PORT ?? 4173),
+ *   publicOrigin: process.env.MEEKO_PUBLIC_ORIGIN,
  *   handleSignals: true,
  *   shutdownTimeout: 5_000,
  * };

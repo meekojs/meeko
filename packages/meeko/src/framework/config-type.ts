@@ -10,7 +10,7 @@ import type { MeekoModuleEntry } from "./module.js";
  * import { defineMeekoConfig } from "@meekojs/meeko/framework";
  *
  * export default defineMeekoConfig({
- *   server: { adapter: "cloudflare", name: "mi-app", wrangler: { vars: { PUBLIC_ORIGIN: "https://mi-app.example" } } },
+ *   server: { adapter: "cloudflare", name: "mi-app", wrangler: { vars: { MEEKO_PUBLIC_ORIGIN: "https://mi-app.example" } } },
  * });
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#build-despliegue-y-verificación

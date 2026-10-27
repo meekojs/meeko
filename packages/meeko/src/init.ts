@@ -126,7 +126,7 @@ const server = createServer(async (request, response) => {
   }
 });
 
-const port = Number(process.env.PORT ?? 4173);
+const port = Number(process.env.MEEKO_PORT || process.env.PORT || 4173);
 server.listen(port, "127.0.0.1", () => console.log("http://127.0.0.1:" + port));
 let shutdownPromise;
 const closeServer = () => new Promise((resolveClose, rejectClose) => {

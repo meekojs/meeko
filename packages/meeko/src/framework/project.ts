@@ -12,6 +12,7 @@ import { attachNodeWebSocketServer, toNodeListener } from "../node.js";
 import type { ServerApp, ServerAppOptions } from "../framework-server/app.js";
 import type { AssetManifest, AssetRecord } from "../framework-server/assets.js";
 import { reportServerError } from "../framework-server/contracts.js";
+import { meekoEnv } from "../framework-server/env.js";
 import { buildDataFile, frameworkClientEntry, frameworkNodeEntry, frameworkServerEntry } from "./app-manifest.js";
 import type { BuildAppData } from "./app-manifest.js";
 import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./config.js";
@@ -363,8 +364,9 @@ export async function previewProject(projectRoot: string, adapter?: MeekoAdapter
     if (!wrangler) throw new Error("Wrangler no está instalado; añádelo con pnpm add -D wrangler para previsualizar el build de cloudflare");
     // wrangler dev runs the bundled Worker in workerd with local bindings.
     command = process.execPath;
-    args = [wrangler, "dev", "--config", config,
-      ...(process.env.PORT ? ["--port", process.env.PORT] : []), ...(process.env.HOST ? ["--ip", process.env.HOST] : [])];
+    const port = meekoEnv(process.env, "PORT");
+    const host = meekoEnv(process.env, "HOST");
+    args = [wrangler, "dev", "--config", config, ...(port ? ["--port", port] : []), ...(host ? ["--ip", host] : [])];
     runtime = { name: "Wrangler", install: "https://developers.cloudflare.com/workers/wrangler/install-and-update/" };
   } else {
     const entry = resolve(root, adapterEntry(target));
@@ -436,10 +438,10 @@ async function startDevelopment(root: string): Promise<Server> {
   setModuleDevelopmentMode(true);
   const { config, modules } = await loadConfiguredModules(root);
   const server = config.server?.adapter === "node" ? config.server : undefined;
-  const host = process.env.HOST || server?.host || "127.0.0.1";
-  // A port named by PORT or server.port (or the one a supervisor's first server took) is kept, and
-  // listening reports it when in use; otherwise dev takes the first free one from 4173 up.
-  const named = process.env[supervisedPortEnv] || process.env.PORT || server?.port;
+  const host = meekoEnv(process.env, "HOST") || server?.host || "127.0.0.1";
+  // A port named by MEEKO_PORT, PORT or server.port (or the one a supervisor's first server took) is
+  // kept, and listening reports it when in use; otherwise dev takes the first free one from 4173 up.
+  const named = process.env[supervisedPortEnv] || meekoEnv(process.env, "PORT") || server?.port;
   const namedHmr = process.env[supervisedHmrPortEnv] || process.env.MEEKO_HMR_PORT;
   const { port, hmrPort, busy } = await resolveDevPorts({
     host, ...(named ? { port: Number(named) } : {}), ...(namedHmr ? { hmrPort: Number(namedHmr) } : {}),
@@ -523,7 +525,7 @@ async function startDevelopment(root: string): Promise<Server> {
       return devStylesheetLink("/app/styles/main.css?direct", moduleId);
     };
     const devServer = vite;
-    const publicOrigin = process.env.PUBLIC_ORIGIN || undefined;
+    const publicOrigin = meekoEnv(process.env, "PUBLIC_ORIGIN");
     const createDevApp = async (): Promise<ServerApp> => {
       await modules.callHook("routes:resolved", { routes: await discoverConfiguredRoutes(root) });
       const entry = await devServer.ssrLoadModule(`/${frameworkServerEntry}`) as { createApp(options: Omit<ServerAppOptions, "manifest" | "load" | "runtime">): Promise<ServerApp> };

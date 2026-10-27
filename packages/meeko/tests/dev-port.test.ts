@@ -27,7 +27,7 @@ test("dev gives up with a clear message when the whole range is in use", async (
   await assert.rejects(resolveDevPorts({ host: "127.0.0.1", attempts: 3, free: async () => false }), (error: unknown) => {
     assert.ok(error instanceof Error);
     assert.equal((error as NodeJS.ErrnoException).code, "EADDRINUSE");
-    assert.match(error.message, /Los puertos 4173–4175 de 127\.0\.0\.1 ya están en uso; usa PORT=/);
+    assert.match(error.message, /Los puertos 4173–4175 de 127\.0\.0\.1 ya están en uso; usa MEEKO_PORT=/);
     return true;
   });
 });
@@ -60,5 +60,5 @@ test("a port in use names the port and how to fix it", () => {
   const error = devPortInUse(4173, "127.0.0.1", cause);
   assert.equal((error as NodeJS.ErrnoException).code, "EADDRINUSE");
   assert.equal(error.cause, cause);
-  assert.equal(error.message, "El puerto 4173 de 127.0.0.1 ya está en uso; usa PORT=<otro puerto> o cierra el otro meeko dev");
+  assert.equal(error.message, "El puerto 4173 de 127.0.0.1 ya está en uso; usa MEEKO_PORT=<otro puerto> o cierra el otro meeko dev");
 });

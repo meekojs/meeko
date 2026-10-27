@@ -88,7 +88,7 @@ export async function resolveDevPorts(request: DevPortRequest): Promise<DevPorts
     return port === first ? { port, hmrPort } : { port, hmrPort, busy: first };
   }
   throw Object.assign(
-    new Error(`Los puertos ${first}–${first + attempts - 1} de ${request.host} ya están en uso; usa PORT=<puerto> o cierra otro meeko dev`),
+    new Error(`Los puertos ${first}–${first + attempts - 1} de ${request.host} ya están en uso; usa MEEKO_PORT=<puerto> o cierra otro meeko dev`),
     { code: "EADDRINUSE" },
   );
 }
@@ -96,7 +96,7 @@ export async function resolveDevPorts(request: DevPortRequest): Promise<DevPorts
 /** The error of a `meeko dev` whose HTTP port is taken, with the original error as its cause. */
 export function devPortInUse(port: number, host: string, cause: unknown): Error {
   return Object.assign(
-    new Error(`El puerto ${port} de ${host} ya está en uso; usa PORT=<otro puerto> o cierra el otro meeko dev`, { cause }),
+    new Error(`El puerto ${port} de ${host} ya está en uso; usa MEEKO_PORT=<otro puerto> o cierra el otro meeko dev`, { cause }),
     { code: "EADDRINUSE" },
   );
 }

@@ -23,7 +23,7 @@ export type RedisMessageListener = (message: string, channel: string) => unknown
  * import { createClient } from "redis";
  * import type { RedisPublisherClient } from "@meekojs/meeko/server";
  *
- * const publisher: RedisPublisherClient = createClient({ url: process.env.REDIS_URL });
+ * const publisher: RedisPublisherClient = createClient({ url: process.env.MEEKO_REDIS_URL });
  * ```
  */
 export interface RedisPublisherClient {
@@ -42,7 +42,7 @@ export interface RedisPublisherClient {
  * import { createClient } from "redis";
  * import type { RedisSubscriberClient } from "@meekojs/meeko/server";
  *
- * const redis = createClient({ url: process.env.REDIS_URL });
+ * const redis = createClient({ url: process.env.MEEKO_REDIS_URL });
  * const connection = redis.duplicate();
  * await connection.connect();
  * const subscriber: RedisSubscriberClient = connection;
@@ -157,7 +157,7 @@ function decodeEnvelope(raw: string): SocketMessage {
  * import { defineServerRuntime, RedisSocketPubSub, SessionManager } from "@meekojs/meeko/server";
  *
  * export default defineServerRuntime(async ({ env, production }) => {
- *   const redis = createClient({ url: env.REDIS_URL });
+ *   const redis = createClient({ url: env.MEEKO_REDIS_URL });
  *   await redis.connect();
  *   const subscriber = redis.duplicate();
  *   await subscriber.connect();

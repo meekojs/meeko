@@ -164,7 +164,7 @@ La versión de TypeScript que incluye el paquete puede actualizarse en un minor.
 - Desde `1.2`, `app/plugins/*.ts` en la aplicación y sus layers, con los sufijos `.client.ts` (sólo navegador, antes de hidratar) y `.server.ts` (sólo servidor, una vez por petición de página).
 - Los sufijos `.client.ts`, `.server.ts` y `.shared.ts`, y las exclusiones `*.test.ts`, `*.spec.ts` y `*.d.ts`.
 - Los autoimports `api`, `rpc`, `socket`, `useSocket`, `useState`, `href` y `provideErrorHandler`, y desde `1.1` `onMounted`, `useApi`, `useRpcQuery` y `useRpcMutation`, y desde `1.2` `useRoute`, `useForm`, `useStorage`, `useApiMutation`, `useHead` y `useSeoMeta` (un export propio con uno de esos nombres tiene prioridad sobre el del framework). En el código de nivel superior de `<script server>`, `usePage`, `redirect` y `notFound` se pueden usar sin import, y desde `1.2` también `useHead` y `useSeoMeta`.
-- Las variables de entorno `HOST`, `PORT`, `PUBLIC_ORIGIN` y `MEEKO_HMR_PORT`.
+- Las variables de entorno `MEEKO_HOST`, `MEEKO_PORT` (con `PORT` como respaldo permanente), `MEEKO_PUBLIC_ORIGIN` y `MEEKO_HMR_PORT`, y el prefijo `MEEKO_`, reservado para las variables que lee Meeko. `HOST` y `PUBLIC_ORIGIN` están obsoletas desde `1.2`.
 
 ### Salidas de build
 
@@ -255,12 +255,15 @@ Un minor sólo puede añadir campos opcionales a estos formatos. Debe aceptar lo
 | `useSocket(url, contract, options)` de `@meekojs/meeko/framework` | `1.1` | `useSocketClient`, con la misma firma y los mismos tipos | `2.0` |
 | Segmentos `byId` de `api.*` y de `ApiClient` (`api.users.byId.get({ params: { id } })`) | `1.2` | La llamada del segmento dinámico: `api.users({ id }).get()` | `2.0` |
 | Carpetas de layer (con `app/pages` y sin módulo) listadas en `modules` de `meeko.config.ts` | `1.2` | La misma cadena en `layers` | `2.0` |
+| Variables de entorno `HOST` y `PUBLIC_ORIGIN` | `1.2` | `MEEKO_HOST` y `MEEKO_PUBLIC_ORIGIN`. `PORT` no está obsoleta | `2.0` |
 
 El alias `useSocket` es la misma función que `useSocketClient`, así que no emite aviso de consola: el editor lo marca por su `@deprecated`. No afecta al autoimport `useSocket("canal", opciones)` de los clientes generados, que no está deprecado. Véase [framework.md](framework.md#clientes-con-url-y-contrato-explícitos).
 
 Los segmentos `byId` construyen las mismas peticiones que la llamada del segmento y tampoco emiten aviso de consola: el editor tacha cada método que se llama a través de ellos. La clave `clientKey` del manifiesto, `createLocalCalls().api("users.byId", ...)` y `useApi` no cambian ni están deprecados. Véase [framework.md](framework.md#segmentos-dinámicos-en-api).
 
 Una carpeta de layer listada en `modules` se sigue aplicando como layer, en la misma posición que antes, y `meeko dev`, `meeko build` y `meeko check` escriben un aviso una vez por proceso. `extends` no está deprecado: es un alias de `layers`. Véase [framework.md](framework.md#carpetas-en-modules-deprecado).
+
+`HOST` y `PUBLIC_ORIGIN` sólo se leen cuando falta `MEEKO_HOST` o `MEEKO_PUBLIC_ORIGIN`, y entonces `meeko dev`, `start`, `preview` y las salidas de `meeko build` escriben un aviso una vez por proceso que nombra la variable nueva. Véase [framework.md](framework.md#crear-una-aplicación).
 
 Una vulnerabilidad que no se pueda corregir de forma compatible es la única excepción. En ese caso, el cambio mínimo necesario puede publicarse en un patch o un minor, con su explicación y migración en el CHANGELOG.
 

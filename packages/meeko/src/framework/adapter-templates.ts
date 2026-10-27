@@ -40,6 +40,7 @@ async function prerenderSource(): Promise<PrerenderSource | undefined> {
 
 /** Bun adapter entry; \`meeko build --adapter bun\` bundles it to .meeko/output/bun/index.js. */
 export const bunEntrySource = `import { createBunAssetReader, createBunServer } from "@meekojs/meeko/bun";
+import { meekoEnv } from "@meekojs/meeko/internal";
 import type { PrerenderSource, PrerenderedPage } from "@meekojs/meeko/server";
 import { createApp, load, manifest } from "./entry-server.ts";
 
@@ -59,6 +60,7 @@ ${prerenderSource}
 /** Creates the built application. */
 export async function createBunApp() {
   const prerender = await prerenderSource();
+  const publicOrigin = meekoEnv(bun.env, "PUBLIC_ORIGIN");
   return createApp({
     production: true,
     platform: {
@@ -70,15 +72,16 @@ export async function createBunApp() {
     },
     assets: createBunAssetReader({ root: new URL("client/", output), assets: manifest.assets ?? {} }),
     ...(prerender ? { prerender } : {}),
-    ...(bun.env.PUBLIC_ORIGIN ? { publicOrigin: bun.env.PUBLIC_ORIGIN } : {}),
+    ...(publicOrigin ? { publicOrigin } : {}),
   });
 }
 
-/** Serves the built application; HOST, PORT and PUBLIC_ORIGIN override the defaults. */
+/** Serves the built application; MEEKO_HOST, MEEKO_PORT (or PORT) and MEEKO_PUBLIC_ORIGIN override the defaults. */
 export async function start() {
   const app = await createBunApp();
-  const host = bun.env.HOST || "127.0.0.1";
-  const server = bun.serve({ hostname: host, port: bun.env.PORT ? Number(bun.env.PORT) : 4173, ...createBunServer(app) });
+  const host = meekoEnv(bun.env, "HOST") || "127.0.0.1";
+  const port = meekoEnv(bun.env, "PORT");
+  const server = bun.serve({ hostname: host, port: port ? Number(port) : 4173, ...createBunServer(app) });
   const visible = host === "0.0.0.0" ? "127.0.0.1" : host === "::" ? "::1" : host;
   process.stdout.write(\`http://\${visible.includes(":") ? \`[\${visible}]\` : visible}:\${server.port}\\n\`);
   let stopping: Promise<void> | undefined;
@@ -101,6 +104,7 @@ if (import.meta.main) await start();
 
 /** Deno adapter entry; \`meeko build --adapter deno\` bundles it to .meeko/output/deno/main.js. */
 export const denoEntrySource = `import { createDenoAssetReader, serveDeno } from "@meekojs/meeko/deno";
+import { meekoEnv } from "@meekojs/meeko/internal";
 import type { PrerenderSource, PrerenderedPage } from "@meekojs/meeko/server";
 import { createApp, load, manifest } from "./entry-server.ts";
 
@@ -119,12 +123,13 @@ ${prerenderSource}
 /** Creates the built application. */
 export async function createDenoApp() {
   const prerender = await prerenderSource();
-  const publicOrigin = deno.env.get("PUBLIC_ORIGIN");
+  const env = deno.env.toObject();
+  const publicOrigin = meekoEnv(env, "PUBLIC_ORIGIN");
   return createApp({
     production: true,
     platform: {
       name: "deno",
-      env: deno.env.toObject(),
+      env,
       waitUntil(promise) {
         void Promise.resolve(promise).catch((error: unknown) => console.error("[meeko] background task failed", error));
       },
@@ -135,12 +140,13 @@ export async function createDenoApp() {
   });
 }
 
-/** Serves the built application; HOST, PORT and PUBLIC_ORIGIN override the defaults. */
+/** Serves the built application; MEEKO_HOST, MEEKO_PORT (or PORT) and MEEKO_PUBLIC_ORIGIN override the defaults. */
 export async function start() {
   const app = await createDenoApp();
-  const port = deno.env.get("PORT");
+  const env = deno.env.toObject();
+  const port = meekoEnv(env, "PORT");
   const server = await serveDeno(app, {
-    host: deno.env.get("HOST") || "127.0.0.1",
+    host: meekoEnv(env, "HOST") || "127.0.0.1",
     port: port ? Number(port) : 4173,
     handleSignals: true,
   });
@@ -161,24 +167,28 @@ import {
   createCloudflareAssetReader, createCloudflarePrerenderSource, createSocketRoomClass, createWorker, DurableObjectSocketPubSub,
 } from "@meekojs/meeko/cloudflare";
 import type { CloudflareAppContext, CloudflareAssetsBinding, DurableObjectNamespaceLike } from "@meekojs/meeko/cloudflare";
+import { meekoEnv } from "@meekojs/meeko/internal";
 import type { ServerPlatform } from "@meekojs/meeko/server";
 import { createApp, manifest } from "./entry-server.ts";
 
 interface MeekoWorkerEnv {
   readonly ASSETS: CloudflareAssetsBinding;
   readonly MEEKO_SOCKET?: DurableObjectNamespaceLike;
+  readonly MEEKO_PUBLIC_ORIGIN?: string;
+  /** @deprecated Since 1.2; use MEEKO_PUBLIC_ORIGIN. */
   readonly PUBLIC_ORIGIN?: string;
 }
 
 /** Creates the application once per isolate, from the Worker bindings. */
 function createCloudflareApp({ env, platform }: CloudflareAppContext<MeekoWorkerEnv>) {
+  const publicOrigin = meekoEnv(env, "PUBLIC_ORIGIN");
   return createApp({
     production: true,
     platform: platform as unknown as ServerPlatform<Readonly<Record<string, string | undefined>>>,
     assets: createCloudflareAssetReader({ binding: env.ASSETS, assets: manifest.assets ?? {} }),
     prerender: createCloudflarePrerenderSource({ binding: env.ASSETS }),
     ...(env.MEEKO_SOCKET ? { defaultSocketPubSub: new DurableObjectSocketPubSub(env.MEEKO_SOCKET) } : {}),
-    ...(typeof env.PUBLIC_ORIGIN === "string" && env.PUBLIC_ORIGIN ? { publicOrigin: env.PUBLIC_ORIGIN } : {}),
+    ...(publicOrigin ? { publicOrigin } : {}),
   });
 }
 

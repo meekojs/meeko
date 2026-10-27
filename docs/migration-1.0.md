@@ -135,7 +135,7 @@ meeko build
 node .meeko/output/node/index.mjs   # o meeko start
 ```
 
-El servidor escucha en `HOST`/`PORT` (o en `server.host`/`server.port` de `meeko.config.ts`), con `127.0.0.1:4173` por defecto. El build Node necesita las dependencias de `node_modules`. Para Bun, Deno o Cloudflare Workers use `meeko build --adapter <bun|deno|cloudflare>`; véase [Build, despliegue y verificación](framework.md#build-despliegue-y-verificación).
+El servidor escucha en `MEEKO_HOST`/`MEEKO_PORT` (`HOST`/`PORT` antes de `1.2`; o en `server.host`/`server.port` de `meeko.config.ts`), con `127.0.0.1:4173` por defecto. El build Node necesita las dependencias de `node_modules`. Para Bun, Deno o Cloudflare Workers use `meeko build --adapter <bun|deno|cloudflare>`; véase [Build, despliegue y verificación](framework.md#build-despliegue-y-verificación).
 
 `prerenderRoutes` exige que cada documento contenga `<head>` y escribe también el payload de navegación.
 

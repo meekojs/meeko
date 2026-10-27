@@ -85,7 +85,7 @@ test("composables with framework autoimports, pages without a script and static 
   const origin = `http://127.0.0.1:${port}`;
   const running = spawn(process.execPath, [join(repositoryRoot, "dist", "cli.js"), "dev", root], {
     cwd: root,
-    env: { ...process.env, PORT: String(port), MEEKO_HMR_PORT: String(hmrPort), PUBLIC_ORIGIN: origin },
+    env: { ...process.env, PORT: String(port), MEEKO_HMR_PORT: String(hmrPort), MEEKO_PUBLIC_ORIGIN: origin },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });

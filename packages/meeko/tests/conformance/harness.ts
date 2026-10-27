@@ -205,7 +205,7 @@ export async function startConformanceOutput(adapter: ConformanceAdapter): Promi
     const entry = adapter === "node" ? "index.mjs" : adapter === "bun" ? "index.js" : "main.js";
     const args = adapter === "deno" ? ["run", "-A", join(result.output, entry)] : [join(result.output, entry)];
     child = spawn(runtimeCommand(adapter)!, args, {
-      cwd: root, env: { ...process.env, PORT: "0", HOST: "127.0.0.1", NO_COLOR: "1" }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
+      cwd: root, env: { ...process.env, PORT: "0", MEEKO_HOST: "127.0.0.1", NO_COLOR: "1" }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
     });
     const running = child;
     running.stdout?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });

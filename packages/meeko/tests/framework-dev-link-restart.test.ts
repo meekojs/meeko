@@ -188,7 +188,7 @@ test("meeko dev with an explicit port in use fails with a clear message", { time
   running.stderr?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
   const [code] = await once(running, "exit") as [number | null];
   assert.equal(code, 1, logs);
-  assert.match(logs, new RegExp(`El puerto ${port} de 127\\.0\\.0\\.1 ya está en uso; usa PORT=<otro puerto> o cierra el otro meeko dev`));
+  assert.match(logs, new RegExp(`El puerto ${port} de 127\\.0\\.0\\.1 ya está en uso; usa MEEKO_PORT=<otro puerto> o cierra el otro meeko dev`));
   assert.doesNotMatch(logs, /WebSocket server error/);
   assert.doesNotMatch(logs, /http:\/\/127\.0\.0\.1:/);
 });

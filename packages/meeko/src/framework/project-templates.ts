@@ -62,6 +62,7 @@ export function createApp(options: AppHostOptions): Promise<ServerApp> {
 export const nodeEntrySource = `import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { meekoEnv } from "@meekojs/meeko/internal";
 import { createNodeAssetReader, serveNode } from "@meekojs/meeko/node";
 import type { PrerenderSource, PrerenderedPage } from "@meekojs/meeko/server";
 import { nodeServer } from "virtual:meeko-server-app";
@@ -105,6 +106,7 @@ async function prerenderSource(): Promise<PrerenderSource | undefined> {
 /** Creates the built application; \`prerendering\` is used by \`meeko build\`. */
 export async function createNodeApp(options: { readonly prerendering?: boolean } = {}) {
   const prerender = options.prerendering ? undefined : await prerenderSource();
+  const publicOrigin = meekoEnv(process.env, "PUBLIC_ORIGIN");
   return createApp({
     production: true,
     prerendering: options.prerendering === true,
@@ -116,16 +118,17 @@ export async function createNodeApp(options: { readonly prerendering?: boolean }
     },
     assets: createNodeAssetReader({ root: join(output, "client"), assets: manifest.assets ?? {} }),
     ...(prerender ? { prerender } : {}),
-    ...(process.env.PUBLIC_ORIGIN ? { publicOrigin: process.env.PUBLIC_ORIGIN } : {}),
+    ...(publicOrigin ? { publicOrigin } : {}),
   });
 }
 
-/** Serves the built application; HOST, PORT and PUBLIC_ORIGIN override the build configuration. */
+/** Serves the built application; MEEKO_HOST, MEEKO_PORT (or PORT) and MEEKO_PUBLIC_ORIGIN override the build configuration. */
 export async function start() {
   const app = await createNodeApp();
+  const port = meekoEnv(process.env, "PORT");
   const server = await serveNode(app, {
-    host: process.env.HOST || nodeServer.host,
-    port: process.env.PORT ? Number(process.env.PORT) : nodeServer.port,
+    host: meekoEnv(process.env, "HOST") || nodeServer.host,
+    port: port ? Number(port) : nodeServer.port,
     handleSignals: true,
   });
   process.stdout.write(server.url + "\\n");

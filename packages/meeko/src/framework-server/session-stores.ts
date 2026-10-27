@@ -90,7 +90,7 @@ function decodeRecord<T>(value: string, id: string): SessionRecord<T> {
  * import { defineServerRuntime, RedisSessionStore, SessionManager } from "@meekojs/meeko/server";
  *
  * export default defineServerRuntime(async ({ env, production, prerendering }) => {
- *   const redis = createClient({ url: env.REDIS_URL });
+ *   const redis = createClient({ url: env.MEEKO_REDIS_URL });
  *   await redis.connect();
  *   const subscriber = redis.duplicate();
  *   await subscriber.connect();

@@ -34,3 +34,4 @@ export type { Snippet, SnippetArgs, SnippetMap, SnippetTypes } from "./snippets.
 export type { Signal } from "./reactivity.js";
 export { definePageBody, pageData } from "./framework/page-body.js";
 export type { JsonShape, SerializableExport, ServerData } from "./framework/page-body.js";
+export { meekoEnv } from "./framework-server/env.js";

@@ -35,8 +35,9 @@ test("the help names the environment variables that dev, start and preview read"
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /^Uso: meeko dev/);
   assert.match(result.stdout, /Variables de entorno:/);
-  assert.match(result.stdout, /PORT, HOST {7}puerto y dirección de dev, start y preview/);
-  assert.match(result.stdout, /PUBLIC_ORIGIN {4}origen público de dev, start y preview/);
+  assert.match(result.stdout, /MEEKO_PORT, MEEKO_HOST {2}puerto y dirección de dev, start y preview/);
+  assert.match(result.stdout, /MEEKO_PUBLIC_ORIGIN {2}origen público de dev, start y preview/);
+  assert.match(result.stdout, /HOST y PUBLIC_ORIGIN están obsoletas/);
   assert.match(result.stdout, /MEEKO_HMR_PORT/);
   assert.match(result.stdout, /MEEKO_EDITOR_BRIDGE=0/);
 });

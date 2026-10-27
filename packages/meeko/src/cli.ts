@@ -25,14 +25,15 @@ import type { CompileDiagnostic } from "./compiler/sfc.js";
 
 const usage = "Uso: meeko dev [directorio]\n     meeko check [directorio | componente.meeko] [--json]\n     meeko build [directorio] [--adapter <node|cloudflare|deno|bun>]\n     meeko start [directorio]\n     meeko preview [directorio] [--adapter <node|cloudflare|bun|deno>]\n     meeko clean [directorio] [--all] [--dry-run]\n     meeko check-app <directorio>\n     meeko compile <componente.meeko> <salida.ts>\n     meeko types <componente.meeko>\n     meeko routes <directorio>\n     meeko prerender <directorio>\n     meeko init <directorio>\n     meeko init-framework <directorio>\n     meeko lsp --stdio\n     meeko --help | --version\n\n" +
   "Variables de entorno:\n" +
-  "     PORT, HOST       puerto y dirección de dev, start y preview; sustituyen a server.port y\n" +
+  "     MEEKO_PORT, MEEKO_HOST  puerto y dirección de dev, start y preview; sustituyen a server.port y\n" +
   "                      server.host de meeko.config.ts (por defecto, 127.0.0.1:4173; preview\n" +
-  "                      de cloudflare se los pasa a wrangler dev)\n" +
-  "     PUBLIC_ORIGIN    origen público de dev, start y preview (Node, Bun y Deno) para las\n" +
-  "                      comprobaciones de Origin de HTTP y Socket tras un proxy\n" +
+  "                      de cloudflare se los pasa a wrangler dev). PORT sigue valiendo\n" +
+  "     MEEKO_PUBLIC_ORIGIN  origen público de dev, start y preview para las comprobaciones de\n" +
+  "                      Origin de HTTP y Socket tras un proxy\n" +
   "     MEEKO_HMR_PORT   puerto del WebSocket de HMR de dev\n" +
   "     MEEKO_EDITOR_BRIDGE=0  desactiva el puente con el editor de dev\n" +
   "     MEEKO_LINK_WATCH=0     dev no se reinicia al reconstruir un @meekojs/meeko enlazado\n" +
+  "     HOST y PUBLIC_ORIGIN están obsoletas: usa MEEKO_HOST y MEEKO_PUBLIC_ORIGIN\n" +
   "dev, build, start, preview y check leen el .env del proyecto; el entorno real tiene prioridad.\n";
 /** Prints the diagnostics on stderr, warnings included. */
 function writeDiagnostics(diagnostics: readonly CompileDiagnostic[]): void {

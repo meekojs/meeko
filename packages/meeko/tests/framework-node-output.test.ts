@@ -115,7 +115,7 @@ export default defineApiRoute({ contentType: "response", async handler({ context
     await rename(join(root, name), join(moved, name.replaceAll("/", "-")));
   }
   child = spawn(process.execPath, [join(result.output, "index.mjs")], {
-    cwd: root, env: { ...process.env, PORT: "0", HOST: "127.0.0.1" }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
+    cwd: root, env: { ...process.env, MEEKO_PORT: "0", MEEKO_HOST: "127.0.0.1" }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
   });
   let logs = "";
   child.stdout?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });

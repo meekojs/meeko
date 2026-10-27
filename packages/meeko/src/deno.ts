@@ -42,8 +42,8 @@ function denoGlobal(): DenoNamespace {
  * import type { ServeDenoOptions } from "@meekojs/meeko/deno";
  *
  * const options: ServeDenoOptions = {
- *   host: Deno.env.get("HOST") ?? "127.0.0.1",
- *   port: Number(Deno.env.get("PORT") ?? 4173),
+ *   host: Deno.env.get("MEEKO_HOST") ?? "127.0.0.1",
+ *   port: Number(Deno.env.get("MEEKO_PORT") ?? 4173),
  *   handleSignals: true,
  * };
  * ```
