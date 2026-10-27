@@ -68,6 +68,40 @@ Desde `1.2`, una declaración de nivel superior puede desestructurar un objeto o
 - **Datos con `await`.** El resultado de `await useApi(...)` o `await useRpcQuery(...)` puede desestructurarse: `const { data, refresh } = await useApi("/api/users")`. `data` sigue siendo la señal del recurso, cuyos datos el framework ya envía en el payload.
 - **Tras el primer `await` de navegador.** Los nombres desestructurados después de `await useElementRef(...)` o `await useSocket(...)` sólo existen en el navegador, como los demás; la plantilla no puede leerlos (`MEEK057`).
 
+### Props reactivas
+
+Desde `1.2`, cuando el padre cambia una prop, el hijo sigue montado: Meeko le entrega el valor nuevo y sólo se actualizan los bindings que leen esa prop, como en Vue o Svelte. El DOM del hijo, con el foco, el cursor y la composición (IME) de un `<input>` que el usuario está escribiendo, su estado, los snippets que recibió y sus propios hijos se conservan. Hasta `1.1`, Meeko volvía a renderizar el rango del hijo y sólo conservaba sus señales editables por nombre: el campo en el que se escribía se reemplazaba.
+
+```html
+<!-- UiTextField.meeko -->
+<script lang="ts">
+const props = defineProps<{ label: string; error?: string; hint?: string }>({ hint: "" });
+const value = defineModel<string>("value");
+const invalid = computed(() => Boolean(props.error));
+</script>
+
+<template>
+    <label>{props.label} <input model="value" bind:aria-invalid="invalid.value ? 'true' : 'false'"></label>
+    <p if:when="props.error">{props.error}</p>
+    <small>{props.hint}</small>
+</template>
+```
+
+```html
+<UiTextField model:value="form.fields.name" bind:label="'Nombre'" bind:error="form.errors.value.name" />
+```
+
+Si `form.errors.value.name` cambia mientras el usuario escribe, el `<p>` aparece o desaparece y `aria-invalid` cambia, pero el `<input>` es el mismo y conserva el foco y lo tecleado.
+
+- **Qué es reactivo.** `props` es una vista de sólo lectura de las props actuales. Cada lectura de `props.x` en la plantilla, en un `computed`, en un `effect` o en la función de entrada de `useApi` o `useRpcQuery` sigue a la prop, también en los hijos a los que el componente la pasa. `"x" in props`, `Object.keys(props)` y `{ ...props }` ven las props que el padre añade o deja de pasar.
+- **Qué no lo es.** El setup se ejecuta una vez por instancia, así que un valor que copia una prop conserva el valor inicial, como en Vue: `const { label } = props`, `const title = props.title.toUpperCase()`, `signal(props.initial)` o `useApi(ruta, { query: { q: props.q } })`. Para seguir la prop, léala donde se usa (`{props.label}`), derive con `computed(() => props.title.toUpperCase())` o pase una función a los composables de datos (`useApi(ruta, () => ({ query: { q: props.q } }))`).
+- **Valores por defecto.** Se aplican en cada lectura: una prop que pasa a `undefined` vuelve a su default.
+- **Sólo lectura.** Asignar, borrar o definir una propiedad de `props` en el navegador lanza `TypeError`. Para cambiar un valor del padre, emita un evento (`defineEmits`) o use un modelo (`defineModel`).
+- **Cuándo se vuelve a montar.** El rango se reconstruye, conservando las señales editables por nombre, cuando cambia el componente de `<component is>`, cuando el padre pasa otra señal en un `model` o empieza o deja de pasar un snippet, y en los componentes con un `await` de datos en el nivel superior (`await useApi(...)` o `await useRpcQuery(...)`): sus peticiones se construyeron con las props con las que se renderizaron, así que unas props nuevas los vuelven a montar cuando sus datos están listos (véase [Componentes que se montan más tarde](framework.md#componentes-que-se-montan-más-tarde)).
+- **Snippets.** El contenido de un snippet pertenece al padre: sigue sus señales y los argumentos (`args`) que le pasa el hijo sin volver a pintarse, y no se reconstruye cuando cambian otras props del hijo.
+- **SSR, hidratación y raíz.** No cambian: el servidor renderiza con el objeto de props y la hidratación conecta el mismo HTML. `hydrate(root, props)` y `hydrateScope` de un componente raíz reciben el objeto tal cual; sólo un padre Meeko entrega la vista reactiva a sus hijos.
+- **HMR y DevTools.** Una actualización en caliente del hijo sigue leyendo las props que actualiza el padre, y el panel de DevTools muestra las props nuevas.
+
 ### Valores por defecto en `defineProps`
 
 Los defaults están integrados en la misma macro; no se necesita `withDefaults`:
@@ -572,7 +606,7 @@ const release = hydrate(document.querySelector('#counter')!, props, state)
 // Llamar release() cuando la raíz deje de usarse.
 ```
 
-Para transferir props o estado en una etiqueta `<script>`, usa `serializeJson(value)`; comprueba que el dato pueda representarse fielmente en JSON y escapa caracteres que podrían cerrar la etiqueta. `renderToString` sigue disponible cuando el estado inicial se deriva de forma determinista de las props y no se necesita una captura explícita. `renderToString` y `renderWithState` son síncronos: fuera del render del framework no pueden esperar un `await useApi(...)` o `await useRpcQuery(...)`, y un componente que lo necesita lanza un error con el código `MEEKO_SUSPENDED`. Use el componente desde una página del framework o use el composable sin `await`. Dentro del framework, un componente que se monta en el navegador después de la página espera sus datos con la zona vacía en lugar de lanzar ese error (véase [Componentes que se montan más tarde](framework.md#componentes-que-se-montan-más-tarde)). Los módulos compilados exportan además `hasDataAwait` y `__meekoChildren`, marcas que el framework lee para saltarse la carga previa de una navegación, y `__meekoChannels` y `__meekoTag`, que sólo tipan las etiquetas del padre; ninguna forma parte del contrato. Al cambiar props reactivas de un hijo, Meeko conserva sus señales editables por nombre mientras reconstruye ese rango.
+Para transferir props o estado en una etiqueta `<script>`, usa `serializeJson(value)`; comprueba que el dato pueda representarse fielmente en JSON y escapa caracteres que podrían cerrar la etiqueta. `renderToString` sigue disponible cuando el estado inicial se deriva de forma determinista de las props y no se necesita una captura explícita. `renderToString` y `renderWithState` son síncronos: fuera del render del framework no pueden esperar un `await useApi(...)` o `await useRpcQuery(...)`, y un componente que lo necesita lanza un error con el código `MEEKO_SUSPENDED`. Use el componente desde una página del framework o use el composable sin `await`. Dentro del framework, un componente que se monta en el navegador después de la página espera sus datos con la zona vacía en lugar de lanzar ese error (véase [Componentes que se montan más tarde](framework.md#componentes-que-se-montan-más-tarde)). Los módulos compilados exportan además `hasDataAwait` y `__meekoChildren`, marcas que el framework lee para saltarse la carga previa de una navegación, `__meekoReactiveProps` (desde `1.2`), que indica al padre que puede actualizar las props del hijo sin volver a montarlo, y `__meekoChannels` y `__meekoTag`, que sólo tipan las etiquetas del padre; ninguna forma parte del contrato. Al cambiar las props de un hijo, Meeko actualiza en su sitio los bindings que las leen (véase [Props reactivas](#props-reactivas)); cuando el hijo se vuelve a montar, conserva sus señales editables por nombre.
 
 ## Reactividad
 

@@ -27,7 +27,7 @@ export type { ApiClient, ApiMutationInput, ApiOperation, ClientOptions, PublicAp
 export { createSocketClient, createSocketRegistry, useSocket, useSocketChannel, useSocketClient } from "./framework/socket.js";
 export { createUseApi, createUseApiMutation, createUseRpcMutation, createUseRpcQuery } from "./framework/resources.js";
 export type { ApiMutation, ApiMutationContract, ApiQueryContract, ApiQueryOptions, DataResource, LoadedResource, Reactive, RpcMutation, UseApi, UseApiMutation, UseRpcMutation, UseRpcQuery } from "./framework/resources.js";
-export type { MutationOptions, RetrySafeMutation, RetrySafeOptions, UncertainMutation } from "./framework/mutations.js";
+export type { MutationAttempt, MutationFailure, MutationOptions, RetrySafeMutation, RetrySafeOptions, UncertainMutation } from "./framework/mutations.js";
 export type { SocketClient, SocketContract, SocketSchema, SocketClientOptions, SocketRegistry, SocketRegistryOptions } from "./framework/socket.js";
 
 /**

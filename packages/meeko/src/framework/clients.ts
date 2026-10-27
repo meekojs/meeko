@@ -141,7 +141,16 @@ export type AnyApiOperation = ApiOperation<unknown, unknown, unknown, unknown>;
 
 type SearchValue = string | number | boolean | null | undefined;
 export type QueryValue = SearchValue | readonly SearchValue[];
-type RequestOptions = { readonly signal?: AbortSignal };
+/** Options of one call of `api.*` and `rpc.*`, beside its contract input. */
+type RequestOptions = {
+  /** Cancela la petición. */
+  readonly signal?: AbortSignal;
+  /**
+   * Desde 1.2: UUID que viaja en la cabecera `Idempotency-Key`, para que el servidor reconozca una
+   * repetición de la misma escritura. Uno que no es un UUID rechaza con `TypeError` sin enviar nada.
+   */
+  readonly idempotencyKey?: string;
+};
 /**
  * The `Key` option for a contract value `T`. It does not distribute over `T`, so a value typed as
  * the whole union (`{ body: A | B }`) is accepted, not only one member at a time. An absent value
@@ -604,6 +613,29 @@ export interface ApiRequestInput {
   readonly query?: Readonly<Record<string, QueryValue>>;
   readonly body?: unknown;
   readonly signal?: AbortSignal;
+  readonly idempotencyKey?: string;
+}
+
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Whether `value` is a UUID that can travel as an idempotency key. */
+export function isIdempotencyKey(value: unknown): value is string {
+  return typeof value === "string" && uuid.test(value);
+}
+
+/** The `Idempotency-Key` header: a Structured Field string, as the IETF draft defines it. */
+export function idempotencyHeader(key: string): Record<string, string> {
+  return { "idempotency-key": `"${key}"` };
+}
+
+/**
+ * The headers of a call's own `idempotencyKey`, before the framework's `extra`, which a retry-safe
+ * mutation fills with its own key.
+ */
+function callHeaders(key: unknown, label: string, extra: Readonly<Record<string, string>> | undefined): Readonly<Record<string, string>> | undefined {
+  if (key === undefined) return extra;
+  if (!isIdempotencyKey(key)) throw new TypeError(`${label}: idempotencyKey must be a UUID such as crypto.randomUUID() returns`);
+  return { ...idempotencyHeader(key), ...extra };
 }
 
 /**
@@ -611,11 +643,12 @@ export interface ApiRequestInput {
  * `extra` adds headers of the framework, such as `Idempotency-Key`.
  */
 export async function requestApi(endpoint: PublicApiEndpoint, input: ApiRequestInput, options: ClientOptions, extra?: Readonly<Record<string, string>>): Promise<unknown> {
+  const headers = callHeaders(input.idempotencyKey, `${endpoint.method} ${endpoint.pathname}`, extra);
   const path = pathWithParams(endpoint.pathname, input.params) + queryString(input.query);
   const url = endpointUrl(path, options);
   const fetcher = options.fetch ?? fetch;
   const response = await fetcher(url, {
-    method: endpoint.method, headers: headersFor(options, endpoint.method, input.body !== undefined, extra),
+    method: endpoint.method, headers: headersFor(options, endpoint.method, input.body !== undefined, headers),
     credentials: "same-origin", ...(input.body === undefined ? {} : { body: JSON.stringify(input.body) }),
     ...(input.signal ? { signal: input.signal } : {}),
   });
@@ -624,9 +657,10 @@ export async function requestApi(endpoint: PublicApiEndpoint, input: ApiRequestI
 
 /** Calls one RPC procedure, with the session's CSRF token; `rpc.*` and the RPC composables share it. */
 export async function requestRpc(endpoint: PublicRpcEndpoint, input: unknown, request: RequestOptions, options: ClientOptions, extra?: Readonly<Record<string, string>>): Promise<unknown> {
+  const headers = callHeaders(request.idempotencyKey, `rpc ${endpoint.id}`, extra);
   const fetcher = options.fetch ?? fetch;
   const response = await fetcher(endpointUrl(endpoint.pathname, options), {
-    method: "POST", headers: headersFor(options, "POST", true, extra), credentials: "same-origin",
+    method: "POST", headers: headersFor(options, "POST", true, headers), credentials: "same-origin",
     body: JSON.stringify(input), ...(request.signal ? { signal: request.signal } : {}),
   });
   return responseValue(response);

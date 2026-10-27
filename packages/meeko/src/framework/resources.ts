@@ -256,7 +256,8 @@ export type UseRpcQuery<Contract extends Record<string, RpcOperation>> =
 /**
  * Firma de `useRpcMutation(procedimiento, opciones?)`: devuelve una {@link RpcMutation} que llama
  * al procedimiento con `mutate(input)`. Con `{ retrySafe: { key } }` (desde `1.2`) devuelve además
- * {@link RetrySafeMutation}. No admite `await` en el nivel superior (`MEEK055`).
+ * {@link RetrySafeMutation}; `onSuccess` y `onError` (desde `1.2`) avisan de cada intento, también
+ * de los reintentos automáticos. No admite `await` en el nivel superior (`MEEK055`).
  *
  * @typeParam Contract Contrato `RpcContract` generado, indexado por ID de procedimiento.
  * @since 1.1.0
@@ -273,8 +274,8 @@ export type UseRpcQuery<Contract extends Record<string, RpcOperation>> =
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#mutaciones
  */
 export type UseRpcMutation<Contract extends Record<string, RpcOperation>> = {
-  <Procedure extends keyof Contract & string>(procedure: Procedure, options?: MutationOptions & { readonly retrySafe?: undefined }): RpcMutation<Contract[Procedure]["input"], Contract[Procedure]["output"]>;
-  <Procedure extends keyof Contract & string>(procedure: Procedure, options: MutationOptions & { readonly retrySafe: RetrySafeOptions }): RpcMutation<Contract[Procedure]["input"], Contract[Procedure]["output"]>
+  <Procedure extends keyof Contract & string>(procedure: Procedure, options?: MutationOptions<Contract[Procedure]["input"], Contract[Procedure]["output"]> & { readonly retrySafe?: undefined }): RpcMutation<Contract[Procedure]["input"], Contract[Procedure]["output"]>;
+  <Procedure extends keyof Contract & string>(procedure: Procedure, options: MutationOptions<Contract[Procedure]["input"], Contract[Procedure]["output"]> & { readonly retrySafe: RetrySafeOptions }): RpcMutation<Contract[Procedure]["input"], Contract[Procedure]["output"]>
     & RetrySafeMutation<Contract[Procedure]["input"], Contract[Procedure]["output"]>;
 };
 
@@ -311,8 +312,9 @@ type MutationOf<Mutations, Path extends keyof Mutations, Method extends keyof Mu
 /**
  * Firma de `useApiMutation(ruta, método, opciones?)`: devuelve una {@link ApiMutation} que llama
  * a un endpoint `POST`, `PUT`, `PATCH` o `DELETE` con `mutate({ params, query, body })`. Con
- * `{ retrySafe: { key } }` devuelve además {@link RetrySafeMutation}. Se llama mientras se ejecuta el
- * script de un componente, normalmente en su nivel superior, y no admite `await` (`MEEK055`).
+ * `{ retrySafe: { key } }` devuelve además {@link RetrySafeMutation}; `onSuccess` y `onError` avisan
+ * de cada intento. Se llama mientras se ejecuta el script de un componente, normalmente en su nivel
+ * superior, y no admite `await` (`MEEK055`).
  *
  * @typeParam Mutations Operaciones por ruta y método, normalmente un {@link ApiMutationContract}.
  * @since 1.2.0
@@ -329,8 +331,8 @@ type MutationOf<Mutations, Path extends keyof Mutations, Method extends keyof Mu
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#mutaciones
  */
 export type UseApiMutation<Mutations> = {
-  <Path extends keyof Mutations & string, Method extends keyof Mutations[Path] & string>(path: Path, method: Method, options?: MutationOptions & { readonly retrySafe?: undefined }): ApiMutation<MutationOf<Mutations, Path, Method>>;
-  <Path extends keyof Mutations & string, Method extends keyof Mutations[Path] & string>(path: Path, method: Method, options: MutationOptions & { readonly retrySafe: RetrySafeOptions }): ApiMutation<MutationOf<Mutations, Path, Method>>
+  <Path extends keyof Mutations & string, Method extends keyof Mutations[Path] & string>(path: Path, method: Method, options?: MutationOptions<ApiMutationInput<MutationOf<Mutations, Path, Method>>, MutationOf<Mutations, Path, Method>["output"]> & { readonly retrySafe?: undefined }): ApiMutation<MutationOf<Mutations, Path, Method>>;
+  <Path extends keyof Mutations & string, Method extends keyof Mutations[Path] & string>(path: Path, method: Method, options: MutationOptions<ApiMutationInput<MutationOf<Mutations, Path, Method>>, MutationOf<Mutations, Path, Method>["output"]> & { readonly retrySafe: RetrySafeOptions }): ApiMutation<MutationOf<Mutations, Path, Method>>
     & RetrySafeMutation<ApiMutationInput<MutationOf<Mutations, Path, Method>>, MutationOf<Mutations, Path, Method>["output"]>;
 };
 

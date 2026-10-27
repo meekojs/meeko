@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { Window as HappyWindow } from "happy-dom";
 import { compile } from "../src/compiler.ts";
 import type { ClientComponent } from "../src/framework/client.ts";
-import type { ApiOperation, RpcOperation } from "../src/framework/clients.ts";
+import type { ApiClient, ApiOperation, RpcClient, RpcOperation } from "../src/framework/clients.ts";
 import { createRouteManifest } from "../src/framework/router.ts";
 import type { RouteRecord } from "../src/framework/router.ts";
 import { createRequestContext, defineRpc, dispatchRpc, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
@@ -36,13 +36,22 @@ interface SaleServer {
   answer: (url: URL) => Response | "network";
 }
 
-const globals = globalThis as unknown as { meekoSales?: SaleServer; meekoSalesFetch?: typeof fetch; saleView?: SaleView };
+const globals = globalThis as unknown as {
+  meekoSales?: SaleServer;
+  meekoSalesFetch?: typeof fetch;
+  saleView?: SaleView;
+  /** What the `onSuccess` and `onError` of `notified` saw, in order. */
+  meekoNotices?: string[];
+  /** Makes the `onSuccess` of `notified` throw. */
+  meekoNoticeThrows?: boolean;
+};
 
 interface SaleView {
   readonly charge: RpcMutation<{ total: number }, { id: string }> & RetrySafeMutation<{ total: number }, { id: string }>;
   readonly remove: ApiMutation<ApiOperation<{ id: string }, undefined, undefined, undefined>>;
   readonly create: ApiMutation<ApiOperation<undefined, undefined, { total: number }, { id: string }>> & RetrySafeMutation<{ body: { total: number } }, { id: string }>;
   readonly again: SaleView["charge"];
+  readonly notified: SaleView["charge"];
 }
 
 function installServer(): SaleServer {
@@ -77,7 +86,18 @@ const charge = useRpcMutation("sales.checkout", { retrySafe: { key: "pos:sale" }
 const remove = useApiMutation("/api/notes/[id]", "DELETE");
 const create = useApiMutation("/api/sales", "POST", { retrySafe: { key: "api:sale" } });
 const again = useRpcMutation("sales.checkout", { retrySafe: { key: "pos:sale" } });
-Object.assign(globalThis, { saleView: { charge, remove, create, again } });
+const notices = globalThis as unknown as { meekoNotices: string[]; meekoNoticeThrows?: boolean };
+const notified = useRpcMutation("sales.checkout", {
+  retrySafe: { key: "pos:notified" },
+  onSuccess(output, attempt) {
+    notices.meekoNotices.push(\`ok \${attempt.trigger} \${output.id} \${String(notified.uncertain.value)} \${String(notified.pending.value)}\`);
+    if (notices.meekoNoticeThrows) throw new Error("notice failed");
+  },
+  onError(error, attempt) {
+    notices.meekoNotices.push(\`error \${attempt.trigger} \${attempt.uncertain} \${String((error as { code?: string }).code ?? error.name)} \${notified.error.value === error}\`);
+  },
+});
+Object.assign(globalThis, { saleView: { charge, remove, create, again, notified } });
 </script>
 <template><p class="uncertain">{charge.uncertain.value ? charge.uncertain.value.idempotencyKey : "none"}</p><p class="pending">{String(charge.pending.value)}</p></template>`;
 
@@ -350,6 +370,134 @@ test("useApiMutation sends params and body with CSRF; retrySafe adds the idempot
   }
 });
 
+test("onSuccess and onError report every attempt, also automatic retries, after one coherent state update", async () => {
+  const server = installServer();
+  globals.meekoNotices = [];
+  globals.meekoNoticeThrows = false;
+  const { modules, cleanup } = await loadModules();
+  try {
+    const { effect } = await runtime();
+    const { app, browser, errors, view } = await boot(modules, "https://example.test/sale");
+    const { notified } = view();
+    const notices = globals.meekoNotices;
+    // Every reactive state the page can observe, one entry per notification.
+    const states: string[] = [];
+    const stop = effect(() => {
+      const failure = notified.error.value as { code?: string; name?: string } | null;
+      states.push([
+        notified.uncertain.value ? "uncertain" : "settled",
+        failure ? failure.code ?? failure.name : "no-error",
+        notified.pending.value ? "pending" : "idle",
+        JSON.stringify(notified.data.value),
+      ].join(" "));
+    });
+
+    server.answer = () => "network";
+    await assert.rejects(notified.mutate({ total: 1 }), TypeError);
+    assert.deepEqual(notices, ["error mutate true TypeError true"]);
+    assert.deepEqual(states, ["settled no-error idle null", "settled no-error pending null", "uncertain TypeError idle null"]);
+
+    // A 4xx to the retry that the browser sends on its own: the page hears about it, and `error`
+    // changes in the same update that settles the intent, never after it.
+    states.length = 0;
+    server.answer = () => Response.json({ code: "SHIFT_CLOSED" }, { status: 409 });
+    online(browser);
+    await flush();
+    assert.deepEqual(notices.slice(1), ["error resume false SHIFT_CLOSED true"]);
+    assert.deepEqual(states, ["uncertain no-error pending null", "settled SHIFT_CLOSED idle null"]);
+
+    // Without an answer again, then a success of the automatic retry: one notice, with the receipt.
+    server.answer = () => "network";
+    await assert.rejects(notified.mutate({ total: 2 }));
+    states.length = 0;
+    server.answer = () => Response.json({ id: "s9" });
+    online(browser);
+    await flush();
+    assert.deepEqual(notices.slice(3), ["ok resume s9 null false"]);
+    assert.deepEqual(states, ["uncertain no-error pending null", 'settled no-error idle {"id":"s9"}']);
+
+    // Two calls that share one request notify once.
+    server.answer = () => "network";
+    await assert.rejects(notified.mutate({ total: 3 }));
+    server.answer = () => Response.json({ id: "s10" });
+    const calls = server.calls.length;
+    await Promise.all([notified.retry(), notified.retry()]);
+    assert.equal(server.calls.length, calls + 1);
+    assert.deepEqual(notices.slice(5), ["ok retry s10 null false"]);
+
+    // discard() forgets the intent and the error that described it.
+    server.answer = () => "network";
+    await assert.rejects(notified.mutate({ total: 4 }));
+    assert.ok(notified.error.value);
+    notified.discard();
+    assert.equal(notified.uncertain.value, null);
+    assert.equal(notified.error.value, null);
+
+    // A failing notice reaches the error handler; the mutation and its promise are unaffected.
+    globals.meekoNoticeThrows = true;
+    server.answer = () => Response.json({ id: "s11" });
+    assert.deepEqual(await notified.mutate({ total: 5 }), { id: "s11" });
+    assert.deepEqual(notified.data.value, { id: "s11" });
+    assert.equal(errors.length, 1);
+    assert.match(String(errors[0]), /notice failed/);
+    stop();
+    app.dispose();
+    browser.happyDOM.abort();
+  } finally {
+    globals.meekoNoticeThrows = false;
+    await cleanup();
+  }
+});
+
+test("a mutation without retrySafe clears error when it starts and notifies each call", async () => {
+  const { createRoot, collectMounted, effect } = await runtime();
+  let answer: () => Response | "network" = () => "network";
+  const fetchStub = (async () => {
+    const next = answer();
+    if (next === "network") throw new TypeError("fetch failed");
+    return next;
+  }) as unknown as typeof fetch;
+  const manifest = { api: [], rpc: [{ id: "notes.add", pathname: "/_meeko/rpc/notes.add" }] } as const;
+  const useRpcMutation = createUseRpcMutation<{ "notes.add": RpcOperation<{ text: string }, { id: string }> }>(manifest, { baseUrl: "https://example.test", fetch: fetchStub });
+  const notices: string[] = [];
+  const add = createRoot(() => collectMounted(null, () => useRpcMutation("notes.add", {
+    onSuccess: (output, attempt) => { notices.push(`ok ${output.id} ${attempt.trigger} ${String(attempt.idempotencyKey)} ${attempt.input.text}`); },
+    onError: (error, attempt) => { notices.push(`error ${error.name} ${attempt.uncertain} ${attempt.input.text}`); },
+  })));
+  const states: string[] = [];
+  const stop = effect(() => { states.push(`${add.error.value ? add.error.value.name : "no-error"} ${add.pending.value ? "pending" : "idle"} ${JSON.stringify(add.data.value)}`); });
+  await assert.rejects(add.mutate({ text: "a" }), TypeError);
+  answer = () => Response.json({ id: "n1" });
+  assert.deepEqual(await add.mutate({ text: "b" }), { id: "n1" });
+  assert.deepEqual(states, ["no-error idle null", "no-error pending null", "TypeError idle null", "no-error pending null", 'no-error idle {"id":"n1"}']);
+  assert.deepEqual(notices, ["error TypeError false a", "ok n1 mutate null b"]);
+  stop();
+});
+
+test("api.* and rpc.* send a call's own idempotencyKey and reject one that is not a UUID", async () => {
+  const { createApiClient, createRpcClient } = await runtime();
+  const calls: Array<{ line: string; key: string | null }> = [];
+  const fetchStub = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    calls.push({ line: `${init?.method} ${new URL(String(input)).pathname}`, key: new Headers(init?.headers).get("idempotency-key") });
+    return Response.json({ id: "s1" });
+  }) as typeof fetch;
+  const options = { baseUrl: "https://example.test", fetch: fetchStub, csrfToken: () => "csrf-1" };
+  const api = createApiClient<Pick<Contract, "sales">>({ api: [{ clientKey: "sales", pathname: "/api/sales", method: "POST" }] }, options);
+  const rpc = createRpcClient<{ "sales.checkout": RpcOperation<{ total: number }, { id: string }> }>({ rpc: [{ id: "sales.checkout", pathname: "/_meeko/rpc/sales.checkout" }] }, options);
+  const key = "6f1d3c1e-8a7b-4c2d-9e0f-1a2b3c4d5e6f";
+  assert.deepEqual(await api.sales.post({ body: { total: 1 }, idempotencyKey: key }), { id: "s1" });
+  assert.deepEqual(await rpc.sales.checkout({ total: 1 }, { idempotencyKey: key.toUpperCase() }), { id: "s1" });
+  await api.sales.post({ body: { total: 1 } });
+  assert.deepEqual(calls, [
+    { line: "POST /api/sales", key: `"${key}"` },
+    { line: "POST /_meeko/rpc/sales.checkout", key: `"${key.toUpperCase()}"` },
+    { line: "POST /api/sales", key: null },
+  ]);
+  await assert.rejects(api.sales.post({ body: { total: 1 }, idempotencyKey: "sale-1" }), (error: unknown) => error instanceof TypeError && /idempotencyKey must be a UUID/.test(error.message));
+  await assert.rejects(rpc.sales.checkout({ total: 1 }, { idempotencyKey: "" }), TypeError);
+  assert.equal(calls.length, 3, "an invalid key sends nothing");
+});
+
 test("mutation composables validate their arguments and need a component script", async () => {
   const { createRoot, collectMounted } = await runtime();
   const manifest = {
@@ -364,6 +512,8 @@ test("mutation composables validate their arguments and need a component script"
       assert.throws(() => useApiMutation("/api/notes", "GET"), /is a read; use useApi/);
       assert.throws(() => useApiMutation("/api/missing", "POST"), /no POST endpoint/);
       assert.throws(() => useRpcMutation("notes.add", { retrySafe: { key: "" } }), TypeError);
+      assert.throws(() => useRpcMutation("notes.add", { onSuccess: "notify" }), /onSuccess expects a function/);
+      assert.throws(() => useApiMutation("/api/notes", "POST", { onError: 1 }), /onError expects a function/);
       // A render that only produces HTML never touches the storage.
       const add = useRpcMutation("notes.add", { retrySafe: { key: "notes:add" } }) as { uncertain: { value: unknown } };
       assert.equal(add.uncertain.value, null);
@@ -446,5 +596,33 @@ export function typedMutations(): void {
   const plain = useRpcMutation("sales.checkout");
   // @ts-expect-error uncertain exists only with retrySafe
   void plain.uncertain;
+  // The notices are typed by the operation.
+  useRpcMutation("sales.checkout", {
+    retrySafe: { key: "pos:typed" },
+    onSuccess: (output, attempt) => {
+      const id: string = output.id;
+      const input: number = attempt.input.total;
+      const trigger: "mutate" | "retry" | "resume" = attempt.trigger;
+      void [id, input, trigger];
+    },
+    onError: (error, attempt) => {
+      const message: string = error.message;
+      const uncertain: boolean = attempt.uncertain;
+      // @ts-expect-error the input has no such field
+      void attempt.input.missing;
+      void [message, uncertain];
+    },
+  });
+  useApiMutation("/api/sales", "POST", { onSuccess: (output, attempt) => { const id: string = output.id; const total: number = attempt.input.body.total; void [id, total]; } });
+  // @ts-expect-error onSuccess receives the output
+  useRpcMutation("sales.checkout", { onSuccess: (output: { missing: string }) => output });
   void [created, body, removed, total];
+}
+
+// Types only: a call's own idempotency key.
+export function typedIdempotencyKeys(api: ApiClient<Contract>, rpc: RpcClient<{ "sales.checkout": RpcOperation<{ total: number }, { id: string }> }>): void {
+  void api.sales.post({ body: { total: 1 }, idempotencyKey: "6f1d3c1e-8a7b-4c2d-9e0f-1a2b3c4d5e6f" });
+  void rpc.sales.checkout({ total: 1 }, { idempotencyKey: "6f1d3c1e-8a7b-4c2d-9e0f-1a2b3c4d5e6f", signal: AbortSignal.timeout(1_000) });
+  // @ts-expect-error the key is a string
+  void api.sales.post({ body: { total: 1 }, idempotencyKey: 1 });
 }

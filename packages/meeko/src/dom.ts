@@ -12,6 +12,8 @@ import { sameChannels } from "./channels.js";
 import type { NativeModelKind, NativeModelValues } from "./models.js";
 import { snippetOf } from "./snippets.js";
 import type { Snippet, SnippetData } from "./snippets.js";
+import { reactiveProps } from "./props.js";
+import type { PropsSource } from "./props.js";
 
 /**
  * Fragmento de DOM que pertenece a una instancia o a una región dinámica: los hijos de `root` o,
@@ -343,8 +345,20 @@ export function componentProps<Props extends object>(component: ComponentModule<
 const deferredAttempts = 3;
 
 /**
- * Hidrata un hijo dentro de su rango y actualiza props reactivas con limpieza previa.
- * `expose` receives the `exposed` value of each hydrated instance, with `hydrated` set, and
+ * Whether a compiled module reads its props through the view of `reactiveProps`, so new props can
+ * reach a mounted instance in place. Modules compiled before 1.2, and modules written by hand, are
+ * rebuilt instead.
+ */
+function acceptsReactiveProps(component: object): boolean {
+  return (component as { readonly __meekoReactiveProps?: unknown }).__meekoReactiveProps === true;
+}
+
+/**
+ * Hidrata un hijo dentro de su rango y actualiza sus props reactivas.
+ * A compiled child keeps its instance, its DOM and its focus: changed props are written into the
+ * signals of its props view and only the bindings that read them update. Another component, other
+ * models or a snippet that appears or disappears rebuild the range, keeping its editable signals by
+ * name. `expose` receives the `exposed` value of each hydrated instance, with `hydrated` set, and
  * `null` once it is released.
  *
  * A child that awaits data it does not have, because it mounts after its page, leaves its region
@@ -368,9 +382,22 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
   let component = resolveComponent();
   let props = read();
   let release: ComponentRelease = unmounted;
+  /** Props view of the mounted instance, when its module reads props reactively. */
+  let source: PropsSource<Props> | undefined;
   /** Cancels the deferred mount in progress. */
   let loading: AbortController | undefined;
   const publish = (): void => expose?.(release.exposed ?? null, true);
+  // The child's setup reads its props and other signals: none of them belongs to the observer that mounts it.
+  const hydrateChild = (target: ComponentModule<Props>, targetProps: Props, targetState: Record<string, unknown> | undefined): ComponentRelease => {
+    const nextSource = acceptsReactiveProps(target) ? reactiveProps(targetProps) : undefined;
+    const hydrated = untrack(() => target.hydrateScope(inner, nextSource ? nextSource.props : targetProps, targetState));
+    source = nextSource;
+    return hydrated;
+  };
+  const unmount = (): void => {
+    release = unmounted;
+    source = undefined;
+  };
   const defer = (target: ComponentModule<Props>, targetProps: Props, targetState: Record<string, unknown> | undefined, attempt = 1): void => {
     const control = new AbortController();
     loading = control;
@@ -389,7 +416,7 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
         }
         loading = undefined;
         insertHtml(inner.end!, html);
-        try { release = data.read(() => target.hydrateScope(inner, targetProps, targetState)); }
+        try { release = data.read(() => hydrateChild(target, targetProps, targetState)); }
         catch (error) {
           clearRegion(inner);
           throw error;
@@ -407,7 +434,7 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
     clearRegion(inner);
     defer(component, props, state);
   } else {
-    release = component.hydrateScope(inner, props, state);
+    release = hydrateChild(component, props, state);
     publish();
   }
   let stop = () => {};
@@ -420,7 +447,15 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
     // `on:save="(id) => save(id)"` is a new function then, but not a new value: keep the hydrated child.
     const initial = first;
     first = false;
-    if (nextComponent === component && sameProps(props, next, initial) && sameChannels(props, next)) return;
+    if (nextComponent === component && sameChannels(props, next)) {
+      if (sameProps(props, next, initial)) return;
+      // A mounted compiled child keeps its DOM: the bindings that read a changed prop update.
+      if (source) {
+        props = next;
+        source.update(next);
+        return;
+      }
+    }
     // The new component or props replace a deferred mount that has not finished.
     loading?.abort();
     loading = undefined;
@@ -433,7 +468,7 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
       if (!isLateSuspension(error)) throw error;
       // It waits for data: release the current child and leave the region empty until the data loads.
       const previousRelease = release;
-      release = unmounted;
+      unmount();
       component = nextComponent;
       props = next;
       try {
@@ -447,11 +482,10 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
     try {
       if (mounted) expose?.(null);
       release();
-      release = unmounted;
+      unmount();
       clearRegion(inner);
       insertHtml(inner.end!, html);
-      const nextRelease = nextComponent.hydrateScope(inner, next, state);
-      release = nextRelease;
+      release = hydrateChild(nextComponent, next, state);
       component = nextComponent;
       props = next;
       publish();
@@ -459,11 +493,11 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
       try {
         restoreRegion(inner, previous);
         if (mounted) {
-          release = component.hydrateScope(inner, props, previousState);
+          release = hydrateChild(component, props, previousState);
           publish();
         } else defer(component, props, undefined);
       } catch (rollbackError) {
-        release = unmounted;
+        unmount();
         stop();
         throw new RegionRecoveryError([error, rollbackError], `Meeko component update and recovery failed in ${location}`);
       }
@@ -474,6 +508,7 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
     loading?.abort();
     loading = undefined;
     stop();
+    source = undefined;
     try { release(); }
     finally { expose?.(null); }
   };

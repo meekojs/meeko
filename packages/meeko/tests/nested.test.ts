@@ -48,9 +48,12 @@ test("componentes anidados e instancias hermanas hidratan sin colisionar marcado
     assert.equal(otherRoot.querySelector("button")?.textContent?.trim(), "Other: 0");
     findButton("Update").click();
     assert.equal(findButton("Updated:").textContent?.trim(), "Updated: 1");
+    // New props update the mounted child in place: same button, same state.
+    assert.equal(findButton("Updated:"), first);
+    assert.equal(root.querySelector("em"), firstEmphasis);
+    assert.equal(firstEmphasis?.textContent, "Updated");
     assert.equal(findButton("Fixed:"), fixed);
     assert.equal(fixed.textContent?.trim(), "Fixed: 1");
-    assert.equal(first.isConnected, false);
 
     const itemA = root.querySelector('[data-id="a"]');
     const itemB = root.querySelector('[data-id="b"]');

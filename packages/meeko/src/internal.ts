@@ -28,6 +28,7 @@ export type { ChannelsOf, ComponentTag, EventNames, ExtraProps, ModelInputs, NoM
 export { borrowedKey, checkWritableSignal, modelSelected, modelText, modelValue, useModel } from "./models.js";
 export type { ModelOptions, NativeModelKind, NativeModelValues, WritableSignalCheck } from "./models.js";
 export { snippet, useSnippets } from "./snippets.js";
+export { resolveProps } from "./props.js";
 export type { Snippet, SnippetArgs, SnippetMap, SnippetTypes } from "./snippets.js";
 export type { Signal } from "./reactivity.js";
 export { definePageBody, pageData } from "./framework/page-body.js";
