@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolve } from "node:path";
 import test from "node:test";
-import { createServer } from "vite";
+import { createLogger, createServer } from "vite";
 import { meeko } from "../src/vite.ts";
 import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
 
@@ -48,6 +48,46 @@ test("a component's CSS is a module beside its file, so PostCSS resolves relativ
     const style = await server.transformRequest(id);
     assert.match(style?.code ?? "", /rgb\(1, 2, 3\)/, "the relative @import is inlined");
     assert.match(style?.code ?? "", /\.card\[data-meeko-s-[0-9a-f]+\]/);
+  } finally {
+    await server.close();
+    await project.remove();
+  }
+});
+
+test("an unknown component stylesheet is served empty with a warning, and old ones are released", async () => {
+  // A tab from before a restart of `meeko dev` asks for a hash this server never compiled: Vite
+  // must not read the .meeko file itself as CSS.
+  const project = await createTempProject("vite-style-stale-");
+  const root = project.root;
+  await linkRepositoryPackages(root);
+  const warnings: string[] = [];
+  const customLogger = createLogger("silent");
+  customLogger.warn = (message) => { warnings.push(message); };
+  const server = await createServer({ root, configFile: false, plugins: [meeko()], server: { middlewareMode: true, hmr: false }, customLogger });
+  try {
+    const filename = join(root, "Card.meeko");
+    const styleId = async (color: string): Promise<string> => {
+      await writeFile(filename, `<template><p class="card">x</p></template>\n<style scoped>\n.card { color: ${color}; }\n</style>\n`);
+      server.moduleGraph.invalidateAll();
+      const component = await server.transformRequest(filename);
+      const id = /import "([^"]*\?meeko-style=[0-9a-f]{64}&lang\.css)"/.exec(component?.code ?? "")?.[1];
+      assert.ok(id, component?.code);
+      return id;
+    };
+    const stale = `${filename.replaceAll("\\", "/")}?meeko-style=${"b".repeat(64)}&lang.css`;
+    const unknown = await server.transformRequest(stale);
+    assert.doesNotMatch(unknown?.code ?? "", /card|template/, "an empty stylesheet, not the component source");
+    assert.ok(warnings.some((warning) => /bbbbbbbb ya no existe/.test(warning)), JSON.stringify(warnings));
+    const first = await styleId("red");
+    assert.match((await server.transformRequest(first))?.code ?? "", /color: red/);
+    await styleId("green");
+    const third = await styleId("blue");
+    assert.match((await server.transformRequest(third))?.code ?? "", /color: blue/);
+    // Only the last two stylesheets of a file are kept: the first one is gone.
+    server.moduleGraph.invalidateAll();
+    warnings.length = 0;
+    assert.doesNotMatch((await server.transformRequest(first))?.code ?? "", /color: red/);
+    assert.equal(warnings.length, 1);
   } finally {
     await server.close();
     await project.remove();

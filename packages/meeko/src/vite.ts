@@ -114,7 +114,18 @@ export function meeko(): Plugin {
   let ssrBuild = false;
   let workerBuild = false;
   let root = "";
+  // The CSS of each compiled component by hash, and the hashes of each file, newest last. Only the
+  // last two of a file are kept: the browser and SSR transforms of one edit may finish in either
+  // order, and older stylesheets would otherwise pile up for as long as `meeko dev` runs.
   const styles = new Map<string, string>();
+  const fileStyles = new Map<string, string[]>();
+  const keepStyle = (filename: string, hash: string, css: string): void => {
+    styles.set(hash, css);
+    const hashes = (fileStyles.get(filename) ?? []).filter((known) => known !== hash);
+    hashes.push(hash);
+    while (hashes.length > 2) styles.delete(hashes.shift()!);
+    fileStyles.set(filename, hashes);
+  };
   /**
    * Whether a file under the project feeds autoimports or routes. `tree` also
    * counts the server modules that discovery lists, for an added or removed file.
@@ -195,7 +206,14 @@ export function meeko(): Plugin {
         return `export const modules = {${entries.join(",")}};`;
       }
       const style = styleQuery.exec(id)?.[1];
-      return style === undefined ? null : styles.get(style) ?? null;
+      if (style === undefined) return null;
+      const css = styles.get(style);
+      if (css !== undefined) return css;
+      // A tab opened before a restart of `meeko dev` (or before several edits) asks for a stylesheet
+      // this server no longer has. Without a result Vite would read the .meeko file itself as CSS and
+      // fail in PostCSS; an empty stylesheet keeps the page up until it reloads with the current one.
+      this.warn(`[meeko] ${id.replace(/\?.*$/, "")}: la hoja de estilos ${style.slice(0, 8)} ya no existe (una pestaña anterior al reinicio de meeko dev o a una edición) y se sirve vacía; recarga la página.`);
+      return "/* meeko: stylesheet from an earlier version of this component */\n";
     },
     async transform(source, id, options) {
       const serverTransform = Boolean(options?.ssr || ssrBuild);
@@ -271,7 +289,7 @@ export function meeko(): Plugin {
       const registry = await discoverAutoImports(root);
       const result = compile(source, filename, { hot: isDev, projectComponents: autoImportedValues(registry), ...(scopeAttribute ? { scopeAttribute } : {}) });
       const styleHash = createHash("sha256").update(filename).update("\0").update(result.css).digest("hex");
-      if (result.css) styles.set(styleHash, result.css);
+      if (result.css) keepStyle(filename, styleHash, result.css);
       const cssImport = result.css ? `\nimport ${JSON.stringify(`${filename}?meeko-style=${styleHash}&lang.css`)};` : "";
       const hotCode = isDev ? `\nif (import.meta.hot) {\n  __meeko.enableHotModule(__hotId);\n  __meeko.connectLiveBridge(import.meta.hot);\n  import.meta.hot.accept((next) => { if (next) __meeko.replaceHotModule(__hotId, next); });\n}\n` : "";
       const code = transformAutoImports(source, filename, result.code, registry, serverTransform ? "server" : "client");
