@@ -32,7 +32,7 @@ jobs:
         run: |
           pnpm run conformance:node 2>&1 | Tee-Object -FilePath .meeko/ci-logs/conformance-node.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - run: node node_modules/playwright-core/cli.js install chromium firefox webkit
+      - run: node packages/meeko/node_modules/playwright-core/cli.js install chromium firefox webkit
       - name: Browser E2E
         shell: pwsh
         run: |
@@ -46,6 +46,7 @@ jobs:
       - run: pnpm run package:smoke
       - name: Pack public artifact
         shell: pwsh
+        working-directory: packages/meeko
         run: |
           New-Item -ItemType Directory -Force .meeko/ci-artifacts | Out-Null
           pnpm pack --pack-destination .meeko/ci-artifacts
@@ -55,9 +56,9 @@ jobs:
         env:
           MEEKO_BROWSER_CHANNEL: chromium
         run: |
-          $tarballs = @(Get-ChildItem -LiteralPath .meeko/ci-artifacts -Filter '*.tgz' -File)
+          $tarballs = @(Get-ChildItem -LiteralPath packages/meeko/.meeko/ci-artifacts -Filter '*.tgz' -File)
           if ($tarballs.Count -ne 1) { throw "Expected one Meeko tarball, found $($tarballs.Count)." }
-          ./tests/fullstack-consumer.ps1 -Tarball $tarballs[0].FullName
+          ./packages/meeko/tests/fullstack-consumer.ps1 -Tarball $tarballs[0].FullName
       - name: Diagnostic logs on failure
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -70,7 +71,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: meeko-tarball
-          path: .meeko/ci-artifacts/*.tgz
+          path: packages/meeko/.meeko/ci-artifacts/*.tgz
           if-no-files-found: ignore
 
   redis-integration:
@@ -100,7 +101,7 @@ jobs:
         run: |
           mkdir -p .meeko/ci-logs
           set -o pipefail
-          pnpm exec tsx --test tests/redis.integration.ts 2>&1 | tee .meeko/ci-logs/redis.log
+          pnpm -F @meekojs/meeko exec tsx --test tests/redis.integration.ts 2>&1 | tee .meeko/ci-logs/redis.log
         env:
           MEEKO_REDIS_URL: redis://127.0.0.1:6379
       - name: Redis diagnostic log on failure
@@ -224,13 +225,11 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm install --frozen-lockfile
-        working-directory: editors/vscode
       - run: pnpm run package:vsix
-        working-directory: editors/vscode
+        working-directory: packages/vscode
       - run: pnpm run test:host:isolated
-        working-directory: editors/vscode
+        working-directory: packages/vscode
         if: runner.os != 'Linux'
       - run: xvfb-run -a pnpm run test:host:isolated
-        working-directory: editors/vscode
+        working-directory: packages/vscode
         if: runner.os == 'Linux'

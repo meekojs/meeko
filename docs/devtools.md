@@ -34,7 +34,7 @@ Cada evento conserva el nombre y el archivo `.meeko` del componente y una copia 
 
 ## Panel de Chrome DevTools
 
-1. Abre `chrome://extensions`, activa el modo de desarrollador y carga la carpeta `tools/devtools-extension` como extensión descomprimida.
+1. Abre `chrome://extensions`, activa el modo de desarrollador y carga la carpeta `packages/devtools` del repositorio como extensión descomprimida.
 2. Abre una aplicación Meeko servida por Vite en desarrollo y después las herramientas de desarrollador de Chrome.
 3. En la pestaña **Meeko**:
    - selecciona una instancia para ver sus props, sus señales y su línea de tiempo;
@@ -43,7 +43,7 @@ Cada evento conserva el nombre y el archivo `.meeko` del componente y una copia 
    - usa **Resaltar** para ubicar la instancia en la página;
    - activa el punto de parada y provoca una actualización de su señal.
 
-La extensión consulta el hook de la página inspeccionada. No necesita cuenta, servicio remoto, permisos de host ni scripts de contenido. Su versión (`1.0.0`) es independiente de la del paquete npm; la instalación, el empaquetado y las pruebas se describen en [`tools/devtools-extension/README.md`](../tools/devtools-extension/README.md).
+La extensión consulta el hook de la página inspeccionada. No necesita cuenta, servicio remoto, permisos de host ni scripts de contenido. Su versión (`1.0.0`) es independiente de la del paquete npm; la instalación, el empaquetado y las pruebas se describen en [`packages/devtools/README.md`](../packages/devtools/README.md).
 
 ## Protocolo
 
@@ -69,7 +69,7 @@ El hook expone:
 
 La versión sólo cambia con incompatibilidades y, según la [política de estabilidad](stability.md#devtools-y-editor), sólo en una versión major de Meeko. Dentro del protocolo 1 pueden aparecer campos o tipos de evento nuevos. Los dos paneles rechazan un hook o una captura con otra versión, o sin ella (runtimes anteriores a 1.0), y muestran un mensaje que indica la versión encontrada y la admitida. Nunca leen datos de un protocolo que no conocen. El panel integrado viaja en el mismo paquete que el runtime. La extensión de Chrome necesita un `@meekojs/meeko` que implemente el protocolo 1.
 
-`src/devtools-protocol.ts` es la única fuente de los tipos. La extensión usa una copia generada en `tools/devtools-extension/types/protocol.d.ts`, que su `tsc` con `checkJs` comprueba sobre `protocol.js` y `panel.js`. Para regenerarla después de cambiar el protocolo:
+`packages/meeko/src/devtools-protocol.ts` es la única fuente de los tipos. La extensión usa una copia generada en `packages/devtools/types/protocol.d.ts`, que su `tsc` con `checkJs` comprueba sobre `protocol.js` y `panel.js`. Para regenerarla después de cambiar el protocolo:
 
 ```powershell
 pnpm run devtools:types
@@ -98,7 +98,7 @@ Reglas:
 
 ## Puente del editor
 
-Desde `1.1`, `meeko dev` publica los valores de las señales de las páginas abiertas para un editor local, que los muestra junto al código y puede editarlos (véase la [extensión de VS Code](../editors/vscode/README.md#valores-en-vivo)). El puente sólo existe en desarrollo y su protocolo no forma parte del contrato público (véase la [política de estabilidad](stability.md#fuera-del-contrato)).
+Desde `1.1`, `meeko dev` publica los valores de las señales de las páginas abiertas para un editor local, que los muestra junto al código y puede editarlos (véase la [extensión de VS Code](../packages/vscode/README.md#valores-en-vivo)). El puente sólo existe en desarrollo y su protocolo no forma parte del contrato público (véase la [política de estabilidad](stability.md#fuera-del-contrato)).
 
 ### Funcionamiento
 

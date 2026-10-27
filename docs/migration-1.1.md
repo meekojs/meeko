@@ -1,6 +1,6 @@
 # Actualizar de 1.0 a 1.1
 
-`1.1` es un minor: el código escrito para `1.0` sigue funcionando y lo nuevo (etiquetas de componente, eventos, modelos, snippets, refs, `<script server>`, composables de datos, componentes genéricos…) es opcional. Aun así, algunos cambios se notan al actualizar. Esta guía los reúne con lo que conviene revisar en cada uno. La lista completa, con lo añadido y corregido, está en el [CHANGELOG](../CHANGELOG.md); los compromisos de compatibilidad, en la [política de estabilidad](stability.md).
+`1.1` es un minor: el código escrito para `1.0` sigue funcionando y lo nuevo (etiquetas de componente, eventos, modelos, snippets, refs, `<script server>`, composables de datos, componentes genéricos…) es opcional. Aun así, algunos cambios se notan al actualizar. Esta guía los reúne con lo que conviene revisar en cada uno. La lista completa, con lo añadido y corregido, está en el [CHANGELOG](../packages/meeko/CHANGELOG.md); los compromisos de compatibilidad, en la [política de estabilidad](stability.md).
 
 ## Orden recomendado
 

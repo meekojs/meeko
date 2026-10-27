@@ -6,7 +6,7 @@ El repositorio público es `meekojs/meeko` y el paquete npm es `@meekojs/meeko`.
 - un minor añade API o depreca con un reemplazo documentado;
 - sólo una major rompe compatibilidad o retira lo deprecado.
 
-Cada cambio se anota en el [CHANGELOG](../CHANGELOG.md) antes de publicar. Las versiones `0.x` anteriores podían cambiar la API en un minor.
+Cada cambio se anota en el [CHANGELOG](../packages/meeko/CHANGELOG.md) antes de publicar. Las versiones `0.x` anteriores podían cambiar la API en un minor.
 
 ## Verificación previa
 
@@ -16,25 +16,27 @@ En una copia limpia del commit que se publicará:
 pnpm install --frozen-lockfile
 pnpm run verify
 pnpm run e2e
-node node_modules/playwright-core/cli.js install chromium firefox webkit
+node packages/meeko/node_modules/playwright-core/cli.js install chromium firefox webkit
 pnpm run pilot:e2e
 pnpm run package:smoke
-pnpm -C editors/vscode run package:vsix
-pnpm -C editors/vscode run test:host:isolated
-npm pack --dry-run --json
+pnpm -F meeko-language run package:vsix
+pnpm -F meeko-language run test:host:isolated
+npm pack ./packages/meeko --dry-run --json
 ```
+
+Las órdenes `pnpm run …` de la raíz reenvían al paquete `packages/meeko` (`pnpm -F @meekojs/meeko run …`); `verify` además comprueba la extensión de Chrome (`pnpm -F meeko-devtools-extension run check`).
 
 `pilot:e2e` comprueba SSR e hidratación en Chromium, Firefox y WebKit durante desarrollo y desde el build de producción. `package:smoke` instala el tarball en un proyecto temporal fuera del monorepo y comprueba CLI, SSR, declaraciones de TypeScript, Vite y un proyecto generado con `meeko init`. El paquete npm sólo incluye `dist`, `README.md`, `LICENSE` y `package.json`; no incluye ejemplos, pruebas, variantes del logo ni archivos locales. Antes de subir una versión, se revisa el resultado de `npm pack --dry-run --json` para confirmar esa lista.
 
 ## Publicar una actualización
 
-Actualiza la versión de `package.json` y [CHANGELOG.md](../CHANGELOG.md), ejecuta las verificaciones y sube el commit a `main`. Tras comprobar que CI pasó y que el commit remoto coincide con el probado localmente, comprueba el tarball. Una versión publicada no se sobrescribe; las correcciones requieren un número nuevo.
+Actualiza la versión de `packages/meeko/package.json` y [CHANGELOG.md](../packages/meeko/CHANGELOG.md), ejecuta las verificaciones y sube el commit a `main`. Tras comprobar que CI pasó y que el commit remoto coincide con el probado localmente, comprueba el tarball. Una versión publicada no se sobrescribe; las correcciones requieren un número nuevo.
 
 `0.0.2` se publicó manualmente con `npm publish --access public` desde el commit verificado, tras completar la autenticación de npm. El registro confirmó la versión y el checksum antes de crear la etiqueta. No guardes códigos ni tokens en el repositorio.
 
 ## Publicación confiable para versiones posteriores
 
-El workflow [`.github/workflows/publish.yml`](../.github/workflows/publish.yml) ejecuta las verificaciones, comprueba que `v<versión>` coincida con `package.json` y publica desde un runner de GitHub mediante OIDC. El **Trusted Publisher** para `meekojs/meeko` y `publish.yml` se registró en npm con permiso de publicación. Su primera ejecución publicó `0.0.3` con procedencia firmada. No añadas un token de publicación a GitHub.
+El workflow [`.github/workflows/publish.yml`](../.github/workflows/publish.yml) ejecuta las verificaciones, comprueba que `v<versión>` coincida con `packages/meeko/package.json` y publica desde un runner de GitHub mediante OIDC, con `npm publish --provenance` dentro de `packages/meeko`. npm asocia el Trusted Publisher al repositorio y al nombre del workflow (`publish.yml`), no a la carpeta del paquete, así que el paso a workspace no lo cambia; `repository.directory` del manifiesto indica la carpeta. El **Trusted Publisher** para `meekojs/meeko` y `publish.yml` se registró en npm con permiso de publicación. Su primera ejecución publicó `0.0.3` con procedencia firmada. No añadas un token de publicación a GitHub.
 
 Antes de cada versión, comprueba `npm trust list @meekojs/meeko`. Crea `v<versión>` sobre el commit aprobado y súbela. La etiqueta activa el workflow; comprueba que éste terminó correctamente y que la versión pública de npm corresponde a la etiqueta. npm genera procedencia automáticamente cuando publica desde este flujo confiable. Si falla la publicación, conserva la etiqueta y corrige el flujo; no reutilices la misma versión después de una publicación exitosa.
 
@@ -44,9 +46,9 @@ Nada se publica por un push a `main` ni por un pull request: npm, la release de 
 
 | Etiqueta | Workflow | Comprueba | Publica |
 | --- | --- | --- | --- |
-| `v<versión>` | `publish.yml` | `package.json` | npm (`@meekojs/meeko`) y la release de GitHub con los seis VSIX y el ZIP de Chrome |
-| `vscode-v<versión>` | `publish-vscode.yml` | `editors/vscode/package.json` | Visual Studio Marketplace y Open VSX |
-| `devtools-v<versión>` | `publish-devtools.yml` | `tools/devtools-extension/manifest.json` | Chrome Web Store |
+| `v<versión>` | `publish.yml` | `packages/meeko/package.json` | npm (`@meekojs/meeko`) y la release de GitHub con los seis VSIX y el ZIP de Chrome |
+| `vscode-v<versión>` | `publish-vscode.yml` | `packages/vscode/package.json` | Visual Studio Marketplace y Open VSX |
+| `devtools-v<versión>` | `publish-devtools.yml` | `packages/devtools/manifest.json` | Chrome Web Store |
 
 Cada workflow falla antes de publicar si la etiqueta no coincide exactamente con la versión de su archivo. Las extensiones conservan así un número de versión independiente del paquete npm: una corrección de la extensión no obliga a publicar Meeko, y una versión de Meeko no sube las extensiones a las tiendas.
 
@@ -68,7 +70,7 @@ Los secretos se guardan en **Settings → Secrets and variables → Actions → 
 
 ### VS Code: Marketplace y Open VSX
 
-`publish-vscode.yml` comprueba que `vscode-v<versión>` coincide con `editors/vscode/package.json` y que la versión es `major.minor.patch`; ninguna de las dos tiendas acepta sufijos de prerelease en la versión de la extensión. Después ejecuta en Windows, Ubuntu y macOS las pruebas unitarias de la extensión, el VSIX de la plataforma y la prueba en un host aislado de VS Code. Sólo si todo pasa, empaqueta los seis VSIX y los publica con `@vscode/vsce@4.0.0` y `ovsx@1.3.0`, ambas versiones fijadas. Las dos herramientas leen el token de la variable de entorno; nunca aparece en la línea de órdenes. `--skip-duplicate` permite repetir la ejecución si una tienda falló después de que la otra publicara.
+`publish-vscode.yml` comprueba que `vscode-v<versión>` coincide con `packages/vscode/package.json` y que la versión es `major.minor.patch`; ninguna de las dos tiendas acepta sufijos de prerelease en la versión de la extensión. Después ejecuta en Windows, Ubuntu y macOS las pruebas unitarias de la extensión, el VSIX de la plataforma y la prueba en un host aislado de VS Code. Sólo si todo pasa, empaqueta los seis VSIX y los publica con `@vscode/vsce@4.0.0` y `ovsx@1.3.0`, ambas versiones fijadas. Las dos herramientas leen el token de la variable de entorno; nunca aparece en la línea de órdenes. `--skip-duplicate` permite repetir la ejecución si una tienda falló después de que la otra publicara.
 
 | Secreto | Uso |
 | --- | --- |
@@ -79,7 +81,7 @@ Alta en Visual Studio Marketplace:
 
 1. Con la cuenta Microsoft del proyecto, crea una organización en [Azure DevOps](https://dev.azure.com/).
 2. En **User settings → Personal access tokens**, crea un token con **Organization: All accessible organizations** y el ámbito **Marketplace → Manage**. Anota su caducidad; al renovarlo hay que actualizar el secreto.
-3. En la [página de gestión del Marketplace](https://marketplace.visualstudio.com/manage), crea el publisher con ID `meekojs`, el mismo valor de `publisher` en `editors/vscode/package.json`.
+3. En la [página de gestión del Marketplace](https://marketplace.visualstudio.com/manage), crea el publisher con ID `meekojs`, el mismo valor de `publisher` en `packages/vscode/package.json`.
 4. Opcionalmente, comprueba el token en local con `pnpm dlx @vscode/vsce@4.0.0 verify-pat meekojs` y guárdalo como `VSCE_PAT`.
 
 Alta en Open VSX:
@@ -91,7 +93,7 @@ Alta en Open VSX:
 
 ### Chrome Web Store
 
-`publish-devtools.yml` comprueba que `devtools-v<versión>` coincide con `tools/devtools-extension/manifest.json`. En Windows ejecuta `pnpm run devtools:check` y la prueba de la extensión instalada en Chrome for Testing. Después empaqueta un ZIP con `manifest.json` en la raíz, como exige la tienda (`package-zip.ps1 -RootLayout`), lo sube y lo envía a revisión mediante la [API v2 de Chrome Web Store](https://developer.chrome.com/docs/webstore/using-api). La versión 1.1 de la API está obsoleta; la v2 identifica cada elemento por publisher, por lo que hace falta `CHROME_PUBLISHER_ID`. La publicación sólo ocurre si existen los cinco secretos; con una configuración incompleta el job avisa qué nombres faltan y no publica.
+`publish-devtools.yml` comprueba que `devtools-v<versión>` coincide con `packages/devtools/manifest.json`. En Windows ejecuta `pnpm run devtools:check` y la prueba de la extensión instalada en Chrome for Testing. Después empaqueta un ZIP con `manifest.json` en la raíz, como exige la tienda (`package-zip.ps1 -RootLayout`), lo sube y lo envía a revisión mediante la [API v2 de Chrome Web Store](https://developer.chrome.com/docs/webstore/using-api). La versión 1.1 de la API está obsoleta; la v2 identifica cada elemento por publisher, por lo que hace falta `CHROME_PUBLISHER_ID`. La publicación sólo ocurre si existen los cinco secretos; con una configuración incompleta el job avisa qué nombres faltan y no publica.
 
 | Secreto | Uso |
 | --- | --- |
@@ -115,7 +117,7 @@ La tienda revisa cada envío; el workflow termina cuando la subida se acepta y e
 
 ### Publicar una versión de una extensión
 
-1. Sube la versión en `editors/vscode/package.json` y su `CHANGELOG.md`, o en `tools/devtools-extension/manifest.json` y `package.json`.
+1. Sube la versión en `packages/vscode/package.json` y su `CHANGELOG.md`, o en `packages/devtools/manifest.json` y `package.json`.
 2. Tras comprobar que CI pasó en `main`, crea la etiqueta `vscode-v<versión>` o `devtools-v<versión>` sobre ese commit y súbela.
 3. Revisa la ejecución: los pasos omitidos por falta de secretos aparecen como avisos. Comprueba después la versión en cada tienda.
 
@@ -137,7 +139,7 @@ El paquete [npm `0.0.4`](https://www.npmjs.com/package/@meekojs/meeko/v/0.0.4) s
 
 ## Versión 0.1.0
 
-El paquete [npm `0.1.0`](https://www.npmjs.com/package/@meekojs/meeko/v/0.1.0) salió del commit `b492cf1` y coincide con la etiqueta [`v0.1.0`](https://github.com/meekojs/meeko/releases/tag/v0.1.0). Contiene cambios incompatibles respecto de `0.0.4`, documentados con su migración en el [CHANGELOG](../CHANGELOG.md). La [CI de `main`](https://github.com/meekojs/meeko/actions/runs/40168927109) pasó antes de etiquetar. El [workflow de publicación](https://github.com/meekojs/meeko/actions/runs/40169193614) repitió los gates y publicó mediante OIDC con procedencia SLSA firmada. Se instaló después desde npm en un proyecto vacío, donde la reactividad, las subrutas `framework` y `server` y los comandos `dev`, `check`, `build` y `start` de la CLI respondieron.
+El paquete [npm `0.1.0`](https://www.npmjs.com/package/@meekojs/meeko/v/0.1.0) salió del commit `b492cf1` y coincide con la etiqueta [`v0.1.0`](https://github.com/meekojs/meeko/releases/tag/v0.1.0). Contiene cambios incompatibles respecto de `0.0.4`, documentados con su migración en el [CHANGELOG](../packages/meeko/CHANGELOG.md). La [CI de `main`](https://github.com/meekojs/meeko/actions/runs/40168927109) pasó antes de etiquetar. El [workflow de publicación](https://github.com/meekojs/meeko/actions/runs/40169193614) repitió los gates y publicó mediante OIDC con procedencia SLSA firmada. Se instaló después desde npm en un proyecto vacío, donde la reactividad, las subrutas `framework` y `server` y los comandos `dev`, `check`, `build` y `start` de la CLI respondieron.
 
 ## Versión 1.0.0-rc.1
 
@@ -173,7 +175,7 @@ El paquete [npm `1.0.1`](https://www.npmjs.com/package/@meekojs/meeko/v/1.0.1) s
 
 ## Versión 1.1.0
 
-El paquete [npm `1.1.0`](https://www.npmjs.com/package/@meekojs/meeko/v/1.1.0) salió del commit `686dad3` y coincide con la etiqueta [`v1.1.0`](https://github.com/meekojs/meeko/releases/tag/v1.1.0). Es un minor con las funciones y cambios recogidos en el [CHANGELOG](../CHANGELOG.md) y la [guía de actualización](migration-1.1.md). Los cambios de comportamiento aceptados como excepción están en [stability.md](stability.md). La extensión de VS Code sube también a `1.1.0`; sigue sin publicarse en las tiendas.
+El paquete [npm `1.1.0`](https://www.npmjs.com/package/@meekojs/meeko/v/1.1.0) salió del commit `686dad3` y coincide con la etiqueta [`v1.1.0`](https://github.com/meekojs/meeko/releases/tag/v1.1.0). Es un minor con las funciones y cambios recogidos en el [CHANGELOG](../packages/meeko/CHANGELOG.md) y la [guía de actualización](migration-1.1.md). Los cambios de comportamiento aceptados como excepción están en [stability.md](stability.md). La extensión de VS Code sube también a `1.1.0`; sigue sin publicarse en las tiendas.
 
 - **Validación previa.** `diegootayza` consumió el checkout mediante una copia fija (`link:` a un worktree de preview) durante el desarrollo y validó cada función en su aplicación. Una revisión independiente del diff completo encontró un P1 (`model` con un valor restaurado rompía la hidratación) y dos P2 (`html=` con HTML desbalanceado y `html`/`model` en elementos personalizados), corregidos antes de publicar.
 - **Gates locales** sobre los commits de la versión: instalación congelada, `verify` (755/755 y 10/10 de DevTools), conformidad en Node, Bun 1.4.4, Deno 2.9.8 y workerd (70/70), `e2e`, `pilot:e2e`, `package:smoke`, el consumidor full-stack, el host aislado de VS Code, `npm pack --dry-run` (399 archivos, sólo `dist/`, `README.md`, `LICENSE` y `package.json`) y `git diff --check`.

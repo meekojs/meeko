@@ -1,0 +1,13 @@
+src/**
+tests/**
+scripts/**
+artifacts/**
+build.mjs
+package-vsix.ps1
+tsconfig.json
+README.md
+dist/*.map
+dist/*.cjs
+node_modules/@vscode/**
+node_modules/typescript/dist/**
+node_modules/typescript/vendor/**

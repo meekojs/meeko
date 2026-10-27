@@ -1,6 +1,6 @@
 # Política de estabilidad 1.x
 
-A partir de `1.0.0`, `@meekojs/meeko` sigue [Semantic Versioning](https://semver.org/lang/es/). Esta página define qué cubre esa promesa, qué queda fuera, cómo se retira una API y en qué entornos se ejecuta Meeko. Los cambios de cada versión se registran en el [CHANGELOG](../CHANGELOG.md); la actualización desde `0.1.0` se explica en la [guía de migración a 1.0](migration-1.0.md), y la de `1.0` a `1.1`, en [Actualizar de 1.0 a 1.1](migration-1.1.md).
+A partir de `1.0.0`, `@meekojs/meeko` sigue [Semantic Versioning](https://semver.org/lang/es/). Esta página define qué cubre esa promesa, qué queda fuera, cómo se retira una API y en qué entornos se ejecuta Meeko. Los cambios de cada versión se registran en el [CHANGELOG](../packages/meeko/CHANGELOG.md); la actualización desde `0.1.0` se explica en la [guía de migración a 1.0](migration-1.0.md), y la de `1.0` a `1.1`, en [Actualizar de 1.0 a 1.1](migration-1.1.md).
 
 | Versión | Puede incluir |
 | --- | --- |

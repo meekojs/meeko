@@ -29,9 +29,9 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $version = (Get-Content -LiteralPath tools/devtools-extension/manifest.json -Raw | ConvertFrom-Json).version
+          $version = (Get-Content -LiteralPath packages/devtools/manifest.json -Raw | ConvertFrom-Json).version
           if ($env:GITHUB_REF_NAME -ne "devtools-v$version") {
-            throw "La etiqueta $env:GITHUB_REF_NAME no coincide con tools/devtools-extension/manifest.json ($version)."
+            throw "La etiqueta $env:GITHUB_REF_NAME no coincide con packages/devtools/manifest.json ($version)."
           }
           # Chrome sólo admite de uno a cuatro enteros separados por puntos.
           if ($version -notmatch '^\d+(\.\d+){0,3}$') {
@@ -58,9 +58,9 @@ jobs:
       - run: pnpm run devtools:check
       # La prueba instalada usa la app Vite de ejemplo, que importa `@meekojs/meeko/vite` desde dist.
       - run: pnpm run build
-      - run: node node_modules/playwright-core/cli.js install chromium
+      - run: node packages/devtools/node_modules/playwright-core/cli.js install chromium
       - name: Extensión instalada en Chrome for Testing
-        run: node --test tools/devtools-extension/tests/installed.e2e.js
+        run: pnpm -F meeko-devtools-extension run test:installed
 
   publish:
     name: Chrome Web Store
@@ -96,7 +96,7 @@ jobs:
           DEVTOOLS_VERSION: ${{ needs.version.outputs.version }}
         run: |
           $zip = Join-Path $env:RUNNER_TEMP "meeko-devtools-$env:DEVTOOLS_VERSION-store.zip"
-          pwsh -NoProfile -File tools/devtools-extension/package-zip.ps1 -OutputPath $zip -RootLayout
+          pwsh -NoProfile -File packages/devtools/package-zip.ps1 -OutputPath $zip -RootLayout
           if ($LASTEXITCODE -ne 0) { throw 'Falló el ZIP de Chrome DevTools.' }
           $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
           try {

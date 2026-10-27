@@ -37,7 +37,7 @@ jobs:
         run: |
           mkdir -p .meeko/ci-logs
           set -o pipefail
-          pnpm exec tsx --test tests/redis.integration.ts 2>&1 | tee .meeko/ci-logs/redis.log
+          pnpm -F @meekojs/meeko exec tsx --test tests/redis.integration.ts 2>&1 | tee .meeko/ci-logs/redis.log
         env:
           MEEKO_REDIS_URL: redis://127.0.0.1:6379
       - name: Redis diagnostic log on failure
@@ -161,15 +161,13 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm install --frozen-lockfile
-        working-directory: editors/vscode
       - run: pnpm run package:vsix
-        working-directory: editors/vscode
+        working-directory: packages/vscode
       - run: pnpm run test:host:isolated
-        working-directory: editors/vscode
+        working-directory: packages/vscode
         if: runner.os != 'Linux'
       - run: xvfb-run -a pnpm run test:host:isolated
-        working-directory: editors/vscode
+        working-directory: packages/vscode
         if: runner.os == 'Linux'
 
   publish:
@@ -193,9 +191,9 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $packageVersion = node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version"
+          $packageVersion = node -p "JSON.parse(require('node:fs').readFileSync('packages/meeko/package.json', 'utf8')).version"
           if ($env:GITHUB_REF_NAME -ne "v$packageVersion") {
-            throw "La etiqueta $env:GITHUB_REF_NAME no coincide con package.json ($packageVersion)."
+            throw "La etiqueta $env:GITHUB_REF_NAME no coincide con packages/meeko/package.json ($packageVersion)."
           }
           # Una prerelease (1.0.0-rc.1) se publica en `next` y nunca mueve `latest`.
           $distTag = if ($packageVersion.Contains('-')) { 'next' } else { 'latest' }
@@ -213,7 +211,7 @@ jobs:
         run: |
           pnpm run conformance:node 2>&1 | Tee-Object -FilePath .meeko/ci-logs/conformance-node.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - run: node node_modules/playwright-core/cli.js install chromium firefox webkit
+      - run: node packages/meeko/node_modules/playwright-core/cli.js install chromium firefox webkit
       - name: Browser E2E
         shell: pwsh
         run: |
@@ -227,6 +225,7 @@ jobs:
       - run: pnpm run package:smoke
       - name: Pack public artifact
         shell: pwsh
+        working-directory: packages/meeko
         run: |
           New-Item -ItemType Directory -Force .meeko/ci-artifacts | Out-Null
           pnpm pack --pack-destination .meeko/ci-artifacts
@@ -236,9 +235,9 @@ jobs:
         env:
           MEEKO_BROWSER_CHANNEL: chromium
         run: |
-          $tarballs = @(Get-ChildItem -LiteralPath .meeko/ci-artifacts -Filter '*.tgz' -File)
+          $tarballs = @(Get-ChildItem -LiteralPath packages/meeko/.meeko/ci-artifacts -Filter '*.tgz' -File)
           if ($tarballs.Count -ne 1) { throw "Expected one Meeko tarball, found $($tarballs.Count)." }
-          ./tests/fullstack-consumer.ps1 -Tarball $tarballs[0].FullName
+          ./packages/meeko/tests/fullstack-consumer.ps1 -Tarball $tarballs[0].FullName
       - name: Diagnostic logs on failure
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -248,12 +247,14 @@ jobs:
           if-no-files-found: ignore
       - name: Publicar con identidad OIDC
         shell: pwsh
+        # npm vincula el Trusted Publisher al repositorio y a este archivo (publish.yml), no a la carpeta.
+        working-directory: packages/meeko
         env:
           NPM_DIST_TAG: ${{ steps.version.outputs.dist-tag }}
         run: |
           if ($env:NPM_DIST_TAG -notin @('latest', 'next')) { throw "dist-tag inesperado: '$env:NPM_DIST_TAG'." }
           npm install --global npm@11.19.0
-          npm publish --access public --tag $env:NPM_DIST_TAG
+          npm publish --provenance --access public --tag $env:NPM_DIST_TAG
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   github-release:
@@ -276,19 +277,17 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $packageVersion = node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version"
+          $packageVersion = node -p "JSON.parse(require('node:fs').readFileSync('packages/meeko/package.json', 'utf8')).version"
           if ($env:GITHUB_REF_NAME -ne "v$packageVersion") {
-            throw "La etiqueta $env:GITHUB_REF_NAME no coincide con package.json ($packageVersion)."
+            throw "La etiqueta $env:GITHUB_REF_NAME no coincide con packages/meeko/package.json ($packageVersion)."
           }
-          $vscodeVersion = node -p "JSON.parse(require('node:fs').readFileSync('editors/vscode/package.json', 'utf8')).version"
-          $devtoolsVersion = node -p "JSON.parse(require('node:fs').readFileSync('tools/devtools-extension/manifest.json', 'utf8')).version"
+          $vscodeVersion = node -p "JSON.parse(require('node:fs').readFileSync('packages/vscode/package.json', 'utf8')).version"
+          $devtoolsVersion = node -p "JSON.parse(require('node:fs').readFileSync('packages/devtools/manifest.json', 'utf8')).version"
           "package=$packageVersion" >> $env:GITHUB_OUTPUT
           "prerelease=$($packageVersion.Contains('-').ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "vscode=$vscodeVersion" >> $env:GITHUB_OUTPUT
           "devtools=$devtoolsVersion" >> $env:GITHUB_OUTPUT
       - run: pnpm install --frozen-lockfile
-      - run: pnpm install --frozen-lockfile
-        working-directory: editors/vscode
       - name: Empaquetar los seis VSIX y el ZIP de Chrome
         shell: pwsh
         env:
@@ -298,13 +297,13 @@ jobs:
           $assets = Join-Path $env:RUNNER_TEMP 'release-assets'
           New-Item -ItemType Directory -Force $assets | Out-Null
           foreach ($target in @('win32-x64', 'win32-arm64', 'linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64')) {
-            pwsh -NoProfile -File editors/vscode/package-vsix.ps1 -Target $target
+            pwsh -NoProfile -File packages/vscode/package-vsix.ps1 -Target $target
             if ($LASTEXITCODE -ne 0) { throw "Falló el VSIX $target." }
-            $vsix = "editors/vscode/artifacts/meeko-language-$env:VSCODE_VERSION-$target.vsix"
+            $vsix = "packages/vscode/artifacts/meeko-language-$env:VSCODE_VERSION-$target.vsix"
             if (!(Test-Path -LiteralPath $vsix -PathType Leaf)) { throw "Falta $vsix." }
             Copy-Item -LiteralPath $vsix -Destination $assets
           }
-          pwsh -NoProfile -File tools/devtools-extension/package-zip.ps1 -OutputPath (Join-Path $assets "meeko-devtools-$env:DEVTOOLS_VERSION.zip")
+          pwsh -NoProfile -File packages/devtools/package-zip.ps1 -OutputPath (Join-Path $assets "meeko-devtools-$env:DEVTOOLS_VERSION.zip")
           if ($LASTEXITCODE -ne 0) { throw 'Falló el ZIP de Chrome DevTools.' }
           $lines = Get-ChildItem -LiteralPath $assets -File | Sort-Object Name | ForEach-Object {
             "$((Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant())  $($_.Name)"
@@ -334,7 +333,7 @@ jobs:
               '',
               "Adjuntos: extensión de VS Code ``meeko-language`` $env:VSCODE_VERSION (seis VSIX: win32, linux y darwin en x64/arm64) y Meeko DevTools para Chrome $env:DEVTOOLS_VERSION (ZIP), con sus sumas en ``SHA256SUMS.txt``. Las extensiones tienen versión propia y se publican en sus tiendas con las etiquetas ``vscode-v*`` y ``devtools-v*``.",
               '',
-              "Cambios: [CHANGELOG.md](https://github.com/$env:GITHUB_REPOSITORY/blob/$tag/CHANGELOG.md)."
+              "Cambios: [CHANGELOG.md](https://github.com/$env:GITHUB_REPOSITORY/blob/$tag/packages/meeko/CHANGELOG.md)."
             ) -join "`n"
             $arguments = @('release', 'create', $tag) + $assets + @('--repo', $env:GITHUB_REPOSITORY, '--verify-tag', '--title', $tag, '--notes', $notes)
             $arguments += if ($env:PRERELEASE -eq 'true') { '--prerelease' } else { '--latest' }

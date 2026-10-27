@@ -1,6 +1,6 @@
 # Editores
 
-Meeko incluye un servidor de lenguaje ([Language Server Protocol](https://microsoft.github.io/language-server-protocol/)) que da a cualquier editor compatible las mismas funciones que la [extensión de VS Code](../editors/vscode/README.md): diagnósticos de `meeko check`, completado, hover, ir a definición, referencias, renombrado entre archivos `.meeko` y `.ts`, ayuda de firma, símbolos del documento, plegado, formato, tokens semánticos, CodeLens y acciones rápidas (añadir imports, resolver un autoimport ambiguo con un import explícito, quitar `params` de un `href` estático, añadir `each:key` y mover un sidecar a `<script server>`).
+Meeko incluye un servidor de lenguaje ([Language Server Protocol](https://microsoft.github.io/language-server-protocol/)) que da a cualquier editor compatible las mismas funciones que la [extensión de VS Code](../packages/vscode/README.md): diagnósticos de `meeko check`, completado, hover, ir a definición, referencias, renombrado entre archivos `.meeko` y `.ts`, ayuda de firma, símbolos del documento, plegado, formato, tokens semánticos, CodeLens y acciones rápidas (añadir imports, resolver un autoimport ambiguo con un import explícito, quitar `params` de un `href` estático, añadir `each:key` y mover un sidecar a `<script server>`).
 
 El bloque `<script server lang="ts">` de una página se analiza como un módulo TypeScript propio, con los autoimports de servidor (o de cliente si su `render` estático es `"client"`) y posiciones del `.meeko`: diagnósticos de tipos, completado, hover, navegación, referencias, símbolos y formato. Un bloque fuera de `app/pages` de alguna raíz configurada, o en un `+layout` o `+error`, produce `MEEK044` sobre su etiqueta de apertura. Los `export const` de un bloque con código de nivel superior tienen su tipo en el `<script>` y en la plantilla de la página, y «ir a definición» sobre uno de ellos lleva a su `export`.
 
@@ -92,7 +92,7 @@ En el padre, cada etiqueta de un componente con `generic` se comprueba como en `
 
 ### Valores en vivo
 
-Los valores en vivo de las señales no pasan por el servidor de lenguaje: los publica `meeko dev` mediante el [puente del editor](devtools.md#puente-del-editor), que la extensión de VS Code consume (véase su [README](../editors/vscode/README.md#valores-en-vivo)). Cada `meeko dev` escribe su propio descriptor, `.meeko/dev/editor-bridge-<puerto>.json`, y la extensión se conecta a todos los que encuentra, así que funcionan varios servidores de desarrollo a la vez. Una señal que es la misma que otra, como el modelo que un hijo recibe con `defineModel`, lleva el campo `alias` con la señal principal: la extensión la muestra como `open = true (= dialogOpen)`, su hover dice «alias de `dialogOpen`» y editarla edita la principal. Otro editor puede leer el mismo puente, teniendo en cuenta que su protocolo es sólo de desarrollo y no forma parte del contrato público.
+Los valores en vivo de las señales no pasan por el servidor de lenguaje: los publica `meeko dev` mediante el [puente del editor](devtools.md#puente-del-editor), que la extensión de VS Code consume (véase su [README](../packages/vscode/README.md#valores-en-vivo)). Cada `meeko dev` escribe su propio descriptor, `.meeko/dev/editor-bridge-<puerto>.json`, y la extensión se conecta a todos los que encuentra, así que funcionan varios servidores de desarrollo a la vez. Una señal que es la misma que otra, como el modelo que un hijo recibe con `defineModel`, lleva el campo `alias` con la señal principal: la extensión la muestra como `open = true (= dialogOpen)`, su hover dice «alias de `dialogOpen`» y editarla edita la principal. Otro editor puede leer el mismo puente, teniendo en cuenta que su protocolo es sólo de desarrollo y no forma parte del contrato público.
 
 ## Arrancar el servidor
 
@@ -264,7 +264,7 @@ Los IDE de JetBrains se conectan mediante el plugin [LSP4IJ](https://plugins.jet
 3. En **Mappings → File name patterns**, añade `*.meeko` con el identificador de lenguaje `meeko`.
 4. En **Configuration → Initialization Options**, escribe `{ "trusted": true }`, y en **Configuration → Server / Configuration** los ajustes del editor, por ejemplo `{ "meeko": { "format": { "indentSections": true } } }`.
 
-Para el resaltado sintáctico, registra la gramática TextMate de la extensión de VS Code en **Settings → Editor → TextMate Bundles** apuntando a la carpeta `editors/vscode` del repositorio o a una extensión VSIX descomprimida.
+Para el resaltado sintáctico, registra la gramática TextMate de la extensión de VS Code en **Settings → Editor → TextMate Bundles** apuntando a la carpeta `packages/vscode` del repositorio o a una extensión VSIX descomprimida.
 
 ## Sublime Text
 

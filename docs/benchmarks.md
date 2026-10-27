@@ -1,6 +1,6 @@
 # Comparativa reproducible: Meeko y Vue
 
-Esta prueba usa el mismo caso funcional en ambos motores: un botón renderizado en el servidor con valor inicial `0`, valor derivado `doble`, hidratación y un clic que actualiza ambos valores. El ejemplo de Meeko es [`Counter.meeko`](../examples/counter/Counter.meeko); la contraparte de Vue está en [`benchmarks/vue-counter.ts`](../benchmarks/vue-counter.ts). Vue usa una función `render` escrita a mano y su runtime de producción, sin compilador de plantillas en el navegador. Meeko usa el módulo producido por su compilador. Se comprueba el texto visible antes y después de cada clic.
+Esta prueba usa el mismo caso funcional en ambos motores: un botón renderizado en el servidor con valor inicial `0`, valor derivado `doble`, hidratación y un clic que actualiza ambos valores. El ejemplo de Meeko es [`Counter.meeko`](../packages/meeko/examples/counter/Counter.meeko); la contraparte de Vue está en [`benchmarks/vue-counter.ts`](../packages/meeko/benchmarks/vue-counter.ts). Vue usa una función `render` escrita a mano y su runtime de producción, sin compilador de plantillas en el navegador. Meeko usa el módulo producido por su compilador. Se comprueba el texto visible antes y después de cada clic.
 
 ## Cómo repetirla
 
@@ -12,7 +12,7 @@ $env:MEEKO_BENCH_ORDER = 'vue-first'
 try { pnpm run benchmark } finally { Remove-Item Env:MEEKO_BENCH_ORDER }
 ```
 
-El comando compila Meeko, genera el componente de ejemplo, verifica los tipos del benchmark y ejecuta [`benchmarks/run.ts`](../benchmarks/run.ts). No descarga Chrome. Para usar otro ejecutable compatible, define `MEEKO_CHROME_PATH`. El resultado completo sale como JSON por stdout e incluye versiones, CPU, orden de ejecución y estado Git.
+El comando compila Meeko, genera el componente de ejemplo, verifica los tipos del benchmark y ejecuta [`benchmarks/run.ts`](../packages/meeko/benchmarks/run.ts). No descarga Chrome. Para usar otro ejecutable compatible, define `MEEKO_CHROME_PATH`. El resultado completo sale como JSON por stdout e incluye versiones, CPU, orden de ejecución y estado Git.
 
 ## Método
 
@@ -49,7 +49,7 @@ $env:MEEKO_BENCH_ORDER = 'vue-first'
 try { pnpm run benchmark:scenarios } finally { Remove-Item Env:MEEKO_BENCH_ORDER }
 ```
 
-Para aislar una carga, define `MEEKO_BENCH_SCENARIO` como `tree`, `list`, `navigation` o `navigation-mount`. El runner de [escenarios](../benchmarks/scenarios.ts) comprueba el HTML SSR, el contenido e identidad de los nodos tras cada paso y la URL de navegación. Las implementaciones de [Vue](../benchmarks/vue-scenarios.ts) usan funciones `render` escritas a mano y su runtime de producción, sin compilador de plantillas en el navegador.
+Para aislar una carga, define `MEEKO_BENCH_SCENARIO` como `tree`, `list`, `navigation` o `navigation-mount`. El runner de [escenarios](../packages/meeko/benchmarks/scenarios.ts) comprueba el HTML SSR, el contenido e identidad de los nodos tras cada paso y la URL de navegación. Las implementaciones de [Vue](../packages/meeko/benchmarks/vue-scenarios.ts) usan funciones `render` escritas a mano y su runtime de producción, sin compilador de plantillas en el navegador.
 
 | Caso | Operación verificada |
 | --- | --- |
@@ -95,7 +95,7 @@ La hidratación de lista marcó 3,9 y 3,1 ms en Meeko frente a 1,8 y 1,9 ms en V
 
 ## Consumidor instalado desde npm
 
-El 23 de octubre de 2026 se instaló `@meekojs/meeko@0.0.2` dos veces desde el registro público, cada vez en un directorio temporal y con una caché npm vacía. Se compiló un contador `.meeko` con la CLI instalada y se midieron siete procesos Node separados que importan el componente generado y hacen un render SSR. El ensayo se reproduce con `pwsh -NoProfile -File tools/measure-published-consumer.ps1 -Version 0.0.2`. Máquina: Windows 11, Intel Core Ultra 9 285K, Node 24.21.0 y npm 11.19.0.
+El 23 de octubre de 2026 se instaló `@meekojs/meeko@0.0.2` dos veces desde el registro público, cada vez en un directorio temporal y con una caché npm vacía. Se compiló un contador `.meeko` con la CLI instalada y se midieron siete procesos Node separados que importan el componente generado y hacen un render SSR. El ensayo se reproduce con `pwsh -NoProfile -File packages/meeko/benchmarks/measure-published-consumer.ps1 -Version 0.0.2`. Máquina: Windows 11, Intel Core Ultra 9 285K, Node 24.21.0 y npm 11.19.0.
 
 | Métrica | Primera corrida | Segunda corrida |
 | --- | ---: | ---: |

@@ -28,9 +28,9 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $version = (Get-Content -LiteralPath editors/vscode/package.json -Raw | ConvertFrom-Json).version
+          $version = (Get-Content -LiteralPath packages/vscode/package.json -Raw | ConvertFrom-Json).version
           if ($env:GITHUB_REF_NAME -ne "vscode-v$version") {
-            throw "La etiqueta $env:GITHUB_REF_NAME no coincide con editors/vscode/package.json ($version)."
+            throw "La etiqueta $env:GITHUB_REF_NAME no coincide con packages/vscode/package.json ($version)."
           }
           # Marketplace y Open VSX sólo aceptan major.minor.patch.
           if ($version -notmatch '^\d+\.\d+\.\d+$') {
@@ -57,17 +57,15 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm install --frozen-lockfile
-        working-directory: editors/vscode
       - run: pnpm run test
-        working-directory: editors/vscode
+        working-directory: packages/vscode
       - run: pnpm run package:vsix
-        working-directory: editors/vscode
+        working-directory: packages/vscode
       - run: pnpm run test:host:isolated
-        working-directory: editors/vscode
+        working-directory: packages/vscode
         if: runner.os != 'Linux'
       - run: xvfb-run -a pnpm run test:host:isolated
-        working-directory: editors/vscode
+        working-directory: packages/vscode
         if: runner.os == 'Linux'
 
   publish:
@@ -103,9 +101,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
         if: steps.stores.outputs.any == 'true'
-      - run: pnpm install --frozen-lockfile
-        if: steps.stores.outputs.any == 'true'
-        working-directory: editors/vscode
       - name: Empaquetar los seis VSIX
         if: steps.stores.outputs.any == 'true'
         shell: pwsh
@@ -115,9 +110,9 @@ jobs:
           $packages = Join-Path $env:RUNNER_TEMP 'vsix'
           New-Item -ItemType Directory -Force $packages | Out-Null
           foreach ($target in @('win32-x64', 'win32-arm64', 'linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64')) {
-            pwsh -NoProfile -File editors/vscode/package-vsix.ps1 -Target $target
+            pwsh -NoProfile -File packages/vscode/package-vsix.ps1 -Target $target
             if ($LASTEXITCODE -ne 0) { throw "Falló el VSIX $target." }
-            $vsix = "editors/vscode/artifacts/meeko-language-$env:VSCODE_VERSION-$target.vsix"
+            $vsix = "packages/vscode/artifacts/meeko-language-$env:VSCODE_VERSION-$target.vsix"
             if (!(Test-Path -LiteralPath $vsix -PathType Leaf)) { throw "Falta $vsix." }
             Copy-Item -LiteralPath $vsix -Destination $packages
           }

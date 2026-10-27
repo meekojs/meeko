@@ -1,6 +1,6 @@
 # Plan de desarrollo
 
-Meeko 1.0 completa el alcance previsto para la primera versión estable. Desde ahí, la [política de estabilidad](stability.md) rige qué puede cambiar en cada versión. Este plan resume lo entregado y enumera las ampliaciones previstas para la serie 1.x. Ninguna tiene fecha comprometida. Los detalles de cada versión están en el [CHANGELOG](../CHANGELOG.md), y la preparación de la publicación, en [releasing.md](releasing.md).
+Meeko 1.0 completa el alcance previsto para la primera versión estable. Desde ahí, la [política de estabilidad](stability.md) rige qué puede cambiar en cada versión. Este plan resume lo entregado y enumera las ampliaciones previstas para la serie 1.x. Ninguna tiene fecha comprometida. Los detalles de cada versión están en el [CHANGELOG](../packages/meeko/CHANGELOG.md), y la preparación de la publicación, en [releasing.md](releasing.md).
 
 ## Entregado en 1.0
 
@@ -46,4 +46,4 @@ Las versiones `0.0.1` a `0.1.0` construyeron este alcance por etapas:
 6. DevTools;
 7. framework full-stack.
 
-El [CHANGELOG](../CHANGELOG.md) y las secciones por versión de [releasing.md](releasing.md) registran qué incluyó cada una y cómo se verificó.
+El [CHANGELOG](../packages/meeko/CHANGELOG.md) y las secciones por versión de [releasing.md](releasing.md) registran qué incluyó cada una y cómo se verificó.

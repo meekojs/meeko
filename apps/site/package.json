@@ -1,0 +1,30 @@
+{
+  "name": "meeko-site",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "assets": "node scripts/assets.mjs",
+    "dev": "node scripts/assets.mjs && meeko dev .",
+    "check": "meeko check .",
+    "build": "node scripts/assets.mjs && meeko build . && node scripts/postbuild.mjs",
+    "build:static": "pnpm run build && node scripts/static.mjs",
+    "preview": "pnpm run build && meeko start ."
+  },
+  "dependencies": {
+    "@meekojs/meeko": "workspace:*",
+    "github-slugger": "2.0.0",
+    "markdown-it": "15.0.3",
+    "shiki": "4.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "pagefind": "1.5.2",
+    "sharp": "0.35.5",
+    "typescript": "7.0.2",
+    "vite": "8.3.5"
+  }
+}

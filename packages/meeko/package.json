@@ -1,0 +1,132 @@
+{
+  "name": "@meekojs/meeko",
+  "version": "1.1.0",
+  "packageManager": "pnpm@12.14.0",
+  "description": "Typed .meeko component engine with SSR, hydration, signals, Vite, and DevTools.",
+  "license": "MIT",
+  "type": "module",
+  "files": ["dist/"],
+  "types": "./dist/index.d.ts",
+  "repository": { "type": "git", "url": "git+https://github.com/meekojs/meeko.git", "directory": "packages/meeko" },
+  "homepage": "https://github.com/meekojs/meeko#readme",
+  "bugs": { "url": "https://github.com/meekojs/meeko/issues" },
+  "keywords": ["meeko", "components", "ssr", "hydration", "reactivity", "vite", "typescript", "devtools"],
+  "publishConfig": { "access": "public" },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "default": "./dist/vite.js"
+    },
+    "./framework": {
+      "types": "./dist/framework.d.ts",
+      "default": "./dist/framework.js"
+    },
+    "./server": {
+      "types": "./dist/framework-server.d.ts",
+      "default": "./dist/framework-server.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "default": "./dist/node.js"
+    },
+    "./bun": {
+      "types": "./dist/bun.d.ts",
+      "default": "./dist/bun.js"
+    },
+    "./deno": {
+      "types": "./dist/deno.d.ts",
+      "default": "./dist/deno.js"
+    },
+    "./cloudflare": {
+      "types": "./dist/cloudflare.d.ts",
+      "default": "./dist/cloudflare.js"
+    },
+    "./build": {
+      "types": "./dist/build.d.ts",
+      "default": "./dist/build.js"
+    },
+    "./prettier": {
+      "types": "./dist/prettier.d.ts",
+      "default": "./dist/prettier.js"
+    },
+    "./internal": {
+      "types": "./dist/internal.d.ts",
+      "default": "./dist/internal.js"
+    },
+    "./devtools-ui": {
+      "types": "./dist/devtools-ui/index.d.ts",
+      "default": "./dist/devtools-ui/index.js"
+    }
+  },
+  "bin": {
+    "meeko": "dist/cli.js",
+    "meeko-language-server": "dist/language-server/main.js"
+  },
+  "scripts": {
+    "prepack": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "node scripts/clean-test-tmp.mjs && pnpm run build && pnpm run example:compile && tsx --test --test-concurrency=1 tests/*.test.ts",
+    "example:compile": "node dist/cli.js compile examples/counter/Counter.meeko examples/counter/Counter.generated.ts && node dist/cli.js compile examples/attributes/Attributes.meeko examples/attributes/Attributes.generated.ts && node dist/cli.js compile examples/regions/Regions.meeko examples/regions/Regions.generated.ts && node dist/cli.js compile examples/primitives/Primitives.meeko examples/primitives/Primitives.generated.ts",
+    "example:bundle": "pnpm run build && pnpm run example:compile && esbuild examples/counter/client.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=examples/counter/client.bundle.js",
+    "example:check": "tsc -p examples/counter/tsconfig.json --noEmit",
+    "example:serve": "pnpm run example:bundle && tsx examples/counter/server.ts",
+    "vite:dev": "vite examples/vite --config examples/vite/vite.config.ts",
+    "vite:types": "pnpm run build && node dist/cli.js types examples/counter/Counter.meeko && node dist/cli.js types examples/regions/Regions.meeko && node dist/cli.js types examples/vite/Hot.meeko && node dist/cli.js types examples/nested/Parent.meeko && tsc -p examples/vite/tsconfig.json --noEmit",
+    "vite:build": "vite build examples/vite --config examples/vite/vite.config.ts",
+    "pilot:dev": "tsx examples/pilot/server.ts",
+    "pilot:check": "pnpm run build && node dist/cli.js check examples/pilot/App.meeko && node dist/cli.js types examples/pilot/App.meeko && tsc -p examples/pilot/tsconfig.json --noEmit",
+    "pilot:build": "tsx examples/pilot/build.ts",
+    "pilot:serve": "node examples/pilot/.output/server/http.js",
+    "pilot:e2e": "node --import tsx --test --test-force-exit tests/pilot.e2e.ts",
+    "conformance": "pnpm run build && tsx --test --test-concurrency=1 tests/conformance/*.test.ts",
+    "conformance:node": "pnpm run build && tsx --test tests/conformance/node.test.ts",
+    "conformance:bun": "pnpm run build && tsx --test tests/conformance/bun.test.ts",
+    "conformance:deno": "pnpm run build && tsx --test tests/conformance/deno.test.ts",
+    "conformance:workerd": "pnpm run build && tsx --test tests/conformance/workerd.test.ts",
+    "e2e": "pnpm run example:bundle && pnpm run vite:build && tsx --test tests/browser.e2e.ts tests/editor-bridge.e2e.ts",
+    "benchmark:check": "pnpm run example:compile && node dist/cli.js compile benchmarks/cases/TreeLeaf.meeko benchmarks/cases/TreeLeaf.generated.ts && node dist/cli.js compile benchmarks/cases/TreeBranch.meeko benchmarks/cases/TreeBranch.generated.ts && node dist/cli.js compile benchmarks/cases/Tree.meeko benchmarks/cases/Tree.generated.ts && node dist/cli.js compile benchmarks/cases/List.meeko benchmarks/cases/List.generated.ts && node dist/cli.js compile benchmarks/cases/Navigation.meeko benchmarks/cases/Navigation.generated.ts && tsc -p tsconfig.benchmark.json --noEmit",
+    "benchmark": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/run.ts",
+    "benchmark:scenarios": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/scenarios.ts",
+    "package:smoke": "pwsh -NoProfile -File tests/package-consumer.ps1",
+    "verify": "pnpm run check && pnpm run test && pnpm run example:check && tsc -p tsconfig.test.json --noEmit && pnpm run vite:types && pnpm run benchmark:check && pnpm run vite:build && pnpm run pilot:check"
+  },
+  "dependencies": {
+    "@typescript/typescript6": "6.0.2",
+    "parse5": "^8.0.0",
+    "postcss": "^8.5.31",
+    "postcss-selector-parser": "^7.1.7",
+    "prettier": "^3.9.10",
+    "typescript": "7.0.2",
+    "vscode-css-languageservice": "6.3.10",
+    "vscode-html-languageservice": "5.6.2",
+    "vscode-languageserver": "11.0.0",
+    "vscode-languageserver-textdocument": "1.0.16",
+    "ws": "8.22.0"
+  },
+  "peerDependencies": {
+    "vite": "^8.3.5"
+  },
+  "peerDependenciesMeta": {
+    "vite": { "optional": true }
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/ws": "8.18.2",
+    "esbuild": "0.28.2",
+    "happy-dom": "^20.0.0",
+    "playwright-core": "1.64.1",
+    "redis": "6.3.0",
+    "tsx": "^4.20.0",
+    "vite": "8.3.5",
+    "vue": "3.5.44",
+    "wrangler": "4.152.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

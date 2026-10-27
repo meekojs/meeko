@@ -1,6 +1,6 @@
 # Migrar de 0.1.0 a 1.0
 
-Esta guía reúne los cambios incompatibles entre `0.1.0` y `1.0`. Su lista completa, con lo añadido y corregido, está en el [CHANGELOG](../CHANGELOG.md). A partir de 1.0 rige la [política de estabilidad](stability.md).
+Esta guía reúne los cambios incompatibles entre `0.1.0` y `1.0`. Su lista completa, con lo añadido y corregido, está en el [CHANGELOG](../packages/meeko/CHANGELOG.md). A partir de 1.0 rige la [política de estabilidad](stability.md).
 
 ## Orden recomendado
 

@@ -7,6 +7,10 @@
 - Usa mensajes de commit en español, en modo imperativo y con una intención concreta. Ejemplos: `Agrega posiciones al parser de componentes` y `Corrige la hidratación de listas con claves`.
 - Separa cambios funcionales, documentación y ajustes de formato cuando tengan objetivos independientes.
 
+## Estructura
+
+El repositorio es un workspace de pnpm con un único lockfile: el paquete `@meekojs/meeko` en `packages/meeko`, la extensión de VS Code en `packages/vscode`, la de Chrome DevTools en `packages/devtools` y el sitio en `apps/site`. La documentación (`docs/`) y el logo (`assets/brand/`) son del repositorio. Instala siempre desde la raíz.
+
 ## Verificación local
 
 ```powershell
@@ -15,7 +19,7 @@ pnpm run verify
 pnpm run example:bundle
 ```
 
-`verify` comprueba el código fuente y el ejemplo con TypeScript 7, ejecuta las pruebas y genera el componente de ejemplo. Una prueba de compilador debe demostrar también la salida SSR, la hidratación y un diagnóstico relevante cuando corresponda.
+Las órdenes de la raíz reenvían al paquete (`pnpm -F @meekojs/meeko run <orden>`); para otra pieza usa su filtro, por ejemplo `pnpm -F meeko-language run test`. `verify` comprueba el código fuente y el ejemplo con TypeScript 7, ejecuta las pruebas y genera el componente de ejemplo. Una prueba de compilador debe demostrar también la salida SSR, la hidratación y un diagnóstico relevante cuando corresponda.
 
 ## Cambios al formato `.meeko`
 

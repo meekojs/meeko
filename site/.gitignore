@@ -1,8 +1,0 @@
-node_modules/
-.meeko/
-dist-static/
-# Generated from ../assets/brand and the build by scripts/assets.mjs and scripts/postbuild.mjs.
-public/brand/
-public/pagefind/
-public/sitemap.xml
-public/robots.txt
