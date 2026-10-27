@@ -33,13 +33,41 @@ function readHidden(input: PasswordInput, output: PromptOutput, prompt: string):
       if (error) reject(error);
       else resolvePassword(value);
     };
+    // Escape sequences (arrows, Home, F1, Alt+key, bracketed paste markers) are consumed whole, also
+    // across chunks once their introducer arrived: none of their characters belong to the password.
+    let escape: "none" | "esc" | "csi" | "ss3" | "string" | "string-esc" = "none";
     const onData = (chunk: string): void => {
-      for (const character of chunk) {
+      const characters = [...chunk];
+      for (const [index, character] of characters.entries()) {
+        const code = character.codePointAt(0)!;
+        if (escape === "esc") {
+          if (character === "[") escape = "csi";
+          else if (character === "O") escape = "ss3";
+          // OSC, DCS, SOS, PM and APC run until BEL or ESC \.
+          else if ("]PX^_".includes(character)) escape = "string";
+          else escape = "none";
+          continue;
+        }
+        if (escape === "csi") {
+          // Parameter and intermediate bytes (space to ?) continue it; a final byte (@ to ~) or
+          // anything malformed ends it.
+          if (code < 0x20 || code > 0x3f) escape = "none";
+          continue;
+        }
+        if (escape === "ss3") { escape = "none"; continue; }
+        if (escape === "string" || escape === "string-esc") {
+          if (character === "\u0007" || (escape === "string-esc" && character === "\\")) escape = "none";
+          else escape = character === "\u001b" ? "string-esc" : "string";
+          continue;
+        }
         if (character === "\r" || character === "\n") { finish(); return; }
         if (character === "\u0003" || (character === "\u0004" && value === "")) { finish(new PromptCancelled()); return; }
         if (character === "\u007f" || character === "\b") { value = [...value].slice(0, -1).join(""); continue; }
-        // Other control characters (arrows, escape sequences) are not part of a password.
-        if (character < " " || character === "\u001b") continue;
+        // A lone Escape key arrives as the last character of its chunk; a sequence continues.
+        if (character === "\u001b") { escape = index === characters.length - 1 ? "none" : "esc"; continue; }
+        if (character === "\u009b") { escape = "csi"; continue; }
+        // Other C0 and C1 control characters are not part of a password.
+        if (code < 0x20 || (code >= 0x80 && code <= 0x9f)) continue;
         value += character;
       }
     };

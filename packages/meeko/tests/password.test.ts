@@ -89,15 +89,29 @@ test("meeko auth hash reads a piped password and prints only the hash line", asy
 class FakeTerminal extends EventEmitter {
   readonly isTTY = true;
   rawModes: boolean[] = [];
-  constructor(private readonly keystrokes: string[]) { super(); }
+  /** One entry per prompt: its keys, or the chunks in which the terminal delivers them. */
+  constructor(private readonly keystrokes: (string | string[])[]) { super(); }
   setRawMode(mode: boolean): void { this.rawModes.push(mode); }
   setEncoding(): void {}
   pause(): void {}
   resume(): void {
     const next = this.keystrokes.shift();
-    if (next !== undefined) setImmediate(() => this.emit("data", next));
+    if (next === undefined) return;
+    const chunks = typeof next === "string" ? [next] : next;
+    setImmediate(() => { for (const chunk of chunks) this.emit("data", chunk); });
   }
 }
+
+test("the terminal prompt drops whole escape sequences and other control characters", async () => {
+  const output = { write: () => {} };
+  // Arrows (CSI and SS3), Home, Delete, F5, Alt+x, a bracketed paste, a title (OSC), Tab and Ctrl+U.
+  const typed = "se\u001b[A\u001bOBc\u001b[H\u001b[3~r\u001b[15~e\u001bx\u001b[200~t\u001b[201~\u001b]0;t\u0007\t\u0015";
+  assert.equal(await promptPassword(new FakeTerminal([`${typed}\r`, "secret\r"]), output), "secret");
+  // A sequence split across chunks, an 8-bit CSI and a lone Escape key.
+  const split = ["se\u001b[", "1;5", "Ccr", "\u009bDet\u001b", "\r"];
+  assert.equal(await promptPassword(new FakeTerminal([split, "secret\r"]), output), "secret");
+  assert.equal(await promptPassword(new FakeTerminal(["añ\u001b[D€\r", "añ€\r"]), output), "añ€", "text after a sequence is kept");
+});
 
 test("the terminal prompt reads twice in raw mode without echo, with Backspace, and rejects a mismatch or Ctrl+C", async () => {
   let written = "";
