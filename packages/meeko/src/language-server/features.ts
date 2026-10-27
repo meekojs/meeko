@@ -7,7 +7,7 @@ import {
   CodeActionKind, CompletionItemKind, FoldingRangeKind, InsertTextFormat, MarkupKind, SemanticTokensBuilder, SymbolKind,
 } from "vscode-languageserver/node";
 import type {
-  CodeAction, CompletionItem, Diagnostic, DocumentSymbol, FoldingRange, FormattingOptions, Hover, Location,
+  CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentSymbol, FoldingRange, FormattingOptions, Hover, Location,
   ParameterInformation, Position, Range, SemanticTokens, SemanticTokensLegend, SignatureHelp, SignatureInformation,
   TextEdit, WorkspaceEdit,
 } from "vscode-languageserver/node";
@@ -62,6 +62,10 @@ const userPreferences: ts.UserPreferences = {
   importModuleSpecifierPreference: "relative",
   includeCompletionsForModuleExports: true,
   includeCompletionsWithInsertText: true,
+  // Like tsserver: auto-import entries whose module specifier is not resolved within TypeScript's
+  // budget come back unresolved and the list is incomplete, so the editor asks again as the user
+  // types. Without it, every completion resolved the specifier of every export (about 6 s).
+  allowIncompleteCompletions: true,
 };
 // Renaming an imported symbol renames its declaration and every importer, across .meeko and
 // .ts files, instead of introducing a local `import { a as b }` alias.
@@ -424,21 +428,27 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
 }
 
 export function completion(base: FeatureContext, position: Position): CompletionItem[] | undefined {
+  return completionList(base, position)?.items;
+}
+
+/** Completado con `isIncomplete`: TypeScript no resolvió todavía todos los autoimports. */
+export function completionList(base: FeatureContext, position: Position): CompletionList | undefined {
+  const list = (items: CompletionItem[] | undefined, isIncomplete = false): CompletionList | undefined => items && { isIncomplete, items };
   const sourceOffset = base.document.offsetAt(position);
   const event = base.component.componentEvents?.find((span) => sourceOffset >= span.start && sourceOffset <= span.end);
-  if (event) return componentEventCompletion(base, event, sourceOffset);
+  if (event) return list(componentEventCompletion(base, event, sourceOffset));
   const model = base.component.componentModels?.find((span) => sourceOffset >= span.start && sourceOffset <= span.end);
-  if (model) return componentModelCompletion(base, model, sourceOffset);
+  if (model) return list(componentModelCompletion(base, model, sourceOffset));
   const params = snippetTagAt(base.component, sourceOffset, "params");
-  if (params) return snippetParamsCompletion(base, params, sourceOffset);
+  if (params) return list(snippetParamsCompletion(base, params, sourceOffset));
   const snippetName = snippetTagAt(base.component, sourceOffset, "name");
-  if (snippetName) return snippetNameCompletion(base, snippetName);
+  if (snippetName) return list(snippetNameCompletion(base, snippetName));
   const context = contextAtPosition(base, position);
   const offset = generatedOffset(context, position);
   if (offset === undefined) return undefined;
   const result = context.project.service.getCompletionsAtPosition(context.component.virtualFilename, offset, userPreferences);
   if (!result) return undefined;
-  return result.entries.map((entry) => {
+  return list(result.entries.map((entry) => {
     const item: CompletionItem = { label: entry.name, kind: completionKind(entry.kind), sortText: entry.sortText };
     if (entry.insertText !== undefined) item.insertText = entry.insertText;
     if (entry.filterText !== undefined) item.filterText = entry.filterText;
@@ -457,7 +467,7 @@ export function completion(base: FeatureContext, position: Position): Completion
     };
     item.data = data;
     return item;
-  });
+  }), result.isIncomplete === true);
 }
 
 /** `{@link X}`, `{@link X texto}` o `{@link https://… texto}` como Markdown legible. */

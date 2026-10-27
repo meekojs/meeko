@@ -39,6 +39,29 @@ export function pathKey(path: string): string {
   return ts.sys.useCaseSensitiveFileNames ? normalized : normalized.toLowerCase();
 }
 
+/** The module specifier cache of tsserver; `ts.server.createModuleSpecifierCache` is internal. */
+interface SpecifierCache {
+  clear(): void;
+}
+
+/**
+ * tsserver's cache of auto-import paths, keyed by the importing file. It is internal to
+ * TypeScript 6, so without it the completions still work, only slower.
+ */
+function createSpecifierCache(root: string): SpecifierCache | undefined {
+  const internal = ts as unknown as {
+    toPath?: (file: string, base: string, canonical: (file: string) => string) => string;
+    server?: { createModuleSpecifierCache?: (host: { toPath(file: string): string; watchNodeModulesForPackageJsonChanges(directory: string): { close(): void } }) => SpecifierCache };
+  };
+  const create = internal.server?.createModuleSpecifierCache;
+  const toPath = internal.toPath;
+  if (!create || !toPath) return undefined;
+  const canonical = (file: string): string => ts.sys.useCaseSensitiveFileNames ? file : file.toLowerCase();
+  // Changes inside node_modules are not watched; an install changes the project's package.json or
+  // lockfile, and filesChanged clears the cache then.
+  return create({ toPath: (file) => toPath(file, root, canonical), watchNodeModulesForPackageJsonChanges: () => ({ close() {} }) });
+}
+
 /**
  * Proyecto TypeScript compartido por los componentes de un paquete. Incluye los archivos del
  * tsconfig y todos los `.meeko` del proyecto para que referencias y renombrados crucen archivos.
@@ -47,6 +70,20 @@ export class MeekoProject {
   readonly root: string;
   readonly service: ts.LanguageService;
   private compiler: ProjectCompilerOptions;
+  /**
+   * Module resolutions shared by every file of the program. Without it each import walks the
+   * `node_modules` folders again with `stat` and `realpath`: about 20 s on the first diagnostics.
+   */
+  private moduleCache: ts.ModuleResolutionCache;
+  /** Import paths already computed for auto-import completions, as tsserver keeps them. */
+  private specifierCache: SpecifierCache | undefined;
+  /** Files whose imports this host resolved, by TypeScript path. */
+  private readonly resolvedFiles = new Set<string>();
+  /**
+   * Files that must resolve their imports again: a created or removed file can change them, and
+   * the language service otherwise keeps the program while no script version changes.
+   */
+  private invalidatedFiles = new Set<string>();
   private registry: readonly AutoImport[] = [];
   private registryKey = "";
   private roots: readonly string[];
@@ -61,9 +98,20 @@ export class MeekoProject {
   constructor(root: string, private readonly options: WorkspaceOptions) {
     this.root = resolve(root);
     this.compiler = resolveProjectCompilerOptions(this.root);
+    this.moduleCache = this.createModuleCache();
+    this.specifierCache = createSpecifierCache(this.root);
     this.roots = [this.root];
-    const host: ts.LanguageServiceHost = {
+    // The language service passes getModuleResolutionCache on to the program, which shares its
+    // package.json cache with auto-import completions; it is not in the public host type.
+    const host: ts.LanguageServiceHost & {
+      getModuleResolutionCache(): ts.ModuleResolutionCache;
+      getModuleSpecifierCache(): SpecifierCache | undefined;
+      hasInvalidatedResolutions(path: string): boolean;
+    } = {
       getCompilationSettings: () => this.compiler.options,
+      hasInvalidatedResolutions: (path) => this.invalidatedFiles.has(path),
+      getModuleResolutionCache: () => this.moduleCache,
+      getModuleSpecifierCache: () => this.specifierCache,
       getScriptFileNames: () => [
         ...this.compiler.fileNames,
         ...[...this.entries.values()].flatMap((entry) => entry.component
@@ -92,17 +140,30 @@ export class MeekoProject {
       // `meeko types` generate, which may be stale and lack what the editor models (the type
       // arguments of a generic tag, for example): a component of this project resolves to its
       // live virtual module instead.
-      resolveModuleNameLiterals: (literals, containingFile, redirectedReference, options, containingSourceFile) => literals.map((literal) => {
-        const resolved = ts.resolveModuleName(
-          literal.text, containingFile, options, host, undefined, redirectedReference,
-          ts.getModeForUsageLocation(containingSourceFile, literal, options),
-        );
-        const owner = resolved.resolvedModule && this.declarationOwner(resolved.resolvedModule.resolvedFileName);
-        return owner ? { ...resolved, resolvedModule: { ...resolved.resolvedModule!, resolvedFileName: owner, extension: ts.Extension.Ts } } : resolved;
-      }),
+      resolveModuleNameLiterals: (literals, containingFile, redirectedReference, options, containingSourceFile) => {
+        // TypeScript paths are canonical: forward slashes, lowercase without case sensitivity.
+        const path = ts.sys.useCaseSensitiveFileNames ? containingFile : containingFile.toLowerCase();
+        this.resolvedFiles.add(path);
+        this.invalidatedFiles.delete(path);
+        return this.resolveLiterals(host, literals, containingFile, redirectedReference, options, containingSourceFile);
+      },
     };
     this.service = ts.createLanguageService(host, ts.createDocumentRegistry(ts.sys.useCaseSensitiveFileNames, this.root));
     this.loading = this.reloadRegistry();
+  }
+
+  private resolveLiterals(
+    host: ts.ModuleResolutionHost, literals: readonly ts.StringLiteralLike[], containingFile: string,
+    redirectedReference: ts.ResolvedProjectReference | undefined, options: ts.CompilerOptions, containingSourceFile: ts.SourceFile,
+  ): ts.ResolvedModuleWithFailedLookupLocations[] {
+    return literals.map((literal) => {
+      const resolved = ts.resolveModuleName(
+        literal.text, containingFile, options, host, this.moduleCache, redirectedReference,
+        ts.getModeForUsageLocation(containingSourceFile, literal, options),
+      );
+      const owner = resolved.resolvedModule && this.declarationOwner(resolved.resolvedModule.resolvedFileName);
+      return owner ? { ...resolved, resolvedModule: { ...resolved.resolvedModule!, resolvedFileName: owner, extension: ts.Extension.Ts } } : resolved;
+    });
   }
 
   /** Espera la configuración y el registro de autoimports vigentes. */
@@ -206,12 +267,24 @@ export class MeekoProject {
     }
     if (affected) this.index = undefined;
     if (configuration) this.compiler = resolveProjectCompilerOptions(this.root);
+    // A file created, removed or renamed can change where an import resolves.
+    if (configuration) this.moduleCache = this.createModuleCache();
+    else if (affected) this.moduleCache.clear();
+    if (affected) {
+      this.specifierCache?.clear();
+      this.invalidatedFiles = new Set(this.resolvedFiles);
+    }
     if (configuration || sources) this.loading = this.loading.then(() => this.reloadRegistry());
     return affected;
   }
 
   dispose(): void {
     this.service.dispose();
+  }
+
+  private createModuleCache(): ts.ModuleResolutionCache {
+    const canonical = (file: string): string => ts.sys.useCaseSensitiveFileNames ? file : file.toLowerCase();
+    return ts.createModuleResolutionCache(this.root, canonical, this.compiler.options);
   }
 
   /**

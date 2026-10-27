@@ -11,7 +11,7 @@ import { projectRoot } from "../compiler/project-root.js";
 import { checkFrameworkPageContracts } from "../framework/page-contracts-check.js";
 import { componentDiagnostics, contractRange, frameworkContractRoot } from "./diagnostics.js";
 import {
-  codeActions, completion, componentNameCompletion, definition, directiveNameCompletion, documentSymbols, foldingRanges, formatting, hover, prepareRename, references,
+  codeActions, completionList, componentNameCompletion, definition, directiveNameCompletion, documentSymbols, foldingRanges, formatting, hover, prepareRename, references,
   rename, resolveCompletion, semanticTokens, semanticTokensLegend, signatureHelp,
 } from "./features.js";
 import type { CompletionData, FeatureContext, LocatedDocument, MeekoFormatSettings } from "./features.js";
@@ -276,6 +276,8 @@ export function startLanguageServer(connection: Connection): void {
       watchers: [
         { globPattern: "**/*.{ts,mts,cts,meeko}" },
         { globPattern: "**/{tsconfig*.json,meeko.config.*}" },
+        // Installing or removing a dependency changes where imports resolve (see MeekoProject).
+        { globPattern: "**/{package.json,package-lock.json,pnpm-lock.yaml,yarn.lock,bun.lock}" },
       ],
     });
   });
@@ -362,7 +364,7 @@ export function startLanguageServer(connection: Connection): void {
       const directives = directiveNameCompletion(document, position);
       if (directives) return directives;
     }
-    return withContext(textDocument.uri, (context) => completion(context, position));
+    return withContext(textDocument.uri, (context) => completionList(context, position));
   });
   connection.onCompletionResolve(async (item) => {
     const data = item.data as CompletionData | undefined;
