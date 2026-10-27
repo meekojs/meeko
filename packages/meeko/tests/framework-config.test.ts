@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -62,5 +62,21 @@ test("configured layers cannot escape the project through a directory link", asy
   } finally {
     await rm(root, { recursive: true, force: true });
     await rm(external, { recursive: true, force: true });
+  }
+});
+
+test("loadMeekoConfig reads a rewrite that keeps the same mtime", async () => {
+  // Two writes within one mtime tick, as a fast editor save or a test can make them.
+  const root = await mkdtemp(join(tmpdir(), "meeko-config-reload-"));
+  try {
+    const file = join(root, "meeko.config.mjs");
+    await writeFile(file, `export default { css: { scopeAttribute: "all" } };\n`);
+    const { atime, mtime } = await stat(file);
+    assert.equal((await loadMeekoConfig(root)).css?.scopeAttribute, "all");
+    await writeFile(file, `export default { css: { scopeAttribute: "matched" } };\n`);
+    await utimes(file, atime, mtime);
+    assert.equal((await loadMeekoConfig(root)).css?.scopeAttribute, "matched");
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });

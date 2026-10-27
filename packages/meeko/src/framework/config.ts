@@ -1,4 +1,5 @@
-import { realpath, stat } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { readFile, realpath, stat } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -75,7 +76,9 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
   const file = await configFile(root);
   if (!file) return {};
   const url = pathToFileURL(file);
-  url.searchParams.set("mtime", String((await stat(file)).mtimeMs));
+  // The content, not the mtime, names the module: two writes within one mtime tick would
+  // otherwise load the first version again from the import cache.
+  url.searchParams.set("v", createHash("sha256").update(await readFile(file)).digest("hex").slice(0, 16));
   let loaded: unknown;
   try { loaded = (await import(url.href) as { default?: unknown }).default; }
   catch (error) { throw new Error(`Cannot load ${file}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
