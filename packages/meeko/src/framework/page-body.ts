@@ -2,6 +2,8 @@ import type { GeneratedRoutes } from "../framework.js";
 import type { RequestContext } from "../framework-server/context.js";
 import type { Deferred } from "./deferred.js";
 import type { PageHead, PageSchema } from "./page.js";
+import { mergeHeadInputs, providePageHeadSink } from "./head.js";
+import type { HeadInput } from "./head.js";
 
 /**
  * Petición para la que se ejecuta el código de nivel superior del `<script server>` de una página,
@@ -162,6 +164,19 @@ export function providePageScope(provider: PageScope): void {
   scope = provider;
 }
 
+/** `useHead` calls of each run of top-level server code. */
+const bodyHeads = new WeakMap<PageRequest<unknown, unknown>, Array<() => HeadInput>>();
+
+// useHead in top-level server code adds to the route head of the request being rendered.
+providePageHeadSink((read) => {
+  const page = scope?.current();
+  if (!page) return false;
+  const heads = bodyHeads.get(page);
+  if (!heads) return false;
+  heads.push(read);
+  return true;
+});
+
 function outside(name: string): Error {
   return new Error(`MEEK073: ${name}() sólo está disponible mientras se ejecuta el código de nivel superior del <script server> de una página`);
 }
@@ -276,7 +291,7 @@ export function definePageBody(options: Record<string, unknown> | undefined, bod
   if (options?.load !== undefined) throw new TypeError("MEEK070: un <script server> con código de nivel superior no puede declarar también route.load; deja sólo uno de los dos");
   if (options?.render === "client") throw new TypeError('MEEK074: una página render: "client" no puede tener código de servidor de nivel superior; su <script server> se ejecuta en el navegador');
   if (exportsHead && options?.head !== undefined) throw new TypeError("MEEK072: <script server> exporta head y además declara route.head; deja sólo uno de los dos");
-  const heads = new WeakMap<object, unknown>();
+  const heads = new WeakMap<object, { readonly exported: unknown; readonly used: ReadonlyArray<() => HeadInput> }>();
   const load = async (context: BodyContext): Promise<Record<string, unknown>> => {
     const page: PageRequest<unknown, unknown> = {
       url: new URL(context.request.url), params: context.params, search: context.search, request: context.request, signal: context.signal,
@@ -285,23 +300,29 @@ export function definePageBody(options: Record<string, unknown> | undefined, bod
         return context.context;
       },
     };
+    const used: Array<() => HeadInput> = [];
+    bodyHeads.set(page, used);
     const run = (): Promise<PageBodyResult> => body();
     const result = await (scope ? scope.run(page, run) : run());
     // An exported promise arrives awaited; a `defer` value is sent later by the stream.
     const entries = await Promise.all(Object.entries(result.data).map(async ([key, value]) => [key, thenable(value) ? await value : value] as const));
     const data: Record<string, unknown> = Object.fromEntries(entries);
-    if (exportsHead) heads.set(data, result.head);
+    heads.set(data, { exported: exportsHead ? result.head : undefined, used });
     return data;
   };
   const optionsHead = options?.head as ((context: unknown) => PageHead) | undefined;
-  const head = exportsHead
-    ? (context: { readonly data: unknown }): PageHead => {
-      const value = typeof context.data === "object" && context.data !== null ? heads.get(context.data) : undefined;
-      const resolved = typeof value === "function" ? (value as () => PageHead)() : value as PageHead | undefined;
-      return resolved ?? {};
-    }
-    : optionsHead;
-  return { ...options, load, ...(head ? { head } : {}) };
+  // useHead calls come first; `export const head` or `route.head` wins over them.
+  const head = (context: { readonly data: unknown }): PageHead => {
+    const stored = typeof context.data === "object" && context.data !== null ? heads.get(context.data) : undefined;
+    const value = stored?.exported;
+    const declared = exportsHead
+      ? typeof value === "function" ? (value as () => PageHead)() : value as PageHead | undefined
+      : optionsHead?.(context);
+    if (!stored?.used.length) return declared ?? {};
+    const merged = mergeHeadInputs([...stored.used.map((read) => read()), declared]) as PageHead;
+    return declared?.description === undefined ? merged : { ...merged, description: declared.description };
+  };
+  return { ...options, load, head };
 }
 
 /** @internal The exports of the page's top-level server code, as the compiled page reads them. */

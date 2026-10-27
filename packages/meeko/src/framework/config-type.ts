@@ -1,3 +1,5 @@
+import type { DocumentConfig } from "./head.js";
+
 /**
  * Destino de ejecución de `meeko build`, una unión discriminada por `adapter`. Cada adaptador
  * escribe en `.meeko/output/<adapter>/`; `--adapter` de la CLI tiene prioridad.
@@ -86,6 +88,13 @@ export interface MeekoConfig {
    * pasará a ser el valor por defecto.
    */
   readonly css?: { readonly scopeAttribute?: "all" | "matched" };
+  /**
+   * Documento HTML de la aplicación: `lang` de `<html>` y etiquetas y atributos comunes de
+   * `<head>`, con la menor prioridad frente a `useHead` y al `head` de las páginas. Se fija en el
+   * build y llega también al navegador, porque termina en el HTML.
+   * @since 1.2.0
+   */
+  readonly document?: DocumentConfig;
 }
 
 /**

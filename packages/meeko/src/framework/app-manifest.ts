@@ -5,7 +5,9 @@ import type { AppManifest, ClientAssets } from "../framework-server/app.js";
 import type { AssetManifest } from "../framework-server/assets.js";
 import { discoverServerManifest } from "../framework-server/manifest-discovery.js";
 import { serializeJson } from "../server.js";
-import { discoverConfiguredRoutes } from "./config.js";
+import { discoverConfiguredRoutes, loadMeekoConfig } from "./config.js";
+import { resolveDocumentConfig } from "./head.js";
+import type { DocumentConfig } from "./head.js";
 import { discoverErrorPage } from "./routes-discovery.js";
 import type { ErrorPageRecord, RouteRecord } from "./router.js";
 
@@ -83,10 +85,12 @@ export async function discoverAppManifest(projectRoot: string, client: ClientAss
   const routeMiddleware = (await scripts(resolve(root, "app", "middleware"), /\.(?:test|spec|d|server|client)\.ts$/)).map((file) => moduleKey(root, file)).sort();
   const serverMiddleware = (await scripts(resolve(root, "server", "middleware"), /\.(?:test|spec|d|client)\.ts$/)).map((file) => moduleKey(root, file)).sort();
   const errorPage = await portableErrorPage(root);
+  const document = await documentManifest(root);
   const manifest: AppManifest = {
     version: 1,
     routes,
     ...(errorPage ? { errorPage } : {}),
+    ...(document ? { document } : {}),
     server: {
       api: server.api.map((endpoint) => ({ ...endpoint, file: moduleKey(root, endpoint.file) })),
       rpc: server.rpc.map((endpoint) => ({ ...endpoint, file: moduleKey(root, endpoint.file) })),
@@ -127,12 +131,24 @@ export async function serverAppSource(projectRoot: string, build: BuildAppData |
   ].join("\n");
 }
 
-/** Source of `virtual:meeko-manifest/client`: routes and the application error page for client navigation. */
+/**
+ * `document` of meeko.config.ts as both builds bake it. It ends up in every HTML document, so the
+ * browser bundle may carry it too.
+ */
+export async function documentManifest(projectRoot: string): Promise<DocumentConfig | undefined> {
+  return resolveDocumentConfig((await loadMeekoConfig(projectRoot)).document);
+}
+
+/**
+ * Source of `virtual:meeko-manifest/client`: routes, the application error page and the document
+ * configuration for client navigation.
+ */
 export async function clientRoutesSource(projectRoot: string): Promise<string> {
   const root = resolve(projectRoot);
   const routes = portableRoutes(root, await discoverConfiguredRoutes(root), { sidecars: "client" });
   const errorPage = await portableErrorPage(root);
-  return `export const routes = ${serializeJson(routes)};\nexport const errorPage = ${errorPage ? serializeJson(errorPage) : "undefined"};\n`;
+  const document = await documentManifest(root);
+  return `export const routes = ${serializeJson(routes)};\nexport const errorPage = ${errorPage ? serializeJson(errorPage) : "undefined"};\nexport const documentConfig = ${document ? serializeJson(document) : "undefined"};\n`;
 }
 
 /**

@@ -75,9 +75,17 @@ function contentTag(value: string): string {
   return `"${createHash("sha256").update(value).digest("base64url").slice(0, 27)}"`;
 }
 
+/**
+ * The start of a Meeko document: `<html>` with its escaped attributes, the charset and the
+ * default viewport and icon tags that the application did not replace.
+ */
+const documentStart = /^<!doctype html><html(?: [^>]*)?><head><meta charset="utf-8">(?:<meta name="viewport" content="width=device-width,initial-scale=1">)?(?:<link rel="icon" href="data:,">)?/;
+
 /** Finds where the per-request CSRF meta tag belongs inside a stored document. */
 function headOffset(pathname: string, html: string): number {
   if (html.startsWith(DOCUMENT_HEAD_PREFIX)) return DOCUMENT_HEAD_PREFIX.length;
+  const start = documentStart.exec(html);
+  if (start) return start[0].length;
   const close = html.search(/<\/head>/i);
   if (close < 0) throw new Error(`Prerendered ${pathname} has no <head>; the CSRF token cannot be inserted`);
   return close;

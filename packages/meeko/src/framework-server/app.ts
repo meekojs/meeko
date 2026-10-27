@@ -4,6 +4,8 @@ import type { ErrorPageRecord, RouteRecord } from "../framework/router.js";
 import { createPageHandler, withRouteManifest } from "../framework/server.js";
 import type { DocumentMarkup, DocumentOptions, PageHandlerOptions, PageModule, PageRoute, PrerenderSource } from "../framework/server.js";
 import { escapeHtml } from "../server.js";
+import { mergeDocumentConfigs, normalizeDocumentConfig } from "../framework/head.js";
+import type { DocumentConfig } from "../framework/head.js";
 import type { AssetManifest, AssetReader } from "./assets.js";
 import { createRequestContext } from "./context.js";
 import type { RequestContext } from "./context.js";
@@ -82,6 +84,11 @@ export interface AppManifest {
   readonly client: ClientAssets;
   /** Archivos públicos del build; en desarrollo los sirve Vite. */
   readonly assets?: AssetManifest;
+  /**
+   * `document` de `meeko.config.ts`, con el head que añaden los módulos, fijado en el build.
+   * @since 1.2.0
+   */
+  readonly document?: DocumentConfig | undefined;
 }
 
 /**
@@ -331,10 +338,13 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
       ...manifest.client.css.map((href) => `<link rel="stylesheet" href="${escapeHtml(href)}">`),
       ...manifest.client.preload.map((href) => `<link rel="modulepreload" href="${escapeHtml(href)}">`),
     ].join("");
+    // The host's document configuration refines the one baked into the build.
+    const documentConfig = mergeDocumentConfigs(normalizeDocumentConfig(manifest.document, "manifest.document"), options.document?.config);
     const document: DocumentOptions = {
       head: (context) => clientHead + markup(options.document?.head, context),
       ...(options.document?.bodyEnd === undefined ? {} : { bodyEnd: options.document.bodyEnd }),
       ...(options.document?.nonce === undefined ? {} : { nonce: options.document.nonce }),
+      ...(documentConfig === undefined ? {} : { config: documentConfig }),
     };
     const pageOptions: PageHandlerOptions = {
       routes: manifest.routes,

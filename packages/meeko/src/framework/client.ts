@@ -20,6 +20,8 @@ import { provideBrowserWindow } from "./storage.js";
 import { lateRender, mayAwaitData, renderWithSuspense } from "../suspense.js";
 import { mountBatch } from "../lifecycle.js";
 import type { DeferredError, DeferredInternals, DeferredOutcome } from "./deferred.js";
+import { BrowserHead, provideHead, routeHeadInput, withHeadLevel } from "./head.js";
+import type { DocumentConfig, HeadInput } from "./head.js";
 
 export { useNavigation, useRoute } from "./navigation.js";
 export type { NavigationState, RouteState } from "./navigation.js";
@@ -138,6 +140,13 @@ export interface ClientAppOptions {
   readonly onError?: ComponentErrorHandler;
   /** Ventana del navegador; por defecto, `window`. */
   readonly browser?: Window;
+  /**
+   * `document` de `meeko.config.ts`, el mismo que renderiza el servidor: la entrada cliente que
+   * genera Meeko lo toma de `virtual:meeko-manifest/client`. `useHead` y la navegación lo usan para
+   * aplicar `titleTemplate` y restaurar sus etiquetas.
+   * @since 1.2.0
+   */
+  readonly document?: DocumentConfig | undefined;
 }
 
 /**
@@ -221,13 +230,12 @@ function readPayload(value: unknown): HydrationPayload {
   if (parsed.resources !== undefined && !isRecord(parsed.resources)) throw new TypeError("Invalid Meeko page data");
   const render = parsed.render ?? "ssr";
   if (typeof render !== "string" || !pageRenders.includes(render) || (error && render !== "ssr")) throw new TypeError("Invalid Meeko page render mode");
-  const head = parsed.head ?? {};
-  if (!isRecord(head) || (head.title !== undefined && typeof head.title !== "string") || (head.description !== undefined && typeof head.description !== "string")) {
-    throw new TypeError("Invalid Meeko page head");
-  }
+  let head: PageHead;
+  try { head = payloadHead((parsed.head ?? {}) as PageHead); }
+  catch (cause) { throw new TypeError("Invalid Meeko page head", { cause }); }
   return {
     route: error ? "" : parsed.route as string, error, render: render as PageRender, props: parsed.props, state: parsed.state,
-    sharedState: parsed.sharedState ?? {}, head: payloadHead(head as PageHead),
+    sharedState: parsed.sharedState ?? {}, head,
     deferred: readDeferredEntries(parsed.deferred),
     resources: (parsed.resources as Record<string, unknown> | undefined) ?? {},
   };
@@ -486,44 +494,6 @@ function applyCsrfToken(browser: Window, token: string): () => void {
   };
 }
 
-/**
- * The title of an SSR document whose page has no `head.title`: the first
- * `<title>` of the host markup (`DocumentOptions.head`), or none. Meeko writes
- * a page `<title>` before that markup, so after one the host title is the second.
- */
-function hostDocumentTitle(document: Document, pageTitle: boolean): string {
-  const element = document.head?.querySelectorAll("title")[pageTitle ? 1 : 0];
-  // Same whitespace handling as document.title.
-  return (element?.textContent ?? "").replace(/[\t\n\f\r ]+/g, " ").replace(/^ | $/g, "");
-}
-
-/**
- * The description of an SSR document whose page has none: the first description meta of the host
- * markup, or none. A page description is written before that markup, so the host's is the second.
- */
-function hostDocumentDescription(document: Document, pageDescription: boolean): string | undefined {
-  return document.head?.querySelectorAll('meta[name="description"]')[pageDescription ? 1 : 0]?.getAttribute("content") ?? undefined;
-}
-
-/** Shows `description` in the first description meta, creating it, or removes that meta. */
-function applyDocumentDescription(document: Document, description: string | undefined): void {
-  const head = document.head;
-  if (!head) return;
-  let meta = head.querySelector('meta[name="description"]');
-  if (description === undefined) {
-    meta?.remove();
-    return;
-  }
-  if (!meta) {
-    meta = document.createElement("meta");
-    meta.setAttribute("name", "description");
-    const title = head.querySelector("title");
-    if (title) title.after(meta);
-    else head.append(meta);
-  }
-  if (meta.getAttribute("content") !== description) meta.setAttribute("content", description);
-}
-
 function bind(component: ClientComponent, props: Record<string, unknown>): Component<Record<string, unknown>> {
   return {
     renderWithState: () => component.renderWithState(props),
@@ -540,7 +510,8 @@ async function createTree(
   leaf: string | Component<Record<string, unknown>>,
 ): Promise<{ component: Component<Record<string, unknown>>; layouts: LayoutInstance[]; modules: unknown[] }> {
   const page = typeof leaf === "string" ? await loadPage(leaf) : undefined;
-  let component = page ? bind(page, props) : leaf as Component<Record<string, unknown>>;
+  // useHead of the page outranks its layouts', and a layout's outranks app.meeko's, as in SSR.
+  let component = page ? withHeadLevel(bind(page, props), chain.length) : leaf as Component<Record<string, unknown>>;
   const layouts: LayoutInstance[] = [];
   /** The compiled modules that render the tree, for `mayAwaitData`; an empty outlet renders none. */
   const modules: unknown[] = page ? [page] : [];
@@ -553,7 +524,7 @@ async function createTree(
     }) as Record<string, unknown>;
     const layout = await loadPage(file);
     modules.push(layout);
-    component = bind(layout, layoutProps);
+    component = withHeadLevel(bind(layout, layoutProps), index);
     layouts.unshift({ file, outlet });
   }
   return { component, layouts, modules };
@@ -590,9 +561,11 @@ async function createTree(
 export async function mountClientApp(options: ClientAppOptions): Promise<ClientApp> {
   const browser = options.browser ?? window;
   const payload = readPayload(options.payload);
-  // A page without head.title leaves the title SSR would give it, not the previous page's.
-  const defaultTitle = hostDocumentTitle(browser.document, payload.head.title !== undefined);
-  const defaultDescription = hostDocumentDescription(browser.document, payload.head.description !== undefined);
+  // Adopts the head that SSR wrote; a page without a title shows the host's, not the previous page's.
+  const documentHead = new BrowserHead(browser.document, options.document);
+  // An error page (notFound(), a loader or data failure, or app/error.meeko for a URL without
+  // a route) has the title of its SSR error document.
+  const routeHead = (head: PageHead, errorPage: boolean): HeadInput => routeHeadInput(head, errorPage ? ERROR_PAGE_TITLE : undefined);
   const appError = options.errorPage;
   const initial = matchRoute(options.routes, browser.location.pathname);
   if (payload.error) {
@@ -624,6 +597,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     provideRoute(routeState);
     provideResourceCache(resourceCache);
     provideBrowserWindow(browser);
+    provideHead(documentHead);
     return hydrate();
   });
   // A client page arrives with its layouts around an empty outlet; the page
@@ -648,8 +622,12 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       : await createTree(appError!.layouts, payload.props, options.loadPage, 0, appError!.file);
     // Awaited data comes from the payload: hydration stays synchronous and never requests it again.
     const initialData = new ResourceScope("read", payload.resources);
-    // onMounted callbacks run once the whole tree has hydrated.
-    release = withResourceScope(initialData, () => hydrateApp(committedRoute.state, () => mountBatch(() => first.component.hydrateScope({ root: options.root }, {}, payload.state))));
+    // onMounted callbacks run once the whole tree has hydrated. The head adopts the SSR tags once,
+    // with every useHead of the hydrated tree registered.
+    release = documentHead.hold(() => {
+      documentHead.setRoute(routeHead(payload.head, payload.error));
+      return withResourceScope(initialData, () => hydrateApp(committedRoute.state, () => mountBatch(() => first.component.hydrateScope({ root: options.root }, {}, payload.state))));
+    });
     resourceCache.merge(initialData.loadedData());
   } catch (error) {
     stopChunks();
@@ -969,7 +947,9 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       try { previousRelease(); }
       catch (error) { reportNavigationError(browser, error, observeNavigationError); }
     };
-    const commitWithToken = () => {
+    // The head changes once per commit: the entries of the released page leave, the new page's
+    // arrive and the route head is replaced.
+    const commitWithToken = () => documentHead.hold(() => {
       const restoreToken = serverCsrfToken === null ? undefined : applyCsrfToken(browser, serverCsrfToken);
       try { commit(); }
       catch (error) {
@@ -977,11 +957,8 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         catch (restoreError) { throw new AggregateError([error, restoreError], "Meeko navigation and CSRF recovery failed"); }
         throw error;
       }
-      // An error page (notFound(), a loader or data failure, or app/error.meeko for a URL without
-      // a route) has the title of its SSR error document.
-      browser.document.title = head.title ?? (errorPage !== undefined ? ERROR_PAGE_TITLE : defaultTitle);
-      applyDocumentDescription(browser.document, head.description ?? defaultDescription);
-    };
+      documentHead.setRoute(routeHead(head, errorPage !== undefined));
+    });
     if (serverSharedState) stateStore.seedForNavigation(serverSharedState, commitWithToken);
     else if (loaderDraft) loaderDraft.commit(commitWithToken);
     else commitWithToken();
@@ -1030,6 +1007,8 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     dispose() {
       if (disposed) return;
       disposed = true;
+      // The document keeps the head of the last page.
+      documentHead.dispose();
       navigator.dispose();
       stopChunks();
       activeStream?.abort();

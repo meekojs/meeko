@@ -64,7 +64,7 @@ function filesInSync(path: string): string[] {
 function builtins(root: string): AutoImport[] {
   const entries: AutoImport[] = [
     ...["signal", "computed", "effect", "batch", "onCleanup", "onMounted", "provide", "inject", "createContext", "provideErrorHandler"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko", specifier: "@meekojs/meeko", scope: "shared", typeOnly: false, component: false })),
-    ...["useState", "href", "useRoute", "useForm", "useStorage"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "shared", typeOnly: false, component: false })),
+    ...["useState", "href", "useRoute", "useForm", "useStorage", "useHead", "useSeoMeta"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "shared", typeOnly: false, component: false })),
   ];
   for (const scope of ["client", "server"] as const) {
     const file = join(root, ".meeko", "generated", `clients.${scope}.ts`);
@@ -84,7 +84,7 @@ function builtins(root: string): AutoImport[] {
  * the project's own export wins, instead of making the name ambiguous. `useApiMutation` comes from
  * the generated clients; the others, from `@meekojs/meeko/framework`.
  */
-const yieldingBuiltins: ReadonlySet<string> = new Set(["useRoute", "useForm", "useStorage", "useApiMutation"]);
+const yieldingBuiltins: ReadonlySet<string> = new Set(["useRoute", "useForm", "useStorage", "useApiMutation", "useHead", "useSeoMeta"]);
 
 function isGeneratedClient(file: string): boolean {
   return /[\\/]\.meeko[\\/]generated[\\/]clients\.(?:client|server)\.ts$/.test(file);

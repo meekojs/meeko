@@ -6,6 +6,13 @@ import type { SfcSection } from "./sfc.js";
 export const pageRequestApis = ["usePage", "redirect", "notFound"] as const;
 export type PageRequestApi = (typeof pageRequestApis)[number];
 
+/**
+ * Head APIs that, called at the top level of `<script server>`, add to the page head of each
+ * request: the block then has top-level code. They also work in components, so the component
+ * `<script>` may use them.
+ */
+const pageHeadApis: readonly string[] = ["useHead", "useSeoMeta"];
+
 export const frameworkModule = "@meekojs/meeko/framework";
 
 /** A name bound by `<script server>`; offsets are in the `.meeko` file. */
@@ -171,6 +178,7 @@ export function analyzeServerScript(source: string, filename: string, section: S
   // Request APIs: imported from the framework under any local name, or used without any binding.
   const moduleNames = scopeNames(file);
   const apis = new Map<string, PageRequestApi>();
+  const headApis = new Set(pageHeadApis.filter((name) => !moduleNames.has(name)));
   const usePageImports: Array<{ local: string; start: number; end: number }> = [];
   for (const statement of file.statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier) || statement.moduleSpecifier.text !== frameworkModule) continue;
@@ -178,6 +186,7 @@ export function analyzeServerScript(source: string, filename: string, section: S
     if (!bindings || !ts.isNamedImports(bindings) || statement.importClause?.isTypeOnly) continue;
     for (const [index, element] of bindings.elements.entries()) {
       const imported = (element.propertyName ?? element.name).text;
+      if (!element.isTypeOnly && pageHeadApis.includes(imported)) headApis.add(element.name.text);
       if (element.isTypeOnly || !(pageRequestApis as readonly string[]).includes(imported)) continue;
       apis.set(element.name.text, imported as PageRequestApi);
       if (imported !== "usePage") continue;
@@ -243,14 +252,17 @@ export function analyzeServerScript(source: string, filename: string, section: S
 
   // A request API called outside any function runs per request: the block has top-level code.
   const references: Array<{ identifier: ts.Identifier; nested: boolean; inRoute: boolean }> = [];
+  let headCall = false;
   for (const statement of file.statements) {
     if (ts.isImportDeclaration(statement) || typeOnlyStatement(statement)) continue;
     const inRoute = statement === route?.statement;
     visitReferences(statement, (identifier, nested) => {
       if (apis.has(identifier.text)) references.push({ identifier, nested, inRoute });
+      // useHead() at the top level adds to the head of every request, like `export const head`.
+      if (!nested && !inRoute && headApis.has(identifier.text)) headCall = true;
     });
   }
-  if (references.some((reference) => !reference.nested && !reference.inRoute)) body = true;
+  if (headCall || references.some((reference) => !reference.nested && !reference.inRoute)) body = true;
   const implicit = [...new Set(references.map((reference) => apis.get(reference.identifier.text)!).filter((api) => !moduleNames.has(api)))];
 
   if (!body) {

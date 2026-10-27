@@ -1,4 +1,6 @@
 import type { StateStore } from "./state.js";
+import { normalizeHeadInput } from "./head.js";
+import type { HeadInput } from "./head.js";
 
 /**
  * Subconjunto de Standard Schema v1 que se puede usar en el navegador, como el que implementan los
@@ -116,7 +118,9 @@ export interface ClientPageLoadContext<P extends PageSchema | undefined, S exten
 
 /**
  * Metadatos del documento que devuelve el `head` de una página. Sin `title` se conserva el del
- * host, o ninguno.
+ * host, o ninguno. Desde `1.2` admite también las etiquetas y los atributos de {@link HeadInput}
+ * (con `titleTemplate` sólo como cadena, porque viaja en el payload de navegación); el `head` de la
+ * ruta tiene la máxima prioridad frente a `useHead`.
  *
  * @example
  * ```ts
@@ -124,12 +128,15 @@ export interface ClientPageLoadContext<P extends PageSchema | undefined, S exten
  * import type { PageHead } from "@meekojs/meeko/framework";
  *
  * export const route = definePage({
- *   load: () => ({ name: "Ada" }),
- *   head: ({ data }): PageHead => ({ title: `Perfil de ${data.name}` }),
+ *   load: () => ({ name: "Ada", avatar: "https://example.com/ada.png" }),
+ *   head: ({ data }): PageHead => ({
+ *     title: `Perfil de ${data.name}`,
+ *     meta: [{ property: "og:image", content: data.avatar }],
+ *   }),
  * });
  * ```
  */
-export interface PageHead {
+export interface PageHead extends Omit<HeadInput, "title" | "titleTemplate"> {
   /** Título del documento: `<title>` en SSR y `document.title` al navegar. */
   readonly title?: string;
   /**
@@ -138,14 +145,19 @@ export interface PageHead {
    * @since 1.1.0
    */
   readonly description?: string;
+  /**
+   * Plantilla del título, con `%s` en el lugar del título.
+   * @since 1.2.0
+   */
+  readonly titleTemplate?: string;
 }
 
-/** The fields of a page head that travel in the payload. */
+/**
+ * The fields of a page head that travel in the payload, validated. A function `titleTemplate`
+ * cannot travel and fails.
+ */
 export function payloadHead(head: PageHead): PageHead {
-  return {
-    ...(head.title === undefined ? {} : { title: head.title }),
-    ...(head.description === undefined ? {} : { description: head.description }),
-  };
+  return normalizeHeadInput(head, "page head", { serializable: true, page: true }) as PageHead;
 }
 
 /**
