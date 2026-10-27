@@ -76,6 +76,20 @@ test("aria-current compares the path of the link, without its query or fragment"
   assert.equal(linkCurrent(route, "/users/8"), undefined);
 });
 
+test("a static <MeekoLink> with a non-ASCII path is encoded like href() and matches the route's path", () => {
+  const { code } = compile("<template><MeekoLink to=\"/categorías/menú\">Categorías</MeekoLink></template>", layout);
+  assert.match(code, / href=\\"\/categor%C3%ADas\/men%C3%BA\\"/, "the HTML href is the encoded path");
+  assert.match(code, /__meeko\.linkCurrent\(__meeko_route, "\/categor%C3%ADas\/men%C3%BA"\)/);
+  // useRoute().path is url.pathname: always encoded.
+  const route = { path: { value: new URL("https://x.test/categorías/menú").pathname } };
+  assert.equal(route.path.value, "/categor%C3%ADas/men%C3%BA");
+  assert.equal(linkCurrent(route, "/categor%C3%ADas/men%C3%BA"), "page");
+  assert.equal(linkCurrent(route, "/categorías/menú"), "page", "a raw href is the same route");
+  assert.equal(linkCurrent({ path: { value: "/a%40b" } }, "/a@b"), "page", "characters that URL keeps but href() encodes");
+  assert.equal(linkCurrent({ path: { value: "/categor%C3%ADas" } }, "/categorias"), undefined);
+  assert.equal(linkCurrent({ path: { value: "/bad%E0%A4" } }, "/bad%E0%A4"), "page", "a malformed escape compares as written");
+});
+
 test("the editor completes the attributes of <MeekoLink> and the routes of to=\"\"", () => {
   const text = `<script lang="ts"></script>\n<template><MeekoLink c></MeekoLink><MeekoLink to=""></MeekoLink></template>`;
   const document = TextDocument.create("file:///Nav.meeko", "meeko", 1, text);

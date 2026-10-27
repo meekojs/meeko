@@ -752,8 +752,9 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
     };
     // A static route without params is its own href: a plain attribute, with no binding. The type
     // check still calls href(), so an unknown route is an error there.
+    // Encoded per segment as href() does, so `/categorías` is `/categor%C3%ADas`, like the route's path.
     const fixed = !context.narrow && link.to.literal !== undefined && !link.to.literal.includes("[") && !link.params && !link.search
-      ? link.to.literal
+      ? staticRouteHref(link.to.literal)
       : undefined;
     if (fixed !== undefined) attrs.push({ kind: "static", value: ` href="${escapeAttribute(fixed)}"` });
     const current = (map: (expression: string, offset: number) => string): string =>
@@ -792,6 +793,12 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
   try { children = (node.childNodes ?? []).map((child) => renderNode(child, bindings, context)); }
   finally { context.selectModel = selectModel; }
   return [opening, ...children, quote(`</${tag}>`)].join(" + ");
+}
+
+/** The href of a route without parameters, with each segment encoded as `href()` encodes it. */
+function staticRouteHref(id: string): string {
+  const parts = id.split("/").filter(Boolean).map((part) => encodeURIComponent(part));
+  return new URL(parts.length ? `/${parts.join("/")}` : "/", "http://meeko.local").pathname;
 }
 
 /**
