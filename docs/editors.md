@@ -79,6 +79,9 @@ La plantilla (salvo esos manejadores) y los estilos no forman zonas, y las zonas
 
 Además de las de imports y `href`:
 
+- **Props leídas una sola vez (`MEEK101`).** «Convertir en computed» cambia `const upper = props.label.toUpperCase()` por `computed(() => props.label.toUpperCase())` y añade `.value` a cada uso, en el script y en la plantilla (una propiedad abreviada conserva su clave: `{ upper }` pasa a `{ upper: upper.value }`). Una desestructuración `const { label, title: heading } = props` se convierte en un `computed` por nombre. Si sólo interesa el primer valor, «Leer … sólo una vez con untrack» lo declara con `untrack(() => props.x)`.
+- **Añadir `each:as` (`MEEK022`).** En una lista sin `each:as`, lo añade con el singular de la lista (`variants.value` → `variant`) o `item`. Funciona aunque el componente no compile, que es lo que provoca ese error.
+- **Crear un componente.** En una etiqueta como `<AppNuevo bind:title="name.value" />` cuyo componente no existe, crea `app/components/App/Nuevo.meeko` (dentro de la carpeta más larga de `app/components` con la que empieza el nombre, como los nombra el autoimport) con una prop por cada `bind:`, del tipo del valor que pasa la etiqueta. Sólo se ofrece si el cliente admite crear archivos en una edición de workspace (`resourceOperations` con `create`).
 - **Añadir `each:key`.** En una lista sin clave, propone `each:key="item.id"` (u otra propiedad identificadora del elemento) o el propio elemento si es una cadena o un número.
 - **Mover el sidecar a `<script server>`.** En las primeras líneas de una página con un `x.route.ts` junto a ella, mueve su contenido a un bloque `<script server lang="ts">` y borra el sidecar en una sola edición. Los imports relativos siguen funcionando porque ambos archivos comparten carpeta. Sólo se ofrece si el cliente admite borrar archivos en una edición de workspace (`workspace.workspaceEdit.documentChanges` y `resourceOperations` con `delete`).
 

@@ -14,6 +14,8 @@ import { nodeAt } from "./reactivity.js";
 export interface EditCapabilities {
   /** `documentChanges` with `delete` resource operations. */
   readonly deleteFiles?: boolean;
+  /** `documentChanges` with `create` resource operations. */
+  readonly createFiles?: boolean;
 }
 
 function intersects(range: Range, start: { line: number }, end: { line: number }): boolean {

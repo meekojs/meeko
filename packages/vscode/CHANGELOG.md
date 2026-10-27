@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - Sin cursiva: el modificador `reactive` ya no se asigna a `markup.italic`, que los temas muestran en cursiva, y los valores en vivo al final de la línea tampoco usan cursiva. Para recuperarla, añada `"*.reactive": { "italic": true }` en `rules` de `editor.semanticTokenColorCustomizations`.
+- Acciones rápidas: convertir en `computed` una prop que el setup lee una sola vez (o declararlo con `untrack`), añadir `each:as` a una lista y crear el componente de una etiqueta que no existe.
 - HTML y CSS: completado de etiquetas, atributos, valores y eventos (`on:click`) con la documentación de MDN, CSS en `<style>` con diagnósticos y selector de color, y clases de `<style>` en `class="…"` con ir a definición y aviso de clases sin uso en `<style scoped>`. Lo da el servidor de lenguaje de Meeko 1.2.
 - Etiquetas: se cierran al escribir `>` o `</` (nuevo ajuste `meeko.autoClosingTags`) y la de apertura y la de cierre se renombran juntas (`editor.linkedEditing` activado por defecto en los `.meeko`).
 - Completado de las directivas en el nombre de un atributo (`each:of`, `if:when`, `bind:`, `on:`…), también en las etiquetas de componente; lo da el servidor de lenguaje de Meeko 1.2.

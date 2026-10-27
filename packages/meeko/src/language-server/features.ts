@@ -649,6 +649,32 @@ export function rename(base: FeatureContext, position: Position, newName: string
   return { changes };
 }
 
+/**
+ * Edits that replace every use of the variable declared at `position` (not its declaration), in
+ * the script and the template: `replacement` receives the name and gives the new text. A
+ * shorthand property keeps its key (`{ x }` → `{ x: x.value }`).
+ */
+export function usageEdits(base: FeatureContext, position: Position, replacement: (name: string) => string): TextEdit[] | undefined {
+  const context = contextAtPosition(base, position);
+  const offset = generatedOffset(context, position);
+  if (offset === undefined) return undefined;
+  const locations = context.project.service.findRenameLocations(context.component.virtualFilename, offset, false, false, { ...userPreferences, providePrefixAndSuffixTextForRename: true }) ?? [];
+  const declaration = base.document.offsetAt(position);
+  const edits: TextEdit[] = [];
+  const seen = new Set<string>();
+  for (const location of locations) {
+    const target = locationOf(context, location.fileName, location.textSpan);
+    if (!target || target.uri !== base.document.uri) continue;
+    const start = base.document.offsetAt(target.range.start);
+    const key = `${start}:${base.document.offsetAt(target.range.end)}`;
+    if (start === declaration || seen.has(key)) continue;
+    seen.add(key);
+    const name = base.document.getText(target.range);
+    edits.push({ range: target.range, newText: `${location.prefixText ?? ""}${replacement(name)}${location.suffixText ?? ""}` });
+  }
+  return edits;
+}
+
 export function signatureHelp(base: FeatureContext, position: Position): SignatureHelp | undefined {
   const context = contextAtPosition(base, position);
   const offset = generatedOffset(context, position);

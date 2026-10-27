@@ -20,6 +20,7 @@ import {
   linkedEditingRanges, styleDiagnostics, tagCompletion,
 } from "./embedded.js";
 import { codeLenses } from "./lenses.js";
+import { createComponentActions, listItemActions, propsReadActions } from "./quick-fixes.js";
 import { MeekoWorkspace, pathKey } from "./project.js";
 import { executionZones } from "./zones.js";
 import type { ExecutionZoneKind, ExecutionZoneReason } from "./zones.js";
@@ -124,6 +125,7 @@ export function startLanguageServer(connection: Connection): void {
   let configurationSupport = false;
   let codeLensRefresh = false;
   let deleteFiles = false;
+  let createFiles = false;
   let formatFallback: MeekoFormatSettings = {};
   /** Workspace folders of the client, the reference of {@link ignoredChange}. */
   let folders: string[] = [];
@@ -259,6 +261,7 @@ export function startLanguageServer(connection: Connection): void {
     codeLensRefresh = params.capabilities.workspace?.codeLens?.refreshSupport === true;
     const workspaceEdit = params.capabilities.workspace?.workspaceEdit;
     deleteFiles = workspaceEdit?.documentChanges === true && (workspaceEdit.resourceOperations ?? []).includes("delete");
+    createFiles = workspaceEdit?.documentChanges === true && (workspaceEdit.resourceOperations ?? []).includes("create");
     formatFallback = formatSettingsOf(options.format) ?? {};
     const version = packageVersion();
     return {
@@ -431,8 +434,18 @@ export function startLanguageServer(connection: Connection): void {
     // formatting() never rejects: a file that does not compile yields no edits.
     return withContext(textDocument.uri, (context) => formatting(context, options, settings, { trusted: workspace.options.trusted !== false, log }));
   });
-  connection.onCodeAction(({ textDocument, range, context: request }) =>
-    withContext(textDocument.uri, (context) => codeActions(context, range, request.diagnostics, { deleteFiles }, request.only)));
+  connection.onCodeAction(async ({ textDocument, range, context: request }) => {
+    const compiled = await withContext(textDocument.uri, (context) => [
+      ...codeActions(context, range, request.diagnostics, { deleteFiles }, request.only),
+      ...propsReadActions(context, request.diagnostics),
+      ...createComponentActions(context, request.diagnostics, { createFiles }),
+    ]);
+    // A list without `each:as` does not compile: its fix works on the text.
+    const document = documents.get(textDocument.uri);
+    const actions = [...compiled ?? [], ...document ? listItemActions(document, request.diagnostics) : []];
+    const only = request.only;
+    return only?.length ? actions.filter((action) => action.kind !== undefined && only.some((kind) => action.kind === kind || action.kind!.startsWith(`${kind}.`))) : actions;
+  });
   connection.onCodeLens(({ textDocument }) => withContext(textDocument.uri, (context) => codeLenses(context), true));
   connection.onRequest(ExecutionZonesRequest, ({ textDocument }) => withContext(textDocument.uri, (context) => ({
     zones: executionZones(context.component, context.project.sourceRoots()).map((zone): ExecutionZoneItem => ({
