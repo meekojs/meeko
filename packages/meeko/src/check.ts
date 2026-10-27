@@ -1,9 +1,9 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire as createModuleRequire } from "node:module";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { applyAutoImports, compileWithAutoImports, discoverAutoImports } from "./autoimports.js";
@@ -59,6 +59,26 @@ function generatedDeclarations(rootDirectory: string, filename: string): string[
   const types = join(rootDirectory, ".meeko", "types");
   return [join(types, "autoimports", `${componentTarget(rootDirectory, filename)}.d.ts`), join(types, "routes.d.ts")]
     .filter((file) => existsSync(file));
+}
+
+/**
+ * The project's own declaration files under `app/`, `server/` and `shared/`, such as the
+ * `MeekoSession` augmentation in `server/types/session.d.ts`. The server, app and shared projects
+ * include them; a component check needs them too, for the `.ts` files its `<script server>` imports.
+ */
+function projectDeclarations(rootDirectory: string): string[] {
+  const files: string[] = [];
+  for (const folder of ["app", "server", "shared"]) {
+    const directory = join(rootDirectory, folder);
+    if (!existsSync(directory)) continue;
+    for (const entry of readdirSync(directory, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith(".d.ts") || entry.name.endsWith(".d.meeko.ts")) continue;
+      const path = join(entry.parentPath, entry.name);
+      if (relative(directory, path).split(sep).includes("node_modules")) continue;
+      files.push(path);
+    }
+  }
+  return files.sort();
 }
 
 async function compileGraph(source: string, filename: string, options: CheckSourceOptions): Promise<{ root: GeneratedEntry; entries: Map<string, GeneratedEntry>; tempDirectory: string }> {
@@ -242,7 +262,7 @@ export async function checkSource(source: string, filename: string, options: Che
     // command-line flags below still override every type-checking option.
     const rootDirectory = projectRoot(absolute);
     const resolution = await projectResolutionOptions(rootDirectory);
-    const files = [graph.root.generated, ...generatedDeclarations(rootDirectory, absolute)];
+    const files = [graph.root.generated, ...generatedDeclarations(rootDirectory, absolute), ...projectDeclarations(rootDirectory)];
     const project = resolution ? join(graph.tempDirectory, "tsconfig.json") : undefined;
     if (project) await writeFile(project, JSON.stringify({ compilerOptions: resolution, files }), { encoding: "utf8", flag: "wx" });
     try {

@@ -356,3 +356,45 @@ test("a leftover server/session.ts stops check, dev and build with the runtime m
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("a MeekoSession declaration in server/ types the session in a page's <script server> and the server code it imports", async () => {
+  const parent = resolve(".meeko");
+  await mkdir(parent, { recursive: true });
+  const root = await mkdtemp(join(parent, "check-session-types-"));
+  try {
+    await mkdir(join(root, "app", "pages"), { recursive: true });
+    await mkdir(join(root, "server", "types"), { recursive: true });
+    await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}\n');
+    await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
+    await symlink(resolve("."), join(root, "node_modules", "@meekojs", "meeko"), "junction");
+    await writeFile(join(root, "server", "types", "session.d.ts"), [
+      "export {};",
+      'declare module "@meekojs/meeko/server" {',
+      '  interface MeekoSession { user: string; role: "owner" }',
+      "}",
+      "",
+    ].join("\n"));
+    await writeFile(join(root, "server", "auth.ts"), [
+      'import type { RequestContext } from "@meekojs/meeko/server";',
+      'export const isOwner = (context: RequestContext): boolean => context.session.current?.data.role === "owner";',
+      "",
+    ].join("\n"));
+    const page = (user: string) => [
+      '<script server lang="ts">',
+      'import { isOwner } from "../../server/auth.js";',
+      "const { context } = usePage();",
+      'if (!isOwner(context)) redirect("/login");',
+      `export const user: string = ${user};`,
+      "</script>",
+      "<template><p>{user}</p></template>",
+      "",
+    ].join("\n");
+    await writeFile(join(root, "app", "pages", "index.meeko"), page("context.session.current!.data.user"));
+    await checkFrameworkProject(root);
+    // The declaration really types the data: a missing field is an error on the page.
+    await writeFile(join(root, "app", "pages", "index.meeko"), page("context.session.current!.data.email"));
+    await assert.rejects(checkFrameworkProject(root), /Property 'email' does not exist on type 'MeekoSession'/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
