@@ -1,12 +1,15 @@
 import { relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "@typescript/typescript6";
-import { InlayHintKind, SymbolKind } from "vscode-languageserver/node";
-import type { DocumentLink, InlayHint, Range, SymbolInformation } from "vscode-languageserver/node";
+import type { TextDocument } from "vscode-languageserver-textdocument";
+import { CompletionItemKind, InlayHintKind, SymbolKind } from "vscode-languageserver/node";
+import type { CompletionItem, DocumentLink, InlayHint, Position, Range, SymbolInformation } from "vscode-languageserver/node";
 import { parseSfc } from "../compiler/sfc.js";
 import { attributeValueStart, parseTemplate } from "../compiler/template.js";
 import type { TemplateNode } from "../compiler/template.js";
 import { appTargetAt } from "./app-index.js";
+import type { AppIndex } from "./app-index.js";
+import { tagAt } from "./embedded.js";
 import { snippetParameters, sourceRange, toRange, virtualDocuments } from "./features.js";
 import type { FeatureContext } from "./features.js";
 import { appTargetDefinition } from "./insights.js";
@@ -49,6 +52,20 @@ export function documentLinks(context: FeatureContext): DocumentLink[] {
     visit(file);
   }
   return links;
+}
+
+/** Inside `to="…"` of a `<MeekoLink>`: the routes of the project, with their page. */
+export function linkRouteCompletion(document: TextDocument, position: Position, index: AppIndex, root: string): CompletionItem[] | undefined {
+  const source = document.getText();
+  const context = tagAt(source, document.offsetAt(position));
+  if (context?.tag !== "MeekoLink" || context.value?.attribute !== "to") return undefined;
+  const range = { start: document.positionAt(context.value.start), end: position };
+  return index.routes.map((route): CompletionItem => ({
+    label: route.id,
+    kind: CompletionItemKind.File,
+    detail: relative(root, route.file).replaceAll("\\", "/"),
+    textEdit: { range, newText: route.id },
+  }));
 }
 
 /** `query` as a subsequence of `name`, ignoring case: `uscd` matches `UiCardDetails`. */

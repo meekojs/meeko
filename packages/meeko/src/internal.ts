@@ -11,6 +11,7 @@ export type { ComponentModule, ComponentRelease, DomScope } from "./dom.js";
 export { enableHotModule, registerHotInstance, registerHotScope, replaceHotModule, replaceHotStyle, restoreSignals, snapshotSignals } from "./hmr.js";
 export type { HotComponent, HotState } from "./hmr.js";
 export { devtoolsUpdate, devtoolsWrite, registerDevtoolsInstance } from "./devtools.js";
+export { linkCurrent } from "./link.js";
 export { connectLiveBridge } from "./devtools-live.js";
 export { checkComponentEvents, createEmit } from "./emits.js";
 export type { Emit, EmitArgs, EmitMap, EmitProps, Emits, NoEmitConflict } from "./emits.js";

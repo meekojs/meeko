@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Más color: las directivas de control (`if:when`, `each:*`) se ven como palabras clave, los eventos (`on:*`) como funciones y las etiquetas propias de Meeko (`MeekoLink`, `MeekoOutlet`, `component`, `snippet`, `render`) como integradas; las señales tienen su propio color. Las etiquetas de cierre `</snippet>`, `</component>` y las de elementos personalizados ya no salen en rojo.
+- `<MeekoLink>`: `to="` sugiere las rutas del proyecto, y el completado ofrece `to`, `bind:params` y `bind:search`; `<` sugiere `MeekoLink` y, en `app.meeko` y los layouts, `MeekoOutlet`.
 - Comandos «Meeko: Nuevo componente», «Nueva página» y «Nuevo endpoint de API», que crean el archivo con su plantilla (el endpoint, con sus schemas públicos en valibot o zod) sin sobrescribir nada.
 - Navegación: enlaces en las rutas de `href`, `useApi` y `useRpcQuery`, búsqueda de componentes, páginas, endpoints y procedimientos con Ctrl+T y pistas de tipo en `each:as` y `<snippet params>`.
 - VSIX más ligero: de 18,3 MB a 13,3 MB, sin las copias CommonJS ni los lenguajes de Prettier que Meeko no formatea, sin el compilador y las traducciones de TypeScript 6 que el servidor no carga y con el icono a 256 px.

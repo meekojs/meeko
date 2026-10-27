@@ -27,9 +27,11 @@ test("framework starter creates routable SSR/client sources and refuses overwrit
     assert.match(compile(page, join(target, "app/pages/index.meeko")).code, /renderWithState/);
     assert.match(compile(layout, join(target, "app/layouts/default.meeko")).code, /renderComponent/);
     assert.match(compile(appShell, join(target, "app/app.meeko")).code, /renderComponent/);
-    assert.match(layout, /<component is="props\.outlet"><\/component>/);
-    assert.match(layout, /outlet: Component<Record<string, unknown>>/);
-    assert.match(appShell, /outlet: Component<Record<string, unknown>>/);
+    // The shell and the layout render what goes inside with <MeekoOutlet />, without declaring props.
+    assert.match(layout, /<main><MeekoOutlet \/><\/main>/);
+    assert.match(layout, /<MeekoLink to="\/">Meeko<\/MeekoLink>/);
+    assert.match(appShell, /<MeekoOutlet \/>/);
+    assert.doesNotMatch(`${layout}${appShell}`, /defineProps/);
     assert.match(globalCss, /box-sizing: border-box/);
     const tsconfig = JSON.parse(await readFile(join(target, "tsconfig.json"), "utf8")) as {
       references: { path: string }[];

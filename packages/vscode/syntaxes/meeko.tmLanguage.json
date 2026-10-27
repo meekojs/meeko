@@ -53,6 +53,7 @@
         { "include": "#renderTag" },
         { "include": "#customElementTag" },
         { "include": "#htmlTag" },
+        { "include": "#closingTag" },
         { "include": "text.html.basic" }
       ]
     },
@@ -72,7 +73,7 @@
       "end": "(/?>)",
       "beginCaptures": {
         "1": { "name": "punctuation.definition.tag.begin.html" },
-        "2": { "name": "entity.name.type.class.component.meeko" }
+        "2": { "name": "entity.name.type.class.component.meeko", "patterns": [{ "include": "#builtinTagName" }] }
       },
       "endCaptures": { "1": { "name": "punctuation.definition.tag.end.html" } },
       "patterns": [
@@ -88,7 +89,7 @@
       "end": "(/?>)",
       "beginCaptures": {
         "1": { "name": "punctuation.definition.tag.begin.html" },
-        "2": { "name": "entity.name.tag.html" }
+        "2": { "name": "entity.name.tag.html", "patterns": [{ "include": "#builtinTagName" }] }
       },
       "endCaptures": { "1": { "name": "punctuation.definition.tag.end.html" } },
       "patterns": [
@@ -132,7 +133,7 @@
       "begin": "(?<![\\w:-])((?:bind|on|if|each):[\\w-]+)(\\s*=\\s*)([\"'])",
       "end": "\\3",
       "beginCaptures": {
-        "1": { "name": "entity.other.attribute-name.directive.meeko" },
+        "1": { "name": "entity.other.attribute-name.directive.meeko", "patterns": [{ "include": "#directiveName" }] },
         "2": { "name": "keyword.operator.assignment.meeko" },
         "3": { "name": "punctuation.definition.string.begin.html" }
       },
@@ -140,12 +141,33 @@
       "contentName": "meta.embedded.inline.typescript",
       "patterns": [{ "include": "source.ts" }]
     },
+    "closingTag": {
+      "comment": "Closing tags that are not components: the HTML grammar marks </snippet>, </component> and custom elements as unrecognized (red).",
+      "match": "(</)([A-Za-z][\\w.:-]*)\\s*(>)",
+      "captures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.tag.html", "patterns": [{ "include": "#builtinTagName" }] },
+        "3": { "name": "punctuation.definition.tag.end.html" }
+      }
+    },
+    "builtinTagName": {
+      "comment": "Meeko's own tags read as built-ins: <component>, <snippet>, <render>, <MeekoLink> and <MeekoOutlet>.",
+      "match": "(?<![\\w.:-])(?:component|snippet|render|MeekoLink|MeekoOutlet)(?![\\w.:-])",
+      "name": "entity.name.function.builtin.meeko"
+    },
+    "directiveName": {
+      "comment": "Control flow directives read as keywords and events as functions; bindings stay attributes.",
+      "patterns": [
+        { "match": "(?<![\\w:-])(?:if|each):[\\w-]+", "name": "keyword.control.flow.meeko" },
+        { "match": "(?<![\\w:-])on:[\\w-]+", "name": "entity.name.function.event.meeko" }
+      ]
+    },
     "htmlTag": {
       "begin": "(<)([A-Za-z][\\w.:-]*)",
       "end": "(/?>)",
       "beginCaptures": {
         "1": { "name": "punctuation.definition.tag.begin.html" },
-        "2": { "name": "entity.name.tag.html" }
+        "2": { "name": "entity.name.tag.html", "patterns": [{ "include": "#builtinTagName" }] }
       },
       "endCaptures": { "1": { "name": "punctuation.definition.tag.end.html" } },
       "patterns": [
@@ -173,7 +195,7 @@
       "begin": "(?<![\\w:-])((?:bind|on|if|each|model):[\\w-]+|model|is)(\\s*=\\s*)([\"'])",
       "end": "\\3",
       "beginCaptures": {
-        "1": { "name": "entity.other.attribute-name.directive.meeko" },
+        "1": { "name": "entity.other.attribute-name.directive.meeko", "patterns": [{ "include": "#directiveName" }] },
         "2": { "name": "keyword.operator.assignment.meeko" },
         "3": { "name": "punctuation.definition.string.begin.html" }
       },

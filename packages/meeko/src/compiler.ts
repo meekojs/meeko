@@ -52,6 +52,11 @@ interface AttributeBinding {
   name: string;
   expression: string;
   offset: number;
+  /**
+   * Code built from several source expressions, such as the `href` of `<MeekoLink>`: `map` marks
+   * each one at its own offset (SSR) or also rewrites list locals (hydration).
+   */
+  build?: (map: (expression: string, offset: number) => string) => string;
 }
 
 interface ConditionBinding {
@@ -94,6 +99,8 @@ interface ComponentBinding {
   id: number;
   reference: string;
   referenceOffset: number;
+  /** Source length of the reference when it is not the source text: `<MeekoOutlet>` renders `__meeko_outlet_props.outlet`. */
+  referenceLength?: number;
   /**
    * `attribute` is the source spelling, `bind:onSave`, `on:save` or `variant`; `name` is the prop.
    * `literal` marks a static attribute, whose `expression` is the quoted text or `true`.
@@ -233,6 +240,69 @@ function emptyBindings(): TemplateBindings {
 }
 
 const voidElements = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
+
+/** `<MeekoOutlet />`: the layout or page inside app.meeko and the layouts. */
+const outletTag = "MeekoOutlet";
+/** What `<MeekoOutlet />` renders: the `outlet` prop, through an alias that the setup declares. */
+const outletReference = "__meeko_outlet_props.outlet";
+
+/** `<MeekoLink>`: an `<a>` whose `href` comes from the typed `href()`. */
+const linkTag = "MeekoLink";
+
+/** A source expression of `<MeekoLink>`: `to`, `params` or `search`, at its offset. */
+interface LinkPart {
+  expression: string;
+  offset: number;
+}
+
+/** The parts of `<MeekoLink>` that build its `href`. */
+interface LinkParts {
+  to: LinkPart;
+  params?: LinkPart;
+  search?: LinkPart;
+}
+
+/**
+ * `<MeekoLink to="/users/[id]" bind:params="…" bind:search="…" class="…">` as the `<a>` it renders:
+ * `to`, `params` and `search` build the href; every other attribute and the children stay on the
+ * `<a>`, so `class`, `target`, `aria-*`, `data-*` and `on:click` work as on any link.
+ */
+function linkElement(node: TemplateNode, context: TemplateContext): { node: TemplateNode; link: LinkParts } {
+  const parts: Partial<LinkParts> = {};
+  const rest: NonNullable<TemplateNode["attrs"]> = [];
+  for (const attribute of node.attrs ?? []) {
+    const rawName = /^[^\s=]+/.exec(context.source.slice(attribute.start, attribute.end))?.[0] ?? attribute.name;
+    const key = rawName === "to" || rawName === "bind:to" ? "to" : rawName === "bind:params" ? "params" : rawName === "bind:search" ? "search" : undefined;
+    if (rawName === "href" || rawName === "bind:href") {
+      throw compileError(context.source, context.filename, "MEEK105", "<MeekoLink> construye su href: indica la ruta con to=\"/users/[id]\" y sus parámetros con bind:params", attribute.start);
+    }
+    if (rawName === "params" || rawName === "search") {
+      throw compileError(context.source, context.filename, "MEEK105", `${rawName} de <MeekoLink> es un objeto: escríbelo como bind:${rawName}="{ … }"`, attribute.start);
+    }
+    if (!key) { rest.push(attribute); continue; }
+    if (parts[key]) throw compileError(context.source, context.filename, "MEEK105", `<MeekoLink> recibe ${key} dos veces; deja uno`, attribute.start);
+    if (rawName === "to") {
+      // `to="/users/[id]"`: the route ID as a string literal, mapped with its quotes as a static prop.
+      const valueStart = attributeValueStart(context.source, attribute);
+      if (valueStart === undefined || !attribute.value) throw compileError(context.source, context.filename, "MEEK105", "to de <MeekoLink> necesita la ruta, como to=\"/users/[id]\"", attribute.start);
+      const quoted = /["']/.test(context.source[valueStart - 1] ?? "");
+      parts.to = { expression: quote(attribute.value), offset: quoted ? valueStart - 1 : valueStart };
+      continue;
+    }
+    const offset = attributeValueOffset(node, attribute.name, context);
+    validateExpression(attribute.value, context.source, context.filename, offset);
+    parts[key] = { expression: attribute.value, offset };
+  }
+  if (!parts.to) throw compileError(context.source, context.filename, "MEEK105", "<MeekoLink> necesita to con la ruta, como <MeekoLink to=\"/users/[id]\">", node.start);
+  const { componentName: _componentName, selfClosing: _selfClosing, ...element } = node;
+  return { node: { ...element, nodeName: "a", tagName: "a", attrs: rest }, link: parts as LinkParts };
+}
+
+/** app/app.meeko, a layout of app/layouts or a +layout.meeko: the components Meeko gives an outlet. */
+function isOutletHost(filename: string): boolean {
+  const path = filename.replaceAll("\\", "/");
+  return /\/app\/app\.meeko$/.test(path) || /\/app\/layouts\/.+\.meeko$/.test(path) || /\/\+layout\.meeko$/.test(path);
+}
 
 /** Elements whose content is not parsed as HTML, so `html` cannot fill them. */
 const rawTextElements = new Set(["textarea", "title", "script", "style", "xmp", "iframe", "noembed", "noframes", "noscript", "plaintext"]);
@@ -484,13 +554,29 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
     throw compileError(context.source, context.filename, "MEEK061", "<snippet> debe ser hijo directo de una etiqueta de componente, como <AppDialog><snippet name=\"title\">...</snippet></AppDialog>", node.start);
   }
   if (node.tagName === "render") return renderSnippetTag(node, bindings, context);
+  // `<MeekoLink to="/users/[id]" bind:params="…">` is an `<a>` with a checked href.
+  let link: LinkParts | undefined;
+  if (node.componentName === linkTag) ({ node, link } = linkElement(node, context));
   const componentTag = node.componentName !== undefined;
+  const outlet = node.componentName === outletTag;
+  if (outlet) {
+    if (!isOutletHost(context.filename)) {
+      throw compileError(context.source, context.filename, "MEEK104", "<MeekoOutlet /> sólo se usa en app/app.meeko y en los layouts (app/layouts/*.meeko o +layout.meeko): pinta el layout o la página que van dentro", node.start);
+    }
+    if ((node.attrs ?? []).length || (node.childNodes ?? []).some((child) => child.nodeName !== "#text" || Boolean(child.value?.trim()))) {
+      throw compileError(context.source, context.filename, "MEEK104", "<MeekoOutlet /> no admite atributos ni contenido: escríbelo como <MeekoOutlet />", node.start);
+    }
+  }
   if (node.tagName === "component" || componentTag) {
     const position = node.start;
     let reference: string;
     let referenceOffset: number;
     let snippets: SnippetBinding[] = [];
-    if (componentTag) {
+    if (outlet) {
+      // The layout or page inside, from the `outlet` prop that Meeko passes to app.meeko and layouts.
+      reference = outletReference;
+      referenceOffset = node.start + 1;
+    } else if (componentTag) {
       // `<AppButton>` is `<component is="AppButton">`: the tag names an identifier of the script scope.
       reference = node.componentName!;
       referenceOffset = node.start + 1;
@@ -575,15 +661,16 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
       throw compileError(context.source, context.filename, "MEEK066", `${spelling} y ${prop.attribute} pasan los dos ${model.name}; un modelo no es una prop, deja sólo ${spelling}`, later);
     }
     const id = context.nextRegion++;
-    const tagLength = componentTag ? reference.length + 1 : "<component".length;
-    bindings.components.push({ id, reference, referenceOffset, props, models, snippets, offset: position, tagLength, ...(ref ? { ref } : {}) });
+    const referenceLength = outlet ? outletTag.length : reference.length;
+    const tagLength = componentTag ? referenceLength + 1 : "<component".length;
+    bindings.components.push({ id, reference, referenceOffset, ...(outlet ? { referenceLength } : {}), props, models, snippets, offset: position, tagLength, ...(ref ? { ref } : {}) });
     const entry = bindings.components.at(-1)!;
     const mappedProps = props.map((prop) => `${markSource(quote(prop.name), prop.nameOffset, prop.nameLength)}: ${markSource(prop.expression, prop.offset)}`);
-    const input = componentTagCall(entry, narrowed(markSource(reference, referenceOffset), context.guards), markSource(`{ ${mappedProps.join(", ")} }`, position, node.end - position),
+    const input = componentTagCall(entry, narrowed(markSource(reference, referenceOffset, referenceLength), context.guards), markSource(`{ ${mappedProps.join(", ")} }`, position, node.end - position),
       models.map((model) => markSource(model.expression, model.offset)),
       snippets.map((snippet) => `__meeko.snippet(${snippetParameters(snippet)} => ${snippet.render})`));
     // `any`: the tag call already checked the props; inferring them here would also infer the child's type parameters.
-    return `__meeko.renderComponent<any>(${id}, ${markSource(reference, referenceOffset)}, ${input}, __meeko_transfer)`;
+    return `__meeko.renderComponent<any>(${id}, ${markSource(reference, referenceOffset, referenceLength)}, ${input}, __meeko_transfer)`;
   }
   const tag = node.tagName!;
 
@@ -650,6 +737,23 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
       throw compileError(context.source, context.filename, "MEEK012", `Directiva de plantilla no admitida: ${attr.name}`, context.templateOffset + (node.sourceCodeLocation?.startOffset ?? 0));
     } else {
       attrs.push({ kind: "static", value: ` ${attr.name}="${escapeAttribute(attr.value)}"` });
+    }
+  }
+  if (link) {
+    // `href` from the typed `href()`, each part mapped to its attribute; `aria-current` on the committed route.
+    const target = (map: (expression: string, offset: number) => string): string => {
+      const options = (["params", "search"] as const).flatMap((key) => link[key] ? [`${key}: ${map(link[key].expression, link[key].offset)}`] : []);
+      // Always an options object: a dynamic route without bind:params then reports the missing `params`.
+      // The call maps to `to`, where TypeScript reports what the call itself lacks.
+      return markSource(`__meeko_href(${map(link.to.expression, link.to.offset)}, { ${options.join(", ")} })`, link.to.offset, link.to.expression.length);
+    };
+    const current = (map: (expression: string, offset: number) => string): string => `__meeko.linkCurrent(__meeko_route, ${target(map)})`;
+    const marked = (expression: string, offset: number): string => markSource(expression, offset);
+    for (const [name, build] of [["href", target], ["aria-current", current]] as const) {
+      const id = context.nextAttribute++;
+      bindings.attributes.push({ id, name, expression: link.to.expression, offset: link.to.offset, build });
+      attrs.push({ kind: "static", value: ` data-meeko-a-${id}=""` });
+      attrs.push({ kind: "dynamic", expression: `__meeko.renderAttribute(${quote(name)}, ${build(marked)})` });
     }
   }
   // Every element carries the attribute, or with `scopeAttribute: "matched"` only those that a
@@ -1394,6 +1498,10 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
   // Los paréntesis evitan que `() => { ... }.value` se lea como bloque; su tramo externo conserva la ubicación.
   const arrowExpression = (expression: string, offset: number, expressionLocals = locals, within = guards): string =>
     markSource(`(${mappedExpression(expression, offset, expressionLocals, within)})`, offset, expression.length);
+  // `<MeekoOutlet>` reads a generated expression that maps to the tag name, not to its own text.
+  const componentReference = (entry: ComponentBinding): string => entry.referenceLength === undefined
+    ? arrowExpression(entry.reference, entry.referenceOffset)
+    : markSource(`(${entry.reference})`, entry.referenceOffset, entry.referenceLength);
   for (const { id, expression, offset } of bindings.texts) {
     const point = locate(context.source, offset);
     const location = `${basename(context.filename)}:${point.line}:${point.column} (text ${id})`;
@@ -1406,11 +1514,12 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
     const source = hot ? `, { file: ${quote(context.filename)}, line: ${point.line}, column: ${point.column}, expression: ${quote(expression)}, kind: "text" }` : "";
     statements.push(`__meeko_cleanups.push(__meeko.bindHtml(__scope, ${id}, () => ${arrowExpression(expression, offset)}, ${quote(location)}${source}));`);
   }
-  for (const { id, name, expression, offset } of bindings.attributes) {
+  for (const { id, name, expression, offset, build } of bindings.attributes) {
     const point = locate(context.source, offset);
     const location = `${basename(context.filename)}:${point.line}:${point.column} (attribute ${name})`;
     const source = hot ? `, { file: ${quote(context.filename)}, line: ${point.line}, column: ${point.column}, expression: ${quote(expression)}, kind: "attribute" }` : "";
-    statements.push(`__meeko_cleanups.push(__meeko.bindAttribute(__scope, ${id}, ${quote(name)}, () => ${arrowExpression(expression, offset)}, ${quote(location)}${source}));`);
+    const value = build ? `(${build((part, partOffset) => mappedExpression(part, partOffset))})` : arrowExpression(expression, offset);
+    statements.push(`__meeko_cleanups.push(__meeko.bindAttribute(__scope, ${id}, ${quote(name)}, () => ${value}, ${quote(location)}${source}));`);
   }
   for (const { id, name, expression, offset, tag, svg } of bindings.events) {
     const eventType = templateEventType("__meeko.", name, tag, svg);
@@ -1457,9 +1566,9 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
       });
       return `__meeko.snippet(${snippetParameters(snippet)} => ${rewriteLocals(snippet.render, outer)}, (__meeko_args_${snippet.id}, __scope) => { ${hydrationBody(snippet.bindings, context, hot, inner, unshadowed(guards, snippet.params))} })`;
     });
-    const input = componentTagCall(entry, arrowExpression(entry.reference, entry.referenceOffset), markSource(`{ ${props.join(", ")} }`, entry.offset, 1),
+    const input = componentTagCall(entry, componentReference(entry), markSource(`{ ${props.join(", ")} }`, entry.offset, 1),
       entry.models.map((model) => mappedExpression(model.expression, model.offset)), snippets);
-    componentStatements.push(`__meeko_cleanups.push(__meeko.bindComponent<any>(__scope, ${entry.id}, () => ${arrowExpression(entry.reference, entry.referenceOffset)}, () => (${input}), ${quote(location)}${entry.ref && context.usedRefs.has(entry.ref.name) ? `, __meeko.refTarget(__meeko_refs, ${entry.ref.id})` : ""}));`);
+    componentStatements.push(`__meeko_cleanups.push(__meeko.bindComponent<any>(__scope, ${entry.id}, () => ${componentReference(entry)}, () => (${input}), ${quote(location)}${entry.ref && context.usedRefs.has(entry.ref.name) ? `, __meeko.refTarget(__meeko_refs, ${entry.ref.id})` : ""}));`);
     // Type-only check, never called: a model needs a writable signal.
     const writable = entry.models.map((model) => ` __meeko.checkWritableSignal(${mappedExpression(model.expression, model.offset)});`).join("");
     if (writable) componentStatements.push(`void (() => {${writable} });`);
@@ -1510,7 +1619,7 @@ function templateChildren(bindings: TemplateBindings, setupNames: ReadonlySet<st
     for (const entry of current.components) {
       const reference = entry.reference.trim();
       const root = /^([A-Za-z_$][\w$]*)(?:\s*\.\s*[A-Za-z_$][\w$]*)*$/.exec(reference)?.[1];
-      const outlet = propsName !== undefined && reference.replace(/\s+/g, "") === `${propsName}.outlet`;
+      const outlet = reference === outletReference || (propsName !== undefined && reference.replace(/\s+/g, "") === `${propsName}.outlet`);
       if (!outlet) {
         if (root === undefined || setupNames.has(root) || locals.has(root)) dynamic = true;
         else if (!children.has(reference)) children.set(reference, markSource(entry.reference, entry.referenceOffset));
@@ -1604,6 +1713,30 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
   const html = renderNode(parsed, bindingsForTemplate, context);
   const hot = options.hot === true;
   const scriptParts = compileScript(script, source, filename, hot, context.refs, generic);
+  if (html.includes("__meeko_href(")) {
+    // `<MeekoLink>` builds its href with the typed `href()` and reads the committed route for aria-current.
+    scriptParts.imports.push('import { href as __meeko_href_overloads, useRoute as __meeko_useRoute } from "@meekojs/meeko/framework";');
+    // The same rule as href() in one signature: an unknown route or missing params reports what is
+    // wrong instead of "No overload matches this call".
+    scriptParts.types.push([
+      'type __MeekoRoutes = import("@meekojs/meeko/framework").GeneratedRoutes;',
+      "type __MeekoRouteId = keyof __MeekoRoutes extends never ? string : keyof __MeekoRoutes & string;",
+      "type __MeekoLinkParams<K extends string> = K extends keyof __MeekoRoutes ? __MeekoRoutes[K] : Record<string, string>;",
+      "type __MeekoLinkOptions<K extends string> = (keyof __MeekoLinkParams<K> extends never ? { params?: never } : { params: __MeekoLinkParams<K> })",
+      "  & { search?: Readonly<Record<string, string | number | boolean | null | undefined>> };",
+      "const __meeko_href = __meeko_href_overloads as <K extends __MeekoRouteId>(id: K, options: __MeekoLinkOptions<K>) => string;",
+    ].join("\n"));
+    scriptParts.setup.unshift("const __meeko_route = __meeko_useRoute();");
+    scriptParts.names.unshift("__meeko_route");
+  }
+  if (html.includes(outletReference)) {
+    // `<MeekoOutlet />` reads the outlet that Meeko passes, whether or not the script declares props.
+    if (scriptParts.propsTypeOffset === undefined && scriptParts.propsType === "Record<string, never>") {
+      scriptParts.propsType = '{ outlet: import("@meekojs/meeko").Component<Record<string, unknown>> }';
+    }
+    scriptParts.setup.unshift('const __meeko_outlet_props = __props as unknown as { readonly outlet: import("@meekojs/meeko").Component<Record<string, unknown>> };');
+    scriptParts.names.unshift("__meeko_outlet_props");
+  }
   checkClientScript(source, filename, script, pageData);
   if (pageData.length) {
     // A type-only import of the block's TypeScript copy: erased at run time, read by `meeko check` and the editor.

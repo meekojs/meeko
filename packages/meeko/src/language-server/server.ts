@@ -21,7 +21,7 @@ import {
 } from "./embedded.js";
 import { codeLenses } from "./lenses.js";
 import { createComponentActions, listItemActions, propsReadActions } from "./quick-fixes.js";
-import { documentLinks, inlayHints, workspaceSymbols } from "./nav.js";
+import { documentLinks, inlayHints, linkRouteCompletion, workspaceSymbols } from "./nav.js";
 import { MeekoWorkspace, pathKey } from "./project.js";
 import { executionZones } from "./zones.js";
 import type { ExecutionZoneKind, ExecutionZoneReason } from "./zones.js";
@@ -385,6 +385,8 @@ export function startLanguageServer(connection: Connection): void {
       if (directives) return directives;
       const classes = classCompletion(document, position);
       if (classes) return classes;
+      const routes = linkRouteCompletion(document, position, await project.appIndex(), project.root);
+      if (routes) return routes;
     }
     const typed = await withContext(textDocument.uri, (context) => completionList(context, position, request?.triggerCharacter));
     if (typed || !document) return typed;

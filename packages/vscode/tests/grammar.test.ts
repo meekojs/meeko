@@ -58,6 +58,7 @@ test("Meeko tokens distinguish section attributes, HTML and TypeScript expressio
     '<input model="value" data-model="plain"><AppDialog model:open="count"><snippet name="plain" params="plain">x</snippet></AppDialog>',
     '<render snippet="props.outlet" args="count, 1" />',
     "<p>{({ id: 1 }).id}</p>",
+    '<li if:when="count" each:of="value" each:as="id">x</li>',
     '<article html="props.outlet" data-html="plain"></article>',
     "</template>",
     "<style scoped>",
@@ -104,6 +105,17 @@ test("Meeko tokens distinguish section attributes, HTML and TypeScript expressio
   assert.equal(tokens.filter((token) => token.text === "outlet" && token.scopes.includes("meta.embedded.inline.typescript")).length, 3, "html value is TypeScript");
   assert.ok(hasScope("my-widget", "entity.name.tag.html") && !hasScope("my-widget", component), "custom elements stay HTML tags");
   assert.ok(hasScope("component", "entity.name.tag.html"), "<component> stays an HTML-style tag");
+  // Colors: control flow reads as a keyword, events as functions, Meeko's tags as built-ins.
+  assert.ok(hasScope("on:click", "entity.name.function.event.meeko") && hasScope("on:save", "entity.name.function.event.meeko"), "events");
+  assert.ok(["if:when", "each:of", "each:as"].every((name) => hasScope(name, "keyword.control.flow.meeko")), "control flow directives");
+  assert.ok(!hasScope("model:open", "entity.name.function.event.meeko") && !hasScope("model:open", "keyword.control.flow.meeko"), "bindings stay attributes");
+  assert.equal(tokens.filter((token) => token.text === "snippet" && token.scopes.includes("entity.name.function.builtin.meeko")).length, 2, "<snippet> and </snippet> are built-ins");
+  assert.ok(hasScope("render", "entity.name.function.builtin.meeko") && hasScope("component", "entity.name.function.builtin.meeko"), "<render> and <component> are built-ins");
+  assert.ok(!hasScope("AppButton", "entity.name.function.builtin.meeko") && !hasScope("my-widget", "entity.name.function.builtin.meeko"), "other tags keep their color");
+  // The HTML grammar marked these closing tags as unrecognized: Meeko's own grammar names them.
+  for (const tag of ["component", "snippet", "my-widget", "article"]) {
+    assert.equal(tokens.filter((token) => token.text === tag && token.scopes.includes("entity.name.tag.html")).length, 2, `opening and closing <${tag}>`);
+  }
   assert.ok(tokens.some((token) => token.text === "count" && token.scopes.includes("meta.embedded.inline.typescript") && token.scopes.includes("variable.other.readwrite.ts")), "TypeScript inside attribute and interpolation");
   assert.ok(tokens.some((token) => token.text === "id" && token.scopes.includes("meta.embedded.inline.typescript") && token.scopes.includes("variable.other.readwrite.ts")), "nested object literal keeps TypeScript scope");
   assert.ok(hasScope("color", "support.type.property-name.css"), "CSS scope survives");

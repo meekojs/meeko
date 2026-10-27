@@ -208,7 +208,8 @@ export function appTargetAt(program: ts.Program, fileName: string, offset: numbe
     if (!argument) return undefined;
     const position = call.arguments.indexOf(argument);
     const first = call.arguments[0];
-    if (callee === "href" && (position === 0 || (position === 1 && first && !ts.isStringLiteralLike(first)))) {
+    // `__meeko_href` is the href() that `<MeekoLink to="…">` compiles to.
+    if ((callee === "href" || callee === "__meeko_href") && (position === 0 || (position === 1 && first && !ts.isStringLiteralLike(first)))) {
       const route = index.routes.find((candidate) => candidate.id === argument.text);
       return { kind: "route", id: argument.text, ...(route ? { route } : {}), node: argument };
     }

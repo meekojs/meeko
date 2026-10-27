@@ -6,6 +6,23 @@ import test from "node:test";
 import { applyAutoImports, compileWithAutoImports, discoverAutoImports } from "../src/autoimports.ts";
 import { checkSource } from "../src/check.ts";
 
+test("definePage and the server definitions are autoimported where they run", async () => {
+  const root = await mkdtemp(join(tmpdir(), "meeko-imports-"));
+  try {
+    await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}');
+    const registry = await discoverAutoImports(root);
+    const page = applyAutoImports("export const route = definePage({ render: \"ssr\" });", join(root, "app", "pages", "index.meeko"), registry, "server");
+    assert.match(page, /import \{ definePage as definePage \} from "@meekojs\/meeko\/framework"/);
+    const endpoint = applyAutoImports("export default defineApiRoute({ handler: () => { throw new ApiError(\"NOPE\", 400); } });", join(root, "server", "api", "ping.get.ts"), registry, "server");
+    assert.match(endpoint, /import \{ defineApiRoute as defineApiRoute \} from "@meekojs\/meeko\/server"/);
+    assert.match(endpoint, /import \{ ApiError as ApiError \} from "@meekojs\/meeko\/server"/);
+    // The server definitions never reach browser code.
+    assert.throws(() => applyAutoImports("defineApiRoute({});", join(root, "app", "pages", "index.meeko"), registry, "client"), /defineApiRoute/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("app/types exports are autoimported as types in the app, not in shared/", async () => {
   const root = await mkdtemp(join(tmpdir(), "meeko-imports-"));
   try {

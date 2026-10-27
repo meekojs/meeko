@@ -105,10 +105,10 @@
       {
         "language": "meeko",
         "scopes": {
-          "variable.signal": ["variable.language.signal.meeko"],
-          "variable.readonly.signal": ["variable.language.signal.meeko"],
-          "variable.signal.reactive": ["variable.language.signal.meeko"],
-          "variable.readonly.signal.reactive": ["variable.language.signal.meeko"],
+          "variable.signal": ["support.class.component.signal.meeko"],
+          "variable.readonly.signal": ["support.class.component.signal.meeko"],
+          "variable.signal.reactive": ["support.class.component.signal.meeko"],
+          "variable.readonly.signal.reactive": ["support.class.component.signal.meeko"],
           "variable.computed": ["entity.name.function.computed.meeko"],
           "variable.readonly.computed": ["entity.name.function.computed.meeko"],
           "variable.computed.reactive": ["entity.name.function.computed.meeko"],

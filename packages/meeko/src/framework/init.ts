@@ -39,8 +39,6 @@ export default defineMeekoConfig({
 }
 `,
   "app/pages/index.meeko": `<script server lang="ts">
-import { definePage } from "@meekojs/meeko/framework";
-
 export const route = definePage({ render: "prerender" });
 </script>
 
@@ -64,34 +62,14 @@ const count = signal(0);
   </section>
 </template>
 `,
-  "app/app.meeko": `<script lang="ts">
-import type { Component } from "@meekojs/meeko";
-
-export interface Props {
-  outlet: Component<Record<string, unknown>>;
-}
-
-const props = defineProps<Props>();
-</script>
-
-<template>
-  <div class="site-root"><component is="props.outlet"></component></div>
+  "app/app.meeko": `<template>
+  <div class="site-root"><MeekoOutlet /></div>
 </template>
 `,
-  "app/layouts/default.meeko": `<script lang="ts">
-import type { Component } from "@meekojs/meeko";
-
-export interface Props {
-  outlet: Component<Record<string, unknown>>;
-}
-
-const props = defineProps<Props>();
-</script>
-
-<template>
+  "app/layouts/default.meeko": `<template>
   <div class="app-shell">
-    <header><a href="/">Meeko</a></header>
-    <main><component is="props.outlet"></component></main>
+    <header><MeekoLink to="/">Meeko</MeekoLink></header>
+    <main><MeekoOutlet /></main>
   </div>
 </template>
 

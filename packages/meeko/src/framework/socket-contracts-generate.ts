@@ -7,7 +7,8 @@ import { resolveConfigSources } from "./config.js";
 import { discoverServerManifest } from "../framework-server/manifest-discovery.js";
 import { standardSchemaTypes } from "./standard-schema-types.js";
 
-interface ImportedSymbol { file: string; exported: string; }
+/** An import of a channel file; its specifier resolves only when a schema uses it. */
+interface ImportedSymbol { specifier: string; exported: string; }
 interface SchemaReference { file: string; exported: string; }
 type ReadSource = (file: string) => string | undefined;
 
@@ -66,14 +67,16 @@ function publicSchemas(file: string, root: string, options: ts.CompilerOptions, 
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
     const clause = statement.importClause;
     if (!clause || clause.isTypeOnly) continue;
-    const target = resolveImport(statement.moduleSpecifier.text, file, options);
-    if (clause.name) imports.set(clause.name.text, { file: target, exported: "default" });
+    // Resolved on use: an import that names no schema, such as the autoimported defineSocketChannel
+    // from @meekojs/meeko/server, need not resolve.
+    const specifier = statement.moduleSpecifier.text;
+    if (clause.name) imports.set(clause.name.text, { specifier, exported: "default" });
     if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
       for (const element of clause.namedBindings.elements) {
-        if (!element.isTypeOnly) imports.set(element.name.text, { file: target, exported: element.propertyName?.text ?? element.name.text });
+        if (!element.isTypeOnly) imports.set(element.name.text, { specifier, exported: element.propertyName?.text ?? element.name.text });
       }
     }
-    if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings)) imports.set(clause.namedBindings.name.text, { file: target, exported: "*" });
+    if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings)) imports.set(clause.namedBindings.name.text, { specifier, exported: "*" });
   }
   const assignment = ast.statements.find((statement): statement is ts.ExportAssignment => ts.isExportAssignment(statement) && !statement.isExportEquals);
   const call = assignment?.expression;
@@ -98,13 +101,14 @@ function publicSchemas(file: string, root: string, options: ts.CompilerOptions, 
       else if (ts.isPropertyAccessExpression(value) && ts.isIdentifier(value.expression)) { local = value.expression.text; member = value.name.text; }
       else throw new Error(`${file}: ${name}.${event} debe referenciar un schema importado de shared/`);
       const imported = imports.get(local);
-      if (!imported || !inside(shared, imported.file)) throw new Error(`${file}: ${name}.${event} debe venir de shared/`);
+      const importedFile = imported && resolveImport(imported.specifier, file, options);
+      if (!imported || !importedFile || !inside(shared, importedFile)) throw new Error(`${file}: ${name}.${event} debe venir de shared/`);
       const exported = imported.exported === "*" ? member : imported.exported;
       if (!exported || (member && imported.exported !== "*")) throw new Error(`${file}: ${name}.${event} debe referenciar un único export de shared/`);
       standardSchemaTypes(value, checker, () => new Error(`${file}: ${name}.${event} debe exponer tipos de entrada y salida de Standard Schema concretos`));
-      validateSharedGraph(imported.file, root, shared, options, seen, read);
+      validateSharedGraph(importedFile, root, shared, options, seen, read);
       if (result[event]) throw new Error(`${file}: el evento de Socket ${name}.${event} está repetido`);
-      result[event] = { file: imported.file, exported };
+      result[event] = { file: importedFile, exported };
     }
     return result;
   };

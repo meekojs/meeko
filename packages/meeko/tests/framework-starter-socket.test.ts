@@ -280,7 +280,7 @@ test("generated starter reloads edited pages in SSR and Chrome development", { t
   assert.match(await (await fetch(origin)).text(), /Updated in development/);
   const layoutFile = join(root, "app", "layouts", "default.meeko");
   const layoutSource = await readFile(layoutFile, "utf8");
-  await writeFile(layoutFile, layoutSource.replace("<a href=\"/\">Meeko</a>", "<a href=\"/\">Updated shell</a>"), "utf8");
+  await writeFile(layoutFile, layoutSource.replace("<MeekoLink to=\"/\">Meeko</MeekoLink>", "<MeekoLink to=\"/\">Updated shell</MeekoLink>"), "utf8");
   await page.waitForFunction(() => document.querySelector("header")?.textContent?.includes("Updated shell"), undefined, { timeout: 15_000 });
   assert.match(await (await fetch(origin)).text(), /Updated shell/);
   await page.getByRole("button", { name: "Count: 0" }).click();

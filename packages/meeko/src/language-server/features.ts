@@ -339,12 +339,26 @@ export function componentNameCompletion(project: MeekoProject, document: TextDoc
   const script = /<script(?![^>]*\bserver\b)[^>]*>([\s\S]*?)<\/script>/.exec(source)?.[1] ?? "";
   const files = componentFiles(ts.createSourceFile(filename, script, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS), filename, project.autoImports());
   const start = document.positionAt(offset - typed.length);
-  return [...files].map(([name, file]): CompletionItem => ({
-    label: name,
-    kind: CompletionItemKind.Class,
-    detail: relative(project.root, file).replaceAll("\\", "/"),
-    textEdit: { range: { start, end: position }, newText: name },
-  }));
+  // Meeko's own tags: MeekoLink anywhere, MeekoOutlet in app.meeko and the layouts.
+  const outletHost = /[\\/]app[\\/]app\.meeko$|[\\/]app[\\/]layouts[\\/].+\.meeko$|[\\/]\+layout\.meeko$/.test(filename);
+  const builtins = [
+    { name: "MeekoLink", detail: "Enlace a una ruta tipada: <MeekoLink to=\"/users/[id]\" bind:params=\"{ id }\">" },
+    ...(outletHost ? [{ name: "MeekoOutlet", detail: "La página o el layout de dentro: <MeekoOutlet />" }] : []),
+  ].filter((builtin) => !files.has(builtin.name));
+  return [
+    ...[...files].map(([name, file]): CompletionItem => ({
+      label: name,
+      kind: CompletionItemKind.Class,
+      detail: relative(project.root, file).replaceAll("\\", "/"),
+      textEdit: { range: { start, end: position }, newText: name },
+    })),
+    ...builtins.map((builtin): CompletionItem => ({
+      label: builtin.name,
+      kind: CompletionItemKind.Class,
+      detail: builtin.detail,
+      textEdit: { range: { start, end: position }, newText: builtin.name },
+    })),
+  ];
 }
 
 /** Una directiva de la plantilla: su nombre, lo que inserta y en qué etiquetas vale. */
@@ -357,6 +371,13 @@ interface TemplateDirective {
   /** Sólo en estos elementos HTML. */
   readonly elements?: readonly string[];
 }
+
+/** What `<MeekoLink>` adds to an `<a>`: the route and the parts of its href. */
+const linkAttributes = [
+  { name: "to", detail: "Ruta de la página, como /users/[id]: sólo las que existen", insert: 'to="$1"' },
+  { name: "bind:params", detail: "Parámetros de una ruta dinámica, como { id: user.id }", insert: 'bind:params="{ $1 }"' },
+  { name: "bind:search", detail: "Query string, como { tab: \"perfil\" }", insert: 'bind:search="{ $1 }"' },
+] as const;
 
 const templateDirectives: readonly TemplateDirective[] = [
   { name: "if:when", detail: "Muestra la etiqueta mientras la expresión es verdadera", insert: 'if:when="$1"', on: "all" },
@@ -384,15 +405,18 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
   if (!context || context.value) return undefined;
   const word = /[\w:.-]*$/.exec(source.slice(context.tagStart, offset))![0];
   if (!/\s/.test(source[offset - word.length - 1] ?? "")) return undefined;
+  // `<MeekoLink>` renders an `<a>`: element directives and attributes, plus the parts of its href.
+  const link = context.tag === "MeekoLink";
+  const component = context.component && !link;
   // DOM events of an element after `on:`; a component's come from its props.
-  if (/^on:/.test(word)) return context.component ? undefined : domEventCompletion(document, position, context, word);
+  if (/^on:/.test(word)) return component ? undefined : domEventCompletion(document, position, context, word);
   // `model:va`, `bind:ti`: the name after the prefix has its own completion.
-  if (/^(?:model|bind|ref):./.test(word)) return undefined;
+  if (/^(?:model|bind|ref):./.test(word) && !(link && /^bind:/.test(word))) return undefined;
   const present = new Set([...source.slice(context.tagStart, context.tagEnd).matchAll(/\s([^\s=/>"']+)/g)].map((match) => match[1]!));
   present.delete(word);
   const start = document.positionAt(offset - word.length);
   const directives = templateDirectives
-    .filter((directive) => directive.on === "all" || directive.on === (context.component ? "component" : "element"))
+    .filter((directive) => directive.on === "all" || directive.on === (component ? "component" : "element"))
     .filter((directive) => !directive.elements || directive.elements.includes(context.tag.toLowerCase()))
     .filter((directive) => directive.name.endsWith(":") || !present.has(directive.name))
     .map((directive, index): CompletionItem => ({
@@ -404,8 +428,19 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
       textEdit: { range: { start, end: position }, newText: directive.insert },
       ...(directive.name.endsWith(":") ? { command: { title: "Completar", command: "editor.action.triggerSuggest" } } : {}),
     }));
+  const linkParts = link ? linkAttributes.filter((attribute) => !present.has(attribute.name)).map((attribute, index): CompletionItem => ({
+    label: attribute.name,
+    kind: CompletionItemKind.Property,
+    detail: attribute.detail,
+    sortText: `.${index}`,
+    insertTextFormat: InsertTextFormat.Snippet,
+    textEdit: { range: { start, end: position }, newText: attribute.insert },
+    ...(attribute.name === "to" ? { command: { title: "Rutas", command: "editor.action.triggerSuggest" } } : {}),
+  })) : [];
   // The HTML attributes of an element (`type`, `href`, `aria-*`…) after Meeko's directives.
-  return context.component ? directives : [...directives, ...htmlAttributeCompletion(document, position, present)];
+  if (component) return directives;
+  const html = htmlAttributeCompletion(document, position, present).filter((item) => !link || item.label !== "href");
+  return [...linkParts, ...directives, ...html];
 }
 
 export function completion(base: FeatureContext, position: Position): CompletionItem[] | undefined {
