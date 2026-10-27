@@ -19,7 +19,7 @@ function inside(parent: string, child: string): boolean {
 
 function compilerOptions(root: string): ts.CompilerOptions {
   const config = ts.findConfigFile(root, ts.sys.fileExists, "tsconfig.json");
-  if (!config) return { module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext };
+  if (!config) return { module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler };
   const loaded = ts.readConfigFile(config, ts.sys.readFile);
   if (loaded.error) throw new Error(ts.flattenDiagnosticMessageText(loaded.error.messageText, "\n"));
   return ts.parseJsonConfigFileContent(loaded.config, ts.sys, dirname(config)).options;

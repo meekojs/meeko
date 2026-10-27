@@ -21,8 +21,8 @@ export default defineMeekoConfig({
   "tsconfig.json": `{
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "lib": ["ES2022", "DOM"],
     "types": ["node", "vite/client"],
     "strict": true,

@@ -249,7 +249,7 @@ export async function checkSource(source: string, filename: string, options: Che
       const result = await execFileAsync(tscExecutable, [
         ...(nativeTscPath ? [] : [tscPath]), ...(project ? ["--project", project] : ["--ignoreConfig"]), "--noEmit", "--pretty", "false", "--strict", "--skipLibCheck",
         "--noUncheckedIndexedAccess", "--exactOptionalPropertyTypes", "--verbatimModuleSyntax",
-        "--module", "nodenext", "--moduleResolution", "nodenext", "--target", "es2022",
+        "--module", "esnext", "--moduleResolution", "bundler", "--target", "es2022",
         "--lib", "es2022,dom", ...(project ? [] : files),
       ], { cwd: dirname(absolute), maxBuffer: 8 * 1024 * 1024, windowsHide: true });
       output = result.stdout + result.stderr;

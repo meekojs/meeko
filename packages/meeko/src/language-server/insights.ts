@@ -74,7 +74,7 @@ export function reactiveHover(context: FeatureContext, sourceOffset: number): Ho
 
 /**
  * The component behind a `X.d.meeko.ts` declaration that `meeko types` writes, next to it or under
- * `.meeko/types`: with NodeNext resolution TypeScript resolves `./X.meeko` to it.
+ * `.meeko/types`: TypeScript (NodeNext or Bundler resolution) resolves `./X.meeko` to it.
  */
 function generatedDeclarationOwner(context: FeatureContext, fileName: string): VirtualComponent | undefined {
   if (!fileName.endsWith(".d.meeko.ts")) return undefined;

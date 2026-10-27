@@ -33,7 +33,7 @@ function inside(parent: string, child: string): boolean {
 
 function optionsFor(root: string): ts.CompilerOptions {
   const config = ts.findConfigFile(root, ts.sys.fileExists, "tsconfig.json");
-  if (!config) return { module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext, target: ts.ScriptTarget.ES2022, skipLibCheck: true };
+  if (!config) return { module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, target: ts.ScriptTarget.ES2022, skipLibCheck: true };
   const loaded = ts.readConfigFile(config, ts.sys.readFile);
   if (loaded.error) throw new Error(ts.flattenDiagnosticMessageText(loaded.error.messageText, "\n"));
   return ts.parseJsonConfigFileContent(loaded.config, ts.sys, dirname(config)).options;

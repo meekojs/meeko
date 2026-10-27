@@ -1024,8 +1024,8 @@ function finishVirtual(
 export function defaultCompilerOptions(root: string): ts.CompilerOptions {
   return {
     target: ts.ScriptTarget.ES2022,
-    module: ts.ModuleKind.NodeNext,
-    moduleResolution: ts.ModuleResolutionKind.NodeNext,
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
     strict: true,
     noUncheckedIndexedAccess: true,
     exactOptionalPropertyTypes: true,

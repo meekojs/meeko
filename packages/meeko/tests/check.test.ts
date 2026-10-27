@@ -71,6 +71,20 @@ test("CLI check ofrece JSON y compile no emite código con errores de tipos", as
   }
 });
 
+test("checkSource acepta imports relativos sin extensión, como Vite", async () => {
+  // Bundler resolution: Vite runs every source in dev and build, so `.js` is not required.
+  const directory = await mkdtemp(join(exampleDirectory, ".meeko-check-test-"));
+  try {
+    await writeFile(join(directory, "format.ts"), "export function format(value: number): string { return value.toFixed(2); }\n");
+    await writeFile(join(directory, "Child.meeko"), `<template><p>child</p></template>`);
+    const source = `<script lang="ts">\nimport { format } from "./format";\nimport { format as formatJs } from "./format.js";\nimport * as Child from "./Child.meeko";\nconst value: string = format(1) + formatJs(2);\n</script>\n<template><p>{value}</p><Child /></template>`;
+    const diagnostics = await checkSource(source, join(directory, "Uses.meeko"));
+    assert.deepEqual(diagnostics.map((item) => `${item.code}: ${item.message}`), []);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("CLI check muestra los avisos sin fallar", async () => {
   const directory = await mkdtemp(join(exampleDirectory, ".meeko-check-test-"));
   const input = join(directory, "ReadOnce.meeko");

@@ -81,8 +81,8 @@ function projectCompilerOptions(root: string): ts.CompilerOptions {
   const config = ts.findConfigFile(root, ts.sys.fileExists, "tsconfig.json");
   if (!config) return {
     target: ts.ScriptTarget.Latest,
-    module: ts.ModuleKind.NodeNext,
-    moduleResolution: ts.ModuleResolutionKind.NodeNext,
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
     noEmit: true,
     skipLibCheck: true,
   };

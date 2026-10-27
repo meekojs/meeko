@@ -11,7 +11,7 @@ import { generateRouteBlockTypes, routeBlockTypesDirectory } from "./route-block
 export const projectNames = ["app", "server", "shared"] as const;
 
 const compilerOptions = {
-  target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", lib: ["ES2022", "DOM"],
+  target: "ES2022", module: "ESNext", moduleResolution: "Bundler", lib: ["ES2022", "DOM"],
   types: ["node", "vite/client"], strict: true, noEmit: true, allowArbitraryExtensions: true,
   exactOptionalPropertyTypes: true, noUncheckedIndexedAccess: true, verbatimModuleSyntax: true,
   skipLibCheck: true,

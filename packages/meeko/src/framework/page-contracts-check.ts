@@ -70,7 +70,7 @@ export async function checkFrameworkPageContracts(projectRoot: string): Promise<
   const config = join(root, ".meeko", "tsconfig.page-contracts.json");
   const configSource = `${JSON.stringify({
     compilerOptions: {
-      target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", lib: ["ES2022", "DOM"],
+      target: "ES2022", module: "ESNext", moduleResolution: "Bundler", lib: ["ES2022", "DOM"],
       types: [], strict: true, noEmit: true, skipLibCheck: true, allowArbitraryExtensions: true,
       rootDirs: ["..", "./types"],
     },

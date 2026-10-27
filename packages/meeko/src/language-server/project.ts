@@ -136,7 +136,7 @@ export class MeekoProject {
       realpath: (file) => ts.sys.realpath?.(file) ?? file,
       useCaseSensitiveFileNames: () => ts.sys.useCaseSensitiveFileNames,
       getNewLine: () => ts.sys.newLine,
-      // With NodeNext resolution TypeScript prefers the `X.d.meeko.ts` that `meeko dev` or
+      // With NodeNext or Bundler resolution TypeScript prefers the `X.d.meeko.ts` that `meeko dev` or
       // `meeko types` generate, which may be stale and lack what the editor models (the type
       // arguments of a generic tag, for example): a component of this project resolves to its
       // live virtual module instead.
