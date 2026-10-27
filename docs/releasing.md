@@ -76,16 +76,16 @@ Los secretos se guardan en **Settings → Secrets and variables → Actions → 
 | --- | --- |
 | `AZURE_CLIENT_ID` | ID de aplicación (cliente) del registro de Microsoft Entra ID que publica en Marketplace. No es una contraseña. |
 | `AZURE_TENANT_ID` | ID del directorio (tenant) de ese registro. No es una contraseña. |
-| `VSCE_PAT` | Transitorio: token de Azure DevOps para Marketplace. Sólo se usa si faltan los dos anteriores. |
-| `OVSX_PAT` | Token de acceso de Open VSX. |
+| `VSCE_PAT` | Respaldo opcional para Marketplace si faltan los dos ID de Entra. El secreto anterior se eliminó y su PAT se revocó. |
+| `OVSX_PAT` | Token de Open VSX limitado a publicar `meekojs.meeko-language`. |
 
-Visual Studio Marketplace se publica con **Microsoft Entra ID** y OIDC: GitHub emite en cada ejecución un token de corta duración para el environment `vscode-marketplace`, Entra lo cambia por un acceso a Azure DevOps y no se guarda ningún token. Los PAT globales de Azure DevOps (los de **All accessible organizations**, el único ámbito que admite Marketplace) [se retiran el 1 de diciembre de 2026](https://code.visualstudio.com/api/working-with-extensions/publishing-extension). Mientras `AZURE_CLIENT_ID` y `AZURE_TENANT_ID` no existan, el workflow sigue usando `VSCE_PAT` y lo advierte; el PAT actual caduca el 26 de noviembre de 2026.
+Visual Studio Marketplace se publica con **Microsoft Entra ID** y OIDC: GitHub emite en cada ejecución un token de corta duración para el environment `vscode-marketplace`, Entra lo cambia por un acceso a Azure DevOps y no se guarda ningún token. Los PAT globales de Azure DevOps (los de **All accessible organizations**, el único ámbito que admite Marketplace) [se retiran el 1 de diciembre de 2026](https://code.visualstudio.com/api/working-with-extensions/publishing-extension). El workflow conserva la ruta de respaldo con `VSCE_PAT` si faltan los dos ID de Entra, pero ese secreto ya no está configurado.
 
 Alta en Visual Studio Marketplace:
 
 1. En la [página de gestión del Marketplace](https://marketplace.visualstudio.com/manage), con la cuenta Microsoft del mantenedor, crea el publisher con ID `meekojs`, el mismo valor de `publisher` en `packages/vscode/package.json` (ya existe).
 2. En el [portal de Azure](https://portal.azure.com/), **Microsoft Entra ID → App registrations → New registration**: nombre `meeko-marketplace-publisher`, cuentas de este directorio únicamente, sin URI de redirección. No hace falta una suscripción de Azure. Anota **Application (client) ID** y **Directory (tenant) ID**.
-3. En el registro, **Certificates & secrets → Federated credentials → Add credential**, escenario **GitHub Actions deploying Azure resources**: organización `meekojs`, repositorio `meeko`, tipo de entidad **Environment**, environment `vscode-marketplace`. El sujeto resultante es `repo:meekojs/meeko:environment:vscode-marketplace` y la audiencia `api://AzureADTokenExchange`. No crees un client secret.
+3. En el registro, **Certificates & secrets → Federated credentials → Add credential**, escenario **GitHub Actions deploying Azure resources**: organización `meekojs` (ID `346854110`), repositorio `meeko` (ID `1430909739`), tipo de entidad **Environment**, environment `vscode-marketplace`. Comprueba que el sujeto sea `repo:meekojs@346854110/meeko@1430909739:environment:vscode-marketplace` y la audiencia `api://AzureADTokenExchange`. GitHub emite el sujeto con ID inmutables en este repositorio; el formato que sólo usa nombres no coincide. No crees un client secret.
 4. En GitHub, guarda los dos ID como secretos `AZURE_CLIENT_ID` y `AZURE_TENANT_ID` (Settings → Secrets and variables → Actions).
 5. Ejecuta a mano el workflow **Identidad de Marketplace** (`marketplace-identity.yml`). Su resumen muestra el ID de perfil de Azure DevOps de la identidad.
 6. En la página del publisher `meekojs`, **Members → Add**, pega ese ID y asígnale el rol **Contributor**.
@@ -95,8 +95,8 @@ Alta en Open VSX:
 
 1. Inicia sesión en [open-vsx.org](https://open-vsx.org/) con la cuenta de GitHub del proyecto y acepta el acuerdo de publicación de Eclipse Foundation desde el perfil.
 2. En **Settings → Access Tokens**, genera un token.
-3. Crea el namespace `meekojs` una vez: `pnpm dlx ovsx@1.3.0 create-namespace meekojs` con `OVSX_PAT` en el entorno. Para que la extensión aparezca como verificada, solicita la propiedad del namespace siguiendo las instrucciones de Open VSX.
-4. Guarda el token como `OVSX_PAT`.
+3. Crea el namespace `meekojs` una vez desde la cuenta de Open VSX (ya existe). Para que la extensión aparezca como verificada, solicita la propiedad del namespace siguiendo las instrucciones de Open VSX.
+4. Limita el token al namespace `meekojs`, a la extensión `meeko-language` y a **Publishing only**. Guárdalo como `OVSX_PAT`.
 
 ### Chrome Web Store
 
