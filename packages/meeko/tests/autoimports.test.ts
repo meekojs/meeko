@@ -46,6 +46,7 @@ test("autoimports discover nested exports and enforce client/server scope", asyn
     assert.match(applyAutoImports("secret;", filename, registry, "server"), /secret\.js/);
     assert.match(applyAutoImports("const state = signal(0);", filename, registry, "client"), /from "@meekojs\/meeko"/);
     assert.match(applyAutoImports("provideErrorHandler((error) => console.error(error));", filename, registry, "client"), /import \{ provideErrorHandler as provideErrorHandler \} from "@meekojs\/meeko"/);
+    assert.match(applyAutoImports("const key = untrack(() => 1);", filename, registry, "client"), /import \{ untrack as untrack \} from "@meekojs\/meeko"/);
     // Without generated clients, `useSocket` resolves to `useSocketClient`, not to its deprecated alias.
     assert.equal(registry.filter((entry) => entry.name === "useSocket").length, 1);
     assert.match(applyAutoImports('const chat = useSocket("ws://example.test/chat", contract);', filename, registry, "client"), /import \{ useSocketClient as useSocket \} from "@meekojs\/meeko\/framework"/);

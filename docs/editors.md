@@ -22,7 +22,7 @@ Los tipos de token son los de TypeScript. Sobre ellos, el servidor añade modifi
 
 Lo que decide si un `.value` es reactivo es el tipo, no el nombre: sólo cuenta el `value` de una `Signal` o `ReadonlySignal` de Meeko (incluidas las que devuelven `useElementRef` y los composables). `props.value`, `input.value` o `event.currentTarget.value` son lecturas normales y no se marcan.
 
-Un tema o un cliente puede colorearlos con reglas de token semántico (por ejemplo, `variable.signal` o `*.modification`). La extensión de VS Code trae colores por defecto mediante ámbitos TextMate.
+Un tema o un cliente puede colorearlos con reglas de token semántico (por ejemplo, `variable.signal` o `*.modification`). La extensión de VS Code trae colores por defecto mediante ámbitos TextMate. Desde la `1.2` de la extensión, `reactive` no cambia el estilo por defecto (antes ponía en cursiva lo que leía un valor reactivo); para marcarlo, añada `"*.reactive": { "italic": true }` en `rules` de `editor.semanticTokenColorCustomizations`.
 
 ### Hover
 
@@ -82,7 +82,9 @@ Además de las de imports y `href`:
 - **Añadir `each:key`.** En una lista sin clave, propone `each:key="item.id"` (u otra propiedad identificadora del elemento) o el propio elemento si es una cadena o un número.
 - **Mover el sidecar a `<script server>`.** En las primeras líneas de una página con un `x.route.ts` junto a ella, mueve su contenido a un bloque `<script server lang="ts">` y borra el sidecar en una sola edición. Los imports relativos siguen funcionando porque ambos archivos comparten carpeta. Sólo se ofrece si el cliente admite borrar archivos en una edición de workspace (`workspace.workspaceEdit.documentChanges` y `resourceOperations` con `delete`).
 
-### Completado de modelos y snippets
+### Completado de directivas, modelos y snippets
+
+En el nombre de un atributo de la plantilla, el completado ofrece las directivas de Meeko que admite la etiqueta: `if:when`, `each:of`, `each:as`, `each:key`, `each:index`, `bind:`, `on:` y `ref:` en cualquier etiqueta, también en las de componente; `html` en los elementos, `model` en `input`, `textarea` y `select`, y `model:` en los componentes. No repite las que la etiqueta ya tiene, y tras un prefijo (`on:`, `model:`) vuelve a abrir el completado con los nombres del hijo.
 
 El completado ofrece los modelos del hijo tras `model:` en una etiqueta de componente, los nombres de los snippets del hijo en `<snippet name="…">` y sus parámetros en `params`.
 

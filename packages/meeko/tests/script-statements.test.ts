@@ -183,7 +183,7 @@ test("meeko check and the editor accept the new statements and report the reject
     },
   })}\n`);
   try {
-    const accepted = await checkSource(statements, join(root, "Statements.meeko"));
+    const accepted = (await checkSource(statements, join(root, "Statements.meeko"))).filter((diagnostic) => diagnostic.severity !== "warning");
     assert.deepEqual(accepted, [], JSON.stringify(accepted));
     const writeType = statements.replace("count.value = props.initial;", "count.value = props.tags;");
     const typed = await checkSource(writeType, join(root, "WrongType.meeko"));

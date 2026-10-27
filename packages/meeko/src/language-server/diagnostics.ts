@@ -199,7 +199,7 @@ export async function componentDiagnostics(
     return true;
   });
   return found.map((item): Diagnostic => {
-    const diagnostic: Diagnostic = { range: toRange(document, 0, 0), message: item.message, code: item.code, source: "Meeko", severity: DiagnosticSeverity.Error };
+    const diagnostic: Diagnostic = { range: toRange(document, 0, 0), message: item.message, code: item.code, source: "Meeko", severity: item.severity === "warning" ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error };
     if (pathKey(item.filename) !== pathKey(own)) {
       // Errors in imported modules are reported where the component starts, with a link to their file.
       const target = locate(item.filename);

@@ -80,7 +80,8 @@ export async function checkFrameworkPageContracts(projectRoot: string): Promise<
   catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") await writeFile(config, configSource); else throw error; }
   const compiler = join(dirname(typescriptPackage), "bin", "tsc");
   let output = "";
-  try { await execute(process.execPath, [compiler, "-p", config, "--noEmit", "--pretty", "false"]); }
+  // The language server runs this without a console: a visible window would open on Windows.
+  try { await execute(process.execPath, [compiler, "-p", config, "--noEmit", "--pretty", "false"], { windowsHide: true }); }
   catch (error) {
     const failure = error as Error & { stdout?: string; stderr?: string };
     output = `${failure.stdout ?? ""}${failure.stderr ?? ""}`;

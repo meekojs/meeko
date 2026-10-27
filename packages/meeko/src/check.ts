@@ -35,6 +35,8 @@ interface GeneratedEntry {
   mappings: SourceMapping[];
   /** TypeScript copy of the page's `<script server>`, which types the exports the page reads. */
   server?: { readonly file: string; readonly code: string };
+  /** Compiler warnings of this component. */
+  warnings: readonly CompileDiagnostic[];
 }
 
 /** Ajustes de `checkSource` para herramientas que no deben ejecutar la configuración del proyecto. */
@@ -75,6 +77,7 @@ async function compileGraph(source: string, filename: string, options: CheckSour
       original, source: content, code: compiled.code,
       generated: join(generatedDirectory, relative(rootDirectory, original) + ".ts"),
       mappings: compiled.mappings.map((mapping) => ({ ...mapping })),
+      warnings: compiled.warnings ?? [],
     };
     byOriginal.set(original, entry);
     byGenerated.set(entry.generated, entry);
@@ -305,7 +308,8 @@ export async function checkSource(source: string, filename: string, options: Che
   const sameError = (left: CompileDiagnostic, right: CompileDiagnostic): boolean =>
     left.filename === right.filename && left.code === right.code && left.message === right.message;
   const seen = new Set<string>();
-  return mapped.filter((item) => {
+  // Warnings of the checked component only; each imported component reports its own when checked.
+  return [...mapped, ...graph.root.warnings].filter((item) => {
     const span = approximate.get(item);
     if (span && mapped.some((other) => other !== item && !approximate.has(other) && sameError(other, item)
       && other.location.offset >= span[0] && other.location.offset < span[1])) return false;

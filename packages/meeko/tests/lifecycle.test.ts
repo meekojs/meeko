@@ -326,7 +326,8 @@ test("meeko check types onMounted, defineExpose and lists without each:key", { t
   ];
   try {
     for (const item of cases) {
-      const diagnostics = await checkSource(item.source, join(root, `${item.name}.meeko`));
+      // Type errors only: MEEK101 warnings about props read once are covered by props-read-once.test.ts.
+      const diagnostics = (await checkSource(item.source, join(root, `${item.name}.meeko`))).filter((diagnostic) => diagnostic.severity !== "warning");
       const messages = JSON.stringify(diagnostics);
       const codes = new Set(diagnostics.map((diagnostic) => diagnostic.code));
       if (item.codes.length === 0) assert.deepEqual([...codes], [], `${item.name}: ${messages}`);

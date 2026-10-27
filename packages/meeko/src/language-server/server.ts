@@ -11,7 +11,7 @@ import { projectRoot } from "../compiler/project-root.js";
 import { checkFrameworkPageContracts } from "../framework/page-contracts-check.js";
 import { componentDiagnostics, contractRange, frameworkContractRoot } from "./diagnostics.js";
 import {
-  codeActions, completion, componentNameCompletion, definition, documentSymbols, foldingRanges, formatting, hover, prepareRename, references,
+  codeActions, completion, componentNameCompletion, definition, directiveNameCompletion, documentSymbols, foldingRanges, formatting, hover, prepareRename, references,
   rename, resolveCompletion, semanticTokens, semanticTokensLegend, signatureHelp,
 } from "./features.js";
 import type { CompletionData, FeatureContext, LocatedDocument, MeekoFormatSettings } from "./features.js";
@@ -358,6 +358,9 @@ export function startLanguageServer(connection: Connection): void {
       await project.ready();
       const tags = componentNameCompletion(project, document, filename, position);
       if (tags) return tags;
+      // `each:`, `if:when`, `bind:`… in a tag, also a component tag; the tag may not parse yet.
+      const directives = directiveNameCompletion(document, position);
+      if (directives) return directives;
     }
     return withContext(textDocument.uri, (context) => completion(context, position));
   });

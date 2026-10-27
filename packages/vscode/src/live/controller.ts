@@ -56,12 +56,12 @@ export function registerLiveValues(context: vscode.ExtensionContext, output: vsc
   };
 
   const valueType = vscode.window.createTextEditorDecorationType({
-    after: { margin: "0 0 0 2em", color: new vscode.ThemeColor("editorCodeLens.foreground"), fontStyle: "italic" },
+    after: { margin: "0 0 0 2em", color: new vscode.ThemeColor("editorCodeLens.foreground") },
     rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
   });
   const flashType = vscode.window.createTextEditorDecorationType({
     after: {
-      margin: "0 0 0 2em", color: new vscode.ThemeColor("editor.foreground"), fontStyle: "italic",
+      margin: "0 0 0 2em", color: new vscode.ThemeColor("editor.foreground"),
       backgroundColor: new vscode.ThemeColor("editor.findMatchHighlightBackground"),
     },
     rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,

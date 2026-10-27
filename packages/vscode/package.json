@@ -111,14 +111,7 @@
           "property.modification": ["keyword.control.write.meeko"],
           "property.modification.reactive": ["keyword.control.write.meeko"],
           "method.modification": ["keyword.control.write.meeko"],
-          "method.modification.reactive": ["keyword.control.write.meeko"],
-          "variable.reactive": ["markup.italic.reactive.meeko"],
-          "variable.readonly.reactive": ["markup.italic.reactive.meeko"],
-          "property.reactive": ["markup.italic.reactive.meeko"],
-          "property.readonly.reactive": ["markup.italic.reactive.meeko"],
-          "parameter.reactive": ["markup.italic.reactive.meeko"],
-          "function.reactive": ["markup.italic.reactive.meeko"],
-          "method.reactive": ["markup.italic.reactive.meeko"]
+          "method.modification.reactive": ["keyword.control.write.meeko"]
         }
       }
     ],

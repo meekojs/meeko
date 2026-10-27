@@ -19,6 +19,8 @@ import { assertBuildAdapter, buildProject, developmentServerPorts, previewProjec
 import { findLinkedMeeko, isSupervisedDevelopment, linkWatchEnabled, runSupervisedDevelopment, superviseDevelopment } from "./framework/dev-link.js";
 import { checkFrameworkProject, prepareFrameworkTypes } from "./framework/check-project.js";
 import { cleanProject, formatCleanResult } from "./framework/clean.js";
+import { formatDiagnostic, hasErrors } from "./compiler/sfc.js";
+import type { CompileDiagnostic } from "./compiler/sfc.js";
 
 const usage = "Uso: meeko dev [directorio]\n     meeko check [directorio | componente.meeko] [--json]\n     meeko build [directorio] [--adapter <node|cloudflare|deno|bun>]\n     meeko start [directorio]\n     meeko preview [directorio] [--adapter <node|cloudflare|bun|deno>]\n     meeko clean [directorio] [--all] [--dry-run]\n     meeko check-app <directorio>\n     meeko compile <componente.meeko> <salida.ts>\n     meeko types <componente.meeko>\n     meeko routes <directorio>\n     meeko prerender <directorio>\n     meeko init <directorio>\n     meeko init-framework <directorio>\n     meeko lsp --stdio\n     meeko --help | --version\n\n" +
   "Variables de entorno:\n" +
@@ -30,6 +32,10 @@ const usage = "Uso: meeko dev [directorio]\n     meeko check [directorio | compo
   "     MEEKO_HMR_PORT   puerto del WebSocket de HMR de dev\n" +
   "     MEEKO_EDITOR_BRIDGE=0  desactiva el puente con el editor de dev\n" +
   "     MEEKO_LINK_WATCH=0     dev no se reinicia al reconstruir un @meekojs/meeko enlazado\n";
+/** Prints the diagnostics on stderr, warnings included. */
+function writeDiagnostics(diagnostics: readonly CompileDiagnostic[]): void {
+  for (const diagnostic of diagnostics) process.stderr.write(`${formatDiagnostic(diagnostic)}\n`);
+}
 const argv = process.argv.slice(2);
 /** First problem with the command line, reported before the usage. */
 let problem: string | undefined;
@@ -114,7 +120,7 @@ if (problem !== undefined) {
       else {
         const requested = adapter === undefined ? undefined : assertBuildAdapter(adapter);
         warnLegacyLayerEntries(root, await loadMeekoConfig(root));
-        await checkFrameworkProject(root);
+        writeDiagnostics(await checkFrameworkProject(root));
         const result = await buildProject(root, requested === undefined ? {} : { adapter: requested });
         process.stdout.write(`${result.output}\n`);
       }
@@ -127,7 +133,7 @@ if (problem !== undefined) {
     } else if (command === "check" && (!input || (await stat(input).catch(() => undefined))?.isDirectory())) {
       if (output) throw new Error("--json sólo está disponible para un componente .meeko");
       warnLegacyLayerEntries(input ?? ".", await loadMeekoConfig(input ?? "."));
-      await checkFrameworkProject(input ?? ".");
+      writeDiagnostics(await checkFrameworkProject(input ?? "."));
       process.stdout.write(`${resolve(input ?? ".")}: OK\n`);
     } else if (command === "init" || command === "init-framework") {
       if (!input) throw new Error("Falta el directorio de destino");
@@ -148,11 +154,8 @@ if (problem !== undefined) {
     } else if (command === "check-app") {
       if (!input) throw new Error("Falta el directorio del proyecto");
       const diagnostics = await checkApp(input);
-      for (const diagnostic of diagnostics) {
-        const { line, column } = diagnostic.location;
-        process.stderr.write(`${diagnostic.filename}:${line}:${column} ${diagnostic.code}: ${diagnostic.message}\n`);
-      }
-      if (diagnostics.length > 0) process.exitCode = 1;
+      writeDiagnostics(diagnostics);
+      if (hasErrors(diagnostics)) process.exitCode = 1;
       else process.stdout.write(`${input}: OK\n`);
     } else {
       if (!input) throw new Error("Falta la ruta del componente");
@@ -160,11 +163,8 @@ if (problem !== undefined) {
       const diagnostics = await checkSource(source, input);
       if (command === "check" && output === "--json") {
         process.stdout.write(`${JSON.stringify(diagnostics)}\n`);
-      } else if (diagnostics.length > 0) {
-        for (const diagnostic of diagnostics) {
-          const { line, column } = diagnostic.location;
-          process.stderr.write(`${diagnostic.filename}:${line}:${column} ${diagnostic.code}: ${diagnostic.message}\n`);
-        }
+      } else if (hasErrors(diagnostics)) {
+        writeDiagnostics(diagnostics);
       } else if (command === "compile") {
         // The component follows the `css` options of the project that contains it.
         const scopeAttribute = (await loadMeekoConfig(projectRoot(input))).css?.scopeAttribute;
@@ -174,9 +174,10 @@ if (problem !== undefined) {
       } else if (command === "types") {
         for (const generated of await generateTypes(source, input)) process.stdout.write(`${generated}\n`);
       } else {
+        writeDiagnostics(diagnostics);
         process.stdout.write(`${input}: OK\n`);
       }
-      if (diagnostics.length > 0) process.exitCode = 1;
+      if (hasErrors(diagnostics)) process.exitCode = 1;
     }
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);

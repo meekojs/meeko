@@ -1,5 +1,10 @@
 # Cambios de Meeko Language
 
+## [Unreleased]
+
+- Sin cursiva: el modificador `reactive` ya no se asigna a `markup.italic`, que los temas muestran en cursiva, y los valores en vivo al final de la línea tampoco usan cursiva. Para recuperarla, añada `"*.reactive": { "italic": true }` en `rules` de `editor.semanticTokenColorCustomizations`.
+- Completado de las directivas en el nombre de un atributo (`each:of`, `if:when`, `bind:`, `on:`…), también en las etiquetas de componente; lo da el servidor de lenguaje de Meeko 1.2.
+
 ## [1.1.0] - 2026-10-26
 
 - Colores de reactividad: las señales, los valores `computed` y los recursos de datos tienen sus propios modificadores de token semántico (`signal`, `computed`, `resource`); las escrituras de `.value` se marcan con `modification` y las expresiones de la plantilla que leen un valor reactivo, con `reactive`. Lo decide el tipo, no el nombre: `props.value` o `input.value` no se marcan. Los colores por defecto salen de los scopes de TextMate y se pueden cambiar con `editor.semanticTokenColorCustomizations`.

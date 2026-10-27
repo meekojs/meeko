@@ -71,6 +71,23 @@ test("CLI check ofrece JSON y compile no emite código con errores de tipos", as
   }
 });
 
+test("CLI check muestra los avisos sin fallar", async () => {
+  const directory = await mkdtemp(join(exampleDirectory, ".meeko-check-test-"));
+  const input = join(directory, "ReadOnce.meeko");
+  await writeFile(input, `<script lang="ts">\nconst props = defineProps<{ label: string }>();\nconst { label } = props;\n</script>\n<template><p>{label}</p></template>`);
+  try {
+    const diagnostics = await checkSource(await readFile(input, "utf8"), input);
+    assert.deepEqual(diagnostics.map((item) => [item.code, item.severity, item.location.line]), [["MEEK101", "warning", 3]], JSON.stringify(diagnostics));
+    const text = await execFileAsync(process.execPath, [resolve("dist/cli.js"), "check", input]);
+    assert.match(text.stderr, /ReadOnce\.meeko:3:\d+ aviso MEEK101: Desestructurar props copia sus valores/);
+    assert.match(text.stdout, /: OK/);
+    const json = await execFileAsync(process.execPath, [resolve("dist/cli.js"), "check", input, "--json"]);
+    assert.deepEqual((JSON.parse(json.stdout) as Array<{ code: string; severity?: string }>).map((item) => [item.code, item.severity]), [["MEEK101", "warning"]]);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("checkSource resuelve imports .meeko anidados y comprueba props del hijo", async () => {
   const directory = resolve("examples/nested");
   const badValue = `<script lang="ts">import * as Child from "./Child.meeko";</script>\n<template><component is="Child" bind:label="42"></component></template>`;

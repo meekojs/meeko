@@ -4,7 +4,7 @@ import { getCSSLanguageService } from "vscode-css-languageservice";
 import { getLanguageService as getHtmlLanguageService } from "vscode-html-languageservice";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
-  CodeActionKind, CompletionItemKind, FoldingRangeKind, MarkupKind, SemanticTokensBuilder, SymbolKind,
+  CodeActionKind, CompletionItemKind, FoldingRangeKind, InsertTextFormat, MarkupKind, SemanticTokensBuilder, SymbolKind,
 } from "vscode-languageserver/node";
 import type {
   CodeAction, CompletionItem, Diagnostic, DocumentSymbol, FoldingRange, FormattingOptions, Hover, Location,
@@ -338,6 +338,89 @@ export function componentNameCompletion(project: MeekoProject, document: TextDoc
     detail: relative(project.root, file).replaceAll("\\", "/"),
     textEdit: { range: { start, end: position }, newText: name },
   }));
+}
+
+/** Una directiva de la plantilla: su nombre, lo que inserta y en qué etiquetas vale. */
+interface TemplateDirective {
+  readonly name: string;
+  readonly detail: string;
+  /** Snippet que inserta; un prefijo como `on:` vuelve a pedir el completado para su nombre. */
+  readonly insert: string;
+  readonly on: "all" | "element" | "component";
+  /** Sólo en estos elementos HTML. */
+  readonly elements?: readonly string[];
+}
+
+const templateDirectives: readonly TemplateDirective[] = [
+  { name: "if:when", detail: "Muestra la etiqueta mientras la expresión es verdadera", insert: 'if:when="$1"', on: "all" },
+  { name: "each:of", detail: "Repite la etiqueta por cada elemento de la lista", insert: 'each:of="$1"', on: "all" },
+  { name: "each:as", detail: "Nombre de cada elemento de each:of", insert: 'each:as="$1"', on: "all" },
+  { name: "each:key", detail: "Clave única de cada elemento de each:of (cadena o número)", insert: 'each:key="$1"', on: "all" },
+  { name: "each:index", detail: "Nombre del índice de each:of (por defecto, index)", insert: 'each:index="$1"', on: "all" },
+  { name: "bind:", detail: "Atributo o prop con el valor de una expresión", insert: "bind:", on: "all" },
+  { name: "on:", detail: "Manejador de un evento", insert: "on:", on: "all" },
+  { name: "ref:", detail: "Referencia a la etiqueta para useElementRef", insert: "ref:$1", on: "all" },
+  { name: "model", detail: "Enlaza el valor del control con una señal", insert: 'model="$1"', on: "element", elements: ["input", "textarea", "select"] },
+  { name: "html", detail: "Inserta la expresión como HTML sin escapar", insert: 'html="$1"', on: "element" },
+  { name: "model:", detail: "Enlaza un modelo del componente (defineModel) con una señal", insert: "model:", on: "component" },
+];
+
+/**
+ * Directivas de Meeko en el nombre de un atributo de una etiqueta de la plantilla (`each:`,
+ * `if:when`, `bind:`…), también en las etiquetas de componente. Lee el texto, como
+ * {@link componentNameCompletion}: la etiqueta suele estar a medio escribir.
+ */
+export function directiveNameCompletion(document: TextDocument, position: Position): CompletionItem[] | undefined {
+  const source = document.getText();
+  const offset = document.offsetAt(position);
+  const open = /<template(?=[\s>])[^>]*>/.exec(source);
+  const close = source.lastIndexOf("</template>");
+  const contentStart = open ? open.index + open[0].length : -1;
+  if (!open || offset <= contentStart || (close >= 0 && offset > close)) return undefined;
+  const tagStart = source.lastIndexOf("<", offset - 1);
+  if (tagStart < contentStart) return undefined;
+  const tag = /^<([A-Za-z][\w$.-]*)/.exec(source.slice(tagStart, offset))?.[1];
+  if (!tag) return undefined;
+  // Inside a quoted value, or after the tag closed, the cursor is not on an attribute name.
+  let quote: string | undefined;
+  for (let index = tagStart + 1 + tag.length; index < offset; index++) {
+    const char = source[index]!;
+    if (quote) { if (char === quote) quote = undefined; }
+    else if (char === '"' || char === "'") quote = char;
+    else if (char === ">") return undefined;
+  }
+  if (quote) return undefined;
+  const word = /[\w:.-]*$/.exec(source.slice(tagStart, offset))![0];
+  if (!/\s/.test(source[offset - word.length - 1] ?? "")) return undefined;
+  // `on:cl`, `model:va`, `bind:ti`: the name after the prefix has its own completion.
+  if (/^(?:on|model|bind|ref):./.test(word)) return undefined;
+  const component = /^[A-Z]/.test(tag) || tag === "component";
+  const tagEnd = (() => {
+    let inside: string | undefined;
+    for (let index = offset; index < source.length; index++) {
+      const char = source[index]!;
+      if (inside) { if (char === inside) inside = undefined; }
+      else if (char === '"' || char === "'") inside = char;
+      else if (char === ">" || char === "<") return index;
+    }
+    return source.length;
+  })();
+  const present = new Set([...source.slice(tagStart, tagEnd).matchAll(/\s([^\s=/>"']+)/g)].map((match) => match[1]!));
+  present.delete(word);
+  const start = document.positionAt(offset - word.length);
+  return templateDirectives
+    .filter((directive) => directive.on === "all" || directive.on === (component ? "component" : "element"))
+    .filter((directive) => !directive.elements || directive.elements.includes(tag.toLowerCase()))
+    .filter((directive) => directive.name.endsWith(":") || !present.has(directive.name))
+    .map((directive, index): CompletionItem => ({
+      label: directive.name,
+      kind: CompletionItemKind.Keyword,
+      detail: directive.detail,
+      sortText: String(index).padStart(2, "0"),
+      insertTextFormat: InsertTextFormat.Snippet,
+      textEdit: { range: { start, end: position }, newText: directive.insert },
+      ...(directive.name.endsWith(":") ? { command: { title: "Completar", command: "editor.action.triggerSuggest" } } : {}),
+    }));
 }
 
 export function completion(base: FeatureContext, position: Position): CompletionItem[] | undefined {

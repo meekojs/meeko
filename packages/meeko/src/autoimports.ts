@@ -64,7 +64,7 @@ function filesInSync(path: string): string[] {
 
 function builtins(root: string): AutoImport[] {
   const entries: AutoImport[] = [
-    ...["signal", "computed", "effect", "batch", "onCleanup", "onMounted", "provide", "inject", "createContext", "provideErrorHandler"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko", specifier: "@meekojs/meeko", scope: "shared", typeOnly: false, component: false })),
+    ...["signal", "computed", "effect", "batch", "untrack", "onCleanup", "onMounted", "provide", "inject", "createContext", "provideErrorHandler"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko", specifier: "@meekojs/meeko", scope: "shared", typeOnly: false, component: false })),
     ...["useState", "href", "useRoute", "useForm", "useStorage", "useHead", "useSeoMeta"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "shared", typeOnly: false, component: false })),
   ];
   for (const scope of ["client", "server"] as const) {

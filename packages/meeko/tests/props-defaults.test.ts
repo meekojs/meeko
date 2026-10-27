@@ -16,7 +16,7 @@ const fixture = resolve("tests/fixtures/PropsDefaults.meeko");
 
 test("defineProps defaults are isolated and agree between SSR and hydration", { timeout: 35_000 }, async () => {
   const source = await readFile(fixture, "utf8");
-  assert.deepEqual(await checkSource(source, fixture), []);
+  assert.deepEqual((await checkSource(source, fixture)).filter((diagnostic) => diagnostic.severity !== "warning"), []);
   const server = await createServer({ configFile: false, plugins: [meeko()], server: { middlewareMode: true, hmr: false } });
   const browser = new Window();
   try {
@@ -64,7 +64,7 @@ test("generated ComponentProps makes only defaulted fields optional to TypeScrip
     await writeFile(unionFile, unionSource);
     await generateTypes(unionSource, unionFile);
     const parent = `<script lang="ts">import * as Card from "./Card.meeko";</script><template><component is="Card" bind:required="'yes'"></component></template>`;
-    assert.deepEqual(await checkSource(parent, join(root, "src", "Parent.meeko")), []);
+    assert.deepEqual((await checkSource(parent, join(root, "src", "Parent.meeko"))).filter((diagnostic) => diagnostic.severity !== "warning"), []);
     const wrongChild = `<script lang="ts">import * as Card from "./Card.meeko";</script><template><component is="Card" bind:required="'yes'" bind:count="'wrong'"></component></template>`;
     const wrongChildDiagnostics = await checkSource(wrongChild, join(root, "src", "WrongChild.meeko"));
     assert.ok(wrongChildDiagnostics.some((entry) => entry.code === "TS2322" && entry.location.offset >= wrongChild.indexOf("bind:count")), JSON.stringify(wrongChildDiagnostics));

@@ -41,6 +41,8 @@ test("every custom modifier of the server legend is declared and colored for .me
   for (const modifier of ["signal", "computed", "resource", "modification", "reactive"]) {
     assert.ok(Object.keys(scopes).some((selector) => selector.split(".").includes(modifier)), `${modifier} has a default scope`);
   }
+  // Themes render markup.italic in italics; reactive code keeps the font style of its type.
+  assert.deepEqual(Object.values(scopes).flat().filter((scope) => scope.startsWith("markup.italic")), []);
 });
 
 test("execution zones have a setting, theme colors and gutter icons", () => {

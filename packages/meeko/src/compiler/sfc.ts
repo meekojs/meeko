@@ -13,6 +13,22 @@ export interface CompileDiagnostic {
   message: string;
   filename: string;
   location: SourceLocation;
+  /**
+   * `"warning"` en un aviso, que no hace fallar `meeko check`; sin el campo, es un error.
+   * @since 1.2.0
+   */
+  severity?: "warning";
+}
+
+/** Line of a diagnostic in the terminal: `file:line:column CODE: message`, with `aviso` before a warning's code. */
+export function formatDiagnostic(diagnostic: CompileDiagnostic): string {
+  const { line, column } = diagnostic.location;
+  return `${diagnostic.filename}:${line}:${column} ${diagnostic.severity === "warning" ? "aviso " : ""}${diagnostic.code}: ${diagnostic.message}`;
+}
+
+/** Whether any diagnostic is an error; warnings alone do not fail a check. */
+export function hasErrors(diagnostics: readonly CompileDiagnostic[]): boolean {
+  return diagnostics.some((diagnostic) => diagnostic.severity !== "warning");
 }
 
 /** Error que conserva el diagnóstico estructurado para CLI y editor. */

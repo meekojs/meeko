@@ -2,6 +2,8 @@ import { dirname, join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { formatDiagnostic, hasErrors } from "../compiler/sfc.js";
+import type { CompileDiagnostic } from "../compiler/sfc.js";
 import { checkApp } from "./check-app.js";
 import { prepareProject } from "./project.js";
 import { assertNoLegacySessionFile } from "./runtime-migration.js";
@@ -14,7 +16,7 @@ const require = createRequire(import.meta.url);
 async function checkTypeScript(configs: readonly string[], routeBlocks: ReadonlyMap<string, string>): Promise<void> {
   const compiler = join(dirname(require.resolve("typescript/package.json")), "bin", "tsc");
   for (const config of configs) {
-    try { await execute(process.execPath, [compiler, "-p", config, "--noEmit"]); }
+    try { await execute(process.execPath, [compiler, "-p", config, "--noEmit"], { windowsHide: true }); }
     catch (error) {
       const failure = error as Error & { stdout?: string; stderr?: string };
       // Diagnostics in a `<script server>` copy point at the page, on the same line and column.
@@ -30,18 +32,18 @@ export async function prepareFrameworkTypes(projectRoot: string): Promise<void> 
   await prepareFrameworkTypeDeclarations(root);
 }
 
-/** Generates declarations, checks .meeko sources, then checks app/server/shared TS separately. */
-export async function checkFrameworkProject(projectRoot: string): Promise<void> {
+/**
+ * Generates declarations, checks .meeko sources, then checks app/server/shared TS separately.
+ * Throws on errors; returns the warnings of the .meeko sources.
+ */
+export async function checkFrameworkProject(projectRoot: string): Promise<CompileDiagnostic[]> {
   const root = resolve(projectRoot);
   assertNoLegacySessionFile(root);
   await prepareFrameworkTypes(root);
   const sourceDiagnostics = await checkApp(root);
-  if (sourceDiagnostics.length > 0) {
-    throw new Error(sourceDiagnostics.map((diagnostic) => {
-      const { line, column } = diagnostic.location;
-      return `${diagnostic.filename}:${line}:${column} ${diagnostic.code}: ${diagnostic.message}`;
-    }).join("\n"));
-  }
+  // The error lists the warnings too, so none is lost behind the errors.
+  if (hasErrors(sourceDiagnostics)) throw new Error(sourceDiagnostics.map(formatDiagnostic).join("\n"));
   const configs = projectNames.map((name) => join(root, ".meeko", `tsconfig.${name}.json`));
   await checkTypeScript(configs, await routeBlockTypeFiles(root));
+  return sourceDiagnostics;
 }
