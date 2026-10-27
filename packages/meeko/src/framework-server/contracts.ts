@@ -2,7 +2,7 @@ import { serializeJson } from "../server.js";
 import type { RequestContext } from "./context.js";
 import { countRateLimit, rateLimitKey, rateLimitSettings, rateLimitSubject, retryAfterSeconds } from "./rate-limit.js";
 import type { RateLimitOptions } from "./rate-limit.js";
-import { isAllowedOrigin, SessionSecurityError, type SessionManager } from "./sessions.js";
+import { isAllowedOrigin, SessionSecurityError, settleSessionOrigin, type SessionManager } from "./sessions.js";
 
 /**
  * Contrato público de Standard Schema v1 que validan los contratos de API, RPC y Socket. Los
@@ -239,9 +239,14 @@ export interface ApiRouteDefinition<P extends Schema | undefined, Q extends Sche
    * `"required"` (desde `1.2`) responde `403 INVALID_ORIGIN` a las peticiones `POST`, `PUT`,
    * `PATCH` y `DELETE` cuyo `Origin` falta o no es el de la aplicación ni uno de
    * `SessionManager.allowedOrigins`, aunque no haya sesión; por ejemplo, un inicio de sesión.
-   * Sin él, Origin sólo se comprueba en las mutaciones autenticadas con cookie.
+   * Sin él, Origin se comprueba en las mutaciones autenticadas con cookie y, desde `1.2`, cuando el
+   * handler llama a `context.session.create()`.
+   *
+   * `"none"` (desde `1.2`, **inseguro**) permite que `session.create()` cree una sesión sin un
+   * `Origin` permitido, para clientes que no lo envían, como una app nativa. Expone esa ruta al
+   * *login CSRF*: úsela sólo con otra prueba de que la petición no viene de otra web.
    */
-  origin?: "required";
+  origin?: "required" | "none";
   /**
    * Límite de peticiones (desde `1.2`), como `{ limit: 5, window: "5m" }`: por encima responde
    * `429 RATE_LIMITED` con `Retry-After`, tras Origin y CSRF y antes de `auth`, `authorize`, la
@@ -350,9 +355,14 @@ export interface RpcDefinition<I extends Schema, O extends Schema, S = unknown, 
   /**
    * `"required"` (desde `1.2`) responde `403 INVALID_ORIGIN` a toda llamada cuyo `Origin` falta o no
    * es el de la aplicación ni uno de `SessionManager.allowedOrigins`, aunque no haya sesión; por
-   * ejemplo, un inicio de sesión. Sin él, Origin sólo se comprueba en las llamadas con sesión.
+   * ejemplo, un inicio de sesión. Sin él, Origin se comprueba en las llamadas con sesión y, desde
+   * `1.2`, cuando el handler llama a `context.session.create()`.
+   *
+   * `"none"` (desde `1.2`, **inseguro**) permite que `session.create()` cree una sesión sin un
+   * `Origin` permitido, para clientes que no lo envían, como una app nativa. Expone ese
+   * procedimiento al *login CSRF*: úselo sólo con otra prueba de que la llamada no viene de otra web.
    */
-  origin?: "required";
+  origin?: "required" | "none";
   /**
    * Límite de llamadas (desde `1.2`), como `{ limit: 5, window: "5m" }`: por encima responde
    * `429 RATE_LIMITED` con `Retry-After`, tras Origin y CSRF y antes de `auth`, `authorize`, la
@@ -462,7 +472,7 @@ function queryObject(url: URL): Record<string, string | string[]> {
 
 type Guarded<S> = {
   auth?: "required" | "optional";
-  origin?: "required";
+  origin?: "required" | "none";
   rateLimit?: RateLimitOptions<S>;
   authorize?: (context: RequestContext<S>) => boolean | Promise<boolean>;
 };
@@ -499,8 +509,12 @@ async function guard<S>(definition: Guarded<S>, context: RequestContext<S>, sess
   const request = context.request;
   // Anonymous mutations such as a sign-in opt in to the session's allowed-origin rule. SSR
   // clients send the request's own origin, so local dispatch passes.
-  if (definition.origin === "required" && (mutating ?? !["GET", "HEAD", "OPTIONS"].includes(request.method))
-    && !isAllowedOrigin(request, sessions.allowedOrigins ?? [])) throw new ApiError("INVALID_ORIGIN", 403);
+  if (definition.origin === "required" && (mutating ?? !["GET", "HEAD", "OPTIONS"].includes(request.method))) {
+    if (!isAllowedOrigin(request, sessions.allowedOrigins ?? [])) throw new ApiError("INVALID_ORIGIN", 403);
+    context.session[settleSessionOrigin]?.("verified");
+  }
+  // An explicit, documented opt-out: session.create() then skips its login CSRF check.
+  if (definition.origin === "none") context.session[settleSessionOrigin]?.("exempt");
   sessions.assertMutationAllowed(request, context.session, mutating);
   // Before auth and authorize: a flood of anonymous requests is limited too.
   if (definition.rateLimit) await enforceRateLimit(definition.rateLimit, context, sessions);

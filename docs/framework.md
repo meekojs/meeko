@@ -1688,6 +1688,14 @@ export default defineRpc({
 
 En un endpoint de API se comprueban los métodos `POST`, `PUT`, `PATCH` y `DELETE` (un `GET` no lleva `Origin` al navegar); en un RPC, todas las llamadas. Se acepta el origen de la petición, que tras `createServerApp` es el `publicOrigin` configurado, y los de `SessionManager({ allowedOrigins })`: la misma regla que en las mutaciones autenticadas. Un `Origin` ausente, `null` u otro distinto responde `403 INVALID_ORIGIN` antes de leer o validar la entrada y de ejecutar el handler. Las llamadas de los clientes `api.*` y `rpc.*` durante el SSR envían el origen de la petición en curso, así que el despacho local sigue funcionando. Una llamada desde fuera del navegador (una app nativa o un script) debe enviar una cabecera `Origin` permitida.
 
+**`session.create()` protege el inicio de sesión aunque falte `origin: "required"`.** Desde `1.2`, en una petición `POST`, `PUT`, `PATCH` o `DELETE`, `context.session.create()` sólo crea la sesión si el `Origin` de esa petición ya se comprobó (con `origin: "required"`, o en una mutación autenticada que superó Origin y CSRF) o si está permitido en ese momento; si no, rechaza con `403 INVALID_ORIGIN` sin tocar el store ni enviar la cookie. Los navegadores envían `Origin` en toda petición `POST`, también en las de su propio origen, así que un inicio de sesión desde la propia aplicación sigue funcionando sin cambios. Lo que cambia:
+
+- Un script, una prueba o una app nativa que inicia sesión sin cabecera `Origin` recibe `403`. Envíe el `Origin` de la aplicación o declare `origin: "none"` en esa ruta. `"none"` es **inseguro**: desactiva esta comprobación y deja la ruta expuesta al *login CSRF*, así que úselo sólo con otra prueba de que la petición no viene de otra web (por ejemplo, un secreto de la app que el navegador no tiene). En desarrollo, el primer rechazo escribe un aviso con estas dos salidas.
+- `GET`, `HEAD` y `OPTIONS` no se comprueban, porque un callback de OAuth o un enlace mágico llegan como navegación desde otro sitio, sin `Origin`. Esos flujos deben validar su propio `state` o token de un solo uso.
+- Un `SessionHandle` que no cargó `SessionManager.load` (un host propio que lo construye a mano) no conoce su petición y crea la sesión como antes.
+
+Es un cambio incompatible publicado en un minor como corrección de seguridad, según la [política de estabilidad](stability.md#excepciones-aprobadas): sin él, cualquier ruta de inicio de sesión sin `origin: "required"` que acepte formularios o `text/plain` era vulnerable por defecto.
+
 ### Revocación durante una petición
 
 Revocar una familia también detiene el trabajo que ya había pasado la autenticación:

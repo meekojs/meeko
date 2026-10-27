@@ -1,5 +1,6 @@
 import { encodeBase64Url } from "./base64url.js";
 import { ApiError, SessionRevokedError } from "./contracts.js";
+import { warnOnce } from "./env.js";
 import { countRateLimit, MemoryRateCounter } from "./rate-limit.js";
 import type { RateLimitHit } from "./rate-limit.js";
 import type { Unsubscribe } from "./socket.js";
@@ -363,6 +364,20 @@ const signalControllers = new WeakMap<AbortSignal, AbortController>();
  */
 export const lockSessionCookie = Symbol("meeko.session.lockCookie");
 
+/** @internal Ties a handle to its request, so `create` can check the request's Origin. */
+export const bindSessionRequest = Symbol("meeko.session.bindRequest");
+/**
+ * @internal Records how a guard settled the Origin of the request: `"verified"` after
+ * `origin: "required"` or the CSRF check of an authenticated mutation, `"exempt"` with
+ * `origin: "none"`.
+ */
+export const settleSessionOrigin = Symbol("meeko.session.settleOrigin");
+
+const safeMethods: ReadonlySet<string> = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/** Managers created with `production: true`, which skip the development hints. */
+const productionManagers = new WeakSet<SessionManager<any>>();
+
 function sessionLockedError(): ApiError {
   return new ApiError("SESSION_LOCKED", 500, "SESSION_LOCKED: the session cookie was already sent with the response headers; create, rotate or revoke the session in the loader, before any deferred work");
 }
@@ -403,6 +418,9 @@ export class SessionHandle<T = unknown> {
   private readonly mutations = new Set<Promise<void>>();
   private readonly revocation = new AbortController();
   private watched: { readonly familyId: string; readonly ref: WeakRef<AbortController> | undefined } | undefined;
+  /** The request that `SessionManager.load` read, and whether its Origin was already checked. */
+  private request: Request | undefined;
+  private origin: "unchecked" | "verified" | "exempt" = "unchecked";
   /**
    * @param manager Gestor que creó el handle.
    * @param current Sesión activa, si la petición trae una válida.
@@ -410,6 +428,26 @@ export class SessionHandle<T = unknown> {
   constructor(private readonly manager: SessionManager<T>, public current?: SessionRecord<T>) {
     signalControllers.set(this.revocation.signal, this.revocation);
     this.watch();
+  }
+  /** @internal */
+  [bindSessionRequest](request: Request): this { this.request = request; return this; }
+  /** @internal */
+  [settleSessionOrigin](state: "verified" | "exempt"): void {
+    if (this.origin !== "exempt") this.origin = state;
+  }
+  /**
+   * Login CSRF: a cross-site form or script must not plant a session in the victim's browser.
+   * A mutating request creates a session only when a guard verified its Origin, or when its
+   * Origin is allowed now. Safe methods pass, for OAuth callbacks and magic links.
+   */
+  private assertCreateOrigin(): void {
+    const request = this.request;
+    if (!request || this.origin !== "unchecked" || safeMethods.has(request.method)) return;
+    if (isAllowedOrigin(request, this.manager.allowedOrigins)) { this.origin = "verified"; return; }
+    if (!productionManagers.has(this.manager)) {
+      warnOnce("session:create-origin", "[meeko] session.create() rechazó una petición sin un Origin permitido (403 INVALID_ORIGIN): los navegadores lo envían, pero un script o una app nativa debe enviar Origin, o la ruta declarar origin: \"none\" (inseguro frente al login CSRF).");
+    }
+    throw new SessionSecurityError("INVALID_ORIGIN");
   }
   /** Cabecera `Set-Cookie` pendiente tras crear, rotar o revocar, o `undefined`. */
   get cookieHeader(): string | undefined { return this.pendingCookie; }
@@ -422,10 +460,17 @@ export class SessionHandle<T = unknown> {
    * Crea una sesión nueva con `data`, con ID, familia y token CSRF aleatorios, y prepara la cookie.
    * Si ya hay una sesión, la sustituye de forma atómica conservando su familia. `options.ttlMs`
    * (desde `1.2`) fija la duración de esta sesión; por defecto, la del gestor.
+   *
+   * Desde `1.2`, en una petición `POST`, `PUT`, `PATCH` o `DELETE` sólo crea la sesión si su
+   * `Origin` está permitido (el de la aplicación o uno de `SessionManager.allowedOrigins`); si no,
+   * rechaza con `INVALID_ORIGIN` (`403`) sin tocar el store. Así, otra web no puede iniciar sesión
+   * en el navegador de la víctima (*login CSRF*). Las rutas con `origin: "none"` lo omiten.
    * @throws {RangeError} Si `options.ttlMs` no es un entero positivo.
+   * @throws {SessionSecurityError} `INVALID_ORIGIN` en una mutación sin un `Origin` permitido.
    */
   async create(data: T, options: SessionCreateOptions = {}): Promise<SessionRecord<T>> {
     if (options.ttlMs !== undefined && !validTtl(options.ttlMs)) throw new RangeError("Invalid session TTL");
+    this.assertCreateOrigin();
     return this.mutate(() => this.write(data, options.ttlMs));
   }
   /**
@@ -575,6 +620,7 @@ export class SessionManager<T = unknown> {
     if (this.cookieName.startsWith("__Host-") && !this.secure) throw new Error("__Host- cookies require Secure");
     this.allowedOrigins = options.allowedOrigins ?? [];
     this.production = options.production === true;
+    if (this.production) productionManagers.add(this);
   }
   /** Serializa la cabecera `Set-Cookie` de la sesión con la política del gestor; `ttlMs` 0 la borra. */
   serializeCookie(value: string, ttlMs: number): string {
@@ -608,9 +654,9 @@ export class SessionManager<T = unknown> {
     const record = id ? await this.store.get(id) : undefined;
     if (record && record.expiresAt <= Date.now()) {
       await this.store.delete(record.id);
-      return new SessionHandle(this);
+      return new SessionHandle(this)[bindSessionRequest](request);
     }
-    return new SessionHandle(this, record);
+    return new SessionHandle(this, record)[bindSessionRequest](request);
   }
   /**
    * Cuenta una petición en la ventana fija `key` (desde `1.2`): con `SessionStore.rateLimit` si el
@@ -645,6 +691,8 @@ export class SessionManager<T = unknown> {
     if (!session.current || !mutating) return;
     if (!isAllowedOrigin(request, this.allowedOrigins)) throw new SessionSecurityError("INVALID_ORIGIN");
     if (request.headers.get("x-meeko-csrf") !== session.current.csrfToken) throw new SessionSecurityError("INVALID_CSRF");
+    // This request may now replace its session: Origin and CSRF were both verified.
+    session[settleSessionOrigin]?.("verified");
   }
 }
 

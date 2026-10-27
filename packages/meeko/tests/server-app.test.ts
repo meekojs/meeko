@@ -226,7 +226,10 @@ test("serveNode applies publicOrigin to HTTP and Socket origin checks behind a p
     const { app } = await fixture();
     const server = await serveNode(app, { port: 0, ...(publicOrigin ? { publicOrigin } : {}) });
     try {
-      const login = await fetch(`${server.url}/api/login`, { method: "POST", headers: { origin: external } });
+      // Without publicOrigin, the proxy's origin is foreign: even signing in from it is refused.
+      const foreign = await fetch(`${server.url}/api/login`, { method: "POST", headers: { origin: external } });
+      assert.equal(foreign.status, publicOrigin ? 200 : 403);
+      const login = publicOrigin ? foreign : await fetch(`${server.url}/api/login`, { method: "POST", headers: { origin: new URL(server.url).origin } });
       const cookie = login.headers.get("set-cookie")!.split(";")[0]!;
       const csrf = ((await login.json()) as { csrf: string }).csrf;
       const rpc = await fetch(`${server.url}/_meeko/rpc/users/get`, {
