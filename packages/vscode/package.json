@@ -56,6 +56,12 @@
           "scope": "resource",
           "description": "Marca dónde se ejecuta el código de un componente .meeko: sólo en el servidor (<script server>), en el servidor y en el navegador (el setup) o sólo en el navegador (después del primer await de navegador y dentro de onMounted). Las zonas se muestran como una barra en el margen y un color de línea tenue; pasa el cursor por la primera línea de una zona para ver la explicación."
         },
+        "meeko.autoClosingTags": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Cierra las etiquetas de la plantilla al escribir > o </, como la extensión de HTML de VS Code."
+        },
         "meeko.live.enabled": {
           "type": "boolean",
           "default": true,
@@ -84,7 +90,7 @@
       ]
     },
     "configurationDefaults": {
-      "[meeko]": { "editor.semanticHighlighting.enabled": true }
+      "[meeko]": { "editor.semanticHighlighting.enabled": true, "editor.linkedEditing": true }
     },
     "semanticTokenModifiers": [
       { "id": "signal", "description": "Una señal de Meeko (signal, useState, defineModel, useElementRef) y sus usos." },

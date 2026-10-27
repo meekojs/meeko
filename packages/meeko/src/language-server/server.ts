@@ -6,7 +6,7 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import {
   CodeActionKind, CodeLensRefreshRequest, createConnection, DiagnosticSeverity, DidChangeWatchedFilesNotification, RequestType, TextDocuments, TextDocumentSyncKind,
 } from "vscode-languageserver/node";
-import type { Connection, Diagnostic, InitializeResult, Range, SemanticTokens, TextDocumentIdentifier } from "vscode-languageserver/node";
+import type { Connection, Diagnostic, InitializeResult, Position, Range, SemanticTokens, TextDocumentIdentifier } from "vscode-languageserver/node";
 import { projectRoot } from "../compiler/project-root.js";
 import { checkFrameworkPageContracts } from "../framework/page-contracts-check.js";
 import { componentDiagnostics, contractRange, frameworkContractRoot } from "./diagnostics.js";
@@ -15,6 +15,10 @@ import {
   rename, resolveCompletion, semanticTokens, semanticTokensLegend, signatureHelp,
 } from "./features.js";
 import type { CompletionData, FeatureContext, LocatedDocument, MeekoFormatSettings } from "./features.js";
+import {
+  classCompletion, classDefinition, colorPresentations, cssCompletion, cssHover, documentColors, htmlCompletion, htmlHover,
+  linkedEditingRanges, styleDiagnostics, tagCompletion,
+} from "./embedded.js";
 import { codeLenses } from "./lenses.js";
 import { MeekoWorkspace, pathKey } from "./project.js";
 import { executionZones } from "./zones.js";
@@ -34,6 +38,12 @@ export interface ExecutionZoneItem {
  * on both sides (the setup) and only in the browser (after the first browser `await` and inside
  * `onMounted`). It is computed statically, without a running app.
  */
+/**
+ * The closing tag that typing `>` or `</` completes in the template, as a snippet (`$0</div>`).
+ * The VS Code extension asks for it after those keystrokes, like the HTML extension does.
+ */
+export const TagCompletionRequest = new RequestType<{ textDocument: TextDocumentIdentifier; position: Position }, string | null, void>("meeko/tagComplete");
+
 export const ExecutionZonesRequest = new RequestType<{ textDocument: TextDocumentIdentifier }, { zones: ExecutionZoneItem[] } | null, void>("meeko/executionZones");
 
 /** Opciones de inicialización que acepta el servidor (`initializationOptions`). */
@@ -180,7 +190,8 @@ export function startLanguageServer(connection: Connection): void {
       project.setDocument(filename, document.getText());
       componentDiagnostics(project, document, filename, locate).then((found) => {
         if (documents.get(document.uri)?.version !== version) return;
-        ownDiagnostics.set(document.uri, found);
+        // CSS errors and unused classes of <style>: read from the text, also when the script fails.
+        ownDiagnostics.set(document.uri, [...found, ...styleDiagnostics(document)]);
         publish(document.uri);
       }, (error: unknown) => log(`${filename}: ${error instanceof Error ? error.message : String(error)}`));
     }, delay));
@@ -253,7 +264,9 @@ export function startLanguageServer(connection: Connection): void {
     return {
       capabilities: {
         textDocumentSync: { openClose: true, change: TextDocumentSyncKind.Incremental, save: { includeText: false } },
-        completionProvider: { triggerCharacters: [".", ":"], resolveProvider: true },
+        completionProvider: { triggerCharacters: [".", ":", "<", "/", "\""], resolveProvider: true },
+        linkedEditingRangeProvider: true,
+        colorProvider: true,
         hoverProvider: true,
         definitionProvider: true,
         referencesProvider: true,
@@ -351,7 +364,7 @@ export function startLanguageServer(connection: Connection): void {
     }
   };
 
-  connection.onCompletion(async ({ textDocument, position }) => {
+  connection.onCompletion(async ({ textDocument, position, context: request }) => {
     // `<A` in the template: the component is usually unparsable while the tag is being typed.
     const document = documents.get(textDocument.uri);
     const filename = uriToPath(textDocument.uri);
@@ -363,16 +376,49 @@ export function startLanguageServer(connection: Connection): void {
       // `each:`, `if:when`, `bind:`… in a tag, also a component tag; the tag may not parse yet.
       const directives = directiveNameCompletion(document, position);
       if (directives) return directives;
+      const classes = classCompletion(document, position);
+      if (classes) return classes;
     }
-    return withContext(textDocument.uri, (context) => completionList(context, position));
+    const typed = await withContext(textDocument.uri, (context) => completionList(context, position, request?.triggerCharacter));
+    if (typed || !document) return typed;
+    // Outside TypeScript: HTML tags and attribute values of the template, and CSS of <style>.
+    return htmlCompletion(document, position) ?? cssCompletion(document, position) ?? null;
   });
   connection.onCompletionResolve(async (item) => {
     const data = item.data as CompletionData | undefined;
     if (!data?.uri) return item;
     return await withContext(data.uri, (context) => resolveCompletion(context, item)) ?? item;
   });
-  connection.onHover(({ textDocument, position }) => withContext(textDocument.uri, (context) => hover(context, position), true));
-  connection.onDefinition(({ textDocument, position }) => withContext(textDocument.uri, (context) => definition(context, position), true));
+  connection.onHover(async ({ textDocument, position }) => {
+    const typed = await withContext(textDocument.uri, (context) => hover(context, position), true);
+    const document = documents.get(textDocument.uri);
+    if (typed || !document) return typed;
+    return htmlHover(document, position) ?? cssHover(document, position) ?? null;
+  });
+  connection.onDefinition(async ({ textDocument, position }) => {
+    const document = documents.get(textDocument.uri);
+    // A class in `class="…"` goes to its selectors in <style>.
+    const classes = document && classDefinition(document, position);
+    if (classes) return classes;
+    return withContext(textDocument.uri, (context) => definition(context, position), true);
+  });
+  connection.languages.onLinkedEditingRange(({ textDocument, position }) => {
+    const document = documents.get(textDocument.uri);
+    const ranges = document && linkedEditingRanges(document, position);
+    return ranges ? { ranges } : null;
+  });
+  connection.onRequest(TagCompletionRequest, ({ textDocument, position }) => {
+    const document = documents.get(textDocument.uri);
+    return (document && tagCompletion(document, position)) ?? null;
+  });
+  connection.onDocumentColor(({ textDocument }) => {
+    const document = documents.get(textDocument.uri);
+    return document ? documentColors(document) : [];
+  });
+  connection.onColorPresentation(({ textDocument, color, range }) => {
+    const document = documents.get(textDocument.uri);
+    return document ? colorPresentations(document, color, range) : [];
+  });
   connection.onReferences(({ textDocument, position, context: options }) =>
     withContext(textDocument.uri, (context) => references(context, position, options.includeDeclaration)));
   connection.onPrepareRename(({ textDocument, position }) => withContext(textDocument.uri, (context) => prepareRename(context, position)));

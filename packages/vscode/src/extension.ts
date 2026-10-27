@@ -6,6 +6,7 @@ import type { ResolvedLanguageServer } from "./server-resolution.js";
 import { ExecutionZoneDecorations, executionZonesRequest } from "./zones.js";
 import type { ExecutionZoneItem } from "./zones.js";
 import { registerLiveValues } from "./live/controller.js";
+import { registerAutoClosingTags } from "./auto-close.js";
 import type { MeekoLiveApi } from "./live/controller.js";
 
 /** API que devuelve la activación; las pruebas la usan para saber qué servidor se eligió. */
@@ -88,6 +89,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<MeekoE
   };
 
   await start();
+  context.subscriptions.push(registerAutoClosingTags(() => client));
   context.subscriptions.push({ dispose: () => { zones?.dispose(); zones = undefined; } });
   context.subscriptions.push(vscode.workspace.onDidGrantWorkspaceTrust(async () => {
     await stop();

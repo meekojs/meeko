@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 interface Manifest {
   contributes: {
     configuration: { properties: Record<string, { type: string; default: unknown }> };
+    configurationDefaults: Record<string, Record<string, unknown>>;
     semanticTokenModifiers: Array<{ id: string }>;
     semanticTokenScopes: Array<{ language: string; scopes: Record<string, string[]> }>;
     colors: Array<{ id: string; defaults: Record<string, string> }>;
@@ -43,6 +44,12 @@ test("every custom modifier of the server legend is declared and colored for .me
   }
   // Themes render markup.italic in italics; reactive code keeps the font style of its type.
   assert.deepEqual(Object.values(scopes).flat().filter((scope) => scope.startsWith("markup.italic")), []);
+});
+
+test("tags close and rename together in .meeko files", () => {
+  const setting = manifest.contributes.configuration.properties["meeko.autoClosingTags"];
+  assert.deepEqual([setting?.type, setting?.default], ["boolean", true]);
+  assert.equal(manifest.contributes.configurationDefaults["[meeko]"]?.["editor.linkedEditing"], true);
 });
 
 test("execution zones have a setting, theme colors and gutter icons", () => {

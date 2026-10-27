@@ -15,6 +15,7 @@ import type { AutoImport } from "../autoimports.js";
 import { parseSfc } from "../compiler/sfc.js";
 import type { SfcSection } from "../compiler/sfc.js";
 import { eachKeyActions, sidecarActions } from "./actions.js";
+import { domEventCompletion, htmlAttributeCompletion, tagAt } from "./embedded.js";
 import { componentSummaryMarkdown, tagSummary } from "./components.js";
 import type { EditCapabilities } from "./actions.js";
 import type { AppIndex } from "./app-index.js";
@@ -69,6 +70,8 @@ const userPreferences: ts.UserPreferences = {
 };
 // Renaming an imported symbol renames its declaration and every importer, across .meeko and
 // .ts files, instead of introducing a local `import { a as b }` alias.
+/** Trigger characters that TypeScript understands; `:` and others are Meeko's own. */
+const typescriptTriggers = [".", '"', "'", "`", "/", "@", "<", "#", " "] as const;
 const renamePreferences: ts.UserPreferences = { ...userPreferences, providePrefixAndSuffixTextForRename: false };
 
 /** Rango fuente de un tramo generado; ambos extremos deben pertenecer a un mismo tramo mapeado. */
@@ -377,54 +380,32 @@ const templateDirectives: readonly TemplateDirective[] = [
 export function directiveNameCompletion(document: TextDocument, position: Position): CompletionItem[] | undefined {
   const source = document.getText();
   const offset = document.offsetAt(position);
-  const open = /<template(?=[\s>])[^>]*>/.exec(source);
-  const close = source.lastIndexOf("</template>");
-  const contentStart = open ? open.index + open[0].length : -1;
-  if (!open || offset <= contentStart || (close >= 0 && offset > close)) return undefined;
-  const tagStart = source.lastIndexOf("<", offset - 1);
-  if (tagStart < contentStart) return undefined;
-  const tag = /^<([A-Za-z][\w$.-]*)/.exec(source.slice(tagStart, offset))?.[1];
-  if (!tag) return undefined;
-  // Inside a quoted value, or after the tag closed, the cursor is not on an attribute name.
-  let quote: string | undefined;
-  for (let index = tagStart + 1 + tag.length; index < offset; index++) {
-    const char = source[index]!;
-    if (quote) { if (char === quote) quote = undefined; }
-    else if (char === '"' || char === "'") quote = char;
-    else if (char === ">") return undefined;
-  }
-  if (quote) return undefined;
-  const word = /[\w:.-]*$/.exec(source.slice(tagStart, offset))![0];
+  const context = tagAt(source, offset);
+  if (!context || context.value) return undefined;
+  const word = /[\w:.-]*$/.exec(source.slice(context.tagStart, offset))![0];
   if (!/\s/.test(source[offset - word.length - 1] ?? "")) return undefined;
-  // `on:cl`, `model:va`, `bind:ti`: the name after the prefix has its own completion.
-  if (/^(?:on|model|bind|ref):./.test(word)) return undefined;
-  const component = /^[A-Z]/.test(tag) || tag === "component";
-  const tagEnd = (() => {
-    let inside: string | undefined;
-    for (let index = offset; index < source.length; index++) {
-      const char = source[index]!;
-      if (inside) { if (char === inside) inside = undefined; }
-      else if (char === '"' || char === "'") inside = char;
-      else if (char === ">" || char === "<") return index;
-    }
-    return source.length;
-  })();
-  const present = new Set([...source.slice(tagStart, tagEnd).matchAll(/\s([^\s=/>"']+)/g)].map((match) => match[1]!));
+  // DOM events of an element after `on:`; a component's come from its props.
+  if (/^on:/.test(word)) return context.component ? undefined : domEventCompletion(document, position, context, word);
+  // `model:va`, `bind:ti`: the name after the prefix has its own completion.
+  if (/^(?:model|bind|ref):./.test(word)) return undefined;
+  const present = new Set([...source.slice(context.tagStart, context.tagEnd).matchAll(/\s([^\s=/>"']+)/g)].map((match) => match[1]!));
   present.delete(word);
   const start = document.positionAt(offset - word.length);
-  return templateDirectives
-    .filter((directive) => directive.on === "all" || directive.on === (component ? "component" : "element"))
-    .filter((directive) => !directive.elements || directive.elements.includes(tag.toLowerCase()))
+  const directives = templateDirectives
+    .filter((directive) => directive.on === "all" || directive.on === (context.component ? "component" : "element"))
+    .filter((directive) => !directive.elements || directive.elements.includes(context.tag.toLowerCase()))
     .filter((directive) => directive.name.endsWith(":") || !present.has(directive.name))
     .map((directive, index): CompletionItem => ({
       label: directive.name,
       kind: CompletionItemKind.Keyword,
       detail: directive.detail,
-      sortText: String(index).padStart(2, "0"),
+      sortText: `0${String(index).padStart(2, "0")}`,
       insertTextFormat: InsertTextFormat.Snippet,
       textEdit: { range: { start, end: position }, newText: directive.insert },
       ...(directive.name.endsWith(":") ? { command: { title: "Completar", command: "editor.action.triggerSuggest" } } : {}),
     }));
+  // The HTML attributes of an element (`type`, `href`, `aria-*`…) after Meeko's directives.
+  return context.component ? directives : [...directives, ...htmlAttributeCompletion(document, position, present)];
 }
 
 export function completion(base: FeatureContext, position: Position): CompletionItem[] | undefined {
@@ -432,7 +413,7 @@ export function completion(base: FeatureContext, position: Position): Completion
 }
 
 /** Completado con `isIncomplete`: TypeScript no resolvió todavía todos los autoimports. */
-export function completionList(base: FeatureContext, position: Position): CompletionList | undefined {
+export function completionList(base: FeatureContext, position: Position, triggerCharacter?: string): CompletionList | undefined {
   const list = (items: CompletionItem[] | undefined, isIncomplete = false): CompletionList | undefined => items && { isIncomplete, items };
   const sourceOffset = base.document.offsetAt(position);
   const event = base.component.componentEvents?.find((span) => sourceOffset >= span.start && sourceOffset <= span.end);
@@ -446,7 +427,13 @@ export function completionList(base: FeatureContext, position: Position): Comple
   const context = contextAtPosition(base, position);
   const offset = generatedOffset(context, position);
   if (offset === undefined) return undefined;
-  const result = context.project.service.getCompletionsAtPosition(context.component.virtualFilename, offset, userPreferences);
+  // TypeScript answers a trigger character only where it means something: "/" in an import path,
+  // a quote in a string with known values (href("/…")), "<" in a type argument.
+  const trigger = triggerCharacter && (typescriptTriggers as readonly string[]).includes(triggerCharacter)
+    ? { triggerCharacter: triggerCharacter as ts.CompletionsTriggerCharacter, triggerKind: ts.CompletionTriggerKind.TriggerCharacter }
+    : {};
+  if (triggerCharacter && !("triggerCharacter" in trigger)) return undefined;
+  const result = context.project.service.getCompletionsAtPosition(context.component.virtualFilename, offset, { ...userPreferences, ...trigger });
   if (!result) return undefined;
   return list(result.entries.map((entry) => {
     const item: CompletionItem = { label: entry.name, kind: completionKind(entry.kind), sortText: entry.sortText };

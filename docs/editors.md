@@ -1,6 +1,6 @@
 # Editores
 
-Meeko incluye un servidor de lenguaje ([Language Server Protocol](https://microsoft.github.io/language-server-protocol/)) que da a cualquier editor compatible las mismas funciones que la [extensión de VS Code](../packages/vscode/README.md): diagnósticos de `meeko check`, completado, hover, ir a definición, referencias, renombrado entre archivos `.meeko` y `.ts`, ayuda de firma, símbolos del documento, plegado, formato, tokens semánticos, CodeLens y acciones rápidas (añadir imports, resolver un autoimport ambiguo con un import explícito, quitar `params` de un `href` estático, añadir `each:key` y mover un sidecar a `<script server>`).
+Meeko incluye un servidor de lenguaje ([Language Server Protocol](https://microsoft.github.io/language-server-protocol/)) que da a cualquier editor compatible las mismas funciones que la [extensión de VS Code](../packages/vscode/README.md): diagnósticos de `meeko check`, completado (también de HTML en la plantilla y de CSS en `<style>`), hover, ir a definición, referencias, renombrado entre archivos `.meeko` y `.ts`, ayuda de firma, símbolos del documento, plegado, formato, tokens semánticos, CodeLens, edición vinculada de etiquetas, colores de `<style>` y acciones rápidas (añadir imports, resolver un autoimport ambiguo con un import explícito, quitar `params` de un `href` estático, añadir `each:key` y mover un sidecar a `<script server>`).
 
 El bloque `<script server lang="ts">` de una página se analiza como un módulo TypeScript propio, con los autoimports de servidor (o de cliente si su `render` estático es `"client"`) y posiciones del `.meeko`: diagnósticos de tipos, completado, hover, navegación, referencias, símbolos y formato. Un bloque fuera de `app/pages` de alguna raíz configurada, o en un `+layout` o `+error`, produce `MEEK044` sobre su etiqueta de apertura. Los `export const` de un bloque con código de nivel superior tienen su tipo en el `<script>` y en la plantilla de la página, y «ir a definición» sobre uno de ellos lleva a su `export`.
 
@@ -87,6 +87,15 @@ Además de las de imports y `href`:
 En el nombre de un atributo de la plantilla, el completado ofrece las directivas de Meeko que admite la etiqueta: `if:when`, `each:of`, `each:as`, `each:key`, `each:index`, `bind:`, `on:` y `ref:` en cualquier etiqueta, también en las de componente; `html` en los elementos, `model` en `input`, `textarea` y `select`, y `model:` en los componentes. No repite las que la etiqueta ya tiene, y tras un prefijo (`on:`, `model:`) vuelve a abrir el completado con los nombres del hijo.
 
 El completado ofrece los modelos del hijo tras `model:` en una etiqueta de componente, los nombres de los snippets del hijo en `<snippet name="…">` y sus parámetros en `params`.
+
+### HTML y CSS en la plantilla y en `<style>`
+
+Desde `1.2`, el servidor también entiende el marcado y los estilos. Lee el texto, sin compilar el componente, así que funciona mientras una etiqueta o una regla están a medio escribir:
+
+- **Plantilla:** completado de etiquetas, de atributos HTML (después de las directivas de Meeko y sin los manejadores `onclick`…, que en Meeko se escriben `on:click`) y de sus valores (`type="checkbox"`), con la documentación de MDN en el hover. Tras `on:` en un elemento, los eventos del DOM con su descripción. Las etiquetas de componente y los valores que son expresiones (`bind:`, `on:`, `if:when`, `each:`…, `{…}`) siguen en manos de TypeScript.
+- **Etiquetas:** la de apertura y la de cierre se renombran juntas (edición vinculada, que la extensión de VS Code activa con `editor.linkedEditing` en los `.meeko`), y la extensión cierra la etiqueta al escribir `>` o `</` (ajuste `meeko.autoClosingTags`). Otros clientes la piden con `meeko/tagComplete`, que devuelve un snippet como `$0</div>`.
+- **`<style>`:** completado y hover de propiedades y valores, diagnósticos de CSS (`:global(…)` y las at-rules desconocidas no son errores) y el selector de color.
+- **Clases:** en `class="…"` se completan las clases que define `<style>`, e ir a definición lleva de una clase a sus selectores. En `<style scoped>`, una clase que no nombran ni la plantilla ni el script se marca como sin uso (atenuada, con el código `MEEK_UNUSED_CLASS`). Cuenta cualquier aparición del nombre, también en un `computed` o en `classList.add("open")`, y un prefijo antes de una interpolación (`` `badge--${tone}` ``) cubre todas las clases que empiezan por él. Las de `:global(…)` nunca se marcan, porque pueden alcanzar a otros componentes.
 
 ### Componentes genéricos
 
