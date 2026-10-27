@@ -598,10 +598,10 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
     throw compileError(context.source, context.filename, "MEEK061", "<snippet> debe ser hijo directo de una etiqueta de componente, como <AppDialog><snippet name=\"title\">...</snippet></AppDialog>", node.start);
   }
   if (node.tagName === "render") return renderSnippetTag(node, bindings, context);
-  // `<MeekoLink to="/users/[id]" bind:params="…">` is an `<a>` with a checked href.
   // A component of the project with the name of a built-in tag is that component, as in 1.1.
   const shadowed = node.componentName !== undefined && context.shadowedTags.has(node.componentName);
   if (shadowed && !context.shadowedUses.has(node.componentName!)) context.shadowedUses.set(node.componentName!, node.start);
+  // `<MeekoLink to="/users/[id]" bind:params="…">` is an `<a>` with a checked href.
   let link: LinkParts | undefined;
   if (node.componentName === linkTag && !shadowed) ({ node, link } = linkElement(node, context));
   const componentTag = node.componentName !== undefined;

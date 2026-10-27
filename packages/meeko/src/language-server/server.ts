@@ -11,8 +11,8 @@ import { projectRoot } from "../compiler/project-root.js";
 import { checkFrameworkPageContracts } from "../framework/page-contracts-check.js";
 import { componentDiagnostics, contractRange, frameworkContractRoot } from "./diagnostics.js";
 import {
-  codeActions, completionList, componentNameCompletion, definition, directiveNameCompletion, documentSymbols, shadowedTagsOf, foldingRanges, formatting, hover, prepareRename, references,
-  rename, resolveCompletion, semanticTokens, semanticTokensLegend, signatureHelp,
+  codeActions, completionList, componentNameCompletion, definition, directiveNameCompletion, documentSymbols, foldingRanges, formatting, hover, prepareRename, references,
+  rename, resolveCompletion, semanticTokens, semanticTokensLegend, shadowedTagsOf, signatureHelp,
 } from "./features.js";
 import type { CompletionData, FeatureContext, LocatedDocument, MeekoFormatSettings } from "./features.js";
 import {
