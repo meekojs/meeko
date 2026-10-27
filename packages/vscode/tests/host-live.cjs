@@ -74,7 +74,7 @@ exports.run = async function run() {
   const extension = vscode.extensions.getExtension("meekojs.meeko-language");
   const api = await extension.activate();
   assert.ok(api.live, "La extensión expone el estado de los valores en vivo");
-  assert.deepEqual(extension.packageJSON.contributes.commands.map((command) => `${command.category}: ${command.title}`), ["Meeko: Editar valor de la señal", "Meeko: Reconectar valores en vivo"]);
+  assert.deepEqual(extension.packageJSON.contributes.commands.map((command) => `${command.category}: ${command.title}`), ["Meeko: Editar valor de la señal", "Meeko: Reconectar valores en vivo", "Meeko: Nuevo componente", "Meeko: Nueva página", "Meeko: Nuevo endpoint de API"]);
 
   const uri = vscode.Uri.file(file);
   const document = await vscode.workspace.openTextDocument(uri);
