@@ -526,6 +526,8 @@ a[aria-current="page"] { font-weight: 700; }
 
 En el editor, `to="` sugiere las rutas del proyecto y lleva a su página con Ctrl+clic. `meeko init-framework` genera el shell y el layout con estas etiquetas.
 
+Un proyecto anterior a `1.2` con un componente propio llamado `MeekoLink` o `MeekoOutlet` (en `app/components`, de un módulo o importado o declarado en el `<script>`) lo conserva: la etiqueta es ese componente, con sus props, y no la de Meeko. `meeko check`, `meeko build` y el editor lo avisan con `MEEK106`; renombre el componente para usar la etiqueta propia.
+
 Las páginas, los layouts, `app/app.meeko` y `app/error.meeko` no pueden ser [componentes genéricos](api.md#componentes-genéricos-generic): Meeko les pasa sus props y no puede elegir sus parámetros de tipo, así que `generic` en su `<script>` da `MEEK100`. Lleve el contenido genérico a un componente de `app/components` y úselo desde la página.
 
 Si una página falla y existe `+error.meeko`, Meeko la carga y renderiza con el mismo contexto de petición y estado SSR. El observador del servidor recibe el fallo original con su `requestId`; el HTML muestra un mensaje público y no incluye detalles privados. Si también falla la página de error, el servidor registra ese segundo fallo y entrega una respuesta segura.

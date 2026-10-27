@@ -203,6 +203,10 @@ interface TemplateContext {
   narrow: boolean;
   /** `if:when` conditions around the node being compiled, when `narrow`. */
   guards: Guard[];
+  /** Meeko's own tags that a component of the project replaces; see {@link shadowedBuiltinTags}. */
+  shadowedTags: ReadonlySet<string>;
+  /** Offset of the first tag of each replaced built-in, for its MEEK106 warning. */
+  shadowedUses: Map<string, number>;
 }
 
 /**
@@ -249,6 +253,38 @@ const outletReference = "__meeko_outlet_props.outlet";
 
 /** `<MeekoLink>`: an `<a>` whose `href` comes from the typed `href()`. */
 const linkTag = "MeekoLink";
+
+/** Meeko's own tags since 1.2, which a 1.1 project may already use as the names of its components. */
+const builtinTags: readonly string[] = [linkTag, outletTag];
+
+/**
+ * Meeko's own tags that a component of the project replaces: one that the script imports or declares
+ * at its top level, or one of `projectComponents` (the names that the project autoimports). The
+ * project's component wins, so a 1.1 component named `MeekoLink` or `MeekoOutlet` keeps working.
+ */
+export function shadowedBuiltinTags(script: string, projectComponents: Iterable<string> = []): Set<string> {
+  const shadowed = new Set<string>();
+  for (const name of projectComponents) if (builtinTags.includes(name)) shadowed.add(name);
+  if (!builtinTags.some((tag) => script.includes(tag))) return shadowed;
+  const file = ts.createSourceFile("script.ts", script, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+  const declared: ts.Identifier[] = [];
+  for (const statement of file.statements) {
+    if (ts.isImportDeclaration(statement)) {
+      const clause = statement.importClause;
+      if (!clause || clause.isTypeOnly) continue;
+      if (clause.name) declared.push(clause.name);
+      const bindings = clause.namedBindings;
+      if (bindings && ts.isNamespaceImport(bindings)) declared.push(bindings.name);
+      else if (bindings) for (const element of bindings.elements) if (!element.isTypeOnly) declared.push(element.name);
+    } else if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) bindingIdentifiers(declaration.name, declared);
+    } else if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name) {
+      declared.push(statement.name);
+    }
+  }
+  for (const identifier of declared) if (builtinTags.includes(identifier.text)) shadowed.add(identifier.text);
+  return shadowed;
+}
 
 /** A source expression of `<MeekoLink>`: `to`, `params` or `search`, at its offset. */
 interface LinkPart {
@@ -336,6 +372,11 @@ export interface CompileOptions {
    * `css.scopeAttribute` de `meeko.config.ts`.
    */
   scopeAttribute?: "all" | "matched";
+  /**
+   * Nombres que el proyecto autoimporta. Un componente llamado `MeekoLink` o `MeekoOutlet` tiene
+   * prioridad sobre la etiqueta propia de Meeko, con el aviso MEEK106.
+   */
+  projectComponents?: Iterable<string>;
 }
 
 function quote(value: string): string {
@@ -558,10 +599,13 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
   }
   if (node.tagName === "render") return renderSnippetTag(node, bindings, context);
   // `<MeekoLink to="/users/[id]" bind:params="…">` is an `<a>` with a checked href.
+  // A component of the project with the name of a built-in tag is that component, as in 1.1.
+  const shadowed = node.componentName !== undefined && context.shadowedTags.has(node.componentName);
+  if (shadowed && !context.shadowedUses.has(node.componentName!)) context.shadowedUses.set(node.componentName!, node.start);
   let link: LinkParts | undefined;
-  if (node.componentName === linkTag) ({ node, link } = linkElement(node, context));
+  if (node.componentName === linkTag && !shadowed) ({ node, link } = linkElement(node, context));
   const componentTag = node.componentName !== undefined;
-  const outlet = node.componentName === outletTag;
+  const outlet = node.componentName === outletTag && !shadowed;
   if (outlet) {
     if (!isOutletHost(context.filename)) {
       throw compileError(context.source, context.filename, "MEEK104", "<MeekoOutlet /> sólo se usa en app/app.meeko y en los layouts (app/layouts/*.meeko o +layout.meeko): pinta el layout o la página que van dentro", node.start);
@@ -1727,7 +1771,7 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
   }
   const parsed = parseTemplate(source, template, filename);
   const bindingsForTemplate = emptyBindings();
-  const context: TemplateContext = { source, filename, templateOffset: template.contentStart, scopeAttribute, scopeTargets: targets, nextText: 0, nextRegion: 0, nextRef: 0, nextHtml: 0, nextElement: 0, listDepth: 0, refs: new Map(), usedRefs: new Set(), nextSnippet: 0, snippetDepth: 0, selectModel: undefined, narrow: options.typeCheck === true, guards: [] };
+  const context: TemplateContext = { source, filename, templateOffset: template.contentStart, scopeAttribute, scopeTargets: targets, nextText: 0, nextRegion: 0, nextRef: 0, nextHtml: 0, nextElement: 0, listDepth: 0, refs: new Map(), usedRefs: new Set(), nextSnippet: 0, snippetDepth: 0, selectModel: undefined, narrow: options.typeCheck === true, guards: [], shadowedTags: shadowedBuiltinTags(script.content, options.projectComponents), shadowedUses: new Map() };
   const html = renderNode(parsed, bindingsForTemplate, context);
   const hot = options.hot === true;
   const scriptParts = compileScript(script, source, filename, hot, context.refs, generic);
@@ -1886,5 +1930,10 @@ function __meeko_resolveProps${G}(input: ComponentProps${A}): ${setupPropsType} 
 }` : plainPropsDeclaration);
   const markedCode = `// Generated by Meeko. Edit the .meeko source instead.\nimport * as __meeko from "@meekojs/meeko/internal";\n${scriptParts.imports.join("\n")}\n${scriptParts.types.join("\n")}\n${propsDeclaration}\nfunction __setup${G}(__props: ${setupPropsType}${usesRefs ? ", __meeko_refs: __meeko.ElementRefs" : ""}) {\n${refsType}${scriptParts.setup.join("\n")}\n${refHelpers.join("")}return { ${setupReturn} };\n}\n${exposedType}${channelsType}export const css = ${quote(css)};\n${dataMarks}${hotIdExport}export function renderWithState${G}(__inputProps: ComponentProps${A}): { html: string; state: __meeko.HotState } {\nreturn __meeko.createRoot((__meeko_dispose) => {\nconst __meeko_transfer = true;\n${refsDeclaration}const __bindings = ${setupCall("null")};\nconst { ${bindings} } = __bindings;\nreturn __meeko.finishWithCleanup(() => {\nconst __meeko_html = ${html};\nconst __meeko_state = __meeko.snapshotSignals(__bindings);\n__meeko.serializeJson(__meeko_state);\nreturn { html: __meeko_html, state: __meeko_state };\n}, __meeko_dispose);\n});\n}\nexport function renderToString${G}(__inputProps: ComponentProps${A}${stateParam}): string {\nreturn __meeko.createRoot((__meeko_dispose) => {\nconst __meeko_transfer = false;\n${refsDeclaration}${setupCode("null")}\nreturn __meeko.finishWithCleanup(() => ${html}, __meeko_dispose);\n});\n}\nexport function hydrate${G}(root: Element, __inputProps: ComponentProps${A}${stateParam}): () => void {\nconst __scope: __meeko.DomScope = { root };\nreturn hydrateScope${A}(${scopeForward});\n}\nexport function hydrateScope${G}(__scope: __meeko.DomScope, __inputProps: ComponentProps${A}${stateParam}${scopeHotRootParam}): __meeko.ComponentRelease<ComponentExposed${A}> {\nreturn __meeko.mountBatch(() => __meeko.createRoot((__meeko_dispose) => {\nconst __meeko_transfer = false;\nconst __mounted: Array<() => __meeko.MountedResult> = [];\n${refsDeclaration}${setupCode("__mounted")}\nconst __release = (() => { ${hydrationBody(bindingsForTemplate, context, hot)} })();\n__meeko.runMounted(__mounted);\n${releaseCode}\n}));\n}\n`;
   const { code, mappings } = extractSourceMappings(markedCode);
-  return { code, css, mappings, ...(scriptParts.warnings.length ? { warnings: scriptParts.warnings } : {}) };
+  // MEEK106: the project's component keeps a built-in tag's name; renaming it adopts the built-in.
+  const warnings = [...scriptParts.warnings, ...[...context.shadowedUses].map(([tag, offset]): CompileDiagnostic => ({
+    code: "MEEK106", filename, location: locate(source, offset), severity: "warning",
+    message: `<${tag}> es el componente ${tag} del proyecto, no la etiqueta propia de Meeko (${tag === linkTag ? "un enlace con href tipado y aria-current" : "la página o el layout de dentro"}); renombra el componente para usar la de Meeko`,
+  }))];
+  return { code, css, mappings, ...(warnings.length ? { warnings } : {}) };
 }

@@ -314,6 +314,11 @@ function startsTypePosition(node: ts.Node): boolean {
   return ts.isTypeNode(node);
 }
 
+/** Names that the registry imports as values; a component named like a built-in tag replaces it. */
+export function autoImportedValues(registry: readonly AutoImport[]): string[] {
+  return registry.filter((entry) => !entry.typeOnly).map((entry) => entry.name);
+}
+
 /** Añade imports ESM para referencias libres del módulo generado. */
 export function applyAutoImports(code: string, filename: string, registry: readonly AutoImport[], target: "client" | "server" | "shared"): string {
   const ast = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -356,8 +361,8 @@ export function transformAutoImports(source: string, filename: string, code: str
 
 /** Compile result shared by Vite, CLI checks and declaration generation. */
 export async function compileWithAutoImports(source: string, filename: string, options: CompileOptions = {}, target: "client" | "server" = "client", knownRegistry?: readonly AutoImport[]): Promise<CompileResult> {
-  const compiled = compile(source, filename, options);
   const registry = knownRegistry ?? await discoverAutoImports(projectRoot(filename));
+  const compiled = compile(source, filename, { ...options, projectComponents: autoImportedValues(registry) });
   const code = transformAutoImports(source, filename, compiled.code, registry, target);
   const offset = code.length - compiled.code.length;
   return {

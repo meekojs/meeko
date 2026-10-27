@@ -11,7 +11,7 @@ import { projectRoot } from "../compiler/project-root.js";
 import { checkFrameworkPageContracts } from "../framework/page-contracts-check.js";
 import { componentDiagnostics, contractRange, frameworkContractRoot } from "./diagnostics.js";
 import {
-  codeActions, completionList, componentNameCompletion, definition, directiveNameCompletion, documentSymbols, foldingRanges, formatting, hover, prepareRename, references,
+  codeActions, completionList, componentNameCompletion, definition, directiveNameCompletion, documentSymbols, shadowedTagsOf, foldingRanges, formatting, hover, prepareRename, references,
   rename, resolveCompletion, semanticTokens, semanticTokensLegend, signatureHelp,
 } from "./features.js";
 import type { CompletionData, FeatureContext, LocatedDocument, MeekoFormatSettings } from "./features.js";
@@ -405,11 +405,12 @@ export function startLanguageServer(connection: Connection): void {
       const tags = componentNameCompletion(project, document, filename, position);
       if (tags) return tags;
       // `each:`, `if:when`, `bind:`… in a tag, also a component tag; the tag may not parse yet.
-      const directives = directiveNameCompletion(document, position);
+      const shadowed = shadowedTagsOf(project, document.getText());
+      const directives = directiveNameCompletion(document, position, shadowed);
       if (directives) return directives;
       const classes = classCompletion(document, position);
       if (classes) return classes;
-      const routes = linkRouteCompletion(document, position, await project.appIndex(), project.root);
+      const routes = linkRouteCompletion(document, position, await project.appIndex(), project.root, shadowed);
       if (routes) return routes;
     }
     const typed = await withContext(textDocument.uri, (context) => completionList(context, position, request?.triggerCharacter));

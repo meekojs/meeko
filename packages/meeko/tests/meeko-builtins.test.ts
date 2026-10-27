@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import { compile } from "../src/compiler.ts";
+import { compileWithAutoImports } from "../src/autoimports.ts";
+import type { AutoImport } from "../src/autoimports.ts";
+import { compile, shadowedBuiltinTags } from "../src/compiler.ts";
 import { MeekoCompileError } from "../src/compiler/sfc.ts";
 import { directiveNameCompletion } from "../src/language-server/features.ts";
 import { linkRouteCompletion } from "../src/language-server/nav.ts";
@@ -88,6 +90,40 @@ test("a static <MeekoLink> with a non-ASCII path is encoded like href() and matc
   assert.equal(linkCurrent({ path: { value: "/a%40b" } }, "/a@b"), "page", "characters that URL keeps but href() encodes");
   assert.equal(linkCurrent({ path: { value: "/categor%C3%ADas" } }, "/categorias"), undefined);
   assert.equal(linkCurrent({ path: { value: "/bad%E0%A4" } }, "/bad%E0%A4"), "page", "a malformed escape compares as written");
+});
+
+test("a project component named MeekoLink or MeekoOutlet wins over the built-in tag, with MEEK106", async () => {
+  // Autoimported from app/components, as in a 1.1 project: the tag renders that component.
+  const linkSource = "<template><MeekoLink to=\"/docs\" label=\"x\">Docs</MeekoLink></template>";
+  const autoimported = compile(linkSource, "/project/app/components/Nav.meeko", { projectComponents: ["MeekoLink", "signal"] });
+  assert.match(autoimported.code, /__meeko\.renderComponent<any>\(0, MeekoLink/);
+  assert.doesNotMatch(autoimported.code, /linkCurrent|__meeko_href|"<a"/);
+  assert.deepEqual(autoimported.warnings?.map((warning) => [warning.code, warning.severity, warning.location.column]), [["MEEK106", "warning", 11]]);
+  assert.match(autoimported.warnings![0]!.message, /renombra el componente para usar la de Meeko/);
+  const registry: AutoImport[] = [{ name: "MeekoLink", imported: "*", file: "/project/app/components/MeekoLink.meeko", scope: "app", typeOnly: false, component: true }];
+  const withImports = await compileWithAutoImports(linkSource, "/project/app/components/Nav.meeko", {}, "client", registry);
+  assert.match(withImports.code, /import \* as MeekoLink from "\.\/MeekoLink\.meeko";/);
+  // Imported or declared in the script, also in a component that is not an outlet host (no MEEK104).
+  const imported = compile("<script lang=\"ts\">\nimport MeekoOutlet from \"./Outlet.meeko\";\n</script>\n<template><MeekoOutlet title=\"x\" /></template>", "/project/app/components/Card.meeko");
+  assert.match(imported.code, /renderComponent<any>\(0, MeekoOutlet/);
+  assert.deepEqual(imported.warnings?.map((warning) => warning.code), ["MEEK106"]);
+  const declared = compile("<script lang=\"ts\">\nconst { MeekoLink } = useWidgets();\n</script>\n<template><MeekoLink href=\"/x\" /></template>", "/project/app/components/Card.meeko");
+  assert.match(declared.code, /renderComponent<any>\(0, MeekoLink/, "href is a prop of the project's component, not MEEK105");
+  // A type-only import or an unrelated name keeps the built-in, without a warning.
+  const builtin = compile("<script lang=\"ts\">\nimport type { MeekoLink } from \"./types\";\nconst MeekoLinks = 1;\n</script>\n<template><MeekoLink to=\"/docs\">Docs</MeekoLink></template>", "/project/app/components/Nav.meeko");
+  assert.match(builtin.code, /__meeko\.linkCurrent/);
+  assert.equal(builtin.warnings, undefined);
+  assert.deepEqual([...shadowedBuiltinTags("import { MeekoLink as Link } from './x';", ["MeekoOutlet", "MeekoLinks"])], ["MeekoOutlet"]);
+});
+
+test("the editor treats a project component named MeekoLink as a component", () => {
+  const text = `<script lang="ts"></script>\n<template><MeekoLink c></MeekoLink><MeekoLink to=""></MeekoLink></template>`;
+  const document = TextDocument.create("file:///Nav.meeko", "meeko", 1, text);
+  const shadowed = new Set(["MeekoLink"]);
+  const attributes = directiveNameCompletion(document, document.positionAt(text.indexOf("MeekoLink c") + 11), shadowed)!.map((item) => item.label);
+  assert.ok(!attributes.includes("to") && attributes.includes("model:"), JSON.stringify(attributes));
+  const routes: RouteRecord[] = [{ id: "/", file: "/project/app/pages/index.meeko", layouts: [] }];
+  assert.equal(linkRouteCompletion(document, document.positionAt(text.indexOf('to=""') + 4), { routes, api: [], rpc: [] }, "/project", shadowed), undefined);
 });
 
 test("the editor completes the attributes of <MeekoLink> and the routes of to=\"\"", () => {

@@ -102,6 +102,21 @@ test("CLI check muestra los avisos sin fallar", async () => {
   }
 });
 
+test("checkSource comprueba un componente propio llamado MeekoLink como componente, con el aviso MEEK106", async () => {
+  const directory = await mkdtemp(join(exampleDirectory, ".meeko-check-test-"));
+  try {
+    await writeFile(join(directory, "MeekoLink.meeko"), `<script lang="ts">\nconst props = defineProps<{ to: string; label: string }>();\n</script>\n<template><a bind:href="props.to">{props.label}</a></template>`);
+    const uses = (props: string) => `<script lang="ts">\nimport * as MeekoLink from "./MeekoLink.meeko";\n</script>\n<template><MeekoLink ${props} /></template>`;
+    const valid = await checkSource(uses(`to="/docs" label="Docs"`), join(directory, "Nav.meeko"));
+    assert.deepEqual(valid.map((item) => [item.code, item.severity ?? "error"]), [["MEEK106", "warning"]], JSON.stringify(valid));
+    // The props are the project component's: a missing one is a type error, not MEEK105.
+    const invalid = await checkSource(uses(`to="/docs"`), join(directory, "Nav.meeko"));
+    assert.ok(invalid.some((item) => item.code.startsWith("TS") && /label/.test(item.message)), JSON.stringify(invalid));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("checkSource resuelve imports .meeko anidados y comprueba props del hijo", async () => {
   const directory = resolve("examples/nested");
   const badValue = `<script lang="ts">import * as Child from "./Child.meeko";</script>\n<template><component is="Child" bind:label="42"></component></template>`;

@@ -11,7 +11,9 @@ import type {
   ParameterInformation, Position, Range, SemanticTokens, SemanticTokensLegend, SignatureHelp, SignatureInformation,
   TextEdit, WorkspaceEdit,
 } from "vscode-languageserver/node";
+import { autoImportedValues } from "../autoimports.js";
 import type { AutoImport } from "../autoimports.js";
+import { shadowedBuiltinTags } from "../compiler.js";
 import { parseSfc } from "../compiler/sfc.js";
 import type { SfcSection } from "../compiler/sfc.js";
 import { eachKeyActions, sidecarActions } from "./actions.js";
@@ -325,6 +327,15 @@ function snippetParamsCompletion(context: FeatureContext, tag: SnippetTag, sourc
 }
 
 /**
+ * Etiquetas propias de Meeko (`MeekoLink`, `MeekoOutlet`) que en este documento son un componente
+ * del proyecto, autoimportado o importado en el script, como en el compilador.
+ */
+export function shadowedTagsOf(project: MeekoProject, source: string): Set<string> {
+  const script = /<script(?![^>]*\bserver\b)[^>]*>([\s\S]*?)<\/script>/.exec(source)?.[1] ?? "";
+  return shadowedBuiltinTags(script, autoImportedValues(project.autoImports()));
+}
+
+/**
  * Nombres de componente al escribir `<A` en la plantilla. No depende del modelo virtual, que
  * no se puede construir mientras la etiqueta está a medio escribir.
  */
@@ -398,7 +409,7 @@ const templateDirectives: readonly TemplateDirective[] = [
  * `if:when`, `bind:`…), también en las etiquetas de componente. Lee el texto, como
  * {@link componentNameCompletion}: la etiqueta suele estar a medio escribir.
  */
-export function directiveNameCompletion(document: TextDocument, position: Position): CompletionItem[] | undefined {
+export function directiveNameCompletion(document: TextDocument, position: Position, shadowed: ReadonlySet<string> = new Set()): CompletionItem[] | undefined {
   const source = document.getText();
   const offset = document.offsetAt(position);
   const context = tagAt(source, offset);
@@ -406,7 +417,8 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
   const word = /[\w:.-]*$/.exec(source.slice(context.tagStart, offset))![0];
   if (!/\s/.test(source[offset - word.length - 1] ?? "")) return undefined;
   // `<MeekoLink>` renders an `<a>`: element directives and attributes, plus the parts of its href.
-  const link = context.tag === "MeekoLink";
+  // A component of the project named MeekoLink is a component tag, with its own props.
+  const link = context.tag === "MeekoLink" && !shadowed.has("MeekoLink");
   const component = context.component && !link;
   // DOM events of an element after `on:`; a component's come from its props.
   if (/^on:/.test(word)) return component ? undefined : domEventCompletion(document, position, context, word);

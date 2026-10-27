@@ -55,10 +55,10 @@ export function documentLinks(context: FeatureContext): DocumentLink[] {
 }
 
 /** Inside `to="…"` of a `<MeekoLink>`: the routes of the project, with their page. */
-export function linkRouteCompletion(document: TextDocument, position: Position, index: AppIndex, root: string): CompletionItem[] | undefined {
+export function linkRouteCompletion(document: TextDocument, position: Position, index: AppIndex, root: string, shadowed: ReadonlySet<string> = new Set()): CompletionItem[] | undefined {
   const source = document.getText();
   const context = tagAt(source, document.offsetAt(position));
-  if (context?.tag !== "MeekoLink" || context.value?.attribute !== "to") return undefined;
+  if (context?.tag !== "MeekoLink" || shadowed.has("MeekoLink") || context.value?.attribute !== "to") return undefined;
   const range = { start: document.positionAt(context.value.start), end: position };
   return index.routes.map((route): CompletionItem => ({
     label: route.id,
