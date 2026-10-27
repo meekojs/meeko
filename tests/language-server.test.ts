@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { PassThrough } from "node:stream";
 import { after, before, describe, test } from "node:test";
@@ -21,6 +22,7 @@ import type {
 import { checkSource } from "../src/check.ts";
 import { startLanguageServer } from "../src/language-server/server.ts";
 import type { LanguageServerInitializationOptions } from "../src/language-server/server.ts";
+import { createTempProject, linkRepositoryPackages, repositoryRoot } from "./helpers/temp-project.ts";
 
 /** Cliente LSP mínimo que registra diagnósticos y documentos abiertos. */
 class Client {
@@ -121,14 +123,14 @@ function applyEdits(text: string, edits: readonly TextEdit[]): string {
   return TextDocument.applyEdits(document, [...edits]);
 }
 
+/**
+ * A temporary project outside the repository, so no editor of the machine checks it while the
+ * test runs. With `linkPackage`, `@meekojs/meeko` resolves to the repository like an install.
+ */
 async function project(prefix: string, files: Record<string, string>, linkPackage = true): Promise<string> {
-  await mkdir(resolve(".meeko"), { recursive: true });
-  const root = await mkdtemp(resolve(".meeko", prefix));
+  const { root } = await createTempProject(prefix);
   await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}\n');
-  if (linkPackage) {
-    await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
-    await symlink(resolve("."), join(root, "node_modules", "@meekojs", "meeko"), "junction");
-  }
+  if (linkPackage) await linkRepositoryPackages(root);
   for (const [name, content] of Object.entries(files)) {
     await mkdir(dirname(join(root, name)), { recursive: true });
     await writeFile(join(root, name), content);
@@ -449,6 +451,40 @@ describe("Meeko language server configuration and contracts", () => {
         const diagnostics = await untrusted.waitForDiagnostics(uri, () => true);
         assert.ok(diagnostics.some((item) => item.code === "TS2304"), JSON.stringify(diagnostics));
       } finally { await untrusted.close(); }
+    } finally { await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
+  });
+
+  // An editor's watcher also reports the files of a package linked into node_modules and of
+  // temporary projects under .meeko/ (the tests of a linked Meeko checkout, for example):
+  // checking their contracts would load their configuration and write into them.
+  test("watched changes in linked packages and under .meeko/ do not check those projects", async () => {
+    const page = '<script lang="ts"></script><template><p>Home</p></template>\n';
+    const nested = ["node_modules/linked", ".meeko/tmp/fixture"];
+    const files: Record<string, string> = { "app/pages/index.meeko": page, "app/components/Card.meeko": page };
+    for (const directory of nested) {
+      files[`${directory}/package.json`] = '{"private":true,"type":"module"}\n';
+      files[`${directory}/app/pages/index.meeko`] = page;
+    }
+    const root = await project("lsp-ignored-", files);
+    try {
+      const trusted = await inProcess(root);
+      try {
+        // An open component loads the workspace's project, which every reported path is under.
+        await trusted.waitForDiagnostics(await trusted.open(join(root, "app", "components", "Card.meeko")), () => true);
+        const changed = async (path: string): Promise<void> => {
+          await trusted.connection.sendNotification(DidChangeWatchedFilesNotification.type, {
+            changes: [{ uri: pathToFileURL(join(root, path, "app", "pages", "index.meeko")).href, type: FileChangeType.Changed }],
+          });
+        };
+        for (const directory of nested) await changed(directory);
+        await changed(".");
+        const generated = (directory: string): string => join(root, directory, ".meeko", "generated");
+        const deadline = Date.now() + 30_000;
+        while (!existsSync(generated(".")) && Date.now() < deadline) await new Promise((done) => setTimeout(done, 100));
+        assert.ok(existsSync(generated(".")), "A change in the workspace's own pages checks its contracts");
+        await new Promise((done) => setTimeout(done, 1500));
+        for (const directory of nested) assert.ok(!existsSync(generated(directory)), `${directory} was checked`);
+      } finally { await trusted.close(); }
     } finally { await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
   });
 
@@ -795,9 +831,14 @@ ${body}
   const valid = page('<SaveButton bind:id="1" on:save="(id) => saved.push(id)" />\n<SaveButton bind:id="2"></SaveButton>');
 
   before(async () => {
-    // The package resolves to src/ so the test does not depend on a build of dist/.
+    // The package resolves to src/ so the test does not depend on a build of dist/; every
+    // entry the generated framework files import is mapped, so they type-check too.
+    const source = (file: string): string[] => [join(repositoryRoot, "src", file).replaceAll("\\", "/")];
     root = await project("lsp-components-", {
-      "tsconfig.json": `${JSON.stringify({ compilerOptions: { strict: true, types: ["node"], paths: { "@meekojs/meeko/internal": ["../../src/internal.ts"], "@meekojs/meeko": ["../../src/index.ts"] } } })}\n`,
+      "tsconfig.json": `${JSON.stringify({ compilerOptions: { strict: true, types: ["node"], paths: {
+        "@meekojs/meeko/framework": source("framework.ts"), "@meekojs/meeko/server": source("framework-server.ts"),
+        "@meekojs/meeko/internal": source("internal.ts"), "@meekojs/meeko": source("index.ts"),
+      } } })}\n`,
       "app/components/save-button.meeko": child,
       "app/pages/index.meeko": valid,
     }, false);

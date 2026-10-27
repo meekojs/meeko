@@ -10,7 +10,7 @@ export type ReactiveKind = "signal" | "computed" | "resource";
 /** What created a reactive declaration. `composable` is a call whose type is a signal or resource. */
 export type ReactiveOrigin =
   | "signal" | "useState" | "defineModel" | "useElementRef" | "computed"
-  | "useApi" | "useRpcQuery" | "useRpcMutation" | "composable";
+  | "useApi" | "useRpcQuery" | "useRpcMutation" | "useApiMutation" | "useStorage" | "composable";
 
 /** One use of a reactive declaration, with source offsets of the `.meeko` file. */
 export interface ReactiveAccess {
@@ -57,9 +57,9 @@ export interface ReactivityAnalysis {
 }
 
 const signalOrigins: Readonly<Record<string, ReactiveOrigin>> = {
-  signal: "signal", useState: "useState", defineModel: "defineModel", useElementRef: "useElementRef",
+  signal: "signal", useState: "useState", defineModel: "defineModel", useElementRef: "useElementRef", useStorage: "useStorage",
 };
-const resourceOrigins = new Set(["useApi", "useRpcQuery", "useRpcMutation"]);
+const resourceOrigins = new Set(["useApi", "useRpcQuery", "useRpcMutation", "useApiMutation"]);
 const resourceTriggers = new Set(["refresh", "mutate"]);
 const scriptContexts = new Set(["effect", "computed", "onMounted", "watch"]);
 
@@ -182,7 +182,7 @@ function classify(declaration: ts.VariableDeclaration, checker: ts.TypeChecker):
   const name = type.aliasSymbol?.name ?? type.getSymbol()?.name;
   if (name === "Signal") return { kind: "signal", origin: "composable", awaited, call: expression };
   if (name === "ReadonlySignal") return { kind: "computed", origin: "composable", awaited, call: expression };
-  if (name === "DataResource" || name === "LoadedResource" || name === "RpcMutation") return { kind: "resource", origin: "composable", awaited, call: expression };
+  if (name === "DataResource" || name === "LoadedResource" || name === "RpcMutation" || name === "ApiMutation") return { kind: "resource", origin: "composable", awaited, call: expression };
   return undefined;
 }
 
@@ -357,6 +357,10 @@ export function crossing(declaration: ReactiveDeclaration): string {
         : "Se carga en el navegador después de montar el componente; el SSR lo renderiza mientras está pendiente.";
     case "useRpcMutation":
       return "Sólo navegador: llama al procedimiento bajo demanda y nunca se ejecuta durante el SSR.";
+    case "useApiMutation":
+      return "Sólo navegador: llama al endpoint bajo demanda y nunca se ejecuta durante el SSR.";
+    case "useStorage":
+      return "No pasa al cliente: el SSR y la hidratación usan el valor inicial, y el navegador aplica el valor guardado en su almacenamiento justo después de hidratar.";
     case "signal":
       return "Pasa al cliente: su valor se serializa en el estado del componente tras el SSR y se restaura al hidratar, así que debe ser serializable en JSON.";
     default:

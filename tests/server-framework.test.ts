@@ -373,6 +373,6 @@ test("status chooses 201, 202 or 204 for JSON endpoints and generated clients re
     return request.method === "POST" ? dispatchApiRoute(created, await contextFor(request), sessions) : dispatchApiRoute(removed, await contextFor(request), sessions);
   } });
   assert.equal(await api.orders.post({ body: { name: "Lin" } }), "created:Lin");
-  const nothing: undefined = await api.orders.byId.delete({ params: { id: "1" } });
+  const nothing: undefined = await api.orders({ id: "1" }).delete();
   assert.equal(nothing, undefined);
 });

@@ -11,7 +11,11 @@
  * ```
  */
 export interface PublicApiEndpoint {
-  /** Ruta del método en el cliente, separada por puntos: `"users.byId"` da `api.users.byId.get()`. */
+  /**
+   * Ruta del método en el cliente, separada por puntos. Un segmento `by` + parámetro con mayúscula
+   * inicial es el segmento dinámico de ese parámetro: `"users.byId"` con `/api/users/[id]` da
+   * `api.users({ id }).get()`.
+   */
   readonly clientKey: string;
   /** Ruta HTTP con los segmentos dinámicos entre corchetes. */
   readonly pathname: string;
@@ -99,7 +103,7 @@ export function createPublicServerManifest(manifest: PublicServerManifest): Publ
  * const api = createApiClient<{ "users.byId": { get: GetUser } }>({
  *   api: [{ clientKey: "users.byId", pathname: "/api/users/[id]", method: "GET" }],
  * });
- * const user = await api.users.byId.get({ params: { id: "123" } });
+ * const user = await api.users({ id: "123" }).get();
  * ```
  */
 export interface ApiOperation<Params = undefined, Query = undefined, Body = undefined, Output = unknown> {
@@ -159,15 +163,100 @@ type ApiArguments<O extends AnyApiOperation> = O["params"] extends undefined
     ? O["body"] extends undefined ? [options?: ParamOption<O["params"]> & QueryOption<O["query"]> & BodyOption<O["body"]> & RequestOptions] : [options: ParamOption<O["params"]> & QueryOption<O["query"]> & BodyOption<O["body"]> & RequestOptions]
     : [options: ParamOption<O["params"]> & QueryOption<O["query"]> & BodyOption<O["body"]> & RequestOptions]
   : [options: ParamOption<O["params"]> & QueryOption<O["query"]> & BodyOption<O["body"]> & RequestOptions];
+/**
+ * Entrada de una operación de API que no es `GET`, sin `signal`: `params`, `query` y `body` según
+ * su contrato. Es lo que recibe `mutate` de `useApiMutation` y lo que guarda una mutación
+ * `retrySafe` mientras su resultado es incierto.
+ *
+ * @typeParam O Operación del contrato de API.
+ * @since 1.2.0
+ * @example
+ * ```ts
+ * import type { ApiMutationInput, ApiOperation } from "@meekojs/meeko/framework";
+ *
+ * type CreateSale = ApiOperation<undefined, undefined, { total: number }, { id: string }>;
+ * const input: ApiMutationInput<CreateSale> = { body: { total: 1200 } };
+ * ```
+ */
+export type ApiMutationInput<O extends AnyApiOperation> = ParamOption<O["params"]> & QueryOption<O["query"]> & BodyOption<O["body"]>;
+/** `mutate()` may be called without its input when the operation requires nothing. */
+export type ApiMutationArguments<O extends AnyApiOperation> = O["params"] extends undefined
+  ? OptionalQuery<O["query"]> extends true
+    ? O["body"] extends undefined ? [input?: ApiMutationInput<O>] : [input: ApiMutationInput<O>]
+    : [input: ApiMutationInput<O>]
+  : [input: ApiMutationInput<O>];
 type Nest<Path extends string, Value> = Path extends `${infer Head}.${infer Tail}` ? { [K in Head]: Nest<Tail, Value> } : { [K in Path]: Value };
 type Intersection<Union> = (Union extends unknown ? (value: Union) => void : never) extends (value: infer Result) => void ? Result : never;
-type ApiMethods<Operations> = { [Method in keyof Operations]: Operations[Method] extends AnyApiOperation
-  ? (...args: ApiArguments<Operations[Method]>) => Promise<Operations[Method]["output"]>
+/** The params still missing once a segment call bound `Bound`; none left forbids the option. */
+type RemainingParams<Params, Bound extends string> = 0 extends 1 & Params ? Params
+  : Params extends object ? [Exclude<keyof Params, Bound>] extends [never] ? undefined : Omit<Params, Bound>
+  : Params;
+type BoundOperation<Operation extends AnyApiOperation, Bound extends string> = [Bound] extends [never] ? Operation
+  : ApiOperation<RemainingParams<Operation["params"], Bound>, Operation["query"], Operation["body"], Operation["output"]>;
+type ApiMethods<Operations, Bound extends string = never> = { [Method in keyof Operations]: Operations[Method] extends AnyApiOperation
+  ? (...args: ApiArguments<BoundOperation<Operations[Method], Bound>>) => Promise<Operations[Method]["output"]>
   : never };
 /**
- * Cliente de API tipado: un árbol de objetos según `clientKey` con un método por verbo HTTP
- * (`api.users.byId.get(...)`). Cada método recibe `params`, `query`, `body` y `signal` según su
- * operación y devuelve la salida, o rechaza con {@link ClientError}.
+ * A method reached through a `byId` segment: it still takes `params` and is deprecated. The reason
+ * stays on one line because editors show it as the message of the hint.
+ */
+interface DeprecatedApiMethod<Args extends unknown[], Output> {
+  /** @deprecated Desde 1.2.0: llame al segmento dinámico con sus parámetros, como `api.users({ id }).get()` en lugar de `api.users.byId.get({ params: { id } })`. Se retirará en 2.0. */
+  (...args: Args): Promise<Output>;
+}
+type DeprecatedApiMethods<Operations> = { [Method in keyof Operations]: Operations[Method] extends AnyApiOperation
+  ? DeprecatedApiMethod<ApiArguments<Operations[Method]>, Operations[Method]["output"]>
+  : never };
+/** The route parameter names of one client key, which name its dynamic segments. */
+type RouteParamNames<Operations> = { [Method in keyof Operations]: Operations[Method] extends { readonly params: infer Params }
+  ? 0 extends 1 & Params ? never : Params extends object ? keyof Params & string : never
+  : never }[keyof Operations];
+/** `byId` is the dynamic segment of the route parameter `id`; any other name is static. */
+type SegmentParam<Segment extends string, Names extends string> = Names extends unknown ? Segment extends `by${Capitalize<Names>}` ? Names : never : never;
+type ClientSegment<Name extends string, Param extends string> = { readonly name: Name; readonly param: Param };
+type ClientPath<Key extends string, Names extends string> = Key extends `${infer Head}.${infer Tail}`
+  ? [ClientSegment<Head, SegmentParam<Head, Names>>, ...ClientPath<Tail, Names>]
+  : [ClientSegment<Key, SegmentParam<Key, Names>>];
+/** One client key of the contract as its segments, below the node that is being typed. */
+type ClientEntries<Contract> = { [Key in keyof Contract & string]: { readonly path: ClientPath<Key, RouteParamNames<Contract[Key]>>; readonly operations: Contract[Key] } }[keyof Contract & string];
+type EntryHead<Entries> = Entries extends { readonly path: readonly [infer Head, ...unknown[]] } ? Head : never;
+type SegmentNames<Entries> = EntryHead<Entries> extends infer Head ? Head extends { readonly name: infer Name extends string } ? Name : never : never;
+type StaticNames<Entries> = EntryHead<Entries> extends infer Head ? Head extends { readonly name: infer Name extends string; readonly param: infer Param } ? [Param] extends [never] ? Name : never : never : never;
+type DynamicSegments<Entries> = EntryHead<Entries> extends infer Head ? Head extends { readonly param: infer Param } ? [Param] extends [never] ? never : Head : never : never;
+type DynamicNames<Entries> = DynamicSegments<Entries> extends infer Head ? Head extends { readonly name: infer Name extends string } ? Name : never : never;
+type ChildEntries<Entries, Name extends string> = Entries extends { readonly path: readonly [{ readonly name: Name }, ...infer Tail]; readonly operations: infer Operations }
+  ? { readonly path: Tail; readonly operations: Operations } : never;
+type NodeOperations<Entries> = Entries extends { readonly path: readonly []; readonly operations: infer Operations } ? Operations : never;
+/** One call signature per dynamic child: `node({ id })` binds `id` and returns that child. */
+type SegmentCalls<Entries, Bound extends string> = Intersection<DynamicSegments<Entries> extends infer Segment
+  ? Segment extends ClientSegment<infer Name, infer Param>
+    ? (params: { readonly [Key in Param]: string }) => ApiNode<ChildEntries<Entries, Name>, Bound | Param>
+    : never
+  : never>;
+/**
+ * A node of the client: methods, static children, segment calls and, before any call, the `byId`
+ * aliases. The outer conditional keeps hovers structural, since a resolved conditional type is not
+ * shown as `ApiNode<...>`.
+ */
+type ApiNode<Entries, Bound extends string> = [Entries] extends [never] ? unknown
+  : ([NodeOperations<Entries>] extends [never] ? unknown : ApiMethods<NodeOperations<Entries>, Bound>)
+    & ([StaticNames<Entries>] extends [never] ? unknown : { [Name in StaticNames<Entries>]: ApiNode<ChildEntries<Entries, Name>, Bound> })
+    & SegmentCalls<Entries, Bound>
+    & ([Bound] extends [never] ? [DynamicNames<Entries>] extends [never] ? unknown : { [Name in DynamicNames<Entries>]: DeprecatedApiNode<ChildEntries<Entries, Name>> } : unknown);
+/** The subtree below a `byId` alias, as in 1.0 and 1.1: every method takes all its `params`. */
+type DeprecatedApiNode<Entries> = [Entries] extends [never] ? unknown
+  : ([NodeOperations<Entries>] extends [never] ? unknown : DeprecatedApiMethods<NodeOperations<Entries>>)
+    & ([SegmentNames<Entries>] extends [never] ? unknown : { [Name in SegmentNames<Entries>]: DeprecatedApiNode<ChildEntries<Entries, Name>> });
+/**
+ * Cliente de API tipado: un árbol según `clientKey` con un método por verbo HTTP. Un segmento
+ * dinámico se llama con sus parámetros (`api.users({ id }).get()`); los métodos que se alcanzan así
+ * ya no reciben `params`. Cada método recibe `query`, `body` y `signal` según su operación y
+ * devuelve la salida, o rechaza con {@link ClientError}.
+ *
+ * El segmento de `clientKey` que forma `by` con el nombre en mayúscula inicial de un parámetro de
+ * la ruta (`byId` para `[id]` o `[...id]`) es el segmento dinámico de ese parámetro. Desde `1.2`,
+ * la forma `api.users.byId.get({ params: { id } })` sigue funcionando pero está obsoleta y se
+ * retirará en `2.0`.
  *
  * @typeParam Contract Contrato `ApiContract` generado, indexado por `clientKey`.
  * @example
@@ -177,11 +266,21 @@ type ApiMethods<Operations> = { [Method in keyof Operations]: Operations[Method]
  * declare const api: ApiClient<{ users: { get: ApiOperation<undefined, { page?: string }, undefined, string[]> } }>;
  * const names = await api.users.get({ query: { page: "2" } });
  * ```
+ * Segmentos dinámicos, desde `1.2`:
+ * ```ts
+ * import type { ApiClient, ApiOperation } from "@meekojs/meeko/framework";
+ *
+ * type User = { id: string; name: string };
+ * declare const api: ApiClient<{
+ *   "users.byId": { get: ApiOperation<{ id: string }, undefined, undefined, User> };
+ *   "orgs.byOrg.users.byId": { delete: ApiOperation<{ org: string; id: string }, undefined, undefined, undefined> };
+ * }>;
+ * const user = await api.users({ id: "123" }).get();
+ * await api.orgs({ org: "acme" }).users({ id: "123" }).delete();
+ * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#api-y-rpc
  */
-export type ApiClient<Contract extends Record<string, Record<string, AnyApiOperation>>> = Intersection<{
-  [Key in keyof Contract & string]: Nest<Key, ApiMethods<Contract[Key]>>
-}[keyof Contract & string]>;
+export type ApiClient<Contract extends Record<string, Record<string, AnyApiOperation>>> = ApiNode<ClientEntries<Contract>, never>;
 /**
  * Cliente RPC tipado: un árbol de funciones según el ID de cada procedimiento
  * (`rpc.users.get(input, { signal })`), que devuelven su salida o rechazan con {@link ClientError}.
@@ -390,9 +489,10 @@ function endpointUrl(pathname: string, options: ClientOptions): string {
   return baseUrl ? new URL(pathname, baseUrl).toString() : pathname;
 }
 
-function headersFor(options: ClientOptions, method: string, json: boolean): Headers {
+function headersFor(options: ClientOptions, method: string, json: boolean, extra?: Readonly<Record<string, string>>): Headers {
   const headers = new Headers(typeof options.headers === "function" ? options.headers() : options.headers);
   if (json) headers.set("content-type", "application/json");
+  for (const [name, value] of Object.entries(extra ?? {})) headers.set(name, value);
   if (method !== "GET" && method !== "HEAD") {
     const csrf = typeof options.csrfToken === "function" ? options.csrfToken() : options.csrfToken;
     if (csrf) headers.set("x-meeko-csrf", csrf);
@@ -415,16 +515,86 @@ function insert(root: Record<string, unknown>, key: string, value: unknown): voi
   node[last] = value;
 }
 
-function ensureObject(root: Record<string, unknown>, key: string): Record<string, unknown> {
-  const parts = key.split(".");
-  if (parts.some((part) => !/^[A-Za-z_$][\w$]*$/.test(part))) throw new TypeError(`Invalid client key: ${key}`);
-  let node = root;
-  for (const part of parts) {
-    const existing = node[part];
-    if (existing === undefined) node[part] = Object.create(null) as Record<string, unknown>;
-    else if (!existing || typeof existing !== "object") throw new TypeError(`Client key collision: ${key}`);
-    node = node[part] as Record<string, unknown>;
+/** The API client as a tree of segments; a child with `param` is a dynamic segment. */
+interface ApiTree {
+  readonly methods: Map<string, PublicApiEndpoint>;
+  readonly children: Map<string, { readonly param: string | undefined; readonly tree: ApiTree }>;
+}
+
+const apiTree = (): ApiTree => ({ methods: new Map(), children: new Map() });
+
+/** `byId` names the dynamic segment `[id]` or `[...id]` in a client key, as the manifest builds it. */
+const segmentAlias = (param: string): string => `by${param[0]!.toUpperCase()}${param.slice(1)}`;
+
+function addApiEndpoint(root: ApiTree, endpoint: PublicApiEndpoint): void {
+  const key = endpoint.clientKey;
+  const segments = key.split(".");
+  if (segments.some((part) => !/^[A-Za-z_$][\w$]*$/.test(part))) throw new TypeError(`Invalid client key: ${key}`);
+  const params = [...endpoint.pathname.matchAll(/\[(?:\.\.\.)?([A-Za-z_$][\w$]*)\]/g)].map((match) => match[1]!);
+  const bound = new Set<string>();
+  let tree = root;
+  for (const segment of segments) {
+    const matches = params.filter((name) => segmentAlias(name) === segment);
+    const param = matches[0];
+    if (matches.length > 1 || (param !== undefined && bound.has(param))) throw new TypeError(`Ambiguous client key: ${key}`);
+    if (param !== undefined) bound.add(param);
+    let child = tree.children.get(segment);
+    if (!child) tree.children.set(segment, child = { param, tree: apiTree() });
+    else if (child.param !== param) throw new TypeError(`Client key collision: ${key}`);
+    tree = child.tree;
   }
+  const method = endpoint.method.toLowerCase();
+  if (tree.methods.has(method)) throw new TypeError(`Duplicate API method: ${key}.${method}`);
+  tree.methods.set(method, endpoint);
+}
+
+function assertApiTree(tree: ApiTree, path: string): void {
+  for (const [name, child] of tree.children) {
+    const key = path ? `${path}.${name}` : name;
+    if (tree.methods.has(name)) throw new TypeError(`Client key collision: ${key}`);
+    assertApiTree(child.tree, key);
+  }
+}
+
+/**
+ * Defines a member of a node. A callable node is a function, as its type says, so a static child
+ * named `name` or `length` replaces the function's own property instead of failing to assign it.
+ */
+function define(node: Record<string, unknown>, key: string, value: unknown): void {
+  Object.defineProperty(node, key, { value, enumerable: true, writable: true, configurable: true });
+}
+
+/** The client of one node; `bound` holds the params of the segment calls that reached it. */
+function apiNode(tree: ApiTree, bound: Readonly<Record<string, string>> | undefined, options: ClientOptions): Record<string, unknown> {
+  const dynamic = new Map<string, ApiTree>();
+  for (const child of tree.children.values()) if (child.param !== undefined) dynamic.set(child.param, child.tree);
+  const call = (params: unknown) => {
+    const keys = params !== null && typeof params === "object" ? Object.keys(params) : [];
+    if (keys.length === 0) throw new TypeError(`Missing route parameter: ${[...dynamic.keys()].join(" | ")}`);
+    const unknown = keys.find((key) => !dynamic.has(key)) ?? keys[1];
+    if (unknown !== undefined) throw new TypeError(`Unknown route parameter: ${unknown}`);
+    const name = keys[0]!;
+    return apiNode(dynamic.get(name)!, { ...bound, [name]: (params as Record<string, string>)[name]! }, options);
+  };
+  const node = (dynamic.size === 0 ? Object.create(null) : call) as Record<string, unknown>;
+  for (const [method, endpoint] of tree.methods) {
+    define(node, method, bound
+      ? (input: ApiRequestInput = {}) => requestApi(endpoint, { ...input, params: { ...input.params, ...bound } }, options)
+      : (input: ApiRequestInput = {}) => requestApi(endpoint, input, options));
+  }
+  for (const [name, child] of tree.children) {
+    if (child.param === undefined) define(node, name, apiNode(child.tree, bound, options));
+    // The `byId` alias of 1.0 and 1.1 exists only before the first segment call.
+    else if (!bound) define(node, name, deprecatedApiNode(child.tree, options));
+  }
+  return node;
+}
+
+/** The subtree below a `byId` alias, as in 1.0 and 1.1: every method takes all its `params`. */
+function deprecatedApiNode(tree: ApiTree, options: ClientOptions): Record<string, unknown> {
+  const node: Record<string, unknown> = Object.create(null);
+  for (const [method, endpoint] of tree.methods) node[method] = (input: ApiRequestInput = {}) => requestApi(endpoint, input, options);
+  for (const [name, child] of tree.children) node[name] = deprecatedApiNode(child.tree, options);
   return node;
 }
 
@@ -436,13 +606,16 @@ export interface ApiRequestInput {
   readonly signal?: AbortSignal;
 }
 
-/** Sends one request to a public API endpoint; `api.*` and `useApi` share it. */
-export async function requestApi(endpoint: PublicApiEndpoint, input: ApiRequestInput, options: ClientOptions): Promise<unknown> {
+/**
+ * Sends one request to a public API endpoint; `api.*`, `useApi` and `useApiMutation` share it.
+ * `extra` adds headers of the framework, such as `Idempotency-Key`.
+ */
+export async function requestApi(endpoint: PublicApiEndpoint, input: ApiRequestInput, options: ClientOptions, extra?: Readonly<Record<string, string>>): Promise<unknown> {
   const path = pathWithParams(endpoint.pathname, input.params) + queryString(input.query);
   const url = endpointUrl(path, options);
   const fetcher = options.fetch ?? fetch;
   const response = await fetcher(url, {
-    method: endpoint.method, headers: headersFor(options, endpoint.method, input.body !== undefined),
+    method: endpoint.method, headers: headersFor(options, endpoint.method, input.body !== undefined, extra),
     credentials: "same-origin", ...(input.body === undefined ? {} : { body: JSON.stringify(input.body) }),
     ...(input.signal ? { signal: input.signal } : {}),
   });
@@ -450,10 +623,10 @@ export async function requestApi(endpoint: PublicApiEndpoint, input: ApiRequestI
 }
 
 /** Calls one RPC procedure, with the session's CSRF token; `rpc.*` and the RPC composables share it. */
-export async function requestRpc(endpoint: PublicRpcEndpoint, input: unknown, request: RequestOptions, options: ClientOptions): Promise<unknown> {
+export async function requestRpc(endpoint: PublicRpcEndpoint, input: unknown, request: RequestOptions, options: ClientOptions, extra?: Readonly<Record<string, string>>): Promise<unknown> {
   const fetcher = options.fetch ?? fetch;
   const response = await fetcher(endpointUrl(endpoint.pathname, options), {
-    method: "POST", headers: headersFor(options, "POST", true), credentials: "same-origin",
+    method: "POST", headers: headersFor(options, "POST", true, extra), credentials: "same-origin",
     body: JSON.stringify(input), ...(request.signal ? { signal: request.signal } : {}),
   });
   return responseValue(response);
@@ -466,7 +639,8 @@ export async function requestRpc(endpoint: PublicRpcEndpoint, input: unknown, re
  * @param manifest Manifiesto público con la lista `api`.
  * @param options Opciones de transporte.
  * @returns El {@link ApiClient} tipado por `Contract`.
- * @throws {TypeError} Si dos endpoints producen el mismo método o un `clientKey` no es válido.
+ * @throws {TypeError} Si dos endpoints producen el mismo método, un `clientKey` no es válido o un
+ * segmento no puede ser a la vez estático y dinámico, o dinámico de dos parámetros.
  * @example
  * ```ts
  * import { createApiClient } from "@meekojs/meeko/framework";
@@ -482,14 +656,10 @@ export async function requestRpc(endpoint: PublicRpcEndpoint, input: unknown, re
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#api-y-rpc
  */
 export function createApiClient<Contract extends Record<string, Record<string, AnyApiOperation>>>(manifest: Pick<PublicServerManifest, "api">, options: ClientOptions = {}): ApiClient<Contract> {
-  const root: Record<string, unknown> = Object.create(null);
-  for (const endpoint of manifest.api) {
-    const methods = ensureObject(root, endpoint.clientKey);
-    const method = endpoint.method.toLowerCase();
-    if (methods[method]) throw new TypeError(`Duplicate API method: ${endpoint.clientKey}.${method}`);
-    methods[method] = (input: ApiRequestInput = {}) => requestApi(endpoint, input, options);
-  }
-  return root as ApiClient<Contract>;
+  const tree = apiTree();
+  for (const endpoint of manifest.api) addApiEndpoint(tree, endpoint);
+  assertApiTree(tree, "");
+  return apiNode(tree, undefined, options) as ApiClient<Contract>;
 }
 
 /**

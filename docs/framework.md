@@ -67,7 +67,11 @@ export default defineServerRuntime(({ production, prerendering }) => ({
 
 `app/styles/main.css` es opcional y se carga automáticamente como hoja global en desarrollo y en el build. Vite la incluye en el asset CSS de producción; Meeko enlaza ese asset en el HTML SSR y prerenderizado. Los bloques `<style>` de `.meeko` siguen disponibles para estilos locales.
 
-En desarrollo, Vite abre un WebSocket HMR en un puerto derivado de `PORT` para que dos aplicaciones Meeko no compitan por el puerto predeterminado de Vite. El SSR de desarrollo carga `@meekojs/meeko` desde Node, fuera del module runner de Vite, como el build; así una aplicación que consume Meeko con `link:` mantiene una sola instancia del runtime aunque Vite recargue sus módulos. Si reconstruye un Meeko enlazado, reinicie `meeko dev`. `MEEKO_HMR_PORT` permite fijarlo explícitamente cuando el entorno lo exige; el navegador debe poder acceder a ese puerto además del HTTP de la aplicación.
+En desarrollo, Vite abre un WebSocket HMR en un puerto derivado del puerto HTTP para que dos aplicaciones Meeko no compitan por el puerto predeterminado de Vite. `MEEKO_HMR_PORT` permite fijarlo explícitamente cuando el entorno lo exige; el navegador debe poder acceder a ese puerto además del HTTP de la aplicación.
+
+Si ni `PORT` ni `server.port` fijan el puerto, `meeko dev` usa el primero libre a partir de `4173` (hasta `4192`), como Vite: con otro `meeko dev` ya en `4173`, el segundo escribe `[meeko] El puerto 4173 está en uso; meeko dev usa el 4174` y la URL real, y deriva de ese puerto el del WebSocket HMR y el descriptor del puente con el editor (`.meeko/dev/editor-bridge-4174.json`). Un puerto fijado con `PORT` o `server.port` no cambia: si está ocupado, `meeko dev` termina con `El puerto 4173 de 127.0.0.1 ya está en uso; usa PORT=<otro puerto> o cierra el otro meeko dev`.
+
+El SSR de desarrollo carga `@meekojs/meeko` desde Node, fuera del module runner de Vite, como el build; así una aplicación que consume Meeko con `link:` mantiene una sola instancia del runtime aunque Vite recargue sus módulos. Por eso, cuando `@meekojs/meeko` está enlazado (`link:` de pnpm, `npm link` o un workspace: el paquete se resuelve fuera de todo `node_modules`), `meeko dev` ejecuta el servidor en un proceso hijo y vigila `dist/` y `package.json` del paquete enlazado. Al reconstruirlo, espera a que la compilación termine (400 ms sin cambios), escribe `[meeko] Meeko enlazado cambió; reiniciando meeko dev…`, cierra el servidor anterior (Socket, HTTP, Vite y el descriptor del puente con el editor) y arranca otro proceso en el mismo puerto, con el mismo entorno. Si el nuevo proceso no arranca, por ejemplo porque la compilación quedó a medias, lo informa y vuelve a intentarlo con el siguiente cambio. `Ctrl+C` detiene ambos procesos. Con una instalación normal desde el registro no se vigila nada más; `MEEKO_LINK_WATCH=0` desactiva el reinicio también con un paquete enlazado.
 
 ## Configuración, módulos y layers
 
@@ -82,6 +86,8 @@ export default defineMeekoConfig({
 ```
 
 Cada fuente declarada aporta su propio `app/pages`, componentes y autoimports. El orden es app, `extends` y `modules`, en el orden escrito.
+
+Desde `1.2`, `css: { scopeAttribute: "matched" }` limita el atributo de `<style scoped>` a los elementos que algún selector con ámbito puede seleccionar; con `"all"`, el valor por defecto en `1.x`, va en todos los elementos de la plantilla. `"matched"` pasará a ser el valor por defecto en `2.0`. Véase [Estilos con ámbito](api.md#qué-elementos-reciben-el-atributo), con el caso de las clases que el script añade con la API del DOM.
 
 `extends` y `modules` se comportan igual: la única diferencia es el orden y el nombre con que aparecen en los diagnósticos («layer» o «module»). Use `extends` para una base compartida de la que parte la aplicación (diseño, páginas comunes) y `modules` para funciones que se añaden (autenticación, panel de administración). Cada fuente necesita su carpeta `app/pages`. Sus páginas se muestran dentro del shell del proyecto: `app/app.meeko` y el layout raíz de la aplicación (`app/layouts/default.meeko` o `app/pages/+layout.meeko`) envuelven también a las páginas de capas y módulos, y los `+layout.meeko` propios de la capa se anidan dentro. Si el proyecto tiene `app.meeko` o layout raíz, sustituyen a los equivalentes de la capa; si no, se usan los de la capa. Una página de capa que falla usa el `+error.meeko` más cercano de su propio árbol, después el `app/error.meeko` de la capa y, por último, la página de error raíz del proyecto. La `404` de una URL sin ruta siempre usa la del proyecto. Los módulos programáticos (`RouteModule.routes()`) siguen declarando sus propios layouts. El manifiesto rechaza colisiones de URL; el registro rechaza nombres de autoimport repetidos. El diagnóstico incluye los archivos en conflicto. Las rutas configuradas deben vivir dentro del proyecto. La configuración de rutas se carga con Node. En un workspace de confianza el servidor de lenguaje también la ejecuta, por lo que las listas pueden construirse dinámicamente; en un workspace no confiable (o con `trusted: false`, ver [editores](editors.md)) el editor no ejecuta código del proyecto y sólo reconoce arrays literales de cadenas.
 
@@ -420,7 +426,7 @@ Los componentes recibidos como props mantienen la dirección del contrato: un co
 
 ## Autoimports y TypeScript
 
-Meeko analiza exports AST de `app/{components,composables,utils,stores}`, `shared/{types,schemas,utils,constants,enums}` y `server/utils`. Los símbolos de `app/` están disponibles en cliente y SSR, pero no desde `shared/`; los sufijos `.client.ts` y `.server.ts` restringen un módulo a su entorno. `imports.serverDirs` añade directorios privados exclusivos del servidor. Los símbolos del framework `api`, `rpc`, `socket`, `useSocket`, `useApi`, `useRpcQuery`, `useRpcMutation`, `useState`, `href` y `useRoute`, y `onMounted` de la raíz, también figuran en el registro; un export propio llamado `useRoute` tiene prioridad sobre el del framework. Los imports explícitos prevalecen. Una colisión produce error; nunca se elige por orden de archivos. Un `enum` o una clase autoimportados sirven también como tipo, con sus miembros (`Scope.App`); si un archivo sólo los usa como tipo, Meeko inserta `import type`. Los schemas de `shared/schemas` pueden llegar por autoimport a los contratos de API, RPC y Socket. `meeko check` comprueba los `.ts` que importa un `.meeko` con los autoimports de su ámbito y con las rutas generadas, igual que los proyectos `tsconfig.*`.
+Meeko analiza exports AST de `app/{components,composables,utils,stores}`, `shared/{types,schemas,utils,constants,enums}` y `server/utils`. Los símbolos de `app/` están disponibles en cliente y SSR, pero no desde `shared/`; los sufijos `.client.ts` y `.server.ts` restringen un módulo a su entorno. `imports.serverDirs` añade directorios privados exclusivos del servidor. Los símbolos del framework `api`, `rpc`, `socket`, `useSocket`, `useApi`, `useRpcQuery`, `useRpcMutation`, `useState`, `href` y `useRoute`, desde `1.2` `useForm`, `useStorage` y `useApiMutation`, y `onMounted` de la raíz, también figuran en el registro; un export propio llamado `useRoute`, `useForm`, `useStorage` o `useApiMutation` tiene prioridad sobre el del framework. Los imports explícitos prevalecen. Una colisión produce error; nunca se elige por orden de archivos. Un `enum` o una clase autoimportados sirven también como tipo, con sus miembros (`Scope.App`); si un archivo sólo los usa como tipo, Meeko inserta `import type`. Los schemas de `shared/schemas` pueden llegar por autoimport a los contratos de API, RPC y Socket. `meeko check` comprueba los `.ts` que importa un `.meeko` con los autoimports de su ámbito y con las rutas generadas, igual que los proyectos `tsconfig.*`.
 
 Los `.ts` normales de `app/` (composables, utils, stores) se ejecutan en SSR y en el navegador, como los `.meeko` que los usan, y sus autoimports del framework (`api`, `rpc`, `socket`, `useSocket`, `useApi`…) se resuelven por entorno: el cliente de servidor en SSR y el del navegador en el navegador. Antes de `1.1` usaban siempre el del navegador, y `meeko dev` o `meeko build` fallaban con «Client-only module reached the server bundle». Un `.client.ts` sigue siendo sólo de navegador.
 
@@ -506,7 +512,7 @@ export default defineRpc({
 // app/pages/users/index.meeko, sin imports manuales
 const loadUsers = async () => {
   const users = await api.users.get();
-  const user = await api.users.byId.get({ params: { id: "123" } });
+  const user = await api.users({ id: "123" }).get();
   const result = await rpc.users.get({ id: "123" });
   return { users, user, result };
 };
@@ -523,6 +529,31 @@ Los schemas públicos de API, RPC y Socket deben exponer tipos Standard Schema c
 `meeko check .` genera proyectos TypeScript separados para cliente, servidor y shared. Incluye las fuentes de los layers y módulos declarados en `meeko.config.ts`, aunque sus rutas no usen los nombres convencionales `layers/` o `modules/`. Un archivo `*.server.ts` de `app/` se comprueba en el proyecto servidor y uno `*.shared.ts` en el proyecto shared; los archivos con sufijo de ámbito conservan esa selección también dentro de `shared/` y `server/`.
 
 Los errores de API y RPC se normalizan en el servidor: un `ApiError` conserva `code` y `status`, la respuesta añade `requestId` y `x-request-id`, y un fallo desconocido se devuelve como `INTERNAL_ERROR` sin exponer su mensaje. La misma normalización se aplica al despacho local SSR y al transporte Node, incluso cuando Vite carga módulos en grafos distintos. La navegación que solicita `application/meeko+json` recibe el mismo formato; una página HTML de error conserva el estado HTTP y `x-request-id` sin incluir detalles privados. El servidor generado observa los fallos 5xx: en producción registra tipo e ID, y en desarrollo muestra también el error original. Las respuestas 4xx esperadas no se registran como fallos internos.
+
+### Segmentos dinámicos en `api.*`
+
+Cada carpeta o archivo de `server/api` es un nivel de `api.*`, y cada archivo aporta el método de su sufijo. Desde `1.2`, un segmento dinámico se llama con sus parámetros: `node({ nombre: valor })` devuelve el cliente de ese segmento, y los métodos que se alcanzan así ya no reciben `params`. `query`, `body` y `signal` siguen igual, y la URL se construye y se codifica como con `params`.
+
+```ts
+// server/api/menu/categories/index.get.ts         → api.menu.categories.get()
+// server/api/menu/categories/[id].patch.ts        → api.menu.categories({ id }).patch({ body })
+// server/api/menu/categories/[id]/archive.post.ts → api.menu.categories({ id }).archive.post()
+// server/api/orgs/[org]/users/[id].get.ts         → api.orgs({ org }).users({ id }).get()
+const list = await api.menu.categories.get();
+await api.menu.categories({ id }).patch({ body: { name } });
+await api.menu.categories({ id }).archive.post();
+const user = await api.orgs({ org }).users({ id }).get({ query: { tab: "profile" } });
+```
+
+- La llamada recibe un objeto con el único parámetro de su segmento, como cadena: TypeScript rechaza que falte, una clave de más, un valor que no es texto y `params` en los métodos que siguen a la llamada. Un objeto sin el parámetro o con otro lanza un `TypeError` al llamar; un valor vacío, `.`, `..` o con `/` rechaza la petición igual que con `params`.
+- Un nivel conserva sus métodos y sus hijos estáticos junto a la llamada: `api.menu.categories.get()` y `api.menu.categories({ id })` conviven. Si un nivel tiene varios segmentos dinámicos hijos (`users/[id].get.ts` y `users/[slug]/posts.get.ts`), el nombre del parámetro elige el segmento: `api.users({ id })` o `api.users({ slug }).posts.get()`.
+- Un catch-all `[...path]` recibe, como en `params`, una cadena con los segmentos unidos por `/`: `api.files({ path: "docs/a b.txt" }).get()` pide `/api/files/docs/a%20b.txt`, con cada segmento codificado por separado.
+- `useApi` no cambia: sigue recibiendo la ruta con corchetes y `params`, como `useApi("/api/menu/categories/[id]", { params: { id } })`.
+- El editor completa la llamada, sus parámetros y los métodos del segmento, y el hover y "ir a la definición" de `api.menu.categories({ id }).archive.post` llevan al handler.
+
+En `clientKey`, el segmento dinámico de `[id]` o `[...id]` se llama `byId`: `by` seguido del nombre del parámetro con la inicial en mayúscula. El cliente reconoce así el segmento al que corresponde cada parámetro, también en un cliente explícito de `createApiClient`. Por eso el manifiesto rechaza, con las rutas en conflicto, un segmento estático que se llame igual que el segmento dinámico de su nivel (`users/byId/` junto a `users/[id]`) o de su propia ruta (`[id]/byId.get.ts`), y dos parámetros cuyo nombre sólo cambia en la inicial (`[id]` y `[Id]`) en el mismo nivel o en la misma ruta.
+
+La forma anterior, `api.menu.categories.byId.archive.post({ params: { id } })`, sigue funcionando durante toda la serie 1.x y se retirará en `2.0`. Está obsoleta desde `1.2`: el editor tacha cada método que se llama a través de `byId` y su hover indica el reemplazo; no hay aviso de consola. Sólo existe antes de la primera llamada de segmento: `api.orgs({ org }).users.byId` no existe.
 
 ### Errores de validación en formularios
 
@@ -554,6 +585,8 @@ const fieldError = (path: string) => {
 ```
 
 Escriba mensajes propios en el schema: algunos mensajes por defecto de Valibot citan el valor recibido.
+
+`useForm` lleva estos `issues` a cada campo del formulario sin código propio (véase [Formularios: `useForm`](#formularios-useform)).
 
 ### Valores por petición: `locals`
 
@@ -621,7 +654,7 @@ export default defineApiRoute({
 ```
 
 - `status` debe ser un literal (`status: 201`): el generador lo lee sin ejecutar el handler y rechaza otro valor. Una constante o una expresión no sirven.
-- Con `204`, el handler no devuelve nada y no se declara `response`; devolver un valor responde `500` `INVALID_RESPONSE`. En el contrato generado la salida es `undefined`, así que `await api.orders.byId.delete({ params })` resuelve `undefined`, igual que `useApi`.
+- Con `204`, el handler no devuelve nada y no se declara `response`; devolver un valor responde `500` `INVALID_RESPONSE`. En el contrato generado la salida es `undefined`, así que `await api.orders({ id }).delete()` resuelve `undefined`, igual que `useApi`.
 - `status` no se combina con `contentType: "response"`: ese handler ya devuelve su propio `Response` con el estado que quiera.
 - Un `status` no admitido, combinado con `contentType: "response"` o un `204` con `response` responde `500` `INVALID_RESPONSE_STATUS` antes de leer la entrada, aunque el generador ya lo rechaza en `meeko routes`, `meeko check` y `meeko dev`.
 - Los errores no cambian: siguen saliendo de `ApiError` con su propio estado.
@@ -631,13 +664,14 @@ export default defineApiRoute({
 
 ### Datos en componentes: `useApi`, `useRpcQuery` y `useRpcMutation`
 
-Desde `1.1`, un componente puede pedir sus propios datos con tres composables autoimportados desde los clientes generados. Usan los mismos contratos, tipos, sesión y CSRF que `api.*` y `rpc.*`:
+Desde `1.1`, un componente puede pedir sus propios datos con composables autoimportados desde los clientes generados. Usan los mismos contratos, tipos, sesión y CSRF que `api.*` y `rpc.*`:
 
 | Composable | Uso | Devuelve |
 | --- | --- | --- |
 | `useApi(ruta, opciones?)` | Lectura de un endpoint `GET` | `{ data, error, pending, refresh }` |
 | `useRpcQuery(procedimiento, input)` | Lectura mediante un procedimiento RPC | `{ data, error, pending, refresh }` |
-| `useRpcMutation(procedimiento)` | Escritura bajo demanda | `{ mutate(input), data, error, pending }` |
+| `useRpcMutation(procedimiento, opciones?)` | Escritura bajo demanda mediante RPC | `{ mutate(input), data, error, pending }` |
+| `useApiMutation(ruta, método, opciones?)` (desde `1.2`) | Escritura bajo demanda en un endpoint `POST`, `PUT`, `PATCH` o `DELETE` | `{ mutate({ params, query, body }), data, error, pending }` |
 
 `ruta` es la ruta del endpoint tal como la describe `server/api`, con los segmentos dinámicos entre corchetes: `"/api/users"` o `"/api/users/[id]"`. Sólo se admiten endpoints `GET`. `procedimiento` es el ID del procedimiento con puntos: `server/rpc/users/get.ts` es `"users.get"`. El editor completa rutas y procedimientos, y TypeScript comprueba `params`, `query` e `input` contra el contrato. `data`, `error` y `pending` son señales de sólo lectura; `error` es un `Error` o `null`.
 
@@ -719,6 +753,102 @@ Para mostrar un indicador mientras tanto, use el composable sin `await` y lea `p
 
 `useRpcMutation(procedimiento)` no hace ninguna petición hasta que se llama `mutate(input)`, nunca en SSR. `mutate` envía el token CSRF como `rpc.*`, actualiza `pending`, `data` y `error` y devuelve la salida del procedimiento, o rechaza con su error. No se puede esperar con `await` en el nivel superior (`MEEK055`): espere `mutate` dentro de un handler.
 
+Desde `1.2`, `useApiMutation(ruta, método)` hace lo mismo con un endpoint de API que no es `GET`. `ruta` se escribe como en `useApi` (`"/api/notes/[id]"`) y `método` es `"POST"`, `"PUT"`, `"PATCH"` o `"DELETE"`; TypeScript sólo acepta los métodos que existen para esa ruta. `mutate({ params, query, body })` recibe la entrada de la operación, comprobada contra el contrato, y se puede llamar sin argumentos si la operación no exige nada. Un endpoint `204` resuelve con `undefined`.
+
+```html
+<script lang="ts">
+const props = defineProps<{ params: { id: string }; search: Record<string, string | string[]> }>();
+const note = await useApi("/api/notes/[id]", { params: { id: props.params.id } });
+const save = useApiMutation("/api/notes/[id]", "PUT");
+const remove = useApiMutation("/api/notes/[id]", "DELETE");
+async function rename(text: string): Promise<void> {
+    await save.mutate({ params: { id: props.params.id }, body: { text } });
+    await note.refresh();
+}
+</script>
+<template>
+    <p if:when="save.error.value">No se pudo guardar.</p>
+    <button bind:disabled="remove.pending.value" on:click="() => remove.mutate({ params: { id: props.params.id } })">Borrar</button>
+</template>
+```
+
+Igual que `useRpcMutation`, se llama mientras se ejecuta el script del componente (en su nivel superior) y `await useApiMutation(...)` da `MEEK055`. Un export propio de la aplicación llamado `useApiMutation` tiene prioridad sobre el autoimport.
+
+#### Mutaciones seguras ante reintentos
+
+Una escritura que se queda sin respuesta (se cae la red, el servidor responde `5xx` o el proceso muere) puede haberse aplicado o no. Reintentarla a ciegas puede cobrar dos veces; descartarla puede perder una venta. Desde `1.2`, `useRpcMutation` y `useApiMutation` aceptan la opción `retrySafe`, que resuelve ese caso en el cliente y deja la deduplicación al servidor:
+
+```ts
+const charge = useRpcMutation("sales.checkout", { retrySafe: { key: "pos:sale" } });
+const step = useApiMutation("/api/kitchen/items/[id]/steps", "POST", { retrySafe: { key: "kitchen:step", storage: "session" } });
+```
+
+- **Intención con clave.** `mutate(input)` crea un UUID nuevo (la clave de idempotencia), guarda la intención (la entrada, la clave y la hora) en el almacenamiento del navegador bajo `retrySafe.key` y después la envía con la cabecera `Idempotency-Key: "<uuid>"`, con el formato de cadena de Structured Fields que define el borrador del IETF. Si la página se cierra a mitad de la petición, la intención sigue guardada.
+- **Sin respuesta.** Un fallo de red, un `5xx`, un `408` o un `429` conservan la intención: `mutate` rechaza con el error, `error` lo refleja y `charge.uncertain.value` muestra la intención (`{ idempotencyKey, input, startedAt }`). Se reintenta con la **misma** clave cuando el navegador vuelve a estar en línea (evento `online`), cuando se monta un componente que usa la mutación (también después de recargar) y al llamar a `charge.retry()`. Mientras se reintenta, `uncertain` conserva su valor y `pending` vale `true`.
+- **Con respuesta.** Un `2xx` borra la intención y `mutate` o `retry()` resuelven con la salida. Cualquier otro `4xx` también la borra: el servidor contestó, así que no hay nada que reintentar; el `ClientError` llega a `error` y rechaza la promesa.
+- **Una intención a la vez.** Mientras haya una intención incierta bajo esa clave, `mutate` rechaza con un error `MUTATION_UNCERTAIN` sin enviar nada. La aplicación decide: `retry()` la reintenta, `discard()` la olvida sin enviarla (pida antes confirmación al usuario, porque pudo registrarse).
+- **Nunca en SSR ni en seco.** El servidor nunca la envía ni la lee, y las pasadas en seco de una navegación tampoco: sólo la reintenta el componente ya montado.
+- **Almacenamiento.** `storage: "local"` (por defecto) sobrevive a recargas y a cerrar el navegador; `"session"`, sólo a recargas de esa pestaña. Si el navegador bloquea el almacenamiento, la intención vive en memoria y se reintenta mientras la página siga abierta. La intención usa [`useStorage`](#estado-persistente-usestorage) por dentro, así que otra pestaña la ve llegar por el evento `storage`; si dos pestañas la reintentan a la vez, el servidor recibe la misma clave dos veces y responde lo mismo.
+
+Use una clave de almacenamiento por mutación, que incluya lo que la distinga entre usuarios o cuentas que comparten el navegador (`` `pos:sale:${restaurant.slug}` ``). Una intención que guardó otra mutación bajo la misma clave nunca se envía a este endpoint. La entrada se guarda y se reenvía tal como viaja, en JSON.
+
+```html
+<script lang="ts">
+const charge = useRpcMutation("sales.checkout", { retrySafe: { key: "pos:sale" } });
+const failure = signal("");
+async function pay(input: SaleInput): Promise<void> {
+    failure.value = "";
+    try {
+        const receipt = await charge.mutate(input);
+        notify(`Venta #${receipt.number} cobrada.`);
+    } catch (error) {
+        // Sin respuesta: queda en verificación y se reintentará con la misma clave.
+        if (!charge.uncertain.value) failure.value = errorMessage(error);
+    }
+}
+function discard(): void {
+    if (window.confirm("Descarta esta venta sólo si comprobaste que no se registró.")) charge.discard();
+}
+</script>
+<template>
+    <div role="alert" if:when="charge.uncertain.value">
+        <p>Venta en verificación: no tuvo respuesta. Se reintentará con la misma clave, así que no se cobrará dos veces.</p>
+        <button bind:disabled="charge.pending.value" on:click="() => charge.retry().catch(() => {})">Reintentar ahora</button>
+        <button on:click="discard">Descartar</button>
+    </div>
+    <p if:when="failure.value">{failure.value}</p>
+</template>
+```
+
+**En el servidor**, la clave llega validada como `context.idempotencyKey`: el UUID en minúsculas, o `undefined` si la cabecera falta o no es un UUID (se acepta con o sin comillas). Meeko no deduplica: la aplicación guarda la clave junto al resultado, con una restricción única, y ante una clave repetida devuelve el resultado que ya registró en lugar de aplicar la escritura otra vez.
+
+```sql
+ALTER TABLE sales ADD COLUMN idempotency_key uuid;
+CREATE UNIQUE INDEX sales_idempotency_key ON sales (restaurant_id, idempotency_key);
+```
+
+```ts
+// server/rpc/sales/checkout.ts
+export default defineRpc({
+    input: saleInput,
+    output: saleReceipt,
+    auth: "required",
+    handler: async ({ input, context }) => {
+        const key = context.idempotencyKey;
+        if (!key) throw new ApiError("IDEMPOTENCY_KEY_REQUIRED", 400);
+        const { db, restaurantId } = context.services;
+        // Un reintento de una venta ya registrada devuelve el mismo recibo, sin cobrar otra vez.
+        const existing = await db.sales.findByKey(restaurantId, key);
+        if (existing) return existing.receipt;
+        // La restricción única cubre también dos reintentos simultáneos: el segundo INSERT falla
+        // y vuelve a leer la venta del primero.
+        return db.sales.insertOrGet(restaurantId, key, input);
+    },
+});
+```
+
+Acote la clave al usuario o a la cuenta, como en el índice, y, si quiere seguir el borrador del IETF al pie de la letra, responda `422` cuando la misma clave llega con otra entrada. La cabecera no cambia la seguridad: la petición sigue necesitando la sesión, el token CSRF y el `Origin` de siempre. En una petición del mismo origen el navegador la envía sin más; si un cliente de otro origen llama a la API con CORS, añada `Idempotency-Key` a `Access-Control-Allow-Headers` en su proxy o middleware.
+
 #### `load` o composables
 
 | Necesidad | Use |
@@ -728,9 +858,182 @@ Para mostrar un indicador mientras tanto, use el composable sin `await` y lea `p
 | Datos que pertenecen a un componente reutilizable o a un layout | `await useApi` / `await useRpcQuery` |
 | Datos que dependen de señales del componente y se recargan al cambiar | `useApi` / `useRpcQuery`, con o sin `await` |
 | Datos que pueden llegar después del primer pintado, con un indicador de carga | `useApi` / `useRpcQuery` sin `await` |
-| Escrituras | `useRpcMutation`, o `api.*`/`rpc.*` en un handler |
+| Escrituras | `useRpcMutation` / `useApiMutation`, o `api.*`/`rpc.*` en un handler |
+| Escrituras que no deben aplicarse dos veces si se pierde la respuesta (cobros, pasos de cocina) | `useRpcMutation` / `useApiMutation` con `retrySafe` |
+| Estado del navegador que debe sobrevivir a una recarga (un ticket abierto, la caja elegida) | [`useStorage`](#estado-persistente-usestorage) |
+| Formularios que envían datos, con validación y errores por campo | `useForm` con `api.*`/`rpc.*` en su `submit` |
 
-Las reglas de nivel superior de estos composables (`MEEK054`, `MEEK055`) se describen en [api.md](api.md#composables-de-nivel-superior-y-await). Un host propio puede crearlos con `createUseApi(manifest, options)`, `createUseRpcQuery(manifest, options)` y `createUseRpcMutation(manifest, options)` de `@meekojs/meeko/framework`, que es lo que hacen los clientes generados; los tipos `DataResource`, `LoadedResource`, `RpcMutation`, `UseApi`, `UseRpcQuery`, `UseRpcMutation`, `ApiQueryContract`, `ApiQueryOptions` y `Reactive` describen su forma.
+Las reglas de nivel superior de estos composables (`MEEK054`, `MEEK055`) se describen en [api.md](api.md#composables-de-nivel-superior-y-await). Un host propio puede crearlos con `createUseApi(manifest, options)`, `createUseRpcQuery(manifest, options)`, `createUseRpcMutation(manifest, options)` y, desde `1.2`, `createUseApiMutation(manifest, options)` de `@meekojs/meeko/framework`, que es lo que hacen los clientes generados; los tipos `DataResource`, `LoadedResource`, `RpcMutation`, `UseApi`, `UseRpcQuery`, `UseRpcMutation`, `ApiQueryContract`, `ApiQueryOptions` y `Reactive`, y desde `1.2` `ApiMutation`, `ApiMutationInput`, `ApiMutationContract`, `UseApiMutation`, `MutationOptions`, `RetrySafeOptions`, `RetrySafeMutation` y `UncertainMutation`, describen su forma.
+
+### Estado persistente: `useStorage`
+
+Desde `1.2`, `useStorage(clave, inicial, opciones?)` devuelve una señal editable cuyo valor se guarda en JSON en `localStorage` (o en `sessionStorage` con `storage: "session"`). Se autoimporta en los `.meeko` desde `@meekojs/meeko/framework`, como `useState`, y se llama mientras se ejecuta el script de un componente (en su nivel superior o dentro de un composable que este llama).
+
+```html
+<script lang="ts">
+const lines = useStorage("pos:ticket", [] as TicketLine[]);
+const registerId = useStorage("pos:register", "");
+const add = (line: TicketLine): void => { lines.value = [...lines.value, line]; };
+</script>
+<template><p>{lines.value.length} productos en el ticket</p></template>
+```
+
+- **SSR e hidratación sin desajustes.** El servidor nunca lee el almacenamiento: el HTML usa `inicial`, y la hidratación también. El valor guardado se aplica justo al terminar de hidratar la página, antes de `onMounted`, igual que `model` con un control que el usuario editó antes de hidratar. Un componente que se monta después (un `if:` que se abre, la página de una navegación en el navegador) ya pinta el valor guardado en su primer render. La señal no viaja en el estado del payload: su fuente es el almacenamiento.
+- **Escrituras.** Cada asignación se guarda al momento, en JSON. Asigne valores nuevos (`lines.value = [...lines.value, line]`), como con cualquier señal: mutar el objeto no avisa ni guarda. Asignar `undefined` borra la clave, y la siguiente lectura vuelve a `inicial` (declare el tipo con `| undefined`, por ejemplo `useStorage<string | undefined>("draft", undefined)`).
+- **Lecturas inválidas.** Un valor que no es JSON o que no cumple `schema` se ignora y la señal vale `inicial`. `schema` es un Standard Schema síncrono (Valibot, Zod…); con él, el tipo de la señal sale del schema:
+
+  ```ts
+  import * as v from "valibot";
+  const theme = useStorage("theme", "light", { schema: v.picklist(["light", "dark"]) });
+  ```
+
+- **Almacenamiento bloqueado.** En modo privado, sin permiso o con la cuota llena, nunca lanza: la señal sigue funcionando en memoria. Sólo un fallo inesperado, como un valor que JSON no puede representar (`BigInt`, ciclos) o un `schema` que lanza o es asíncrono, llega al `provideErrorHandler` más cercano o al `onError` de la aplicación.
+- **Otras pestañas.** Mientras algún componente usa la clave, el evento `storage` de otra pestaña actualiza la señal (con la misma validación); un `localStorage.clear()` la devuelve a `inicial`. El listener se libera con el último componente que la usa.
+- **Una señal por clave.** Dos componentes que usan la misma clave y el mismo almacenamiento comparten una sola señal; el primero que la crea fija `inicial` y `schema`. Cuando ya ningún componente la usa, el siguiente vuelve a leer el almacenamiento.
+
+| Necesidad | Use |
+| --- | --- |
+| Estado compartido de la aplicación, igual en SSR y en el navegador | `useState` |
+| Estado del navegador que sobrevive a una recarga o se comparte entre pestañas | `useStorage` |
+| Datos que pertenecen al servidor | `useApi` / `useRpcQuery` |
+
+No guarde secretos ni tokens: el almacenamiento es legible por cualquier script de la página. Incluya en la clave lo que distinga a usuarios o cuentas que comparten navegador (`` `pos:ticket:${restaurant.slug}` ``).
+
+### Formularios: `useForm`
+
+Desde `1.2`, `useForm` reúne lo que repite cada formulario: una señal por campo, la validación en el navegador, `pending`, el mensaje de error, `event.preventDefault()` y los `issues` de un `400` del servidor llevados a cada campo. Se autoimporta desde `@meekojs/meeko/framework` y valida con cualquier Standard Schema, como los de Valibot.
+
+```ts
+// shared/schemas/menu.ts
+import * as v from "valibot";
+
+export const categoryInput = v.object({
+  name: v.pipe(v.string(), v.trim(), v.minLength(1, "Escribe un nombre."), v.maxLength(60, "Usa como mucho 60 caracteres.")),
+  description: v.pipe(v.string(), v.trim(), v.maxLength(200, "Usa como mucho 200 caracteres.")),
+});
+export const categorySchema = v.object({ id: v.string(), name: v.string(), description: v.string() });
+```
+
+```ts
+// server/api/menu/categories/index.post.ts
+import { ApiError, defineApiRoute } from "@meekojs/meeko/server";
+import { categoryInput, categorySchema } from "../../../../shared/schemas/menu.js";
+import { createCategory } from "../../../utils/menu.js";
+
+export default defineApiRoute({
+  body: categoryInput,
+  response: categorySchema,
+  status: 201,
+  handler: async ({ body }) => {
+    const category = await createCategory(body);
+    if (!category) throw new ApiError("CATEGORY_EXISTS", 409);
+    return category;
+  },
+});
+```
+
+```html
+<!-- app/components/TextField.meeko -->
+<script lang="ts">
+const props = defineProps<{ label: string; error?: string | undefined }>();
+const value = defineModel<string>("value");
+</script>
+<template>
+    <label>{props.label} <input model="value" bind:aria-invalid="props.error ? 'true' : null"></label>
+    <p class="field-error" if:when="props.error">{props.error}</p>
+</template>
+```
+
+```html
+<!-- app/pages/menu/categories/new.meeko -->
+<script lang="ts">
+import { ClientError } from "@meekojs/meeko/framework";
+
+const form = useForm({
+    schema: categoryInput,
+    initial: { name: "", description: "" },
+    submit: (values) => api.menu.categories.post({ body: values }),
+    errorMessage: (failure) => failure instanceof ClientError && failure.code === "CATEGORY_EXISTS"
+        ? "Ya existe una categoría con ese nombre."
+        : "No se pudo guardar. Revisa la conexión e inténtalo de nuevo.",
+});
+</script>
+<template>
+    <form on:submit="form.submit" novalidate>
+        <p class="alert" role="alert" if:when="form.error.value">{form.error.value}</p>
+        <label>Nombre <input model="form.fields.name" bind:aria-invalid="form.errors.value.name ? 'true' : null"></label>
+        <p class="field-error" if:when="form.errors.value.name">{form.errors.value.name}</p>
+        <TextField label="Descripción" model:value="form.fields.description" bind:error="form.errors.value.description" />
+        <button bind:disabled="form.pending.value">{form.pending.value ? "Guardando…" : "Guardar"}</button>
+        <p if:when="form.submitted.value">Categoría guardada.</p>
+    </form>
+</template>
+```
+
+`useForm(options)` recibe:
+
+| Opción | Uso |
+| --- | --- |
+| `schema` | Opcional. Standard Schema que valida los campos al enviar. |
+| `initial` | Valor inicial de cada campo. Con `schema`, uno por cada clave de su entrada, también las opcionales (`undefined` si no hay valor). |
+| `submit(values)` | Envía los datos: recibe la salida del schema (o los valores de los campos, sin schema) y devuelve el resultado, o rechaza. |
+| `errorMessage(failure)` | Opcional. Texto de `error` para un fallo sin `issues`; por defecto, `failure.message`, que en un `ClientError` es su `code`. |
+
+y devuelve un `Form`:
+
+| Propiedad | Valor |
+| --- | --- |
+| `fields` | Una `Signal` escribible por campo, para `model` en un `<input>`, `<textarea>` o `<select>` y `model:nombre` en un componente. |
+| `errors` | Señal con el primer mensaje de cada ruta con error (`errors.value.name`, `errors.value["items.0.name"]`); un campo sin error no tiene clave. |
+| `error` | Señal con el mensaje del formulario completo, o `null`. |
+| `failure` | Señal con el error original del último envío fallido (también el `ClientError` de un `400`), o `null`. |
+| `pending` | `true` mientras se valida de forma asíncrona o se ejecuta `submit`. |
+| `submitted` | `true` cuando el último envío terminó bien. |
+| `dirty` | `true` si algún campo difiere de los valores iniciales (los arrays y objetos se comparan por contenido). |
+| `submit(event?)` | Envía el formulario; resuelve con lo que devuelve `submit`, o con `undefined`. Nunca rechaza. |
+| `reset(values?)` | Vuelve a los valores iniciales, o a `initial` combinado con `values`. |
+
+Todas las señales salvo `fields` son de sólo lectura.
+
+**Envío.** `form.submit(event)` llama a `event.preventDefault()`, valida los campos con el schema y, si son válidos, llama a `submit` con la salida del schema. Mientras hay un envío en curso, otro `form.submit()` se ignora (resuelve `undefined`, y también evita el envío nativo del navegador). Al empezar un envío válido se borran `errors`, `error`, `failure` y `submitted`. `submit` puede devolver un valor o una promesa; para hacer algo con el resultado, envuelva la llamada:
+
+```ts
+async function save(event: SubmitEvent): Promise<void> {
+    const category = await form.submit(event);
+    if (category) form.reset();
+}
+```
+
+**Validación.** El schema se ejecuta al enviar, no mientras se escribe. Cada issue va a `errors` con su ruta unida con `.`, como los `issues` del servidor: `"name"`, o `"items.0.name"` en un campo anidado. Si una ruta tiene varios, se conserva el primero. Un issue con ruta `""` (de una regla sobre el objeto completo) o de una clave que el formulario no tiene va a `error`. Tras un error, el campo se vuelve a validar cada vez que cambia: su mensaje se actualiza o desaparece en cuanto es válido, sin esperar al siguiente envío. Un campo sin error no se valida hasta el envío. Si el schema es asíncrono, `pending` vale `true` mientras valida.
+
+**Errores del servidor.** Un `ClientError` con `issues` (la respuesta `400` de una entrada que no supera el schema del servidor) se reparte igual: cada mensaje en su campo y los demás en `error`. Es útil sin schema en el navegador, o cuando el servidor tiene reglas que el formulario no comprueba. Sin schema, cambiar un campo borra sus mensajes del servidor:
+
+```ts
+// app/pages/ingresar.meeko: sin schema, valida sólo el servidor
+const form = useForm({
+    initial: { email: "", password: "" },
+    submit: (values) => api.session.post({ body: values }),
+    errorMessage: (failure) => failure instanceof ClientError && failure.code === "INVALID_CREDENTIALS"
+        ? "Los datos no coinciden con ninguna cuenta."
+        : "No se pudo conectar con el servidor.",
+});
+```
+
+```json
+{ "code": "INVALID_BODY", "status": 400, "requestId": "…", "issues": [{ "path": "email", "message": "Escribe un correo válido." }, { "path": "password", "message": "Escribe tu contraseña." }] }
+```
+
+Con esa respuesta, `form.errors.value` vale `{ email: "Escribe un correo válido.", password: "Escribe tu contraseña." }`, `form.error.value` vale `null` y `form.failure.value` es el `ClientError`. Un `401` `INVALID_CREDENTIALS` deja `errors` vacío y `error` con el texto de `errorMessage`. Para marcar un campo desde el propio `submit` (por ejemplo, tras comprobar algo en el navegador), lance un `ClientError` con `issues`: `throw new ClientError("EMAIL_TAKEN", 409, undefined, [{ path: "email", message: "Ese correo ya tiene cuenta." }])`.
+
+**Otros fallos.** Un error sin `issues` pone en `error` el texto de `errorMessage(failure)` y en `failure` el error original, y `form.submit()` resuelve `undefined`. Un `ClientError` es una respuesta prevista del servidor y no se informa en otro sitio. Cualquier otro error (un fallo de red, un error de programación en `submit` o un schema que lanza) llega además al observador de errores del componente, `provideErrorHandler` o el `onError` de `mountClientApp`, con la fuente `"event"`; sin observador, se escribe en la consola. Así un fallo inesperado nunca se pierde en silencio, aunque la plantilla no muestre `error`.
+
+**`reset` y `dirty`.** `reset()` devuelve los campos a `initial`; `reset(values)` los lleva a `initial` combinado con `values`, por ejemplo para editar un registro existente: `form.reset({ name: category.name, description: category.description })`. Esos valores pasan a ser la referencia de `dirty`. `reset` borra `errors`, `error`, `failure` y `submitted`, y descarta el resultado de una validación o un envío que siga en curso (aunque `pending` sigue en `true` hasta que termine). Como con cualquier señal, sustituya los arrays y objetos en lugar de mutarlos: `form.fields.items.value = [...form.fields.items.value, item]`.
+
+**Tipos.** Con `schema`, los campos tienen el tipo de la entrada del schema y `submit` recibe su salida: con un `v.transform`, el campo puede ser texto (`price: Signal<string>`) y `submit` recibir un número. Sin schema, los campos y los valores tienen el tipo de `initial`. `meeko check` comprueba `initial` contra la entrada del schema, rechaza un campo que no existe (`form.fields.nmae`) o una ruta de `errors` que no existe, y exige que el campo de un `model` tenga el tipo del control (un campo `number` no sirve para un `<input>` de texto). El tipo `Form<Values, Result>` describe el resultado, por ejemplo para pasar el formulario a un componente.
+
+**SSR e hidratación.** En SSR el formulario se renderiza con `initial` y nunca envía: los eventos no existen en el servidor, y `form.submit()` no hace nada si se llama mientras el script se ejecuta para producir sólo HTML (SSR o la pasada en seco de una navegación). Los campos son estado del componente que no viaja en el payload: no forman parte del estado transferido ni del que conserva HMR, porque `form` no es una señal. Al hidratar, el navegador vuelve a ejecutar `useForm` con el mismo `initial`, así que `initial` debe depender sólo de props, datos de la ruta y estado, como la entrada de un `await useApi`. Lo que el usuario escriba antes de que la página se hidrate se conserva: `model` lo copia a la señal del campo al terminar la hidratación.
+
+Llame a `useForm` en el nivel superior del `<script>`, como cualquier estado del componente. A diferencia de `useApi`, no tiene la restricción `MEEK054` ni admite `await`.
 
 ## WebSocket
 

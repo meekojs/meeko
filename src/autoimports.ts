@@ -64,12 +64,12 @@ function filesInSync(path: string): string[] {
 function builtins(root: string): AutoImport[] {
   const entries: AutoImport[] = [
     ...["signal", "computed", "effect", "batch", "onCleanup", "onMounted", "provide", "inject", "createContext", "provideErrorHandler"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko", specifier: "@meekojs/meeko", scope: "shared", typeOnly: false, component: false })),
-    ...["useState", "href", "useRoute"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "shared", typeOnly: false, component: false })),
+    ...["useState", "href", "useRoute", "useForm", "useStorage"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "shared", typeOnly: false, component: false })),
   ];
   for (const scope of ["client", "server"] as const) {
     const file = join(root, ".meeko", "generated", `clients.${scope}.ts`);
     if (!existsSync(file)) continue;
-    for (const name of ["api", "rpc", "socket", "useSocket", "useApi", "useRpcQuery", "useRpcMutation"]) entries.push({ name, imported: name, file, scope, typeOnly: false, component: false });
+    for (const name of ["api", "rpc", "socket", "useSocket", "useApi", "useRpcQuery", "useRpcMutation", "useApiMutation"]) entries.push({ name, imported: name, file, scope, typeOnly: false, component: false });
   }
   if (!entries.some((entry) => entry.name === "useSocket")) {
     // Without generated clients, `useSocket` is the framework's `useSocketClient`: the same
@@ -81,13 +81,22 @@ function builtins(root: string): AutoImport[] {
 
 /**
  * Framework autoimports added after 1.0 that a project may already export under the same name:
- * the project's own export wins, instead of making the name ambiguous.
+ * the project's own export wins, instead of making the name ambiguous. `useApiMutation` comes from
+ * the generated clients; the others, from `@meekojs/meeko/framework`.
  */
-const yieldingBuiltins: ReadonlySet<string> = new Set(["useRoute"]);
+const yieldingBuiltins: ReadonlySet<string> = new Set(["useRoute", "useForm", "useStorage", "useApiMutation"]);
+
+function isGeneratedClient(file: string): boolean {
+  return /[\\/]\.meeko[\\/]generated[\\/]clients\.(?:client|server)\.ts$/.test(file);
+}
+
+function isYieldingBuiltin(entry: AutoImport): boolean {
+  return yieldingBuiltins.has(entry.name) && (entry.specifier === "@meekojs/meeko/framework" || isGeneratedClient(entry.file));
+}
 
 function withoutShadowedBuiltins(result: AutoImport[]): AutoImport[] {
-  return result.filter((entry) => !(entry.specifier === "@meekojs/meeko/framework" && yieldingBuiltins.has(entry.name)
-    && result.some((other) => other !== entry && other.name === entry.name)));
+  return result.filter((entry) => !(isYieldingBuiltin(entry)
+    && result.some((other) => other.name === entry.name && !isYieldingBuiltin(other))));
 }
 
 function addAutoImport(result: AutoImport[], entry: AutoImport): void {
@@ -209,8 +218,11 @@ function scopeNames(node: ts.Node): Set<string> {
   if ((ts.isForOfStatement(node) || ts.isForInStatement(node)) && ts.isVariableDeclarationList(node.initializer)) {
     for (const declaration of node.initializer.declarations) bindingNames(declaration.name, names);
   }
-  if (ts.isSourceFile(node) || ts.isBlock(node)) {
-    for (const statement of node.statements) {
+  // The clauses of a `switch` share one scope.
+  const statements = ts.isSourceFile(node) || ts.isBlock(node) ? node.statements
+    : ts.isCaseBlock(node) ? node.clauses.flatMap((clause) => [...clause.statements]) : undefined;
+  if (statements) {
+    for (const statement of statements) {
       if (ts.isVariableStatement(statement)) for (const declaration of statement.declarationList.declarations) bindingNames(declaration.name, names);
       if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement) || ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement) || ts.isEnumDeclaration(statement)) && statement.name) names.add(statement.name.text);
       if (ts.isImportDeclaration(statement)) {
@@ -228,7 +240,7 @@ function scopeNames(node: ts.Node): Set<string> {
 
 function introducesScope(node: ts.Node): boolean {
   return ts.isSourceFile(node) || ts.isBlock(node) || ts.isFunctionLike(node) || ts.isCatchClause(node)
-    || ts.isForStatement(node) || ts.isForOfStatement(node) || ts.isForInStatement(node);
+    || ts.isForStatement(node) || ts.isForOfStatement(node) || ts.isForInStatement(node) || ts.isCaseBlock(node);
 }
 
 function isReference(node: ts.Identifier): boolean {
@@ -246,6 +258,8 @@ function isReference(node: ts.Identifier): boolean {
   if (ts.isVariableDeclaration(parent) && parent.name === node) return false;
   if ((ts.isFunctionDeclaration(parent) || ts.isClassDeclaration(parent) || ts.isInterfaceDeclaration(parent) || ts.isTypeAliasDeclaration(parent)) && parent.name === node) return false;
   if (ts.isPropertySignature(parent) && parent.name === node) return false;
+  // Labels of `outer: for (...)`, `break outer` and `continue outer` name no value.
+  if ((ts.isLabeledStatement(parent) || ts.isBreakOrContinueStatement(parent)) && parent.label === node) return false;
   return true;
 }
 

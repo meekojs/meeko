@@ -64,10 +64,17 @@ import type { ApiContract, RpcContract } from "./.meeko/types/server-contracts.j
 declare const manifest: { api: readonly [{ clientKey: "users.byId"; pathname: "/api/users/[id]"; method: "GET" }]; rpc: readonly [{ id: "users.get"; pathname: "/_meeko/rpc/users/get" }] };
 const api = createApiClient<ApiContract>(manifest);
 const rpc = createRpcClient<RpcContract>(manifest);
-const user: Promise<{ id: string; name: string }> = api.users.byId.get({ params: { id: "1" } });
+const user: Promise<{ id: string; name: string }> = api.users({ id: "1" }).get();
+const legacyUser: Promise<{ id: string; name: string }> = api.users.byId.get({ params: { id: "1" } });
 const listing: Promise<{ id: string; name: string }> = api.users.get();
 const result: Promise<{ id: string; name: string }> = rpc.users.get({ id: "1" });
-void user; void listing; void result;
+void user; void legacyUser; void listing; void result;
+// @ts-expect-error path ID must be a string
+api.users({ id: 2 });
+// @ts-expect-error the segment call requires id
+api.users({});
+// @ts-expect-error params are bound by the segment call
+api.users({ id: "1" }).get({ params: { id: "1" } });
 // @ts-expect-error path ID must be a string
 api.users.byId.get({ params: { id: 2 } });
 // @ts-expect-error body must contain name

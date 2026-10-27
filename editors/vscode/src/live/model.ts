@@ -5,6 +5,20 @@ export type { EditorBridgeDescriptor, EditorBridgeEvent, EditorCommandResult, Ed
 /** Descriptores del puente: cada `meeko dev` en marcha escribe el suyo, con su puerto en el nombre. */
 export const bridgeDescriptorGlob = "**/.meeko/dev/editor-bridge-*.json";
 
+/**
+ * `true` si el descriptor, con su ruta relativa a la carpeta del workspace, es de un proyecto del
+ * workspace. Se descartan los de paquetes en `node_modules` (un paquete enlazado con `link:` y sus
+ * proyectos temporales) y los de proyectos dentro del `.meeko/` de otro (proyectos temporales de
+ * herramientas y pruebas): sus valores no son del código del workspace.
+ */
+export function isWorkspaceBridgeDescriptor(path: string): boolean {
+  const segments = path.split(/[\\/]/).filter(Boolean);
+  const name = segments.at(-1) ?? "";
+  if (!/^editor-bridge-\d+\.json$/.test(name) || segments.at(-2) !== "dev" || segments.at(-3) !== ".meeko") return false;
+  const project = segments.slice(0, -3);
+  return !project.some((segment) => segment === "node_modules" || segment === ".meeko");
+}
+
 /** Valores de una misma declaración de señal en todas las instancias montadas. */
 export interface LiveGroup {
   name: string;

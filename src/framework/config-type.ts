@@ -77,6 +77,15 @@ export interface MeekoConfig {
   readonly imports?: { readonly serverDirs?: readonly string[] };
   /** Destino del servidor de producción. Por defecto, `{ adapter: "node" }`. */
   readonly server?: MeekoServerConfig;
+  /**
+   * Estilos de los componentes. `scopeAttribute` elige qué elementos reciben el atributo de
+   * `<style scoped>`: `"all"` (por defecto en 1.x), todos los de la plantilla; `"matched"`
+   * (desde `1.2`), sólo los que algún selector con ámbito puede seleccionar. Con `"matched"`, una
+   * clase o un atributo que el script añade con la API del DOM a un elemento sin `ref:` ni `on:`
+   * no recibe los estilos con ámbito si ese elemento quedó sin atributo. En `2.0`, `"matched"`
+   * pasará a ser el valor por defecto.
+   */
+  readonly css?: { readonly scopeAttribute?: "all" | "matched" };
 }
 
 /**

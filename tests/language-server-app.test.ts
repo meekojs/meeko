@@ -13,6 +13,8 @@ const notes = useApi("/api/notes", { query: { q: "" } });
 const user = useRpcQuery("users.get", { id: 1 });
 async function load(): Promise<void> {
   await api.notes.get({ query: { q: "x" } });
+  await api.notes({ id: "n1" }).get();
+  await api.notes.byId.get({ params: { id: "n1" } });
   await rpc.users.get({ id: 1 });
 }
 </script>
@@ -37,7 +39,19 @@ export default defineRpc({
 });
 `;
 
-const clients = `export declare const api: { notes: { get(input?: { query?: { q: string } }): Promise<string[]> } };
+const noteHandler = `import { defineApiRoute } from "@meekojs/meeko/server";
+import { Note, NoteParams } from "../../../shared/notes.js";
+export default defineApiRoute({
+  params: NoteParams,
+  response: Note,
+  handler: () => "",
+});
+`;
+
+const clients = `export declare const api: {
+  notes: { get(input?: { query?: { q: string } }): Promise<string[]>; byId: { get(input: { params: { id: string } }): Promise<string> } }
+    & ((params: { readonly id: string }) => { get(): Promise<string> });
+};
 export declare const rpc: { users: { get(input: { id: number }): Promise<{ name: string }> } };
 export declare function useApi(path: "/api/notes", options?: { query: { q: string } }): { data: { value: string[] | null } };
 export declare function useRpcQuery(id: "users.get", input: { id: number }): { data: { value: { name: string } | null } };
@@ -56,8 +70,9 @@ describe("language server: routes, API and RPC", () => {
       "app/pages/users/[id].meeko": `<script lang="ts">\nconst props = defineProps<{ params: { id: string } }>();\n</script>\n<template><p>{props.params.id}</p></template>\n`,
       "app/layouts/default.meeko": `<script lang="ts">\nconst props = defineProps<{ outlet: object }>();\n</script>\n<template><main>{String(props.outlet)}</main></template>\n`,
       "server/api/notes.get.ts": handler,
+      "server/api/notes/[id].get.ts": noteHandler,
       "server/rpc/users/get.ts": procedure,
-      "shared/notes.ts": "export const NoteQuery = {};\nexport const NoteList = {};\n",
+      "shared/notes.ts": "export const NoteQuery = {};\nexport const NoteList = {};\nexport const NoteParams = {};\nexport const Note = {};\n",
       "shared/users.ts": "export const UserInput = {};\nexport const User = {};\n",
       ".meeko/generated/clients.client.ts": clients,
       ".meeko/generated/clients.server.ts": clients,
@@ -77,7 +92,7 @@ describe("language server: routes, API and RPC", () => {
 
   test("the application index has the pages, endpoints and procedures", () => {
     assert.deepEqual(component.app?.routes.map((route) => route.id).sort(), ["/", "/users/[id]"]);
-    assert.deepEqual(component.app?.api.map((endpoint) => `${endpoint.method} ${endpoint.pathname}`), ["GET /api/notes"]);
+    assert.deepEqual(component.app?.api.map((endpoint) => `${endpoint.method} ${endpoint.pathname}`), ["GET /api/notes", "GET /api/notes/[id]"]);
     assert.deepEqual(component.app?.rpc.map((endpoint) => endpoint.id), ["users.get"]);
   });
 
@@ -107,6 +122,18 @@ describe("language server: routes, API and RPC", () => {
       assert.equal(fileURLToPath(target!.uri).toLowerCase(), workspace.file("server/api/notes.get.ts").toLowerCase());
       assert.deepEqual(target!.range.start, { line: 5, character: 2 });
     }
+  });
+
+  test("a segment call and its byId alias show the endpoint of the dynamic route", () => {
+    for (const [needle, delta] of [["notes({ id", 1], ["get();", 1], ["byId.get", 1], ["byId.get", 6]] as const) {
+      const text = hoverText(needle, delta, "api.notes({");
+      assert.match(text, /\*\*GET\*\* `\/api\/notes\/\[id\]` → handler \[server\/api\/notes\/\[id\]\.get\.ts\]/, `${needle}: ${text}`);
+      assert.match(text, /- params: `NoteParams`/);
+      const [target] = definition(component, component.at(needle, delta, "api.notes({")) as Location[];
+      assert.equal(fileURLToPath(target!.uri).toLowerCase(), workspace.file("server/api/notes/[id].get.ts").toLowerCase());
+    }
+    // The static member of the same node keeps its own endpoint.
+    assert.match(hoverText("get({ query", 1), /\*\*GET\*\* `\/api\/notes` →/);
   });
 
   test("useRpcQuery and rpc.* show the procedure, its schemas and handler", () => {

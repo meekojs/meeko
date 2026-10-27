@@ -15,6 +15,7 @@ import { MemorySessionStore, SessionManager } from "../src/framework-server/sess
 import { createLocalServerFetch } from "../src/framework-server/discovery.ts";
 import { defineApiRoute, defineRpc, dispatchApiRoute } from "../src/framework-server/contracts.ts";
 import type { Schema, ServerManifest } from "../src/framework-server.ts";
+import type { ApiOperation } from "../src/framework/clients.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -281,4 +282,38 @@ test("in-process automatic clients use the HTTP contract pipeline and original S
   assert.equal((await serverFetch(valid, context)).headers.get("x-meeko-csrf-token"), record.csrfToken);
   const forged = new Request("https://meeko.test/api/users", { method: "POST", headers: { cookie: "meeko.sid=forged" }, body: JSON.stringify("x") });
   assert.equal((await serverFetch(forged, context)).status, 403);
+});
+
+test("in-process automatic clients dispatch segment calls with their params", async () => {
+  const anySchema: Schema<unknown> = { "~standard": { version: 1, validate: (value) => ({ value }) } };
+  const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
+  const anonymous = await sessions.load(new Request("https://meeko.test/"));
+  const record = await anonymous.create({ user: "alice" });
+  const source = new Request("https://meeko.test/menu", { headers: { cookie: `meeko.sid=${record.id}` } });
+  const context = createRequestContext(source, {}, await sessions.load(source));
+  const manifest: ServerManifest = {
+    api: [
+      { kind: "api", file: "member.ts", pathname: "/api/orgs/[org]/users/[id]", clientKey: "orgs.byOrg.users.byId", method: "GET" },
+      { kind: "api", file: "archive.ts", pathname: "/api/menu/categories/[id]/archive", clientKey: "menu.categories.byId.archive", method: "POST" },
+      { kind: "api", file: "file.ts", pathname: "/api/files/[...path]", clientKey: "files.byPath", method: "GET" },
+    ],
+    rpc: [],
+  };
+  const read = defineApiRoute({ params: anySchema, query: anySchema, response: anySchema, handler: ({ params, query }) => ({ params, query, body: null }) });
+  const write = defineApiRoute({ params: anySchema, query: anySchema, body: anySchema, response: anySchema, handler: ({ params, query, body }) => ({ params, query, body }) });
+  const modules = new Map<string, unknown>([["member.ts", { default: read }], ["archive.ts", { default: write }], ["file.ts", { default: read }]]);
+  const serverFetch = createLocalServerFetch({ manifest, sessions, load: async (file) => modules.get(file) });
+  type Echo = { params: Record<string, string>; query: Record<string, string>; body: unknown };
+  const api = createApiClient<{
+    "orgs.byOrg.users.byId": { get: ApiOperation<{ org: string; id: string }, { tab?: string }, undefined, Echo> };
+    "menu.categories.byId.archive": { post: ApiOperation<{ id: string }, undefined, { reason: string }, Echo> };
+    "files.byPath": { get: ApiOperation<{ path: string }, undefined, undefined, Echo> };
+  }>(manifest, createServerClientOptions());
+  await withRequestContext(context, serverFetch, async () => {
+    assert.deepEqual(await api.orgs({ org: "acme" }).users({ id: "a b" }).get({ query: { tab: "x" } }), { params: { org: "acme", id: "a b" }, query: { tab: "x" }, body: null });
+    assert.deepEqual(await api.menu.categories({ id: "7" }).archive.post({ body: { reason: "old" } }), { params: { id: "7" }, query: {}, body: { reason: "old" } });
+    assert.deepEqual(await api.files({ path: "docs/a b.txt" }).get(), { params: { path: "docs/a b.txt" }, query: {}, body: null });
+    // The deprecated alias dispatches the same request.
+    assert.deepEqual(await api.orgs.byOrg.users.byId.get({ params: { org: "acme", id: "a b" } }), { params: { org: "acme", id: "a b" }, query: {}, body: null });
+  });
 });

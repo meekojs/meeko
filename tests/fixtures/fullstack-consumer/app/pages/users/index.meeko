@@ -6,7 +6,7 @@ export interface Props {
 }
 const props = defineProps<Props>();
 const result = signal("idle");
-const getUser = async () => { result.value = (await api.users.byId.get({ params: { id: "123" } })).name; };
+const getUser = async () => { result.value = (await api.users({ id: "123" }).get()).name; };
 const postUser = async () => { result.value = (await api.users.post({ body: { name: "Grace" } })).name; };
 </script>
 <template>

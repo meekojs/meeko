@@ -16,6 +16,8 @@ import { buildDataFile, frameworkClientEntry, frameworkNodeEntry, frameworkServe
 import type { BuildAppData } from "./app-manifest.js";
 import { loadMeekoConfig, resolveConfigSources } from "./config.js";
 import { createDevAppReloader, isDiscoverySource } from "./dev-watch.js";
+import { supervisedHmrPortEnv, supervisedPortEnv } from "./dev-link.js";
+import { devHmrHost, devPortInUse, resolveDevPorts } from "./dev-port.js";
 import type { MeekoAdapterName } from "./config-type.js";
 import { prerenderWithNodeBuild } from "./prerender.js";
 import { bunEntrySource, cloudflareEntrySource, denoEntrySource } from "./adapter-templates.js";
@@ -355,6 +357,26 @@ export async function previewProject(projectRoot: string, adapter?: MeekoAdapter
 
 interface NodeStartModule { start(): Promise<{ readonly server: Server }> }
 
+/** How each development server started by {@link startProject} closes, as on SIGINT. */
+const developmentStops = new WeakMap<Server, () => Promise<void>>();
+
+/**
+ * Closes a development server started by {@link startProject} as SIGINT does: the editor bridge
+ * and its descriptor, the Socket server, the HTTP server, the app and Vite. Idempotent; resolves
+ * once everything closed. A production server is not affected.
+ */
+export function stopDevelopmentServer(server: Server): Promise<void> {
+  return developmentStops.get(server)?.() ?? Promise.resolve();
+}
+
+/** HTTP and HMR ports of each development server started by {@link startProject}. */
+const developmentPorts = new WeakMap<Server, { readonly port: number; readonly hmrPort: number }>();
+
+/** HTTP and HMR ports of a development server started by {@link startProject}; `undefined` for any other server. */
+export function developmentServerPorts(server: Server): { readonly port: number; readonly hmrPort: number } | undefined {
+  return developmentPorts.get(server);
+}
+
 /** Starts the package-owned Node 24 HTTP host for development or the built Node output. */
 export async function startProject(projectRoot: string, production: boolean): Promise<Server> {
   const root = resolve(projectRoot);
@@ -372,8 +394,15 @@ async function startDevelopment(root: string): Promise<Server> {
   assertNoLegacySessionFile(root);
   const config = await loadMeekoConfig(root);
   const server = config.server?.adapter === "node" ? config.server : undefined;
-  const port = Number(process.env.PORT || server?.port || 4173);
   const host = process.env.HOST || server?.host || "127.0.0.1";
+  // A port named by PORT or server.port (or the one a supervisor's first server took) is kept, and
+  // listening reports it when in use; otherwise dev takes the first free one from 4173 up.
+  const named = process.env[supervisedPortEnv] || process.env.PORT || server?.port;
+  const namedHmr = process.env[supervisedHmrPortEnv] || process.env.MEEKO_HMR_PORT;
+  const { port, hmrPort, busy } = await resolveDevPorts({
+    host, ...(named ? { port: Number(named) } : {}), ...(namedHmr ? { hmrPort: Number(namedHmr) } : {}),
+  });
+  if (busy !== undefined) process.stdout.write(`[meeko] El puerto ${busy} está en uso; meeko dev usa el ${port}\n`);
   await prepareProject(root);
   let vite: ViteDevServer | undefined;
   let app: ServerApp | undefined;
@@ -435,11 +464,9 @@ async function startDevelopment(root: string): Promise<Server> {
       ssr: { external: ["@meekojs/meeko"] },
       server: {
         middlewareMode: true,
-        // Middleware mode opens a separate Vite WebSocket server. Derive its
-        // port from the app port so concurrent projects do not share 24678.
-        hmr: { host: "127.0.0.1", port: process.env.MEEKO_HMR_PORT
-          ? Number(process.env.MEEKO_HMR_PORT)
-          : ((port + 32767) % 65535) + 1 },
+        // Middleware mode opens a separate Vite WebSocket server, on a port derived
+        // from the app port so concurrent projects do not share 24678.
+        hmr: { host: devHmrHost, port: hmrPort },
       },
       appType: "custom",
     });
@@ -514,9 +541,10 @@ async function startDevelopment(root: string): Promise<Server> {
     onTreeChange = (file) => { if (isDiscoverySource(resolve(file), sourceRoots)) reloader.rebuild(); };
     onRestart = (start) => reloader.restart(start);
     await new Promise<void>((done, fail) => {
-      httpServer.once("error", fail);
+      const failed = (error: NodeJS.ErrnoException): void => fail(error.code === "EADDRINUSE" ? devPortInUse(port, host, error) : error);
+      httpServer.once("error", failed);
       httpServer.listen(port, host, () => {
-        httpServer.off("error", fail);
+        httpServer.off("error", failed);
         done();
       });
     });
@@ -531,13 +559,12 @@ async function startDevelopment(root: string): Promise<Server> {
         process.stderr.write(`[meeko] editor bridge unavailable: ${error instanceof Error ? error.message : String(error)}\n`);
       }
     }
-    let stopping = false;
-    const shutdown = () => {
-      if (stopping) return;
-      stopping = true;
+    let stopped: Promise<void> | undefined;
+    const shutdown = (): Promise<void> => {
+      if (stopped) return stopped;
       process.off("SIGINT", shutdown);
       process.off("SIGTERM", shutdown);
-      void (async () => {
+      stopped = (async () => {
         const steps: Array<() => Promise<unknown>> = [
           // Its event streams would keep the HTTP server open.
           () => bridge?.close() ?? Promise.resolve(),
@@ -551,7 +578,10 @@ async function startDevelopment(root: string): Promise<Server> {
           catch (error) { reportError(error, randomUUID()); }
         }
       })();
+      return stopped;
     };
+    developmentStops.set(httpServer, shutdown);
+    developmentPorts.set(httpServer, { port: address && typeof address !== "string" ? address.port : port, hmrPort });
     process.once("SIGINT", shutdown);
     process.once("SIGTERM", shutdown);
     process.stdout.write(`http://${visibleHost.includes(":") ? `[${visibleHost}]` : visibleHost}:${port}\n`);

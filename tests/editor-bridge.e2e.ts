@@ -2,15 +2,16 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import test from "node:test";
 import { chromium } from "playwright-core";
 import type { EditorBridgeDescriptor } from "../src/devtools-bridge-protocol.ts";
 import { editorBridgeFile } from "../src/framework/editor-bridge.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
 import { BridgeConnection } from "../editors/vscode/src/live/client.ts";
+import { createTempProject, linkRepositoryPackages, repositoryRoot } from "./helpers/temp-project.ts";
 
 async function freePort(): Promise<number> {
   const server = createServer();
@@ -51,15 +52,14 @@ const profile = signal({ name: "Ada", tags: ["a", "b"] });
 // meeko dev, a real browser and the editor's client: values reach the editor,
 // clicks update them and an editor command changes the page.
 test("meeko dev publishes live signal values to the editor and applies its edits", { timeout: 90_000 }, async (context) => {
-  const base = resolve(".meeko");
-  await mkdir(base, { recursive: true });
-  const root = await mkdtemp(join(base, "editor-bridge-"));
-  const repository = resolve(".");
+  // Outside the repository: an editor with the Meeko extension watching a workspace that
+  // contains or links this checkout would discover the descriptor and connect as an editor.
+  const project = await createTempProject("editor-bridge");
+  const root = project.root;
+  const repository = repositoryRoot;
   await initFrameworkProject(root);
   await writeFile(join(root, "app", "pages", "live.meeko"), livePage);
-  await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
-  await symlink(repository, join(root, "node_modules", "@meekojs", "meeko"), "junction");
-  await symlink(join(repository, "node_modules", "vite"), join(root, "node_modules", "vite"), "junction");
+  await linkRepositoryPackages(root, ["@meekojs/meeko", "vite"]);
   const port = await freePort();
   const origin = `http://127.0.0.1:${port}`;
   const child = spawn(process.execPath, [join(repository, "dist", "cli.js"), "dev", root], {
@@ -77,7 +77,7 @@ test("meeko dev publishes live signal values to the editor and applies its edits
     connection?.dispose();
     await browser.close();
     if (child.exitCode === null && child.signalCode === null) { const exited = once(child, "exit"); child.kill("SIGINT"); await exited; }
-    await rm(root, { recursive: true, force: true });
+    await project.remove();
   });
   await until(() => logs.includes(origin) || child.exitCode !== null, () => `meeko dev did not listen: ${logs}`, 30_000);
   assert.equal(child.exitCode, null, logs);

@@ -11,7 +11,7 @@ import type { EmitsDeclaration } from "./compiler/emits.js";
 import { analyzeExpose, ExposeError } from "./compiler/expose.js";
 import { GenericError, genericReference, parseGeneric, sectionAttribute } from "./compiler/generic.js";
 import type { GenericParameters } from "./compiler/generic.js";
-import { analyzeComposables, ComposableError, conditionalComposable, freeIdentifiers, isContinuationStatement, nodeDepth } from "./compiler/composables.js";
+import { analyzeComposables, ComposableError, conditionalComposable, freeIdentifiers, isExecutableStatement, nodeDepth } from "./compiler/composables.js";
 import type { ScriptComposables, StatementEdit } from "./compiler/composables.js";
 import type { ExposeDeclaration } from "./compiler/expose.js";
 import { analyzeModels, ModelError } from "./compiler/models.js";
@@ -26,6 +26,8 @@ import type { SfcSection } from "./compiler/sfc.js";
 import { scanInterpolations } from "./compiler/interpolation.js";
 import { attributeValueStart, decodeTemplateText, isCustomElementTag, parseTemplate } from "./compiler/template.js";
 import { templateEventType } from "./compiler/events.js";
+import { scopeTargets } from "./compiler/scope-targets.js";
+import type { ScopeCandidate, ScopeTargets } from "./compiler/scope-targets.js";
 import type { TemplateNode } from "./compiler/template.js";
 
 interface DynamicText {
@@ -168,6 +170,8 @@ interface TemplateContext {
   filename: string;
   templateOffset: number;
   scopeAttribute: string | undefined;
+  /** Elements that receive `scopeAttribute`: those that a scoped selector may match. */
+  scopeTargets: ScopeTargets;
   nextText: number;
   nextEvent: number;
   nextAttribute: number;
@@ -247,6 +251,12 @@ export interface CompileOptions {
    * tras su condición, que estrecha sus tipos.
    */
   typeCheck?: boolean;
+  /**
+   * Elementos que reciben el atributo de `<style scoped>`: `"all"` (por defecto en 1.x), todos los
+   * de la plantilla; `"matched"`, sólo los que algún selector con ámbito puede seleccionar. Es el
+   * `css.scopeAttribute` de `meeko.config.ts`.
+   */
+  scopeAttribute?: "all" | "matched";
 }
 
 function quote(value: string): string {
@@ -600,11 +610,13 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
     attrs.push({ kind: "static", value: ` data-meeko-h="${html.id}"` });
   }
   // An <option> of a <select model> renders `selected` from the model during SSR.
+  let modelSelected = false;
   if (tag === "option" && context.selectModel && !node.attrs?.some((attribute) => attribute.name === "selected" || attribute.name === "bind:selected")) {
     const valueAttribute = node.attrs?.find((attribute) => attribute.name === "value" || attribute.name === "bind:value");
     if (valueAttribute) {
       const optionValue = valueAttribute.name === "value" ? quote(valueAttribute.value) : `(${valueAttribute.value})`;
       attrs.push({ kind: "dynamic", expression: `__meeko.renderAttribute("selected", __meeko.modelSelected(${context.selectModel.expression}, ${optionValue}))` });
+      modelSelected = true;
     }
   }
   for (const attr of node.attrs ?? []) {
@@ -634,7 +646,11 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
       attrs.push({ kind: "static", value: ` ${attr.name}="${escapeAttribute(attr.value)}"` });
     }
   }
-  if (context.scopeAttribute) attrs.push({ kind: "static", value: ` ${context.scopeAttribute}=""` });
+  // Every element carries the attribute, or with `scopeAttribute: "matched"` only those that a
+  // scoped selector may match; SSR, hydration and every later render of a region share this string.
+  if (context.scopeAttribute && context.scopeTargets(scopeCandidate(node, tag, custom, model !== undefined, modelSelected, [modelAttribute, htmlAttribute]))) {
+    attrs.push({ kind: "static", value: ` ${context.scopeAttribute}=""` });
+  }
   const openingParts: string[] = [quote(`<${tag}`)];
   for (const attr of attrs) {
     if (attr.kind === "dynamic") openingParts.push(attr.expression);
@@ -862,11 +878,31 @@ function isFunctionLiteral(expression: string): boolean {
   return node !== undefined && (ts.isArrowFunction(node) || ts.isFunctionExpression(node));
 }
 
+/**
+ * The element as scoped selectors see it: the static attributes it renders and the attributes
+ * that `bind:`, `model` or a `<select model>` may change. `ref:` and `on:` hand the element to
+ * the script, and a custom element manages its own attributes: those are open to any class or
+ * attribute.
+ */
+function scopeCandidate(node: TemplateNode, tag: string, custom: boolean, model: boolean, modelSelected: boolean, directives: ReadonlyArray<object | undefined>): ScopeCandidate {
+  const attributes = new Map<string, string>();
+  const dynamic = new Set<string>();
+  let open = custom;
+  for (const attribute of node.attrs ?? []) {
+    if (isRefDirective(attribute) || attribute.name.startsWith("on:")) open = true;
+    else if (attribute.name.startsWith("bind:")) dynamic.add(attribute.name.slice(5).toLowerCase());
+    else if (!directives.includes(attribute)) attributes.set(attribute.name.toLowerCase(), attribute.value);
+  }
+  if (model) dynamic.add("value").add("checked");
+  if (modelSelected) dynamic.add("selected");
+  return { tag: tag.toLowerCase(), attributes, dynamic, open };
+}
+
 function escapeAttribute(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 }
 
-function scopeCss(css: string, scopeAttribute: string): string {
+function scopeCss(css: string, scopeAttribute: string): { css: string; targets: ScopeTargets } {
   const root = postcss.parse(css);
   root.walkRules((rule) => {
     let parent: postcss.Node | undefined = rule.parent;
@@ -881,7 +917,7 @@ function scopeCss(css: string, scopeAttribute: string): string {
       selectors.each((selector) => scopeSelector(selector, scopeAttribute, fail));
     }).processSync(rule.selector);
   });
-  return root.toString();
+  return { css: root.toString(), targets: scopeTargets(root, scopeAttribute) };
 }
 
 function isGlobalPseudo(node: selectorParser.Node): node is selectorParser.Pseudo {
@@ -1101,6 +1137,21 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
       : undefined;
     return markSource(instrumented ?? original, section.contentStart + statement.getStart(file), original.length);
   };
+  /**
+   * An expression or control-flow statement of the setup or of the continuation: `defineProps`
+   * only works in its own declaration (MEEK016), and a top-level-only composable inside `if`, a
+   * loop, `try`, `switch` or a block would run conditionally or repeatedly (MEEK054).
+   */
+  const checkExecutable = (statement: ts.Statement): void => {
+    const props = definePropsCall(statement);
+    if (props) {
+      throw compileError(source, filename, "MEEK016", "defineProps debe aparecer una sola vez, en su propia declaración const de nivel superior, como const props = defineProps<Props>()", section.contentStart + props.getStart(file));
+    }
+    const composable = conditionalComposable(statement);
+    if (composable) {
+      throw compileError(source, filename, "MEEK054", `${composable.expression.getText(file)}() debe llamarse sin condiciones en el nivel superior de <script>, no dentro de if, de un bucle, de try, de switch ni de un bloque`, section.contentStart + composable.expression.getStart(file));
+    }
+  };
   for (const [index, statement] of file.statements.entries()) {
     if (ts.isImportDeclaration(statement)) {
       imports.push(markSource(statement.getText(file), section.contentStart + statement.getStart(file)));
@@ -1117,6 +1168,9 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
       types.push(markSource(statement.getText(file), section.contentStart + statement.getStart(file)));
       continue;
     }
+    if (exportsValue(statement)) {
+      throw compileError(source, filename, "MEEK018", `Export de nivel superior no admitido en el script: ${unsupportedStatementHint(statement)}`, section.contentStart + statement.getStart(file));
+    }
     if (index >= split) {
       // From the first browser await on, statements run in the browser after the component mounts.
       const macro = macroCall(statement, file, emitsDeclaration, exposeDeclaration, modelDeclarations, snippetsDeclaration);
@@ -1130,14 +1184,11 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
         for (const identifier of declaredIdentifiers(declaration)) continuationNames.set(identifier.text, section.contentStart + identifier.getStart(file));
       } else if (ts.isFunctionDeclaration(statement) && statement.name) {
         continuationNames.set(statement.name.text, section.contentStart + statement.name.getStart(file));
-      } else if (isContinuationStatement(statement)) {
+      } else if (isExecutableStatement(statement)) {
         // The continuation is an async function: assignments, calls and control flow run there.
-        const composable = conditionalComposable(statement);
-        if (composable) {
-          throw compileError(source, filename, "MEEK054", `${composable.expression.getText(file)}() debe llamarse sin condiciones en el nivel superior de <script>, no dentro de if, de un bucle, de try ni de switch`, section.contentStart + composable.expression.getStart(file));
-        }
+        checkExecutable(statement);
       } else {
-        throw compileError(source, filename, "MEEK018", `Sentencia de script no admitida tras el primer await de navegador: ${ts.SyntaxKind[statement.kind]}; usa declaraciones, expresiones, if, bucles, try o switch`, section.contentStart + statement.getStart(file));
+        throw compileError(source, filename, "MEEK018", `Sentencia de script no admitida tras el primer await de navegador: ${ts.SyntaxKind[statement.kind]}; ${unsupportedStatementHint(statement)}`, section.contentStart + statement.getStart(file));
       }
       continuation.push(setupStatement(statement));
       continue;
@@ -1209,11 +1260,14 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
       setup.push(`const __meeko_exposed = __meeko.${setupStatement(statement)}`);
       continue;
     }
-    if (ts.isExpressionStatement(statement) && (ts.isCallExpression(statement.expression) || composables.awaits.has(statement))) {
+    if (isExecutableStatement(statement)) {
+      // Calls, assignments and control flow run in order, in SSR and on hydration alike, before
+      // the template reads the bindings; a hydration restores the state snapshot after them.
+      checkExecutable(statement);
       setup.push(setupStatement(statement));
       continue;
     }
-    throw compileError(source, filename, "MEEK018", `Sentencia de nivel superior no admitida en el script: ${ts.SyntaxKind[statement.kind]}`, section.contentStart + statement.getStart(file));
+    throw compileError(source, filename, "MEEK018", `Sentencia de nivel superior no admitida en el script: ${ts.SyntaxKind[statement.kind]}; ${unsupportedStatementHint(statement)}`, section.contentStart + statement.getStart(file));
   }
   // Values at the end of the synchronous setup, the ones it returns.
   if (unowned.length) setup.push(`for (const __meeko_value of [${unowned.join(", ")}]) __meeko_borrowed.add(__meeko_value);`);
@@ -1272,6 +1326,33 @@ function taggedRefs(bindings: TemplateBindings, narrow: boolean): Map<RefBinding
   };
   visit(bindings, []);
   return found;
+}
+
+/** A `defineProps(...)` call anywhere inside `node`, which only a top-level declaration accepts. */
+function definePropsCall(node: ts.Node): ts.CallExpression | undefined {
+  if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "defineProps") return node;
+  return ts.forEachChild(node, definePropsCall);
+}
+
+/** A top-level value export: the script of a component only exports types. */
+function exportsValue(statement: ts.Statement): boolean {
+  if (ts.isExportDeclaration(statement) || ts.isExportAssignment(statement)) return true;
+  return ts.canHaveModifiers(statement) && (ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) ?? false);
+}
+
+/** MEEK018: what to write instead of a top-level statement that the script does not run. */
+function unsupportedStatementHint(statement: ts.Statement): string {
+  if (exportsValue(statement)) {
+    return "el script de un componente sólo exporta tipos (export interface, export type); quita export, porque la plantilla ya ve las declaraciones del nivel superior. Los datos de una página se exportan desde <script server>";
+  }
+  if (ts.isClassDeclaration(statement)) return "declara la clase en un módulo .ts e impórtala; el setup se ejecuta una vez por instancia del componente";
+  if (ts.isEnumDeclaration(statement)) return "usa una unión de literales (type Status = \"idle\" | \"busy\") o declara el enum en un módulo .ts e impórtalo";
+  if (ts.isModuleDeclaration(statement)) return "declara el namespace en un módulo .ts o en un archivo .d.ts";
+  if (ts.isImportEqualsDeclaration(statement)) return "usa import ... from";
+  if (ts.isReturnStatement(statement)) return "el setup no devuelve nada: la plantilla ve las declaraciones del nivel superior; para omitir código, ponlo dentro de un if";
+  if (ts.isThrowStatement(statement)) return "un throw incondicional haría fallar siempre el componente; ponlo dentro de un if o de una función";
+  if (ts.isBreakOrContinueStatement(statement)) return "break y continue sólo funcionan dentro de un bucle, de un switch o de una sentencia etiquetada";
+  return "usa declaraciones, funciones, expresiones, if, bucles, try, switch o bloques";
 }
 
 /** Name of the compiler macro a statement calls: defineProps, defineEmits, defineExpose, defineModel or defineSnippets. */
@@ -1487,8 +1568,14 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
     ? `data-meeko-s-${createHash("sha256").update(filename).digest("hex").slice(0, 8)}`
     : undefined;
   let css: string;
+  let targets: ScopeTargets = () => false;
   try {
-    css = scopeAttribute ? scopeCss(style?.content ?? "", scopeAttribute) : style?.content ?? "";
+    if (scopeAttribute) {
+      const scoped = scopeCss(style?.content ?? "", scopeAttribute);
+      css = scoped.css;
+      // "all", the 1.x default, scopes every element of the template.
+      targets = options.scopeAttribute === "matched" ? scoped.targets : () => true;
+    } else css = style?.content ?? "";
   } catch (error) {
     if (error instanceof postcss.CssSyntaxError && style && error.line !== undefined && error.column !== undefined) {
       const lines = style.content.split(/\r\n|\r|\n/);
@@ -1499,7 +1586,7 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
   }
   const parsed = parseTemplate(source, template, filename);
   const bindingsForTemplate = emptyBindings();
-  const context: TemplateContext = { source, filename, templateOffset: template.contentStart, scopeAttribute, nextText: 0, nextEvent: 0, nextAttribute: 0, nextRegion: 0, nextRef: 0, nextHtml: 0, listDepth: 0, refs: new Map(), usedRefs: new Set(), nextModel: 0, nextSnippet: 0, snippetDepth: 0, selectModel: undefined, narrow: options.typeCheck === true, guards: [] };
+  const context: TemplateContext = { source, filename, templateOffset: template.contentStart, scopeAttribute, scopeTargets: targets, nextText: 0, nextEvent: 0, nextAttribute: 0, nextRegion: 0, nextRef: 0, nextHtml: 0, listDepth: 0, refs: new Map(), usedRefs: new Set(), nextModel: 0, nextSnippet: 0, snippetDepth: 0, selectModel: undefined, narrow: options.typeCheck === true, guards: [] };
   const html = renderNode(parsed, bindingsForTemplate, context);
   const hot = options.hot === true;
   const scriptParts = compileScript(script, source, filename, hot, context.refs, generic);

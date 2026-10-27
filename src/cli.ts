@@ -4,6 +4,8 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { checkSource } from "./check.js";
 import { compile } from "./compiler.js";
+import { projectRoot } from "./compiler/project-root.js";
+import { loadMeekoConfig } from "./framework/config.js";
 import { generateTypes } from "./types.js";
 import { initProject } from "./init.js";
 import { initFrameworkProject } from "./framework/init.js";
@@ -12,7 +14,8 @@ import { generateServerContracts } from "./framework/contracts-generate.js";
 import { checkApp, generateAppTypes } from "./framework/check-app.js";
 import { prerenderProject } from "./framework/prerender.js";
 import { generateTypeScriptAutoImports } from "./autoimports-ts.js";
-import { assertBuildAdapter, buildProject, previewProject, startProject } from "./framework/project.js";
+import { assertBuildAdapter, buildProject, developmentServerPorts, previewProject, startProject, stopDevelopmentServer } from "./framework/project.js";
+import { findLinkedMeeko, isSupervisedDevelopment, linkWatchEnabled, runSupervisedDevelopment, superviseDevelopment } from "./framework/dev-link.js";
 import { checkFrameworkProject, prepareFrameworkTypes } from "./framework/check-project.js";
 import { cleanProject, formatCleanResult } from "./framework/clean.js";
 
@@ -24,7 +27,8 @@ const usage = "Uso: meeko dev [directorio]\n     meeko check [directorio | compo
   "     PUBLIC_ORIGIN    origen público de dev, start y preview (Node, Bun y Deno) para las\n" +
   "                      comprobaciones de Origin de HTTP y Socket tras un proxy\n" +
   "     MEEKO_HMR_PORT   puerto del WebSocket de HMR de dev\n" +
-  "     MEEKO_EDITOR_BRIDGE=0  desactiva el puente con el editor de dev\n";
+  "     MEEKO_EDITOR_BRIDGE=0  desactiva el puente con el editor de dev\n" +
+  "     MEEKO_LINK_WATCH=0     dev no se reinicia al reconstruir un @meekojs/meeko enlazado\n";
 const argv = process.argv.slice(2);
 /** First problem with the command line, reported before the usage. */
 let problem: string | undefined;
@@ -89,8 +93,16 @@ if (problem !== undefined) {
     if (projectCommand) {
       const root = input ?? ".";
       if (command === "dev") {
-        await prepareFrameworkTypes(root);
-        await startProject(root, false);
+        // A linked Meeko (pnpm link:, npm link, a workspace) is rebuilt while dev runs: a
+        // supervisor restarts the server in a fresh process, which loads the new build.
+        const linked = linkWatchEnabled() ? findLinkedMeeko(resolve(root)) : undefined;
+        const start = async () => {
+          await prepareFrameworkTypes(root);
+          return startProject(root, false);
+        };
+        if (linked) process.exitCode = await superviseDevelopment(linked);
+        else if (isSupervisedDevelopment()) await runSupervisedDevelopment(start, stopDevelopmentServer, developmentServerPorts);
+        else await start();
       }
       else if (command === "start") await startProject(root, true);
       // Preview runs the output in its runtime: Node in this process; Bun, Deno and wrangler dev as a child.
@@ -148,7 +160,9 @@ if (problem !== undefined) {
           process.stderr.write(`${diagnostic.filename}:${line}:${column} ${diagnostic.code}: ${diagnostic.message}\n`);
         }
       } else if (command === "compile") {
-        const result = compile(source, input);
+        // The component follows the `css` options of the project that contains it.
+        const scopeAttribute = (await loadMeekoConfig(projectRoot(input))).css?.scopeAttribute;
+        const result = compile(source, input, scopeAttribute ? { scopeAttribute } : {});
         await writeFile(output!, result.code, "utf8");
         process.stdout.write(`${output}\n`);
       } else if (command === "types") {

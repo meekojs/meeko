@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "@typescript/typescript6";
 import { TextDocument } from "vscode-languageserver-textdocument";
@@ -85,10 +85,22 @@ function uriToPath(uri: string): string | undefined {
   catch { return undefined; }
 }
 
-/** Generated output (.meeko/) and dependencies never trigger checks; checks write there themselves. */
-function ignoredChange(path: string): boolean {
+/**
+ * Generated output (.meeko/) and dependencies never trigger checks; checks write there themselves.
+ * The rule also holds relative to each workspace folder: a project reached through `node_modules`
+ * (a package linked with `link:`, whose own temporary projects the editor's watcher reports) or
+ * nested in a `.meeko/` directory (temporary projects of tools and tests) is not workspace code,
+ * and checking its contracts would load its configuration and write into it.
+ */
+function ignoredChange(path: string, folders: readonly string[]): boolean {
   const parts = relative(projectRoot(path), path).split(/[\\/]/);
-  return parts.some((part) => part === "node_modules" || part === ".git") || parts[0] === ".meeko";
+  if (parts.some((part) => part === "node_modules" || part === ".git") || parts[0] === ".meeko") return true;
+  return folders.some((folder) => {
+    const inner = relative(folder, path);
+    if (!inner || inner === ".." || inner.startsWith(`..${sep}`) || isAbsolute(inner)) return false;
+    const segments = inner.split(/[\\/]/);
+    return segments.some((part) => part === "node_modules" || part === ".git") || segments.slice(0, -1).includes(".meeko");
+  });
 }
 
 /** Registra los manejadores del servidor de lenguaje Meeko en una conexión LSP. */
@@ -103,6 +115,8 @@ export function startLanguageServer(connection: Connection): void {
   let codeLensRefresh = false;
   let deleteFiles = false;
   let formatFallback: MeekoFormatSettings = {};
+  /** Workspace folders of the client, the reference of {@link ignoredChange}. */
+  let folders: string[] = [];
   const log = (message: string): void => connection.console.log(message);
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
   const openVersions = new Map<string, number>();
@@ -225,6 +239,7 @@ export function startLanguageServer(connection: Connection): void {
   connection.onInitialize((params): InitializeResult => {
     const options = (params.initializationOptions ?? {}) as LanguageServerInitializationOptions;
     workspace = new MeekoWorkspace({ trusted: options.trusted !== false, log });
+    folders = (params.workspaceFolders?.map((folder) => folder.uri) ?? (params.rootUri ? [params.rootUri] : [])).flatMap((uri) => uriToPath(uri) ?? []);
     contracts = options.projectContracts !== false;
     if (typeof options.diagnosticsDelay === "number" && options.diagnosticsDelay >= 0) delay = options.diagnosticsDelay;
     semanticRefresh = params.capabilities.workspace?.semanticTokens?.refreshSupport === true;
@@ -296,7 +311,7 @@ export function startLanguageServer(connection: Connection): void {
   });
 
   connection.onDidChangeWatchedFiles(({ changes }) => {
-    const paths = changes.flatMap((change) => uriToPath(change.uri) ?? []).filter((path) => !ignoredChange(path));
+    const paths = changes.flatMap((change) => uriToPath(change.uri) ?? []).filter((path) => !ignoredChange(path, folders));
     if (!paths.length) return;
     const projects = workspace.filesChanged(paths);
     if (!projects.length) return;

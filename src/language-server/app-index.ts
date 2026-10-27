@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import ts from "@typescript/typescript6";
 import { discoverServerManifest } from "../framework-server/manifest-discovery.js";
+import { clientSegment } from "../framework-server/discovery.js";
 import type { ApiEndpoint, RpcEndpoint } from "../framework-server/discovery.js";
 import { composeFrameworkRoutes } from "../framework/modules.js";
 import { discoverConfiguredRoutes, readMeekoConfigSync, resolveConfigSources } from "../framework/config.js";
@@ -141,8 +142,59 @@ function generatedClient(identifier: ts.Identifier, checker: ts.TypeChecker): bo
 }
 
 /**
- * The route of `href("/users/[id]")`, the endpoint of `useApi("/api/notes")` and `api.notes.get`,
- * or the procedure of `useRpcQuery("users.get")`, `useRpcMutation(...)` and `rpc.users.get`.
+ * The parameter of a segment call such as `api.notes({ id })`: the only property of its only
+ * argument. A call of an HTTP method (`api.notes.get({ query })`) is never a segment call.
+ */
+function segmentParam(call: ts.CallExpression, checker: ts.TypeChecker): string | undefined {
+  const callee = call.expression;
+  if (call.arguments.length !== 1 || (ts.isPropertyAccessExpression(callee) && apiMethods.has(callee.name.text))) return undefined;
+  const argument = call.arguments[0]!;
+  if (ts.isObjectLiteralExpression(argument)) {
+    const [property] = argument.properties;
+    if (argument.properties.length !== 1 || !property || (!ts.isPropertyAssignment(property) && !ts.isShorthandPropertyAssignment(property))) return undefined;
+    return ts.isIdentifier(property.name) || ts.isStringLiteral(property.name) ? property.name.text : undefined;
+  }
+  const properties = checker.getTypeAtLocation(argument).getProperties();
+  return properties.length === 1 ? properties[0]!.name : undefined;
+}
+
+/**
+ * `api.notes.byId.get` or `api.notes({ id }).get`: the whole member chain around `node`, from the
+ * client to its last name, with the client segment of each segment call when `calls` is set.
+ */
+function memberChain(node: ts.Identifier, checker: ts.TypeChecker, calls: boolean): { chain: ts.Expression; names: string[]; labels: string[]; root: ts.Expression } {
+  let chain: ts.Expression = node;
+  if (ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) chain = node.parent;
+  for (;;) {
+    const parent: ts.Node = chain.parent;
+    if (ts.isPropertyAccessExpression(parent) && parent.expression === chain) chain = parent;
+    else if (calls && ts.isCallExpression(parent) && parent.expression === chain && ts.isPropertyAccessExpression(parent.parent)
+      && parent.parent.expression === parent && segmentParam(parent, checker) !== undefined) chain = parent.parent;
+    else break;
+  }
+  const names: string[] = [];
+  const labels: string[] = [];
+  let root: ts.Expression = chain;
+  for (;;) {
+    if (ts.isPropertyAccessExpression(root)) {
+      names.unshift(root.name.text);
+      labels.unshift(`.${root.name.text}`);
+      root = root.expression;
+      continue;
+    }
+    const param = calls && ts.isCallExpression(root) ? segmentParam(root, checker) : undefined;
+    if (param === undefined || !ts.isCallExpression(root)) break;
+    names.unshift(clientSegment(param));
+    labels.unshift(`({ ${param} })`);
+    root = root.expression;
+  }
+  return { chain, names, labels, root };
+}
+
+/**
+ * The route of `href("/users/[id]")`, the endpoint of `useApi("/api/notes")`,
+ * `useApiMutation("/api/notes", "POST")` and `api.notes.get`, or the procedure of
+ * `useRpcQuery("users.get")`, `useRpcMutation(...)` and `rpc.users.get`.
  */
 export function appTargetAt(program: ts.Program, fileName: string, offset: number, index: AppIndex): AppTarget | undefined {
   const file = program.getSourceFile(fileName);
@@ -163,6 +215,11 @@ export function appTargetAt(program: ts.Program, fileName: string, offset: numbe
     if (callee === "useApi" && position === 0) {
       return { kind: "api", label: argument.text, endpoints: index.api.filter((endpoint) => endpoint.pathname === argument.text && endpoint.method === "GET"), node: argument };
     }
+    if (callee === "useApiMutation" && position === 0) {
+      const method = call.arguments[1];
+      const verb = method && ts.isStringLiteralLike(method) ? method.text.toUpperCase() : undefined;
+      return { kind: "api", label: argument.text, endpoints: index.api.filter((endpoint) => endpoint.pathname === argument.text && endpoint.method !== "GET" && (!verb || endpoint.method === verb)), node: argument };
+    }
     if ((callee === "useRpcQuery" || callee === "useRpcMutation") && position === 0) {
       const endpoint = index.rpc.find((candidate) => candidate.id === argument.text);
       return { kind: "rpc", id: argument.text, ...(endpoint ? { endpoint } : {}), node: argument };
@@ -170,22 +227,16 @@ export function appTargetAt(program: ts.Program, fileName: string, offset: numbe
     return undefined;
   }
   if (!ts.isIdentifier(node)) return undefined;
-  // `api.notes.byId.get`: the whole member chain, from the client to its last name.
-  let chain: ts.Expression = node;
-  if (ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) chain = node.parent;
-  while (ts.isPropertyAccessExpression(chain.parent) && chain.parent.expression === chain) chain = chain.parent;
-  const names: string[] = [];
-  let root: ts.Expression = chain;
-  while (ts.isPropertyAccessExpression(root)) {
-    names.unshift(root.name.text);
-    root = root.expression;
-  }
+  // Only `api` has segment calls; `rpc.users.find({ id }).then` stays a plain member chain.
+  let member = memberChain(node, checker, true);
+  if (!ts.isIdentifier(member.root) || member.root.text !== "api") member = memberChain(node, checker, false);
+  const { chain, names, labels, root } = member;
   if (!ts.isIdentifier(root) || !names.length) return undefined;
   if (root.text === "api" && generatedClient(root, checker)) {
     const method = names.at(-1)!;
     const key = apiMethods.has(method) ? names.slice(0, -1).join(".") : names.join(".");
     const endpoints = index.api.filter((endpoint) => endpoint.clientKey === key && (!apiMethods.has(method) || endpoint.method.toLowerCase() === method));
-    return endpoints.length ? { kind: "api", label: `api.${names.join(".")}`, endpoints, node: chain } : undefined;
+    return endpoints.length ? { kind: "api", label: `api${labels.join("")}`, endpoints, node: chain } : undefined;
   }
   if (root.text === "rpc" && generatedClient(root, checker)) {
     const id = names.join(".");

@@ -1,4 +1,4 @@
-import { captureParentOwner, isWritableSignal } from "./reactivity.js";
+import { captureParentOwner, isExternalSignal, isWritableSignal } from "./reactivity.js";
 import { borrowedKey } from "./models.js";
 import { parseRegionHtml } from "./dom.js";
 import type { DomScope } from "./dom.js";
@@ -50,7 +50,8 @@ export function snapshotSignals(bindings: Record<string, unknown>): HotState {
   // Models shared by the parent belong to the parent's state, not to this instance's.
   const borrowed = (bindings as { [borrowedKey]?: ReadonlySet<unknown> })[borrowedKey];
   for (const [name, value] of Object.entries(bindings)) {
-    if (isWritableSignal(value) && !borrowed?.has(value)) state[name] = value.value;
+    // A signal kept outside the component (useStorage) has its own source of truth.
+    if (isWritableSignal(value) && !borrowed?.has(value) && !isExternalSignal(value)) state[name] = value.value;
   }
   return state;
 }
@@ -60,7 +61,7 @@ export function restoreSignals(bindings: Record<string, unknown>, state?: HotSta
   if (!state) return;
   for (const [name, value] of Object.entries(state)) {
     const target = bindings[name];
-    if (isWritableSignal(target) && !(bindings as { [borrowedKey]?: ReadonlySet<unknown> })[borrowedKey]?.has(target)) target.value = value;
+    if (isWritableSignal(target) && !isExternalSignal(target) && !(bindings as { [borrowedKey]?: ReadonlySet<unknown> })[borrowedKey]?.has(target)) target.value = value;
   }
 }
 

@@ -8,7 +8,7 @@ Meeko compila archivos `.meeko` a código TypeScript con `renderWithState(props)
 
 1. `<script lang="ts">` declara tipos, imports y estado. `defineProps<Props>()` es una macro de compilación. En una página, `<script server lang="ts">` declara las opciones de ruta; el compilador lo excluye del componente y Vite lo sirve como un módulo aparte (`<página>.meeko?meeko-route&lang.ts`), sólo en el servidor salvo en las rutas `render: "client"`.
 2. `<template>` define HTML, expresiones de texto `{expression}`, eventos `on:event="handler"`, atributos dinámicos `bind:name="expression"`, condiciones `if:when` y listas `each:of` con claves obligatorias.
-3. `<style>` es opcional. `scoped` añade un atributo estable a los elementos y a los selectores CSS.
+3. `<style>` es opcional. `scoped` añade un atributo estable a los elementos y a los selectores CSS; con `css.scopeAttribute: "matched"`, sólo a los elementos que esos selectores pueden seleccionar (véase [Estilos con ámbito](api.md#estilos-con-ámbito-y-global)).
 4. El servidor escapa el texto dinámico e inserta marcadores para las expresiones reactivas.
 5. La aplicación transfiere props y estado de `renderWithState` al navegador como JSON escapado. Cada hijo anidado lleva su estado dentro de su marcador inicial. Durante `hydrate`, Meeko restaura señales, busca los marcadores, verifica el texto existente, conecta eventos y crea observadores. La función devuelta libera estos recursos.
 

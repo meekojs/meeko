@@ -158,7 +158,9 @@ export function meeko(): Plugin {
       const normalizedId = normalizePath(resolve(id));
       const normalizedRoot = normalizePath(root);
       const clientModule = !serverTransform && normalizedId.startsWith(`${normalizedRoot}/`);
-      const sources = normalizedId.startsWith(`${normalizedRoot}/`) ? await resolveConfigSources(root) : [];
+      // Every component this plugin compiles, also one outside the project, follows the project's `css` options.
+      const config = normalizedId.startsWith(`${normalizedRoot}/`) || id.endsWith(".meeko") ? await loadMeekoConfig(root) : undefined;
+      const sources = normalizedId.startsWith(`${normalizedRoot}/`) ? await resolveConfigSources(root, config) : [];
       const serverDirectories = sources.map((entry) => `${normalizePath(entry.root)}/server/`);
       const serverOnly = (moduleId: string): boolean => serverDirectories.some((directory) => moduleId.startsWith(directory));
       if (clientModule && (serverOnly(normalizedId) || /\.server\.[cm]?[jt]sx?$/.test(id))) {
@@ -209,7 +211,8 @@ export function meeko(): Plugin {
       }
       const filename = normalizePath(resolve(id));
       assertRouteBlockPlacement(source, filename, sources.map((entry) => entry.root));
-      const result = compile(source, filename, { hot: isDev });
+      const scopeAttribute = config?.css?.scopeAttribute;
+      const result = compile(source, filename, { hot: isDev, ...(scopeAttribute ? { scopeAttribute } : {}) });
       const styleId = `${stylePrefix}${createHash("sha256").update(filename).update("\0").update(result.css).digest("hex")}.css`;
       if (result.css) styles.set(styleId, result.css);
       const cssImport = result.css ? `\nimport ${JSON.stringify(styleId.slice(1))};` : "";

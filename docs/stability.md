@@ -27,7 +27,7 @@ Las subrutas declaradas en `exports` de `package.json` y **todos** los símbolos
 | Entrada | Contenido |
 | --- | --- |
 | `@meekojs/meeko` | Reactividad (`signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`), ciclo de vida (`onMounted`, desde `1.1`), contexto (`createContext`, `provide`, `inject`), `provideErrorHandler`, `serializeJson` y sus tipos, incluidos los de componentes y del protocolo DevTools. |
-| `@meekojs/meeko/framework` | Configuración, rutas, páginas, `defer`, estado, navegación (`useNavigation` y, desde `1.2`, `useRoute` con su tipo `RouteState`), middleware de rutas, clientes API, RPC y Socket (`createSocketClient`, `createSocketRegistry`, `useSocketChannel`, `useSocketClient` desde `1.1` y su alias obsoleto `useSocket`), las fábricas de los composables de datos (`createUseApi`, `createUseRpcQuery`, `createUseRpcMutation` y sus tipos, desde `1.1`) y la API del código de nivel superior de `<script server>` (`usePage`, `redirect`, `notFound` y los tipos `PageRequest`, `PageRequestOf`, `PageBodyHead`, `ServerData`, `JsonShape` y `SerializableExport`, desde `1.1`). |
+| `@meekojs/meeko/framework` | Configuración, rutas, páginas, `defer`, estado (`useState` y, desde `1.2`, `useStorage` con sus tipos `StorageOptions` y `StorageArea`), navegación (`useNavigation` y, desde `1.2`, `useRoute` con su tipo `RouteState`), formularios (`useForm` y su tipo `Form`, desde `1.2`), middleware de rutas, clientes API, RPC y Socket (`createSocketClient`, `createSocketRegistry`, `useSocketChannel`, `useSocketClient` desde `1.1` y su alias obsoleto `useSocket`), las fábricas de los composables de datos (`createUseApi`, `createUseRpcQuery`, `createUseRpcMutation` y sus tipos, desde `1.1`; `createUseApiMutation`, las opciones `retrySafe` y sus tipos `ApiMutation`, `ApiMutationInput`, `ApiMutationContract`, `UseApiMutation`, `MutationOptions`, `RetrySafeOptions`, `RetrySafeMutation` y `UncertainMutation`, desde `1.2`) y la API del código de nivel superior de `<script server>` (`usePage`, `redirect`, `notFound` y los tipos `PageRequest`, `PageRequestOf`, `PageBodyHead`, `ServerData`, `JsonShape` y `SerializableExport`, desde `1.1`). |
 | `@meekojs/meeko/vite` | Plugin `meeko()` de Vite. |
 | `@meekojs/meeko/server` | Núcleo de servidor portable: `createServerApp`, `defineServerRuntime`, contratos API/RPC, sesiones y stores, middleware, Socket y sus brokers, `createSocketUpgradeHandler` y OpenAPI. |
 | `@meekojs/meeko/node` | Adaptador Node: `serveNode`, `toNodeListener`, `createNodeAssetReader`, `attachNodeWebSocketServer` y `createNodeSocketUpgradeHandler`. |
@@ -119,7 +119,7 @@ El texto de los mensajes puede mejorar en cualquier versión; desde `1.1` está 
 | `MEEK013` | Error de sintaxis del `<script>`. |
 | `MEEK014`, `MEEK015` | Más de una variable por sentencia, o una desestructuración del resultado de `defineProps` o `useElementRef` (desde `1.2`; antes, cualquier desestructuración). |
 | `MEEK016`, `MEEK017` | `defineProps` repetido o fuera de su propia declaración, o sin argumento de tipo. |
-| `MEEK018` | Sentencia de nivel superior no admitida en el `<script>` o en la continuación de navegador. |
+| `MEEK018` | Sentencia de nivel superior no admitida en el `<script>` o en la continuación de navegador: un `export` de valor, una clase, un `enum`, un `namespace`, `import =` o un `return`, `throw`, `break` o `continue` suelto. Desde `1.2` el setup síncrono admite cualquier sentencia de expresión y control de flujo, como la continuación. |
 | `MEEK019` | `:global(...)` no válido en `<style scoped>`. |
 | `MEEK020` | Error de sintaxis de una expresión de la plantilla. |
 | `MEEK021`, `MEEK022` | `if:when` y `each:of` en el mismo nodo; `each:as` o `each:index` no válidos o repetidos. |
@@ -151,7 +151,7 @@ La versión de TypeScript que incluye el paquete puede actualizarse en un minor.
 
 ### Convenciones de proyecto
 
-- `meeko.config.ts` con `defineMeekoConfig`: `extends`, `modules`, `imports.serverDirs` y la unión discriminada `server` (`node`, `bun`, `deno` y `cloudflare`, con sus campos documentados).
+- `meeko.config.ts` con `defineMeekoConfig`: `extends`, `modules`, `imports.serverDirs`, la unión discriminada `server` (`node`, `bun`, `deno` y `cloudflare`, con sus campos documentados) y, desde `1.2`, `css.scopeAttribute`.
 - `app/`:
   - `app.meeko`, `error.meeko`, `pages/`, `layouts/default.meeko`, `middleware/`, `components/`, `composables/`, `utils/`, `stores/` y `styles/main.css`;
   - páginas `index.meeko`, `[id].meeko`, `[...slug].meeko` y grupos `(group)`, con `+layout.meeko`, `+error.meeko` y las opciones de ruta en `<script server>` o en sidecars `*.route.ts`.
@@ -160,7 +160,7 @@ La versión de TypeScript que incluye el paquete puede actualizarse en un minor.
   - `server/runtime.ts`, cuyo export por defecto es `defineServerRuntime(...)`.
 - `shared/`, `public/`, layers y módulos.
 - Los sufijos `.client.ts`, `.server.ts` y `.shared.ts`, y las exclusiones `*.test.ts`, `*.spec.ts` y `*.d.ts`.
-- Los autoimports `api`, `rpc`, `socket`, `useSocket`, `useState`, `href` y `provideErrorHandler`, y desde `1.1` `onMounted`, `useApi`, `useRpcQuery` y `useRpcMutation`, y desde `1.2` `useRoute` (un export propio con ese nombre tiene prioridad sobre el del framework). En el código de nivel superior de `<script server>`, `usePage`, `redirect` y `notFound` se pueden usar sin import.
+- Los autoimports `api`, `rpc`, `socket`, `useSocket`, `useState`, `href` y `provideErrorHandler`, y desde `1.1` `onMounted`, `useApi`, `useRpcQuery` y `useRpcMutation`, y desde `1.2` `useRoute`, `useForm`, `useStorage` y `useApiMutation` (un export propio con uno de esos nombres tiene prioridad sobre el del framework). En el código de nivel superior de `<script server>`, `usePage`, `redirect` y `notFound` se pueden usar sin import.
 - Las variables de entorno `HOST`, `PORT`, `PUBLIC_ORIGIN` y `MEEKO_HMR_PORT`.
 
 ### Salidas de build
@@ -191,7 +191,7 @@ Estos formatos permiten clientes externos, proxies, CSP y despliegues graduales:
   - con `app/error.meeko`, una URL sin ruta responde `404` con un payload `error: true`, sin `route` y con props `{ status, message }`;
   - desde `1.1`, el campo opcional `resources` lleva los datos de los `await useApi(...)` y `await useRpcQuery(...)` que leyó el render, como objeto por clave de petición. El formato de esas claves es interno y puede cambiar en cualquier versión: sólo el servidor y el navegador de la misma versión lo interpretan. Un payload sin `resources` sigue siendo válido.
 - **Streaming.** Los bloques `<script type="application/json" data-meeko-deferred="N">`, hijos directos de `<body>` y posteriores a `#meeko-payload`.
-- **Endpoints.** `/api/...` según los archivos de `server/api`, `POST /_meeko/rpc/<ruta>` con cuerpo JSON y `/_meeko/socket/<canal>?room=<sala>`, cuyos mensajes de texto son `{ event, payload }`. Los errores tienen la forma `{ code, status, requestId }`; desde `1.2`, un `400` por entrada no válida puede añadir `issues: [{ path, message }]`.
+- **Endpoints.** `/api/...` según los archivos de `server/api`, `POST /_meeko/rpc/<ruta>` con cuerpo JSON y `/_meeko/socket/<canal>?room=<sala>`, cuyos mensajes de texto son `{ event, payload }`. Los errores tienen la forma `{ code, status, requestId }`; desde `1.2`, un `400` por entrada no válida puede añadir `issues: [{ path, message }]`. Desde `1.2`, las mutaciones `retrySafe` envían la cabecera `Idempotency-Key` con un UUID como cadena de Structured Fields (`"…"`), y el servidor la expone validada en `RequestContext.idempotencyKey`.
 - **Cabeceras:**
   - `x-meeko-csrf` en las mutaciones;
   - `x-meeko-csrf-token` y `x-request-id` en las respuestas;
@@ -250,10 +250,23 @@ Un minor sólo puede añadir campos opcionales a estos formatos. Debe aceptar lo
 | API | Desde | Reemplazo | Se retira en |
 | --- | --- | --- | --- |
 | `useSocket(url, contract, options)` de `@meekojs/meeko/framework` | `1.1` | `useSocketClient`, con la misma firma y los mismos tipos | `2.0` |
+| Segmentos `byId` de `api.*` y de `ApiClient` (`api.users.byId.get({ params: { id } })`) | `1.2` | La llamada del segmento dinámico: `api.users({ id }).get()` | `2.0` |
 
 El alias `useSocket` es la misma función que `useSocketClient`, así que no emite aviso de consola: el editor lo marca por su `@deprecated`. No afecta al autoimport `useSocket("canal", opciones)` de los clientes generados, que no está deprecado. Véase [framework.md](framework.md#clientes-con-url-y-contrato-explícitos).
 
+Los segmentos `byId` construyen las mismas peticiones que la llamada del segmento y tampoco emiten aviso de consola: el editor tacha cada método que se llama a través de ellos. La clave `clientKey` del manifiesto, `createLocalCalls().api("users.byId", ...)` y `useApi` no cambian ni están deprecados. Véase [framework.md](framework.md#segmentos-dinámicos-en-api).
+
 Una vulnerabilidad que no se pueda corregir de forma compatible es la única excepción. En ese caso, el cambio mínimo necesario puede publicarse en un patch o un minor, con su explicación y migración en el CHANGELOG.
+
+### Cambios previstos para 2.0
+
+Además de retirar lo deprecado, `2.0` cambiará estos valores por defecto. En `1.x` cada uno se puede activar antes con su opción.
+
+| Comportamiento | Opción | Desde | Por defecto en 1.x | Por defecto en 2.0 |
+| --- | --- | --- | --- | --- |
+| Elementos que reciben el atributo de `<style scoped>` | `css.scopeAttribute` de `meeko.config.ts` (`scopeAttribute` de `compile()`) | `1.2` | `"all"`: todos los de la plantilla | `"matched"`: sólo los que algún selector con ámbito puede seleccionar |
+
+Con `"matched"`, una clase o un atributo que el script añade con la API del DOM a un elemento sin `ref:` ni `on:` deja de recibir los estilos con ámbito si ese elemento se quedó sin el atributo. Véase [api.md](api.md#qué-elementos-reciben-el-atributo).
 
 ## Entornos soportados
 

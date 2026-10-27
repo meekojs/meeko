@@ -80,6 +80,13 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
       throw new TypeError(`${file}: ${key} must be an array of nonempty paths`);
     }
   }
+  const css = config.css as Record<string, unknown> | undefined;
+  if (css !== undefined) {
+    if (!css || typeof css !== "object" || Array.isArray(css)) throw new TypeError(`${file}: css must be an object`);
+    if (css.scopeAttribute !== undefined && css.scopeAttribute !== "all" && css.scopeAttribute !== "matched") {
+      throw new TypeError(`${file}: css.scopeAttribute must be "all" or "matched"`);
+    }
+  }
   const server = config.server as Record<string, unknown> | undefined;
   if (server !== undefined) {
     if (!server || typeof server !== "object" || !["node", "cloudflare", "deno", "bun"].includes(server.adapter as string)) {

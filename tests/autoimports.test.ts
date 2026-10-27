@@ -38,6 +38,10 @@ test("autoimports discover nested exports and enforce client/server scope", asyn
     assert.doesNotMatch(applyAutoImports('import { useCount } from "../composables/count.js"; useCount();', filename, registry, "client"), /as useCount/);
     assert.doesNotMatch(applyAutoImports('const useCount = () => 2; useCount();', filename, registry, "client"), /as useCount/);
     assert.match(applyAutoImports('function inner() { const useCount = () => 2; return useCount(); } const outer = useCount();', filename, registry, "client"), /as useCount/);
+    // Labels name no value, and the clauses of a `switch` share a scope of their own.
+    assert.doesNotMatch(applyAutoImports("useCount: for (const n of [1]) { if (n) continue useCount; break useCount; }", filename, registry, "client"), /as useCount/);
+    assert.doesNotMatch(applyAutoImports("switch (1) { case 1: const useCount = () => 2; useCount(); }", filename, registry, "client"), /as useCount/);
+    assert.match(applyAutoImports("switch (1) { case 1: const useCount = () => 2; } const outer = useCount();", filename, registry, "client"), /as useCount/);
     assert.throws(() => applyAutoImports("secret;", filename, registry, "client"), /no está disponible en el ámbito client/);
     assert.match(applyAutoImports("secret;", filename, registry, "server"), /secret\.js/);
     assert.match(applyAutoImports("const state = signal(0);", filename, registry, "client"), /from "@meekojs\/meeko"/);

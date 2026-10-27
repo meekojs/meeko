@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { BridgeConnection } from "./client.js";
 import type { LiveChange } from "./client.js";
-import { bridgeDescriptorGlob, editableValue, groupSignals, hoverMarkdown, inlineText, parseEditedValue, placeGroups } from "./model.js";
+import { bridgeDescriptorGlob, editableValue, groupSignals, hoverMarkdown, inlineText, isWorkspaceBridgeDescriptor, parseEditedValue, placeGroups } from "./model.js";
 import type { EditorLiveSignal, LiveGroup } from "./model.js";
 
 const descriptorGlob = bridgeDescriptorGlob;
@@ -158,6 +158,8 @@ export function registerLiveValues(context: vscode.ExtensionContext, output: vsc
 
   const connect = (uri: vscode.Uri): void => {
     if (!settings().enabled || uri.scheme !== "file") return;
+    // The watcher also reports descriptors of linked packages and of temporary projects under `.meeko/`.
+    if (!isWorkspaceBridgeDescriptor(vscode.workspace.asRelativePath(uri, false))) return;
     const key = uri.fsPath;
     let connection = connections.get(key);
     if (!connection) {

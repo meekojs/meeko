@@ -270,9 +270,8 @@ test("the continuation keeps composables unconditional and rejects other stateme
   assertCompileError(macro, "MEEK058", macro.indexOf("const value"));
   const klass = script(`${head}class Later {}`);
   assertCompileError(klass, "MEEK018", klass.indexOf("class"));
-  // Before the browser await the setup keeps its rules: a bare assignment is not a declaration.
-  const early = script(`status.value = "x";\n${head}`);
-  assertCompileError(early, "MEEK018", early.indexOf("status.value = "));
+  // Since 1.2 the synchronous setup also runs assignments before the browser await.
+  assert.doesNotThrow(() => compile(script(`status.value = "x";\n${head}`), "Early.meeko"));
   assert.doesNotThrow(() => compile(script(`${head}status.value = "y";\nconst other = useElementRef("other");`), "Ok.meeko"));
 });
 

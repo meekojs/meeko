@@ -14,15 +14,20 @@ export type { ClientPageDefinition, ClientPageLoadContext, PageDefinition, PageH
 export { notFound, redirect, usePage } from "./framework/page-body.js";
 export type { JsonShape, PageBodyHead, PageRequest, PageRequestOf, SerializableExport, ServerData } from "./framework/page-body.js";
 export { StateStore, useState } from "./framework/state.js";
+export { useForm } from "./framework/form.js";
+export type { Form } from "./framework/form.js";
+export { useStorage } from "./framework/storage.js";
+export type { StorageArea, StorageOptions } from "./framework/storage.js";
 export { defer } from "./framework/deferred.js";
 export type { DeferOptions, Deferred, DeferredError, DeferredFactory, DeferredStatus } from "./framework/deferred.js";
 export { defineRouteMiddleware } from "./framework/middleware.js";
 export type { RouteMiddleware, RouteMiddlewareContext } from "./framework/middleware.js";
 export { ClientError, createApiClient, createBrowserClientOptions, createPublicServerManifest, createRpcClient } from "./framework/clients.js";
-export type { ApiClient, ApiOperation, ClientOptions, PublicApiEndpoint, PublicRpcEndpoint, PublicServerManifest, RpcClient, RpcOperation, ValidationIssue } from "./framework/clients.js";
+export type { ApiClient, ApiMutationInput, ApiOperation, ClientOptions, PublicApiEndpoint, PublicRpcEndpoint, PublicServerManifest, RpcClient, RpcOperation, ValidationIssue } from "./framework/clients.js";
 export { createSocketClient, createSocketRegistry, useSocket, useSocketChannel, useSocketClient } from "./framework/socket.js";
-export { createUseApi, createUseRpcMutation, createUseRpcQuery } from "./framework/resources.js";
-export type { ApiQueryContract, ApiQueryOptions, DataResource, LoadedResource, Reactive, RpcMutation, UseApi, UseRpcMutation, UseRpcQuery } from "./framework/resources.js";
+export { createUseApi, createUseApiMutation, createUseRpcMutation, createUseRpcQuery } from "./framework/resources.js";
+export type { ApiMutation, ApiMutationContract, ApiQueryContract, ApiQueryOptions, DataResource, LoadedResource, Reactive, RpcMutation, UseApi, UseApiMutation, UseRpcMutation, UseRpcQuery } from "./framework/resources.js";
+export type { MutationOptions, RetrySafeMutation, RetrySafeOptions, UncertainMutation } from "./framework/mutations.js";
 export type { SocketClient, SocketContract, SocketSchema, SocketClientOptions, SocketRegistry, SocketRegistryOptions } from "./framework/socket.js";
 
 /**

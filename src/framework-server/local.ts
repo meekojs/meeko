@@ -1,5 +1,6 @@
 import { ApiError, dispatchApiRoute, dispatchRpc, errorResponse, reportServerError } from "./contracts.js";
 import type { ApiRouteDefinition, RpcDefinition, Schema, ServerErrorObserver } from "./contracts.js";
+import { idempotencyKeyOf } from "./context.js";
 import type { RequestContext } from "./context.js";
 import type { ApiMethod, ServerManifest, ServerModuleLoader } from "./discovery.js";
 import type { SessionManager } from "./sessions.js";
@@ -107,7 +108,7 @@ function routeModule(module: unknown): unknown {
 export function createLocalCalls<S>(options: LocalCallOptions<S>) {
   if (typeof options.load !== "function") throw new TypeError("Local calls require a module loader");
   const load = options.load;
-  const derived = (request: Request): RequestContext<S> => ({ ...options.context, request });
+  const derived = (request: Request): RequestContext<S> => ({ ...options.context, request, idempotencyKey: idempotencyKeyOf(request) });
   return {
     async api(clientKey: string, method: ApiMethod, input: LocalApiInput = {}): Promise<Response> {
       try {

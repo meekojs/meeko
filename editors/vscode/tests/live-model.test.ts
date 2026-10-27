@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  SseParser, aliasDescription, bridgeDescriptorGlob, editableValue, fileKey, formatValue, groupSignals, hoverMarkdown, inlineText, loopbackBridgeUrl, parseEditedValue, placeGroups, previewValue,
+  SseParser, aliasDescription, bridgeDescriptorGlob, editableValue, fileKey, formatValue, groupSignals, hoverMarkdown, inlineText, isWorkspaceBridgeDescriptor, loopbackBridgeUrl, parseEditedValue, placeGroups, previewValue,
 } from "../src/live/model.js";
 import type { EditorLiveSignal } from "../src/live/model.js";
 
@@ -90,6 +90,22 @@ test("marca los alias de defineModel en la decoración y en el hover", () => {
   assert.ok(principal);
   assert.equal(inlineText(principal), "dialogOpen = true", "La principal no lleva marca");
   assert.equal(bridgeDescriptorGlob, "**/.meeko/dev/editor-bridge-*.json");
+});
+
+test("sólo se conecta a los descriptores de proyectos del workspace", () => {
+  for (const path of [".meeko/dev/editor-bridge-4173.json", "apps/web/.meeko/dev/editor-bridge-5173.json", "apps\\web\\.meeko\\dev\\editor-bridge-1.json"]) {
+    assert.ok(isWorkspaceBridgeDescriptor(path), path);
+  }
+  for (const path of [
+    "node_modules/@meekojs/meeko/.meeko/editor-bridge-x/.meeko/dev/editor-bridge-50705.json",
+    "node_modules/@meekojs/meeko/.claude/worktrees/a/.meeko/tmp/dev-watch-y/.meeko/dev/editor-bridge-1.json",
+    ".meeko/tmp/dev-editor-bridge-z/.meeko/dev/editor-bridge-2.json",
+    "apps\\web\\node_modules\\pkg\\.meeko\\dev\\editor-bridge-3.json",
+    ".meeko/dev/editor-bridge.json",
+    ".meeko/dev/other-4173.json",
+  ]) {
+    assert.ok(!isWorkspaceBridgeDescriptor(path), path);
+  }
 });
 
 test("valida el JSON editado y propone el valor actual", () => {

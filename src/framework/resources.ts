@@ -1,5 +1,6 @@
 /**
- * Data composables for component scripts: `useApi`, `useRpcQuery` and `useRpcMutation`.
+ * Data composables for component scripts: `useApi`, `useRpcQuery`, `useRpcMutation` and
+ * `useApiMutation`.
  *
  * `useApi` and `useRpcQuery` return reactive `{ data, error, pending, refresh }`. Awaited at the
  * top level of a script, the framework loads the data before the page renders (SSR, hydration
@@ -12,7 +13,9 @@ import { batch, createContext, effect, findContext, isSignal, onCleanup, provide
 import type { ReadonlySignal } from "../reactivity.js";
 import { awaitSync, canSuspendLate, provideDeferredData, suspend, suspendLate } from "../suspense.js";
 import { requestApi, requestRpc } from "./clients.js";
-import type { AnyApiOperation, ApiRequestInput, ClientOptions, PublicServerManifest, RpcOperation } from "./clients.js";
+import type { AnyApiOperation, ApiMutationArguments, ApiMutationInput, ApiRequestInput, ClientOptions, PublicServerManifest, RpcOperation } from "./clients.js";
+import { createMutation } from "./mutations.js";
+import type { MutationOptions, RetrySafeMutation, RetrySafeOptions } from "./mutations.js";
 
 /**
  * Datos reactivos que devuelven `useApi` y `useRpcQuery`. Sin `await`, `data` vale `null` hasta la
@@ -74,7 +77,8 @@ export interface LoadedResource<T> {
 
 /**
  * Resultado de `useRpcMutation(procedimiento)`: llama al procedimiento bajo demanda con `mutate`,
- * nunca en SSR, y refleja la última llamada en `pending`, `data` y `error`.
+ * nunca en SSR, y refleja la última llamada en `pending`, `data` y `error`. Con la opción
+ * `retrySafe` añade {@link RetrySafeMutation} (desde `1.2`).
  *
  * @typeParam Input Entrada del procedimiento.
  * @typeParam Output Salida del procedimiento.
@@ -100,6 +104,39 @@ export interface RpcMutation<Input, Output> {
   readonly error: ReadonlySignal<Error | null>;
   /** Salida de la última llamada correcta, o `null`. */
   readonly data: ReadonlySignal<Output | null>;
+}
+
+/**
+ * Resultado de `useApiMutation(ruta, método)`: llama a un endpoint de API que no es `GET` bajo
+ * demanda con `mutate({ params, query, body })`, nunca en SSR, y refleja la última llamada en
+ * `pending`, `data` y `error`. Con la opción `retrySafe` añade {@link RetrySafeMutation}.
+ *
+ * @typeParam O Operación del contrato de API.
+ * @since 1.2.0
+ * @example
+ * ```html
+ * <script lang="ts">
+ * const remove = useApiMutation("/api/notes/[id]", "DELETE");
+ * async function erase(id: string): Promise<void> {
+ *   await remove.mutate({ params: { id } });
+ * }
+ * </script>
+ * <template><p if:when="remove.error.value">No se pudo borrar.</p></template>
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#mutaciones
+ */
+export interface ApiMutation<O extends AnyApiOperation> {
+  /**
+   * Llama al endpoint con el token CSRF; devuelve su salida o rechaza con su error. Se puede
+   * llamar sin argumentos cuando la operación no exige `params`, `query` ni `body`.
+   */
+  mutate(...input: ApiMutationArguments<O>): Promise<O["output"]>;
+  /** `true` mientras una llamada está en curso. */
+  readonly pending: ReadonlySignal<boolean>;
+  /** Fallo de la última llamada, o `null`. */
+  readonly error: ReadonlySignal<Error | null>;
+  /** Salida de la última llamada correcta, o `null`. */
+  readonly data: ReadonlySignal<O["output"] | null>;
 }
 
 /**
@@ -217,8 +254,9 @@ export type UseApi<Queries> =
 export type UseRpcQuery<Contract extends Record<string, RpcOperation>> =
   <Procedure extends keyof Contract & string>(procedure: Procedure, ...input: RpcQueryArguments<Contract[Procedure]["input"]>) => DataResource<Contract[Procedure]["output"]>;
 /**
- * Firma de `useRpcMutation(procedimiento)`: devuelve una {@link RpcMutation} que llama al
- * procedimiento con `mutate(input)`. No admite `await` en el nivel superior (`MEEK055`).
+ * Firma de `useRpcMutation(procedimiento, opciones?)`: devuelve una {@link RpcMutation} que llama
+ * al procedimiento con `mutate(input)`. Con `{ retrySafe: { key } }` (desde `1.2`) devuelve además
+ * {@link RetrySafeMutation}. No admite `await` en el nivel superior (`MEEK055`).
  *
  * @typeParam Contract Contrato `RpcContract` generado, indexado por ID de procedimiento.
  * @since 1.1.0
@@ -229,12 +267,72 @@ export type UseRpcQuery<Contract extends Record<string, RpcOperation>> =
  * async function save(name: string): Promise<void> {
  *   await rename.mutate({ id: "1", name });
  * }
+ * const charge = useRpcMutation("sales.checkout", { retrySafe: { key: "pos:sale" } });
  * </script>
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#mutaciones
  */
-export type UseRpcMutation<Contract extends Record<string, RpcOperation>> =
-  <Procedure extends keyof Contract & string>(procedure: Procedure) => RpcMutation<Contract[Procedure]["input"], Contract[Procedure]["output"]>;
+export type UseRpcMutation<Contract extends Record<string, RpcOperation>> = {
+  <Procedure extends keyof Contract & string>(procedure: Procedure, options?: MutationOptions & { readonly retrySafe?: undefined }): RpcMutation<Contract[Procedure]["input"], Contract[Procedure]["output"]>;
+  <Procedure extends keyof Contract & string>(procedure: Procedure, options: MutationOptions & { readonly retrySafe: RetrySafeOptions }): RpcMutation<Contract[Procedure]["input"], Contract[Procedure]["output"]>
+    & RetrySafeMutation<Contract[Procedure]["input"], Contract[Procedure]["output"]>;
+};
+
+type MutationEndpoint<M> = M extends { readonly api: readonly (infer E)[] }
+  ? Extract<E, { readonly method: "POST" | "PUT" | "PATCH" | "DELETE"; readonly pathname: string; readonly clientKey: string }>
+  : never;
+type MethodOperation<C, K, M extends string> = K extends keyof C ? Lowercase<M> extends keyof C[K] ? Extract<C[K][Lowercase<M>], AnyApiOperation> : never : never;
+
+/**
+ * Operaciones de escritura (`POST`, `PUT`, `PATCH`, `DELETE`) de un contrato de API indexadas por
+ * ruta y método (`["/api/notes"]["POST"]`), a partir del manifiesto público. Es el tipo que recibe
+ * {@link UseApiMutation}.
+ *
+ * @typeParam Manifest Manifiesto público con los endpoints (`pathname`, `method`, `clientKey`).
+ * @typeParam Contract Contrato `ApiContract` generado, indexado por `clientKey`.
+ * @since 1.2.0
+ * @example
+ * ```ts
+ * import type { ApiMutationContract, ApiOperation } from "@meekojs/meeko/framework";
+ *
+ * type Contract = { notes: { post: ApiOperation<undefined, undefined, { text: string }, { id: string }> } };
+ * declare const manifest: { readonly api: readonly [{ readonly clientKey: "notes"; readonly pathname: "/api/notes"; readonly method: "POST" }] };
+ * // Mutations["/api/notes"]["POST"] es la operación de api.notes.post.
+ * type Mutations = ApiMutationContract<typeof manifest, Contract>;
+ * ```
+ */
+export type ApiMutationContract<Manifest, Contract> = {
+  [P in MutationEndpoint<Manifest>["pathname"]]: {
+    [E in Extract<MutationEndpoint<Manifest>, { readonly pathname: P }> as E["method"]]: MethodOperation<Contract, E["clientKey"], E["method"]>;
+  };
+};
+
+type MutationOf<Mutations, Path extends keyof Mutations, Method extends keyof Mutations[Path]> = Extract<Mutations[Path][Method], AnyApiOperation>;
+/**
+ * Firma de `useApiMutation(ruta, método, opciones?)`: devuelve una {@link ApiMutation} que llama
+ * a un endpoint `POST`, `PUT`, `PATCH` o `DELETE` con `mutate({ params, query, body })`. Con
+ * `{ retrySafe: { key } }` devuelve además {@link RetrySafeMutation}. Se llama mientras se ejecuta el
+ * script de un componente, normalmente en su nivel superior, y no admite `await` (`MEEK055`).
+ *
+ * @typeParam Mutations Operaciones por ruta y método, normalmente un {@link ApiMutationContract}.
+ * @since 1.2.0
+ * @example
+ * ```html
+ * <script lang="ts">
+ * const create = useApiMutation("/api/notes", "POST");
+ * const sale = useApiMutation("/api/sales", "POST", { retrySafe: { key: "pos:sale" } });
+ * async function add(text: string): Promise<void> {
+ *   await create.mutate({ body: { text } });
+ * }
+ * </script>
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#mutaciones
+ */
+export type UseApiMutation<Mutations> = {
+  <Path extends keyof Mutations & string, Method extends keyof Mutations[Path] & string>(path: Path, method: Method, options?: MutationOptions & { readonly retrySafe?: undefined }): ApiMutation<MutationOf<Mutations, Path, Method>>;
+  <Path extends keyof Mutations & string, Method extends keyof Mutations[Path] & string>(path: Path, method: Method, options: MutationOptions & { readonly retrySafe: RetrySafeOptions }): ApiMutation<MutationOf<Mutations, Path, Method>>
+    & RetrySafeMutation<ApiMutationInput<MutationOf<Mutations, Path, Method>>, MutationOf<Mutations, Path, Method>["output"]>;
+};
 
 type ScopeEntry =
   | { readonly status: "pending"; readonly promise: Promise<void> }
@@ -561,7 +659,7 @@ export function createUseRpcQuery<Contract extends Record<string, RpcOperation>>
 
 /**
  * Crea `useRpcMutation` para los procedimientos de un manifiesto público, como hacen los clientes
- * generados.
+ * generados. El composable acepta desde `1.2` las opciones de mutación (`retrySafe`).
  *
  * @param manifest Manifiesto público con la lista `rpc`.
  * @param options Opciones de transporte: `fetch`, `baseUrl`, cabeceras y CSRF.
@@ -579,28 +677,51 @@ export function createUseRpcQuery<Contract extends Record<string, RpcOperation>>
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#mutaciones
  */
 export function createUseRpcMutation<Contract extends Record<string, RpcOperation>>(manifest: Pick<PublicServerManifest, "rpc">, options: ClientOptions = {}): UseRpcMutation<Contract> {
-  const useRpcMutation = (procedure: string): RpcMutation<unknown, unknown> => {
-    requireSetup(`useRpcMutation("${procedure}")`);
+  const useRpcMutation = (procedure: string, mutationOptions?: MutationOptions): RpcMutation<unknown, unknown> => {
+    const label = `useRpcMutation("${procedure}")`;
+    requireSetup(label);
     const endpoint = rpcEndpoint(manifest, procedure, "useRpcMutation");
-    const pending = signal(false);
-    const error = signal<Error | null>(null);
-    const data = signal<unknown>(null);
-    return {
-      pending, error, data,
-      async mutate(input) {
-        pending.value = true;
-        try {
-          const output = await requestRpc(endpoint, input, {}, options);
-          batch(() => { data.value = output; error.value = null; });
-          return output;
-        } catch (failure) {
-          error.value = toError(failure);
-          throw failure;
-        } finally {
-          pending.value = false;
-        }
-      },
-    };
+    return createMutation({
+      label,
+      target: `RPC ${procedure}`,
+      send: (input, headers) => requestRpc(endpoint, input, {}, options, headers),
+    }, mutationOptions) as RpcMutation<unknown, unknown>;
   };
   return useRpcMutation as never;
+}
+
+/**
+ * Crea `useApiMutation` para los endpoints `POST`, `PUT`, `PATCH` y `DELETE` de un manifiesto
+ * público, como hacen los clientes generados.
+ *
+ * @param manifest Manifiesto público con la lista `api`.
+ * @param options Opciones de transporte: `fetch`, `baseUrl`, cabeceras y CSRF.
+ * @returns El composable `useApiMutation`. Con una ruta o un método sin endpoint, o con `GET`, lanza
+ * `TypeError`, y fuera del script de un componente, `Error`.
+ * @since 1.2.0
+ * @example
+ * ```ts
+ * import { createBrowserClientOptions, createUseApiMutation } from "@meekojs/meeko/framework";
+ * import type { ApiContract } from "../types/server-contracts.js";
+ *
+ * const manifest = { version: 1, api: [{ clientKey: "notes", pathname: "/api/notes", method: "POST" }], rpc: [] } as const;
+ * export const useApiMutation = createUseApiMutation<ApiContract, typeof manifest>(manifest, createBrowserClientOptions());
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#mutaciones
+ */
+export function createUseApiMutation<Contract extends Record<string, Record<string, AnyApiOperation>>, Manifest extends Pick<PublicServerManifest, "api">>(manifest: Manifest, options: ClientOptions = {}): UseApiMutation<ApiMutationContract<Manifest, Contract>> {
+  const useApiMutation = (path: string, method: string, mutationOptions?: MutationOptions): ApiMutation<AnyApiOperation> => {
+    const label = `useApiMutation("${path}", "${method}")`;
+    requireSetup(label);
+    const verb = String(method).toUpperCase();
+    if (verb === "GET" || verb === "HEAD") throw new TypeError(`useApiMutation: ${verb} ${path} is a read; use useApi`);
+    const endpoint = manifest.api.find((entry) => entry.pathname === path && entry.method === verb);
+    if (!endpoint) throw new TypeError(`useApiMutation: no ${verb} endpoint at ${path}`);
+    return createMutation({
+      label,
+      target: `${verb} ${path}`,
+      send: (input, headers) => requestApi(endpoint, (input ?? {}) as ApiRequestInput, options, headers),
+    }, mutationOptions) as unknown as ApiMutation<AnyApiOperation>;
+  };
+  return useApiMutation as never;
 }

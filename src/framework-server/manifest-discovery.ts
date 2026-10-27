@@ -1,6 +1,6 @@
 import { readdir } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
-import { assertCallablePaths, clientKey, collisionKey, parts } from "./discovery.js";
+import { assertCallablePaths, assertClientSegments, clientKey, collisionKey, parts } from "./discovery.js";
 import type { ApiEndpoint, ApiMethod, RpcEndpoint, ServerManifest, SocketEndpoint } from "./discovery.js";
 
 async function files(directory: string): Promise<string[]> {
@@ -82,6 +82,7 @@ export async function discoverServerManifest(projectRoot: string): Promise<Serve
     if (previous) throw new Error(`Colisión de rutas de API: ${previous} y ${endpoint.file} resuelven los dos a ${pathKey}`);
     paths.set(pathKey, endpoint.file);
   }
+  assertClientSegments(api);
   assertCallablePaths(api.map((endpoint) => ({ file: endpoint.file, path: `${endpoint.clientKey}.${endpoint.method.toLowerCase()}` })), "Colisión de nombres del cliente de API");
   assertCallablePaths(rpc.map((endpoint) => ({ file: endpoint.file, path: endpoint.id })), "Colisión de procedimientos RPC");
   return Object.freeze({ api: Object.freeze(api), rpc: Object.freeze(rpc), socket: Object.freeze(socket) });

@@ -39,6 +39,26 @@ export interface RequestContext<TServices = unknown, TEnv = unknown> {
   readonly state: Map<string, unknown>;
   /** Runtime que atiende la petición, con su entorno y el soporte de trabajo en segundo plano. */
   readonly platform: ServerPlatform<TEnv>;
+  /**
+   * Clave de idempotencia de la cabecera `Idempotency-Key` (borrador del IETF), validada como UUID
+   * y en minúsculas; `undefined` si no llegó o no es un UUID. La envían las mutaciones `retrySafe`
+   * y es la misma en cada reintento de una intención. Meeko no deduplica: guárdela con el resultado
+   * (por ejemplo, en una columna única) y responda lo mismo cuando se repita. Desde `1.2`.
+   */
+  readonly idempotencyKey?: string | undefined;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The `Idempotency-Key` of a request, as a lowercase UUID. The IETF draft defines the header as a
+ * Structured Field string (`"…"`); a bare value is accepted too.
+ */
+export function idempotencyKeyOf(request: Request): string | undefined {
+  const header = request.headers.get("idempotency-key")?.trim();
+  if (!header) return undefined;
+  const value = header.length > 1 && header.startsWith('"') && header.endsWith('"') ? header.slice(1, -1) : header;
+  return UUID.test(value) ? value.toLowerCase() : undefined;
 }
 
 /**
@@ -119,6 +139,7 @@ export function createRequestContext<TServices, TEnv = unknown>(request: Request
     request, requestId: crypto.randomUUID(), services, session, state: new Map(),
     get signal() { return signal ??= revocation ? combinedSignal(request.signal, revocation) : request.signal; },
     platform: platform ?? defaultPlatform() as ServerPlatform<TEnv>,
+    idempotencyKey: idempotencyKeyOf(request),
   };
 }
 

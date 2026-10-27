@@ -1,4 +1,4 @@
-import { createRequestContext } from "./context.js";
+import { createRequestContext, idempotencyKeyOf } from "./context.js";
 import type { RequestContext, ServerFetch } from "./context.js";
 import { ApiError, dispatchApiRoute, dispatchRpc, errorResponse, reportServerError } from "./contracts.js";
 import type { ApiRouteDefinition, RpcDefinition, Schema, ServerErrorObserver } from "./contracts.js";
@@ -132,8 +132,41 @@ export function collisionKey(pathname: string): string {
   return parts(pathname).map((part) => part.kind === "static" ? part.value : part.kind === "param" ? "[]" : "[...]").join("/");
 }
 
+/** `byId`: the client segment of the dynamic segment `[id]` or `[...id]`. */
+export function clientSegment(param: string): string {
+  return `by${param[0]!.toUpperCase()}${param.slice(1)}`;
+}
+
 export function clientKey(pathname: string): string {
-  return parts(pathname).map((part) => part.kind === "static" ? part.value : part.kind === "param" ? `by${part.value[0]!.toUpperCase()}${part.value.slice(1)}` : `by${part.value[0]!.toUpperCase()}${part.value.slice(1)}`).join(".");
+  return parts(pathname).map((part) => part.kind === "static" ? part.value : clientSegment(part.value)).join(".");
+}
+
+/**
+ * The generated client reads `byId` as the dynamic segment of `[id]` (`api.users({ id })`), so each
+ * client segment must be either static or the segment of one route parameter, in every route.
+ */
+export function assertClientSegments(api: readonly Pick<ApiEndpoint, "file" | "pathname">[]): void {
+  const seen = new Map<string, { file: string; segment: string }>();
+  for (const endpoint of api) {
+    const routeParts = parts(endpoint.pathname).slice(1);
+    const params = routeParts.filter((part) => part.kind !== "static").map((part) => part.value);
+    let path = "";
+    for (const part of routeParts) {
+      const name = part.kind === "static" ? part.value : clientSegment(part.value);
+      const describe = (value: string) => value === "" ? `el segmento estático ${name}` : `el segmento [${value}]`;
+      const matches = params.filter((param) => clientSegment(param) === name);
+      if (part.kind === "static" ? matches.length > 0 : matches.length > 1) {
+        throw new Error(`Colisión de nombres del cliente de API: en ${endpoint.file}, ${describe(part.kind === "static" ? "" : part.value)} y el segmento [${matches.find((param) => param !== part.value)}] resuelven los dos a ${name}`);
+      }
+      path = path ? `${path}.${name}` : name;
+      const segment = part.kind === "static" ? "" : part.value;
+      const previous = seen.get(path);
+      if (previous && previous.segment !== segment) {
+        throw new Error(`Colisión de nombres del cliente de API: ${previous.file} (${describe(previous.segment)}) y ${endpoint.file} (${describe(segment)}) resuelven los dos a ${path}`);
+      }
+      if (!previous) seen.set(path, { file: endpoint.file, segment });
+    }
+  }
 }
 
 /** A callable cannot also be the parent object of another generated client member. */
@@ -354,7 +387,8 @@ export function createLocalServerFetch<S>(options: Pick<ServerDispatcherOptions<
         return errorResponse(new ApiError("INVALID_CREDENTIALS", 403), active.requestId);
       }
     }
-    const context: RequestContext<S> = { ...active, request, signal: request.signal } as RequestContext<S>;
+    // The key belongs to the request it came with, not to the one that dispatches this call.
+    const context: RequestContext<S> = { ...active, request, signal: request.signal, idempotencyKey: idempotencyKeyOf(request) } as RequestContext<S>;
     return dispatch(context);
   };
 }

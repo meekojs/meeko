@@ -77,8 +77,8 @@ export function analyzeComposables(file: ts.SourceFile): ScriptComposables {
       || (ts.isExpressionStatement(parent) && parent === statement);
     const call = ts.isCallExpression(node.expression) ? node.expression : undefined;
     const name = call ? calleeName(call) : undefined;
-    if (name === "useRpcMutation") {
-      throw new ComposableError("MEEK055", "useRpcMutation no se puede esperar con await; llámalo sin await y espera su mutate(input) en un handler", node);
+    if (name === "useRpcMutation" || name === "useApiMutation") {
+      throw new ComposableError("MEEK055", `${name} no se puede esperar con await; llámalo sin await y espera su mutate(input) en un handler`, node);
     }
     if (!call || !name || (!browserAwaits.has(name) && !dataAwaits.has(name))) {
       throw new ComposableError("MEEK055", `El await de nivel superior sólo se admite sobre ${allowedAwaits}; mueve el resto del trabajo asíncrono a una función o a onMounted`, node);
@@ -126,18 +126,22 @@ export function analyzeComposables(file: ts.SourceFile): ScriptComposables {
 }
 
 /**
- * Whether a statement after the first browser await may run in the browser continuation, an
- * async function: any expression statement, and `if`, loops, `try`, `switch` and blocks.
+ * Whether a top-level statement runs as code, in order, in the synchronous setup or in the
+ * browser continuation: any expression statement, and `if`, loops, `try`, `switch`, blocks,
+ * labeled statements around one of them and empty statements. Declarations, imports and types
+ * have rules of their own.
  */
-export function isContinuationStatement(statement: ts.Statement): boolean {
+export function isExecutableStatement(statement: ts.Statement): boolean {
+  if (ts.isLabeledStatement(statement)) return isExecutableStatement(statement.statement);
   return ts.isExpressionStatement(statement) || ts.isIfStatement(statement) || ts.isForStatement(statement)
     || ts.isForOfStatement(statement) || ts.isForInStatement(statement) || ts.isWhileStatement(statement)
-    || ts.isDoStatement(statement) || ts.isTryStatement(statement) || ts.isSwitchStatement(statement) || ts.isBlock(statement);
+    || ts.isDoStatement(statement) || ts.isTryStatement(statement) || ts.isSwitchStatement(statement) || ts.isBlock(statement)
+    || ts.isEmptyStatement(statement);
 }
 
 /**
- * The first call of a top-level-only composable inside a control-flow statement of the
- * continuation: it would run conditionally or repeatedly, so it is MEEK054 like a nested call.
+ * The first call of a top-level-only composable inside a control-flow statement of the setup or
+ * of the continuation: it would run conditionally or repeatedly, so it is MEEK054 like a nested call.
  */
 export function conditionalComposable(statement: ts.Statement): ts.CallExpression | undefined {
   if (ts.isExpressionStatement(statement)) return undefined;

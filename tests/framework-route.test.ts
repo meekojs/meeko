@@ -99,9 +99,11 @@ const sources: Record<string, string> = {
 
 /** Compiles the components against the source runtime, so the test does not depend on dist/. */
 async function loadModules(): Promise<{ modules: Record<string, ClientComponent>; cleanup: () => Promise<void> }> {
-  // Inside the repository, so the components and the test share one instance of the runtime modules.
+  // An ES module package, like the repository: the components load as ES modules and share one
+  // instance of the runtime modules with the test, instead of a CommonJS copy.
   const project = await createTempProject("route-test");
   const directory = project.root;
+  await writeFile(join(directory, "package.json"), '{"private":true,"type":"module"}\n');
   const runtimePath = (path: string): string => JSON.stringify(pathToFileURL(resolve(path)).href);
   await writeFile(join(directory, "data.ts"), dataModule(runtimePath("src/framework.ts")));
   const modules: Record<string, ClientComponent> = {};

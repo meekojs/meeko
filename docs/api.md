@@ -13,10 +13,13 @@ El nivel superior del `<script>` es el setup del componente y sólo admite estas
 - `import` y `export type`, `interface` y `type`;
 - `const`/`let` con **una** declaración por sentencia (`MEEK014`). Desde `1.2` la declaración puede desestructurar un objeto o un array, con valores por defecto, renombres y resto, como `const { toasts, dismiss } = useToasts()` (véase [Desestructuración en el script](#desestructuración-en-el-script));
 - declaraciones `function` con nombre;
-- llamadas como sentencia, por ejemplo `onCleanup(...)`, `onMounted(...)` o `effect(...)`;
+- cualquier sentencia de expresión: llamadas como `onCleanup(...)`, `onMounted(...)` o `effect(...)` y, desde `1.2`, también asignaciones y otras expresiones, como `count.value = props.initial`, `label ??= "Sin título"`, `items.value.push(item)` o `void Child`;
+- desde `1.2`, control de flujo: `if`, `for`, `for...of`, `for...in`, `while`, `do...while`, `try`, `switch`, bloques `{ ... }`, sentencias etiquetadas sobre ellos (`outer: for (...)`) y sentencias vacías (el `;` sobrante tras una función);
 - `await` sobre los composables que lo admiten, como sentencia completa o inicializador completo (véase [Composables de nivel superior y `await`](#composables-de-nivel-superior-y-await)).
 
-Cualquier otra sentencia de nivel superior (`if`, `for`, `try`, clases, `export const`…) da `MEEK018`. Póngala dentro de una función, de un `effect` o de un composable de `app/composables`. En el script se admiten imports, tipos, declaraciones de variables y funciones, y llamadas de expresión para registrar hooks durante el setup. `defineProps<Props>()` es una macro de compilación: declara las props que reciben `renderToString` e `hydrate`; no necesita una implementación en tiempo de ejecución. `defineEmits`, `defineExpose`, `defineModel`, `defineSnippets` y `useElementRef` también son macros de compilación y no se importan.
+Las sentencias de expresión y de control se ejecutan en orden, igual que las llamadas: en SSR y otra vez al hidratar, antes de que la plantilla lea los nombres del setup. Una escritura como `count.value = props.initial` no rompe la hidratación, porque el servidor y el navegador la repiten con las mismas props, y el estado transferido (o el que conserva una actualización en caliente) se restaura después del setup. Como cualquier código del nivel superior, se repite en cada pasada de un render que espera datos (véase [Navegación y `render: "client"`](framework.md#navegación-y-render-client)): una escritura externa o una petición van en `onMounted` o en un handler. Las declaraciones dentro de un bloque, de un bucle o de un `case` son locales: la plantilla sólo ve las del nivel superior. `useElementRef`, `useApi`, `useRpcQuery` y `useRpcMutation` dentro de una sentencia de control o de un bloque se ejecutarían de forma condicional o repetida y dan `MEEK054`; `defineProps` fuera de su propia declaración `const` da `MEEK016`.
+
+Cualquier otra sentencia de nivel superior da `MEEK018`, con una indicación de qué escribir en su lugar: `export` de valores (`export const`, `export function`, `export { ... }`, `export default`; el script sólo exporta tipos, y los datos de una página se exportan desde `<script server>`), clases, `enum`, `namespace`, `import x = require(...)`, y `return`, `throw`, `break` o `continue` sueltos (dentro de un `if` o de un bucle sí se admiten). Lleve una clase o un `enum` a un módulo `.ts` e impórtelo. `defineProps<Props>()` es una macro de compilación: declara las props que reciben `renderToString` e `hydrate`; no necesita una implementación en tiempo de ejecución. `defineEmits`, `defineExpose`, `defineModel`, `defineSnippets` y `useElementRef` también son macros de compilación y no se importan.
 
 ```html
 <script lang="ts">
@@ -197,6 +200,57 @@ Use `each:key` cuando la lista cambia de orden o recibe elementos en medio y cad
 | `:global(html.dark)` | `html.dark`, sin atributo de ámbito |
 
 Un compuesto que contiene `:global(...)` no se limita; el atributo se añade al último compuesto local del selector, y un selector completamente global no lo recibe. `:global` sin paréntesis o vacío, una lista de selectores dentro de `:global(...)` y un `:global(...)` anidado en otra pseudoclase, como `:not(...)`, fallan con `MEEK019` en su posición. Las reglas dentro de `@keyframes` no se modifican.
+
+#### Qué elementos reciben el atributo
+
+Por defecto, `data-meeko-s-<hash>` va en todos los elementos de la plantilla del componente. Desde `1.2`, la opción `css.scopeAttribute: "matched"` de `meeko.config.ts` lo añade sólo a los elementos que algún selector con ámbito puede seleccionar, y el HTML pesa menos:
+
+```ts
+// meeko.config.ts
+import { defineMeekoConfig } from "@meekojs/meeko/framework";
+
+export default defineMeekoConfig({
+  css: { scopeAttribute: "matched" }, // "all" por defecto en 1.x
+});
+```
+
+La opción vale para todo lo que compila el proyecto: el plugin de Vite (`meeko dev`, `meeko build` y el prerender; fuera del framework, el plugin lee el `meeko.config.ts` de la raíz de Vite) y `meeko compile`, que lee la configuración de la carpeta del `package.json` más cercano. Quien llama a `compile()` directamente pasa `{ scopeAttribute: "matched" }` en sus opciones. `meeko check` y el editor no dependen de ella: sólo cambia el HTML que se renderiza, no los tipos ni los diagnósticos. Como cualquier cambio de `meeko.config.ts`, cambiarla exige reiniciar `meeko dev`.
+
+En `1.x` el valor por defecto es `"all"`, porque `"matched"` puede cambiar el resultado de un caso que antes funcionaba: una clase o un atributo que el script añade con la API del DOM a un elemento que se quedó sin el atributo (véase el final de esta sección). En `2.0`, `"matched"` pasará a ser el valor por defecto; véase [Estabilidad](stability.md#cambios-previstos-para-20).
+
+Con `"matched"`, los elementos a los que las reglas aplican son los mismos que con `"all"`. De cada selector cuenta únicamente el compuesto que lleva el atributo: los demás compuestos (ancestros, hermanos y `:global(...)`) seleccionan cualquier elemento de la página, con atributo o sin él, así que un elemento que sólo aparece como ancestro, como el `.card` de `.card .title`, no lo necesita. Un elemento recibe el atributo cuando ese compuesto puede coincidir con él:
+
+- Una etiqueta coincide con los elementos de esa etiqueta; una clase, un id o un selector de atributo (`[href^="/"]`), con los elementos que los tienen en la plantilla. Las mayúsculas no se distinguen.
+- `*`, las pseudoclases (`:hover`, `:focus-visible`, `:nth-child(...)`, `:not(...)`, `:has(...)`) y los pseudoelementos no restringen: `:hover` a solas pone el atributo en todos los elementos y `a:hover`, en todos los `<a>`.
+- `:is(...)` y `:where(...)` coinciden cuando coincide alguno de sus argumentos; `&` en CSS anidado, cuando coincide el selector de la regla que lo contiene.
+
+Un atributo que puede cambiar después del render cuenta como presente con cualquier valor:
+
+- `bind:class` puede dar cualquier clase; `bind:id`, cualquier id; `bind:nombre`, el atributo `nombre` (`bind:aria-current` y `[aria-current="page"]`).
+- `model` da `value` y `checked` a su control, y un `<select model>` da `selected` a sus `<option>`.
+- Un elemento con `ref:` o con un `on:evento` queda en manos del script, por la referencia o por `event.currentTarget`, y un elemento personalizado (`<x-chip>`) gestiona sus propios atributos: en ellos sólo cuenta la etiqueta, y cualquier clase o atributo del selector puede coincidir.
+- El navegador añade `open` a `<details>` y a `<dialog>`.
+
+```html
+<template>
+  <section class="card">
+    <h2 class="title">Título</h2>
+    <p>Texto</p>
+    <span bind:class="state.value">Estado</span>
+    <em>Nota</em>
+  </section>
+</template>
+
+<style scoped>
+.card .title { font-weight: 700; } /* el <h2>; .card es sólo un ancestro */
+p:hover { color: teal; }           /* el <p> */
+.active { color: green; }          /* el <span>, por bind:class */
+</style>
+```
+
+Con `"matched"`, aquí `<section>` y `<em>` se renderizan sin el atributo. El contenido de `html="..."` y los elementos de un componente hijo no reciben el atributo del padre, como antes (selecciónelos con `:global(...)`, por ejemplo `.content :global(p)`), y el contenido de un snippet recibe el del componente que lo escribe. Un componente sin `<style scoped>` nunca emite el atributo y, con `"matched"`, tampoco uno cuyos selectores son todos globales. El SSR, la hidratación y las regiones de `if:when` y `each:of` comparten la plantilla compilada, así que el atributo coincide en el HTML del servidor y en el que se renderiza en el navegador.
+
+Antes de activar `"matched"`, revise el código que cambia clases o atributos con la API del DOM (`classList`, `setAttribute`, `toggleAttribute`). En un elemento sin `ref:` ni `on:`, como un descendiente al que el script llega con `querySelector`, `closest` o `event.target`, o uno que modifica una biblioteca externa, la clase sólo recibe los estilos con ámbito si ese elemento ya tenía el atributo. Use `bind:class` o `bind:nombre`, ponga una `ref:` en ese elemento o escriba el selector con `:global(...)`. Con `"all"`, todos los elementos de la plantilla tienen el atributo y este caso no se da.
 
 CLI y VS Code comprueban el tipo del evento que recibe `on:event` y que `each:key` devuelve `string | number`; ambos ubican el diagnóstico en la expresión de la plantilla. Desde `1.2`, en un elemento HTML el evento tiene el tipo de `HTMLElementEventMap` (`SVGElementEventMap` dentro de `<svg>`) para su nombre, como `KeyboardEvent` en `on:keydown` o `PointerEvent` en `on:pointerdown`, y `Event` si el nombre no está en el mapa (antes sólo se tipaban `click`, `input`, `change`, `submit`, `keydown`, `keyup`, `focus` y `blur`). Además, `event.currentTarget` tiene el tipo del elemento de la etiqueta, el mismo que da `ref:` (`HTMLInputElement` en `<input>`, `HTMLSelectElement` en `<select>`, `HTMLElement` en un elemento personalizado), así que `on:input="(event) => query.value = event.currentTarget.value"` y `on:change="(event) => accepted.value = event.currentTarget.checked"` se comprueban sin conversiones; una propiedad que el elemento no tiene sigue siendo un error. `event.target` conserva el tipo `EventTarget | null`, porque puede ser un descendiente. En una etiqueta de componente, `on:evento` es una prop de callback y recibe los argumentos de su `defineEmits`. El documento virtual de VS Code aplica las mismas opciones estrictas de acceso indexado, props opcionales exactas e imports de tipo que `meeko check`.
 
@@ -467,7 +521,9 @@ Con `users` de tipo `Signal<User[]>`, `T` es `User`. Con ese `T` se comprueban e
 
 ### Composables de nivel superior y `await`
 
-`useElementRef`, `useApi`, `useRpcQuery` y `useRpcMutation` sólo se llaman en el nivel superior del `<script>`; dentro de una función, un handler, un `effect` o `onMounted` dan `MEEK054`. `useState`, `useSocket`, `useSocketClient` y `useNavigation` mantienen su comportamiento de `1.0` y pueden llamarse también desde código anidado, igual que `useRoute` (véase [Ruta actual](framework.md#ruta-actual)). `useApi`, `useRpcQuery` y `useRpcMutation` pertenecen al framework y se describen en [framework.md](framework.md#datos-en-componentes-useapi-userpcquery-y-userpcmutation).
+`useElementRef`, `useApi`, `useRpcQuery` y `useRpcMutation` sólo se llaman en el nivel superior del `<script>`; dentro de una función, un handler, un `effect` o `onMounted` dan `MEEK054`. `useState`, `useSocket`, `useSocketClient` y `useNavigation` mantienen su comportamiento de `1.0` y pueden llamarse también desde código anidado, igual que `useRoute` (véase [Ruta actual](framework.md#ruta-actual)). `useForm` (desde `1.2`) tampoco da `MEEK054`, aunque su lugar es el nivel superior del script, como cualquier estado del componente (véase [Formularios: `useForm`](framework.md#formularios-useform)). `useApi`, `useRpcQuery` y `useRpcMutation` pertenecen al framework y se describen en [framework.md](framework.md#datos-en-componentes-useapi-userpcquery-y-userpcmutation).
+
+Desde `1.2`, `useApiMutation` y `useStorage` necesitan que el script del componente se esté ejecutando (fuera de él lanzan un `Error`), pero el compilador no las incluye en `MEEK054`, para no rechazar funciones propias con el mismo nombre de proyectos anteriores. Llame a `useApiMutation` en el nivel superior, como `useRpcMutation`; `useStorage` puede llamarse también dentro de un composable que el script invoca. `await useApiMutation(...)` da `MEEK055`. Se describen en [Mutaciones](framework.md#mutaciones) y en [Estado persistente](framework.md#estado-persistente-usestorage).
 
 El setup sigue siendo síncrono, con una excepción: admite `await` de nivel superior sólo sobre estos composables, y de dos clases.
 
@@ -484,7 +540,7 @@ El primer `await` de navegador divide el setup:
 - Desde ese `await`, el resto es una continuación que sólo se ejecuta en el navegador, una vez montado el componente y listo lo que espera. Pertenece al componente: sus `effect`, `onCleanup` y composables se liberan al desmontarlo, y si se desmonta mientras espera, la continuación no se reanuda. Un fallo llega al observador de errores con la fuente `"mounted"`.
 - `defineProps`, `defineEmits`, `defineExpose`, `defineModel` y `defineSnippets` deben ir antes de ese `await` (`MEEK058`).
 - Un `await useApi(...)` o `await useRpcQuery(...)` posterior se ejecuta también sólo en el navegador, como una petición normal.
-- La continuación es una función asíncrona, así que admite más sentencias que el setup: además de declaraciones `const`/`let` simples y funciones, cualquier sentencia de expresión (asignaciones como `count.value = 1`, no sólo llamadas), `if`, `for`, `for...of`, `for...in`, `while`, `do...while`, `try`, `switch` y bloques. `useElementRef`, `useApi`, `useRpcQuery` y `useRpcMutation` dentro de una de esas sentencias de control se ejecutarían de forma condicional o repetida y dan `MEEK054`. Cualquier otra sentencia (una clase, `export const`…) da `MEEK018`.
+- La continuación es una función asíncrona y admite las mismas sentencias que el setup síncrono: declaraciones `const`/`let` simples y funciones, cualquier sentencia de expresión (asignaciones como `count.value = 1`, no sólo llamadas), `if`, `for`, `for...of`, `for...in`, `while`, `do...while`, `try`, `switch`, bloques, sentencias etiquetadas y sentencias vacías. `useElementRef`, `useApi`, `useRpcQuery` y `useRpcMutation` dentro de una de esas sentencias de control se ejecutarían de forma condicional o repetida y dan `MEEK054`. Cualquier otra sentencia (una clase, `export const`…) da `MEEK018`.
 
 `await useElementRef("x")` espera el valor del `defineExpose` del componente que nombra `ref:x`. Si ese componente no tiene `defineExpose`, no hay nada que esperar: `meeko check` lo marca con `MEEK080` (el editor lo muestra como un error de tipos de `await`) y, en ejecución, la promesa rechaza con un error `MEEK080` cuando el componente se hidrata. Añada `defineExpose` al componente o lea `useElementRef("x").value` sin `await`.
 

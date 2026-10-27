@@ -69,6 +69,26 @@ describe("language server: deprecated symbols and JSDoc links", () => {
     await workspace.open("app/pages/index.meeko");
   });
 
+  test("a method reached through the byId alias of the API client is struck through", { timeout: 120_000 }, async () => {
+    const text = `<script lang="ts">
+import { createApiClient } from "@meekojs/meeko/framework";
+import type { ApiOperation } from "@meekojs/meeko/framework";
+const api = createApiClient<{ "users.byId": { get: ApiOperation<{ id: string }, undefined, undefined, string> } }>({
+  api: [{ clientKey: "users.byId", pathname: "/api/users/[id]", method: "GET" }],
+});
+const current = api.users({ id: "1" }).get();
+const legacy = api.users.byId.get({ params: { id: "1" } });
+</script>
+<template><p>{String(current)}{String(legacy)}</p></template>
+`;
+    const component = await workspace.open("app/pages/api.meeko", text);
+    const diagnostics = await componentDiagnostics(workspace.project, component.document, workspace.file("app/pages/api.meeko"), () => undefined);
+    const deprecated = diagnostics.filter((item) => item.tags?.includes(DiagnosticTag.Deprecated));
+    assert.deepEqual(deprecated.map((item) => [component.document.offsetAt(item.range.start), item.code]), [[component.offset("get({ params"), "TS6387"]], JSON.stringify(diagnostics));
+    assert.equal(deprecated[0]!.message, "Esta firma de «get» está obsoleta: Desde 1.2.0: llame al segmento dinámico con sus parámetros, como `api.users({ id }).get()` en lugar de `api.users.byId.get({ params: { id } })`. Se retirará en 2.0.");
+    assert.equal(diagnostics.some((item) => item.severity === DiagnosticSeverity.Error && item.range.start.line > 0), false, JSON.stringify(diagnostics));
+  });
+
   test("hovers render {@link} as readable text instead of the literal tag", async () => {
     const component = await workspace.open("app/pages/index.meeko");
     const socket = (hover(component, component.at("useSocket;", 2))?.contents as MarkupContent).value;

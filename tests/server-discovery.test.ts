@@ -63,6 +63,25 @@ test("rejects ambiguous API URL and generated client names", async (t) => {
     assert.match(String(error), /users\.get(?:\.post)?/);
     return true;
   });
+  // `byId` is the client segment of `[id]`, so it cannot also be static or belong to `[Id]`.
+  for (const paths of [
+    ["api/users/[id].get.ts", "api/users/byId/posts.get.ts"],
+    ["api/users/byId/posts.get.ts", "api/users/[id].post.ts"],
+    ["api/users/[id].get.ts", "api/users/[Id]/posts.get.ts"],
+  ]) {
+    const segments = await fixture(t, paths);
+    await assert.rejects(discoverServerManifest(segments.root), (error: unknown) => {
+      assert.match(String(error), /Colisión de nombres del cliente de API: .+ resuelven los dos a users\.byId/);
+      assert.match(String(error), /\[(?:id|Id)\]/);
+      return true;
+    });
+  }
+  const sameRoute = await fixture(t, ["api/orgs/[id]/byId.get.ts"]);
+  await assert.rejects(discoverServerManifest(sameRoute.root), /Colisión de nombres del cliente de API: en .+, el segmento estático byId y el segmento \[id\] resuelven los dos a byId/);
+  const sameRouteParams = await fixture(t, ["api/orgs/[id]/[Id].get.ts"]);
+  await assert.rejects(discoverServerManifest(sameRouteParams.root), /el segmento \[id\] y el segmento \[Id\] resuelven los dos a byId/);
+  const siblings = await fixture(t, ["api/users/index.get.ts", "api/users/name.get.ts", "api/users/[id].get.ts", "api/users/[slug]/posts.get.ts"]);
+  assert.deepEqual((await discoverServerManifest(siblings.root)).api.map((entry) => entry.clientKey).sort(), ["users", "users.byId", "users.bySlug.posts", "users.name"]);
   const nestedRpc = await fixture(t, ["rpc/users.ts", "rpc/users/get.ts"]);
   await assert.rejects(discoverServerManifest(nestedRpc.root), (error: unknown) => {
     assert.match(String(error), /Colisión de procedimientos RPC/);

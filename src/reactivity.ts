@@ -114,6 +114,21 @@ export function isWritableSignal(value: unknown): value is Signal<unknown> {
   return typeof value === "object" && value !== null && writableSignals.has(value) && !derivedSignals.has(value);
 }
 
+const externalSignals = new WeakSet<object>();
+
+/**
+ * Marks a writable signal whose value lives outside its component, such as the browser storage of
+ * `useStorage`: the SSR state and HMR neither snapshot nor restore it. Internal.
+ */
+export function markExternalSignal(value: Signal<unknown>): void {
+  externalSignals.add(value);
+}
+
+/** Whether a component's state snapshot skips this signal (see `markExternalSignal`). Internal. */
+export function isExternalSignal(value: unknown): boolean {
+  return typeof value === "object" && value !== null && externalSignals.has(value);
+}
+
 /** Any signal created by Meeko, writable or derived (`computed`). Internal. */
 export function isSignal(value: unknown): value is ReadonlySignal<unknown> {
   return typeof value === "object" && value !== null && writableSignals.has(value);
@@ -385,6 +400,11 @@ export function runDry<T>(work: () => T): T {
   dryDepth++;
   try { return work(); }
   finally { dryDepth--; }
+}
+
+/** True inside `runDry`: a render whose output is discarded and must not touch the browser. Internal. */
+export function isDryRender(): boolean {
+  return dryDepth > 0;
 }
 
 /**

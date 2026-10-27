@@ -16,6 +16,7 @@ import type { ErrorPageRecord, NavigationContext, Navigator, RouteMatch, RouteRe
 import { hydrateWithStateStore, StateStore, withStateStore } from "./state.js";
 import { createDeferred, deferredSettle, deferredSource, extractDeferred, placeDeferred } from "./deferred.js";
 import { provideResourceCache, ResourceCache, ResourceScope, withResourceScope } from "./resources.js";
+import { provideBrowserWindow } from "./storage.js";
 import { lateRender, mayAwaitData, renderWithSuspense } from "../suspense.js";
 import { mountBatch } from "../lifecycle.js";
 import type { DeferredError, DeferredInternals, DeferredOutcome } from "./deferred.js";
@@ -622,6 +623,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     provideNavigation(navigationState);
     provideRoute(routeState);
     provideResourceCache(resourceCache);
+    provideBrowserWindow(browser);
     return hydrate();
   });
   // A client page arrives with its layouts around an empty outlet; the page
@@ -882,6 +884,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         return runDry(() => withResourceScope(scope, () => withStateStore(new StateStore(preview), () => {
           // The dry pass already sees the route it is loading, as the commit will.
           provideRoute(fixedRoute(target));
+          provideBrowserWindow(browser);
           return tree.component.renderWithState({});
         })));
       }, { signal: context.signal });
@@ -935,6 +938,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       const nextRoute = liveRoute(target);
       const rendered = withStateStore(stateStore, () => {
         provideRoute(nextRoute.state);
+        provideBrowserWindow(browser);
         return next.component.renderWithState({});
       });
       // Hydrate the next view after the committed one, between private markers,
