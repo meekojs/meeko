@@ -217,7 +217,10 @@ export interface ServerApp {
   close(): Promise<void>;
 }
 
-/** Renders a page without server middleware or prerendered output; used by prerendering. */
+/**
+ * Renders a page without server middleware or prerendered output; used by prerendering. A render
+ * that does not answer 200 rejects with the first error it reported instead of its error page.
+ */
 export const renderPage: unique symbol = Symbol.for("meeko.server-app.render-page") as never;
 
 export type InternalServerApp = ServerApp & { readonly [renderPage]: (request: Request) => Promise<Response> };
@@ -324,7 +327,15 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
   try {
     const configuredOrigin = options.publicOrigin ?? runtime.publicOrigin;
     const publicOrigin = configuredOrigin ? normalizeOrigin(configuredOrigin) : undefined;
-    const reportError: ServerErrorObserver = runtime.onError ?? defaultObserver(options.production);
+    const hostObserver: ServerErrorObserver = runtime.onError ?? defaultObserver(options.production);
+    // A prerendered page fails the build with its full error, so the default
+    // observer's private one-line report is left out while one is rendered.
+    const prerenderFailures = new AsyncLocalStorage<unknown[]>();
+    const reportError: ServerErrorObserver = (error, requestId) => {
+      const failures = prerenderFailures.getStore();
+      failures?.push(error);
+      if (!failures || runtime.onError) hostObserver(error, requestId);
+    };
     reportBackground = (error) => observeServerError(error, crypto.randomUUID(), reportError);
     const platformStore = new AsyncLocalStorage<ServerPlatform>();
     const currentPlatform = (): ServerPlatform => platformStore.getStore() ?? basePlatform;
@@ -455,7 +466,14 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
           return decorated(normalized);
         });
       },
-      [renderPage]: (request) => run(basePlatform, () => renderOnly(withPublicOrigin(request))),
+      [renderPage]: async (request) => {
+        const failures: unknown[] = [];
+        const response = await prerenderFailures.run(failures, () => run(basePlatform, () => renderOnly(withPublicOrigin(request))));
+        if (response.status === 200 || failures.length === 0) return response;
+        // The developer runs the build: the page's own error explains the failed render.
+        await response.body?.cancel();
+        throw failures[0];
+      },
       manifest,
       ...(socket ? { socket } : {}),
       ...(publicOrigin ? { publicOrigin } : {}),

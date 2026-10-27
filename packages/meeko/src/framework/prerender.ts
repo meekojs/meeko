@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { access, mkdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
+import { inspect } from "node:util";
 import { renderPage } from "../framework-server/app.js";
 import type { InternalServerApp, ServerApp } from "../framework-server/app.js";
 import { serializeJson } from "../server.js";
@@ -98,6 +99,31 @@ function headOffset(pathname: string, html: string): number {
   return close;
 }
 
+/**
+ * An error with its stack and the chain of its `cause`s, for a build failure that the developer
+ * reads locally; the production runtime never prints this.
+ */
+function describeFailure(error: unknown): string {
+  const lines: string[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+  for (let depth = 0; depth < 16 && !seen.has(current); depth++) {
+    seen.add(current);
+    if (!(current instanceof Error)) {
+      let text: string;
+      try { text = typeof current === "string" ? current : inspect(current, { depth: 2 }); }
+      catch { text = typeof current; }
+      lines.push(depth === 0 ? text : `Caused by: ${text}`);
+      break;
+    }
+    const frames = (current.stack ?? "").split("\n").filter((line) => /^\s+at /.test(line));
+    lines.push(`${depth === 0 ? "" : "Caused by: "}${current.name}: ${current.message}`, ...frames);
+    if (current.cause === undefined) break;
+    current = current.cause;
+  }
+  return lines.join("\n");
+}
+
 /** The navigation payload embedded in a Meeko document; `serializeJson` escapes every `<` inside it. */
 const embeddedPayload = /<script id="meeko-payload" type="application\/json">([^<]*)<\/script>/;
 
@@ -110,6 +136,8 @@ const embeddedPayload = /<script id="meeko-payload" type="application\/json">([^
  * @returns Las rutas absolutas de los archivos HTML escritos.
  * @throws {Error} Si una ruta dinámica no tiene `prerenderEntries`, una URL se repite o la tapa otra
  * ruta, una página no responde HTML `200` o una ruta `render: "client"` declara `prerenderEntries`.
+ * Si `handler` rechaza, el mensaje incluye la URL, el archivo de la ruta, el error con su pila y la
+ * cadena de `cause`, y el error original queda en `cause`.
  * @example
  * ```ts
  * import { discoverRoutes, prerenderRoutes } from "@meekojs/meeko/build";
@@ -160,8 +188,15 @@ export async function prerenderRoutes(options: PrerenderOptions): Promise<string
   const outputs: string[] = [];
   const pages: Record<string, PrerenderIndex["pages"][string]> = {};
   await mkdir(outputRoot, { recursive: true });
+  const render = async (pathname: string, init?: RequestInit): Promise<Response> => {
+    try { return await options.handler(new Request(new URL(pathname, origin), init)); }
+    catch (error) {
+      const file = urls.get(pathname) ?? matchRoute(options.routes, pathname)?.route.file;
+      throw new Error(`Prerender ${pathname}${file ? ` (${file})` : ""} failed: ${describeFailure(error)}`, { cause: error });
+    }
+  };
   for (const pathname of pathnames) {
-    const response = await options.handler(new Request(new URL(pathname, origin)));
+    const response = await render(pathname);
     if (response.status !== 200 || !(response.headers.get("content-type") ?? "").includes("text/html")) {
       throw new Error(`Prerender ${pathname} returned HTTP ${response.status} instead of HTML 200`);
     }
@@ -178,7 +213,7 @@ export async function prerenderRoutes(options: PrerenderOptions): Promise<string
     // HTML; only a document without one asks the handler a second time.
     let navigationPayload = rendered.match(embeddedPayload)?.[1];
     if (navigationPayload === undefined) {
-      const navigation = await options.handler(new Request(new URL(pathname, origin), { headers: { accept: "application/meeko+json" } }));
+      const navigation = await render(pathname, { headers: { accept: "application/meeko+json" } });
       if (navigation.status === 200 && (navigation.headers.get("content-type") ?? "").startsWith("application/meeko+json")) navigationPayload = await navigation.text();
       else await navigation.body?.cancel();
     }

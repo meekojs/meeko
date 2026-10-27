@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -8,6 +9,8 @@ import { createRouteManifest } from "../src/framework/router.ts";
 import { defer } from "../src/framework/deferred.ts";
 import { createFrameworkHandler } from "../src/framework/server.ts";
 import type { PageRoute } from "../src/framework/server.ts";
+import { initFrameworkProject } from "../src/framework/init.ts";
+import { linkRepositoryPackages, repositoryRoot, tempProject } from "./helpers/temp-project.ts";
 
 test("prerender writes static and explicit dynamic HTML under one output root", async () => {
   const root = await mkdtemp(join(tmpdir(), "meeko-prerender-"));
@@ -147,4 +150,50 @@ test("prerender stores the HTML and navigation payload of one loader run and fai
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("a rejected render names the URL and route and carries the error with its stack and cause chain", async () => {
+  const root = await mkdtemp(join(tmpdir(), "meeko-prerender-error-"));
+  const routes = createRouteManifest([{ id: "/posts/[slug]", file: "post.meeko", layouts: [], sidecar: "post.route.ts" }]);
+  const failure = new Error("catalog unavailable", { cause: new TypeError("socket closed", { cause: "ECONNRESET" }) });
+  try {
+    const rejection = await prerenderRoutes({
+      routes, outputRoot: root,
+      loadRoute: async () => ({ render: "prerender", prerenderEntries: [{ slug: "first" }] }),
+      handler: async () => { throw failure; },
+    }).then(() => undefined, (error: unknown) => error);
+    assert.ok(rejection instanceof Error);
+    assert.equal(rejection.cause, failure);
+    assert.match(rejection.message, /^Prerender \/posts\/first \(post\.meeko\) failed: Error: catalog unavailable\n\s+at /);
+    assert.match(rejection.message, /\nCaused by: TypeError: socket closed\n\s+at /);
+    assert.match(rejection.message, /\nCaused by: ECONNRESET$/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("meeko build fails on a page that throws while prerendering and prints its route, message, stack and cause", { timeout: 120_000 }, async (context) => {
+  const root = await tempProject(context, "prerender-error");
+  await initFrameworkProject(root);
+  await writeFile(join(root, "app", "pages", "broken.meeko"), [
+    '<script server lang="ts">',
+    'export const route = definePage({ render: "prerender" });',
+    "</script>",
+    '<script lang="ts">',
+    "function readCatalog(): string {",
+    '  throw new Error("catalog unavailable while prerendering", { cause: new Error("upstream returned 503") });',
+    "}",
+    "const title = readCatalog();",
+    "</script>",
+    "<template><h1>{title}</h1></template>",
+    "",
+  ].join("\n"));
+  await linkRepositoryPackages(root, ["@meekojs/meeko", "vite"]);
+  const result = spawnSync(process.execPath, [join(repositoryRoot, "dist", "cli.js"), "build", root], { cwd: root, encoding: "utf8", windowsHide: true });
+  const output = `${result.stdout}\n${result.stderr}`;
+  assert.equal(result.status, 1, output);
+  assert.match(result.stderr, /Prerender \/broken \([^)]*broken\.meeko\) failed: /, output);
+  assert.match(result.stderr, /Error: catalog unavailable while prerendering\n\s+at /, output);
+  assert.match(result.stderr, /Caused by: Error: upstream returned 503/, output);
+  assert.doesNotMatch(output, /request error/, "the build prints the full error, not the private one-line report");
 });
