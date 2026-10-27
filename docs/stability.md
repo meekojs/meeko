@@ -38,8 +38,9 @@ Las subrutas declaradas en `exports` de `package.json` y **todos** los símbolos
 | `@meekojs/meeko/build` | Herramientas de build para Node: descubrimiento, configuración, prerender y `buildProject`. |
 | `@meekojs/meeko/devtools-ui` | Panel DevTools integrado (`mountDevtoolsPanel`). |
 | `@meekojs/meeko/prettier` | Plugin de Prettier para `.meeko` (desde `1.1`): el parser `meeko` y la opción `meekoIndentSections`. El nombre del parser y de la opción son estables; la salida exacta del formato puede mejorar en un minor, como la de Prettier. |
+| `@meekojs/meeko/postcss` | Plugin de PostCSS `meekoUtilities()` (desde `1.2`): la at-rule `@utilities "<ruta>" [layer(<nombre>)]`, `defineUtilities`, los helpers `rule`, `atRule` y `css` y sus tipos. Sólo se ejecuta en Node, en desarrollo y en el build. El formato exacto del CSS generado (espacios, saltos de línea) puede cambiar en un minor. |
 
-`tests/package-boundaries.test.ts` fija la lista exacta de exports de la raíz.
+`tests/package-boundaries.test.ts` fija la lista exacta de exports de la raíz y de las subrutas de `package.json`.
 
 Los tipos forman parte del contrato. Hay dos matices:
 

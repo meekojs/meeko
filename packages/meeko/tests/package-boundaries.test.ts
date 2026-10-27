@@ -20,6 +20,32 @@ test("engine and framework browser bundles exclude server transports", async () 
   assert.ok(!inputs.some((input) => /(?:^|\/)(?:ws|framework-server)(?:\/|$)/.test(input)), inputs.join("\n"));
 });
 
+test("package.json exports exactly the public subpaths", async () => {
+  const manifest = JSON.parse(await readFile(resolve("package.json"), "utf8")) as { exports: Record<string, unknown> };
+  assert.deepEqual(Object.keys(manifest.exports), [
+    ".", "./vite", "./framework", "./server", "./node", "./bun", "./deno", "./cloudflare",
+    "./build", "./prettier", "./postcss", "./internal", "./devtools-ui",
+  ]);
+});
+
+test("runtime entries never load the build-time PostCSS plugin", async () => {
+  const runtimeEntries = ["index", "framework", "framework-server", "node", "bun", "deno", "cloudflare", "internal"];
+  const result = await build({
+    entryPoints: runtimeEntries.map((entry) => resolve(`dist/${entry}.js`)),
+    bundle: true,
+    format: "esm",
+    platform: "node",
+    packages: "external",
+    write: false,
+    metafile: true,
+    outdir: "out",
+  });
+  const inputs = Object.keys(result.metafile.inputs).map((input) => input.replaceAll("\\", "/"));
+  assert.ok(!inputs.some((input) => /(?:^|\/)dist\/postcss(?:\/|\.js$)/.test(input)), inputs.join("\n"));
+  const postcssEntry = await import(pathToFileURL(resolve("dist/postcss.js")).href);
+  assert.deepEqual(Object.keys(postcssEntry).sort(), ["default", "defineUtilities", "meekoUtilities"]);
+});
+
 test("the root entry exposes only the documented public runtime", async () => {
   const root = await import(pathToFileURL(resolve("dist/index.js")).href);
   assert.deepEqual(Object.keys(root).sort(), [

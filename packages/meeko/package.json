@@ -57,6 +57,10 @@
       "types": "./dist/prettier.d.ts",
       "default": "./dist/prettier.js"
     },
+    "./postcss": {
+      "types": "./dist/postcss.d.ts",
+      "default": "./dist/postcss.js"
+    },
     "./internal": {
       "types": "./dist/internal.d.ts",
       "default": "./dist/internal.js"

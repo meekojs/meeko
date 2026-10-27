@@ -46,6 +46,26 @@ if (typeof mountDevtoolsPanel !== "function") {
 }
 '@
 
+  Set-Content -LiteralPath (Join-Path $consumer 'palette.ts') -Encoding utf8 -Value 'export const names: readonly string[] = ["gray", "blue"];'
+  Set-Content -LiteralPath (Join-Path $consumer 'utilities.ts') -Encoding utf8 -Value @'
+import { defineUtilities } from "@meekojs/meeko/postcss";
+import { names } from "./palette";
+export default defineUtilities(({ rule }) => names.map((name) => rule(`.color[data-color='${name}']`, { "--color-1": `var(--${name}-1)` })));
+'@
+  Set-Content -LiteralPath (Join-Path $consumer 'postcss-smoke.mjs') -Encoding utf8 -Value @'
+import postcss from "postcss";
+import { meekoUtilities } from "@meekojs/meeko/postcss";
+import { resolve } from "node:path";
+const result = await postcss([meekoUtilities()]).process('@utilities "./utilities.ts" layer(utilities);', { from: resolve("styles.css") });
+if (!/@layer utilities[^]*data-color='blue'[^]*var\(--blue-1\)/.test(result.css)) {
+  throw new Error("@utilities del paquete instalado produjo un resultado inesperado:\n" + result.css);
+}
+const dependencies = result.messages.filter((message) => message.type === "dependency").length;
+if (dependencies !== 2 || result.warnings().length) {
+  throw new Error(`@utilities no empaquetó el módulo con rolldown (dependencias: ${dependencies}, avisos: ${result.warnings().length})`);
+}
+'@
+
   & npm install --prefix $consumer --ignore-scripts --no-audit --no-fund $tarball 'vite@8.3.5'
   if ($LASTEXITCODE -ne 0) { throw 'No se pudo instalar el tarball en el consumidor externo.' }
 
@@ -59,6 +79,8 @@ if (typeof mountDevtoolsPanel !== "function") {
     if ($LASTEXITCODE -ne 0) { throw 'Falló meeko compile desde el paquete instalado.' }
     & node smoke.mjs
     if ($LASTEXITCODE -ne 0) { throw 'Falló SSR desde el paquete instalado.' }
+    & node postcss-smoke.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'Falló @meekojs/meeko/postcss desde el paquete instalado.' }
     & $cli types Counter.meeko
     if ($LASTEXITCODE -ne 0) { throw 'Falló meeko types desde el paquete instalado.' }
     & node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit
