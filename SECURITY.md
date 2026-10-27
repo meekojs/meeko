@@ -2,11 +2,11 @@
 
 ## Versiones con soporte
 
-| Versión | Correcciones de seguridad |
-| --- | --- |
-| Último minor de 1.x | Sí |
+| Versión                  | Correcciones de seguridad     |
+| ------------------------ | ----------------------------- |
+| Último minor de 1.x      | Sí                            |
 | Minors anteriores de 1.x | No; actualice al último minor |
-| 0.x | No |
+| 0.x                      | No                            |
 
 Las prereleases (`1.0.0-rc.N`) reciben correcciones en la siguiente prerelease o en la versión final.
 
