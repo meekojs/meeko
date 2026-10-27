@@ -25,6 +25,11 @@ pnpm run build:static                # dist-static/, para un hosting estático
   `deploy/nginx.conf` sirve esa carpeta con la navegación cliente completa; sin la negociación de
   `Accept` que configura, cada navegación carga el documento entero.
 - La búsqueda usa el índice de Pagefind del build: en `meeko dev` no existe.
+- La referencia de la API (`/docs/reference` y `/docs/reference/<símbolo>`) se genera en el build:
+  `server/content/api.ts` lee con TypeScript cada export de las subrutas públicas de
+  `packages/meeko/package.json` y su JSDoc, así que un export nuevo tiene su página sin tocar el
+  sitio. La sintaxis de `.meeko` que no es un export (bloques, macros, etiquetas y directivas) está
+  en `server/content/api-builtins.ts`, completada con la documentación del servidor de lenguaje.
 - Desde la raíz, `pnpm run site:build` y `pnpm run site:build:static` compilan primero el paquete y
   después el sitio. Un despliegue desde el repositorio ejecuta `pnpm install --frozen-lockfile` y
   `pnpm run site:build:static` en la raíz y publica `apps/site/dist-static/`.

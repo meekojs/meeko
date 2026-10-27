@@ -1,4 +1,5 @@
 import type { NavLink, NavSection, Pager } from "../../shared/types/docs.js";
+import { apiGroups, groupHref, referenceHref } from "./api-groups.js";
 
 /** A page of the site and the Markdown file of the repository it renders. */
 export interface CatalogEntry {
@@ -44,7 +45,7 @@ export function pageOfSource(source: string): string | undefined {
   return catalog.find((entry) => entry.source === source)?.href;
 }
 
-/** The sidebar, grouped by section in reading order. */
+/** The sidebar, grouped by section in reading order, with the API reference after the guides. */
 export function navigation(): NavSection[] {
   const sections: Array<{ title: string; links: NavLink[] }> = [];
   for (const entry of catalog) {
@@ -52,6 +53,12 @@ export function navigation(): NavSection[] {
     if (!section) sections.push(section = { title: entry.section, links: [] });
     section.links.push({ href: entry.href, label: entry.label });
   }
+  const reference = {
+    title: "Referencia de la API",
+    links: [{ href: referenceHref, label: "Índice de la API" }, ...apiGroups().map((group) => ({ href: groupHref(group), label: group.label }))],
+  };
+  const guides = sections.findIndex((section) => section.title === "Guías");
+  sections.splice(guides < 0 ? sections.length : guides + 1, 0, reference);
   return sections;
 }
 

@@ -50,22 +50,36 @@ function summary(text: string, limit = 160): string {
   return `${cut.slice(0, cut.lastIndexOf(" ")).replace(/[,;:.]$/, "")}…`;
 }
 
-let renderer: Promise<MarkdownIt> | undefined;
+const renderers = new Map<boolean, Promise<MarkdownIt>>();
+
+/** Escapes text for HTML content and attribute values. */
+export function escapeHtml(text: string): string {
+  return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+
+/** A highlighted `<pre>` under the header of every code block: its language and a copy button. */
+export function codeBlockHtml(label: string, pre: string): string {
+  const name = escapeHtml(label);
+  return `<div class="code-block" data-lang="${name}"><div class="code-head" data-pagefind-ignore><span class="code-lang">${name}</span><button type="button" class="code-copy" data-copy>Copiar</button></div>${pre}</div>\n`;
+}
 
 /**
  * The Markdown renderer of the site: GitHub-compatible heading ids with anchors, tables in a
  * scrolling wrapper and code blocks highlighted with Shiki, under a header with a copy button.
+ * `html` keeps raw HTML, as the documents of the repository use it; JSDoc fragments escape it,
+ * because their prose names tags and generics such as `Signal<T>` without backticks.
  */
-function markdown(): Promise<MarkdownIt> {
-  renderer ??= (async () => {
+function markdown(html = true): Promise<MarkdownIt> {
+  let renderer = renderers.get(html);
+  if (renderer) return renderer;
+  renderer = (async () => {
     const highlight = await createHighlight();
-    // The documents are this repository's own trusted content, so their raw HTML is kept.
-    const md = markdownIt({ html: true, linkify: false, typographer: false });
+    const md = markdownIt({ html, linkify: false, typographer: false });
     md.renderer.rules.fence = (tokens, index) => {
       const token = tokens[index]!;
       const code = token.content.replace(/\n$/, "");
       const { lang, label } = blockLanguage(token.info, code);
-      return `<div class="code-block" data-lang="${md.utils.escapeHtml(label)}"><div class="code-head" data-pagefind-ignore><span class="code-lang">${md.utils.escapeHtml(label)}</span><button type="button" class="code-copy" data-copy>Copiar</button></div>${highlight(code, lang)}</div>\n`;
+      return codeBlockHtml(label, highlight(code, lang));
     };
     md.renderer.rules.table_open = () => '<div class="table-wrap"><table>\n';
     md.renderer.rules.table_close = () => "</table></div>\n";
@@ -79,11 +93,37 @@ function markdown(): Promise<MarkdownIt> {
     };
     return md;
   })();
+  renderers.set(html, renderer);
   return renderer;
 }
 
+/** Options of {@link renderSource}. */
+export interface RenderOptions {
+  /**
+   * The page of an inline code span, such as `/docs/reference/signal` for `` `signal()` ``. The
+   * first span of each `##` section that names a page links to it; headings and links keep theirs.
+   */
+  readonly codeLinks?: (code: string) => string | undefined;
+}
+
+/** Links the inline code of `token` that `codeLinks` knows, once per page and section. */
+function linkCode(token: Token, codeLinks: NonNullable<RenderOptions["codeLinks"]>, linked: Set<string>): void {
+  let depth = 0;
+  for (const child of token.children ?? []) {
+    if (child.type === "link_open") depth++;
+    else if (child.type === "link_close") depth--;
+    else if (child.type === "code_inline" && depth === 0) {
+      const href = codeLinks(child.content);
+      if (!href || linked.has(href)) continue;
+      linked.add(href);
+      child.type = "html_inline";
+      child.content = `<a href="${escapeHtml(href)}"><code>${escapeHtml(child.content)}</code></a>`;
+    }
+  }
+}
+
 /** Renders a document of the repository by its path from the root, such as `docs/api.md`. */
-export async function renderSource(source: string, transform: (text: string) => string = (text) => text): Promise<RenderedDoc> {
+export async function renderSource(source: string, transform: (text: string) => string = (text) => text, options: RenderOptions = {}): Promise<RenderedDoc> {
   const md = await markdown();
   const text = transform(readRepositoryFile(source));
   const tokens = md.parse(text, {});
@@ -91,6 +131,7 @@ export async function renderSource(source: string, transform: (text: string) => 
   const toc: TocEntry[] = [];
   let title = "";
   let description = "";
+  let linked = new Set<string>();
   for (const [index, token] of tokens.entries()) {
     if (token.type === "heading_open") {
       const content = inlineText(tokens[index + 1]);
@@ -98,6 +139,7 @@ export async function renderSource(source: string, transform: (text: string) => 
       token.attrSet("id", id);
       if (token.tag === "h1" && !title) title = content;
       if (token.tag === "h2" || token.tag === "h3") toc.push({ id, text: content, level: Number(token.tag.slice(1)) });
+      if (token.tag === "h2") linked = new Set();
     } else if (token.type === "paragraph_open" && !description) {
       description = summary(inlineText(tokens[index + 1]));
     } else if (token.type === "inline") {
@@ -106,8 +148,54 @@ export async function renderSource(source: string, transform: (text: string) => 
         const href = child.attrGet("href");
         if (typeof href === "string" && href) child.attrSet("href", rewriteHref(href, source));
       }
+      if (options.codeLinks && tokens[index - 1]?.type !== "heading_open") linkCode(token, options.codeLinks, linked);
     }
   }
   const html = md.renderer.render(tokens, md.options, {});
   return { title: title || source, description, html, toc, source, editUrl: githubUrl(source, "edit") };
+}
+
+const headingCache = new Map<string, Promise<ReadonlyMap<string, string>>>();
+
+/** Text of every heading of a document by its id, the same ids as {@link renderSource} writes. */
+export function documentHeadings(source: string): Promise<ReadonlyMap<string, string>> {
+  let headings = headingCache.get(source);
+  if (!headings) {
+    headings = markdown().then((md) => {
+      const tokens = md.parse(readRepositoryFile(source), {});
+      const slugger = new GithubSlugger();
+      const found = new Map<string, string>();
+      for (const [index, token] of tokens.entries()) {
+        if (token.type !== "heading_open") continue;
+        const content = inlineText(tokens[index + 1]);
+        found.set(slugger.slug(content), content);
+      }
+      return found;
+    });
+    headingCache.set(source, headings);
+  }
+  return headings;
+}
+
+/**
+ * Renders Markdown written outside the documents, such as the JSDoc of an export, whose links are
+ * relative to `source`. Raw HTML is escaped.
+ */
+export async function renderFragment(text: string, source: string): Promise<string> {
+  const md = await markdown(false);
+  const tokens = md.parse(text, {});
+  for (const token of tokens) {
+    if (token.type !== "inline") continue;
+    for (const child of token.children ?? []) {
+      if (child.type !== "link_open") continue;
+      const href = child.attrGet("href");
+      if (typeof href === "string" && href) child.attrSet("href", rewriteHref(href, source));
+    }
+  }
+  return md.renderer.render(tokens, md.options, {});
+}
+
+/** One line of Markdown as inline HTML, without a paragraph, such as a summary in a list. */
+export async function renderInline(text: string): Promise<string> {
+  return (await markdown(false)).renderInline(text);
 }

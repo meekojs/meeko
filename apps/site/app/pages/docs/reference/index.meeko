@@ -1,0 +1,379 @@
+<script server lang="ts">
+	import { definePage } from '@meekojs/meeko/framework'
+	import { apiIndex, apiKinds } from '../../../../server/content/api.js'
+	import { navigation } from '../../../../server/content/catalog.js'
+	import { githubUrl } from '../../../../server/content/repository.js'
+
+	// The index is generated in `meeko build` from the sources of the package; see server/content/api.ts.
+	export const route = definePage({ render: 'prerender' })
+
+	export const groups = await apiIndex()
+	const items = groups.flatMap((group) => group.sections.flatMap((section) => section.items))
+	export const total = items.length
+	export const kinds = apiKinds()
+		.map((entry) => ({ ...entry, count: items.filter((item) => item.kind === entry.kind).length }))
+		.filter((entry) => entry.count > 0)
+	export const nav = navigation()
+	export const toc = groups.map((group) => ({ id: group.id, text: group.specifier ?? group.title, level: 2 }))
+	const first = groups[0]?.sections[0]?.items[0]
+	export const pages = {
+		previous: { href: '/docs/api', label: 'Componentes y API' },
+		next: first ? { href: first.href, label: first.name } : null,
+	}
+	export const source = 'apps/site/server/content/api-groups.ts'
+	export const editUrl = githubUrl(source, 'edit')
+	export const head = {
+		title: 'Referencia de la API · Meeko',
+		description: 'Una página por cada export público de @meekojs/meeko y por cada macro, etiqueta y directiva de los componentes .meeko, generada desde el código fuente.',
+	}
+</script>
+
+<script lang="ts">
+	export interface Props {
+		params: Record<string, string>
+		search: Record<string, string | string[]>
+	}
+
+	const query = signal('')
+	const kind = signal('all')
+
+	/** The groups with the symbols whose name contains the query and whose kind is chosen. */
+	const visible = computed(() => {
+		const text = query.value.trim().toLowerCase()
+		const chosen = kind.value
+		return groups
+			.map((group) => ({
+				...group,
+				sections: group.sections
+					.filter((section) => chosen === 'all' || section.kind === chosen)
+					.map((section) => ({ ...section, items: section.items.filter((item) => !text || item.name.toLowerCase().includes(text)) }))
+					.filter((section) => section.items.length > 0),
+			}))
+			.filter((group) => group.sections.length > 0)
+	})
+	const count = computed(() => visible.value.reduce((sum, group) => sum + group.sections.reduce((inner, section) => inner + section.items.length, 0), 0))
+
+	function choose(value: string): void {
+		kind.value = kind.value === value ? 'all' : value
+	}
+</script>
+
+<template>
+	<DocsLayout
+		bind:nav="nav"
+		current="/docs/reference"
+		bind:toc="toc"
+		bind:pager="pages"
+		bind:editUrl="editUrl"
+		bind:source="source"
+	>
+		<article class="prose reference">
+			<h1>Referencia de la API</h1>
+			<p class="lead">{total} páginas: una por cada export público del paquete y una por cada bloque, macro, etiqueta y directiva que reconoce el compilador de componentes. Salen del código fuente y de su JSDoc, la misma documentación que muestra el editor.</p>
+			<p>
+				Las guías
+				<a href="/docs/api">Componentes y API</a>
+				y
+				<a href="/docs/framework">Framework full-stack</a>
+				explican los conceptos con ejemplos completos.
+			</p>
+			<div
+				class="filters"
+				role="search"
+				data-pagefind-ignore
+			>
+				<label
+					class="field"
+					for="api-filter"
+				>
+					<svg
+						viewBox="0 0 24 24"
+						aria-hidden="true"
+					>
+						<path d="M4 6h16M7 12h10M10 18h4" />
+					</svg>
+					<span class="sr-only">Filtrar por nombre</span>
+					<input
+						id="api-filter"
+						type="search"
+						model="query"
+						placeholder="Filtrar por nombre: signal, definePage, SessionManager…"
+						autocomplete="off"
+						spellcheck="false"
+					/>
+				</label>
+				<div
+					class="kinds"
+					role="group"
+					aria-label="Filtrar por tipo"
+				>
+					<button
+						type="button"
+						bind:aria-pressed="String(kind.value === 'all')"
+						on:click="() => choose('all')"
+					>
+						Todo
+					</button>
+					<button
+						type="button"
+						each:of="kinds"
+						each:as="entry"
+						each:key="entry.kind"
+						bind:aria-pressed="String(kind.value === entry.kind)"
+						on:click="() => choose(entry.kind)"
+					>
+						{entry.label}
+						<span class="tally">{entry.count}</span>
+					</button>
+				</div>
+				<p
+					class="count"
+					aria-live="polite"
+				>
+					{count.value === total ? total + ' símbolos' : count.value + ' de ' + total + ' símbolos'}
+				</p>
+			</div>
+			<p
+				class="empty"
+				if:when="count.value === 0"
+			>
+				Ningún símbolo coincide con «{query.value.trim()}». La
+				<kbd>/</kbd>
+				abre la búsqueda en toda la documentación.
+			</p>
+			<section
+				class="group"
+				each:of="visible.value"
+				each:as="group"
+				each:key="group.id"
+			>
+				<h2 bind:id="group.id">
+					<code if:when="group.specifier">{group.specifier}</code>
+					<span if:when="!group.specifier">{group.title}</span>
+				</h2>
+				<p
+					class="group-description"
+					html="group.description"
+				></p>
+				<div
+					class="kind"
+					each:of="group.sections"
+					each:as="section"
+					each:key="section.kind"
+				>
+					<h3>{section.title}</h3>
+					<ul class="entries">
+						<li
+							each:of="section.items"
+							each:as="item"
+							each:key="item.href"
+						>
+							<a
+								class="name"
+								bind:href="item.href"
+							>
+								<code>{item.name}</code>
+							</a>
+							<span
+								class="deprecated"
+								if:when="item.deprecated"
+							>
+								obsoleto
+							</span>
+							<span
+								class="summary"
+								html="item.summary"
+							></span>
+						</li>
+					</ul>
+				</div>
+			</section>
+		</article>
+	</DocsLayout>
+</template>
+
+<style scoped>
+	.reference {
+		max-width: 56rem;
+	}
+	.lead {
+		color: var(--ink-soft);
+		font-size: 1.05rem;
+	}
+	.filters {
+		display: grid;
+		gap: 0.75rem;
+		margin: 1.75rem 0 0.5rem;
+	}
+	.field {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		transition: border-color 0.15s;
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		background: var(--surface);
+		padding: 0 0.9rem;
+		height: 46px;
+		color: var(--muted);
+	}
+	.field:focus-within {
+		border-color: var(--accent);
+	}
+	.field input {
+		flex: 1;
+		outline: 0;
+		border: 0;
+		background: transparent;
+		min-width: 0;
+		color: var(--ink);
+		font: inherit;
+		font-size: 1rem;
+	}
+	.field input::placeholder {
+		color: var(--muted);
+	}
+	svg {
+		flex: none;
+		fill: none;
+		stroke: currentColor;
+		stroke-linecap: round;
+		stroke-width: 2;
+		width: 18px;
+		height: 18px;
+	}
+	.kinds {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+	.kinds button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		transition:
+			border-color 0.15s,
+			background-color 0.15s;
+		cursor: pointer;
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		background: var(--bg);
+		padding: 0.28rem 0.75rem;
+		color: var(--ink-soft);
+		font: 600 0.84rem/1.4 var(--font-ui);
+	}
+	.kinds button:hover {
+		border-color: var(--accent);
+		color: var(--ink);
+	}
+	.kinds button[aria-pressed='true'] {
+		border-color: var(--accent);
+		background: var(--accent-soft);
+		color: var(--accent-ink);
+	}
+	.tally {
+		color: var(--muted);
+		font: 600 0.75rem var(--font-mono);
+		font-variant-numeric: tabular-nums;
+	}
+	.kinds button[aria-pressed='true'] .tally {
+		color: inherit;
+	}
+	.count {
+		margin: 0;
+		color: var(--muted);
+		font-size: 0.88rem;
+		font-variant-numeric: tabular-nums;
+	}
+	.empty {
+		border: 1px dashed var(--line);
+		border-radius: 12px;
+		padding: 1rem 1.2rem;
+		color: var(--ink-soft);
+	}
+	.empty kbd {
+		border: 1px solid var(--line);
+		border-bottom-width: 2px;
+		border-radius: 5px;
+		background: var(--surface);
+		padding: 0.05rem 0.4rem;
+		font: 600 0.8rem var(--font-mono);
+	}
+	.group h2 code {
+		border: 0;
+		background: none;
+		padding: 0;
+		font-size: 0.82em;
+		letter-spacing: 0;
+	}
+	.group-description {
+		max-width: 46rem;
+		color: var(--ink-soft);
+	}
+	.kind h3 {
+		margin: 1.6rem 0 0.4rem;
+		color: var(--muted);
+		font: 700 0.75rem/1.4 var(--font-ui);
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+	.entries {
+		margin: 0;
+		border-top: 1px solid var(--line);
+		padding: 0;
+		list-style: none;
+	}
+	.entries li {
+		display: grid;
+		grid-template-columns: minmax(11rem, 17rem) minmax(0, 1fr);
+		align-items: baseline;
+		gap: 0.25rem 1.25rem;
+		margin: 0;
+		border-bottom: 1px solid var(--line);
+		padding: 0.55rem 0;
+	}
+	.name {
+		text-decoration: none;
+		overflow-wrap: anywhere;
+	}
+	.name code {
+		border: 0;
+		background: none;
+		padding: 0;
+		color: var(--accent-ink);
+		font-weight: 600;
+		font-size: 0.9rem;
+	}
+	.name:hover code {
+		text-decoration: underline;
+		text-underline-offset: 0.18em;
+	}
+	.deprecated {
+		grid-column: 1;
+		justify-self: start;
+		border: 1px solid var(--nose);
+		border-radius: 999px;
+		padding: 0 0.45rem;
+		color: var(--ink-soft);
+		font: 600 0.7rem/1.5 var(--font-ui);
+	}
+	.summary {
+		grid-row: 1;
+		grid-column: 2;
+		color: var(--ink-soft);
+		font-size: 0.92rem;
+		line-height: 1.5;
+	}
+	.summary :global(code) {
+		font-size: 0.84em;
+	}
+	@media (max-width: 640px) {
+		.entries li {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.summary {
+			grid-row: auto;
+			grid-column: 1;
+		}
+	}
+</style>

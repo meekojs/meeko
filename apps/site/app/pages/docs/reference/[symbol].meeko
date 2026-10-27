@@ -1,0 +1,665 @@
+<script server lang="ts">
+	import { definePage } from '@meekojs/meeko/framework'
+	import { apiPage, apiPager, apiSlugs } from '../../../../server/content/api.js'
+	import { referenceHref } from '../../../../server/content/api-groups.js'
+	import { navigation } from '../../../../server/content/catalog.js'
+
+	// One page per export and per piece of `.meeko` syntax, generated in `meeko build` from the
+	// sources of the package: a new export gets its page without changes here.
+	export const route = definePage({
+		render: 'prerender',
+		prerenderEntries: async () => (await apiSlugs()).map((symbol) => ({ symbol })),
+	})
+
+	const { params } = usePage()
+	const found = await apiPage(params.symbol)
+	if (!found) notFound()
+	export const page = found
+	export const nav = navigation()
+	export const pages = await apiPager(found.slug)
+	export const index = referenceHref
+	/** Title of the search result: the name and where it comes from. */
+	export const searchTitle = `title:${found.name} · ${found.specifier ?? 'sintaxis de .meeko'}`
+	export const head = {
+		title: `${found.name} · Referencia de la API · Meeko`,
+		description: found.summary || `${found.name}, ${found.kindLabel} de ${found.specifier ?? 'los componentes .meeko'}.`,
+	}
+</script>
+
+<script lang="ts">
+	export interface Props {
+		params: { symbol: string }
+		search: Record<string, string | string[]>
+	}
+</script>
+
+<template>
+	<DocsLayout
+		bind:nav="nav"
+		bind:current="page.group.href"
+		bind:toc="page.toc"
+		bind:pager="pages"
+		bind:editUrl="page.editUrl"
+		bind:source="page.editPath"
+	>
+		<article
+			class="prose symbol"
+			data-pagefind-body
+			bind:data-pagefind-meta="searchTitle"
+			on:click="copyCodeBlock"
+		>
+			<nav
+				class="crumbs"
+				aria-label="Ruta"
+				data-pagefind-ignore
+			>
+				<a bind:href="index">Referencia de la API</a>
+				<span aria-hidden="true">/</span>
+				<a bind:href="page.group.href">{page.group.title}</a>
+			</nav>
+			<h1 class="title">
+				<code>{page.name}</code>
+			</h1>
+			<p class="badges">
+				<span class="badge kind">{page.kindLabel}</span>
+				<span
+					class="badge"
+					if:when="page.since"
+				>
+					Desde {page.since}
+				</span>
+				<span
+					class="badge deprecated"
+					if:when="page.deprecated !== null"
+				>
+					Obsoleto
+				</span>
+				<span
+					class="badge"
+					if:when="page.autoImport"
+				>
+					Sin import
+				</span>
+			</p>
+			<div
+				class="note deprecation"
+				role="note"
+				if:when="page.deprecated !== null"
+			>
+				<strong>Obsoleto.</strong>
+				<div html="page.deprecated"></div>
+			</div>
+			<div
+				class="description"
+				html="page.description"
+			></div>
+			<p
+				class="autoimport"
+				if:when="page.autoImport"
+				html="page.autoImport"
+			></p>
+			<div
+				class="import"
+				if:when="page.importCode"
+				html="page.importCode"
+			></div>
+			<p
+				class="source"
+				if:when="page.sourceUrl"
+				data-pagefind-ignore
+			>
+				<a
+					bind:href="page.sourceUrl"
+					rel="noopener"
+				>
+					<svg
+						viewBox="0 0 24 24"
+						aria-hidden="true"
+					>
+						<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14" />
+					</svg>
+					Código fuente
+					<span class="path">{page.sourceLabel}</span>
+				</a>
+			</p>
+
+			<section if:when="page.signatures.length > 0">
+				<h2 id="firma">
+					{page.signatureTitle}
+					<a
+						class="heading-anchor"
+						href="#firma"
+						aria-label="Enlace a esta sección"
+						data-pagefind-ignore
+					>
+						#
+					</a>
+				</h2>
+				<div
+					class="signature"
+					each:of="page.signatures"
+					each:as="signature"
+				>
+					<div
+						class="signature-description"
+						if:when="signature.description"
+						html="signature.description"
+					></div>
+					<div html="signature.code"></div>
+				</div>
+			</section>
+
+			<section if:when="page.typeParameters.length > 0">
+				<h2 id="parametros-de-tipo">
+					Parámetros de tipo
+					<a
+						class="heading-anchor"
+						href="#parametros-de-tipo"
+						aria-label="Enlace a esta sección"
+						data-pagefind-ignore
+					>
+						#
+					</a>
+				</h2>
+				<dl class="parameters">
+					<div
+						each:of="page.typeParameters"
+						each:as="parameter"
+						each:key="parameter.name"
+					>
+						<dt>
+							<code class="parameter-name">{parameter.name}</code>
+							<code
+								class="parameter-type"
+								if:when="parameter.type"
+								html="parameter.type"
+							></code>
+						</dt>
+						<dd html="parameter.description"></dd>
+					</div>
+				</dl>
+			</section>
+
+			<section if:when="page.parameters.length > 0">
+				<h2 id="parametros">
+					Parámetros
+					<a
+						class="heading-anchor"
+						href="#parametros"
+						aria-label="Enlace a esta sección"
+						data-pagefind-ignore
+					>
+						#
+					</a>
+				</h2>
+				<dl class="parameters">
+					<div
+						each:of="page.parameters"
+						each:as="parameter"
+						each:key="parameter.name"
+					>
+						<dt>
+							<code class="parameter-name">{parameter.name}</code>
+							<span
+								class="parameter-type"
+								html="parameter.type"
+							></span>
+							<span
+								class="optional"
+								if:when="parameter.optional"
+							>
+								opcional
+							</span>
+						</dt>
+						<dd html="parameter.description"></dd>
+					</div>
+				</dl>
+			</section>
+
+			<section if:when="page.returns">
+				<h2 id="devuelve">
+					Devuelve
+					<a
+						class="heading-anchor"
+						href="#devuelve"
+						aria-label="Enlace a esta sección"
+						data-pagefind-ignore
+					>
+						#
+					</a>
+				</h2>
+				<dl class="parameters">
+					<div>
+						<dt>
+							<span
+								class="parameter-type"
+								html="page.returns?.type ?? ''"
+							></span>
+						</dt>
+						<dd html="page.returns?.description ?? ''"></dd>
+					</div>
+				</dl>
+			</section>
+
+			<section if:when="page.throws.length > 0">
+				<h2 id="lanza">
+					Lanza
+					<a
+						class="heading-anchor"
+						href="#lanza"
+						aria-label="Enlace a esta sección"
+						data-pagefind-ignore
+					>
+						#
+					</a>
+				</h2>
+				<dl class="parameters">
+					<div
+						each:of="page.throws"
+						each:as="thrown"
+					>
+						<dt>
+							<span
+								class="parameter-type"
+								html="thrown.type || '<code>Error</code>'"
+							></span>
+						</dt>
+						<dd html="thrown.description"></dd>
+					</div>
+				</dl>
+			</section>
+
+			<section if:when="page.examples.length > 0">
+				<h2 id="ejemplos">
+					{page.examples.length > 1 ? 'Ejemplos' : 'Ejemplo'}
+					<a
+						class="heading-anchor"
+						href="#ejemplos"
+						aria-label="Enlace a esta sección"
+						data-pagefind-ignore
+					>
+						#
+					</a>
+				</h2>
+				<div
+					class="example"
+					each:of="page.examples"
+					each:as="example"
+					html="example"
+				></div>
+			</section>
+
+			<section if:when="page.members.length > 0">
+				<h2 id="miembros">
+					{page.membersTitle}
+					<a
+						class="heading-anchor"
+						href="#miembros"
+						aria-label="Enlace a esta sección"
+						data-pagefind-ignore
+					>
+						#
+					</a>
+				</h2>
+				<div
+					class="member"
+					each:of="page.members"
+					each:as="member"
+					each:key="member.id"
+				>
+					<h3 bind:id="member.id">
+						<code>{member.name}</code>
+						<a
+							class="heading-anchor"
+							bind:href="'#' + member.id"
+							aria-label="Enlace a esta sección"
+							data-pagefind-ignore
+						>
+							#
+						</a>
+					</h3>
+					<p
+						class="member-meta"
+						if:when="member.kind"
+						data-pagefind-ignore
+					>
+						<span>{member.kind}</span>
+						<span
+							each:of="member.flags"
+							each:as="flag"
+						>
+							{flag}
+						</span>
+						<span
+							class="since"
+							if:when="member.since"
+						>
+							desde {member.since}
+						</span>
+						<span
+							class="obsolete"
+							if:when="member.deprecated !== null"
+						>
+							obsoleto
+						</span>
+					</p>
+					<div
+						class="member-signature"
+						html="member.signature"
+					></div>
+					<div
+						class="member-deprecation"
+						if:when="member.deprecated"
+						html="member.deprecated ?? ''"
+					></div>
+					<div
+						class="member-description"
+						html="member.description"
+					></div>
+				</div>
+			</section>
+
+			<section if:when="page.see.length > 0 || page.related.length > 0">
+				<h2 id="vease-tambien">
+					Véase también
+					<a
+						class="heading-anchor"
+						href="#vease-tambien"
+						aria-label="Enlace a esta sección"
+						data-pagefind-ignore
+					>
+						#
+					</a>
+				</h2>
+				<ul
+					class="see"
+					if:when="page.see.length > 0"
+				>
+					<li
+						each:of="page.see"
+						each:as="entry"
+						html="entry"
+					></li>
+				</ul>
+				<ul
+					class="related"
+					if:when="page.related.length > 0"
+					aria-label="Símbolos relacionados"
+				>
+					<li
+						each:of="page.related"
+						each:as="link"
+						each:key="link.href"
+					>
+						<a bind:href="link.href">
+							<code>{link.name}</code>
+						</a>
+					</li>
+				</ul>
+			</section>
+		</article>
+	</DocsLayout>
+</template>
+
+<style scoped>
+	.symbol {
+		max-width: 50rem;
+	}
+	.crumbs {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.4rem;
+		margin: 0 0 0.9rem;
+		color: var(--muted);
+		font-size: 0.88rem;
+	}
+	.crumbs a {
+		color: var(--ink-soft);
+		text-decoration: none;
+	}
+	.crumbs a:hover {
+		color: var(--accent-ink);
+		text-decoration: underline;
+	}
+	.title {
+		margin-bottom: 0.7rem;
+		overflow-wrap: anywhere;
+	}
+	.title code {
+		border: 0;
+		background: none;
+		padding: 0;
+		font-weight: 700;
+		font-size: 0.86em;
+		letter-spacing: -0.01em;
+	}
+	.badges {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		margin: 0 0 1.4rem;
+	}
+	.badge {
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		background: var(--surface);
+		padding: 0.08rem 0.6rem;
+		color: var(--ink-soft);
+		font: 600 0.78rem/1.6 var(--font-ui);
+	}
+	.badge.kind {
+		border-color: transparent;
+		background: var(--accent-soft);
+		color: var(--accent-ink);
+	}
+	.badge.deprecated {
+		border-color: var(--nose);
+		background: color-mix(in oklab, var(--nose) 16%, transparent);
+		color: var(--ink);
+	}
+	.note {
+		margin: 0 0 1.4rem;
+		border: 1px solid var(--nose);
+		border-radius: 12px;
+		background: color-mix(in oklab, var(--nose) 10%, var(--bg));
+		padding: 0.75rem 1rem;
+	}
+	.note :global(p) {
+		display: inline;
+		margin: 0;
+	}
+	.note div {
+		display: inline;
+	}
+	.description :global(p:last-child) {
+		margin-bottom: 1.1rem;
+	}
+	.autoimport {
+		color: var(--ink-soft);
+		font-size: 0.95rem;
+	}
+	.import :global(.code-block) {
+		margin-bottom: 0.6rem;
+	}
+	.source {
+		margin: 0;
+		font-size: 0.88rem;
+	}
+	.source a {
+		display: inline-flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem;
+		color: var(--muted);
+		text-decoration: none;
+	}
+	.source a:hover {
+		color: var(--accent-ink);
+	}
+	.source .path {
+		font: 0.8rem var(--font-mono);
+	}
+	svg {
+		flex: none;
+		fill: none;
+		stroke: currentColor;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-width: 1.8;
+		width: 16px;
+		height: 16px;
+	}
+	.signature + .signature {
+		margin-top: 1.2rem;
+	}
+	.signature-description :global(p) {
+		margin-bottom: 0.5rem;
+		color: var(--ink-soft);
+	}
+	.parameters {
+		margin: 0 0 1.2rem;
+		border-top: 1px solid var(--line);
+	}
+	.parameters > div {
+		border-bottom: 1px solid var(--line);
+		padding: 0.7rem 0;
+	}
+	.parameters dt {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.35rem 0.6rem;
+	}
+	.parameters dd {
+		margin: 0.3rem 0 0;
+		color: var(--ink-soft);
+	}
+	.parameters dd :global(p) {
+		margin: 0;
+	}
+	.parameters dd:empty {
+		display: none;
+	}
+	.parameter-name {
+		font-weight: 700;
+	}
+	.parameter-type :global(code),
+	code.parameter-type {
+		border-color: transparent;
+		background: transparent;
+		padding: 0;
+		color: var(--ink-soft);
+		font-size: 0.84rem;
+	}
+	.optional {
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		padding: 0 0.45rem;
+		color: var(--muted);
+		font: 600 0.72rem/1.5 var(--font-ui);
+	}
+	:global(.api-type-link) {
+		color: var(--accent-ink);
+		text-decoration: underline;
+		text-decoration-color: color-mix(in oklab, var(--accent) 45%, transparent);
+		text-underline-offset: 0.18em;
+	}
+	:global(.api-type-link:hover) {
+		text-decoration-color: currentColor;
+	}
+	.example + .example {
+		margin-top: 0.4rem;
+	}
+	.member {
+		border-top: 1px solid var(--line);
+		padding-top: 0.2rem;
+	}
+	.member h3 {
+		margin: 1.1rem 0 0.2rem;
+	}
+	.member h3 code {
+		border: 0;
+		background: none;
+		padding: 0;
+		font-size: 0.92em;
+	}
+	.member-meta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+		margin: 0 0 0.6rem;
+		color: var(--muted);
+		font-size: 0.8rem;
+	}
+	.member-meta span + span::before {
+		margin-right: 0.35rem;
+		content: '·';
+	}
+	.member-meta .obsolete {
+		color: var(--ink);
+		font-weight: 650;
+	}
+	.member-signature :global(.shiki) {
+		margin: 0 0 0.7rem;
+		border: 1px solid var(--code-line);
+		border-radius: 10px;
+		background: var(--code-bg) !important;
+		padding: 0.6rem 0.85rem;
+		font-size: 0.82rem;
+	}
+	.member-deprecation {
+		margin: 0 0 0.6rem;
+		border-left: 1px solid var(--nose);
+		padding-left: 0.75rem;
+		color: var(--ink-soft);
+		font-size: 0.92rem;
+	}
+	.member-deprecation :global(p) {
+		margin: 0;
+	}
+	.member-description :global(p:last-child) {
+		margin-bottom: 0.9rem;
+	}
+	.see {
+		margin-bottom: 1rem;
+	}
+	.see :global(.api-see-source) {
+		color: var(--muted);
+		font-size: 0.85rem;
+	}
+	.see :global(.api-see-source)::before {
+		margin-right: 0.3rem;
+		content: '·';
+	}
+	.related {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.45rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.related li {
+		margin: 0;
+	}
+	.related a {
+		display: inline-block;
+		transition: border-color 0.15s;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		background: var(--surface);
+		padding: 0.2rem 0.55rem;
+		text-decoration: none;
+	}
+	.related a:hover {
+		border-color: var(--accent);
+	}
+	.related code {
+		border: 0;
+		background: none;
+		padding: 0;
+		color: var(--accent-ink);
+		font-size: 0.85rem;
+	}
+</style>

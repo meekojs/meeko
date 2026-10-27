@@ -93,17 +93,37 @@ export function blockLanguage(info: string, code: string): { readonly lang: stri
   return { lang, label: name };
 }
 
+/** Themes of every highlighted block: both as CSS variables, from which the stylesheet picks one. */
+const themeOptions = {
+  themes: { light: "github-light-default", dark: "github-dark-default" },
+  defaultColor: false,
+  // The light theme's comment gray falls below 4.5:1 on the site's cream code background.
+  colorReplacements: { "github-light-default": { "#6e7781": "#59636e" } },
+} as const;
+
 /**
  * A synchronous highlighter, once the grammars are loaded: the HTML of a block with both themes as
  * CSS variables (`--shiki-light`, `--shiki-dark`), from which the stylesheet picks one.
  */
 export async function createHighlight(): Promise<(code: string, lang: string) => string> {
   const shiki = await load();
-  return (code, lang) => shiki.codeToHtml(code, {
-    lang,
-    themes: { light: "github-light-default", dark: "github-dark-default" },
-    defaultColor: false,
-    // The light theme's comment gray falls below 4.5:1 on the site's cream code background.
-    colorReplacements: { "github-light-default": { "#6e7781": "#59636e" } },
-  });
+  return (code, lang) => shiki.codeToHtml(code, { lang, ...themeOptions });
+}
+
+/** A highlighted token: its text and the inline style with the colors of both themes. */
+export interface HighlightedToken {
+  readonly content: string;
+  readonly style: string;
+}
+
+/**
+ * A synchronous tokenizer with the same grammars and themes as {@link createHighlight}, for code
+ * whose HTML the caller writes itself, such as an API signature with links on its type names.
+ */
+export async function createTokenizer(): Promise<(code: string, lang: string) => HighlightedToken[][]> {
+  const shiki = await load();
+  return (code, lang) => shiki.codeToTokens(code, { lang, ...themeOptions }).tokens.map((line) => line.map((token) => ({
+    content: token.content,
+    style: Object.entries(token.htmlStyle ?? {}).map(([property, value]) => `${property}:${value}`).join(";"),
+  })));
 }

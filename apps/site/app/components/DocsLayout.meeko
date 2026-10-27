@@ -1,255 +1,436 @@
 <script lang="ts">
-import { signal } from "@meekojs/meeko";
-import type { NavSection, Pager, TocEntry } from "../../shared/types/docs.js";
+	import { signal } from '@meekojs/meeko'
+	import type { NavSection, Pager, TocEntry } from '../../shared/types/docs.js'
 
-interface Props {
-  nav: readonly NavSection[];
-  /** URL of the page, to mark it in the sidebar. */
-  current: string;
-  toc: readonly TocEntry[];
-  pager: Pager;
-  /** "Edit on GitHub" link and repository path of the source. */
-  editUrl: string;
-  source: string;
-}
+	interface Props {
+		nav: readonly NavSection[]
+		/** URL of the page, to mark it in the sidebar. */
+		current: string
+		toc: readonly TocEntry[]
+		pager: Pager
+		/** "Edit on GitHub" link and repository path of the source. */
+		editUrl: string
+		source: string
+	}
 
-const props = defineProps<Props>();
-// The page writes the article; `aside` adds a block under the table of contents.
-const snippets = defineSnippets<{ default: []; aside?: [] }>();
-const menuOpen = signal(false);
-const activeHeading = signal("");
+	const props = defineProps<Props>()
+	// The page writes the article; `aside` adds a block under the table of contents.
+	const snippets = defineSnippets<{ default: []; aside?: [] }>()
+	const menuOpen = signal(false)
+	const activeHeading = signal('')
 
-function toggleMenu(): void {
-  menuOpen.value = !menuOpen.value;
-}
+	function toggleMenu(): void {
+		menuOpen.value = !menuOpen.value
+	}
 
-/** Folds the narrow-screen table of contents once a heading is chosen. */
-function closeMobileToc(event: MouseEvent): void {
-  if (event.target instanceof Element && event.target.closest("a")) (event.currentTarget as HTMLElement).closest("details")?.removeAttribute("open");
-}
+	/** Folds the narrow-screen table of contents once a heading is chosen. */
+	function closeMobileToc(event: MouseEvent): void {
+		if (event.target instanceof Element && event.target.closest('a')) (event.currentTarget as HTMLElement).closest('details')?.removeAttribute('open')
+	}
 
-// Marks in the table of contents the last heading that scrolled past the top of the viewport.
-onMounted(() => {
-  const headings = props.toc
-    .map((entry) => document.getElementById(entry.id))
-    .filter((element): element is HTMLElement => element !== null);
-  if (!headings.length) return;
-  let frame = 0;
-  const update = (): void => {
-    frame = 0;
-    let current = headings[0]!.id;
-    for (const heading of headings) {
-      if (heading.getBoundingClientRect().top <= 140) current = heading.id;
-      else break;
-    }
-    activeHeading.value = current;
-  };
-  const schedule = (): void => {
-    if (!frame) frame = requestAnimationFrame(update);
-  };
-  window.addEventListener("scroll", schedule, { passive: true });
-  update();
-  return () => {
-    window.removeEventListener("scroll", schedule);
-    if (frame) cancelAnimationFrame(frame);
-  };
-});
+	// Marks in the table of contents the last heading that scrolled past the top of the viewport.
+	onMounted(() => {
+		let headings: HTMLElement[] = []
+		let frame = 0
+		const update = (): void => {
+			frame = 0
+			if (!headings.length) return
+			let current = headings[0]!.id
+			for (const heading of headings) {
+				if (heading.getBoundingClientRect().top <= 140) current = heading.id
+				else break
+			}
+			activeHeading.value = current
+		}
+		const schedule = (): void => {
+			if (!frame) frame = requestAnimationFrame(update)
+		}
+		window.addEventListener('scroll', schedule, { passive: true })
+		// The layout stays mounted while the table of contents changes with the page; the headings
+		// of the new page render after it, so they are read on the next frame.
+		effect(() => {
+			const ids = props.toc.map((entry) => entry.id)
+			requestAnimationFrame(() => {
+				headings = ids.map((id) => document.getElementById(id)).filter((element): element is HTMLElement => element !== null)
+				update()
+			})
+		})
+		return () => {
+			window.removeEventListener('scroll', schedule)
+			if (frame) cancelAnimationFrame(frame)
+		}
+	})
 </script>
 
 <template>
-  <div class="docs" bind:data-menu="menuOpen.value ? 'open' : 'closed'">
-    <button type="button" class="menu-toggle" on:click="toggleMenu" bind:aria-expanded="String(menuOpen.value)" aria-controls="docs-nav">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10" /></svg>
-      Índice de la documentación
-    </button>
-    <nav id="docs-nav" class="sidebar" aria-label="Documentación" data-pagefind-ignore>
-      <section each:of="props.nav" each:as="section" each:key="section.title">
-        <h2>{section.title}</h2>
-        <ul>
-          <li each:of="section.links" each:as="link" each:key="link.href">
-            <a bind:href="link.href" bind:aria-current="link.href === props.current ? 'page' : undefined">{link.label}</a>
-          </li>
-        </ul>
-      </section>
-    </nav>
-    <div class="content">
-      <details class="toc-mobile" if:when="props.toc.length > 0" data-pagefind-ignore>
-        <summary>En esta página</summary>
-        <ul on:click="closeMobileToc">
-          <li each:of="props.toc" each:as="entry" each:key="entry.id" bind:class="entry.level === 3 ? 'nested' : undefined">
-            <a bind:href="'#' + entry.id">{entry.text}</a>
-          </li>
-        </ul>
-      </details>
-      <render snippet="snippets.default" />
-      <footer class="page-footer" data-pagefind-ignore>
-        <a class="edit" bind:href="props.editUrl" rel="noopener">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4" /></svg>
-          Editar en GitHub <span class="path">{props.source}</span>
-        </a>
-        <nav class="pager" aria-label="Páginas anterior y siguiente">
-          <a if:when="props.pager.previous" class="previous" bind:href="props.pager.previous?.href">
-            <small>Anterior</small>
-            <span>{props.pager.previous?.label}</span>
-          </a>
-          <a if:when="props.pager.next" class="next" bind:href="props.pager.next?.href">
-            <small>Siguiente</small>
-            <span>{props.pager.next?.label}</span>
-          </a>
-        </nav>
-      </footer>
-    </div>
-    <aside class="toc" aria-label="En esta página" data-pagefind-ignore>
-      <div class="toc-inner">
-        <p class="toc-title" if:when="props.toc.length > 0">En esta página</p>
-        <ul>
-          <li each:of="props.toc" each:as="entry" each:key="entry.id" bind:class="entry.level === 3 ? 'nested' : undefined">
-            <a bind:href="'#' + entry.id" bind:aria-current="activeHeading.value === entry.id ? 'location' : undefined">{entry.text}</a>
-          </li>
-        </ul>
-        <render snippet="snippets.aside" />
-      </div>
-    </aside>
-  </div>
+	<div
+		class="docs"
+		bind:data-menu="menuOpen.value ? 'open' : 'closed'"
+	>
+		<button
+			type="button"
+			class="menu-toggle"
+			on:click="toggleMenu"
+			bind:aria-expanded="String(menuOpen.value)"
+			aria-controls="docs-nav"
+		>
+			<svg
+				viewBox="0 0 24 24"
+				aria-hidden="true"
+			>
+				<path d="M4 7h16M4 12h16M4 17h10" />
+			</svg>
+			Índice de la documentación
+		</button>
+		<nav
+			id="docs-nav"
+			class="sidebar"
+			aria-label="Documentación"
+			data-pagefind-ignore
+		>
+			<section
+				each:of="props.nav"
+				each:as="section"
+				each:key="section.title"
+			>
+				<h2>{section.title}</h2>
+				<ul>
+					<li
+						each:of="section.links"
+						each:as="link"
+						each:key="link.href"
+					>
+						<a
+							bind:href="link.href"
+							bind:aria-current="link.href === props.current ? 'page' : undefined"
+						>
+							{link.label}
+						</a>
+					</li>
+				</ul>
+			</section>
+		</nav>
+		<div class="content">
+			<details
+				class="toc-mobile"
+				if:when="props.toc.length > 0"
+				data-pagefind-ignore
+			>
+				<summary>En esta página</summary>
+				<ul on:click="closeMobileToc">
+					<li
+						each:of="props.toc"
+						each:as="entry"
+						each:key="entry.id"
+						bind:class="entry.level === 3 ? 'nested' : undefined"
+					>
+						<a bind:href="'#' + entry.id">{entry.text}</a>
+					</li>
+				</ul>
+			</details>
+			<render snippet="snippets.default" />
+			<footer
+				class="page-footer"
+				data-pagefind-ignore
+			>
+				<a
+					class="edit"
+					bind:href="props.editUrl"
+					rel="noopener"
+				>
+					<svg
+						viewBox="0 0 24 24"
+						aria-hidden="true"
+					>
+						<path d="M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4" />
+					</svg>
+					Editar en GitHub
+					<span class="path">{props.source}</span>
+				</a>
+				<nav
+					class="pager"
+					aria-label="Páginas anterior y siguiente"
+				>
+					<a
+						if:when="props.pager.previous"
+						class="previous"
+						bind:href="props.pager.previous?.href"
+					>
+						<small>Anterior</small>
+						<span>{props.pager.previous?.label}</span>
+					</a>
+					<a
+						if:when="props.pager.next"
+						class="next"
+						bind:href="props.pager.next?.href"
+					>
+						<small>Siguiente</small>
+						<span>{props.pager.next?.label}</span>
+					</a>
+				</nav>
+			</footer>
+		</div>
+		<aside
+			class="toc"
+			aria-label="En esta página"
+			data-pagefind-ignore
+		>
+			<div class="toc-inner">
+				<p
+					class="toc-title"
+					if:when="props.toc.length > 0"
+				>
+					En esta página
+				</p>
+				<ul>
+					<li
+						each:of="props.toc"
+						each:as="entry"
+						each:key="entry.id"
+						bind:class="entry.level === 3 ? 'nested' : undefined"
+					>
+						<a
+							bind:href="'#' + entry.id"
+							bind:aria-current="activeHeading.value === entry.id ? 'location' : undefined"
+						>
+							{entry.text}
+						</a>
+					</li>
+				</ul>
+				<render snippet="snippets.aside" />
+			</div>
+		</aside>
+	</div>
 </template>
 
 <style scoped>
-.docs {
-  display: grid;
-  grid-template-columns: 15.5rem minmax(0, 1fr) 14rem;
-  gap: 2.5rem;
-  max-width: 88rem;
-  margin: 0 auto;
-  padding: 0 1.5rem;
-}
-.menu-toggle { display: none; }
-.sidebar, .toc-inner {
-  position: sticky;
-  top: calc(var(--header-height) + 1rem);
-  max-height: calc(100dvh - var(--header-height) - 2rem);
-  overflow-y: auto;
-  padding: 1.75rem 0 2rem;
-  scrollbar-width: thin;
-}
-.sidebar section + section { margin-top: 1.4rem; }
-.sidebar h2 {
-  margin: 0 0 0.4rem;
-  padding-left: 0.75rem;
-  color: var(--muted);
-  font: 700 0.72rem/1.4 var(--font-ui);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.sidebar ul, .toc ul { margin: 0; padding: 0; list-style: none; }
-.sidebar a {
-  display: block;
-  padding: 0.32rem 0.75rem;
-  border-radius: 8px;
-  color: var(--ink-soft);
-  font-size: 0.93rem;
-  text-decoration: none;
-}
-.sidebar a:hover { background: var(--surface); color: var(--ink); }
-.sidebar a[aria-current="page"] {
-  background: var(--accent-soft);
-  color: var(--accent-ink);
-  font-weight: 650;
-}
-.content { min-width: 0; padding: 1.75rem 0 4rem; }
-.toc { font-size: 0.85rem; }
-.toc-title {
-  margin: 0 0 0.6rem;
-  color: var(--muted);
-  font: 700 0.72rem/1.4 var(--font-ui);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.toc li.nested, .toc-mobile li.nested { padding-left: 0.85rem; }
-.toc-mobile { display: none; }
-.toc a {
-  display: block;
-  padding: 0.22rem 0 0.22rem 0.75rem;
-  border-left: 2px solid var(--line);
-  color: var(--muted);
-  line-height: 1.4;
-  text-decoration: none;
-}
-.toc a:hover { color: var(--ink); }
-.toc a[aria-current="location"] { border-left-color: var(--accent); color: var(--accent-ink); }
-.page-footer { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
-.edit {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.45rem;
-  color: var(--muted);
-  font-size: 0.9rem;
-  text-decoration: none;
-}
-.edit:hover { color: var(--accent-ink); }
-.edit .path { font: 0.8rem var(--font-mono); }
-.pager { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem; }
-.pager a {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  padding: 0.9rem 1.1rem;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  color: var(--ink);
-  text-decoration: none;
-  transition: border-color 0.15s, transform 0.15s;
-}
-.pager a:hover { border-color: var(--accent); transform: translateY(-1px); }
-.pager small { color: var(--muted); font-size: 0.78rem; }
-.pager span { font-weight: 650; }
-.pager .next { grid-column: 2; text-align: right; }
-svg {
-  width: 17px;
-  height: 17px;
-  flex: none;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-@media (max-width: 1180px) {
-  .docs { grid-template-columns: 14rem minmax(0, 1fr); }
-  .toc { display: none; }
-  .toc-mobile {
-    display: block;
-    margin: 0 0 1.5rem;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--surface);
-    font-size: 0.9rem;
-  }
-  .toc-mobile summary { padding: 0.6rem 0.9rem; font-weight: 650; cursor: pointer; }
-  .toc-mobile ul { max-height: 50vh; margin: 0; padding: 0 0.9rem 0.7rem; overflow-y: auto; list-style: none; }
-  .toc-mobile a { display: block; padding: 0.25rem 0; color: var(--ink-soft); text-decoration: none; }
-  .toc-mobile a:hover { color: var(--accent-ink); }
-}
-@media (max-width: 860px) {
-  .docs { display: block; padding: 0 1.1rem; }
-  .menu-toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    width: 100%;
-    margin-top: 1rem;
-    padding: 0.65rem 0.9rem;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--surface);
-    color: var(--ink);
-    font: 600 0.92rem var(--font-ui);
-    cursor: pointer;
-  }
-  .sidebar { display: none; position: static; max-height: none; padding: 0.75rem 0 0; }
-  .docs[data-menu="open"] .sidebar { display: block; }
-  .content { padding-top: 1.25rem; }
-  .pager { grid-template-columns: 1fr; }
-  .pager .next { grid-column: 1; }
-}
+	.docs {
+		display: grid;
+		grid-template-columns: 15.5rem minmax(0, 1fr) 14rem;
+		gap: 2.5rem;
+		margin: 0 auto;
+		padding: 0 1.5rem;
+		max-width: 88rem;
+	}
+	.menu-toggle {
+		display: none;
+	}
+	.sidebar,
+	.toc-inner {
+		position: sticky;
+		top: calc(var(--header-height) + 1rem);
+		padding: 1.75rem 0 2rem;
+		max-height: calc(100dvh - var(--header-height) - 2rem);
+		overflow-y: auto;
+		scrollbar-width: thin;
+	}
+	.sidebar section + section {
+		margin-top: 1.4rem;
+	}
+	.sidebar h2 {
+		margin: 0 0 0.4rem;
+		padding-left: 0.75rem;
+		color: var(--muted);
+		font: 700 0.72rem/1.4 var(--font-ui);
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+	.sidebar ul,
+	.toc ul {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.sidebar a {
+		display: block;
+		border-radius: 8px;
+		padding: 0.32rem 0.75rem;
+		color: var(--ink-soft);
+		font-size: 0.93rem;
+		text-decoration: none;
+	}
+	.sidebar a:hover {
+		background: var(--surface);
+		color: var(--ink);
+	}
+	.sidebar a[aria-current='page'] {
+		background: var(--accent-soft);
+		color: var(--accent-ink);
+		font-weight: 650;
+	}
+	.content {
+		padding: 1.75rem 0 4rem;
+		min-width: 0;
+	}
+	.toc {
+		font-size: 0.85rem;
+	}
+	.toc-title {
+		margin: 0 0 0.6rem;
+		color: var(--muted);
+		font: 700 0.72rem/1.4 var(--font-ui);
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+	.toc li.nested,
+	.toc-mobile li.nested {
+		padding-left: 0.85rem;
+	}
+	.toc-mobile {
+		display: none;
+	}
+	.toc a {
+		display: block;
+		border-left: 2px solid var(--line);
+		padding: 0.22rem 0 0.22rem 0.75rem;
+		color: var(--muted);
+		line-height: 1.4;
+		text-decoration: none;
+	}
+	.toc a:hover {
+		color: var(--ink);
+	}
+	.toc a[aria-current='location'] {
+		border-left-color: var(--accent);
+		color: var(--accent-ink);
+	}
+	.page-footer {
+		margin-top: 3.5rem;
+		border-top: 1px solid var(--line);
+		padding-top: 1.5rem;
+	}
+	.edit {
+		display: inline-flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.45rem;
+		color: var(--muted);
+		font-size: 0.9rem;
+		text-decoration: none;
+	}
+	.edit:hover {
+		color: var(--accent-ink);
+	}
+	.edit .path {
+		font: 0.8rem var(--font-mono);
+	}
+	.pager {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1rem;
+		margin-top: 1.5rem;
+	}
+	.pager a {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		transition:
+			border-color 0.15s,
+			transform 0.15s;
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		padding: 0.9rem 1.1rem;
+		color: var(--ink);
+		text-decoration: none;
+	}
+	.pager a:hover {
+		transform: translateY(-1px);
+		border-color: var(--accent);
+	}
+	.pager small {
+		color: var(--muted);
+		font-size: 0.78rem;
+	}
+	.pager span {
+		font-weight: 650;
+	}
+	.pager .next {
+		grid-column: 2;
+		text-align: right;
+	}
+	svg {
+		flex: none;
+		fill: none;
+		stroke: currentColor;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-width: 1.8;
+		width: 17px;
+		height: 17px;
+	}
+	@media (max-width: 1180px) {
+		.docs {
+			grid-template-columns: 14rem minmax(0, 1fr);
+		}
+		.toc {
+			display: none;
+		}
+		.toc-mobile {
+			display: block;
+			margin: 0 0 1.5rem;
+			border: 1px solid var(--line);
+			border-radius: 10px;
+			background: var(--surface);
+			font-size: 0.9rem;
+		}
+		.toc-mobile summary {
+			cursor: pointer;
+			padding: 0.6rem 0.9rem;
+			font-weight: 650;
+		}
+		.toc-mobile ul {
+			margin: 0;
+			padding: 0 0.9rem 0.7rem;
+			max-height: 50vh;
+			overflow-y: auto;
+			list-style: none;
+		}
+		.toc-mobile a {
+			display: block;
+			padding: 0.25rem 0;
+			color: var(--ink-soft);
+			text-decoration: none;
+		}
+		.toc-mobile a:hover {
+			color: var(--accent-ink);
+		}
+	}
+	@media (max-width: 860px) {
+		.docs {
+			display: block;
+			padding: 0 1.1rem;
+		}
+		.menu-toggle {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			cursor: pointer;
+			margin-top: 1rem;
+			border: 1px solid var(--line);
+			border-radius: 10px;
+			background: var(--surface);
+			padding: 0.65rem 0.9rem;
+			width: 100%;
+			color: var(--ink);
+			font: 600 0.92rem var(--font-ui);
+		}
+		.sidebar {
+			display: none;
+			position: static;
+			padding: 0.75rem 0 0;
+			max-height: none;
+		}
+		.docs[data-menu='open'] .sidebar {
+			display: block;
+		}
+		.content {
+			padding-top: 1.25rem;
+		}
+		.pager {
+			grid-template-columns: 1fr;
+		}
+		.pager .next {
+			grid-column: 1;
+		}
+	}
 </style>
