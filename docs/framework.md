@@ -739,7 +739,7 @@ La pasada se salta si ningún componente del árbol nuevo puede esperar datos. E
 
 #### Componentes que se montan más tarde
 
-Un componente que aparece después de hidratar o confirmar la página (cuando un `if:` pasa a ser verdadero, en una fila nueva de `each:`, al cambiar el componente de `<component is>` o al recibir props nuevas que lo vuelven a renderizar) reutiliza los datos que la aplicación ya cargó. Si hace un `await` de datos que no están en caché:
+Un componente que aparece después de hidratar o confirmar la página (cuando un `if:` pasa a ser verdadero, en una fila nueva de `each:`, al cambiar el componente de `<component is>` o al recibir props nuevas: un componente con un `await` de datos en el nivel superior se vuelve a montar con ellas, en lugar de actualizarlas en su sitio como los demás; véase [Props reactivas](api.md#props-reactivas)) reutiliza los datos que la aplicación ya cargó. Si hace un `await` de datos que no están en caché:
 
 - Su zona queda vacía, sin error, mientras los datos se cargan.
 - La carga usa pasadas en seco bajo la raíz del componente que lo contiene, con su mismo contexto (`inject`), sin efectos, sin `onMounted` y sin conexiones de socket.
@@ -752,6 +752,8 @@ Para mostrar un indicador mientras tanto, use el composable sin `await` y lea `p
 #### Mutaciones
 
 `useRpcMutation(procedimiento)` no hace ninguna petición hasta que se llama `mutate(input)`, nunca en SSR. `mutate` envía el token CSRF como `rpc.*`, actualiza `pending`, `data` y `error` y devuelve la salida del procedimiento, o rechaza con su error. No se puede esperar con `await` en el nivel superior (`MEEK055`): espere `mutate` dentro de un handler.
+
+Desde `1.2`, cada envío empieza con `pending` en `true` y `error` en `null` en una sola actualización, y termina escribiendo a la vez `data` o `error` y `pending` en `false`: un `effect` que lee varias de esas señales nunca ve una mezcla del intento anterior y del nuevo. Las opciones `onSuccess(output, intento)` y `onError(error, intento)` se llaman después, con el estado ya actualizado, una vez por intento (véase [Avisos de cada intento](#avisos-de-cada-intento-onsuccess-y-onerror)).
 
 Desde `1.2`, `useApiMutation(ruta, método)` hace lo mismo con un endpoint de API que no es `GET`. `ruta` se escribe como en `useApi` (`"/api/notes/[id]"`) y `método` es `"POST"`, `"PUT"`, `"PATCH"` o `"DELETE"`; TypeScript sólo acepta los métodos que existen para esa ruta. `mutate({ params, query, body })` recibe la entrada de la operación, comprobada contra el contrato, y se puede llamar sin argumentos si la operación no exige nada. Un endpoint `204` resuelve con `undefined`.
 
@@ -784,9 +786,9 @@ const step = useApiMutation("/api/kitchen/items/[id]/steps", "POST", { retrySafe
 ```
 
 - **Intención con clave.** `mutate(input)` crea un UUID nuevo (la clave de idempotencia), guarda la intención (la entrada, la clave y la hora) en el almacenamiento del navegador bajo `retrySafe.key` y después la envía con la cabecera `Idempotency-Key: "<uuid>"`, con el formato de cadena de Structured Fields que define el borrador del IETF. Si la página se cierra a mitad de la petición, la intención sigue guardada.
-- **Sin respuesta.** Un fallo de red, un `5xx`, un `408` o un `429` conservan la intención: `mutate` rechaza con el error, `error` lo refleja y `charge.uncertain.value` muestra la intención (`{ idempotencyKey, input, startedAt }`). Se reintenta con la **misma** clave cuando el navegador vuelve a estar en línea (evento `online`), cuando se monta un componente que usa la mutación (también después de recargar) y al llamar a `charge.retry()`. Mientras se reintenta, `uncertain` conserva su valor y `pending` vale `true`.
-- **Con respuesta.** Un `2xx` borra la intención y `mutate` o `retry()` resuelven con la salida. Cualquier otro `4xx` también la borra: el servidor contestó, así que no hay nada que reintentar; el `ClientError` llega a `error` y rechaza la promesa.
-- **Una intención a la vez.** Mientras haya una intención incierta bajo esa clave, `mutate` rechaza con un error `MUTATION_UNCERTAIN` sin enviar nada. La aplicación decide: `retry()` la reintenta, `discard()` la olvida sin enviarla (pida antes confirmación al usuario, porque pudo registrarse).
+- **Sin respuesta.** Un fallo de red, un `5xx`, un `408` o un `429` conservan la intención: `mutate` rechaza con el error, `error` lo refleja y `charge.uncertain.value` muestra la intención (`{ idempotencyKey, input, startedAt }`). Se reintenta con la **misma** clave cuando el navegador vuelve a estar en línea (evento `online`), cuando se monta un componente que usa la mutación (también después de recargar) y al llamar a `charge.retry()`. Mientras se reintenta, `uncertain` conserva su valor, `pending` vale `true` y `error` vuelve a `null`.
+- **Con respuesta.** Un `2xx` borra la intención y `mutate` o `retry()` resuelven con la salida. Cualquier otro `4xx` también la borra: el servidor contestó, así que no hay nada que reintentar; el `ClientError` llega a `error` y rechaza la promesa. `uncertain` vuelve a `null` en la misma actualización que escribe `data` o `error` y pone `pending` en `false`, también en los demás componentes que usan la misma clave: un `effect` que mira `uncertain` lee ya el resultado de ese intento, nunca un `error` anterior.
+- **Una intención a la vez.** Mientras haya una intención incierta bajo esa clave, `mutate` rechaza con un error `MUTATION_UNCERTAIN` sin enviar nada. La aplicación decide: `retry()` la reintenta, `discard()` la olvida sin enviarla (pida antes confirmación al usuario, porque pudo registrarse) y vacía `error`, que describía el fallo de esa intención.
 - **Nunca en SSR ni en seco.** El servidor nunca la envía ni la lee, y las pasadas en seco de una navegación tampoco: sólo la reintenta el componente ya montado.
 - **Almacenamiento.** `storage: "local"` (por defecto) sobrevive a recargas y a cerrar el navegador; `"session"`, sólo a recargas de esa pestaña. Si el navegador bloquea el almacenamiento, la intención vive en memoria y se reintenta mientras la página siga abierta. La intención usa [`useStorage`](#estado-persistente-usestorage) por dentro, así que otra pestaña la ve llegar por el evento `storage`; si dos pestañas la reintentan a la vez, el servidor recibe la misma clave dos veces y responde lo mismo.
 
@@ -820,6 +822,29 @@ function discard(): void {
 </template>
 ```
 
+##### Avisos de cada intento: `onSuccess` y `onError`
+
+Un reintento automático (al volver la conexión o al montarse el componente) no tiene una promesa a la que esperar. Desde `1.2`, las opciones `onSuccess` y `onError` de `useRpcMutation` y `useApiMutation`, con o sin `retrySafe`, se llaman una vez por cada intento que termina, lo haya enviado quien sea, después de actualizar `data`, `error`, `pending` y `uncertain`:
+
+```ts
+const charge = useRpcMutation("sales.checkout", {
+    retrySafe: { key: "pos:sale" },
+    onSuccess(receipt, attempt) {
+        // También tras un reintento en segundo plano: la venta en verificación se confirmó.
+        if (attempt.trigger !== "mutate") notify(`Venta #${receipt.number} cobrada.`);
+        ticket.clear();
+    },
+    onError(error, attempt) {
+        // Sólo los rechazos con respuesta: sin respuesta, la venta sigue en verificación.
+        if (!attempt.uncertain) notify(`La venta no se registró: ${errorMessage(error)}`);
+    },
+});
+```
+
+- **`intento`.** Lleva la entrada enviada (`input`), su clave (`idempotencyKey`, `null` sin `retrySafe`) y quién lo envió (`trigger`): `"mutate"`, `"retry"` (una llamada a `retry()`) o `"resume"` (el reintento automático). En `onError`, `uncertain` es `true` cuando no hubo respuesta y la intención se conserva para reintentarla; sin `retrySafe` siempre es `false`.
+- **Una vez por intento.** Si `mutate` y `retry()` esperan la misma petición, o dos componentes con la misma clave la comparten, cada mutación avisa una sola vez. La promesa de `mutate` y `retry()` sigue resolviendo o rechazando como siempre: use los avisos para lo que también debe pasar tras un reintento en segundo plano y la promesa para lo propio de esa llamada.
+- **Errores.** Un fallo dentro del aviso (o la promesa que rechaza si es asíncrono) llega al `provideErrorHandler` más cercano con la fuente `"event"`, como un manejador `on:`; no cambia el estado de la mutación ni el resultado de la promesa.
+
 **En el servidor**, la clave llega validada como `context.idempotencyKey`: el UUID en minúsculas, o `undefined` si la cabecera falta o no es un UUID (se acepta con o sin comillas). Meeko no deduplica: la aplicación guarda la clave junto al resultado, con una restricción única, y ante una clave repetida devuelve el resultado que ya registró en lugar de aplicar la escritura otra vez.
 
 ```sql
@@ -848,6 +873,24 @@ export default defineRpc({
 ```
 
 Acote la clave al usuario o a la cuenta, como en el índice, y, si quiere seguir el borrador del IETF al pie de la letra, responda `422` cuando la misma clave llega con otra entrada. La cabecera no cambia la seguridad: la petición sigue necesitando la sesión, el token CSRF y el `Origin` de siempre. En una petición del mismo origen el navegador la envía sin más; si un cliente de otro origen llama a la API con CORS, añada `Idempotency-Key` a `Access-Control-Allow-Headers` en su proxy o middleware.
+
+##### Una clave propia en `api.*` y `rpc.*`
+
+Desde `1.2`, una llamada de los clientes generados acepta `idempotencyKey`, un UUID que viaja en la misma cabecera `Idempotency-Key`. Va junto a `params`, `query`, `body` y `signal` en `api.*`, y en las opciones de `rpc.*`:
+
+```ts
+const key = crypto.randomUUID();
+await api.sales.post({ body: sale, idempotencyKey: key });
+await rpc.sales.checkout(sale, { idempotencyKey: key, signal: AbortSignal.timeout(10_000) });
+```
+
+Un valor que no es un UUID rechaza con `TypeError` sin enviar la petición. La clave no se guarda ni se reintenta: es la misma cabecera, y la deduplicación sigue siendo del servidor.
+
+| Situación | Use |
+| --- | --- |
+| Una escritura desde un componente que debe sobrevivir a una caída de red o a una recarga, con aviso de «en verificación» | `useRpcMutation` / `useApiMutation` con `retrySafe`: Meeko crea la clave, guarda la intención y la reintenta |
+| Código que no es un componente (un script, una cola propia, un service worker) o una clave que ya existe fuera de Meeko, como el id de un pedido sin conexión | `api.*` / `rpc.*` con `idempotencyKey`: usted guarda la clave y repite la llamada con ella |
+| Pruebas de la deduplicación del servidor | `api.*` / `rpc.*` con `idempotencyKey`, sin escribir la cabecera a mano |
 
 #### `load` o composables
 

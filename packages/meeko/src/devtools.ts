@@ -5,6 +5,7 @@ import type {
 } from "./devtools-protocol.js";
 import { logClientError, observeCallback } from "./error-observer.js";
 import { borrowedKey } from "./models.js";
+import { isReactiveProps, trackProps } from "./props.js";
 import { currentEffectOwner, effect, isWritableSignal, signalReadSites, untrack } from "./reactivity.js";
 import type { Signal } from "./reactivity.js";
 
@@ -459,6 +460,15 @@ export function registerDevtoolsInstance(input: DevtoolsRegistration): () => voi
       if (entry.breakpoint) {
         debugger;
       }
+    }));
+  }
+  // A prop that its parent changes in place reaches the panel with its next snapshot.
+  if (isReactiveProps(input.props)) {
+    let initial = true;
+    entry.stopSignals.push(effect(() => {
+      trackProps(input.props as object);
+      if (initial) { initial = false; return; }
+      notify();
     }));
   }
   record(previous ? "hmr" : "mount", entry.id);
