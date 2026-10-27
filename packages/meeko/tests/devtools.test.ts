@@ -77,7 +77,7 @@ test("DevTools atribuye la lectura a la expresión y raíz actuales, no al lugar
       const shared = signal(1);
       const visible = signal(true);
       const rootA = browser.document.createElement("div");
-      rootA.innerHTML = "<!--meeko:text:0-->1<!--meeko:text:1-->1<span data-meeko-a-0 title=\"1\"></span>";
+      rootA.innerHTML = "<!--meeko:text:0-->1<!--meeko:text:1-->1<span data-meeko=\"0\" title=\"1\"></span>";
       const rootB = browser.document.createElement("div");
       rootB.innerHTML = "<!--meeko:text:0-->1";
       browser.document.body.append(rootA, rootB);

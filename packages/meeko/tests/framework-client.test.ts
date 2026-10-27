@@ -886,7 +886,7 @@ test("navigation errors use each mounted app's active component observer", async
 test("a component without an ancestor observer never reports to an unrelated component's observer", async () => {
   const browser = new HappyWindow({ url: "https://example.test/start" });
   const root = browser.document.createElement("main");
-  root.innerHTML = '<section></section><button data-meeko-e-0="">Run</button>';
+  root.innerHTML = '<section></section><button data-meeko="0">Run</button>';
   browser.document.body.append(root);
   const logs: unknown[][] = [];
   const originalError = console.error;
@@ -923,7 +923,7 @@ test("a component without an ancestor observer never reports to an unrelated com
 test("the application observer receives event, effect, cleanup and navigation failures with their source", async () => {
   const browser = new HappyWindow({ url: "https://example.test/start" });
   const root = browser.document.createElement("main");
-  root.innerHTML = '<button data-meeko-e-0="">Run</button>';
+  root.innerHTML = '<button data-meeko="0">Run</button>';
   browser.document.body.append(root);
   const logs: unknown[][] = [];
   browser.console.error = (...args: unknown[]) => { logs.push(args); };

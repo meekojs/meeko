@@ -72,7 +72,7 @@ const tokens = [
   "<button>", "</button>", "<form>", "</form>", "<br>", "</br>", "<hr>", "<pre>", "</pre>", "<!-- c -->", "<!--", "<![CDATA[x]]>",
   "<!doctype html>", "<body class=x>", "</body>", "</html>", "<xmp>", "</xmp>", "<template>", "</template>", "<rt>", "<rp>",
   "<ruby>", "</ruby>", "<nobr>", "<plaintext>", "<iframe>", "<noscript>", "</noscript>", "<font color=red>", "<image>", "</ x>",
-  "<?pi>", "<b", '<div data-meeko-e-0="">', "<a title='>'>", '<p a="<div>">', '<em ="x><div>">', "<listing>", "<details>",
+  "<?pi>", "<b", '<div data-meeko="0">', "<a title='>'>", '<p a="<div>">', '<em ="x><div>">', "<listing>", "<details>",
 ];
 
 /** Small deterministic generator, so a failure always reproduces. */

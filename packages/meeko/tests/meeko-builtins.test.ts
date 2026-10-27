@@ -49,6 +49,27 @@ test("<MeekoLink> is an <a> with a typed href, aria-current and every other attr
   assert.equal(errorCode("<template><MeekoLink>x</MeekoLink></template>", layout), "MEEK105");
 });
 
+test("a static <MeekoLink> keeps its href in the HTML and binds only aria-current", () => {
+  const { code } = compile("<template><MeekoLink to=\"/docs\">Docs</MeekoLink></template>", layout);
+  assert.match(code, / href=\\"\/docs\\"/);
+  assert.match(code, /__meeko\.linkCurrent\(__meeko_route, /);
+  assert.doesNotMatch(code, /bindAttribute\(__scope, \d+, "href"/, "a fixed href needs no binding");
+  // A route with parameters still goes through the typed href().
+  const dynamic = compile("<template><MeekoLink to=\"/users/[id]\" bind:params=\"{ id: '7' }\">x</MeekoLink></template>", layout).code;
+  assert.match(dynamic, /bindAttribute\(__scope, 0, "href"/);
+});
+
+test("an element with several bindings carries a single data-meeko marker", () => {
+  const source = `<script lang="ts">\nconst title = signal("a");\nconst box = useElementRef<HTMLElement>("box");\n</script>\n<template><p ref:box bind:title="title.value" on:click="() => title.value = 'b'">x</p><span bind:title="title.value">y</span></template>`;
+  const { code } = compile(source, "/project/app/components/Marked.meeko");
+  assert.match(code, /data-meeko=\\"0\\"/);
+  assert.match(code, /data-meeko=\\"1\\"/);
+  assert.doesNotMatch(code, /data-meeko-[aemr]-/);
+  assert.match(code, /bindAttribute\(__scope, 0, "title"/);
+  assert.match(code, /bindEvent\(__scope, 0, "click"/);
+  assert.match(code, /bindAttribute\(__scope, 1, "title"/);
+});
+
 test("aria-current compares the path of the link, without its query or fragment", () => {
   const route = { path: { value: "/users/7" } };
   assert.equal(linkCurrent(route, "/users/7?tab=perfil#bio"), "page");

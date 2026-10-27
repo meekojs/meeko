@@ -137,7 +137,7 @@ test("hydration keeps matching HTML, replaces a mismatch and follows the signal"
 test("markers inside inserted HTML do not capture the component's bindings", async () => {
   const source = `<script lang="ts">
 import { signal } from "@meekojs/meeko";
-const fake = signal('<button data-meeko-e-0="" class="fake">f</button><!--meeko:text:0-->x<!--/meeko:text:0-->');
+const fake = signal('<button data-meeko="0" class="fake">f</button><!--meeko:text:0-->x<!--/meeko:text:0-->');
 const count = signal(0);
 </script>
 <template><div html="fake.value"></div><button class="real" on:click="() => count.value++">{count.value}</button></template>`;
@@ -162,8 +162,8 @@ const count = signal(0);
 const unbalanced = `<script lang="ts">
 import { signal } from "@meekojs/meeko";
 const truncated = signal("<b>Hola");
-const closing = signal('x</div><button data-meeko-e-0="" class="fake">f</button>');
-const block = signal('<div class="inner">bloque</div><button data-meeko-e-0="" class="fake2">g</button>');
+const closing = signal('x</div><button data-meeko="0" class="fake">f</button>');
+const block = signal('<div class="inner">bloque</div><button data-meeko="0" class="fake2">g</button>');
 const count = signal(0);
 </script>
 <template><main><article class="a" html="truncated.value"></article><span class="after">after</span><div class="b" html="closing.value"></div><p class="c" html="block.value"></p><button class="real" on:click="() => count.value++">{count.value}</button></main></template>`;
@@ -175,7 +175,7 @@ test("SSR normalizes html so unbalanced content stays inside its element", async
     // A truncated tag closes inside the element.
     assert.match(html, /<article data-meeko-h="0" class="a"><b>Hola<\/b><\/article><span class="after">/);
     // A stray end tag is dropped, so the value cannot close the element and leave a marker outside.
-    assert.match(html, /<div data-meeko-h="1" class="b">x<button data-meeko-e-0="" class="fake">f<\/button><\/div>/);
+    assert.match(html, /<div data-meeko-h="1" class="b">x<button data-meeko="0" class="fake">f<\/button><\/div>/);
     // A <div> would close the <p>: the element renders empty and the browser fills it on hydration.
     assert.match(html, /<p data-meeko-h="2" class="c"><\/p>/);
     // In a <pre>, the newline right after the start tag survives the document parser.

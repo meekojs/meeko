@@ -254,7 +254,8 @@ const Child = 1;
 const items = [1];
 </script><template>${body}</template>`;
   const element = compile(template(`<input ref:field class="x">`), "Ref.meeko").code;
-  assert.match(element, /"<input" \+ " data-meeko-r-0=\\"\\"" \+ " class=\\"x\\""/);
+  // One `data-meeko` number per element, after its own attributes.
+  assert.match(element, /"<input" \+ " class=\\"x\\"" \+ " data-meeko=\\"0\\""/);
   assert.doesNotMatch(element, /ref:/);
 
   const duplicate = template(`<p ref:same></p><span ref:same></span>`);
@@ -281,7 +282,7 @@ const name = "dyn";
 </script><template><p ref="field"></p><p bind:ref="name"></p></template>`, "Plain.meeko").code;
   assert.match(plain, /ref=\\"field\\"/);
   assert.match(plain, /__meeko\.renderAttribute\("ref"/);
-  assert.doesNotMatch(plain, /data-meeko-r-/);
+  assert.doesNotMatch(plain, /bindElementRef/);
   const component = compile(`<script lang="ts">
 import * as Child from "./Child.meeko";
 const value = "x";

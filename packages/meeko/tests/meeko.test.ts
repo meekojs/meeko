@@ -70,7 +70,7 @@ test("SSR genera HTML escapado y estado aislado por render", () => {
 test("hidratar texto y atributos iguales al SSR no muta el DOM", () => {
   const window = new Window();
   const root = window.document.createElement("main");
-  root.innerHTML = '<!--meeko:text:0-->A<!--/meeko:text:0--><span data-meeko-a-0="" title="A"></span>';
+  root.innerHTML = '<!--meeko:text:0-->A<!--/meeko:text:0--><span data-meeko="0" title="A"></span>';
   const value = signal("A");
   const observer = new window.MutationObserver(() => {});
   observer.observe(root, { subtree: true, childList: true, characterData: true, attributes: true });
@@ -90,7 +90,7 @@ test("hidratar texto y atributos iguales al SSR no muta el DOM", () => {
 test("los atributos de formulario enlazados actualizan la propiedad viva tras editar el control", () => {
   const window = new Window();
   const root = window.document.createElement("main");
-  root.innerHTML = '<input data-meeko-a-0="" value=""><input type="checkbox" data-meeko-a-1=""><select><option value="a">A</option><option value="b" data-meeko-a-2="">B</option></select>';
+  root.innerHTML = '<input data-meeko="0" value=""><input type="checkbox" data-meeko="1"><select><option value="a">A</option><option value="b" data-meeko="2">B</option></select>';
   const text = signal("");
   const checked = signal(false);
   const selected = signal(false);
@@ -125,7 +125,7 @@ test("los atributos de formulario enlazados actualizan la propiedad viva tras ed
 
 test("bind:value aplica el valor inicial a textarea y select sin pisar lo que el usuario ya cambió", () => {
   const window = new Window();
-  const markup = '<textarea data-meeko-a-0="" value="hola"></textarea><select data-meeko-a-1="" value="b"><option value="a">A</option><option value="b">B</option><option value="c">C</option></select>';
+  const markup = '<textarea data-meeko="0" value="hola"></textarea><select data-meeko="1" value="b"><option value="a">A</option><option value="b">B</option><option value="c">C</option></select>';
   const pristine = window.document.createElement("main");
   pristine.innerHTML = markup;
   const edited = window.document.createElement("main");
@@ -152,7 +152,7 @@ test("bind:value aplica el valor inicial a textarea y select sin pisar lo que el
 test("bind:value no reescribe un input cuyo valor ya coincide, para conservar el cursor", () => {
   const window = new Window();
   const root = window.document.createElement("main");
-  root.innerHTML = '<input data-meeko-a-0="" value="">';
+  root.innerHTML = '<input data-meeko="0" value="">';
   const input = root.querySelector("input") as unknown as HTMLInputElement;
   const text = signal("");
   const stop = bindAttribute({ root: root as unknown as Element }, 0, "value", () => text.value, "Form.meeko:1:1");

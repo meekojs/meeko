@@ -79,7 +79,7 @@ test("useElementRef reads refs: null in SSR, elements, lists and exposed values 
     const log: string[] = [];
     const root = window.document.createElement("main");
     root.innerHTML = modules["Refs"]!.renderToString({ log });
-    assert.match(root.innerHTML, /<input data-meeko-r-0="" value="x">/);
+    assert.match(root.innerHTML, /<input value="x" data-meeko="0">/);
     const release = modules["Refs"]!.hydrate(root as unknown as Element, { log });
     assert.deepEqual(log.splice(0), ["mounted:INPUT:null:2:KID"]);
     release();

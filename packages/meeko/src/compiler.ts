@@ -85,6 +85,8 @@ interface ListBinding {
 /** Static `ref="name"` of the template: an element or a component instance. */
 interface RefBinding {
   id: number;
+  /** The `data-meeko` number of an element ref; a component ref has none. */
+  element?: number;
   name: string;
   /** Start of the name in the attribute value. */
   offset: number;
@@ -181,18 +183,17 @@ interface TemplateContext {
   /** Elements that receive `scopeAttribute`: those that a scoped selector may match. */
   scopeTargets: ScopeTargets;
   nextText: number;
-  nextEvent: number;
-  nextAttribute: number;
   nextRegion: number;
   nextRef: number;
   nextHtml: number;
+  /** Next `data-meeko="N"` of an element with bindings. */
+  nextElement: number;
   /** Depth of each:of rows around the node being compiled. */
   listDepth: number;
   /** Every ref of the template, by name, to type them and reject duplicates. */
   refs: Map<string, RefBinding>;
   /** Refs that the script reads; only these are bound when the component hydrates. */
   usedRefs: ReadonlySet<string>;
-  nextModel: number;
   nextSnippet: number;
   /** Depth of `<snippet>` content around the node being compiled. */
   snippetDepth: number;
@@ -253,6 +254,8 @@ const linkTag = "MeekoLink";
 interface LinkPart {
   expression: string;
   offset: number;
+  /** The text of a static `to="/about"`. */
+  literal?: string;
 }
 
 /** The parts of `<MeekoLink>` that build its `href`. */
@@ -286,7 +289,7 @@ function linkElement(node: TemplateNode, context: TemplateContext): { node: Temp
       const valueStart = attributeValueStart(context.source, attribute);
       if (valueStart === undefined || !attribute.value) throw compileError(context.source, context.filename, "MEEK105", "to de <MeekoLink> necesita la ruta, como to=\"/users/[id]\"", attribute.start);
       const quoted = /["']/.test(context.source[valueStart - 1] ?? "");
-      parts.to = { expression: quote(attribute.value), offset: quoted ? valueStart - 1 : valueStart };
+      parts.to = { expression: quote(attribute.value), offset: quoted ? valueStart - 1 : valueStart, literal: attribute.value };
       continue;
     }
     const offset = attributeValueOffset(node, attribute.name, context);
@@ -675,19 +678,21 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
   const tag = node.tagName!;
 
   const attrs: Array<{ kind: "static"; value: string } | { kind: "dynamic"; expression: string }> = [];
+  // One `data-meeko="N"` per element: its attributes, events, model and ref all find it by that number.
+  let element: number | undefined;
+  const mark = (): number => element ??= context.nextElement++;
   // `ref:name` names the element for the script instead of becoming an HTML attribute.
   const ref = templateRef(node, context, { kind: "element", tag, svg: node.namespaceURI === "http://www.w3.org/2000/svg" });
   if (ref) {
+    ref.element = mark();
     bindings.refs.push(ref);
-    attrs.push({ kind: "static", value: ` data-meeko-r-${ref.id}=""` });
   }
   // On a custom element (`<x-markdown html="intro">`), `html` and `model` stay HTML attributes, as in 1.0.
   const custom = isCustomElementTag(tag);
   const modelAttribute = custom ? undefined : node.attrs?.find((attribute) => attribute.name === "model" || attribute.name.startsWith("model:"));
-  const model = modelAttribute ? nativeModel(node, modelAttribute, context) : undefined;
+  const model = modelAttribute ? nativeModel(node, modelAttribute, context, mark()) : undefined;
   if (model) {
     bindings.models.push(model);
-    attrs.push({ kind: "static", value: ` data-meeko-m-${model.id}=""` });
     const value = `__meeko.modelValue(${markSource(model.expression, model.offset)})`;
     if (model.kind === "checkbox") attrs.push({ kind: "dynamic", expression: `__meeko.renderAttribute("checked", ${value})` });
     else if (model.kind === "radio") {
@@ -717,11 +722,10 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
     if (attr.name.startsWith("on:")) {
       const name = attr.name.slice(3);
       if (!/^[a-z]+$/.test(name)) throw compileError(context.source, context.filename, "MEEK011", `Nombre de evento no válido: ${name}`, context.templateOffset + (node.sourceCodeLocation?.startOffset ?? 0));
-      const id = context.nextEvent++;
+      const id = mark();
       const offset = attributeValueOffset(node, attr.name, context);
       validateExpression(attr.value, context.source, context.filename, offset);
       bindings.events.push({ id, name, expression: attr.value, offset, tag, svg: node.namespaceURI === "http://www.w3.org/2000/svg" });
-      attrs.push({ kind: "static", value: ` data-meeko-e-${id}=""` });
     } else if (attr.name.startsWith("bind:")) {
       const name = attr.name.slice(5);
       if (!/^[a-z][a-z0-9:.-]*$/.test(name) || name.startsWith("on")) {
@@ -729,9 +733,8 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
       }
       const offset = attributeValueOffset(node, attr.name, context);
       validateExpression(attr.value, context.source, context.filename, offset);
-      const id = context.nextAttribute++;
+      const id = mark();
       bindings.attributes.push({ id, name, expression: attr.value, offset });
-      attrs.push({ kind: "static", value: ` data-meeko-a-${id}=""` });
       attrs.push({ kind: "dynamic", expression: `__meeko.renderAttribute(${quote(name)}, ${markSource(attr.value, offset)})` });
     } else if (attr.name.startsWith(":")) {
       throw compileError(context.source, context.filename, "MEEK012", `Directiva de plantilla no admitida: ${attr.name}`, context.templateOffset + (node.sourceCodeLocation?.startOffset ?? 0));
@@ -747,15 +750,23 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
       // The call maps to `to`, where TypeScript reports what the call itself lacks.
       return markSource(`__meeko_href(${map(link.to.expression, link.to.offset)}, { ${options.join(", ")} })`, link.to.offset, link.to.expression.length);
     };
-    const current = (map: (expression: string, offset: number) => string): string => `__meeko.linkCurrent(__meeko_route, ${target(map)})`;
+    // A static route without params is its own href: a plain attribute, with no binding. The type
+    // check still calls href(), so an unknown route is an error there.
+    const fixed = !context.narrow && link.to.literal !== undefined && !link.to.literal.includes("[") && !link.params && !link.search
+      ? link.to.literal
+      : undefined;
+    if (fixed !== undefined) attrs.push({ kind: "static", value: ` href="${escapeAttribute(fixed)}"` });
+    const current = (map: (expression: string, offset: number) => string): string =>
+      `__meeko.linkCurrent(__meeko_route, ${fixed === undefined ? target(map) : quote(fixed)})`;
     const marked = (expression: string, offset: number): string => markSource(expression, offset);
-    for (const [name, build] of [["href", target], ["aria-current", current]] as const) {
-      const id = context.nextAttribute++;
+    const dynamic = fixed === undefined ? [["href", target], ["aria-current", current]] as const : [["aria-current", current]] as const;
+    for (const [name, build] of dynamic) {
+      const id = mark();
       bindings.attributes.push({ id, name, expression: link.to.expression, offset: link.to.offset, build });
-      attrs.push({ kind: "static", value: ` data-meeko-a-${id}=""` });
       attrs.push({ kind: "dynamic", expression: `__meeko.renderAttribute(${quote(name)}, ${build(marked)})` });
     }
   }
+  if (element !== undefined) attrs.push({ kind: "static", value: ` data-meeko="${element}"` });
   // Every element carries the attribute, or with `scopeAttribute: "matched"` only those that a
   // scoped selector may match; SSR, hydration and every later render of a region share this string.
   if (context.scopeAttribute && context.scopeTargets(scopeCandidate(node, tag, custom, model !== undefined, modelSelected, [modelAttribute, htmlAttribute]))) {
@@ -787,7 +798,7 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
  * `model="signal"` on a native control: text-like `<input>` and `<textarea>` (value, input),
  * checkbox and radio (checked, change), `<select>` (value, change) and `<select multiple>`.
  */
-function nativeModel(node: TemplateNode, attribute: { name: string; value: string; start: number; end: number }, context: TemplateContext): ModelBinding {
+function nativeModel(node: TemplateNode, attribute: { name: string; value: string; start: number; end: number }, context: TemplateContext, id: number): ModelBinding {
   const fail = (message: string, offset = attribute.start): never => { throw compileError(context.source, context.filename, "MEEK065", message, offset); };
   const tag = node.tagName!;
   if (attribute.name !== "model") fail(`${/^[^\s=]+/.exec(context.source.slice(attribute.start, attribute.end))?.[0] ?? attribute.name} nombra un modelo de componente; un control de formulario usa model="signal"`);
@@ -831,7 +842,7 @@ function nativeModel(node: TemplateNode, attribute: { name: string; value: strin
     else if (bound) radio = { expression: bound.value, offset: attributeValueOffset(node, "bind:value", context) };
     else fail("Un radio con model necesita value=\"...\" o bind:value=\"expression\"");
   }
-  return { id: context.nextModel++, kind, expression: attribute.value, offset, ...(radio ? { radio } : {}) };
+  return { id, kind, expression: attribute.value, offset, ...(radio ? { radio } : {}) };
 }
 
 /**
@@ -1532,7 +1543,7 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
     }`);
   }
   for (const ref of bindings.refs) {
-    if (context.usedRefs.has(ref.name)) statements.push(`__meeko_cleanups.push(__meeko.bindElementRef(__scope, __meeko_refs, ${ref.id}));`);
+    if (context.usedRefs.has(ref.name)) statements.push(`__meeko_cleanups.push(__meeko.bindElementRef(__scope, __meeko_refs, ${ref.id}, ${ref.element}));`);
   }
   for (const model of bindings.models) {
     const radio = !model.radio ? "" : "code" in model.radio ? `, () => ${model.radio.code}` : `, () => ${arrowExpression(model.radio.expression, model.radio.offset)}`;
@@ -1709,11 +1720,11 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
   }
   const parsed = parseTemplate(source, template, filename);
   const bindingsForTemplate = emptyBindings();
-  const context: TemplateContext = { source, filename, templateOffset: template.contentStart, scopeAttribute, scopeTargets: targets, nextText: 0, nextEvent: 0, nextAttribute: 0, nextRegion: 0, nextRef: 0, nextHtml: 0, listDepth: 0, refs: new Map(), usedRefs: new Set(), nextModel: 0, nextSnippet: 0, snippetDepth: 0, selectModel: undefined, narrow: options.typeCheck === true, guards: [] };
+  const context: TemplateContext = { source, filename, templateOffset: template.contentStart, scopeAttribute, scopeTargets: targets, nextText: 0, nextRegion: 0, nextRef: 0, nextHtml: 0, nextElement: 0, listDepth: 0, refs: new Map(), usedRefs: new Set(), nextSnippet: 0, snippetDepth: 0, selectModel: undefined, narrow: options.typeCheck === true, guards: [] };
   const html = renderNode(parsed, bindingsForTemplate, context);
   const hot = options.hot === true;
   const scriptParts = compileScript(script, source, filename, hot, context.refs, generic);
-  if (html.includes("__meeko_href(")) {
+  if (html.includes("__meeko_route")) {
     // `<MeekoLink>` builds its href with the typed `href()` and reads the committed route for aria-current.
     scriptParts.imports.push('import { href as __meeko_href_overloads, useRoute as __meeko_useRoute } from "@meekojs/meeko/framework";');
     // The same rule as href() in one signature: an unknown route or missing params reports what is

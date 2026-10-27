@@ -11,7 +11,7 @@ import { meeko } from "../src/vite.ts";
 test("component event failures are reported and listeners still release", async () => {
   const browser = new HappyWindow({ url: "https://example.test/" });
   const root = browser.document.createElement("div");
-  root.innerHTML = '<button data-meeko-e-1>Run</button>';
+  root.innerHTML = '<button data-meeko="1">Run</button>';
   browser.document.body.append(root);
   const button = root.querySelector("button")!;
   const logged: unknown[][] = [];
@@ -42,7 +42,7 @@ test("component error observers inherit, override, and stay isolated by root", a
   const seen: string[] = [];
   const roots = ["first", "nested", "second"].map((name) => {
     const root = browser.document.createElement("div");
-    root.innerHTML = `<button data-meeko-e-1>${name}</button>`;
+    root.innerHTML = `<button data-meeko="1">${name}</button>`;
     browser.document.body.append(root);
     return root;
   });
@@ -79,7 +79,7 @@ test("component error observers inherit, override, and stay isolated by root", a
 test("a rejected component error observer reports both failures", async () => {
   const browser = new HappyWindow({ url: "https://example.test/" });
   const root = browser.document.createElement("div");
-  root.innerHTML = '<button data-meeko-e-1>Run</button>';
+  root.innerHTML = '<button data-meeko="1">Run</button>';
   const logged: unknown[][] = [];
   const originalError = console.error;
   console.error = (...args: unknown[]) => { logged.push(args); };

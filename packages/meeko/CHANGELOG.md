@@ -48,6 +48,8 @@
 
 ### Cambiado
 
+- **Un marcador de hidratación por elemento.** Cada elemento con bindings lleva un único `data-meeko="N"` en lugar de un atributo por binding (`data-meeko-a-N`, `data-meeko-e-N`, `data-meeko-m-N` y `data-meeko-r-N`): el HTML pesa menos y el runtime busca el elemento una sola vez para todos sus atributos, eventos, modelos y referencias. Los atributos son internos; sólo cambia algo para quien los leía desde CSS o pruebas.
+- **`<MeekoLink>` estático conserva su `href` en el HTML.** Con un `to` sin segmentos dinámicos ni `bind:params`/`bind:search`, el SSR escribe el `href` directamente y sólo `aria-current` queda enlazado, así que el enlace funciona sin JavaScript y lo siguen los rastreadores.
 - **Resolución de módulos `Bundler`.** `meeko check`, el editor y los `tsconfig` que genera Meeko usan `"module": "ESNext"` y `"moduleResolution": "Bundler"` en lugar de `NodeNext`: un import relativo ya no necesita `.js` (`import { format } from "../utils/format"`), como en Vite y Nuxt. Los imports con `.js` siguen funcionando y `meeko init-framework` genera el `tsconfig.json` nuevo; un proyecto existente puede cambiar esas dos líneas de su `tsconfig.json`.
 - **Lo que el setup copia de una prop conserva el valor inicial.** Con las props reactivas, `const { label } = props` o `props.x.toUpperCase()` en el setup ya no se recalculan: hasta `1.1` el hijo se reconstruía con cada cambio. Use `{props.x}`, `computed` o una función en `useApi`/`useRpcQuery`. Es una excepción aprobada de SemVer, registrada en [docs/stability.md](../../docs/stability.md).
 - **Estado de las mutaciones.** Cada envío vacía `error` al empezar; el resultado escribe `data` o `error`, `pending` y `uncertain` en una sola actualización, y `discard()` vacía `error`.

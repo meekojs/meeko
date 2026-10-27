@@ -95,11 +95,11 @@ const summary = computed(() => [name.value, notes.value, agree.value, size.value
 
 test("model on native controls renders the signal during SSR", () => {
   const { code } = compile(controls, "Controls.meeko");
-  assert.match(code, /data-meeko-m-0=\\"\\"" \+ __meeko\.renderAttribute\("value", __meeko\.modelValue\(name\)\)/);
-  assert.match(code, /" class=\\"notes\\"" \+ ">" \+ __meeko\.modelText\(notes\) \+ "<\/textarea>"/);
+  assert.match(code, /__meeko\.renderAttribute\("value", __meeko\.modelValue\(name\)\) \+ " class=\\"name\\"" \+ " data-meeko=\\"0\\""/);
+  assert.match(code, /" class=\\"notes\\"" \+ " data-meeko=\\"1\\"" \+ ">" \+ __meeko\.modelText\(notes\) \+ "<\/textarea>"/);
   assert.match(code, /__meeko\.renderAttribute\("checked", __meeko\.modelSelected\(size, "s"\)\)/);
   assert.match(code, /__meeko\.renderAttribute\("selected", __meeko\.modelSelected\(color, \(item\)\)\)/);
-  assert.match(code, /__meeko\.bindModel\(__scope, 6, "multiple", \(\) => \(tags\)\)/);
+  assert.match(code, /__meeko\.bindModel\(__scope, 7, "multiple", \(\) => \(tags\)\)/);
   assert.match(code, /__meeko\.bindModel\(__scope, 4, "radio", \(\) => \(size\), \(\) => "m"\)/);
   assert.match(code, /__meeko\.checkWritableSignal\(name\)/);
 });

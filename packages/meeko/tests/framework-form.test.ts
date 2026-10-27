@@ -375,7 +375,7 @@ test("a .meeko form renders in SSR without submitting, hydrates, and submits val
     const response = await server(new Request("https://example.test/", { headers: { accept: "text/html" } }));
     const html = await response.text();
     const visible = html.replace(/<!--[\s\S]*?-->/g, "");
-    assert.match(visible, /<input[^>]* value="Bebidas" class="name">/);
+    assert.match(visible, /<input[^>]* value="Bebidas" class="name" data-meeko="[0-9]+">/);
     assert.match(visible, /<p class="state">idle:false<\/p>/);
     assert.deepEqual(calls, [], "SSR never submits");
 

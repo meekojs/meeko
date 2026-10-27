@@ -181,9 +181,11 @@ function findComment(scope: DomScope, data: string): Comment {
   return node as Comment;
 }
 
-function findElement(scope: DomScope, name: string): Element {
-  const node = visit(scope, (candidate) => candidate.nodeType === 1 && (candidate as Element).hasAttribute(name));
-  if (!node) throw new Error(`Missing Meeko target ${name}`);
+/** The element marked `data-meeko="id"`: every binding of an element (attributes, events, model, ref) shares its number. */
+function findMarked(scope: DomScope, id: number): Element {
+  const value = String(id);
+  const node = visit(scope, (candidate) => candidate.nodeType === 1 && (candidate as Element).getAttribute("data-meeko") === value);
+  if (!node) throw new Error(`Missing Meeko element ${id}`);
   return node as Element;
 }
 
@@ -515,8 +517,8 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
 }
 
 /** Publishes the element of a `ref:` directive while its region stays hydrated. */
-export function bindElementRef(scope: DomScope, refs: ElementRefs, id: number): () => void {
-  const target = findElement(scope, `data-meeko-r-${id}`);
+export function bindElementRef(scope: DomScope, refs: ElementRefs, id: number, element: number): () => void {
+  const target = findMarked(scope, element);
   const publish = refTarget(refs, id);
   publish(target);
   return () => publish(null);
@@ -579,7 +581,7 @@ export function bindHtml(scope: DomScope, id: number, read: () => unknown, locat
 
 /** Conecta un atributo dinámico al elemento SSR y comprueba su valor inicial. */
 export function bindAttribute(scope: DomScope, id: number, name: string, read: () => unknown, location: string, source?: EffectSource): () => void {
-  const target = findElement(scope, `data-meeko-a-${id}`);
+  const target = findMarked(scope, id);
   const initial = attributeValue(name, read());
   if (target.getAttribute(name) !== initial) throw new Error(`Hydration mismatch in ${location}`);
   let first = true;
@@ -634,7 +636,7 @@ function syncFormState(target: Element, name: string, next: string | null): void
 
 /** Conecta un evento al elemento SSR y entrega su función de limpieza. */
 export function bindEvent(scope: DomScope, id: number, name: string, handler: (event: Event) => void): () => void {
-  const target = findElement(scope, `data-meeko-e-${id}`);
+  const target = findMarked(scope, id);
   const report = componentErrorReporter();
   const listener = (event: Event) => observeCallback(
     () => handler(event),
@@ -703,7 +705,7 @@ function readControl(target: Element, kind: NativeModelKind, model: { value: unk
  * semantics whatever the type; a type without a text value (checkbox, radio, file…) is an error.
  */
 export function bindModel<K extends NativeModelKind>(scope: DomScope, id: number, kind: K, read: () => { value: NativeModelValues[K] }, radioValue?: () => unknown): () => void {
-  const target = findElement(scope, `data-meeko-m-${id}`);
+  const target = findMarked(scope, id);
   const report = componentErrorReporter();
   const writable = (): { value: unknown } => {
     const model = read();
