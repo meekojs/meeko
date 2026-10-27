@@ -70,7 +70,7 @@ async function compileGraph(source: string, filename: string, options: CheckSour
     if (previous) return previous;
     const target = componentTarget(rootDirectory, original);
     const registry = options.autoImports ? await options.autoImports(projectRoot(original)) : undefined;
-    const compiled = await compileWithAutoImports(content, original, {}, target, registry);
+    const compiled = await compileWithAutoImports(content, original, { typeCheck: true }, target, registry);
     const entry: GeneratedEntry = {
       original, source: content, code: compiled.code,
       generated: join(generatedDirectory, relative(rootDirectory, original) + ".ts"),

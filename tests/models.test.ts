@@ -259,6 +259,96 @@ test("a restored value in a child's defineModel control reaches the parent after
   }
 });
 
+const password = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const secret = signal("s3cret");
+const revealed = signal(false);
+const kind = signal("password");
+</script>
+<template><form>
+<input class="secret" bind:type="revealed.value ? 'text' : 'password'" model="secret" autocomplete="current-password" />
+<button type="button" class="toggle" on:click="() => revealed.value = !revealed.value">ver</button>
+<input class="free" bind:type="kind.value" model="secret" />
+<button type="button" class="checkbox" on:click="() => kind.value = 'checkbox'">checkbox</button>
+<output>{secret.value}|{revealed.value}</output>
+</form></template>`;
+
+test("model with bind:type binds a text value while the type changes", async () => {
+  const { code } = compile(password, "Password.meeko");
+  assert.match(code, /__meeko\.renderAttribute\("type", revealed\.value \? 'text' : 'password'\)/);
+  assert.match(code, /__meeko\.renderAttribute\("value", __meeko\.modelValue\(secret\)\)/);
+  assert.match(code, /__meeko\.bindModel\(__scope, 0, "text", \(\) => \(secret\)\)/);
+  const { component, cleanup } = await load({ Password: password }, "Password");
+  const window = new Window();
+  const errors: unknown[][] = [];
+  const consoleError = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args); };
+  try {
+    const root = window.document.createElement("main");
+    root.innerHTML = component.renderToString({});
+    const input = root.querySelector("input.secret") as unknown as HTMLInputElement;
+    const output = (): string => root.querySelector("output")?.textContent ?? "";
+    // SSR writes the type and the value of the signal.
+    assert.equal(input.getAttribute("type"), "password");
+    assert.equal(input.getAttribute("value"), "s3cret");
+    const release = component.hydrate(root as unknown as Element, {});
+    assert.equal(output(), "s3cret|false");
+
+    // Showing the text keeps the value and the binding in both directions.
+    (root.querySelector("button.toggle") as unknown as HTMLButtonElement).click();
+    assert.equal(input.type, "text");
+    assert.equal(input.value, "s3cret");
+    input.value = "visible";
+    fire(window, input as unknown as Element, "input");
+    assert.equal(output(), "visible|true");
+    (root.querySelector("button.toggle") as unknown as HTMLButtonElement).click();
+    assert.equal(input.type, "password");
+    assert.equal(input.value, "visible");
+    input.value = "hidden";
+    fire(window, input as unknown as Element, "input");
+    assert.equal(output(), "hidden|false");
+    // `change` is not the event of a text model.
+    input.value = "ignored";
+    fire(window, input as unknown as Element, "change");
+    assert.equal(output(), "hidden|false");
+    input.value = "hidden";
+    assert.deepEqual(errors, []);
+
+    // A type without a text value is reported; the signal and the control stay as they are.
+    const free = root.querySelector("input.free") as unknown as HTMLInputElement;
+    (root.querySelector("button.checkbox") as unknown as HTMLButtonElement).click();
+    assert.equal(free.type, "checkbox");
+    fire(window, free as unknown as Element, "input");
+    assert.equal(output(), "hidden|false");
+    assert.equal(errors.length, 1);
+    assert.match(String(errors[0]?.[1]), /type "checkbox" is not supported/);
+    // A write of the signal reaches the text field, and the checkbox reports instead of taking it.
+    input.value = "again";
+    fire(window, input as unknown as Element, "input");
+    assert.equal(output(), "again|false");
+    assert.equal(errors.length, 2);
+    release();
+  } finally {
+    console.error = consoleError;
+    window.happyDOM.abort();
+    await cleanup();
+  }
+});
+
+test("model with bind:type fails the hydration when the type has no text value", async () => {
+  const source = password.replace(`const kind = signal("password");`, `const kind = signal("radio");`);
+  const { component, cleanup } = await load({ Password: source }, "Password");
+  const window = new Window();
+  try {
+    const root = window.document.createElement("main");
+    root.innerHTML = component.renderToString({});
+    assert.throws(() => component.hydrate(root as unknown as Element, {}), /type "radio" is not supported/);
+  } finally {
+    window.happyDOM.abort();
+    await cleanup();
+  }
+});
+
 test("model on native controls reports MEEK065", () => {
   const source = (template: string): string => `<script lang="ts">import { signal } from "@meekojs/meeko";\nconst value = signal("");\nconst f = () => {};</script>\n<template>${template}</template>`;
   const div = source(`<div model="value"></div>`);
@@ -273,8 +363,13 @@ test("model on native controls reports MEEK065", () => {
   assertCompileError(checked, "MEEK065", checked.indexOf("bind:checked"));
   const radio = source(`<input type="radio" model="value" />`);
   assertCompileError(radio, "MEEK065", radio.indexOf(`model="value"`));
-  const type = source(`<input bind:type="'text'" model="value" />`);
-  assertCompileError(type, "MEEK065", type.indexOf("bind:type"));
+  // `bind:type` makes the control text-like; a static `type` beside it is ambiguous.
+  const type = source(`<input bind:type="'text'" type="password" model="value" />`);
+  assertCompileError(type, "MEEK065", type.indexOf(` type="password"`) + 1);
+  const multiple = source(`<select bind:multiple="true" model="value"></select>`);
+  assertCompileError(multiple, "MEEK065", multiple.indexOf("bind:multiple"));
+  const dynamicValue = source(`<input bind:type="'text'" model="value" bind:value="value.value" />`);
+  assertCompileError(dynamicValue, "MEEK065", dynamicValue.indexOf("bind:value"));
   const named = source(`<input model:value="value" />`);
   assertCompileError(named, "MEEK065", named.indexOf("model:value"));
   const textarea = source(`<textarea model="value">text</textarea>`);
@@ -395,6 +490,8 @@ test("meeko check types models: names, value types, writability and required one
     { name: "NativeCheckbox", source: parentWith(`<input type="checkbox" model="name" />`), codes: ["TS2322"], at: `name" />` },
     { name: "NativeMultiple", source: parentWith(`<select multiple model="name"></select>`), codes: ["TS2322"], at: `name"></select>` },
     { name: "NativeComputed", source: parentWith(`<input model="derived" />`), codes: ["TS2345"], at: `derived" />` },
+    { name: "NativeDynamicType", source: parentWith(`<input bind:type="flag.value ? 'text' : 'password'" model="name" />`), codes: [] },
+    { name: "NativeDynamicTypeBoolean", source: parentWith(`<input bind:type="flag.value ? 'text' : 'password'" model="flag" />`), codes: ["TS2322"], at: `flag" />` },
     { name: "Default", source: `<script lang="ts">\nconst a = defineModel<number>({ default: "x" });\n</script><template><p>{a.value}</p></template>`, codes: ["TS2322"], at: `default: "x"` },
     { name: "NoModels", source: `<script lang="ts">\nimport { signal } from "@meekojs/meeko";\nimport * as Plain from "./Plain.meeko";\nconst v = signal("");\n</script><template><Plain model="v" /></template>`, codes: ["TS2322"], at: "model=" },
   ];

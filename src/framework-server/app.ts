@@ -17,7 +17,7 @@ import { createDetachedPlatform } from "./platform.js";
 import type { ServerPlatform } from "./platform.js";
 import type { ServerRuntime, ServerRuntimeDefinition } from "./runtime.js";
 import { MemorySessionStore, SessionManager } from "./sessions.js";
-import { createSocketHub } from "./socket.js";
+import { createSocketHub, withSocketHub } from "./socket.js";
 import type { SocketHub, SocketPubSub } from "./socket.js";
 
 /**
@@ -398,16 +398,20 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
         ...(typeof sessions.cookieName === "string" ? { sessionCookieName: sessions.cookieName } : {}),
       };
     }
-    // href(id) in API, RPC and server middleware uses this application's manifest.
-    const run = (platform: ServerPlatform, handler: () => Promise<Response>): Promise<Response> =>
-      platformStore.run(platform, () => withRouteManifest(manifest.routes, async () => {
+    // href(id) in API, RPC and server middleware uses this application's manifest, and the
+    // generated server `socket` broadcasts through this application's hub.
+    const socketHub = socket?.hub;
+    const run = (platform: ServerPlatform, handler: () => Promise<Response>): Promise<Response> => {
+      const handle = () => withRouteManifest(manifest.routes, async () => {
         try { return await handler(); }
         catch (error) {
           const requestId = crypto.randomUUID();
           observeServerError(error, requestId, reportError);
           return errorResponse(error, requestId);
         }
-      }));
+      });
+      return platformStore.run(platform, () => socketHub ? withSocketHub(socketHub, handle) : handle());
+    };
     const app: InternalServerApp = {
       fetch(request, platform = basePlatform) {
         return run(platform, async () => {

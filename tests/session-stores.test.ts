@@ -277,3 +277,60 @@ test("SQL store rotates and revokes sessions in a real SQLite transaction", asyn
   assert.equal(await manager.store.get(rotated.id), undefined);
   await manager.close();
 });
+
+test("a session's own TTL drives the cookie and each store's expiry, and survives rotation", async () => {
+  const hour = 60 * 60 * 1000;
+  const redis = new TestRedis();
+  const stores = [
+    ["memory", new MemorySessionStore<{ role: string }>()],
+    ["redis", new RedisSessionStore<{ role: string }>(redis, { prefix: "meeko:ttl:" })],
+    ["sql", new SqlSessionStore<{ role: string }>(new TestSql())],
+  ] as const;
+  for (const [name, store] of stores) {
+    const manager = new SessionManager({ store, secure: false, ttlMs: 7 * 24 * hour });
+    const handle = await manager.load(new Request("http://localhost/"));
+    for (const ttlMs of [0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
+      await assert.rejects(handle.create({ role: "staff" }, { ttlMs }), RangeError, `${name}: ${ttlMs}`);
+    }
+    assert.equal(handle.current, undefined, name);
+    assert.equal(handle.cookieHeader, undefined, name);
+
+    const staff = await handle.create({ role: "staff" }, { ttlMs: 12 * hour });
+    assert.equal(staff.ttlMs, 12 * hour, name);
+    assert.equal(staff.expiresAt - staff.createdAt, 12 * hour, name);
+    assert.match(handle.cookieHeader ?? "", /Max-Age=43200(;|$)/, name);
+    if (name === "redis") {
+      const stored = redis.records.get(`meeko:ttl:${staff.id}`);
+      assert.ok(stored && Math.abs(stored.expiresAt - staff.expiresAt) < 1000, "Redis PX follows the session TTL");
+    }
+
+    // A later request reads the TTL back from the store and keeps it when rotating.
+    const loaded = await manager.load(new Request("http://localhost/", { headers: { cookie: `${manager.cookieName}=${staff.id}` } }));
+    assert.equal(loaded.current?.ttlMs, 12 * hour, name);
+    const rotated = await loaded.rotate();
+    assert.equal(rotated.ttlMs, 12 * hour, name);
+    assert.equal(rotated.expiresAt - rotated.createdAt, 12 * hour, name);
+    assert.match(loaded.cookieHeader ?? "", /Max-Age=43200(;|$)/, name);
+    assert.equal((await store.get(rotated.id))?.expiresAt, rotated.expiresAt, name);
+
+    // Without options, the manager's TTL applies, as in 1.1.
+    const owner = await manager.load(new Request("http://localhost/"));
+    const created = await owner.create({ role: "owner" });
+    assert.equal(created.ttlMs, undefined, name);
+    assert.equal(created.expiresAt - created.createdAt, 7 * 24 * hour, name);
+    assert.match(owner.cookieHeader ?? "", /Max-Age=604800(;|$)/, name);
+    assert.equal((await owner.rotate()).expiresAt - owner.current!.createdAt, 7 * 24 * hour, name);
+  }
+});
+
+test("records written before per-session TTLs rotate with the manager's TTL", async () => {
+  const store = new MemorySessionStore<{ userId: string }>();
+  const now = Date.now();
+  await store.set({ id: "a".repeat(43), familyId: "legacy", csrfToken: "csrf", data: { userId: "u" }, createdAt: now, expiresAt: now + 60_000 });
+  const manager = new SessionManager({ store, secure: false, ttlMs: 2 * 60_000 });
+  const handle = await manager.load(new Request("http://localhost/", { headers: { cookie: `meeko.sid=${"a".repeat(43)}` } }));
+  const rotated = await handle.rotate();
+  assert.equal(rotated.ttlMs, undefined);
+  assert.equal(rotated.expiresAt - rotated.createdAt, 2 * 60_000);
+  assert.match(handle.cookieHeader ?? "", /Max-Age=120(;|$)/);
+});

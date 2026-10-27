@@ -26,17 +26,17 @@ function compilerOptions(root: string): ts.CompilerOptions {
 
 function resolveImport(specifier: string, importer: string, options: ts.CompilerOptions): string {
   const target = ts.resolveModuleName(specifier, importer, options, ts.sys).resolvedModule?.resolvedFileName;
-  if (!target) throw new Error(`${importer}: unresolved import ${specifier}`);
+  if (!target) throw new Error(`${importer}: no se puede resolver el import ${specifier}`);
   return target;
 }
 
 function validateSharedGraph(file: string, root: string, shared: string, options: ts.CompilerOptions, seen: Set<string>, read: ReadSource): void {
   if (seen.has(file)) return;
   seen.add(file);
-  if (!inside(shared, file)) throw new Error(`${file}: public Socket schema must stay inside shared/`);
+  if (!inside(shared, file)) throw new Error(`${file}: un schema público de Socket debe quedarse dentro de shared/`);
   // Autoimported dependencies appear as the imports that the Vite transform adds.
   const source = read(file);
-  if (source === undefined) throw new Error(`${file}: Socket schema file missing`);
+  if (source === undefined) throw new Error(`${file}: no se encuentra el archivo del schema de Socket`);
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
   const check = (specifier: string): void => {
     const target = resolveImport(specifier, file, options);
@@ -60,7 +60,7 @@ function property(object: ts.ObjectLiteralExpression, name: string): ts.Expressi
 
 function publicSchemas(file: string, root: string, options: ts.CompilerOptions, program: ts.Program, checker: ts.TypeChecker, read: ReadSource): { clientToServer: Record<string, SchemaReference>; serverToClient: Record<string, SchemaReference> } {
   const ast = program.getSourceFile(file);
-  if (!ast) throw new Error(`${file}: Socket channel file missing`);
+  if (!ast) throw new Error(`${file}: no se encuentra el archivo del canal Socket`);
   const imports = new Map<string, ImportedSymbol>();
   for (const statement of ast.statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
@@ -78,30 +78,32 @@ function publicSchemas(file: string, root: string, options: ts.CompilerOptions, 
   const assignment = ast.statements.find((statement): statement is ts.ExportAssignment => ts.isExportAssignment(statement) && !statement.isExportEquals);
   const call = assignment?.expression;
   if (!call || !ts.isCallExpression(call) || !ts.isIdentifier(call.expression) || call.expression.text !== "defineSocketChannel" || !call.arguments[0] || !ts.isObjectLiteralExpression(call.arguments[0])) {
-    throw new Error(`${file}: public Socket contract requires export default defineSocketChannel({...})`);
+    throw new Error(`${file}: el contrato público de Socket requiere export default defineSocketChannel({...})`);
   }
   const shared = join(root, "shared");
   const seen = new Set<string>();
   const direction = (name: "clientToServer" | "serverToClient"): Record<string, SchemaReference> => {
     const object = property(call.arguments[0] as ts.ObjectLiteralExpression, name);
-    if (!object || !ts.isObjectLiteralExpression(object)) throw new Error(`${file}: ${name} must be a static object`);
+    if (!object || !ts.isObjectLiteralExpression(object)) throw new Error(`${file}: ${name} debe ser un objeto estático`);
     const result: Record<string, SchemaReference> = Object.create(null);
     for (const entry of object.properties) {
-      if (!ts.isPropertyAssignment(entry) || !(ts.isIdentifier(entry.name) || ts.isStringLiteral(entry.name))) throw new Error(`${file}: ${name} requires named schema properties`);
-      const event = entry.name.text;
-      const value = entry.initializer;
+      // `{ kitchenChanged }` names the event after the imported schema, like `{ kitchenChanged: kitchenChanged }`.
+      const named = (ts.isPropertyAssignment(entry) && (ts.isIdentifier(entry.name) || ts.isStringLiteral(entry.name))) || ts.isShorthandPropertyAssignment(entry);
+      if (!named) throw new Error(`${file}: ${name} sólo admite propiedades con nombre que referencien un schema, como \`evento: schema\` o la forma abreviada \`schema\``);
+      const event = (entry.name as ts.Identifier | ts.StringLiteral).text;
+      const value: ts.Expression = ts.isPropertyAssignment(entry) ? entry.initializer : entry.name;
       let local: string;
       let member: string | undefined;
       if (ts.isIdentifier(value)) local = value.text;
       else if (ts.isPropertyAccessExpression(value) && ts.isIdentifier(value.expression)) { local = value.expression.text; member = value.name.text; }
-      else throw new Error(`${file}: ${name}.${event} must reference an imported shared schema`);
+      else throw new Error(`${file}: ${name}.${event} debe referenciar un schema importado de shared/`);
       const imported = imports.get(local);
-      if (!imported || !inside(shared, imported.file)) throw new Error(`${file}: ${name}.${event} must come from shared/`);
+      if (!imported || !inside(shared, imported.file)) throw new Error(`${file}: ${name}.${event} debe venir de shared/`);
       const exported = imported.exported === "*" ? member : imported.exported;
-      if (!exported || (member && imported.exported !== "*")) throw new Error(`${file}: ${name}.${event} must reference one shared export`);
-      standardSchemaTypes(value, checker, () => new Error(`${file}: ${name}.${event} must expose concrete Standard Schema input and output types`));
+      if (!exported || (member && imported.exported !== "*")) throw new Error(`${file}: ${name}.${event} debe referenciar un único export de shared/`);
+      standardSchemaTypes(value, checker, () => new Error(`${file}: ${name}.${event} debe exponer tipos de entrada y salida de Standard Schema concretos`));
       validateSharedGraph(imported.file, root, shared, options, seen, read);
-      if (result[event]) throw new Error(`${file}: duplicate Socket event ${name}.${event}`);
+      if (result[event]) throw new Error(`${file}: el evento de Socket ${name}.${event} está repetido`);
       result[event] = { file: imported.file, exported };
     }
     return result;

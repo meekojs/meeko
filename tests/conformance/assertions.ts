@@ -340,6 +340,29 @@ export function conformanceSuite(adapter: ConformanceAdapter, extra?: (suite: Co
       assert.equal(leaked, 0);
     });
 
+    it("validates server broadcasts from API handlers before publishing", async () => {
+      const peer = await opened(track(connect(origin, "room", { room: "server-broadcast" })));
+      // The peer's own message coming back proves its room subscription exists.
+      const echoed = messages(peer, 1);
+      send(peer, "say", { text: "ready" });
+      await echoed;
+      let received = 0;
+      peer.on("message", () => { received++; });
+      // The fixture's runtime allows 1024-byte Socket messages; the API body limit is far larger.
+      const response = await fetch(`${origin}/api/broadcast`, {
+        method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ room: "server-broadcast", text: "x".repeat(2048) }),
+      });
+      assert.equal(response.status, 413);
+      assert.equal((await response.json() as { code: string }).code, "SOCKET_LIMIT_EXCEEDED");
+      const delivered = messages(peer, 1);
+      const accepted = await fetch(`${origin}/api/broadcast`, {
+        method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ room: "server-broadcast", text: "fits" }),
+      });
+      assert.equal(accepted.status, 200);
+      assert.deepEqual(await delivered, [{ event: "said", payload: { text: "fits" } }]);
+      assert.equal(received, 1);
+    });
+
     it("streams render: stream pages without buffering: the first byte precedes the deferred value", async () => {
       const delay = 1_500;
       const started = performance.now();

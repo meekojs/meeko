@@ -49,7 +49,11 @@ function installDataServer(): DataServer {
       return Response.json([`${q}1`, `${q}2`]);
     }
     if (url.pathname === "/_meeko/rpc/users.get") return Response.json({ name: `User ${(JSON.parse(String(init!.body)) as { id: number }).id}` });
-    if (url.pathname === "/_meeko/rpc/notes.add") return Response.json({ saved: (JSON.parse(String(init!.body)) as { text: string }).text });
+    if (url.pathname === "/_meeko/rpc/notes.add") {
+      const text = (JSON.parse(String(init!.body)) as { text: string }).text;
+      if (!text) return Response.json({ code: "INVALID_INPUT", status: 400, requestId: "r", issues: [{ path: "text", message: "Escribe una nota." }] }, { status: 400 });
+      return Response.json({ saved: text });
+    }
     return new Response(null, { status: 404 });
   }) as typeof fetch;
   return server;
@@ -95,10 +99,12 @@ const props = defineProps<{ status: number; message: string }>();
 <template><p class="error">{props.status}:{props.message}</p></template>`;
 
 const mutationPage = `<script lang="ts">
+import { ClientError } from "@meekojs/meeko/framework";
 import { useRpcMutation } from "./data.ts";
 const add = useRpcMutation("notes.add");
+const issue = () => add.error.value instanceof ClientError ? add.error.value.issues?.map((item) => item.path + ":" + item.message).join(",") ?? "" : "";
 </script>
-<template><p class="state">{add.pending.value ? "saving" : add.data.value ? add.data.value.saved : "idle"}</p><button class="add" on:click="() => { void add.mutate({ text: 'hi' }); }">a</button></template>`;
+<template><p class="state">{add.pending.value ? "saving" : add.data.value ? add.data.value.saved : "idle"}</p><p class="issue">{issue()}</p><button class="add" on:click="() => { void add.mutate({ text: 'hi' }); }">a</button><button class="empty" on:click="() => { add.mutate({ text: '' }).catch(() => {}); }">e</button></template>`;
 
 const pages: Record<string, string> = {
   "notes.meeko": notesPage, "broken.meeko": brokenPage, "home.meeko": homePage,
@@ -324,6 +330,11 @@ test("useRpcMutation never runs in SSR and sends the CSRF token when mutate is c
     assert.equal(text(root, ".state"), "hi");
     assert.deepEqual(data.calls.splice(0), ['POST /_meeko/rpc/notes.add {"text":"hi"}']);
     assert.equal(data.headers[0]!.get("x-meeko-csrf"), "token-1");
+    // Schema messages of a rejected input reach the form through the mutation's error.
+    assert.equal(text(root, ".issue"), "");
+    (root.querySelector(".empty") as unknown as HTMLButtonElement).click();
+    await flush();
+    assert.equal(text(root, ".issue"), "text:Escribe una nota.");
     app.dispose();
     browser.happyDOM.abort();
   } finally {

@@ -50,7 +50,8 @@ function bindingNames(name: ts.BindingName, names: Set<string>): void {
   else for (const element of name.elements) if (!ts.isOmittedExpression(element)) bindingNames(element.name, names);
 }
 
-function bindingIdentifiers(name: ts.BindingName, found: ts.Identifier[]): void {
+/** Identifiers that a binding name declares: the name itself or each one of a destructuring pattern. */
+export function bindingIdentifiers(name: ts.BindingName, found: ts.Identifier[]): void {
   if (ts.isIdentifier(name)) found.push(name);
   else for (const element of name.elements) if (!ts.isOmittedExpression(element)) bindingIdentifiers(element.name, found);
 }

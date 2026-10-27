@@ -76,7 +76,7 @@ function definition(file: ts.SourceFile, kind: Kind): ts.ObjectLiteralExpression
   const expression = assignment?.expression;
   const name = kind === "api" ? "defineApiRoute" : "defineRpc";
   if (!expression || !ts.isCallExpression(expression) || !ts.isIdentifier(expression.expression) || expression.expression.text !== name || !expression.arguments[0] || !ts.isObjectLiteralExpression(expression.arguments[0])) {
-    throw new Error(`${file.fileName}: public ${kind.toUpperCase()} contract requires export default ${name}({...})`);
+    throw new Error(`${file.fileName}: el contrato público de ${kind.toUpperCase()} requiere export default ${name}({...})`);
   }
   return expression.arguments[0];
 }
@@ -87,12 +87,12 @@ function publicSchema(expression: ts.Expression | undefined, label: string, file
   let member: string | undefined;
   if (ts.isIdentifier(expression)) local = expression.text;
   else if (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression)) { local = expression.expression.text; member = expression.name.text; }
-  else throw new Error(`${file.fileName}: ${label} must reference an imported shared schema`);
+  else throw new Error(`${file.fileName}: ${label} debe referenciar un schema importado de shared/`);
   const imported = imports.get(local);
-  if (!imported) throw new Error(`${file.fileName}: ${label} must come from shared/`);
+  if (!imported) throw new Error(`${file.fileName}: ${label} debe venir de shared/`);
   const exported = imported.exported === "*" ? member : imported.exported;
-  if (!exported || (imported.exported !== "*" && member)) throw new Error(`${file.fileName}: ${label} must reference one shared export`);
-  standardSchemaTypes(expression, checker, () => new Error(`${file.fileName}: ${label} must expose concrete Standard Schema input and output types`));
+  if (!exported || (imported.exported !== "*" && member)) throw new Error(`${file.fileName}: ${label} debe referenciar un único export de shared/`);
+  standardSchemaTypes(expression, checker, () => new Error(`${file.fileName}: ${label} debe exponer tipos de entrada y salida de Standard Schema concretos`));
   validateSharedGraph(imported.file, root, sharedRoot, options, new Set(), read);
   const target = relative(outputDir, imported.file).replaceAll("\\", "/").replace(/\.(?:ts|mts|cts)$/, (suffix) => suffix === ".mts" ? ".mjs" : suffix === ".cts" ? ".cjs" : ".js");
   const specifier = target.startsWith(".") ? target : `./${target}`;
@@ -105,7 +105,7 @@ function schemaInputType(expression: ts.Expression, checker: ts.TypeChecker, inv
 
 function validatePathParams(expression: ts.Expression, pathname: string, checker: ts.TypeChecker, file: ts.SourceFile): void {
   const expected = [...pathname.matchAll(/\[(?:\.\.\.)?([A-Za-z_$][\w$]*)\]/g)].map((match) => match[1]!);
-  const invalid = () => new Error(`${file.fileName}: params must contain exactly the route parameters as required URL strings`);
+  const invalid = () => new Error(`${file.fileName}: params debe contener exactamente los parámetros de la ruta, como cadenas de URL obligatorias`);
   const inputType = schemaInputType(expression, checker, invalid);
   const stringType = checker.getStringType();
   for (const variant of inputType.isUnion() ? inputType.types : [inputType]) {
@@ -124,7 +124,7 @@ function validatePathParams(expression: ts.Expression, pathname: string, checker
 }
 
 function validateQuery(expression: ts.Expression, checker: ts.TypeChecker, file: ts.SourceFile): void {
-  const invalid = () => new Error(`${file.fileName}: query values must be URL strings or arrays of URL strings`);
+  const invalid = () => new Error(`${file.fileName}: los valores de query deben ser cadenas de URL o listas de cadenas de URL`);
   const inputType = schemaInputType(expression, checker, invalid);
   const stringType = checker.getStringType();
   const validValue = (value: ts.Type, arrayAllowed: boolean): boolean => {
@@ -152,14 +152,14 @@ function validateQuery(expression: ts.Expression, checker: ts.TypeChecker, file:
 function validateSharedGraph(file: string, root: string, sharedRoot: string, options: ts.CompilerOptions, seen: Set<string>, read: ReadSource): void {
   if (seen.has(file)) return;
   seen.add(file);
-  if (!inside(sharedRoot, file)) throw new Error(`${file}: public schema dependency escapes shared/`);
+  if (!inside(sharedRoot, file)) throw new Error(`${file}: una dependencia de un schema público sale de shared/`);
   // Autoimported dependencies appear as the imports that the Vite transform adds.
   const source = read(file);
-  if (source === undefined) throw new Error(`${file}: public schema dependency not found`);
+  if (source === undefined) throw new Error(`${file}: no se encuentra una dependencia de un schema público`);
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
   const checkDependency = (specifier: string): void => {
     const target = resolvedImport(specifier, file, options);
-    if (!target) throw new Error(`${file}: unresolved public schema dependency ${specifier}`);
+    if (!target) throw new Error(`${file}: no se puede resolver la dependencia ${specifier} de un schema público`);
     if (inside(root, target) && !relative(root, target).split(sep).includes("node_modules")) validateSharedGraph(target, root, sharedRoot, options, seen, read);
   };
   for (const statement of ast.statements) {
@@ -177,7 +177,7 @@ function validateSharedGraph(file: string, root: string, sharedRoot: string, opt
 
 function shapeFor(endpoint: ApiEndpoint | RpcEndpoint, checker: ts.TypeChecker, program: ts.Program, root: string, options: ts.CompilerOptions, outputDir: string, read: ReadSource): { type: string; contentType?: "response" } {
   const file = program.getSourceFile(endpoint.file);
-  if (!file) throw new Error(`Handler not found: ${endpoint.file}`);
+  if (!file) throw new Error(`No se encuentra el handler: ${endpoint.file}`);
   const sharedRoot = join(root, "shared");
   const imports = importMap(file, sharedRoot, options);
   const kind: Kind = endpoint.kind;
@@ -186,25 +186,38 @@ function shapeFor(endpoint: ApiEndpoint | RpcEndpoint, checker: ts.TypeChecker, 
   if (kind === "rpc") {
     const input = schema("input");
     const output = schema("output");
-    if (!input || !output) throw new Error(`${file.fileName}: RPC requires public input and output schemas`);
+    if (!input || !output) throw new Error(`${file.fileName}: el RPC requiere schemas públicos input y output`);
     return { type: `import("@meekojs/meeko/framework").RpcOperation<__Input<${input}>, __Output<${output}>>` };
   }
   const params = schema("params");
-  if (params && !endpoint.pathname.includes("[")) throw new Error(`${file.fileName}: static API path cannot declare params`);
+  if (params && !endpoint.pathname.includes("[")) throw new Error(`${file.fileName}: una ruta de API estática no puede declarar params`);
   if (params) validatePathParams(objectProperty(contract, "params")!, endpoint.pathname, checker, file);
   const query = schema("query");
   if (query) validateQuery(objectProperty(contract, "query")!, checker, file);
   const body = schema("body");
-  const response = schema("response");
   const content = objectProperty(contract, "contentType");
-  if (content && (!ts.isStringLiteral(content) || (content.text !== "json" && content.text !== "response"))) throw new Error(`${file.fileName}: contentType must be a static json or response literal`);
+  if (content && (!ts.isStringLiteral(content) || (content.text !== "json" && content.text !== "response"))) throw new Error(`${file.fileName}: contentType debe ser el literal estático "json" o "response"`);
   const responseType = content && ts.isStringLiteral(content) && content.text === "response";
-  if (!responseType && !response) throw new Error(`${file.fileName}: API requires a public response schema`);
-  if (endpoint.pathname.includes("[") && !params) throw new Error(`${file.fileName}: dynamic API path requires a public params schema`);
+  const status = successStatus(objectProperty(contract, "status"), file);
+  if (status !== undefined && responseType) throw new Error(`${file.fileName}: status no se combina con contentType: "response"; ese handler devuelve su propio Response con su estado`);
+  const noContent = status === 204;
+  if (noContent && objectProperty(contract, "response")) throw new Error(`${file.fileName}: status 204 responde sin cuerpo y no admite un schema response`);
+  const response = schema("response");
+  if (!responseType && !noContent && !response) throw new Error(`${file.fileName}: la API requiere un schema público response`);
+  if (endpoint.pathname.includes("[") && !params) throw new Error(`${file.fileName}: una ruta de API dinámica requiere un schema público params`);
+  const output = responseType ? "Response" : noContent ? "undefined" : `__Output<${response}>`;
   return {
-    type: `import("@meekojs/meeko/framework").ApiOperation<${params ? `__Input<${params}>` : "undefined"}, ${query ? `__Input<${query}>` : "undefined"}, ${body ? `__Input<${body}>` : "undefined"}, ${responseType ? "Response" : `__Output<${response}>`}>`,
+    type: `import("@meekojs/meeko/framework").ApiOperation<${params ? `__Input<${params}>` : "undefined"}, ${query ? `__Input<${query}>` : "undefined"}, ${body ? `__Input<${body}>` : "undefined"}, ${output}>`,
     ...(responseType ? { contentType: "response" as const } : {}),
   };
+}
+
+/** The literal `status` of an API definition; generated clients type a `204` as `undefined`. */
+function successStatus(expression: ts.Expression | undefined, file: ts.SourceFile): 200 | 201 | 202 | 204 | undefined {
+  if (!expression) return undefined;
+  const value = ts.isNumericLiteral(expression) ? Number(expression.text) : Number.NaN;
+  if (value !== 200 && value !== 201 && value !== 202 && value !== 204) throw new Error(`${file.fileName}: status debe ser el literal 200, 201, 202 o 204`);
+  return value;
 }
 
 /** Generate public API/RPC declarations without importing handler modules. */
@@ -255,16 +268,17 @@ export async function generateServerContracts(projectRoot: string): Promise<Gene
   const clientSource = (server: boolean): string => [
     "// Generated by Meeko. Contains only public route descriptors and shared contract types.",
     `import { createApiClient, createRpcClient${server ? "" : ", createBrowserClientOptions"} } from "@meekojs/meeko/framework";`,
-    'import { createSocketRegistry, useSocketChannel, type SocketRegistryOptions } from "@meekojs/meeko/framework";',
+    `import { ${server ? "" : "createSocketRegistry, "}useSocketChannel, type SocketRegistryOptions } from "@meekojs/meeko/framework";`,
     'import { createUseApi, createUseRpcMutation, createUseRpcQuery } from "@meekojs/meeko/framework";',
-    ...(server ? ['import { createServerClientOptions } from "@meekojs/meeko/server";'] : []),
+    ...(server ? ['import { createServerClientOptions, createServerSocketRegistry } from "@meekojs/meeko/server";'] : []),
     'import type { ApiContract, RpcContract } from "../types/server-contracts.js";',
     'import { socketContracts } from "./socket-contracts.js";',
     `const manifest = ${JSON.stringify(publicManifest, null, 2)} as const;`,
     `const options = ${server ? "createServerClientOptions()" : "createBrowserClientOptions()"};`,
     "export const api = createApiClient<ApiContract>(manifest, options);",
     "export const rpc = createRpcClient<RpcContract>(manifest, options);",
-    "export const socket = createSocketRegistry(socketContracts);",
+    // On the server each channel also broadcasts to its rooms through the application's hub.
+    `export const socket = ${server ? "createServerSocketRegistry" : "createSocketRegistry"}(socketContracts);`,
     "export const useSocket = <K extends keyof typeof socketContracts & string>(name: K, options?: SocketRegistryOptions) => useSocketChannel(socketContracts, name, options);",
     "export const useApi = createUseApi<ApiContract, typeof manifest>(manifest, options);",
     "export const useRpcQuery = createUseRpcQuery<RpcContract>(manifest, options);",

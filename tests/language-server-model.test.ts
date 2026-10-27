@@ -102,6 +102,71 @@ test("editor checks event handler types at their template expression", () => {
   } finally { valid.dispose(); }
 });
 
+test("editor and CLI type a native on:event with the element's event and currentTarget", async () => {
+  const component = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const text = signal("");
+const accepted = signal(false);
+const key = signal("");
+const radius = signal("");
+</script><template>
+<input on:input="(event) => text.value = event.currentTarget.value" />
+<input type="checkbox" on:change="(event) => accepted.value = event.currentTarget.checked" />
+<textarea on:input="(event) => text.value = event.currentTarget.value"></textarea>
+<select on:change="(event) => text.value = event.currentTarget.value"><option value="a">a</option></select>
+<input on:keydown="(event) => key.value = event.key + event.currentTarget.value" />
+<button on:pointerdown="(event) => key.value = String(event.pointerId) + event.currentTarget.type">b</button>
+<svg><circle r="1" on:click="(event) => radius.value = String(event.currentTarget.r.baseVal.value + event.clientX)" /></svg>
+<x-widget on:custom="(event) => key.value = event.currentTarget.dataset.name ?? event.type"></x-widget>
+</template>`;
+  const cli = await checkSource(component, filename);
+  assert.deepEqual(cli.map((item) => `${item.code}: ${item.message}`), []);
+  const valid = createEditorModel(component, filename);
+  try {
+    assert.deepEqual(valid.service.getSemanticDiagnostics(valid.virtualFilename).map((item) => String(item.messageText)), []);
+  } finally { valid.dispose(); }
+
+  // A property the element does not have is still an error, at the same place in both.
+  const broken = component.replace("event.currentTarget.checked", "event.currentTarget.missing");
+  const start = broken.indexOf("missing");
+  const errors = await checkSource(broken, filename);
+  assert.ok(errors.some((item) => item.code === "TS2339" && item.location.offset === start && /HTMLInputElement/.test(item.message)), JSON.stringify(errors));
+  const invalid = createEditorModel(broken, filename);
+  try {
+    const diagnostics = invalid.service.getSemanticDiagnostics(invalid.virtualFilename);
+    assert.ok(diagnostics.some((item) => item.code === 2339 && item.start !== undefined && invalid.toSource(item.start) === start),
+      JSON.stringify(diagnostics.map((item) => ({ code: item.code, source: invalid.toSource(item.start ?? 0) }))));
+  } finally { invalid.dispose(); }
+
+  // `currentTarget` is the element of the tag: a <button> handler has no `value` of an input's type.
+  const wrongTag = component.replace('<button on:pointerdown="(event) => key.value = String(event.pointerId) + event.currentTarget.type"', '<button on:pointerdown="(event) => accepted.value = event.currentTarget.checked"');
+  const tagErrors = await checkSource(wrongTag, filename);
+  assert.ok(tagErrors.some((item) => item.code === "TS2339" && /HTMLButtonElement/.test(item.message)), JSON.stringify(tagErrors));
+});
+
+test("editor and CLI type model on <input bind:type> as a text control", async () => {
+  const component = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const secret = signal("");
+const revealed = signal(false);
+</script><template><input bind:type="revealed.value ? 'text' : 'password'" model="secret" /></template>`;
+  assert.deepEqual((await checkSource(component, filename)).map((item) => item.code), []);
+  const valid = createEditorModel(component, filename);
+  try {
+    assert.deepEqual(valid.service.getSemanticDiagnostics(valid.virtualFilename).map((item) => String(item.messageText)), []);
+  } finally { valid.dispose(); }
+  const broken = component.replace(`model="secret"`, `model="revealed"`);
+  const start = broken.indexOf(`revealed" />`);
+  const cli = await checkSource(broken, filename);
+  assert.ok(cli.some((item) => item.code === "TS2322" && item.location.offset === start), JSON.stringify(cli));
+  const invalid = createEditorModel(broken, filename);
+  try {
+    const diagnostics = invalid.service.getSemanticDiagnostics(invalid.virtualFilename);
+    assert.ok(diagnostics.some((item) => item.code === 2322 && item.start !== undefined && invalid.toSource(item.start) === start),
+      JSON.stringify(diagnostics.map((item) => ({ code: item.code, source: invalid.toSource(item.start ?? 0) }))));
+  } finally { invalid.dispose(); }
+});
+
 test("editor requires string or number keyed-list identifiers", () => {
   const component = '<script lang="ts">const items = [{ id: 1 }];</script><template><li each:of="items" each:as="item" each:key="({ id: item.id })">{item.id}</li></template>';
   const invalid = createEditorModel(component, filename);

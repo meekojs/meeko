@@ -34,6 +34,24 @@ test("OpenAPI includes public schema contracts and rejects private or unrepresen
   await assert.rejects(generateOpenApi({ ...base, manifest: { api: [{ ...manifest.api[0]!, pathname: "/api/[...slug]" }], rpc: [] } }), /catch-all/);
 });
 
+test("OpenAPI documents the declared success status of JSON endpoints", async () => {
+  const manifest: ServerManifest = {
+    api: [
+      { kind: "api", file: "create.ts", pathname: "/api/users", method: "POST", clientKey: "users" },
+      { kind: "api", file: "delete.ts", pathname: "/api/users/[id]", method: "DELETE", clientKey: "users.byId" },
+    ],
+    rpc: [],
+  };
+  const modules = new Map<string, unknown>([
+    ["create.ts", { default: defineApiRoute({ response: stringSchema, status: 201, handler: () => "created" }) }],
+    ["delete.ts", { default: defineApiRoute({ params: paramsSchema, status: 204, handler: () => {} }) }],
+  ]);
+  const document = await generateOpenApi({ manifest, info: { title: "Meeko", version: "1" }, publicSchemas: { paramsSchema, stringSchema }, toJsonSchema: (schema: Schema) => json.get(schema), load: async (file: string) => modules.get(file) });
+  const paths = document.paths as Record<string, Record<string, { responses: Record<string, unknown> }>>;
+  assert.deepEqual(paths["/api/users"]!.post!.responses, { "201": { description: "Created", content: { "application/json": { schema: { $ref: "#/components/schemas/stringSchema" } } } } });
+  assert.deepEqual(paths["/api/users/{id}"]!.delete!.responses, { "204": { description: "No Content" } });
+});
+
 test("Node upgrade preflights before transport and bridges messages without protocol parsing", async () => {
   const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
   const hub = createSocketHub({

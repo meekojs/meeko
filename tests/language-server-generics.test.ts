@@ -90,7 +90,7 @@ describe("language server: generic components", () => {
     const child = open("DataTable.meeko", table);
     assert.deepEqual(virtualErrors(child), []);
     assert.match(child.component.code, /export type ComponentProps<T extends \{ id: string \}> = /);
-    assert.match(child.component.code, /export declare const __meekoTag: <T extends \{ id: string \}>\(props: ComponentProps<T> & __MeekoExtraProps/);
+    assert.match(child.component.code, /export declare const __meekoTag: <T extends \{ id: string \}>\(props: __MeekoTagProps<ComponentProps<T>> & __MeekoExtraProps/);
     assert.match(hoverText(child, child.at("row.id", 1)), /const row: T/);
     // The parameter in the attribute is the alias the script uses.
     assert.match(hoverText(child, child.at("T extends")), /type T = \{\s+id: string;\s+\}/);

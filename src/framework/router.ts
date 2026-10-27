@@ -370,7 +370,7 @@ function scrollToFragment(browser: Window, url: URL, toTop: boolean): void {
  * `createNavigator` plus an optional renderer for URLs without a route. Without
  * it such URLs are left to the browser, as `createNavigator` does.
  */
-export function createAppNavigator(routes: readonly RouteRecord[], render: (context: NavigationContext) => Promise<void | boolean> | void | boolean, browser: Window = window, onError?: (error: unknown) => void, unmatched?: UnmatchedNavigation): Navigator {
+export function createAppNavigator(routes: readonly RouteRecord[], render: (context: NavigationContext) => Promise<void | boolean> | void | boolean, browser: Window = window, onError?: (error: unknown) => void, unmatched?: UnmatchedNavigation, onSameDocument?: (url: URL) => void): Navigator {
   const initial = matchRoute(routes, browser.location.pathname);
   let currentLayouts: readonly string[] | undefined = initial ? initial.route.layouts : unmatched?.layouts;
   let currentUrl = browser.location.href;
@@ -386,6 +386,7 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
       pending = undefined;
       browser.history.pushState(null, "", url);
       currentUrl = url.href;
+      onSameDocument?.(url);
       scrollToFragment(browser, url, false);
       return true;
     }
@@ -474,6 +475,7 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
     catch { url = undefined; }
     if (url && sameDocument(url, new URL(currentUrl))) {
       currentUrl = url.href;
+      onSameDocument?.(url);
       return;
     }
     void navigate(browser.location.href, { replace: true }).catch((error: unknown) => reportNavigationError(browser, error, onError));

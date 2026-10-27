@@ -19,7 +19,7 @@ export type { MountedResult } from "./lifecycle.js";
 export { defineExpose, exposedKey } from "./expose.js";
 export type { ExposedOf } from "./expose.js";
 export { createRefs, elementListRef, elementRef, refTarget } from "./element-refs.js";
-export type { ElementListRef, ElementOf, ElementRef, ElementRefOf, ElementRefs, UnexposedRef, UnexposedRefMessage } from "./element-refs.js";
+export type { ElementListRef, ElementOf, ElementRef, ElementRefOf, ElementRefs, EventOf, UnexposedRef, UnexposedRefMessage } from "./element-refs.js";
 export { continueInBrowser } from "./continuation.js";
 export type { BrowserContinuation } from "./continuation.js";
 export { awaitData } from "./suspense.js";

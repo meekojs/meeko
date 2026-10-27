@@ -24,10 +24,10 @@ function rel(root: string, file: string): string {
 function apiEndpoint(directory: string, file: string): ApiEndpoint {
   const path = rel(directory, file);
   const match = /^(.*)\.(get|post|put|patch|delete)$/.exec(path);
-  if (!match) throw new Error(`API handler requires a method suffix: ${file}`);
+  if (!match) throw new Error(`El handler de API necesita el sufijo de su método (.get, .post, .put, .patch o .delete): ${file}`);
   const route = match[1]!.split("/");
   if (route.at(-1) === "index") route.pop();
-  if (route.length === 0) throw new Error(`API handler cannot target /api because it has no generated client key: ${file}`);
+  if (route.length === 0) throw new Error(`Un handler de API no puede atender /api porque no tendría clave en el cliente generado: ${file}`);
   const pathname = `/api${route.length ? `/${route.join("/")}` : ""}`;
   parts(pathname);
   return { kind: "api", file, pathname, method: match[2]!.toUpperCase() as ApiMethod, clientKey: clientKey(pathname.slice(4)) };
@@ -36,7 +36,7 @@ function apiEndpoint(directory: string, file: string): ApiEndpoint {
 function rpcEndpoint(directory: string, file: string): RpcEndpoint {
   const path = rel(directory, file);
   const route = path.split("/");
-  if (route.some((part) => !/^[A-Za-z_$][\w$]*$/.test(part))) throw new Error(`Invalid RPC procedure name: ${file}`);
+  if (route.some((part) => !/^[A-Za-z_$][\w$]*$/.test(part))) throw new Error(`Nombre de procedimiento RPC no válido: ${file}`);
   const id = route.join(".");
   return { kind: "rpc", file, id, pathname: `/_meeko/rpc/${route.join("/")}` };
 }
@@ -66,23 +66,23 @@ export async function discoverServerManifest(projectRoot: string): Promise<Serve
   const rpc = (await files(rpcRoot)).map((file) => rpcEndpoint(rpcRoot, file));
   const socket = (await files(socketRoot)).map((file): SocketEndpoint => {
     const name = rel(socketRoot, file);
-    if (!/^[A-Za-z_$][\w$-]*$/.test(name)) throw new Error(`Invalid Socket channel name in ${file}; use a single named file`);
+    if (!/^[A-Za-z_$][\w$-]*$/.test(name)) throw new Error(`Nombre de canal Socket no válido en ${file}; usa un único archivo con nombre`);
     return { kind: "socket", file, name, pathname: `/_meeko/socket/${name}` };
   });
   const socketNames = new Map<string, string>();
   for (const endpoint of socket) {
     const previous = socketNames.get(endpoint.name);
-    if (previous) throw new Error(`Socket channel collision: ${previous} and ${endpoint.file} both resolve to ${endpoint.name}`);
+    if (previous) throw new Error(`Colisión de canales Socket: ${previous} y ${endpoint.file} resuelven los dos a ${endpoint.name}`);
     socketNames.set(endpoint.name, endpoint.file);
   }
   const paths = new Map<string, string>();
   for (const endpoint of api) {
     const pathKey = `${endpoint.method} ${collisionKey(endpoint.pathname)}`;
     const previous = paths.get(pathKey);
-    if (previous) throw new Error(`API route collision: ${previous} and ${endpoint.file} both resolve to ${pathKey}`);
+    if (previous) throw new Error(`Colisión de rutas de API: ${previous} y ${endpoint.file} resuelven los dos a ${pathKey}`);
     paths.set(pathKey, endpoint.file);
   }
-  assertCallablePaths(api.map((endpoint) => ({ file: endpoint.file, path: `${endpoint.clientKey}.${endpoint.method.toLowerCase()}` })), "API client name collision");
-  assertCallablePaths(rpc.map((endpoint) => ({ file: endpoint.file, path: endpoint.id })), "RPC collision");
+  assertCallablePaths(api.map((endpoint) => ({ file: endpoint.file, path: `${endpoint.clientKey}.${endpoint.method.toLowerCase()}` })), "Colisión de nombres del cliente de API");
+  assertCallablePaths(rpc.map((endpoint) => ({ file: endpoint.file, path: endpoint.id })), "Colisión de procedimientos RPC");
   return Object.freeze({ api: Object.freeze(api), rpc: Object.freeze(rpc), socket: Object.freeze(socket) });
 }

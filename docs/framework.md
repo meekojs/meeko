@@ -370,11 +370,57 @@ const nav = useNavigation();
 // <p if:when="nav.pending.value">Cargando…</p>
 ```
 
+### Ruta actual
+
+Desde `1.2`, `useRoute()` devuelve la ruta confirmada que renderiza el componente, con una señal de sólo lectura por valor (tipo `RouteState`):
+
+| Campo | Valor |
+| --- | --- |
+| `url` | URL relativa al origen, como cadena: `pathname`, `search` y, en el navegador, el fragmento (`/users/42?tab=a#bio`). No lleva el origen, así que coincide en un HTML prerenderizado en otro dominio. |
+| `path` | `pathname`, codificado como en `location.pathname` (`/users/42`). |
+| `id` | ID de la ruta en el manifiesto (`"/users/[id]"`), o `null` en la página `404` de `app/error.meeko` para una URL sin ruta. |
+| `params` | Parámetros de la ruta, con la misma forma que recibe la página (validados por su schema). |
+| `search` | Parámetros de búsqueda, con la misma forma que recibe la página; en la página `404`, la query string con las claves repetidas en arrays. |
+
+Se autoimporta en las aplicaciones (un export propio llamado `useRoute` en `app/composables` u otra carpeta de autoimports tiene prioridad sobre el del framework) y, como `useNavigation`, puede llamarse también desde código anidado. Funciona en páginas, layouts, `app/app.meeko`, `app/error.meeko` y sus componentes:
+
+- **SSR.** Los valores son los de la petición, también en las rutas `"prerender"` y `"stream"` y en los layouts de una ruta `"client"`. El servidor no recibe el fragmento, así que en SSR `url` nunca lo lleva.
+- **Hidratación.** El navegador hidrata con los mismos valores que el SSR, sin desajustes. Si la dirección tiene un `#fragmento`, `url` lo incorpora justo después de la hidratación.
+- **Navegación.** Los valores cambian sólo cuando una navegación se confirma, a la vez que el outlet, nunca mientras `useNavigation().pending` vale `true`; la página anterior se libera antes de que se actualicen los efectos que leen la ruta. También cambian al volver atrás o adelante en el historial y en una navegación sólo de fragmento, donde `path` se mantiene y cambia `url`. El render previo que carga los `await` de datos de la página nueva ya ve la ruta de destino.
+- **Fuera de una aplicación.** Fuera de un render del framework o de `mountClientApp` (por ejemplo, en una prueba unitaria con `renderToString`), `useRoute()` lanza un error que lo explica, en lugar de inventar una ruta; pase la ruta al componente como prop en esas pruebas.
+
+Un layout con barra lateral marca así el enlace activo, igual en el HTML del servidor y después de cada navegación (`bind:` elimina el atributo cuando el valor es `null`):
+
+```html
+<!-- app/layouts/default.meeko -->
+<script lang="ts">
+import type { Component } from "@meekojs/meeko";
+
+const props = defineProps<{ outlet: Component<Record<string, unknown>> }>();
+const route = useRoute();
+const links = [
+  { href: "/", label: "Inicio" },
+  { href: "/users", label: "Usuarios" },
+  { href: "/settings", label: "Ajustes" },
+];
+const isActive = (href: string): boolean => href === "/" ? route.path.value === "/" : route.path.value.startsWith(href);
+</script>
+
+<template>
+  <aside>
+    <nav>
+      <a each:of="links" each:as="link" each:key="link.href" bind:href="link.href" bind:aria-current="isActive(link.href) ? 'page' : null">{link.label}</a>
+    </nav>
+  </aside>
+  <main><component is="props.outlet"></component></main>
+</template>
+```
+
 Los componentes recibidos como props mantienen la dirección del contrato: un componente que exige `label` no satisface un outlet que puede renderizarlo sin `label`. `meeko check` diagnostica la expresión que pasa el componente. Al guardar un módulo TypeScript importado por un `.meeko` abierto, la extensión de VS Code vuelve a comprobar sus diagnósticos y tokens semánticos.
 
 ## Autoimports y TypeScript
 
-Meeko analiza exports AST de `app/{components,composables,utils,stores}`, `shared/{types,schemas,utils,constants,enums}` y `server/utils`. Los símbolos de `app/` están disponibles en cliente y SSR, pero no desde `shared/`; los sufijos `.client.ts` y `.server.ts` restringen un módulo a su entorno. `imports.serverDirs` añade directorios privados exclusivos del servidor. Los símbolos del framework `api`, `rpc`, `socket`, `useSocket`, `useApi`, `useRpcQuery`, `useRpcMutation`, `useState` y `href`, y `onMounted` de la raíz, también figuran en el registro. Los imports explícitos prevalecen. Una colisión produce error; nunca se elige por orden de archivos. Un `enum` o una clase autoimportados sirven también como tipo, con sus miembros (`Scope.App`); si un archivo sólo los usa como tipo, Meeko inserta `import type`. Los schemas de `shared/schemas` pueden llegar por autoimport a los contratos de API, RPC y Socket. `meeko check` comprueba los `.ts` que importa un `.meeko` con los autoimports de su ámbito y con las rutas generadas, igual que los proyectos `tsconfig.*`.
+Meeko analiza exports AST de `app/{components,composables,utils,stores}`, `shared/{types,schemas,utils,constants,enums}` y `server/utils`. Los símbolos de `app/` están disponibles en cliente y SSR, pero no desde `shared/`; los sufijos `.client.ts` y `.server.ts` restringen un módulo a su entorno. `imports.serverDirs` añade directorios privados exclusivos del servidor. Los símbolos del framework `api`, `rpc`, `socket`, `useSocket`, `useApi`, `useRpcQuery`, `useRpcMutation`, `useState`, `href` y `useRoute`, y `onMounted` de la raíz, también figuran en el registro; un export propio llamado `useRoute` tiene prioridad sobre el del framework. Los imports explícitos prevalecen. Una colisión produce error; nunca se elige por orden de archivos. Un `enum` o una clase autoimportados sirven también como tipo, con sus miembros (`Scope.App`); si un archivo sólo los usa como tipo, Meeko inserta `import type`. Los schemas de `shared/schemas` pueden llegar por autoimport a los contratos de API, RPC y Socket. `meeko check` comprueba los `.ts` que importa un `.meeko` con los autoimports de su ámbito y con las rutas generadas, igual que los proyectos `tsconfig.*`.
 
 Los `.ts` normales de `app/` (composables, utils, stores) se ejecutan en SSR y en el navegador, como los `.meeko` que los usan, y sus autoimports del framework (`api`, `rpc`, `socket`, `useSocket`, `useApi`…) se resuelven por entorno: el cliente de servidor en SSR y el del navegador en el navegador. Antes de `1.1` usaban siempre el del navegador, y `meeko dev` o `meeko build` fallaban con «Client-only module reached the server bundle». Un `.client.ts` sigue siendo sólo de navegador.
 
@@ -477,6 +523,111 @@ Los schemas públicos de API, RPC y Socket deben exponer tipos Standard Schema c
 `meeko check .` genera proyectos TypeScript separados para cliente, servidor y shared. Incluye las fuentes de los layers y módulos declarados en `meeko.config.ts`, aunque sus rutas no usen los nombres convencionales `layers/` o `modules/`. Un archivo `*.server.ts` de `app/` se comprueba en el proyecto servidor y uno `*.shared.ts` en el proyecto shared; los archivos con sufijo de ámbito conservan esa selección también dentro de `shared/` y `server/`.
 
 Los errores de API y RPC se normalizan en el servidor: un `ApiError` conserva `code` y `status`, la respuesta añade `requestId` y `x-request-id`, y un fallo desconocido se devuelve como `INTERNAL_ERROR` sin exponer su mensaje. La misma normalización se aplica al despacho local SSR y al transporte Node, incluso cuando Vite carga módulos en grafos distintos. La navegación que solicita `application/meeko+json` recibe el mismo formato; una página HTML de error conserva el estado HTTP y `x-request-id` sin incluir detalles privados. El servidor generado observa los fallos 5xx: en producción registra tipo e ID, y en desarrollo muestra también el error original. Las respuestas 4xx esperadas no se registran como fallos internos.
+
+### Errores de validación en formularios
+
+Desde `1.2`, cuando `params`, `query`, `body` o el `input` de un RPC no superan su schema, la respuesta `400` (`INVALID_PARAMS`, `INVALID_QUERY`, `INVALID_BODY` o `INVALID_INPUT`) incluye `issues`: una lista de `{ path, message }` con, como mucho, 20 elementos. `path` son las claves de la ruta del issue de Standard Schema unidas con `.` (`"items.0.name"`), o `""` para la entrada completa; `message` es el mensaje del schema. Sólo viajan esos dos campos: nunca el valor recibido, lo esperado ni una traza. Los issues sin mensaje se omiten, y sin ninguno la respuesta no lleva `issues`. Un resultado del handler que no supera `response` u `output` sigue siendo `500` sin detalle, porque es un fallo del servidor.
+
+```ts
+// shared/schemas/auth.ts
+import * as v from "valibot";
+export const loginInput = v.object({
+  email: v.pipe(v.string(), v.email("Escribe un correo válido.")),
+  password: v.pipe(v.string(), v.minLength(1, "Escribe tu contraseña.")),
+});
+```
+
+```json
+{ "code": "INVALID_INPUT", "status": 400, "requestId": "…", "issues": [{ "path": "password", "message": "Escribe tu contraseña." }] }
+```
+
+En el cliente, `ClientError.issues` es esa lista de sólo lectura (tipo `ValidationIssue`), o `undefined` si la respuesta no la trae. Llega igual desde `api.*`, `rpc.*` y el `error` de `useApi`, `useRpcQuery` y `useRpcMutation`:
+
+```ts
+import { ClientError } from "@meekojs/meeko/framework";
+
+const login = useRpcMutation("auth.login");
+const fieldError = (path: string) => {
+  const error = login.error.value;
+  return error instanceof ClientError ? error.issues?.find((issue) => issue.path === path)?.message : undefined;
+};
+```
+
+Escriba mensajes propios en el schema: algunos mensajes por defecto de Valibot citan el valor recibido.
+
+### Valores por petición: `locals`
+
+Desde `1.2`, `defineApiRoute` y `defineRpc` aceptan `locals(context)`, que calcula un valor por petición (por ejemplo, el usuario actual) y se lo entrega al handler como `locals`, con el tipo inferido de lo que devuelve. Sin `locals`, el handler recibe `locals: undefined`. `authorize` no cambia y sigue devolviendo un booleano.
+
+El orden de cada petición es: Origin con `origin: "required"`, Origin y CSRF de la sesión, `auth`, `authorize`, validación de la entrada (`params`, `query` y `body`, o `input`), `locals`, handler y validación de la respuesta. Así, `locals` sólo se ejecuta con una entrada válida y una petición ya autorizada. Si lanza un `ApiError`, ese error es la respuesta (por ejemplo, `401` si el usuario de la sesión ya no existe o `403` si perdió el acceso); cualquier otro error es `500`.
+
+```ts
+// server/rpc/orders/create.ts
+import { ApiError, defineRpc } from "@meekojs/meeko/server";
+import { newOrder, orderSchema } from "../../../shared/schemas/order.js";
+import { createOrder, findUser } from "../../utils/store.js";
+
+export default defineRpc({
+  input: newOrder,
+  output: orderSchema,
+  auth: "required",
+  locals: async ({ session }) => {
+    const user = await findUser((session.current!.data as { userId: string }).userId);
+    if (!user) throw new ApiError("UNAUTHENTICATED", 401);
+    return { user };
+  },
+  handler: ({ input, locals }) => createOrder(locals.user, input),
+});
+```
+
+Declare `locals` antes de `handler` en el objeto: si `locals` usa su parámetro, TypeScript sólo infiere su tipo para el handler cuando aparece antes.
+
+### Estado de la respuesta: `status`
+
+Desde `1.2`, `defineApiRoute` acepta `status` para elegir el estado de una respuesta correcta sin renunciar a JSON, a la validación con `response` ni al tipo del cliente generado:
+
+| `status` | Respuesta | `api.*` resuelve |
+| --- | --- | --- |
+| `200` (por defecto) | JSON validado con `response` | el valor de `response` |
+| `201` | JSON validado con `response` (`201 Created`) | el valor de `response` |
+| `202` | JSON validado con `response` (`202 Accepted`) | el valor de `response` |
+| `204` | sin cuerpo ni `content-type` (`204 No Content`) | `undefined` |
+
+```ts
+// server/api/orders/index.post.ts
+import { defineApiRoute } from "@meekojs/meeko/server";
+import { newOrder, orderSchema } from "../../../shared/schemas/order.js";
+import { createOrder } from "../../utils/store.js";
+
+export default defineApiRoute({
+  body: newOrder,
+  response: orderSchema,
+  status: 201,
+  handler: ({ body }) => createOrder(body),
+});
+```
+
+```ts
+// server/api/orders/[id].delete.ts
+import { defineApiRoute } from "@meekojs/meeko/server";
+import { orderParams } from "../../../shared/schemas/order.js";
+import { deleteOrder } from "../../utils/store.js";
+
+export default defineApiRoute({
+  params: orderParams,
+  status: 204,
+  handler: async ({ params }) => { await deleteOrder(params.id); },
+});
+```
+
+- `status` debe ser un literal (`status: 201`): el generador lo lee sin ejecutar el handler y rechaza otro valor. Una constante o una expresión no sirven.
+- Con `204`, el handler no devuelve nada y no se declara `response`; devolver un valor responde `500` `INVALID_RESPONSE`. En el contrato generado la salida es `undefined`, así que `await api.orders.byId.delete({ params })` resuelve `undefined`, igual que `useApi`.
+- `status` no se combina con `contentType: "response"`: ese handler ya devuelve su propio `Response` con el estado que quiera.
+- Un `status` no admitido, combinado con `contentType: "response"` o un `204` con `response` responde `500` `INVALID_RESPONSE_STATUS` antes de leer la entrada, aunque el generador ya lo rechaza en `meeko routes`, `meeko check` y `meeko dev`.
+- Los errores no cambian: siguen saliendo de `ApiError` con su propio estado.
+- `generateOpenApi` documenta el estado declarado (`201 Created`, `202 Accepted` o `204 No Content`, este sin `content`).
+- El estado es fijo por endpoint. Para elegirlo en cada petición (por ejemplo, `201` al crear y `200` al actualizar en un mismo `PUT`), use `contentType: "response"` o dos endpoints.
+- RPC no tiene `status`: un procedimiento siempre responde `200` con su `output`.
 
 ### Datos en componentes: `useApi`, `useRpcQuery` y `useRpcMutation`
 
@@ -583,7 +734,7 @@ Las reglas de nivel superior de estos composables (`MEEK054`, `MEEK055`) se desc
 
 ## WebSocket
 
-`server/socket/chat.ts` exporta un `defineSocketChannel` con schemas separados para cada dirección. Los schemas expuestos al cliente deben venir de `shared/`. El generador emite un contrato público sin importar handlers privados.
+`server/socket/chat.ts` exporta un `defineSocketChannel` con schemas separados para cada dirección. Los schemas expuestos al cliente deben venir de `shared/`. El generador emite un contrato público sin importar handlers privados. Cada evento se declara como `evento: schema` o, desde `1.2`, con la forma abreviada `{ kitchenChanged }` cuando el schema importado se llama como el evento; lo mismo vale para los campos de `defineApiRoute` y `defineRpc` (`{ body, response }`).
 
 ```ts
 // server/socket/chat.ts
@@ -644,6 +795,44 @@ feed.on("price", (price) => console.log(price.symbol, price.value));
 ```
 
 Hasta `1.0` esta función se exportaba como `useSocket` desde `@meekojs/meeko/framework`, con el mismo nombre que el autoimport generado y otra firma. Ese export sigue disponible como alias obsoleto de `useSocketClient` (es la misma función) durante toda la serie 1.x y se retirará en `2.0`. El autoimport `useSocket("canal")` de los clientes generados no está obsoleto. En un proyecto sin clientes generados, el autoimport `useSocket` resuelve a `useSocketClient`.
+
+### Broadcast desde el servidor
+
+Desde `1.2`, el autoimport `socket` del código de servidor (API, RPC, `<script server>`, middleware y handlers de Socket) añade a cada canal `broadcast(roomId, event, payload)`, tipado con el contrato generado del canal. Sustituye a publicar a mano en el `SocketPubSub` del runtime, que no comprueba el evento ni el payload:
+
+```ts
+// server/socket/operations.ts
+import { defineSocketChannel } from "@meekojs/meeko/server";
+import { kitchenChanged, subscribe } from "../../shared/schemas/operations.js";
+
+export default defineSocketChannel({
+  clientToServer: { subscribe },
+  serverToClient: { kitchenChanged },
+});
+```
+
+```ts
+// server/api/orders/[id]/ready.post.ts
+import { defineApiRoute } from "@meekojs/meeko/server";
+import { orderParams, orderSchema } from "../../../../shared/schemas/order.js";
+import { markReady } from "../../../utils/orders.js";
+
+export default defineApiRoute({
+  params: orderParams,
+  response: orderSchema,
+  handler: async ({ params }) => {
+    const order = await markReady(params.id);
+    await socket.operations.broadcast(order.storeId, "kitchenChanged", { orderId: order.id, status: "ready" });
+    return order;
+  },
+});
+```
+
+- **Mismas comprobaciones que `hub.broadcast`.** El hub valida con la definición del canal: un evento que no está en `serverToClient` rechaza con `UNKNOWN_SOCKET_EVENT` (404), un payload que no cumple su schema con `INVALID_SOCKET_PAYLOAD` (400) y un mensaje serializado mayor que `socket.maxMessageBytes` con `SOCKET_LIMIT_EXCEEDED` (413), siempre antes de publicar. Se resuelve cuando el broker acepta el mensaje; véase [Broadcast y varias instancias](#broadcast-y-varias-instancias). Dentro de un handler de API o RPC, un rechazo no capturado es la respuesta de error, con ese código y estado.
+- **Sala.** `roomId` es la sala de `?room=`; las conexiones sin sala usan `""`.
+- **Qué hub.** `broadcast` publica en el hub de la aplicación que atiende la petición HTTP en curso, también desde su trabajo asíncrono (como `platform.waitUntil` o un temporizador iniciado en la petición), o en el hub del handler de Socket en curso. Funciona igual en Node, Bun, Deno y Cloudflare Workers, donde el broker es el Durable Object de cada sala.
+- **Fuera de una petición.** Una tarea que empieza al arrancar, fuera de cualquier petición, no tiene aplicación actual y `broadcast` lanza un error. Cree un registro con el hub explícito: `createServerSocketRegistry(socketContracts, { hub: () => app.socket?.hub })` de `@meekojs/meeko/server`, o use `app.socket.hub.broadcast(canal, sala, evento, payload)` sin tipos.
+- **Sólo servidor.** En el navegador `socket.<canal>` sigue siendo el cliente WebSocket y no tiene `broadcast`. En el servidor, `on`, `emit`, `state` y `close` de `socket.<canal>` lanzan un error, porque durante SSR no hay conexión. Hasta `1.1`, leer `socket.<canal>` en el servidor ya lanzaba ese error.
 
 ### Broadcast y varias instancias
 
@@ -730,6 +919,33 @@ Todo `SessionStore` persistente personalizado debe almacenar `familyId` y garant
 **Migración de drivers SQL existentes:** añada una columna de familia a la tabla (por ejemplo, `family_id`), rellene las filas existentes con `family_id = id` y cree un índice único sobre ella. `read` y `write` deben transferir `SqlSessionRow.familyId`; `replace` debe comprobar la misma familia y sustituir la fila en una transacción; `revokeFamily(familyId)` debe borrar la fila activa por familia. Migre el esquema antes de iniciar la nueva versión. Un driver antiguo sin `revokeFamily` falla al construir `SqlSessionStore`; no se admite silenciosamente en producción.
 
 Para Redis, instale `redis` en la aplicación, cree el cliente con `createClient({ url: process.env.REDIS_URL })`, llame `connect()` antes de servir tráfico y páselo a `RedisSessionStore` con un prefijo propio. El host debe cerrar su cliente con `quit()` al detenerse; `SessionManager.close()` cierra el store, pero no se apropia de clientes externos. La prueba de integración `tests/redis.integration.ts` usa un namespace aleatorio y sólo borra sus propias claves. Se ejecuta contra un Redis real con `MEEKO_REDIS_URL=redis://127.0.0.1:6379 pnpm exec tsx --test tests/redis.integration.ts`; CI dispone de un servicio Redis dedicado. La prueba local requiere un Redis accesible y no usa bases ajenas.
+
+### Duración de cada sesión
+
+`SessionManager({ ttlMs })` fija la duración por defecto (7 días). Desde `1.2`, `context.session.create(data, { ttlMs })` da a una sesión su propia duración, un entero positivo de milisegundos; por ejemplo, 30 días para los propietarios y 12 horas para el personal. Un valor no válido rechaza con `RangeError` sin tocar el store. Esa duración fija el `Max-Age` de la cookie y la caducidad en el store (`expiresAt`, que Redis aplica con `PX` y SQL y D1 guardan en `expires_at`), se guarda en `SessionRecord.ttlMs` y `rotate()` la conserva: cada rotación cuenta de nuevo esa duración desde el momento de rotar.
+
+```ts
+const ttlMs = user.role === "staff" ? 12 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+await context.session.create({ userId: user.id }, { ttlMs });
+```
+
+Las sesiones creadas sin `ttlMs`, y los registros escritos antes de `1.2`, usan la duración del gestor también al rotar. `SqlSessionStore` no necesita una columna nueva: deduce la duración de cada fila como `expiresAt - createdAt`, así que una fila anterior conserva al rotar la duración con la que se creó. Un `SessionStore` propio debe conservar el campo `ttlMs` del registro si quiere que la duración sobreviva a la rotación; si lo pierde, la sesión rota con la duración del gestor.
+
+### Origin en mutaciones anónimas
+
+Origin y `x-meeko-csrf` se comprueban sólo en las mutaciones que llegan con una cookie de sesión. Un endpoint que crea la sesión, como el inicio de sesión, se llama sin ella y queda expuesto al *login CSRF*: otra web podría iniciar sesión en el navegador de la víctima con una cuenta del atacante. Desde `1.2`, `origin: "required"` en `defineApiRoute` o `defineRpc` exige un `Origin` permitido aunque no haya sesión:
+
+```ts
+// server/rpc/auth/login.ts
+export default defineRpc({
+  input: loginInput,
+  output: loginOutput,
+  origin: "required",
+  handler: async ({ input, context }) => { /* … */ },
+});
+```
+
+En un endpoint de API se comprueban los métodos `POST`, `PUT`, `PATCH` y `DELETE` (un `GET` no lleva `Origin` al navegar); en un RPC, todas las llamadas. Se acepta el origen de la petición, que tras `createServerApp` es el `publicOrigin` configurado, y los de `SessionManager({ allowedOrigins })`: la misma regla que en las mutaciones autenticadas. Un `Origin` ausente, `null` u otro distinto responde `403 INVALID_ORIGIN` antes de leer o validar la entrada y de ejecutar el handler. Las llamadas de los clientes `api.*` y `rpc.*` durante el SSR envían el origen de la petición en curso, así que el despacho local sigue funcionando. Una llamada desde fuera del navegador (una app nativa o un script) debe enviar una cabecera `Origin` permitida.
 
 ### Revocación durante una petición
 

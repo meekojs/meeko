@@ -2,14 +2,14 @@ import { hasRegionRecoveryFailure, parseRegionHtml } from "../dom.js";
 import type { Component, DomScope } from "../dom.js";
 import { createAppErrorChannel, provideAppErrorChannel } from "../component-errors.js";
 import type { ComponentErrorHandler } from "../component-errors.js";
-import { finishWithCleanup, runDry, signal } from "../reactivity.js";
+import { batch, finishWithCleanup, runDry, signal } from "../reactivity.js";
 import type { Signal } from "../reactivity.js";
 import { ERROR_PAGE_TITLE, PAYLOAD_VERSION, PageInputError, pageSearchObject, payloadHead, validatePageInputs } from "./page.js";
 import type { PageHead, PageRender, PageSchema } from "./page.js";
 import { ClientError } from "./clients.js";
 import { runRouteMiddleware } from "./middleware.js";
-import { provideNavigation } from "./navigation.js";
-import type { NavigationState } from "./navigation.js";
+import { fixedRoute, liveRoute, provideNavigation, provideRoute, routeSnapshot } from "./navigation.js";
+import type { LiveRoute, NavigationState, RouteState } from "./navigation.js";
 import type { RouteMiddleware } from "./middleware.js";
 import { activateRouteManifest, createAppNavigator, matchRoute, reportNavigationError, sameDocument } from "./router.js";
 import type { ErrorPageRecord, NavigationContext, Navigator, RouteMatch, RouteRecord, UnmatchedNavigationContext } from "./router.js";
@@ -20,8 +20,8 @@ import { lateRender, mayAwaitData, renderWithSuspense } from "../suspense.js";
 import { mountBatch } from "../lifecycle.js";
 import type { DeferredError, DeferredInternals, DeferredOutcome } from "./deferred.js";
 
-export { useNavigation } from "./navigation.js";
-export type { NavigationState } from "./navigation.js";
+export { useNavigation, useRoute } from "./navigation.js";
+export type { NavigationState, RouteState } from "./navigation.js";
 
 /**
  * Forma pública de un módulo `.meeko` compilado que necesita `mountClientApp` para renderizar e
@@ -602,6 +602,12 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     if (JSON.stringify(initial.params) !== JSON.stringify(payload.props.params)) throw new Error("Meeko route parameters do not match SSR");
   }
   const stateStore = new StateStore(payload.sharedState);
+  // The route of useRoute(): the server's values, so hydration matches; the fragment the server
+  // never saw is applied right after hydration.
+  const initialUrl = new URL(browser.location.href);
+  let committedRoute: LiveRoute = liveRoute(payload.error
+    ? routeSnapshot(initialUrl, null, {}, pageSearchObject(initialUrl.searchParams), false)
+    : routeSnapshot(initialUrl, payload.route, payload.props.params as Record<string, unknown>, payload.props.search as Record<string, unknown>, false));
   const resourceCache = new ResourceCache();
   const errorChannel = createAppErrorChannel(options.onError);
   const observeNavigationError = options.onNavigationError ?? ((error: unknown) => {
@@ -611,9 +617,10 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   });
   const pending = signal(false);
   const navigationState: NavigationState = { pending: { get value() { return pending.value; } } };
-  const hydrateApp = (hydrate: () => () => void) => hydrateWithStateStore(stateStore, () => {
+  const hydrateApp = (routeState: RouteState, hydrate: () => () => void) => hydrateWithStateStore(stateStore, () => {
     provideAppErrorChannel(errorChannel);
     provideNavigation(navigationState);
+    provideRoute(routeState);
     provideResourceCache(resourceCache);
     return hydrate();
   });
@@ -640,7 +647,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     // Awaited data comes from the payload: hydration stays synchronous and never requests it again.
     const initialData = new ResourceScope("read", payload.resources);
     // onMounted callbacks run once the whole tree has hydrated.
-    release = withResourceScope(initialData, () => hydrateApp(() => mountBatch(() => first.component.hydrateScope({ root: options.root }, {}, payload.state))));
+    release = withResourceScope(initialData, () => hydrateApp(committedRoute.state, () => mountBatch(() => first.component.hydrateScope({ root: options.root }, {}, payload.state))));
     resourceCache.merge(initialData.loadedData());
   } catch (error) {
     stopChunks();
@@ -653,6 +660,16 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   let activeStream: AbortController | undefined;
   let disposed = false;
   let stableUrl = browser.location.href;
+  /** A fragment-only change of the committed URL (history, a fragment link or `navigate("#x")`) updates `useRoute().url`. */
+  const syncFragment = (url: URL): void => {
+    if (disposed) return;
+    const committed = committedRoute.current();
+    const href = url.pathname + url.search;
+    if (committed.url.split("#")[0] !== href || committed.url === href + url.hash) return;
+    try { committedRoute.set({ ...committed, url: href + url.hash }); }
+    catch (error) { reportNavigationError(browser, error, observeNavigationError); }
+  };
+  syncFragment(initialUrl);
   const recoverCommitFailure = (error: unknown): never => {
     // A failed outlet update or hydration can leave live scopes attached to a
     // partially replaced tree. Recreate the last committed route with SSR.
@@ -719,6 +736,9 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     let lines: AsyncGenerator<string> | undefined;
     let navigationDeferred: ReadonlyMap<number, DeferredInternals> | undefined;
     let serverData: Record<string, unknown> = {};
+    // useRoute() values of the target: the parameters the page receives once they are known.
+    let routeParams: Readonly<Record<string, unknown>> = match?.params ?? {};
+    let routeSearch: Readonly<Record<string, unknown>> = pageSearchObject(context.url.searchParams);
     const route = match?.route;
     /** Aborted when this navigation is superseded before its commit, or by the next commit or dispose. */
     const routeWork = (): AbortSignal => {
@@ -733,6 +753,8 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     };
     const runSidecar = async (sidecar: ClientRoute | undefined, onLoaderError?: (error: unknown) => void): Promise<void> => {
       const validated = await validatePageInputs(sidecar, match!.params, pageSearchObject(context.url.searchParams));
+      routeParams = validated.params;
+      routeSearch = validated.search;
       loaderDraft = sidecar?.load ? stateStore.navigationDraft() : undefined;
       const routeContext = { ...context, match: match!, ...validated, state: loaderDraft?.state ?? stateStore };
       try {
@@ -834,6 +856,8 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         serverSharedState = payload.sharedState;
         serverData = payload.resources;
         props = payload.props;
+        routeParams = payload.props.params as Record<string, unknown>;
+        routeSearch = payload.props.search as Record<string, unknown>;
         head = payload.head;
       }
     } else {
@@ -841,6 +865,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       await runSidecar(sidecar);
     }
     if (context.signal.aborted || disposed) return;
+    const target = routeSnapshot(context.url, route?.id ?? null, routeParams, routeSearch, true);
     const retained = Math.min(context.retainedLayouts, layouts.length);
     let next = await createTree(route ? route.layouts : appError!.layouts, props, options.loadPage, retained, errorPage ?? route!.file);
     if (context.signal.aborted || disposed) return;
@@ -854,7 +879,11 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       const preview = loaderDraft ? loaderDraft.state.snapshot() : { ...serverSharedState, ...stateStore.snapshot() };
       await renderWithSuspense(() => {
         scope.beginPass();
-        return runDry(() => withResourceScope(scope, () => withStateStore(new StateStore(preview), () => tree.component.renderWithState({}))));
+        return runDry(() => withResourceScope(scope, () => withStateStore(new StateStore(preview), () => {
+          // The dry pass already sees the route it is loading, as the commit will.
+          provideRoute(fixedRoute(target));
+          return tree.component.renderWithState({});
+        })));
       }, { signal: context.signal });
       return scope;
     };
@@ -885,13 +914,16 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       if (retained) {
         const outlet = layouts[retained - 1]!.outlet;
         const previous = outlet.value;
+        const previousRoute = committedRoute.current();
+        // One batch, outlet first: the outlet releases the previous page before any effect
+        // that reads the route runs, and the new page renders with the new route.
         try {
-          withStateStore(stateStore, () => { outlet.value = next.component; });
+          withStateStore(stateStore, () => batch(() => { outlet.value = next.component; committedRoute.set(target); }));
         } catch (error) {
           // The outlet binding restores and rehydrates its previous page; only
           // a failed restoration leaves a region that needs a full reload.
           if (hasRegionRecoveryFailure(error)) recoverCommitFailure(error);
-          try { withStateStore(stateStore, () => { outlet.value = previous; }); }
+          try { withStateStore(stateStore, () => batch(() => { outlet.value = previous; committedRoute.set(previousRoute); })); }
           catch (restoreError) { recoverCommitFailure(new AggregateError([error, restoreError], "Meeko navigation could not restore the previous outlet")); }
           throw error;
         }
@@ -899,7 +931,12 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         stableUrl = context.url.href;
         return;
       }
-      const rendered = withStateStore(stateStore, () => next.component.renderWithState({}));
+      // A new tree reads its own route; the previous one keeps its values until it is released.
+      const nextRoute = liveRoute(target);
+      const rendered = withStateStore(stateStore, () => {
+        provideRoute(nextRoute.state);
+        return next.component.renderWithState({});
+      });
       // Hydrate the next view after the committed one, between private markers,
       // so a failure leaves the visible route and its bindings untouched.
       const document = options.root.ownerDocument;
@@ -909,7 +946,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       let nextRelease: () => void;
       try {
         options.root.insertBefore(parseRegionHtml(options.root, rendered.html), end);
-        nextRelease = hydrateApp(() => next.component.hydrateScope({ root: options.root, start, end }, {}, rendered.state));
+        nextRelease = hydrateApp(nextRoute.state, () => next.component.hydrateScope({ root: options.root, start, end }, {}, rendered.state));
       } catch (error) {
         for (let node: ChildNode | null = start; node;) {
           const following: ChildNode | null = node === end ? null : node.nextSibling;
@@ -920,6 +957,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       }
       const previousRelease = release;
       release = nextRelease;
+      committedRoute = nextRoute;
       layouts = next.layouts;
       stableUrl = context.url.href;
       while (options.root.firstChild && options.root.firstChild !== start) options.root.firstChild.remove();
@@ -958,7 +996,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     try { return await renderRoute(context, initialLoad); }
     finally { if (token === navigationCount) pending.value = false; }
   };
-  const navigator = createAppNavigator(options.routes, run, browser, observeNavigationError, appError ? { layouts: appError.layouts, render: run } : undefined);
+  const navigator = createAppNavigator(options.routes, run, browser, observeNavigationError, appError ? { layouts: appError.layouts, render: run } : undefined, syncFragment);
   const onClick = (event: MouseEvent) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const target = event.target;

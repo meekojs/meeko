@@ -47,17 +47,17 @@ test("discovers API methods and RPC procedures and dispatches path parameters", 
 test("rejects ambiguous API URL and generated client names", async (t) => {
   const rootApi = await fixture(t, ["api/index.get.ts"]);
   await assert.rejects(discoverServerManifest(rootApi.root), (error: unknown) => {
-    assert.match(String(error), /cannot target \/api/);
+    assert.match(String(error), /no puede atender \/api/);
     assert.match(String(error), /api[\\/]index\.get\.ts/);
     return true;
   });
   const ambiguous = await fixture(t, ["api/users/[id].get.ts", "api/users/[slug].get.ts"]);
-  await assert.rejects(discoverServerManifest(ambiguous.root), /API route collision/);
+  await assert.rejects(discoverServerManifest(ambiguous.root), /Colisión de rutas de API/);
   const client = await fixture(t, ["api/users/[id].get.ts", "api/users/byId.get.ts"]);
-  await assert.rejects(discoverServerManifest(client.root), /API client name collision/);
+  await assert.rejects(discoverServerManifest(client.root), /Colisión de nombres del cliente de API/);
   const nestedApi = await fixture(t, ["api/users/index.get.ts", "api/users/get.post.ts"]);
   await assert.rejects(discoverServerManifest(nestedApi.root), (error: unknown) => {
-    assert.match(String(error), /API client name collision/);
+    assert.match(String(error), /Colisión de nombres del cliente de API/);
     assert.match(String(error), /users[\\/]index\.get\.ts/);
     assert.match(String(error), /users[\\/]get\.post\.ts/);
     assert.match(String(error), /users\.get(?:\.post)?/);
@@ -65,7 +65,7 @@ test("rejects ambiguous API URL and generated client names", async (t) => {
   });
   const nestedRpc = await fixture(t, ["rpc/users.ts", "rpc/users/get.ts"]);
   await assert.rejects(discoverServerManifest(nestedRpc.root), (error: unknown) => {
-    assert.match(String(error), /RPC collision/);
+    assert.match(String(error), /Colisión de procedimientos RPC/);
     assert.match(String(error), /rpc[\\/]users\.ts/);
     assert.match(String(error), /rpc[\\/]users[\\/]get\.ts/);
     assert.match(String(error), /users(?:\.get)?/);

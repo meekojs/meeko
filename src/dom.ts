@@ -1,4 +1,4 @@
-import { batch, createRoot, currentEffectOwner, effect, finishWithCleanup, isWritableSignal, signal, switchOwner, untrack } from "./reactivity.js";
+import { batch, createRoot, currentEffectOwner, effect, effectInOrder, finishWithCleanup, isWritableSignal, reserveUpdateOrder, signal, switchOwner, untrack } from "./reactivity.js";
 import { observeCallback } from "./error-observer.js";
 import { componentErrorReporter } from "./component-errors.js";
 import type { EffectSource, Signal } from "./reactivity.js";
@@ -352,6 +352,8 @@ const deferredAttempts = 3;
  * binding first cancels the load; a failure goes to the nearest error handler.
  */
 export function bindComponent<Props extends object>(scope: DomScope, id: number, input: ComponentModule<Props> | (() => ComponentModule<Props>), read: () => Props, location: string, expose?: (value: unknown, hydrated?: boolean) => void): () => void {
+  // The child hydrates first; its props still update before the child reacts on its own.
+  const order = reserveUpdateOrder();
   let inner: DomScope;
   let state: Record<string, unknown> | undefined;
   try {
@@ -411,7 +413,7 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
   let stop = () => {};
   let first = true;
   // The onMounted callbacks of a new child run once the whole update has finished.
-  stop = effect(() => mountBatch(() => {
+  stop = effectInOrder(order, () => mountBatch(() => {
     const nextComponent = resolveComponent();
     const next = read();
     // The first run reads the props again only to track them. An inline callback such as
@@ -621,6 +623,20 @@ function editedControl(target: Element, kind: NativeModelKind): boolean {
   return control.value !== control.defaultValue;
 }
 
+/** `<input>` types without a text value; a text `model` cannot bind them. */
+const nonTextInputTypes = new Set(["checkbox", "radio", "file", "submit", "reset", "button", "image"]);
+
+/**
+ * The error of a text `model` whose `<input>` has a type without a text value. The compiler only
+ * allows text-like static types, so this happens when `bind:type` switches to one of them.
+ */
+function textModelTypeError(target: Element): TypeError | undefined {
+  if (target.localName !== "input") return undefined;
+  const type = (target as HTMLInputElement).type;
+  if (!nonTextInputTypes.has(type)) return undefined;
+  return new TypeError(`Meeko model on <input bind:type> binds a text value, so type "${type}" is not supported; use a separate <input type="${type}"> with its own model`);
+}
+
 /** Writes a model value into the live state of its control. */
 function applyModel(target: Element, kind: NativeModelKind, value: unknown, radioValue: string | undefined): void {
   if (kind === "checkbox") syncFormState(target, "checked", value ? "" : null);
@@ -648,7 +664,8 @@ function readControl(target: Element, kind: NativeModelKind, model: { value: unk
  * event writes the signal. A control edited before hydration keeps the user's value and writes it
  * to the signal once the hydration batch ends (`afterMountBatch`), before `onMounted`, so the
  * regions that read the signal hydrate against the SSR value first. `radio` reads the value of the
- * radio, from its attribute or `bind:value`.
+ * radio, from its attribute or `bind:value`. A text model on `<input bind:type>` keeps text
+ * semantics whatever the type; a type without a text value (checkbox, radio, file…) is an error.
  */
 export function bindModel<K extends NativeModelKind>(scope: DomScope, id: number, kind: K, read: () => { value: NativeModelValues[K] }, radioValue?: () => unknown): () => void {
   const target = findElement(scope, `data-meeko-m-${id}`);
@@ -659,11 +676,21 @@ export function bindModel<K extends NativeModelKind>(scope: DomScope, id: number
     return model;
   };
   let model = untrack(writable);
+  // A text model on `<input bind:type>`: a type without a text value fails the hydration, and
+  // later reports to the error observer, leaving the signal and the control as they are.
+  const typeError = (): TypeError | undefined => kind === "text" ? textModelTypeError(target) : undefined;
+  const initialError = typeError();
+  if (initialError) throw initialError;
+  const readModel = (): void => {
+    const error = typeError();
+    if (error) throw error;
+    readControl(target, kind, model);
+  };
   const edited = editedControl(target, kind);
   // Writing the restored value mid-hydration would change regions that have not hydrated yet;
   // it reaches the signal once the whole hydration batch has finished.
   const cancelRead = edited
-    ? afterMountBatch(() => observeCallback(() => readControl(target, kind, model), report))
+    ? afterMountBatch(() => observeCallback(readModel, report))
     : () => {};
   let first = true;
   const stop = effect(() => {
@@ -675,10 +702,12 @@ export function bindModel<K extends NativeModelKind>(scope: DomScope, id: number
       first = false;
       if (edited) return;
     }
-    applyModel(target, kind, value, option);
+    const error = typeError();
+    if (error) report(error);
+    else applyModel(target, kind, value, option);
   });
   const event = kind === "text" ? "input" : "change";
-  const listener = (): void => observeCallback(() => readControl(target, kind, model), report);
+  const listener = (): void => observeCallback(readModel, report);
   target.addEventListener(event, listener);
   return () => {
     cancelRead();
@@ -695,11 +724,13 @@ export function renderIf(id: number, condition: unknown, render: () => string): 
 /** Hidrata una condición y conserva los nodos mientras sigue siendo verdadera. */
 export function bindIf(scope: DomScope, id: number, read: () => unknown, render: () => string, hydrate: (inner: DomScope) => () => void): () => void {
   const inner = region(scope, "if", id);
+  // Its content hydrates first; the condition still updates before that content does.
+  const order = reserveUpdateOrder();
   let active = Boolean(read());
   if (!active && inner.start?.nextSibling !== inner.end) throw new Error(`Hydration mismatch in condition ${id}`);
   let release = active ? hydrate(inner) : undefined;
   let stop = () => {};
-  stop = effect(() => mountBatch(() => {
+  stop = effectInOrder(order, () => mountBatch(() => {
     const next = Boolean(read());
     if (next === active) return;
     if (next) {
@@ -920,6 +951,8 @@ function stableListPositions(indices: readonly number[]): Set<number> {
  */
 export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>, keyOf: (item: T, index: number) => string | number, render: (item: T, index: number) => string, hydrate: (item: Signal<T>, index: Signal<number>, inner: DomScope) => () => void, trackIndex = true): () => void {
   const outer = region(scope, "for", id);
+  // The rows hydrate first; the list still updates (and drops rows) before their bindings run.
+  const order = reserveUpdateOrder();
   const entries = new Map<string, ListEntry<T>>();
   const initial = [...read()];
   let currentKeys: string[] = [];
@@ -953,7 +986,7 @@ export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>,
   }
   let initialItems: T[] | undefined = initial;
   let stop = () => {};
-  stop = effect(() => mountBatch(() => {
+  stop = effectInOrder(order, () => mountBatch(() => {
     const items = [...read()];
     if (initialItems) {
       const previous = initialItems;

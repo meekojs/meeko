@@ -16,10 +16,10 @@ export default defineSocketChannel({
       await new Promise((resolve) => setTimeout(resolve, payload.delay));
       await emit("ack", { n: payload.n });
     },
-    // Publishes to another room, which may live in another instance or Durable Object.
-    relay: async ({ payload, context }) => {
-      const { pubsub } = context.services as { pubsub: SocketPubSub };
-      await pubsub.publish("room", payload.room, { event: "said", payload: { text: payload.text } });
+    // Publishes to another room, which may live in another instance or Durable Object,
+    // through the generated server `socket`, bound to the hub that runs this handler.
+    relay: async ({ payload }) => {
+      await socket.room.broadcast(payload.room, "said", { text: payload.text });
     },
   },
 });

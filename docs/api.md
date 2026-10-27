@@ -11,7 +11,7 @@ Un componente contiene un `<template>` (sin él, `MEEK007`) y, normalmente, un `
 El nivel superior del `<script>` es el setup del componente y sólo admite estas sentencias:
 
 - `import` y `export type`, `interface` y `type`;
-- `const`/`let` con **una** variable y un nombre simple por sentencia (`MEEK014`). Desestructurar, como `const { a, b } = useX()`, no está permitido (`MEEK015`): guarde el resultado en una variable y lea sus campos (`const x = useX();` y después `x.a`), o devuelva señales individuales desde el composable;
+- `const`/`let` con **una** declaración por sentencia (`MEEK014`). Desde `1.2` la declaración puede desestructurar un objeto o un array, con valores por defecto, renombres y resto, como `const { toasts, dismiss } = useToasts()` (véase [Desestructuración en el script](#desestructuración-en-el-script));
 - declaraciones `function` con nombre;
 - llamadas como sentencia, por ejemplo `onCleanup(...)`, `onMounted(...)` o `effect(...)`;
 - `await` sobre los composables que lo admiten, como sentencia completa o inicializador completo (véase [Composables de nivel superior y `await`](#composables-de-nivel-superior-y-await)).
@@ -42,6 +42,29 @@ Cualquier otra sentencia de nivel superior (`if`, `for`, `try`, clases, `export 
 </template>
 ```
 
+### Desestructuración en el script
+
+Desde `1.2`, una declaración de nivel superior puede desestructurar un objeto o un array. Cada nombre es un enlace del setup como cualquier otro: lo ven la plantilla, `meeko check` y el editor.
+
+```html
+<script lang="ts">
+    const { toasts, dismiss } = useToasts()
+    const { title = 'Sin título', ...rest } = props.options
+    let [first, , ...others] = pair()
+</script>
+
+<template>
+    <p each:of="toasts.value" each:as="toast" each:index="index">
+        {toast.text} <button on:click="() => dismiss(index)">×</button>
+    </p>
+</template>
+```
+
+- **Estado.** Una señal desestructurada sigue siendo una señal, pero no entra en la captura de estado del componente: ni en la transferencia de SSR (`renderWithState`) ni en la que conserva HMR. Pertenece al composable o al store que la devolvió, que puede compartirla entre componentes o guardar valores que no son JSON. Si una señal es estado propio del componente, declárela con un nombre simple (`const count = signal(0)`), que sí se captura.
+- **Macros y refs.** `defineProps` y `useElementRef` necesitan un nombre simple: `const { title } = defineProps<Props>()` o `const { value } = useElementRef("input")` dan `MEEK015`; lea `props.title` o `input.value`. `defineEmits`, `defineModel` y `defineSnippets` siguen exigiendo su propia declaración `const` con nombre simple (`MEEK045`, `MEEK063`, `MEEK059`).
+- **Datos con `await`.** El resultado de `await useApi(...)` o `await useRpcQuery(...)` puede desestructurarse: `const { data, refresh } = await useApi("/api/users")`. `data` sigue siendo la señal del recurso, cuyos datos el framework ya envía en el payload.
+- **Tras el primer `await` de navegador.** Los nombres desestructurados después de `await useElementRef(...)` o `await useSocket(...)` sólo existen en el navegador, como los demás; la plantilla no puede leerlos (`MEEK057`).
+
 ### Valores por defecto en `defineProps`
 
 Los defaults están integrados en la misma macro; no se necesita `withDefaults`:
@@ -66,6 +89,20 @@ El argumento debe ser un **objeto literal con propiedades nombradas**. Los valor
 
 La plantilla acepta texto `{expression}`, eventos `on:event="handler"`, atributos dinámicos `bind:name="expression"`, condiciones `if:when="expression"`, referencias `ref:name`, modelos `model="signal"` (véase [Controles de formulario con `model`](#controles-de-formulario-con-model)), HTML sin escapar `html="expression"` (véase [HTML sin escapar con `html`](#html-sin-escapar-con-html)) y listas con `each:of`, `each:as` y, opcionalmente, `each:key`. `each:index` nombra el índice y su valor predeterminado es `index`. Las claves son cadenas o números finitos y deben ser únicas entre hermanos. Los atributos booleanos se agregan o eliminan según el valor de la expresión. En los controles de formulario, `bind:value` (en `input`, `textarea` y `select`), `bind:checked` (en `input`) y `bind:selected` (en `option`) actualizan también la propiedad del elemento, porque el navegador deja de leer el atributo en cuanto el usuario edita el control. El control refleja siempre el signal, así que el manejador de `input` debe guardar el texto tal cual (`value.value = event.currentTarget.value`) y convertirlo donde se use. Un `select multiple` no se sincroniza con `bind:value`.
 
+### Condiciones con `if:when` y tipos
+
+Desde `1.2`, `if:when` estrecha los tipos dentro de su elemento, como `v-if` en Vue: sus atributos, sus props, sus eventos y su contenido se comprueban sabiendo que la condición se cumple, en `meeko check` y en VS Code. No hace falta `!`:
+
+```html
+<p if:when="user.value">{user.value.name}</p>
+<WorkspaceHeader if:when="session.data.value.staff" bind:staff="session.data.value.staff" />
+```
+
+- TypeScript estrecha la misma referencia que comprueba la condición: `if:when="user.value"` estrecha `user.value.name`, pero no otra expresión que devuelva el mismo valor.
+- Alcanza a las condiciones y listas anidadas y al contenido de una etiqueta de componente (sus snippets). Un `each:as`, un `each:index` o un parámetro de snippet con el mismo nombre que una variable de la condición la oculta, y ahí no se estrecha.
+- Dentro de una función flecha escrita en la plantilla, como `on:click="() => save(user.value.id)"`, TypeScript no conserva el estrechamiento de una propiedad; extraiga el manejador a una función del script o compruebe el valor dentro de la función.
+- Sólo cambia la comprobación de tipos: en ejecución el contenido nunca se evalúa con la condición falsa.
+
 Una expresión de texto puede contener llaves propias de JavaScript: objetos literales (`{ { total: count.value }.total }`), plantillas literales con `${...}`, cadenas que incluyen `{` o `}`, comentarios y expresiones regulares. La expresión termina en la llave que equilibra la de apertura; si no existe, el compilador informa `MEEK010` en la llave de apertura. Los valores de directivas pueden escribirse sin comillas cuando HTML lo permite, por ejemplo `on:click=increment` o `each:of=items`; CLI y VS Code los ubican igual que los valores entre comillas.
 
 ### Controles de formulario con `model`
@@ -89,7 +126,7 @@ const tags = signal<string[]>([]);
 
 | Control | Propiedad y evento | Tipo de la señal |
 | --- | --- | --- |
-| `<input>` de texto (cualquier `type` salvo los siguientes) y `<textarea>` | `value`, en `input` | `string` |
+| `<input>` de texto (cualquier `type` salvo los siguientes, o `bind:type`) y `<textarea>` | `value`, en `input` | `string` |
 | `<input type="checkbox">` | `checked`, en `change` | `boolean` |
 | `<input type="radio">` | marcado si la señal vale su `value`; `change` escribe ese valor | `string \| null \| undefined` |
 | `<select>` | `value`, en `change` | `string` |
@@ -99,8 +136,22 @@ const tags = signal<string[]>([]);
 - **Señal escribible.** La expresión debe ser una señal escribible del tipo de la tabla. Un `computed`, una señal de sólo lectura o un valor normal es un error de tipos, y en ejecución lanza un `TypeError`.
 - **Sincronización.** Asignar la señal desde código actualiza la propiedad viva del control, como `bind:value` desde `1.0.1`. En SSR, el HTML lleva el valor de la señal (`value`, `checked`, el contenido del `<textarea>` o el `selected` de cada `<option>`). Si el usuario edita el control antes de que la página se hidrate (o el navegador restaura su valor), se conserva lo que escribió y se copia a la señal al terminar la hidratación, antes de los `onMounted`: las regiones `if:`, `each:`, `<render>` y los padres que leen la señal se hidratan primero con el valor del SSR y después reaccionan al valor restaurado.
 - **Radio.** Necesita `value="..."` o `bind:value="expression"`.
+- **`type` dinámico.** Desde `1.2`, `model` admite `bind:type` en `<input>` y trata el control siempre como uno de texto: `value`, en `input`, con una señal `string`, también cuando el tipo cambia. Sirve, por ejemplo, para un campo de contraseña que muestra su texto:
 
-`MEEK065` señala los usos no admitidos: `model` en un elemento que no es `<input>`, `<textarea>` o `<select>`; en `<input type="file">`, `submit`, `reset`, `button` o `image`; con `bind:type` o `bind:multiple` en lugar de valores estáticos; con contenido en `<textarea model>`; junto a `value`, `bind:value` u `on:input` en un control de texto (o `checked`, `bind:checked` u `on:change` en uno marcable, y `value`, `bind:value` u `on:change` en un `<select>`); un segundo `model` o `model:nombre`, que es sólo para componentes. Los demás eventos `on:` se admiten.
+  ```html
+  <script lang="ts">
+  const password = signal("");
+  const revealed = signal(false);
+  </script>
+  <template>
+      <input bind:type="revealed.value ? 'text' : 'password'" model="password" autocomplete="current-password">
+      <button type="button" on:click="() => revealed.value = !revealed.value">Mostrar</button>
+  </template>
+  ```
+
+  `bind:type` sólo puede dar tipos de texto (`text`, `password`, `email`, `search`, `number`…). Con `checkbox`, `radio`, `file`, `submit`, `reset`, `button` o `image`, que no tienen un valor de texto, el modelo no cambia ni la señal ni el control: si el control ya tiene ese tipo al hidratarse, la hidratación lanza un `TypeError`; si lo toma después, cada lectura o escritura del modelo entrega un `TypeError` al observador de errores más cercano (véase `provideErrorHandler`). Para un checkbox o un radio, use otro `<input>` con su `type` estático.
+
+`MEEK065` señala los usos no admitidos: `model` en un elemento que no es `<input>`, `<textarea>` o `<select>`; en `<input type="file">`, `submit`, `reset`, `button` o `image`; con `bind:type` y además `type="..."` en el mismo `<input>`; con `bind:multiple` en lugar de `multiple` estático; con contenido en `<textarea model>`; junto a `value`, `bind:value` u `on:input` en un control de texto (o `checked`, `bind:checked` u `on:change` en uno marcable, y `value`, `bind:value` u `on:change` en un `<select>`); un segundo `model` o `model:nombre`, que es sólo para componentes. Los demás eventos `on:` se admiten.
 
 ### HTML sin escapar con `html`
 
@@ -147,7 +198,7 @@ Use `each:key` cuando la lista cambia de orden o recibe elementos en medio y cad
 
 Un compuesto que contiene `:global(...)` no se limita; el atributo se añade al último compuesto local del selector, y un selector completamente global no lo recibe. `:global` sin paréntesis o vacío, una lista de selectores dentro de `:global(...)` y un `:global(...)` anidado en otra pseudoclase, como `:not(...)`, fallan con `MEEK019` en su posición. Las reglas dentro de `@keyframes` no se modifican.
 
-CLI y VS Code comprueban el tipo del evento que recibe `on:event` y que `each:key` devuelve `string | number`; ambos ubican el diagnóstico en la expresión de la plantilla. Los eventos conocidos usan su tipo de `GlobalEventHandlersEventMap` y los demás reciben `Event`. El documento virtual de VS Code aplica las mismas opciones estrictas de acceso indexado, props opcionales exactas e imports de tipo que `meeko check`.
+CLI y VS Code comprueban el tipo del evento que recibe `on:event` y que `each:key` devuelve `string | number`; ambos ubican el diagnóstico en la expresión de la plantilla. Desde `1.2`, en un elemento HTML el evento tiene el tipo de `HTMLElementEventMap` (`SVGElementEventMap` dentro de `<svg>`) para su nombre, como `KeyboardEvent` en `on:keydown` o `PointerEvent` en `on:pointerdown`, y `Event` si el nombre no está en el mapa (antes sólo se tipaban `click`, `input`, `change`, `submit`, `keydown`, `keyup`, `focus` y `blur`). Además, `event.currentTarget` tiene el tipo del elemento de la etiqueta, el mismo que da `ref:` (`HTMLInputElement` en `<input>`, `HTMLSelectElement` en `<select>`, `HTMLElement` en un elemento personalizado), así que `on:input="(event) => query.value = event.currentTarget.value"` y `on:change="(event) => accepted.value = event.currentTarget.checked"` se comprueban sin conversiones; una propiedad que el elemento no tiene sigue siendo un error. `event.target` conserva el tipo `EventTarget | null`, porque puede ser un descendiente. En una etiqueta de componente, `on:evento` es una prop de callback y recibe los argumentos de su `defineEmits`. El documento virtual de VS Code aplica las mismas opciones estrictas de acceso indexado, props opcionales exactas e imports de tipo que `meeko check`.
 
 `each:index` tiene tipo `number` tanto en el componente compilado como en el documento virtual de VS Code; no se infiere como el literal inicial `0`.
 
@@ -203,6 +254,7 @@ Desde `1.1`, una etiqueta cuyo nombre empieza por mayúscula es un componente: `
 - Su contenido son snippets del hijo (véase [Snippets](#snippets-con-definesnippets)). Pasar contenido a un componente sin `defineSnippets` es un error de tipos. `MEEK049`, que rechazaba cualquier contenido, ya no se emite.
 - Un cierre `</AppButton>` sin apertura da `MEEK008`, y una etiqueta de componente fuera de `<template>`, `<script>` y `<style>` da `MEEK002`.
 - Los nombres en mayúscula no se confunden con elementos HTML: `<Table>`, `<Input>` o `<Title>` son componentes.
+- Desde `1.2`, una prop opcional del hijo (`error?: string`) acepta también `undefined` en la etiqueta, como `bind:error="failed.value ? 'Obligatorio' : undefined"`, aunque el proyecto use `exactOptionalPropertyTypes`: para Meeko pasar `undefined` equivale a no pasar la prop, y si la prop tiene default en `defineProps` el hijo recibe el default. Las props obligatorias siguen rechazando `undefined` y una prop desconocida sigue siendo un error.
 
 Use `<component is="expression">` cuando el componente se elige con una expresión, como `props.outlet` o `props.content`; para un componente fijo, la etiqueta es más corta. El editor completa los nombres tras `<` y lleva de la etiqueta al archivo `.meeko`.
 
@@ -415,7 +467,7 @@ Con `users` de tipo `Signal<User[]>`, `T` es `User`. Con ese `T` se comprueban e
 
 ### Composables de nivel superior y `await`
 
-`useElementRef`, `useApi`, `useRpcQuery` y `useRpcMutation` sólo se llaman en el nivel superior del `<script>`; dentro de una función, un handler, un `effect` o `onMounted` dan `MEEK054`. `useState`, `useSocket`, `useSocketClient` y `useNavigation` mantienen su comportamiento de `1.0` y pueden llamarse también desde código anidado. `useApi`, `useRpcQuery` y `useRpcMutation` pertenecen al framework y se describen en [framework.md](framework.md#datos-en-componentes-useapi-userpcquery-y-userpcmutation).
+`useElementRef`, `useApi`, `useRpcQuery` y `useRpcMutation` sólo se llaman en el nivel superior del `<script>`; dentro de una función, un handler, un `effect` o `onMounted` dan `MEEK054`. `useState`, `useSocket`, `useSocketClient` y `useNavigation` mantienen su comportamiento de `1.0` y pueden llamarse también desde código anidado, igual que `useRoute` (véase [Ruta actual](framework.md#ruta-actual)). `useApi`, `useRpcQuery` y `useRpcMutation` pertenecen al framework y se describen en [framework.md](framework.md#datos-en-componentes-useapi-userpcquery-y-userpcmutation).
 
 El setup sigue siendo síncrono, con una excepción: admite `await` de nivel superior sólo sobre estos composables, y de dos clases.
 

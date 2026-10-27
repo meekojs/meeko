@@ -18,6 +18,8 @@ import { deferredSettle, deferredSource, extractDeferred } from "./deferred.js";
 import type { DeferredInternals, DeferredOutcome } from "./deferred.js";
 import { matchRoute, provideServerRouteManifest } from "./router.js";
 import { providePageScope } from "./page-body.js";
+import { fixedRoute, provideRoute, routeSnapshot } from "./navigation.js";
+import type { RouteSnapshot } from "./navigation.js";
 import type { PageRequest } from "./page-body.js";
 import type { ErrorPageRecord, RouteRecord } from "./router.js";
 
@@ -316,9 +318,12 @@ async function renderPageTree(
   module: PageModule,
   input: Record<string, unknown>,
   initial: StateStore,
+  route: RouteSnapshot,
   signal?: AbortSignal,
 ): Promise<{ rendered: { html: string; state: Record<string, unknown> }; store: StateStore; resources: Record<string, unknown> | undefined; styles: string[] }> {
   const scope = new ResourceScope("collect", {}, signal);
+  // useRoute() in the page, its layouts and app.meeko reads the route of this request.
+  const routeState = fixedRoute(route);
   let baseline: Record<string, unknown> | undefined;
   let store = initial;
   // The CSS of the child components of the last pass, the one whose HTML the document sends.
@@ -328,7 +333,10 @@ async function renderPageTree(
     else baseline = initial.snapshot();
     scope.beginPass();
     styles.clear();
-    return collectStyles(styles, () => withResourceScope(scope, () => withStateStore(store, () => module.renderWithState(input))));
+    return collectStyles(styles, () => withResourceScope(scope, () => withStateStore(store, () => {
+      provideRoute(routeState);
+      return module.renderWithState(input);
+    })));
   }, signal ? { signal } : {});
   const used = scope.usedData();
   return { rendered, store, resources: Object.keys(used).length ? used : undefined, styles: [...styles] };
@@ -531,6 +539,8 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     let requestContext: RequestContext | undefined;
     /** The request state of the render that completed; a suspended pass replaces it. */
     let pageStore = stateStore;
+    /** The route of `useRoute()`; validation replaces the raw parameters with the page's. */
+    let route: RouteSnapshot | undefined;
     const finish = (response: Response): Response => {
       const headers = new Headers(response.headers);
       headers.set("x-request-id", requestContext?.requestId ?? fallbackRequestId);
@@ -543,6 +553,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     try {
     const url = new URL(request.url);
     const match = matchRoute(options.routes, url.pathname);
+    route = routeSnapshot(url, match?.route.id ?? null, match ? match.params : {}, pageSearchObject(url.searchParams), false);
     const errorPage = options.errorPage;
     if (!match && !(errorPage && wantsPage(request, url.pathname))) return finish(new Response("Not Found", {
       status: 404, headers: { "cache-control": "no-store" },
@@ -558,7 +569,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
         const page = await options.loadPage(errorPage!.file);
         if (page.css) styles.push(page.css);
         const { module, input } = await wrapInLayouts(options.loadPage, page, { ...notFoundProps }, errorPage!.layouts, styles);
-        const { rendered, store, resources, styles: childStyles } = await renderPageTree(module, input, stateStore, request.signal);
+        const { rendered, store, resources, styles: childStyles } = await renderPageTree(module, input, stateStore, route!, request.signal);
         styles.push(...childStyles);
         pageStore = store;
         store.seal();
@@ -602,6 +613,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     const renderMode = routeRender(match.route, sidecar);
     const clientPage = renderMode === "client";
     const validated = await validatePageInputs(sidecar, match.params, pageSearchObject(url.searchParams));
+    route = routeSnapshot(url, match.route.id, validated.params, validated.search, false);
     // Client disconnect, session revocation, a cancelled stream or a HEAD
     // response: the loader and its deferred work stop being awaited.
     const driverSignal = AbortSignal.any([requestContext?.signal ?? request.signal, deferredWork.signal]);
@@ -661,7 +673,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     }
     const { module, input } = await wrapInLayouts(options.loadPage, page, clientPage ? {} : props, match.route.layouts, styles);
     // Top-level data awaits load before the HTML, also before the first byte of a stream.
-    const { rendered, store, resources, styles: childStyles } = await renderPageTree(module, input, stateStore, driverSignal);
+    const { rendered, store, resources, styles: childStyles } = await renderPageTree(module, input, stateStore, route, driverSignal);
     // Child components link their CSS in the document too, not only once the client bundle loads.
     styles.push(...childStyles);
     pageStore = store;
@@ -761,7 +773,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
             // A failure after the render sealed the page state still renders its error page.
             const { rendered: errorRendered } = await renderPageTree(errorPage, {
               status: known.status, message: known.status >= 500 ? "Internal Server Error" : known.code,
-            }, pageStore.sealed ? new StateStore() : pageStore, request.signal);
+            }, pageStore.sealed ? new StateStore() : pageStore, route!, request.signal);
             const host = documentParts(options.document, request);
             const document = `<!doctype html><html><head><meta charset="utf-8"><title>${ERROR_PAGE_TITLE}</title>${host.head}</head><body><div id="app">${errorRendered.html}</div>${host.bodyEnd}</body></html>`;
             return finish(new Response(request.method === "HEAD" ? null : document, {

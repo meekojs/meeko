@@ -1,11 +1,24 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createRequestContext, type RequestContext } from "./context.js";
 import { ApiError, normalizeServerError, observeErrorCallback, SessionRevokedError, type Schema } from "./contracts.js";
 import { serializeJson } from "../server.js";
 import type { SessionHandle, SessionManager } from "./sessions.js";
 import type { ServerPlatform } from "./platform.js";
+import type { SocketClient, SocketContract } from "../framework/socket.js";
 
 type Output<S> = S extends Schema<unknown, infer O> ? O : never;
 type SchemaMap = Readonly<Record<string, Schema>>;
+type SchemaInput<T> = T extends { readonly "~standard": { readonly types?: infer U } }
+  ? NonNullable<U> extends { readonly input: infer I } ? I : never
+  : T extends Schema<infer I, unknown> ? I : never;
+
+/** The hub of the application whose request or Socket handler is running. */
+const activeHub = new AsyncLocalStorage<SocketHub>();
+
+/** Binds `socket.<channel>.broadcast` of generated server clients to `hub` across async work. */
+export function withSocketHub<T>(hub: SocketHub, run: () => T): T {
+  return activeHub.run(hub, run);
+}
 
 /**
  * Conexión WebSocket ya aceptada por el adaptador, tal como la ve el hub.
@@ -393,7 +406,7 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
       catch { /* Logging cannot interrupt delivery to other peers. */ }
     }
   };
-  return {
+  const hub: SocketHub = {
     async preflight(name, request, roomId) { await authorizeHandshake(name, request, roomId); },
     async accept(name: string, request: Request, peer: SocketPeer, roomId?: string): Promise<SocketConnection> {
       const { definition, services, session } = await authorizeHandshake(name, request, roomId);
@@ -547,7 +560,8 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
           if (definition.authorizeEvent && !(await definition.authorizeEvent({ event, payload, context: eventContext, ...(roomId === undefined ? {} : { roomId }) }))) throw new ApiError("FORBIDDEN", 403);
           const handler = definition.handlers?.[event];
           if (!handler) throw new ApiError("UNHANDLED_SOCKET_EVENT", 404);
-          await handler({ payload, context: eventContext, ...(roomId === undefined ? {} : { roomId }), emit });
+          // A handler can broadcast to its own or another room with the generated server `socket`.
+          await withSocketHub(hub, () => handler({ payload, context: eventContext, ...(roomId === undefined ? {} : { roomId }), emit }));
         },
       };
     },
@@ -561,4 +575,137 @@ export function createSocketHub<TServices>(options: SocketHubOptions<TServices>)
       await pubsub.publish(name, roomId, { event, payload: checked });
     },
   };
+  return hub;
+}
+
+/**
+ * Broadcast tipado de un canal Socket desde el servidor, que añade el registro `socket` de los
+ * clientes de servidor generados (desde `1.2`).
+ *
+ * @typeParam C Contrato público del canal.
+ * @since 1.2.0
+ * @example
+ * ```ts
+ * import type { SocketBroadcaster } from "@meekojs/meeko/server";
+ *
+ * declare const kitchen: SocketBroadcaster<typeof socketContracts.operations>;
+ * await kitchen.broadcast("store-12", "kitchenChanged", { orderId: "A-31", status: "ready" });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#broadcast-desde-el-servidor
+ */
+export interface SocketBroadcaster<C extends SocketContract> {
+  /**
+   * Publica `event` en la sala `roomId` del canal con las mismas comprobaciones que
+   * `hub.broadcast`: rechaza con `UNKNOWN_SOCKET_EVENT` (404), `INVALID_SOCKET_PAYLOAD` (400) o
+   * `SOCKET_LIMIT_EXCEEDED` (413) antes de publicar, y se resuelve cuando el broker acepta el
+   * mensaje. Las conexiones sin sala usan `""`.
+   */
+  broadcast<K extends keyof C["serverToClient"] & string>(roomId: string, event: K, payload: SchemaInput<C["serverToClient"][K]>): Promise<void>;
+}
+
+/**
+ * Registro `socket` de los clientes de servidor generados (`clients.server.ts`): por cada canal,
+ * el mismo tipo que en el navegador más `broadcast` (desde `1.2`). En el servidor los miembros del
+ * cliente (`on`, `emit`, `state`, `close`) lanzan un error, porque no hay conexión durante SSR.
+ *
+ * @typeParam C Contratos públicos por nombre de canal.
+ * @since 1.2.0
+ * @example
+ * ```ts
+ * import { createServerSocketRegistry } from "@meekojs/meeko/server";
+ * import type { ServerSocketRegistry } from "@meekojs/meeko/server";
+ * import { socketContracts } from "./socket-contracts.js";
+ *
+ * export const socket: ServerSocketRegistry<typeof socketContracts> = createServerSocketRegistry(socketContracts);
+ * ```
+ */
+export type ServerSocketRegistry<C extends Record<string, SocketContract>> = {
+  readonly [K in keyof C]: SocketClient<C[K]> & SocketBroadcaster<C[K]>;
+};
+
+/**
+ * Opciones de {@link createServerSocketRegistry}.
+ *
+ * @since 1.2.0
+ * @example
+ * ```ts
+ * import { createServerSocketRegistry } from "@meekojs/meeko/server";
+ * import type { ServerSocketRegistryOptions } from "@meekojs/meeko/server";
+ *
+ * const options: ServerSocketRegistryOptions = { hub: () => app.socket?.hub };
+ * const socket = createServerSocketRegistry(socketContracts, options);
+ * ```
+ */
+export interface ServerSocketRegistryOptions {
+  /**
+   * Hub al que publica `broadcast`, o una función que lo devuelve en cada llamada. Sin él, se usa
+   * el de la aplicación que atiende la petición o el handler de Socket en curso; sirve para el
+   * trabajo que empieza fuera de ellos, como una tarea programada al arrancar.
+   */
+  readonly hub?: SocketHub | (() => SocketHub | undefined);
+}
+
+const ssrUnavailable = (): never => { throw new Error("Socket connections are unavailable during SSR"); };
+
+/**
+ * Crea el registro `socket` de los clientes de servidor: cada canal ofrece
+ * `broadcast(roomId, event, payload)`, tipado por su contrato público y validado por el hub con la
+ * definición del canal. Sin `options.hub`, publica en el hub de la aplicación de la petición HTTP
+ * (API, RPC, páginas y middleware, también su trabajo asíncrono, como `platform.waitUntil`) o del
+ * handler de Socket en curso. Los clientes generados lo usan para el autoimport `socket` de
+ * servidor.
+ *
+ * @param contracts Contratos públicos por nombre de canal.
+ * @param options Hub explícito para el trabajo fuera de una petición.
+ * @returns El registro tipado.
+ * @throws {Error} Desde `broadcast`, sin `options.hub` y fuera de una petición o de un handler de
+ * Socket de una aplicación con canales.
+ * @since 1.2.0
+ * @example
+ * ```ts
+ * // server/api/orders/[id]/ready.post.ts, con el autoimport `socket` de servidor
+ * import { defineApiRoute } from "@meekojs/meeko/server";
+ * import { orderParams, orderSchema } from "../../../../shared/schemas/order.js";
+ * import { markReady } from "../../../utils/orders.js";
+ *
+ * export default defineApiRoute({
+ *   params: orderParams,
+ *   response: orderSchema,
+ *   handler: async ({ params }) => {
+ *     const order = await markReady(params.id);
+ *     await socket.operations.broadcast(order.storeId, "kitchenChanged", { orderId: order.id, status: "ready" });
+ *     return order;
+ *   },
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#broadcast-desde-el-servidor
+ */
+export function createServerSocketRegistry<C extends Record<string, SocketContract>>(contracts: C, options: ServerSocketRegistryOptions = {}): ServerSocketRegistry<C> {
+  const resolveHub = (name: string): SocketHub => {
+    const explicit = typeof options.hub === "function" ? options.hub() : options.hub;
+    const hub = explicit ?? activeHub.getStore();
+    if (!hub) {
+      throw new Error(`socket.${name}.broadcast() requires an active Meeko request or Socket handler of an application with Socket channels; `
+        + "outside them, pass the application's hub with createServerSocketRegistry(contracts, { hub: () => app.socket?.hub })");
+    }
+    return hub;
+  };
+  const result: Record<string, unknown> = Object.create(null);
+  for (const name of Object.keys(contracts)) {
+    const channel = Object.create(null, {
+      state: { get: ssrUnavailable, enumerable: true },
+      on: { value: ssrUnavailable, enumerable: true },
+      emit: { value: ssrUnavailable, enumerable: true },
+      close: { value: ssrUnavailable, enumerable: true },
+      broadcast: {
+        enumerable: true,
+        value: async (roomId: string, event: string, payload: unknown): Promise<void> => {
+          if (typeof roomId !== "string") throw new TypeError("Socket broadcast requires a room ID string");
+          await resolveHub(name).broadcast(name, roomId, event, payload);
+        },
+      },
+    }) as object;
+    Object.defineProperty(result, name, { value: Object.freeze(channel), enumerable: true });
+  }
+  return Object.freeze(result) as ServerSocketRegistry<C>;
 }

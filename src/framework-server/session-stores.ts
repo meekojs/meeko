@@ -266,6 +266,8 @@ export interface SqlSessionStoreOptions {
 /**
  * Store de sesiones SQL genérico y persistente: la aplicación aporta las sentencias mediante su
  * driver. Las filas caducadas se borran al leerlas. No notifica revocaciones a otras instancias.
+ * La duración propia de cada sesión (`SessionRecord.ttlMs`) se deduce de `expiresAt - createdAt`,
+ * sin columna adicional.
  *
  * @typeParam T Datos de la aplicación en la sesión.
  * @example
@@ -292,7 +294,13 @@ export class SqlSessionStore<T = unknown> implements SessionStore<T> {
     const row = await this.driver.read(id);
     if (!row) return undefined;
     if (row.id !== id || typeof row.dataJson !== "string" || typeof row.familyId !== "string" || !row.familyId) throw new Error("Session SQL schema requires a nonempty family_id column");
-    const record = decodeRecord<T>(serializeJson({ id: row.id, familyId: row.familyId, csrfToken: row.csrfToken, data: JSON.parse(row.dataJson) as unknown, createdAt: row.createdAt, expiresAt: row.expiresAt }), id);
+    // Rows have no TTL column: Meeko writes `expiresAt = createdAt + ttl`, so the session's own TTL
+    // survives rotation without a schema change.
+    const ttlMs = row.expiresAt - row.createdAt;
+    const record = decodeRecord<T>(serializeJson({
+      id: row.id, familyId: row.familyId, csrfToken: row.csrfToken, data: JSON.parse(row.dataJson) as unknown, createdAt: row.createdAt, expiresAt: row.expiresAt,
+      ...(Number.isSafeInteger(ttlMs) && ttlMs > 0 ? { ttlMs } : {}),
+    }), id);
     if (record.expiresAt > Date.now()) return record;
     await this.delete(id);
     return undefined;

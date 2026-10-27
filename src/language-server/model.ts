@@ -7,7 +7,8 @@ import { projectRoot } from "../compiler/project-root.js";
 import { GenericError, parseGeneric, sectionAttribute } from "../compiler/generic.js";
 import type { GenericParameters } from "../compiler/generic.js";
 import { analyzePropsDefaults, PropsDefaultsError } from "../compiler/props.js";
-import { templateEventType } from "../compiler/events.js";
+import { freeIdentifiers } from "../compiler/composables.js";
+import { templateEventDeclaration, templateEventType } from "../compiler/events.js";
 import { scanInterpolations } from "../compiler/interpolation.js";
 import { MeekoCompileError, parseSfc } from "../compiler/sfc.js";
 import { analyzeServerScript } from "../compiler/server-script.js";
@@ -175,10 +176,12 @@ const channelDeclarations = [
   // with `on`, which the event names check, so an unknown `on:` is a single error.
   "type __MeekoAnyProp = ((...args: any[]) => unknown) | {} | null | undefined;",
   "type __MeekoExtraProps = { readonly [name: `on${string}`]: __MeekoAnyProp };",
+  // Like `TagProps`: an optional prop also accepts `undefined`, which Meeko treats as an absent prop.
+  "type __MeekoTagProps<P> = P extends unknown ? { [K in keyof P]: {} extends Record<K, unknown> ? P[K] : {} extends Pick<P, K> ? P[K] | undefined : P[K] } : never;",
   "type __MeekoEventNames<P> = { readonly [K in (P extends unknown ? keyof P : never)]?: unknown };",
   "type __MeekoIsUnion<T, W = T> = T extends unknown ? ([W] extends [T] ? false : true) : never;",
   "type __MeekoPropsOf<M> = [M] extends [{ readonly renderToString: (props: infer P, ...rest: never[]) => unknown }] ? P : __MeekoLoose;",
-  "type __MeekoModuleTag<M> = (props: __MeekoPropsOf<M> & __MeekoExtraProps, events: NoInfer<__MeekoEventNames<__MeekoPropsOf<M>>>, models: NoInfer<__MeekoModelInputs<M>>, snippets: NoInfer<__MeekoSnippetInputs<M>>) => { readonly typeArguments: {}; readonly props: __MeekoPropsOf<M>; readonly events: {}; readonly models: __MeekoChannelsOf<M> extends { readonly models: infer X } ? X : null; readonly snippets: __MeekoChannelsOf<M> extends { readonly snippets: infer X } ? X : null; readonly exposed: __MeekoExposedOf<M> };",
+  "type __MeekoModuleTag<M> = (props: __MeekoTagProps<__MeekoPropsOf<M>> & __MeekoExtraProps, events: NoInfer<__MeekoEventNames<__MeekoPropsOf<M>>>, models: NoInfer<__MeekoModelInputs<M>>, snippets: NoInfer<__MeekoSnippetInputs<M>>) => { readonly typeArguments: {}; readonly props: __MeekoPropsOf<M>; readonly events: {}; readonly models: __MeekoChannelsOf<M> extends { readonly models: infer X } ? X : null; readonly snippets: __MeekoChannelsOf<M> extends { readonly snippets: infer X } ? X : null; readonly exposed: __MeekoExposedOf<M> };",
   "type __MeekoLooseTag = (props: { readonly [name: string]: __MeekoAnyProp }, events: any, models: any, snippets: any) => { readonly typeArguments: {}; readonly exposed: any };",
   // A child module declares its own tag, generic for a generic component; other values get one from their shape.
   "type __MeekoTagOf<M> = 0 extends 1 & M ? __MeekoLooseTag : [M] extends [never] ? __MeekoLooseTag : true extends __MeekoIsUnion<M> ? __MeekoModuleTag<M> : M extends { readonly __meekoTag: infer F } ? F : __MeekoModuleTag<M>;",
@@ -199,6 +202,8 @@ const snippetDeclarations = [
 function nativeModelKind(node: TemplateNode): "text" | "checkbox" | "radio" | "select" | "multiple" | undefined {
   const find = (name: string) => node.attrs?.find((attribute) => attribute.name === name);
   if (node.tagName === "input") {
+    // `bind:type` makes the control text-like; together with a static `type` it is MEEK065.
+    if (find("bind:type")) return find("type") ? undefined : "text";
     const type = (find("type")?.value ?? "text").trim().toLowerCase();
     return type === "checkbox" ? "checkbox" : type === "radio" ? "radio" : "text";
   }
@@ -516,6 +521,19 @@ export function createVirtualComponent(source: string, filename: string, options
   let snippetDepth = 0;
   /** Copias sin mapear de la comprobación de etiqueta de cada ref a componente fuera de listas, para su tipo expuesto. */
   const refHelpers: string[] = [];
+  /**
+   * Condiciones `if:when` alrededor del nodo visitado, con los nombres que leen. Su contenido va en
+   * un `if` que estrecha los tipos, como hace el compilador para `meeko check`; un snippet es una
+   * función propia y las repite, sin mapear, salvo las que sus parámetros ocultan.
+   */
+  const guards: Array<{ readonly text: string; readonly names: ReadonlySet<string> }> = [];
+  /** Abre un `if` sin mapear con las condiciones que siguen valiendo donde `shadowing` oculta nombres. */
+  const reguard = (shadowing: readonly string[]): boolean => {
+    const active = guards.filter((guard) => !shadowing.some((name) => guard.names.has(name)));
+    if (!active.length) return false;
+    code += `if (${active.map((guard) => `!!(${guard.text})`).join(" && ")}) {\n`;
+    return true;
+  };
 
   /** Atributo de una etiqueta de componente que es una prop estática: `variant="primary"` o `disabled`. */
   const staticProp = (rawName: string): boolean => validIdentifier(rawName) && !reservedTagAttributes.has(rawName);
@@ -557,6 +575,16 @@ export function createVirtualComponent(source: string, filename: string, options
   const visit = (node: TemplateNode): void => {
     const attrs = node.attrs ?? [];
     let childrenVisited = false;
+    // `if:when` narrows the bindings and the children of its element, like `v-if` in Vue.
+    const condition = attrs.find((attr) => attr.name === "if:when");
+    const conditionStart = condition ? attributeValueStart(source, condition) : undefined;
+    const narrows = condition !== undefined && conditionStart !== undefined && condition.value.trim() !== "";
+    if (narrows) {
+      code += "if (!!(";
+      mapped(condition.value, conditionStart);
+      code += ")) {\n";
+      guards.push({ text: condition.value, names: new Set(freeIdentifiers(condition.value).map(({ name }) => name)) });
+    }
     const list = attrs.find((attr) => attr.name === "each:of");
     const refDirective = attrs.find((attr) => attr.name.startsWith("ref:"));
     if (refDirective) {
@@ -577,6 +605,9 @@ export function createVirtualComponent(source: string, filename: string, options
     if (list) listDepth++;
     const item = attrs.find((attr) => attr.name === "each:as")?.value ?? "item";
     const index = attrs.find((attr) => attr.name === "each:index")?.value ?? "index";
+    // A row's item and index shadow outer names: snippets inside the row do not repeat those conditions.
+    const outerGuards = list ? guards.splice(0, guards.length) : undefined;
+    if (outerGuards) guards.push(...outerGuards.filter((guard) => !guard.names.has(item) && !guard.names.has(index)));
     if (list) {
       const listStart = attributeValueStart(source, list);
       code += `for (const ${validIdentifier(item) ? item : "item"} of (`;
@@ -716,10 +747,12 @@ export function createVirtualComponent(source: string, filename: string, options
       for (const attr of attrs) {
         if (!/^(?:bind|on|if|each):/.test(attr.name) && !(node.tagName === "component" && attr.name === "is")) continue;
         if (["each:of", "each:as", "each:index"].includes(attr.name)) continue;
+        if (attr === condition && narrows) continue;
         const start = attributeValueStart(source, attr);
         if (start === undefined) continue;
         if (attr.name.startsWith("on:")) {
-          code += `void (((__meeko_handler: (event: ${templateEventType(attr.name.slice(3))}) => unknown) => __meeko_handler)(`;
+          const eventType = templateEventType("__Meeko", attr.name.slice(3), node.tagName ?? "", node.namespaceURI === "http://www.w3.org/2000/svg");
+          code += `void (((__meeko_handler: (event: ${eventType}) => unknown) => __meeko_handler)(`;
           mapped(attr.value, start);
           code += "));\n";
         } else if (attr.name === "each:key") {
@@ -739,6 +772,11 @@ export function createVirtualComponent(source: string, filename: string, options
     if (!childrenVisited) for (const child of node.childNodes ?? []) visit(child);
     for (const child of node.content?.childNodes ?? []) visit(child);
     if (list) { code += "}\n"; listDepth--; }
+    if (outerGuards) guards.splice(0, guards.length, ...outerGuards);
+    if (narrows) {
+      code += "}\n";
+      guards.pop();
+    }
   };
 
   /** `model` y `model:nombre` de una etiqueta de componente: el argumento de modelos de su comprobación. */
@@ -777,8 +815,9 @@ export function createVirtualComponent(source: string, filename: string, options
     code += "{ ";
     if (loose.some((child) => child.nodeName !== "#comment" && (child.nodeName !== "#text" || Boolean(child.value?.trim())))) {
       code += "\"default\": __meeko_snippet(() => {\n";
+      const guarded = reguard([]);
       for (const child of loose) visit(child);
-      code += "}),\n";
+      code += guarded ? "}\n}),\n" : "}),\n";
     }
     for (const child of children) {
       if (child.tagName !== "snippet") continue;
@@ -800,8 +839,9 @@ export function createVirtualComponent(source: string, filename: string, options
         mapped(paramsAttribute.value, paramsStart);
       }
       code += ") => {\n";
+      const guarded = reguard((paramsAttribute?.value ?? "").split(",").map((param) => param.trim()).filter(Boolean));
       for (const grandchild of child.childNodes ?? []) visit(grandchild);
-      code += "}),\n";
+      code += guarded ? "}\n}),\n" : "}),\n";
       if (nameStart !== undefined) {
         snippetTags.push({
           nameStart,
@@ -819,6 +859,7 @@ export function createVirtualComponent(source: string, filename: string, options
   code += channelDeclarations;
   if (code.includes("__meeko_snippet(") || code.includes("__meeko_render(")) code += snippetDeclarations;
   if (code.includes("__meeko_html(")) code += htmlDeclaration;
+  if (code.includes("__MeekoEventOf<")) code += `${templateEventDeclaration}\n`;
   // `useElementRef` is a compiler macro typed from the template, like the compiled component.
   code += "type __MeekoExposedOf<M> = M extends { readonly hydrateScope: (...args: never[]) => infer R } ? R extends { readonly exposed?: infer E } ? (unknown extends E ? null : E) : null : null;\n";
   code += "type __MeekoElementOf<Tag extends string, Svg extends boolean> = Svg extends true ? Tag extends keyof SVGElementTagNameMap ? SVGElementTagNameMap[Tag] : SVGElement : Tag extends keyof HTMLElementTagNameMap ? HTMLElementTagNameMap[Tag] : HTMLElement;\n";
@@ -869,7 +910,7 @@ export function createVirtualComponent(source: string, filename: string, options
   // The check of a parent's tag, like the compiled component's: the parameters come from the props
   // alone. Its result lets the editor show the child with them resolved.
   const typeArguments = generic ? generic.names.map((name) => `${name}: ${name}`).join("; ") : "";
-  code += `export declare const __meekoTag: ${G}(props: ComponentProps${A} & __MeekoExtraProps, events: NoInfer<__MeekoEventNames<ComponentProps${A}>>, models: NoInfer<__MeekoTagModels<ComponentModels${A}>>, snippets: NoInfer<__MeekoTagSnippets<ComponentSnippets${A}>>) => { readonly typeArguments: { ${typeArguments} }; readonly props: ComponentProps${A}; readonly events: ${emitsTypeText ? `__MeekoEmits${A}` : "{}"}; readonly models: ComponentModels${A}; readonly snippets: ComponentSnippets${A}; readonly exposed: ComponentExposed${A} };\n`;
+  code += `export declare const __meekoTag: ${G}(props: __MeekoTagProps<ComponentProps${A}> & __MeekoExtraProps, events: NoInfer<__MeekoEventNames<ComponentProps${A}>>, models: NoInfer<__MeekoTagModels<ComponentModels${A}>>, snippets: NoInfer<__MeekoTagSnippets<ComponentSnippets${A}>>) => { readonly typeArguments: { ${typeArguments} }; readonly props: ComponentProps${A}; readonly events: ${emitsTypeText ? `__MeekoEmits${A}` : "{}"}; readonly models: ComponentModels${A}; readonly snippets: ComponentSnippets${A}; readonly exposed: ComponentExposed${A} };\n`;
   code += `export declare function hydrateScope${G}(scope: object, props: ComponentProps${A}, state?: Record<string, unknown>): { (): void; readonly exposed?: ComponentExposed${A} };\n`;
   code += `export declare function hydrate${G}(root: object, props: ComponentProps${A}, state?: Record<string, unknown>): () => void;\n`;
   code += "export declare const css: string;\n";

@@ -1,4 +1,4 @@
-import type { ApiRouteDefinition, RpcDefinition, Schema } from "./contracts.js";
+import type { ApiRouteDefinition, ApiSuccessStatus, RpcDefinition, Schema } from "./contracts.js";
 import type { ServerManifest, ServerModuleLoader } from "./discovery.js";
 import { serializeJson } from "../server.js";
 
@@ -38,6 +38,9 @@ export interface OpenApiOptions {
 
 type JsonSchema = Record<string, unknown>;
 type PathItem = Record<string, unknown>;
+
+/** The success status of each JSON endpoint, as `defineApiRoute({ status })` declares it. */
+const successDescriptions: Readonly<Record<ApiSuccessStatus, string>> = { 200: "OK", 201: "Created", 202: "Accepted", 204: "No Content" };
 
 function asSchema(value: unknown, name: string): JsonSchema {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`OpenAPI schema ${name} is not representable as JSON Schema`);
@@ -111,7 +114,12 @@ export async function generateOpenApi(options: OpenApiOptions): Promise<Record<s
   for (const endpoint of options.manifest.api) {
     const definition = await requireDefinition(endpoint.file) as unknown as ApiRouteDefinition<Schema | undefined, Schema | undefined, Schema | undefined, Schema | undefined>;
     if (definition.contentType === "response") throw new Error(`OpenAPI non-JSON response requires an explicit representation: ${endpoint.file}`);
-    const operation: Record<string, unknown> = { operationId: `${endpoint.clientKey.replaceAll(".", "_")}_${endpoint.method.toLowerCase()}`, responses: { "200": { description: "OK", content: { "application/json": { schema: ref(definition.response, `${endpoint.file} response`) } } } } };
+    const status = definition.status ?? 200;
+    if (!(status in successDescriptions)) throw new Error(`OpenAPI response status is not supported: ${endpoint.file}`);
+    const success = status === 204
+      ? { description: successDescriptions[status] }
+      : { description: successDescriptions[status], content: { "application/json": { schema: ref(definition.response, `${endpoint.file} response`) } } };
+    const operation: Record<string, unknown> = { operationId: `${endpoint.clientKey.replaceAll(".", "_")}_${endpoint.method.toLowerCase()}`, responses: { [String(status)]: success } };
     const parameters: Array<Record<string, unknown>> = [];
     const routeParams = [...endpoint.pathname.matchAll(/\[([A-Za-z_$][\w$]*)\]/g)].map((match) => match[1]!);
     if (routeParams.length) {

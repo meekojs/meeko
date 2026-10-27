@@ -43,6 +43,19 @@ test("<Name /> closes itself and keeps the following nodes as siblings", () => {
   assert.doesNotThrow(() => parseSfc(`${script}<template><AppButton /></template>`, "Tags.meeko"));
 });
 
+test("<Name /> inside a <form> keeps </form> as the end of the form", () => {
+  // `</form>` only removes the form from the open elements; the parser used to leave `<Name />`
+  // open, so the rest of the template went into the form and `</form>` became text.
+  for (const form of [`<form>`, `<form on:submit="(event) => event.preventDefault()">`, `<fORM id="f">`]) {
+    const code = render(`${form}<AppButton bind:label="'a'" /><Input /></form><p>after</p>`);
+    assert.doesNotMatch(code, /escapeHtml\("[^"]*<\/form/i, form);
+    assert.match(code, /__meeko_transfer\) \+ "<\/form>" \+ "<p" \+ ">" \+ __meeko\.escapeHtml\("after"\)/, form);
+  }
+  // A form nested in a component's content and an unrelated tag that starts with "form".
+  const nested = render(`<div><form><AppButton /></form><formatted-text>x</formatted-text></div>`);
+  assert.match(nested, /"<\/form>" \+ "<formatted-text"/);
+});
+
 test("<component is /> closes itself like a PascalCase tag", () => {
   const code = render(`<div><component is="AppButton" bind:label="'a'" /><p>after</p></div><component is="show ? AppButton : Table"/><em>tail</em>`);
   assert.match(code, /"<div" \+ ">" \+ __meeko\.renderComponent<any>\(0, AppButton, __meeko\.componentTag\(\(\) => AppButton\)\(\{ "label": 'a' \}[^]*?\) \+ "<p" \+ ">" \+ __meeko\.escapeHtml\("after"\) \+ "<\/p>" \+ "<\/div>" \+ __meeko\.renderComponent<any>\(1, show \? AppButton : Table[^]*?\) \+ "<em"/);

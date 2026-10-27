@@ -69,6 +69,20 @@ test("D1SessionDriver refuses to rotate an expired session and prunes expired ro
   assert.equal(await driver.read("old"), undefined);
 });
 
+test("D1 sessions keep their own TTL across rotation without a schema change", async () => {
+  const db = sqliteD1();
+  db.sqlite.exec(D1SessionDriver.schema());
+  const manager = new SessionManager({ store: new SqlSessionStore<{ user: string }>(new D1SessionDriver(db)), production: true, secure: false });
+  const handle = await manager.load(new Request("http://localhost/"));
+  const created = await handle.create({ user: "staff" }, { ttlMs: 12 * 60 * 60 * 1000 });
+  const loaded = await manager.load(new Request("http://localhost/", { headers: { cookie: `${manager.cookieName}=${created.id}` } }));
+  const rotated = await loaded.rotate();
+  assert.equal(rotated.expiresAt - rotated.createdAt, 12 * 60 * 60 * 1000);
+  assert.match(loaded.cookieHeader ?? "", /Max-Age=43200(;|$)/);
+  const row = db.sqlite.prepare("SELECT created_at, expires_at FROM meeko_sessions WHERE id = ?").get(rotated.id) as { created_at: number; expires_at: number };
+  assert.equal(row.expires_at - row.created_at, 12 * 60 * 60 * 1000);
+});
+
 test("D1SessionDriver rejects table names that are not plain identifiers", () => {
   assert.throws(() => new D1SessionDriver(sqliteD1(), { table: "x; DROP TABLE y" }), /table/);
   assert.match(D1SessionDriver.schema(), /family_id TEXT NOT NULL UNIQUE/);

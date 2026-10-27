@@ -83,6 +83,16 @@ type AnyPropValue = ((...args: any[]) => unknown) | {} | null | undefined;
  */
 export type ExtraProps = { readonly [name: `on${string}`]: AnyPropValue };
 
+/**
+ * Props que acepta una etiqueta de componente: una prop opcional admite también `undefined`, que
+ * Meeko trata como una prop ausente (con `exactOptionalPropertyTypes`, `label?: string` no lo
+ * admitiría en `bind:label="cond ? 'x' : undefined"`). Las props obligatorias y las firmas de índice
+ * no cambian, así que una prop desconocida sigue siendo una propiedad sobrante.
+ */
+export type TagProps<Props> = Props extends unknown
+  ? { [K in keyof Props]: {} extends Record<K, unknown> ? Props[K] : {} extends Pick<Props, K> ? Props[K] | undefined : Props[K] }
+  : never;
+
 /** Todos los nombres de prop de un tipo de props, también de cada miembro de una unión. */
 type PropNames<Props> = Props extends unknown ? keyof Props : never;
 
@@ -112,7 +122,7 @@ type IsUnion<T, Whole = T> = T extends unknown ? ([Whole] extends [T] ? false : 
 type PropsOf<Module> = [Module] extends [{ readonly renderToString: (props: infer Props, ...rest: never[]) => unknown }] ? Props : LooseChannel;
 
 /** Comprobación de etiqueta de un módulo tipado sólo como componente: props, canales y valor expuesto. */
-type ModuleTag<Module> = (props: PropsOf<Module> & ExtraProps, events: NoInfer<EventNames<PropsOf<Module>>>, models: NoInfer<ModelInputs<Module>>, snippets: NoInfer<SnippetInputs<Module>>) => TagInput<ExposedOf<Module>>;
+type ModuleTag<Module> = (props: TagProps<PropsOf<Module>> & ExtraProps, events: NoInfer<EventNames<PropsOf<Module>>>, models: NoInfer<ModelInputs<Module>>, snippets: NoInfer<SnippetInputs<Module>>) => TagInput<ExposedOf<Module>>;
 
 /** Comprobación de etiqueta de un componente `any`: todo pasa y los manejadores reciben parámetros `any`. */
 type LooseTag = (props: { readonly [name: string]: AnyPropValue }, events: any, models: any, snippets: any) => TagInput<any>;

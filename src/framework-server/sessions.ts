@@ -26,6 +26,46 @@ export interface SessionRecord<T = unknown> {
   createdAt: number;
   /** Fecha de caducidad, en milisegundos desde la época. */
   expiresAt: number;
+  /**
+   * Duración propia de la sesión en milisegundos, fijada con `create(data, { ttlMs })`; `rotate()`
+   * la conserva. Sin ella, la sesión usa `SessionManager.ttlMs`.
+   * @since 1.2.0
+   */
+  ttlMs?: number;
+}
+
+/**
+ * Opciones de `SessionHandle.create`.
+ *
+ * @since 1.2.0
+ * @example
+ * ```ts
+ * import type { SessionCreateOptions } from "@meekojs/meeko/server";
+ *
+ * const staff: SessionCreateOptions = { ttlMs: 12 * 60 * 60 * 1000 };
+ * await context.session.create({ userId: "u_123", role: "staff" }, staff);
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#duración-de-cada-sesión
+ */
+export interface SessionCreateOptions {
+  /**
+   * Duración de esta sesión en milisegundos, un entero positivo. Fija la caducidad en el store y el
+   * `Max-Age` de la cookie, y se conserva al rotar. Por defecto, `SessionManager.ttlMs`.
+   */
+  readonly ttlMs?: number;
+}
+
+function validTtl(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+/**
+ * Whether `Origin` is the request's own origin (the public origin behind `createServerApp`) or
+ * one of `allowedOrigins`. A missing Origin is never allowed.
+ */
+export function isAllowedOrigin(request: Request, allowedOrigins: readonly string[]): boolean {
+  const origin = request.headers.get("origin");
+  return origin !== null && (origin === new URL(request.url).origin || allowedOrigins.includes(origin));
 }
 
 /**
@@ -172,7 +212,10 @@ export interface SessionOptions<T> {
   store: SessionStore<T>;
   /** Exige un store persistente con `replace` y `revokeFamily`. */
   production?: boolean;
-  /** Duración de la sesión en milisegundos; 7 días por defecto. */
+  /**
+   * Duración de la sesión en milisegundos; 7 días por defecto. Una sesión creada con
+   * `create(data, { ttlMs })` usa la suya.
+   */
   ttlMs?: number;
   /** Cookie `Secure`; `true` por defecto. */
   secure?: boolean;
@@ -383,20 +426,25 @@ export class SessionHandle<T = unknown> {
   get signal(): AbortSignal { return this.revocation.signal; }
   /**
    * Crea una sesión nueva con `data`, con ID, familia y token CSRF aleatorios, y prepara la cookie.
-   * Si ya hay una sesión, la sustituye de forma atómica conservando su familia.
+   * Si ya hay una sesión, la sustituye de forma atómica conservando su familia. `options.ttlMs`
+   * (desde `1.2`) fija la duración de esta sesión; por defecto, la del gestor.
+   * @throws {RangeError} Si `options.ttlMs` no es un entero positivo.
    */
-  async create(data: T): Promise<SessionRecord<T>> {
-    return this.mutate(() => this.write(data));
+  async create(data: T, options: SessionCreateOptions = {}): Promise<SessionRecord<T>> {
+    if (options.ttlMs !== undefined && !validTtl(options.ttlMs)) throw new RangeError("Invalid session TTL");
+    return this.mutate(() => this.write(data, options.ttlMs));
   }
   /**
-   * Cambia el ID y el token CSRF de la sesión actual conservando sus datos y su familia, por
-   * ejemplo tras iniciar sesión.
+   * Cambia el ID y el token CSRF de la sesión actual conservando sus datos, su familia y su
+   * duración, por ejemplo tras iniciar sesión. La nueva caducidad se cuenta desde la rotación.
    * @throws {Error} Si no hay sesión, ha caducado o fue revocada.
    */
   async rotate(): Promise<SessionRecord<T>> {
     return this.mutate(async () => {
       if (!this.current) throw new Error("No active session to rotate");
-      return this.write(this.current.data);
+      // Records written before 1.2, or whose TTL is not valid, use the manager's.
+      const ttlMs = this.current.ttlMs;
+      return this.write(this.current.data, validTtl(ttlMs) ? ttlMs : undefined);
     });
   }
   /**
@@ -436,17 +484,22 @@ export class SessionHandle<T = unknown> {
     void settled.then(() => { this.mutations.delete(settled); });
     return running;
   }
-  private async write(data: T): Promise<SessionRecord<T>> {
+  /** `ttlMs` is the session's own TTL, stored on the record; without it the manager's applies. */
+  private async write(data: T, ttlMs: number | undefined): Promise<SessionRecord<T>> {
     const previous = this.current;
     const now = Date.now();
-    const record = { id: token(), familyId: previous?.familyId ?? previous?.id ?? token(), csrfToken: token(), data, createdAt: now, expiresAt: now + this.manager.ttlMs };
+    const lifetime = ttlMs ?? this.manager.ttlMs;
+    const record: SessionRecord<T> = {
+      id: token(), familyId: previous?.familyId ?? previous?.id ?? token(), csrfToken: token(), data, createdAt: now, expiresAt: now + lifetime,
+      ...(ttlMs === undefined ? {} : { ttlMs }),
+    };
     if (previous) {
       if (!this.manager.store.replace) throw new Error("Session storage does not support atomic rotation");
       if (!(await this.manager.store.replace(previous.id, record))) throw new Error("Session has expired or been revoked");
     } else await this.manager.store.set(record);
     this.current = record;
     this.watch();
-    this.pendingCookie = this.manager.serializeCookie(record.id, this.manager.ttlMs);
+    this.pendingCookie = this.manager.serializeCookie(record.id, lifetime);
     return record;
   }
   /**
@@ -499,11 +552,11 @@ export class SessionHandle<T = unknown> {
 export class SessionManager<T = unknown> {
   /** Store de las sesiones. */
   readonly store: SessionStore<T>;
-  /** Duración de las sesiones en milisegundos. */
+  /** Duración por defecto de las sesiones en milisegundos; `create(data, { ttlMs })` la sustituye. */
   readonly ttlMs: number;
   /** Nombre de la cookie de sesión. */
   readonly cookieName: string;
-  /** Orígenes adicionales aceptados en las mutaciones autenticadas. */
+  /** Orígenes adicionales aceptados en las mutaciones autenticadas y en las rutas con `origin: "required"`. */
   readonly allowedOrigins: readonly string[];
   private readonly secure: boolean;
   private readonly sameSite: "Lax" | "Strict" | "None";
@@ -586,9 +639,7 @@ export class SessionManager<T = unknown> {
    */
   assertMutationAllowed(request: Request, session: SessionHandle<T>, mutating = !["GET", "HEAD", "OPTIONS"].includes(request.method)): void {
     if (!session.current || !mutating) return;
-    const origin = request.headers.get("origin");
-    const expected = new URL(request.url).origin;
-    if (!origin || (origin !== expected && !this.allowedOrigins.includes(origin))) throw new SessionSecurityError("INVALID_ORIGIN");
+    if (!isAllowedOrigin(request, this.allowedOrigins)) throw new SessionSecurityError("INVALID_ORIGIN");
     if (request.headers.get("x-meeko-csrf") !== session.current.csrfToken) throw new SessionSecurityError("INVALID_CSRF");
   }
 }

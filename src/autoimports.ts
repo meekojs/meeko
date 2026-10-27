@@ -64,7 +64,7 @@ function filesInSync(path: string): string[] {
 function builtins(root: string): AutoImport[] {
   const entries: AutoImport[] = [
     ...["signal", "computed", "effect", "batch", "onCleanup", "onMounted", "provide", "inject", "createContext", "provideErrorHandler"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko", specifier: "@meekojs/meeko", scope: "shared", typeOnly: false, component: false })),
-    ...["useState", "href"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "shared", typeOnly: false, component: false })),
+    ...["useState", "href", "useRoute"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "shared", typeOnly: false, component: false })),
   ];
   for (const scope of ["client", "server"] as const) {
     const file = join(root, ".meeko", "generated", `clients.${scope}.ts`);
@@ -77,6 +77,17 @@ function builtins(root: string): AutoImport[] {
     entries.push({ name: "useSocket", imported: "useSocketClient", file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "shared", typeOnly: false, component: false });
   }
   return entries;
+}
+
+/**
+ * Framework autoimports added after 1.0 that a project may already export under the same name:
+ * the project's own export wins, instead of making the name ambiguous.
+ */
+const yieldingBuiltins: ReadonlySet<string> = new Set(["useRoute"]);
+
+function withoutShadowedBuiltins(result: AutoImport[]): AutoImport[] {
+  return result.filter((entry) => !(entry.specifier === "@meekojs/meeko/framework" && yieldingBuiltins.has(entry.name)
+    && result.some((other) => other !== entry && other.name === entry.name)));
 }
 
 function addAutoImport(result: AutoImport[], entry: AutoImport): void {
@@ -143,7 +154,7 @@ export async function discoverAutoImports(root: string): Promise<AutoImport[]> {
       }
     }
   }
-  return result;
+  return withoutShadowedBuiltins(result);
 }
 
 /** Same static registry used by the synchronous VS Code Language Service. */
@@ -164,7 +175,7 @@ export function discoverAutoImportsSync(root: string): AutoImport[] {
       }
     }
   }
-  return result;
+  return withoutShadowedBuiltins(result);
 }
 
 function configuredDirectories(serverDirs: readonly string[] | undefined): readonly string[] {

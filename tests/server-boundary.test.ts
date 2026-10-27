@@ -63,7 +63,7 @@ test("server, node, bun, deno, cloudflare and build subpaths expose exactly thei
   assert.deepEqual(Object.keys(server).sort(), [
     "ApiError", "LocalSocketPubSub", "MemorySessionStore", "RedisSessionStore", "RedisSocketPubSub", "SessionHandle", "SessionManager",
     "SessionRevokedError", "SessionSecurityError", "SqlSessionStore", "composeServerMiddleware", "createFrameworkHandler", "createLocalCalls",
-    "createLocalServerFetch", "createRequestContext", "createServerApp", "createServerClientOptions", "createServerDispatcher",
+    "createLocalServerFetch", "createRequestContext", "createServerApp", "createServerClientOptions", "createServerDispatcher", "createServerSocketRegistry",
     "createSocketHub", "createSocketUpgradeHandler", "defineApiRoute", "defineRpc", "defineServerMiddleware", "defineServerRuntime", "defineSocketChannel",
     "dispatchApiRoute", "dispatchRpc", "errorResponse", "executeApiRoute", "executeRpc", "generateOpenApi",
     "loadSocketChannels", "openSocketSession", "useRequestState",

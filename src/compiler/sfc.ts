@@ -91,6 +91,10 @@ export interface MaskedHtml {
 
 const rawTextElement = /<(?:script|style|textarea|title|xmp|iframe|noembed|noframes|noscript|plaintext)(?=[\s/>])/iy;
 const componentTag = /<(\/?)[A-Z][\w$]*(?=[\s/>])/y;
+// A capital first letter makes `<Form>` a component tag, so only a lowercase `f` is the element.
+const formTag = /<(\/?)f[Oo][Rr][Mm](?=[\s/>])/y;
+/** The name a masked `<form>` has while parse5 reads the template; see `maskComponentTags`. */
+export const maskedFormTag = "jorm";
 
 /** Final `>` of a start tag whose attributes begin at `from`, and whether it ends in `/>`. */
 function startTagEnd(html: string, from: number): { end: number; selfClosing: boolean } | undefined {
@@ -144,6 +148,14 @@ export function maskComponentTags(html: string, options: { blankComponents?: boo
       if (close < 0) break;
       index = close + 2;
       continue;
+    }
+    // `</form>` only drops the form from the open elements, so a `<Name />` the parser kept open
+    // inside it would swallow the rest of the template. Masked as `jorm`, it closes like a `<div>`.
+    formTag.lastIndex = index;
+    const form = formTag.exec(html);
+    if (form) {
+      chars[index + form[1]!.length + 1] = "j";
+      changed = true;
     }
     componentTag.lastIndex = index;
     const tag = componentTag.exec(html);

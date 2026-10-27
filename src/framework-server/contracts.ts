@@ -1,6 +1,6 @@
 import { serializeJson } from "../server.js";
 import type { RequestContext } from "./context.js";
-import { SessionSecurityError, type SessionManager } from "./sessions.js";
+import { isAllowedOrigin, SessionSecurityError, type SessionManager } from "./sessions.js";
 
 /**
  * Contrato público de Standard Schema v1 que validan los contratos de API, RPC y Socket. Los
@@ -88,6 +88,36 @@ export class SessionRevokedError extends ApiError {
   }
 }
 
+/** At most this many schema issues reach the client. */
+const maxPublicIssues = 20;
+
+/** Invalid input: a `400` whose schema messages reach the client as `issues`. */
+class InvalidInputError extends ApiError {
+  constructor(code: string, readonly issues: readonly { readonly path: string; readonly message: string }[]) {
+    super(code, 400);
+  }
+}
+
+function issuePath(path: unknown): string {
+  if (!Array.isArray(path)) return "";
+  return path.map((segment: unknown) => {
+    const key = segment !== null && typeof segment === "object" && "key" in segment ? (segment as { key: unknown }).key : segment;
+    return typeof key === "symbol" ? key.description ?? "" : String(key);
+  }).join(".");
+}
+
+/** Only each issue's path keys and schema message are public; inputs and expectations are not. */
+function publicIssues(issues: readonly unknown[]): { path: string; message: string }[] {
+  const result: { path: string; message: string }[] = [];
+  for (const issue of issues) {
+    if (result.length >= maxPublicIssues) break;
+    if (issue === null || typeof issue !== "object") continue;
+    const { message, path } = issue as { message?: unknown; path?: unknown };
+    if (typeof message === "string" && message) result.push({ path: issuePath(path), message });
+  }
+  return result;
+}
+
 /** Preserve public errors loaded through separate Vite module graphs; hide all others. */
 export function normalizeServerError(error: unknown): ApiError {
   if (error instanceof SessionSecurityError) return new ApiError(error.code, 403);
@@ -147,6 +177,25 @@ export function reportServerError(error: unknown, requestId: string, observer?: 
 }
 
 /**
+ * Estados de éxito que un endpoint JSON puede elegir con `status` (desde `1.2`). `204` responde sin
+ * cuerpo y el cliente generado resuelve `undefined`.
+ *
+ * @since 1.2.0
+ * @example
+ * ```ts
+ * import type { ApiSuccessStatus } from "@meekojs/meeko/server";
+ *
+ * const created: ApiSuccessStatus = 201;
+ * ```
+ */
+export type ApiSuccessStatus = 200 | 201 | 202 | 204;
+
+const successStatuses: ReadonlySet<unknown> = new Set<ApiSuccessStatus>([200, 201, 202, 204]);
+
+/** What a JSON handler returns: nothing with `204`, the response schema's value otherwise. */
+type ApiHandlerResult<R, T> = [T] extends [204] ? void | undefined : R extends Schema ? Output<R> : Response;
+
+/**
  * Contrato de un endpoint de `server/api/<ruta>.<método>.ts`: schemas de entrada y respuesta,
  * autenticación, autorización y handler. Se declara con {@link defineApiRoute}.
  *
@@ -155,6 +204,8 @@ export function reportServerError(error: unknown, requestId: string, observer?: 
  * @typeParam B Schema de `body`.
  * @typeParam R Schema de la respuesta.
  * @typeParam S Tipo de los servicios.
+ * @typeParam L Valor de `locals` que recibe el handler; `undefined` sin `locals`.
+ * @typeParam T Estado de éxito declarado con `status` (desde `1.2`).
  * @example
  * ```ts
  * import type { ApiRouteDefinition, Schema } from "@meekojs/meeko/server";
@@ -162,23 +213,48 @@ export function reportServerError(error: unknown, requestId: string, observer?: 
  * type Health = ApiRouteDefinition<undefined, undefined, undefined, Schema<{ ok: boolean }>>;
  * ```
  */
-export interface ApiRouteDefinition<P extends Schema | undefined, Q extends Schema | undefined, B extends Schema | undefined, R extends Schema | undefined, S = unknown> {
+export interface ApiRouteDefinition<P extends Schema | undefined, Q extends Schema | undefined, B extends Schema | undefined, R extends Schema | undefined, S = unknown, L = undefined, T extends ApiSuccessStatus = ApiSuccessStatus> {
   /** Segmentos dinámicos de la ruta, como cadenas obligatorias. */
   params?: P;
   /** Query string; sus campos aceptan cadenas o listas de cadenas. */
   query?: Q;
   /** Cuerpo JSON (`application/json`, hasta 1 MiB). */
   body?: B;
-  /** Schema de la respuesta; obligatorio salvo con `contentType: "response"`. */
+  /** Schema de la respuesta; obligatorio salvo con `contentType: "response"` o `status: 204`. */
   response?: R;
+  /**
+   * Estado HTTP de la respuesta correcta (desde `1.2`): `200` por defecto, `201` al crear, `202`
+   * al aceptar trabajo diferido o `204` sin cuerpo. Con `200`, `201` y `202` la respuesta sigue
+   * siendo JSON validado con `response`; con `204` el handler no devuelve nada y no se declara
+   * `response`. No se combina con `contentType: "response"`. Debe ser un literal para que el
+   * generador lo lea.
+   */
+  status?: T;
   /** `"required"` responde `401 UNAUTHENTICATED` sin sesión. */
   auth?: "required" | "optional";
+  /**
+   * `"required"` (desde `1.2`) responde `403 INVALID_ORIGIN` a las peticiones `POST`, `PUT`,
+   * `PATCH` y `DELETE` cuyo `Origin` falta o no es el de la aplicación ni uno de
+   * `SessionManager.allowedOrigins`, aunque no haya sesión; por ejemplo, un inicio de sesión.
+   * Sin él, Origin sólo se comprueba en las mutaciones autenticadas con cookie.
+   */
+  origin?: "required";
   /** `"response"` deja que el handler devuelva su propio `Response`. */
   contentType?: "json" | "response";
   /** Devolver `false` responde `403 FORBIDDEN`. */
   authorize?: (context: RequestContext<S>) => boolean | Promise<boolean>;
-  /** Recibe la entrada validada y el contexto; su resultado se valida con `response`. */
-  handler: (args: { params: OptionalOutput<P>; query: OptionalOutput<Q>; body: OptionalOutput<B>; context: RequestContext<S> }) => Promise<R extends Schema ? Output<R> : Response> | (R extends Schema ? Output<R> : Response);
+  /**
+   * Calcula un valor por petición que el handler recibe como `locals` (desde `1.2`), como el
+   * usuario actual. Se ejecuta tras Origin, CSRF, `auth`, `authorize` y la validación de la
+   * entrada, y justo antes del handler; un `ApiError` que lance (por ejemplo `401` o `403`) es la
+   * respuesta. Declárelo antes de `handler` para que TypeScript infiera su tipo.
+   */
+  locals?: (context: RequestContext<S>) => L | Promise<L>;
+  /**
+   * Recibe la entrada validada, el contexto y `locals`; su resultado se valida con `response`. Con
+   * `status: 204` no devuelve nada.
+   */
+  handler: (args: { params: OptionalOutput<P>; query: OptionalOutput<Q>; body: OptionalOutput<B>; context: RequestContext<S>; locals: L }) => Promise<ApiHandlerResult<R, T>> | ApiHandlerResult<R, T>;
 }
 
 /**
@@ -200,9 +276,42 @@ export interface ApiRouteDefinition<P extends Schema | undefined, Q extends Sche
  *   handler: ({ params }) => ({ id: params.id, name: "Ada" }),
  * });
  * ```
+ * Con `locals`, el handler recibe el usuario ya cargado:
+ * ```ts
+ * // server/api/orders/index.post.ts
+ * import { ApiError, defineApiRoute } from "@meekojs/meeko/server";
+ * import { newOrder, orderSchema } from "../../../shared/schemas/order.js";
+ * import { createOrder, findUser } from "../../utils/store.js";
+ *
+ * export default defineApiRoute({
+ *   auth: "required",
+ *   body: newOrder,
+ *   response: orderSchema,
+ *   locals: async ({ session }) => {
+ *     const user = await findUser((session.current?.data as { userId: string }).userId);
+ *     if (!user) throw new ApiError("UNAUTHENTICATED", 401);
+ *     return { user };
+ *   },
+ *   handler: ({ body, locals }) => createOrder(locals.user, body),
+ * });
+ * ```
+ * Con `status`, una creación responde `201 Created` sin perder la validación ni el tipo del cliente:
+ * ```ts
+ * // server/api/orders/index.post.ts
+ * import { defineApiRoute } from "@meekojs/meeko/server";
+ * import { newOrder, orderSchema } from "../../../shared/schemas/order.js";
+ * import { createOrder } from "../../utils/store.js";
+ *
+ * export default defineApiRoute({
+ *   body: newOrder,
+ *   response: orderSchema,
+ *   status: 201,
+ *   handler: ({ body }) => createOrder(body),
+ * });
+ * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#api-y-rpc
  */
-export function defineApiRoute<P extends Schema | undefined = undefined, Q extends Schema | undefined = undefined, B extends Schema | undefined = undefined, R extends Schema | undefined = undefined, S = unknown>(definition: ApiRouteDefinition<P, Q, B, R, S>): ApiRouteDefinition<P, Q, B, R, S> {
+export function defineApiRoute<P extends Schema | undefined = undefined, Q extends Schema | undefined = undefined, B extends Schema | undefined = undefined, R extends Schema | undefined = undefined, S = unknown, L = undefined, T extends ApiSuccessStatus = ApiSuccessStatus>(definition: ApiRouteDefinition<P, Q, B, R, S, L, T>): ApiRouteDefinition<P, Q, B, R, S, L, T> {
   return definition;
 }
 
@@ -213,6 +322,7 @@ export function defineApiRoute<P extends Schema | undefined = undefined, Q exten
  * @typeParam I Schema de la entrada.
  * @typeParam O Schema de la salida.
  * @typeParam S Tipo de los servicios.
+ * @typeParam L Valor de `locals` que recibe el handler; `undefined` sin `locals`.
  * @example
  * ```ts
  * import type { RpcDefinition, Schema } from "@meekojs/meeko/server";
@@ -220,22 +330,36 @@ export function defineApiRoute<P extends Schema | undefined = undefined, Q exten
  * type GetUser = RpcDefinition<Schema<{ id: string }>, Schema<{ id: string; name: string }>>;
  * ```
  */
-export interface RpcDefinition<I extends Schema, O extends Schema, S = unknown> {
+export interface RpcDefinition<I extends Schema, O extends Schema, S = unknown, L = undefined> {
   /** Schema de la entrada JSON. */
   input: I;
   /** Schema de la salida. */
   output: O;
   /** `"required"` responde `401 UNAUTHENTICATED` sin sesión. */
   auth?: "required" | "optional";
+  /**
+   * `"required"` (desde `1.2`) responde `403 INVALID_ORIGIN` a toda llamada cuyo `Origin` falta o no
+   * es el de la aplicación ni uno de `SessionManager.allowedOrigins`, aunque no haya sesión; por
+   * ejemplo, un inicio de sesión. Sin él, Origin sólo se comprueba en las llamadas con sesión.
+   */
+  origin?: "required";
   /** Devolver `false` responde `403 FORBIDDEN`. */
   authorize?: (context: RequestContext<S>) => boolean | Promise<boolean>;
-  /** Recibe la entrada validada y el contexto; su resultado se valida con `output`. */
-  handler: (args: { input: Output<I>; context: RequestContext<S> }) => Promise<Input<O> | Output<O>> | Input<O> | Output<O>;
+  /**
+   * Calcula un valor por petición que el handler recibe como `locals` (desde `1.2`), como el
+   * usuario actual. Se ejecuta tras Origin, CSRF, `auth`, `authorize` y la validación de la
+   * entrada, y justo antes del handler; un `ApiError` que lance (por ejemplo `401` o `403`) es la
+   * respuesta. Declárelo antes de `handler` para que TypeScript infiera su tipo.
+   */
+  locals?: (context: RequestContext<S>) => L | Promise<L>;
+  /** Recibe la entrada validada, el contexto y `locals`; su resultado se valida con `output`. */
+  handler: (args: { input: Output<I>; context: RequestContext<S>; locals: L }) => Promise<Input<O> | Output<O>> | Input<O> | Output<O>;
 }
 
 /**
  * Declara un procedimiento RPC, el export por defecto de `server/rpc/<ruta>.ts`, que se llama con
- * `POST /_meeko/rpc/<ruta>` y desde `rpc.*`. Siempre comprueba Origin y CSRF.
+ * `POST /_meeko/rpc/<ruta>` y desde `rpc.*`. Comprueba Origin y CSRF en las llamadas con sesión, y
+ * Origin en todas con `origin: "required"`.
  *
  * @param definition Schemas, guardas y handler.
  * @returns La misma definición, con sus tipos inferidos.
@@ -251,15 +375,39 @@ export interface RpcDefinition<I extends Schema, O extends Schema, S = unknown> 
  *   handler: ({ input }) => ({ id: input.id, name: "Ada" }),
  * });
  * ```
+ * Un inicio de sesión exige un Origin permitido aunque aún no haya sesión:
+ * ```ts
+ * // server/rpc/auth/login.ts
+ * import { ApiError, defineRpc } from "@meekojs/meeko/server";
+ * import { loginInput, loginOutput } from "../../../shared/schemas/auth.js";
+ * import { verifyPassword } from "../../utils/users.js";
+ *
+ * export default defineRpc({
+ *   input: loginInput,
+ *   output: loginOutput,
+ *   origin: "required",
+ *   handler: async ({ input, context }) => {
+ *     const user = await verifyPassword(input.email, input.password);
+ *     if (!user) throw new ApiError("INVALID_CREDENTIALS", 401);
+ *     await context.session.create({ userId: user.id }, { ttlMs: user.staff ? 12 * 3_600_000 : 30 * 86_400_000 });
+ *     return { ok: true };
+ *   },
+ * });
+ * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#api-y-rpc
  */
-export function defineRpc<I extends Schema, O extends Schema, S = unknown>(definition: RpcDefinition<I, O, S>): RpcDefinition<I, O, S> {
+export function defineRpc<I extends Schema, O extends Schema, S = unknown, L = undefined>(definition: RpcDefinition<I, O, S, L>): RpcDefinition<I, O, S, L> {
   return definition;
 }
 
 async function validate<S extends Schema>(schema: S, value: unknown, label: string): Promise<Output<S>> {
   const result = await schema["~standard"].validate(value);
-  if ("issues" in result && result.issues) throw new ApiError(`INVALID_${label.toUpperCase()}`, label === "response" || label === "output" ? 500 : 400);
+  if ("issues" in result && result.issues) {
+    const code = `INVALID_${label.toUpperCase()}`;
+    // A response that breaks its own schema is a server fault: no detail reaches the client.
+    if (label === "response" || label === "output") throw new ApiError(code, 500);
+    throw new InvalidInputError(code, publicIssues(result.issues));
+  }
   return (result as { value: Output<S> }).value;
 }
 
@@ -294,8 +442,15 @@ function queryObject(url: URL): Record<string, string | string[]> {
   return result;
 }
 
-async function guard<S>(definition: { auth?: "required" | "optional"; authorize?: (context: RequestContext<S>) => boolean | Promise<boolean> }, context: RequestContext<S>, sessions: SessionManager, mutating?: boolean): Promise<void> {
-  sessions.assertMutationAllowed(context.request, context.session, mutating);
+type Guarded<S> = { auth?: "required" | "optional"; origin?: "required"; authorize?: (context: RequestContext<S>) => boolean | Promise<boolean> };
+
+async function guard<S>(definition: Guarded<S>, context: RequestContext<S>, sessions: SessionManager, mutating?: boolean): Promise<void> {
+  const request = context.request;
+  // Anonymous mutations such as a sign-in opt in to the session's allowed-origin rule. SSR
+  // clients send the request's own origin, so local dispatch passes.
+  if (definition.origin === "required" && (mutating ?? !["GET", "HEAD", "OPTIONS"].includes(request.method))
+    && !isAllowedOrigin(request, sessions.allowedOrigins ?? [])) throw new ApiError("INVALID_ORIGIN", 403);
+  sessions.assertMutationAllowed(request, context.session, mutating);
   if (definition.auth === "required" && !context.session.current) throw new ApiError("UNAUTHENTICATED", 401);
   if (definition.authorize && !(await definition.authorize(context))) throw new ApiError("FORBIDDEN", 403);
 }
@@ -303,14 +458,19 @@ async function guard<S>(definition: { auth?: "required" | "optional"; authorize?
 /**
  * Ejecuta un endpoint de API con sus guardas y validaciones y devuelve la respuesta JSON, o lanza
  * un `ApiError`. Es la pieza de bajo nivel de {@link dispatchApiRoute}, que además normaliza errores.
+ * El orden es: Origin (`origin: "required"`), Origin y CSRF de la sesión, `auth`, `authorize`,
+ * `params`, `query`, `body`, `locals`, handler y `response`. La respuesta usa el estado de
+ * `status` (`200` por defecto); con `204`, sin cuerpo.
  *
  * @param definition Endpoint declarado con `defineApiRoute`.
  * @param context Contexto de la petición.
  * @param sessions Gestor de sesiones, para Origin y CSRF.
  * @param rawParams Parámetros de la ruta sin validar.
  * @returns La respuesta del endpoint.
- * @throws {ApiError} Con `UNAUTHENTICATED`, `FORBIDDEN`, `INVALID_PARAMS`, `INVALID_QUERY`, `INVALID_BODY`,
- * `UNSUPPORTED_MEDIA_TYPE`, `BODY_TOO_LARGE`, `INVALID_RESPONSE` o los del handler.
+ * @throws {ApiError} Con `INVALID_ORIGIN`, `UNAUTHENTICATED`, `FORBIDDEN`, `INVALID_PARAMS`, `INVALID_QUERY`,
+ * `INVALID_BODY`, `UNSUPPORTED_MEDIA_TYPE`, `BODY_TOO_LARGE`, `INVALID_RESPONSE`, `INVALID_RESPONSE_STATUS`
+ * (un `status` no admitido o combinado con `contentType: "response"` o, con `204`, con `response`) o los de
+ * `locals` y del handler.
  * @example
  * ```ts
  * import { executeApiRoute } from "@meekojs/meeko/server";
@@ -319,31 +479,42 @@ async function guard<S>(definition: { auth?: "required" | "optional"; authorize?
  * const response = await executeApiRoute(userRoute, context, sessions, { id: "123" });
  * ```
  */
-export async function executeApiRoute<P extends Schema | undefined, Q extends Schema | undefined, B extends Schema | undefined, R extends Schema | undefined, S>(definition: ApiRouteDefinition<P, Q, B, R, S>, context: RequestContext<S>, sessions: SessionManager, rawParams: unknown = {}): Promise<Response> {
+export async function executeApiRoute<P extends Schema | undefined, Q extends Schema | undefined, B extends Schema | undefined, R extends Schema | undefined, S, L = undefined, T extends ApiSuccessStatus = ApiSuccessStatus>(definition: ApiRouteDefinition<P, Q, B, R, S, L, T>, context: RequestContext<S>, sessions: SessionManager, rawParams: unknown = {}): Promise<Response> {
+  // A misdeclared status is a server fault, reported before any input is read.
+  const status = definition.status ?? 200;
+  if (!successStatuses.has(status) || (definition.status !== undefined && definition.contentType === "response")
+    || (status === 204 && definition.response)) throw new ApiError("INVALID_RESPONSE_STATUS", 500);
   await guard(definition, context, sessions);
   const params = definition.params ? await validate(definition.params, rawParams, "params") : undefined;
   const query = definition.query ? await validate(definition.query, queryObject(new URL(context.request.url)), "query") : undefined;
   const body = definition.body ? await validate(definition.body, await readJson(context.request), "body") : undefined;
-  const result = await definition.handler({ params: params as OptionalOutput<P>, query: query as OptionalOutput<Q>, body: body as OptionalOutput<B>, context });
+  const locals = definition.locals ? await definition.locals(context) : undefined;
+  const result: unknown = await definition.handler({ params: params as OptionalOutput<P>, query: query as OptionalOutput<Q>, body: body as OptionalOutput<B>, context, locals: locals as L });
   if (definition.contentType === "response") {
     if (!(result instanceof Response)) throw new ApiError("INVALID_RESPONSE", 500);
     return result;
   }
+  if (status === 204) {
+    if (result !== undefined) throw new ApiError("INVALID_RESPONSE", 500);
+    return new Response(null, { status: 204 });
+  }
   if (!definition.response) throw new ApiError("MISSING_RESPONSE_SCHEMA", 500);
   const output = await validate(definition.response, result, "response");
-  return new Response(serializeJson(output), { headers: { "content-type": "application/json; charset=utf-8" } });
+  return new Response(serializeJson(output), { status, headers: { "content-type": "application/json; charset=utf-8" } });
 }
 
 /**
  * Ejecuta un procedimiento RPC con sus guardas y validaciones y devuelve su salida validada. Es la
- * pieza de bajo nivel de {@link dispatchRpc}.
+ * pieza de bajo nivel de {@link dispatchRpc}. El orden es: Origin (`origin: "required"`), Origin y
+ * CSRF de la sesión, `auth`, `authorize`, `input`, `locals`, handler y `output`.
  *
  * @param definition Procedimiento declarado con `defineRpc`.
  * @param rawInput Entrada sin validar.
  * @param context Contexto de la petición.
  * @param sessions Gestor de sesiones, para Origin y CSRF.
  * @returns La salida validada.
- * @throws {ApiError} Con `UNAUTHENTICATED`, `FORBIDDEN`, `INVALID_INPUT`, `INVALID_OUTPUT` o los del handler.
+ * @throws {ApiError} Con `INVALID_ORIGIN`, `UNAUTHENTICATED`, `FORBIDDEN`, `INVALID_INPUT`, `INVALID_OUTPUT` o
+ * los de `locals` y del handler.
  * @example
  * ```ts
  * import { executeRpc } from "@meekojs/meeko/server";
@@ -352,10 +523,11 @@ export async function executeApiRoute<P extends Schema | undefined, Q extends Sc
  * const user = await executeRpc(getUser, { id: "123" }, context, sessions);
  * ```
  */
-export async function executeRpc<I extends Schema, O extends Schema, S>(definition: RpcDefinition<I, O, S>, rawInput: unknown, context: RequestContext<S>, sessions: SessionManager): Promise<Output<O>> {
+export async function executeRpc<I extends Schema, O extends Schema, S, L = undefined>(definition: RpcDefinition<I, O, S, L>, rawInput: unknown, context: RequestContext<S>, sessions: SessionManager): Promise<Output<O>> {
   await guard(definition, context, sessions, true);
   const input = await validate(definition.input, rawInput, "input");
-  const result = await definition.handler({ input, context });
+  const locals = definition.locals ? await definition.locals(context) : undefined;
+  const result = await definition.handler({ input, context, locals: locals as L });
   const output = await validate(definition.output, result, "output");
   serializeJson(output);
   return output;
@@ -364,7 +536,9 @@ export async function executeRpc<I extends Schema, O extends Schema, S>(definiti
 /**
  * Convierte un error en la respuesta JSON pública `{ code, status, requestId }` con la cabecera
  * `x-request-id`. Un `ApiError` conserva su código y estado; cualquier otro error es
- * `INTERNAL_ERROR`/`500`, sin su mensaje.
+ * `INTERNAL_ERROR`/`500`, sin su mensaje. Desde `1.2`, la entrada que no supera su schema
+ * (`INVALID_PARAMS`, `INVALID_QUERY`, `INVALID_BODY`, `INVALID_INPUT`) añade
+ * `issues: [{ path, message }]`, con como mucho 20 mensajes del schema.
  *
  * @param error Error capturado.
  * @param requestId ID de la petición.
@@ -379,7 +553,8 @@ export async function executeRpc<I extends Schema, O extends Schema, S>(definiti
  */
 export function errorResponse(error: unknown, requestId: string): Response {
   const known = normalizeServerError(error);
-  return new Response(serializeJson({ code: known.code, status: known.status, requestId }), { status: known.status, headers: { "content-type": "application/json; charset=utf-8", "x-request-id": requestId } });
+  const issues = known instanceof InvalidInputError && known.issues.length ? known.issues : undefined;
+  return new Response(serializeJson({ code: known.code, status: known.status, requestId, ...(issues ? { issues } : {}) }), { status: known.status, headers: { "content-type": "application/json; charset=utf-8", "x-request-id": requestId } });
 }
 
 function finish(response: Response, context: RequestContext): Response {
@@ -413,7 +588,7 @@ function finish(response: Response, context: RequestContext): Response {
  * const response = await dispatchApiRoute(userRoute, context, sessions, { id: "123" }, (error, id) => console.error(id, error));
  * ```
  */
-export async function dispatchApiRoute<P extends Schema | undefined, Q extends Schema | undefined, B extends Schema | undefined, R extends Schema | undefined, S>(definition: ApiRouteDefinition<P, Q, B, R, S>, context: RequestContext<S>, sessions: SessionManager, params: unknown = {}, onError?: ServerErrorObserver): Promise<Response> {
+export async function dispatchApiRoute<P extends Schema | undefined, Q extends Schema | undefined, B extends Schema | undefined, R extends Schema | undefined, S, L = undefined, T extends ApiSuccessStatus = ApiSuccessStatus>(definition: ApiRouteDefinition<P, Q, B, R, S, L, T>, context: RequestContext<S>, sessions: SessionManager, params: unknown = {}, onError?: ServerErrorObserver): Promise<Response> {
   try { return finish(await executeApiRoute(definition, context, sessions, params), context); }
   catch (error) { reportServerError(error, context.requestId, onError); return finish(errorResponse(error, context.requestId), context); }
 }
@@ -436,7 +611,7 @@ export async function dispatchApiRoute<P extends Schema | undefined, Q extends S
  * const response = await dispatchRpc(getUser, context, sessions);
  * ```
  */
-export async function dispatchRpc<I extends Schema, O extends Schema, S>(definition: RpcDefinition<I, O, S>, context: RequestContext<S>, sessions: SessionManager, onError?: ServerErrorObserver): Promise<Response> {
+export async function dispatchRpc<I extends Schema, O extends Schema, S, L = undefined>(definition: RpcDefinition<I, O, S, L>, context: RequestContext<S>, sessions: SessionManager, onError?: ServerErrorObserver): Promise<Response> {
   try {
     if (context.request.method !== "POST") throw new ApiError("METHOD_NOT_ALLOWED", 405);
     const output = await executeRpc(definition, await readJson(context.request), context, sessions);

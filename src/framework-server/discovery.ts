@@ -119,11 +119,11 @@ type PatternPart = { kind: "static" | "param" | "rest"; value: string };
 export function parts(pathname: string): PatternPart[] {
   return pathname.split("/").filter(Boolean).map((part, index, all) => {
     if (/^\[\.\.\.[A-Za-z_$][\w$]*\]$/.test(part)) {
-      if (index !== all.length - 1) throw new Error(`Catch-all must be last: ${pathname}`);
+      if (index !== all.length - 1) throw new Error(`El segmento catch-all debe ser el último: ${pathname}`);
       return { kind: "rest", value: part.slice(4, -1) };
     }
     if (/^\[[A-Za-z_$][\w$]*\]$/.test(part)) return { kind: "param", value: part.slice(1, -1) };
-    if (!/^[A-Za-z0-9_-]+$/.test(part)) throw new Error(`Invalid server route segment: ${part}`);
+    if (!/^[A-Za-z0-9_-]+$/.test(part)) throw new Error(`Segmento de ruta del servidor no válido: ${part}`);
     return { kind: "static", value: part };
   });
 }
@@ -142,7 +142,7 @@ export function assertCallablePaths(entries: readonly { readonly file: string; r
   for (const entry of entries) {
     for (const [previousPath, previousFile] of seen) {
       if (entry.path !== previousPath && !entry.path.startsWith(`${previousPath}.`) && !previousPath.startsWith(`${entry.path}.`)) continue;
-      throw new Error(`${label}: ${previousFile} (${previousPath}) and ${entry.file} (${entry.path}) cannot both be callable client paths`);
+      throw new Error(`${label}: ${previousFile} (${previousPath}) y ${entry.file} (${entry.path}) no pueden ser a la vez rutas invocables del cliente`);
     }
     seen.set(entry.path, entry.file);
   }
@@ -171,7 +171,7 @@ export async function loadSocketChannels(manifest: Pick<ServerManifest, "socket"
   const channels: Record<string, unknown> = Object.create(null);
   for (const endpoint of manifest.socket ?? []) {
     const module = await load(endpoint.file);
-    if (!module || typeof module !== "object" || !("default" in module)) throw new Error(`${endpoint.file}: Socket channel requires a default export`);
+    if (!module || typeof module !== "object" || !("default" in module)) throw new Error(`${endpoint.file}: el canal Socket requiere un export por defecto`);
     channels[endpoint.name] = (module as { default: unknown }).default;
   }
   return channels;

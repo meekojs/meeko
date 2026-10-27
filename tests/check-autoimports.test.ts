@@ -156,7 +156,7 @@ test("server contracts still reject autoimported schemas that do not live in sha
     ].join("\n"),
   });
   try {
-    await assert.rejects(generateServerContracts(root), /query must come from shared\//);
+    await assert.rejects(generateServerContracts(root), /query debe venir de shared\//);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

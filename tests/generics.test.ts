@@ -118,7 +118,7 @@ test("generic gives the compiled module generic types and functions", () => {
   assert.ok(code.includes("return hydrateScope<T>(__scope, __inputProps, __state);"));
   assert.ok(code.includes("() => __setup<T>(__inputProps)"));
   // The tag check that a parent calls: T comes from the props, the rest only uses it.
-  assert.ok(code.includes(`export declare const __meekoTag: <${parameters}>(props: ComponentProps<T> & __meeko.ExtraProps, events: NoInfer<__meeko.EventNames<ComponentProps<T>>>, models: NoInfer<ComponentModels<T>>, snippets: NoInfer<ComponentSnippets<T>>) => __meeko.TagInput<ComponentExposed<T>>;`));
+  assert.ok(code.includes(`export declare const __meekoTag: <${parameters}>(props: __MeekoTagProps<ComponentProps<T>> & __meeko.ExtraProps, events: NoInfer<__meeko.EventNames<ComponentProps<T>>>, models: NoInfer<ComponentModels<T>>, snippets: NoInfer<ComponentSnippets<T>>) => __meeko.TagInput<ComponentExposed<T>>;`));
   assert.ok(code.includes(`declare function __meeko_channels<${parameters}>(): { readonly models: ComponentModels<T>; readonly snippets: ComponentSnippets<T> };`));
   // Inside the setup, the macros use the parameters of __setup.
   assert.match(code, /const current: __meeko\.Signal<__MeekoModels<T>\["current"\]> = __meeko\.useModel<__MeekoModels<T>\["current"\]>/);
@@ -134,7 +134,7 @@ test("generic gives the compiled module generic types and functions", () => {
   const plain = compile(`<script lang="ts">const props = defineProps<{ id: number }>();</script><template><p>{props.id}</p></template>`, "Plain.meeko").code;
   assert.match(plain, /export type ComponentProps = \{ id: number \};/);
   assert.match(plain, /export function renderToString\(__inputProps: ComponentProps, __state\?: __meeko\.HotState\): string/);
-  assert.match(plain, /export declare const __meekoTag: \(props: ComponentProps & __meeko\.ExtraProps, events: NoInfer<__meeko\.EventNames<ComponentProps>>, models: __meeko\.NoModels, snippets: __meeko\.NoSnippets\) => __meeko\.TagInput<ComponentExposed>;/);
+  assert.match(plain, /export declare const __meekoTag: \(props: __MeekoTagProps<ComponentProps> & __meeko\.ExtraProps, events: NoInfer<__meeko\.EventNames<ComponentProps>>, models: __meeko\.NoModels, snippets: __meeko\.NoSnippets\) => __meeko\.TagInput<ComponentExposed>;/);
   assert.match(plain, /export declare const __meekoChannels: \{ readonly models: ComponentModels; readonly snippets: ComponentSnippets \};/);
 });
 

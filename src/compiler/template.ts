@@ -1,5 +1,5 @@
 import { parseFragment } from "parse5";
-import { compileError, maskComponentTags, parseErrorMessage } from "./sfc.js";
+import { compileError, maskComponentTags, maskedFormTag, parseErrorMessage } from "./sfc.js";
 import type { SfcSection } from "./sfc.js";
 
 /** Atributo normalizado de una etiqueta de plantilla. */
@@ -110,7 +110,10 @@ function normalize(node: ParsedNode, context: NormalizeContext): TemplateNode {
     start: template.contentStart + (location?.startOffset ?? 0),
     end: template.contentStart + (location?.endOffset ?? template.content.length),
   };
-  if (node.tagName !== undefined) result.tagName = node.tagName;
+  if (node.tagName === maskedFormTag && /^<\/?form/i.test(template.content.slice(location?.startOffset ?? 0, (location?.startOffset ?? 0) + 6))) {
+    result.nodeName = "form";
+    result.tagName = "form";
+  } else if (node.tagName !== undefined) result.tagName = node.tagName;
   if (node.tagName !== undefined && node.namespaceURI !== undefined) result.namespaceURI = node.namespaceURI;
   const componentName = componentTagName(node, context);
   if (componentName !== undefined) {

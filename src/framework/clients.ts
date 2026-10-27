@@ -138,10 +138,21 @@ export type AnyApiOperation = ApiOperation<unknown, unknown, unknown, unknown>;
 type SearchValue = string | number | boolean | null | undefined;
 export type QueryValue = SearchValue | readonly SearchValue[];
 type RequestOptions = { readonly signal?: AbortSignal };
-type ParamOption<T> = T extends undefined ? { readonly params?: never } : { readonly params: T };
+/**
+ * The `Key` option for a contract value `T`. It does not distribute over `T`, so a value typed as
+ * the whole union (`{ body: A | B }`) is accepted, not only one member at a time. An absent value
+ * (`undefined`) forbids the option, an `undefined` member, `any` or `Optional` makes it optional,
+ * and `unknown` keeps it required.
+ */
+type ContractOption<Key extends string, T, Optional extends boolean = false> = 0 extends 1 & T ? { readonly [K in Key]?: T }
+  : [T] extends [undefined] ? { readonly [K in Key]?: never }
+  : unknown extends T ? { readonly [K in Key]: T }
+  : undefined extends T ? { readonly [K in Key]?: Exclude<T, undefined> }
+  : Optional extends true ? { readonly [K in Key]?: T } : { readonly [K in Key]: T };
+type ParamOption<T> = ContractOption<"params", T>;
 /** A query whose fields are all optional (it accepts `{}`) may be left out. */
-type QueryOption<T> = T extends undefined ? { readonly query?: never } : {} extends T ? { readonly query?: T } : { readonly query: T };
-type BodyOption<T> = T extends undefined ? { readonly body?: never } : { readonly body: T };
+type QueryOption<T> = ContractOption<"query", T, {} extends T ? true : false>;
+type BodyOption<T> = ContractOption<"body", T>;
 type OptionalQuery<Q> = [Q] extends [undefined] ? true : {} extends Q ? true : false;
 type ApiArguments<O extends AnyApiOperation> = O["params"] extends undefined
   ? OptionalQuery<O["query"]> extends true
@@ -190,6 +201,38 @@ export type RpcClient<Contract extends Record<string, RpcOperation>> = Intersect
 }[keyof Contract & string]>;
 
 /**
+ * Un mensaje del schema sobre un campo de la entrada que el servidor rechazó con `400`
+ * (`INVALID_PARAMS`, `INVALID_QUERY`, `INVALID_BODY` o `INVALID_INPUT`). Lo llevan
+ * `ClientError.issues` y el campo `issues` de la respuesta JSON.
+ *
+ * @since 1.2.0
+ * @example
+ * ```ts
+ * import type { ValidationIssue } from "@meekojs/meeko/framework";
+ *
+ * const fieldErrors = (issues: readonly ValidationIssue[] = []): Record<string, string> =>
+ *   Object.fromEntries(issues.map((issue) => [issue.path, issue.message]));
+ * ```
+ */
+export interface ValidationIssue {
+  /** Claves del campo unidas con `.`, como `"items.0.name"`; `""` para la entrada completa. */
+  readonly path: string;
+  /** Mensaje del schema, como el de `v.minLength(1, "Escribe tu contraseña.")`. */
+  readonly message: string;
+}
+
+function validationIssues(value: unknown): readonly ValidationIssue[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const issues: ValidationIssue[] = [];
+  for (const item of value as unknown[]) {
+    if (item === null || typeof item !== "object") continue;
+    const { path, message } = item as { path?: unknown; message?: unknown };
+    if (typeof path === "string" && typeof message === "string") issues.push(Object.freeze({ path, message }));
+  }
+  return issues.length ? Object.freeze(issues) : undefined;
+}
+
+/**
  * Error que lanzan los clientes de API y RPC ante una respuesta no correcta. `message` es el
  * código. Una respuesta de error sin `code` usa `HTTP_ERROR`, y una respuesta correcta que no es
  * JSON, `INVALID_RESPONSE`.
@@ -205,14 +248,27 @@ export type RpcClient<Contract extends Record<string, RpcOperation>> = Intersect
  *   else throw error;
  * }
  * ```
+ * Los mensajes de validación llegan a un formulario por `issues`:
+ * ```ts
+ * import { ClientError } from "@meekojs/meeko/framework";
+ *
+ * try {
+ *   await rpc.auth.login({ email, password });
+ * } catch (error) {
+ *   if (!(error instanceof ClientError) || !error.issues) throw error;
+ *   for (const issue of error.issues) fieldErrors.set(issue.path, issue.message);
+ * }
+ * ```
  */
 export class ClientError extends Error {
   /**
    * @param code Código de error del servidor, como `NOT_FOUND` o `INTERNAL_ERROR`.
    * @param status Estado HTTP de la respuesta.
    * @param requestId ID de la petición (`x-request-id`), si el servidor lo envió.
+   * @param issues Mensajes del schema de una entrada no válida (desde `1.2`), o `undefined` si la
+   * respuesta no los trae.
    */
-  constructor(public readonly code: string, public readonly status: number, public readonly requestId?: string) {
+  constructor(public readonly code: string, public readonly status: number, public readonly requestId?: string, public readonly issues?: readonly ValidationIssue[]) {
     super(code);
     this.name = "ClientError";
   }
@@ -321,7 +377,7 @@ async function responseValue(response: Response, contentType: "json" | "response
     const record = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
     const code = typeof record.code === "string" ? record.code : "HTTP_ERROR";
     const requestId = typeof record.requestId === "string" ? record.requestId : response.headers.get("x-request-id") ?? undefined;
-    throw new ClientError(code, response.status, requestId);
+    throw new ClientError(code, response.status, requestId, validationIssues(record.issues));
   }
   if (contentType === "response") return response;
   if (response.status === 204) return undefined;

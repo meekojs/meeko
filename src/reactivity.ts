@@ -83,6 +83,10 @@ export function createContext<T>(description?: string): ContextKey<T> {
 export type EffectSource = DevtoolsReadSite;
 
 interface Observer {
+  /** Creation order: a region, or a `computed`, is always older than the observers it creates. */
+  id: number;
+  /** In the pending queue; cleared when it runs or is disposed. */
+  queued?: boolean;
   run: () => void;
   dependencies: Set<InternalSignal<unknown>>;
   disposed: boolean;
@@ -119,7 +123,68 @@ let activeObserver: Observer | undefined;
 let activeOwner: Owner | undefined;
 let batchDepth = 0;
 let flushing = false;
-const pending = new Set<Observer>();
+let nextObserverId = 0;
+
+/**
+ * Observers waiting to run, oldest first. Running in creation order means a parent runs before
+ * what it created: when an `if:` region hides, it disposes its bindings before they read the
+ * value that hid it. A `computed` that changes queues its readers, and the oldest of them runs
+ * next even if younger observers were already waiting.
+ */
+const pending = {
+  heap: [] as Observer[],
+  size: 0,
+  add(observer: Observer): void {
+    if (observer.queued || observer.disposed) return;
+    observer.queued = true;
+    this.size++;
+    const heap = this.heap;
+    heap.push(observer);
+    for (let index = heap.length - 1; index > 0;) {
+      const parent = (index - 1) >> 1;
+      if (heap[parent]!.id <= observer.id) break;
+      heap[index] = heap[parent]!;
+      heap[parent] = observer;
+      index = parent;
+    }
+  },
+  /** Removed lazily: the entry stays in the heap and is skipped when it surfaces. */
+  delete(observer: Observer): void {
+    if (!observer.queued) return;
+    observer.queued = false;
+    this.size--;
+  },
+  pop(): Observer | undefined {
+    const heap = this.heap;
+    while (heap.length > 0) {
+      const top = heap[0]!;
+      const last = heap.pop()!;
+      if (heap.length > 0) {
+        heap[0] = last;
+        for (let index = 0; ;) {
+          const left = index * 2 + 1;
+          const right = left + 1;
+          let smallest = index;
+          if (left < heap.length && heap[left]!.id < heap[smallest]!.id) smallest = left;
+          if (right < heap.length && heap[right]!.id < heap[smallest]!.id) smallest = right;
+          if (smallest === index) break;
+          [heap[index], heap[smallest]] = [heap[smallest]!, heap[index]!];
+          index = smallest;
+        }
+      }
+      if (!top.queued) continue;
+      top.queued = false;
+      this.size--;
+      return top;
+    }
+    return undefined;
+  },
+  clear(): void {
+    for (const observer of this.heap) observer.queued = false;
+    this.heap = [];
+    this.size = 0;
+  },
+};
 
 /**
  * Publica un valor en la instancia activa y sus descendientes. Las raíces independientes no
@@ -242,20 +307,20 @@ function flush(): void {
   flushing = true;
   const failures: unknown[] = [];
   try {
-    let iterations = 0;
-    while (pending.size > 0) {
-      if (++iterations > 1000) {
+    // A round is a pass in creation order; going back to an older observer starts a new one. An
+    // observer that keeps writing what it reads loops forever, so the rounds are bounded.
+    let rounds = 0;
+    let lastId = Infinity;
+    for (let observer = pending.pop(); observer; observer = pending.pop()) {
+      if (observer.id <= lastId && ++rounds > 1000) {
         pending.clear();
         failures.push(new Error("Reactive update cycle exceeded 1000 iterations"));
         break;
       }
-      const observers = [...pending];
-      pending.clear();
-      for (const observer of observers) {
-        if (observer.disposed) continue;
-        try { observer.run(); }
-        catch (error) { failures.push(error); }
-      }
+      lastId = observer.id;
+      if (observer.disposed) continue;
+      try { observer.run(); }
+      catch (error) { failures.push(error); }
     }
   } finally {
     flushing = false;
@@ -348,9 +413,25 @@ export function effect<const F extends () => unknown>(fn: SyncEffectCallback<F>,
   return observe(fn, source);
 }
 
-function observe(fn: () => unknown, source?: EffectSource): () => void {
+/**
+ * Reserves a place in the update order for an effect created later. A region that hydrates its
+ * content before creating its own effect takes its place first, so it still updates (and disposes
+ * that content) before the content's own bindings run. Internal.
+ */
+export function reserveUpdateOrder(): number {
+  return nextObserverId++;
+}
+
+/** `effect` in a place reserved with {@link reserveUpdateOrder}. Internal. */
+export function effectInOrder(order: number, fn: () => unknown, source?: EffectSource): () => void {
+  if (dryDepth > 0) return () => {};
+  return observe(fn, source, order);
+}
+
+function observe(fn: () => unknown, source?: EffectSource, order = nextObserverId++): () => void {
   const owner = activeOwner;
   const observer: Observer = {
+    id: order,
     dependencies: new Set(),
     disposed: false,
     run() {
@@ -426,7 +507,7 @@ export function captureParentOwner(): <T>(work: () => T) => T {
 export function trackReadSite<T>(source: EffectSource, read: () => T): T {
   const outer = activeObserver;
   if (!outer) return read();
-  const probe: Observer = { run() {}, dependencies: new Set(), disposed: false };
+  const probe: Observer = { id: nextObserverId++, run() {}, dependencies: new Set(), disposed: false };
   activeObserver = probe;
   try {
     return read();

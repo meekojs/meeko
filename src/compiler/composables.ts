@@ -4,7 +4,7 @@ import ts from "@typescript/typescript6";
  * Composables that the compiler resolves from the top level of a `<script>`. Calling one inside
  * a function, handler, effect or `onMounted` is MEEK054. `useState`, `useSocket`,
  * `useSocketClient` and `useNavigation` keep their 1.0 behavior and may still be called from
- * nested code.
+ * nested code, as may `useRoute`.
  */
 export const topLevelComposables: ReadonlySet<string> = new Set(["useElementRef", "useApi", "useRpcQuery", "useRpcMutation"]);
 

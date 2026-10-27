@@ -93,13 +93,13 @@ test("server contract generator rejects private schema types", async () => {
     await writeFile(handler, `import { defineApiRoute } from "@meekojs/meeko/server";
 import { privateSchema } from "../../private.js";
 export default defineApiRoute({ params: privateSchema, response: privateSchema, handler: async () => "private" });`);
-    await assert.rejects(generateServerContracts(root), /must come from shared/);
+    await assert.rejects(generateServerContracts(root), /debe venir de shared/);
     await writeFile(handler, `import { defineApiRoute } from "@meekojs/meeko/server";
 import { userIdParams, userSchema } from "../../../shared/schemas/user.js";
 export default defineApiRoute({ params: userIdParams, response: userSchema, handler: async () => ({ id: "1", name: "Ada" }) });`);
     const shared = join(root, "shared", "schemas", "user.ts");
     await writeFile(shared, `${await readFile(shared, "utf8")}\nexport type Hidden = import("../../server/private.js").Secret;\n`);
-    await assert.rejects(generateServerContracts(root), /dependency escapes shared/);
+    await assert.rejects(generateServerContracts(root), /dependencia de un schema público sale de shared/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -111,9 +111,9 @@ test("server contract generator rejects path parameter schemas that cannot accep
     const shared = join(root, "shared", "schemas", "user.ts");
     const source = await readFile(shared, "utf8");
     await writeFile(shared, source.replace("schema<{ id: string }>();", "schema<{ id: number }>();"));
-    await assert.rejects(generateServerContracts(root), /params.*URL strings/);
+    await assert.rejects(generateServerContracts(root), /params.*cadenas de URL/);
     await writeFile(shared, source.replace("schema<{ id: string }>();", "schema<{ id: string; extra?: string }>();"));
-    await assert.rejects(generateServerContracts(root), /params.*URL strings/);
+    await assert.rejects(generateServerContracts(root), /params.*cadenas de URL/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -126,7 +126,7 @@ test("server contract generator requires params only for dynamic API paths", asy
     await writeFile(dynamic, `import { defineApiRoute } from "@meekojs/meeko/server";
 import { userSchema } from "../../../shared/schemas/user.js";
 export default defineApiRoute({ response: userSchema, handler: async () => ({ id: "1", name: "Ada" }) });`);
-    await assert.rejects(generateServerContracts(root), /dynamic API path requires a public params schema/);
+    await assert.rejects(generateServerContracts(root), /ruta de API dinámica requiere un schema público params/);
 
     const original = await readFile(join(root, "shared", "schemas", "user.ts"), "utf8");
     await writeFile(join(root, "shared", "schemas", "user.ts"), `${original}\nexport const emptyParams = schema<{}>();\n`);
@@ -137,7 +137,7 @@ export default defineApiRoute({ params: userIdParams, response: userSchema, hand
     await writeFile(staticHandler, `import { defineApiRoute } from "@meekojs/meeko/server";
 import { emptyParams, userSchema } from "../../../shared/schemas/user.js";
 export default defineApiRoute({ params: emptyParams, response: userSchema, handler: async () => ({ id: "1", name: "Ada" }) });`);
-    await assert.rejects(generateServerContracts(root), /static API path cannot declare params/);
+    await assert.rejects(generateServerContracts(root), /ruta de API estática no puede declarar params/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -153,7 +153,7 @@ test("server contract generator rejects query schemas with values unavailable fr
     await writeFile(handler, `import { defineApiRoute } from "@meekojs/meeko/server";
 import { badQuery, userSchema } from "../../../shared/schemas/user.js";
 export default defineApiRoute({ query: badQuery, response: userSchema, handler: async () => ({ id: "1", name: "Ada" }) });`);
-    await assert.rejects(generateServerContracts(root), /query.*URL strings/);
+    await assert.rejects(generateServerContracts(root), /query.*cadenas de URL/);
     await writeFile(shared, `${source}\nexport const badQuery = schema<{ page?: string; tags?: readonly string[] }>();\n`);
     await generateServerContracts(root);
   } finally {
@@ -179,7 +179,7 @@ export const recursiveContract = schema<undefined, RecursiveContract>();
     await writeFile(api, `import { defineApiRoute } from "@meekojs/meeko/server";
 import { unsafeAny } from "../../../shared/schemas/user.js";
 export default defineApiRoute({ response: unsafeAny, handler: async () => undefined });`);
-    await assert.rejects(generateServerContracts(root), /response must expose concrete Standard Schema input and output types/);
+    await assert.rejects(generateServerContracts(root), /response debe exponer tipos de entrada y salida de Standard Schema concretos/);
 
     await writeFile(api, `import { defineApiRoute } from "@meekojs/meeko/server";
 import { userSchema } from "../../../shared/schemas/user.js";
@@ -188,27 +188,77 @@ export default defineApiRoute({ response: userSchema, handler: async () => ({ id
     await writeFile(rpc, `import { defineRpc } from "@meekojs/meeko/server";
 import { unsafeUnknown, userSchema } from "../../../shared/schemas/user.js";
 export default defineRpc({ input: unsafeUnknown, output: userSchema, handler: async () => ({ id: "1", name: "Ada" }) });`);
-    await assert.rejects(generateServerContracts(root), /input must expose concrete Standard Schema input and output types/);
+    await assert.rejects(generateServerContracts(root), /input debe exponer tipos de entrada y salida de Standard Schema concretos/);
 
     await writeFile(rpc, `import { defineRpc } from "@meekojs/meeko/server";
 import { getUserInput, unsafeNever } from "../../../shared/schemas/user.js";
 export default defineRpc({ input: getUserInput, output: unsafeNever, handler: async () => { throw new Error("unreachable"); } });`);
-    await assert.rejects(generateServerContracts(root), /output must expose concrete Standard Schema input and output types/);
+    await assert.rejects(generateServerContracts(root), /output debe exponer tipos de entrada y salida de Standard Schema concretos/);
 
     await writeFile(rpc, `import { defineRpc } from "@meekojs/meeko/server";
 import { unsafeNestedInput, userSchema } from "../../../shared/schemas/user.js";
 export default defineRpc({ input: unsafeNestedInput, output: userSchema, handler: async () => ({ id: "1", name: "Ada" }) });`);
-    await assert.rejects(generateServerContracts(root), /input must expose concrete Standard Schema input and output types/);
+    await assert.rejects(generateServerContracts(root), /input debe exponer tipos de entrada y salida de Standard Schema concretos/);
 
     await writeFile(rpc, `import { defineRpc } from "@meekojs/meeko/server";
 import { getUserInput, unsafeNestedOutput } from "../../../shared/schemas/user.js";
 export default defineRpc({ input: getUserInput, output: unsafeNestedOutput, handler: async () => ({ items: [] }) });`);
-    await assert.rejects(generateServerContracts(root), /output must expose concrete Standard Schema input and output types/);
+    await assert.rejects(generateServerContracts(root), /output debe exponer tipos de entrada y salida de Standard Schema concretos/);
 
     await writeFile(rpc, `import { defineRpc } from "@meekojs/meeko/server";
 import { getUserInput, recursiveContract } from "../../../shared/schemas/user.js";
 export default defineRpc({ input: getUserInput, output: recursiveContract, handler: async () => ({ value: "root" }) });`);
     await generateServerContracts(root);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("server contract generator reads a literal status, types 204 as undefined and accepts shorthand schemas", async () => {
+  const root = await fixture();
+  try {
+    const create = join(root, "server", "api", "users", "index.post.ts");
+    await writeFile(create, `import { defineApiRoute } from "@meekojs/meeko/server";
+import { createUserBody as body, userSchema as response } from "../../../shared/schemas/user.js";
+export default defineApiRoute({ body, response, status: 201, handler: async ({ body }) => ({ id: "1", name: body.name }) });`);
+    const remove = join(root, "server", "api", "users", "[id].delete.ts");
+    await writeFile(remove, `import { defineApiRoute } from "@meekojs/meeko/server";
+import { userIdParams } from "../../../shared/schemas/user.js";
+export default defineApiRoute({ params: userIdParams, status: 204, handler: async () => {} });`);
+    const generated = await generateServerContracts(root);
+    const declaration = await readFile(generated.types, "utf8");
+    assert.match(declaration, /post: import\("@meekojs\/meeko\/framework"\)\.ApiOperation<undefined, undefined, __Input<[^>]+\["createUserBody"\]>, __Output<[^>]+\["userSchema"\]>>/);
+    assert.match(declaration, /delete: import\("@meekojs\/meeko\/framework"\)\.ApiOperation<__Input<[^>]+\["userIdParams"\]>, undefined, undefined, undefined>/);
+    const publicManifest = await readFile(generated.manifest, "utf8");
+    assert.doesNotMatch(publicManifest, /status/);
+    const serverClients = await readFile(join(root, ".meeko", "generated", "clients.server.ts"), "utf8");
+    assert.match(serverClients, /import \{ createServerClientOptions, createServerSocketRegistry \} from "@meekojs\/meeko\/server";/);
+    assert.match(serverClients, /export const socket = createServerSocketRegistry\(socketContracts\);/);
+    const browserClients = await readFile(join(root, ".meeko", "generated", "clients.client.ts"), "utf8");
+    assert.match(browserClients, /export const socket = createSocketRegistry\(socketContracts\);/);
+    assert.doesNotMatch(browserClients, /createServerSocketRegistry|@meekojs\/meeko\/server/);
+
+    await writeFile(remove, `import { defineApiRoute } from "@meekojs/meeko/server";
+import { userIdParams } from "../../../shared/schemas/user.js";
+const status = 204;
+export default defineApiRoute({ params: userIdParams, status, handler: async () => {} });`);
+    await assert.rejects(generateServerContracts(root), /status debe ser el literal 200, 201, 202 o 204/);
+    await writeFile(remove, `import { defineApiRoute } from "@meekojs/meeko/server";
+import { userIdParams } from "../../../shared/schemas/user.js";
+export default defineApiRoute({ params: userIdParams, status: 203, handler: async () => {} });`);
+    await assert.rejects(generateServerContracts(root), /status debe ser el literal 200, 201, 202 o 204/);
+    await writeFile(remove, `import { defineApiRoute } from "@meekojs/meeko/server";
+import { userIdParams, userSchema } from "../../../shared/schemas/user.js";
+export default defineApiRoute({ params: userIdParams, response: userSchema, status: 204, handler: async () => {} });`);
+    await assert.rejects(generateServerContracts(root), /status 204 responde sin cuerpo y no admite un schema response/);
+    await writeFile(remove, `import { defineApiRoute } from "@meekojs/meeko/server";
+import { userIdParams } from "../../../shared/schemas/user.js";
+export default defineApiRoute({ params: userIdParams, contentType: "response", status: 200, handler: async () => new Response(null) });`);
+    await assert.rejects(generateServerContracts(root), /status no se combina con contentType: "response"/);
+    await writeFile(remove, `import { defineApiRoute } from "@meekojs/meeko/server";
+import { userIdParams } from "../../../shared/schemas/user.js";
+export default defineApiRoute({ params: userIdParams, handler: async () => {} });`);
+    await assert.rejects(generateServerContracts(root), /la API requiere un schema público response/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

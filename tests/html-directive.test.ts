@@ -69,7 +69,7 @@ test("html compiles to unescaped SSR content, a marker and a hydration binding",
   const { code } = compile(component, "Html.meeko");
   assert.match(code, /"<article" \+ " data-meeko-h=\\"0\\"" \+ " class=\\"doc\\"" \+ ">" \+ __meeko\.rawHtml\(body\.value, "article"\) \+ "<\/article>"/);
   assert.match(code, /__meeko\.bindHtml\(__scope, 0, \(\) => \(body\.value\), "Html\.meeko:\d+:\d+ \(html 0\)"\)/);
-  assert.match(code, /__meeko\.bindHtml\(__scope, 2, \(\) => \(\(__meeko_item\.value\)\)/);
+  assert.match(code, /__meeko\.bindHtml\(__scope, 2, \(\) => \(\(__meeko_item_\d+\.value\)\)/);
   assert.doesNotMatch(code, / html=\\"/, "html is a directive, not an attribute");
 });
 
