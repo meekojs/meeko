@@ -1,6 +1,6 @@
 import type { ChildProcess } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readdir, realpath, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { testTempRoot } from "../../scripts/test-tmp-root.mjs";
@@ -12,15 +12,58 @@ export const repositoryRoot = resolve(fileURLToPath(new URL("../..", import.meta
  * Parent of every temporary test project: a directory of this checkout in the system's
  * temporary directory (see `scripts/test-tmp-root.mjs`). Outside the repository no editor
  * or watcher of a workspace sees the projects, and their `meeko dev` bridges, contracts and
- * generated files stay theirs. Its `node_modules` links to the repository's, so projects
- * resolve the repository's dependencies as they would inside it; `@meekojs/meeko` itself is
- * linked by each project with {@link linkRepositoryPackages}. `scripts/clean-test-tmp.mjs`
- * empties it before each test run, so an interrupted run leaves nothing behind.
+ * generated files stay theirs. Its `node_modules` mirrors the repository's (see
+ * {@link linkRepositoryDependencies}), so projects resolve the repository's dependencies as
+ * they would inside it; `@meekojs/meeko` itself is linked by each project with
+ * {@link linkRepositoryPackages}. `scripts/clean-test-tmp.mjs` empties it before each test
+ * run, so an interrupted run leaves nothing behind.
  */
 export const tempProjectsRoot = testTempRoot(repositoryRoot);
 
+/** Links `link` to the directory `target`; a link left by an earlier run to another directory is replaced. */
+async function linkDirectory(target: string, link: string): Promise<void> {
+  try {
+    await symlink(target, link, "junction");
+    return;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+  }
+  if (await realpath(link).catch(() => undefined) === target) return;
+  // An install moved the package since: `unlink` removes only a link, never a directory.
+  await unlink(link);
+  await symlink(target, link, "junction");
+}
+
 /**
- * Creates {@link tempProjectsRoot}, its link to the repository's `node_modules` and a
+ * Mirrors the repository's `node_modules` in `directory`: one junction (a directory symlink
+ * outside Windows) per dependency, to the real directory of the package. pnpm links each
+ * dependency with a relative symlink where Windows lets it create one, as on an elevated CI
+ * runner, and with a junction where it does not. Windows does not resolve such a relative
+ * symlink reached through a link to the `node_modules` that holds it, so Node and TypeScript 7
+ * missed `@typescript/typescript6` and `@types/node` there: the folder is mirrored, not linked.
+ * Entries that start with a dot (`.bin`, tool caches) are left out. Returns the links, so the
+ * caller can remove them before deleting `directory`.
+ */
+export async function linkRepositoryDependencies(directory: string): Promise<string[]> {
+  const source = join(repositoryRoot, "node_modules");
+  const names: string[] = [];
+  for (const entry of await readdir(source)) {
+    if (entry.startsWith(".")) continue;
+    if (entry.startsWith("@")) for (const name of await readdir(join(source, entry))) names.push(join(entry, name));
+    else names.push(entry);
+  }
+  const links: string[] = [];
+  for (const name of names) {
+    const link = join(directory, name);
+    await mkdir(dirname(link), { recursive: true });
+    await linkDirectory(await realpath(join(source, name)), link);
+    links.push(link);
+  }
+  return links;
+}
+
+/**
+ * Creates {@link tempProjectsRoot}, its mirror of the repository's `node_modules` and a
  * `package.json` with `"type": "module"`: inside the repository the projects inherited the
  * repository's, and without it Node would load their compiled `.ts` files as CommonJS, with a
  * second copy of the runtime. A project that writes its own `package.json` overrides it.
@@ -28,23 +71,28 @@ export const tempProjectsRoot = testTempRoot(repositoryRoot);
 async function prepareTempProjectsRoot(): Promise<void> {
   await mkdir(tempProjectsRoot, { recursive: true });
   await writeFile(join(tempProjectsRoot, "package.json"), `${JSON.stringify({ private: true, type: "module" })}\n`);
-  try {
-    await symlink(join(repositoryRoot, "node_modules"), join(tempProjectsRoot, "node_modules"), "junction");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+  const modules = join(tempProjectsRoot, "node_modules");
+  // Earlier runs linked the whole folder: remove that link, never what it points to.
+  if ((await lstat(modules).catch(() => undefined))?.isSymbolicLink()) {
+    await unlink(modules).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error;
+    });
   }
+  await linkRepositoryDependencies(modules);
 }
 
 /**
  * Links packages of the repository into `<root>/node_modules`, as an install would:
  * `@meekojs/meeko` is the repository itself (its `exports` point to `dist/`); any other
- * name is the repository's own dependency, e.g. `vite` or `@types`.
+ * name is the repository's own dependency, e.g. `vite` or `@types/node`, linked to its real
+ * directory for the reason given in {@link linkRepositoryDependencies}.
  */
 export async function linkRepositoryPackages(root: string, names: readonly string[] = ["@meekojs/meeko"]): Promise<void> {
   for (const name of names) {
     const link = join(root, "node_modules", ...name.split("/"));
     await mkdir(dirname(link), { recursive: true });
-    await symlink(name === "@meekojs/meeko" ? repositoryRoot : join(repositoryRoot, "node_modules", ...name.split("/")), link, "junction");
+    const target = name === "@meekojs/meeko" ? repositoryRoot : await realpath(join(repositoryRoot, "node_modules", ...name.split("/")));
+    await symlink(target, link, "junction");
   }
 }
 

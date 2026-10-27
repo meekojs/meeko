@@ -10,7 +10,7 @@ import type { EditorBridgeDescriptor } from "../src/devtools-bridge-protocol.ts"
 import { editorBridgeFile } from "../src/framework/editor-bridge.ts";
 import { hmrPortFor, isPortFree } from "../src/framework/dev-port.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
-import { repositoryRoot, stopChild, tempProject } from "./helpers/temp-project.ts";
+import { linkRepositoryDependencies, repositoryRoot, stopChild, tempProject } from "./helpers/temp-project.ts";
 
 /** A junction on Windows (no privilege needed), a directory symlink elsewhere. */
 const link = (target: string, path: string) => symlink(target, path, process.platform === "win32" ? "junction" : "dir");
@@ -64,7 +64,7 @@ test("meeko dev restarts when a linked Meeko is rebuilt", { timeout: 240_000 }, 
   const sandbox = await realpath(await mkdtemp(join(tmpdir(), "meeko-dev-restart-")));
   const meeko = join(sandbox, "meeko");
   const app = join(sandbox, "app");
-  const links = [join(meeko, "node_modules"), join(app, "node_modules", "@meekojs", "meeko"), join(app, "node_modules", "vite")];
+  const links = [join(app, "node_modules", "@meekojs", "meeko"), join(app, "node_modules", "vite")];
   context.after(async () => {
     await stopChild(child);
     if (lastPid !== undefined && isAlive(lastPid)) process.kill(lastPid);
@@ -76,11 +76,12 @@ test("meeko dev restarts when a linked Meeko is rebuilt", { timeout: 240_000 }, 
   await mkdir(meeko, { recursive: true });
   await cp(join(repositoryRoot, "dist"), join(meeko, "dist"), { recursive: true });
   await cp(join(repositoryRoot, "package.json"), join(meeko, "package.json"));
-  await link(join(repositoryRoot, "node_modules"), links[0]!);
+  // The copy resolves the repository's dependencies like a linked checkout resolves its own.
+  links.push(...await linkRepositoryDependencies(join(meeko, "node_modules")));
   await initFrameworkProject(app);
   await mkdir(join(app, "node_modules", "@meekojs"), { recursive: true });
-  await link(meeko, links[1]!);
-  await link(join(repositoryRoot, "node_modules", "vite"), links[2]!);
+  await link(meeko, links[0]!);
+  await link(join(repositoryRoot, "node_modules", "vite"), links[1]!);
 
   // The default port is taken (by this test or by something else): dev moves to the next free one.
   blocker = await occupy(4173);
