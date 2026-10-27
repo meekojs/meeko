@@ -3,9 +3,9 @@
 // 1. Pagefind indexes them; the bundle, sitemap.xml and robots.txt are written to public/.
 //    `meeko start` only serves the files of the build manifest, so when those public files
 //    change, `meeko build` runs once more to list them (a clean checkout always builds twice).
-// 2. Each prerendered document gets what Meeko has no option for yet: `<html lang="es">`, the
-//    favicon, its canonical URL and Open Graph tags. Its `headOffset` and `ETag` in
-//    prerender/manifest.json follow the change.
+// 2. Each prerendered document gets the tags that depend on the page: its canonical URL and its
+//    Open Graph title, description and URL. `lang`, the icons and the site-wide tags come from
+//    `document` in meeko.config.ts. Its `ETag` in prerender/manifest.json follows the change.
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
@@ -29,34 +29,26 @@ async function readManifest() {
   return JSON.parse(await readFile(join(prerender, "manifest.json"), "utf8"));
 }
 
-/** The document with the site's additions to `<html>` and `<head>`, and how much `<head>` moved. */
+/**
+ * The document with the tags that depend on the page: its canonical URL and its Open Graph title,
+ * description and URL. `lang`, the icons and the site-wide tags come from `document` in
+ * meeko.config.ts. Running it twice leaves the document as it is.
+ */
 export function decorate(html, pathname) {
-  if (html.includes('<html lang="es">')) return { html, shift: 0 };
-  const opening = html.indexOf("<html>");
-  if (opening < 0) throw new Error(`${pathname}: no <html> to mark as Spanish`);
-  const lang = '<html lang="es">';
-  let result = html.slice(0, opening) + lang + html.slice(opening + "<html>".length);
-  const title = decodeEntities(/<title>([^<]*)<\/title>/.exec(result)?.[1] ?? "Meeko");
-  const description = decodeEntities(/<meta name="description" content="([^"]*)">/.exec(result)?.[1] ?? "");
+  if (html.includes('<meta property="og:title"')) return { html };
+  const title = decodeEntities(/<title>([^<]*)<\/title>/.exec(html)?.[1] ?? "Meeko");
+  const description = decodeEntities(/<meta name="description" content="([^"]*)">/.exec(html)?.[1] ?? "");
   const url = `${origin}${pathname === "/" ? "/" : pathname}`;
   const extras = [
-    '<link rel="icon" type="image/png" sizes="64x64" href="/brand/favicon-64.png">',
-    '<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">',
-    '<meta name="theme-color" content="#fffaf3" media="(prefers-color-scheme: light)">',
-    '<meta name="theme-color" content="#16100e" media="(prefers-color-scheme: dark)">',
     // The 404 document is served for any missing URL, so it names no address of its own.
     ...(pathname === "/404" ? [] : [`<link rel="canonical" href="${escapeAttribute(url)}">`, `<meta property="og:url" content="${escapeAttribute(url)}">`]),
-    '<meta property="og:type" content="website">',
-    '<meta property="og:site_name" content="Meeko">',
-    '<meta property="og:locale" content="es_ES">',
     `<meta property="og:title" content="${escapeAttribute(title)}">`,
     ...(description ? [`<meta property="og:description" content="${escapeAttribute(description)}">`] : []),
-    `<meta property="og:image" content="${origin}/brand/apple-touch-icon.png">`,
   ].join("");
-  const close = result.indexOf("</head>");
+  const close = html.indexOf("</head>");
   if (close < 0) throw new Error(`${pathname}: no </head>`);
-  result = result.slice(0, close) + extras + result.slice(close);
-  return { html: result, shift: lang.length - "<html>".length };
+  // After the CSRF meta tag's offset, so `headOffset` does not move.
+  return { html: html.slice(0, close) + extras + html.slice(close) };
 }
 
 async function decoratePrerender() {
@@ -64,11 +56,9 @@ async function decoratePrerender() {
   for (const [pathname, page] of Object.entries(manifest.pages)) {
     const file = join(prerender, ...page.file.split("/"));
     const before = await readFile(file, "utf8");
-    const { html, shift } = decorate(before, pathname);
+    const { html } = decorate(before, pathname);
     if (html === before) continue;
     await writeFile(file, html, "utf8");
-    // The CSRF meta tag goes after Meeko's head prefix, which `lang` moved.
-    page.headOffset += shift;
     page.etag = etagOf(html);
   }
   await writeFile(join(prerender, "manifest.json"), `${JSON.stringify(manifest)}\n`, "utf8");

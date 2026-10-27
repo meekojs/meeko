@@ -22,6 +22,12 @@ export interface HeadMeta {
   property?: string;
   /** Atributo `http-equiv`. */
   httpEquiv?: string;
+  /**
+   * Atributo `media`, como en `theme-color`. Forma parte de la deduplicación: dos `theme-color` con
+   * distinto `media` conviven.
+   * @since 1.2.0
+   */
+  media?: string;
   /** Atributo `content`. */
   content: string;
   /** Clave de deduplicación explícita; no se escribe en el HTML. */
@@ -318,7 +324,7 @@ function readList<T>(value: unknown, label: string, read: (entry: unknown, label
   return value.map((entry, index) => read(entry, `${label}[${index}]`));
 }
 
-const metaFields = { name: "string", property: "string", httpEquiv: "string", content: "string", key: "string" } as const;
+const metaFields = { name: "string", property: "string", httpEquiv: "string", content: "string", media: "string", key: "string" } as const;
 const linkFields = { rel: "string", href: "string", hreflang: "string", type: "string", media: "string", sizes: "string", as: "string", crossorigin: "crossorigin", key: "string" } as const;
 const scriptFields = { src: "string", type: "string", async: "boolean", defer: "boolean", module: "boolean", children: "string", key: "string" } as const;
 const styleFields = { children: "string", media: "string", key: "string" } as const;
@@ -474,9 +480,10 @@ function metaTag(meta: HeadMeta, fallback: boolean): HeadTag {
     : meta.property !== undefined ? `property:${meta.property}`
       : meta.httpEquiv !== undefined ? `http-equiv:${meta.httpEquiv.toLowerCase()}`
         : `content:${meta.content}`;
+  const media = meta.media === undefined ? "" : `|media:${meta.media}`;
   return {
-    tag: "meta", key: meta.key !== undefined ? `meta:key:${meta.key}` : `meta:${natural}`,
-    attributes: attributes([["name", meta.name], ["property", meta.property], ["http-equiv", meta.httpEquiv], ["content", meta.content]]),
+    tag: "meta", key: meta.key !== undefined ? `meta:key:${meta.key}` : `meta:${natural}${media}`,
+    attributes: attributes([["name", meta.name], ["property", meta.property], ["http-equiv", meta.httpEquiv], ["content", meta.content], ["media", meta.media]]),
     ...(fallback ? { fallback } : {}),
   };
 }

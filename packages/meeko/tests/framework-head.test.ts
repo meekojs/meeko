@@ -472,6 +472,20 @@ test("useSeoMeta maps each field to name, property or the canonical link", async
   assert.throws(() => seoMetaHead({ ogtitle: "x" } as never), /unknown field ogtitle/);
 });
 
+test("meta media is rendered and keeps one entry per media in the deduplication", async () => {
+  const { documentHeadEntries, renderHeadDocument, resolveHead } = await runtime();
+  const config: DocumentConfig = { head: { meta: [
+    { name: "theme-color", content: "#fff", media: "(prefers-color-scheme: light)" },
+    { name: "theme-color", content: "#000", media: "(prefers-color-scheme: dark)" },
+  ] } };
+  const route = { meta: [{ name: "theme-color", content: "#111", media: "(prefers-color-scheme: dark)" }] };
+  const { prefix, head } = renderHeadDocument(resolveHead(documentHeadEntries(config, route)), undefined);
+  const html = prefix + head;
+  assert.match(html, /<meta name="theme-color" content="#fff" media="\(prefers-color-scheme: light\)">/);
+  assert.match(html, /<meta name="theme-color" content="#111" media="\(prefers-color-scheme: dark\)">/);
+  assert.doesNotMatch(html, /content="#000"/, "the route replaces the entry with the same media");
+});
+
 test("head inputs are validated: attribute names, event handlers and serializable configs", async () => {
   const { normalizeHeadInput, normalizeDocumentConfig, resolveHead } = await runtime();
   assert.throws(() => normalizeHeadInput({ htmlAttrs: { onclick: "x()" } }, "useHead"), /event handler attribute onclick/);
