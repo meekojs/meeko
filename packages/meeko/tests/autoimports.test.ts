@@ -6,6 +6,25 @@ import test from "node:test";
 import { applyAutoImports, compileWithAutoImports, discoverAutoImports } from "../src/autoimports.ts";
 import { checkSource } from "../src/check.ts";
 
+test("app/types exports are autoimported as types in the app, not in shared/", async () => {
+  const root = await mkdtemp(join(tmpdir(), "meeko-imports-"));
+  try {
+    await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}');
+    await mkdir(join(root, "app", "types"), { recursive: true });
+    await writeFile(join(root, "app", "types", "variants.ts"), "export type ThemeColor = 'gray' | 'accent';\nexport interface ThemeOptions { color: ThemeColor }\n");
+    const registry = await discoverAutoImports(root);
+    const page = join(root, "app", "pages", "index.meeko");
+    for (const target of ["client", "server"] as const) {
+      const code = applyAutoImports("const color: ThemeColor = 'gray'; const options: ThemeOptions = { color };", page, registry, target);
+      assert.match(code, /import type \{ ThemeColor as ThemeColor \} from "\.\.\/types\/variants\.js"/);
+      assert.match(code, /import type \{ ThemeOptions as ThemeOptions \}/);
+    }
+    assert.throws(() => applyAutoImports("type Color = ThemeColor;", join(root, "shared", "utils", "color.ts"), registry, "shared"), /ThemeColor/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("autoimports discover nested exports and enforce client/server scope", async () => {
   const root = await mkdtemp(join(tmpdir(), "meeko-imports-"));
   try {

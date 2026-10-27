@@ -23,7 +23,7 @@ export interface AutoImport {
 }
 
 const directories = [
-  "app/components", "app/composables", "app/utils", "app/stores",
+  "app/components", "app/composables", "app/utils", "app/stores", "app/types",
   "shared/types", "shared/schemas", "shared/utils", "shared/constants", "shared/enums",
   "server/utils",
 ] as const;
