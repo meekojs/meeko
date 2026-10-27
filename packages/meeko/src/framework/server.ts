@@ -22,6 +22,8 @@ import { fixedRoute, provideRoute, routeSnapshot } from "./navigation.js";
 import type { RouteSnapshot } from "./navigation.js";
 import type { PageRequest } from "./page-body.js";
 import type { ErrorPageRecord, RouteRecord } from "./router.js";
+import { emptyPluginState, notifyPluginErrorHandlers, runPlugins } from "./plugin.js";
+import type { PluginRegistration, PluginState } from "./plugin.js";
 
 /** Route manifest of the application handling the current request, for `href(id)`. */
 const requestManifest = new AsyncLocalStorage<readonly RouteRecord[]>();
@@ -160,6 +162,12 @@ export interface FrameworkHandlerOptions<Route = PageRoute> {
   readonly clientEntry?: string;
   /** Añadidos del host a cada documento HTML que renderiza el handler. */
   readonly document?: DocumentOptions;
+  /**
+   * Plugins de aplicación (`definePlugin`) que se ejecutan, en orden, una vez por petición de página
+   * antes del render. Sus valores de `provide` llegan a la página, sus layouts y la página de error.
+   * @since 1.2.0
+   */
+  readonly plugins?: readonly PluginRegistration[];
 }
 
 /**
@@ -319,6 +327,7 @@ async function renderPageTree(
   input: Record<string, unknown>,
   initial: StateStore,
   route: RouteSnapshot,
+  plugins: PluginState,
   signal?: AbortSignal,
 ): Promise<{ rendered: { html: string; state: Record<string, unknown> }; store: StateStore; resources: Record<string, unknown> | undefined; styles: string[] }> {
   const scope = new ResourceScope("collect", {}, signal);
@@ -335,6 +344,8 @@ async function renderPageTree(
     styles.clear();
     return collectStyles(styles, () => withResourceScope(scope, () => withStateStore(store, () => {
       provideRoute(routeState);
+      // Values of the app plugins, which ran for this request.
+      plugins.apply();
       return module.renderWithState(input);
     })));
   }, signal ? { signal } : {});
@@ -541,6 +552,19 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     let pageStore = stateStore;
     /** The route of `useRoute()`; validation replaces the raw parameters with the page's. */
     let route: RouteSnapshot | undefined;
+    /** The app plugins run once per request, right before its first render, with the route known then. */
+    let pluginRun: Promise<PluginState> | undefined;
+    let plugins: PluginState = emptyPluginState;
+    const startPlugins = async (): Promise<PluginState> => {
+      pluginRun ??= runPlugins(options.plugins, { side: "server", route: fixedRoute(route!), request });
+      plugins = await pluginRun;
+      return plugins;
+    };
+    /** The host observer and the observers the plugins of this request registered. */
+    const observe = (failure: unknown, requestId: string): void => {
+      observeServerError(failure, requestId, options.onError);
+      notifyPluginErrorHandlers(plugins.errorHandlers, failure, { side: "server", requestId });
+    };
     const finish = (response: Response): Response => {
       const headers = new Headers(response.headers);
       headers.set("x-request-id", requestContext?.requestId ?? fallbackRequestId);
@@ -569,7 +593,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
         const page = await options.loadPage(errorPage!.file);
         if (page.css) styles.push(page.css);
         const { module, input } = await wrapInLayouts(options.loadPage, page, { ...notFoundProps }, errorPage!.layouts, styles);
-        const { rendered, store, resources, styles: childStyles } = await renderPageTree(module, input, stateStore, route!, request.signal);
+        const { rendered, store, resources, styles: childStyles } = await renderPageTree(module, input, stateStore, route!, await startPlugins(), request.signal);
         styles.push(...childStyles);
         pageStore = store;
         store.seal();
@@ -633,7 +657,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       if (outcome.status !== "rejected" || outcome.error.status < 500) return;
       // A client that left, or a HEAD request, is not a server failure.
       if (request.signal.aborted || deferredWork.signal.aborted) return;
-      observeServerError(outcome.failure, requestId, options.onError);
+      observe(outcome.failure, requestId);
     };
     let deferredEntries: Record<string, unknown>[];
     if (streaming) {
@@ -673,7 +697,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     }
     const { module, input } = await wrapInLayouts(options.loadPage, page, clientPage ? {} : props, match.route.layouts, styles);
     // Top-level data awaits load before the HTML, also before the first byte of a stream.
-    const { rendered, store, resources, styles: childStyles } = await renderPageTree(module, input, stateStore, route, driverSignal);
+    const { rendered, store, resources, styles: childStyles } = await renderPageTree(module, input, stateStore, route, await startPlugins(), driverSignal);
     // Child components link their CSS in the document too, not only once the client bundle loads.
     styles.push(...childStyles);
     pageStore = store;
@@ -721,7 +745,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
           return null;
         }
         return streamBody(first, outcomes.map((_, id) => line(id).then((text) => piece(text, id))), last, (reason, failed) => {
-          if (failed) observeServerError(reason, requestId, options.onError);
+          if (failed) observe(reason, requestId);
           deferredWork.abort(reason);
         });
       };
@@ -756,7 +780,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       const known = error instanceof PageInputError ? new ApiError(error.code, 400) : normalizeServerError(error);
       const requestId = requestContext?.requestId ?? fallbackRequestId;
       const report = (failure: unknown): void => {
-        observeServerError(failure, requestId, options.onError);
+        observe(failure, requestId);
       };
       if (known.status >= 500) report(error);
       if (wantsPayload(request)) {
@@ -773,7 +797,9 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
             // A failure after the render sealed the page state still renders its error page.
             const { rendered: errorRendered } = await renderPageTree(errorPage, {
               status: known.status, message: known.status >= 500 ? "Internal Server Error" : known.code,
-            }, pageStore.sealed ? new StateStore() : pageStore, route!, request.signal);
+            }, pageStore.sealed ? new StateStore() : pageStore, route!,
+            // Plugins that failed (perhaps the failure shown here) leave the error page without their values.
+            await startPlugins().catch(() => emptyPluginState), request.signal);
             const host = documentParts(options.document, request);
             const document = `<!doctype html><html><head><meta charset="utf-8"><title>${ERROR_PAGE_TITLE}</title>${host.head}</head><body><div id="app">${errorRendered.html}</div>${host.bodyEnd}</body></html>`;
             return finish(new Response(request.method === "HEAD" ? null : document, {

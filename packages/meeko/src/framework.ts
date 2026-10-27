@@ -4,6 +4,10 @@ import type { RouteRecord } from "./framework/router.js";
 export { createNavigator, createRouteManifest, matchRoute } from "./framework/router.js";
 export { defineMeekoConfig } from "./framework/config-type.js";
 export type { MeekoConfig } from "./framework/config-type.js";
+export { defineMeekoModule } from "./framework/module.js";
+export type { MeekoHookable, MeekoHooks, MeekoModule, MeekoModuleContext, MeekoModuleDefinition, MeekoModuleEntry, MeekoModuleMeta, ModuleAutoImport, ModulePlugin, ModuleServerHandler } from "./framework/module.js";
+export { definePlugin } from "./framework/plugin.js";
+export type { MeekoPlugin, PluginApp, PluginErrorHandler, PluginErrorInfo, PluginRegistration } from "./framework/plugin.js";
 export type { ErrorPageRecord, NavigationContext, Navigator, RouteMatch, RouteRecord } from "./framework/router.js";
 export { mountClientApp } from "./framework/client.js";
 export type { ClientApp, ClientAppOptions, ClientComponent, ClientRoute } from "./framework/client.js";
@@ -79,7 +83,7 @@ type RuntimeHrefOptions = Parameters<typeof runtimeHref>[2];
  * const link = href("/users/[id]", { params: { id: "42" }, search: { tab: "profile" } });
  * // "/users/42?tab=profile"
  * ```
- * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#configuración-módulos-y-layers
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#configuración
  */
 export function href<K extends RouteKey>(id: K, ...options: HrefArguments<K>): string;
 /**

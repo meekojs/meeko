@@ -6,6 +6,7 @@ import { checkSource } from "./check.js";
 import { compile } from "./compiler.js";
 import { projectRoot } from "./compiler/project-root.js";
 import { loadMeekoConfig } from "./framework/config.js";
+import { setModuleDevelopmentMode, warnLegacyLayerEntries } from "./framework/module-loader.js";
 import { generateTypes } from "./types.js";
 import { initProject } from "./init.js";
 import { initFrameworkProject } from "./framework/init.js";
@@ -97,6 +98,9 @@ if (problem !== undefined) {
         // supervisor restarts the server in a fresh process, which loads the new build.
         const linked = linkWatchEnabled() ? findLinkedMeeko(resolve(root)) : undefined;
         const start = async () => {
+          // Modules run once in this process, already in development mode for the types prepared below.
+          setModuleDevelopmentMode(true);
+          warnLegacyLayerEntries(root, await loadMeekoConfig(root));
           await prepareFrameworkTypes(root);
           return startProject(root, false);
         };
@@ -109,6 +113,7 @@ if (problem !== undefined) {
       else if (command === "preview") await previewProject(root, adapter === undefined ? undefined : assertBuildAdapter(adapter));
       else {
         const requested = adapter === undefined ? undefined : assertBuildAdapter(adapter);
+        warnLegacyLayerEntries(root, await loadMeekoConfig(root));
         await checkFrameworkProject(root);
         const result = await buildProject(root, requested === undefined ? {} : { adapter: requested });
         process.stdout.write(`${result.output}\n`);
@@ -121,6 +126,7 @@ if (problem !== undefined) {
       if (result.failures.length > 0) process.exitCode = 1;
     } else if (command === "check" && (!input || (await stat(input).catch(() => undefined))?.isDirectory())) {
       if (output) throw new Error("--json sólo está disponible para un componente .meeko");
+      warnLegacyLayerEntries(input ?? ".", await loadMeekoConfig(input ?? "."));
       await checkFrameworkProject(input ?? ".");
       process.stdout.write(`${resolve(input ?? ".")}: OK\n`);
     } else if (command === "init" || command === "init-framework") {

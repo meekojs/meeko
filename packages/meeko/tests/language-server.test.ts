@@ -454,6 +454,43 @@ describe("Meeko language server configuration and contracts", () => {
     } finally { await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
   });
 
+  test("module autoimports reach trusted workspaces; untrusted ones never run module code", async () => {
+    const root = await project("lsp-module-", {
+      "meeko.config.ts": 'import tools from "./modules/tools/index.ts";\nexport default { modules: [tools] };\n',
+      "modules/tools/index.ts": [
+        'import { writeFileSync } from "node:fs";',
+        'import { defineMeekoModule } from "@meekojs/meeko/framework";',
+        "export default defineMeekoModule({",
+        '  meta: { name: "tools" },',
+        "  setup(_options, meeko) {",
+        '    writeFileSync(new URL("./ran.txt", import.meta.url), "yes");',
+        '    meeko.addAutoImports({ name: "shout", from: new URL("./shout.ts", import.meta.url) });',
+        "  },",
+        "});",
+        "",
+      ].join("\n"),
+      "modules/tools/shout.ts": "export function shout(text: string): string { return text.toUpperCase(); }\n",
+      "app/pages/index.meeko": '<script lang="ts">\nconst text: string = shout("hi");\n</script>\n<template><p>{text}</p></template>\n',
+    });
+    try {
+      const untrusted = await inProcess(root, { trusted: false });
+      try {
+        const uri = await untrusted.open(join(root, "app", "pages", "index.meeko"));
+        const diagnostics = await untrusted.waitForDiagnostics(uri, () => true);
+        assert.ok(diagnostics.some((item) => item.code === "TS2304"), JSON.stringify(diagnostics));
+        assert.equal(existsSync(join(root, "modules", "tools", "ran.txt")), false, "an untrusted workspace ran module code");
+      } finally { await untrusted.close(); }
+      const trusted = await inProcess(root, { trusted: true });
+      try {
+        const uri = await trusted.open(join(root, "app", "pages", "index.meeko"));
+        assert.deepEqual(await trusted.waitForDiagnostics(uri, () => true), []);
+        const hover = await trusted.connection.sendRequest(HoverRequest.type, { textDocument: { uri }, position: trusted.position(uri, "shout", 2) });
+        assert.match((hover?.contents as MarkupContent).value, /shout\(text: string\): string/);
+        assert.equal(existsSync(join(root, "modules", "tools", "ran.txt")), true);
+      } finally { await trusted.close(); }
+    } finally { await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
+  });
+
   // An editor's watcher also reports the files of a package linked into node_modules and of
   // temporary projects under .meeko/ (the tests of a linked Meeko checkout, for example):
   // checking their contracts would load their configuration and write into them.

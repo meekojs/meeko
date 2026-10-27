@@ -19,6 +19,8 @@ import { provideResourceCache, ResourceCache, ResourceScope, withResourceScope }
 import { provideBrowserWindow } from "./storage.js";
 import { lateRender, mayAwaitData, renderWithSuspense } from "../suspense.js";
 import { mountBatch } from "../lifecycle.js";
+import { notifyPluginErrorHandlers, runPlugins } from "./plugin.js";
+import type { PluginRegistration } from "./plugin.js";
 import type { DeferredError, DeferredInternals, DeferredOutcome } from "./deferred.js";
 
 export { useNavigation, useRoute } from "./navigation.js";
@@ -138,6 +140,13 @@ export interface ClientAppOptions {
   readonly onError?: ComponentErrorHandler;
   /** Ventana del navegador; por defecto, `window`. */
   readonly browser?: Window;
+  /**
+   * Plugins de aplicación (`definePlugin`), que se ejecutan en orden antes de la hidratación. Sus
+   * valores de `provide` llegan a todos los componentes, y sus observadores de `onError` reciben lo
+   * mismo que `onError`. La entrada que genera Meeko pasa los de `app/plugins` y los módulos.
+   * @since 1.2.0
+   */
+  readonly plugins?: readonly PluginRegistration[];
 }
 
 /**
@@ -610,7 +619,29 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     ? routeSnapshot(initialUrl, null, {}, pageSearchObject(initialUrl.searchParams), false)
     : routeSnapshot(initialUrl, payload.route, payload.props.params as Record<string, unknown>, payload.props.search as Record<string, unknown>, false));
   const resourceCache = new ResourceCache();
-  const errorChannel = createAppErrorChannel(options.onError);
+  // The route of the plugins follows the committed route, also when a navigation replaces the
+  // whole tree (and its live route): reading it also reads `routeGeneration`.
+  const routeGeneration = signal(0);
+  const followCommitted = <K extends keyof RouteState>(key: K): RouteState[K] => Object.freeze({
+    get value() { void routeGeneration.value; return committedRoute.state[key].value; },
+  }) as RouteState[K];
+  const pluginRoute: RouteState = Object.freeze({
+    url: followCommitted("url"), path: followCommitted("path"), id: followCommitted("id"),
+    params: followCommitted("params"), search: followCommitted("search"),
+  });
+  // href(id) already resolves while the plugins start.
+  const releasePluginManifest = activateRouteManifest(options.routes);
+  let plugins: Awaited<ReturnType<typeof runPlugins>>;
+  try { plugins = await runPlugins(options.plugins, { side: "client", route: pluginRoute }); }
+  finally { releasePluginManifest(); }
+  const pluginObserver: ComponentErrorHandler | undefined = plugins.errorHandlers.length
+    ? (error, source) => notifyPluginErrorHandlers(plugins.errorHandlers, error, { side: "client", source })
+    : undefined;
+  const hostObserver = options.onError;
+  const applicationObserver: ComponentErrorHandler | undefined = hostObserver && pluginObserver
+    ? (error, source) => { try { hostObserver(error, source); } finally { pluginObserver(error, source); } }
+    : hostObserver ?? pluginObserver;
+  const errorChannel = createAppErrorChannel(applicationObserver);
   const observeNavigationError = options.onNavigationError ?? ((error: unknown) => {
     const handler = errorChannel.current();
     if (handler) return handler(error, "navigation");
@@ -624,6 +655,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     provideRoute(routeState);
     provideResourceCache(resourceCache);
     provideBrowserWindow(browser);
+    plugins.apply();
     return hydrate();
   });
   // A client page arrives with its layouts around an empty outlet; the page
@@ -885,6 +917,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
           // The dry pass already sees the route it is loading, as the commit will.
           provideRoute(fixedRoute(target));
           provideBrowserWindow(browser);
+          plugins.apply();
           return tree.component.renderWithState({});
         })));
       }, { signal: context.signal });
@@ -939,6 +972,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       const rendered = withStateStore(stateStore, () => {
         provideRoute(nextRoute.state);
         provideBrowserWindow(browser);
+        plugins.apply();
         return next.component.renderWithState({});
       });
       // Hydrate the next view after the committed one, between private markers,
@@ -962,6 +996,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       const previousRelease = release;
       release = nextRelease;
       committedRoute = nextRoute;
+      routeGeneration.value++;
       layouts = next.layouts;
       stableUrl = context.url.href;
       while (options.root.firstChild && options.root.firstChild !== start) options.root.firstChild.remove();

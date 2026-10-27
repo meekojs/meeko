@@ -7,6 +7,7 @@ import type { CompileOptions, CompileResult } from "./compiler.js";
 import { projectRoot } from "./compiler/project-root.js";
 import { parseSfc } from "./compiler/sfc.js";
 import { loadMeekoConfig, readMeekoConfigSync, resolveConfigSources } from "./framework/config.js";
+import { legacyLayerEntries, resolveMeekoModules } from "./framework/module-loader.js";
 
 export type ImportScope = "client" | "server" | "shared" | "app";
 export interface AutoImport {
@@ -115,15 +116,26 @@ function addAutoImport(result: AutoImport[], entry: AutoImport): void {
   if (previous.typeOnly && !entry.typeOnly) previous.typeOnly = false;
 }
 
-function addFileImports(result: AutoImport[], root: string, directory: string, file: string, source?: string): void {
-  const scope = scopeOf(file);
+/**
+ * A directory a module adds: `components` names its `.meeko` files like `app/components`, after
+ * `prefix`; `scope` is the scope of its files without a `.client`, `.server` or `.shared` suffix.
+ */
+interface ModuleDirectory {
+  readonly components?: boolean;
+  readonly prefix?: string;
+  readonly scope?: ImportScope;
+}
+
+function addFileImports(result: AutoImport[], root: string, directory: string, file: string, source?: string, module?: ModuleDirectory): void {
+  const scope = module?.scope && !/\.(?:shared|server|client)\.[cm]?tsx?$/.test(file) ? module.scope : scopeOf(file);
   if (extname(file) === ".meeko") {
-    if (directory !== "app/components") return;
+    if (!(module ? module.components : directory === "app/components")) return;
     const path = relative(join(root, directory), file).replace(/\.meeko$/, "");
-    const name = path.split(/[\\/]/).map((part) => part.replace(/(^|[-_])(\w)/g, (_, _dash: string, letter: string) => letter.toUpperCase())).join("");
+    const name = (module?.prefix ?? "") + path.split(/[\\/]/).map((part) => part.replace(/(^|[-_])(\w)/g, (_, _dash: string, letter: string) => letter.toUpperCase())).join("");
     addAutoImport(result, { name, imported: "*", file, scope, typeOnly: false, component: true });
     return;
   }
+  if (module?.components) return;
   const ast = ts.createSourceFile(file, source ?? "", ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   // Classes and enums are values that also name a type, also when a local export list exposes them.
   const localValueTypes = new Set<string>();
@@ -151,7 +163,11 @@ function addFileImports(result: AutoImport[], root: string, directory: string, f
   }
 }
 
-/** Construye el registro a partir de exports sintácticos, sin ejecutar módulos de la aplicación. */
+/**
+ * Construye el registro a partir de exports sintácticos, sin ejecutar módulos de la aplicación. La
+ * configuración sí se ejecuta, con sus módulos: sus carpetas de componentes y autoimports y sus
+ * entradas de `addAutoImports` forman parte del registro.
+ */
 export async function discoverAutoImports(root: string): Promise<AutoImport[]> {
   const result: AutoImport[] = builtins(root);
   const config = await loadMeekoConfig(root);
@@ -163,15 +179,34 @@ export async function discoverAutoImports(root: string): Promise<AutoImport[]> {
       }
     }
   }
+  const modules = await resolveMeekoModules(root, config);
+  for (const { dir, prefix } of modules.componentsDirs) {
+    for (const file of await filesIn(dir)) addFileImports(result, dir, "", file, undefined, { components: true, prefix, scope: "app" });
+  }
+  for (const { dir, scope } of modules.autoImportsDirs) {
+    for (const file of await filesIn(dir)) {
+      if (extname(file) !== ".meeko") addFileImports(result, dir, "", file, await readFile(file, "utf8"), { scope });
+    }
+  }
+  for (const entry of modules.autoImports) {
+    addAutoImport(result, {
+      name: entry.as, imported: entry.name, file: entry.from, scope: entry.scope, typeOnly: entry.type, component: false,
+      ...(entry.specifier ? { specifier: entry.from } : {}),
+    });
+  }
   return withoutShadowedBuiltins(result);
 }
 
-/** Same static registry used by the synchronous VS Code Language Service. */
+/**
+ * Same static registry used by the synchronous VS Code Language Service. It never executes the
+ * configuration: `layers`, `extends` and the layer folders listed in `modules` take part, the
+ * modules do not.
+ */
 export function discoverAutoImportsSync(root: string): AutoImport[] {
   const result = builtins(root);
   const config = readMeekoConfigSync(root);
   const sourceRoots = [resolve(root)];
-  for (const entry of [...(config.extends ?? []), ...(config.modules ?? [])]) {
+  for (const entry of [...(config.extends ?? []), ...(config.layers ?? []), ...legacyLayerEntries(root, config)]) {
     const sourceRoot = resolve(root, entry);
     const path = relative(root, sourceRoot);
     if (path === ".." || path.startsWith(`..${sep}`) || isAbsolute(path)) throw new Error(`Una fuente de autoimports configurada sale de la raíz del proyecto: ${entry}`);

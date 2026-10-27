@@ -4,6 +4,7 @@ import ts from "@typescript/typescript6";
 import { applyAutoImports, discoverAutoImports } from "./autoimports.js";
 import type { AutoImport, ImportScope } from "./autoimports.js";
 import { readMeekoConfigSync } from "./framework/config.js";
+import { legacyLayerEntries } from "./framework/module-loader.js";
 
 export type TypeScriptScope = Exclude<ImportScope, "app">;
 
@@ -34,7 +35,8 @@ function sourceScope(root: string, filename: string, sourceRoots?: readonly stri
   const config = sourceRoots ? undefined : readMeekoConfigSync(root);
   const configured = sourceRoots ?? [
     ...(config?.extends ?? []),
-    ...(config?.modules ?? []),
+    ...(config?.layers ?? []),
+    ...(config ? legacyLayerEntries(root, config) : []),
   ].map((entry) => resolve(root, entry));
   for (const sourceRoot of [...configured, root].sort((a, b) => b.length - a.length)) {
     const scope = scopeWithin(sourceRoot, filename);

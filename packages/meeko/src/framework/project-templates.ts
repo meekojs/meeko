@@ -3,6 +3,7 @@ export const clientEntrySource = `import { mountClientApp, type ClientComponent,
 import { modules as pages } from "virtual:meeko-client-pages";
 import { modules as clientRoutes } from "virtual:meeko-client-routes";
 import { errorPage, routes } from "virtual:meeko-manifest/client";
+import { plugins } from "virtual:meeko-plugins/client";
 
 const middlewareModules = import.meta.glob(["/app/middleware/**/*.ts", "!/app/middleware/**/*.test.ts", "!/app/middleware/**/*.spec.ts", "!/app/middleware/**/*.d.ts", "!/app/middleware/**/*.server.ts", "!/app/middleware/**/*.client.ts"], { eager: true });
 const loadMiddleware = async (): Promise<RouteMiddleware[]> => Object.entries(middlewareModules)
@@ -25,7 +26,7 @@ if (!root || !payload) throw new Error("Missing Meeko SSR data");
 
 const hydrationStart = performance.now();
 await mountClientApp({
-  root, payload, routes, errorPage, serverData: true, loadMiddleware,
+  root, payload, routes, errorPage, serverData: true, loadMiddleware, plugins,
   async loadPage(file) {
     const load = pages[file] ?? errorPages[file];
     if (!load) throw new Error("Page module missing: " + file);
@@ -44,14 +45,14 @@ performance.measure("meeko-hydration", { start: hydrationStart, end: performance
 
 /** Adapter-neutral application entry: the baked manifest plus its module map. */
 export const serverEntrySource = `import { createServerApp, type ServerApp, type ServerAppOptions } from "@meekojs/meeko/server";
-import { load, manifest, runtime } from "virtual:meeko-server-app";
+import { load, manifest, plugins, runtime } from "virtual:meeko-server-app";
 
 export { load, manifest };
 
-export type AppHostOptions = Omit<ServerAppOptions, "manifest" | "load" | "runtime">;
+export type AppHostOptions = Omit<ServerAppOptions, "manifest" | "load" | "runtime" | "plugins">;
 
 export function createApp(options: AppHostOptions): Promise<ServerApp> {
-  return createServerApp({ ...options, manifest, load, runtime });
+  return createServerApp({ ...options, manifest, load, runtime, plugins });
 }
 `;
 
