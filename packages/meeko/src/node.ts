@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { TLSSocket } from "node:tls";
 import { ApiError, errorResponse, observeServerError } from "./framework-server/contracts.js";
+import { setSocketAddress } from "./framework-server/env.js";
 import { assetResponse, etagMatches, findAsset } from "./framework-server/assets.js";
 import type { AssetManifest, AssetReader } from "./framework-server/assets.js";
 import type { ServerApp } from "./framework-server/app.js";
@@ -113,10 +114,10 @@ export function toNodeListener(handler: (request: Request) => Promise<Response> 
         if (value !== undefined) headers.set(name, Array.isArray(value) ? value.join(", ") : value);
       }
       const hasBody = method !== "GET" && method !== "HEAD";
-      const request = new Request(url, {
+      const request = setSocketAddress(new Request(url, {
         method, headers, signal: controller.signal,
         ...(hasBody ? { body: Readable.toWeb(incoming) as ReadableStream<Uint8Array>, duplex: "half" as const } : {}),
-      });
+      }), incoming.socket.remoteAddress);
       const result = await handler(request);
       const candidateRequestId = result.headers.get("x-request-id");
       if (candidateRequestId && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateRequestId)) {

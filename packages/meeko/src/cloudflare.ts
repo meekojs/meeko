@@ -3,6 +3,7 @@ import { assetResponse, etagMatches, findAsset } from "./framework-server/assets
 import type { AssetManifest, AssetReader } from "./framework-server/assets.js";
 import type { ServerApp } from "./framework-server/app.js";
 import { ApiError, errorResponse, observeErrorCallback } from "./framework-server/contracts.js";
+import { setSocketAddress } from "./framework-server/env.js";
 import { fetchApp, positiveInteger, publicOriginOf, rebaseRequest } from "./framework-server/fetch-host.js";
 import { createDetachedPlatform } from "./framework-server/platform.js";
 import type { ServerPlatform } from "./framework-server/platform.js";
@@ -363,6 +364,8 @@ export function createWorker<Env = Record<string, unknown>>(app: CloudflareApp<E
       }
       const report = options.onError ?? ((error: unknown, requestId: string) => instance.reportError(error, requestId));
       const platform: ServerPlatform<Env> = { name: "cloudflare", env, waitUntil: (promise) => ctx.waitUntil(promise) };
+      // Cloudflare's edge sets CF-Connecting-IP and replaces any value the client sends.
+      setSocketAddress(request, request.headers.get("cf-connecting-ip") ?? undefined);
       const origin = configuredOrigin ?? instance.publicOrigin;
       if (instance.socket && request.headers.has("upgrade")) {
         try {

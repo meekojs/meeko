@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { SessionHandle } from "./sessions.js";
+import { clientAddressOf } from "./env.js";
 import { defaultPlatform } from "./platform.js";
 import type { ServerPlatform } from "./platform.js";
 
@@ -46,6 +47,13 @@ export interface RequestContext<TServices = unknown, TEnv = unknown> {
    * (por ejemplo, en una columna única) y responda lo mismo cuando se repita. Desde `1.2`.
    */
   readonly idempotencyKey?: string | undefined;
+  /**
+   * IP del cliente (desde `1.2`): la de la conexión que entrega el adaptador o, con
+   * `MEEKO_TRUST_PROXY`, la que añadió a `X-Forwarded-For` el proxy de confianza más externo.
+   * `undefined` si no se conoce. Sin `MEEKO_TRUST_PROXY`, `X-Forwarded-For` nunca se lee, porque
+   * cualquier cliente puede enviarlo. La usa `rateLimit` y sirve para registros y auditoría.
+   */
+  readonly clientAddress?: string | undefined;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -135,11 +143,14 @@ function combinedSignal(request: AbortSignal, revocation: AbortSignal): AbortSig
 export function createRequestContext<TServices, TEnv = unknown>(request: Request, services: TServices, session: SessionHandle, platform?: ServerPlatform<TEnv>): RequestContext<TServices, TEnv> {
   const revocation = (session as Partial<SessionHandle> | undefined)?.signal;
   let signal: AbortSignal | undefined;
+  const resolvedPlatform = platform ?? defaultPlatform() as ServerPlatform<TEnv>;
+  let address: { readonly value: string | undefined } | undefined;
   return {
     request, requestId: crypto.randomUUID(), services, session, state: new Map(),
     get signal() { return signal ??= revocation ? combinedSignal(request.signal, revocation) : request.signal; },
-    platform: platform ?? defaultPlatform() as ServerPlatform<TEnv>,
+    platform: resolvedPlatform,
     idempotencyKey: idempotencyKeyOf(request),
+    get clientAddress() { return (address ??= { value: clientAddressOf(request, resolvedPlatform.env) }).value; },
   };
 }
 

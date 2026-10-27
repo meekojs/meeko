@@ -1,5 +1,7 @@
 import { serializeJson } from "../server.js";
 import type { RequestContext } from "./context.js";
+import { countRateLimit, rateLimitKey, rateLimitSettings, rateLimitSubject, retryAfterSeconds } from "./rate-limit.js";
+import type { RateLimitOptions } from "./rate-limit.js";
 import { isAllowedOrigin, SessionSecurityError, type SessionManager } from "./sessions.js";
 
 /**
@@ -240,6 +242,13 @@ export interface ApiRouteDefinition<P extends Schema | undefined, Q extends Sche
    * Sin él, Origin sólo se comprueba en las mutaciones autenticadas con cookie.
    */
   origin?: "required";
+  /**
+   * Límite de peticiones (desde `1.2`), como `{ limit: 5, window: "5m" }`: por encima responde
+   * `429 RATE_LIMITED` con `Retry-After`, tras Origin y CSRF y antes de `auth`, `authorize`, la
+   * entrada y el handler. Cuenta en el store de sesiones (Redis entre instancias) y, si el store
+   * falla, la petición se rechaza.
+   */
+  rateLimit?: RateLimitOptions<S>;
   /** `"response"` deja que el handler devuelva su propio `Response`. */
   contentType?: "json" | "response";
   /** Devolver `false` responde `403 FORBIDDEN`. */
@@ -344,6 +353,13 @@ export interface RpcDefinition<I extends Schema, O extends Schema, S = unknown, 
    * ejemplo, un inicio de sesión. Sin él, Origin sólo se comprueba en las llamadas con sesión.
    */
   origin?: "required";
+  /**
+   * Límite de llamadas (desde `1.2`), como `{ limit: 5, window: "5m" }`: por encima responde
+   * `429 RATE_LIMITED` con `Retry-After`, tras Origin y CSRF y antes de `auth`, `authorize`, la
+   * entrada y el handler. Cuenta en el store de sesiones (Redis entre instancias) y, si el store
+   * falla, la llamada se rechaza.
+   */
+  rateLimit?: RateLimitOptions<S>;
   /** Devolver `false` responde `403 FORBIDDEN`. */
   authorize?: (context: RequestContext<S>) => boolean | Promise<boolean>;
   /**
@@ -376,7 +392,7 @@ export interface RpcDefinition<I extends Schema, O extends Schema, S = unknown, 
  *   handler: ({ input }) => ({ id: input.id, name: "Ada" }),
  * });
  * ```
- * Un inicio de sesión exige un Origin permitido aunque aún no haya sesión:
+ * Un inicio de sesión exige un Origin permitido aunque aún no haya sesión, y limita los intentos:
  * ```ts
  * // server/rpc/auth/login.ts
  * import { ApiError, defineRpc } from "@meekojs/meeko/server";
@@ -387,6 +403,7 @@ export interface RpcDefinition<I extends Schema, O extends Schema, S = unknown, 
  *   input: loginInput,
  *   output: loginOutput,
  *   origin: "required",
+ *   rateLimit: { limit: 5, window: "5m" },
  *   handler: async ({ input, context }) => {
  *     const user = await verifyPassword(input.email, input.password);
  *     if (!user) throw new ApiError("INVALID_CREDENTIALS", 401);
@@ -443,7 +460,40 @@ function queryObject(url: URL): Record<string, string | string[]> {
   return result;
 }
 
-type Guarded<S> = { auth?: "required" | "optional"; origin?: "required"; authorize?: (context: RequestContext<S>) => boolean | Promise<boolean> };
+type Guarded<S> = {
+  auth?: "required" | "optional";
+  origin?: "required";
+  rateLimit?: RateLimitOptions<S>;
+  authorize?: (context: RequestContext<S>) => boolean | Promise<boolean>;
+};
+
+/** Too many requests: `429 RATE_LIMITED`, with the seconds to wait in `Retry-After`. */
+class RateLimitedError extends ApiError {
+  constructor(readonly retryAfter: number) { super("RATE_LIMITED", 429); }
+}
+
+/** Counter route of a request: the dispatcher's route pattern, or its method and pathname. */
+const routeIds = new WeakMap<object, string>();
+
+/** Names the route of a request for its rate limit, so `/users/1` and `/users/2` share a counter. */
+export function setRateLimitRoute(context: RequestContext<any>, route: string): void { routeIds.set(context, route); }
+
+async function enforceRateLimit<S>(options: RateLimitOptions<S>, context: RequestContext<S>, sessions: SessionManager): Promise<void> {
+  // A misdeclared limit is a server fault, reported before the request does anything.
+  const settings = rateLimitSettings(options as RateLimitOptions<never>);
+  if (!settings) throw new ApiError("INVALID_RATE_LIMIT", 500);
+  const subject = await rateLimitSubject(options, context);
+  if (subject === undefined) throw new ApiError("INVALID_RATE_LIMIT", 500);
+  const request = context.request;
+  const route = routeIds.get(context) ?? `${request.method} ${new URL(request.url).pathname}`;
+  const key = await rateLimitKey(route, subject);
+  // Stores without their own counter (and custom managers) count in this instance's memory.
+  const counter = typeof (sessions as Partial<SessionManager>).rateLimit === "function"
+    ? sessions.rateLimit(key, settings.windowMs)
+    : countRateLimit(undefined, key, settings.windowMs, false);
+  const hit = await counter;
+  if (hit.count > settings.limit) throw new RateLimitedError(retryAfterSeconds(hit.resetInMs));
+}
 
 async function guard<S>(definition: Guarded<S>, context: RequestContext<S>, sessions: SessionManager, mutating?: boolean): Promise<void> {
   const request = context.request;
@@ -452,6 +502,8 @@ async function guard<S>(definition: Guarded<S>, context: RequestContext<S>, sess
   if (definition.origin === "required" && (mutating ?? !["GET", "HEAD", "OPTIONS"].includes(request.method))
     && !isAllowedOrigin(request, sessions.allowedOrigins ?? [])) throw new ApiError("INVALID_ORIGIN", 403);
   sessions.assertMutationAllowed(request, context.session, mutating);
+  // Before auth and authorize: a flood of anonymous requests is limited too.
+  if (definition.rateLimit) await enforceRateLimit(definition.rateLimit, context, sessions);
   if (definition.auth === "required" && !context.session.current) throw new ApiError("UNAUTHENTICATED", 401);
   if (definition.authorize && !(await definition.authorize(context))) throw new ApiError("FORBIDDEN", 403);
 }
@@ -459,17 +511,17 @@ async function guard<S>(definition: Guarded<S>, context: RequestContext<S>, sess
 /**
  * Ejecuta un endpoint de API con sus guardas y validaciones y devuelve la respuesta JSON, o lanza
  * un `ApiError`. Es la pieza de bajo nivel de {@link dispatchApiRoute}, que además normaliza errores.
- * El orden es: Origin (`origin: "required"`), Origin y CSRF de la sesión, `auth`, `authorize`,
- * `params`, `query`, `body`, `locals`, handler y `response`. La respuesta usa el estado de
- * `status` (`200` por defecto); con `204`, sin cuerpo.
+ * El orden es: Origin (`origin: "required"`), Origin y CSRF de la sesión, `rateLimit`, `auth`,
+ * `authorize`, `params`, `query`, `body`, `locals`, handler y `response`. La respuesta usa el
+ * estado de `status` (`200` por defecto); con `204`, sin cuerpo.
  *
  * @param definition Endpoint declarado con `defineApiRoute`.
  * @param context Contexto de la petición.
  * @param sessions Gestor de sesiones, para Origin y CSRF.
  * @param rawParams Parámetros de la ruta sin validar.
  * @returns La respuesta del endpoint.
- * @throws {ApiError} Con `INVALID_ORIGIN`, `UNAUTHENTICATED`, `FORBIDDEN`, `INVALID_PARAMS`, `INVALID_QUERY`,
- * `INVALID_BODY`, `UNSUPPORTED_MEDIA_TYPE`, `BODY_TOO_LARGE`, `INVALID_RESPONSE`, `INVALID_RESPONSE_STATUS`
+ * @throws {ApiError} Con `INVALID_ORIGIN`, `RATE_LIMITED`, `UNAUTHENTICATED`, `FORBIDDEN`, `INVALID_PARAMS`, `INVALID_QUERY`,
+ * `INVALID_BODY`, `UNSUPPORTED_MEDIA_TYPE`, `BODY_TOO_LARGE`, `INVALID_RATE_LIMIT`, `INVALID_RESPONSE`, `INVALID_RESPONSE_STATUS`
  * (un `status` no admitido o combinado con `contentType: "response"` o, con `204`, con `response`) o los de
  * `locals` y del handler.
  * @example
@@ -507,15 +559,15 @@ export async function executeApiRoute<P extends Schema | undefined, Q extends Sc
 /**
  * Ejecuta un procedimiento RPC con sus guardas y validaciones y devuelve su salida validada. Es la
  * pieza de bajo nivel de {@link dispatchRpc}. El orden es: Origin (`origin: "required"`), Origin y
- * CSRF de la sesión, `auth`, `authorize`, `input`, `locals`, handler y `output`.
+ * CSRF de la sesión, `rateLimit`, `auth`, `authorize`, `input`, `locals`, handler y `output`.
  *
  * @param definition Procedimiento declarado con `defineRpc`.
  * @param rawInput Entrada sin validar.
  * @param context Contexto de la petición.
  * @param sessions Gestor de sesiones, para Origin y CSRF.
  * @returns La salida validada.
- * @throws {ApiError} Con `INVALID_ORIGIN`, `UNAUTHENTICATED`, `FORBIDDEN`, `INVALID_INPUT`, `INVALID_OUTPUT` o
- * los de `locals` y del handler.
+ * @throws {ApiError} Con `INVALID_ORIGIN`, `RATE_LIMITED`, `UNAUTHENTICATED`, `FORBIDDEN`, `INVALID_INPUT`,
+ * `INVALID_RATE_LIMIT`, `INVALID_OUTPUT` o los de `locals` y del handler.
  * @example
  * ```ts
  * import { executeRpc } from "@meekojs/meeko/server";
@@ -539,7 +591,8 @@ export async function executeRpc<I extends Schema, O extends Schema, S, L = unde
  * `x-request-id`. Un `ApiError` conserva su código y estado; cualquier otro error es
  * `INTERNAL_ERROR`/`500`, sin su mensaje. Desde `1.2`, la entrada que no supera su schema
  * (`INVALID_PARAMS`, `INVALID_QUERY`, `INVALID_BODY`, `INVALID_INPUT`) añade
- * `issues: [{ path, message }]`, con como mucho 20 mensajes del schema.
+ * `issues: [{ path, message }]`, con como mucho 20 mensajes del schema, y `429 RATE_LIMITED`
+ * lleva `Retry-After` con los segundos que faltan.
  *
  * @param error Error capturado.
  * @param requestId ID de la petición.
@@ -555,7 +608,9 @@ export async function executeRpc<I extends Schema, O extends Schema, S, L = unde
 export function errorResponse(error: unknown, requestId: string): Response {
   const known = normalizeServerError(error);
   const issues = known instanceof InvalidInputError && known.issues.length ? known.issues : undefined;
-  return new Response(serializeJson({ code: known.code, status: known.status, requestId, ...(issues ? { issues } : {}) }), { status: known.status, headers: { "content-type": "application/json; charset=utf-8", "x-request-id": requestId } });
+  const headers: Record<string, string> = { "content-type": "application/json; charset=utf-8", "x-request-id": requestId };
+  if (known instanceof RateLimitedError) headers["retry-after"] = String(known.retryAfter);
+  return new Response(serializeJson({ code: known.code, status: known.status, requestId, ...(issues ? { issues } : {}) }), { status: known.status, headers });
 }
 
 function finish(response: Response, context: RequestContext): Response {

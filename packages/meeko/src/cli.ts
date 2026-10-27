@@ -30,6 +30,8 @@ const usage = "Uso: meeko dev [directorio]\n     meeko check [directorio | compo
   "                      de cloudflare se los pasa a wrangler dev). PORT sigue valiendo\n" +
   "     MEEKO_PUBLIC_ORIGIN  origen público de dev, start y preview para las comprobaciones de\n" +
   "                      Origin de HTTP y Socket tras un proxy\n" +
+  "     MEEKO_REDIS_URL  Redis de las sesiones en producción si server/runtime.ts no las declara\n" +
+  "     MEEKO_TRUST_PROXY  proxies de confianza para X-Forwarded-For (un número o true)\n" +
   "     MEEKO_HMR_PORT   puerto del WebSocket de HMR de dev\n" +
   "     MEEKO_EDITOR_BRIDGE=0  desactiva el puente con el editor de dev\n" +
   "     MEEKO_LINK_WATCH=0     dev no se reinicia al reconstruir un @meekojs/meeko enlazado\n" +

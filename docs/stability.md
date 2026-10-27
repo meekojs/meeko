@@ -166,7 +166,7 @@ La versión de TypeScript que incluye el paquete puede actualizarse en un minor.
 - Desde `1.2`, `app/plugins/*.ts` en la aplicación y sus layers, con los sufijos `.client.ts` (sólo navegador, antes de hidratar) y `.server.ts` (sólo servidor, una vez por petición de página).
 - Los sufijos `.client.ts`, `.server.ts` y `.shared.ts`, y las exclusiones `*.test.ts`, `*.spec.ts` y `*.d.ts`.
 - Los autoimports `api`, `rpc`, `socket`, `useSocket`, `useState`, `href` y `provideErrorHandler`, y desde `1.1` `onMounted`, `useApi`, `useRpcQuery` y `useRpcMutation`, y desde `1.2` `useRoute`, `useForm`, `useStorage`, `useApiMutation`, `useHead` y `useSeoMeta` (un export propio con uno de esos nombres tiene prioridad sobre el del framework). En el código de nivel superior de `<script server>`, `usePage`, `redirect` y `notFound` se pueden usar sin import, y desde `1.2` también `useHead` y `useSeoMeta`.
-- Las variables de entorno `MEEKO_HOST`, `MEEKO_PORT` (con `PORT` como respaldo permanente), `MEEKO_PUBLIC_ORIGIN`, `MEEKO_HMR_PORT` y, desde `1.2`, `MEEKO_REDIS_URL`, `MEEKO_REDIS_PREFIX`, `MEEKO_SESSION_TTL` y `MEEKO_SESSION_SAMESITE`, y el prefijo `MEEKO_`, reservado para las variables que lee Meeko. `HOST` y `PUBLIC_ORIGIN` están obsoletas desde `1.2`.
+- Las variables de entorno `MEEKO_HOST`, `MEEKO_PORT` (con `PORT` como respaldo permanente), `MEEKO_PUBLIC_ORIGIN`, `MEEKO_HMR_PORT` y, desde `1.2`, `MEEKO_REDIS_URL`, `MEEKO_REDIS_PREFIX`, `MEEKO_SESSION_TTL`, `MEEKO_SESSION_SAMESITE` y `MEEKO_TRUST_PROXY`, y el prefijo `MEEKO_`, reservado para las variables que lee Meeko. `HOST` y `PUBLIC_ORIGIN` están obsoletas desde `1.2`.
 
 ### Salidas de build
 
@@ -196,7 +196,7 @@ Estos formatos permiten clientes externos, proxies, CSP y despliegues graduales:
   - con `app/error.meeko`, una URL sin ruta responde `404` con un payload `error: true`, sin `route` y con props `{ status, message }`;
   - desde `1.1`, el campo opcional `resources` lleva los datos de los `await useApi(...)` y `await useRpcQuery(...)` que leyó el render, como objeto por clave de petición. El formato de esas claves es interno y puede cambiar en cualquier versión: sólo el servidor y el navegador de la misma versión lo interpretan. Un payload sin `resources` sigue siendo válido.
 - **Streaming.** Los bloques `<script type="application/json" data-meeko-deferred="N">`, hijos directos de `<body>` y posteriores a `#meeko-payload`.
-- **Endpoints.** `/api/...` según los archivos de `server/api`, `POST /_meeko/rpc/<ruta>` con cuerpo JSON y `/_meeko/socket/<canal>?room=<sala>`, cuyos mensajes de texto son `{ event, payload }`. Los errores tienen la forma `{ code, status, requestId }`; desde `1.2`, un `400` por entrada no válida puede añadir `issues: [{ path, message }]`. Desde `1.2`, las mutaciones `retrySafe` y las llamadas de `api.*` y `rpc.*` con `idempotencyKey` envían la cabecera `Idempotency-Key` con un UUID como cadena de Structured Fields (`"…"`), y el servidor la expone validada en `RequestContext.idempotencyKey`.
+- **Endpoints.** `/api/...` según los archivos de `server/api`, `POST /_meeko/rpc/<ruta>` con cuerpo JSON y `/_meeko/socket/<canal>?room=<sala>`, cuyos mensajes de texto son `{ event, payload }`. Los errores tienen la forma `{ code, status, requestId }`; desde `1.2`, un `400` por entrada no válida puede añadir `issues: [{ path, message }]`, y `rateLimit` responde `429` `RATE_LIMITED` con `Retry-After` en segundos. Desde `1.2`, las mutaciones `retrySafe` y las llamadas de `api.*` y `rpc.*` con `idempotencyKey` envían la cabecera `Idempotency-Key` con un UUID como cadena de Structured Fields (`"…"`), y el servidor la expone validada en `RequestContext.idempotencyKey`.
 - **Cabeceras:**
   - `x-meeko-csrf` en las mutaciones;
   - `x-meeko-csrf-token` y `x-request-id` en las respuestas;
@@ -208,6 +208,7 @@ Estos formatos permiten clientes externos, proxies, CSP y despliegues graduales:
 - **Redis:**
   - el canal `<prefix>socket:<canal>:<sala>` con el sobre `{ v: 1, event, payload }`;
   - el canal de revocaciones `<prefix>revoked`;
+  - desde `1.2`, los contadores de `rateLimit` en `<prefix>ratelimit:<resumen>` (el resumen de la ruta y el sujeto no es contrato);
   - los registros de sesión que escriben `RedisSessionStore` y `SqlSessionStore`;
   - el esquema de referencia de `D1SessionDriver.schema()`.
 - **Prerender.** El índice `prerender/manifest.json` (`{ version: 1, pages }`).

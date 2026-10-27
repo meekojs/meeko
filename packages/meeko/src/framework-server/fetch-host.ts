@@ -1,4 +1,5 @@
 import { errorResponse, observeServerError } from "./contracts.js";
+import { copySocketAddress } from "./env.js";
 import type { ServerApp } from "./app.js";
 import type { ServerPlatform } from "./platform.js";
 
@@ -22,7 +23,7 @@ export function rebaseRequest(request: Request, origin: string | undefined): Req
   if (!origin) return request;
   const url = new URL(request.url);
   if (url.origin === origin) return request;
-  return new Request(new URL(url.pathname + url.search, origin), request);
+  return copySocketAddress(request, new Request(new URL(url.pathname + url.search, origin), request));
 }
 
 /** Validates a positive integer adapter option. */

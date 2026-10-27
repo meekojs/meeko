@@ -1,6 +1,6 @@
 import { createRequestContext, idempotencyKeyOf } from "./context.js";
 import type { RequestContext, ServerFetch } from "./context.js";
-import { ApiError, dispatchApiRoute, dispatchRpc, errorResponse, reportServerError } from "./contracts.js";
+import { ApiError, dispatchApiRoute, dispatchRpc, errorResponse, reportServerError, setRateLimitRoute } from "./contracts.js";
 import type { ApiRouteDefinition, RpcDefinition, Schema, ServerErrorObserver } from "./contracts.js";
 import type { ServerPlatform } from "./platform.js";
 import type { SessionManager } from "./sessions.js";
@@ -304,6 +304,7 @@ export function createContextDispatcher<S>(options: Pick<ServerDispatcherOptions
         if (!endpoint) throw new ApiError("NOT_FOUND", 404);
         if (request.method !== "POST") throw new ApiError("METHOD_NOT_ALLOWED", 405);
         const definition = exportedDefinition(await load(endpoint.file)) as RpcDefinition<Schema, Schema, S>;
+        setRateLimitRoute(context, `rpc ${endpoint.id}`);
         return dispatchRpc(definition, context, options.sessions, options.onError);
       }
       let allowed: ApiMethod[] = [];
@@ -312,6 +313,7 @@ export function createContextDispatcher<S>(options: Pick<ServerDispatcherOptions
         if (!params) continue;
         if (request.method !== endpoint.method) { allowed.push(endpoint.method); continue; }
         const definition = exportedDefinition(await load(endpoint.file)) as ApiRouteDefinition<Schema | undefined, Schema | undefined, Schema | undefined, Schema | undefined, S>;
+        setRateLimitRoute(context, `api ${endpoint.method} ${endpoint.pathname}`);
         return dispatchApiRoute(definition, context, options.sessions, params, options.onError);
       }
       if (allowed.length) {

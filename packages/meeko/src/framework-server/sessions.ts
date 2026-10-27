@@ -1,4 +1,7 @@
+import { encodeBase64Url } from "./base64url.js";
 import { ApiError, SessionRevokedError } from "./contracts.js";
+import { countRateLimit, MemoryRateCounter } from "./rate-limit.js";
+import type { RateLimitHit } from "./rate-limit.js";
 import type { Unsubscribe } from "./socket.js";
 
 /**
@@ -109,6 +112,13 @@ export interface SessionStore<T = unknown> {
    * notificaciones ya llegan.
    */
   subscribeRevocations?(listener: (familyId: string) => void): Unsubscribe | Promise<Unsubscribe>;
+  /**
+   * Cuenta una petición en la ventana fija `key` de `windowMs` milisegundos y devuelve el total de
+   * la ventana y cuánto falta para la siguiente (desde `1.2`). Lo usa la opción `rateLimit` de API y
+   * RPC; debe ser atómico entre instancias y rechazar si el almacenamiento falla, para que la
+   * petición se rechace. Sin él, los límites se cuentan en la memoria de cada instancia.
+   */
+  rateLimit?(key: string, windowMs: number): Promise<RateLimitHit>;
   /** Libera los recursos propios del store. */
   close?(): Promise<void>;
 }
@@ -185,7 +195,10 @@ export class MemorySessionStore<T = unknown> implements SessionStore<T> {
     this.revocationListeners.add(listener);
     return () => { this.revocationListeners.delete(listener); };
   }
-  async close(): Promise<void> { this.records.clear(); this.families.clear(); }
+  private readonly counters = new MemoryRateCounter();
+  /** Cuenta en memoria del proceso; las ventanas caducadas se liberan solas. */
+  async rateLimit(key: string, windowMs: number): Promise<RateLimitHit> { return this.counters.hit(key, windowMs); }
+  async close(): Promise<void> { this.records.clear(); this.families.clear(); this.counters.clear(); }
 }
 
 /**
@@ -227,26 +240,7 @@ export interface SessionOptions<T> {
   allowedOrigins?: readonly string[];
 }
 
-const base64UrlAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-
-/** Unpadded base64url, identical to Node's encoding, without depending on Buffer. */
-export function encodeBase64Url(bytes: Uint8Array): string {
-  let output = "";
-  let index = 0;
-  for (; index + 2 < bytes.length; index += 3) {
-    const value = (bytes[index]! << 16) | (bytes[index + 1]! << 8) | bytes[index + 2]!;
-    output += base64UrlAlphabet[value >> 18]! + base64UrlAlphabet[(value >> 12) & 63]! + base64UrlAlphabet[(value >> 6) & 63]! + base64UrlAlphabet[value & 63]!;
-  }
-  const remaining = bytes.length - index;
-  if (remaining === 1) {
-    const value = bytes[index]! << 16;
-    output += base64UrlAlphabet[value >> 18]! + base64UrlAlphabet[(value >> 12) & 63]!;
-  } else if (remaining === 2) {
-    const value = (bytes[index]! << 16) | (bytes[index + 1]! << 8);
-    output += base64UrlAlphabet[value >> 18]! + base64UrlAlphabet[(value >> 12) & 63]! + base64UrlAlphabet[(value >> 6) & 63]!;
-  }
-  return output;
-}
+export { encodeBase64Url };
 
 function token(): string { return encodeBase64Url(crypto.getRandomValues(new Uint8Array(32))); }
 
@@ -560,6 +554,7 @@ export class SessionManager<T = unknown> {
   readonly allowedOrigins: readonly string[];
   private readonly secure: boolean;
   private readonly sameSite: "Lax" | "Strict" | "None";
+  private readonly production: boolean;
   /**
    * @param options Store, modo producción y política de la cookie.
    * @throws {Error} En producción con un store no persistente o sin `replace` y `revokeFamily`, o con
@@ -579,6 +574,7 @@ export class SessionManager<T = unknown> {
     if (!/^[A-Za-z0-9_.-]+$/.test(this.cookieName)) throw new TypeError("Invalid cookie name");
     if (this.cookieName.startsWith("__Host-") && !this.secure) throw new Error("__Host- cookies require Secure");
     this.allowedOrigins = options.allowedOrigins ?? [];
+    this.production = options.production === true;
   }
   /** Serializa la cabecera `Set-Cookie` de la sesión con la política del gestor; `ttlMs` 0 la borra. */
   serializeCookie(value: string, ttlMs: number): string {
@@ -615,6 +611,14 @@ export class SessionManager<T = unknown> {
       return new SessionHandle(this);
     }
     return new SessionHandle(this, record);
+  }
+  /**
+   * Cuenta una petición en la ventana fija `key` (desde `1.2`): con `SessionStore.rateLimit` si el
+   * store lo tiene, o en la memoria de esta instancia, con un aviso en producción. Un fallo del
+   * store rechaza, de modo que la petición limitada no pasa.
+   */
+  rateLimit(key: string, windowMs: number): Promise<RateLimitHit> {
+    return countRateLimit(this.store, key, windowMs, this.production);
   }
   /** Cancela la suscripción a revocaciones y cierra el store; no cierra clientes externos como Redis. */
   async close(): Promise<void> {

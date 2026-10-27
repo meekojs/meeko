@@ -19,6 +19,7 @@ import { createDetachedPlatform } from "./platform.js";
 import type { ServerPlatform } from "./platform.js";
 import type { ServerRuntime, ServerRuntimeDefinition } from "./runtime.js";
 import type { SessionManager } from "./sessions.js";
+import { copySocketAddress, trustProxyOf } from "./env.js";
 import { createSessionDefaults, warnIgnoredSessionEnv } from "./zero-config.js";
 import type { SessionDefaults } from "./zero-config.js";
 import { createSocketHub, withSocketHub } from "./socket.js";
@@ -362,6 +363,8 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
       hostPlatform.waitUntil(tracked);
     },
   };
+  // A mistyped MEEKO_TRUST_PROXY stops startup instead of failing every rate-limited request.
+  trustProxyOf(basePlatform.env);
   const runtime = await createRuntime(options, basePlatform);
   const sessions = runtime.sessions;
   let closing: Promise<void> | undefined;
@@ -470,7 +473,7 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
       const target = new URL(publicOrigin);
       target.pathname = url.pathname;
       target.search = url.search;
-      return new Request(target, request);
+      return copySocketAddress(request, new Request(target, request));
     };
     let socket: ServerAppSocket | undefined;
     if (manifest.server.socket?.length) {

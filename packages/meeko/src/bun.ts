@@ -1,6 +1,7 @@
 import { assetLocation, assetResponse, etagMatches, findAsset } from "./framework-server/assets.js";
 import type { AssetManifest, AssetReader } from "./framework-server/assets.js";
 import type { ServerApp } from "./framework-server/app.js";
+import { setSocketAddress } from "./framework-server/env.js";
 import { fetchApp, positiveInteger, publicOriginOf, rebaseRequest, visibleHost } from "./framework-server/fetch-host.js";
 import { createDetachedPlatform } from "./framework-server/platform.js";
 import type { ServerPlatform } from "./framework-server/platform.js";
@@ -49,6 +50,8 @@ export interface BunServerLike {
   upgrade(request: Request, options?: { data?: unknown; headers?: HeadersInit }): boolean;
   /** URL en la que escucha el servidor. */
   readonly url?: URL;
+  /** Dirección de la conexión de una petición (desde `1.2`); la usa `RequestContext.clientAddress`. */
+  requestIP?(request: Request): { readonly address: string } | null;
 }
 
 /**
@@ -205,6 +208,8 @@ export function createBunServer(app: ServerApp, options: BunServerOptions = {}):
     socket.data instanceof MeekoBunSocket ? socket.data : undefined;
   return {
     async fetch(request, server) {
+      try { setSocketAddress(request, server.requestIP?.(request)?.address); }
+      catch { /* An address Bun cannot report leaves the client unknown. */ }
       if (app.socket && request.headers.has("upgrade")) {
         // Without a configured origin, use the address Bun listens on, never the Host header.
         const listening = server.url ? `${server.url.protocol}//${visibleHost(server.url.hostname)}${server.url.port ? `:${server.url.port}` : ""}` : new URL(request.url).origin;

@@ -1,6 +1,7 @@
 import { assetLocation, assetResponse, etagMatches, findAsset } from "./framework-server/assets.js";
 import type { AssetManifest, AssetReader } from "./framework-server/assets.js";
 import type { ServerApp } from "./framework-server/app.js";
+import { setSocketAddress } from "./framework-server/env.js";
 import { createTrackedPlatform, fetchApp, positiveInteger, publicOriginOf, rebaseRequest, visibleHost } from "./framework-server/fetch-host.js";
 import type { ServerPlatform } from "./framework-server/platform.js";
 import type { SocketPeer } from "./framework-server/socket.js";
@@ -18,7 +19,7 @@ interface DenoHttpServer {
 interface DenoNamespace {
   serve(
     options: { hostname?: string; port?: number; onListen?(address: { hostname: string; port: number }): void; onError?(error: unknown): Response | Promise<Response> },
-    handler: (request: Request) => Response | Promise<Response>,
+    handler: (request: Request, info?: { readonly remoteAddr?: { readonly hostname?: string } }) => Response | Promise<Response>,
   ): DenoHttpServer;
   upgradeWebSocket(request: Request, options?: { idleTimeout?: number }): { socket: WebSocket; response: Response };
   open(path: string | URL, options?: { read?: boolean }): Promise<{ readonly readable: ReadableStream<Uint8Array> }>;
@@ -181,7 +182,8 @@ export async function serveDeno(app: ServerApp, options: ServeDenoOptions = {}):
     return response;
   };
 
-  const handler = async (request: Request): Promise<Response> => {
+  const handler = async (request: Request, info?: { readonly remoteAddr?: { readonly hostname?: string } }): Promise<Response> => {
+    setSocketAddress(request, info?.remoteAddr?.hostname);
     await ready;
     if (closing) return new Response(null, { status: 503 });
     if (handshake && request.headers.has("upgrade")) {

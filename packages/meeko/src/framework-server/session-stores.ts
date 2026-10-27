@@ -1,4 +1,5 @@
 import { serializeJson } from "../server.js";
+import type { RateLimitHit } from "./rate-limit.js";
 import { RedisChannelSubscriptions } from "./redis-pubsub.js";
 import type { RedisSubscriberClient } from "./redis-pubsub.js";
 import type { SessionRecord, SessionStore } from "./sessions.js";
@@ -181,6 +182,20 @@ export class RedisSessionStore<T = unknown> implements SessionStore<T> {
       "-- meeko:session:revoke-family\nlocal active = redis.call('GET', KEYS[1]) if active then redis.call('DEL', ARGV[1] .. active) redis.call('DEL', KEYS[1]) else redis.call('DEL', ARGV[1] .. ARGV[2]) end redis.call('PUBLISH', ARGV[3], ARGV[2]) return 1",
       { keys: [this.familyKey(familyId)], arguments: [this.options.prefix, familyId, this.revocationChannel()] },
     );
+  }
+  /**
+   * Cuenta una petición en la ventana fija `<prefix>ratelimit:<key>` con un script atómico
+   * (`INCR` y `PEXPIRE` en la primera petición de la ventana), compartido por todas las instancias.
+   */
+  async rateLimit(key: string, windowMs: number): Promise<RateLimitHit> {
+    if (!Number.isSafeInteger(windowMs) || windowMs <= 0) throw new RangeError("Rate limit window must be a positive integer of milliseconds");
+    const result = await this.client.eval(
+      "-- meeko:rate-limit\nlocal count = redis.call('INCR', KEYS[1]) local ttl = redis.call('PTTL', KEYS[1]) if count == 1 or ttl < 0 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) ttl = tonumber(ARGV[1]) end return {count, ttl}",
+      { keys: [`${this.options.prefix}ratelimit:${key}`], arguments: [String(windowMs)] },
+    );
+    const [count, resetInMs] = Array.isArray(result) ? result.map(Number) : [];
+    if (!Number.isSafeInteger(count) || count! < 1 || !Number.isFinite(resetInMs)) throw new Error("Unexpected Redis rate limit result");
+    return { count: count!, resetInMs: Math.max(0, resetInMs!) };
   }
   async close(): Promise<void> { if (this.options.closeClient) await this.client.quit?.(); }
 }

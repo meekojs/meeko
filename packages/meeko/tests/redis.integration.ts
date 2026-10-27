@@ -424,3 +424,27 @@ test("sessions without server/runtime.ts use MEEKO_REDIS_URL in production and r
     await admin.quit();
   }
 });
+
+test("rateLimit counts in real Redis across instances and expires with its window", { skip: !url, timeout: 30_000 }, async () => {
+  if (!url) throw new Error("MEEKO_REDIS_URL is required");
+  const prefix = `meeko:test:${randomUUID()}:`;
+  const admin = await connectedClient(url);
+  const store = new RedisSessionStore(admin, { prefix });
+  try {
+    const first = await store.rateLimit("login:203.0.113.7", 1500);
+    const second = await store.rateLimit("login:203.0.113.7", 1500);
+    assert.equal(first.count, 1);
+    assert.equal(second.count, 2);
+    assert.ok(second.resetInMs > 0 && second.resetInMs <= 1500, String(second.resetInMs));
+    const ttl = await admin.pTTL(`${prefix}ratelimit:login:203.0.113.7`);
+    assert.ok(ttl > 0 && ttl <= 1500, `TTL ${ttl}`);
+    // Concurrent hits from several instances never lose a count.
+    const parallel = await Promise.all(Array.from({ length: 20 }, () => new RedisSessionStore(admin, { prefix }).rateLimit("burst", 5000)));
+    assert.deepEqual(parallel.map((hit) => hit.count).sort((a, b) => a - b), Array.from({ length: 20 }, (_, index) => index + 1));
+    await new Promise((resolve) => setTimeout(resolve, 1700));
+    assert.equal((await store.rateLimit("login:203.0.113.7", 1500)).count, 1, "a new window after expiry");
+  } finally {
+    await deletePrefix(admin, prefix);
+    await admin.quit();
+  }
+});

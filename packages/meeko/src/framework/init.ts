@@ -92,6 +92,9 @@ header { margin-bottom: 2rem; }
 # MEEKO_REDIS_URL=rediss://user:password@redis.example.com:6380
 # MEEKO_SESSION_TTL=7d
 # MEEKO_SESSION_SAMESITE=Lax
+
+# Number of proxies in front of the server whose X-Forwarded-For can be trusted, for rateLimit.
+# MEEKO_TRUST_PROXY=1
 `,
   "README.md": `# Meeko framework starter
 

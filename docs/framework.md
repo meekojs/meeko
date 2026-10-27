@@ -93,6 +93,7 @@ En desarrollo, Vite abre un WebSocket HMR en un puerto derivado del puerto HTTP 
 | `MEEKO_REDIS_URL` | La salida de Node, Bun y Deno | Redis de las sesiones en producción cuando `server/runtime.ts` no declara `sessions`; véase [Sesiones sin configuración](#sesiones-sin-configuración). |
 | `MEEKO_REDIS_PREFIX` | Ídem | Prefijo de sus claves; por defecto, `meeko:<name de package.json>:prod:`. |
 | `MEEKO_SESSION_TTL`, `MEEKO_SESSION_SAMESITE` | `dev` y producción | Duración (`12h`, `7d`…; 7 días por defecto) y `SameSite` (`Lax` por defecto, o `Strict`) de esas sesiones. |
+| `MEEKO_TRUST_PROXY` | `dev` y producción | Proxies de confianza delante del servidor (un número, o `true` para todos), cuyas entradas de `X-Forwarded-For` dan la IP del cliente; véase [Límite de peticiones](#límite-de-peticiones-ratelimit). Sin ella, `X-Forwarded-For` nunca se lee. |
 | `MEEKO_HMR_PORT` | `dev` | Puerto del WebSocket de HMR; sin él, se deriva del puerto HTTP. |
 | `MEEKO_EDITOR_BRIDGE=0` | `dev` | Desactiva el puente con el editor (valores en vivo). |
 | `MEEKO_LINK_WATCH=0` | `dev` | No reinicia `meeko dev` al reconstruir un `@meekojs/meeko` enlazado. |
@@ -933,7 +934,7 @@ Escriba mensajes propios en el schema: algunos mensajes por defecto de Valibot c
 
 Desde `1.2`, `defineApiRoute` y `defineRpc` aceptan `locals(context)`, que calcula un valor por petición (por ejemplo, el usuario actual) y se lo entrega al handler como `locals`, con el tipo inferido de lo que devuelve. Sin `locals`, el handler recibe `locals: undefined`. `authorize` no cambia y sigue devolviendo un booleano.
 
-El orden de cada petición es: Origin con `origin: "required"`, Origin y CSRF de la sesión, `auth`, `authorize`, validación de la entrada (`params`, `query` y `body`, o `input`), `locals`, handler y validación de la respuesta. Así, `locals` sólo se ejecuta con una entrada válida y una petición ya autorizada. Si lanza un `ApiError`, ese error es la respuesta (por ejemplo, `401` si el usuario de la sesión ya no existe o `403` si perdió el acceso); cualquier otro error es `500`.
+El orden de cada petición es: Origin con `origin: "required"`, Origin y CSRF de la sesión, `rateLimit` (desde `1.2`), `auth`, `authorize`, validación de la entrada (`params`, `query` y `body`, o `input`), `locals`, handler y validación de la respuesta. Así, `locals` sólo se ejecuta con una entrada válida y una petición ya autorizada. Si lanza un `ApiError`, ese error es la respuesta (por ejemplo, `401` si el usuario de la sesión ya no existe o `403` si perdió el acceso); cualquier otro error es `500`.
 
 ```ts
 // server/rpc/orders/create.ts
@@ -1618,13 +1619,33 @@ printf '%s' "$PASSWORD" | npx meeko auth hash   # o la lee de stdin
 
 El comando escribe en stdout sólo la línea del hash, lista para `.env` (`ADMIN_PASSWORD_HASH=…`); los avisos van a stderr.
 
+### Límite de peticiones: `rateLimit`
+
+Desde `1.2`, `defineApiRoute` y `defineRpc` aceptan `rateLimit: { limit, window, key? }`: como mucho `limit` peticiones por ventana fija de `window` (milisegundos o un texto como `"30s"`, `"5m"`, `"1h"`). La petición que lo supera recibe `429 RATE_LIMITED` con `Retry-After` (segundos hasta la ventana siguiente), sin validar la entrada ni ejecutar el handler. Se comprueba tras Origin y CSRF y antes de `auth`, `authorize`, la entrada y `locals`, así que también frena a los clientes anónimos.
+
+```ts
+export default defineApiRoute({
+  body: loginInput,
+  response: okResult,
+  origin: "required",
+  rateLimit: { limit: 5, window: "5m" },
+  handler: async ({ body, context }) => { /* … */ },
+});
+```
+
+- **Clave.** Sin `key`, cada IP de cliente tiene su contador por ruta (las IPv6 por su red /64, porque un cliente dispone de toda una /64). La IP es `context.clientAddress`: la de la conexión que entrega el adaptador (Node, Bun, Deno; en Workers, `CF-Connecting-IP`, que fija Cloudflare). Si Meeko no la conoce, todos los clientes comparten el contador de la ruta. `key: (context) => string` cuenta por otro sujeto, como el usuario de la sesión; se ejecuta antes de validar la entrada, así que no recibe el cuerpo. Una ruta dinámica (`/api/users/[id]`) tiene un solo contador para todos sus valores.
+- **Proxies.** `X-Forwarded-For` nunca se lee salvo con `MEEKO_TRUST_PROXY`, porque cualquier cliente puede enviarlo. Con un número `n`, la IP es la entrada que añadió el proxy de confianza más externo, la `n`-ésima desde la derecha: con un único proxy (Traefik en Coolify, Caddy, nginx) use `MEEKO_TRUST_PROXY=1`, y las entradas que el cliente falsificó a la izquierda se ignoran. `true` toma la entrada de la izquierda: sólo es seguro si el proxy de entrada sustituye la cabecera en lugar de añadirse. Sin la variable, tras un proxy todos los clientes comparten el contador del proxy. Un valor no válido detiene el arranque.
+- **Almacenamiento.** Los contadores viven en el store de sesiones: en memoria con `MemorySessionStore` y, con `RedisSessionStore` (también el de [Sesiones sin configuración](#sesiones-sin-configuración)), en `<prefix>ratelimit:<resumen>`, con un script Lua que hace `INCR` y `PEXPIRE` de forma atómica para todas las instancias. La clave guarda un resumen SHA-256 de la ruta y el sujeto, nunca la IP ni la clave en claro. Si Redis falla, la petición se rechaza con `500` (*fail closed*) y el error llega a `onError`.
+- **Store propio.** Un `SessionStore` puede implementar `rateLimit(key, windowMs)`, que cuenta una petición en la ventana fija `key` y resuelve `{ count, resetInMs }` (tipo `RateLimitHit`); debe ser atómico entre instancias y rechazar si falla. `SqlSessionStore` (y D1) no lo implementa: con él, los contadores viven en la memoria de cada instancia o aislado, y Meeko lo avisa una vez en producción.
+- Un `limit` que no es un entero positivo, una `window` no válida o una `key` vacía responden `500 INVALID_RATE_LIMIT`.
+
 ## Sesiones y seguridad
 
 Las sesiones usan IDs opacos aleatorios en cookies `HttpOnly`, host-only, `Secure` por defecto y `SameSite=Lax` por defecto. Cada sesión nueva recibe también un `familyId` opaco que permanece al rotar su ID. `SessionHandle` permite crear, rotar y revocar; la rotación y la revocación de toda la familia requieren operaciones atómicas en el store. Así, un logout iniciado con un handle anterior invalida el ID activo aunque otra petición ya lo haya rotado. Las mutaciones autenticadas con cookie verifican Origin y `x-meeko-csrf`. Las respuestas SSR y API entregan el token CSRF por meta o cabecera same-origin. La aplicación debe definir verificación de identidad y reglas de autorización; Meeko no guarda secretos de autenticación en el navegador.
 
 `MemorySessionStore` sirve sólo en desarrollo. `SessionManager({ production: true, store })` exige `persistent: true`, `replace` atómico y `revokeFamily`; una aplicación sin `MEEKO_REDIS_URL` ni `sessions` propias no arranca en producción. `RedisSessionStore` acepta un cliente compatible con `get`, `set` con `PX`, `del` y `eval`; usa un índice de familia con el TTL de la sesión activa. Use un prefijo propio por aplicación y entorno. Los registros Redis anteriores sin `familyId` siguen siendo legibles y adquieren una familia en la primera rotación. `SqlSessionStore` acepta un `SqlSessionDriver` con `read`, `write`, `remove`, `replace` transaccional, `revokeFamily` y `close` opcional. El ejemplo ejecutable en `tests/fixtures/fullstack-consumer/server/runtime.ts` usa SQLite real; el framework no depende de una librería SQL ni de un motor de base de datos concreto. `SessionManager.close()` libera el store cuando el host es propietario del recurso.
 
-Todo `SessionStore` persistente personalizado debe almacenar `familyId` y garantizar que `replace` y `revokeFamily` sean atómicos frente a peticiones concurrentes. Antes de actualizar, migre los registros existentes y los índices necesarios para localizar la sesión activa por familia. No despliegue el nuevo runtime sobre un store antiguo: en producción la construcción falla de forma deliberada cuando no puede garantizar rotación y revocación familiar seguras.
+Todo `SessionStore` persistente personalizado debe almacenar `familyId` y garantizar que `replace` y `revokeFamily` sean atómicos frente a peticiones concurrentes. Antes de actualizar, migre los registros existentes y los índices necesarios para localizar la sesión activa por familia. No despliegue el nuevo runtime sobre un store antiguo: en producción la construcción falla de forma deliberada cuando no puede garantizar rotación y revocación familiar seguras. Desde `1.2`, un store puede implementar además `rateLimit(key, windowMs)` para los contadores de [`rateLimit`](#límite-de-peticiones-ratelimit).
 
 **Migración de drivers SQL existentes:** añada una columna de familia a la tabla (por ejemplo, `family_id`), rellene las filas existentes con `family_id = id` y cree un índice único sobre ella. `read` y `write` deben transferir `SqlSessionRow.familyId`; `replace` debe comprobar la misma familia y sustituir la fila en una transacción; `revokeFamily(familyId)` debe borrar la fila activa por familia. Migre el esquema antes de iniciar la nueva versión. Un driver antiguo sin `revokeFamily` falla al construir `SqlSessionStore`; no se admite silenciosamente en producción.
 
