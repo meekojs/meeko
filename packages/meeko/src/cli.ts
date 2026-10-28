@@ -16,7 +16,7 @@ import { checkApp, generateAppTypes } from "./framework/check-app.js";
 import { prerenderProject } from "./framework/prerender.js";
 import { generateTypeScriptAutoImports } from "./autoimports-ts.js";
 import { assertBuildAdapter, buildProject, developmentServerPorts, previewProject, startProject, stopDevelopmentServer } from "./framework/project.js";
-import { findLinkedMeeko, isSupervisedDevelopment, linkWatchEnabled, runSupervisedDevelopment, superviseDevelopment } from "./framework/dev-link.js";
+import { findLinkedMeeko, isSupervisedDevelopment, linkWatchEnabled, runSupervisedDevelopment, superviseDevelopment, warnLinkedMeekoRebuilds } from "./framework/dev-link.js";
 import { checkFrameworkProject, loadCheckedMeekoConfig, prepareFrameworkTypes } from "./framework/check-project.js";
 import { cleanProject, formatCleanResult } from "./framework/clean.js";
 import { loadProjectEnv } from "./framework/env-file.js";
@@ -34,7 +34,7 @@ const usage = "Uso: meeko dev [directorio]\n     meeko check [directorio | compo
   "     MEEKO_TRUST_PROXY  proxies de confianza para X-Forwarded-For (un número o true)\n" +
   "     MEEKO_HMR_PORT   puerto del WebSocket de HMR de dev\n" +
   "     MEEKO_EDITOR_BRIDGE=0  desactiva el puente con el editor de dev\n" +
-  "     MEEKO_LINK_WATCH=0     dev no se reinicia al reconstruir un @meekojs/meeko enlazado\n" +
+  "     MEEKO_LINK_WATCH=0     dev no se reinicia al reconstruir un @meekojs/meeko enlazado (avisa)\n" +
   "     HOST y PUBLIC_ORIGIN están obsoletas: usa MEEKO_HOST y MEEKO_PUBLIC_ORIGIN\n" +
   "dev, build, start, preview y check leen el .env del proyecto; el entorno real tiene prioridad.\n";
 /** Prints the diagnostics on stderr, warnings included. */
@@ -110,7 +110,8 @@ if (problem !== undefined) {
       if (command === "dev") {
         // A linked Meeko (pnpm link:, npm link, a workspace) is rebuilt while dev runs: a
         // supervisor restarts the server in a fresh process, which loads the new build.
-        const linked = linkWatchEnabled() ? findLinkedMeeko(resolve(root)) : undefined;
+        const supervised = isSupervisedDevelopment();
+        const linked = supervised ? undefined : findLinkedMeeko(resolve(root));
         const start = async () => {
           // Modules run once in this process, already in development mode for the types prepared below.
           setModuleDevelopmentMode(true);
@@ -118,9 +119,13 @@ if (problem !== undefined) {
           await prepareFrameworkTypes(root);
           return startProject(root, false);
         };
-        if (linked) process.exitCode = await superviseDevelopment(linked);
-        else if (isSupervisedDevelopment()) await runSupervisedDevelopment(start, stopDevelopmentServer, developmentServerPorts);
-        else await start();
+        if (linked && linkWatchEnabled()) process.exitCode = await superviseDevelopment(linked);
+        else if (supervised) await runSupervisedDevelopment(start, stopDevelopmentServer, developmentServerPorts);
+        else {
+          // Without a supervisor the server keeps the build it loaded: each rebuild is reported.
+          if (linked) warnLinkedMeekoRebuilds(linked);
+          await start();
+        }
       }
       else if (command === "start") await startProject(root, true);
       // Preview runs the output in its runtime: Node in this process; Bun, Deno and wrangler dev as a child.
@@ -182,9 +187,10 @@ if (problem !== undefined) {
       } else if (hasErrors(diagnostics)) {
         writeDiagnostics(diagnostics);
       } else if (command === "compile") {
-        // The component follows the `css` options of the project that contains it.
-        const scopeAttribute = (await loadMeekoConfig(projectRoot(input))).css?.scopeAttribute;
-        const result = compile(source, input, scopeAttribute ? { scopeAttribute } : {});
+        // The component follows the `css` and `theme` options of the project that contains it.
+        const config = await loadMeekoConfig(projectRoot(input));
+        const scopeAttribute = config.css?.scopeAttribute;
+        const result = compile(source, input, { ...(scopeAttribute ? { scopeAttribute } : {}), theme: config.theme !== undefined && config.theme !== false });
         await writeFile(output!, result.code, "utf8");
         process.stdout.write(`${output}\n`);
       } else if (command === "types") {

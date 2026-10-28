@@ -31,6 +31,24 @@ test("the template completes HTML tag names and attribute values, not expression
   assert.equal(htmlCompletion(script.document, script.position), undefined);
 });
 
+test("<sn right inside a component tag offers <snippet name>, also in <MeekoThemeToggle>, not in <MeekoLink> or an element", () => {
+  const snippetItem = (template: string) => {
+    const { document, position } = at(component(template));
+    return htmlCompletion(document, position)?.items.find((item) => item.label === "snippet");
+  };
+  for (const template of ["<AppCard><sn|</AppCard>", "<AppCard>\n  <snippet name=\"header\">H</snippet>\n  <|\n</AppCard>", "<MeekoThemeToggle><sn|</MeekoThemeToggle>"]) {
+    const item = snippetItem(template);
+    assert.ok(item, template);
+    assert.equal((item.textEdit as { newText: string }).newText, 'snippet name="$1">$0</snippet>');
+    // The names of the child's snippets come right after.
+    assert.equal(item.command?.command, "editor.action.triggerSuggest");
+  }
+  // `<snippet>` must be a direct child of a component tag (MEEK061); <MeekoLink> renders an <a>.
+  for (const template of ["<MeekoLink to=\"/\"><sn|</MeekoLink>", "<div><sn|</div>", "<AppCard><p><sn|</p></AppCard>", "<sn|", "<AppCard><di|</AppCard>"]) {
+    assert.equal(snippetItem(template), undefined, template);
+  }
+});
+
 test("HTML tags and attributes have their MDN hover", () => {
   const tag = at(component(`<but|ton type="button"></button>`));
   assert.match(hoverText(htmlHover(tag.document, tag.position)), /button/i);

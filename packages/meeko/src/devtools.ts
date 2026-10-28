@@ -458,6 +458,7 @@ export function registerDevtoolsInstance(input: DevtoolsRegistration): () => voi
       if (initial) { initial = false; return; }
       record("signal", entry.id, name, safeValue(current), entry, signalReadSites(signal, entry.owner), writeSiteFor(signal, current));
       if (entry.breakpoint) {
+        // eslint-disable-next-line no-debugger -- DevTools signal breakpoints pause here on purpose.
         debugger;
       }
     }));

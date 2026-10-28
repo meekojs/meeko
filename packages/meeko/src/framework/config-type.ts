@@ -1,6 +1,7 @@
 import type { ContentSecurityPolicy } from "../framework-server/csp.js";
 import type { DocumentConfig } from "./head.js";
 import type { MeekoModuleEntry } from "./module.js";
+import type { ThemeConfig } from "./theme.js";
 
 /**
  * Archivo de cabeceras que escribe el adaptador `static` en su salida: `"_headers"` es el formato
@@ -269,6 +270,22 @@ export interface MeekoConfig {
    * @since 1.3.0
    */
   readonly robots?: boolean | RobotsConfig;
+  /**
+   * Tema claro/oscuro (y temas propios) sin parpadeo: la elección se guarda en una cookie, el
+   * servidor escribe el tema en `<html>` desde el primer byte y un script en línea de `<head>` lo
+   * aplica antes de pintar cuando el servidor no lo conoce (páginas prerenderizadas, adaptador
+   * `static`, modo `"system"` sin client hint). Activa `useTheme()`. `true` usa los valores por
+   * defecto; sin `theme`, nada cambia.
+   * @since 1.4.0
+   * @example
+   * ```ts
+   * import { defineMeekoConfig } from "@meekojs/meeko/framework";
+   *
+   * export default defineMeekoConfig({ theme: { themes: ["light", "dark", "sepia"], default: "system" } });
+   * ```
+   * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#tema-clarooscuro-sin-parpadeo
+   */
+  readonly theme?: boolean | ThemeConfig;
 }
 
 /**

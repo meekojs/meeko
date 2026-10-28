@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { PassThrough } from "node:stream";
 import { after, before, describe, test } from "node:test";
@@ -9,7 +9,7 @@ import { pathToFileURL } from "node:url";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
   CodeActionRequest, CompletionRequest, CompletionResolveRequest, ConfigurationRequest, createConnection, createProtocolConnection, DefinitionRequest,
-  DidChangeTextDocumentNotification, DidChangeWatchedFilesNotification, DidOpenTextDocumentNotification, DidSaveTextDocumentNotification,
+  DidChangeTextDocumentNotification, DidChangeWatchedFilesNotification, DidCloseTextDocumentNotification, DidOpenTextDocumentNotification, DidSaveTextDocumentNotification,
   DocumentFormattingRequest, DocumentSymbolRequest, ExitNotification, FileChangeType, FoldingRangeRequest, HoverRequest,
   InitializedNotification, InitializeRequest, PrepareRenameRequest, PublishDiagnosticsNotification, ReferencesRequest,
   RegistrationRequest, RenameRequest, SemanticTokensRefreshRequest, SemanticTokensRequest, ShutdownRequest, SignatureHelpRequest,
@@ -21,6 +21,7 @@ import type {
 } from "vscode-languageserver/node";
 import { checkSource } from "../src/check.ts";
 import { startLanguageServer } from "../src/language-server/server.ts";
+import type { CompletionData } from "../src/language-server/features.ts";
 import type { LanguageServerInitializationOptions } from "../src/language-server/server.ts";
 import { createTempProject, linkRepositoryPackages, repositoryRoot } from "./helpers/temp-project.ts";
 
@@ -762,6 +763,13 @@ const text = "widget";
       assert.ok(items.includes("defineProps") && items.includes("defineRouteMiddleware"), JSON.stringify(items.filter((item) => /^define/.test(item))));
       assert.deepEqual(items.filter((item) => serverOnly.includes(item)), []);
     }
+    // Without a dependency in package.json TypeScript would import the linked package by its path:
+    // a public export comes from its entry instead.
+    const listed = await client.connection.sendRequest(CompletionRequest.type, { textDocument: { uri }, position: client.position(uri, "defin;", 5) });
+    const middleware = (Array.isArray(listed) ? listed : listed?.items ?? []).find((item) => item.label === "defineRouteMiddleware")!;
+    assert.equal(middleware.labelDetails?.description, "@meekojs/meeko/framework");
+    const resolvedMiddleware = await client.connection.sendRequest(CompletionResolveRequest.type, middleware) as CompletionItem;
+    assert.deepEqual(resolvedMiddleware.additionalTextEdits?.map((edit) => edit.newText), ['import { defineRouteMiddleware } from "@meekojs/meeko/framework";\n']);
     // The block keeps them.
     const block = await labels(client.position(uri, "definePage(", 3));
     assert.ok(block.includes("definePage"), JSON.stringify(block.filter((item) => /^define/.test(item))));
@@ -989,8 +997,8 @@ ${body}
     for (const position of [client.position(uri, "SaveButton", 2), client.position(uri, "/SaveButton", 3)]) {
       const hover = await client.connection.sendRequest(HoverRequest.type, { textDocument: { uri }, position });
       const value = (hover?.contents as MarkupContent).value;
-      assert.match(value, /\(componente\) SaveButton/);
-      assert.match(value, /app\/components\/save-button\.meeko/);
+      assert.match(value, /^```ts\n<SaveButton\n {2}id: number\n {2}on:save\(id: number\)\n {2}on:close\(\)\n\/>\n```/);
+      assert.match(value, /Componente · \[app\/components\/save-button\.meeko\]\(file:/);
       assert.equal(client.document(uri).getText(hover!.range!), "SaveButton");
       const definitions = await client.connection.sendRequest(DefinitionRequest.type, { textDocument: { uri }, position }) as Location[];
       assert.equal(definitions.length, 1, JSON.stringify(definitions));
@@ -1045,5 +1053,259 @@ ${body}
       assert.ok(indented.includes('\n      <SaveButton bind:id="1" on:save="(id) => saved.push(id)" /><SaveButton\n        bind:id="2"\n      ></SaveButton>\n'), indented);
       assert.ok(indented.includes("\n      <p>after</p>\n"), indented);
     } finally { await indentedClient.close(); }
+  });
+});
+
+/** The items of a completion response, a list or an array. */
+function itemsOf(result: CompletionItem[] | { items: CompletionItem[] } | null | undefined): CompletionItem[] {
+  return Array.isArray(result) ? result : result?.items ?? [];
+}
+
+/** Waits until `check` holds or the time runs out; the project check runs tsc, so it takes seconds. */
+async function eventually(check: () => boolean, message: () => string, timeout = 90_000): Promise<void> {
+  const deadline = Date.now() + timeout;
+  while (!check()) {
+    if (Date.now() > deadline) throw new Error(message());
+    await new Promise((done) => setTimeout(done, 100));
+  }
+}
+
+const builtinLayout = `<script lang="ts">
+const id = "1";
+</script>
+<template>
+  <header><MeekoLink to="/users/[id]" bind:params="{ id }" class="brand">Perfil</MeekoLink></header>
+  <main><MeekoOutlet /></main>
+</template>
+`;
+
+const documentedCard = `<script lang="ts">
+type CardVariant = "primary" | "secondary";
+const props = defineProps<{
+  /** Estilo de la tarjeta. */
+  variant?: CardVariant;
+  title: string;
+}>();
+const snippets = defineSnippets<{ header?: []; default: [] }>();
+</script>
+<template><article class={props.variant}><render snippet="snippets.header" /><h2>{props.title}</h2><render snippet="snippets.default" /></article></template>
+`;
+
+/**
+ * A type in the script that starts with `Meeko`: completion lists the package's exports and local
+ * names. `useRoute` brings the package's framework declarations into the program.
+ */
+const typing = `<script lang="ts">
+const route = useRoute();
+type MeekoLocalAlias = { local: true };
+type Wanted = Meeko;
+</script>
+<template><p>{route.path.value}</p></template>
+`;
+
+describe("Meeko language server built-in tags, component hover and completion", () => {
+  /** Files of a project whose `@meekojs/meeko` is the repository, linked (junction) or installed. */
+  const files: Record<string, string> = {
+    "package.json": `${JSON.stringify({ private: true, type: "module", dependencies: { "@meekojs/meeko": "link:meeko" } })}\n`,
+    "tsconfig.json": `${JSON.stringify({ compilerOptions: { strict: true, module: "ESNext", moduleResolution: "Bundler", target: "ES2022", types: [], skipLibCheck: true, noEmit: true, allowArbitraryExtensions: true }, include: ["lib/**/*.ts"] })}\n`,
+    "lib/meeko-local.ts": "/** Opciones del proyecto. */\nexport interface MeekoLocalOptions { readonly name: string }\n",
+    "app/layouts/default.meeko": builtinLayout,
+    "app/pages/index.meeko": '<script lang="ts"></script><template><AppCard title="Hola" variant="primary">Cuerpo</AppCard></template>\n',
+    "app/pages/users/[id].meeko": '<script lang="ts"></script><template><p>User</p></template>\n',
+    "app/pages/typing.meeko": typing,
+    "app/components/AppCard.meeko": documentedCard,
+  };
+
+  test("<MeekoLink> and <MeekoOutlet> hover with their props and go to the type that declares them", async () => {
+    const root = await project("lsp-builtins-", files);
+    const client = await inProcess(root, { projectContracts: false });
+    try {
+      const uri = await client.open(join(root, "app", "layouts", "default.meeko"));
+      await client.waitForDiagnostics(uri, () => true);
+      const hoverAt = async (needle: string, delta: number): Promise<{ value: string; range: string }> => {
+        const hover = await client.connection.sendRequest(HoverRequest.type, { textDocument: { uri }, position: client.position(uri, needle, delta) });
+        return { value: (hover?.contents as MarkupContent | undefined)?.value ?? "", range: hover?.range ? client.document(uri).getText(hover.range) : "" };
+      };
+      const link = await hoverAt("<MeekoLink", 3);
+      assert.equal(link.range, "MeekoLink");
+      assert.match(link.value, /^```ts\n<MeekoLink\n {2}to: "\/users\/\[id\]"\n {2}bind:params\?: [^\n]+\n {2}bind:search\?: Readonly<Record<string, [^\n]+>>\n>\n {2}default\?\(\)\n<\/MeekoLink>\n```/);
+      assert.doesNotMatch(link.value, /\bany\b/);
+      assert.match(link.value, /props: \[`MeekoLinkProps`\]\(file:\/\/\/[^)]+framework\.d\.ts#L\d+,\d+\)/);
+      assert.match(link.value, /- `bind:params`: Parámetros de una ruta dinámica/);
+      assert.match(link.value, /\[Guía de `<MeekoLink>`\]\(https:\/\/github\.com\/meekojs\/meeko\/blob\/main\/docs\/framework\.md#meekooutlet--y-meekolink\)/);
+      // The closing tag hovers the same.
+      assert.equal((await hoverAt("/MeekoLink", 3)).range, "MeekoLink");
+      const outlet = await hoverAt("<MeekoOutlet", 3);
+      assert.match(outlet.value, /^```ts\n<MeekoOutlet \/>\n```\n\nEtiqueta de Meeko · props: \[`MeekoOutletProps`\]/);
+      assert.match(outlet.value, /MEEK104/);
+      // The attributes have the types of MeekoLinkProps, with their JSDoc.
+      const params = await hoverAt("bind:params", "bind:pa".length);
+      assert.match(params.value, /\(property\) MeekoLinkProps<"\/users\/\[id\]">\.params\?/);
+      assert.match(params.value, /Parámetros de una ruta dinámica/);
+
+      for (const [needle, name] of [["<MeekoLink", "MeekoLinkProps"], ["<MeekoOutlet", "MeekoOutletProps"]] as const) {
+        const definitions = await client.connection.sendRequest(DefinitionRequest.type, { textDocument: { uri }, position: client.position(uri, needle, 3) }) as Location[];
+        assert.equal(definitions.length, 1, JSON.stringify(definitions));
+        assert.match(definitions[0]!.uri, /\/dist\/framework\.d\.ts$/);
+        const text = await readFile(new URL(definitions[0]!.uri), "utf8");
+        const declaration = TextDocument.create(definitions[0]!.uri, "typescript", 0, text).getText(definitions[0]!.range);
+        assert.equal(declaration, name);
+      }
+      // `to="…"` goes to the page of the route.
+      const page = await client.connection.sendRequest(DefinitionRequest.type, { textDocument: { uri }, position: client.position(uri, "/users/[id]\"", 2) }) as Location[];
+      assert.ok(page.some((item) => item.uri.endsWith("/app/pages/users/%5Bid%5D.meeko")), JSON.stringify(page));
+
+      // Completion: the props of the tag and the attributes of the <a> it renders, never href.
+      const attributes = itemsOf(await client.connection.sendRequest(CompletionRequest.type, { textDocument: { uri }, position: client.position(uri, ' class="brand"', 1) })).map((item) => item.label);
+      assert.ok(attributes.includes("bind:search") && attributes.includes("target") && attributes.includes("on:"), JSON.stringify(attributes));
+      assert.ok(!attributes.includes("href") && !attributes.includes("to") && !attributes.includes("bind:params"), JSON.stringify(attributes));
+    } finally {
+      await client.close();
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    }
+  });
+
+  test("the hover of a component is its signature in a ts block, with its file and JSDoc, without empty sections", async () => {
+    const root = await project("lsp-card-hover-", files);
+    const client = await inProcess(root, { projectContracts: false });
+    try {
+      const uri = await client.open(join(root, "app", "pages", "index.meeko"));
+      await client.waitForDiagnostics(uri, () => true);
+      const hover = await client.connection.sendRequest(HoverRequest.type, { textDocument: { uri }, position: client.position(uri, "<AppCard", 2) });
+      const value = (hover?.contents as MarkupContent).value;
+      assert.equal(value.slice(0, value.indexOf("```", 5) + 3), "```ts\n<AppCard\n  variant?: CardVariant\n  title: string\n>\n  header?()\n  default()\n</AppCard>\n```");
+      assert.match(value, /\n\nComponente · \[app\/components\/AppCard\.meeko\]\(file:\/\/\/[^)]+\/app\/components\/AppCard\.meeko\)\n\n/);
+      assert.match(value, /\*\*Props\*\*\n- `variant`: Estilo de la tarjeta\./);
+      assert.doesNotMatch(value, /ninguno|Eventos|Modelos|\(componente\)/);
+    } finally {
+      await client.close();
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    }
+  });
+
+  for (const install of ["linked", "installed"] as const) {
+    test(`completion in the script leaves out virtual helpers and internal paths of a ${install} package`, async () => {
+      const root = await project(`lsp-completion-${install}-`, files, install === "linked");
+      if (install === "installed") {
+        // A copy like an install: the manifest and the declarations of dist/, in node_modules.
+        const target = join(root, "node_modules", "@meekojs", "meeko");
+        await mkdir(target, { recursive: true });
+        await cp(join(repositoryRoot, "package.json"), join(target, "package.json"));
+        await cp(join(repositoryRoot, "dist"), join(target, "dist"), { recursive: true, filter: (source) => !/\.(?:js|map)$/.test(source) });
+      }
+      const client = await inProcess(root, { projectContracts: false });
+      try {
+        const uri = await client.open(join(root, "app", "pages", "typing.meeko"));
+        await client.waitForDiagnostics(uri, () => true);
+        const position = client.position(uri, "Meeko;", "Meeko".length);
+        let items: CompletionItem[] = [];
+        // TypeScript resolves auto-import paths within a budget: ask again while the list is incomplete.
+        for (let attempt = 0; attempt < 10; attempt++) {
+          const result = await client.connection.sendRequest(CompletionRequest.type, { textDocument: { uri }, position });
+          items = itemsOf(result);
+          if (!Array.isArray(result) && !result?.isIncomplete) break;
+        }
+        const labels = items.map((item) => item.label);
+        assert.ok(labels.includes("MeekoLocalAlias"), JSON.stringify(labels));
+        assert.deepEqual(labels.filter((label) => /^__meeko/i.test(label)), []);
+        const repository = repositoryRoot.replaceAll("\\", "/").toLowerCase();
+        for (const item of items) {
+          const data = (item.data as CompletionData | undefined)?.data;
+          const specifier = data?.moduleSpecifier ?? item.labelDetails?.description;
+          if (specifier) {
+            assert.doesNotMatch(specifier, /^@meekojs\/meeko\/(?:internal|dist|src)/, item.label);
+            assert.ok(!(/^\.\.?\//.test(specifier) && /meeko[\\/](?:dist|src)[\\/]/.test(specifier)), `${item.label} from ${specifier}`);
+          }
+          // An export of the package is imported from one of its public entries, never by its path.
+          const file = data?.fileName?.replaceAll("\\", "/").toLowerCase();
+          const inPackage = file && (file.startsWith(`${repository}/`) || file.includes("/node_modules/@meekojs/meeko/"));
+          if (inPackage) assert.match(item.labelDetails?.description ?? "", /^@meekojs\/meeko(?:\/[a-z-]+)?$/, `${item.label} from ${file}`);
+        }
+        // Declared in dist/framework/config-type.d.ts and not exported by any entry: only its path
+        // reaches it, so it is not offered.
+        assert.ok(!labels.includes("MeekoAdapterName"), JSON.stringify(labels));
+        const module = items.find((item) => item.label === "MeekoModule");
+        assert.ok(module, JSON.stringify(labels));
+        // The props types of the built-in tags and RouteId are autoimported: offered without an import.
+        for (const name of ["MeekoLinkProps", "MeekoOutletProps", "RouteId"]) {
+          const offered = items.filter((item) => item.label === name);
+          assert.equal(offered.length, 1, `${name}: ${JSON.stringify(offered)}`);
+          assert.equal(offered[0]!.labelDetails?.description, "@meekojs/meeko/framework");
+          assert.equal(offered[0]!.data, undefined, `${name} adds no import`);
+        }
+        // The package's exports after the local names and the project's auto-imports.
+        const local = items.find((item) => item.label === "MeekoLocalAlias")!;
+        assert.ok(module.sortText! > local.sortText!, `${module.sortText} <= ${local.sortText}`);
+        const project = items.find((item) => item.label === "MeekoLocalOptions");
+        if (project) assert.ok(module.sortText! > project.sortText!, `${module.sortText} <= ${project.sortText}`);
+        const resolved = await client.connection.sendRequest(CompletionResolveRequest.type, module) as CompletionItem;
+        // Its own import, not a name added to the one the virtual code generates for `useRoute`.
+        assert.equal(resolved.additionalTextEdits?.length, 1, JSON.stringify(resolved.additionalTextEdits));
+        assert.match(resolved.additionalTextEdits[0]!.newText, /^import \{ (?:type )?MeekoModule \} from "@meekojs\/meeko\/framework";\n$/);
+      } finally {
+        await client.close();
+        await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+      }
+    });
+  }
+});
+
+describe("Meeko language server project check", () => {
+  test("refreshes on a new component in a new folder, keeps checking with an empty one and reads unsaved text", async () => {
+    const layoutSource = '<script lang="ts">const props = defineProps<{ outlet: object }>();</script><template><p>Shell</p></template>\n';
+    const root = await project("lsp-project-check-", {
+      "app/pages/index.meeko": '<script lang="ts"></script><template><p>Home</p></template>\n',
+      "app/layouts/default.meeko": layoutSource,
+    });
+    const client = await inProcess(root);
+    const watched = async (path: string, type: FileChangeType): Promise<void> => {
+      await client.connection.sendNotification(DidChangeWatchedFilesNotification.type, { changes: [{ uri: pathToFileURL(join(root, path)).href, type }] });
+    };
+    try {
+      // The open layout with unsaved text that breaks its contract: the check reads it, not the disk.
+      const layout = join(root, "app", "layouts", "default.meeko");
+      const layoutUri = await client.open(layout, layoutSource.replace("outlet: object", "outlet: object; missing: string"));
+      await client.waitForDiagnostics(layoutUri, (items) => items.some((item) => item.code === "MEEK_LAYOUT_PROPS"));
+
+      // A new folder with an empty component, as the editor creates it: no failure anywhere.
+      const navbar = join(root, "app", "components", "Layout", "LayoutNavbar.meeko");
+      const navbarUri = pathToFileURL(navbar).href;
+      await mkdir(dirname(navbar), { recursive: true });
+      await writeFile(navbar, "");
+      await watched("app/components/Layout", FileChangeType.Created);
+      await watched("app/components/Layout/LayoutNavbar.meeko", FileChangeType.Created);
+      // A component that does not compile yet: its error goes to that file, not to the open ones.
+      await writeFile(navbar, '<script lang="ts">const props = defineProps<{ title: string }>();</script>\n');
+      await watched("app/components/Layout/LayoutNavbar.meeko", FileChangeType.Changed);
+      await client.waitForDiagnostics(navbarUri, (items) => items.some((item) => item.code === "MEEK007"));
+      const layoutItems = client.diagnostics.get(layoutUri) ?? [];
+      assert.ok(layoutItems.some((item) => item.code === "MEEK_LAYOUT_PROPS"), JSON.stringify(layoutItems));
+      assert.ok(!layoutItems.some((item) => item.code === "MEEK_PROJECT_CHECK" || item.code === "MEEK007"), JSON.stringify(layoutItems));
+
+      // Saved with its content, as in the editor: the check runs again and the error goes away.
+      const fixed = '<script lang="ts">const props = defineProps<{ title: string }>();</script>\n<template><nav>{props.title}</nav></template>\n';
+      await client.open(navbar, fixed);
+      await writeFile(navbar, fixed);
+      await client.connection.sendNotification(DidSaveTextDocumentNotification.type, { textDocument: { uri: navbarUri } });
+      await eventually(() => !client.diagnostics.get(navbarUri)?.some((item) => item.code === "MEEK007" || item.code === "MEEK_PROJECT_CHECK"),
+        () => JSON.stringify(client.diagnostics.get(navbarUri)));
+      assert.ok(existsSync(join(root, ".meeko", "types", "app", "components", "Layout", "LayoutNavbar.d.meeko.ts")), "The new component has its declaration");
+
+      // Fixing the layout's unsaved text and saving another file clears its contract.
+      await client.change(layoutUri, layoutSource);
+      await client.connection.sendNotification(DidSaveTextDocumentNotification.type, { textDocument: { uri: navbarUri } });
+      await eventually(() => !client.diagnostics.get(layoutUri)?.some((item) => item.code === "MEEK_LAYOUT_PROPS" || item.code === "MEEK_PROJECT_CHECK"),
+        () => JSON.stringify(client.diagnostics.get(layoutUri)));
+
+      // A removed folder checks the project again too.
+      await client.connection.sendNotification(DidCloseTextDocumentNotification.type, { textDocument: { uri: navbarUri } });
+      await rm(dirname(navbar), { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+      await watched("app/components/Layout", FileChangeType.Deleted);
+      await eventually(() => !existsSync(join(root, ".meeko", "types", "app", "components", "Layout", "LayoutNavbar.d.meeko.ts")),
+        () => "The declaration of the removed component is still there");
+    } finally {
+      await client.close();
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    }
   });
 });

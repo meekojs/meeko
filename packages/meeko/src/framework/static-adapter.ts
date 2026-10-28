@@ -12,7 +12,7 @@ import type { MeekoServerConfig } from "./config-type.js";
 import { contentTypes } from "./content-types.js";
 import { importNodeOutput } from "./prerender.js";
 import type { PrerenderIndex } from "./prerender.js";
-import { inlineScriptHashes } from "./script-hashes.js";
+import { inlineScriptHashes, inlineStyleHashes } from "./script-hashes.js";
 
 type StaticConfig = Extract<MeekoServerConfig, { adapter: "static" }>;
 
@@ -80,21 +80,24 @@ async function writeNew(target: string, contents: string | Uint8Array, conflict:
   await writeFile(target, contents);
 }
 
-/** Headers of every response: the CSP with the hashes of the pages' inline scripts, then `headers`. */
+/** Headers of every response: the CSP with the hashes of the pages' inline scripts and styles, then `headers`. */
 async function staticHeaders(output: string, config: StaticConfig | undefined): Promise<Record<string, string>> {
   const headers: Record<string, string> = {};
   if (config?.contentSecurityPolicy) {
     const hashes = new Set<string>();
+    const styleHashes = new Set<string>();
     const problems: string[] = [];
     for (const file of await htmlFiles(output)) {
-      const report = inlineScriptHashes(await readFile(file, "utf8"));
+      const html = await readFile(file, "utf8");
+      const report = inlineScriptHashes(html);
       for (const hash of report.hashes) hashes.add(hash);
+      for (const hash of inlineStyleHashes(html)) styleHashes.add(hash);
       for (const item of report.unhashable) problems.push(`${relative(output, file).replaceAll("\\", "/")}: ${item}`);
     }
     if (problems.length) {
       throw new Error(`server.contentSecurityPolicy no puede permitir JavaScript en atributos on* ni en URL javascript: con hashes; muévelo a un script o a on: del componente:\n${problems.map((problem) => `- ${problem}`).join("\n")}`);
     }
-    headers["Content-Security-Policy"] = contentSecurityPolicy(config.contentSecurityPolicy, [...hashes].sort());
+    headers["Content-Security-Policy"] = contentSecurityPolicy(config.contentSecurityPolicy, [...hashes].sort(), [...styleHashes].sort());
   }
   return { ...headers, ...config?.headers };
 }

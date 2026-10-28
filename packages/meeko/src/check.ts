@@ -205,6 +205,17 @@ const untrustedHtmlType = /\bMEEK107: /;
  */
 export const untrustedHtmlMessage = "`html` inserta HTML sin escapar; un `string` puede venir de un usuario (XSS). Sanéelo y márquelo con `trustHtml(…)`, o use `{expr}`, que escapa.";
 
+/** The type error of `RequiredSnippetMessage` that `checkSnippetCondition` reports for `<snippet if:when>`. */
+const requiredSnippetType = /\bMEEK110: ([A-Za-z_$][\w$]*) /;
+
+/**
+ * Message of `MEEK110`: `if:when` on a `<snippet>` that fills a snippet the child requires, which
+ * the child would then render without content.
+ */
+export function requiredSnippetMessage(name: string): string {
+  return `if:when en <snippet name="${name}"> deja de pasar el snippet cuando la condición es falsa, pero el hijo declara ${name} como obligatorio. Decláralo opcional en el defineSnippets del hijo (${name}?: [...]) o quita if:when`;
+}
+
 /** The type error of `UnexposedRefMessage` that TypeScript reports for `await useElementRef(...)`. */
 const unexposedRefType = /\bMEEK080: /;
 
@@ -286,6 +297,10 @@ export async function checkSource(source: string, filename: string, options: Che
       const generated = generatedOffset(entry.code, diagnostic.line, diagnostic.column);
       const offset = originalOffset(entry.mappings, generated);
       if (unexposedRefType.test(diagnostic.message)) return unexposedRefDiagnostic(entry, generated, offset);
+      const requiredSnippet = requiredSnippetType.exec(diagnostic.message);
+      if (requiredSnippet) {
+        return { code: "MEEK110", message: requiredSnippetMessage(requiredSnippet[1]!), filename: entry.original, location: locate(entry.source, offset ?? 0) };
+      }
       if (untrustedHtmlType.test(diagnostic.message)) {
         return { code: "MEEK107", message: untrustedHtmlMessage, filename: entry.original, location: locate(entry.source, offset ?? 0), severity: "warning" };
       }

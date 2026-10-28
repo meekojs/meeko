@@ -90,7 +90,6 @@ test("hydration rejects malformed or mismatched payloads", async () => {
 
 test("client rejects invalid route input before navigation and preserves request state", async () => {
   const browser = new HappyWindow({ url: "https://example.test/start" });
-  const root = browser.document.createElement("div");
   const routes = createRouteManifest([
     { id: "/start", file: "start.meeko", layouts: [], sidecar: "start.route.ts" },
     { id: "/users/[id]", file: "user.meeko", layouts: [], sidecar: "user.route.ts" },

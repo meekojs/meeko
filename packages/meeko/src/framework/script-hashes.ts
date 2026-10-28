@@ -108,3 +108,38 @@ export function inlineScriptHashes(html: string): InlineScriptReport {
   visit(parse(html) as unknown as Parse5Node);
   return { hashes: [...hashes].sort(), unhashable };
 }
+
+/**
+ * Calcula el hash SHA-256 (base64) de cada `<style>` en línea de un documento HTML, como fuentes
+ * CSP `'sha256-…'` para `style-src`: el estilo que añade `theme` para `<MeekoThemeToggle>` y los
+ * `<style>` de los componentes. Los atributos `style="…"` no cuentan, porque un hash no los
+ * permite. El texto se lee como lo hace el navegador, así que el hash coincide con el que éste
+ * comprueba.
+ *
+ * @param html Documento HTML completo.
+ * @returns Los hashes como fuentes CSP, ordenados y sin repetir.
+ * @since 1.4.0
+ * @example
+ * ```ts
+ * import { readFile } from "node:fs/promises";
+ * import { inlineScriptHashes, inlineStyleHashes } from "@meekojs/meeko/build";
+ * import { contentSecurityPolicy } from "@meekojs/meeko/server";
+ *
+ * const html = await readFile("dist/index.html", "utf8");
+ * const header = contentSecurityPolicy({ "default-src": ["'self'"] }, inlineScriptHashes(html).hashes, inlineStyleHashes(html));
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#csp-con-hashes
+ */
+export function inlineStyleHashes(html: string): readonly string[] {
+  const hashes = new Set<string>();
+  const visit = (node: Parse5Node): void => {
+    if (node.tagName === "style") {
+      const text = (node.childNodes ?? []).map((child) => child.nodeName === "#text" ? child.value ?? "" : "").join("");
+      hashes.add(`'sha256-${createHash("sha256").update(text, "utf8").digest("base64")}'`);
+    }
+    for (const child of node.childNodes ?? []) visit(child);
+    if (node.content) visit(node.content);
+  };
+  visit(parse(html) as unknown as Parse5Node);
+  return [...hashes].sort();
+}

@@ -36,8 +36,15 @@ const hashSource = /^'sha(?:256|384|512)-[A-Za-z0-9+/]+={0,2}'$/;
  *
  * Con hashes en `script-src`, el navegador ignora `'unsafe-inline'` de esa directiva.
  *
+ * Desde `1.4`, `styleHashes` (como `PrerenderIndex.pages[ruta].styleHashes`) permite igual los
+ * `<style>` en línea, como el del tema de `<MeekoThemeToggle>` y los de los componentes: van a
+ * `style-src-elem` si la política la tiene, si no a `style-src`, o a una copia de `default-src`.
+ * Si esa directiva ya admite `'unsafe-inline'` no se añaden, porque con un hash el navegador
+ * ignoraría `'unsafe-inline'` y bloquearía los atributos `style="…"`, que ningún hash permite.
+ *
  * @param policy Directivas y fuentes de la política.
  * @param scriptHashes Fuentes `'sha256-…'` (o `sha384`/`sha512`) de los scripts en línea.
+ * @param styleHashes Fuentes `'sha256-…'` (o `sha384`/`sha512`) de los `<style>` en línea; desde `1.4`.
  * @returns El valor de la cabecera, con las directivas en el orden de `policy`.
  * @throws {TypeError} Si un nombre de directiva, una fuente o un hash no son válidos.
  * @since 1.3.0
@@ -53,10 +60,13 @@ const hashSource = /^'sha(?:256|384|512)-[A-Za-z0-9+/]+={0,2}'$/;
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#csp-con-hashes
  */
-export function contentSecurityPolicy(policy: ContentSecurityPolicy, scriptHashes: readonly string[] = []): string {
+export function contentSecurityPolicy(policy: ContentSecurityPolicy, scriptHashes: readonly string[] = [], styleHashes: readonly string[] = []): string {
   if (!policy || typeof policy !== "object" || Array.isArray(policy)) throw new TypeError("contentSecurityPolicy: the policy must be an object of directives");
   for (const hash of scriptHashes) {
     if (typeof hash !== "string" || !hashSource.test(hash)) throw new TypeError(`contentSecurityPolicy: invalid script hash ${JSON.stringify(hash)}`);
+  }
+  for (const hash of styleHashes) {
+    if (typeof hash !== "string" || !hashSource.test(hash)) throw new TypeError(`contentSecurityPolicy: invalid style hash ${JSON.stringify(hash)}`);
   }
   const directives = new Map<string, string[]>();
   for (const [name, sources] of Object.entries(policy)) {
@@ -72,6 +82,15 @@ export function contentSecurityPolicy(policy: ContentSecurityPolicy, scriptHashe
     if (base) {
       // The hashes allow inline scripts; a directive copied from default-src keeps what it allowed.
       directives.set("script-src", [...new Set([...base, ...scriptHashes])]);
+    }
+  }
+  if (styleHashes.length) {
+    // `<style>` elements follow style-src-elem when the policy has it, else style-src, else default-src.
+    const name = directives.has("style-src-elem") ? "style-src-elem" : "style-src";
+    const base = directives.get(name) ?? directives.get("default-src");
+    // With a hash the browser ignores 'unsafe-inline', which also allows the style attributes.
+    if (base && !base.some((source) => source.toLowerCase() === "'unsafe-inline'")) {
+      directives.set(name, [...new Set([...base, ...styleHashes])]);
     }
   }
   return [...directives].map(([name, sources]) => [name, ...sources].join(" ")).join("; ");

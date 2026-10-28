@@ -347,9 +347,9 @@ export async function componentDiagnostics(
     }
     // `on:event`, `model:name` and `bind:prop` on a component are reported at the attribute name, and a missing
     // model, snippet or `<render args>` at the tag: mark the whole directive or tag name.
-    // MEEK080 marks the whole `useElementRef("name")` call.
+    // MEEK080 marks the whole `useElementRef("name")` call, and MEEK110 the `if:when` of a `<snippet>`.
     const directive = end === undefined
-      ? (item.code === "MEEK080" ? /^useElementRef\s*\(\s*(["'`])[^"'`]*\1\s*\)/ : /^(?:(?:on|model|bind):[\w$]+|model(?![\w$:])|<[A-Za-z][\w$.-]*)/).exec(source.slice(offset, offset + 256))
+      ? (item.code === "MEEK080" ? /^useElementRef\s*\(\s*(["'`])[^"'`]*\1\s*\)/ : item.code === "MEEK110" ? /^if:when/ : /^(?:(?:on|model|bind):[\w$]+|model(?![\w$:])|<[A-Za-z][\w$.-]*)/).exec(source.slice(offset, offset + 256))
       : null;
     diagnostic.range = toRange(document, offset, end ?? (directive ? offset + directive[0].length : tokenEnd(source, offset)));
     return diagnostic;
@@ -384,6 +384,27 @@ export function contractRange(source: string, filename: string, offset: number):
     if (end > relativeOffset) return [offset, script.contentStart + end];
   } catch { /* Fall back to the token below. */ }
   return [offset, tokenEnd(source, offset)];
+}
+
+/**
+ * Raíz de la aplicación cuya comprobación de proyecto (tipos de los componentes y contratos de
+ * páginas) puede cambiar con esta ruta: cualquier `.meeko`, archivo TypeScript, configuración o
+ * carpeta (creada, borrada o renombrada) de una aplicación con `app/`. Nunca lo generado en
+ * `.meeko/` ni las dependencias.
+ */
+export function projectCheckRoot(path: string): string | undefined {
+  const root = projectRoot(path);
+  const inner = relative(root, resolve(path));
+  if (!inner || inner === ".." || inner.startsWith(`..${sep}`)) return undefined;
+  const parts = inner.split(sep);
+  if (parts[0] === ".meeko" || parts.some((part) => part === "node_modules" || part === ".git")) return undefined;
+  const name = parts.at(-1)!;
+  const relevant = (/\.(?:meeko|[cm]?ts)$/.test(name) && !name.endsWith(".d.meeko.ts"))
+    || /^meeko\.config\.[cm]?[jt]s$/.test(name) || /^tsconfig.*\.json$/.test(name) || name === "package.json"
+    // A folder: it has no extension, and a removed one cannot be checked on disk.
+    || !name.includes(".");
+  if (!relevant) return undefined;
+  return frameworkContractRoot(path) ?? (existsSync(join(root, "app")) ? root : undefined);
 }
 
 /** Raíz del proyecto cuyo contrato de páginas depende de este archivo, si lo hay. */

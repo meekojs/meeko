@@ -177,6 +177,7 @@ test("la transferencia de estado rechaza datos que JSON cambiaría silenciosamen
   assert.throws(() => serializeJson({ value: Number.NaN }), /Non-finite number at \$\.value/);
   assert.throws(() => serializeJson({ value: undefined }), /Non-serializable value at \$\.value/);
   assert.throws(() => serializeJson({ value: new Date() }), /Non-plain object at \$\.value/);
+  // eslint-disable-next-line no-sparse-arrays -- the hole is the input under test.
   assert.throws(() => serializeJson([, 1]), /Sparse array/);
   const circular: { self?: unknown } = {};
   circular.self = circular;
@@ -245,14 +246,14 @@ test("detecta diferencias entre el servidor y el navegador", () => {
 test("atributos dinámicos se escapan en SSR y se actualizan sobre el nodo hidratado", () => {
   const window = new Window();
   const root = window.document.createElement("main");
-  root.innerHTML = renderAttributes({ initial: `a\" & <b>` });
+  root.innerHTML = renderAttributes({ initial: `a" & <b>` });
   const input = root.querySelector("input");
   const button = root.querySelector("button");
   assert.ok(input);
   assert.ok(button);
-  assert.equal(input.getAttribute("value"), `a\" & <b>`);
+  assert.equal(input.getAttribute("value"), `a" & <b>`);
   assert.equal(input.getAttribute("disabled"), "");
-  const dispose = hydrateAttributes(root as unknown as Element, { initial: `a\" & <b>` });
+  const dispose = hydrateAttributes(root as unknown as Element, { initial: `a" & <b>` });
   assert.equal(root.querySelector("input"), input);
   button.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
   assert.equal(input.getAttribute("value"), "updated & ready");

@@ -4,6 +4,7 @@ import { getDefaultHTMLDataProvider, getLanguageService as getHtmlLanguageServic
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { CompletionItemKind, DiagnosticSeverity, DiagnosticTag, InsertTextFormat } from "vscode-languageserver/node";
 import type { CompletionItem, CompletionList, Diagnostic, Hover, MarkupContent, Position, Range } from "vscode-languageserver/node";
+import { builtinTag } from "./builtin-tags.js";
 import { cssClassRules } from "./class-rules.js";
 
 // HTML of the template and CSS of `<style>`, outside the TypeScript model: what the editor offers
@@ -112,9 +113,9 @@ export function tagAt(source: string, offset: number): TagContext | undefined {
 }
 
 /** `on:event` names of an HTML element, from the HTML data of VS Code (MDN descriptions). */
-export function domEventCompletion(document: TextDocument, position: Position, context: TagContext, word: string): CompletionItem[] {
+export function domEventCompletion(document: TextDocument, position: Position, context: TagContext, word: string, element = context.tag): CompletionItem[] {
   const start = document.positionAt(document.offsetAt(position) - word.length);
-  return htmlData.provideAttributes(context.tag.toLowerCase())
+  return htmlData.provideAttributes(element.toLowerCase())
     .filter((attribute) => /^on[a-z]/.test(attribute.name))
     .map((attribute): CompletionItem => {
       const event = attribute.name.slice(2);
@@ -130,12 +131,20 @@ export function domEventCompletion(document: TextDocument, position: Position, c
 
 /**
  * HTML attribute names of an element (`type`, `href`, `aria-*`…), with their snippet and MDN
- * documentation. Event handler attributes are left out: Meeko writes them as `on:event`.
+ * documentation. Event handler attributes are left out: Meeko writes them as `on:event`. `element`
+ * is the element a built-in tag renders: `<MeekoLink>` completes the attributes of an `<a>`.
  */
-export function htmlAttributeCompletion(document: TextDocument, position: Position, present: ReadonlySet<string>): CompletionItem[] {
+export function htmlAttributeCompletion(document: TextDocument, position: Position, present: ReadonlySet<string>, element?: string): CompletionItem[] {
   const template = templateRegion(document.getText());
   if (!template) return [];
-  const html = masked(document, template, "html");
+  let html = masked(document, template, "html");
+  const tagStart = html.getText().lastIndexOf("<", document.offsetAt(position) - 1);
+  const tag = element === undefined ? undefined : /^<([A-Za-z][\w$.-]*)/.exec(html.getText().slice(tagStart))?.[1];
+  if (element !== undefined && tag && tag.length >= element.length) {
+    // Same length, so positions do not move: `<MeekoLink` reads as `<a        `.
+    const text = html.getText();
+    html = TextDocument.create(html.uri, "html", html.version, `${text.slice(0, tagStart + 1)}${element.padEnd(tag.length)}${text.slice(tagStart + 1 + tag.length)}`);
+  }
   const list = htmlService.doComplete(html, position, htmlService.parseHTMLDocument(html));
   return list.items.filter((item) => item.kind !== CompletionItemKind.Snippet && !/^on[a-z]/.test(item.label) && !present.has(item.label))
     .map((item) => ({ ...item, sortText: `1${item.sortText ?? item.label}` }));
@@ -158,10 +167,42 @@ export function htmlCompletion(document: TextDocument, position: Position): Comp
   const open = source.lastIndexOf("{", offset - 1);
   if (!context && open > source.lastIndexOf("}", offset - 1) && open >= template.contentStart) return undefined;
   const html = masked(document, template, "html");
-  const list = htmlService.doComplete(html, position, htmlService.parseHTMLDocument(html));
+  const parsed = htmlService.parseHTMLDocument(html);
+  const list = htmlService.doComplete(html, position, parsed);
   // A lowercase tag only: components come from their own completion.
   const items = list.items.filter((item) => item.kind !== CompletionItemKind.Snippet && !/^on[a-z]/.test(item.label));
+  const snippet = snippetTagCompletion(document, position, parsed);
+  if (snippet) items.unshift(snippet);
   return items.length ? { isIncomplete: list.isIncomplete, items } : undefined;
+}
+
+/**
+ * `<snippet name="…">` while a tag name is typed (`<sn`) right inside a component tag
+ * (`<AppCard>`, `<MeekoThemeToggle>`), whose snippets it fills; after inserting it the names of the
+ * child's snippets are offered. Not inside `<MeekoLink>`, which renders its content in the `<a>`
+ * (`MEEK061`), nor in an element.
+ */
+function snippetTagCompletion(document: TextDocument, position: Position, parsed: ReturnType<typeof htmlService.parseHTMLDocument>): CompletionItem | undefined {
+  const source = document.getText();
+  const offset = document.offsetAt(position);
+  const typed = /<([a-z]*)$/.exec(source.slice(Math.max(0, offset - 64), offset));
+  if (!typed || !"snippet".startsWith(typed[1]!)) return undefined;
+  const tagStart = offset - typed[0].length;
+  // The node that contains the `<` is the parent of the tag being typed.
+  const parent = parsed.findNodeAt(tagStart).tag;
+  if (!parent || !/^[A-Z]/.test(parent)) return undefined;
+  const builtin = builtinTag(parent);
+  if (builtin && !builtin.component) return undefined;
+  return {
+    label: "snippet",
+    kind: CompletionItemKind.Property,
+    detail: `Snippet de <${parent}>: <snippet name="…">`,
+    documentation: { kind: "markdown", value: `Llena un snippet del componente: \`<snippet name="nombre" params="a, b">…</snippet>\`, hijo directo de \`<${parent}>\`.` },
+    sortText: "0",
+    insertTextFormat: InsertTextFormat.Snippet,
+    textEdit: { range: { start: document.positionAt(tagStart + 1), end: position }, newText: 'snippet name="$1">$0</snippet>' },
+    command: { title: "Snippets", command: "editor.action.triggerSuggest" },
+  };
 }
 
 /** MDN documentation of an HTML tag or attribute of the template. */

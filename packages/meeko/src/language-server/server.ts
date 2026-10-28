@@ -1,15 +1,17 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "@typescript/typescript6";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
   CodeActionKind, CodeLensRefreshRequest, createConnection, DiagnosticSeverity, DidChangeWatchedFilesNotification, RequestType, TextDocuments, TextDocumentSyncKind,
+  WatchKind,
 } from "vscode-languageserver/node";
 import type { Connection, Diagnostic, InitializeResult, Position, Range, SemanticTokens, TextDocumentIdentifier } from "vscode-languageserver/node";
 import { projectRoot } from "../compiler/project-root.js";
+import { MeekoCompileError } from "../compiler/sfc.js";
 import { checkFrameworkPageContracts } from "../framework/page-contracts-check.js";
-import { componentDiagnostics, contractRange, frameworkContractRoot } from "./diagnostics.js";
+import { componentDiagnostics, contractRange, frameworkContractRoot, projectCheckRoot, tokenEnd } from "./diagnostics.js";
 import {
   codeActions, completionList, componentNameCompletion, definition, directiveNameCompletion, documentSymbols, foldingRanges, formatting, hover, prepareRename, references,
   rename, resolveCompletion, semanticTokens, semanticTokensLegend, shadowedTagsOf, signatureHelp,
@@ -114,6 +116,14 @@ function ignoredChange(path: string, folders: readonly string[]): boolean {
     const segments = inner.split(/[\\/]/);
     return segments.some((part) => part === "node_modules" || part === ".git") || segments.slice(0, -1).includes(".meeko");
   });
+}
+
+/**
+ * Changes that can affect a project: components, modules, configuration, dependencies and folders.
+ * The folder watcher also reports other files of `app/` (images, fonts…), which change nothing.
+ */
+function relevantChange(path: string): boolean {
+  return /\.(?:meeko|[cm]?[jt]s|json|ya?ml|lock)$/i.test(path) || !basename(path).includes(".");
 }
 
 /** Registra los manejadores del servidor de lenguaje Meeko en una conexión LSP. */
@@ -245,7 +255,11 @@ export function startLanguageServer(connection: Connection): void {
     }, delay));
   };
 
-  /** Los contratos dependen de rutas y sidecars guardados; se comprueban fuera del ritmo de escritura. */
+  /**
+   * The project check (component declarations and page contracts) runs off the typing rhythm, after
+   * a save or a change on disk, with the text of the open components. Each run replaces every
+   * diagnostic of the previous one, its failure included.
+   */
   const scheduleContractCheck = (root: string, trigger?: TextDocument): void => {
     if (!workspace.options.trusted || !contracts) return;
     const key = pathKey(root);
@@ -255,35 +269,59 @@ export function startLanguageServer(connection: Connection): void {
     contractTimers.set(key, setTimeout(() => {
       contractTimers.delete(key);
       const previous = contractRuns.get(key) ?? Promise.resolve();
-      const run = previous.then(async () => {
-        if (contractVersions.get(key) !== version) return;
-        const found = await checkFrameworkPageContracts(root);
-        if (contractVersions.get(key) !== version) return;
-        const grouped = new Map<string, Diagnostic[]>();
-        for (const item of found) {
-          const target = locate(item.filename);
-          if (!target) continue;
-          const [start, end] = contractRange(target.document.getText(), item.filename, item.offset);
-          grouped.set(target.uri, [...(grouped.get(target.uri) ?? []), {
-            range: { start: target.document.positionAt(start), end: target.document.positionAt(end) },
-            message: item.message, code: item.code, source: "Meeko", severity: DiagnosticSeverity.Error,
-          }]);
-        }
+      const grouped = new Map<string, Diagnostic[]>();
+      const add = (target: LocatedDocument, start: number, end: number, message: string, code: string): void => {
+        grouped.set(target.uri, [...(grouped.get(target.uri) ?? []), {
+          range: { start: target.document.positionAt(start), end: target.document.positionAt(end) },
+          message, code, source: "Meeko", severity: DiagnosticSeverity.Error,
+        }]);
+      };
+      /** A component that does not compile, at its own position; its document reports it if open. */
+      const componentFailure = (filename: string, error: unknown): void => {
+        if (openDocument(filename)) return;
+        const target = locate(filename);
+        if (!target) return;
+        const diagnostic = error instanceof MeekoCompileError ? error.diagnostic : undefined;
+        const offset = diagnostic?.location.offset ?? 0;
+        add(target, offset, tokenEnd(target.document.getText(), offset), diagnostic?.message ?? (error instanceof Error ? error.message : String(error)), diagnostic?.code ?? "MEEK_PROJECT_CHECK");
+      };
+      /** Publishes this run and clears what the previous one published that is gone, a failure included. */
+      const apply = (): void => {
         for (const uri of contractUris.get(key) ?? []) {
           if (!grouped.has(uri)) { contractDiagnostics.delete(uri); publish(uri); }
         }
         for (const [uri, items] of grouped) { contractDiagnostics.set(uri, items); publish(uri); }
         contractUris.set(key, new Set(grouped.keys()));
+      };
+      const run = previous.then(async () => {
+        if (contractVersions.get(key) !== version) return;
+        // Open components count with their unsaved text, like their own diagnostics; one being
+        // written (empty, or with a syntax error) does not stop the check of the others.
+        const found = await checkFrameworkPageContracts(root, { read: (filename) => openDocument(filename)?.getText(), onError: componentFailure });
+        if (contractVersions.get(key) !== version) return;
+        for (const item of found) {
+          const target = locate(item.filename);
+          if (!target) continue;
+          const [start, end] = contractRange(target.document.getText(), item.filename, item.offset);
+          add(target, start, end, item.message, item.code);
+        }
+        apply();
       }).catch((error: unknown) => {
+        if (contractVersions.get(key) !== version) return;
         const message = error instanceof Error ? error.message : String(error);
         log(`${root}: falló la comprobación de contratos del proyecto: ${message}`);
-        if (trigger && documents.get(trigger.uri)) {
-          contractDiagnostics.set(trigger.uri, [{
-            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
-            message: `Falló la comprobación de contratos del proyecto: ${message}`, code: "MEEK_PROJECT_CHECK", source: "Meeko", severity: DiagnosticSeverity.Error,
-          }]);
-          publish(trigger.uri);
-        }
+        // A file that breaks the check (a page that does not compile) gets the error; otherwise the
+        // document that started the check, or one open component of the project. Never all of them.
+        const compile = error instanceof MeekoCompileError ? error.diagnostic : undefined;
+        const fallback = [trigger, ...documents.all()].find((document) => {
+          const filename = document && documents.get(document.uri) ? uriToPath(document.uri) : undefined;
+          return filename?.endsWith(".meeko") && pathKey(projectRoot(filename)) === key;
+        });
+        // An open file already reports its own compile error.
+        const target = compile ? (openDocument(compile.filename) ? undefined : locate(compile.filename)) : fallback && { uri: fallback.uri, document: fallback };
+        if (target && compile) add(target, compile.location.offset, tokenEnd(target.document.getText(), compile.location.offset), compile.message, compile.code);
+        else if (target) add(target, 0, 1, `Falló la comprobación de contratos del proyecto: ${message}`, "MEEK_PROJECT_CHECK");
+        apply();
       });
       contractRuns.set(key, run);
       void run.finally(() => { if (contractRuns.get(key) === run) contractRuns.delete(key); });
@@ -347,6 +385,9 @@ export function startLanguageServer(connection: Connection): void {
         { globPattern: "**/{tsconfig*.json,meeko.config.*}" },
         // Installing or removing a dependency changes where imports resolve (see MeekoProject).
         { globPattern: "**/{package.json,package-lock.json,pnpm-lock.yaml,yarn.lock,bun.lock}" },
+        // Folders of an application created, removed or renamed: the watcher may report only the
+        // folder (`app/components/Layout`), not each component inside.
+        { globPattern: "**/{app,server,shared}/**", kind: WatchKind.Create | WatchKind.Delete },
       ],
     });
   });
@@ -366,17 +407,23 @@ export function startLanguageServer(connection: Connection): void {
 
   documents.onDidSave(({ document }) => {
     scheduleCheck(document);
-    const root = contractRootOf(document);
+    // Any component or module of the application: a component's declaration feeds the pages' contracts.
+    const filename = uriToPath(document.uri);
+    const root = filename && projectCheckRoot(filename);
     if (root) scheduleContractCheck(root, document);
   });
 
   documents.onDidClose(({ document }) => {
     clearTimeout(timers.get(document.uri));
     timers.delete(document.uri);
+    const edited = openVersions.get(document.uri) !== document.version;
     openVersions.delete(document.uri);
     semanticCache.delete(document.uri);
     const filename = uriToPath(document.uri);
     if (filename?.endsWith(".meeko")) workspace.projectFor(filename).closeDocument(filename);
+    // Closed without saving: the project check counted its unsaved text, now the saved one counts.
+    const root = edited && filename ? projectCheckRoot(filename) : undefined;
+    if (root) scheduleContractCheck(root);
     ownDiagnostics.delete(document.uri);
     publish(document.uri);
   });
@@ -386,7 +433,7 @@ export function startLanguageServer(connection: Connection): void {
     // Stylesheets only feed class completion, also the one `meeko dev` writes under `.meeko/`.
     const styles = changed.filter((path) => path.endsWith(".css"));
     if (styles.length) for (const index of classIndexes.values()) index.filesChanged(styles);
-    const paths = changed.filter((path) => !path.endsWith(".css") && !ignoredChange(path, folders));
+    const paths = changed.filter((path) => !path.endsWith(".css") && relevantChange(path) && !ignoredChange(path, folders));
     if (!paths.length) return;
     // A changed configuration is checked again with the open components; none may be open.
     for (const path of paths) if (configUris.has(pathKey(path))) reportConfig(path, []);
@@ -401,9 +448,14 @@ export function startLanguageServer(connection: Connection): void {
       scheduleCheck(document);
       if (!contractDocument && contractRootOf(document)) contractDocument = document;
     }
-    const changedContract = paths.map(frameworkContractRoot).find((root) => root !== undefined);
-    const contractRoot = changedContract ?? (contractDocument && contractRootOf(contractDocument));
-    if (contractRoot) scheduleContractCheck(contractRoot, contractDocument);
+    // A component, module or folder created, changed, removed or renamed checks its application again.
+    const changedRoots = new Map(paths.flatMap((path) => {
+      const root = projectCheckRoot(path);
+      return root ? [[pathKey(root), root] as const] : [];
+    }));
+    const fallbackRoot = contractDocument && contractRootOf(contractDocument);
+    if (!changedRoots.size && fallbackRoot) changedRoots.set(pathKey(fallbackRoot), fallbackRoot);
+    for (const root of changedRoots.values()) scheduleContractCheck(root, contractDocument);
     if (semanticRefresh) void connection.languages.semanticTokens.refresh();
     if (codeLensRefresh) void connection.sendRequest(CodeLensRefreshRequest.type).catch(() => undefined);
   });

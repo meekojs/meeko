@@ -186,7 +186,7 @@ test("meeko check sees imports.appDirs in components and imports.sharedDirs in s
     "meeko.config.ts": 'export default { imports: { appDirs: ["app/services"], sharedDirs: ["shared/validators"] } };\n',
     "app/services/price.ts": "export function formatPrice(value: number): string { return `$${value.toFixed(2)}`; }\n",
     "app/services/secret.server.ts": "export function readSecret(): string { return \"secret\"; }\n",
-    "shared/validators/email.ts": "export function isEmail(value: string): boolean { return /^[^@\s]+@[^@\s]+$/.test(value); }\n",
+    "shared/validators/email.ts": "export function isEmail(value: string): boolean { return /^[^@\\s]+@[^@\\s]+$/.test(value); }\n",
     "app/pages/index.meeko": pageWith('const label: string = `${formatPrice(3)} ${isEmail("a@b.c")}`;'),
     "shared/schemas/signup.ts": [
       "export const signupResult = { \"~standard\": {",
@@ -204,7 +204,7 @@ test("meeko check sees imports.appDirs in components and imports.sharedDirs in s
     const shared = join(root, "shared", "utils", "total.ts");
     await mkdir(dirname(shared), { recursive: true });
     await writeFile(shared, "export const total: string = formatPrice(1);\n");
-    await assert.rejects(checkFrameworkProject(root), /shared[\/]utils[\/]total\.ts.*TS2304.*formatPrice/s);
+    await assert.rejects(checkFrameworkProject(root), /shared[\\/]utils[\\/]total\.ts.*TS2304.*formatPrice/s);
     await rm(shared);
 
     // A `.server.ts` module of an app/ folder is server-only: MEEK108 in a component.

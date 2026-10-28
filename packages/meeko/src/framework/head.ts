@@ -2,6 +2,8 @@ import { createContext, createRoot, effect, findContext, finishWithCleanup, isDr
 import type { ReadonlySignal } from "../reactivity.js";
 import { escapeHtml } from "../server.js";
 import type { ComponentRelease, DomScope } from "../dom.js";
+import { applyColorScheme, applyThemeClass, resolveThemeConfig, themeScript, themeStyle, withThemeAttributes } from "./theme.js";
+import type { DocumentTheme, ThemeConfig, ThemeHead } from "./theme.js";
 
 /**
  * Etiqueta `<meta>` de {@link HeadInput}. Se deduplica por `key` o, si falta, por `name`,
@@ -236,6 +238,13 @@ export interface DocumentConfig {
    * @since 1.3.0
    */
   seo?: boolean | DocumentSeo;
+  /**
+   * Tema claro/oscuro de la aplicación. El build lo copia de `theme` de `meeko.config.ts`, con
+   * todas sus opciones decididas (en `meeko.config.ts` se escribe en `theme`, no aquí); un host
+   * propio que pasa `DocumentOptions.config` y `mountClientApp({ document })` lo da aquí.
+   * @since 1.4.0
+   */
+  theme?: ThemeConfig;
 }
 
 /**
@@ -523,12 +532,16 @@ export function normalizeHeadInput(value: unknown, label: string, options: Norma
 export function normalizeDocumentConfig(value: unknown, label: string): DocumentConfig | undefined {
   if (value === undefined) return undefined;
   if (!isRecord(value)) fail(label, "must be an object");
-  for (const name of Object.keys(value)) if (name !== "lang" && name !== "head" && name !== "seo") fail(label, `unknown field ${name}`);
+  for (const name of Object.keys(value)) if (!["lang", "head", "seo", "theme"].includes(name)) fail(label, `unknown field ${name}`);
   if (value.lang !== undefined && (typeof value.lang !== "string" || !value.lang)) fail(label, "lang must be a nonempty string");
   // Serializable: its titleTemplate is a string, as DocumentHead says.
   const head = value.head === undefined ? undefined : normalizeHeadInput(value.head, `${label}.head`, { serializable: true }) as DocumentHead;
   const seo = resolveSeo(value.seo, `${label}.seo`);
-  return { ...(value.lang === undefined ? {} : { lang: value.lang as string }), ...(head ? { head } : {}), ...(seo ? { seo: { ...seo } } : {}) };
+  const theme = resolveThemeConfig(value.theme, `${label}.theme`);
+  return {
+    ...(value.lang === undefined ? {} : { lang: value.lang as string }), ...(head ? { head } : {}), ...(seo ? { seo: { ...seo } } : {}),
+    ...(theme ? { theme } : {}),
+  };
 }
 
 /**
@@ -558,23 +571,48 @@ export function mergeHeadInputs(inputs: readonly (HeadInput | undefined)[]): Hea
  * `document` of meeko.config.ts as the build bakes it, with the heads that modules add placed
  * before the application's own, which wins. Returns `undefined` when there is nothing to render.
  */
-export function resolveDocumentConfig(config: DocumentConfig | undefined, moduleHeads: readonly HeadInput[] = [], origin?: string): DocumentConfig | undefined {
+export function resolveDocumentConfig(config: DocumentConfig | undefined, moduleHeads: readonly HeadInput[] = [], origin?: string, themeOption?: unknown): DocumentConfig | undefined {
   const heads = moduleHeads.map((head, index) => normalizeHeadInput(head, `module head ${index}`, { serializable: true }) as DocumentHead);
   // The module heads join `document.head`: their title is a site title too, never templated.
   const head = heads.length ? mergeHeadInputs([...heads, config?.head]) as DocumentHead : config?.head;
   const lang = config?.lang;
   // The build bakes the origin it resolved (`site` or MEEKO_PUBLIC_ORIGIN) into `seo`.
   const seo = resolveSeo(config?.seo, "document.seo", origin);
-  if (lang === undefined && !seo && (!head || Object.keys(head).length === 0)) return undefined;
-  return { ...(lang === undefined ? {} : { lang }), ...(head && Object.keys(head).length ? { head } : {}), ...(seo ? { seo: { ...seo } } : {}) };
+  // `theme` of meeko.config.ts, with every option decided: the server and the browser read the same.
+  const theme = resolveThemeConfig(themeOption ?? config?.theme);
+  if (lang === undefined && !seo && !theme && (!head || Object.keys(head).length === 0)) return undefined;
+  return {
+    ...(lang === undefined ? {} : { lang }), ...(head && Object.keys(head).length ? { head } : {}), ...(seo ? { seo: { ...seo } } : {}),
+    ...(theme ? { theme } : {}),
+  };
 }
 
-/** The head input of a `document` configuration: `lang` becomes `htmlAttrs.lang`. */
+/** Key of the inline script and the inline style of the theme in `<head>`. */
+const THEME_SCRIPT_KEY = "meeko:theme";
+
+/**
+ * The head input of a `document` configuration: `lang` becomes `htmlAttrs.lang`, and the theme
+ * adds its inline script, which applies the stored theme before the first paint, and the style that
+ * shows the icon of the choice in `<MeekoThemeToggle>`.
+ */
 export function documentHeadInput(config: DocumentConfig | undefined): HeadInput | undefined {
   if (!config) return undefined;
-  if (config.lang === undefined) return config.head;
-  return { ...config.head, htmlAttrs: { lang: config.lang, ...config.head?.htmlAttrs } };
+  if (documentHeads.has(config)) return documentHeads.get(config);
+  const theme = resolveThemeConfig(config.theme, "document.theme");
+  const head: HeadInput | undefined = theme
+    ? {
+      ...config.head,
+      style: [{ key: THEME_SCRIPT_KEY, children: themeStyle(theme) }, ...config.head?.style ?? []],
+      script: [{ key: THEME_SCRIPT_KEY, children: themeScript(theme) }, ...config.head?.script ?? []],
+    }
+    : config.head;
+  const result = config.lang === undefined ? head : { ...head, htmlAttrs: { lang: config.lang, ...head?.htmlAttrs } };
+  documentHeads.set(config, result);
+  return result;
 }
+
+/** The head input of each document configuration: a server reads it on every request. */
+const documentHeads = new WeakMap<DocumentConfig, HeadInput | undefined>();
 
 /** Two document configurations, the second one winning. */
 export function mergeDocumentConfigs(base: DocumentConfig | undefined, override: DocumentConfig | undefined): DocumentConfig | undefined {
@@ -584,7 +622,11 @@ export function mergeDocumentConfigs(base: DocumentConfig | undefined, override:
   // The host's `seo` wins; without its own origin it keeps the one the build resolved.
   const seo = override.seo === undefined ? base.seo
     : resolveSeo(override.seo, "document.seo", typeof base.seo === "object" ? base.seo.origin : undefined);
-  return { ...(lang === undefined ? {} : { lang }), head: mergeHeadInputs([base.head, override.head]) as DocumentHead, ...(seo === undefined ? {} : { seo }) };
+  const theme = override.theme ?? base.theme;
+  return {
+    ...(lang === undefined ? {} : { lang }), head: mergeHeadInputs([base.head, override.head]) as DocumentHead, ...(seo === undefined ? {} : { seo }),
+    ...(theme === undefined ? {} : { theme }),
+  };
 }
 
 /** A resolved tag: what the server writes and the browser keeps in `<head>`. */
@@ -707,14 +749,18 @@ export function resolveHead(entries: readonly HeadEntry[], page?: HeadPage): Res
     for (const [name, value] of Object.entries(input.htmlAttrs ?? {})) if (value !== undefined) htmlAttrs.set(name, value);
     for (const [name, value] of Object.entries(input.bodyAttrs ?? {})) if (value !== undefined) bodyAttrs.set(name, value);
   }
-  const order = ["meta", "link", "style", "script"];
+  // The theme script goes right after the meta tags (a CSP meta tag still applies to it) and before
+  // the links: a script after a pending stylesheet waits for it, and this one only reads the cookie.
+  const themeScriptKey = `script:key:${THEME_SCRIPT_KEY}`;
+  const order = ["meta", themeScriptKey, "link", "style", "script"];
+  const rank = (tag: HeadTag): number => order.indexOf(tag.key === themeScriptKey ? themeScriptKey : tag.tag);
   // Without a page title, the site title as is; an empty page title with no site title stays empty.
   const resolvedTitle = title === undefined || title === "" ? siteTitle ?? title : applyTemplate(title, template);
   if (page?.seo) for (const tag of seoTags([...tags.values()], resolvedTitle, page.seo, page.pathname)) tags.set(tag.key, tag);
   return {
     title: resolvedTitle,
     htmlAttrs, bodyAttrs,
-    tags: [...tags.values()].sort((left, right) => order.indexOf(left.tag) - order.indexOf(right.tag)),
+    tags: [...tags.values()].sort((left, right) => rank(left) - rank(right)),
   };
 }
 
@@ -853,8 +899,9 @@ interface HeadManager {
   remove?(entry: LiveEntry): void;
 }
 
-const headManagerKey = createContext<HeadManager>("Meeko head");
-const headLevelKey = createContext<number>("Meeko head level");
+// Pure: a component that only imports the runtime (no framework) leaves them out of its bundle.
+const headManagerKey = /*#__PURE__*/ createContext<HeadManager>("Meeko head");
+const headLevelKey = /*#__PURE__*/ createContext<number>("Meeko head level");
 
 /** Makes a head manager available to the component tree of the active root. */
 export function provideHead(manager: HeadCollector | BrowserHead): void {
@@ -1057,8 +1104,10 @@ function comment(node: Node, data: string): boolean {
  * The head of a browser application. It adopts the tags that SSR wrote between the head markers,
  * keeps them in sync with the mounted entries and restores what an entry replaced once it leaves.
  */
-export class BrowserHead {
+export class BrowserHead implements ThemeHead {
   readonly live = true;
+  /** The theme of `<html>`, from the application's `BrowserTheme`. */
+  private theme: DocumentTheme | undefined;
   private readonly entries = new Set<LiveEntry>();
   private readonly config: LiveEntry;
   private readonly route: LiveEntry = { level: ROUTE_LEVEL, order: 0, input: undefined };
@@ -1130,6 +1179,15 @@ export class BrowserHead {
     this.changed();
   }
 
+  /**
+   * Replaces the theme attributes of `<html>`. Before hydration adopts the SSR head nothing is
+   * written: the inline script already applied the same theme, and the first flush keeps it.
+   */
+  setTheme(theme: DocumentTheme | undefined): void {
+    this.theme = theme;
+    if (this.adopted) this.changed();
+  }
+
   /** Runs `work` with updates deferred until it finishes, then applies them once. */
   hold<T>(work: () => T): T {
     this.holds++;
@@ -1162,7 +1220,11 @@ export class BrowserHead {
     const document = this.document;
     const title = resolved.title ?? this.defaultTitle;
     if (document.title !== title) document.title = title;
-    this.syncAttributes(document.documentElement, resolved.htmlAttrs);
+    this.syncAttributes(document.documentElement, withThemeAttributes(resolved.htmlAttrs, this.theme, true));
+    // After the attributes: a `class` of htmlAttrs replaces the attribute and its theme class, and
+    // a `style` the attribute and its color-scheme.
+    applyThemeClass(document.documentElement, this.theme);
+    applyColorScheme(document.documentElement, this.theme);
     if (document.body) this.syncAttributes(document.body, resolved.bodyAttrs);
     this.syncTags(resolved.tags);
     this.adopted = true;

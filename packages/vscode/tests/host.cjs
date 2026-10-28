@@ -87,6 +87,23 @@ exports.run = async function run() {
   const hover = await vscode.commands.executeCommand("vscode.executeHoverProvider", uri, position);
   assert.ok(hover.length > 0, "Hover TypeScript");
 
+  // <MeekoLink> y <MeekoOutlet />: la ficha con los tipos de MeekoLinkProps, no any, e ir a su tipo.
+  const linksUri = vscode.Uri.file(path.join(process.env.MEEKO_HOST_CONSUMER, "app", "layouts", "links.meeko"));
+  const linksDocument = await vscode.workspace.openTextDocument(linksUri);
+  const linkPosition = linksDocument.positionAt(linksDocument.getText().indexOf("<MeekoLink") + 3);
+  const hoverText = (hovers) => hovers.flatMap((item) => item.contents.map((content) => typeof content === "string" ? content : content.value)).join("\n");
+  let linkHover = "";
+  for (let attempt = 0; attempt < 60 && !linkHover.includes("MeekoLinkProps"); attempt++) {
+    linkHover = hoverText(await vscode.commands.executeCommand("vscode.executeHoverProvider", linksUri, linkPosition));
+    if (!linkHover.includes("MeekoLinkProps")) await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  assert.match(linkHover, /```ts\n<MeekoLink\n {2}to: "\/"\n {2}bind:params\?/, `Hover de MeekoLink: ${linkHover}`);
+  assert.doesNotMatch(linkHover, /\bany\b/, "MeekoLink no debe mostrarse como any");
+  const outletHover = hoverText(await vscode.commands.executeCommand("vscode.executeHoverProvider", linksUri, linksDocument.positionAt(linksDocument.getText().indexOf("<MeekoOutlet") + 3)));
+  assert.match(outletHover, /<MeekoOutlet \/>/, `Hover de MeekoOutlet: ${outletHover}`);
+  const linkDefinitions = await vscode.commands.executeCommand("vscode.executeDefinitionProvider", linksUri, linkPosition);
+  assert.ok(linkDefinitions.some((item) => (item.uri ?? item.targetUri).fsPath.endsWith(path.join("dist", "framework.d.ts"))), `Definición de MeekoLink: ${JSON.stringify(linkDefinitions)}`);
+
   const rename = await vscode.commands.executeCommand("vscode.executeDocumentRenameProvider", uri, position, "value");
   assert.ok(rename.get(uri).length >= 2, "Renombrado entre script y plantilla");
 

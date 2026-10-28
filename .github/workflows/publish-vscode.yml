@@ -198,5 +198,21 @@ jobs:
           $env:OVSX_PAT = $env:OVSX_PAT.Trim()
           $packages = @(Get-ChildItem -LiteralPath (Join-Path $env:RUNNER_TEMP 'vsix') -Filter '*.vsix' -File | ForEach-Object FullName)
           if ($packages.Count -ne 6) { throw "Se esperaban 6 VSIX; hay $($packages.Count)." }
-          pnpm dlx 'ovsx@1.3.0' publish --skip-duplicate --packagePath @packages
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Uno a uno, para reconocer el resultado de cada plataforma. Una versión que subió un
+          # intento anterior (por ejemplo, uno que acabó por un timeout) y que Open VSX aún no ha
+          # activado no cuenta como duplicada para --skip-duplicate: ovsx falla con «… is already
+          # published, but currently isn't active and therefore not visible». Ese caso ya está
+          # publicado; cualquier otro error hace fallar el paso. ovsx no imprime el token.
+          $inactive = "is already published, but currently isn't active and therefore not visible"
+          foreach ($package in $packages) {
+            $output = @(pnpm dlx 'ovsx@1.3.0' publish --skip-duplicate --packagePath $package 2>&1 | ForEach-Object { "$_" })
+            $code = $LASTEXITCODE
+            $output | ForEach-Object { Write-Host $_ }
+            if ($code -eq 0) { continue }
+            if (($output -join "`n").Contains($inactive)) {
+              Write-Host "::notice::$(Split-Path -Leaf $package) ya estaba subido a Open VSX y espera su activación; se da por publicado."
+              continue
+            }
+            Write-Host "::error::Open VSX rechazó $(Split-Path -Leaf $package) (código $code)."
+            exit $code
+          }

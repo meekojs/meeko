@@ -157,6 +157,16 @@ Los errores detienen la hoja con el archivo CSS y la línea del `@utilities`, qu
 
 **Carga del módulo y actualización en caliente.** `import()` nativo guarda en caché cada módulo del grafo durante toda la vida del proceso: una query en el módulo de entrada lo recarga a él, pero no a los archivos locales que importa. Por eso el plugin empaqueta el módulo con rolldown, el bundler que Vite 8 ya incluye (no añade dependencias): los archivos locales, también los que llegan por un alias de `tsconfig` o por `#imports` del mismo paquete, forman un único módulo ES que se importa desde una URL `data:`, y los paquetes de `node_modules` quedan externos y se cargan una vez con Node, como en cualquier programa. Así se admite todo TypeScript, imports sin extensión incluidos, e `import.meta.url`, `import.meta.dirname` e `import.meta.filename` siguen describiendo el archivo original. El resultado se reutiliza mientras ningún archivo del grafo cambie de fecha de modificación o de tamaño, de modo que una hoja que se transforma muchas veces no vuelve a empaquetar nada. El plugin publica cada archivo del grafo como dependencia de la hoja (mensajes `dependency` de PostCSS), así que en `meeko dev` editar `color.ts` o `palette.ts` regenera la hoja y Vite actualiza el CSS en caliente, sin recargar la página ni reiniciar el servidor. Guarde estos módulos fuera de las carpetas que Meeko vigila por sus autoimports y sus rutas (`app/components`, `app/composables`, `app/utils`, `app/stores`, `app/pages`, `app/layouts`, `shared/…`, `server/utils`, las de `imports`…): un cambio en ellas recarga la página entera, como cualquier otro archivo de esas carpetas; `app/styles/` es el lugar natural. Fuera de Vite 8 (por ejemplo, `postcss-cli`), si no encuentra rolldown, el plugin importa el módulo con la eliminación de tipos nativa de Node, que exige imports con extensión y sintaxis de TypeScript borrable, recarga sólo el módulo de entrada y lo advierte una vez.
 
+**Autoimports.** Desde `1.4`, el módulo de `@utilities` y los módulos locales en TypeScript que importa reciben los mismos autoimports de valores que el resto del proyecto: el plugin aplica, dentro del bundle de rolldown, el registro y la transformación del plugin de Vite, así que un `app/styles/utilities/color.ts` puede usar sin import la constante `THEME_COLORS` de `app/theme/constants.ts` si `meeko.config.ts` declara `imports: { appDirs: ["app/theme"] }`, igual que un componente. Como en el editor y en `meeko check`, cada módulo recibe los de su ámbito según su carpeta (`app/`, `shared/` o `server/` de la aplicación o de un layer); un módulo fuera de esas carpetas no recibe ninguno. Los módulos de `@utilities` se ejecutan en Node mientras se genera el CSS, así que el registro se limita a lo que tiene sentido ahí:
+
+| Llegan | No llegan |
+| --- | --- |
+| Los exports de valores de `app/composables`, `app/utils`, `app/stores`, `app/types` e `imports.appDirs`; los de `shared/*` e `imports.sharedDirs` (también los `.shared.ts`); los de las mismas carpetas de los layers, y los que añaden los módulos con `addAutoImportsDir` y `addAutoImports` con ámbito `app` o `shared`. | Los de `server/utils`, `imports.serverDirs` y los `.server.ts`; los `.client.ts`; los componentes `.meeko`; los clientes generados (`api`, `rpc`, `socket`, `useApi`…), y las API del framework para componentes y la aplicación en marcha (`signal`, `computed`, `useState`, `href`, `useRoute`, `defineApiRoute`…). |
+
+Usar uno de la segunda columna no da un `ReferenceError` opaco: el nombre se sustituye por un valor que, al usarse (leerlo, llamarlo, convertirlo en texto), lanza un error con el autoimport, su origen y el motivo, que el plugin muestra en la línea del `@utilities`: `"./utilities/color.ts" lanzó un error al generar las utilidades: app/styles/utilities/color.ts usa el autoimport SECRET, que no está disponible al generar el CSS de @utilities: viene de server/utils/secret.ts, que sólo existe en el servidor. …`. Como el error sólo aparece si el valor se usa, un archivo de autoimports que el módulo importa y que además exporta, por ejemplo, un composable con `signal` sigue sirviendo para leer sus constantes. `defineUtilities` no es un autoimport: impórtelo de `@meekojs/meeko/postcss`, porque declararlo global lo ofrecería también a los componentes y llevaría PostCSS al bundle del navegador. Los tipos son los de `app/` (`.meeko/tsconfig.app.json`), así que `meeko check` y el editor dan `TS2304` al usar en `app/styles/` un export de `server/utils`, como en el resto de `app/`; en cambio aceptan los nombres del navegador y del framework de la tabla, que fallan al generar la hoja con el error anterior.
+
+El proyecto es la carpeta más cercana al módulo con un `meeko.config.*`, sin pasar de su `package.json`, o la de ese `package.json` si depende de `@meekojs/meeko`; su configuración se ejecuta como en `meeko dev`, con los `setup` de sus módulos, una vez por hoja y sólo si el módulo se va a empaquetar con rolldown. Si leerla falla (una configuración o un `setup` que lanza), la hoja se genera igual, sin autoimports, con un aviso de PostCSS que da el motivo. Los archivos de autoimports que el módulo usa forman parte de su grafo: son dependencias de la hoja, y cambiarlos la regenera. Añadir o quitar un export en una carpeta de autoimports también vuelve a empaquetar el módulo en la siguiente transformación, aunque ningún archivo de su grafo haya cambiado; en `meeko dev`, esos cambios recargan la página entera, como en cualquier otra carpeta de autoimports. `meekoUtilities({ autoImports: false })` desactiva los autoimports y empaqueta los módulos como en `1.3`. Fuera de un proyecto Meeko (un `postcss-cli` o un bundler en otro proyecto) no hay registro y nada cambia. Sin rolldown, con el `import()` nativo, Node no permite añadir imports: el módulo no recibe autoimports, la configuración no se ejecuta y el aviso de carga nativa lo indica; escriba los imports.
+
 Las reglas generadas en un `<style scoped>` no reciben el atributo de ámbito: Meeko aplica el ámbito al compilar el bloque y PostCSS genera las reglas después, así que son globales, como las de `app/styles/main.css`. El plugin sólo se ejecuta en Node, durante `meeko dev` y el build; `@meekojs/meeko/postcss` no forma parte del runtime del navegador ni del servidor.
 
 **Con Tailwind.** Declare `meekoUtilities()` antes de `@tailwindcss/postcss`:
@@ -202,13 +212,15 @@ En desarrollo, Vite abre un WebSocket HMR en un puerto derivado del puerto HTTP 
 | `MEEKO_TRUST_PROXY` | `dev` y producción | Proxies de confianza delante del servidor (un número, o `true` para todos), cuyas entradas de `X-Forwarded-For` dan la IP del cliente; véase [Límite de peticiones](#límite-de-peticiones-ratelimit). Sin ella, `X-Forwarded-For` nunca se lee. |
 | `MEEKO_HMR_PORT` | `dev` | Puerto del WebSocket de HMR; sin él, se deriva del puerto HTTP. |
 | `MEEKO_EDITOR_BRIDGE=0` | `dev` | Desactiva el puente con el editor (valores en vivo). |
-| `MEEKO_LINK_WATCH=0` | `dev` | No reinicia `meeko dev` al reconstruir un `@meekojs/meeko` enlazado. |
+| `MEEKO_LINK_WATCH=0` | `dev` | No reinicia `meeko dev` al reconstruir un `@meekojs/meeko` enlazado; avisa en la terminal de que hay que reiniciarlo. |
 
 Desde `1.2`, todas las variables que lee Meeko empiezan por `MEEKO_`; el prefijo queda reservado para Meeko, así que las variables propias de la aplicación deben usar otro nombre. `HOST` y `PUBLIC_ORIGIN`, los nombres anteriores, siguen funcionando durante 1.x cuando falta la variable nueva, con un aviso por proceso que nombra su reemplazo, y dejarán de leerse en `2.0`. `PORT` no está obsoleta: es el respaldo permanente de `MEEKO_PORT`.
 
 Si ni `MEEKO_PORT` (o `PORT`) ni `server.port` fijan el puerto, `meeko dev` usa el primero libre a partir de `4173` (hasta `4192`), como Vite: con otro `meeko dev` ya en `4173`, el segundo escribe `[meeko] El puerto 4173 está en uso; meeko dev usa el 4174` y la URL real, y deriva de ese puerto el del WebSocket HMR y el descriptor del puente con el editor (`.meeko/dev/editor-bridge-4174.json`). Un puerto fijado con `MEEKO_PORT`, `PORT` o `server.port` no cambia: si está ocupado, `meeko dev` termina con `El puerto 4173 de 127.0.0.1 ya está en uso; usa MEEKO_PORT=<otro puerto> o cierra el otro meeko dev`.
 
-El SSR de desarrollo carga `@meekojs/meeko` desde Node, fuera del module runner de Vite, como el build; así una aplicación que consume Meeko con `link:` mantiene una sola instancia del runtime aunque Vite recargue sus módulos. Por eso, cuando `@meekojs/meeko` está enlazado (`link:` de pnpm, `npm link` o un workspace: el paquete se resuelve fuera de todo `node_modules`), `meeko dev` ejecuta el servidor en un proceso hijo y vigila `dist/` y `package.json` del paquete enlazado. Al reconstruirlo, espera a que la compilación termine (400 ms sin cambios), escribe `[meeko] Meeko enlazado cambió; reiniciando meeko dev…`, cierra el servidor anterior (Socket, HTTP, Vite y el descriptor del puente con el editor) y arranca otro proceso en el mismo puerto, con el mismo entorno. Si el nuevo proceso no arranca, por ejemplo porque la compilación quedó a medias, lo informa y vuelve a intentarlo con el siguiente cambio. `Ctrl+C` detiene ambos procesos. Con una instalación normal desde el registro no se vigila nada más; `MEEKO_LINK_WATCH=0` desactiva el reinicio también con un paquete enlazado.
+El SSR de desarrollo carga `@meekojs/meeko` desde Node, fuera del module runner de Vite, como el build; así una aplicación que consume Meeko con `link:` mantiene una sola instancia del runtime aunque Vite recargue sus módulos. Por eso, cuando `@meekojs/meeko` está enlazado (`link:` de pnpm, `npm link` o un workspace: el paquete se resuelve fuera de todo `node_modules`), `meeko dev` ejecuta el servidor en un proceso hijo y vigila `dist/` y `package.json` del paquete enlazado. Al reconstruirlo, espera a que la compilación termine (400 ms sin cambios), escribe `[meeko] Meeko enlazado cambió; reiniciando meeko dev…`, cierra el servidor anterior (Socket, HTTP, Vite y el descriptor del puente con el editor) y arranca otro proceso en el mismo puerto, con el mismo entorno. Si el nuevo proceso no arranca, por ejemplo porque la compilación quedó a medias, lo informa y vuelve a intentarlo con el siguiente cambio. Sólo cuentan las escrituras: leer el build no lo reinicia, aunque Windows notifique como cambio la actualización de la fecha de último acceso. `Ctrl+C` detiene ambos procesos. Con una instalación normal desde el registro no se vigila nada más.
+
+`MEEKO_LINK_WATCH=0` (también desde el `.env` del proyecto) desactiva el reinicio con un paquete enlazado: un solo proceso sirve hasta que se detiene. Ese proceso conserva el código de servidor de Meeko que cargó, mientras Vite sirve al navegador los archivos nuevos de `dist/`, así que tras una reconstrucción el HTML del servidor (cabeceras, `<head>`, SSR) sale del build anterior y la hidratación usa el nuevo. Por eso, en cada reconstrucción, cuando termina, escribe `[meeko] Meeko enlazado cambió (…/dist), pero este meeko dev no se reinicia solo (MEEKO_LINK_WATCH=0): el servidor sigue con el código anterior y el navegador recibe el nuevo. Reinicia meeko dev.` Reinícielo antes de comprobar el resultado.
 
 ## Configuración
 
@@ -242,6 +254,7 @@ export default defineMeekoConfig({
 - `dev` (desde `1.3`): opciones de `meeko dev`. `serverLogs: false` desactiva los [logs del servidor en la consola del navegador](#logs-del-servidor-en-la-consola-del-navegador).
 - `site` (desde `1.3`): la URL pública del sitio (`"https://example.com"`, sólo el origen). Es el origen de las URL absolutas que escribe Meeko: `sitemap.xml`, `robots.txt` y `document.seo`. Sin `site`, el build usa `MEEKO_PUBLIC_ORIGIN`. No cambia las comprobaciones de `Origin`, que siguen leyendo `MEEKO_PUBLIC_ORIGIN` o `publicOrigin` de `server/runtime.ts` al ejecutarse.
 - `sitemap` y `robots` (desde `1.3`): `sitemap.xml` y `robots.txt` generados en el build; véase [`sitemap.xml` y `robots.txt`](#sitemapxml-y-robotstxt).
+- `theme` (desde `1.4`): el tema claro/oscuro, y temas propios, sin parpadeo, con `useTheme()`; véase [Tema claro/oscuro sin parpadeo](#tema-clarooscuro-sin-parpadeo).
 
 Desde `1.2`, `css: { scopeAttribute: "matched" }` limita el atributo de `<style scoped>` a los elementos que algún selector con ámbito puede seleccionar; con `"all"`, el valor por defecto en `1.x`, va en todos los elementos de la plantilla. `"matched"` pasará a ser el valor por defecto en `2.0`. Véase [Estilos con ámbito](api.md#qué-elementos-reciben-el-atributo), con el caso de las clases que el script añade con la API del DOM.
 
@@ -337,7 +350,7 @@ export default defineMeekoConfig({
   modules: [
     hello,                                  // un módulo importado
     "@acme/meeko-seo",                      // un paquete, resuelto desde el proyecto
-    ["./modules/theme", { initial: "dark" }], // una ruta y opciones en línea
+    ["./modules/accent", { initial: "teal" }], // una ruta y opciones en línea
   ],
   hello: { greeting: "Hola" },              // opciones en la clave del módulo (meta.configKey)
 });
@@ -349,70 +362,76 @@ Una cadena es un nombre de paquete (con o sin subruta) o una ruta relativa al pr
 
 El `setup` se ejecuta en Node, una vez por configuración y proceso, al cargar la configuración: en `meeko dev`, `meeko build`, `meeko check` y en el servidor de lenguaje de un workspace de confianza. Nunca llega al navegador. Recibe las opciones combinadas y el objeto `meeko`. Las rutas que recibe `meeko` pueden ser absolutas, URL `file:` (`new URL("./x", import.meta.url)`, lo habitual en un paquete) o relativas a la raíz del proyecto.
 
+Un módulo de color de acento, que el usuario elige y que se aplica antes de pintar (para el tema claro/oscuro no hace falta un módulo: Meeko lo trae desde `1.4`, véase [Tema claro/oscuro sin parpadeo](#tema-clarooscuro-sin-parpadeo)):
+
 ```ts
-// modules/theme/index.ts
+// modules/accent/index.ts
 import { defineMeekoModule } from "@meekojs/meeko/framework";
 
-export interface ThemeOptions {
-  initial: "light" | "dark";
+export type Accent = "teal" | "violet" | "amber";
+
+export interface AccentOptions {
+  initial: Accent;
   storageKey: string;
 }
 
-// Tipa la clave `theme` de meeko.config.ts.
+// Tipa la clave `accent` de meeko.config.ts.
 declare module "@meekojs/meeko/framework" {
   interface MeekoConfig {
-    readonly theme?: Partial<ThemeOptions>;
+    readonly accent?: Partial<AccentOptions>;
   }
 }
 
-export default defineMeekoModule<ThemeOptions>({
-  meta: { name: "@acme/meeko-theme", configKey: "theme", compatibility: { meeko: ">=1.2" } },
-  defaults: { initial: "light", storageKey: "theme" },
+export default defineMeekoModule<AccentOptions>({
+  meta: { name: "@acme/meeko-accent", configKey: "accent", compatibility: { meeko: ">=1.2" } },
+  defaults: { initial: "teal", storageKey: "accent" },
   setup(options, meeko) {
     const here = (path: string) => new URL(path, import.meta.url);
-    // <ThemeToggle /> en cualquier componente, sin import.
-    meeko.addComponentsDir(here("./components"), { prefix: "Theme" });
-    // useTheme() sin import, en componentes y en app/.
-    meeko.addAutoImports({ name: "useTheme", from: here("./runtime/use-theme.ts") });
-    // Publica la señal del tema antes de hidratar; las opciones llegan al plugin.
-    meeko.addPlugin({ src: here("./runtime/theme.plugin.ts"), options: { initial: options.initial, storageKey: options.storageKey } });
-    // Aplica el tema guardado antes de pintar, sin parpadeo.
+    // <AccentPicker /> en cualquier componente, sin import.
+    meeko.addComponentsDir(here("./components"), { prefix: "Accent" });
+    // useAccent() sin import, en componentes y en app/.
+    meeko.addAutoImports({ name: "useAccent", from: here("./runtime/use-accent.ts") });
+    // Publica la señal del acento antes de hidratar; las opciones llegan al plugin.
+    meeko.addPlugin({ src: here("./runtime/accent.plugin.ts"), options: { initial: options.initial, storageKey: options.storageKey } });
+    // Aplica el acento guardado antes de pintar, sin parpadeo.
     meeko.addHead({
-      script: [{ key: "theme", children: `document.documentElement.dataset.theme = localStorage.getItem(${JSON.stringify(options.storageKey)}) ?? ${JSON.stringify(options.initial)};` }],
+      script: [{ key: "accent", children: `document.documentElement.dataset.accent = localStorage.getItem(${JSON.stringify(options.storageKey)}) ?? ${JSON.stringify(options.initial)};` }],
     });
   },
 });
 ```
 
 ```ts
-// modules/theme/runtime/use-theme.ts
+// modules/accent/runtime/use-accent.ts
 import { createContext, inject } from "@meekojs/meeko";
 import type { Signal } from "@meekojs/meeko";
+import type { Accent } from "../index.ts";
 
-export const themeKey = createContext<Signal<"light" | "dark">>("theme");
+export const accentKey = createContext<Signal<Accent>>("accent");
 
-export function useTheme(): Signal<"light" | "dark"> {
-  return inject(themeKey);
+export function useAccent(): Signal<Accent> {
+  return inject(accentKey);
 }
 ```
 
 ```ts
-// modules/theme/runtime/theme.plugin.ts
+// modules/accent/runtime/accent.plugin.ts
 import { effect, signal } from "@meekojs/meeko";
 import { definePlugin } from "@meekojs/meeko/framework";
-import { themeKey } from "./use-theme.ts";
+import type { Accent } from "../index.ts";
+import { accentKey } from "./use-accent.ts";
 
-export default definePlugin<{ initial: "light" | "dark"; storageKey: string }>((app, options) => {
+export default definePlugin<{ initial: Accent; storageKey: string }>((app, options) => {
   // El mismo valor inicial en el servidor y en el navegador, para que la hidratación coincida.
-  const theme = signal(options.initial);
-  app.provide(themeKey, theme);
+  const accent = signal(options.initial);
+  app.provide(accentKey, accent);
   if (app.side === "client") {
     let first = true;
     effect(() => {
-      const value = theme.value;
-      // El script de <head> ya aplicó el tema guardado; después, cada cambio se aplica y se guarda.
+      const value = accent.value;
+      // El script de <head> ya aplicó el acento guardado; después, cada cambio se aplica y se guarda.
       if (first) { first = false; return; }
-      document.documentElement.dataset.theme = value;
+      document.documentElement.dataset.accent = value;
       localStorage.setItem(options.storageKey, value);
     });
   }
@@ -449,7 +468,7 @@ Los archivos de runtime de un módulo (plugins, componentes, autoimports, middle
 | --- | --- |
 | `rootDir`, `dev`, `config` | Carpeta del proyecto, `true` en `meeko dev` y la configuración cargada. |
 | `addLayer(dir)` | Añade un layer, después de los de `layers`. Debe tener `app/pages` y estar dentro del proyecto; un paquete instalado en `node_modules` lo está, también con pnpm. |
-| `addComponentsDir(dir, { prefix })` | Autoimporta los `.meeko` de la carpeta y sus subcarpetas, con el nombre en PascalCase tras el prefijo (`components/toggle.meeko` con `prefix: "Theme"` es `ThemeToggle`). |
+| `addComponentsDir(dir, { prefix })` | Autoimporta los `.meeko` de la carpeta y sus subcarpetas, con el nombre en PascalCase tras el prefijo (`components/picker.meeko` con `prefix: "Accent"` es `AccentPicker`). |
 | `addAutoImports(entries)` | Autoimporta exports de un paquete o archivo: `{ name, as?, from, type?, scope? }`; `scope` es `"app"` por defecto (componentes y `app/`, en el navegador y en SSR), `"client"`, `"server"` o `"shared"`. |
 | `addAutoImportsDir(dir, { scope })` | Autoimporta los exports de los `.ts` de una carpeta, con ámbito `"app"`, `"server"` o `"shared"`; los sufijos `.client.ts`, `.server.ts` y `.shared.ts` mandan. |
 | `addPlugin({ src, mode?, options? })` | Añade un [plugin de aplicación](#plugins-de-aplicación). `mode` sale del sufijo del archivo o es `"universal"`. `options` debe ser JSON y llega al navegador si el plugin se ejecuta allí. |
@@ -563,6 +582,17 @@ Desde `1.2`, dos etiquetas propias de Meeko sustituyen a esos patrones. No se im
 
 - **`<MeekoOutlet />`** pinta, en `app/app.meeko` y en los layouts (`app/layouts/*.meeko` o `+layout.meeko`), el layout o la página que van dentro. Lee el `outlet` que Meeko pasa, así que el layout no necesita declarar `defineProps<{ outlet }>()`; si declara sus props, `outlet` debe estar entre ellas. Equivale a `<component is="props.outlet">`: el navegador conserva el layout entre rutas y sólo cambia lo que hay dentro. En otro componente, o con atributos o contenido, da `MEEK104`.
 - **`<MeekoLink to="/users/[id]" bind:params="{ id: user.id }" bind:search="{ tab: 'perfil' }">`** renderiza un `<a>` cuyo `href` construye `href()`: `to` sólo admite rutas que existen, las rutas dinámicas exigen `bind:params` con sus claves y `bind:search` añade la query string. `meeko check` y el editor marcan el error en el atributo (`Argument of type '"/nowhere"' is not assignable…`). En la ruta activa (la misma ruta sin query ni fragmento) añade `aria-current="page"`, que la navegación actualiza. El resto de atributos y los hijos pasan al `<a>` tal cual: `class`, `target`, `rel`, `aria-*`, `data-*` y `on:click`. `href` y `bind:href` no se admiten, porque el enlace lo construye `to` (`MEEK105`).
+- **Tipos de sus props.** Desde `1.4`, `@meekojs/meeko/framework` exporta `MeekoLinkProps<K>` (`to`, `params` y `search` de la ruta `K`), `MeekoOutletProps` (sin props) y `MeekoThemeToggleProps` (las de [`<MeekoThemeToggle>`](#meekothemetoggle)), y `RouteId`, el ID de cualquier ruta de la aplicación (el tipo de `to`). Todos se autoimportan: los tipos de las props donde se usan los componentes, como los [tipos de cada componente](#tipos-de-cada-componente), y `RouteId` en todo el proyecto, como `href`. El editor muestra las props en el hover de las etiquetas y abre su tipo con «Ir a definición». Sirven para tipar un componente que recibe una ruta, sin import:
+
+```html
+<!-- app/components/NavLink.meeko -->
+<script lang="ts">
+const props = defineProps<{ href: MeekoLinkProps["to"]; label: string }>();
+</script>
+<template><a bind:href="href(props.href)">{props.label}</a></template>
+```
+
+  `MeekoLinkProps["to"]` y `RouteId` son el mismo tipo: la unión de las rutas que declara `.meeko/types/routes.d.ts` (`meeko check`, `meeko dev`), o `string` sin esas declaraciones. `<NavLink href="/nowhere">` es un error de tipos en el padre. Un tipo del proyecto con uno de esos nombres (por ejemplo, en `app/types`) tiene prioridad.
 
 ```html
 <!-- app/layouts/default.meeko -->
@@ -877,6 +907,7 @@ export default defineMeekoConfig({
       titleTemplate: "%s · Mi tienda",
       link: [{ rel: "icon", href: "/favicon.svg", type: "image/svg+xml" }],
       // Se ejecuta mientras el navegador lee <head>, antes de pintar; la hidratación no lo repite.
+      // (Para un tema claro/oscuro, use theme: Meeko trae el script, la cookie y useTheme().)
       script: [{ children: 'document.documentElement.dataset.theme = localStorage.getItem("theme") ?? "light"' }],
     },
   },
@@ -948,11 +979,186 @@ export default defineMeekoConfig({
 
 Son las etiquetas de menor prioridad: una página o un layout que declara la misma etiqueta (con `useSeoMeta`, `useHead` o el `head` de la ruta, con cualquier `key`) la sustituye, igual que a las de `document.head`. Las páginas de error (`app/error.meeko`, `+error.meeko` y el `404.html` del adaptador `static`) no reciben `canonical` ni `og:url`, porque se sirven en cualquier URL. Al navegar en el cliente, las etiquetas siguen a la página confirmada. Un host propio que pasa `DocumentOptions.config` con `seo` debe incluir `seo.origin`.
 
+### Tema claro/oscuro sin parpadeo
+
+Desde `1.4`, Meeko trae el tema claro/oscuro (y temas propios): la elección se guarda en una cookie, el servidor escribe el tema en `<html>` desde el primer byte y los componentes pintan en el HTML del servidor los iconos correctos, sin esperar a JavaScript. Cuando el servidor no puede saberlo (una página prerenderizada, el adaptador `static` o el modo `"system"` sin client hint), un script mínimo y bloqueante de `<head>` lo aplica antes del primer pintado.
+
+```ts
+// meeko.config.ts
+import { defineMeekoConfig } from "@meekojs/meeko/framework";
+
+export default defineMeekoConfig({
+  theme: true, // light y dark, "system" por defecto, data-theme y la cookie meeko-theme
+});
+```
+
+```css
+/* app/styles/main.css: los colores de cada tema, con color-scheme también sin JavaScript. */
+:root { color-scheme: light; --bg: #fff; --ink: #111; }
+:root[data-theme="dark"] { color-scheme: dark; --bg: #111; --ink: #eee; }
+/* Sin atributo (modo "system" que el servidor no pudo resolver y sin JavaScript), manda el sistema. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) { color-scheme: dark; --bg: #111; --ink: #eee; }
+}
+```
+
+Sin `theme`, nada cambia: no hay script ni estilo en `<head>`, ni cookie, ni cabeceras, ni `POST /_meeko/theme`. `theme` acepta `true` o un objeto:
+
+| Opción | Por defecto | Qué hace |
+| --- | --- | --- |
+| `themes` | `["light", "dark"]` | Los temas. Cada nombre usa letras, dígitos, `-` o `_` y no puede ser `"system"`. |
+| `default` | `"system"` | La elección de quien no eligió: `"system"` o un tema (el primero si `system: false`). |
+| `system` | `true` | El modo `"system"`, que sigue a `prefers-color-scheme`. `true` usa `light` y `dark`; `{ light: "day", dark: "night" }` elige otros temas; `false` lo desactiva. |
+| `darkThemes` | el oscuro de `system` (o `dark`) | Los temas que reciben `color-scheme: dark`. |
+| `attribute` | `"data-theme"` | Dónde va el tema en `<html>`: un atributo `data-*` o `"class"` (añade el nombre del tema a las clases y quita el de otro tema). |
+| `colorScheme` | `true` | Aplica `color-scheme` a `<html>` por CSSOM (`style.colorScheme`). |
+| `cookie` | `"meeko-theme"` | La cookie de la elección. |
+| `storageKey` | el valor de `cookie` | La clave de `localStorage`, que avisa a las otras pestañas: por defecto, el nombre de la cookie (`"meeko-theme"` si no cambia `cookie`); `false` usa sólo la cookie. |
+| `clientHints` | `true` | Pide y lee `Sec-CH-Prefers-Color-Scheme` para resolver `"system"` en el servidor. |
+
+Las cookies son por host, no por puerto: en desarrollo, todas las aplicaciones Meeko de `localhost` (o `127.0.0.1`), en cualquier puerto, comparten la cookie `meeko-theme`, así que elegir tema en una lo cambia en las demás al recargar (`localStorage` sí es por puerto). Para separarlas, dé a cada aplicación su propio nombre con `cookie`, por ejemplo `theme: { cookie: "mi-app-theme" }`.
+
+#### `useTheme()`
+
+`useTheme()` se autoimporta en los `.meeko` (un export propio con ese nombre tiene prioridad) y se llama mientras se ejecuta el script de un componente. Devuelve:
+
+- `theme`: la elección, `"system"` incluido. Es una señal editable: asignarla equivale a `set`, y sirve para `model="theme"`.
+- `resolved`: el tema efectivo, de sólo lectura; en `"system"`, el de `prefers-color-scheme`.
+- `themes`: la lista de temas, sin `"system"`.
+- `set(theme)`: cambia la elección. Actualiza el atributo (o la clase) de `<html>`, `color-scheme`, la cookie y `localStorage`. Un nombre que no es un tema ni `"system"` lanza `TypeError`.
+
+En `"system"`, `resolved` sigue a los cambios de `prefers-color-scheme` mientras la página está abierta, y un cambio en otra pestaña llega por el evento `storage` de `localStorage`. La navegación en el cliente conserva el tema, porque no recarga `<html>`. En el servidor, `theme` y `resolved` son los de la petición y no se pueden cambiar (`set` lanza un error). Sin `theme` en la configuración, `useTheme()` lanza un error que lo pide.
+
+`meeko check` tipa los temas con la configuración: con `themes: ["light", "dark", "sepia"]`, `resolved` es `"light" | "dark" | "sepia"` y `set("purple")` es un error de tipos. Las declaraciones se generan en `.meeko/types/routes.d.ts` (`GeneratedTheme`); sin ellas, los temas son `string`. El editor no las necesita: declara `GeneratedTheme` a partir de `theme` leído sin ejecutar `meeko.config.ts`, también antes del primer `meeko check`, cuando su valor es un literal (`true` o un objeto con valores literales).
+
+#### Iconos que no saltan
+
+La forma más corta es [`<MeekoThemeToggle>`](#meekothemetoggle), que ya hace lo que sigue. A mano hay dos formas de pintar los iconos, y las dos salen bien en el HTML del servidor cuando éste conoce el tema (la cookie, o el client hint en `"system"`):
+
+- **Desde el CSS (recomendada).** El componente pinta los dos iconos y el CSS muestra uno según el atributo de `<html>`. Nunca salta, ni siquiera cuando el servidor no conoce el tema (una página prerenderizada, el adaptador `static` o `"system"` sin client hint), porque el script de `<head>` pone el atributo antes de pintar y el CSS lo lee desde el primer frame.
+- **Desde `resolved`.** `{resolved.value === "dark" ? "luna" : "sol"}` o un `if:` sobre `resolved`. Sale bien siempre que el servidor conoce el tema; cuando no lo conoce, el HTML del servidor y la hidratación pintan el tema claro de `system` y el icono cambia al terminar la hidratación.
+
+```html
+<!-- app/components/ThemeToggle.meeko -->
+<script lang="ts">
+const { resolved, set } = useTheme();
+const toggle = (): void => set(resolved.value === "dark" ? "light" : "dark");
+</script>
+
+<template>
+  <button type="button" class="theme-toggle" aria-label="Tema oscuro" bind:aria-pressed="String(resolved.value === 'dark')" on:click="toggle">
+    <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" /></svg>
+    <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" /></svg>
+  </button>
+</template>
+
+<style>
+.theme-toggle .moon { display: none; }
+:root[data-theme="dark"] .theme-toggle .sun { display: none; }
+:root[data-theme="dark"] .theme-toggle .moon { display: inline; }
+</style>
+```
+
+`aria-pressed` depende de `resolved`, así que en el caso desconocido cambia al hidratar; no se ve, y un lector de pantalla lo anuncia ya con la página interactiva. Un selector de tres opciones (sistema, claro, oscuro) usa `theme` con `model`:
+
+```html
+<script lang="ts">
+const { theme } = useTheme();
+</script>
+<template>
+  <select aria-label="Tema" model="theme">
+    <option value="system">Sistema</option>
+    <option value="light">Claro</option>
+    <option value="dark">Oscuro</option>
+  </select>
+</template>
+```
+
+<a id="data-theme-choice"></a>**`data-theme-choice`.** Desde `1.4`, `<html>` lleva además la elección, `"system"` incluido: `data-theme-choice="system"` mientras `data-theme` dice el tema efectivo (`dark`). La escribe siempre el script de `<head>`, antes del primer pintado, y el servidor cuando la conoce por la cookie; el runtime la actualiza con cada cambio. Sirve para el CSS propio, use o no `<MeekoThemeToggle>`: un icono de «sistema» que no salta, o el radio marcado de un selector.
+
+```css
+.theme-toggle .icon { display: none; }
+:root[data-theme-choice="light"] .theme-toggle .sun,
+:root[data-theme-choice="dark"] .theme-toggle .moon,
+:root[data-theme-choice="system"] .theme-toggle .monitor { display: inline; }
+```
+
+Sin cookie, el HTML del servidor no la lleva (no sabe si `localStorage` guarda otra elección, y una página prerenderizada es la misma para todos); el script la escribe antes de pintar. Sin JavaScript, un selector `:root:not([data-theme-choice])` corresponde a `default`.
+
+#### `<MeekoThemeToggle>`
+
+Desde `1.4`, con `theme` en `meeko.config.ts`, Meeko trae su propio selector de tema: una etiqueta integrada, como `<MeekoLink>`, sin import.
+
+```html
+<MeekoThemeToggle>
+  <snippet name="light"><IconSun /></snippet>
+  <snippet name="dark"><IconMoon /></snippet>
+  <snippet name="system"><IconMonitor /></snippet>
+</MeekoThemeToggle>
+<MeekoThemeToggle mode="select" />
+<MeekoThemeToggle bind:themes="['light', 'dark']" bind:labels="{ light: 'Claro', dark: 'Oscuro', system: 'Sistema' }" class="toggle" />
+```
+
+| Prop | Por defecto | Qué hace |
+| --- | --- | --- |
+| `mode` | `"cycle"` | `"cycle"`: un botón que pasa a la elección siguiente de la lista. `"select"`: un grupo de radios. |
+| `themes` | los temas y `"system"` | Las elecciones y su orden (`bind:themes="['light', 'dark']"`). |
+| `labels` | «Claro», «Oscuro», «Sistema» | El nombre de cada elección; un tema propio, sin etiqueta, se llama como el tema. |
+| `messages` | en español | Los textos accesibles: `cycle(current, next)` (el `aria-label` del botón), `unknown` («Cambiar tema») y `group` («Tema»), para traducirlos. Tipo `ThemeToggleMessages`. |
+| `class`, `id` | — | Del `<form>` raíz. Otros atributos no pasan: envuelva la etiqueta si los necesita. |
+
+Cada snippet (`light`, `dark`, `system` o el nombre de un tema propio) es el icono de esa elección; sin snippet se pinta su etiqueta. `meeko check` y el editor tipan los snippets, `themes` y `labels` con los temas de `meeko.config.ts` (`system` sólo si está activo) y `mode` como `"cycle" | "select"`; el editor completa la etiqueta, sus props y sus snippets, y su hover muestra la ficha de la etiqueta. El tipo de sus props es `MeekoThemeToggleProps`, autoimportado como `MeekoLinkProps`. No tiene estilos visuales propios: el botón y los radios son elementos nativos que estiliza la aplicación (`.toggle button`, `[role="radio"][aria-checked="true"]`, `[data-meeko-theme-option="dark"]`). Para marcar el radio elegido también antes de hidratar, cuando la elección no se conoce y no hay `aria-checked`, use `data-theme-choice`, como los iconos: `[data-theme-choice="dark"] [data-meeko-theme-option="dark"]`.
+
+**Iconos que nunca saltan.** El componente pinta todos los iconos, cada uno en `<span data-meeko-theme-icon="light|dark|system|…">`, y no elige ninguno: con `theme` activo, Meeko añade a `<head>` una regla CSS mínima, sólo `display: none`, que oculta todos salvo el de `data-theme-choice`. Como el script de `<head>` escribe ese atributo antes del primer pintado, el icono sale bien desde el primer frame en todos los casos (con cookie, en `"system"` sin cookie ni client hint, en una página prerenderizada o en `static`), sin JavaScript en el componente, y hidratar no cambia ningún nodo del componente. Una lista sin `system` (`bind:themes="['light', 'dark']"`) muestra en modo sistema el icono del tema efectivo, según `prefers-color-scheme`, como el script. En `mode="select"` cada radio lleva su icono y todos se ven.
+
+**Accesibilidad.** En `mode="cycle"` es un `<button>` cuyo `aria-label` dice la elección y la siguiente, «Tema: oscuro. Cambiar a sistema», y se actualiza con cada cambio. Cuando el HTML se genera sin conocer la elección (sin la cookie, una página prerenderizada), el `aria-label` es neutro, «Cambiar tema», hasta que termina la hidratación: así no anuncia algo falso ni provoca un desajuste de hidratación, porque la hidratación pinta lo mismo que el servidor. En `mode="select"` es un `role="radiogroup"` con un `aria-label` («Tema») y un botón `role="radio"` por elección con `aria-checked` y el nombre de la elección. Cuando el HTML no conoce la elección, ningún radio lleva `aria-checked`, ni `"true"` ni `"false"`: un grupo con todos en `"false"` diría que no hay ninguno marcado, y marcar el de `default` diría algo falso a quien eligió otro tema, porque la página prerenderizada es la misma para todos. Al terminar la hidratación cada radio recibe su `aria-checked` una sola vez, y el estado visual lo da antes el CSS con `data-theme-choice`; con JavaScript, las flechas, `Inicio` y `Fin` mueven el foco y la elección, con un `tabindex` itinerante, como un grupo de radios nativo. Sin JavaScript cada radio es un botón que se alcanza con el tabulador.
+
+**Sin JavaScript (mejora progresiva).** El componente es un `<form method="post" action="/_meeko/theme">`: el botón de `"cycle"` envía la elección siguiente y cada radio, la suya, junto con la URL de la página (`return`). Con JavaScript, el envío se intercepta y el cambio es inmediato, con `useTheme().set()`, sin navegar. Sin él, el servidor atiende el formulario:
+
+- `POST /_meeko/theme` existe sólo con `theme` activo (en los demás métodos responde `405`).
+- Acepta sólo `application/x-www-form-urlencoded` de hasta 2 KB; `theme` debe ser un tema de `themes` o `"system"` (con el modo sistema activo); si no, `400 INVALID_THEME`, sin escribir nada.
+- Escribe la cookie como el runtime del navegador (`Path=/`, un año, `SameSite=Lax`, `Secure` en HTTPS) y responde `303` a `return`, que debe ser una ruta de este origen (`/docs?tab=a`). Una URL absoluta, `//otro.sitio`, una barra invertida o caracteres de control vuelven a `/`: nunca hay una redirección abierta. El siguiente documento SSR ya trae el tema nuevo.
+- **CSRF.** No usa la sesión ni el token CSRF (`x-meeko-csrf`, que sólo existe con JavaScript): sólo cambia la cookie del tema. Como `origin: "required"` de una ruta de API, exige un `Origin` igual al de la petición, que tras `createServerApp` es el `publicOrigin` configurado; un `Origin` ausente, `null` o de otro sitio responde `403 INVALID_ORIGIN` antes de leer el cuerpo. Los navegadores envían `Origin` en todo `POST`; una página con `Referrer-Policy: no-referrer` lo envía como `null`, así que ahí el formulario sin JavaScript no funciona (con JavaScript sí). Detrás de un proxy, configure el origen público, como para las mutaciones con sesión.
+- **Prerender con Node.** El endpoint existe también en el servidor de una aplicación cuyas páginas son prerenderizadas, y escribe la cookie; pero el HTML prerenderizado es el mismo para todos y, sin JavaScript, no aplica la cookie (lo hace el script de `<head>`), así que la página sigue mostrando el tema por defecto. Sin JavaScript, el cambio sólo se ve en las páginas SSR.
+- **Adaptador `static`.** No hay servidor: el formulario se renderiza igual (el HTML es el que generó el prerender, común a todos los adaptadores) y con JavaScript funciona, pero sin él el `POST` llega al hosting, que lo rechaza. Es una limitación documentada; en un sitio estático, el selector necesita JavaScript.
+
+Usar `<MeekoThemeToggle>` sin `theme` es el error `MEEK111`. `meeko dev` y `meeko build` lo saben por la configuración, que ejecutan; `meeko check` y el editor leen `theme` de `meeko.config.*` sin ejecutarlo. Cuando así no se sabe (`theme: variable`, una configuración que no es un literal, o una carpeta sin `meeko.config.*`, como un layer con su propio `package.json`), no avisan, y el componente da el mismo error al renderizarse. Un componente del proyecto llamado `MeekoThemeToggle` tiene prioridad sobre la etiqueta de Meeko, con el aviso `MEEK106`, como con `MeekoLink`.
+
+#### Cómo se evita el parpadeo en cada caso
+
+| Caso | Quién pone el tema en `<html>` | `useTheme()` en el HTML del servidor |
+| --- | --- | --- |
+| SSR con la cookie (`light`, `dark`, un tema propio) | El servidor, desde el primer byte. | El tema de la cookie. Hidratar no cambia nada. |
+| SSR en `"system"` con `Sec-CH-Prefers-Color-Scheme` | El servidor, con el client hint. | El tema del sistema. Hidratar no cambia nada. |
+| SSR en `"system"` sin el client hint (Firefox, Safari) | El script de `<head>`, antes del primer pintado; el HTML no lleva atributo, así que el CSS de `prefers-color-scheme` también acierta sin JavaScript. | `resolved` vale el tema claro de `system`; cambia al hidratar si el sistema es oscuro. |
+| Página prerenderizada o adaptador `static` | El script de `<head>`, con la cookie o `localStorage`. | El valor por defecto del build; cambia al hidratar si el usuario eligió otro. |
+
+El script lee la cookie, después `localStorage` (así una elección guardada sólo allí, como la de un sitio que antes usaba `localStorage`, sigue valiendo y vuelve a la cookie) y por último `default`; en `"system"` consulta `prefers-color-scheme`. Escribe el tema y [`data-theme-choice`](#data-theme-choice). Una cookie que escribió el servidor (el formulario de `<MeekoThemeToggle>` sin JavaScript) pasa a `localStorage` y a las otras pestañas en la siguiente carga con JavaScript. Se ejecuta siempre y es idempotente: donde el servidor ya escribió el tema, escribe el mismo. Va entre las etiquetas gestionadas de `<head>`, justo después de las `meta` (así también le aplica una CSP en `<meta http-equiv>`) y antes de todas las hojas de estilo enlazadas, las de `document.head` y `useHead` y las del build, así que no espera a ninguna.
+
+**Client Hints.** Una respuesta SSR lleva `Accept-CH: Sec-CH-Prefers-Color-Scheme` y, cuando la elección es `"system"`, `Critical-CH: Sec-CH-Prefers-Color-Scheme`. Chromium recuerda `Accept-CH` para el origen y, la primera vez, ante `Critical-CH`, repite la petición con el hint antes de mostrar nada: una sola vez por origen, con un viaje de ida y vuelta más en esa primera visita. Firefox y Safari no envían el hint y usan el script. Con `clientHints: false`, Meeko no pide ni lee el hint.
+
+**Hidratación.** El navegador hidrata con los valores que renderizó el servidor (viajan en el estado de la página, `sharedState["meeko:theme"]`) y recibe los suyos al terminar la hidratación, antes de `onMounted`, como `useStorage`. Por eso nunca hay un desajuste de hidratación, y sólo cambia lo que dependía de un tema que el servidor no conocía.
+
+**Seguridad.** El servidor sólo acepta en la cookie un tema de `themes` (o `"system"`); cualquier otro valor se ignora y nunca se escribe en el HTML. El navegador escribe la cookie con `Path=/`, `SameSite=Lax`, un año de duración y `Secure` en HTTPS; no es `HttpOnly`, porque la escribe el cliente, y no contiene nada privado.
+
+#### CSP
+
+- **SSR.** El script y el `<style>` de los iconos de `<MeekoThemeToggle>` llevan el nonce de `DocumentOptions.nonce`, como cualquier script o estilo de `useHead`.
+- **Prerender y `static`.** El script y el estilo están en el HTML de cada página, así que sus hashes entran en `scriptHashes` y `styleHashes` del índice de prerender y en la CSP que escribe el adaptador `static` ([CSP con hashes](#csp-con-hashes)). Sus textos sólo dependen de `theme`: son los mismos en todas las páginas y cambian de hash sólo si cambia la configuración.
+- **Por qué un `<style>` con hash.** La regla de los iconos tiene que estar antes del primer pintado y funcionar sin JavaScript (el formulario de `<MeekoThemeToggle>`), así que no puede aplicarla el script por CSSOM. Un `<style>` en línea con nonce (SSR) o con hash (prerender y `static`) lo permite una CSP sin `'unsafe-inline'`, sin un archivo más que pedir. El hash sólo se añade a una directiva sin `'unsafe-inline'`: con un hash, el navegador ignoraría `'unsafe-inline'` y bloquearía los atributos `style="…"` que la política permitía.
+- **`color-scheme`.** No es un atributo `style` del HTML, que una CSP sin `'unsafe-inline'` en `style-src` bloquearía: el script y el runtime lo aplican por CSSOM (`style.colorScheme`), que la CSP permite. Para que la página tenga el esquema correcto también sin JavaScript, declárelo en su CSS por tema, como en el ejemplo de arriba.
+
+#### Caché
+
+Un documento SSR depende de la cookie y del client hint, así que lleva `Vary: Cookie, Sec-CH-Prefers-Color-Scheme` (sin `clientHints`, `Vary: Cookie`). Las respuestas SSR ya son `cache-control: no-store`; si un proxy o una CDN cachea sus páginas, debe incluir la cookie del tema en la clave o no cachearlas, o servirá a un usuario el tema de otro. Muchas CDN no varían por `Cookie` y no cachean una respuesta con `Vary: Cookie`. Las páginas prerenderizadas y el adaptador `static` no varían por el tema: el mismo archivo sirve a todos y el script aplica el tema de cada visitante, así que se cachean igual que antes. Una página prerenderizada servida por `meeko start` sí varía por la sesión, como sin tema: sin sesión responde con `Vary: cookie` y `cache-control: public, max-age=0, must-revalidate`, y con sesión, `private, no-store`, porque inserta la meta CSRF de la sesión (véase [Reglas comunes](#reglas-comunes)).
+
+Un host propio que pasa `DocumentOptions.config` a `createFrameworkHandler` pone el tema en `config.theme` (lo mismo que `mountClientApp({ document })`); el build lo copia allí desde `theme` de `meeko.config.ts`, donde `document.theme` no se admite.
+
 ## Autoimports y TypeScript
 
 **Imports sin extensión.** Desde `1.2`, Meeko comprueba los tipos con `"module": "ESNext"` y `"moduleResolution": "Bundler"`, como Vite y Nuxt: un import relativo no necesita extensión (`import { format } from "../utils/format"`), porque Vite resuelve y empaqueta todo el código en `meeko dev` y en `meeko build`, y Node nunca ejecuta un `.ts` directamente. Los imports con `.js` siguen funcionando. `meeko init-framework` genera el `tsconfig.json` con esos valores; un proyecto anterior puede cambiar sus dos líneas `"module": "NodeNext"` y `"moduleResolution": "NodeNext"` para que el editor también acepte los imports sin extensión en sus `.ts`.
 
-Meeko analiza exports AST de `app/{components,composables,utils,stores,types}` (`app/types` desde `1.2`), `shared/{types,schemas,utils,constants,enums}` y `server/utils`. Los tipos que sólo usa la aplicación van en `app/types`; los que comparten la aplicación y el servidor, en `shared/types`. Un `type` o una `interface` autoimportados llegan con `import type`. Los símbolos de `app/` están disponibles en cliente y SSR, pero no desde `shared/`; los sufijos `.client.ts` y `.server.ts` restringen un módulo a su entorno. `imports.serverDirs` añade directorios privados exclusivos del servidor y, desde `1.3`, `imports.appDirs` e `imports.sharedDirs` añaden carpetas de `app/` y de `shared/` (véase [Carpetas de autoimports](#carpetas-de-autoimports)). Los símbolos del framework `api`, `rpc`, `socket`, `useSocket`, `useApi`, `useRpcQuery`, `useRpcMutation`, `useState`, `href` y `useRoute`, desde `1.2` `useForm`, `useStorage`, `useApiMutation`, `useHead`, `useSeoMeta`, `definePage`, `defineRouteMiddleware` y `definePlugin` (`definePage` sólo tiene efecto en `<script server>` y en los sidecars: en el `<script>` de un componente da el aviso `MEEK109`), y en el código de servidor (`server/` y `<script server>`) `defineApiRoute`, `defineRpc`, `defineServerMiddleware`, `defineSocketChannel`, `defineServerRuntime` y `ApiError`, y de la raíz `signal`, `computed`, `effect`, `batch`, `untrack` (desde `1.2`), `onCleanup`, `onMounted`, `provide`, `inject`, `createContext` y `provideErrorHandler`, también figuran en el registro; un export propio llamado `useRoute`, `useForm`, `useStorage`, `useApiMutation`, `useHead` o `useSeoMeta` tiene prioridad sobre el del framework. Los imports explícitos prevalecen. Una colisión produce error; nunca se elige por orden de archivos. Un `enum` o una clase autoimportados sirven también como tipo, con sus miembros (`Scope.App`); si un archivo sólo los usa como tipo, Meeko inserta `import type`. Los schemas de `shared/schemas` pueden llegar por autoimport a los contratos de API, RPC y Socket. `meeko check` comprueba los `.ts` que importa un `.meeko` con los autoimports de su ámbito y con las rutas generadas, igual que los proyectos `tsconfig.*`.
+Meeko analiza exports AST de `app/{components,composables,utils,stores,types}` (`app/types` desde `1.2`), `shared/{types,schemas,utils,constants,enums}` y `server/utils`. Los tipos que sólo usa la aplicación van en `app/types`; los que comparten la aplicación y el servidor, en `shared/types`. Un `type` o una `interface` autoimportados llegan con `import type`. Los símbolos de `app/` están disponibles en cliente y SSR, pero no desde `shared/`; los sufijos `.client.ts` y `.server.ts` restringen un módulo a su entorno. `imports.serverDirs` añade directorios privados exclusivos del servidor y, desde `1.3`, `imports.appDirs` e `imports.sharedDirs` añaden carpetas de `app/` y de `shared/` (véase [Carpetas de autoimports](#carpetas-de-autoimports)). Los símbolos del framework `api`, `rpc`, `socket`, `useSocket`, `useApi`, `useRpcQuery`, `useRpcMutation`, `useState`, `href` y `useRoute`, desde `1.2` `useForm`, `useStorage`, `useApiMutation`, `useHead`, `useSeoMeta`, `definePage`, `defineRouteMiddleware` y `definePlugin`, desde `1.4` `useTheme` (`definePage` sólo tiene efecto en `<script server>` y en los sidecars: en el `<script>` de un componente da el aviso `MEEK109`), y en el código de servidor (`server/` y `<script server>`) `defineApiRoute`, `defineRpc`, `defineServerMiddleware`, `defineSocketChannel`, `defineServerRuntime` y `ApiError`, y de la raíz `signal`, `computed`, `effect`, `batch`, `untrack` (desde `1.2`), `onCleanup`, `onMounted`, `provide`, `inject`, `createContext` y `provideErrorHandler`, también figuran en el registro; un export propio llamado `useRoute`, `useForm`, `useStorage`, `useApiMutation`, `useHead`, `useSeoMeta` o `useTheme` tiene prioridad sobre el del framework. Los imports explícitos prevalecen. Una colisión produce error; nunca se elige por orden de archivos. Un `enum` o una clase autoimportados sirven también como tipo, con sus miembros (`Scope.App`); si un archivo sólo los usa como tipo, Meeko inserta `import type`. Los schemas de `shared/schemas` pueden llegar por autoimport a los contratos de API, RPC y Socket. `meeko check` comprueba los `.ts` que importa un `.meeko` con los autoimports de su ámbito y con las rutas generadas, igual que los proyectos `tsconfig.*`.
 
 <a id="carpetas-de-autoimports"></a>**Carpetas de autoimports.** Cada carpeta se lee de forma recursiva, en el proyecto y en cada layer; sólo sus `.ts` aportan exports (sin `*.test.ts`, `*.spec.ts` ni `*.d.ts`), y los `.meeko` sólo son componentes en `app/components` y en las carpetas de componentes de los módulos. Un archivo sin sufijo toma el ámbito de la carpeta raíz que lo contiene; `.client.ts`, `.server.ts` y `.shared.ts` mandan sobre él:
 
@@ -965,6 +1171,22 @@ Meeko analiza exports AST de `app/{components,composables,utils,stores,types}` (
 | `server/utils` e `imports.serverDirs`, p. ej. `"server/services"` | `server/` | `server/`, `<script server>` y sidecars; en un componente, `MEEK108` |
 
 Cada opción sólo admite rutas relativas dentro de su carpeta (`appDirs` dentro de `app/`, `sharedDirs` dentro de `shared/`, `serverDirs` dentro de `server/`), con `/` o `\` y sin `.` ni `..`: otra ruta detiene `meeko dev`, `meeko build` y `meeko check` con un error de `meeko.config.ts` que nombra la entrada (`imports.appDirs[1] must be a relative path inside app/: …`) y que el editor, en un workspace de confianza, marca en ella (`MEEK_CONFIG`). Una carpeta que ya es de autoimports (`"app/composables"`) o que está dentro de otra de la lista no se lee dos veces. Los exports de estas carpetas siguen las mismas reglas que los de las carpetas por defecto: `import type` para `type` e `interface`, prioridad sobre los autoimports del framework y error si dos archivos exportan el mismo nombre en un ámbito. Un `*.server.ts` de una carpeta de `appDirs` es de servidor, y un componente que lo usa da `MEEK108`.
+
+<a id="tipos-de-cada-componente"></a>**Tipos de cada componente.** Desde `1.4`, cada componente autoimportado (los `.meeko` de `app/components` del proyecto y de sus layers, y los de las carpetas de componentes de los módulos) aporta además cuatro tipos con el nombre de su etiqueta, sin import: el nombre del componente, con la misma regla que la etiqueta y el prefijo del módulo incluido, seguido de `Props`, `Snippets`, `Models` o `Exposed`.
+
+| Componente | Etiqueta | Tipos |
+| --- | --- | --- |
+| `app/components/App/Card.meeko` | `<AppCard>` | `AppCardProps`, `AppCardSnippets`, `AppCardModels`, `AppCardExposed` |
+| `app/components/user-menu.meeko` | `<UserMenu>` | `UserMenuProps`, `UserMenuSnippets`, `UserMenuModels`, `UserMenuExposed` |
+| `components/picker.meeko` de un módulo con `prefix: "Accent"` | `<AccentPicker>` | `AccentPickerProps`, `AccentPickerSnippets`, … |
+
+- **Qué son.** Exactamente el `ComponentProps`, `ComponentSnippets`, `ComponentModels` y `ComponentExposed` del módulo del componente (véase [Módulo generado](api.md#módulo-generado)), con sus parámetros de tipo en un componente genérico (`DataTableProps<User>`). Un componente sin `defineSnippets`, `defineModel` o `defineExpose` da `null` en el tipo correspondiente, como su módulo: el alias no se convierte en `{}` para que el nombre con etiqueta y el genérico nunca difieran y `null` siga distinguiendo un componente que no declara el canal. Con `null`, `Omit<PlainSnippets, "x">` es `{}`, pero `PlainSnippets & { … }` es `never`: reutilice los snippets de un componente que los declara.
+- **Dónde.** Con el mismo ámbito que el componente: en el `<script>` y la plantilla de los `.meeko` y en los `.ts` de `app/` (y, como los componentes, en `server/` y `<script server>`), nunca en `shared/`, donde son `TS2304` como cualquier símbolo de `app/`. Llegan como `import type` desde el `.meeko`, así que no añaden código al bundle.
+- **Prioridad.** Un autoimport del proyecto con el mismo nombre gana sin aviso, como un export propio llamado `useRoute` frente al del framework: si `app/types` exporta `AppCardProps`, ése es el `AppCardProps` de todo el proyecto. Un import o una declaración del archivo prevalecen, como siempre.
+- **Etiquetas propias.** Las etiquetas de Meeko aportan igual el tipo de sus props, con el mismo ámbito y la misma prioridad, desde los exports públicos de `@meekojs/meeko/framework`: `MeekoLinkProps` para `<MeekoLink>`, `MeekoOutletProps` para `<MeekoOutlet />` y `MeekoThemeToggleProps` para `<MeekoThemeToggle>` (véase [`<MeekoOutlet />` y `<MeekoLink>`](#meekooutlet--y-meekolink)). Llegan como `import type { MeekoLinkProps } from "@meekojs/meeko/framework"`. Un componente del proyecto que sustituye la etiqueta (`app/components/MeekoLink.meeko`, con el aviso `MEEK106`) aporta sus propios tipos con ese nombre, como cualquier componente: su `MeekoLinkProps` son sus props, no las de la etiqueta de Meeko.
+- **Editor y `meeko check`.** Usan el mismo registro: se declaran en `.meeko/types/autoimports/client.d.ts` (y `server.d.ts`) junto al componente; el servidor de lenguaje los completa donde se escribe un tipo, y el hover y la navegación a definición llevan al componente, a la macro que declara cada tipo (`defineSnippets` para `AppCardSnippets`).
+
+Con ellos, un componente reutiliza los snippets de otro sin import: `defineSnippets<Omit<AppCardSnippets, "footer"> & { actions?: [close: () => void] }>()` (véase [Snippets con `defineSnippets`](api.md#snippets-con-definesnippets)).
 
 Los `.ts` normales de `app/` (composables, utils, stores) se ejecutan en SSR y en el navegador, como los `.meeko` que los usan, y sus autoimports del framework (`api`, `rpc`, `socket`, `useSocket`, `useApi`…) se resuelven por entorno: el cliente de servidor en SSR y el del navegador en el navegador. Antes de `1.1` usaban siempre el del navegador, y `meeko dev` o `meeko build` fallaban con «Client-only module reached the server bundle». Un `.client.ts` sigue siendo sólo de navegador.
 
@@ -2172,13 +2394,14 @@ Las URL necesitan el origen público: `site` o, sin él, `MEEKO_PUBLIC_ORIGIN` d
 
 ### CSP con hashes
 
-Una `Content-Security-Policy` sin `'unsafe-inline'` bloquea los scripts en línea de un documento, como el del tema de `document.head.script`. Para las páginas que se generan en el build, Meeko permite cada uno por su hash SHA-256, sin nonce por petición:
+Una `Content-Security-Policy` sin `'unsafe-inline'` bloquea los scripts en línea de un documento, como uno de `document.head.script` o el que añade [`theme`](#tema-clarooscuro-sin-parpadeo). Para las páginas que se generan en el build, Meeko permite cada uno por su hash SHA-256, sin nonce por petición:
 
 - Desde `1.3`, el índice `prerender/manifest.json` guarda en `pages[ruta].scriptHashes` las fuentes `'sha256-…'` de los `<script>` en línea que ejecuta cada página prerenderizada: los de JavaScript, `module`, `importmap` y `speculationrules`. Los bloques de datos (`application/json`, como el payload de Meeko, y `application/ld+json`) y los scripts con `src` no cuentan.
 - `inlineScriptHashes(html)` de `@meekojs/meeko/build` devuelve `{ hashes, unhashable }` para cualquier documento: los hashes y el JavaScript que un hash no puede permitir, los atributos `on*` y las URL `javascript:`. Lee el HTML como el navegador, así que el hash coincide con el que éste comprueba.
 - `contentSecurityPolicy(policy, hashes)` de `@meekojs/meeko/server` construye el valor de la cabecera: añade los hashes a `script-src` sin repetir fuentes o, si la política no tiene `script-src`, a una copia de las fuentes de `default-src` (sin ninguna de las dos, los scripts ya están permitidos y no añade nada). Con hashes, el navegador ignora `'unsafe-inline'` de `script-src`.
+- Desde `1.4`, lo mismo con los `<style>` en línea, como el de los iconos de [`<MeekoThemeToggle>`](#meekothemetoggle) y los de los componentes: `pages[ruta].styleHashes` en el índice, `inlineStyleHashes(html)` de `@meekojs/meeko/build` (los atributos `style="…"` no cuentan, porque un hash no los permite) y un tercer argumento, `contentSecurityPolicy(policy, scriptHashes, styleHashes)`, que los añade a `style-src-elem` si la política la tiene, si no a `style-src` o a una copia de `default-src`. A diferencia de los scripts, no los añade a una directiva que ya admite `'unsafe-inline'`: no hace falta, y el hash anularía `'unsafe-inline'` para los atributos `style="…"`.
 
-El adaptador `static` hace todo eso con `server.contentSecurityPolicy`: calcula los hashes de todos los `.html` de su salida (`404.html` y los de `public/` incluidos), los añade a la política y escribe la cabecera en `headerFiles`. Si una página tiene un atributo `on*` o una URL `javascript:`, el build falla con la lista de archivos: use un script o `on:` del componente. Cambiar un script cambia su hash en el siguiente build, sin tocar la política.
+El adaptador `static` hace todo eso con `server.contentSecurityPolicy`: calcula los hashes de los scripts y, desde `1.4`, de los `<style>` de todos los `.html` de su salida (`404.html` y los de `public/` incluidos), los añade a la política y escribe la cabecera en `headerFiles`. Si una página tiene un atributo `on*` o una URL `javascript:`, el build falla con la lista de archivos: use un script o `on:` del componente. Cambiar un script cambia su hash en el siguiente build, sin tocar la política.
 
 ```ts
 // Un host propio que sirve el build de Node con CSP para sus páginas prerenderizadas.

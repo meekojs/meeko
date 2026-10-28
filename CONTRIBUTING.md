@@ -15,9 +15,12 @@ El repositorio es un workspace de pnpm con un único lockfile: el paquete `@meek
 
 ```powershell
 pnpm install
+pnpm lint
 pnpm run verify
 pnpm run example:bundle
 ```
+
+`pnpm lint` ejecuta ESLint sobre todo el workspace con la configuración de `eslint.config.ts` (las reglas recomendadas de ESLint y typescript-eslint, sin información de tipos) y debe terminar sin errores; los avisos señalan deuda conocida. `pnpm lint:fix` aplica las correcciones automáticas. Los componentes `.meeko` no pasan por ESLint: los validan el compilador y `meeko check`.
 
 Las órdenes de la raíz reenvían al paquete (`pnpm -F @meekojs/meeko run <orden>`); para otra pieza usa su filtro, por ejemplo `pnpm -F meeko-language run test`. `verify` comprueba el código fuente y el ejemplo con TypeScript 7, ejecuta las pruebas y genera el componente de ejemplo. Una prueba de compilador debe demostrar también la salida SSR, la hidratación y un diagnóstico relevante cuando corresponda.
 

@@ -9,6 +9,8 @@
 import { readChannels } from "./channels.js";
 import type { ChannelsOf } from "./channels.js";
 import type { DomScope } from "./dom.js";
+import { passedSnippetsKey } from "./props.js";
+import type { PassedSnippets } from "./props.js";
 import { currentEffectOwner } from "./reactivity.js";
 import type { ReadonlySignal } from "./reactivity.js";
 
@@ -18,6 +20,8 @@ declare const snippetArguments: unique symbol;
  * Contenido de plantilla que un padre pasa a un hijo y que el hijo coloca con `<render>`. `Args`
  * son los parámetros que el hijo le entrega. Es el tipo de cada campo que devuelve
  * `defineSnippets<T>()`; sólo sirve para tipar, su contenido en tiempo de ejecución es interno.
+ * Desde 1.4, una clave de `T` también puede ser un `Snippet<Args>`, que cuenta como `Args`: así
+ * `defineSnippets<Omit<AppCardSnippets, "footer">>()` reutiliza los snippets de otro componente.
  *
  * @typeParam Args Tupla de parámetros que recibe el snippet.
  * @since 1.1.0
@@ -65,13 +69,22 @@ export function snippetOf(value: unknown): SnippetData | undefined {
   return typeof value === "object" && value !== null ? (value as { [snippetData]?: SnippetData })[snippetData] : undefined;
 }
 
-/** Constraint of a `defineSnippets` type: every snippet maps to the tuple of its parameters. */
-export type SnippetTypes<T extends { [K in keyof T]: readonly unknown[] }> = T;
+/**
+ * What each key of a `defineSnippets` type may hold: the tuple of its parameters or, since 1.4, a
+ * `Snippet<Args>`, as in the `ComponentSnippets` (or `AppCardSnippets`) of another component.
+ */
+type SnippetEntry = readonly unknown[] | Snippet<never>;
 
-/** Parameter tuple of a snippet type. */
-type SnippetParameters<Args> = Args extends readonly unknown[] ? Args : never;
+/** Constraint of a `defineSnippets` type: every snippet maps to its parameters, as a tuple or a `Snippet`. */
+export type SnippetTypes<T extends { [K in keyof T]: SnippetEntry }> = T;
 
-/** Snippets of a `defineSnippets` type, with its optional names. */
+/**
+ * Parameter tuple of a snippet type: the tuple itself or the `Args` of a `Snippet<Args>`.
+ * Distributive, so the `undefined` of an optional snippet drops out.
+ */
+type SnippetParameters<Entry> = Entry extends readonly unknown[] ? Entry : Entry extends Snippet<infer Args extends readonly unknown[]> ? Args : never;
+
+/** Snippets of a `defineSnippets` type, with its optional names; a `Snippet` entry stays as it is. */
 export type SnippetMap<T> = { [K in keyof T]: Snippet<SnippetParameters<T[K]>> };
 
 /** Parameters of the snippet `name` of a compiled component, or `any[]` if it has none by that name. */
@@ -81,8 +94,37 @@ export type SnippetArgs<Module, Name extends string> = ChannelsOf<Module> extend
     : any[]
   : any[];
 
-/** The snippets that the parent passed to this instance. */
+function readOnlySnippets(): never {
+  throw new TypeError("Meeko snippets are read-only: the parent passes them with <snippet>");
+}
+
+/** Traps of the snippets of a mounted child, whose parent may start or stop passing one (`<snippet if:when>`). */
+const passedSnippetsTraps: ProxyHandler<{ readonly reader: PassedSnippets }> = {
+  get: ({ reader }, key) => {
+    if (typeof key === "symbol") return undefined;
+    const value = reader.get(key);
+    return snippetOf(value) ? value : undefined;
+  },
+  has: ({ reader }, key) => typeof key === "string" && reader.names().includes(key) && snippetOf(reader.get(key)) !== undefined,
+  ownKeys: ({ reader }) => reader.names().filter((name) => snippetOf(reader.get(name))),
+  getOwnPropertyDescriptor: ({ reader }, key) => {
+    if (typeof key === "symbol") return undefined;
+    const value = reader.get(key);
+    return snippetOf(value) ? { value, writable: false, enumerable: true, configurable: true } : undefined;
+  },
+  set: readOnlySnippets,
+  defineProperty: readOnlySnippets,
+  deleteProperty: readOnlySnippets,
+};
+
+/**
+ * The snippets that the parent passed to this instance. On a child whose props the parent updates
+ * in place, each read is tracked: a binding that reads `snippets.x` follows a `<snippet if:when>`
+ * of the parent, and a snippet that stays passed keeps its identity.
+ */
 export function useSnippets<T>(props: object): SnippetMap<T> {
+  const reader = (props as { readonly [passedSnippetsKey]?: PassedSnippets })[passedSnippetsKey];
+  if (reader) return new Proxy({ reader }, passedSnippetsTraps) as unknown as SnippetMap<T>;
   const passed = readChannels(props)?.snippets ?? {};
   const snippets: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(passed)) if (snippetOf(value)) snippets[name] = value;

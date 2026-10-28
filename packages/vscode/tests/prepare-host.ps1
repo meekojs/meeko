@@ -94,6 +94,7 @@ onMounted(() => {
 <template><p>{props.data.title} {count.value}</p></template>
 '@
   Set-Content -LiteralPath (Join-Path $consumer 'app/layouts/default.meeko') -Encoding utf8 -Value '<script lang="ts">const props = defineProps<{ outlet: object; missing: string }>();</script><template><p>Layout</p></template>'
+  Set-Content -LiteralPath (Join-Path $consumer 'app/layouts/links.meeko') -Encoding utf8 -Value '<script lang="ts"></script><template><MeekoLink to="/" class="brand">Inicio</MeekoLink><MeekoOutlet /></template>'
   $packageName = (& npm pack $packageRoot --pack-destination $testRoot --silent | Select-Object -Last 1)
   if ($LASTEXITCODE -ne 0 -or !$packageName) { throw 'No se pudo empaquetar el motor Meeko.' }
   & npm install --prefix $consumer --ignore-scripts --no-audit --no-fund (Join-Path $testRoot $packageName)

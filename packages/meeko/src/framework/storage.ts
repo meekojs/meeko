@@ -69,7 +69,7 @@ export interface StorageOptions<T = unknown> {
 /** What a read of the storage gives: a decoded value, or nothing usable. */
 export type Decoded<T> = { readonly ok: true; readonly value: T } | { readonly ok: false };
 
-const browserKey = createContext<Window>("Meeko browser window");
+const browserKey = /*#__PURE__*/ createContext<Window>("Meeko browser window");
 
 /** Makes the browser window of a mounted application available to its component tree. */
 export function provideBrowserWindow(browser: Window): void {

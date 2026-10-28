@@ -307,7 +307,7 @@ export function createContextDispatcher<S>(options: Pick<ServerDispatcherOptions
         setRateLimitRoute(context, `rpc ${endpoint.id}`);
         return dispatchRpc(definition, context, options.sessions, options.onError);
       }
-      let allowed: ApiMethod[] = [];
+      const allowed: ApiMethod[] = [];
       for (const endpoint of api) {
         const params = match(pathname, endpoint.pathname);
         if (!params) continue;

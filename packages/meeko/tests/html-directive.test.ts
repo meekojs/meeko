@@ -395,6 +395,7 @@ test("a TrustedHtml export of <script server> and of load reaches the page props
   const shape: JsonShape<{ body: TrustedHtml }> = { body };
   const checked: SerializableExport<{ body: TrustedHtml }, JsonShape<{ body: TrustedHtml }>> = shape;
   // `definePage` infers the data of `load` with the brand, and the page contract only removes `Response`.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the value only feeds the type checks below.
   const route = definePage({ load: async () => ({ body: trustHtml("<p>a</p>") }) });
   type Loaded = Exclude<Awaited<ReturnType<typeof route.load>>, Response>;
   const loaded: Loaded["body"] extends TrustedHtml ? true : false = true;

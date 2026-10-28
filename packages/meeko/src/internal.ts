@@ -26,8 +26,8 @@ export type { ElementListRef, ElementOf, ElementRef, ElementRefOf, ElementRefs, 
 export { continueInBrowser } from "./continuation.js";
 export type { BrowserContinuation } from "./continuation.js";
 export { awaitData } from "./suspense.js";
-export { checkComponentModels, checkComponentSnippets, componentTag, noChannels, withChannels } from "./channels.js";
-export type { ChannelsOf, ComponentTag, EventNames, ExtraProps, ModelInputs, NoModels, NoSnippets, SnippetInputs, SnippetPresence, TagExposed, TagInput } from "./channels.js";
+export { checkComponentModels, checkComponentSnippets, checkSnippetCondition, componentTag, noChannels, withChannels } from "./channels.js";
+export type { ChannelsOf, ComponentTag, EventNames, ExtraProps, ModelInputs, NoModels, NoSnippets, RequiredSnippetMessage, SnippetConditionCheck, SnippetInputs, SnippetPresence, TagExposed, TagInput } from "./channels.js";
 export { borrowedKey, checkWritableSignal, modelSelected, modelText, modelValue, useModel } from "./models.js";
 export type { ModelOptions, NativeModelKind, NativeModelValues, WritableSignalCheck } from "./models.js";
 export { snippet, useSnippets } from "./snippets.js";
@@ -37,3 +37,5 @@ export type { Signal } from "./reactivity.js";
 export { definePageBody, pageData } from "./framework/page-body.js";
 export type { JsonShape, SerializableExport, ServerData } from "./framework/page-body.js";
 export { meekoEnv } from "./framework-server/env.js";
+/** `<MeekoThemeToggle>`: Meeko's own component, compiled from `framework/MeekoThemeToggle.meeko`. */
+export * as MeekoThemeToggle from "./framework/theme-toggle.compiled.js";

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -236,6 +236,19 @@ const emptyModules: ResolvedModules = Object.freeze({
   callHook: async () => {},
 });
 
+/**
+ * The keys of `MeekoConfig` itself, which `meta.configKey` cannot take: the module would read
+ * Meeko's own option as its options, and its augmentation of `MeekoConfig` would clash with
+ * Meeko's type. `satisfies` keeps the list in step with the interface.
+ */
+const ownConfigKeys = Object.keys({
+  layers: true, extends: true, modules: true, imports: true, server: true, css: true, document: true,
+  dev: true, site: true, sitemap: true, robots: true, theme: true,
+} satisfies Record<keyof MeekoConfig, true>);
+
+/** Version of Meeko that added each key of `ownConfigKeys` after 1.2, for the message. */
+const ownConfigKeySince: Readonly<Record<string, string>> = { dev: "1.3", site: "1.3", sitemap: "1.3", robots: "1.3", theme: "1.4" };
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value) as unknown;
@@ -356,6 +369,10 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
       throw new Error(`Meeko module ${name} requires Meeko ${range}; this project uses ${version}`);
     }
     const configKey = module.meta.configKey;
+    if (configKey !== undefined && ownConfigKeys.includes(configKey)) {
+      const since = ownConfigKeySince[configKey];
+      throw new Error(`Meeko module ${name} uses meta.configKey ${JSON.stringify(configKey)}, which is an option of Meeko itself${since ? ` since ${since}` : ""}: give the module another configKey and move its options in meeko.config.* to that key (see docs/migration-1.4.md)`);
+    }
     const configured = configKey === undefined ? undefined : (config as Record<string, unknown>)[configKey];
     const options = mergeModuleOptions(module.defaults, configured, inline);
     const path = (value: string | URL, what: string): string => toPath(root, value, what, name);
@@ -490,7 +507,7 @@ export function resolveMeekoModules(projectRoot: string, config: MeekoConfig, op
 export function resolvedDocument(config: MeekoConfig, modules: ResolvedModules): DocumentConfig | undefined {
   // The origin is resolved only when `document.seo` writes an absolute URL without its own origin.
   const origin = seoNeedsSiteOrigin(config.document?.seo) ? resolveSiteOrigin(config) : undefined;
-  return resolveDocumentConfig(config.document, modules.head ? [modules.head] : [], origin);
+  return resolveDocumentConfig(config.document, modules.head ? [modules.head] : [], origin, config.theme);
 }
 
 /** Whether a `document.seo` value writes `canonical` or `og:url` from the site's origin. */

@@ -359,10 +359,11 @@ function acceptsReactiveProps(component: object): boolean {
 /**
  * Hidrata un hijo dentro de su rango y actualiza sus props reactivas.
  * A compiled child keeps its instance, its DOM and its focus: changed props are written into the
- * signals of its props view and only the bindings that read them update. Another component, other
- * models or a snippet that appears or disappears rebuild the range, keeping its editable signals by
- * name. `expose` receives the `exposed` value of each hydrated instance, with `hydrated` set, and
- * `null` once it is released.
+ * signals of its props view and only the bindings that read them update, also when a snippet
+ * appears or disappears (`<snippet if:when>`). Another component or other models rebuild the range,
+ * keeping its editable signals by name, as does a snippet that appears or disappears for a child
+ * without reactive props. `expose` receives the `exposed` value of each hydrated instance, with
+ * `hydrated` set, and `null` once it is released.
  *
  * A child that awaits data it does not have, because it mounts after its page, leaves its region
  * empty: the binding loads the data in dry passes, then renders and hydrates it. Releasing the
@@ -450,8 +451,10 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
     // `on:save="(id) => save(id)"` is a new function then, but not a new value: keep the hydrated child.
     const initial = first;
     first = false;
-    if (nextComponent === component && sameChannels(props, next)) {
-      if (sameProps(props, next, initial)) return;
+    // A compiled child with reactive props also receives a snippet that appears or disappears
+    // (`<snippet if:when>`) in place: its props view tracks the passed snippets.
+    if (nextComponent === component && sameChannels(props, next, source !== undefined)) {
+      if (sameProps(props, next, initial) && sameChannels(props, next)) return;
       // A mounted compiled child keeps its DOM: the bindings that read a changed prop update.
       if (source) {
         props = next;

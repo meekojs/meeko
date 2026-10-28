@@ -101,6 +101,6 @@ test("server, node, bun, deno, cloudflare and build subpaths expose exactly thei
   const tools = await import(pathToFileURL(await entry("./build")).href);
   assert.deepEqual(Object.keys(tools).sort(), [
     "buildProject", "composeFrameworkRoutes", "discoverConfiguredRoutes", "discoverErrorPage", "discoverRoutes", "discoverServerManifest", "inlineScriptHashes",
-    "loadMeekoConfig", "prerenderProject", "prerenderRoutes", "readMeekoConfigSync", "resolveConfigSources",
+    "inlineStyleHashes", "loadMeekoConfig", "prerenderProject", "prerenderRoutes", "readMeekoConfigSync", "resolveConfigSources",
   ]);
 });

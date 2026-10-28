@@ -11,7 +11,7 @@ import type { RouteRecord } from "./router.js";
 import { DOCUMENT_HEAD_PREFIX } from "./server.js";
 import { loadConfiguredModules } from "./config.js";
 import type { PageRoute } from "./server.js";
-import { inlineScriptHashes } from "./script-hashes.js";
+import { inlineScriptHashes, inlineStyleHashes } from "./script-hashes.js";
 
 /**
  * Opciones de {@link prerenderRoutes}.
@@ -74,7 +74,8 @@ export interface PrerenderIndex {
    * payload de navegación `index.meeko.json` y, desde `1.3`, `scriptHashes`: las fuentes CSP
    * `'sha256-…'` de los scripts en línea que ejecuta la página (véase `inlineScriptHashes`), para
    * construir su `Content-Security-Policy` con `contentSecurityPolicy`. Un índice escrito por una
-   * versión anterior no tiene `scriptHashes`.
+   * versión anterior no tiene `scriptHashes`. Desde `1.4`, `styleHashes` hace lo mismo con los
+   * `<style>` en línea (véase `inlineStyleHashes`), como el del tema de `<MeekoThemeToggle>`.
    */
   readonly pages: Readonly<Record<string, {
     readonly file: string;
@@ -82,6 +83,7 @@ export interface PrerenderIndex {
     readonly etag: string;
     readonly payload?: string;
     readonly scriptHashes?: readonly string[];
+    readonly styleHashes?: readonly string[];
   }>>;
 }
 
@@ -235,6 +237,7 @@ export async function prerenderRoutes(options: PrerenderOptions): Promise<string
     pages[pathname] = {
       file, headOffset: headOffset(pathname, html), etag: contentTag(html), ...(payload ? { payload } : {}),
       scriptHashes: inlineScriptHashes(html).hashes,
+      styleHashes: inlineStyleHashes(html),
     };
   }
   const index: PrerenderIndex = { version: 1, pages };

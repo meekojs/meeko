@@ -122,6 +122,50 @@ test("Meeko tokens distinguish section attributes, HTML and TypeScript expressio
   assert.ok(!tokens.some((token) => token.text === "plain" && token.scopes.includes("meta.embedded.inline.typescript")), "plain HTML values must not use TypeScript scope");
 });
 
+test("a nested <template> does not close the template section", async () => {
+  const require = createRequire(import.meta.url);
+  await loadWASM(readFileSync(require.resolve("vscode-oniguruma/release/onig.wasm")));
+  const registry = new Registry({
+    onigLib: Promise.resolve({ createOnigScanner, createOnigString }),
+    loadGrammar: async (scope) => scope === "source.meeko"
+      ? parseRawGrammar(readFileSync(grammarFile, "utf8"), grammarFile)
+      : fixtureGrammars.get(scope) ?? null,
+  });
+  const grammar = await registry.loadGrammarWithConfiguration("source.meeko", 1, {
+    embeddedLanguages: { "meta.embedded.inline.typescript": 2, "meta.embedded.block.html": 3, "meta.embedded.block.css": 4 },
+  });
+  assert.ok(grammar);
+  const lines = [
+    "<template>",
+    "<template",
+    '  each:of="value"',
+    '  each:as="id"',
+    ">",
+    "<template if:when=\"count\"><b>{id}</b></template>",
+    "</template>",
+    '<button on:click="count">{count}</button>',
+    "</template>",
+    "<style scoped>",
+    "button { color: red; }",
+    "</style>",
+  ];
+  let state = null;
+  const tokens: Array<{ text: string; scopes: string[] }> = [];
+  for (const line of lines) {
+    const result = grammar.tokenizeLine(line, state);
+    state = result.ruleStack;
+    tokens.push(...result.tokens.map((token) => ({ text: line.slice(token.startIndex, token.endIndex), scopes: token.scopes })));
+  }
+  const html = "meta.embedded.block.html";
+  assert.ok(tokens.some((token) => token.text === "each:of" && token.scopes.includes("keyword.control.flow.meeko")), "directives of a multi-line nested <template>");
+  assert.ok(tokens.some((token) => token.text === "id" && token.scopes.includes("meta.embedded.inline.typescript")), "interpolation inside the nested template");
+  // After the nested </template>, the markup is still in the template section.
+  assert.ok(tokens.some((token) => token.text === "on:click" && token.scopes.includes("entity.name.function.event.meeko") && token.scopes.includes(html)), "markup after a nested </template>");
+  assert.ok(tokens.some((token) => token.text === "count" && token.scopes.includes("meta.embedded.inline.typescript") && token.scopes.includes(html)), "expressions after a nested </template>");
+  assert.ok(tokens.some((token) => token.text === "color" && token.scopes.includes("support.type.property-name.css")), "the style section follows the template section");
+  assert.equal(tokens.filter((token) => token.text === "template" && token.scopes.includes("entity.name.tag.meeko")).length, 2, "only the section tags are section tags");
+});
+
 test("generic on <script> is a TypeScript type parameter list, also with > in its value", async () => {
   const require = createRequire(import.meta.url);
   await loadWASM(readFileSync(require.resolve("vscode-oniguruma/release/onig.wasm")));
@@ -189,4 +233,47 @@ test("html, model and model:name on a custom element are plain HTML attributes",
     assert.ok(tokens.some((token) => token.text === "count" && token.scopes.includes(typescript)), `html value is TypeScript in ${line}`);
   }
   assert.ok(tokenize('<input model="count">').some((token) => token.text === "model" && token.scopes.includes(directive)), "model on a form control");
+});
+
+test("if:when on a <snippet> is control flow with a TypeScript value", async () => {
+  const require = createRequire(import.meta.url);
+  await loadWASM(readFileSync(require.resolve("vscode-oniguruma/release/onig.wasm")));
+  const registry = new Registry({
+    onigLib: Promise.resolve({ createOnigScanner, createOnigString }),
+    loadGrammar: async (scope) => scope === "source.meeko"
+      ? parseRawGrammar(readFileSync(grammarFile, "utf8"), grammarFile)
+      : fixtureGrammars.get(scope) ?? null,
+  });
+  const grammar = await registry.loadGrammarWithConfiguration("source.meeko", 1, {
+    embeddedLanguages: { "meta.embedded.inline.typescript": 2, "meta.embedded.block.html": 3 },
+  });
+  assert.ok(grammar);
+  const line = '<template><AppCard><snippet name="footer" params="close" if:when="count"><render snippet="props.outlet" args="close" /></snippet></AppCard></template>';
+  const tokens = grammar.tokenizeLine(line, null).tokens.map((token) => ({ text: line.slice(token.startIndex, token.endIndex), scopes: token.scopes }));
+  const typescript = "meta.embedded.inline.typescript";
+  assert.ok(tokens.some((token) => token.text === "if:when" && token.scopes.includes("keyword.control.flow.meeko")), "if:when of <snippet>");
+  assert.ok(tokens.some((token) => token.text === "count" && token.scopes.includes(typescript) && token.scopes.includes("variable.other.readwrite.ts")), "its value is TypeScript");
+  assert.ok(tokens.some((token) => token.text === "name" && token.scopes.includes("entity.other.attribute-name.html")), "name stays a plain attribute");
+  assert.equal(tokens.filter((token) => token.text === "snippet" && token.scopes.includes("entity.name.function.builtin.meeko")).length, 2, "<snippet> and </snippet> are built-ins");
+});
+
+test("<MeekoThemeToggle> is a built-in tag, also when it closes, and a longer name is not", async () => {
+  const require = createRequire(import.meta.url);
+  await loadWASM(readFileSync(require.resolve("vscode-oniguruma/release/onig.wasm")));
+  const registry = new Registry({
+    onigLib: Promise.resolve({ createOnigScanner, createOnigString }),
+    loadGrammar: async (scope) => scope === "source.meeko"
+      ? parseRawGrammar(readFileSync(grammarFile, "utf8"), grammarFile)
+      : fixtureGrammars.get(scope) ?? null,
+  });
+  const grammar = await registry.loadGrammarWithConfiguration("source.meeko", 1, {
+    embeddedLanguages: { "meta.embedded.inline.typescript": 2, "meta.embedded.block.html": 3 },
+  });
+  assert.ok(grammar);
+  const line = '<template><MeekoThemeToggle mode="select" bind:themes="value"><snippet name="dark">x</snippet></MeekoThemeToggle><MeekoThemeToggles /></template>';
+  const tokens = grammar.tokenizeLine(line, null).tokens.map((token) => ({ text: line.slice(token.startIndex, token.endIndex), scopes: token.scopes }));
+  const builtin = "entity.name.function.builtin.meeko";
+  assert.equal(tokens.filter((token) => token.text === "MeekoThemeToggle" && token.scopes.includes(builtin)).length, 2, "<MeekoThemeToggle> and </MeekoThemeToggle> are built-ins");
+  assert.ok(!tokens.some((token) => token.text.startsWith("MeekoThemeToggles") && token.scopes.includes(builtin)), "a longer name keeps the component color");
+  assert.ok(tokens.some((token) => token.text === "value" && token.scopes.includes("meta.embedded.inline.typescript")), "bind:themes is TypeScript");
 });

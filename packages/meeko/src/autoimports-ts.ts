@@ -91,14 +91,21 @@ function projectCompilerOptions(root: string): ts.CompilerOptions {
   return { ...ts.parseJsonConfigFileContent(loaded.config, ts.sys, dirname(config)).options, noEmit: true };
 }
 
+/** A type export of a TypeScript module, whose declaration may live in another file. */
+function resolvableType(entry: AutoImport): boolean {
+  // The type of a component names its alias in the component's module (`AppCardProps` is its
+  // `ComponentProps`), which TypeScript reads from the generated `.d.meeko.ts`.
+  return entry.typeOnly && !entry.specifier && !entry.componentType;
+}
+
 function typeTargets(root: string, entries: readonly AutoImport[]): Map<string, TypeTarget> {
-  const files = [...new Set(entries.filter((entry) => entry.typeOnly && !entry.specifier).map((entry) => entry.file))];
+  const files = [...new Set(entries.filter(resolvableType).map((entry) => entry.file))];
   const targets = new Map<string, TypeTarget>();
   if (files.length === 0) return targets;
   const program = ts.createProgram({ rootNames: files, options: projectCompilerOptions(root) });
   const checker = program.getTypeChecker();
   for (const entry of entries) {
-    if (!entry.typeOnly || entry.specifier) continue;
+    if (!resolvableType(entry)) continue;
     const file = program.getSourceFile(entry.file);
     const moduleSymbol = file && checker.getSymbolAtLocation(file);
     const exported = moduleSymbol && checker.getExportsOfModule(moduleSymbol).find((symbol) => symbol.name === entry.imported);

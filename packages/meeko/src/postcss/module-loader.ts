@@ -3,6 +3,7 @@ import { stat } from "node:fs/promises";
 import { createRequire, isBuiltin } from "node:module";
 import { dirname, isAbsolute, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import type { UtilityAutoImports } from "./autoimports.js";
 
 /**
  * Loads the TypeScript or JavaScript module of an `@utilities` at-rule, always fresh.
@@ -15,7 +16,12 @@ import { pathToFileURL } from "node:url";
  * their resolved `file:` URL. Without rolldown (PostCSS outside Vite 8), the entry is imported
  * natively with Node's type stripping and a query per version; its local imports do not reload.
  *
- * A loaded module is reused while every file of its graph keeps its modification time and size.
+ * With `autoImports`, every local TypeScript module of the graph gets the project's autoimports
+ * in the bundle; the native import cannot add them.
+ *
+ * A loaded module is reused while every file of its graph keeps its modification time and size,
+ * and the autoimport registry its key: an export added to or removed from an autoimport folder
+ * rebuilds it.
  */
 
 /** The part of rolldown's API this loader uses; rolldown is not a dependency of this package. */
@@ -48,22 +54,27 @@ export interface LoadedUtilityModule {
 interface CachedModule extends LoadedUtilityModule {
   /** `mtimeMs:size` of each file, taken before the bundler read it. */
   readonly stamps: ReadonlyMap<string, string | undefined>;
+  /** {@link UtilityAutoImports.key} of the registry the bundle used; `undefined` without autoimports. */
+  readonly autoImportsKey: string | undefined;
 }
 
 const cache = new Map<string, Promise<CachedModule>>();
 let rolldownLoader: Promise<Rolldown | undefined> | undefined;
 
-/** Loads `file`, reusing the previous load while none of its files changed. */
-export async function loadUtilityModule(file: string): Promise<LoadedUtilityModule> {
+/**
+ * Loads `file`, reusing the previous load while none of its files changed. `autoImports` adds a
+ * Meeko project's autoimports to the local modules of the bundle.
+ */
+export async function loadUtilityModule(file: string, autoImports?: UtilityAutoImports): Promise<LoadedUtilityModule> {
   const cached = cache.get(file);
   if (cached) {
     const entry = await cached.catch(() => undefined);
-    if (entry && await isFresh(entry)) return entry;
+    if (entry && entry.autoImportsKey === autoImports?.key && await isFresh(entry)) return entry;
     // Another caller already started the reload: share it.
     const current = cache.get(file);
-    if (current && current !== cached) return loadUtilityModule(file);
+    if (current && current !== cached) return loadUtilityModule(file, autoImports);
   }
-  const loading = importModule(file);
+  const loading = importModule(file, autoImports);
   cache.set(file, loading);
   // A failed load is not cached: the next transform retries once the file is fixed.
   loading.catch(() => { if (cache.get(file) === loading) cache.delete(file); });
@@ -84,13 +95,14 @@ async function stampOf(file: string): Promise<string | undefined> {
   }
 }
 
-async function importModule(file: string): Promise<CachedModule> {
+async function importModule(file: string, autoImports: UtilityAutoImports | undefined): Promise<CachedModule> {
   const rolldown = await findRolldown();
+  const autoImportsKey = autoImports?.key;
   if (!rolldown) {
     const stamp = await stampOf(file);
     const url = `${pathToFileURL(file).href}?meeko-utilities=${encodeURIComponent(stamp ?? String(Date.now()))}`;
     const exports = await import(url) as Record<string, unknown>;
-    return { exports, files: [file], stamps: new Map([[file, stamp]]), bundled: false };
+    return { exports, files: [file], stamps: new Map([[file, stamp]]), bundled: false, autoImportsKey };
   }
   const stamps = new Map<string, string | undefined>();
   const ownPackage = packageRootOf(file);
@@ -117,13 +129,16 @@ async function importModule(file: string): Promise<CachedModule> {
         return null;
       },
       transform(code, id) {
+        if (!isAbsolute(id)) return null;
+        // The same imports the Vite plugin adds to the module, before rolldown strips its types.
+        let result = autoImports?.transform(code, id) ?? code;
         // The bundle runs from a `data:` URL; `import.meta` keeps describing the original file.
-        if (!isAbsolute(id) || !/\bimport\.meta\.(?:url|filename|dirname)\b/.test(code)) return null;
-        return {
-          code: code.replace(/\bimport\.meta\.(url|filename|dirname)\b/g, (_match, key: string) => JSON.stringify(
+        if (/\bimport\.meta\.(?:url|filename|dirname)\b/.test(result)) {
+          result = result.replace(/\bimport\.meta\.(url|filename|dirname)\b/g, (_match, key: string) => JSON.stringify(
             key === "url" ? pathToFileURL(id).href : key === "filename" ? id : dirname(id),
-          )),
-        };
+          ));
+        }
+        return result === code ? null : { code: result };
       },
     }],
   });
@@ -135,12 +150,14 @@ async function importModule(file: string): Promise<CachedModule> {
     await bundle.close();
   }
   if (!chunk?.code) throw new Error(`rolldown no generó código para ${file}`);
-  const files = [...new Set([file, ...(chunk.moduleIds ?? []).filter((id) => isAbsolute(id))])];
+  // Every local module rolldown loaded, also one whose exports it inlined (a constant) and left
+  // out of `moduleIds`: a change there still changes the output.
+  const files = [...new Set([file, ...stamps.keys(), ...(chunk.moduleIds ?? []).filter((id) => isAbsolute(id))])];
   for (const dependency of files) if (!stamps.has(dependency)) stamps.set(dependency, await stampOf(dependency));
   // Stack traces name the module, not the whole base64 URL.
   const code = `${chunk.code}\n//# sourceURL=${pathToFileURL(file).href}?meeko-utilities-bundle\n`;
   const exports = await import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`) as Record<string, unknown>;
-  return { exports, files, stamps, bundled: true };
+  return { exports, files, stamps, bundled: true, autoImportsKey };
 }
 
 function isRelativeOrAbsolute(specifier: string): boolean {
@@ -164,6 +181,14 @@ function packageRootOf(file: string): string | undefined {
   }
   packageRoots.set(start, found);
   return found;
+}
+
+/**
+ * Whether the modules are bundled with rolldown: only then do they receive a Meeko project's
+ * autoimports, so without it the registry (which runs `meeko.config.*`) is not read.
+ */
+export async function canBundleUtilities(): Promise<boolean> {
+  return await findRolldown() !== undefined;
 }
 
 /**

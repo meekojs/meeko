@@ -1,3 +1,4 @@
+import { basename } from "node:path";
 import { pathToFileURL } from "node:url";
 import ts from "@typescript/typescript6";
 import type { Location } from "vscode-languageserver/node";
@@ -22,7 +23,7 @@ export function positionLink(uri: string, line: number, character: number): stri
   return `${uri}#L${line + 1},${character + 1}`;
 }
 
-function fileUri(context: FeatureContext, file: string): string {
+export function fileUri(context: FeatureContext, file: string): string {
   return context.locate(file)?.uri ?? pathToFileURL(file).href;
 }
 
@@ -102,11 +103,51 @@ export function componentModuleAt(context: FeatureContext, generatedOffset: numb
   return component && component.filename.endsWith(".meeko") && component !== context.component ? { component, node } : undefined;
 }
 
-/** Props, events, models, snippets and exposed members of a child component. */
-export function componentMarkdown(context: FeatureContext, child: VirtualComponent): string | undefined {
+/** Types that the module of a component exports for its channels. */
+const componentTypeNames: ReadonlySet<string> = new Set(["ComponentProps", "ComponentSnippets", "ComponentModels", "ComponentExposed"]);
+
+/**
+ * The component whose channel type an identifier names: `AppCardSnippets`, the autoimported type
+ * of `<AppCard>`, or `CardSnippets` of `import type { ComponentSnippets as CardSnippets }`.
+ */
+export function componentTypeAt(context: FeatureContext, generatedOffset: number): { component: VirtualComponent; node: ts.Identifier; type: string } | undefined {
+  const program = context.project.service.getProgram();
+  const file = program?.getSourceFile(context.component.virtualFilename);
+  const node = file && nodeAt(file, generatedOffset);
+  if (!program || !node || !ts.isIdentifier(node)) return undefined;
+  const checker = program.getTypeChecker();
+  let symbol = checker.getSymbolAtLocation(node);
+  if (!symbol || !(symbol.flags & ts.SymbolFlags.Alias)) return undefined;
+  symbol = checker.getAliasedSymbol(symbol);
+  const declaration = symbol.declarations?.[0];
+  if (!declaration || !ts.isTypeAliasDeclaration(declaration) || !componentTypeNames.has(declaration.name.text)) return undefined;
+  const fileName = declaration.getSourceFile().fileName;
+  const component = context.project.virtualEntry(fileName) ?? generatedDeclarationOwner(context, fileName);
+  return component && component.filename.endsWith(".meeko") && component !== context.component
+    ? { component, node, type: declaration.name.text }
+    : undefined;
+}
+
+/** Tag name of a component: its autoimport (`AppCard` for `app/components/App/Card.meeko`) or its file name. */
+export function componentTagName(context: FeatureContext, child: VirtualComponent): string {
+  const key = child.filename.replaceAll("\\", "/").toLowerCase();
+  const entry = context.project.autoImports().find((candidate) => candidate.component && candidate.file.replaceAll("\\", "/").toLowerCase() === key);
+  return entry?.name ?? basename(child.filename, ".meeko");
+}
+
+/** Link to a component's file, relative to the project: `[app/components/App/Card.meeko](file:///…)`. */
+export function componentFile(context: FeatureContext, file: string): { label: string; uri: string } {
+  return { label: projectPath(context.project.root, file), uri: fileUri(context, file) };
+}
+
+/**
+ * Props, events, models, snippets and exposed members of a child component: its signature as a tag
+ * in a TypeScript block, a link to its `.meeko` and the JSDoc of its members.
+ */
+export function componentMarkdown(context: FeatureContext, child: VirtualComponent, name = componentTagName(context, child), withFile = true): string | undefined {
   const program = context.project.service.getProgram();
   const summary = program && componentSummary(program, child);
-  return summary ? componentSummaryMarkdown(summary).join("\n\n") : undefined;
+  return summary ? componentSummaryMarkdown(summary, name, withFile ? componentFile(context, child.filename) : undefined) : undefined;
 }
 
 function nodeRange(context: FeatureContext, node: ts.Node): readonly [number, number] | undefined {

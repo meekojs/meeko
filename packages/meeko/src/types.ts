@@ -8,11 +8,21 @@ import { projectRoot } from "./compiler/project-root.js";
 /** Stable ownership marker for generated component declarations. */
 export const componentTypeDeclarationMarker = "// @meeko-generated component-declaration v1";
 
+/** Generated declaration of a component, under the project's `.meeko/types`. */
+export function componentTypesPath(root: string, filename: string): string {
+  return join(root, ".meeko", "types", relative(root, resolve(filename))).replace(/\.meeko$/, ".d.meeko.ts");
+}
+
+/** Options of {@link generateTypes}. */
+export interface GenerateTypesOptions {
+  /** Text of a `.meeko` that is not the saved one, such as a component open in the editor. */
+  readonly read?: (filename: string) => string | undefined;
+}
+
 /** Genera declaraciones TypeScript para un componente y sus imports .meeko relativos. */
-export async function generateTypes(source: string, filename: string): Promise<string[]> {
+export async function generateTypes(source: string, filename: string, options: GenerateTypesOptions = {}): Promise<string[]> {
   if (!filename.endsWith(".meeko")) throw new TypeError("Type generation requires a .meeko input file");
   const root = projectRoot(filename);
-  const outputRoot = join(root, ".meeko", "types");
   const declarations = new Map<string, string>();
   async function collect(content: string, path: string): Promise<void> {
     if (declarations.has(path)) return;
@@ -33,13 +43,13 @@ export async function generateTypes(source: string, filename: string): Promise<s
       if (!specifier.endsWith(".meeko")) continue;
       if (!specifier.startsWith(".")) continue;
       const child = resolve(dirname(path), specifier);
-      await collect(await readFile(child, "utf8"), child);
+      await collect(options.read?.(child) ?? await readFile(child, "utf8"), child);
     }
   }
   await collect(source, resolve(filename));
   const outputs: string[] = [];
   for (const [path, declaration] of declarations) {
-    const output = join(outputRoot, relative(root, path)).replace(/\.meeko$/, ".d.meeko.ts");
+    const output = componentTypesPath(root, path);
     const rewritten = replaceModuleSpecifiers(declaration, output, ({ value }) => {
       if (!value.startsWith(".") || value.endsWith(".meeko")) return value;
       const original = resolve(dirname(path), value);

@@ -2,7 +2,7 @@ import { createContext, createRoot, finishWithCleanup, inject, provide, signal }
 import type { Signal } from "../reactivity.js";
 import { serializeJson } from "../server.js";
 
-const stateKey = createContext<StateStore>("Meeko framework state");
+const stateKey = /*#__PURE__*/ createContext<StateStore>("Meeko framework state");
 
 function assertKey(key: string): void {
   if (!key || key === "__proto__" || key === "constructor" || key === "prototype") throw new TypeError("Invalid state key");

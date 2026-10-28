@@ -25,6 +25,7 @@ import { notifyPluginErrorHandlers, runPlugins } from "./plugin.js";
 import type { PluginRegistration } from "./plugin.js";
 import type { DeferredError, DeferredInternals, DeferredOutcome } from "./deferred.js";
 import { BrowserHead, provideHead, routeHeadInput, withHeadLevel } from "./head.js";
+import { BrowserTheme, registerBrowserTheme, resolveThemeConfig, THEME_STATE_KEY } from "./theme.js";
 import type { DocumentConfig, HeadInput } from "./head.js";
 
 export { useNavigation, useRoute } from "./navigation.js";
@@ -597,6 +598,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   const payload = readPayload(options.payload);
   // Adopts the head that SSR wrote; a page without a title shows the host's, not the previous page's.
   const documentHead = new BrowserHead(browser.document, options.document);
+  const themeConfig = resolveThemeConfig(options.document?.theme, "document.theme");
   // An error page (notFound(), a loader or data failure, or app/error.meeko for a URL without
   // a route) has the title of its SSR error document.
   const routeHead = (head: PageHead, errorPage: boolean): HeadInput => routeHeadInput(head, errorPage ? ERROR_PAGE_TITLE : undefined);
@@ -680,6 +682,10 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   // Uncaught exceptions and unhandled rejections of the page reach the application observer
   // from hydration until dispose.
   const releaseGlobalErrors = watchGlobalErrors(browser, () => errorChannel.current());
+  // The theme of `<html>` follows the stored choice; components hydrate with the server's values
+  // (the page state carries them) and receive the browser's once hydration ends.
+  const theme = themeConfig ? new BrowserTheme(browser, themeConfig, documentHead, payload.sharedState[THEME_STATE_KEY]) : undefined;
+  const releaseTheme = theme ? registerBrowserTheme(browser, theme) : () => {};
   try {
     first = initial
       ? await createTree(initial.route.layouts, payload.props, options.loadPage, 0, clientFirst ? emptyOutlet : initial.route.file)
@@ -693,10 +699,13 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       return withResourceScope(initialData, () => hydrateApp(committedRoute.state, () => mountBatch(() => first.component.hydrateScope({ root: options.root }, {}, payload.state))));
     });
     resourceCache.merge(initialData.loadedData());
+    // Components that read the theme already settled at the end of the hydration batch.
+    theme?.settle();
   } catch (error) {
     stopChunks();
     releaseManifest();
     releaseGlobalErrors();
+    releaseTheme();
     throw error;
   }
   let layouts = first.layouts;
@@ -1093,6 +1102,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       browser.document.removeEventListener("click", onClick);
       releaseManifest();
       releaseGlobalErrors();
+      releaseTheme();
       finishWithCleanup(release, () => errorChannel.clear());
     },
   };

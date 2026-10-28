@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import ts from "@typescript/typescript6";
 import { parseSfc } from "../compiler/sfc.js";
+import type { AppTypesOptions } from "./check-app.js";
 import { prepareFrameworkTypeDeclarations } from "./type-declarations.js";
 
 const execute = promisify(execFile);
@@ -59,10 +60,14 @@ function samePath(left: string, right: string): boolean {
   return process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
 }
 
-/** Checks generated route/component contracts after a saved project change. */
-export async function checkFrameworkPageContracts(projectRoot: string): Promise<PageContractDiagnostic[]> {
+/**
+ * Checks generated route/component contracts after a project change. With `options.read`, open
+ * components count with their unsaved text; with `options.onError`, a component that does not compile
+ * is reported there and the rest of the project is still checked.
+ */
+export async function checkFrameworkPageContracts(projectRoot: string, options: AppTypesOptions = {}): Promise<PageContractDiagnostic[]> {
   const root = resolve(projectRoot);
-  await prepareFrameworkTypeDeclarations(root);
+  await prepareFrameworkTypeDeclarations(root, options);
   const generated = join(root, ".meeko", "generated", "page-contracts.server.ts");
   const aliases = contractAliases(await readFile(generated, "utf8"), generated);
   // The editor's isolated consumer may not install the optional Vite peer or
@@ -94,7 +99,7 @@ export async function checkFrameworkPageContracts(projectRoot: string): Promise<
     const alias = aliases.get(Number(match[2]));
     if (!alias) continue;
     const filename = resolve(root, alias.file);
-    const source = await readFile(filename, "utf8");
+    const source = options.read?.(filename) ?? await readFile(filename, "utf8");
     const unsafe = match[3]!.includes("no pueden ser any, never ni unknown");
     // Whole phrases, so each kind keeps its own article and contraction.
     const owner = alias.kind === "MEEK_PAGE_PROPS" ? "Las props de la página" : alias.kind === "MEEK_LAYOUT_PROPS" ? "Las props del layout" : "Las props de la página de error";

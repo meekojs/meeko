@@ -104,6 +104,14 @@ describe("Prettier plugin for .meeko", () => {
     assert.match(template, /<snippet name="actions" params="close"\s*><button on:click="\(\) => close\(\)">x<\/button><\/snippet\s*>/);
   });
 
+  test("formats the if:when of a <snippet> as an expression", async () => {
+    const formatted = templateOf(await formatStable(component(
+      '<AppCard><snippet name="footer"   if:when="snippets.actions&&!busy"><render snippet="snippets.actions" args="close"/></snippet></AppCard>',
+      'import * as AppCard from "./AppCard.meeko";\nconst snippets = defineSnippets<{ actions?: [close: () => void] }>();\nconst busy = false;\nfunction close(){}\n',
+    )));
+    assert.match(formatted, /<snippet name="footer" if:when="snippets\.actions && !busy"\s*>/);
+  });
+
   test("keeps <component is /> self-closing and its following siblings in place", async () => {
     const formatted = templateOf(await formatStable(component(
       '<div><component is="pick(count.value)"   bind:label="count.value" /><p>after</p></div>',

@@ -56,6 +56,7 @@ export function emitPropName(name: string): string {
  * that the parent currently passes is the one that runs. The callback result is returned at
  * runtime so a DOM handler such as `() => emit("save")` reports an async rejection as usual.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- `Check` only carries the compiler's NoEmitConflict type check.
 export function createEmit<Events, Check extends true = true>(props: object): Emit<Events> {
   const emit = (name: string, ...args: readonly unknown[]): unknown => {
     const handler: unknown = Reflect.get(props, emitPropName(name));

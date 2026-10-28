@@ -10,7 +10,7 @@ export type { ComposeRoutesOptions, RouteLayer, RouteModule } from "./framework/
 export { discoverConfiguredRoutes, loadMeekoConfig, readMeekoConfigSync, resolveConfigSources } from "./framework/config.js";
 export type { ConfigSource, MeekoConfig } from "./framework/config.js";
 export type { MeekoAdapterName, MeekoServerConfig, RobotsConfig, SitemapConfig, StaticHeaderFile } from "./framework/config-type.js";
-export { inlineScriptHashes } from "./framework/script-hashes.js";
+export { inlineScriptHashes, inlineStyleHashes } from "./framework/script-hashes.js";
 export type { InlineScriptReport } from "./framework/script-hashes.js";
 export { discoverServerManifest } from "./framework-server/manifest-discovery.js";
 export { prerenderProject, prerenderRoutes } from "./framework/prerender.js";

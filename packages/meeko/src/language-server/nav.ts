@@ -30,7 +30,7 @@ export function documentLinks(context: FeatureContext): DocumentLink[] {
     if (!file) continue;
     const scoped = { ...context, component };
     const visit = (node: ts.Node): void => {
-      if (ts.isStringLiteralLike(node) && ts.isCallExpression(node.parent) && node.getWidth(file) > 2) {
+      if (ts.isStringLiteralLike(node) && (ts.isCallExpression(node.parent) || ts.isPropertyAssignment(node.parent)) && node.getWidth(file) > 2) {
         const inside = node.getStart(file) + 1;
         const range = sourceRange(component, inside, node.getWidth(file) - 2);
         const target = range && appTargetAt(program, component.virtualFilename, inside, context.app!)

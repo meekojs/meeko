@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
-import { existsSync, readFileSync, watch } from "node:fs";
-import type { FSWatcher } from "node:fs";
+import { existsSync, readFileSync, statSync, watch } from "node:fs";
+import type { FSWatcher, Stats } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, sep } from "node:path";
 
@@ -96,12 +96,50 @@ export function createSettleDebounce(delay: number, run: () => void): SettleDebo
   };
 }
 
+/** Options of {@link watchLinkedMeeko}. */
+export interface WatchLinkedMeekoOptions {
+  /** Whether the watchers keep the process alive, as `fs.watch`'s option; `true` by default. */
+  persistent?: boolean;
+}
+
+/**
+ * Tells writes from reads among the `change` events of the files of a linked Meeko. Windows
+ * reports a read as a `change` when it updates the file's last access time (at most once an hour
+ * per file, while that update is on, its default on many systems): a server loading `dist`, or
+ * Vite serving one of its modules, would restart the server it belongs to. A file whose
+ * modification or change time, or size, differs from the last event's changed; the first event of
+ * a file counts when those times are not older than the watch.
+ */
+function createWriteFilter(): (file: string) => boolean {
+  const since = Date.now();
+  const seen = new Map<string, string>();
+  return (file) => {
+    let stats: Stats;
+    try {
+      stats = statSync(file);
+    } catch {
+      // Removed or replaced while the build writes: that is a change.
+      seen.delete(file);
+      return true;
+    }
+    // A directory reports its entries being listed; new and removed entries arrive as renames.
+    if (stats.isDirectory()) return false;
+    const signature = `${stats.mtimeMs}:${stats.ctimeMs}:${stats.size}`;
+    const previous = seen.get(file);
+    seen.set(file, signature);
+    return previous === undefined ? Math.max(stats.mtimeMs, stats.ctimeMs) >= since : previous !== signature;
+  };
+}
+
 /**
  * Watches the build of a linked Meeko: `dist` recursively and the package root for its
  * `package.json` and for `dist` being removed or created again. Calls `change` for every
- * event; the caller debounces them.
+ * event that writes, creates or removes a file (not for one that only reads it); the caller
+ * debounces them.
  */
-export function watchLinkedMeeko(linked: LinkedMeeko, change: () => void): { close(): void } {
+export function watchLinkedMeeko(linked: LinkedMeeko, change: () => void, options: WatchLinkedMeekoOptions = {}): { close(): void } {
+  const persistent = options.persistent ?? true;
+  const written = createWriteFilter();
   let closed = false;
   let dist: FSWatcher | undefined;
   const watchDist = (): void => {
@@ -109,7 +147,9 @@ export function watchLinkedMeeko(linked: LinkedMeeko, change: () => void): { clo
     dist = undefined;
     if (closed || !existsSync(linked.dist)) return;
     try {
-      const watcher = watch(linked.dist, { recursive: true }, () => change());
+      const watcher = watch(linked.dist, { recursive: true, persistent }, (event, name) => {
+        if (event === "rename" || name === null || written(join(linked.dist, name))) change();
+      });
       // Removing the watched directory ends this watcher; the root watcher sees it come back.
       watcher.on("error", () => {
         watcher.close();
@@ -123,12 +163,15 @@ export function watchLinkedMeeko(linked: LinkedMeeko, change: () => void): { clo
   };
   let root: FSWatcher | undefined;
   try {
-    root = watch(linked.directory, (event, name) => {
+    root = watch(linked.directory, { persistent }, (event, name) => {
       if (name === null || name === "dist") {
-        // A rename is `dist` removed or created again; a change, its contents on some platforms.
-        if (event === "rename" || !dist) watchDist();
-        change();
-      } else if (name === "package.json") {
+        // A rename is `dist` removed or created again. A change is its contents on some
+        // platforms, which the `dist` watcher already reports, or `dist` being listed.
+        if (event === "rename" || !dist) {
+          watchDist();
+          change();
+        }
+      } else if (name === "package.json" && (event === "rename" || written(join(linked.directory, name)))) {
         change();
       }
     });
@@ -283,6 +326,34 @@ export async function superviseDevelopment(linked: LinkedMeeko, options: Supervi
     process.off("SIGINT", stop);
     process.off("SIGTERM", stop);
   }
+}
+
+/**
+ * Warns on every rebuild of the linked Meeko that an unsupervised `meeko dev` (with
+ * `MEEKO_LINK_WATCH=0`) keeps running. The server loads `@meekojs/meeko` with Node, outside
+ * Vite's module runner, and Node keeps those modules for the life of the process: the server side
+ * stays on the build this process loaded while Vite serves the browser the new files of `dist`,
+ * so pages render with the old code and hydrate with the new one until the server is restarted.
+ * One line per build, once it settles. The watchers do not keep the process alive.
+ */
+export function warnLinkedMeekoRebuilds(
+  linked: LinkedMeeko,
+  write: (text: string) => void = (text) => { process.stderr.write(text); },
+  delay = linkSettleDelay,
+): { close(): void } {
+  // A `MEEKO_DEV_SUPERVISED=1` inherited without a supervisor also leaves the server alone.
+  const reason = process.env[linkWatchEnv] === "0" ? `${linkWatchEnv}=0` : `${supervisedDevelopmentEnv}=1 sin supervisor`;
+  const debounce = createSettleDebounce(delay, () => {
+    write(`[meeko] Meeko enlazado cambió (${linked.dist}), pero este meeko dev no se reinicia solo (${reason}): `
+      + "el servidor sigue con el código anterior y el navegador recibe el nuevo. Reinicia meeko dev.\n");
+  });
+  const watcher = watchLinkedMeeko(linked, () => debounce.trigger(), { persistent: false });
+  return {
+    close() {
+      debounce.cancel();
+      watcher.close();
+    },
+  };
 }
 
 /** Whether this process is the `meeko dev` that {@link superviseDevelopment} started. */

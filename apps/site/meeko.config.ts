@@ -14,13 +14,17 @@ export default defineMeekoConfig({
   site: "https://meeko.diegootayza.com",
   sitemap: true,
   robots: true,
+  // Light, dark or the system's, in the cookie and localStorage "meeko-theme" (the key the site
+  // used before, so earlier choices still apply). Every page is prerendered, so Meeko's inline
+  // script in <head> applies the stored theme before the first paint, and useTheme() follows it.
+  theme: true,
   // Every page is prerendered: the build is a folder of files for nginx (deploy/nginx.conf).
   server: {
     adapter: "static",
     // _meeko/headers.conf, which deploy/nginx.conf includes in every location.
     headerFiles: ["nginx"],
     // No inline script runs without its SHA-256, which the build adds to script-src on every
-    // build (the theme bootstrap below, for example): changing a script needs no manual step.
+    // build (the theme script of `theme`, for example): changing a script needs no manual step.
     //
     // - script-src 'wasm-unsafe-eval': Pagefind compiles its WebAssembly search engine, in its
     //   worker and in the page. It allows compiling WebAssembly, not `eval` or `new Function`.
@@ -71,9 +75,6 @@ export default defineMeekoConfig({
         { property: "og:locale", content: "es_ES" },
         { property: "og:image", content: "https://meeko.diegootayza.com/brand/apple-touch-icon.png" },
       ],
-      // Runs while the browser parses <head>, before the first paint: it applies the stored theme
-      // so a dark choice never flashes light. Hydration adopts it without running it again.
-      script: [{ children: 'try{var t=localStorage.getItem("meeko-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}' }],
     },
   },
 });

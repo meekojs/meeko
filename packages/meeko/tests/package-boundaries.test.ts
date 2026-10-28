@@ -77,3 +77,29 @@ test("published entry source maps carry their sources without local absolute pat
     assert.ok(map.sources.every((source) => !/^(?:[A-Za-z]:|\/)/.test(source)), map.sources.join("\n"));
   }
 });
+
+test("a component without the framework leaves the theme, the router state and <MeekoThemeToggle> out of its bundle", async () => {
+  // A compiled component imports `@meekojs/meeko/internal`, which also re-exports Meeko's own components.
+  const { compile } = await import(pathToFileURL(resolve("dist/compiler.js")).href) as typeof import("../src/compiler.ts");
+  const component = compile(`<script lang="ts">\nimport { signal } from "@meekojs/meeko";\nconst count = signal(0);\n</script>\n<template><button on:click="() => count.value++">{count.value}</button></template>\n`, resolve("Counter.meeko")).code;
+  const result = await build({
+    stdin: { contents: component, loader: "ts", resolveDir: resolve("."), sourcefile: "Counter.ts" },
+    bundle: true,
+    format: "esm",
+    platform: "browser",
+    minify: true,
+    write: false,
+    metafile: true,
+    outfile: "out.js",
+    alias: { "@meekojs/meeko/internal": resolve("dist/internal.js"), "@meekojs/meeko": resolve("dist/index.js") },
+  });
+  const code = result.outputFiles[0]!.text;
+  for (const marker of ["Meeko theme", "Meeko route", "Meeko navigation", "Meeko framework state", "Meeko browser window", "Meeko head", "data-meeko-theme-icon", "/_meeko/theme"]) {
+    assert.ok(!code.includes(marker), `${marker} reached the bundle`);
+  }
+  const output = Object.values(result.metafile.outputs)[0]!;
+  for (const module of ["navigation", "state", "storage", "theme-toggle.compiled"]) {
+    const input = Object.entries(output.inputs).find(([path]) => path.replaceAll("\\", "/").endsWith(`dist/framework/${module}.js`));
+    assert.equal(input?.[1].bytesInOutput ?? 0, 0, `dist/framework/${module}.js reached the bundle`);
+  }
+});

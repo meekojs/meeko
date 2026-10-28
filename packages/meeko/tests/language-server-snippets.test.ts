@@ -113,6 +113,29 @@ describe("language server: defineModel, defineSnippets, <snippet>, <render> and 
     open("Page.meeko", valid);
   });
 
+  test("<snippet if:when> keeps the snippet's types and narrows its content in the editor model", () => {
+    open("AppDialog.meeko", dialog);
+    const source = (condition: string): string => `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+import * as AppDialog from "./AppDialog.meeko";
+const name = signal("x");
+const user = signal<{ name: string } | null>(null);
+</script>
+<template><AppDialog model="name">x<snippet name="actions" params="close, label"${condition}><button on:click="close">{label}{user.value.name}</button></snippet></AppDialog></template>`;
+    const guarded = open("Conditional.meeko", source(` if:when="user.value"`));
+    assert.deepEqual(virtualErrors(guarded), []);
+    assert.match(hoverText(guarded, guarded.at("close, label", 1)), /\(parameter\) close: \(\) => void/);
+    assert.match(hoverText(guarded, guarded.at("name}", 1)), /\(property\) name: string/);
+    assert.match(hoverText(guarded, guarded.at("user.value\"", 1)), /const user: Signal<\{\s*name: string;\s*\} \| null>[\s\S]*plantilla `if:when`/);
+    // The hover and the completion of the name and the parameters see through the condition.
+    assert.match(hoverText(guarded, guarded.at("actions\" params", 2)), /\(snippet\) actions\?\(close: \(\) => void, label: string\)/);
+    assert.deepEqual((completion(guarded, guarded.at("actions\" params", 3)) ?? []).map((item) => item.label), ["default", "title", "actions"]);
+    const typing = open("Conditional.meeko", source(` if:when="user.value"`).replace('params="close, label"', 'params="close, la"'));
+    assert.deepEqual((completion(typing, typing.at("la\"", 2)) ?? []).map((item) => [item.label, item.detail]), [["label", "string"]]);
+    const unguarded = open("Conditional.meeko", source(""));
+    assert.ok(virtualErrors(unguarded).some((error) => error.startsWith("18047:")), JSON.stringify(virtualErrors(unguarded)));
+  });
+
   test("diagnostics cover <render>, <snippet>, model and model:name", { timeout: 120_000 }, async () => {
     open("AppDialog.meeko", dialog);
     const cases: Array<{ template: string; code: string; text: string }> = [
@@ -124,6 +147,7 @@ describe("language server: defineModel, defineSnippets, <snippet>, <render> and 
       { template: `<AppDialog model="name">x<snippet name="actions" params="close, label">{label.nope}</snippet></AppDialog>`, code: "TS2339", text: "nope" },
       { template: `<AppDialog model="name"><snippet name="title">t</snippet></AppDialog>`, code: "TS2741", text: "<AppDialog" },
       { template: `<div><snippet name="title">t</snippet></div>`, code: "MEEK061", text: "<snippet" },
+      { template: `<AppDialog model="name"><snippet name="default" if:when="visible.value">x</snippet></AppDialog>`, code: "MEEK110", text: "if:when" },
       { template: `<input type="checkbox" model="name" />`, code: "TS2322", text: "name" },
     ];
     const filename = join(root, "Page.meeko");

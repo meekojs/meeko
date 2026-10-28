@@ -48,6 +48,44 @@
       "endCaptures": { "2": { "name": "entity.name.tag.meeko" } },
       "contentName": "meta.embedded.block.html",
       "patterns": [
+        { "include": "#nestedTemplate" },
+        { "include": "#interpolation" },
+        { "include": "#componentTag" },
+        { "include": "#renderTag" },
+        { "include": "#customElementTag" },
+        { "include": "#htmlTag" },
+        { "include": "#closingTag" },
+        { "include": "text.html.basic" }
+      ]
+    },
+    "nestedTemplate": {
+      "comment": "A <template> inside the template section (each:, if:): its </template> closes it and not the section. The first rule colors its opening tag, also across several lines.",
+      "begin": "(<)(template)\\b",
+      "end": "(</)(template)\\s*(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.tag.html" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.tag.html" },
+        "3": { "name": "punctuation.definition.tag.end.html" }
+      },
+      "patterns": [
+        {
+          "begin": "(?<=<template)",
+          "end": "(/?>)",
+          "endCaptures": { "1": { "name": "punctuation.definition.tag.end.html" } },
+          "patterns": [
+            { "include": "#expressionAttribute" },
+            { "include": "#htmlAttribute" },
+            { "name": "string.quoted.double.html", "begin": "\"", "end": "\"" },
+            { "name": "string.quoted.single.html", "begin": "'", "end": "'" },
+            { "name": "entity.other.attribute-name.directive.meeko", "match": "\\bref:[A-Za-z_$][\\w$]*" },
+            { "name": "entity.other.attribute-name.html", "match": "\\b[\\w:-]+\\b" }
+          ]
+        },
+        { "include": "#nestedTemplate" },
         { "include": "#interpolation" },
         { "include": "#componentTag" },
         { "include": "#renderTag" },
@@ -151,8 +189,8 @@
       }
     },
     "builtinTagName": {
-      "comment": "Meeko's own tags read as built-ins: <component>, <snippet>, <render>, <MeekoLink> and <MeekoOutlet>.",
-      "match": "(?<![\\w.:-])(?:component|snippet|render|MeekoLink|MeekoOutlet)(?![\\w.:-])",
+      "comment": "Meeko's own tags read as built-ins: <component>, <snippet>, <render>, <MeekoLink>, <MeekoOutlet> and <MeekoThemeToggle>.",
+      "match": "(?<![\\w.:-])(?:component|snippet|render|MeekoLink|MeekoOutlet|MeekoThemeToggle)(?![\\w.:-])",
       "name": "entity.name.function.builtin.meeko"
     },
     "directiveName": {

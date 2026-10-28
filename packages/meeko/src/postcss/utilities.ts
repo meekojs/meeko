@@ -3,7 +3,9 @@ import { dirname, extname, resolve } from "node:path";
 import type * as CSS from "csstype";
 import type { AtRule, ChildNode, Container, Helpers, Plugin, Result, Root } from "postcss";
 import selectorParser from "postcss-selector-parser";
-import { loadUtilityModule } from "./module-loader.js";
+import { meekoProjectRoot, utilityAutoImports } from "./autoimports.js";
+import type { UtilityAutoImports } from "./autoimports.js";
+import { canBundleUtilities, loadUtilityModule } from "./module-loader.js";
 
 /**
  * Valor de una declaración generada: una cadena se escribe tal cual (puede llevar
@@ -311,6 +313,26 @@ export interface MeekoUtilitiesOptions {
    * Con archivo, la ruta siempre es relativa a la hoja que contiene la at-rule.
    */
   readonly root?: string;
+  /**
+   * Aplica los autoimports de Meeko a los módulos de `@utilities` y a los módulos locales que
+   * importan, como el plugin de Vite al resto del proyecto: los valores exportados en `app/` y
+   * `shared/` (con `imports.appDirs`, `imports.sharedDirs`, los layers y los módulos), sin los
+   * de `server/`, los `.client.ts`, los componentes, los clientes generados ni las API del
+   * framework. Por defecto, `true`; sólo actúa cuando el módulo pertenece a un proyecto Meeko
+   * (una carpeta con `meeko.config.*` o un `package.json` que depende de `@meekojs/meeko`) y
+   * rolldown (Vite 8) está disponible; entonces ejecuta `meeko.config.*` y los `setup` de sus
+   * módulos una vez por hoja, y si eso falla genera la hoja sin autoimports, con un aviso.
+   * `false` empaqueta los módulos tal cual, como en `1.3`, sin ejecutar la configuración.
+   *
+   * @since 1.4.0
+   * @example
+   * ```ts
+   * import { meekoUtilities } from "@meekojs/meeko/postcss";
+   *
+   * export default { plugins: [meekoUtilities({ autoImports: false })] };
+   * ```
+   */
+  readonly autoImports?: boolean;
 }
 
 const pluginName = "meeko-utilities";
@@ -329,7 +351,9 @@ const nativeWarnings = new Set<string>();
  *
  * Con Vite 8 el módulo se empaqueta con rolldown en cada cambio, así que editarlo, o editar un
  * módulo local que importa, regenera el CSS en `meeko dev` sin reiniciar. Coloque el plugin
- * antes de `@tailwindcss/postcss` para que Tailwind vea las reglas generadas.
+ * antes de `@tailwindcss/postcss` para que Tailwind vea las reglas generadas. Desde `1.4`, en un
+ * proyecto Meeko el módulo recibe los autoimports de `app/` y `shared/` (véase
+ * {@link MeekoUtilitiesOptions.autoImports}).
  *
  * @since 1.2.0
  * @example
@@ -356,7 +380,9 @@ export function meekoUtilities(options: MeekoUtilitiesOptions = {}): Plugin {
       warnTailwindFirst(plugin, root, result);
       const atRules: AtRule[] = [];
       root.walkAtRules(/^utilities$/i, (atRule) => { atRules.push(atRule); });
-      for (const atRule of atRules) await expandUtilities(atRule, result, postcss, options);
+      // The registry is read once per stylesheet, so an export added since the last one is seen.
+      const projects = new Map<string, Promise<UtilityAutoImports | undefined>>();
+      for (const atRule of atRules) await expandUtilities(atRule, result, postcss, options, projects);
     },
   };
   return plugin;
@@ -396,7 +422,9 @@ function stylesheetFile(node: AtRule, result: Result): string | undefined {
   return file ? file.replace(/\?.*$/s, "") : undefined;
 }
 
-async function expandUtilities(atRule: AtRule, result: Result, postcss: Helpers["postcss"], options: MeekoUtilitiesOptions): Promise<void> {
+async function expandUtilities(
+  atRule: AtRule, result: Result, postcss: Helpers["postcss"], options: MeekoUtilitiesOptions, projects: Map<string, Promise<UtilityAutoImports | undefined>>,
+): Promise<void> {
   if (atRule.nodes !== undefined) throw atRule.error(`@utilities no lleva bloque { }; escríbalo como ${usage}`);
   const params = parseParams(atRule.params);
   if (!params) throw atRule.error(`@utilities espera una ruta entre comillas y, opcionalmente, layer(<nombre>): ${usage}`);
@@ -411,9 +439,24 @@ async function expandUtilities(atRule: AtRule, result: Result, postcss: Helpers[
   if (!existsSync(file) || !statSync(file).isFile()) {
     throw atRule.error(`@utilities no encuentra "${params.path}" (${file})`, { word: params.path });
   }
+  const project = options.autoImports === false ? undefined : meekoProjectRoot(file);
+  let autoImports: UtilityAutoImports | undefined;
+  // Only a bundled module receives autoimports: without rolldown, `meeko.config.*` is not run.
+  if (project !== undefined && await canBundleUtilities()) {
+    let loading = projects.get(project);
+    if (!loading) {
+      // A registry that cannot be read (a configuration or module `setup` that throws) leaves the
+      // module without autoimports, warned once per stylesheet, instead of breaking the stylesheet.
+      projects.set(project, loading = utilityAutoImports(project).catch((error: unknown) => {
+        result.warn(`@utilities no pudo leer los autoimports del proyecto ${project} y carga "${params.path}" sin ellos: ${errorMessage(error)}`, { node: atRule, plugin: pluginName });
+        return undefined;
+      }));
+    }
+    autoImports = await loading;
+  }
   let loaded: Awaited<ReturnType<typeof loadUtilityModule>>;
   try {
-    loaded = await loadUtilityModule(file);
+    loaded = await loadUtilityModule(file, autoImports);
   } catch (error) {
     throw atRule.error(`@utilities no pudo cargar "${params.path}": ${errorMessage(error)}`, { word: params.path });
   }
@@ -423,7 +466,8 @@ async function expandUtilities(atRule: AtRule, result: Result, postcss: Helpers[
   if (!loaded.bundled && !nativeWarnings.has(file)) {
     nativeWarnings.add(file);
     result.warn(`@utilities cargó "${params.path}" con import() nativo porque no encontró rolldown (Vite 8): `
-      + "los cambios en los módulos que importa no se recargan hasta reiniciar el proceso", { node: atRule, plugin: pluginName });
+      + "los cambios en los módulos que importa no se recargan hasta reiniciar el proceso"
+      + (project !== undefined ? " y no recibe los autoimports de Meeko; impórtelos explícitamente" : ""), { node: atRule, plugin: pluginName });
   }
   const utilities = loaded.exports.default;
   if (typeof utilities !== "function") {
@@ -439,8 +483,8 @@ async function expandUtilities(atRule: AtRule, result: Result, postcss: Helpers[
   try {
     nodes = new Expander(postcss, atRule).expand(output, "la salida");
   } catch (error) {
-    if (error instanceof UtilityError) throw atRule.error(`"${params.path}": ${error.message}`, { word: params.path });
-    throw error;
+    // Also an error of a value of the output, such as an unavailable autoimport the module passed along.
+    throw atRule.error(`"${params.path}": ${errorMessage(error)}`, { word: params.path });
   }
   if (params.layer !== undefined && nodes.length) {
     nodes = [postcss.atRule({ name: "layer", params: params.layer, nodes, raws: blockRaws(params.layer), ...(atRule.source ? { source: atRule.source } : {}) })];

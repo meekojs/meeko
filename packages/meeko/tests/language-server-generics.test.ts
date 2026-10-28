@@ -98,7 +98,7 @@ describe("language server: generic components", () => {
     assert.ok(members.some((item) => item.label === "id"), JSON.stringify(members.map((item) => item.label)));
     // The child's own summary shows its parameters as declared.
     const parent = open("Users.meeko", valid);
-    assert.match(hoverText(parent, parent.at("DataTable from", 1)), /\*\*Parámetros de tipo:\*\* `T extends \{ id: string \}`/);
+    assert.match(hoverText(parent, parent.at("DataTable from", 1)), /```ts\n<DataTable<T extends \{ id: string \}>\n/);
   });
 
   test("the parent resolves T from the props in the tag hover, the handlers, the snippet and the ref", () => {
@@ -106,12 +106,12 @@ describe("language server: generic components", () => {
     const parent = open("Users.meeko", valid);
     assert.deepEqual(virtualErrors(parent), []);
     const tag = hoverText(parent, parent.at("<DataTable ref", 2));
-    assert.match(tag, /\*\*Parámetros de tipo:\*\* `T = User`/);
-    assert.match(tag, /`rows: User\[\]`/);
-    assert.match(tag, /`on:select\(row: User\)`/);
-    assert.match(tag, /`model:current` \(User \| null\)/);
-    assert.match(tag, /`row\(row: User\)`/);
-    assert.match(tag, /\*\*Expone:\*\* `first: \(\) => User \| undefined`/);
+    assert.match(tag, /```ts\n<DataTable<T = User>\n/);
+    assert.match(tag, /\n {2}rows: User\[\]\n/);
+    assert.match(tag, /\n {2}on:select\(row: User\)\n/);
+    assert.match(tag, /\n {2}model:current: User \| null\n/);
+    assert.match(tag, /\n {2}row\(row: User\)\n/);
+    assert.match(tag, /\/\/ ref: expone\nfirst: \(\) => User \| undefined\n/);
     assert.match(hoverText(parent, parent.at("(u) =>", 1)), /\(parameter\) u: User/);
     assert.match(hoverText(parent, parent.at("user\">", 1)), /\(parameter\) user: User/);
     assert.match(hoverText(parent, parent.at("row\" params", 1)), /\(snippet\) row\(row: User\)/);

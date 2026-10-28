@@ -8,7 +8,7 @@ import { checkClientBoundary } from "./compiler/client-boundary.js";
 import { projectRoot } from "./compiler/project-root.js";
 import { parseSfc } from "./compiler/sfc.js";
 import type { CompileDiagnostic } from "./compiler/sfc.js";
-import { importDirectoryOptions, loadMeekoConfig, normalizeImportDirectory, readMeekoConfigSync, resolveConfigSources } from "./framework/config.js";
+import { importDirectoryOptions, loadMeekoConfig, normalizeImportDirectory, readMeekoConfigSync, readThemeEnabledSync, resolveConfigSources } from "./framework/config.js";
 import type { MeekoConfig } from "./framework/config.js";
 import { legacyLayerEntries, resolveMeekoModules } from "./framework/module-loader.js";
 
@@ -23,6 +23,14 @@ export interface AutoImport {
   specifier?: string;
   /** A value export that also names a type: a class, an enum or a value merged with a type. */
   alsoType?: boolean;
+  /**
+   * A type of an autoimported component (`AppCardProps`, `AppCardSnippets`…): `imported` is its
+   * generic name in the component's module (`ComponentProps`…). Also the props type of a built-in
+   * tag (`MeekoLinkProps`), from `@meekojs/meeko/framework`. It yields to any other autoimport with
+   * the same name, such as a type of `app/types`; the type of a built-in tag also yields to the
+   * types of a project component named like the tag.
+   */
+  componentType?: boolean;
 }
 
 const directories = [
@@ -72,13 +80,25 @@ function filesInSync(path: string): string[] {
   return files;
 }
 
+/**
+ * Props types of Meeko's own template tags, autoimported like the types of the project's components
+ * (`AppCardProps`): with the scope of `app/` and from the public `@meekojs/meeko/framework`. A new
+ * built-in tag adds its props type here and in the editor's table (`language-server/builtin-tags.ts`).
+ */
+export const builtinTagTypes: readonly string[] = ["MeekoLinkProps", "MeekoOutletProps", "MeekoThemeToggleProps"];
+
+/** Types of `@meekojs/meeko/framework` autoimported everywhere, like `href`: `RouteId`. */
+const frameworkTypes: readonly string[] = ["RouteId"];
+
 function builtins(root: string): AutoImport[] {
   const entries: AutoImport[] = [
     ...["signal", "computed", "effect", "batch", "untrack", "onCleanup", "onMounted", "provide", "inject", "createContext", "provideErrorHandler"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko", specifier: "@meekojs/meeko", scope: "shared", typeOnly: false, component: false })),
-    ...["useState", "href", "useRoute", "useForm", "useStorage", "useHead", "useSeoMeta", "definePage", "defineRouteMiddleware", "definePlugin"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "shared", typeOnly: false, component: false })),
+    ...["useState", "href", "useRoute", "useForm", "useStorage", "useHead", "useSeoMeta", "useTheme", "definePage", "defineRouteMiddleware", "definePlugin"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "shared", typeOnly: false, component: false })),
     // The definitions of server/ (contract discovery reads the call by name, not by its import).
     ...["defineApiRoute", "defineRpc", "defineServerMiddleware", "defineSocketChannel", "defineServerRuntime"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/server", specifier: "@meekojs/meeko/server", scope: "server", typeOnly: false, component: false })),
     { name: "ApiError", imported: "ApiError", file: "@meekojs/meeko/server", specifier: "@meekojs/meeko/server", scope: "server", typeOnly: false, component: false, alsoType: true },
+    ...frameworkTypes.map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "shared", typeOnly: true, component: false })),
+    ...builtinTagTypes.map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "app", typeOnly: true, component: false, componentType: true })),
   ];
   for (const scope of ["client", "server"] as const) {
     const file = join(root, ".meeko", "generated", `clients.${scope}.ts`);
@@ -98,9 +118,10 @@ function builtins(root: string): AutoImport[] {
  * the project's own export wins, instead of making the name ambiguous. `useApiMutation` comes from
  * the generated clients; the others, from `@meekojs/meeko/framework`.
  */
-const yieldingBuiltins: ReadonlySet<string> = new Set(["useRoute", "useForm", "useStorage", "useApiMutation", "useHead", "useSeoMeta"]);
+const yieldingBuiltins: ReadonlySet<string> = new Set(["useRoute", "useForm", "useStorage", "useApiMutation", "useHead", "useSeoMeta", "useTheme", ...frameworkTypes]);
 
-function isGeneratedClient(file: string): boolean {
+/** `api`, `rpc`, `socket`… of `.meeko/generated/clients.client.ts` or `clients.server.ts`. */
+export function isGeneratedClient(file: string): boolean {
   return /[\\/]\.meeko[\\/]generated[\\/]clients\.(?:client|server)\.ts$/.test(file);
 }
 
@@ -108,9 +129,28 @@ function isYieldingBuiltin(entry: AutoImport): boolean {
   return yieldingBuiltins.has(entry.name) && (entry.specifier === "@meekojs/meeko/framework" || isGeneratedClient(entry.file));
 }
 
-function withoutShadowedBuiltins(result: AutoImport[]): AutoImport[] {
-  return result.filter((entry) => !(isYieldingBuiltin(entry)
-    && result.some((other) => other.name === entry.name && !isYieldingBuiltin(other))));
+/**
+ * The types that the module of each autoimported component exports, by the suffix of their name:
+ * `<AppCard>` gives `AppCardProps`, `AppCardSnippets`, `AppCardModels` and `AppCardExposed`.
+ */
+const componentTypes = [["Props", "ComponentProps"], ["Snippets", "ComponentSnippets"], ["Models", "ComponentModels"], ["Exposed", "ComponentExposed"]] as const;
+
+/**
+ * How readily an entry steps aside for another autoimport with the same name: `0` never; `1` a type
+ * of a project component or a framework autoimport added after 1.0, before any other export; `2`
+ * the props type of a built-in tag, also before the types of a project component that takes the
+ * tag's name (`app/components/MeekoLink.meeko` gives its own `MeekoLinkProps`, MEEK106).
+ */
+function yieldRank(entry: AutoImport): number {
+  if (entry.componentType === true && entry.specifier === "@meekojs/meeko/framework") return 2;
+  return entry.componentType === true || isYieldingBuiltin(entry) ? 1 : 0;
+}
+
+function withoutYieldedEntries(result: AutoImport[]): AutoImport[] {
+  return result.filter((entry) => {
+    const rank = yieldRank(entry);
+    return rank === 0 || !result.some((other) => other.name === entry.name && yieldRank(other) < rank);
+  });
 }
 
 function addAutoImport(result: AutoImport[], entry: AutoImport): void {
@@ -146,6 +186,9 @@ function addFileImports(result: AutoImport[], root: string, directory: string, f
     const path = relative(join(root, directory), file).replace(/\.meeko$/, "");
     const name = (module?.prefix ?? "") + path.split(/[\\/]/).map((part) => part.replace(/(^|[-_])(\w)/g, (_, _dash: string, letter: string) => letter.toUpperCase())).join("");
     addAutoImport(result, { name, imported: "*", file, scope, typeOnly: false, component: true });
+    for (const [suffix, imported] of componentTypes) {
+      addAutoImport(result, { name: `${name}${suffix}`, imported, file, scope, typeOnly: true, component: false, componentType: true });
+    }
     return;
   }
   if (module?.components) return;
@@ -207,7 +250,7 @@ export async function discoverAutoImports(root: string): Promise<AutoImport[]> {
       ...(entry.specifier ? { specifier: entry.from } : {}),
     });
   }
-  return withoutShadowedBuiltins(result);
+  return withoutYieldedEntries(result);
 }
 
 /**
@@ -232,7 +275,7 @@ export function discoverAutoImportsSync(root: string): AutoImport[] {
       }
     }
   }
-  return withoutShadowedBuiltins(result);
+  return withoutYieldedEntries(result);
 }
 
 /**
@@ -412,7 +455,9 @@ export function checkComponentBoundary(source: string, filename: string, compile
 export async function compileWithAutoImports(source: string, filename: string, options: CompileOptions = {}, target: "client" | "server" = "client", knownRegistry?: readonly AutoImport[]): Promise<CompileResult> {
   const root = projectRoot(filename);
   const registry = knownRegistry ?? await discoverAutoImports(root);
-  const compiled = compile(source, filename, { ...options, projectComponents: autoImportedValues(registry) });
+  // `<MeekoThemeToggle>` needs `theme`; the configuration is read without running it, as in the editor.
+  const theme = options.theme ?? readThemeEnabledSync(root);
+  const compiled = compile(source, filename, { ...options, projectComponents: autoImportedValues(registry), ...(theme === undefined ? {} : { theme }) });
   // Before the autoimports, which would only report a server autoimport as unavailable.
   const boundary = target === "client" ? checkComponentBoundary(source, filename, compiled, registry, [join(root, "server")]) : [];
   const code = transformAutoImports(source, filename, compiled.code, registry, target);

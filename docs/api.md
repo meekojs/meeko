@@ -98,7 +98,7 @@ Si `form.errors.value.name` cambia mientras el usuario escribe, el `<p>` aparece
 - **Aviso `MEEK101`.** `meeko check`, `meeko build` y el editor avisan de cada lectura de `props` que se ejecuta una sola vez: desestructurar o expandir `props` y leer `props.x` en el nivel superior del setup, o directamente dentro de `onMounted` (que tampoco se repite: léala en un `effect` para seguirla). Es un aviso, no un error: no hace fallar la comprobación. No avisan las lecturas dentro de otras funciones (manejadores, `computed`, `effect`), las llamadas a una prop función (`props.onReady?.()`), `signal(props.x)` y `untrack(() => props.x)`, que declaran que sólo interesa el valor inicial (por ejemplo, una clave que no cambia), ni los componentes con un `await` de datos en el nivel superior, que se vuelven a montar.
 - **Valores por defecto.** Se aplican en cada lectura: una prop que pasa a `undefined` vuelve a su default.
 - **Sólo lectura.** Asignar, borrar o definir una propiedad de `props` en el navegador lanza `TypeError`. Para cambiar un valor del padre, emita un evento (`defineEmits`) o use un modelo (`defineModel`).
-- **Cuándo se vuelve a montar.** El rango se reconstruye, conservando las señales editables por nombre, cuando cambia el componente de `<component is>`, cuando el padre pasa otra señal en un `model` o empieza o deja de pasar un snippet, y en los componentes con un `await` de datos en el nivel superior (`await useApi(...)` o `await useRpcQuery(...)`): sus peticiones se construyeron con las props con las que se renderizaron, así que unas props nuevas los vuelven a montar cuando sus datos están listos (véase [Componentes que se montan más tarde](framework.md#componentes-que-se-montan-más-tarde)).
+- **Cuándo se vuelve a montar.** El rango se reconstruye, conservando las señales editables por nombre, cuando cambia el componente de `<component is>`, cuando el padre pasa otra señal en un `model`, y en los componentes con un `await` de datos en el nivel superior (`await useApi(...)` o `await useRpcQuery(...)`): sus peticiones se construyeron con las props con las que se renderizaron, así que unas props nuevas los vuelven a montar cuando sus datos están listos (véase [Componentes que se montan más tarde](framework.md#componentes-que-se-montan-más-tarde)). Un snippet que el padre empieza o deja de pasar (`<snippet if:when>`, véase [Snippets condicionales](#snippets-con-definesnippets)) llega al hijo montado como una prop nueva; sólo se reconstruyen los hijos que no reciben props reactivas: los que tienen ese `await` de datos y los compilados antes de `1.2`.
 - **Snippets.** El contenido de un snippet pertenece al padre: sigue sus señales y los argumentos (`args`) que le pasa el hijo sin volver a pintarse, y no se reconstruye cuando cambian otras props del hijo.
 - **SSR, hidratación y raíz.** No cambian: el servidor renderiza con el objeto de props y la hidratación conecta el mismo HTML. `hydrate(root, props)` y `hydrateScope` de un componente raíz reciben el objeto tal cual; sólo un padre Meeko entrega la vista reactiva a sus hijos.
 - **HMR y DevTools.** Una actualización en caliente del hijo sigue leyendo las props que actualiza el padre, y el panel de DevTools muestra las props nuevas.
@@ -137,7 +137,7 @@ Desde `1.2`, `if:when` estrecha los tipos dentro de su elemento, como `v-if` en 
 ```
 
 - TypeScript estrecha la misma referencia que comprueba la condición: `if:when="user.value"` estrecha `user.value.name`, pero no otra expresión que devuelva el mismo valor.
-- Alcanza a las condiciones y listas anidadas y al contenido de una etiqueta de componente (sus snippets). Un `each:as`, un `each:index` o un parámetro de snippet con el mismo nombre que una variable de la condición la oculta, y ahí no se estrecha.
+- Alcanza a las condiciones y listas anidadas y al contenido de una etiqueta de componente (sus snippets). El `if:when` de un `<snippet>` estrecha también su contenido (véase [Snippets condicionales](#snippets-con-definesnippets)). Un `each:as`, un `each:index` o un parámetro de snippet con el mismo nombre que una variable de la condición la oculta, y ahí no se estrecha.
 - Dentro de una función flecha escrita en la plantilla, como `on:click="() => save(user.value.id)"`, TypeScript no conserva el estrechamiento de una propiedad; extraiga el manejador a una función del script o compruebe el valor dentro de la función.
 - Sólo cambia la comprobación de tipos: en ejecución el contenido nunca se evalúa con la condición falsa.
 
@@ -520,8 +520,45 @@ function close(): void {
 - **Tipos.** No pasar un snippet obligatorio, pasar uno que el hijo no declara o usar parámetros que no coinciden con su tupla son errores de tipos en el padre. Los snippets no son props: no aparecen en `ComponentProps`, y el módulo compilado exporta su tipo en `ComponentSnippets`. Cada snippet es un `Snippet<Args>`, tipo que exporta `@meekojs/meeko`.
 - **SSR e hidratación.** El snippet se pinta dentro del DOM del hijo, entre marcadores de comentario, pero pertenece al ámbito reactivo del padre: se libera cuando se libera el padre o el hijo.
 - **Reenvío.** Un componente puede pasar a otro un snippet que recibió: `<Inner><snippet name="x" params="a"><render snippet="snippets.x" args="a" /></snippet></Inner>`.
+- **Snippets condicionales.** Desde `1.4`, `<snippet name="x" if:when="expresión">` pasa el snippet sólo mientras la expresión es verdadera. Con la condición falsa, para el hijo el snippet no existe: `snippets.x` es `undefined`, su `if:when="snippets.x"` es falso y un `<render>` no pinta nada. Sirve para reenviar un snippet opcional; sin `if:when`, la card de este ejemplo recibiría siempre `footer` y su `<footer if:when="snippets.footer">` pintaría un contenedor vacío cuando el panel no recibe `actions`:
 
-`defineSnippets` aparece una sola vez, en su propia declaración `const` de nivel superior con un nombre simple (`MEEK059`), con un argumento de tipo y sin argumentos en tiempo de ejecución (`MEEK060`). `MEEK061` señala un `<snippet>` que no es hijo directo de una etiqueta de componente, sin `name` o con un nombre o parámetros que no son identificadores, repetido, con atributos distintos de `name` y `params`, o un `<snippet name="default">` junto a contenido suelto. `MEEK062` señala un `<render>` sin `snippet`, con contenido o con atributos distintos de `snippet` y `args`. Una `ref:` dentro del contenido de un `<snippet>` da `MEEK052`, porque el hijo puede pintarlo varias veces. `<snippet>` y `<render>` pueden cerrarse solos.
+  ```html
+  <!-- AppPanel.meeko: defineSnippets<{ default: []; actions?: [close: () => void] }>() -->
+  <AppCard>
+    <render snippet="snippets.default" />
+    <snippet name="footer" if:when="snippets.actions"><render snippet="snippets.actions" args="close" /></snippet>
+  </AppCard>
+  ```
+
+  La condición se evalúa en el ámbito del padre (no ve los `params` del propio snippet), igual en el servidor y al hidratar, y es reactiva: cuando cambia, el hijo sigue montado, con su DOM, su estado y su foco, y sólo se actualizan los bindings que leen `snippets.x` (los hijos sin props reactivas se vuelven a montar; véase [Props reactivas](#props-reactivas)). Mientras sigue verdadera, el hijo conserva el mismo snippet. Como con las props, un valor que el setup del hijo copia de `snippets.x` (`const hasFooter = Boolean(snippets.footer)`) conserva el inicial: léalo en la plantilla o en un `computed`. Sólo vale para un snippet que el hijo declara opcional (`x?:`): en uno obligatorio es el error de tipos `MEEK110`. Como `if:when` en un elemento, estrecha los tipos dentro del contenido del snippet. Vale también en `<snippet name="default">`; el contenido suelto, que llena `default` sin etiqueta, no admite condición.
+- **Reutilizar los snippets de otro componente.** Desde `1.4`, el valor de una clave de `T` también puede ser un `Snippet<Args>`, que cuenta como su tupla `Args`. Así, `T` puede partir del mapa de snippets de otro componente, `AppCardSnippets` (el tipo con nombre de cada componente autoimportado; véase [Tipos de cada componente](framework.md#tipos-de-cada-componente)) o el `ComponentSnippets` de su módulo, y recortarlo o ampliarlo con `Omit`, `Pick` o `&`. Cada snippet conserva sus parámetros y su `?`: un modal que envuelve una card declara los de la card salvo `footer`, añade `actions` y los reenvía con `<snippet if:when>`:
+
+  ```html
+  <!-- app/components/App/Card.meeko -->
+  <script lang="ts">
+  const snippets = defineSnippets<{ header?: []; default: []; footer?: [] }>();
+  </script>
+
+  <!-- app/components/App/Modal.meeko -->
+  <script lang="ts">
+  const open = defineModel<boolean>();
+  const snippets = defineSnippets<Omit<AppCardSnippets, "footer"> & { actions?: [close: () => void] }>();
+  function close(): void {
+      open.value = false;
+  }
+  </script>
+  <template>
+      <AppCard>
+          <snippet name="header" if:when="snippets.header"><render snippet="snippets.header" /></snippet>
+          <render snippet="snippets.default" />
+          <snippet name="footer" if:when="snippets.actions"><render snippet="snippets.actions" args="close" /></snippet>
+      </AppCard>
+  </template>
+  ```
+
+  Para quien usa `<AppModal>`, `header` y `actions` son opcionales, `default` es obligatorio, `footer` no existe y `actions` entrega `close`: `meeko check` y el editor lo comprueban en sus etiquetas como en cualquier otro componente, también en uno genérico (`Pick<ListSnippets<T>, "row">`). Las tuplas de siempre no cambian: `defineSnippets<{ item: [name: string] }>()` tiene el mismo tipo que antes y puede mezclarse con entradas `Snippet`. Un valor que no es una tupla ni un `Snippet` sigue siendo el error `TS2344`.
+
+`defineSnippets` aparece una sola vez, en su propia declaración `const` de nivel superior con un nombre simple (`MEEK059`), con un argumento de tipo y sin argumentos en tiempo de ejecución (`MEEK060`). `MEEK061` señala un `<snippet>` que no es hijo directo de una etiqueta de componente, sin `name` o con un nombre o parámetros que no son identificadores, repetido, con atributos distintos de `name`, `params` e `if:when`, con un `if:when` vacío o sin valor, o un `<snippet name="default">` junto a contenido suelto. `MEEK110`, un error de tipos de `meeko check` y del editor, señala el `if:when` de un `<snippet>` que llena un snippet obligatorio del hijo. `MEEK062` señala un `<render>` sin `snippet`, con contenido o con atributos distintos de `snippet` y `args`. Una `ref:` dentro del contenido de un `<snippet>` da `MEEK052`, porque el hijo puede pintarlo varias veces. `<snippet>` y `<render>` pueden cerrarse solos.
 
 ### Exponer valores: `defineExpose`
 
@@ -671,6 +708,8 @@ const payload = serializeJson({ props, state })
 const release = hydrate(document.querySelector('#counter')!, props, state)
 // Llamar release() cuando la raíz deje de usarse.
 ```
+
+Desde `1.4`, cada componente autoimportado también tiene esos cuatro tipos con su nombre de etiqueta, sin import: `<AppCard>` (`app/components/App/Card.meeko`) da `AppCardProps`, `AppCardSnippets`, `AppCardModels` y `AppCardExposed`, que son exactamente su `ComponentProps`, `ComponentSnippets`, `ComponentModels` y `ComponentExposed`, `null` incluido (véase [Tipos de cada componente](framework.md#tipos-de-cada-componente)). El módulo `.meeko` no los exporta con ese nombre, porque el nombre depende de dónde lo autoimporta el proyecto (carpeta y prefijo de módulo), no del componente: desde un import explícito siguen siendo `import type { ComponentSnippets as CardSnippets } from "./Card.meeko"`.
 
 Para transferir props o estado en una etiqueta `<script>`, usa `serializeJson(value)`; comprueba que el dato pueda representarse fielmente en JSON y escapa caracteres que podrían cerrar la etiqueta. `renderToString` sigue disponible cuando el estado inicial se deriva de forma determinista de las props y no se necesita una captura explícita. `renderToString` y `renderWithState` son síncronos: fuera del render del framework no pueden esperar un `await useApi(...)` o `await useRpcQuery(...)`, y un componente que lo necesita lanza un error con el código `MEEKO_SUSPENDED`. Use el componente desde una página del framework o use el composable sin `await`. Dentro del framework, un componente que se monta en el navegador después de la página espera sus datos con la zona vacía en lugar de lanzar ese error (véase [Componentes que se montan más tarde](framework.md#componentes-que-se-montan-más-tarde)). Los módulos compilados exportan además `hasDataAwait` y `__meekoChildren`, marcas que el framework lee para saltarse la carga previa de una navegación, `__meekoReactiveProps` (desde `1.2`), que indica al padre que puede actualizar las props del hijo sin volver a montarlo, y `__meekoChannels` y `__meekoTag`, que sólo tipan las etiquetas del padre; ninguna forma parte del contrato. Al cambiar las props de un hijo, Meeko actualiza en su sitio los bindings que las leen (véase [Props reactivas](#props-reactivas)); cuando el hijo se vuelve a montar, conserva sus señales editables por nombre.
 

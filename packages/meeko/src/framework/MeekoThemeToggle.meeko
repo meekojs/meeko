@@ -1,0 +1,60 @@
+<script lang="ts">
+// <MeekoThemeToggle>, Meeko's own tag with `theme` in meeko.config.ts. `pnpm run builtins` compiles
+// this file into theme-toggle.compiled.ts, which the package ships; edit this file, not that one.
+import { computed } from "../reactivity.js";
+import { useRoute } from "./navigation.js";
+import { themeToggleGroupLabel, themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus, useThemeToggle } from "./theme.js";
+import type { ThemeChoice, ThemeToggleItem, ThemeToggleMessages, ThemeToggleSnippets } from "./theme.js";
+
+interface Props {
+  /** `"cycle"` (por defecto), un botón que pasa al tema siguiente; `"select"`, un grupo de radios. */
+  mode?: "cycle" | "select";
+  /** Elecciones y su orden; por defecto, los temas de la configuración y `"system"` si está activo. */
+  themes?: readonly ThemeChoice[];
+  /** Nombres de cada elección; por defecto, «Claro», «Oscuro», «Sistema» y el nombre de los demás temas. */
+  labels?: Partial<Record<ThemeChoice, string>>;
+  /** Textos accesibles del botón y del grupo, para traducirlos. */
+  messages?: ThemeToggleMessages;
+  /** Clases del elemento raíz, el `<form>`. */
+  class?: string;
+  /** `id` del elemento raíz, el `<form>`. */
+  id?: string;
+}
+
+const props = defineProps<Props>();
+const snippets = defineSnippets<ThemeToggleSnippets>();
+const toggle = useThemeToggle();
+const route = useRoute();
+const mode = computed(() => themeToggleMode(props.mode));
+// What it paints does not depend on the theme; what it says does, one primitive per binding, so
+// the end of hydration rewrites only the values that change. The same choices keep their list.
+let painted: readonly ThemeToggleItem[] | undefined;
+const items = computed(() => (painted = themeToggleItems(toggle.config, { themes: props.themes, labels: props.labels }, painted)));
+const status = computed(() => themeToggleStatus(toggle, items.value, { labels: props.labels, messages: props.messages }));
+const next = computed(() => status.value.next);
+const label = computed(() => status.value.label);
+const checked = computed(() => status.value.checked);
+const focused = computed(() => status.value.focused);
+const group = computed(() => themeToggleGroupLabel(props.messages));
+
+/** With JavaScript the form never posts: the theme changes at once, without a navigation. */
+const submit = (event: SubmitEvent): void => {
+  event.preventDefault();
+  const submitter = event.submitter as HTMLButtonElement | null;
+  toggle.state.set(submitter?.name === "theme" ? submitter.value : next.value);
+};
+
+/** The arrow keys, `Home` and `End` move the focus and the choice, as in a native radio group. */
+const keydown = (event: KeyboardEvent): void => {
+  const radios = [...(event.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>("[role=radio]")];
+  const current = radios.indexOf(event.target as HTMLButtonElement);
+  const target = current < 0 ? undefined : themeToggleKeyTarget(event.key, current, radios.length);
+  if (target === undefined) return;
+  event.preventDefault();
+  radios[target]!.focus();
+  toggle.state.set(radios[target]!.value);
+};
+</script>
+
+<!-- No whitespace between the tags: it would be text inside the button and the group. -->
+<template><form if:when="mode.value === 'cycle'" method="post" action="/_meeko/theme" data-meeko-theme-toggle="cycle" bind:class="props.class" bind:id="props.id" on:submit="submit"><input type="hidden" name="theme" bind:value="next.value"><input type="hidden" name="return" bind:value="route.url.value"><button type="submit" bind:aria-label="label.value"><span each:of="items.value" each:as="item" each:key="item.name" bind:data-meeko-theme-icon="item.icon" aria-hidden="true"><render if:when="snippets[item.name]" snippet="snippets[item.name]" /><template if:when="!snippets[item.name]">{item.label}</template></span></button></form><form if:when="mode.value === 'select'" method="post" action="/_meeko/theme" data-meeko-theme-toggle="select" bind:class="props.class" bind:id="props.id" on:submit="submit"><input type="hidden" name="return" bind:value="route.url.value"><div role="radiogroup" bind:aria-label="group.value" on:keydown="keydown"><button each:of="items.value" each:as="item" each:key="item.name" type="submit" name="theme" bind:value="item.name" role="radio" bind:aria-checked="checked.value === undefined ? undefined : String(checked.value === item.name)" bind:tabindex="focused.value === undefined ? undefined : focused.value === item.name ? '0' : '-1'" bind:aria-label="snippets[item.name] ? item.label : undefined" bind:data-meeko-theme-option="item.name"><render if:when="snippets[item.name]" snippet="snippets[item.name]" /><template if:when="!snippets[item.name]">{item.label}</template></button></div></form></template>

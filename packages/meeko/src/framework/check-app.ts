@@ -4,7 +4,7 @@ import ts from "@typescript/typescript6";
 import { checkSource } from "../check.js";
 import { MeekoCompileError } from "../compiler/sfc.js";
 import type { CompileDiagnostic } from "../compiler/sfc.js";
-import { componentTypeDeclarationMarker, generateTypes } from "../types.js";
+import { componentTypeDeclarationMarker, componentTypesPath, generateTypes } from "../types.js";
 import { loadConfiguredModules, resolveConfigSources } from "./config.js";
 import { assertRouteBlockPlacement } from "./route-block.js";
 
@@ -185,12 +185,37 @@ export async function checkApp(projectRoot: string): Promise<CompileDiagnostic[]
   return diagnostics;
 }
 
+/** Options of {@link generateAppTypes} for the editor, which checks the project while it is being edited. */
+export interface AppTypesOptions {
+  /** Text of a `.meeko` that is not the saved one: the editor passes its open documents. */
+  readonly read?: (filename: string) => string | undefined;
+  /**
+   * Receives a component that does not compile instead of failing: the others are still generated
+   * and the component keeps its previous declaration. Empty components are skipped silently.
+   */
+  readonly onError?: (filename: string, error: unknown) => void;
+}
+
 /** Mirrors app component declarations into the project's virtual type tree. */
-export async function generateAppTypes(projectRoot: string): Promise<string[]> {
+export async function generateAppTypes(projectRoot: string, options: AppTypesOptions = {}): Promise<string[]> {
   const root = resolve(projectRoot);
   const outputs = new Set<string>();
   for (const file of await appMeekoFiles(root)) {
-    for (const output of await generateTypes(await readFile(file, "utf8"), file)) outputs.add(output);
+    const source = options.read?.(file) ?? await readFile(file, "utf8");
+    if (!options.onError) {
+      for (const output of await generateTypes(source, file, options)) outputs.add(output);
+      continue;
+    }
+    // A component being written (new and still empty, or with a syntax error) keeps its last
+    // declaration, so the rest of the project is still checked; an empty file is not reported.
+    try {
+      for (const output of await generateTypes(source, file, options)) outputs.add(output);
+    } catch (error) {
+      if (source.trim()) options.onError(file, error);
+      const previous = componentTypesPath(root, file);
+      try { await access(previous); outputs.add(previous); }
+      catch { /* Never generated: nothing to keep. */ }
+    }
   }
   const generated = [...outputs].sort();
   await reconcileOwnedTypes(root, generated);

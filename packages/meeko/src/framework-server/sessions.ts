@@ -23,7 +23,6 @@ import type { Unsubscribe } from "./socket.js";
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#tipos-de-la-sesión-meekosession
  */
 // Empty on purpose: applications add their fields through module augmentation.
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface MeekoSession {}
 
 /**

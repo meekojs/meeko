@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
 import { createServer as createHttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
@@ -12,7 +13,7 @@ import { buildProject } from "../src/framework/project.ts";
 import { previewStatic } from "../src/framework/static-adapter.ts";
 import { startConformanceOutput } from "./conformance/harness.ts";
 import { staticAppConfig, writeStaticApp } from "./helpers/static-app.ts";
-import { createTempProject } from "./helpers/temp-project.ts";
+import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
 
 async function assertBrowserBehavior(url: string, development: boolean): Promise<void> {
   const browser = await chromium.launch({
@@ -353,6 +354,365 @@ test("el 404.html del adaptador static hidrata en cualquier URL y navega en el c
   } finally {
     await browser?.close();
     if (server) await new Promise<void>((done) => server!.close(() => done()));
+    await project.remove();
+  }
+});
+
+/** What `<html>` showed in the first frame and every later change of its theme. */
+type ThemeProbe = { first?: { theme: string | null; moon: string; scheme: string }; changes: string[] };
+
+/** Records, from the start of each document, what `<html>` shows before the first paint and every later theme change. */
+const themeProbe = (): void => {
+  const probe: { first?: unknown; changes: string[] } = { changes: [] };
+  (window as unknown as { __theme: unknown }).__theme = probe;
+  new MutationObserver((records) => {
+    for (const record of records) {
+      const value = (record.target as Element).getAttribute("data-theme");
+      if (record.attributeName === "data-theme" && record.oldValue !== value) probe.changes.push(`${record.oldValue}→${value}${document.body ? "" : " (before <body>)"}`);
+    }
+  }).observe(document, { subtree: true, attributes: true, attributeOldValue: true, attributeFilter: ["data-theme"] });
+  // The first frame: rendering waits for <head>, so this is what the first paint shows.
+  requestAnimationFrame(() => {
+    const moon = document.querySelector(".moon");
+    probe.first = {
+      theme: document.documentElement.getAttribute("data-theme"),
+      moon: moon ? getComputedStyle(moon).display : "missing",
+      scheme: getComputedStyle(document.documentElement).colorScheme,
+    };
+  });
+  const violations: string[] = [];
+  (window as unknown as { __cspViolations: string[] }).__cspViolations = violations;
+  document.addEventListener("securitypolicyviolation", (event) => violations.push(`${event.violatedDirective} ${event.blockedURI}`));
+};
+
+/** A theme toggle with both icons (the CSS shows one) and a text that `useTheme()` renders. */
+const themeToggle = `<script lang="ts">
+const { resolved, set } = useTheme();
+</script>
+<template><button id="toggle" type="button" aria-label="Tema oscuro" bind:aria-pressed="String(resolved.value === 'dark')" on:click="() => set(resolved.value === 'dark' ? 'light' : 'dark')"><span class="sun">sol</span><span class="moon">luna</span></button><p id="resolved">{resolved.value}</p></template>
+`;
+
+test("el tema llega en el primer byte con la cookie y sin parpadeo en modo sistema, bajo una CSP estricta con nonce", { timeout: 240_000 }, async () => {
+  const project = await createTempProject("theme-e2e");
+  const root = project.root;
+  type ServerModule = typeof import("../src/framework-server.ts");
+  type NodeModule = typeof import("../src/node.ts");
+  let server: import("node:http").Server | undefined;
+  let app: Awaited<ReturnType<ServerModule["createServerApp"]>> | undefined;
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  try {
+    const files: Record<string, string> = {
+      "package.json": '{"name":"theme-app","private":true,"type":"module"}\n',
+      "meeko.config.mjs": "export default { theme: true };\n",
+      "app/styles/main.css": ".moon { display: none }\n:root[data-theme=\"dark\"] .sun { display: none }\n:root[data-theme=\"dark\"] .moon { display: inline }\n",
+      "app/pages/index.meeko": themeToggle,
+    };
+    for (const [file, contents] of Object.entries(files)) {
+      await mkdir(dirname(join(root, file)), { recursive: true });
+      await writeFile(join(root, file), contents);
+    }
+    await linkRepositoryPackages(root, ["@meekojs/meeko", "vite"]);
+    const built = await buildProject(root);
+    const { createServerApp } = await import(pathToFileURL(resolve("dist/framework-server.js")).href) as ServerModule;
+    const { createNodeAssetReader, toNodeListener } = await import(pathToFileURL(resolve("dist/node.js")).href) as NodeModule;
+    const output = await import(pathToFileURL(join(built.output, "index.mjs")).href) as Pick<Parameters<ServerModule["createServerApp"]>[0], "load" | "manifest">;
+    const nonce = randomUUID().replaceAll("-", "");
+    // No 'unsafe-inline' anywhere: the theme script runs by its nonce and color-scheme goes through CSSOM.
+    const policy = `default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'nonce-${nonce}'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'`;
+    app = await createServerApp({
+      manifest: output.manifest, load: output.load, production: false,
+      assets: createNodeAssetReader({ root: join(built.output, "client"), assets: output.manifest.assets ?? {} }),
+      document: { nonce: () => nonce },
+    });
+    const running = app;
+    const documents: Array<{ hint: string | null; html: string; criticalCh: string | null }> = [];
+    server = createHttpServer(toNodeListener(async (request) => {
+      const response = await running.fetch(request);
+      const headers = new Headers(response.headers);
+      headers.set("content-security-policy", policy);
+      if (!headers.get("content-type")?.startsWith("text/html")) return new Response(response.body, { status: response.status, headers });
+      const html = await response.text();
+      documents.push({ hint: request.headers.get("sec-ch-prefers-color-scheme"), html, criticalCh: headers.get("critical-ch") });
+      return new Response(html, { status: response.status, headers });
+    }));
+    await new Promise<void>((ready) => server!.listen(0, "127.0.0.1", ready));
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    browser = await chromium.launch({
+      ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: "chrome" as const }),
+      headless: true,
+    });
+    const open = async (options: { colorScheme: "light" | "dark"; cookie?: string }) => {
+      const context = await browser!.newContext({ colorScheme: options.colorScheme });
+      if (options.cookie) await context.addCookies([{ name: "meeko-theme", value: options.cookie, url: origin }]);
+      await context.addInitScript(themeProbe);
+      const page = await context.newPage();
+      const errors: string[] = [];
+      page.on("pageerror", (error) => errors.push(error.message));
+      page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+      await page.goto(`${origin}/`);
+      await page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length > 0);
+      await page.waitForFunction(() => (window as unknown as { __theme: ThemeProbe }).__theme.first !== undefined);
+      const probe = () => page.evaluate(() => (window as unknown as { __theme: ThemeProbe }).__theme);
+      return { context, page, errors, probe };
+    };
+
+    // 1. A dark cookie on a light system: the first HTML already has the theme and the icon.
+    documents.length = 0;
+    const cookie = await open({ colorScheme: "light", cookie: "dark" });
+    const first = documents.at(-1)!;
+    assert.match(first.html, /<html data-theme="dark" data-theme-choice="dark">/);
+    assert.match(first.html, /<p id="resolved">(?:<!--[^>]*-->)?dark/);
+    assert.match(first.html, /aria-pressed="true"/);
+    assert.deepEqual((await cookie.probe()).first, { theme: "dark", moon: "inline", scheme: "dark" });
+    assert.equal(await cookie.page.locator("#resolved").innerText(), "dark");
+    // Hydration changed nothing.
+    assert.deepEqual((await cookie.probe()).changes, []);
+    // A change applies at once, and the next document comes from the server with it.
+    await cookie.page.locator("#toggle").click();
+    assert.equal(await cookie.page.evaluate(() => document.documentElement.getAttribute("data-theme")), "light");
+    assert.equal(await cookie.page.locator("#resolved").innerText(), "light");
+    assert.equal((await cookie.context.cookies(origin)).find((entry) => entry.name === "meeko-theme")?.value, "light");
+    await cookie.page.reload();
+    await cookie.page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length > 0);
+    assert.match(documents.at(-1)!.html, /<html data-theme="light" data-theme-choice="light">/);
+    assert.deepEqual((await cookie.probe()).first, { theme: "light", moon: "none", scheme: "light" });
+    assert.deepEqual((await cookie.probe()).changes, []);
+    assert.deepEqual(await cookie.page.evaluate(() => (window as unknown as { __cspViolations: string[] }).__cspViolations), []);
+    assert.deepEqual(cookie.errors, []);
+    await cookie.context.close();
+
+    // 2. No cookie and a dark system: dark before the first paint, by the client hint or the script.
+    documents.length = 0;
+    const system = await open({ colorScheme: "dark" });
+    assert.deepEqual((await system.probe()).first, { theme: "dark", moon: "inline", scheme: "dark" });
+    const served = documents.at(-1)!;
+    assert.equal(served.criticalCh, "Sec-CH-Prefers-Color-Scheme");
+    // When Chromium sends the hint, the server resolves the theme itself.
+    if (served.hint !== null) assert.match(served.html, /<html data-theme="dark">/);
+    else assert.match(served.html, /<html><head>/);
+    assert.equal(await system.page.locator("#resolved").innerText(), "dark");
+    // Whatever the server knew, the theme of <html> never changed after it was first set.
+    const changes = (await system.probe()).changes;
+    // The script set it before <body> existed, so nothing was painted with another theme.
+    assert.ok(changes.every((change) => change === "null→dark (before <body>)"), JSON.stringify(changes));
+    // "system" follows the operating system while the page is open.
+    await system.page.emulateMedia({ colorScheme: "light" });
+    await system.page.waitForFunction(() => document.documentElement.getAttribute("data-theme") === "light");
+    assert.equal(await system.page.locator("#resolved").innerText(), "light");
+    assert.deepEqual(await system.page.evaluate(() => (window as unknown as { __cspViolations: string[] }).__cspViolations), []);
+    assert.deepEqual(system.errors, []);
+    console.log(`[theme e2e] hints of the documents in system mode: ${JSON.stringify(documents.map((entry) => entry.hint))}`);
+    await system.context.close();
+  } finally {
+    await browser?.close();
+    if (server) await new Promise<void>((done) => server!.close(() => done()));
+    await app?.close();
+    await project.remove();
+  }
+});
+
+test("una página estática aplica el tema guardado antes del primer pintado con el script permitido por su hash", { timeout: 240_000 }, async () => {
+  const project = await createTempProject("theme-static-e2e");
+  let server: import("node:http").Server | undefined;
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  try {
+    await writeStaticApp(project.root, staticAppConfig.replace("sitemap: true,", "sitemap: true,\n  theme: true,"));
+    await mkdir(join(project.root, "app", "styles"), { recursive: true });
+    await writeFile(join(project.root, "app", "styles", "main.css"), ".moon { display: none }\n:root[data-theme=\"dark\"] .moon { display: inline }\n");
+    await writeFile(join(project.root, "app", "pages", "index.meeko"), themeToggle.replace("<template>", '<template><p id="home">Inicio</p>'));
+    await buildProject(project.root);
+    const previous = { port: process.env.MEEKO_PORT, host: process.env.MEEKO_HOST };
+    process.env.MEEKO_PORT = "0";
+    process.env.MEEKO_HOST = "127.0.0.1";
+    try { server = await previewStatic(project.root); }
+    finally {
+      if (previous.port === undefined) delete process.env.MEEKO_PORT; else process.env.MEEKO_PORT = previous.port;
+      if (previous.host === undefined) delete process.env.MEEKO_HOST; else process.env.MEEKO_HOST = previous.host;
+    }
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    browser = await chromium.launch({
+      ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: "chrome" as const }),
+      headless: true,
+    });
+    for (const setup of [{ cookie: "dark" }, { stored: "dark" }]) {
+      const context = await browser.newContext({ colorScheme: "light" });
+      if (setup.cookie) await context.addCookies([{ name: "meeko-theme", value: setup.cookie, url: origin }]);
+      if (setup.stored) await context.addInitScript((value) => { if (!localStorage.getItem("meeko-theme")) localStorage.setItem("meeko-theme", value); }, setup.stored);
+      await context.addInitScript(themeProbe);
+      const page = await context.newPage();
+      const errors: string[] = [];
+      page.on("pageerror", (error) => errors.push(error.message));
+      page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+      const response = await page.goto(`${origin}/`);
+      // The prerendered file is the same for everyone: no theme on <html>.
+      assert.match(await response!.text(), /^<!doctype html><html lang="es"><head>/);
+      await page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length > 0);
+      await page.waitForFunction(() => (window as unknown as { __theme: ThemeProbe }).__theme.first !== undefined);
+      const probe = await page.evaluate(() => (window as unknown as { __theme: ThemeProbe }).__theme);
+      assert.deepEqual(probe.first, { theme: "dark", moon: "inline", scheme: "dark" }, JSON.stringify(setup));
+      // Only the inline script set the theme, before <body> existed: nothing was painted light.
+      assert.deepEqual(probe.changes, ["null→dark (before <body>)"]);
+      // The component rendered the prerendered default and switched once hydration ended.
+      assert.equal(await page.locator("#resolved").innerText(), "dark");
+      assert.deepEqual(await page.evaluate(() => (window as unknown as { __cspViolations: string[] }).__cspViolations), []);
+      assert.deepEqual(errors, []);
+      // A choice that only localStorage kept goes back to the cookie.
+      assert.equal((await context.cookies(origin)).find((entry) => entry.name === "meeko-theme")?.value, "dark");
+      await context.close();
+    }
+  } finally {
+    await browser?.close();
+    if (server) await new Promise<void>((done) => server!.close(() => done()));
+    await project.remove();
+  }
+});
+
+/** What `<MeekoThemeToggle>` showed in the first frame, and every later change inside it. */
+type ToggleProbe = { first?: { choice: string | null; theme: string | null; icons: string[]; count: number }; changes: string[] };
+
+/** Records, from the start of each document, the icons that the CSS shows and any DOM change of the toggle. */
+const toggleProbe = (): void => {
+  // No named function inside: the test runner would wrap it with a helper that the page lacks.
+  const probe: ToggleProbe = { changes: [] };
+  Object.assign(window, { __toggle: probe });
+  // From the end of parsing ("interactive", before the module scripts run): what hydration changes.
+  document.addEventListener("readystatechange", () => {
+    if (document.readyState !== "interactive") return;
+    new MutationObserver((records) => {
+      for (const record of records) {
+        const target = record.target.nodeType === Node.ELEMENT_NODE ? record.target as Element : record.target.parentElement;
+        if (target?.closest("[data-meeko-theme-toggle]")) probe.changes.push(record.type === "attributes" ? `${(record.target as Element).localName}@${record.attributeName}` : record.type);
+      }
+    }).observe(document, { subtree: true, childList: true, characterData: true, attributes: true });
+  });
+  // The first frame: rendering waits for <head>, so this is what the first paint shows.
+  requestAnimationFrame(() => {
+    probe.first = {
+      choice: document.documentElement.getAttribute("data-theme-choice"), theme: document.documentElement.getAttribute("data-theme"),
+      icons: [...document.querySelectorAll("[data-meeko-theme-icon]")].filter((icon) => getComputedStyle(icon).display !== "none").map((icon) => icon.getAttribute("data-meeko-theme-icon")!),
+      count: document.querySelectorAll("[data-meeko-theme-icon]").length,
+    };
+  });
+  const violations: string[] = [];
+  Object.assign(window, { __cspViolations: violations });
+  document.addEventListener("securitypolicyviolation", (event) => violations.push(`${event.violatedDirective} ${event.blockedURI}`));
+};
+
+test("<MeekoThemeToggle> shows the right icon in the first frame, cycles with JavaScript and posts without it, under a strict CSP", { timeout: 240_000 }, async () => {
+  const project = await createTempProject("theme-toggle-e2e");
+  const root = project.root;
+  type ServerModule = typeof import("../src/framework-server.ts");
+  type NodeModule = typeof import("../src/node.ts");
+  let server: import("node:http").Server | undefined;
+  let app: Awaited<ReturnType<ServerModule["createServerApp"]>> | undefined;
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  try {
+    const files: Record<string, string> = {
+      "package.json": '{"name":"theme-toggle-app","private":true,"type":"module"}\n',
+      "meeko.config.mjs": "export default { theme: true };\n",
+      "app/pages/index.meeko": '<template><MeekoThemeToggle class="toggle"><snippet name="light"><b>sol</b></snippet><snippet name="dark"><b>luna</b></snippet><snippet name="system"><b>pc</b></snippet></MeekoThemeToggle><p id="home">Inicio</p></template>\n',
+    };
+    for (const [file, contents] of Object.entries(files)) {
+      await mkdir(dirname(join(root, file)), { recursive: true });
+      await writeFile(join(root, file), contents);
+    }
+    await linkRepositoryPackages(root, ["@meekojs/meeko", "vite"]);
+    const built = await buildProject(root);
+    const { createServerApp } = await import(pathToFileURL(resolve("dist/framework-server.js")).href) as ServerModule;
+    const { createNodeAssetReader, toNodeListener } = await import(pathToFileURL(resolve("dist/node.js")).href) as NodeModule;
+    const output = await import(pathToFileURL(join(built.output, "index.mjs")).href) as Pick<Parameters<ServerModule["createServerApp"]>[0], "load" | "manifest">;
+    const nonce = randomUUID().replaceAll("-", "");
+    // No 'unsafe-inline': the theme script and the style of the icons run by their nonce.
+    const policy = `default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'nonce-${nonce}'; img-src 'self' data:; connect-src 'self'; form-action 'self'; object-src 'none'; base-uri 'none'`;
+    app = await createServerApp({
+      manifest: output.manifest, load: output.load, production: false,
+      assets: createNodeAssetReader({ root: join(built.output, "client"), assets: output.manifest.assets ?? {} }),
+      document: { nonce: () => nonce },
+    });
+    const running = app;
+    const posts: Array<{ status: number; location: string | null; cookie: string | null }> = [];
+    server = createHttpServer(toNodeListener(async (request) => {
+      const response = await running.fetch(request);
+      const headers = new Headers(response.headers);
+      headers.set("content-security-policy", policy);
+      if (request.method === "POST") posts.push({ status: response.status, location: headers.get("location"), cookie: headers.get("set-cookie") });
+      return new Response(response.body, { status: response.status, headers });
+    }));
+    await new Promise<void>((ready) => server!.listen(0, "127.0.0.1", ready));
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    browser = await chromium.launch({
+      ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: "chrome" as const }),
+      headless: true,
+    });
+
+    // 1. "system" without a cookie on a dark system: the first frame already shows the system icon and the dark theme.
+    const context = await browser.newContext({ colorScheme: "dark" });
+    await context.addInitScript(toggleProbe);
+    const page = await context.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+    await page.goto(`${origin}/`);
+    await page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length > 0);
+    await page.waitForFunction(() => (window as unknown as { __toggle: ToggleProbe }).__toggle.first !== undefined);
+    const probe = () => page.evaluate(() => (window as unknown as { __toggle: ToggleProbe }).__toggle);
+    const visible = () => page.evaluate(() => [...document.querySelectorAll("[data-meeko-theme-icon]")]
+      .filter((icon) => getComputedStyle(icon).display !== "none").map((icon) => icon.getAttribute("data-meeko-theme-icon")!));
+    assert.deepEqual((await probe()).first, { choice: "system", theme: "dark", icons: ["system"], count: 3 });
+    // Hydration changed nothing visible: the same icon, no node of the toggle replaced.
+    assert.deepEqual(await visible(), ["system"]);
+    assert.ok((await probe()).changes.every((change) => /@(?:aria-label|value|tabindex|aria-checked)$/.test(change)), JSON.stringify((await probe()).changes));
+    assert.equal(await page.locator(".toggle button").getAttribute("aria-label"), "Tema: sistema. Cambiar a claro");
+
+    // 2. The cycle: light, dark, system, at once and without a navigation.
+    const before = page.url();
+    for (const [choice, theme] of [["light", "light"], ["dark", "dark"], ["system", "dark"]] as const) {
+      await page.locator(".toggle button").click();
+      await page.waitForFunction((expected) => document.documentElement.getAttribute("data-theme-choice") === expected, choice);
+      assert.equal(await page.evaluate(() => document.documentElement.getAttribute("data-theme")), theme);
+      assert.deepEqual(await visible(), [choice]);
+    }
+    assert.equal(page.url(), before);
+    assert.equal(posts.length, 0, "with JavaScript the form never posts");
+    assert.equal((await context.cookies(origin)).find((entry) => entry.name === "meeko-theme")?.value, "system");
+    assert.deepEqual(await page.evaluate(() => (window as unknown as { __cspViolations: string[] }).__cspViolations), []);
+    assert.deepEqual(errors, []);
+    await context.close();
+
+    // 3. Without JavaScript the button is a form: POST, 303 back to the page, and the server renders the new theme.
+    const plain = await browser.newContext({ colorScheme: "dark", javaScriptEnabled: false });
+    const noScript = await plain.newPage();
+    const consoleErrors: string[] = [];
+    noScript.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
+    await noScript.goto(`${origin}/`);
+    const shown = async (): Promise<string[]> => {
+      const icons: string[] = [];
+      for (const name of ["light", "dark", "system"]) if (await noScript.locator(`[data-meeko-theme-icon="${name}"]`).isVisible()) icons.push(name);
+      return icons;
+    };
+    // Without a cookie and without the script, the CSS shows the default choice.
+    assert.equal(await noScript.locator("html").getAttribute("data-theme-choice"), null);
+    assert.deepEqual(await shown(), ["system"]);
+    /** Clicks the button and waits for the document that the redirect brings. */
+    const submit = async (): Promise<void> => {
+      await Promise.all([noScript.waitForEvent("framenavigated"), noScript.locator(".toggle button").click()]);
+      await noScript.waitForLoadState("load");
+    };
+    await submit();
+    assert.equal(noScript.url(), `${origin}/`);
+    assert.deepEqual(posts.at(-1), { status: 303, location: "/", cookie: "meeko-theme=light; Path=/; Max-Age=31536000; SameSite=Lax" });
+    assert.equal(await noScript.locator("html").getAttribute("data-theme-choice"), "light");
+    assert.equal(await noScript.locator("html").getAttribute("data-theme"), "light");
+    assert.deepEqual(await shown(), ["light"]);
+    await submit();
+    assert.equal(await noScript.locator("html").getAttribute("data-theme-choice"), "dark");
+    assert.deepEqual(await shown(), ["dark"]);
+    assert.deepEqual(consoleErrors.filter((message) => /Content Security Policy/i.test(message)), []);
+    await plain.close();
+  } finally {
+    await browser?.close();
+    if (server) await new Promise<void>((done) => server!.close(() => done()));
+    await app?.close();
     await project.remove();
   }
 });

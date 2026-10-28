@@ -287,7 +287,9 @@ export function meeko(): Plugin {
       assertRouteBlockPlacement(source, filename, sources.map((entry) => entry.root));
       const scopeAttribute = config?.css?.scopeAttribute;
       const registry = await discoverAutoImports(root);
-      const result = compile(source, filename, { hot: isDev, projectComponents: autoImportedValues(registry), ...(scopeAttribute ? { scopeAttribute } : {}) });
+      // `<MeekoThemeToggle>` exists only with `theme` (MEEK111).
+      const theme = config ? config.theme !== undefined && config.theme !== false : undefined;
+      const result = compile(source, filename, { hot: isDev, projectComponents: autoImportedValues(registry), ...(scopeAttribute ? { scopeAttribute } : {}), ...(theme === undefined ? {} : { theme }) });
       // A component outside server/ may run in the browser: the browser graph stops at MEEK108. The SSR
       // graph does not, so a component that only server code imports (an email template in
       // app/emails/ rendered by an API route) keeps compiling there, as in 1.2.

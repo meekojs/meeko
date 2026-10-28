@@ -19,9 +19,9 @@ export interface NavigationState {
   readonly pending: ReadonlySignal<boolean>;
 }
 
-const navigationKey = createContext<NavigationState>("Meeko navigation");
+const navigationKey = /*#__PURE__*/ createContext<NavigationState>("Meeko navigation");
 
-const idle: NavigationState = Object.freeze({ pending: Object.freeze({ value: false }) });
+const idle: NavigationState = /*#__PURE__*/ Object.freeze({ pending: /*#__PURE__*/ Object.freeze({ value: false }) });
 
 /**
  * Lee el estado de navegación de la aplicación actual. `pending` vale `true` mientras se carga una
@@ -89,7 +89,7 @@ export interface RouteSnapshot {
   readonly search: Readonly<Record<string, unknown>>;
 }
 
-const routeKey = createContext<RouteState>("Meeko route");
+const routeKey = /*#__PURE__*/ createContext<RouteState>("Meeko route");
 
 /**
  * Lee la ruta confirmada de la aplicación actual: `url`, `path`, `id`, `params` y `search`. En SSR

@@ -33,9 +33,11 @@ export function readChannels(props: object): ComponentChannels | undefined {
 /**
  * Whether two reads of a component tag pass the same channels. Models are signals and compare by
  * identity. A snippet is a new function on each read but its content is reactive by itself, so
- * only the set of snippet names counts.
+ * only the set of snippet names counts, and which of them are passed: a `<snippet if:when>` passes
+ * `undefined` while its condition is false. With `snippetsInPlace`, for a child whose props view
+ * delivers the passed snippets itself, only the names count.
  */
-export function sameChannels(first: object, second: object): boolean {
+export function sameChannels(first: object, second: object, snippetsInPlace = false): boolean {
   const before = readChannels(first);
   const after = readChannels(second);
   if (!before || !after) return before === after;
@@ -43,7 +45,7 @@ export function sameChannels(first: object, second: object): boolean {
   if (models.length !== Object.keys(after.models).length || models.some((name) => !Object.hasOwn(after.models, name) || !Object.is(before.models[name], after.models[name]))) return false;
   const snippets = Object.keys(before.snippets);
   return snippets.length === Object.keys(after.snippets).length
-    && snippets.every((name) => Object.hasOwn(after.snippets, name) && (before.snippets[name] === undefined) === (after.snippets[name] === undefined));
+    && snippets.every((name) => Object.hasOwn(after.snippets, name) && (snippetsInPlace || (before.snippets[name] === undefined) === (after.snippets[name] === undefined)));
 }
 
 /** Any props or channels, for a component whose type is `any` or `never`. */
@@ -162,6 +164,31 @@ export function componentTag<Module>(component: () => Module): ComponentTag<Modu
 export function checkComponentModels<Module>(component: Module, models: NoInfer<ModelInputs<Module>>): void {
   void component;
   void models;
+}
+
+/**
+ * Type text of `MEEK110`: `if:when` on a `<snippet>` that fills a required snippet of the child.
+ * Short, so that TypeScript never truncates it; `meeko check` reports the long message.
+ */
+export type RequiredSnippetMessage<Name extends string> = `MEEK110: ${Name} es obligatorio en el hijo`;
+
+/**
+ * `unknown` when `<snippet name="Name" if:when>` may stop passing that snippet: the child declares it
+ * optional (`Name?:`), or it is not a snippet of the child, which the tag check already reports.
+ */
+export type SnippetConditionCheck<Module, Name extends string> = 0 extends 1 & Module ? unknown : [Module] extends [never] ? unknown
+  : ChannelsOf<Module> extends { readonly snippets: infer Snippets }
+    ? Snippets extends object ? (Name extends keyof Snippets ? ({} extends Pick<Snippets, Name> ? unknown : RequiredSnippetMessage<Name>) : unknown) : unknown
+    : unknown;
+
+/**
+ * Type-only check of a conditional `<snippet name if:when>`; generated code never calls it. `true`
+ * is not assignable to `RequiredSnippetMessage` when the child requires that snippet (MEEK110).
+ */
+export function checkSnippetCondition<Module, const Name extends string>(component: () => Module, name: Name, optional: SnippetConditionCheck<Module, Name>): void {
+  void component;
+  void name;
+  void optional;
 }
 
 /** Type-only check of the snippets of a component tag, like `checkComponentModels`. */

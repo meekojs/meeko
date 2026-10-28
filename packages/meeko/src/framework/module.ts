@@ -38,9 +38,9 @@ export interface MeekoModuleMeta {
  * import type { ModuleAutoImport } from "@meekojs/meeko/framework";
  *
  * const entries: ModuleAutoImport[] = [
- *   { name: "useTheme", from: "@acme/theme/runtime" },
+ *   { name: "useAccent", from: "@acme/accent/runtime" },
  *   { name: "format", as: "formatDate", from: "date-fns", scope: "shared" },
- *   { name: "Theme", from: "@acme/theme/runtime", type: true },
+ *   { name: "Accent", from: "@acme/accent/runtime", type: true },
  * ];
  * ```
  */

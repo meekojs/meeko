@@ -296,6 +296,47 @@ test("the props view is read-only, tracks names and values, and applies defaults
   assert.deepEqual(plain, { hint: "default", count: 0, label: "x" });
 });
 
+test("the snippets of a props view follow a snippet that appears or disappears, and keep their identity", async () => {
+  const { withChannels } = await import(runtimeUrl("src/channels.js")) as typeof import("../src/channels.ts");
+  const { snippet, useSnippets } = await import(runtimeUrl("src/snippets.js")) as typeof import("../src/snippets.ts");
+  const tag = (footer: boolean): Record<string, unknown> => withChannels({ label: "a" }, undefined, { default: snippet(() => "d"), footer: footer ? snippet(() => "f") : undefined });
+  const source = reactiveProps(tag(false));
+  // Through the defaults view too, as a compiled child with defineProps defaults reads them.
+  const snippets = useSnippets<{ default: []; footer?: [] }>(resolveProps(source.props, { hint: "x" }));
+  const first = snippets.default;
+  assert.ok(first);
+  assert.equal(snippets.footer, undefined);
+  assert.equal("footer" in snippets, false);
+  assert.deepEqual(Object.keys(snippets), ["default"]);
+  assert.throws(() => { (snippets as Record<string, unknown>).footer = first; }, /read-only/);
+
+  const reads: boolean[] = [];
+  const keys: string[][] = [];
+  const stopRead = effect(() => { reads.push(snippets.footer !== undefined); });
+  const stopKeys = effect(() => { keys.push(Object.keys(snippets)); });
+  source.update(tag(false));
+  assert.deepEqual(reads, [false], "a snippet still absent notifies nobody");
+  source.update(tag(true));
+  assert.deepEqual(reads, [false, true]);
+  assert.deepEqual(keys, [["default"], ["default", "footer"]]);
+  const footer = snippets.footer;
+  source.update(tag(true));
+  assert.equal(snippets.footer, footer, "a snippet still passed keeps the value the child has");
+  assert.equal(snippets.default, first);
+  assert.deepEqual(reads, [false, true]);
+  source.update(tag(false));
+  assert.deepEqual(reads, [false, true, false]);
+  assert.equal("footer" in snippets, false);
+  stopRead();
+  stopKeys();
+
+  // Plain props (SSR, a root hydrate) keep a frozen object.
+  const plain = useSnippets<{ default: []; footer?: [] }>(tag(true));
+  assert.ok(Object.isFrozen(plain));
+  assert.deepEqual(Object.keys(plain), ["default", "footer"]);
+  assert.deepEqual(Object.keys(useSnippets<{ default: []; footer?: [] }>(tag(false))), ["default"]);
+});
+
 test("DevTools shows new props and HMR keeps a child reactive to its parent", async () => {
   const parent = `<script lang="ts">
 import type { Signal } from "@meekojs/meeko";

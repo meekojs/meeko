@@ -26,6 +26,9 @@ import { documentHeadEntries, HeadCollector, provideHead, renderHeadDocument, re
 import type { DocumentConfig, HeadDocument, HeadInput } from "./head.js";
 import { emptyPluginState, notifyPluginErrorHandlers, runPlugins } from "./plugin.js";
 import type { PluginRegistration, PluginState } from "./plugin.js";
+import { addThemeHeaders, provideServerTheme, requestTheme, resolveThemeConfig, THEME_ENDPOINT, withThemeAttributes } from "./theme.js";
+import { themeEndpoint } from "./theme-endpoint.js";
+import type { ResolvedThemeConfig, ServerTheme } from "./theme.js";
 
 /** Route manifest of the application handling the current request, for `href(id)`. */
 const requestManifest = new AsyncLocalStorage<readonly RouteRecord[]>();
@@ -235,9 +238,29 @@ export const DOCUMENT_HEAD_PREFIX = '<!doctype html><html><head><meta charset="u
  * The head of a document: `document` of the configuration, the components' `useHead` and the route
  * head. `pathname` names the page for `document.seo`; an error document has none.
  */
-function headDocument(options: DocumentOptions | undefined, nonce: string | undefined, collected: HeadCollector | undefined, route: HeadInput, pathname?: string): HeadDocument {
+function headDocument(options: DocumentOptions | undefined, nonce: string | undefined, collected: HeadCollector | undefined, route: HeadInput, pathname: string | undefined, theme: ServerTheme | undefined): HeadDocument {
   const page = { seo: resolveSeo(options?.config?.seo, "document.seo"), pathname };
-  return renderHeadDocument(resolveHead([...documentHeadEntries(options?.config, route), ...collected?.entries() ?? []], page), nonce);
+  const head = resolveHead([...documentHeadEntries(options?.config, route), ...collected?.entries() ?? []], page);
+  // `<html>` carries the theme of the request from the first byte, when the server knows it.
+  return renderHeadDocument(theme ? { ...head, htmlAttrs: withThemeAttributes(head.htmlAttrs, theme) } : head, nonce);
+}
+
+/** The resolved theme of each document configuration, validated once. */
+const documentThemes = new WeakMap<DocumentConfig, ResolvedThemeConfig | undefined>();
+
+/** The resolved theme of a document configuration, when it has one. */
+function documentTheme(options: DocumentOptions | undefined): ResolvedThemeConfig | undefined {
+  const config = options?.config;
+  if (!config?.theme) return undefined;
+  let theme = documentThemes.get(config);
+  if (!documentThemes.has(config)) documentThemes.set(config, theme = resolveThemeConfig(config.theme, "document.theme"));
+  return theme;
+}
+
+/** The theme of a request when the document configuration has one. */
+function themeOf(options: DocumentOptions | undefined, request: Request): ServerTheme | undefined {
+  const theme = documentTheme(options);
+  return theme ? requestTheme(theme, request) : undefined;
 }
 
 /**
@@ -361,6 +384,7 @@ async function renderPageTree(
   route: RouteSnapshot,
   plugins: PluginState,
   signal?: AbortSignal,
+  theme?: ServerTheme,
 ): Promise<{ rendered: { html: string; state: Record<string, unknown> }; store: StateStore; resources: Record<string, unknown> | undefined; styles: string[]; head: HeadCollector }> {
   const scope = new ResourceScope("collect", {}, signal);
   // useRoute() in the page, its layouts and app.meeko reads the route of this request.
@@ -380,6 +404,7 @@ async function renderPageTree(
     return collectStyles(styles, () => withResourceScope(scope, () => withStateStore(store, () => {
       provideRoute(routeState);
       provideHead(head);
+      if (theme) provideServerTheme(theme);
       // Values of the app plugins, which ran for this request.
       plugins.apply();
       return module.renderWithState(input);
@@ -576,6 +601,13 @@ export function createFrameworkHandler(options: FrameworkHandlerOptions<unknown>
 export function createPageHandler(options: PageHandlerOptions): (request: Request) => Promise<Response> {
   const handle = async (request: Request): Promise<Response> => {
     const fallbackRequestId = crypto.randomUUID();
+    // `<MeekoThemeToggle>` without JavaScript posts its form here, with `theme` in the configuration.
+    const themeConfig = documentTheme(options.document);
+    if (themeConfig && new URL(request.url).pathname === THEME_ENDPOINT) {
+      const response = await themeEndpoint(themeConfig, request);
+      response.headers.set("x-request-id", fallbackRequestId);
+      return response;
+    }
     if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, {
       status: 405, headers: { Allow: "GET, HEAD", "x-request-id": fallbackRequestId, "cache-control": "no-store" },
     });
@@ -601,8 +633,12 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       observeServerError(failure, requestId, options.onError);
       notifyPluginErrorHandlers(plugins.errorHandlers, failure, { side: "server", requestId });
     };
-    const finish = (response: Response): Response => {
+    // The theme of this request: the cookie and, in "system" mode, the client hint.
+    const theme = themeOf(options.document, request);
+    /** `document` marks an HTML document rendered for this request, which depends on the theme. */
+    const finish = (response: Response, document = false): Response => {
       const headers = new Headers(response.headers);
+      if (document && theme) addThemeHeaders(headers, theme);
       headers.set("x-request-id", requestContext?.requestId ?? fallbackRequestId);
       if (requestContext) {
         headers.set("x-meeko-csrf-token", requestContext.session.current?.csrfToken ?? "");
@@ -629,7 +665,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
         const page = await options.loadPage(errorPage!.file);
         if (page.css) styles.push(page.css);
         const { module, input } = await wrapInLayouts(options.loadPage, page, { ...notFoundProps }, errorPage!.layouts, styles);
-        const { rendered, store, resources, styles: childStyles, head: collected } = await renderPageTree(module, input, stateStore, route!, await startPlugins(), request.signal);
+        const { rendered, store, resources, styles: childStyles, head: collected } = await renderPageTree(module, input, stateStore, route!, await startPlugins(), request.signal, theme);
         styles.push(...childStyles);
         pageStore = store;
         store.seal();
@@ -650,11 +686,11 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
         const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
         // Titled like the error document of a matched route; the payload head carries the same
         // title, so hydration still finds the host <title> after the managed head.
-        const head = headDocument(options.document, host.nonce, collected, routeHeadInput({}, ERROR_PAGE_TITLE));
+        const head = headDocument(options.document, host.nonce, collected, routeHeadInput({}, ERROR_PAGE_TITLE), undefined, theme);
         const document = `${head.prefix}${csrfMeta}${styleTags}${head.head}${host.head}</head>${head.bodyOpen}<div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
         return finish(new Response(headRequest ? null : document, {
           status: 404, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
-        }));
+        }), true);
       };
       return requestContext ? await withRequestContext(requestContext, options.serverFetch, renderNotFound) : await renderNotFound();
     }
@@ -734,7 +770,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     }
     const { module, input } = await wrapInLayouts(options.loadPage, page, clientPage ? {} : props, match.route.layouts, styles);
     // Top-level data awaits load before the HTML, also before the first byte of a stream.
-    const { rendered, store, resources, styles: childStyles, head: collected } = await renderPageTree(module, input, stateStore, route, await startPlugins(), driverSignal);
+    const { rendered, store, resources, styles: childStyles, head: collected } = await renderPageTree(module, input, stateStore, route, await startPlugins(), driverSignal, theme);
     // Child components link their CSS in the document too, not only once the client bundle loads.
     styles.push(...childStyles);
     pageStore = store;
@@ -758,7 +794,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     }
     const host = documentParts(options.document, request);
     const nonceAttribute = host.nonceAttribute;
-    const documentHead = (): HeadDocument => headDocument(options.document, host.nonce, collected, routeHeadInput(head), url.pathname);
+    const documentHead = (): HeadDocument => headDocument(options.document, host.nonce, collected, routeHeadInput(head), url.pathname, theme);
     const styleTags = [...new Set(styles)].map((css) => `<style${nonceAttribute}>${css.replaceAll("<", "\\3C ")}</style>`).join("");
     const headRequest = request.method === "HEAD";
     if (streaming) {
@@ -796,7 +832,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       const opening = `${parts.prefix}${csrfMeta}${styleTags}${parts.head}${host.head}</head>${parts.bodyOpen}<div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}`;
       return finish(new Response(body(opening, (text, id) => `<script type="application/json" data-meeko-deferred="${id}">${text}</script>`, `${host.bodyEnd}</body></html>`), {
         status: 200, headers: { "content-type": "text/html; charset=utf-8", ...streamHeaders },
-      }));
+      }), true);
     }
     if (wantsPayload(request)) {
       return finish(new Response(headRequest ? null : payload, {
@@ -809,7 +845,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     const document = `${parts.prefix}${csrfMeta}${styleTags}${parts.head}${host.head}</head>${parts.bodyOpen}<div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
     return finish(new Response(headRequest ? null : document, {
       status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
-    }));
+    }), true);
     };
     return requestContext ? await withRequestContext(requestContext, options.serverFetch, render) : await render();
     } catch (error) {
@@ -837,13 +873,13 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
               status: known.status, message: known.status >= 500 ? "Internal Server Error" : known.code,
             }, pageStore.sealed ? new StateStore() : pageStore, route!,
             // Plugins that failed (perhaps the failure shown here) leave the error page without their values.
-            await startPlugins().catch(() => emptyPluginState), request.signal);
+            await startPlugins().catch(() => emptyPluginState), request.signal, theme);
             const host = documentParts(options.document, request);
-            const head = headDocument(options.document, host.nonce, collected, routeHeadInput({}, ERROR_PAGE_TITLE));
+            const head = headDocument(options.document, host.nonce, collected, routeHeadInput({}, ERROR_PAGE_TITLE), undefined, theme);
             const document = `${head.prefix}${head.head}${host.head}</head>${head.bodyOpen}<div id="app">${errorRendered.html}</div>${host.bodyEnd}</body></html>`;
             return finish(new Response(request.method === "HEAD" ? null : document, {
               status: known.status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
-            }));
+            }), true);
           };
           return requestContext
             ? await withRequestContext(requestContext, options.serverFetch, renderError)

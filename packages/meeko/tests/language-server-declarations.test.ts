@@ -88,7 +88,7 @@ describe("language server: generated component declarations", () => {
     assert.match(hoverText(context, context.at("user\">", 1)), /\(parameter\) user: User/);
     assert.match(hoverText(context, context.at("{user.email}", 2)), /\(parameter\) user: User/);
     assert.match(hoverText(context, context.at("(user) =>", 2)), /\(parameter\) user: User/);
-    assert.match(hoverText(context, context.at("<TmpList", 2)), /\*\*Parámetros de tipo:\*\* `T = User`/);
+    assert.match(hoverText(context, context.at("<TmpList", 2)), /```ts\n<TmpList<T = User>\n/);
     const members = (completion(context, context.at("{user.email}", 7)) ?? []).map((item) => item.label);
     assert.ok(members.includes("email") && members.includes("id"), JSON.stringify(members));
   });

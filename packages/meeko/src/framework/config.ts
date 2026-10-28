@@ -8,6 +8,7 @@ import { composeFrameworkRoutes } from "./modules.js";
 import { contentSecurityPolicy } from "../framework-server/csp.js";
 import type { ContentSecurityPolicy } from "../framework-server/csp.js";
 import { normalizeDocumentConfig, siteOrigin } from "./head.js";
+import { resolveThemeConfig } from "./theme.js";
 import type { RouteRecord } from "./router.js";
 import type { MeekoConfig } from "./config-type.js";
 import { isMeekoModule } from "./module.js";
@@ -153,6 +154,16 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
     if (!dev || typeof dev !== "object" || Array.isArray(dev)) throw new TypeError(`${file}: dev must be an object`);
     if (dev.serverLogs !== undefined && typeof dev.serverLogs !== "boolean") throw new TypeError(`${file}: dev.serverLogs must be a boolean`);
   }
+  // `document.theme` is what the build bakes from `theme`; the configuration has one place for it.
+  if (document !== undefined && document.theme !== undefined) throw new TypeError(`${file}: document.theme is not an option of meeko.config.ts; use theme at the top level`);
+  try { resolveThemeConfig(config.theme, `${file}: theme`); }
+  catch (error) {
+    // Before 1.4, `theme` could hold the options of a module with `configKey: "theme"`.
+    if (error instanceof TypeError && error.message.includes(": unknown field ")) {
+      throw new TypeError(`${error.message}. Since 1.4, theme is Meeko's own light/dark theme option; if these are the options of a module with meta.configKey "theme", give that module another configKey and move them there (see docs/migration-1.4.md)`, { cause: error });
+    }
+    throw error;
+  }
   // The build bakes `document` as JSON: a function titleTemplate fails here, not in production.
   normalizeDocumentConfig(config.document, `${file}: document`);
   if (config.site !== undefined) siteOrigin(config.site, `${file}: site`);
@@ -271,19 +282,10 @@ const executedConfigs = new WeakSet<object>();
  * ```
  */
 export function readMeekoConfigSync(projectRoot: string): MeekoConfig {
-  const file = ["meeko.config.ts", "meeko.config.mts", "meeko.config.js", "meeko.config.mjs"]
-    .map((name) => resolve(projectRoot, name)).find(existsSync);
+  const file = configFileOf(projectRoot);
   if (!file) return {};
-  const source = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
-  const exported = source.statements.find(ts.isExportAssignment);
-  const expression = exported?.expression;
-  const config = expression && ts.isCallExpression(expression) ? expression.arguments[0] : expression;
-  if (!config || !ts.isObjectLiteralExpression(config)) return {};
-  const property = (node: ts.ObjectLiteralExpression, name: string): ts.Expression | undefined => {
-    const item = node.properties.find((entry) => ts.isPropertyAssignment(entry) &&
-      ((ts.isIdentifier(entry.name) && entry.name.text === name) || (ts.isStringLiteral(entry.name) && entry.name.text === name)));
-    return item && ts.isPropertyAssignment(item) ? item.initializer : undefined;
-  };
+  const config = staticConfigObject(file);
+  if (!config) return {};
   const strings = (node: ts.ObjectLiteralExpression, name: string): readonly string[] | undefined => {
     const value = property(node, name);
     if (!value) return undefined;
@@ -311,6 +313,91 @@ export function readMeekoConfigSync(projectRoot: string): MeekoConfig {
     ...(modules ? { modules } : {}),
     ...(Object.keys(importDirs).length ? { imports: importDirs } : {}),
   };
+}
+
+/** `meeko.config.*` of a project, if there is one. */
+function configFileOf(projectRoot: string): string | undefined {
+  return ["meeko.config.ts", "meeko.config.mts", "meeko.config.js", "meeko.config.mjs"]
+    .map((name) => resolve(projectRoot, name)).find(existsSync);
+}
+
+/** The object literal that a configuration file exports, read without running it. */
+function staticConfigObject(file: string): ts.ObjectLiteralExpression | undefined {
+  const source = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
+  const exported = source.statements.find(ts.isExportAssignment);
+  const expression = exported?.expression;
+  const config = expression && ts.isCallExpression(expression) ? expression.arguments[0] : expression;
+  return config && ts.isObjectLiteralExpression(config) ? config : undefined;
+}
+
+/** The value of the property `name` of an object literal, when it is a plain assignment. */
+function property(node: ts.ObjectLiteralExpression, name: string): ts.Expression | undefined {
+  const item = node.properties.find((entry) => ts.isPropertyAssignment(entry) &&
+    ((ts.isIdentifier(entry.name) && entry.name.text === name) || (ts.isStringLiteral(entry.name) && entry.name.text === name)));
+  return item && ts.isPropertyAssignment(item) ? item.initializer : undefined;
+}
+
+/**
+ * Whether `theme` is on in `meeko.config.*`, read without running it, as the editor and `meeko
+ * check` need it for `<MeekoThemeToggle>`: `false` without `theme`, `undefined` when it is not
+ * known: without a configuration (the folder may be a layer with its own `package.json`, whose
+ * application has the configuration) or when only running it tells (`theme: someVariable`, a
+ * configuration that is no literal). Unknown gives no MEEK111; the component reports it when it
+ * renders without `theme`.
+ */
+export function readThemeEnabledSync(projectRoot: string): boolean | undefined {
+  const file = configFileOf(projectRoot);
+  if (!file) return undefined;
+  const config = staticConfigObject(file);
+  if (!config) return undefined;
+  const named = config.properties.some((entry) => entry.name !== undefined && (ts.isIdentifier(entry.name) || ts.isStringLiteral(entry.name)) && entry.name.text === "theme");
+  if (!named) return config.properties.some(ts.isSpreadAssignment) ? undefined : false;
+  const value = property(config, "theme");
+  if (!value) return undefined;
+  if (value.kind === ts.SyntaxKind.TrueKeyword || ts.isObjectLiteralExpression(value)) return true;
+  if (value.kind === ts.SyntaxKind.FalseKeyword) return false;
+  return undefined;
+}
+
+/** The value of a literal (`true`, `"dark"`, `["light", "dark"]`, `{ … }`), or `undefined` for an expression. */
+function literalValue(node: ts.Expression): { readonly value: unknown } | undefined {
+  if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isSatisfiesExpression(node)) return literalValue(node.expression);
+  if (node.kind === ts.SyntaxKind.TrueKeyword) return { value: true };
+  if (node.kind === ts.SyntaxKind.FalseKeyword) return { value: false };
+  if (ts.isStringLiteralLike(node)) return { value: node.text };
+  if (ts.isNumericLiteral(node)) return { value: Number(node.text) };
+  if (ts.isArrayLiteralExpression(node)) {
+    const values: unknown[] = [];
+    for (const element of node.elements) {
+      const item = ts.isSpreadElement(element) ? undefined : literalValue(element);
+      if (!item) return undefined;
+      values.push(item.value);
+    }
+    return { value: values };
+  }
+  if (ts.isObjectLiteralExpression(node)) {
+    const value: Record<string, unknown> = {};
+    for (const entry of node.properties) {
+      if (!ts.isPropertyAssignment(entry) || !(ts.isIdentifier(entry.name) || ts.isStringLiteral(entry.name))) return undefined;
+      const item = literalValue(entry.initializer);
+      if (!item) return undefined;
+      value[entry.name.text] = item.value;
+    }
+    return { value };
+  }
+  return undefined;
+}
+
+/**
+ * `theme` of `meeko.config.*` as the editor reads it, without running the configuration: its value
+ * when it is a literal (`true`, `{ themes: ["light", "dark", "sepia"] }`), `undefined` otherwise
+ * (no configuration, no `theme`, or a value that only running it tells).
+ */
+export function readThemeOptionSync(projectRoot: string): unknown {
+  const file = configFileOf(projectRoot);
+  const config = file ? staticConfigObject(file) : undefined;
+  const value = config && property(config, "theme");
+  return value ? literalValue(value)?.value : undefined;
 }
 
 /**

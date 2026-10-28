@@ -201,6 +201,14 @@ export function appTargetAt(program: ts.Program, fileName: string, offset: numbe
   const node = file && nodeAt(file, offset);
   if (!file || !node) return undefined;
   const checker = program.getTypeChecker();
+  // `to="/users/[id]"` of a `<MeekoLink>`, which the editor checks as `__meeko_builtin_MeekoLink({ to: "…" })`.
+  const property = ts.isStringLiteralLike(node) && ts.isPropertyAssignment(node.parent) && node.parent.initializer === node ? node.parent : undefined;
+  const link = property && ts.isIdentifier(property.name) && property.name.text === "to" && ts.isObjectLiteralExpression(property.parent)
+    && ts.isCallExpression(property.parent.parent) && ts.isIdentifier(property.parent.parent.expression) && property.parent.parent.expression.text === "__meeko_builtin_MeekoLink";
+  if (link && ts.isStringLiteralLike(node)) {
+    const route = index.routes.find((candidate) => candidate.id === node.text);
+    return { kind: "route", id: node.text, ...(route ? { route } : {}), node };
+  }
   if (ts.isStringLiteralLike(node) && ts.isCallExpression(node.parent)) {
     const call = node.parent;
     const callee = ts.isIdentifier(call.expression) ? call.expression.text : undefined;

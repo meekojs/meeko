@@ -172,6 +172,12 @@ export default defineMeekoModule({ meta: { name: "future", compatibility: { meek
   await put(root, "modules/broken/index.ts", `import { defineMeekoModule } from "@meekojs/meeko/framework";
 export default defineMeekoModule({ meta: { name: "broken" }, setup(_options, meeko) { meeko.addPlugin("./missing.ts"); } });
 `);
+  // The theme module of the 1.3 guide: `theme` is Meeko's own option since 1.4.
+  for (const [name, key] of [["acme-theme", "theme"], ["acme-site", "site"], ["acme-layers", "layers"]]) {
+    await put(root, `modules/${name}/index.ts`, `import { defineMeekoModule } from "@meekojs/meeko/framework";
+export default defineMeekoModule({ meta: { name: "@acme/${name}", configKey: "${key}" }, defaults: { initial: "light" }, setup() {} });
+`);
+  }
   for (const name of ["dup-a", "dup-b"]) {
     await put(root, `modules/${name}/index.ts`, `import { defineMeekoModule } from "@meekojs/meeko/framework";
 export default defineMeekoModule({ meta: { name: "dup" }, setup() {} });
@@ -184,6 +190,10 @@ export default defineMeekoModule({ meta: { name: "dup" }, setup() {} });
     [`modules: ["./modules/dup-a", "./modules/dup-b"]`, /Meeko module dup is listed more than once/],
     [`modules: [["./legacy-folder", { a: 1 }]]`, /layer folder, which takes no options; move it to layers/],
     [`modules: [42]`, /modules must be an array/],
+    [`modules: ["./modules/acme-theme"]`, /Meeko module @acme\/acme-theme uses meta\.configKey "theme", which is an option of Meeko itself since 1\.4: give the module another configKey .*migration-1\.4/],
+    [`modules: ["./modules/acme-site"]`, /meta\.configKey "site", which is an option of Meeko itself since 1\.3/],
+    [`modules: ["./modules/acme-layers"]`, /meta\.configKey "layers", which is an option of Meeko itself: /],
+    [`modules: ["./modules/acme-theme"], theme: { initial: "dark", storageKey: "theme" }`, /theme: unknown field initial\. Since 1\.4, theme is Meeko's own .*meta\.configKey "theme".*migration-1\.4/],
     [`modules: ["./nowhere"]`, /not found|does not exist/],
   ];
   for (const [modules, error] of cases) {

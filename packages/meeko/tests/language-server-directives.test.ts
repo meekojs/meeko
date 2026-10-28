@@ -16,6 +16,13 @@ test("component tags offer the list and condition directives, without the ones a
   assert.deepEqual(offered, ["if:when", "each:key", "each:index", "bind:", "on:", "ref:", "model:"]);
 });
 
+test("<snippet> offers name, params and if:when, without the ones already there", () => {
+  assert.deepEqual(labels(`<AppCard><snippet |>x</snippet></AppCard>`), ["name", "params", "if:when"]);
+  assert.deepEqual(labels(`<AppCard><snippet name="footer" i|>x</snippet></AppCard>`), ["params", "if:when"]);
+  assert.deepEqual(labels(`<AppCard><snippet name="footer" params="a" if:when="a" |>x</snippet></AppCard>`), []);
+  assert.deepEqual(labels(`<AppCard><snippet on:|>x</snippet></AppCard>`), ["name", "params", "if:when"]);
+});
+
 test("each: completes in a component tag and replaces what was typed", () => {
   const text = `<script lang="ts"></script>\n<template><AppCard each:</template>`;
   const document = TextDocument.create("file:///Probe.meeko", "meeko", 1, text);

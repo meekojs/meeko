@@ -9,7 +9,12 @@
  *
  * Every view shares one proxy handler and keeps its state in the proxy target, so an instance only
  * costs its target and the signals of the props it reads.
+ *
+ * The snippets that the parent passes travel in the channels, not as props. A conditional
+ * `<snippet if:when>` makes one appear or disappear while the child stays mounted, so the view also
+ * keeps one signal per snippet name that the child reads, through {@link passedSnippetsKey}.
  */
+import { readChannels } from "./channels.js";
 import { batch, signal, untrack } from "./reactivity.js";
 import type { Signal } from "./reactivity.js";
 
@@ -42,6 +47,73 @@ interface PropsState {
   readonly values: Map<string, Signal<unknown>>;
   /** Version of the set of names, created the first time a reader enumerates or tests them. */
   shape: Signal<number> | undefined;
+  /** One signal per snippet name read so far; its value only changes when the snippet appears or disappears. */
+  snippets: Map<string, Signal<unknown>> | undefined;
+  /** Version of the set of passed snippets, created the first time a reader enumerates or tests them. */
+  snippetShape: Signal<number> | undefined;
+}
+
+/**
+ * Key of the reader of the snippets that the parent passes now, on a view of {@link reactiveProps}
+ * (also through the defaults view of {@link resolveProps}); `undefined` on plain props.
+ */
+export const passedSnippetsKey: unique symbol = Symbol("meeko.passedSnippets");
+
+/** Tracked reads of the snippets that the parent passes to a mounted child. */
+export interface PassedSnippets {
+  /** The snippet `name` (or `undefined`), with the same identity while it stays passed. */
+  get(name: string): unknown;
+  /** Names of the snippets passed now. */
+  names(): string[];
+}
+
+/** The snippet `name` in the channels of `props`, or `undefined`. */
+function passedSnippet(props: object, name: string): unknown {
+  const snippets = readChannels(props)?.snippets;
+  return snippets && Object.hasOwn(snippets, name) ? snippets[name] : undefined;
+}
+
+/** Names of the snippets in the channels of `props`. */
+function passedNames(props: object): string[] {
+  const snippets = readChannels(props)?.snippets ?? {};
+  return Object.keys(snippets).filter((name) => snippets[name] !== undefined);
+}
+
+function readSnippet(state: PropsState, name: string): unknown {
+  const snippets = state.snippets ??= new Map();
+  let value = snippets.get(name);
+  if (!value) {
+    value = signal(passedSnippet(state.current, name));
+    snippets.set(name, value);
+  }
+  return value.value;
+}
+
+function snippetReader(state: PropsState): PassedSnippets {
+  return {
+    get: (name) => readSnippet(state, name),
+    names: () => {
+      void (state.snippetShape ??= signal(0)).value;
+      return passedNames(state.current);
+    },
+  };
+}
+
+/**
+ * Writes the snippets of the latest read. A snippet that is still passed keeps the value that the
+ * child already has: its content is reactive by itself, and a new value would render it again.
+ */
+function updateSnippets(state: PropsState, previous: object, next: object): void {
+  const shape = state.snippetShape;
+  if (shape) {
+    const before = passedNames(previous);
+    const after = passedNames(next);
+    if (before.length !== after.length || before.some((name) => !after.includes(name))) shape.value = untrack(() => shape.value) + 1;
+  }
+  for (const [name, value] of state.snippets ?? []) {
+    const passed = passedSnippet(next, name);
+    if ((untrack(() => value.value) === undefined) !== (passed === undefined)) value.value = passed;
+  }
 }
 
 function readProp(state: PropsState, key: string): unknown {
@@ -59,7 +131,7 @@ function trackShape(state: PropsState): void {
 
 const propsTraps: ProxyHandler<PropsState> = {
   ...readOnlyTraps,
-  get: (state, key) => typeof key === "symbol" ? Reflect.get(state.current, key) : readProp(state, key),
+  get: (state, key) => key === passedSnippetsKey ? snippetReader(state) : typeof key === "symbol" ? Reflect.get(state.current, key) : readProp(state, key),
   has: (state, key) => {
     trackShape(state);
     return Reflect.has(state.current, key);
@@ -86,10 +158,10 @@ function sameKeys(first: object, second: object): boolean {
  * Creates the props of a child that its parent updates in place. Each prop name gets a signal the
  * first time it is read; the set of names (`in`, `Object.keys`, spreads) is tracked by a version
  * signal. Symbol keys, such as the channels of models and snippets, are read from the latest
- * object without tracking.
+ * object without tracking; the snippets are tracked through {@link passedSnippetsKey}.
  */
 export function reactiveProps<Props extends object>(initial: Props): PropsSource<Props> {
-  const state: PropsState = { current: initial, values: new Map(), shape: undefined };
+  const state: PropsState = { current: initial, values: new Map(), shape: undefined, snippets: undefined, snippetShape: undefined };
   const view = new Proxy(state, propsTraps) as unknown as Props;
   reactiveViews.add(view);
   return {
@@ -101,6 +173,7 @@ export function reactiveProps<Props extends object>(initial: Props): PropsSource
         const shape = state.shape;
         if (shape && !sameKeys(previous, next)) shape.value = untrack(() => shape.value) + 1;
         for (const [key, value] of state.values) value.value = Reflect.get(next, key);
+        updateSnippets(state, previous, next);
       });
     },
   };

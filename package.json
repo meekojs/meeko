@@ -10,6 +10,8 @@
     "check": "pnpm -F @meekojs/meeko run check",
     "test": "pnpm -F @meekojs/meeko run test",
     "verify": "pnpm -F @meekojs/meeko run verify && pnpm -F meeko-devtools-extension run check",
+    "lint": "eslint . --cache --cache-location node_modules/.cache/eslint/",
+    "lint:fix": "eslint . --fix --cache --cache-location node_modules/.cache/eslint/",
     "e2e": "pnpm -F @meekojs/meeko run e2e",
     "conformance": "pnpm -F @meekojs/meeko run conformance",
     "conformance:node": "pnpm -F @meekojs/meeko run conformance:node",
@@ -34,5 +36,13 @@
   },
   "engines": {
     "node": ">=24"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.13.0",
+    "globals": "17.13.0",
+    "jiti": "2.7.0",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "typescript-eslint": "8.72.1"
   }
 }
