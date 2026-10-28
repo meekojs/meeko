@@ -487,14 +487,18 @@ test("el tema llega en el primer byte con la cookie y sin parpadeo en modo siste
     assert.deepEqual((await system.probe()).first, { theme: "dark", moon: "inline", scheme: "dark" });
     const served = documents.at(-1)!;
     assert.equal(served.criticalCh, "Sec-CH-Prefers-Color-Scheme");
-    // When Chromium sends the hint, the server resolves the theme itself.
-    if (served.hint !== null) assert.match(served.html, /<html data-theme="dark">/);
+    // When Chromium sends the hint, the server resolves the theme with it. Under CDP emulation the
+    // hint can still say light on the first navigation while matchMedia already says dark (seen on
+    // the Windows CI runner): the server then writes light and the script corrects it before the
+    // first paint, which the probe above already checked.
+    if (served.hint !== null) assert.match(served.html, new RegExp(`<html data-theme="${served.hint.includes("dark") ? "dark" : "light"}">`));
     else assert.match(served.html, /<html><head>/);
     assert.equal(await system.page.locator("#resolved").innerText(), "dark");
     // Whatever the server knew, the theme of <html> never changed after it was first set.
     const changes = (await system.probe()).changes;
     // The script set it before <body> existed, so nothing was painted with another theme.
-    assert.ok(changes.every((change) => change === "null→dark (before <body>)"), JSON.stringify(changes));
+    // From nothing, or from the light the server wrote with a stale hint: always before <body>.
+    assert.ok(changes.every((change) => /^(?:null|light)→dark \(before <body>\)$/.test(change)), JSON.stringify(changes));
     // "system" follows the operating system while the page is open.
     await system.page.emulateMedia({ colorScheme: "light" });
     await system.page.waitForFunction(() => document.documentElement.getAttribute("data-theme") === "light");
