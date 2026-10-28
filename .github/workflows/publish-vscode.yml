@@ -193,6 +193,9 @@ jobs:
           # ovsx lee el token de OVSX_PAT; nunca se pasa como argumento.
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
+          # Un secreto pegado con un salto de línea o espacios al final hace que ovsx rechace la
+          # cabecera Authorization («Invalid character in header content»).
+          $env:OVSX_PAT = $env:OVSX_PAT.Trim()
           $packages = @(Get-ChildItem -LiteralPath (Join-Path $env:RUNNER_TEMP 'vsix') -Filter '*.vsix' -File | ForEach-Object FullName)
           if ($packages.Count -ne 6) { throw "Se esperaban 6 VSIX; hay $($packages.Count)." }
           pnpm dlx 'ovsx@1.3.0' publish --skip-duplicate --packagePath @packages
