@@ -1,5 +1,11 @@
 # Cambios de Meeko
 
+## [1.4.1] - 2026-10-28
+
+### Correcciones
+
+- **La hoja global ya no se queda sin reglas tras editar un archivo que importa.** En `meeko dev`, el snapshot `.meeko/styles/main.css` transformaba `app/styles/main.css` en cuanto el watcher avisaba de un cambio. Cuando el aviso llega al truncarse el archivo, antes de escribirse su contenido (el watcher descarta después el cambio de la escritura), transformaba un archivo vacío, y la petición del navegador reutilizaba ese resultado de la caché de Vite. La página se quedaba sin las reglas del archivo hasta la siguiente edición. Ahora el snapshot espera al contenido del archivo cambiado con el `read()` de Vite antes de transformar la hoja.
+
 ## [1.4.0] - 2026-10-28
 
 Los cambios de comportamiento que se notan al actualizar desde `1.3`, con lo que hay que revisar en cada uno, se recogen en [Actualizar de 1.3 a 1.4](../../docs/migration-1.4.md).

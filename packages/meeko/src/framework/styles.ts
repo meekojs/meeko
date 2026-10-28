@@ -153,10 +153,16 @@ export function createGlobalStylesheetSnapshot(root: string, report: (message: s
     plugin: {
       name: "meeko:global-stylesheet-snapshot",
       // Vite has already invalidated the changed file and the modules that import it.
-      hotUpdate({ file }) {
+      hotUpdate({ type, file, read }) {
         if (!server || this.environment.name !== "client") return;
         // While the stylesheet fails, any change may be the fix, such as creating a missing module.
-        if (failure !== undefined || reachesStylesheet(this.environment.moduleGraph, file, graphNames(source))) refresh();
+        if (failure === undefined && !reachesStylesheet(this.environment.moduleGraph, file, graphNames(source))) return;
+        // The watcher may report a file as soon as a writer truncates it and then drop the change
+        // of the write that follows. The client environment caches what the snapshot transforms and
+        // the browser's request for the stylesheet reuses it, so transforming the empty file would
+        // leave the page without its rules until the next edit. `read` waits for the contents.
+        if (type === "delete") refresh();
+        else void Promise.resolve().then(read).then(() => refresh(), () => refresh());
       },
     },
     start(vite) {

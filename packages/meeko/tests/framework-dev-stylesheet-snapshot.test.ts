@@ -6,7 +6,8 @@ import { createServer } from "node:net";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { initFrameworkProject } from "../src/framework/init.ts";
-import { globalStylesheetSnapshotFile } from "../src/framework/styles.ts";
+import type { Plugin, ViteDevServer } from "vite";
+import { createGlobalStylesheetSnapshot, globalStylesheetFile, globalStylesheetSnapshotFile } from "../src/framework/styles.ts";
 import { linkRepositoryPackages, repositoryRoot, stopChild, tempProject } from "./helpers/temp-project.ts";
 
 async function freePort(): Promise<number> {
@@ -152,4 +153,50 @@ test("meeko dev keeps the processed global stylesheet in .meeko/styles/main.css"
   await rm(join(root, "app/styles/main.css"));
   await until(async () => !await stat(snapshotFile).then(() => true, () => false), async () => `The snapshot outlived main.css: ${logs}`);
   assert.equal(running.exitCode, null, logs);
+});
+
+test("the snapshot transforms the stylesheet once a changed file holds its contents", { timeout: 30_000 }, async (context) => {
+  // The watcher may report a file as soon as a writer truncates it and drop the change of the write
+  // that follows. The browser's request for the stylesheet reuses the transform the snapshot starts,
+  // so a transform of the truncated file would leave the page without its rules until the next edit.
+  const root = await tempProject(context, "stylesheet-snapshot-read");
+  const source = join(root, globalStylesheetFile);
+  await mkdir(dirname(source), { recursive: true });
+  await writeFile(source, "body { color: red; }\n");
+  const requests: string[] = [];
+  let code = "body { color: red; }\n";
+  const server = { environments: { client: { transformRequest: async (url: string) => {
+    requests.push(url);
+    return { code };
+  } } } } as unknown as ViteDevServer;
+  const reports: string[] = [];
+  const stylesheetSnapshot = createGlobalStylesheetSnapshot(root, (message) => reports.push(message));
+  context.after(() => stylesheetSnapshot.close());
+  const snapshot = () => readFile(join(root, globalStylesheetSnapshotFile), "utf8").catch(() => "");
+  stylesheetSnapshot.start(server);
+  await until(async () => (await snapshot()).includes("color: red"), async () => `No snapshot: ${await snapshot()}`);
+  assert.equal(requests.length, 1);
+
+  type HotUpdate = (this: unknown, options: { type: "create" | "update" | "delete"; file: string; read: () => string | Promise<string> }) => unknown;
+  const hotUpdate = stylesheetSnapshot.plugin.hotUpdate as Plugin["hotUpdate"] & HotUpdate;
+  const environment = { environment: { name: "client", moduleGraph: { getModulesByFile: () => undefined } } };
+  const file = source.replaceAll("\\", "/");
+  let release!: (contents: string) => void;
+  const contents = new Promise<string>((done) => { release = done; });
+  hotUpdate.call(environment, { type: "update", file, read: () => contents });
+  await new Promise((done) => setImmediate(done));
+  assert.equal(requests.length, 1, "the stylesheet is not transformed while the changed file may be incomplete");
+  code = "body { color: blue; }\n";
+  release(code);
+  await until(async () => (await snapshot()).includes("color: blue"), async () => `The snapshot missed the edit: ${await snapshot()}`);
+  assert.equal(requests.length, 2);
+
+  // A file that cannot be read, or was deleted, still refreshes the snapshot.
+  code = "body { color: green; }\n";
+  hotUpdate.call(environment, { type: "update", file, read: () => Promise.reject(new Error("ENOENT")) });
+  await until(async () => (await snapshot()).includes("color: green"), async () => `The snapshot missed a failed read: ${await snapshot()}`);
+  code = "body { color: black; }\n";
+  hotUpdate.call(environment, { type: "delete", file, read: () => { throw new Error("deleted"); } });
+  await until(async () => (await snapshot()).includes("color: black"), async () => `The snapshot missed a deletion: ${await snapshot()}`);
+  assert.deepEqual(reports, []);
 });

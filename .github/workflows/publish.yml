@@ -3,7 +3,9 @@ name: Publicar en npm
 on:
   push:
     tags:
-      - 'v*'
+      # Sólo etiquetas de versión del paquete (`v1.4.1`): `v*` también encajaba con
+      # `vscode-v*`, que publica la extensión en su propio workflow.
+      - 'v[0-9]*'
 
 # Mínimo privilegio: cada job amplía sólo lo que necesita. `id-token: write` queda
 # limitado a `publish` (npm Trusted Publishing) y `contents: write` a `github-release`.

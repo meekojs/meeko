@@ -1,38 +1,13 @@
 <script lang="ts">
-	import { effect, signal } from '@meekojs/meeko'
 	import type { Component } from '@meekojs/meeko'
-	import type { Theme } from '../../shared/types/theme.js'
 
 	export interface Props {
 		outlet: Component<Record<string, unknown>>
 	}
 
 	const props = defineProps<Props>()
-	const theme = signal<Theme>('system')
-	const storageKey = 'meeko-theme'
-	let mounted = false
-
-	/** Applies the choice to <html> and remembers it; "system" follows prefers-color-scheme. */
-	effect(() => {
-		const value = theme.value
-		if (!mounted) return
-		const root = document.documentElement
-		try {
-			if (value === 'system') localStorage.removeItem(storageKey)
-			else localStorage.setItem(storageKey, value)
-		} catch {
-			/* Storage may be blocked; the choice still applies to this page. */
-		}
-		if (value === 'system') delete root.dataset.theme
-		else root.dataset.theme = value
-	})
-
-	// The bootstrap script of app.meeko already applied the stored theme before the first paint.
-	onMounted(() => {
-		mounted = true
-		const stored = document.documentElement.dataset.theme
-		theme.value = stored === 'light' || stored === 'dark' ? stored : 'system'
-	})
+	// Meeko keeps the theme (theme in meeko.config.ts): <html>, the cookie, localStorage and the system.
+	const { theme } = useTheme()
 
 	const home = href('/')
 	const guide = href('/docs/[slug]', { params: { slug: 'framework' } })
