@@ -2,15 +2,15 @@
 
 Meeko conserva el motor independiente en `@meekojs/meeko`. El modo de aplicación usa `@meekojs/meeko/framework` y Vite usa `@meekojs/meeko/vite`. El servidor se reparte en estas subrutas:
 
-- `@meekojs/meeko/server`: núcleo portable de la aplicación (`createServerApp`, `defineServerRuntime`, contratos API/RPC, sesiones, middleware, Socket, `createSocketUpgradeHandler` y OpenAPI). Sólo usa Web APIs y `node:async_hooks`; no carga TypeScript, Vite, `ws` ni el sistema de archivos.
+- `@meekojs/meeko/server`: núcleo portable de la aplicación (`createServerApp`, `defineServerRuntime`, contratos API/RPC, sesiones, middleware, Socket, `createSocketUpgradeHandler`, OpenAPI y, desde `1.3`, `contentSecurityPolicy`). Sólo usa Web APIs y `node:async_hooks`; no carga TypeScript, Vite, `ws` ni el sistema de archivos.
 - `@meekojs/meeko/node`: adaptador Node (`serveNode`, `toNodeListener`, `createNodeAssetReader`, `attachNodeWebSocketServer` y `createNodeSocketUpgradeHandler`).
 - `@meekojs/meeko/password` (desde `1.2`): `hashPassword`, `verifyPassword` y `needsRehash` con scrypt; necesita `node:crypto`, así que sirve en Node, Bun y Deno, no en Workers (véase [Contraseñas](#contraseñas)).
 - `@meekojs/meeko/bun`: adaptador Bun (`createBunServer` y `createBunAssetReader`).
 - `@meekojs/meeko/deno`: adaptador Deno (`serveDeno` y `createDenoAssetReader`).
 - `@meekojs/meeko/cloudflare`: adaptador Cloudflare Workers (`createWorker`, `createSocketRoomClass`, `DurableObjectSocketPubSub`, `D1SessionDriver`, `createCloudflareAssetReader` y `createCloudflarePrerenderSource`).
-- `@meekojs/meeko/build`: herramientas de build que leen el sistema de archivos y cargan TypeScript (`discoverRoutes`, `discoverErrorPage`, `discoverConfiguredRoutes`, `composeFrameworkRoutes`, `loadMeekoConfig`, `readMeekoConfigSync`, `resolveConfigSources`, `discoverServerManifest`, `prerenderRoutes`, `prerenderProject` y `buildProject`). El servidor de producción no la importa.
+- `@meekojs/meeko/build`: herramientas de build que leen el sistema de archivos y cargan TypeScript (`discoverRoutes`, `discoverErrorPage`, `discoverConfiguredRoutes`, `composeFrameworkRoutes`, `loadMeekoConfig`, `readMeekoConfigSync`, `resolveConfigSources`, `discoverServerManifest`, `prerenderRoutes`, `prerenderProject`, `buildProject` y, desde `1.3`, `inlineScriptHashes`). El servidor de producción no la importa.
 
-Todas las subrutas pertenecen al mismo paquete y versión. Los destinos de servidor publicados son Node 24, Bun, Deno y Cloudflare Workers, y la misma suite de conformidad los comprueba (véase [Build, despliegue y verificación](#build-despliegue-y-verificación)). El build y las herramientas de desarrollo siguen ejecutándose con Node. SSR está activo por defecto.
+Todas las subrutas pertenecen al mismo paquete y versión. Los destinos de servidor publicados son Node 24, Bun, Deno y Cloudflare Workers, y la misma suite de conformidad los comprueba (véase [Build, despliegue y verificación](#build-despliegue-y-verificación)). Desde `1.3`, el adaptador `static` genera además un sitio de archivos, sin servidor, para un hosting estático (véase [Sitio estático](#sitio-estático)). El build y las herramientas de desarrollo siguen ejecutándose con Node. SSR está activo por defecto.
 
 La aplicación generada necesita Node 24 o posterior y TypeScript 7 para comprobar sus declaraciones; el compilador de `.meeko` utiliza internamente TypeScript 6 sólo durante el desarrollo y el build. El paquete es ESM. `vite` es un peer opcional: una aplicación que sólo usa el motor puede importar `@meekojs/meeko` sin iniciar el framework, el servidor, sesiones o Socket. El adaptador Node carga `ws` al activar `attachNodeWebSocketServer`, no al importar el motor.
 
@@ -147,11 +147,15 @@ El módulo exporta por defecto `defineUtilities(fn)` o una función sin envolver
 | `atRule(nombre, params, declaraciones?, ...hijas)` | Una at-rule, sin `@` en el nombre: `atRule("media", "(min-width: 48rem)", …)`, `atRule("supports", "(display: grid)", …)`, `atRule("property", "--angle", { syntax: "'<angle>'", inherits: "false", initialValue: "0deg" })`. Con sólo `nombre` y `params` es una sentencia: `atRule("layer", "a, b")` da `@layer a, b;`. |
 | `` css`…` `` o `css("…")` | CSS literal, que se analiza con PostCSS, para lo que no cabe en los helpers (`@keyframes`, varias reglas copiadas). Conserva las barras invertidas (`content: "\201C"`). |
 
-Las declaraciones son un objeto: las claves en camelCase pasan a kebab-case (`borderRadius` → `border-radius`, `WebkitAppearance` → `-webkit-appearance`, `msFlex` → `-ms-flex`) y las propiedades personalizadas `--*` se escriben tal cual. Un valor es una cadena, que puede terminar en `!important`, o un número, que se escribe sin unidades (`opacity: 0.5`, `zIndex: 10`; escriba `"4px"` para una longitud). `undefined` omite la declaración y un array escribe una declaración por valor, para los valores de respaldo (`display: ["-webkit-box", "flex"]`). Los tipos `UtilityHelpers`, `UtilityDeclarations`, `UtilityOutput`, `UtilityRule`, `UtilityAtRule`, `UtilityCss`, `UtilityFunction` y `MeekoUtilitiesOptions` se exportan desde el mismo subpath.
+Las declaraciones son un objeto: las claves en camelCase pasan a kebab-case (`borderRadius` → `border-radius`, `WebkitAppearance` → `-webkit-appearance`, `msFlex` → `-ms-flex`); las claves en kebab-case (`"border-radius"`) y las propiedades personalizadas `--*` se escriben tal cual. Un valor es una cadena, que puede terminar en `!important`, o un número, que se escribe sin unidades (`opacity: 0.5`, `zIndex: 10`). `undefined` omite la declaración y un array escribe una declaración por valor, para los valores de respaldo (`display: ["-webkit-box", "flex"]`, también un array `as const`).
+
+Desde `1.3`, las declaraciones están tipadas con [csstype](https://github.com/frenic/csstype): el editor autocompleta las propiedades estándar y con prefijo de proveedor, y las palabras clave de su valor (`position: "sticky"`), y una propiedad mal escrita (`backgroundColr`) o una palabra clave que no existe es un error de tipos en el editor y al comprobar el módulo con TypeScript. Las longitudes y los tiempos son cadenas con unidad (`padding: "4px"`, `transitionDuration: "200ms"`), salvo el `0`: `padding: 4` es un error, porque se escribiría `padding: 4`, que el navegador descarta. Los números valen donde CSS los admite sin unidad (`opacity`, `zIndex`, `flexGrow`, `lineHeight`, `fontWeight`…). En `atRule`, el objeto admite además los descriptores de `@font-face` (`src`, `fontDisplay`, `unicodeRange`…), `@property` (`syntax`, `inherits`, `initialValue`), `@page`, `@counter-style`, `@font-palette-values` y `@view-transition` (tipo `UtilityAtRuleDeclarations`). Un objeto que se construye fuera de la llamada pierde las palabras clave (`const base = { position: "absolute" }` es `{ position: string }`): anótelo con `UtilityDeclarations` o use `as const`. Un objeto con claves dinámicas, como el `{ [k: string]: string }` de `Object.fromEntries` en el ejemplo de la paleta o un `Record<string, string>`, se acepta sin comprobar sus claves. A la inversa, `UtilityDeclarations` ya no tiene firma de índice: leerlo con una clave `string` (`decls[key]`) es el error `TS7053` con `noImplicitAny`; use `Object.entries(decls)` o una clave `keyof UtilityDeclarations`. Para una propiedad o una at-rule que csstype todavía no conoce, escriba el CSS con `` css`…` ``.
+
+Los tipos `UtilityHelpers`, `UtilityDeclarations`, `UtilityAtRuleDeclarations` (desde `1.3`), `UtilityValue`, `UtilityOutput`, `UtilityNode`, `UtilityRule`, `UtilityAtRule`, `UtilityCss`, `UtilityFunction` y `MeekoUtilitiesOptions` se exportan desde el mismo subpath.
 
 Los errores detienen la hoja con el archivo CSS y la línea del `@utilities`, que Vite muestra en su overlay: un módulo que no existe o con otra extensión, un módulo que no compila, un export por defecto que no es una función, una excepción de la función (con su mensaje), un selector, un nombre de propiedad, un valor o unos parámetros de at-rule no válidos (un `;` o una llave en un valor, un número `NaN`) y un valor de la salida que no es un nodo de los helpers, por ejemplo una cadena de CSS sin `css`. Tras corregir el módulo, la siguiente edición regenera la hoja.
 
-**Carga del módulo y actualización en caliente.** `import()` nativo guarda en caché cada módulo del grafo durante toda la vida del proceso: una query en el módulo de entrada lo recarga a él, pero no a los archivos locales que importa. Por eso el plugin empaqueta el módulo con rolldown, el bundler que Vite 8 ya incluye (no añade dependencias): los archivos locales, también los que llegan por un alias de `tsconfig` o por `#imports` del mismo paquete, forman un único módulo ES que se importa desde una URL `data:`, y los paquetes de `node_modules` quedan externos y se cargan una vez con Node, como en cualquier programa. Así se admite todo TypeScript, imports sin extensión incluidos, e `import.meta.url`, `import.meta.dirname` e `import.meta.filename` siguen describiendo el archivo original. El resultado se reutiliza mientras ningún archivo del grafo cambie de fecha de modificación o de tamaño, de modo que una hoja que se transforma muchas veces no vuelve a empaquetar nada. El plugin publica cada archivo del grafo como dependencia de la hoja (mensajes `dependency` de PostCSS), así que en `meeko dev` editar `color.ts` o `palette.ts` regenera la hoja y Vite actualiza el CSS en caliente, sin recargar la página ni reiniciar el servidor. Guarde estos módulos fuera de las carpetas que Meeko vigila por sus autoimports y sus rutas (`app/components`, `app/composables`, `app/utils`, `app/stores`, `app/pages`, `app/layouts`, `shared/…`, `server/utils`…): un cambio en ellas recarga la página entera, como cualquier otro archivo de esas carpetas; `app/styles/` es el lugar natural. Fuera de Vite 8 (por ejemplo, `postcss-cli`), si no encuentra rolldown, el plugin importa el módulo con la eliminación de tipos nativa de Node, que exige imports con extensión y sintaxis de TypeScript borrable, recarga sólo el módulo de entrada y lo advierte una vez.
+**Carga del módulo y actualización en caliente.** `import()` nativo guarda en caché cada módulo del grafo durante toda la vida del proceso: una query en el módulo de entrada lo recarga a él, pero no a los archivos locales que importa. Por eso el plugin empaqueta el módulo con rolldown, el bundler que Vite 8 ya incluye (no añade dependencias): los archivos locales, también los que llegan por un alias de `tsconfig` o por `#imports` del mismo paquete, forman un único módulo ES que se importa desde una URL `data:`, y los paquetes de `node_modules` quedan externos y se cargan una vez con Node, como en cualquier programa. Así se admite todo TypeScript, imports sin extensión incluidos, e `import.meta.url`, `import.meta.dirname` e `import.meta.filename` siguen describiendo el archivo original. El resultado se reutiliza mientras ningún archivo del grafo cambie de fecha de modificación o de tamaño, de modo que una hoja que se transforma muchas veces no vuelve a empaquetar nada. El plugin publica cada archivo del grafo como dependencia de la hoja (mensajes `dependency` de PostCSS), así que en `meeko dev` editar `color.ts` o `palette.ts` regenera la hoja y Vite actualiza el CSS en caliente, sin recargar la página ni reiniciar el servidor. Guarde estos módulos fuera de las carpetas que Meeko vigila por sus autoimports y sus rutas (`app/components`, `app/composables`, `app/utils`, `app/stores`, `app/pages`, `app/layouts`, `shared/…`, `server/utils`, las de `imports`…): un cambio en ellas recarga la página entera, como cualquier otro archivo de esas carpetas; `app/styles/` es el lugar natural. Fuera de Vite 8 (por ejemplo, `postcss-cli`), si no encuentra rolldown, el plugin importa el módulo con la eliminación de tipos nativa de Node, que exige imports con extensión y sintaxis de TypeScript borrable, recarga sólo el módulo de entrada y lo advierte una vez.
 
 Las reglas generadas en un `<style scoped>` no reciben el atributo de ámbito: Meeko aplica el ámbito al compilar el bloque y PostCSS genera las reglas después, así que son globales, como las de `app/styles/main.css`. El plugin sólo se ejecuta en Node, durante `meeko dev` y el build; `@meekojs/meeko/postcss` no forma parte del runtime del navegador ni del servidor.
 
@@ -167,6 +171,23 @@ export default { plugins: [meekoUtilities(), tailwindcss()] };
 
 En ese orden, Tailwind recibe las reglas generadas como el resto de la hoja y procesa, por ejemplo, el `@apply` de un `` css`…` ``; con `layer(utilities)` quedan en la misma capa `utilities` que las de Tailwind. En el orden inverso, Tailwind compila primero cada hoja que importa `tailwindcss` y elimina las at-rules que no conoce, `@utilities` incluida, sin error; el plugin lo advierte una vez por proceso. En una hoja sin `@import "tailwindcss"`, como el `<style>` de un componente, el orden no importa.
 
+<a id="hoja-global-procesada-para-el-editor"></a>**Hoja global procesada para el editor.** Las clases que generan las `@utilities`, y las de los archivos que la hoja importa, no están escritas en ningún archivo CSS del proyecto. Por eso `meeko dev` escribe `app/styles/main.css` ya procesada en `.meeko/styles/main.css`: la misma hoja que sirve en `/app/styles/main.css?direct`, con los `@import` resueltos, las `@utilities` expandidas y el resto de plugins de PostCSS aplicados, sin minificar y con un comentario inicial que indica que es generada. La escribe en segundo plano en cuanto el servidor escucha, sin retrasar el arranque, y la reescribe cada vez que cambian la hoja o algo de lo que depende: un archivo importado, un módulo de `@utilities` o un archivo que ese módulo importa. También tras un reinicio de Vite (por ejemplo, al cambiar `.env`).
+
+- Sólo sustituye el archivo cuando cambia su contenido, y de forma atómica (escribe un temporal y lo renombra), así que un lector nunca ve media hoja. Vite no vigila `.meeko/`: escribirla no recarga la página ni provoca otra regeneración.
+- Si la hoja no compila (un error de PostCSS o de un módulo de `@utilities`), el archivo conserva la última versión buena, el servidor sigue funcionando y la consola lo indica una vez: `[meeko] .meeko/styles/main.css conserva la versión anterior: app/styles/main.css no compila (…)`. El siguiente cambio que la arregla la regenera.
+- Sin `app/styles/main.css` no hay archivo; si la hoja se borra con `meeko dev` en marcha, también se borra el archivo.
+- `meeko build` no lo escribe: el CSS del build está minificado y mezcla la hoja global con los `<style>` de los componentes. El archivo se conserva al detener `meeko dev`, así que basta con haberlo ejecutado una vez; `meeko clean` lo elimina con el resto de `.meeko/`.
+- Nada lo carga en ejecución y no debe editarse a mano. Las `url()` aparecen como las reescribe Vite en desarrollo.
+
+Sirve a las extensiones del editor que completan clases a partir de hojas CSS en disco. Con [HTML CSS Support](https://marketplace.visualstudio.com/items?itemName=ecmel.vscode-html-css) (`ecmel.vscode-html-css`) en VS Code:
+
+```json
+// .vscode/settings.json
+{ "css.styleSheets": [".meeko/styles/main.css"] }
+```
+
+La ruta es relativa a la carpeta del workspace. La extensión busca los archivos locales con la búsqueda de VS Code, que aplica `files.exclude` pero no `.gitignore` ni `search.exclude`: encuentra el archivo aunque `.meeko/` esté en `.gitignore`, como en el starter. Si su `files.exclude` oculta `.meeko`, la extensión tampoco lo verá; oculte en su lugar sólo las carpetas que no quiera ver, por ejemplo `".meeko/output": true`. La extensión guarda cada hoja local en caché y sólo la vuelve a leer cuando se guarda desde el propio editor: tras un cambio que regenera el archivo, ejecute **CSS: Clear style sheets cache** desde la paleta de comandos para ver las clases nuevas. Por defecto sólo completa en HTML; para los `.meeko`, añada `"css.enabledLanguages": ["html", "meeko"]` en la configuración de usuario (la extensión no lo admite por workspace) y reinicie VS Code.
+
 En desarrollo, Vite abre un WebSocket HMR en un puerto derivado del puerto HTTP para que dos aplicaciones Meeko no compitan por el puerto predeterminado de Vite. `MEEKO_HMR_PORT` permite fijarlo explícitamente cuando el entorno lo exige; el navegador debe poder acceder a ese puerto además del HTTP de la aplicación.
 
 <a id="variables-de-entorno-y-env"></a>**Variables de entorno y `.env`.** Desde `1.2`, `meeko dev`, `build`, `start`, `preview` y `check` cargan el `.env` de la raíz del proyecto en `process.env`, como Vite y Nuxt en desarrollo. Una variable que el entorno ya define tiene prioridad, así que el entorno real de un despliegue nunca se sustituye. La salida de `meeko build` ejecutada directamente (`node .meeko/output/node/index.mjs`, un contenedor) no lee `.env`: en producción las variables llegan del entorno. Cambiar `.env` exige reiniciar `meeko dev`. Meeko lee estas variables:
@@ -174,7 +195,7 @@ En desarrollo, Vite abre un WebSocket HMR en un puerto derivado del puerto HTTP 
 | Variable | Comandos | Efecto |
 | --- | --- | --- |
 | `MEEKO_PORT`, `MEEKO_HOST` | `dev`, `start`, `preview` y la salida de Node, Bun y Deno | Puerto y dirección; sustituyen a `server.port` y `server.host`. Por defecto, `127.0.0.1:4173`. Sin `MEEKO_PORT` se lee `PORT`, que inyectan plataformas como Coolify, Railway o Cloud Run. |
-| `MEEKO_PUBLIC_ORIGIN` | `dev`, `start`, `preview` y la salida de Node, Bun, Deno y Workers | Origen público tras un proxy HTTPS, para las comprobaciones de `Origin` de HTTP y Socket. |
+| `MEEKO_PUBLIC_ORIGIN` | `dev`, `start`, `preview` y la salida de Node, Bun, Deno y Workers; desde `1.3`, también `build` | Origen público tras un proxy HTTPS, para las comprobaciones de `Origin` de HTTP y Socket. En `build`, y sólo si falta `site` en `meeko.config.ts`, el origen de las URL absolutas de `sitemap.xml`, `robots.txt` y `document.seo`; el build sólo la lee cuando escribe alguna. Como en el servidor, cuenta sólo el origen de la URL: `https://example.com/app` vale `https://example.com`. |
 | `MEEKO_REDIS_URL` | La salida de Node, Bun y Deno | Redis de las sesiones en producción cuando `server/runtime.ts` no declara `sessions`; véase [Sesiones sin configuración](#sesiones-sin-configuración). |
 | `MEEKO_REDIS_PREFIX` | Ídem | Prefijo de sus claves; por defecto, `meeko:<name de package.json>:prod:`. |
 | `MEEKO_SESSION_TTL`, `MEEKO_SESSION_SAMESITE` | `dev` y producción | Duración (`12h`, `7d`…; 7 días por defecto) y `SameSite` (`Lax` por defecto, o `Strict`) de esas sesiones. |
@@ -199,7 +220,11 @@ import seo from "@acme/meeko-seo";
 export default defineMeekoConfig({
   layers: ["./layers/base"],
   modules: [[seo, { siteUrl: "https://example.com" }], "./modules/hello"],
-  imports: { serverDirs: ["server/services", "server/repositories"] },
+  imports: {
+    appDirs: ["app/services"],
+    sharedDirs: ["shared/validators"],
+    serverDirs: ["server/services", "server/repositories"],
+  },
   document: { lang: "es", head: { meta: [{ name: "theme-color", content: "#0f172a" }] } },
 });
 ```
@@ -208,13 +233,19 @@ export default defineMeekoConfig({
 
 - `layers` (desde `1.2`): carpetas que aportan páginas, componentes, autoimports y plugins; véase [Layers](#layers). `extends`, el nombre anterior, sigue funcionando como alias.
 - `modules`: módulos creados con `defineMeekoModule`, que configuran el proyecto desde código; véase [Módulos](#módulos).
-- `imports.serverDirs`: directorios de autoimports exclusivos del servidor, dentro de `server/`.
+- `imports`: carpetas de autoimports además de las de por defecto, con el ámbito de la carpeta que las contiene; véase [Autoimports y TypeScript](#carpetas-de-autoimports).
+  - `imports.appDirs` (desde `1.3`): carpetas dentro de `app/` (`"app/services"`), con el ámbito de `app/`: navegador y SSR, no `shared/` ni `server/`.
+  - `imports.sharedDirs` (desde `1.3`): carpetas dentro de `shared/` (`"shared/validators"`), con el ámbito de `shared/`: aplicación y servidor.
+  - `imports.serverDirs`: carpetas dentro de `server/`, exclusivas del servidor.
 - `server`: el adaptador de `meeko build`; véase [Build, despliegue y verificación](#build-despliegue-y-verificación).
-- `document` (desde `1.2`): `lang` y las entradas de `<head>` de todos los documentos. Los módulos añaden las suyas con `meeko.addHead`; las de `document.head` se aplican después, así que el `title` del proyecto gana.
+- `document` (desde `1.2`): `lang` y las entradas de `<head>` de todos los documentos. Los módulos añaden las suyas con `meeko.addHead`; las de `document.head` se aplican después, así que el `title` del proyecto gana. Desde `1.3`, `document.seo` añade la URL canónica y Open Graph de cada página; véase [Canónica y Open Graph por página](#canónica-y-open-graph-por-página).
+- `dev` (desde `1.3`): opciones de `meeko dev`. `serverLogs: false` desactiva los [logs del servidor en la consola del navegador](#logs-del-servidor-en-la-consola-del-navegador).
+- `site` (desde `1.3`): la URL pública del sitio (`"https://example.com"`, sólo el origen). Es el origen de las URL absolutas que escribe Meeko: `sitemap.xml`, `robots.txt` y `document.seo`. Sin `site`, el build usa `MEEKO_PUBLIC_ORIGIN`. No cambia las comprobaciones de `Origin`, que siguen leyendo `MEEKO_PUBLIC_ORIGIN` o `publicOrigin` de `server/runtime.ts` al ejecutarse.
+- `sitemap` y `robots` (desde `1.3`): `sitemap.xml` y `robots.txt` generados en el build; véase [`sitemap.xml` y `robots.txt`](#sitemapxml-y-robotstxt).
 
 Desde `1.2`, `css: { scopeAttribute: "matched" }` limita el atributo de `<style scoped>` a los elementos que algún selector con ámbito puede seleccionar; con `"all"`, el valor por defecto en `1.x`, va en todos los elementos de la plantilla. `"matched"` pasará a ser el valor por defecto en `2.0`. Véase [Estilos con ámbito](api.md#qué-elementos-reciben-el-atributo), con el caso de las clases que el script añade con la API del DOM.
 
-La configuración se ejecuta en `meeko dev`, `meeko build` y `meeko check`. En un workspace de confianza el servidor de lenguaje también la ejecuta, con sus módulos, por lo que las listas pueden construirse dinámicamente; en un workspace no confiable (o con `trusted: false`, ver [editores](editors.md)) el editor no ejecuta código del proyecto: lee `layers`, `extends` e `imports.serverDirs` como arrays literales de cadenas y, de `modules`, sólo las cadenas literales que son carpetas de layer. Los autoimports y componentes de los módulos no existen para ese editor hasta que se confía en el workspace.
+La configuración se ejecuta en `meeko dev`, `meeko build` y `meeko check`. En un workspace de confianza el servidor de lenguaje también la ejecuta, con sus módulos, por lo que las listas pueden construirse dinámicamente; en un workspace no confiable (o con `trusted: false`, ver [editores](editors.md)) el editor no ejecuta código del proyecto: lee `layers`, `extends`, `imports.appDirs`, `imports.sharedDirs` e `imports.serverDirs` como arrays literales de cadenas y, de `modules`, sólo las cadenas literales que son carpetas de layer. Los autoimports y componentes de los módulos no existen para ese editor hasta que se confía en el workspace.
 
 El descubrimiento de servidor también rechaza árboles de cliente imposibles. Por ejemplo, no permite que `api.users.get()` sea a la vez una función y el padre de `api.users.get.post()`, ni que un procedimiento `rpc.users()` sea el padre de `rpc.users.get()`. El error se produce al generar el manifiesto e identifica ambos archivos, antes de inicializar el cliente o emitir tipos contradictorios.
 
@@ -229,9 +260,33 @@ Al crear o eliminar una página, un layout, `app/app.meeko`, `app/error.meeko`, 
 
 Cuando Vite se reinicia (al cambiar un `.env` o una dependencia de su configuración), `meeko dev` también crea de nuevo la aplicación, con las mismas consecuencias, una vez que el servidor de Vite nuevo está listo. Si coincide con la creación o eliminación de una ruta, crea una sola aplicación.
 
-Editar un canal Socket existente, cambiar `meeko.config.ts` o editar el código de `setup` de un módulo sigue exigiendo reiniciar `npm run dev` (los archivos de runtime de un módulo, como sus plugins o componentes, se recargan como los del proyecto). Los tipos y manifiestos de `.meeko/` no se regeneran en `meeko dev`: ejecute `npm run check` para actualizarlos.
+Crear, editar o eliminar un `.ts` de una carpeta de autoimports (las de por defecto y, desde `1.3`, las de `imports.appDirs`, `sharedDirs` y `serverDirs`) vuelve a leer el registro de autoimports e invalida los módulos, y el navegador se recarga; no hace falta reiniciar. Editar un canal Socket existente, cambiar `meeko.config.ts` (también las listas de `imports`) o editar el código de `setup` de un módulo sigue exigiendo reiniciar `npm run dev` (los archivos de runtime de un módulo, como sus plugins o componentes, se recargan como los del proyecto). Los tipos y manifiestos de `.meeko/` no se regeneran en `meeko dev`: ejecute `npm run check` para actualizarlos.
 
 El observador de archivos de Vite ignora todo `.meeko/` salvo `.meeko/generated`, las entradas que sirve. Así, `meeko check`, el servidor de lenguaje o un build que escriben en `.meeko/check`, `routes`, `types`, `manifests`, `output`, `build` o en los `tsconfig.*` generados mientras corre `meeko dev` no recargan el navegador, y el escaneo de dependencias de Vite tampoco entra en `.meeko/`.
+
+### Logs del servidor en la consola del navegador
+
+Desde `1.3`, en `meeko dev`, lo que el código de servidor escribe con `console.log`, `info`, `warn`, `error` o `debug` mientras atiende una petición aparece también en la consola del navegador, como `features.devLogs` de Nuxt. La terminal lo sigue mostrando igual: los logs se copian, no se desvían.
+
+- **Qué se reenvía.** Cada llamada se asocia a su petición por el contexto asíncrono de esa petición, así que dos peticiones simultáneas no mezclan sus logs. Cuenta todo lo que se ejecuta para ella: middleware de servidor y de ruta, loaders, `<script server>`, plugins `*.server.ts`, el render, los clientes `api.*` y `rpc.*` del SSR, handlers de API y RPC y el trabajo asíncrono que inician, también el de `waitUntil`. Lo que se escribe fuera de una petición (el arranque, la fábrica de `server/runtime.ts`, Vite, los callbacks de Socket) sólo va a la terminal.
+- **Cómo llega.**
+  - El documento HTML lleva los logs de su render en `<head>`, y el navegador los imprime al cargar, antes de hidratar en la práctica. Los dos scripts que Meeko añade allí llevan el nonce del documento (el `'nonce-…'` de su cabecera `Content-Security-Policy` o, sin él, el atributo `nonce` de sus scripts, que escribe `DocumentOptions.nonce`), así que funcionan con una CSP con nonce o con `'strict-dynamic'`.
+  - Con `render: "stream"`, los que se escriben mientras llegan los valores diferidos van en el stream, detrás del bloque al que pertenecen y siempre fuera de `#app`, que el navegador hidrata.
+  - Una navegación cliente recibe los logs de su petición de datos en el payload.
+  - Las peticiones de API y RPC, y lo que se escribe después de completar una respuesta, llegan por el WebSocket de HMR de Vite. Como no se sabe qué pestaña hizo la petición, se imprimen en todas las pestañas abiertas de la aplicación, con el método, la ruta y el `requestId`.
+- **Cómo se ve.** Cada petición es un grupo de la consola con la insignia `server`, el método, la ruta y el principio del `requestId` (el de la cabecera `x-request-id`), y cada log lleva la misma insignia y su nivel (`console.warn` es un aviso, `console.error` un error). Los objetos se pueden desplegar como en el servidor: `Map`, `Set`, fechas, `bigint`, referencias circulares y nombres de clase. Un `Error` muestra la traza del servidor, con sus archivos y líneas, y su `cause`. Las funciones, los símbolos y los datos binarios se muestran por su nombre o su descripción. Los getters no se ejecutan y los proxies no se atraviesan. Un valor más profundo de 8 niveles, una colección de más de 100 elementos o un texto de más de 10 000 caracteres se recortan; una petición con más de 500 logs, o con más de 1 MB de ellos, avisa de cuántos quedaron sólo en la terminal.
+- **Sin duplicados.** Cada log llega una sola vez al navegador, por un único camino. El informe de un error de petición que Meeko ya escribe (`[meeko] request error <id>` y el error con su traza) llega también por este camino y una sola vez. Con `server.forwardConsole` de Vite, que copia la consola del navegador en la terminal, los logs del servidor no vuelven a la terminal.
+- **Sólo en desarrollo.** Ni la captura de `console` ni el código del navegador existen en `meeko build`, `meeko start` o `meeko preview`: el HTML, los payloads y los bundles de producción no los incluyen.
+- **Sólo para el navegador del desarrollador.** Las respuestas sólo llevan los logs si la petición llega desde loopback (`127.0.0.0/8` o `::1`), con una cabecera `Host` de loopback (`localhost`, un subdominio de `.localhost`, `127.x.x.x` o `[::1]`) y sin cabeceras de proxy (`Forwarded`, `Via`, `X-Forwarded-*`, `X-Real-IP`, `CF-Connecting-IP`, `True-Client-IP` y similares). El host de `MEEKO_PUBLIC_ORIGIN` no cuenta como propio: un túnel o un proxy local (ngrok, cloudflared, los *dev tunnels* de VS Code, Tailscale) conecta desde loopback y publica justamente ese nombre, así que sus visitantes no reciben los logs aunque el túnel reescriba `Host` a `localhost`, porque añade cabeceras de reenvío. Con `MEEKO_HOST=0.0.0.0` (para probar desde un móvil, por ejemplo), o tras un túnel, un navegador de otra máquina no recibe logs en sus respuestas: los de sus peticiones se imprimen en las pestañas del propio equipo, porque el WebSocket de HMR de Meeko sólo escucha en `127.0.0.1`. Ese puerto (`MEEKO_HMR_PORT`) no debe publicarse por un túnel: quien se conecte a él recibe los logs de todas las peticiones, como una pestaña local.
+
+Para desactivarlo:
+
+```ts
+// meeko.config.ts
+import { defineMeekoConfig } from "@meekojs/meeko/framework";
+
+export default defineMeekoConfig({ dev: { serverLogs: false } });
+```
 
 El `href` tipado no admite `params` en rutas sin parámetros. Para rutas dinámicas exige las claves declaradas en el manifiesto; el runtime comprueba además sus valores y rechaza claves extra.
 
@@ -245,7 +300,7 @@ Fuera de una aplicación (por ejemplo, en una prueba unitaria sin app) la forma 
 
 ## Layers
 
-Un layer es una carpeta del proyecto con la misma estructura que la aplicación: su `app/pages`, sus componentes y autoimports (`app/components`, `app/composables`, `app/utils`, `app/stores`, `app/types`, `shared/` y `server/utils`) y, desde `1.2`, sus plugins de `app/plugins`. Use layers para una base compartida (diseño, páginas comunes) o para dividir una aplicación grande por áreas.
+Un layer es una carpeta del proyecto con la misma estructura que la aplicación: su `app/pages`, sus componentes y autoimports (`app/components`, `app/composables`, `app/utils`, `app/stores`, `app/types`, `shared/` y `server/utils`) y, desde `1.2`, sus plugins de `app/plugins`. Las carpetas de `imports.appDirs`, `sharedDirs` y `serverDirs` del proyecto se buscan también dentro de cada layer, con la misma ruta relativa (`app/services` es `layers/base/app/services` en el layer `./layers/base`). Use layers para una base compartida (diseño, páginas comunes) o para dividir una aplicación grande por áreas.
 
 ```ts
 export default defineMeekoConfig({
@@ -440,7 +495,7 @@ export default definePlugin((app) => {
 - **Dónde.** `*.client.ts` sólo en el navegador, una vez, antes de la hidratación. `*.server.ts` sólo en el servidor, una vez por petición de página, antes del render (también al prerenderizar; no en las páginas ya prerenderizadas, ni en API, RPC o handlers). Un `.ts` sin sufijo, en los dos. Sólo cuentan los archivos que están directamente en `app/plugins`; las subcarpetas pueden guardar sus auxiliares. Se excluyen `*.test.ts`, `*.spec.ts` y `*.d.ts`.
 - **Orden.** Los de los módulos, en el orden en que los añaden; después los de cada layer y los de la aplicación, por nombre de archivo. Meeko espera a cada `setup`, que puede ser asíncrono.
 - **`app.provide(key, value)`.** Publica un valor para todos los componentes de la aplicación, que lo leen con `inject(key)` (y el composable que lo envuelva): las páginas, layouts, `app.meeko`, la página de error y las páginas a las que se navega en el navegador. En el servidor el valor es de esa petición: no comparta estado mutable entre peticiones. Un componente que se hidrata debe recibir el mismo valor en el servidor y en el navegador; por eso los valores que se renderizan suelen venir de un plugin universal.
-- **`app.onError(handler)`.** En el navegador, el observador recibe lo mismo que `mountClientApp({ onError })` (navegación, Socket y eventos, efectos y limpiezas sin un `provideErrorHandler` más cercano), con `{ side: "client", source }`. En el servidor recibe los fallos del render de esa petición, con `{ side: "server", requestId }`, además del `onError` de `server/runtime.ts`.
+- **`app.onError(handler)`.** En el navegador, el observador recibe lo mismo que `mountClientApp({ onError })` (navegación, Socket y eventos, efectos y limpiezas sin un `provideErrorHandler` más cercano y, desde `1.3`, las excepciones y los rechazos globales de la página; véase [Errores](#errores)), con `{ side: "client", source }`. En el servidor recibe los fallos del render de esa petición, con `{ side: "server", requestId }`, además del `onError` de `server/runtime.ts`.
 - **`app.route`.** La ruta, como `useRoute()`. En el servidor es la de la petición; en el navegador sigue a la ruta confirmada, así que un `effect` que la lee se repite al navegar. `app.request` es la petición en el servidor y `undefined` en el navegador; `app.side` dice dónde se ejecuta.
 - **Fallos.** Un plugin que lanza en el servidor hace fallar la petición, que muestra la página de error sin los valores de los plugins. En el navegador, la hidratación no llega a empezar y la página se queda con el HTML del servidor.
 
@@ -492,7 +547,7 @@ Este pipeline envuelve páginas SSR y `/api` y `/_meeko/rpc`; los assets estáti
 
 Los callbacks `onNavigationError` pueden devolver una promesa: si el observador falla, Meeko registra tanto el fallo del observador como el error de navegación original sin generar un rechazo sin manejar. Los observadores `onError` del servidor tampoco modifican la respuesta cuando lanzan o rechazan; el registro de respaldo incluye el `requestId` disponible y categorías de error, sin mensajes privados.
 
-Los eventos de componentes pueden observarse por raíz con `provideErrorHandler` en el `<script>` de `app/app.meeko` o de un layout; se autoimporta y el callback recibe `unknown` y su `ErrorSource`. Los hijos heredan el observador más cercano, también después de un reemplazo HMR. `mountClientApp({ onError })` define el observador de toda la aplicación: recibe la navegación, los canales Socket y los eventos, efectos y limpiezas que no tienen un `provideErrorHandler` más cercano. Sin `onError`, navegación y Socket consultan el primer proveedor activo de esa aplicación cuando no existe un `onNavigationError` u `onError` explícito del canal. Ese proveedor se desregistra al liberar su raíz; un fallo del observador se registra con el error original. Las llamadas directas a `app.navigate()` y `socket.emit()` mantienen sus rechazos para el código que las espera. En SSR no hay eventos de navegador ni conexiones Socket.
+Los eventos de componentes pueden observarse por raíz con `provideErrorHandler` en el `<script>` de `app/app.meeko` o de un layout; se autoimporta y el callback recibe `unknown` y su `ErrorSource`. Los hijos heredan el observador más cercano, también después de un reemplazo HMR. `mountClientApp({ onError })` define el observador de toda la aplicación: recibe la navegación, los canales Socket, los eventos, efectos y limpiezas que no tienen un `provideErrorHandler` más cercano y, desde `1.3`, las excepciones no capturadas y las promesas rechazadas sin manejar de la página ([Fallos globales del navegador](#fallos-globales-del-navegador)). Sin `onError`, navegación, Socket y esos fallos globales consultan el primer proveedor activo de esa aplicación cuando no existe un `onNavigationError` u `onError` explícito del canal. Ese proveedor se desregistra al liberar su raíz; un fallo del observador se registra con el error original. Las llamadas directas a `app.navigate()` y `socket.emit()` mantienen sus rechazos para el código que las espera. En SSR no hay eventos de navegador ni conexiones Socket.
 
 Si un middleware servidor llama a `next()`, Meeko espera también ese trabajo aunque el middleware olvide esperar la promesa. Un fallo del tramo siguiente se propaga al handler HTTP; si fallan ambos, se conserva cada error en un `AggregateError`. El middleware debe devolver una respuesta del pipeline o una respuesta propia.
 
@@ -577,7 +632,7 @@ const name = signal(user.name);                        // `user` está en ámbit
 - **Exports.** Cada `export const` o `export let` (también desestructurado, `export const { a, b } = ...`) salvo `route` y `head` es un campo de datos de la página. Sólo cruzan los nombres exportados: el resto del bloque, sus imports y sus variables privadas no llegan al bundle cliente ni al payload. Un export que es una promesa se espera antes de renderizar.
 - **En la página.** El `<script>` y la plantilla ven cada export como un valor normal, de sólo lectura en profundidad, con el tipo del export ya esperado. No es una señal: llega en el payload y se sustituye en cada navegación, cuando el bloque vuelve a ejecutarse. Para estado editable, cree una señal a partir de él (`signal(user.name)`). Declarar en el `<script>` un nombre que ya exporta el bloque da `MEEK075`. La página no necesita declarar `data` en `defineProps`; si lo declara, `meeko check` comprueba que sea compatible con los exports.
 - **`export const head`.** Fija el `<head>` de la página como `route.head`: un objeto `{ title, description }` o una función sin argumentos que lo devuelve, calculada en el servidor con los valores del bloque. No forma parte de los datos. Declarar a la vez `export const head` y `route.head` da `MEEK072`. Desde `1.2`, `useHead` y `useSeoMeta` en el nivel superior del bloque son una alternativa, y `export const head` gana sobre ellas (véase [Head del documento](#head-del-documento-document-usehead-y-useseometa)).
-- **API de la petición.** `usePage()` devuelve `{ url, params, search, request, context, signal }`: `params` y `search` salen de los schemas de `route` o, sin schema, de los segmentos del ID de ruta; `context` es el contexto de la petición (sesión, servicios, plataforma) y `signal` se aborta si el cliente se desconecta, se revoca la sesión o se cancela la respuesta. `redirect(url, status?)` detiene el bloque y responde con una redirección (`302` por defecto; admite `301`, `302`, `303`, `307` y `308`), que una navegación cliente sigue como la de un loader. `notFound()` detiene el bloque y responde `404` con la página de error más cercana (`+error.meeko` o `app/error.meeko`). Las tres se importan de `@meekojs/meeko/framework` o se usan sin import dentro del bloque. Fuera del nivel superior del bloque (dentro de una función, de las opciones de ruta o en el `<script>` del componente) dan `MEEK073`, y en ejecución lanzan un error con ese código.
+- **API de la petición.** `usePage()` devuelve `{ url, params, search, request, context, signal }`: `params` y `search` salen de los schemas de `route` o, sin schema, de los segmentos del ID de ruta; `context` es el contexto de la petición (sesión, servicios, plataforma) y `signal` se aborta si el cliente se desconecta, se revoca la sesión o se cancela la respuesta. `redirect(url, status?)` detiene el bloque y responde con una redirección (`302` por defecto; admite `301`, `302`, `303`, `307` y `308`), que una navegación cliente sigue como la de un loader. `notFound()` detiene el bloque y responde `404` con la página de error más cercana (`+error.meeko` o `app/error.meeko`). Las tres se importan de `@meekojs/meeko/framework` o se usan sin import dentro del bloque. Fuera del nivel superior del bloque (dentro de una función, de las opciones de ruta o en el `<script>` del componente; desde `1.3`, también sin import en el `<script>` y en la plantilla) dan `MEEK073`, y en ejecución lanzan un error con ese código.
 - **Serialización.** Los exports viajan en JSON, como los datos de `load`. `meeko check` da un error de tipos en un export que no se puede serializar: funciones, `undefined`, `bigint`, símbolos e instancias de clase como `Date` o `Map`. En ejecución, un valor que `serializeJson` rechaza hace fallar la respuesta con `500`, como un loader.
 - **Estado entre peticiones.** Como el bloque se ejecuta en cada petición, una variable de nivel superior (`const cache = new Map()`) es nueva cada vez. Un valor que deba compartirse entre peticiones vive en un módulo importado.
 
@@ -588,7 +643,7 @@ Meeko considera que un bloque tiene código de nivel superior si exporta con `ex
 | `MEEK070` | Código de nivel superior y `route.load` a la vez: los exports son los datos de la página. Elija uno. |
 | `MEEK071` | `export function`, `export class`, `export enum`, `export default`, `export { ... }` o `export const route` junto a otras declaraciones en la misma sentencia. |
 | `MEEK072` | `export const head` y `route.head` a la vez. |
-| `MEEK073` | `usePage`, `redirect` o `notFound` fuera del nivel superior del bloque. |
+| `MEEK073` | `usePage`, `redirect` o `notFound` fuera del nivel superior del bloque, también en el `<script>` y la plantilla del componente. |
 | `MEEK074` | Código de nivel superior en una página `render: "client"`, cuyo bloque se ejecuta en el navegador. Use `useApi` o `useRpcQuery`, o renderice en el servidor. |
 | `MEEK075` | Un nombre exportado por el bloque se declara también en el `<script>`. |
 | `MEEK076` | Las opciones de ruta leen un nombre declarado por el código de nivel superior, que se ejecuta después y en cada petición. Mueva el valor compartido a un módulo importado. |
@@ -633,6 +688,25 @@ Como alternativa, las opciones de ruta pueden vivir en un sidecar `*.route.ts` j
 
 Las opciones de ruta validan params y search antes del loader y del código de nivel superior. El loader puede devolver un `Response` para redirigir; el código de nivel superior usa `redirect()`. En una navegación cliente, si la petición de datos responde `404` (por `notFound()` o por un `ApiError` con estado `404` del loader), el navegador muestra el `+error.meeko` más cercano, o `app/error.meeko`, con `{ status: 404, message }`, donde `message` es el código público del error (`NOT_FOUND`), igual que el documento SSR. `meeko check .` compara el `ComponentProps` de cada página con los `params`, `search` y datos que entrega su sidecar; un error de contrato identifica ambos archivos. También comprueba que `app/app.meeko` y los layouts acepten el `outlet` suministrado por Meeko, y que `+error.meeko` y `app/error.meeko` acepten `status` y `message`. Estos contratos rechazan props declaradas como `any`, `never` o `unknown`. Los datos del loader son obligatorios para la página cuando el sidecar declara `load`; una query repetida sin schema puede producir `string[]`, además de `string`. El handler SSR crea el estado de `useState` y el contexto de sesión por petición; transfiere sólo props, estado público y datos de ruta serializables. El navegador hidrata ese payload y pide datos al servidor durante la navegación, por lo que un sidecar privado no entra al bundle cliente; sólo los sidecars `render: "client"` son públicos (véase «Modos de render»). `mountClientApp` gestiona historial, cancelación y limpieza. Si un host usa `loadRoute` directamente en cliente, su loader recibe un estado provisional: Meeko aplica sus cambios al confirmar la ruta y los descarta al cancelar o fallar. Las señales de ese estado deben usarse durante `load`, sin conservar referencias después de retornar. Se puede usar `render: "prerender"` con `prerenderEntries` para rutas dinámicas. `meeko build` lee `render` del sidecar sin ejecutarlo: debe ser un literal de texto dentro de `definePage({ ... })`, de un objeto exportado o de una constante local del mismo archivo; un valor calculado, una clave computada (`["render"]` o `[clave]`) que no vaya seguida de un `render` literal, un spread sin `render` explícito posterior o una reexportación detienen el build con el archivo afectado. El build escribe el HTML y el payload de navegación bajo `.meeko/output/node/prerender/` (`meeko prerender .` repite ese paso sobre un build existente). El servidor sirve esas páginas pasando por el middleware de servidor, el contexto de sesión y el middleware de ruta; inserta la meta CSRF de la sesión en `<head>` sin reescribir el documento. Sin sesión responde con `ETag`, `Vary: cookie` y `cache-control: public, max-age=0, must-revalidate`, y devuelve `304` ante `If-None-Match`; con sesión responde `private, no-store`. Una CDN o caché compartida delante del servidor debe respetar `Vary: cookie` o no almacenar respuestas de peticiones con cookie; si ignora `Vary`, configúrela para omitir la caché cuando la petición traiga la cookie de sesión, porque de lo contrario podría entregar la versión anónima a un usuario con sesión y dejarlo sin meta CSRF. `PrerenderedPage.headOffset` del índice `prerender/manifest.json` se mide en unidades de código UTF-16 del HTML almacenado leído como texto (índices de cadena de JavaScript), no en bytes: un adaptador debe leer el archivo como texto UTF-8 y usar el valor tal cual, sin calcularlo a partir de bytes. Una URL con query string, una entrada dinámica no generada o un host con nonce CSP se renderizan con SSR.
 La comprobación del loader cubre tanto `definePage({ load() { /* ... */ } })` como `definePage(options)` cuando el tipo de `options` conserva un `load` obligatorio.
+
+#### Dónde se usa cada API
+
+El `<script>` y la plantilla de un componente se ejecutan en SSR y también en el navegador; `<script server>` y los sidecars `*.route.ts` se ejecutan en el servidor, fuera del componente. Desde `1.3`, `meeko check`, `meeko build` y el editor señalan cada API en el lugar donde no existe, con un mensaje que dice dónde se usa, y el autocompletado del `<script>` y de la plantilla deja de ofrecer las de servidor:
+
+| API | `<script server>` | `<script>` y plantilla | Sidecar `*.route.ts` | `server/` |
+| --- | --- | --- | --- | --- |
+| `definePage` | Sí: `export const route` | No tiene efecto: aviso `MEEK109`, error en `2.0` | Sí | No tiene efecto |
+| `usePage`, `redirect`, `notFound` | Sí, en el nivel superior; fuera de él, `MEEK073` | No: `MEEK073` | No: lanzan `MEEK073` | No: lanzan `MEEK073` |
+| `defineApiRoute`, `defineRpc`, `defineServerMiddleware`, `defineSocketChannel`, `defineServerRuntime`, `ApiError` | Sí, sin import | No: `MEEK108`. En el navegador, un error de API llega como `ClientError` | Sí | Sí, cada una en su carpeta |
+| Autoimports de `server/utils`, de `imports.serverDirs` y de los `*.server.ts` de cualquier carpeta de autoimports (también las de `imports.appDirs`) | Sí | No: `MEEK108`. Pida los datos con `useApi` o `useRpcQuery` | Sí | Sí |
+| Imports de `server/` y de módulos `*.server.*` | Sí | No: `MEEK108`; `import type` sí | Sí | Sí |
+| Imports de valores de `@meekojs/meeko/server` y `/cloudflare` | Sí | No: `MEEK108`; `import type` sí | Sí | Sí |
+| Imports de valores de `@meekojs/meeko/node`, `/bun`, `/deno`, `/password` y `/build` | Sí | Aviso `MEEK109`, error en `2.0`; `import type` sí | Sí | Sí |
+| `defineProps`, `defineEmits`, `defineExpose`, `defineModel`, `defineSnippets`, `useElementRef`, `onMounted` | No: `MEEK108` | Sí | No | No |
+
+Con `render: "client"`, el bloque o el sidecar se ejecutan en el navegador (véase [Modos de render](#modos-de-render)) y no pueden usar las APIs de servidor de la tabla: un autoimport de servidor, un import de `server/` o uno de `*.server.*` detienen el build, y el editor marca el autoimport con `MEEK_AUTOIMPORT`. Un componente dentro de `server/` (una plantilla de correo, por ejemplo) sólo se renderiza en el servidor, así que puede usar las APIs de servidor. El build y `meeko dev` sólo aplican `MEEK108` al bundle del navegador: un componente fuera de `server/` que sólo importa código de servidor (una plantilla en `app/emails/` que renderiza una ruta de API) sigue compilando, como en `1.2`. `meeko check` y el editor, que no conocen el grafo de imports, comprueban todo componente fuera de `server/` como código del navegador, igual que en `1.2`; para que lo acepten, ponga esos componentes en `server/`.
+
+`MEEK108` señala código que ya fallaba antes de `1.3`: el autoimport de servidor no se resolvía en el bundle del navegador, `@meekojs/meeko/server` y `/cloudflare` no se pueden cargar allí, un import de `server/` detenía `meeko build`, y las macros y `onMounted` no existen fuera del `<script>`. `MEEK109` es un aviso porque ese código compila y se carga: `definePage` en el componente no configura la ruta, y las funciones de `/node`, `/bun`, `/deno`, `/password` y `/build` sólo fallan al llamarlas en el navegador (véase [Política de estabilidad](stability.md#apis-deprecadas)).
 
 ### Modos de render
 
@@ -849,11 +923,48 @@ useHead(() => ({ title: `${product.name} (${quantity.value})` }));
 
 **`<script server>`.** `useHead` y `useSeoMeta` en el código de nivel superior hacen que el bloque tenga código de nivel superior, como `usePage`. Sus entradas forman el `head` de la ruta junto con `export const head` (o `route.head`), que gana sobre ellas. Como viajan en el payload, su `titleTemplate` debe ser una cadena.
 
+#### Canónica y Open Graph por página
+
+Desde `1.3`, `document.seo` añade a cada documento las etiquetas que dependen de la página y que, sin él, cada página tendría que repetir con `useSeoMeta`:
+
+```ts
+// meeko.config.ts
+import { defineMeekoConfig } from "@meekojs/meeko/framework";
+
+export default defineMeekoConfig({
+  site: "https://example.com",
+  document: { seo: true, head: { titleTemplate: "%s · Mi sitio" } },
+});
+```
+
+| Opción | Etiqueta | Valor |
+| --- | --- | --- |
+| `canonical` | `<link rel="canonical">` | El origen y la ruta de la página, sin la query string: `https://example.com/docs/api`. |
+| `ogUrl` | `<meta property="og:url">` | La misma URL. |
+| `ogTitle` | `<meta property="og:title">` | El título final, con `titleTemplate` aplicado. |
+| `ogDescription` | `<meta property="og:description">` | La `description` de la página (la del `head` de la ruta, `useSeoMeta` o `document.head`). |
+
+`seo: true` las activa todas; un objeto desactiva las que valen `false` (`seo: { ogDescription: false }`). El origen es `site` o, sin él, `MEEKO_PUBLIC_ORIGIN` del entorno del build; con `canonical` u `ogUrl` activos y sin ninguno de los dos, `meeko build` falla con un mensaje que lo pide. Se fija en el build (`seo.origin` del manifiesto), así que una página renderizada con SSR usa el mismo origen que una prerenderizada. En `meeko dev` sin origen esas dos etiquetas no se escriben.
+
+Son las etiquetas de menor prioridad: una página o un layout que declara la misma etiqueta (con `useSeoMeta`, `useHead` o el `head` de la ruta, con cualquier `key`) la sustituye, igual que a las de `document.head`. Las páginas de error (`app/error.meeko`, `+error.meeko` y el `404.html` del adaptador `static`) no reciben `canonical` ni `og:url`, porque se sirven en cualquier URL. Al navegar en el cliente, las etiquetas siguen a la página confirmada. Un host propio que pasa `DocumentOptions.config` con `seo` debe incluir `seo.origin`.
+
 ## Autoimports y TypeScript
 
 **Imports sin extensión.** Desde `1.2`, Meeko comprueba los tipos con `"module": "ESNext"` y `"moduleResolution": "Bundler"`, como Vite y Nuxt: un import relativo no necesita extensión (`import { format } from "../utils/format"`), porque Vite resuelve y empaqueta todo el código en `meeko dev` y en `meeko build`, y Node nunca ejecuta un `.ts` directamente. Los imports con `.js` siguen funcionando. `meeko init-framework` genera el `tsconfig.json` con esos valores; un proyecto anterior puede cambiar sus dos líneas `"module": "NodeNext"` y `"moduleResolution": "NodeNext"` para que el editor también acepte los imports sin extensión en sus `.ts`.
 
-Meeko analiza exports AST de `app/{components,composables,utils,stores,types}` (`app/types` desde `1.2`), `shared/{types,schemas,utils,constants,enums}` y `server/utils`. Los tipos que sólo usa la aplicación van en `app/types`; los que comparten la aplicación y el servidor, en `shared/types`. Un `type` o una `interface` autoimportados llegan con `import type`. Los símbolos de `app/` están disponibles en cliente y SSR, pero no desde `shared/`; los sufijos `.client.ts` y `.server.ts` restringen un módulo a su entorno. `imports.serverDirs` añade directorios privados exclusivos del servidor. Los símbolos del framework `api`, `rpc`, `socket`, `useSocket`, `useApi`, `useRpcQuery`, `useRpcMutation`, `useState`, `href` y `useRoute`, desde `1.2` `useForm`, `useStorage`, `useApiMutation`, `useHead`, `useSeoMeta`, `definePage`, `defineRouteMiddleware` y `definePlugin`, y en el código de servidor (`server/` y `<script server>`) `defineApiRoute`, `defineRpc`, `defineServerMiddleware`, `defineSocketChannel`, `defineServerRuntime` y `ApiError`, y de la raíz `signal`, `computed`, `effect`, `batch`, `untrack` (desde `1.2`), `onCleanup`, `onMounted`, `provide`, `inject`, `createContext` y `provideErrorHandler`, también figuran en el registro; un export propio llamado `useRoute`, `useForm`, `useStorage`, `useApiMutation`, `useHead` o `useSeoMeta` tiene prioridad sobre el del framework. Los imports explícitos prevalecen. Una colisión produce error; nunca se elige por orden de archivos. Un `enum` o una clase autoimportados sirven también como tipo, con sus miembros (`Scope.App`); si un archivo sólo los usa como tipo, Meeko inserta `import type`. Los schemas de `shared/schemas` pueden llegar por autoimport a los contratos de API, RPC y Socket. `meeko check` comprueba los `.ts` que importa un `.meeko` con los autoimports de su ámbito y con las rutas generadas, igual que los proyectos `tsconfig.*`.
+Meeko analiza exports AST de `app/{components,composables,utils,stores,types}` (`app/types` desde `1.2`), `shared/{types,schemas,utils,constants,enums}` y `server/utils`. Los tipos que sólo usa la aplicación van en `app/types`; los que comparten la aplicación y el servidor, en `shared/types`. Un `type` o una `interface` autoimportados llegan con `import type`. Los símbolos de `app/` están disponibles en cliente y SSR, pero no desde `shared/`; los sufijos `.client.ts` y `.server.ts` restringen un módulo a su entorno. `imports.serverDirs` añade directorios privados exclusivos del servidor y, desde `1.3`, `imports.appDirs` e `imports.sharedDirs` añaden carpetas de `app/` y de `shared/` (véase [Carpetas de autoimports](#carpetas-de-autoimports)). Los símbolos del framework `api`, `rpc`, `socket`, `useSocket`, `useApi`, `useRpcQuery`, `useRpcMutation`, `useState`, `href` y `useRoute`, desde `1.2` `useForm`, `useStorage`, `useApiMutation`, `useHead`, `useSeoMeta`, `definePage`, `defineRouteMiddleware` y `definePlugin` (`definePage` sólo tiene efecto en `<script server>` y en los sidecars: en el `<script>` de un componente da el aviso `MEEK109`), y en el código de servidor (`server/` y `<script server>`) `defineApiRoute`, `defineRpc`, `defineServerMiddleware`, `defineSocketChannel`, `defineServerRuntime` y `ApiError`, y de la raíz `signal`, `computed`, `effect`, `batch`, `untrack` (desde `1.2`), `onCleanup`, `onMounted`, `provide`, `inject`, `createContext` y `provideErrorHandler`, también figuran en el registro; un export propio llamado `useRoute`, `useForm`, `useStorage`, `useApiMutation`, `useHead` o `useSeoMeta` tiene prioridad sobre el del framework. Los imports explícitos prevalecen. Una colisión produce error; nunca se elige por orden de archivos. Un `enum` o una clase autoimportados sirven también como tipo, con sus miembros (`Scope.App`); si un archivo sólo los usa como tipo, Meeko inserta `import type`. Los schemas de `shared/schemas` pueden llegar por autoimport a los contratos de API, RPC y Socket. `meeko check` comprueba los `.ts` que importa un `.meeko` con los autoimports de su ámbito y con las rutas generadas, igual que los proyectos `tsconfig.*`.
+
+<a id="carpetas-de-autoimports"></a>**Carpetas de autoimports.** Cada carpeta se lee de forma recursiva, en el proyecto y en cada layer; sólo sus `.ts` aportan exports (sin `*.test.ts`, `*.spec.ts` ni `*.d.ts`), y los `.meeko` sólo son componentes en `app/components` y en las carpetas de componentes de los módulos. Un archivo sin sufijo toma el ámbito de la carpeta raíz que lo contiene; `.client.ts`, `.server.ts` y `.shared.ts` mandan sobre él:
+
+| Carpeta | Ámbito | Disponible en |
+| --- | --- | --- |
+| `app/components`, `app/composables`, `app/utils`, `app/stores`, `app/types` | `app/` | Componentes y `.ts` de `app/`, en el navegador y en SSR; también en `server/` y `<script server>`. No en `shared/` |
+| `imports.appDirs` (desde `1.3`), p. ej. `"app/services"` | `app/` | Igual que las carpetas de `app/` anteriores |
+| `shared/types`, `shared/schemas`, `shared/utils`, `shared/constants`, `shared/enums` | `shared/` | Todo el proyecto |
+| `imports.sharedDirs` (desde `1.3`), p. ej. `"shared/validators"` | `shared/` | Todo el proyecto |
+| `server/utils` e `imports.serverDirs`, p. ej. `"server/services"` | `server/` | `server/`, `<script server>` y sidecars; en un componente, `MEEK108` |
+
+Cada opción sólo admite rutas relativas dentro de su carpeta (`appDirs` dentro de `app/`, `sharedDirs` dentro de `shared/`, `serverDirs` dentro de `server/`), con `/` o `\` y sin `.` ni `..`: otra ruta detiene `meeko dev`, `meeko build` y `meeko check` con un error de `meeko.config.ts` que nombra la entrada (`imports.appDirs[1] must be a relative path inside app/: …`) y que el editor, en un workspace de confianza, marca en ella (`MEEK_CONFIG`). Una carpeta que ya es de autoimports (`"app/composables"`) o que está dentro de otra de la lista no se lee dos veces. Los exports de estas carpetas siguen las mismas reglas que los de las carpetas por defecto: `import type` para `type` e `interface`, prioridad sobre los autoimports del framework y error si dos archivos exportan el mismo nombre en un ámbito. Un `*.server.ts` de una carpeta de `appDirs` es de servidor, y un componente que lo usa da `MEEK108`.
 
 Los `.ts` normales de `app/` (composables, utils, stores) se ejecutan en SSR y en el navegador, como los `.meeko` que los usan, y sus autoimports del framework (`api`, `rpc`, `socket`, `useSocket`, `useApi`…) se resuelven por entorno: el cliente de servidor en SSR y el del navegador en el navegador. Antes de `1.1` usaban siempre el del navegador, y `meeko dev` o `meeko build` fallaban con «Client-only module reached the server bundle». Un `.client.ts` sigue siendo sólo de navegador.
 
@@ -1677,11 +1788,74 @@ export default defineServerRuntime(async ({ env, production, prerendering }) => 
 - `services` puede ser un objeto compartido o una función por petición; llega a páginas, API, RPC y Socket como `RequestContext.services`.
 - `RequestContext.platform` expone `{ name, env, waitUntil(promise) }`. En Node, `serveNode` espera las tareas registradas con `waitUntil` antes de cerrar la aplicación. Las tareas registradas fuera de una petición HTTP, como en callbacks de Socket, quedan a cargo de la aplicación: `app.close()` las espera y sus fallos llegan al observador `onError` del runtime en lugar de la consola.
 - `publicOrigin` es el origen público de la aplicación, por ejemplo `https://example.com` tras un proxy que termina TLS. HTTP y Socket comparan `Origin` con ese valor; `MEEKO_PUBLIC_ORIGIN` lo sustituye en `meeko dev` y en las salidas de Node, Bun, Deno y Workers. Sin `publicOrigin`, Socket usa la dirección en la que escucha el servidor. Si esa dirección o el `publicOrigin` es de loopback, Socket acepta también los otros nombres de loopback (`localhost`, `127.0.0.1`, `[::1]`) con el mismo esquema y puerto. Esto supone que ningún otro proceso escucha en ese puerto con otra dirección de loopback; si ocurre, configure `publicOrigin` con un origen que no sea de loopback o cambie el puerto.
-- `onError` recibe los fallos internos con su ID de petición; sin él, Meeko registra el nombre del error y el ID, y en desarrollo también el error completo. También recibe los fallos de entrega de Socket, salvo que `socket.onDeliveryError` los observe por separado.
+- `onError` recibe los fallos internos con su ID de petición; sin él, Meeko registra el nombre del error y el ID, y en desarrollo también el error completo. También recibe los fallos de entrega de Socket, salvo que `socket.onDeliveryError` los observe por separado, y, desde `1.3`, las promesas rechazadas sin manejar y las excepciones no capturadas del proceso, con un tercer argumento (véase [Errores](#errores)).
+- `processErrors` (desde `1.3`) decide qué pasa con esos fallos del proceso; sin declararlo, un rechazo se informa y el servidor sigue atendiendo, y una excepción se informa y el servidor se cierra de forma ordenada con código 1 (véase [Fallos fuera de una petición](#fallos-fuera-de-una-petición)).
 - `socket.pubsub` elige el broker de broadcast; `socket.maxPendingDeliveries` y `socket.sessionRefreshMs` limitan la cola de cada peer y la frecuencia con que sus entregas releen la sesión. Véase [Broadcast y varias instancias](#broadcast-y-varias-instancias).
 - `close` se ejecuta después de cerrar las sesiones, al detener el servidor.
 
 `createServerApp({ manifest, load, runtime, production })` de `@meekojs/meeko/server` crea la misma aplicación a partir de un manifiesto y un cargador de módulos, y expone `fetch(request, platform?)`, `socket`, `publicOrigin`, `reportError` y `close()`. El entry generado por `meeko build` la usa; un host propio puede servirla con `serveNode(app, { host, port, publicOrigin, handleSignals, shutdownTimeout })` de `@meekojs/meeko/node`. Si el servidor arranca pero falla la conexión de Socket, `serveNode` libera el puerto y cierra la aplicación antes de propagar el error.
+
+## Errores
+
+Ningún fallo se pierde sin pasar por un observador de Meeko: cada nivel tiene el suyo, y lo que un nivel no atiende sube al siguiente o, sin observador, a la consola, como sin Meeko.
+
+| Nivel | Qué captura | Observador | Política |
+| --- | --- | --- | --- |
+| Componente | Handlers `on:`, `effect`, limpiezas, `onMounted`, la continuación de un setup con `await`, formularios, mutaciones y `useStorage` de ese componente y sus hijos. | `provideErrorHandler((error, source) => …)` en el `<script>`; el más cercano gana ([Middleware de rutas y servidor](#middleware-de-rutas-y-servidor), [api.md](api.md#componentes-meeko)). | Observa sin cambiar la interfaz. Sin proveedor, sube a la aplicación. |
+| Aplicación (navegador) | Lo anterior sin un proveedor más cercano, la navegación, los clientes Socket y, desde `1.3`, las excepciones no capturadas (`"uncaught"`) y las promesas rechazadas sin manejar (`"rejection"`) de la página. | `mountClientApp({ onError })` y `app.onError` de los plugins ([Plugins de aplicación](#plugins-de-aplicación)); `onNavigationError` tiene prioridad para la navegación. | Sin ninguno, la navegación, Socket y los fallos globales van al primer `provideErrorHandler` activo; sin él, a la consola. |
+| Página (SSR) | Un fallo del loader, de `<script server>`, del render (también `render: "stream"` antes del primer byte) o de un `await` de datos. | `+error.meeko` más cercano o `app/error.meeko` ([Página de error de la aplicación](#página-de-error-de-la-aplicación-apperrormeeko)), y el `onError` del runtime y de los plugins con el `requestId` de la respuesta. | El HTML muestra el estado y un mensaje público; un `5xx` se informa con su error privado. Un diferido rechazado de un stream se envía como `{ code, status }` y su causa llega a los mismos observadores ([Streaming SSR](#streaming-ssr-render-stream)). |
+| API y RPC | Lo que lanzan los handlers, `auth`, `authorize`, `locals` y las validaciones. | Respuesta normalizada: `ApiError` conserva `code` y `status`, todo lo demás es `INTERNAL_ERROR`, con `requestId` y `x-request-id` ([API y RPC](#api-y-rpc)). En el cliente, `ClientError` (`isClientError(error, "CODIGO")` desde `1.3`). | Sólo los `5xx` llegan a `onError` del runtime; los `4xx` son respuestas previstas. |
+| Runtime del servidor | Los `5xx` de páginas, API, RPC, Socket, `waitUntil` y el transporte, y desde `1.3` los fallos del proceso. | `onError` de `server/runtime.ts` ([Runtime de servidor](#runtime-de-servidor)). | Nunca cambia la respuesta; un observador que falla se registra sin detalles privados. |
+| Proceso (desde `1.3`) | Promesas rechazadas sin manejar y excepciones no capturadas fuera del flujo de una petición. | `onError` del runtime, con `{ kind, inRequest }` como tercer argumento. | `processErrors`; véase [Fallos fuera de una petición](#fallos-fuera-de-una-petición). |
+
+`ErrorSource`, el segundo argumento de los observadores del navegador, gana `"uncaught"` y `"rejection"` en `1.3`. Es una unión que Meeko entrega a la aplicación, así que, según la [política de estabilidad](stability.md#api-pública), un `switch` exhaustivo sobre ella necesita una rama por defecto.
+
+```ts
+import { isClientError, mountClientApp } from "@meekojs/meeko/framework";
+
+await mountClientApp({
+  ...options,
+  onError(error, source) {
+    if (isClientError(error, "UNAUTHENTICATED")) return location.assign("/login");
+    navigator.sendBeacon("/api/client-errors", JSON.stringify({ source, message: String(error) }));
+  },
+});
+```
+
+### Fallos globales del navegador
+
+Mientras una aplicación está montada, `mountClientApp` escucha `error` y `unhandledrejection` en `window`: un `setTimeout` que lanza, un `fetch().then()` sin `catch` en el setup o el fallo de una librería llegan a `onError` y a `app.onError` con la fuente `"uncaught"` o `"rejection"`. El primer argumento es el error lanzado o el motivo del rechazo, tal cual.
+
+- **Sin duplicados.** Un error que ya recibió un observador de Meeko (un evento, una navegación…) y que la aplicación vuelve a lanzar o deja rechazado no se informa otra vez.
+- **Consola.** Cuando un observador lo recibe, Meeko llama a `preventDefault()` y el navegador no lo repite en la consola. Sin ningún observador, el evento no se toca y el navegador lo muestra como siempre. Un evento que otro listener ya marcó con `preventDefault()` se considera atendido.
+- **Scripts de otro origen.** El `"Script error."` opaco de un script de otro origen cargado sin CORS no trae error, archivo ni línea: se deja a la consola. Para observarlo, cargue el script con `crossorigin` y sirva `Access-Control-Allow-Origin`.
+- **Ciclo de vida.** Los listeners se registran al hidratar y se retiran con `app.dispose()` o si la hidratación falla. Un cambio de un componente con HMR no vuelve a montar la aplicación; un cambio de la entrada recarga la página. Con dos aplicaciones en la misma página, sólo la primera que lo observa recibe cada fallo.
+
+### Fallos fuera de una petición
+
+En el servidor, una promesa que nadie espera dentro de un handler, un `setTimeout` que lanza o el callback de una librería quedan fuera del `try` de la petición. Sin una política, Node 15+, Bun y Deno terminan el proceso con el primer rechazo sin manejar o la primera excepción no capturada, sin pasar por `onError` ni cerrar el servidor de forma ordenada. Desde `1.3`, `meeko dev`, las salidas de `meeko build` (Node, Bun, Deno y Cloudflare Workers) y `serveNode` y `serveDeno` con `handleSignals` aplican la política `processErrors` de `server/runtime.ts`:
+
+| Fallo | Por defecto | Otras opciones |
+| --- | --- | --- |
+| `unhandledRejection` | `"report"`: llega a `onError` y el servidor sigue atendiendo. | `"shutdown"`: además, cierre ordenado con código 1. `"off"`: el runtime decide (en Node, el rechazo pasa a ser una excepción no capturada). |
+| `uncaughtException` | `"shutdown"`: llega a `onError`, el servidor deja de aceptar conexiones, espera las respuestas abiertas y las tareas de `waitUntil`, cierra la aplicación y sale con código 1, porque el estado del proceso ya no es fiable. | `"off"`: el runtime decide. |
+
+```ts
+// server/runtime.ts
+export default defineServerRuntime(() => ({
+  processErrors: { unhandledRejection: "shutdown" },
+  onError(error, requestId, info) {
+    if (info) logger.fatal({ kind: info.kind, inRequest: info.inRequest, requestId }, error);
+    else logger.error({ requestId }, error);
+  },
+}));
+```
+
+- **Observador.** El `onError` del runtime recibe el error, un ID y `{ kind, inRequest }` (tipo `ServerErrorInfo`); los fallos de una petición no llevan ese tercer argumento. Sin `onError`, Meeko escribe en la consola el error completo, como haría el runtime. `processErrors: false` desactiva los dos casos.
+- **`requestId`.** Si el fallo ocurre en el trabajo asíncrono de una petición y el runtime conserva ese contexto hasta el evento, el ID es el de la respuesta (`x-request-id`) e `inRequest` es `true`; si no, el ID es nuevo. Node conserva el contexto para rechazos y excepciones; Deno y workerd, para los rechazos; Bun 1.4, sólo para las excepciones.
+- **Listeners de la aplicación.** Si la aplicación registró sus propios `process.on("uncaughtException" | "unhandledRejection")` (o, en Deno, marcó el evento con `preventDefault()` antes), Meeko informa a `onError` y deja que ella decida: no cierra el proceso.
+- **Por runtime.** Node y Bun usan los eventos de `process`; Deno, `unhandledrejection` y `error` de `globalThis`. En Cloudflare Workers no hay proceso que cerrar: los rechazos sin manejar del aislado llegan a `onError` y una excepción hace fallar sólo la petición o la tarea de `waitUntil` que la lanzó, que Meeko ya informa. En `meeko dev`, un rechazo de la aplicación no detiene el servidor de desarrollo; la política es la del runtime con el que arrancó.
+- **Hosts propios.** `handleProcessErrors(app, { close, onError?, shutdownTimeout? })` de `@meekojs/meeko/server` aplica la misma política a un host que no usa `serveNode` ni `serveDeno`, como `Bun.serve` con `createBunServer`; devuelve la función que retira los listeners. `close` debe detener el servidor y cerrar la aplicación; `shutdownTimeout` (15 s por defecto) limita su duración antes de salir igualmente.
 
 ## Autenticación
 
@@ -1906,7 +2080,7 @@ npm run build   # cliente, servidor Node y prerender bajo .meeko/output/node/
 npm start       # Node 24, con store persistente configurado
 ```
 
-`meeko build [directorio] [--adapter <nombre>]` toma el adaptador de `--adapter` o de `server.adapter` en `meeko.config.ts`, con `node` por defecto. `MeekoConfig.server` es una unión discriminada; para Node acepta `{ adapter: "node", host?, port? }`. El build Node escribe `.meeko/output/node/` con `index.mjs`, `chunks/`, `client/` y `prerender/`. Esa carpeta contiene el manifiesto de rutas, endpoints y assets ya resuelto: no lee `app/`, `server/` ni `meeko.config.ts` y no carga TypeScript ni Vite. Sólo necesita las dependencias de `node_modules`, incluida `@meekojs/meeko`. `meeko start` y `meeko preview` ejecutan `index.mjs`; también puede ejecutarse con `node .meeko/output/node/index.mjs`. Para Bun y Deno, `meeko build --adapter bun` o `--adapter deno` (o `server: { adapter: "bun" }` / `{ adapter: "deno" }`) produce una salida autónoma descrita en [Bun](#bun) y [Deno](#deno), y `--adapter cloudflare` un Worker descrito en [Cloudflare Workers](#cloudflare-workers).
+`meeko build [directorio] [--adapter <nombre>]` toma el adaptador de `--adapter` o de `server.adapter` en `meeko.config.ts`, con `node` por defecto. `MeekoConfig.server` es una unión discriminada; para Node acepta `{ adapter: "node", host?, port? }`. El build Node escribe `.meeko/output/node/` con `index.mjs`, `chunks/`, `client/` y `prerender/`. Esa carpeta contiene el manifiesto de rutas, endpoints y assets ya resuelto: no lee `app/`, `server/` ni `meeko.config.ts` y no carga TypeScript ni Vite. Sólo necesita las dependencias de `node_modules`, incluida `@meekojs/meeko`. `meeko start` y `meeko preview` ejecutan `index.mjs`; también puede ejecutarse con `node .meeko/output/node/index.mjs`. Para Bun y Deno, `meeko build --adapter bun` o `--adapter deno` (o `server: { adapter: "bun" }` / `{ adapter: "deno" }`) produce una salida autónoma descrita en [Bun](#bun) y [Deno](#deno), y `--adapter cloudflare` un Worker descrito en [Cloudflare Workers](#cloudflare-workers). Desde `1.3`, `--adapter static` (o `server: { adapter: "static" }`) genera un sitio de archivos para un hosting estático; véase [Sitio estático](#sitio-estático).
 
 El servidor escucha en `127.0.0.1:4173` salvo que `server.host`/`server.port` o las variables `MEEKO_HOST` y `MEEKO_PORT` (o `PORT`) indiquen otra dirección; use `MEEKO_HOST=0.0.0.0` para aceptar tráfico remoto. `MEEKO_PUBLIC_ORIGIN` fija el origen público para las comprobaciones de Origin de HTTP y Socket cuando un proxy termina TLS. `SIGINT` y `SIGTERM` cierran Socket, HTTP, las tareas de `waitUntil` y el runtime, por ese orden. Las respuestas abiertas, como un stream, disponen de `shutdownTimeout` milisegundos (10 000 por defecto) para terminar; después se cortan sus conexiones y el cierre continúa. Si el cliente se desconecta antes o durante el envío, el cuerpo de la respuesta se cancela, lo que libera archivos abiertos y detiene productores de streams. Un request-target que empieza por `//` se interpreta siempre como ruta del origen propio (o de `MEEKO_PUBLIC_ORIGIN`), nunca como otro host.
 
@@ -1918,6 +2092,107 @@ El starter independiente creado con `meeko init` coordina el cierre de HTTP y Vi
 
 El adaptador Node entrega por separado varias cabeceras `Set-Cookie` y deja de transmitir el cuerpo si el cliente cierra la conexión. Una respuesta ya iniciada no puede sustituirse por un JSON de error; el adaptador cierra esa conexión y comunica el fallo al observador del host.
 
+### Sitio estático
+
+```sh
+npx meeko build --adapter static     # .meeko/output/static/
+npx meeko preview --adapter static   # la sirve como un hosting estático
+```
+
+Desde `1.3`, el adaptador `static` escribe en `.meeko/output/static/` un sitio sin servidor, listo para subir tal cual a nginx, Netlify, Cloudflare Pages, GitHub Pages o un bucket:
+
+- los assets del cliente y `public/`;
+- cada página prerenderizada como `<ruta>/index.html` (`/docs/api` → `docs/api/index.html`, con los segmentos decodificados como los pide el hosting) y su payload de navegación `<ruta>/index.meeko.json`;
+- `404.html`, la página de `app/error.meeko` con estado `404` dentro de sus layouts (sin `app/error.meeko` no se genera y el build lo avisa);
+- `sitemap.xml` y `robots.txt` si están activados, y los archivos de cabeceras de `headerFiles`.
+
+Un hosting estático no negocia `Accept`, así que el cliente de este build no pide la página con `Accept: application/meeko+json`: lee el archivo `index.meeko.json` de la carpeta de la página (`/docs/api/index.meeko.json`, sin la query string). La navegación cliente funciona, por tanto, con cualquier hosting que sirva los archivos; el de los demás adaptadores sigue negociando `Accept`. `404.html` hidrata en cualquier URL, también en una que coincide con una ruta dinámica cuya página no se prerenderizó (`/docs/[slug]` con `slug` desconocido), y navega en el cliente desde ella; una ruta cuyo payload no existe muestra la página de error sin recargar. Los hostings sirven `404.html` para las URL que no existen (en nginx, `error_page 404 /404.html;`).
+
+Todas las páginas deben usar `render: "prerender"`, con `prerenderEntries` en las rutas dinámicas. Antes de compilar nada, el build falla con la lista de lo que necesita un servidor: las páginas `"ssr"`, `"stream"` o `"client"`, los endpoints de API, los procedimientos RPC, los canales Socket, el middleware de `server/middleware` y los handlers de servidor de los módulos. El middleware de ruta (`app/middleware`) se ejecuta al prerenderizar y al navegar en el cliente, pero no en la primera carga de una página; el build lo avisa. `server/runtime.ts` sólo se ejecuta mientras se prerenderiza. Un archivo de `public/` que choca con uno generado (`404.html`, `sitemap.xml`, `robots.txt`, `_headers`, `_meeko/headers.conf` o el `index.html` de una página) es un error.
+
+`server` acepta, con `adapter: "static"`:
+
+```ts
+// meeko.config.ts
+import { defineMeekoConfig } from "@meekojs/meeko/framework";
+
+export default defineMeekoConfig({
+  site: "https://example.com",
+  sitemap: true,
+  robots: true,
+  document: { seo: true },
+  server: {
+    adapter: "static",
+    headerFiles: ["_headers", "nginx"],
+    contentSecurityPolicy: {
+      "default-src": ["'self'"],
+      "script-src": ["'self'"],
+      "style-src": ["'self'", "'unsafe-inline'"],
+      "object-src": ["'none'"],
+      "base-uri": ["'none'"],
+    },
+    headers: { "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin" },
+  },
+});
+```
+
+- `contentSecurityPolicy`: la `Content-Security-Policy` de todas las páginas, por directiva. El build le añade los hashes de los scripts en línea; véase [CSP con hashes](#csp-con-hashes).
+- `headers`: otras cabeceras de todas las respuestas. `Content-Security-Policy` no se admite aquí, porque perdería los hashes.
+- `headerFiles`: dónde se escriben esas cabeceras. Por defecto, en ningún sitio: un hosting estático no las lee de la configuración de Meeko, así que cada formato es opcional y explícito.
+  - `"_headers"` escribe `/_headers`, el formato de Netlify y Cloudflare Pages, con un bloque `/*` para todas las rutas. Esos hostings lo leen y no lo publican.
+  - `"nginx"` escribe `/_meeko/headers.conf`, una línea `add_header … always;` por cabecera, para incluirlo en cada `location` (un `add_header` dentro de una `location` anula los del `server`). El archivo está dentro de la raíz web, así que la configuración debe ocultar `/_meeko/`:
+
+```nginx
+server {
+  root /usr/share/nginx/html;   # el contenido de .meeko/output/static
+  location / {
+    include /usr/share/nginx/html/_meeko/headers.conf;
+    try_files $uri $uri/index.html =404;
+  }
+  location ^~ /_meeko/ { internal; }
+  error_page 404 /404.html;
+}
+```
+
+Esas opciones sólo se leen cuando `server.adapter` es `"static"`; con `meeko build --adapter static` sobre otra configuración se construye sin ellas. `meeko preview` sirve la carpeta como lo haría un hosting (el archivo, el `index.html` de la carpeta o `404.html` con estado `404`, sin publicar `_headers` ni `_meeko/`) y aplica la CSP y `headers`, en `127.0.0.1:4173` salvo que `MEEKO_HOST` y `MEEKO_PORT` digan otra cosa. `meeko start` sirve sólo el build de Node. El build sigue usando Node y Vite, y el prerender, un servidor Node intermedio en `.meeko/build/node/`, como en Bun.
+
+### `sitemap.xml` y `robots.txt`
+
+```ts
+export default defineMeekoConfig({
+  site: "https://example.com",
+  sitemap: { exclude: ["/admin", "/admin/*"] },   // o sitemap: true
+  robots: { disallow: ["/admin/"] },              // o robots: true
+});
+```
+
+Desde `1.3`, `sitemap` escribe `sitemap.xml` (protocolo sitemaps.org 0.9) con la URL absoluta de cada página prerenderizada y de cada ruta sin parámetros, sea `"ssr"`, `"stream"` o `"client"`; las rutas dinámicas sin prerender no se conocen en el build. Se omiten las páginas prerenderizadas que piden `<meta name="robots" content="noindex">` (o `none`) y las rutas de `exclude`, donde `*` sustituye a cualquier secuencia de caracteres, `/` incluida. `robots` escribe `robots.txt` con `User-agent: *`, sus `allow` y `disallow` (`Allow: /` sin ninguno) y, con `sitemap`, la línea `Sitemap:` con su URL absoluta.
+
+Las URL necesitan el origen público: `site` o, sin él, `MEEKO_PUBLIC_ORIGIN` del build. Con `sitemap` y sin origen, el build falla antes de compilar; `robots` sin `sitemap` no lo necesita. Valen para todos los adaptadores. En Node, Bun, Deno y Workers se sirven como los demás archivos públicos, desde el manifiesto de assets del build: como el sitemap lista las páginas prerenderizadas, el adaptador Node las renderiza con un servidor intermedio y construye el suyo después, con el sitemap en su manifiesto (una compilación de servidor más, sólo con `sitemap`). Un `public/sitemap.xml` o `public/robots.txt` choca con la opción correspondiente y el build falla.
+
+### CSP con hashes
+
+Una `Content-Security-Policy` sin `'unsafe-inline'` bloquea los scripts en línea de un documento, como el del tema de `document.head.script`. Para las páginas que se generan en el build, Meeko permite cada uno por su hash SHA-256, sin nonce por petición:
+
+- Desde `1.3`, el índice `prerender/manifest.json` guarda en `pages[ruta].scriptHashes` las fuentes `'sha256-…'` de los `<script>` en línea que ejecuta cada página prerenderizada: los de JavaScript, `module`, `importmap` y `speculationrules`. Los bloques de datos (`application/json`, como el payload de Meeko, y `application/ld+json`) y los scripts con `src` no cuentan.
+- `inlineScriptHashes(html)` de `@meekojs/meeko/build` devuelve `{ hashes, unhashable }` para cualquier documento: los hashes y el JavaScript que un hash no puede permitir, los atributos `on*` y las URL `javascript:`. Lee el HTML como el navegador, así que el hash coincide con el que éste comprueba.
+- `contentSecurityPolicy(policy, hashes)` de `@meekojs/meeko/server` construye el valor de la cabecera: añade los hashes a `script-src` sin repetir fuentes o, si la política no tiene `script-src`, a una copia de las fuentes de `default-src` (sin ninguna de las dos, los scripts ya están permitidos y no añade nada). Con hashes, el navegador ignora `'unsafe-inline'` de `script-src`.
+
+El adaptador `static` hace todo eso con `server.contentSecurityPolicy`: calcula los hashes de todos los `.html` de su salida (`404.html` y los de `public/` incluidos), los añade a la política y escribe la cabecera en `headerFiles`. Si una página tiene un atributo `on*` o una URL `javascript:`, el build falla con la lista de archivos: use un script o `on:` del componente. Cambiar un script cambia su hash en el siguiente build, sin tocar la política.
+
+```ts
+// Un host propio que sirve el build de Node con CSP para sus páginas prerenderizadas.
+import { readFile } from "node:fs/promises";
+import { contentSecurityPolicy } from "@meekojs/meeko/server";
+import type { PrerenderIndex } from "@meekojs/meeko/build";
+
+const index = JSON.parse(await readFile(".meeko/output/node/prerender/manifest.json", "utf8")) as PrerenderIndex;
+const hashes = [...new Set(Object.values(index.pages).flatMap((page) => page.scriptHashes ?? []))];
+const header = contentSecurityPolicy({ "default-src": ["'self'"], "object-src": ["'none'"] }, hashes);
+```
+
+`meeko start` no añade esa cabecera: las páginas con SSR tienen scripts que dependen de cada petición (los de `useHead`), y para ellas la vía es el nonce de `DocumentOptions.nonce`, que Meeko pone en sus `<script>` y `<style>`. Una página prerenderizada no se sirve desde el archivo cuando hay `nonce`, porque el nonce cambia en cada respuesta.
+
 ### Bun
 
 ```sh
@@ -1928,7 +2203,7 @@ bun .meeko/output/bun/index.js       # en producción
 
 El build Bun escribe `.meeko/output/bun/` con `index.js`, `chunks/`, `client/` y `prerender/`. A diferencia del build Node, `index.js` incluye `@meekojs/meeko` y el resto de dependencias del servidor: la carpeta no necesita `node_modules`, ni las fuentes de la aplicación, ni TypeScript o Vite. Copie la carpeta completa al servidor. El build y el prerender siguen ejecutándose con Node; Meeko construye para ello un servidor Node intermedio en `.meeko/build/node/`, que no forma parte de la salida.
 
-La salida escucha en `127.0.0.1:4173` salvo que `MEEKO_HOST` y `MEEKO_PORT` (o `PORT`) indiquen otra dirección; `MEEKO_PUBLIC_ORIGIN` cumple la misma función que en Node. `server.host` y `server.port` sólo se aplican a Node. `SIGINT` y `SIGTERM` detienen `Bun.serve`, cierran las conexiones activas y después la aplicación. `meeko preview` lanza `bun` como proceso hijo, le reenvía las señales y adopta su código de salida; si `bun` no está en el `PATH`, falla con un mensaje explícito.
+La salida escucha en `127.0.0.1:4173` salvo que `MEEKO_HOST` y `MEEKO_PORT` (o `PORT`) indiquen otra dirección; `MEEKO_PUBLIC_ORIGIN` cumple la misma función que en Node. `server.host` y `server.port` sólo se aplican a Node. `SIGINT` y `SIGTERM` detienen `Bun.serve`, cierran las conexiones activas y después la aplicación. Desde `1.3`, los rechazos sin manejar y las excepciones no capturadas siguen `processErrors` (véase [Fallos fuera de una petición](#fallos-fuera-de-una-petición)); un host propio con `createBunServer` lo consigue con `handleProcessErrors`. `meeko preview` lanza `bun` como proceso hijo, le reenvía las señales y adopta su código de salida; si `bun` no está en el `PATH`, falla con un mensaje explícito.
 
 Para alojar la aplicación en un servidor propio, `createBunServer(app, options)` devuelve `{ fetch, websocket }` para `Bun.serve({ port, ...createBunServer(app) })`, y `createBunAssetReader({ root, assets })` sirve los archivos del manifiesto con `Bun.file`. Límites de Socket:
 
@@ -1946,7 +2221,7 @@ deno run --allow-net --allow-env --allow-read=.meeko/output/deno .meeko/output/d
 
 El build Deno escribe `.meeko/output/deno/` con `main.js`, `chunks/`, `client/` y `prerender/`. Como en Bun, `main.js` incluye todas las dependencias del servidor y no necesita `node_modules`, las fuentes, TypeScript ni Vite. `meeko preview` concede todos los permisos (`-A`). En producción bastan `--allow-net`, `--allow-env` (el runtime recibe `Deno.env.toObject()`) y lectura de la carpeta de salida. `MEEKO_HOST`, `MEEKO_PORT` (o `PORT`) y `MEEKO_PUBLIC_ORIGIN` funcionan como en Node.
 
-`serveDeno(app, { host, port, publicOrigin, platform, onError, maxMessageBytes, idleTimeout, handleSignals })` sirve la aplicación con `Deno.serve` y devuelve `{ url, finished, close() }`. `close()` cierra los peers de Socket con `1001`, detiene HTTP, espera las tareas de `waitUntil` y cierra la aplicación, por ese orden. Con `handleSignals`, lo hace ante `SIGINT` y `SIGTERM` (en Windows, `SIGINT` y `SIGBREAK`). `createDenoAssetReader({ root, assets })` sirve los archivos del manifiesto. Límites de Socket:
+`serveDeno(app, { host, port, publicOrigin, platform, onError, maxMessageBytes, idleTimeout, handleSignals })` sirve la aplicación con `Deno.serve` y devuelve `{ url, finished, close() }`. `close()` cierra los peers de Socket con `1001`, detiene HTTP, espera las tareas de `waitUntil` y cierra la aplicación, por ese orden. Con `handleSignals`, lo hace ante `SIGINT` y `SIGTERM` (en Windows, `SIGINT` y `SIGBREAK`) y, desde `1.3`, aplica `processErrors` a los rechazos sin manejar y las excepciones no capturadas (véase [Fallos fuera de una petición](#fallos-fuera-de-una-petición)). `createDenoAssetReader({ root, assets })` sirve los archivos del manifiesto. Límites de Socket:
 
 - `Deno.upgradeWebSocket` no ofrece un límite de frame, así que el adaptador mide cada mensaje con `maxMessageBytes` (por defecto, el límite de Socket de la aplicación o 64 KiB) y cierra con `1009` los mayores. Deno reensambla el frame en memoria antes de esa comprobación; limite el tamaño de las peticiones en el proxy si necesita un tope anterior.
 - El búfer saliente se controla con el límite de búfer del hub mediante `bufferedAmount`.
@@ -2113,7 +2388,8 @@ Para un Worker propio, `@meekojs/meeko/cloudflare` exporta las piezas que usa el
 - assets con `ETag`/`304` y política de caché, e intentos de traversal (`..`, `%2e%2e`, `%2f`, `%5c`) y de leer archivos del build;
 - páginas prerenderizadas con la meta CSRF de la sesión;
 - orden del middleware;
-- Socket: ruta, Origin, autenticación, límites de tamaño, validación y binario, orden de mensajes de un peer y broadcast entre dos conexiones de una sala.
+- Socket: ruta, Origin, autenticación, límites de tamaño, validación y binario, orden de mensajes de un peer y broadcast entre dos conexiones de una sala;
+- fallos del proceso: un rechazo sin manejar llega al `onError` del runtime y la salida sigue atendiendo, y una excepción no capturada llega a `onError` y la salida termina con código 1 (salvo en workerd).
 
 La variante `workerd` añade sesiones en D1 (también leídas desde el Durable Object de un canal privado), la hibernación forzada de una sala (`evictDurableObject` con `webSockets: "hibernate"`) seguida de mensajes en ambos sentidos, el auto-response `ping`/`pong` y un broadcast desde la API, la publicación de una sala a otra por RPC sin fugas a terceras salas, una conexión con una cabecera `Cookie` mayor que el límite del attachment, una sala cuyo nombre supera 1.024 bytes y que la salida sea un único módulo `worker.js`. La prueba de streaming pide `accept-encoding: identity`: el runtime local de Wrangler (Miniflare) emula la compresión de Cloudflare para `text/html` sin respetar `no-transform`, y su codificador gzip sólo escribe al cerrar el cuerpo, de modo que con `wrangler dev` o `meeko preview --adapter cloudflare` un navegador que acepta gzip recibe las páginas `"stream"` completas al final. Es una limitación del entorno local: en producción, la compresión de Cloudflare respeta `no-transform`.
 
@@ -2173,13 +2449,13 @@ Tras 500 renders SSR, el heap pasó de 87,276,056 a 87,012,304 bytes después de
 
 ## Compatibilidad y versionado
 
-Las entradas públicas soportadas de la versión actual son `@meekojs/meeko`, `/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare`, `/build`, `/vite`, `/devtools-ui`, desde `1.1`, `/prettier` y, desde `1.2`, `/password`. `/internal` existe para el código generado por Meeko y no es contrato de consumo directo. La compilación se ofrece mediante la CLI y Vite; la raíz pública expone la reactividad y el runtime de SSR e hidratación, pero no una función `compile`. `defineMeekoConfig`, routing, `definePage`, `useState`, `createApiClient`, `createRpcClient`, `defineSocketChannel`, `attachNodeWebSocketServer`, `RedisSessionStore` y `SqlSessionStore` conservan sus nombres actuales. Los autoimports generados `api`, `rpc`, `socket` y `useSocket` dependen del manifiesto de cada aplicación.
+Las entradas públicas soportadas de la versión actual son `@meekojs/meeko`, `/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare`, `/build`, `/vite`, `/devtools-ui`, desde `1.1`, `/prettier` y, desde `1.2`, `/password` y `/postcss`. `/internal` existe para el código generado por Meeko y no es contrato de consumo directo. La compilación se ofrece mediante la CLI y Vite; la raíz pública expone la reactividad y el runtime de SSR e hidratación, pero no una función `compile`. `defineMeekoConfig`, routing, `definePage`, `useState`, `createApiClient`, `createRpcClient`, `defineSocketChannel`, `attachNodeWebSocketServer`, `RedisSessionStore` y `SqlSessionStore` conservan sus nombres actuales. Los autoimports generados `api`, `rpc`, `socket` y `useSocket` dependen del manifiesto de cada aplicación.
 
 Meeko sigue SemVer desde `1.0`: el contrato público, lo que no es público y la política de deprecación están en [stability.md](stability.md). Una publicación requiere lockfile reproducible con el pnpm declarado, CI verde, consumidor externo y revisión del tarball. No se aumenta la versión automáticamente.
 
 ## Límites actuales
 
-- Los adaptadores de servidor publicados son Node 24, Bun, Deno y Cloudflare Workers; la suite de conformidad se ejecuta con Bun 1.4.4, Deno 2.9.8 y workerd 1.20261019.1 (wrangler 4.152.0). En Workers, Socket requiere Durable Objects, las sesiones requieren D1 o Redis por la API REST de Upstash (KV no es válido) y D1 no notifica revocaciones a otros aislados.
+- Los adaptadores de servidor publicados son Node 24, Bun, Deno y Cloudflare Workers, y desde `1.3` el adaptador `static`, que sólo admite páginas prerenderizadas; la suite de conformidad se ejecuta con Bun 1.4.4, Deno 2.9.8 y workerd 1.20261019.1 (wrangler 4.152.0). En Workers, Socket requiere Durable Objects, las sesiones requieren D1 o Redis por la API REST de Upstash (KV no es válido) y D1 no notifica revocaciones a otros aislados.
 - Redis tiene una prueba de integración con servidor real configurada en CI; su ejecución local depende de un servidor accesible. El adaptador SQL se probó con SQLite real. `RedisSocketPubSub` se prueba en la misma integración con dos procesos.
 - Los canales Socket se descubren como archivos con nombre simple bajo `server/socket/`.
 - Cambios en configuración o registro de autoimports fuerzan recarga completa en Vite.

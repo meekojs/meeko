@@ -2,6 +2,8 @@ import type { AstPath, Doc, Options, Parser, ParserOptions, Plugin, Printer } fr
 import { builders, utils } from "prettier/doc";
 import { scanInterpolations } from "../compiler/interpolation.js";
 import { isCustomElementTag } from "../compiler/template.js";
+import { classOrderOption, classTokens, sortClassTokens } from "./classes.js";
+import type { ClassSortMode } from "./classes.js";
 
 const { group, indent, label, softline } = builders;
 const { mapDoc } = utils;
@@ -186,6 +188,26 @@ function isExpressionAttribute(name: string, element: HtmlNode | undefined): boo
   return false;
 }
 
+/** Tags whose `class` is not the element's: a component prop, or a Meeko construct. */
+const notElementClass = new Set(["component", "render", "snippet", "template"]);
+
+/** A static `class` of an element; on a component tag (`<Card class="x">`) it is a text prop. */
+function isElementClass(node: HtmlNode, element: HtmlNode | undefined): boolean {
+  const tag = element?.name;
+  return node.fullName?.toLowerCase() === "class" && element?.kind === "element" && tag !== undefined && !/^[A-Z]/.test(tag) && !notElementClass.has(tag);
+}
+
+/**
+ * The normalized, optionally sorted, value of a static `class`; `undefined` keeps it verbatim. A
+ * value with a character reference or a `"` is left alone: its tokens are not the source text.
+ */
+function classValue(value: string, options: Options): string | undefined {
+  if (value.includes("&") || value.includes('"')) return undefined;
+  const mode = (options as { meekoSortClasses?: ClassSortMode }).meekoSortClasses;
+  const order = (options as Record<string, unknown>)[classOrderOption] as ReadonlyMap<string, number> | undefined;
+  return sortClassTokens(classTokens(value), mode, order).join(" ");
+}
+
 function unescapedValue(node: HtmlNode): string {
   return (node.value ?? "").replaceAll("&quot;", '"').replaceAll("&apos;", "'");
 }
@@ -261,6 +283,10 @@ const templatePrinter: Printer<HtmlNode> = {
           typeof item === "string" ? item.replaceAll('"', "&quot;") : item);
         return [node.rawName ?? node.fullName!, '="', label(expressionLabel, group(value)), '"'];
       };
+    }
+    if (node.kind === "attribute" && node.value != null && isElementClass(node, path.parent as HtmlNode | undefined)) {
+      const value = classValue(node.value, options);
+      if (value !== undefined) return [node.rawName ?? node.fullName!, '="', value, '"'];
     }
     return host(options as ParserOptions<HtmlNode>).printer.embed(path, options);
   },

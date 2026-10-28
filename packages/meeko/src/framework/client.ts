@@ -1,6 +1,7 @@
 import { hasRegionRecoveryFailure, parseRegionHtml } from "../dom.js";
 import type { Component, DomScope } from "../dom.js";
 import { createAppErrorChannel, provideAppErrorChannel } from "../component-errors.js";
+import { markingObserver } from "../error-observer.js";
 import type { ComponentErrorHandler } from "../component-errors.js";
 import { batch, finishWithCleanup, runDry, signal } from "../reactivity.js";
 import type { Signal } from "../reactivity.js";
@@ -12,6 +13,7 @@ import { fixedRoute, liveRoute, provideNavigation, provideRoute, routeSnapshot }
 import type { LiveRoute, NavigationState, RouteState } from "./navigation.js";
 import type { RouteMiddleware } from "./middleware.js";
 import { activateRouteManifest, createAppNavigator, matchRoute, reportNavigationError, sameDocument } from "./router.js";
+import { watchGlobalErrors } from "./global-errors.js";
 import type { ErrorPageRecord, NavigationContext, Navigator, RouteMatch, RouteRecord, UnmatchedNavigationContext } from "./router.js";
 import { hydrateWithStateStore, StateStore, withStateStore } from "./state.js";
 import { createDeferred, deferredSettle, deferredSource, extractDeferred, placeDeferred } from "./deferred.js";
@@ -129,15 +131,24 @@ export interface ClientAppOptions {
   readonly loadClientRoute?: (file: string) => Promise<ClientRoute>;
   /** Carga el middleware de ruta, que se ejecuta como en SSR antes de pedir cada navegación. */
   readonly loadMiddleware?: () => Promise<readonly RouteMiddleware[]>;
-  /** Pide al handler SSR los datos públicos del loader al navegar (`application/meeko+json`). */
-  readonly serverData?: boolean;
+  /**
+   * Pide al servidor los datos públicos del loader al navegar. Con `true`, la misma URL con
+   * `Accept: application/meeko+json`; desde `1.3`, con `"static"`, el archivo
+   * `<ruta>/index.meeko.json` que escribe el adaptador `static`, para un hosting estático que no
+   * negocia `Accept`.
+   */
+  readonly serverData?: boolean | "static";
   /** Implementación de `fetch` para las navegaciones; por defecto, la global. */
   readonly fetch?: typeof fetch;
   /** Observa los fallos de navegación por clic o historial; tiene prioridad sobre `onError`. */
   readonly onNavigationError?: (error: unknown) => void;
   /**
    * Observa los fallos de esta aplicación en el navegador: navegación, clientes Socket y eventos,
-   * efectos o limpiezas de componentes sin un `provideErrorHandler` más cercano.
+   * efectos o limpiezas de componentes sin un `provideErrorHandler` más cercano. Desde `1.3`,
+   * también las excepciones no capturadas (`"uncaught"`) y las promesas rechazadas sin manejar
+   * (`"rejection"`) de la página mientras la aplicación está montada; el navegador ya no las
+   * repite en la consola. Sin `onError` ni `app.onError`, las recibe el primer
+   * `provideErrorHandler` activo; sin ninguno, el navegador las muestra como siempre.
    */
   readonly onError?: ComponentErrorHandler;
   /** Ventana del navegador; por defecto, `window`. */
@@ -202,6 +213,19 @@ const emptyOutlet: Component<Record<string, unknown>> = {
   renderToString: () => "",
   hydrateScope: () => () => {},
 };
+
+/**
+ * The navigation payload file of a page on a static host: `index.meeko.json` in the page's folder,
+ * next to its `index.html` (`/docs` → `/docs/index.meeko.json`, `/` → `/index.meeko.json`). The
+ * query string and the fragment are not part of a stored page.
+ */
+function staticPayloadUrl(url: URL): string {
+  const target = new URL(url.href);
+  target.pathname = `${url.pathname.replace(/\/+$/, "")}/index.meeko.json`;
+  target.search = "";
+  target.hash = "";
+  return target.href;
+}
 
 /** A navigation to a route, or without `match` to a URL that renders the application error page. */
 type RenderContext = UnmatchedNavigationContext & { readonly match?: RouteMatch };
@@ -577,10 +601,13 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   // a route) has the title of its SSR error document.
   const routeHead = (head: PageHead, errorPage: boolean): HeadInput => routeHeadInput(head, errorPage ? ERROR_PAGE_TITLE : undefined);
   const appError = options.errorPage;
-  const initial = matchRoute(options.routes, browser.location.pathname);
+  const matched = matchRoute(options.routes, browser.location.pathname);
+  // An error payload renders app/error.meeko, whatever the URL: a server answers it for a URL
+  // without a route, and a static host's 404.html for any missing file, including a URL that
+  // matches a dynamic route whose page was not prerendered.
+  const initial = payload.error ? undefined : matched;
   if (payload.error) {
-    // The server rendered app/error.meeko for a URL without a route.
-    if (initial || !appError) throw new Error("Meeko route hydration mismatch");
+    if (!appError) throw new Error("Meeko route hydration mismatch");
   } else {
     if (!initial || initial.route.id !== payload.route) throw new Error("Meeko route hydration mismatch");
     if (JSON.stringify(initial.params) !== JSON.stringify(payload.props.params)) throw new Error("Meeko route parameters do not match SSR");
@@ -616,7 +643,8 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     ? (error, source) => { try { hostObserver(error, source); } finally { pluginObserver(error, source); } }
     : hostObserver ?? pluginObserver;
   const errorChannel = createAppErrorChannel(applicationObserver);
-  const observeNavigationError = options.onNavigationError ?? ((error: unknown) => {
+  // What the host's navigation observer receives is not reported again if it escapes to `window`.
+  const observeNavigationError = (options.onNavigationError && markingObserver(options.onNavigationError)) ?? ((error: unknown) => {
     const handler = errorChannel.current();
     if (handler) return handler(error, "navigation");
     reportNavigationError(browser, error);
@@ -649,6 +677,9 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   let release: () => void;
   // href(id) resolves against this app's manifest from hydration until dispose.
   const releaseManifest = activateRouteManifest(options.routes);
+  // Uncaught exceptions and unhandled rejections of the page reach the application observer
+  // from hydration until dispose.
+  const releaseGlobalErrors = watchGlobalErrors(browser, () => errorChannel.current());
   try {
     first = initial
       ? await createTree(initial.route.layouts, payload.props, options.loadPage, 0, clientFirst ? emptyOutlet : initial.route.file)
@@ -658,13 +689,14 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     // onMounted callbacks run once the whole tree has hydrated. The head adopts the SSR tags once,
     // with every useHead of the hydrated tree registered.
     release = documentHead.hold(() => {
-      documentHead.setRoute(routeHead(payload.head, payload.error));
+      documentHead.setRoute(routeHead(payload.head, payload.error), payload.error ? undefined : initialUrl.pathname);
       return withResourceScope(initialData, () => hydrateApp(committedRoute.state, () => mountBatch(() => first.component.hydrateScope({ root: options.root }, {}, payload.state))));
     });
     resourceCache.merge(initialData.loadedData());
   } catch (error) {
     stopChunks();
     releaseManifest();
+    releaseGlobalErrors();
     throw error;
   }
   let layouts = first.layouts;
@@ -813,13 +845,23 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         errorPage = routeError;
       } : undefined);
     } else if (options.serverData && !options.loadRoute) {
-      const response = await (options.fetch ?? fetch)(context.url.href, {
-        headers: { accept: "application/meeko+json" }, credentials: "same-origin", signal: context.signal,
-      });
+      // A static host serves each page's payload as a file next to its index.html.
+      const response = options.serverData === "static"
+        ? await (options.fetch ?? fetch)(staticPayloadUrl(context.url), { credentials: "same-origin", signal: context.signal })
+        : await (options.fetch ?? fetch)(context.url.href, {
+          headers: { accept: "application/meeko+json" }, credentials: "same-origin", signal: context.signal,
+        });
       // A loader or middleware redirect: follow it instead of this navigation. A browser fetch
       // reports a followed redirect; a custom fetch may hand back the 3xx response itself.
       const location = response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
       const redirect = response.redirected && response.url ? new URL(response.url) : location ? new URL(location, context.url) : undefined;
+      // A static host redirects files, not pages: the browser loads the page itself instead.
+      if (redirect && options.serverData === "static") {
+        void response.body?.cancel().catch(() => {});
+        if (context.signal.aborted || disposed) return false;
+        browser.location.assign(context.url.href);
+        return false;
+      }
       if (redirect) {
         void response.body?.cancel().catch(() => {});
         if (context.signal.aborted || disposed) return false;
@@ -993,7 +1035,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         catch (restoreError) { throw new AggregateError([error, restoreError], "Meeko navigation and CSRF recovery failed"); }
         throw error;
       }
-      documentHead.setRoute(routeHead(head, errorPage !== undefined));
+      documentHead.setRoute(routeHead(head, errorPage !== undefined), errorPage === undefined ? context.url.pathname : undefined);
     });
     if (serverSharedState) stateStore.seedForNavigation(serverSharedState, commitWithToken);
     else if (loaderDraft) loaderDraft.commit(commitWithToken);
@@ -1050,6 +1092,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       activeStream?.abort();
       browser.document.removeEventListener("click", onClick);
       releaseManifest();
+      releaseGlobalErrors();
       finishWithCleanup(release, () => errorChannel.clear());
     },
   };

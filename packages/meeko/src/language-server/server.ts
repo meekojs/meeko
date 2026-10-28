@@ -15,14 +15,15 @@ import {
   rename, resolveCompletion, semanticTokens, semanticTokensLegend, shadowedTagsOf, signatureHelp,
 } from "./features.js";
 import type { CompletionData, FeatureContext, LocatedDocument, MeekoFormatSettings } from "./features.js";
+import { classCompletion, classDefinition, classHover, ClassIndex, classView, isClassCompletionData, resolveClassCompletion, withItemDefaults } from "./classes.js";
 import {
-  classCompletion, classDefinition, colorPresentations, cssCompletion, cssHover, documentColors, htmlCompletion, htmlHover,
-  linkedEditingRanges, styleDiagnostics, tagCompletion,
+  colorPresentations, cssCompletion, cssHover, documentColors, htmlCompletion, htmlHover, linkedEditingRanges, styleDiagnostics, tagCompletion,
 } from "./embedded.js";
 import { codeLenses } from "./lenses.js";
 import { createComponentActions, listItemActions, propsReadActions } from "./quick-fixes.js";
 import { documentLinks, inlayHints, linkRouteCompletion, workspaceSymbols } from "./nav.js";
 import { MeekoWorkspace, pathKey } from "./project.js";
+import type { MeekoProject } from "./project.js";
 import { executionZones } from "./zones.js";
 import type { ExecutionZoneKind, ExecutionZoneReason } from "./zones.js";
 
@@ -127,6 +128,8 @@ export function startLanguageServer(connection: Connection): void {
   let codeLensRefresh = false;
   let deleteFiles = false;
   let createFiles = false;
+  /** The client reads `editRange` and `data` from `itemDefaults` of a completion list (LSP 3.17). */
+  let completionDefaults = false;
   let formatFallback: MeekoFormatSettings = {};
   /** Workspace folders of the client, the reference of {@link ignoredChange}. */
   let folders: string[] = [];
@@ -144,6 +147,26 @@ export function startLanguageServer(connection: Connection): void {
   const contractRuns = new Map<string, Promise<void>>();
   const contractUris = new Map<string, Set<string>>();
   const semanticCache = new Map<string, { version: number; tokens: SemanticTokens }>();
+  /** CSS classes of each project, by {@link pathKey} of its root. */
+  const classIndexes = new Map<string, ClassIndex>();
+  const classesOf = (project: MeekoProject): ClassIndex => {
+    const key = pathKey(project.root);
+    let index = classIndexes.get(key);
+    if (!index) {
+      index = new ClassIndex(project.root);
+      classIndexes.set(key, index);
+    }
+    return index;
+  };
+  /** An open component with its project ready, for the features that read classes. */
+  const componentOf = async (uri: string): Promise<{ document: TextDocument; filename: string; project: MeekoProject } | undefined> => {
+    const document = documents.get(uri);
+    const filename = uriToPath(uri);
+    if (!document || !filename?.endsWith(".meeko")) return undefined;
+    const project = workspace.projectFor(filename);
+    await project.ready();
+    return { document, filename, project };
+  };
 
   const openDocument = (filename: string): TextDocument | undefined => {
     const key = pathKey(filename);
@@ -286,6 +309,8 @@ export function startLanguageServer(connection: Connection): void {
     deleteFiles = workspaceEdit?.documentChanges === true && (workspaceEdit.resourceOperations ?? []).includes("delete");
     createFiles = workspaceEdit?.documentChanges === true && (workspaceEdit.resourceOperations ?? []).includes("create");
     formatFallback = formatSettingsOf(options.format) ?? {};
+    const defaults = params.capabilities.textDocument?.completion?.completionList?.itemDefaults ?? [];
+    completionDefaults = defaults.includes("editRange") && defaults.includes("data");
     const version = packageVersion();
     return {
       capabilities: {
@@ -317,6 +342,8 @@ export function startLanguageServer(connection: Connection): void {
     void connection.client.register(DidChangeWatchedFilesNotification.type, {
       watchers: [
         { globPattern: "**/*.{ts,mts,cts,meeko}" },
+        // Class completion: app/styles/main.css, its imports and the processed .meeko/styles/main.css.
+        { globPattern: "**/*.css" },
         { globPattern: "**/{tsconfig*.json,meeko.config.*}" },
         // Installing or removing a dependency changes where imports resolve (see MeekoProject).
         { globPattern: "**/{package.json,package-lock.json,pnpm-lock.yaml,yarn.lock,bun.lock}" },
@@ -355,7 +382,11 @@ export function startLanguageServer(connection: Connection): void {
   });
 
   connection.onDidChangeWatchedFiles(({ changes }) => {
-    const paths = changes.flatMap((change) => uriToPath(change.uri) ?? []).filter((path) => !ignoredChange(path, folders));
+    const changed = changes.flatMap((change) => uriToPath(change.uri) ?? []);
+    // Stylesheets only feed class completion, also the one `meeko dev` writes under `.meeko/`.
+    const styles = changed.filter((path) => path.endsWith(".css"));
+    if (styles.length) for (const index of classIndexes.values()) index.filesChanged(styles);
+    const paths = changed.filter((path) => !path.endsWith(".css") && !ignoredChange(path, folders));
     if (!paths.length) return;
     // A changed configuration is checked again with the open components; none may be open.
     for (const path of paths) if (configUris.has(pathKey(path))) reportConfig(path, []);
@@ -408,8 +439,8 @@ export function startLanguageServer(connection: Connection): void {
       const shadowed = shadowedTagsOf(project, document.getText());
       const directives = directiveNameCompletion(document, position, shadowed);
       if (directives) return directives;
-      const classes = classCompletion(document, position);
-      if (classes) return classes;
+      const classes = classCompletion(document, position, filename, classesOf(project), project.componentSources());
+      if (classes) return completionDefaults ? withItemDefaults(classes) : classes;
       const routes = linkRouteCompletion(document, position, await project.appIndex(), project.root, shadowed);
       if (routes) return routes;
     }
@@ -419,20 +450,28 @@ export function startLanguageServer(connection: Connection): void {
     return htmlCompletion(document, position) ?? cssCompletion(document, position) ?? null;
   });
   connection.onCompletionResolve(async (item) => {
+    if (isClassCompletionData(item.data)) {
+      const open = await componentOf(item.data.meekoClass);
+      if (!open) return item;
+      return resolveClassCompletion(item, classView(open.document, open.filename, classesOf(open.project), open.project.componentSources()));
+    }
     const data = item.data as CompletionData | undefined;
     if (!data?.uri) return item;
     return await withContext(data.uri, (context) => resolveCompletion(context, item)) ?? item;
   });
   connection.onHover(async ({ textDocument, position }) => {
+    const open = await componentOf(textDocument.uri);
+    const classes = open && classHover(open.document, position, open.filename, classesOf(open.project), open.project.componentSources());
+    if (classes) return classes;
     const typed = await withContext(textDocument.uri, (context) => hover(context, position), true);
     const document = documents.get(textDocument.uri);
     if (typed || !document) return typed;
     return htmlHover(document, position) ?? cssHover(document, position) ?? null;
   });
   connection.onDefinition(async ({ textDocument, position }) => {
-    const document = documents.get(textDocument.uri);
-    // A class in `class="…"` goes to its selectors in <style>.
-    const classes = document && classDefinition(document, position);
+    // A class in `class="…"` or `bind:class` goes to its selectors in <style> and the stylesheets.
+    const open = await componentOf(textDocument.uri);
+    const classes = open && classDefinition(open.document, position, open.filename, classesOf(open.project), open.project.componentSources());
     if (classes) return classes;
     return withContext(textDocument.uri, (context) => definition(context, position), true);
   });

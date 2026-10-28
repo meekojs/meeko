@@ -1,5 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 import { join, posix } from "node:path";
+import { trustHtml } from "@meekojs/meeko";
+import type { TrustedHtml } from "@meekojs/meeko";
 import GithubSlugger from "github-slugger";
 import markdownIt from "markdown-it";
 import type { MarkdownIt, Token } from "markdown-it";
@@ -58,9 +60,9 @@ export function escapeHtml(text: string): string {
 }
 
 /** A highlighted `<pre>` under the header of every code block: its language and a copy button. */
-export function codeBlockHtml(label: string, pre: string): string {
+export function codeBlockHtml(label: string, pre: TrustedHtml): TrustedHtml {
   const name = escapeHtml(label);
-  return `<div class="code-block" data-lang="${name}"><div class="code-head" data-pagefind-ignore><span class="code-lang">${name}</span><button type="button" class="code-copy" data-copy>Copiar</button></div>${pre}</div>\n`;
+  return trustHtml(`<div class="code-block" data-lang="${name}"><div class="code-head" data-pagefind-ignore><span class="code-lang">${name}</span><button type="button" class="code-copy" data-copy>Copiar</button></div>${pre}</div>\n`);
 }
 
 /**
@@ -68,6 +70,9 @@ export function codeBlockHtml(label: string, pre: string): string {
  * scrolling wrapper and code blocks highlighted with Shiki, under a header with a copy button.
  * `html` keeps raw HTML, as the documents of the repository use it; JSDoc fragments escape it,
  * because their prose names tags and generics such as `Signal<T>` without backticks.
+ *
+ * Its output is trusted HTML (`trustHtml`): the text comes from this repository (its documents and
+ * the JSDoc of the package), never from visitors, and Shiki escapes the code it highlights.
  */
 function markdown(html = true): Promise<MarkdownIt> {
   let renderer = renderers.get(html);
@@ -151,7 +156,7 @@ export async function renderSource(source: string, transform: (text: string) => 
       if (options.codeLinks && tokens[index - 1]?.type !== "heading_open") linkCode(token, options.codeLinks, linked);
     }
   }
-  const html = md.renderer.render(tokens, md.options, {});
+  const html = trustHtml(md.renderer.render(tokens, md.options, {}));
   return { title: title || source, description, html, toc, source, editUrl: githubUrl(source, "edit") };
 }
 
@@ -166,9 +171,18 @@ export function documentHeadings(source: string): Promise<ReadonlyMap<string, st
       const slugger = new GithubSlugger();
       const found = new Map<string, string>();
       for (const [index, token] of tokens.entries()) {
-        if (token.type !== "heading_open") continue;
-        const content = inlineText(tokens[index + 1]);
-        found.set(slugger.slug(content), content);
+        if (token.type === "heading_open") {
+          const content = inlineText(tokens[index + 1]);
+          found.set(slugger.slug(content), content);
+        }
+        // An explicit `<a id="…">` is an anchor too; its label is the start of the text it opens.
+        const html = token.type === "html_block" ? [token.content] : token.type === "inline" ? (token.children ?? []).filter((child) => child.type === "html_inline").map((child) => child.content) : [];
+        for (const fragment of html) {
+          for (const match of fragment.matchAll(/<a\s[^>]*\bid="([^"]+)"/g)) {
+            const label = token.type === "inline" ? inlineText(token).trim().split(/(?<=\.)\s/)[0]!.replace(/\.$/, "") : match[1]!;
+            if (!found.has(match[1]!)) found.set(match[1]!, label || match[1]!);
+          }
+        }
       }
       return found;
     });
@@ -181,7 +195,7 @@ export function documentHeadings(source: string): Promise<ReadonlyMap<string, st
  * Renders Markdown written outside the documents, such as the JSDoc of an export, whose links are
  * relative to `source`. Raw HTML is escaped.
  */
-export async function renderFragment(text: string, source: string): Promise<string> {
+export async function renderFragment(text: string, source: string): Promise<TrustedHtml> {
   const md = await markdown(false);
   const tokens = md.parse(text, {});
   for (const token of tokens) {
@@ -192,10 +206,10 @@ export async function renderFragment(text: string, source: string): Promise<stri
       if (typeof href === "string" && href) child.attrSet("href", rewriteHref(href, source));
     }
   }
-  return md.renderer.render(tokens, md.options, {});
+  return trustHtml(md.renderer.render(tokens, md.options, {}));
 }
 
 /** One line of Markdown as inline HTML, without a paragraph, such as a summary in a list. */
-export async function renderInline(text: string): Promise<string> {
-  return (await markdown(false)).renderInline(text);
+export async function renderInline(text: string): Promise<TrustedHtml> {
+  return trustHtml((await markdown(false)).renderInline(text));
 }

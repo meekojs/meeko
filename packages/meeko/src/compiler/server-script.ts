@@ -163,6 +163,35 @@ function optionProperty(object: ts.ObjectLiteralExpression, name: string): ts.Ob
 const emptyScript: ServerScript = { body: false, statements: [], exports: [], implicit: [], usePageImports: [] };
 
 /**
+ * What only exists in a component's `<script>`: the compiler macros, which the compiler replaces
+ * there, and `onMounted`, which needs a component being mounted. `<script server>` runs outside any
+ * component, before the page renders (or in the browser as the loader of a `render: "client"` page).
+ */
+const componentApis: ReadonlySet<string> = new Set(["defineProps", "defineEmits", "defineExpose", "defineModel", "defineSnippets", "useElementRef", "onMounted"]);
+
+/** MEEK108: a component API used in `<script server>`, without a declaration of the same name, or `onMounted` imported. */
+function checkComponentApis(file: ts.SourceFile, moduleNames: ReadonlySet<string>, fail: (code: string, message: string, node: ts.Node) => never): void {
+  const report = (name: string, node: ts.Node): never => fail(
+    "MEEK108",
+    `${name}${name === "onMounted" ? "()" : ""} sólo existe en el <script> de un componente: <script server> se ejecuta fuera del componente, antes de renderizar la página. Muévelo al <script lang="ts">`,
+    node,
+  );
+  for (const statement of file.statements) {
+    if (ts.isImportDeclaration(statement)) {
+      const bindings = statement.importClause?.namedBindings;
+      if (statement.importClause?.isTypeOnly || !ts.isStringLiteral(statement.moduleSpecifier) || statement.moduleSpecifier.text !== "@meekojs/meeko" || !bindings || !ts.isNamedImports(bindings)) continue;
+      const mounted = bindings.elements.find((element) => !element.isTypeOnly && (element.propertyName ?? element.name).text === "onMounted");
+      if (mounted) report("onMounted", mounted);
+      continue;
+    }
+    if (typeOnlyStatement(statement)) continue;
+    visitReferences(statement, (identifier) => {
+      if (componentApis.has(identifier.text) && !moduleNames.has(identifier.text)) report(identifier.text, identifier);
+    });
+  }
+}
+
+/**
  * Reads a page's `<script server lang="ts">` without running it. Rejects the
  * combinations that the generated route module cannot honour. A block with a
  * syntax error is reported as having no top-level code; TypeScript and the
@@ -198,6 +227,7 @@ export function analyzeServerScript(source: string, filename: string, section: S
     }
   }
   for (const api of pageRequestApis) if (!moduleNames.has(api)) apis.set(api, api);
+  checkComponentApis(file, moduleNames, fail);
 
   const statements: ServerStatement[] = [];
   const exports: ServerBinding[] = [];

@@ -266,6 +266,51 @@ test("the browser hydrates a 404 page, keeps its layouts into a route and loads 
   browser.happyDOM.abort();
 });
 
+test("a static host's 404.html hydrates at any missing URL and navigates in the client with payload files", async () => {
+  const { modules, routes, server } = fixture();
+  // A static host answers 404.html, rendered once at build, for every missing file: here a URL
+  // that matches the dynamic route /users/[id] but whose page was not prerendered.
+  const notFound = await (await server(new Request("https://example.test/404.html", { headers: { accept: "text/html" } }))).text();
+  const browser = new HappyWindow({ url: "https://example.test/users/zz" });
+  browser.document.write(notFound);
+  const root = browser.document.getElementById("app")!;
+  const shell = root.querySelector('[data-layout="default"]');
+  const requests: string[] = [];
+  const assigned: string[] = [];
+  Object.defineProperty(browser.location, "assign", { configurable: true, value: (url: string) => { assigned.push(String(url)); } });
+  // The host: each prerendered page's payload as a file; any other file is 404.html.
+  const host = (async (input: RequestInfo | URL) => {
+    const url = new URL(String(input));
+    requests.push(url.pathname + url.search);
+    const page = /^(.*)\/index\.meeko\.json$/.exec(url.pathname)?.[1] || "/";
+    if (page === "/users/7") {
+      const payload = await server(new Request(new URL(page, url), { headers: { accept: "application/meeko+json" } }));
+      return new Response(await payload.text(), { headers: { "content-type": "application/json" } });
+    }
+    return new Response(notFound, { status: 404, headers: { "content-type": "text/html" } });
+  }) as typeof fetch;
+  const app = await mountClientApp({
+    routes, errorPage,
+    root: root as unknown as Element,
+    payload: browser.document.getElementById("meeko-payload")!.textContent!,
+    loadPage: async (file) => modules[file]!,
+    serverData: "static",
+    fetch: host,
+    browser: browser as unknown as Window,
+  });
+  assert.equal(root.querySelector("#error")?.textContent, "404:NOT_FOUND");
+  assert.equal(await app.navigate("/users/7?tab=x"), true);
+  assert.equal(root.querySelector("#user")?.textContent, "7");
+  assert.equal(root.querySelector('[data-layout="default"]'), shell, "the layouts stay mounted");
+  // A route URL whose payload file is missing shows the error page in the client.
+  assert.equal(await app.navigate("/users/8"), true);
+  assert.equal(root.querySelector("#error")?.textContent, "404:NOT_FOUND");
+  assert.deepEqual(requests, ["/users/7/index.meeko.json", "/users/8/index.meeko.json"]);
+  assert.deepEqual(assigned, []);
+  app.dispose();
+  browser.happyDOM.abort();
+});
+
 test("links without a route are left to the browser, so server handlers run once and may redirect anywhere", async () => {
   const { modules, routes, server } = fixture();
   const browser = new HappyWindow({ url: "https://example.test/" });

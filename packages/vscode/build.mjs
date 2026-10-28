@@ -25,10 +25,11 @@ await build({
 // @meekojs/meeko with `meeko-language-server`. TypeScript stays an installed dependency:
 // the server resolves the native tsc next to this file. Prettier is installed too: it loads
 // its language plugins from its own files, and formatting falls back to it when the
-// workspace has no Prettier.
+// workspace has no Prettier. Vite is never bundled: sorting classes by the stylesheet loads the
+// project's own Vite, and only normalizes them when there is none.
 await build({
   ...common,
   entryPoints: ["../meeko/src/language-server/main.ts"],
   outfile: "dist/server.js",
-  external: ["@typescript/typescript6", "prettier", "prettier/*"],
+  external: ["@typescript/typescript6", "prettier", "prettier/*", "vite"],
 });

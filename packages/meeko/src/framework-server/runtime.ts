@@ -1,5 +1,6 @@
 import type { ServerErrorObserver } from "./contracts.js";
 import type { PlatformName, ServerPlatform } from "./platform.js";
+import type { ProcessErrorPolicy } from "./process-errors.js";
 import type { SessionManager } from "./sessions.js";
 import type { SocketDeliveryErrorContext, SocketPubSub } from "./socket.js";
 
@@ -102,8 +103,21 @@ export interface ServerRuntime<Services = unknown, Env = unknown> {
    * comprobaciones de `Origin` de HTTP y de Socket se comparan con él.
    */
   readonly publicOrigin?: string;
-  /** Recibe los fallos internos con su ID de petición; nunca se envían a los clientes. */
+  /**
+   * Recibe los fallos internos con su ID de petición; nunca se envían a los clientes. Desde `1.3`,
+   * también los fallos del proceso (promesas rechazadas sin manejar y excepciones no capturadas),
+   * con un tercer argumento que los identifica.
+   */
   readonly onError?: ServerErrorObserver;
+  /**
+   * Qué hacer con las promesas rechazadas sin manejar y las excepciones no capturadas del proceso.
+   * Por defecto, un rechazo se informa a `onError` y el servidor sigue atendiendo, y una excepción
+   * se informa y cierra el servidor de forma ordenada con código 1. `false` deja los dos casos al
+   * runtime. Se aplica en `meeko dev`, en las salidas de `meeko build` y en `serveNode` y
+   * `serveDeno` con `handleSignals`.
+   * @since 1.3.0
+   */
+  readonly processErrors?: ProcessErrorPolicy | false;
   /** Libera los recursos del runtime después de cerrar sus sesiones. */
   readonly close?: () => void | Promise<void>;
 }

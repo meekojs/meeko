@@ -1,5 +1,13 @@
 # Cambios de Meeko Language
 
+## [1.3.0] - 2026-10-27
+
+- Completado de clases CSS sin la extensión «HTML CSS Support»: en `class="…"` y en las cadenas de `bind:class`, las clases del `<style>` del componente, de los `<style>` globales de los demás componentes y de `app/styles/main.css` con sus `@import`, más las que genera `meeko dev` en `.meeko/styles/main.css` (`@utilities`, Tailwind). Cada sugerencia indica su origen y muestra la regla; el hover y la definición también funcionan sobre las clases. Lo da el servidor de lenguaje de Meeko.
+- Formato: el valor de cada `class="…"` estático se normaliza siempre (sin espacios sobrantes ni clases repetidas), y un array con un salto de línea tras `[` se mantiene con un elemento por línea (`meekoPreserveArrayBreaks`, activo por defecto; se desactiva en la configuración de Prettier del proyecto). Al actualizar, el formato al guardar puede cambiar líneas que no se han tocado. Lo da el plugin de Prettier de Meeko 1.3.
+- Orden de las clases al formatear con `meekoSortClasses` (`"alphabetical"` o `"stylesheet"`) en la configuración de Prettier del proyecto. Con `"stylesheet"` se usa el Vite del proyecto: el servidor incluido en la extensión no empaqueta Vite y, sin él, las clases sólo se normalizan. En un workspace no confiable no se ordenan.
+- Diagnósticos nuevos de Meeko 1.3: el error `MEEK108` y el aviso `MEEK109` marcan una API escrita donde no existe (una API de servidor en el `<script>` o la plantilla, `definePage` fuera de `<script server>`, una macro del componente en `<script server>`), y el aviso `MEEK107` un `html="..."` sin `trustHtml`. El completado del `<script>` y de la plantilla deja de ofrecer APIs de servidor, y `render` de `definePage` ofrece los cuatro modos.
+- `imports.appDirs` e `imports.sharedDirs` de `meeko.config.ts` también se leen en un workspace no confiable y, en uno de confianza, una entrada fuera de su carpeta se marca en la configuración con `MEEK_CONFIG`.
+
 ## [1.2.0] - 2026-10-27
 
 - Más color: las directivas de control (`if:when`, `each:*`) se ven como palabras clave, los eventos (`on:*`) como funciones y las etiquetas propias de Meeko (`MeekoLink`, `MeekoOutlet`, `component`, `snippet`, `render`) como integradas; las señales tienen su propio color. Las etiquetas de cierre `</snippet>`, `</component>` y las de elementos personalizados ya no salen en rojo.

@@ -50,7 +50,7 @@ test("the root entry exposes only the documented public runtime", async () => {
   const root = await import(pathToFileURL(resolve("dist/index.js")).href);
   assert.deepEqual(Object.keys(root).sort(), [
     "batch", "computed", "createContext", "createRoot", "effect", "inject",
-    "onCleanup", "onMounted", "provide", "provideErrorHandler", "serializeJson", "signal", "untrack",
+    "onCleanup", "onMounted", "provide", "provideErrorHandler", "serializeJson", "signal", "trustHtml", "untrack",
   ]);
 });
 

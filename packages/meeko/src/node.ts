@@ -13,6 +13,7 @@ import type { ServerApp } from "./framework-server/app.js";
 import type { ServerPlatform } from "./framework-server/platform.js";
 import { attachNodeWebSocketServer } from "./framework-server/node-websocket.js";
 import type { NodeWebSocketServer } from "./framework-server/node-websocket.js";
+import { handleProcessErrors } from "./framework-server/process-errors.js";
 
 export { attachNodeWebSocketServer } from "./framework-server/node-websocket.js";
 export type { NodeWebSocketOptions, NodeWebSocketServer } from "./framework-server/node-websocket.js";
@@ -256,7 +257,11 @@ export interface ServeNodeOptions {
   readonly platform?: ServerPlatform;
   /** Observador de errores; por defecto, el de la aplicación. */
   readonly onError?: (error: unknown, requestId: string) => void;
-  /** Cierra de forma ordenada ante `SIGINT` y `SIGTERM`. */
+  /**
+   * Cierra de forma ordenada ante `SIGINT` y `SIGTERM`. Desde `1.3`, también aplica la política
+   * `processErrors` de `server/runtime.ts` a las promesas rechazadas sin manejar y a las
+   * excepciones no capturadas del proceso (véase `handleProcessErrors`).
+   */
   readonly handleSignals?: boolean;
   /**
    * Milisegundos que las respuestas abiertas, como un stream, pueden seguir tras `close()` antes de
@@ -375,6 +380,7 @@ export async function serveNode(app: ServerApp, options: ServeNodeOptions = {}):
     throw error;
   }
   let closing: Promise<void> | undefined;
+  let releaseProcessErrors = (): void => {};
   const onSignal = (): void => { void close().catch(() => {}); };
   const close = (): Promise<void> => {
     closing ??= (async () => {
@@ -400,6 +406,8 @@ export async function serveNode(app: ServerApp, options: ServeNodeOptions = {}):
         try { await step(); }
         catch (error) { failures.push(error); report(error, randomUUID()); }
       }
+      // Failures while closing are still reported; the listeners leave with the server.
+      releaseProcessErrors();
       if (failures.length) throw failures[0];
     })();
     return closing;
@@ -407,6 +415,12 @@ export async function serveNode(app: ServerApp, options: ServeNodeOptions = {}):
   if (options.handleSignals) {
     process.once("SIGINT", onSignal);
     process.once("SIGTERM", onSignal);
+    // The server owns the process: its rejections and exceptions follow `processErrors`. The
+    // shutdown deadline leaves room for the grace period of open responses.
+    releaseProcessErrors = handleProcessErrors(app, {
+      close, shutdownTimeout: Math.min(shutdownTimeout + 5_000, 2_147_483_647),
+      ...(options.onError ? { onError: options.onError } : {}),
+    });
   }
   return { server, url, close };
 }

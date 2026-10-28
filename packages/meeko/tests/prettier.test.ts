@@ -225,6 +225,123 @@ describe("Prettier plugin for .meeko", () => {
   });
 });
 
+describe("meekoPreserveArrayBreaks", () => {
+  type CodeOptions = prettier.Options & MeekoPrettierOptions;
+
+  /** Formatea JavaScript o TypeScript con el plugin y comprueba que una segunda pasada no cambia nada. */
+  async function formatCode(source: string, options: CodeOptions = {}): Promise<string> {
+    const settings: CodeOptions = { filepath: "file.ts", plugins: [plugin], ...options };
+    const formatted = await prettier.format(source, settings);
+    assert.equal(await prettier.format(formatted, settings), formatted, "formatting is idempotent");
+    return formatted;
+  }
+
+  /** Cada caso: código fuente, salida con la opción y si usa sintaxis de tipos. */
+  const cases: ReadonlyArray<readonly [source: string, expanded: string, typed?: boolean]> = [
+    ["const routes = [\n  '/', '/about'];", 'const routes = [\n  "/",\n  "/about",\n];'],
+    ["const tags = ['a',\n  'b'];", 'const tags = ["a", "b"];'],
+    ["const numbers = [\n  1, 2, 3];", "const numbers = [\n  1, 2, 3,\n];"],
+    ["const modes = [\n  'light', 'dark'] as const;", 'const modes = [\n  "light",\n  "dark",\n] as const;', true],
+    ["type Pair = [\n  string, number];", "type Pair = [\n  string,\n  number,\n];", true],
+    ["type Named = readonly [\n  key: string, value?: number];", "type Named = readonly [\n  key: string,\n  value?: number,\n];", true],
+    ["type Flat = [string, number];", "type Flat = [string, number];", true],
+    ["const [\n  first, second] = pair;", "const [\n  first,\n  second,\n] = pair;"],
+    ["function sum([\n  a, b]: [number, number] = [1, 2]) { return a + b; }", "function sum(\n  [\n    a,\n    b,\n  ]: [number, number] = [1, 2],\n) {\n  return a + b;\n}", true],
+    ["function swap([\n  a, b] = [1, 2]) { return [b, a]; }", "function swap(\n  [\n    a,\n    b,\n  ] = [1, 2],\n) {\n  return [b, a];\n}"],
+    ["register([\n  'a', 'b']);", 'register([\n  "a",\n  "b",\n]);'],
+    ["await Promise.all([\n  load(), save()]);", "await Promise.all([\n  load(),\n  save(),\n]);"],
+    ["const grid = [[\n  1, 2], [3, 4]];", "const grid = [\n  [\n    1, 2,\n  ],\n  [3, 4],\n];"],
+    ["const commented = [ // first\n  a, b];", "const commented = [\n  // first\n  a,\n  b,\n];"],
+    ["const leading = [\n  // lead\n  a, b];", "const leading = [\n  // lead\n  a,\n  b,\n];"],
+    ["const inline = [/* x */ a, b];", "const inline = [/* x */ a, b];"],
+    ["const empty = [\n];", "const empty = [];"],
+    ["const holes = [\n  , a];", "const holes = [\n  ,\n  a,\n];"],
+    ["class Service { constructor(@Inject() [\n  a, b]: Pair) {} }", "class Service {\n  constructor(\n    @Inject()\n    [\n      a,\n      b,\n    ]: Pair,\n  ) {}\n}", true],
+  ];
+  const source = cases.map(([code]) => code).join("\n");
+  const expanded = `${cases.map(([, output]) => output).join("\n")}\n`;
+  const untypedSource = cases.filter(([, , typed]) => !typed).map(([code]) => code).join("\n");
+
+  test("keeps expanded an array, pattern or tuple with a line break after [ and leaves the rest to Prettier", async () => {
+    assert.equal(await formatCode(source, { printWidth: 800 }), expanded);
+    assert.equal(await formatCode(source), expanded);
+  });
+
+  test("is on by default and replaces the estree printer of Prettier", () => {
+    const option = plugin.options?.meekoPreserveArrayBreaks as { type?: string; default?: unknown } | undefined;
+    assert.deepEqual({ type: option?.type, default: option?.default }, { type: "boolean", default: true });
+    assert.ok(plugin.printers?.estree, "the plugin defines the estree printer");
+  });
+
+  test("collapses the array once [ and the first element are joined, and Prettier still breaks long arrays", async () => {
+    const multiline = await formatCode("const tags = [\n  'a', 'b'];\n", { printWidth: 800 });
+    assert.equal(multiline, 'const tags = [\n  "a",\n  "b",\n];\n');
+    assert.equal(await formatCode(multiline.replace("[\n  ", "["), { printWidth: 800 }), 'const tags = ["a", "b"];\n');
+    const long = `const words = [${Array.from({ length: 12 }, (_, index) => `"word${index}"`).join(", ")}];`;
+    assert.match(await formatCode(long), /^const words = \[\n {2}"word0",\n/);
+    assert.equal(await formatCode(long, { printWidth: 800 }), `${long}\n`);
+  });
+
+  test("with false reproduces Prettier without the plugin for every JavaScript and TypeScript parser", async () => {
+    for (const [parser, filepath] of [["typescript", "file.ts"], ["babel-ts", "file.ts"], ["babel", "file.js"]] as const) {
+      const code = parser === "babel" ? untypedSource : source;
+      for (const printWidth of [80, 800]) {
+        const expected = await prettier.format(code, { parser, filepath, printWidth });
+        assert.equal(await formatCode(code, { parser, filepath, printWidth, meekoPreserveArrayBreaks: false }), expected, `${parser} ${printWidth}`);
+      }
+    }
+  });
+
+  test("delegates to the estree printer of the Prettier that runs it, not to the one Meeko depends on", async () => {
+    const { printers } = await import("prettier/plugins/estree") as unknown as { printers: { estree: prettier.Printer } };
+    const real = printers.estree;
+    // Another Prettier 3.x: its printer writes `x` as `hostX`, which the printer Meeko depends on never does.
+    const calls = { preprocess: 0, print: 0 };
+    const hostPrinter: prettier.Printer = {
+      ...real,
+      preprocess: (ast) => { calls.preprocess += 1; return ast; },
+      print(path, options, print, args) {
+        calls.print += 1;
+        const node = path.node as { type?: string; name?: string };
+        return node.type === "Identifier" && node.name === "x" ? "hostX" : (real.print as (...parameters: unknown[]) => prettier.Doc)(path, options, print, args);
+      },
+    };
+    const code = "const x = [\n  1, 2]; // trailing\n";
+    for (const host of [{ printers: { estree: hostPrinter } }, { printers: { estree: async () => hostPrinter } }] as unknown as prettier.Plugin[]) {
+      const alone = await prettier.format(code, { filepath: "file.ts", plugins: [host] });
+      assert.equal(alone, "const hostX = [1, 2]; // trailing\n");
+      calls.print = 0;
+      assert.equal(await prettier.format(code, { filepath: "file.ts", plugins: [host, plugin], meekoPreserveArrayBreaks: false } as CodeOptions), alone);
+      assert.ok(calls.print > 0 && calls.preprocess > 0, "the host printer printed the file");
+      assert.equal(await prettier.format(code, { filepath: "file.ts", plugins: [host, plugin] }), "const hostX = [\n  1, 2,\n]; // trailing\n");
+    }
+  });
+
+  test("applies to .js files with babel and .tsx files", async () => {
+    assert.equal(await formatCode("export const list = [\n  1, 2];\n", { filepath: "file.js", printWidth: 800 }), "export const list = [\n  1, 2,\n];\n");
+    assert.equal(
+      await formatCode("export const view = <ul>{[\n  'a', 'b'].map((item) => <li>{item}</li>)}</ul>;\n", { filepath: "view.tsx", printWidth: 800 }),
+      'export const view = (\n  <ul>\n    {[\n      "a",\n      "b",\n    ].map((item) => (\n      <li>{item}</li>\n    ))}\n  </ul>\n);\n',
+    );
+  });
+
+  test("applies to the script and the template expressions of a .meeko file", async () => {
+    const meeko = component(
+      '<ul><li each:of="[\n  1, 2]" each:as="n">{n}</li></ul>\n<p bind:title="[a,\n  b].join()">{[\n  a, b].length}</p>',
+      'const a = "a";\nconst b = "b";\nconst items = signal([\n  "a", "b"]);\nconst flat = ["a",\n  "b"];\n',
+    );
+    const formatted = await formatStable(meeko, { printWidth: 800 });
+    assert.ok(formatted.includes('const items = signal([\n  "a",\n  "b",\n]);\nconst flat = ["a", "b"];\n'), formatted);
+    const template = templateOf(formatted);
+    assert.ok(template.includes('each:of="[\n      1, 2,\n    ]"'), template);
+    assert.ok(template.includes('<p bind:title="[a, b].join()">'), template);
+    assert.ok(template.includes("{\n    [\n      a,\n      b,\n    ].length\n  }"), template);
+    const flat = await formatStable(meeko, { printWidth: 800, meekoPreserveArrayBreaks: false });
+    assert.ok(flat.includes('const items = signal(["a", "b"]);\n'), flat);
+    assert.ok(templateOf(flat).includes('<li each:of="[1, 2]" each:as="n">{n}</li>'), flat);
+  });
+});
+
 describe("Prettier in the language server", () => {
   const roots: string[] = [];
   after(async () => { await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true }))); });

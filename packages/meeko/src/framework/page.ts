@@ -176,8 +176,9 @@ export const PAYLOAD_VERSION = 2;
 export const ERROR_PAGE_TITLE = "Error";
 
 /**
- * Opciones de ruta de una página que se renderiza en el servidor (`"ssr"`, `"stream"` o
- * `"prerender"`). Se declaran con {@link definePage} en `<script server>` o en un sidecar `*.route.ts`.
+ * Opciones de ruta de una página que se renderiza en el servidor (`"ssr"`, el modo por defecto,
+ * `"stream"` o `"prerender"`). Se declaran con {@link definePage} en `<script server>` o en un
+ * sidecar `*.route.ts`, que nunca llegan al navegador.
  *
  * @typeParam P Schema de `params`, o `undefined`.
  * @typeParam S Schema de `search`, o `undefined`.
@@ -195,19 +196,47 @@ export const ERROR_PAGE_TITLE = "Error";
  *   load: ({ params }) => ({ slug: params.slug }),
  * });
  * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#opciones-de-ruta-con-definepage
  */
 export interface PageDefinition<P extends PageSchema | undefined, S extends PageSchema | undefined, D, C = unknown> {
-  /** Schema de los parámetros de la ruta; una entrada inválida responde `400`. */
+  /**
+   * Schema de los parámetros de la ruta (los segmentos `[id]` del archivo), que se validan antes de
+   * `load` y del código de nivel superior; una entrada inválida responde `400`. Sin schema, `params`
+   * son los segmentos como texto.
+   */
   readonly params?: P;
-  /** Schema de los parámetros de búsqueda; una entrada inválida responde `400`. */
+  /**
+   * Schema de los parámetros de búsqueda; una entrada inválida responde `400`. Sin schema, cada
+   * clave es un texto, o una lista si se repite en la URL.
+   */
   readonly search?: S;
-  /** Modo de render; debe ser un literal que `meeko build` pueda leer sin ejecutar el archivo. */
+  /**
+   * Cómo llega la página al navegador: `"ssr"` la renderiza en cada petición, `"stream"` envía el
+   * HTML antes de sus valores `defer` y `"prerender"` genera el HTML en `meeko build`. Para
+   * renderizarla en el navegador, `"client"` (véase {@link ClientPageDefinition}). Debe ser un
+   * literal, porque `meeko build` lo lee sin ejecutar el archivo.
+   *
+   * @defaultValue `"ssr"`
+   */
   readonly render?: Exclude<PageRender, "client">;
-  /** Parámetros de cada URL que se prerenderiza en una ruta dinámica `"prerender"`. */
+  /**
+   * Parámetros de cada URL que `meeko build` prerenderiza en una ruta dinámica con
+   * `render: "prerender"`, o una función asíncrona que los devuelve. Una ruta estática se
+   * prerenderiza sin ellos, y `"ssr"` y `"stream"` los ignoran.
+   */
   readonly prerenderEntries?: readonly Readonly<Record<string, string>>[] | (() => Promise<readonly Readonly<Record<string, string>>[]>);
-  /** Loader del servidor; puede devolver un `Response` para redirigir y valores `defer`. */
+  /**
+   * Loader del servidor: se ejecuta en cada petición de la página (en SSR y en la petición de datos
+   * de una navegación), o una vez por URL durante `meeko build` con `"prerender"`. Lo que devuelve
+   * llega a la página como `props.data`, que pasa a ser obligatorio. Puede devolver un `Response`
+   * para redirigir y valores `defer`, que `"stream"` envía después del HTML.
+   */
   readonly load?: (args: PageLoadContext<P, S, C>) => Promise<D> | D;
-  /** Calcula el `title` y la `description` con los datos del loader. */
+  /**
+   * Calcula el head de la página con los datos del loader: `title`, `description` y, desde `1.2`,
+   * las etiquetas de `useHead`. Tiene prioridad sobre `useHead` y sobre el `document` de la
+   * configuración.
+   */
   readonly head?: (args: PageLoadContext<P, S, C> & { data: D }) => PageHead;
 }
 
@@ -232,33 +261,79 @@ export interface PageDefinition<P extends PageSchema | undefined, S extends Page
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#modos-de-render
  */
 export interface ClientPageDefinition<P extends PageSchema | undefined, S extends PageSchema | undefined, D> {
-  /** Schema de los parámetros de la ruta. */
+  /** Schema de los parámetros de la ruta. El servidor los valida antes de enviar los layouts; una entrada inválida responde `400`. */
   readonly params?: P;
-  /** Schema de los parámetros de búsqueda. */
+  /** Schema de los parámetros de búsqueda, que se validan como `params`. */
   readonly search?: S;
-  /** Modo de render. */
+  /**
+   * El servidor sólo renderiza los layouts y el navegador ejecuta `load`, `head` y la página. El
+   * HTML inicial no lleva los datos: es para vistas sin requisitos de SEO.
+   */
   readonly render: "client";
-  /** Una página `"client"` no se puede prerenderizar. */
+  /** Una página `"client"` no se puede prerenderizar: declararlo es un error de tipos y detiene `meeko build`. */
   readonly prerenderEntries?: never;
-  /** Loader del navegador. */
+  /**
+   * Loader del navegador, con {@link ClientPageLoadContext} (sin `request` ni `context`): pide los
+   * datos a la API o al RPC. Lo que devuelve llega a la página como `props.data`.
+   */
   readonly load?: (args: ClientPageLoadContext<P, S>) => Promise<D> | D;
-  /** Se ejecuta en el navegador después de `load`; su título y su descripción se aplican al confirmar la página. */
+  /** Se ejecuta en el navegador después de `load`; su head se aplica al confirmar la página. */
   readonly head?: (args: ClientPageLoadContext<P, S> & { data: D }) => PageHead;
 }
 
+declare const typeArgumentsNotWritten: unique symbol;
+/**
+ * Default of the type parameters that `definePage` can only learn from written type arguments: `T`
+ * of the first signature and `D` of the overloads for written type arguments. No options object
+ * has its key, so a signature that gets it rejects the call before typing `load` and `head`.
+ */
+interface TypeArgumentsNotWritten { readonly [typeArgumentsNotWritten]: true }
+
+/** `X`, or an object that nothing matches when `D` was not written. */
+type WhenWritten<D, X> = [D] extends [TypeArgumentsNotWritten] ? TypeArgumentsNotWritten : X;
+
+/** The result of `definePage` for the options `T` as written: the type of their mode, with `load` required when declared. */
+type DefinedPage<P extends PageSchema | undefined, S extends PageSchema | undefined, D, C, T> = T extends { readonly render: "client" }
+  ? T extends { readonly load: unknown }
+    ? ClientPageDefinition<P, S, D> & { readonly load: NonNullable<ClientPageDefinition<P, S, D>["load"]> }
+    : ClientPageDefinition<P, S, D>
+  : T extends { readonly load: unknown }
+    ? PageDefinition<P, S, D, C> & { readonly load: NonNullable<PageDefinition<P, S, D, C>["load"]> }
+    : PageDefinition<P, S, D, C>;
+
+// One signature for every mode, first: while a call does not type-check yet, the editor completes
+// `render` from the first overload alone, which with one overload per mode offered only "client".
+// `T` is the options as written: it picks the result type without taking part in the inference of
+// `D`, which `head` reads from `load`. Written type arguments (`definePage<P, S, D, C>(…)`, the only
+// way to type the context `C`) infer nothing, so `T` would stay at its default: the overloads of
+// 1.2 that follow pick the mode and `load` for them. A call without written type arguments gets to
+// the last signature, the first one again: while TypeScript skips `load` and `head` to infer `T`,
+// the first one has `T` at its default and the 1.2 overloads `D` at theirs, and both reject the call
+// before they type `load` and `head`, whose parameter types stay as the first signature that types
+// them leaves them.
 /**
  * Declara las opciones de ruta de una página y conserva la inferencia de tipos entre los schemas,
  * `load` y `head`. Se exporta como `route` (o por defecto) desde `<script server>` o un sidecar
- * `*.route.ts`, y `meeko check` compara sus datos con las props de la página.
+ * `*.route.ts`, y `meeko check` compara sus datos con las props de la página. En el `<script>` del
+ * componente no tiene efecto: da el aviso `MEEK109`.
  *
+ * `render` decide el tipo de las opciones: sin él (`"ssr"` por defecto) o con `"stream"` o
+ * `"prerender"` son {@link PageDefinition} y `load` recibe {@link PageLoadContext}; con `"client"`
+ * son {@link ClientPageDefinition} y `load` recibe {@link ClientPageLoadContext}. Si declara
+ * `load`, el resultado lo conserva como obligatorio, igual que los datos de la página.
+ *
+ * @typeParam P Schema de `params`, inferido de la opción.
+ * @typeParam S Schema de `search`, inferido de la opción.
+ * @typeParam D Datos que devuelve `load`.
+ * @typeParam C Tipo del contexto de la petición en el loader de servidor.
+ * @typeParam T Tipo de las opciones recibidas, que decide el modo y si hay `load`.
  * @param definition Opciones de ruta de la página.
- * @returns La misma definición.
+ * @returns La misma definición, con el tipo de su modo de render.
  * @throws {TypeError} Si declara `render: "client"` junto con `prerenderEntries`.
  * @example
  * ```html
  * <!-- app/pages/users/[id].meeko -->
  * <script server lang="ts">
- * import { definePage } from "@meekojs/meeko/framework";
  * import * as v from "valibot";
  *
  * export const route = definePage({
@@ -274,25 +349,59 @@ export interface ClientPageDefinition<P extends PageSchema | undefined, S extend
  * </script>
  * <template><h1>{props.data.id}</h1></template>
  * ```
- * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#routing-layouts-y-ssr
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#opciones-de-ruta-con-definepage
  */
 export function definePage<
   const P extends PageSchema | undefined = undefined,
   const S extends PageSchema | undefined = undefined,
   D = unknown,
->(definition: ClientPageDefinition<P, S, D> & { readonly load: NonNullable<ClientPageDefinition<P, S, D>["load"]> }): ClientPageDefinition<P, S, D> & { readonly load: NonNullable<ClientPageDefinition<P, S, D>["load"]> };
+  C = unknown,
+  const T extends { readonly render?: PageRender; readonly load?: unknown } | TypeArgumentsNotWritten = TypeArgumentsNotWritten,
+>(definition: T & (PageDefinition<P, S, D, C> | ClientPageDefinition<P, S, D>)): DefinedPage<P, S, D, C, T>;
 /**
- * Declara las opciones de una página `render: "client"` sin `load`.
+ * `definePage<P, S, D>(…)` con argumentos de tipo explícitos y `render: "client"` con `load`: los datos
+ * son obligatorios para la página.
  * @see {@link ClientPageDefinition}
  */
 export function definePage<
   const P extends PageSchema | undefined = undefined,
   const S extends PageSchema | undefined = undefined,
-  D = unknown,
->(definition: ClientPageDefinition<P, S, D>): ClientPageDefinition<P, S, D>;
+  D = TypeArgumentsNotWritten,
+>(definition: NoInfer<WhenWritten<D, ClientPageDefinition<P, S, D> & { readonly load: NonNullable<ClientPageDefinition<P, S, D>["load"]> }>>): ClientPageDefinition<P, S, D> & { readonly load: NonNullable<ClientPageDefinition<P, S, D>["load"]> };
 /**
- * Declara las opciones de una página renderizada en el servidor con `load`; sus datos son obligatorios
- * para la página.
+ * `definePage<P, S, D>(…)` con argumentos de tipo explícitos y `render: "client"` sin `load`.
+ * @see {@link ClientPageDefinition}
+ */
+export function definePage<
+  const P extends PageSchema | undefined = undefined,
+  const S extends PageSchema | undefined = undefined,
+  D = TypeArgumentsNotWritten,
+>(definition: NoInfer<WhenWritten<D, ClientPageDefinition<P, S, D>>>): ClientPageDefinition<P, S, D>;
+/**
+ * `definePage<P, S, D, C>(…)` con argumentos de tipo explícitos, render en el servidor y `load`: los
+ * datos son obligatorios para la página.
+ * @see {@link PageDefinition}
+ */
+export function definePage<
+  const P extends PageSchema | undefined = undefined,
+  const S extends PageSchema | undefined = undefined,
+  D = TypeArgumentsNotWritten,
+  C = unknown,
+>(definition: NoInfer<WhenWritten<D, PageDefinition<P, S, D, C> & { readonly load: NonNullable<PageDefinition<P, S, D, C>["load"]> }>>): PageDefinition<P, S, D, C> & { readonly load: NonNullable<PageDefinition<P, S, D, C>["load"]> };
+/**
+ * `definePage<P, S, D, C>(…)` con argumentos de tipo explícitos y render en el servidor sin `load`.
+ * @see {@link PageDefinition}
+ */
+export function definePage<
+  const P extends PageSchema | undefined = undefined,
+  const S extends PageSchema | undefined = undefined,
+  D = TypeArgumentsNotWritten,
+  C = unknown,
+>(definition: NoInfer<WhenWritten<D, PageDefinition<P, S, D, C>>>): PageDefinition<P, S, D, C>;
+// The first signature again, last: it resolves the calls without written type arguments, and when
+// no signature accepts a call TypeScript reports the error of the last one, that of these options.
+/**
+ * Declara las opciones de ruta de una página; véase la primera firma.
  * @see {@link PageDefinition}
  */
 export function definePage<
@@ -300,17 +409,8 @@ export function definePage<
   const S extends PageSchema | undefined = undefined,
   D = unknown,
   C = unknown,
->(definition: PageDefinition<P, S, D, C> & { readonly load: NonNullable<PageDefinition<P, S, D, C>["load"]> }): PageDefinition<P, S, D, C> & { readonly load: NonNullable<PageDefinition<P, S, D, C>["load"]> };
-/**
- * Declara las opciones de una página renderizada en el servidor (`"ssr"`, `"stream"` o `"prerender"`).
- * @see {@link PageDefinition}
- */
-export function definePage<
-  const P extends PageSchema | undefined = undefined,
-  const S extends PageSchema | undefined = undefined,
-  D = unknown,
-  C = unknown,
->(definition: PageDefinition<P, S, D, C>): PageDefinition<P, S, D, C>;
+  const T extends { readonly render?: PageRender; readonly load?: unknown } = {},
+>(definition: T & (PageDefinition<P, S, D, C> | ClientPageDefinition<P, S, D>)): DefinedPage<P, S, D, C, T>;
 export function definePage(definition: unknown): unknown {
   if (typeof definition === "object" && definition !== null && "render" in definition && definition.render === "client"
     && "prerenderEntries" in definition && definition.prerenderEntries !== undefined) {

@@ -828,7 +828,7 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
   if (html) {
     // The tag (and a foreign namespace) is the context that normalizes the HTML so it fits the element.
     const namespace = node.namespaceURI === "http://www.w3.org/2000/svg" ? ", \"svg\"" : node.namespaceURI === "http://www.w3.org/1998/Math/MathML" ? ", \"math\"" : "";
-    return [opening, `__meeko.rawHtml(${markSource(html.expression, html.offset)}, ${quote(tag)}${namespace})`, quote(`</${tag}>`)].join(" + ");
+    return [opening, `__meeko.rawHtml(${htmlValue(html, context)}, ${quote(tag)}${namespace})`, quote(`</${tag}>`)].join(" + ");
   }
   if (model && tag === "textarea") return [opening, `__meeko.modelText(${markSource(model.expression, model.offset)})`, quote("</textarea>")].join(" + ");
   const selectModel = context.selectModel;
@@ -917,6 +917,20 @@ function htmlDirective(node: TemplateNode, attribute: { name: string; value: str
   const offset = attributeValueOffset(node, attribute.name, context);
   validateExpression(attribute.value, context.source, context.filename, offset);
   return { id: context.nextHtml++, expression: attribute.value, offset };
+}
+
+/**
+ * The SSR value of `html="expression"`. For `meeko check` (`narrow`), the expression goes through
+ * `__meeko.checkTrustedHtml`, whose second argument fails with the `MEEK107` type text when the
+ * value is an untrusted `string` (see `TrustedHtmlCheck`); that argument maps to the expression,
+ * and the whole call too, so that `rawHtml` still reports a non-string value at the expression.
+ * The modules that run never include the check.
+ */
+function htmlValue(html: HtmlBinding, context: TemplateContext): string {
+  const value = markSource(html.expression, html.offset);
+  if (!context.narrow) return value;
+  const length = html.expression.length;
+  return markSource(`__meeko.checkTrustedHtml(${value}, ${markSource("true", html.offset, length)})`, html.offset, length);
 }
 
 /**

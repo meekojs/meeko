@@ -339,6 +339,12 @@ export async function componentDiagnostics(
         if (range?.[0] === offset && range[1] > offset) { end = range[1]; break; }
       }
     }
+    // MEEK107 marks the whole value of `html="..."`, up to its closing quote.
+    if (end === undefined && item.code === "MEEK107") {
+      const quote = source[offset - 1];
+      const close = quote === "\"" || quote === "'" ? source.indexOf(quote, offset) : -1;
+      if (close > offset) end = close;
+    }
     // `on:event`, `model:name` and `bind:prop` on a component are reported at the attribute name, and a missing
     // model, snippet or `<render args>` at the tag: mark the whole directive or tag name.
     // MEEK080 marks the whole `useElementRef("name")` call.

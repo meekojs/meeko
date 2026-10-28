@@ -227,6 +227,95 @@ export interface DocumentConfig {
    * plantilla; `titleTemplate`, una cadena con `%s`, se aplica a los títulos de las páginas.
    */
   head?: DocumentHead;
+  /**
+   * Etiquetas de SEO que dependen de cada página: con `true`, `<link rel="canonical">` y `og:url`
+   * con el origen de `site` (o `MEEKO_PUBLIC_ORIGIN` del build) y la ruta, y `og:title` y
+   * `og:description` con el título y la descripción finales. Una página que declara cualquiera de
+   * ellas (con `useSeoMeta`, `useHead` o su `head`) la sustituye. Las páginas de error no reciben
+   * `canonical` ni `og:url`.
+   * @since 1.3.0
+   */
+  seo?: boolean | DocumentSeo;
+}
+
+/**
+ * Opciones de `document.seo`: cada etiqueta derivada se puede desactivar. Las que no se nombran
+ * quedan activas.
+ *
+ * @since 1.3.0
+ * @example
+ * ```ts
+ * // meeko.config.ts
+ * import { defineMeekoConfig } from "@meekojs/meeko/framework";
+ *
+ * export default defineMeekoConfig({
+ *   site: "https://example.com",
+ *   // canonical, og:url y og:title; sin og:description.
+ *   document: { seo: { ogDescription: false } },
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#canónica-y-open-graph-por-página
+ */
+export interface DocumentSeo {
+  /** `<link rel="canonical">` con el origen y la ruta de la página. */
+  canonical?: boolean;
+  /** `<meta property="og:url">` con la misma URL. */
+  ogUrl?: boolean;
+  /** `<meta property="og:title">` con el título final de la página. */
+  ogTitle?: boolean;
+  /** `<meta property="og:description">` con la `description` de la página. */
+  ogDescription?: boolean;
+  /**
+   * Origen absoluto de las URL (`https://example.com`). Por defecto, `site` de `meeko.config.ts`
+   * o `MEEKO_PUBLIC_ORIGIN` del entorno del build; sin ninguno, `meeko build` falla si `canonical`
+   * u `ogUrl` están activos. Un host propio que pasa `DocumentOptions.config` debe darlo aquí.
+   */
+  origin?: string;
+}
+
+/** `document.seo` with every field decided; the origin is absent when none is known. */
+export interface ResolvedSeo {
+  readonly canonical: boolean;
+  readonly ogUrl: boolean;
+  readonly ogTitle: boolean;
+  readonly ogDescription: boolean;
+  readonly origin?: string;
+}
+
+/** The origin of an absolute HTTP(S) URL whose path is `/`, or a `TypeError` naming `label`. */
+export function siteOrigin(value: unknown, label: string): string {
+  let url: URL;
+  try { url = new URL(String(value)); }
+  catch { throw new TypeError(`${label} must be an absolute URL such as "https://example.com"`); }
+  if (typeof value !== "string" || (url.protocol !== "http:" && url.protocol !== "https:")) throw new TypeError(`${label} must use http: or https:`);
+  if (url.pathname !== "/" || url.search || url.hash || url.username || url.password) {
+    throw new TypeError(`${label} must be an origin without path, query, fragment or credentials, such as "https://example.com"`);
+  }
+  return url.origin;
+}
+
+/** `document.seo` with its defaults, or `undefined` when it is off. */
+export function resolveSeo(value: unknown, label: string, origin?: string): ResolvedSeo | undefined {
+  if (value === undefined || value === false) return undefined;
+  if (value !== true && !isRecord(value)) fail(label, "must be true, false or an object");
+  const options: Record<string, unknown> = value === true ? {} : value;
+  for (const [name, field] of Object.entries(options)) {
+    if (name === "origin") continue;
+    if (!["canonical", "ogUrl", "ogTitle", "ogDescription"].includes(name)) fail(label, `unknown field ${name}`);
+    if (field !== undefined && typeof field !== "boolean") fail(label, `${name} must be a boolean`);
+  }
+  const resolvedOrigin = options.origin === undefined ? origin : siteOrigin(options.origin, `${label}.origin`);
+  return {
+    canonical: options.canonical !== false, ogUrl: options.ogUrl !== false,
+    ogTitle: options.ogTitle !== false, ogDescription: options.ogDescription !== false,
+    ...(resolvedOrigin === undefined ? {} : { origin: resolvedOrigin }),
+  };
+}
+
+/** The page a document renders, for the tags of `document.seo`; `pathname` is absent on error pages. */
+export interface HeadPage {
+  readonly seo: ResolvedSeo | undefined;
+  readonly pathname: string | undefined;
 }
 
 /**
@@ -434,11 +523,12 @@ export function normalizeHeadInput(value: unknown, label: string, options: Norma
 export function normalizeDocumentConfig(value: unknown, label: string): DocumentConfig | undefined {
   if (value === undefined) return undefined;
   if (!isRecord(value)) fail(label, "must be an object");
-  for (const name of Object.keys(value)) if (name !== "lang" && name !== "head") fail(label, `unknown field ${name}`);
+  for (const name of Object.keys(value)) if (name !== "lang" && name !== "head" && name !== "seo") fail(label, `unknown field ${name}`);
   if (value.lang !== undefined && (typeof value.lang !== "string" || !value.lang)) fail(label, "lang must be a nonempty string");
   // Serializable: its titleTemplate is a string, as DocumentHead says.
   const head = value.head === undefined ? undefined : normalizeHeadInput(value.head, `${label}.head`, { serializable: true }) as DocumentHead;
-  return { ...(value.lang === undefined ? {} : { lang: value.lang as string }), ...(head ? { head } : {}) };
+  const seo = resolveSeo(value.seo, `${label}.seo`);
+  return { ...(value.lang === undefined ? {} : { lang: value.lang as string }), ...(head ? { head } : {}), ...(seo ? { seo: { ...seo } } : {}) };
 }
 
 /**
@@ -468,13 +558,15 @@ export function mergeHeadInputs(inputs: readonly (HeadInput | undefined)[]): Hea
  * `document` of meeko.config.ts as the build bakes it, with the heads that modules add placed
  * before the application's own, which wins. Returns `undefined` when there is nothing to render.
  */
-export function resolveDocumentConfig(config: DocumentConfig | undefined, moduleHeads: readonly HeadInput[] = []): DocumentConfig | undefined {
+export function resolveDocumentConfig(config: DocumentConfig | undefined, moduleHeads: readonly HeadInput[] = [], origin?: string): DocumentConfig | undefined {
   const heads = moduleHeads.map((head, index) => normalizeHeadInput(head, `module head ${index}`, { serializable: true }) as DocumentHead);
   // The module heads join `document.head`: their title is a site title too, never templated.
   const head = heads.length ? mergeHeadInputs([...heads, config?.head]) as DocumentHead : config?.head;
   const lang = config?.lang;
-  if (lang === undefined && (!head || Object.keys(head).length === 0)) return undefined;
-  return { ...(lang === undefined ? {} : { lang }), ...(head && Object.keys(head).length ? { head } : {}) };
+  // The build bakes the origin it resolved (`site` or MEEKO_PUBLIC_ORIGIN) into `seo`.
+  const seo = resolveSeo(config?.seo, "document.seo", origin);
+  if (lang === undefined && !seo && (!head || Object.keys(head).length === 0)) return undefined;
+  return { ...(lang === undefined ? {} : { lang }), ...(head && Object.keys(head).length ? { head } : {}), ...(seo ? { seo: { ...seo } } : {}) };
 }
 
 /** The head input of a `document` configuration: `lang` becomes `htmlAttrs.lang`. */
@@ -489,7 +581,10 @@ export function mergeDocumentConfigs(base: DocumentConfig | undefined, override:
   if (!base) return override;
   if (!override) return base;
   const lang = override.lang ?? base.lang;
-  return { ...(lang === undefined ? {} : { lang }), head: mergeHeadInputs([base.head, override.head]) as DocumentHead };
+  // The host's `seo` wins; without its own origin it keeps the one the build resolved.
+  const seo = override.seo === undefined ? base.seo
+    : resolveSeo(override.seo, "document.seo", typeof base.seo === "object" ? base.seo.origin : undefined);
+  return { ...(lang === undefined ? {} : { lang }), head: mergeHeadInputs([base.head, override.head]) as DocumentHead, ...(seo === undefined ? {} : { seo }) };
 }
 
 /** A resolved tag: what the server writes and the browser keeps in `<head>`. */
@@ -587,7 +682,7 @@ function applyTemplate(title: string, template: HeadInput["titleTemplate"]): str
  * above it (layouts, pages, `useHead`, the route head); an empty one counts as no title, so the
  * site title shows instead of a template around nothing.
  */
-export function resolveHead(entries: readonly HeadEntry[]): ResolvedHead {
+export function resolveHead(entries: readonly HeadEntry[], page?: HeadPage): ResolvedHead {
   const sorted = [{ level: DEFAULT_LEVEL, order: -1, input: defaultHead }, ...entries]
     .filter((entry) => entry.input !== undefined)
     .sort((left, right) => left.level - right.level || left.order - right.order);
@@ -613,12 +708,42 @@ export function resolveHead(entries: readonly HeadEntry[]): ResolvedHead {
     for (const [name, value] of Object.entries(input.bodyAttrs ?? {})) if (value !== undefined) bodyAttrs.set(name, value);
   }
   const order = ["meta", "link", "style", "script"];
+  // Without a page title, the site title as is; an empty page title with no site title stays empty.
+  const resolvedTitle = title === undefined || title === "" ? siteTitle ?? title : applyTemplate(title, template);
+  if (page?.seo) for (const tag of seoTags([...tags.values()], resolvedTitle, page.seo, page.pathname)) tags.set(tag.key, tag);
   return {
-    // Without a page title, the site title as is; an empty page title with no site title stays empty.
-    title: title === undefined || title === "" ? siteTitle ?? title : applyTemplate(title, template),
+    title: resolvedTitle,
     htmlAttrs, bodyAttrs,
     tags: [...tags.values()].sort((left, right) => order.indexOf(left.tag) - order.indexOf(right.tag)),
   };
+}
+
+function attribute(tag: HeadTag, name: string): string | undefined {
+  const value = tag.attributes.find(([key]) => key === name)?.[1];
+  return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * The tags of `document.seo` that the resolved head lacks: a tag the page or the configuration
+ * declares (under any key) always wins. The canonical URL and `og:url` need the origin and a page
+ * pathname, which error pages do not have.
+ */
+function seoTags(tags: readonly HeadTag[], title: string | undefined, seo: ResolvedSeo, pathname: string | undefined): HeadTag[] {
+  const hasMeta = (property: string): boolean => tags.some((tag) => tag.tag === "meta" && attribute(tag, "property") === property);
+  const added: HeadTag[] = [];
+  const meta = (property: string, content: string): void => {
+    if (!hasMeta(property)) added.push(metaTag({ property, content }, false));
+  };
+  const url = pathname !== undefined && seo.origin !== undefined ? `${seo.origin}${pathname.startsWith("/") ? pathname : `/${pathname}`}` : undefined;
+  if (url !== undefined && seo.ogUrl) meta("og:url", url);
+  if (seo.ogTitle && title) meta("og:title", title);
+  const description = tags.find((tag) => tag.tag === "meta" && attribute(tag, "name")?.toLowerCase() === "description");
+  const descriptionText = description && attribute(description, "content");
+  if (seo.ogDescription && descriptionText) meta("og:description", descriptionText);
+  if (url !== undefined && seo.canonical && !tags.some((tag) => tag.tag === "link" && attribute(tag, "rel")?.trim().toLowerCase() === "canonical")) {
+    added.push(linkTag({ rel: "canonical", href: url }, false));
+  }
+  return added;
 }
 
 const jsonScriptTypes = new Set(["application/json", "application/ld+json", "importmap", "speculationrules"]);
@@ -948,9 +1073,13 @@ export class BrowserHead {
   private readonly attributeOwners = new Map<Element, Map<string, string | null>>();
   private readonly defaultTitle: string;
   private readonly nonce: string | undefined;
+  private readonly seo: ResolvedSeo | undefined;
+  /** Pathname of the committed page for `document.seo`; `undefined` on an error page. */
+  private pathname: string | undefined;
 
   constructor(private readonly document: Document, config: DocumentConfig | undefined) {
     this.config = { level: CONFIG_LEVEL, order: 0, input: documentHeadInput(config) };
+    this.seo = resolveSeo(config?.seo, "document.seo");
     const head = document.head;
     if (head) {
       for (const node of [...head.childNodes]) {
@@ -991,9 +1120,13 @@ export class BrowserHead {
     if (this.entries.delete(entry)) this.changed();
   }
 
-  /** Replaces the route head: the payload or the client route `head` of the committed page. */
-  setRoute(input: HeadInput | undefined): void {
+  /**
+   * Replaces the route head: the payload or the client route `head` of the committed page, and
+   * its pathname for `document.seo` (`undefined` on an error page).
+   */
+  setRoute(input: HeadInput | undefined, pathname?: string): void {
     this.route.input = input;
+    this.pathname = pathname;
     this.changed();
   }
 
@@ -1025,7 +1158,7 @@ export class BrowserHead {
   private flush(): void {
     this.dirty = false;
     if (this.disposed) return;
-    const resolved = resolveHead([this.config, ...this.entries, this.route]);
+    const resolved = resolveHead([this.config, ...this.entries, this.route], { seo: this.seo, pathname: this.pathname });
     const document = this.document;
     const title = resolved.title ?? this.defaultTitle;
     if (document.title !== title) document.title = title;

@@ -140,19 +140,48 @@ export function normalizeServerError(error: unknown): ApiError {
 }
 
 /**
+ * Qué fallo del proceso recibe un {@link ServerErrorObserver} como tercer argumento: una promesa
+ * rechazada sin manejar o una excepción no capturada, fuera del flujo de una petición. Los fallos
+ * de las peticiones no lo llevan.
+ *
+ * @since 1.3.0
+ * @example
+ * ```ts
+ * import type { ServerErrorInfo } from "@meekojs/meeko/server";
+ *
+ * function describe(info: ServerErrorInfo | undefined): string {
+ *   if (!info) return "petición";
+ *   return `${info.kind}${info.inRequest ? " durante una petición" : ""}`;
+ * }
+ * ```
+ */
+export interface ServerErrorInfo {
+  /** `"unhandledRejection"`: una promesa rechazada sin manejar; `"uncaughtException"`: una excepción no capturada. */
+  readonly kind: "unhandledRejection" | "uncaughtException";
+  /**
+   * `true` si el fallo se produjo dentro del trabajo asíncrono de una petición y `requestId` es el
+   * de esa petición; `false` si el ID es nuevo. Depende de que el runtime conserve el contexto
+   * asíncrono hasta el evento (véase la documentación de errores).
+   */
+  readonly inRequest: boolean;
+}
+
+/**
  * Observador de los fallos internos del servidor, con el ID de la petición. Su propio fallo no
- * cambia la respuesta.
+ * cambia la respuesta. Desde `1.3`, los fallos del proceso (promesas rechazadas sin manejar y
+ * excepciones no capturadas) llegan con un tercer argumento, {@link ServerErrorInfo}.
  *
  * @example
  * ```ts
  * import type { ServerErrorObserver } from "@meekojs/meeko/server";
  *
- * export const onError: ServerErrorObserver = (error, requestId) => {
- *   console.error(`[${requestId}]`, error instanceof Error ? error.name : typeof error);
+ * export const onError: ServerErrorObserver = (error, requestId, info) => {
+ *   const where = info ? info.kind : "request";
+ *   console.error(`[${where} ${requestId}]`, error instanceof Error ? error.name : typeof error);
  * };
  * ```
  */
-export type ServerErrorObserver = (error: unknown, requestId: string) => void;
+export type ServerErrorObserver = (error: unknown, requestId: string, info?: ServerErrorInfo) => void;
 
 function reportObserverFailure(error: unknown, observerError: unknown, requestId?: string): void {
   try {
@@ -169,8 +198,8 @@ export function observeErrorCallback(error: unknown, observer?: (error: unknown)
 }
 
 /** Apply the same isolation to observers that also receive a request ID. */
-export function observeServerError(error: unknown, requestId: string, observer?: ServerErrorObserver): void {
-  observeErrorCallback(error, observer ? (failure) => observer(failure, requestId) : undefined, requestId);
+export function observeServerError(error: unknown, requestId: string, observer?: ServerErrorObserver, info?: ServerErrorInfo): void {
+  observeErrorCallback(error, observer ? (failure) => info ? observer(failure, requestId, info) : observer(failure, requestId) : undefined, requestId);
 }
 
 /** Surface internal failures to the host while keeping observers out of the response path. */

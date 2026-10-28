@@ -3,6 +3,7 @@ import type { SessionData, SessionHandle } from "./sessions.js";
 import { clientAddressOf } from "./env.js";
 import { defaultPlatform } from "./platform.js";
 import type { ServerPlatform } from "./platform.js";
+import { takeScopedRequestId } from "./process-errors.js";
 
 /**
  * Contexto de una petición HTTP: sesión, servicios, plataforma y estado propios de esa petición,
@@ -149,7 +150,8 @@ export function createRequestContext<TServices, TEnv = unknown>(request: Request
   const resolvedPlatform = platform ?? defaultPlatform() as ServerPlatform<TEnv>;
   let address: { readonly value: string | undefined } | undefined;
   return {
-    request, requestId: crypto.randomUUID(), services, session, state: new Map(),
+    // The first context of a ServerApp request takes the ID its process failures carry.
+    request, requestId: takeScopedRequestId() ?? crypto.randomUUID(), services, session, state: new Map(),
     get signal() { return signal ??= revocation ? combinedSignal(request.signal, revocation) : request.signal; },
     platform: resolvedPlatform,
     idempotencyKey: idempotencyKeyOf(request),

@@ -491,6 +491,31 @@ describe("Meeko language server configuration and contracts", () => {
     } finally { await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
   });
 
+  test("imports.appDirs and sharedDirs reach completion, hover and definition, trusted or not", async () => {
+    const root = await project("lsp-import-dirs-", {
+      "meeko.config.ts": 'export default { imports: { appDirs: ["app/services"], sharedDirs: ["shared/validators"] } };\n',
+      "app/services/price.ts": "export function formatPrice(value: number): string { return `$${value}`; }\n",
+      "shared/validators/email.ts": "export function isEmail(value: string): boolean { return value.includes(\"@\"); }\n",
+      "app/pages/index.meeko": '<script lang="ts">\nconst text: string = formatPrice(2);\nconst valid: boolean = isEmail("a@b");\n</script>\n<template><p>{text} {valid}</p></template>\n',
+    });
+    try {
+      for (const trusted of [true, false]) {
+        const client = await inProcess(root, { trusted });
+        try {
+          const uri = await client.open(join(root, "app", "pages", "index.meeko"));
+          assert.deepEqual(await client.waitForDiagnostics(uri, () => true), [], `trusted: ${trusted}`);
+          const completions = await client.connection.sendRequest(CompletionRequest.type, { textDocument: { uri }, position: client.position(uri, "formatPrice(2)", "formatP".length) });
+          const items = Array.isArray(completions) ? completions : completions?.items ?? [];
+          assert.ok(items.some((item) => item.label === "formatPrice"), `trusted: ${trusted}`);
+          const hover = await client.connection.sendRequest(HoverRequest.type, { textDocument: { uri }, position: client.position(uri, "isEmail", 2) });
+          assert.match((hover?.contents as MarkupContent).value, /isEmail\(value: string\): boolean/);
+          const definitions = await client.connection.sendRequest(DefinitionRequest.type, { textDocument: { uri }, position: client.position(uri, "formatPrice(2)", 2) }) as Location[];
+          assert.ok(definitions.some((item) => item.uri.endsWith("/app/services/price.ts")), JSON.stringify(definitions));
+        } finally { await client.close(); }
+      }
+    } finally { await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
+  });
+
   // An editor's watcher also reports the files of a package linked into node_modules and of
   // temporary projects under .meeko/ (the tests of a linked Meeko checkout, for example):
   // checking their contracts would load their configuration and write into them.
@@ -585,6 +610,22 @@ const label = signal(user.name);
 <template><p>{user.path}{label.value}</p></template>
 `;
 
+const modesPage = `<script server lang="ts">
+export const route = definePage({ render: "" });
+</script>
+<script lang="ts">
+const page = defin;
+const later = 1;
+</script>
+<template><p>{later}</p></template>
+`;
+
+const leakPage = `<script lang="ts">
+const user = findUser();
+</script>
+<template><p>{user.name}</p></template>
+`;
+
 describe("Meeko language server <script server> blocks", () => {
   let root: string;
   let client: Client;
@@ -604,6 +645,8 @@ const props = defineProps<{ data: { name: string } }>();
 <template><p>{props.data.name}</p></template>
 `,
       "app/pages/profile.meeko": bodyPage,
+      "app/pages/modes.meeko": modesPage,
+      "app/pages/leak.meeko": leakPage,
       "app/components/Widget.meeko": `<script server lang="ts">
 export const route = {};
 </script>
@@ -698,6 +741,44 @@ const text = "widget";
     const problem = diagnostics.find((item) => item.code === "MEEK_AUTOIMPORT")!;
     assert.equal(client.document(uri).getText(problem.range), "findUser");
     assert.match(String(problem.message), /no está disponible en el ámbito client/);
+  });
+
+  test("definePage completes the four render modes in the block", async () => {
+    const uri = await client.open(file("app/pages/modes.meeko"));
+    const completions = await client.connection.sendRequest(CompletionRequest.type, { textDocument: { uri }, position: client.position(uri, 'render: "', 9) });
+    const items = Array.isArray(completions) ? completions : completions?.items ?? [];
+    assert.deepEqual(items.map((item) => item.label).sort(), ["client", "prerender", "ssr", "stream"]);
+  });
+
+  test("the component script and template neither complete nor accept server-only APIs", async () => {
+    const uri = await client.open(file("app/pages/modes.meeko"));
+    const labels = async (position: { line: number; character: number }): Promise<string[]> => {
+      const completions = await client.connection.sendRequest(CompletionRequest.type, { textDocument: { uri }, position });
+      return (Array.isArray(completions) ? completions : completions?.items ?? []).map((item) => item.label);
+    };
+    const serverOnly = ["definePage", "usePage", "redirect", "notFound", "defineApiRoute", "defineRpc", "defineServerMiddleware", "defineSocketChannel", "defineServerRuntime", "ApiError", "createServerApp", "hashPassword", "findUser"];
+    for (const position of [client.position(uri, "defin;", 5), client.position(uri, "{later}", 1)]) {
+      const items = await labels(position);
+      assert.ok(items.includes("defineProps") && items.includes("defineRouteMiddleware"), JSON.stringify(items.filter((item) => /^define/.test(item))));
+      assert.deepEqual(items.filter((item) => serverOnly.includes(item)), []);
+    }
+    // The block keeps them.
+    const block = await labels(client.position(uri, "definePage(", 3));
+    assert.ok(block.includes("definePage"), JSON.stringify(block.filter((item) => /^define/.test(item))));
+
+    const leak = await client.open(file("app/pages/leak.meeko"));
+    const diagnostics = await client.waitForDiagnostics(leak, (items) => items.some((item) => item.code === "MEEK108"));
+    const error = diagnostics.find((item) => item.code === "MEEK108")!;
+    assert.equal(client.document(leak).getText(error.range), "findUser");
+    assert.match(String(error.message), /server\/utils\/users\.ts, que sólo existe en el servidor/);
+    assert.equal(error.severity, 1);
+
+    await client.change(leak, leakPage.replace("const user = findUser();", "const route = definePage({});\nconst user = { name: \"Ada\" };"));
+    const warnings = await client.waitForDiagnostics(leak, (items) => items.some((item) => item.code === "MEEK109"));
+    const warning = warnings.find((item) => item.code === "MEEK109")!;
+    assert.equal(client.document(leak).getText(warning.range), "definePage");
+    assert.equal(warning.severity, 2);
+    await client.change(leak, leakPage);
   });
 
   test("MEEK044 and MEEK043 mark the opening tag of a misplaced or malformed block", async () => {

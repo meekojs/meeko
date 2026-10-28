@@ -8,7 +8,11 @@ import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
 import { createServer, preview } from "vite";
 import { createExampleServer } from "../examples/counter/server.ts";
+import { buildProject } from "../src/framework/project.ts";
+import { previewStatic } from "../src/framework/static-adapter.ts";
 import { startConformanceOutput } from "./conformance/harness.ts";
+import { staticAppConfig, writeStaticApp } from "./helpers/static-app.ts";
+import { createTempProject } from "./helpers/temp-project.ts";
 
 async function assertBrowserBehavior(url: string, development: boolean): Promise<void> {
   const browser = await chromium.launch({
@@ -211,5 +215,144 @@ test("una página render: stream es interactiva antes del diferido y respeta una
     await new Promise<void>((resolveDone, reject) => server.close((error) => error ? reject(error) : resolveDone()));
     await app.close();
     await built.stop();
+  }
+});
+
+test("Chrome real envía las excepciones y los rechazos globales a onError sin duplicados y deja de hacerlo al desmontar", { timeout: 120_000 }, async () => {
+  const { build } = await import("esbuild");
+  const { createFrameworkHandler } = await import("../src/framework/server.ts");
+  const { page: fixturePage, routes } = await import("./fixtures/global-errors/page.ts");
+  const bundle = await build({
+    entryPoints: [resolve("tests/fixtures/global-errors/client.ts")],
+    bundle: true, format: "esm", platform: "browser", target: "es2022", write: false,
+  });
+  const script = bundle.outputFiles[0]!.text;
+  const render = createFrameworkHandler({ routes, loadPage: async () => fixturePage, clientEntry: "/client.js" });
+  const server = createHttpServer((request, response) => {
+    if (request.url === "/client.js") {
+      response.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
+      response.end(script);
+      return;
+    }
+    void render(new Request(`http://127.0.0.1${request.url ?? "/"}`, { headers: { accept: "text/html" } })).then(async (page) => {
+      response.writeHead(page.status, Object.fromEntries(page.headers));
+      response.end(await page.text());
+    });
+  });
+  await new Promise<void>((resolveReady) => server.listen(0, "127.0.0.1", resolveReady));
+  const { port } = server.address() as AddressInfo;
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  try {
+    browser = await chromium.launch({
+      ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: "chrome" as const }),
+      headless: true,
+    });
+    const page = await browser.newPage();
+    const pageErrors: string[] = [];
+    const consoleErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+    page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle" });
+    type Report = { message: string; source: string };
+    type FixtureWindow = Window & { __ready?: boolean; __reports: Report[] };
+    await page.waitForFunction(() => (window as unknown as FixtureWindow).__ready === true);
+    const reports = () => page.evaluate(() => (window as unknown as FixtureWindow).__reports);
+    await page.locator("#timer").click();
+    await page.waitForFunction(() => (window as unknown as FixtureWindow).__reports.length === 1);
+    await page.locator("#reject").click();
+    await page.waitForFunction(() => (window as unknown as FixtureWindow).__reports.length === 2);
+    assert.deepEqual(await reports(), [
+      { message: "timer failure", source: "uncaught" },
+      { message: "rejected failure", source: "rejection" },
+    ]);
+    // Both were prevented: Chrome does not log them a second time.
+    assert.ok(!consoleErrors.some((text) => /timer failure|rejected failure/.test(text)), consoleErrors.join("\n"));
+    // The same error thrown again by the app is not reported twice.
+    await page.locator("#reported").click();
+    await page.waitForTimeout(300);
+    assert.equal((await reports()).length, 2);
+    // After dispose the browser's own report is back and onError hears nothing.
+    await page.locator("#dispose").click();
+    await page.waitForTimeout(300);
+    assert.equal((await reports()).length, 2);
+    assert.ok(pageErrors.includes("after dispose"), pageErrors.join("\n"));
+  } finally {
+    await browser?.close();
+    await new Promise<void>((resolveDone, reject) => server.close((error) => error ? reject(error) : resolveDone()));
+  }
+});
+
+test("el 404.html del adaptador static hidrata en cualquier URL y navega en el cliente bajo su CSP", { timeout: 240_000 }, async () => {
+  const project = await createTempProject("static-e2e");
+  let server: import("node:http").Server | undefined;
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  try {
+    await writeStaticApp(project.root, staticAppConfig);
+    await buildProject(project.root);
+    const previous = { port: process.env.MEEKO_PORT, host: process.env.MEEKO_HOST };
+    process.env.MEEKO_PORT = "0";
+    process.env.MEEKO_HOST = "127.0.0.1";
+    try { server = await previewStatic(project.root); }
+    finally {
+      if (previous.port === undefined) delete process.env.MEEKO_PORT; else process.env.MEEKO_PORT = previous.port;
+      if (previous.host === undefined) delete process.env.MEEKO_HOST; else process.env.MEEKO_HOST = previous.host;
+    }
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    browser = await chromium.launch({
+      ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: "chrome" as const }),
+      headless: true,
+    });
+    const page = await browser.newPage();
+    const errors: string[] = [];
+    const documents: string[] = [];
+    const payloads: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      // The browser logs the 404 status of the document and of the missing payload file.
+      if (message.type() === "error" && !message.text().includes("404 (Not Found)")) errors.push(`${message.text()} @ ${message.location().url}`);
+    });
+    page.on("request", (request) => {
+      if (request.resourceType() === "document") documents.push(new URL(request.url()).pathname);
+      if (request.url().endsWith("index.meeko.json")) payloads.push(new URL(request.url()).pathname);
+    });
+    await page.addInitScript(() => {
+      const violations: string[] = [];
+      (window as unknown as { __cspViolations: string[] }).__cspViolations = violations;
+      document.addEventListener("securitypolicyviolation", (event) => violations.push(`${event.violatedDirective} ${event.blockedURI}`));
+    });
+    // /docs/zz matches the dynamic route /docs/[slug], but only a and b were prerendered.
+    const response = await page.goto(`${origin}/docs/zz`);
+    assert.equal(response?.status(), 404);
+    await page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length > 0);
+    assert.equal(await page.locator("#error").innerText(), "404");
+    assert.equal(await page.evaluate(() => (window as unknown as { boot?: number }).boot), 1, "the inline script allowed by its hash ran");
+    await page.evaluate(() => { (window as unknown as { marker: number }).marker = 1; });
+    await page.locator("#error-a").click();
+    await page.locator("#doc", { hasText: "a" }).waitFor();
+    assert.equal(new URL(page.url()).pathname, "/docs/a");
+    assert.equal(await page.title(), "Doc a · Test");
+    assert.equal(await page.locator('link[rel="canonical"]').getAttribute("href"), "https://example.com/docs/a");
+    await page.locator("#to-b").click();
+    await page.locator("#doc", { hasText: "b" }).waitFor();
+    assert.equal(await page.locator('link[rel="canonical"]').getAttribute("href"), "https://example.com/docs/b");
+    await page.locator("#to-home").click();
+    await page.locator("#home").waitFor();
+    // A route URL that was not prerendered shows the error page in the client too.
+    await page.locator("#to-missing").click();
+    await page.locator("#error").waitFor();
+    assert.equal(await page.locator('link[rel="canonical"]').count(), 0);
+    assert.equal(await page.evaluate(() => (window as unknown as { marker?: number }).marker), 1, "every navigation stayed in the client");
+    // History navigation reads the payload files too.
+    await page.goBack();
+    await page.locator("#home").waitFor();
+    assert.equal(await page.evaluate(() => (window as unknown as { marker?: number }).marker), 1);
+    assert.deepEqual(documents, ["/docs/zz"]);
+    assert.deepEqual(payloads, ["/docs/a/index.meeko.json", "/docs/b/index.meeko.json", "/index.meeko.json", "/docs/zz/index.meeko.json", "/index.meeko.json"]);
+    assert.deepEqual(await page.evaluate(() => (window as unknown as { __cspViolations: string[] }).__cspViolations), []);
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser?.close();
+    if (server) await new Promise<void>((done) => server!.close(() => done()));
+    await project.remove();
   }
 });

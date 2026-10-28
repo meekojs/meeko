@@ -4,9 +4,12 @@ import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
 import { compile } from "./compiler.js";
 import type { CompileOptions, CompileResult } from "./compiler.js";
+import { checkClientBoundary } from "./compiler/client-boundary.js";
 import { projectRoot } from "./compiler/project-root.js";
 import { parseSfc } from "./compiler/sfc.js";
-import { loadMeekoConfig, readMeekoConfigSync, resolveConfigSources } from "./framework/config.js";
+import type { CompileDiagnostic } from "./compiler/sfc.js";
+import { importDirectoryOptions, loadMeekoConfig, normalizeImportDirectory, readMeekoConfigSync, resolveConfigSources } from "./framework/config.js";
+import type { MeekoConfig } from "./framework/config.js";
 import { legacyLayerEntries, resolveMeekoModules } from "./framework/module-loader.js";
 
 export type ImportScope = "client" | "server" | "shared" | "app";
@@ -28,10 +31,17 @@ const directories = [
   "server/utils",
 ] as const;
 
-function scopeOf(file: string): ImportScope {
+/**
+ * `directory`, the folder of the file relative to its source root (`app/services`), gives the scope
+ * of a file without suffix: the folders of `imports` take the scope of `app/`, `shared/` or `server/`
+ * whatever the folders above the project are called.
+ */
+function scopeOf(file: string, directory?: string): ImportScope {
   if (/\.shared\.[cm]?tsx?$/.test(file)) return "shared";
   if (/\.server\.[cm]?tsx?$/.test(file)) return "server";
   if (/\.client\.[cm]?tsx?$/.test(file)) return "client";
+  const base = directory?.split("/")[0];
+  if (base === "server" || base === "app" || base === "shared") return base;
   if (file.includes(`${sep}server${sep}`)) return "server";
   // App modules render on both sides during SSR, but are not available to shared/ sources.
   if (file.includes(`${sep}app${sep}`)) return "app";
@@ -130,7 +140,7 @@ interface ModuleDirectory {
 }
 
 function addFileImports(result: AutoImport[], root: string, directory: string, file: string, source?: string, module?: ModuleDirectory): void {
-  const scope = module?.scope && !/\.(?:shared|server|client)\.[cm]?tsx?$/.test(file) ? module.scope : scopeOf(file);
+  const scope = module?.scope && !/\.(?:shared|server|client)\.[cm]?tsx?$/.test(file) ? module.scope : scopeOf(file, module ? undefined : directory);
   if (extname(file) === ".meeko") {
     if (!(module ? module.components : directory === "app/components")) return;
     const path = relative(join(root, directory), file).replace(/\.meeko$/, "");
@@ -176,7 +186,7 @@ export async function discoverAutoImports(root: string): Promise<AutoImport[]> {
   const config = await loadMeekoConfig(root);
   const sources = await resolveConfigSources(root, config);
   for (const source of sources) {
-    for (const directory of configuredDirectories(config.imports?.serverDirs)) {
+    for (const directory of autoImportDirectories(config.imports)) {
       for (const file of await filesIn(join(source.root, directory))) {
         addFileImports(result, source.root, directory, file, extname(file) === ".meeko" ? undefined : await readFile(file, "utf8"));
       }
@@ -216,7 +226,7 @@ export function discoverAutoImportsSync(root: string): AutoImport[] {
     sourceRoots.push(sourceRoot);
   }
   for (const sourceRoot of sourceRoots) {
-    for (const directory of configuredDirectories(config.imports?.serverDirs)) {
+    for (const directory of autoImportDirectories(config.imports)) {
       for (const file of filesInSync(join(sourceRoot, directory))) {
         addFileImports(result, sourceRoot, directory, file, extname(file) === ".meeko" ? undefined : readFileSync(file, "utf8"));
       }
@@ -225,17 +235,24 @@ export function discoverAutoImportsSync(root: string): AutoImport[] {
   return withoutShadowedBuiltins(result);
 }
 
-function configuredDirectories(serverDirs: readonly string[] | undefined): readonly string[] {
-  const result = new Set<string>(directories);
-  for (const raw of serverDirs ?? []) {
-    const directory = raw.replaceAll("\\", "/").replace(/\/$/, "");
-    const parts = directory.split("/");
-    if (parts[0] !== "server" || parts.length < 2 || parts.some((part) => !part || part === "." || part === "..")) {
-      throw new Error(`serverDir de autoimports debe ser una ruta relativa dentro de server/: ${raw}`);
+/**
+ * The autoimport folders of each source root, relative to it with `/`: the default ones, then those
+ * of `imports.appDirs`, `sharedDirs` and `serverDirs`. A configured folder that repeats a default
+ * one, or lies inside another listed folder, is left out: that folder already reads its files.
+ */
+export function autoImportDirectories(imports: MeekoConfig["imports"]): readonly string[] {
+  const result: string[] = [...directories];
+  for (const option of importDirectoryOptions) {
+    for (const raw of imports?.[option] ?? []) {
+      const directory = normalizeImportDirectory(option, raw);
+      if (directory === undefined) {
+        throw new Error(`imports.${option} de autoimports debe ser una ruta relativa dentro de ${option.replace(/Dirs$/, "")}/: ${raw}`);
+      }
+      result.push(directory);
     }
-    result.add(directory);
   }
-  return [...result];
+  const unique = [...new Set(result)];
+  return unique.filter((directory) => !unique.some((other) => other !== directory && directory.startsWith(`${other}/`)));
 }
 
 function bindingNames(name: ts.BindingName, names: Set<string>): void {
@@ -319,23 +336,44 @@ export function autoImportedValues(registry: readonly AutoImport[]): string[] {
   return registry.filter((entry) => !entry.typeOnly).map((entry) => entry.name);
 }
 
-/** Añade imports ESM para referencias libres del módulo generado. */
-export function applyAutoImports(code: string, filename: string, registry: readonly AutoImport[], target: "client" | "server" | "shared"): string {
+/** A free reference of a module: a name that no declaration or import of the module binds. */
+export interface FreeReference {
+  readonly name: string;
+  /** Offset of the identifier in the module. */
+  readonly start: number;
+  /** Read at run time; `false` for a name that only appears in a type. */
+  readonly value: boolean;
+}
+
+/**
+ * The free references of a module, in source order: the names that `applyAutoImports` would
+ * resolve against the registry.
+ */
+export function freeReferences(code: string, filename: string): FreeReference[] {
   const ast = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const referenced = new Set<string>();
-  // Names read at runtime; the others only appear in types and need `import type`
-  // under `verbatimModuleSyntax`, which keeps every value import in the output.
-  const values = new Set<string>();
+  const found: FreeReference[] = [];
   const visit = (node: ts.Node, scopes: readonly Set<string>[], inType: boolean): void => {
     const active = introducesScope(node) ? [...scopes, scopeNames(node)] : scopes;
     const typePosition = inType || startsTypePosition(node);
     if (ts.isIdentifier(node) && isReference(node) && !active.some((scope) => scope.has(node.text))) {
-      referenced.add(node.text);
-      if (!typePosition) values.add(node.text);
+      found.push({ name: node.text, start: node.getStart(ast), value: !typePosition });
     }
     ts.forEachChild(node, (child) => visit(child, active, typePosition));
   };
   visit(ast, [], false);
+  return found;
+}
+
+/** Añade imports ESM para referencias libres del módulo generado. */
+export function applyAutoImports(code: string, filename: string, registry: readonly AutoImport[], target: "client" | "server" | "shared"): string {
+  const referenced = new Set<string>();
+  // Names read at runtime; the others only appear in types and need `import type`
+  // under `verbatimModuleSyntax`, which keeps every value import in the output.
+  const values = new Set<string>();
+  for (const reference of freeReferences(code, filename)) {
+    referenced.add(reference.name);
+    if (reference.value) values.add(reference.name);
+  }
   const imports: string[] = [];
   for (const name of [...referenced].sort()) {
     const candidates = registry.filter((entry) => entry.name === name);
@@ -359,15 +397,31 @@ export function transformAutoImports(source: string, filename: string, code: str
   return applyAutoImports(code, filename, registry, target);
 }
 
+/**
+ * `MEEK108`, `MEEK073` and `MEEK109` of a compiled browser component (one outside `server/`), whose
+ * `<script>` and template also run in the browser: throws the first error, returns the warnings.
+ */
+export function checkComponentBoundary(source: string, filename: string, compiled: Pick<CompileResult, "code" | "mappings">, registry: readonly AutoImport[], serverDirectories: readonly string[]): CompileDiagnostic[] {
+  return checkClientBoundary({
+    source, filename, code: compiled.code, mappings: compiled.mappings, registry, serverDirectories,
+    references: freeReferences(compiled.code, filename),
+  });
+}
+
 /** Compile result shared by Vite, CLI checks and declaration generation. */
 export async function compileWithAutoImports(source: string, filename: string, options: CompileOptions = {}, target: "client" | "server" = "client", knownRegistry?: readonly AutoImport[]): Promise<CompileResult> {
-  const registry = knownRegistry ?? await discoverAutoImports(projectRoot(filename));
+  const root = projectRoot(filename);
+  const registry = knownRegistry ?? await discoverAutoImports(root);
   const compiled = compile(source, filename, { ...options, projectComponents: autoImportedValues(registry) });
+  // Before the autoimports, which would only report a server autoimport as unavailable.
+  const boundary = target === "client" ? checkComponentBoundary(source, filename, compiled, registry, [join(root, "server")]) : [];
   const code = transformAutoImports(source, filename, compiled.code, registry, target);
   const offset = code.length - compiled.code.length;
+  const warnings = [...compiled.warnings ?? [], ...boundary];
   return {
     ...compiled,
     code,
     mappings: offset ? compiled.mappings.map((mapping) => ({ ...mapping, generatedStart: mapping.generatedStart + offset, generatedEnd: mapping.generatedEnd + offset })) : compiled.mappings,
+    ...(warnings.length ? { warnings } : {}),
   };
 }

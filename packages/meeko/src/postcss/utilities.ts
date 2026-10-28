@@ -1,5 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
+import type * as CSS from "csstype";
 import type { AtRule, ChildNode, Container, Helpers, Plugin, Result, Root } from "postcss";
 import selectorParser from "postcss-selector-parser";
 import { loadUtilityModule } from "./module-loader.js";
@@ -20,11 +21,34 @@ import { loadUtilityModule } from "./module-loader.js";
  */
 export type UtilityValue = string | number;
 
+/** Longitud de csstype: una cadena con unidad (`"4px"`, `"1rem"`) o el `0` sin unidad. */
+type CssLength = (string & {}) | 0;
+
+/** Un valor con `!important`; también para las propiedades que csstype limita a palabras clave. */
+type ImportantValue = `${string}!important`;
+
+/** Un valor de csstype, con `!important`, un array de valores de respaldo o `undefined` para omitirlo. */
+type DeclaredValue<Value> =
+  | Exclude<Value, undefined>
+  | ImportantValue
+  | readonly (Exclude<Value, undefined> | ImportantValue)[]
+  | undefined;
+
+/** Las propiedades de csstype con sus valores declarables; conserva su documentación en el editor. */
+type DeclaredProperties<Properties> = { readonly [Property in keyof Properties]?: DeclaredValue<Properties[Property]> };
+
 /**
- * Declaraciones de una regla como objeto. Las claves en camelCase pasan a kebab-case
- * (`backgroundColor` → `background-color`, `WebkitAppearance` → `-webkit-appearance`); las
- * propiedades personalizadas `--*` se escriben tal cual. `undefined` omite la declaración y
- * un array escribe una declaración por valor, en orden, para los valores de respaldo.
+ * Declaraciones de una regla como objeto, tipadas con
+ * [csstype](https://github.com/frenic/csstype): el editor autocompleta las propiedades y sus
+ * palabras clave, y una propiedad mal escrita es un error de tipos. Las longitudes y los tiempos
+ * son cadenas con unidad (`"4px"`, `"200ms"`), salvo el `0`; los números sólo valen en las
+ * propiedades sin unidad (`opacity`, `zIndex`, `flexGrow`, `lineHeight`…). Para lo que csstype
+ * no conozca, use el helper `css`.
+ *
+ * Las claves en camelCase pasan a kebab-case (`backgroundColor` → `background-color`,
+ * `WebkitAppearance` → `-webkit-appearance`); las claves en kebab-case y las propiedades
+ * personalizadas `--*` se escriben tal cual. `undefined` omite la declaración y un array
+ * escribe una declaración por valor, en orden, para los valores de respaldo.
  *
  * @since 1.2.0
  * @example
@@ -35,13 +59,51 @@ export type UtilityValue = string | number;
  *   "--card-gap": "1rem",
  *   borderRadius: "1rem",
  *   display: ["-webkit-box", "flex"],
+ *   position: "relative !important",
+ *   opacity: 0.9,
  *   outline: undefined,
  * };
  * ```
  */
-export interface UtilityDeclarations {
-  readonly [property: string]: UtilityValue | readonly UtilityValue[] | undefined;
+export interface UtilityDeclarations
+  extends DeclaredProperties<CSS.Properties<CssLength>>, DeclaredProperties<CSS.PropertiesHyphen<CssLength>> {
+  readonly [property: `--${string}`]: UtilityValue | readonly UtilityValue[] | undefined;
 }
+
+/** Los descriptores de `@counter-style`, `@font-face`, `@font-palette-values`, `@page`, `@property` y `@view-transition`. */
+type AtRuleDescriptors =
+  & CSS.AtRule.CounterStyle<CssLength> & CSS.AtRule.CounterStyleHyphen<CssLength>
+  & CSS.AtRule.FontFace<CssLength> & CSS.AtRule.FontFaceHyphen<CssLength>
+  & CSS.AtRule.FontPaletteValues<CssLength> & CSS.AtRule.FontPaletteValuesHyphen<CssLength>
+  & CSS.AtRule.Page<CssLength> & CSS.AtRule.PageHyphen<CssLength>
+  & CSS.AtRule.Property<CssLength> & CSS.AtRule.PropertyHyphen<CssLength>
+  & CSS.AtRule.ViewTransition<CssLength> & CSS.AtRule.ViewTransitionHyphen<CssLength>;
+
+/**
+ * Declaraciones del cuerpo de una at-rule creada con {@link UtilityHelpers.atRule}: las
+ * propiedades de {@link UtilityDeclarations} y los descriptores de `@font-face` (`src`,
+ * `fontDisplay`, `unicodeRange`…), `@property` (`syntax`, `inherits`, `initialValue`),
+ * `@page`, `@counter-style`, `@font-palette-values` y `@view-transition`, tipados con csstype.
+ * Es un subtipo de {@link UtilityDeclarations}.
+ *
+ * @since 1.3.0
+ * @example
+ * ```ts
+ * import { defineUtilities, type UtilityAtRuleDeclarations } from "@meekojs/meeko/postcss";
+ *
+ * const inter: UtilityAtRuleDeclarations = {
+ *   fontFamily: "Inter",
+ *   src: "url('/fonts/inter.woff2') format('woff2')",
+ *   fontDisplay: "swap",
+ * };
+ * export default defineUtilities(({ atRule }) => [
+ *   atRule("font-face", "", inter),
+ *   atRule("property", "--angle", { syntax: "'<angle>'", inherits: "false", initialValue: "0deg" }),
+ * ]);
+ * ```
+ */
+export interface UtilityAtRuleDeclarations
+  extends UtilityDeclarations, DeclaredProperties<Omit<AtRuleDescriptors, keyof UtilityDeclarations>> {}
 
 /**
  * Una regla creada con {@link UtilityHelpers.rule}: un selector, sus declaraciones y sus
@@ -92,7 +154,7 @@ export interface UtilityAtRule {
   /** Parámetros tras el nombre, por ejemplo `(min-width: 48rem)`. */
   readonly params: string;
   /** Declaraciones del cuerpo, para `@font-face` o `@property`. */
-  readonly declarations: UtilityDeclarations;
+  readonly declarations: UtilityAtRuleDeclarations;
   /** Reglas, at-rules y CSS del cuerpo. */
   readonly children: readonly UtilityOutput[];
   /** `false` cuando la at-rule es una sentencia sin `{ }`. */
@@ -183,7 +245,7 @@ export interface UtilityHelpers {
    * Crea una at-rule, como `@media`, `@supports`, `@container`, `@font-face` o `@property`.
    * `name` va sin `@`. Sin cuerpo (sólo `name` y `params`) se emite como sentencia.
    */
-  atRule(name: string, params: string, declarations: UtilityDeclarations, ...children: UtilityOutput[]): UtilityAtRule;
+  atRule(name: string, params: string, declarations: UtilityAtRuleDeclarations, ...children: UtilityOutput[]): UtilityAtRule;
   atRule(name: string, params: string, ...children: UtilityOutput[]): UtilityAtRule;
   /**
    * CSS literal, como cadena o plantilla etiquetada; se analiza con PostCSS. Las barras
@@ -401,10 +463,10 @@ function isUtilityNode(value: unknown): value is UtilityNode {
 }
 
 /** Splits `rule`/`atRule` arguments: a plain object first is the declarations, the rest are children. */
-function body(args: readonly unknown[]): { declarations: UtilityDeclarations; children: UtilityOutput[] } {
+function body(args: readonly unknown[]): { declarations: UtilityAtRuleDeclarations; children: UtilityOutput[] } {
   const [first, ...rest] = args;
   if (typeof first === "object" && first !== null && !Array.isArray(first) && !isUtilityNode(first)) {
-    return { declarations: first as UtilityDeclarations, children: rest as UtilityOutput[] };
+    return { declarations: first as UtilityAtRuleDeclarations, children: rest as UtilityOutput[] };
   }
   return { declarations: {}, children: args as UtilityOutput[] };
 }

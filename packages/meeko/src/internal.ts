@@ -6,6 +6,8 @@
  */
 export { createRoot, finishWithCleanup, trackReadSite, withReadSite } from "./reactivity.js";
 export { attributeValue, escapeHtml, rawHtml, renderAttribute, serializeJson } from "./server.js";
+export { checkTrustedHtml } from "./trusted-html.js";
+export type { TrustedHtmlCheck, UntrustedHtmlMessage } from "./trusted-html.js";
 export { bindAttribute, bindComponent, bindElementRef, bindEvent, bindFor, bindHtml, bindIf, bindModel, bindSnippet, bindText, componentProps, indexKey, keyToken, releaseAll, renderComponent, renderFor, renderIf, renderSnippet, withStateSnapshot } from "./dom.js";
 export type { ComponentModule, ComponentRelease, DomScope } from "./dom.js";
 export { enableHotModule, registerHotInstance, registerHotScope, replaceHotModule, replaceHotStyle, restoreSignals, snapshotSignals } from "./hmr.js";

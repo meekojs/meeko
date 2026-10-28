@@ -77,10 +77,10 @@ test("server, node, bun, deno, cloudflare and build subpaths expose exactly thei
   const server = await import(pathToFileURL(await entry("./server")).href);
   assert.deepEqual(Object.keys(server).sort(), [
     "ApiError", "LocalSocketPubSub", "MemorySessionStore", "RedisSessionStore", "RedisSocketPubSub", "SessionHandle", "SessionManager",
-    "SessionRevokedError", "SessionSecurityError", "SqlSessionStore", "composeServerMiddleware", "createFrameworkHandler", "createLocalCalls",
+    "SessionRevokedError", "SessionSecurityError", "SqlSessionStore", "composeServerMiddleware", "contentSecurityPolicy", "createFrameworkHandler", "createLocalCalls",
     "createLocalServerFetch", "createRequestContext", "createServerApp", "createServerClientOptions", "createServerDispatcher", "createServerSocketRegistry",
     "createSocketHub", "createSocketUpgradeHandler", "defineApiRoute", "defineRpc", "defineServerMiddleware", "defineServerRuntime", "defineSocketChannel",
-    "dispatchApiRoute", "dispatchRpc", "errorResponse", "executeApiRoute", "executeRpc", "generateOpenApi",
+    "dispatchApiRoute", "dispatchRpc", "errorResponse", "executeApiRoute", "executeRpc", "generateOpenApi", "handleProcessErrors",
     "loadSocketChannels", "openSocketSession", "useRequestState",
   ]);
   const node = await import(pathToFileURL(await entry("./node")).href);
@@ -100,7 +100,7 @@ test("server, node, bun, deno, cloudflare and build subpaths expose exactly thei
   ]);
   const tools = await import(pathToFileURL(await entry("./build")).href);
   assert.deepEqual(Object.keys(tools).sort(), [
-    "buildProject", "composeFrameworkRoutes", "discoverConfiguredRoutes", "discoverErrorPage", "discoverRoutes", "discoverServerManifest",
+    "buildProject", "composeFrameworkRoutes", "discoverConfiguredRoutes", "discoverErrorPage", "discoverRoutes", "discoverServerManifest", "inlineScriptHashes",
     "loadMeekoConfig", "prerenderProject", "prerenderRoutes", "readMeekoConfigSync", "resolveConfigSources",
   ]);
 });

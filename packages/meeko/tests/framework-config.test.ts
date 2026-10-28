@@ -80,3 +80,18 @@ test("loadMeekoConfig reads a rewrite that keeps the same mtime", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("loadMeekoConfig validates the dev options", async () => {
+  const root = await mkdtemp(join(tmpdir(), "meeko-config-dev-"));
+  try {
+    const file = join(root, "meeko.config.mjs");
+    await writeFile(file, `export default { dev: { serverLogs: false } };\n`);
+    assert.equal((await loadMeekoConfig(root)).dev?.serverLogs, false);
+    for (const [dev, error] of [["[]", /dev must be an object/], ['{ serverLogs: "no" }', /dev\.serverLogs must be a boolean/]] as const) {
+      await writeFile(file, `export default { dev: ${dev} };\n`);
+      await assert.rejects(loadMeekoConfig(root), error);
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

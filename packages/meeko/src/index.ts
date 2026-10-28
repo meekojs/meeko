@@ -4,6 +4,8 @@ export { provideErrorHandler } from "./component-errors.js";
 export { onMounted } from "./lifecycle.js";
 export type { ComponentErrorHandler, ErrorSource } from "./component-errors.js";
 export { serializeJson } from "./server.js";
+export { trustHtml } from "./trusted-html.js";
+export type { TrustedHtml } from "./trusted-html.js";
 export type { Component, ComponentModule, ComponentRelease, DomScope } from "./dom.js";
 export type { HotState } from "./hmr.js";
 export type { Snippet } from "./snippets.js";

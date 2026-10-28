@@ -36,5 +36,9 @@ export default defineServerRuntime<ConformanceEnv>(({ env, production, platform,
     sessions: new SessionManager({ secure: false, production, store }),
     services: { pubsub },
     socket: { pubsub, maxMessageBytes: 1024 },
+    // One line per failure, so the suite can find what each output observed.
+    onError: (error, requestId, info) => {
+      console.log(`[conformance:onError] ${JSON.stringify({ message: error instanceof Error ? error.message : String(error), requestId, info: info ?? null })}`);
+    },
   };
 });

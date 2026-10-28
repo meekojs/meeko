@@ -5,11 +5,16 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { Window } from "happy-dom";
 import * as prettier from "prettier";
+import { DiagnosticSeverity } from "vscode-languageserver/node";
 import type { MarkupContent } from "vscode-languageserver/node";
-import { checkSource } from "../src/check.ts";
+import { checkSource, untrustedHtmlMessage } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
-import { MeekoCompileError } from "../src/compiler/sfc.ts";
+import { hasErrors, MeekoCompileError } from "../src/compiler/sfc.ts";
 import { parseRegionHtml } from "../src/dom.ts";
+import { definePage } from "../src/framework.ts";
+import type { JsonShape, SerializableExport, ServerData } from "../src/framework.ts";
+import { trustHtml } from "../src/index.ts";
+import type { TrustedHtml } from "../src/index.ts";
 import { componentDiagnostics } from "../src/language-server/diagnostics.ts";
 import { hover, semanticTokens, semanticTokensLegend } from "../src/language-server/features.ts";
 import plugin from "../src/prettier.ts";
@@ -299,20 +304,106 @@ test("html directives inside a later browser continuation report MEEK057", () =>
   assert.throws(() => compile(source, "Html.meeko"), (error: unknown) => error instanceof MeekoCompileError && error.diagnostic.code === "MEEK057");
 });
 
-test("meeko check types the html value as string, null or undefined", { timeout: 90_000 }, async () => {
+/** A temporary project under `.meeko/` whose package imports resolve to `src/`. */
+async function checkProject(prefix: string): Promise<string> {
   await mkdir(resolve(".meeko"), { recursive: true });
-  const root = await mkdtemp(resolve(".meeko", "html-check-"));
+  const root = await mkdtemp(resolve(".meeko", prefix));
   await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}\n');
   await writeFile(join(root, "tsconfig.json"), `${JSON.stringify({ compilerOptions: { types: ["node"], paths: { "@meekojs/meeko/internal": ["../../src/internal.ts"], "@meekojs/meeko": ["../../src/index.ts"] } } })}\n`);
+  return root;
+}
+
+test("meeko check types the html value as string, null or undefined", { timeout: 90_000 }, async () => {
+  const root = await checkProject("html-check-");
   try {
-    const valid = `<script lang="ts">\nconst text: string | undefined = "<b>x</b>";\n</script><template><div html="text"></div></template>`;
+    const valid = `<script lang="ts">\nimport { trustHtml } from "@meekojs/meeko";\nconst text = Math.random() > 0.5 ? trustHtml("<b>x</b>") : undefined;\n</script><template><div html="text"></div></template>`;
     assert.deepEqual(await checkSource(valid, join(root, "Valid.meeko")), []);
-    const number = `<script lang="ts">\nconst count = 1;\n</script><template><div html="count"></div></template>`;
+    const number = `<script lang="ts">\nconst count = 1;\nconst value: unknown = "<b>x</b>";\n</script><template><div html="count"></div><p html="value"></p></template>`;
     const diagnostics = await checkSource(number, join(root, "Number.meeko"));
     assert.ok(diagnostics.some((diagnostic) => diagnostic.code === "TS2345" && diagnostic.location.offset === number.indexOf(`count"></div>`)), JSON.stringify(diagnostics));
+    // `unknown` is already an error of the html type, not also a MEEK107 warning.
+    assert.ok(diagnostics.some((diagnostic) => diagnostic.code === "TS2345" && diagnostic.location.offset === number.indexOf(`value"></p>`)), JSON.stringify(diagnostics));
+    assert.ok(!diagnostics.some((diagnostic) => diagnostic.code === "MEEK107"), JSON.stringify(diagnostics));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("meeko check warns with MEEK107 when html is a string without the TrustedHtml brand", { timeout: 90_000 }, async () => {
+  const root = await checkProject("html-trust-");
+  try {
+    const source = `<script lang="ts">
+import { signal, trustHtml } from "@meekojs/meeko";
+import type { TrustedHtml } from "@meekojs/meeko";
+const plain: string = String(Math.random());
+const optional: string | undefined = Math.random() > 0.5 ? plain : undefined;
+const loose: any = JSON.parse("1");
+// The setup returns its bindings in an object, which widens a literal \`const\` to \`string\`; \`as const\` keeps it.
+const widened = "<b>x</b>";
+const literal = "<b>x</b>" as const;
+const choice: "<b>a</b>" | "<i>b</i>" = Math.random() > 0.5 ? "<b>a</b>" : "<i>b</i>";
+const trusted = trustHtml(plain);
+const maybe: TrustedHtml | null = Math.random() > 0.5 ? trusted : null;
+const body = signal<TrustedHtml | undefined>(undefined);
+const page = { returns: Math.random() > 0.5 ? { type: trusted } : null };
+</script>
+<template>
+<div k="plain" html="plain"></div>
+<div k="optional" html="optional"></div>
+<div k="loose" html="loose"></div>
+<div k="pattern" html="\`<u>\${plain}</u>\`"></div>
+<div k="concat" html="'<u>' + plain + '</u>'"></div>
+<section if:when="optional"><div k="narrowed" html="optional"></div></section>
+<div k="widened" html="widened"></div>
+<div html="literal"></div>
+<div html="'<br>'"></div>
+<div html="choice"></div>
+<div html="Math.random() > 0.5 ? '<b>a</b>' : '<i>b</i>'"></div>
+<div html="trusted"></div>
+<div html="maybe"></div>
+<div html="body.value"></div>
+<div html="page.returns?.type ?? ''"></div>
+<div html="null"></div>
+</template>`;
+    const diagnostics = await checkSource(source, join(root, "Trust.meeko"));
+    assert.deepEqual(diagnostics.filter((diagnostic) => diagnostic.code !== "MEEK107"), [], JSON.stringify(diagnostics));
+    assert.equal(hasErrors(diagnostics), false);
+    const warned = ["plain", "optional", "loose", "pattern", "concat", "narrowed", "widened"].map((key) => {
+      const at = source.indexOf(`k="${key}" html="`);
+      return at + `k="${key}" html="`.length;
+    });
+    assert.deepEqual(diagnostics.map((diagnostic) => diagnostic.location.offset), warned, JSON.stringify(diagnostics));
+    for (const diagnostic of diagnostics) {
+      assert.equal(diagnostic.severity, "warning");
+      assert.equal(diagnostic.message, untrustedHtmlMessage);
+    }
+    // An imported component reports its own warning when it is checked, not in each parent.
+    await writeFile(join(root, "Trust.meeko"), source);
+    const parent = `<script lang="ts">\nimport * as Trust from "./Trust.meeko";\n</script><template><Trust /></template>`;
+    assert.deepEqual(await checkSource(parent, join(root, "Parent.meeko")), []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a TrustedHtml export of <script server> and of load reaches the page props with its brand", () => {
+  // The brand exists only in types: `ServerData` and the JSON shape of the payload keep it.
+  type Exported = ServerData<{ readonly body: TrustedHtml; readonly items: readonly TrustedHtml[]; readonly maybe: TrustedHtml | null }>;
+  const exported: Exported = { body: trustHtml("<p>a</p>"), items: [trustHtml("<i>b</i>")], maybe: null };
+  const body: TrustedHtml = exported.body;
+  const item: TrustedHtml | undefined = exported.items[0];
+  const shape: JsonShape<{ body: TrustedHtml }> = { body };
+  const checked: SerializableExport<{ body: TrustedHtml }, JsonShape<{ body: TrustedHtml }>> = shape;
+  // `definePage` infers the data of `load` with the brand, and the page contract only removes `Response`.
+  const route = definePage({ load: async () => ({ body: trustHtml("<p>a</p>") }) });
+  type Loaded = Exclude<Awaited<ReturnType<typeof route.load>>, Response>;
+  const loaded: Loaded["body"] extends TrustedHtml ? true : false = true;
+  // @ts-expect-error A plain string is not a TrustedHtml.
+  const plain: ServerData<{ body: TrustedHtml }> = { body: "<p>a</p>" };
+  assert.equal(loaded, true);
+  // At run time the value is the same string and serializes as one.
+  assert.equal(JSON.stringify({ body, item, checked: checked.body, plain: plain.body }), '{"body":"<p>a</p>","item":"<i>b</i>","checked":"<p>a</p>","plain":"<p>a</p>"}');
+  assert.equal(trustHtml("<b>x</b>"), "<b>x</b>");
 });
 
 test("the editor types html and its hover warns that it is unsafe with untrusted content", async () => {
@@ -331,6 +422,23 @@ test("the editor types html and its hover warns that it is unsafe with untrusted
     const diagnostics = await componentDiagnostics(workspace.project, broken.document, workspace.file("Invalid.meeko"), () => undefined);
     const at = diagnostics.filter((item) => broken.document.getText(item.range) === "count");
     assert.deepEqual(at.map((item) => item.code), ["TS2345"], JSON.stringify(diagnostics));
+  } finally {
+    await workspace.dispose();
+  }
+});
+
+test("the editor warns with MEEK107 on the whole value of an untrusted html", async () => {
+  const source = `<script lang="ts">\nimport { trustHtml } from "@meekojs/meeko";\nconst plain: string = String(Math.random());\nconst trusted = trustHtml(plain);\n</script>\n<template><div html="plain + ''"></div><p html='trusted'></p><span html="'<br>'"></span></template>\n`;
+  const workspace = await languageProject("lsp-html-trust-", { "Trust.meeko": source });
+  try {
+    const context = await workspace.open("Trust.meeko");
+    const diagnostics = await componentDiagnostics(workspace.project, context.document, workspace.file("Trust.meeko"), () => undefined);
+    // Only the template: the test project lacks Node types for the framework sources it imports.
+    const template = source.indexOf("<template>");
+    const inTemplate = diagnostics.filter((item) => context.document.offsetAt(item.range.start) > template);
+    assert.deepEqual(inTemplate.map((item) => ({ code: item.code, severity: item.severity, text: context.document.getText(item.range), message: item.message })), [
+      { code: "MEEK107", severity: DiagnosticSeverity.Warning, text: "plain + ''", message: untrustedHtmlMessage },
+    ]);
   } finally {
     await workspace.dispose();
   }

@@ -92,6 +92,8 @@ export async function formatWithPrettier(request: EditorFormatRequest): Promise<
     endOfLine: "auto",
     meekoIndentSections: request.indentSections === true,
     ...projectOptions,
+    // Sorting by the stylesheet runs the project's PostCSS configuration and `@utilities` modules.
+    ...(request.trusted ? {} : { meekoSortClasses: "off" }),
     filepath: request.filename,
     parser: "meeko",
   };

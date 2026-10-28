@@ -408,6 +408,50 @@ export function conformanceSuite(adapter: ConformanceAdapter, extra?: (suite: Co
       assert.deepEqual(lines[0]!.deferred, [{ id: 0, path: ["data", "slow"], status: "pending" }]);
       assert.deepEqual(lines.slice(1), [{ deferred: 0, value: { text: "Deferred done" } }]);
     });
+
+    it("reports an unhandled rejection to onError of server/runtime.ts and keeps serving", async () => {
+      const response = await fetch(`${origin}/api/unhandled`);
+      assert.equal(response.status, 200, server.logs());
+      const { requestId } = await response.json() as { requestId: string };
+      const entry = await observedFailure(server, "conformance unhandled rejection");
+      assert.equal(entry.info?.kind, "unhandledRejection");
+      // The request's ID when the runtime keeps the async context up to the event.
+      if (requestScopeReachesRejections[adapter]) assert.deepEqual({ requestId: entry.requestId, inRequest: entry.info?.inRequest }, { requestId, inRequest: true });
+      assert.equal((await fetch(`${origin}/about`)).status, 200, server.logs());
+    });
     extra?.({ server: () => server, session: () => ({ cookie, csrf }), track });
+
+    // Last: the output stops. Workers have no process to close.
+    if (adapter !== "workerd") {
+      it("reports an uncaught exception to onError and exits in order with code 1", async () => {
+        for (const peer of sockets) peer.terminate();
+        const response = await fetch(`${origin}/api/crash`, { method: "POST", headers: { origin } });
+        assert.equal(await response.text(), "scheduled");
+        assert.equal(await server.exited, 1, server.logs());
+        const entry = await observedFailure(server, "conformance uncaught exception");
+        assert.equal(entry.info?.kind, "uncaughtException");
+      });
+    }
   });
+}
+
+/**
+ * Whether the runtime keeps the request's async context up to its `unhandledrejection` event.
+ * Bun 1.4 runs the `process` listener without it, so the failure arrives with a new ID.
+ */
+const requestScopeReachesRejections: Readonly<Record<ConformanceAdapter, boolean>> = { node: true, deno: true, bun: false, workerd: true };
+
+interface ObservedFailure { message: string; requestId: string; info: { kind: string; inRequest: boolean } | null }
+
+/** Waits for the `[conformance:onError]` line of the fixture's runtime for `message`. */
+async function observedFailure(server: RunningOutput, message: string): Promise<ObservedFailure> {
+  const start = Date.now();
+  while (Date.now() - start < 10_000) {
+    for (const match of server.logs().matchAll(/\[conformance:onError\] (\{.*\})/g)) {
+      const entry = JSON.parse(match[1]!) as ObservedFailure;
+      if (entry.message === message) return entry;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`onError never observed "${message}":\n${server.logs()}`);
 }

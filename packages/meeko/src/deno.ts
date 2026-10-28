@@ -4,6 +4,7 @@ import type { ServerApp } from "./framework-server/app.js";
 import { setSocketAddress, trustProxyOf } from "./framework-server/env.js";
 import { createTrackedPlatform, fetchApp, positiveInteger, publicOriginOf, rebaseRequest, visibleHost } from "./framework-server/fetch-host.js";
 import type { ServerPlatform } from "./framework-server/platform.js";
+import { handleProcessErrors } from "./framework-server/process-errors.js";
 import type { SocketPeer } from "./framework-server/socket.js";
 import { createSocketUpgradeHandler } from "./framework-server/upgrade.js";
 import type { SocketSession, SocketUpgrade, SocketUpgradeClose, SocketUpgradeHandler } from "./framework-server/upgrade.js";
@@ -64,7 +65,11 @@ export interface ServeDenoOptions {
   readonly maxMessageBytes?: number;
   /** Segundos sin `pong` antes de que Deno cierre un peer; los pings se envían a la mitad de ese intervalo. Por defecto, 60. */
   readonly idleTimeout?: number;
-  /** Cierra de forma ordenada ante `SIGINT` y `SIGTERM` (`SIGINT` y `SIGBREAK` en Windows). */
+  /**
+   * Cierra de forma ordenada ante `SIGINT` y `SIGTERM` (`SIGINT` y `SIGBREAK` en Windows). Desde
+   * `1.3`, también aplica la política `processErrors` de `server/runtime.ts` a las promesas
+   * rechazadas sin manejar y a las excepciones no capturadas (véase `handleProcessErrors`).
+   */
   readonly handleSignals?: boolean;
 }
 
@@ -242,6 +247,7 @@ export async function serveDeno(app: ServerApp, options: ServeDenoOptions = {}):
 
   const signals = deno.build.os === "windows" ? ["SIGINT", "SIGBREAK"] : ["SIGINT", "SIGTERM"];
   const onSignal = (): void => { void close().catch(() => {}); };
+  let releaseProcessErrors = (): void => {};
   let closed: Promise<void> | undefined;
   const close = (): Promise<void> => {
     closed ??= (async () => {
@@ -263,6 +269,8 @@ export async function serveDeno(app: ServerApp, options: ServeDenoOptions = {}):
         try { await step(); }
         catch (error) { failures.push(error); report(error, crypto.randomUUID()); }
       }
+      // Failures while closing are still reported; the listeners leave with the server.
+      releaseProcessErrors();
       if (failures.length) throw failures[0];
     })();
     return closed;
@@ -272,6 +280,8 @@ export async function serveDeno(app: ServerApp, options: ServeDenoOptions = {}):
       try { deno.addSignalListener(signal, onSignal); }
       catch { /* Unsupported signal on this platform. */ }
     }
+    // The server owns the process: its rejections and exceptions follow `processErrors`.
+    releaseProcessErrors = handleProcessErrors(app, { close, ...(options.onError ? { onError: options.onError } : {}) });
   }
   return { url, finished: server.finished, close };
 }

@@ -7,7 +7,7 @@ import type { Plugin } from "vite";
 import { compile } from "./compiler.js";
 import { moduleSpecifiers } from "./compiler/import-graph.js";
 import { sourceMapForCompiled } from "./compiler/sourcemap.js";
-import { autoImportedValues, discoverAutoImports, transformAutoImports } from "./autoimports.js";
+import { autoImportDirectories, autoImportedValues, checkComponentBoundary, discoverAutoImports, transformAutoImports } from "./autoimports.js";
 import { transformTypeScriptAutoImports, typeScriptAutoImportMap } from "./autoimports-ts.js";
 import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./framework/config.js";
 import { clientPluginsSource, clientRoutesSource, clientSidecarsSource, readBuildAppData, serverAppSource } from "./framework/app-manifest.js";
@@ -140,8 +140,8 @@ export function meeko(): Plugin {
       const prefix = `${normalizePath(source.root)}/`;
       if (!normalized.startsWith(prefix)) continue;
       const path = normalized.slice(prefix.length);
-      const registrySource = /^(?:app\/(?:components|composables|utils|stores)|shared\/(?:types|schemas|utils|constants|enums)|server\/utils)\//.test(path) ||
-        (config.imports?.serverDirs ?? []).some((directory) => path.startsWith(`${directory.replaceAll("\\", "/").replace(/\/$/, "")}/`));
+      // The default folders and those of `imports.appDirs`, `sharedDirs` and `serverDirs`.
+      const registrySource = autoImportDirectories(config.imports).some((directory) => path.startsWith(`${directory}/`));
       const routesSource = /^(?:app\/(?:pages|layouts|middleware|plugins)|server\/middleware)\//.test(path);
       if (registrySource || routesSource || (tree && isDiscoverySource(file, [source.root]))) return true;
     }
@@ -288,6 +288,10 @@ export function meeko(): Plugin {
       const scopeAttribute = config?.css?.scopeAttribute;
       const registry = await discoverAutoImports(root);
       const result = compile(source, filename, { hot: isDev, projectComponents: autoImportedValues(registry), ...(scopeAttribute ? { scopeAttribute } : {}) });
+      // A component outside server/ may run in the browser: the browser graph stops at MEEK108. The SSR
+      // graph does not, so a component that only server code imports (an email template in
+      // app/emails/ rendered by an API route) keeps compiling there, as in 1.2.
+      if (!serverTransform && !serverDirectories.some((directory) => filename.startsWith(directory))) checkComponentBoundary(source, filename, result, registry, serverDirectories);
       const styleHash = createHash("sha256").update(filename).update("\0").update(result.css).digest("hex");
       if (result.css) keepStyle(filename, styleHash, result.css);
       const cssImport = result.css ? `\nimport ${JSON.stringify(`${filename}?meeko-style=${styleHash}&lang.css`)};` : "";

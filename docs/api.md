@@ -193,11 +193,12 @@ const tags = signal<string[]>([]);
 
 ### HTML sin escapar con `html`
 
-Desde `1.1`, `html="expression"` en un elemento lo llena con el HTML de la expresión, **sin escapar**. La expresión es un `string`; `null` y `undefined` dejan el elemento vacío.
+Desde `1.1`, `html="expression"` en un elemento lo llena con el HTML de la expresión, **sin escapar**. La expresión es un `string`; `null` y `undefined` dejan el elemento vacío. Desde `1.3`, ese `string` debe estar marcado como de confianza con `trustHtml` (tipo `TrustedHtml`) o `meeko check` avisa con `MEEK107`; véase [HTML de confianza](#html-de-confianza-trustedhtml-y-trusthtml).
 
 ```html
 <script lang="ts">
-const article = signal("<p>Contenido <strong>generado</strong> en el servidor.</p>");
+import { trustHtml } from "@meekojs/meeko";
+const article = signal(trustHtml("<p>Contenido <strong>generado</strong> en el servidor.</p>"));
 </script>
 <template><article class="prose" html="article.value"></article></template>
 ```
@@ -213,6 +214,42 @@ El elemento no admite hijos, ni siquiera comentarios o `{expression}`; sólo esp
 
 **Elementos personalizados.** `html` y `model` son directivas sólo en los elementos HTML estándar, donde no son atributos HTML válidos. En un elemento personalizado (una etiqueta con guion, como `<x-markdown html="intro">` o `<my-input model="query">`) siguen siendo atributos HTML literales, como en `1.0`, y el elemento admite hijos.
 
+#### HTML de confianza: `TrustedHtml` y `trustHtml`
+
+Desde `1.3`, el tipo de la expresión de `html` declara de dónde viene el HTML. `TrustedHtml` es un `string` con una marca que sólo existe en los tipos, y `trustHtml(html)` la pone: en ejecución devuelve el mismo `string`, sin copiarlo ni comprobarlo. Ambos se importan de `@meekojs/meeko`; no son autoimports, para que la declaración de confianza sea siempre un import visible y funcione igual fuera del framework.
+
+**`trustHtml` no sanea: sólo declara.** Úselo donde nace el HTML, no justo antes de la plantilla:
+
+```ts
+// server/content/articles.ts
+import DOMPurify from "isomorphic-dompurify";
+import { trustHtml } from "@meekojs/meeko";
+import type { TrustedHtml } from "@meekojs/meeko";
+
+// HTML de usuarios o de terceros: se sanea primero y después se declara de confianza.
+export function commentHtml(input: string): TrustedHtml {
+  return trustHtml(DOMPurify.sanitize(input));
+}
+
+// HTML propio, como el Markdown del repositorio renderizado en el build: basta con declararlo.
+export function articleHtml(markdownDeConfianza: string): TrustedHtml {
+  return trustHtml(markdownDeConfianza);
+}
+```
+
+Para HTML de usuarios se recomienda [DOMPurify](https://github.com/cure53/DOMPurify) (en SSR, `isomorphic-dompurify`, que lo ejecuta sobre jsdom). Para mostrar texto, `{expression}` escapa y no necesita nada de esto.
+
+`meeko check`, `meeko build` y el editor avisan con **`MEEK107`** cuando el tipo de la expresión no es asignable a `TrustedHtml | null | undefined`:
+
+- **Avisan** `string`, `string | undefined`, una concatenación o plantilla con un `string` (`'<b>' + name + '</b>'`, cuyo tipo es `string` o un patrón como `` `<b>${string}</b>` ``) y `any`, que no dice nada del origen (por ejemplo, el resultado de `JSON.parse` o de `response.json()`).
+- **No avisan** `TrustedHtml` (también con `null` o `undefined`), los tipos literales de texto y sus uniones, que el autor escribió en el código (`html="'<br>'"`, `html="open.value ? '<b>sí</b>' : '<i>no</i>'"` o una variable con tipo literal declarado), y `null` o `undefined`.
+- `unknown`, `number` y los demás tipos que no son texto siguen siendo un error de tipos (`TS2345`), no además un aviso.
+- Una constante del `<script>` sin anotación, como `const icon = "<svg>…</svg>"`, llega a la plantilla como `string`, porque el setup entrega sus bindings en un objeto y TypeScript ensancha el literal: escriba `as const` (`const icon = "<svg>…</svg>" as const`) o márquela con `trustHtml`.
+
+Los datos de servidor conservan la marca: un export de `<script server>` o el resultado de `load` de tipo `TrustedHtml` llega a la plantilla con ese tipo (`ServerData<T>` y el contrato de la página la mantienen), porque el payload es JSON y la marca sólo existe en los tipos. Marque el HTML en el módulo de servidor que lo produce y declare `TrustedHtml` en sus tipos compartidos.
+
+`MEEK107` es un aviso: se muestra, pero no hace fallar `meeko check` ni `meeko build`, y no cambia el SSR, la hidratación ni el código generado; todo lo que compilaba en `1.2` sigue compilando y funcionando igual. Está deprecado insertar un `string` sin marcar: en `2.0` el aviso pasará a ser un error (véase [Deprecación](stability.md#apis-deprecadas)).
+
 ### Listas con y sin `each:key`
 
 Desde `1.1`, `each:key` es opcional (antes, una lista sin clave daba `MEEK023`, que se retira). Sin clave, la clave de cada fila es su índice: la fila `i` conserva sus nodos y recibe el elemento `i`, y las filas sólo se añaden o se quitan al final. Al insertar, borrar o reordenar en medio de la lista, cada fila muestra el elemento que ahora ocupa su posición.
@@ -223,6 +260,34 @@ Desde `1.1`, `each:key` es opcional (antes, una lista sin clave daba `MEEK023`, 
 ```
 
 Use `each:key` cuando la lista cambia de orden o recibe elementos en medio y cada fila tiene estado propio que debe acompañar a su elemento: un componente hijo con señales, un control de formulario que el usuario está editando, el foco o una animación. Con la clave, Meeko mueve las filas existentes en lugar de reasignarlas. Para listas que sólo se muestran o sólo crecen al final, el índice basta.
+
+### Estilos del componente: `<style>` y `<style scoped>`
+
+Un `.meeko` admite un bloque de estilos, con o sin `scoped`. Los dos pasan por el mismo PostCSS que `app/styles/main.css` (`postcss.config.*`, Tailwind, `@utilities`) y Vite los empaqueta junto al componente: el SSR enlaza el CSS de los componentes de la página y la navegación cliente carga el de cada ruta al entrar en ella.
+
+| | `<style scoped>` | `<style>` |
+| --- | --- | --- |
+| Alcance | Sólo los elementos de la plantilla del componente, mediante el atributo `data-meeko-s-<hash>`. | **Toda la página**, como `app/styles/main.css`. |
+| Hijos y contenido de `html="..."` | No, salvo con `:global(...)`. | Sí. |
+| `:global(...)` | Desenvuelve el selector sin el atributo. | No se transforma: no lo use. |
+| Riesgo | Ninguna fuga. | Una `.card` de un componente afecta a la `.card` de cualquier otro. |
+
+Un `<style>` sin `scoped` es CSS global que vive junto al componente que lo necesita. No se limita a los momentos en que el componente está montado: una vez cargado, sigue aplicándose al navegar a otras rutas, y su orden frente a otras hojas depende de cuándo se cargó. Úselo para estilos globales a propósito, por ejemplo los de un contenido de terceros que el componente envuelve:
+
+```html
+<!-- MarkdownView.meeko -->
+<template>
+  <article class="markdown-view" html="props.content"></article>
+</template>
+
+<style>
+  /* Global a propósito: el prefijo .markdown-view evita afectar al resto de la página. */
+  .markdown-view p { margin-block: 0.75em; }
+  .markdown-view pre { overflow-x: auto; }
+</style>
+```
+
+Para casi todo lo demás, `<style scoped>` es la opción por defecto, y `:global(...)` alcanza a los hijos o al contenido de `html` sin perder el ámbito: `.markdown-view :global(p)` da `.markdown-view[data-meeko-s-…] p`. Los estilos de toda la aplicación (reset, tokens, tipografía) van mejor en `app/styles/main.css` o en un archivo que esta importe, donde su orden es explícito.
 
 ### Estilos con ámbito y `:global(...)`
 
@@ -293,7 +358,7 @@ CLI y VS Code comprueban el tipo del evento que recibe `on:event` y que `each:ke
 
 Los handlers de `on:event` pueden ser asíncronos. Meeko observa su promesa y entrega los fallos síncronos o rechazos al observador más cercano, sin dejar un rechazo no manejado ni detener otros listeners. La limpieza del componente elimina sus listeners. Si no hay observador, Meeko registra el fallo en consola.
 
-Dentro del script de un componente, `provideErrorHandler((error, source) => { ... })` registra un observador para sus eventos y los de sus hijos, y también para los rechazos de un `effect` u `onCleanup` que devolvió por error una promesa. Se autoimporta como una función ESM real; `error` tiene tipo `unknown`, por lo que debe refinarse antes de leer sus propiedades, y `source` es un `ErrorSource` (`"event"`, `"effect"`, `"cleanup"`, `"mounted"`, `"navigation"` o `"socket"`). `"mounted"` (desde `1.1`) identifica los fallos de un callback de `onMounted` y de la continuación en el navegador de un setup con `await` (véase [Ciclo de vida](#ciclo-de-vida)). Un componente descendiente puede registrar otro observador para su propia rama. El contexto está aislado por raíz; un observador asíncrono que rechace se registra junto al error original. En una aplicación montada, la navegación y los canales Socket creados dentro de la aplicación también utilizan el observador activo; sus opciones explícitas `onNavigationError` y `onError` tienen prioridad. El servidor usa su propio observador con `requestId`.
+Dentro del script de un componente, `provideErrorHandler((error, source) => { ... })` registra un observador para sus eventos y los de sus hijos, y también para los rechazos de un `effect` u `onCleanup` que devolvió por error una promesa. Se autoimporta como una función ESM real; `error` tiene tipo `unknown`, por lo que debe refinarse antes de leer sus propiedades, y `source` es un `ErrorSource` (`"event"`, `"effect"`, `"cleanup"`, `"mounted"`, `"navigation"`, `"socket"` y, desde `1.3`, `"uncaught"` y `"rejection"` para los fallos globales de la página en una aplicación montada; véase [Errores](framework.md#errores)). La unión puede ganar miembros en un minor: un `switch` exhaustivo necesita una rama por defecto. `"mounted"` (desde `1.1`) identifica los fallos de un callback de `onMounted` y de la continuación en el navegador de un setup con `await` (véase [Ciclo de vida](#ciclo-de-vida)). Un componente descendiente puede registrar otro observador para su propia rama. El contexto está aislado por raíz; un observador asíncrono que rechace se registra junto al error original. En una aplicación montada, la navegación y los canales Socket creados dentro de la aplicación también utilizan el observador activo; sus opciones explícitas `onNavigationError` y `onError` tienen prioridad. El servidor usa su propio observador con `requestId`.
 
 ```html
 <script lang="ts">
@@ -654,13 +719,13 @@ No hay `onUpdated`: para reaccionar a cambios, use `effect`.
 
 Los observadores creados durante `hydrate` pertenecen a esa instancia. Durante HMR de Vite se conservan por nombre las señales editables del script; los valores derivados se calculan otra vez. Este estado en memoria de HMR es independiente de la transferencia JSON entre servidor y navegador.
 
-La raíz `@meekojs/meeko` exporta exactamente `signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `onMounted`, `createContext`, `provide`, `inject`, `provideErrorHandler` y `serializeJson`, más los tipos de señales, contexto, componentes, `HotState` y DevTools. Este motor documenta además `@meekojs/meeko/vite` y `@meekojs/meeko/devtools-ui`. Las subrutas del framework y de los adaptadores (`/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare` y `/build`) se describen en la [guía del framework](framework.md). El compilador importa sus funciones de DOM, HMR y registro de DevTools desde `@meekojs/meeko/internal`. Esa ruta es un contrato entre el compilador y su runtime de la **misma versión exacta**, y no está destinada a imports manuales. Un módulo generado debe compilarse con la misma versión del paquete que lo ejecuta, así que hay que volver a compilarlo al actualizar Meeko.
+La raíz `@meekojs/meeko` exporta exactamente `signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `onMounted`, `createContext`, `provide`, `inject`, `provideErrorHandler`, `serializeJson` y, desde `1.3`, `trustHtml`, más los tipos de señales, contexto, componentes, `HotState`, DevTools y, desde `1.3`, `TrustedHtml`. Este motor documenta además `@meekojs/meeko/vite` y `@meekojs/meeko/devtools-ui`. Las subrutas del framework y de los adaptadores (`/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare` y `/build`) se describen en la [guía del framework](framework.md). El compilador importa sus funciones de DOM, HMR y registro de DevTools desde `@meekojs/meeko/internal`. Esa ruta es un contrato entre el compilador y su runtime de la **misma versión exacta**, y no está destinada a imports manuales. Un módulo generado debe compilarse con la misma versión del paquete que lo ejecuta, así que hay que volver a compilarlo al actualizar Meeko.
 
 ## Herramientas
 
 `meeko check archivo.meeko` comprueba sintaxis y tipos; `--json` entrega diagnósticos estructurados. `meeko compile entrada.meeko salida.ts` genera el módulo tipado y no escribe un archivo si hay errores. `meeko types archivo.meeko` emite declaraciones `Archivo.d.meeko.ts` para ese componente y los hijos importados bajo `.meeko/types/`, reflejando su ruta relativa al proyecto; no escribe declaraciones junto a las fuentes. En una aplicación de framework, la generación registra sus salidas en `.meeko/manifests/component-types.json` y elimina únicamente declaraciones administradas cuyo componente ya no existe. La primera ejecución tras actualizar reconoce mediante AST únicamente declaraciones generadas huérfanas de versiones anteriores, mientras conserva archivos ajenos y regenera los componentes vigentes. Para resolver esos imports con props precisas, TypeScript necesita `allowArbitraryExtensions` y `rootDirs` que superponga el árbol fuente con `.meeko/types/`. `meeko init` escribe esa configuración; un consumidor configurado a mano debe incorporarla. El plugin `@meekojs/meeko/vite` compila los imports `.meeko` en cliente y SSR y añade HMR y CSS durante desarrollo. `meeko lsp --stdio` (también disponible como bin `meeko-language-server`) arranca el servidor de lenguaje que usan la [extensión de VS Code](../packages/vscode/README.md) y [otros editores](editors.md) para ofrecer las mismas comprobaciones en el editor.
 
-`@meekojs/meeko/prettier` es el plugin de Prettier para `.meeko`. Con `{ "plugins": ["@meekojs/meeko/prettier"] }` en la configuración de Prettier, `prettier --write "**/*.meeko"` formatea script, `<script server>`, plantilla y estilo; la opción `meekoIndentSections` (por defecto `false`) indenta un nivel el contenido de todas las secciones. El servidor de lenguaje usa el mismo plugin, así que el editor y la CI coinciden (véase [editores](editors.md#formato-con-prettier)).
+`@meekojs/meeko/prettier` es el plugin de Prettier para `.meeko`. Con `{ "plugins": ["@meekojs/meeko/prettier"] }` en la configuración de Prettier, `prettier --write "**/*.meeko"` formatea script, `<script server>`, plantilla y estilo; la opción `meekoIndentSections` (por defecto `false`) indenta un nivel el contenido de todas las secciones, y `meekoPreserveArrayBreaks` (por defecto `true`) deja expandido, en todo el JavaScript y TypeScript que formatee Prettier, un array con un salto de línea tras `[`, como `objectWrap: "preserve"` con los objetos. El servidor de lenguaje usa el mismo plugin, así que el editor y la CI coinciden (véase [editores](editors.md#formato-con-prettier)).
 
 ## Compatibilidad y límites
 

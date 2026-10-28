@@ -3,7 +3,8 @@ import { createRequire } from "node:module";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { MeekoConfig } from "./config-type.js";
-import { normalizeHeadInput, resolveDocumentConfig } from "./head.js";
+import { meekoEnv } from "../framework-server/env.js";
+import { normalizeHeadInput, resolveDocumentConfig, siteOrigin } from "./head.js";
 import type { DocumentConfig, DocumentHead, HeadInput } from "./head.js";
 import { isMeekoModule } from "./module.js";
 import type { MeekoHooks, MeekoModule, MeekoModuleContext, ModuleAutoImport, ModulePlugin } from "./module.js";
@@ -487,7 +488,39 @@ export function resolveMeekoModules(projectRoot: string, config: MeekoConfig, op
  * modules, validated and deduplicated like `useHead` (the configuration's entries win).
  */
 export function resolvedDocument(config: MeekoConfig, modules: ResolvedModules): DocumentConfig | undefined {
-  return resolveDocumentConfig(config.document, modules.head ? [modules.head] : []);
+  // The origin is resolved only when `document.seo` writes an absolute URL without its own origin.
+  const origin = seoNeedsSiteOrigin(config.document?.seo) ? resolveSiteOrigin(config) : undefined;
+  return resolveDocumentConfig(config.document, modules.head ? [modules.head] : [], origin);
+}
+
+/** Whether a `document.seo` value writes `canonical` or `og:url` from the site's origin. */
+function seoNeedsSiteOrigin(seo: unknown): boolean {
+  if (seo === true) return true;
+  if (seo === null || typeof seo !== "object") return false;
+  const options = seo as Record<string, unknown>;
+  return options.origin === undefined && (options.canonical !== false || options.ogUrl !== false);
+}
+
+/**
+ * The public origin of the site for the absolute URLs the build writes (`sitemap.xml`,
+ * `robots.txt`, `document.seo`): `site` of the configuration or, without it, `MEEKO_PUBLIC_ORIGIN`
+ * of the build's environment. `site` must be a bare origin; `MEEKO_PUBLIC_ORIGIN` keeps only the
+ * origin of its URL, as the server does with it (`https://example.com/app` gives
+ * `https://example.com`). Call it only when an absolute URL is written.
+ */
+export function resolveSiteOrigin(config: MeekoConfig, env: Readonly<Record<string, string | undefined>> = process.env): string | undefined {
+  if (config.site !== undefined) return siteOrigin(config.site, "site");
+  const fromEnv = meekoEnv(env, "PUBLIC_ORIGIN");
+  return fromEnv ? publicOriginOf(fromEnv) : undefined;
+}
+
+/** The origin of `MEEKO_PUBLIC_ORIGIN`, accepted as the server accepts it. */
+function publicOriginOf(value: string): string {
+  let url: URL;
+  try { url = new URL(value); }
+  catch { throw new TypeError(`MEEKO_PUBLIC_ORIGIN must be an absolute URL such as "https://example.com"`); }
+  if (url.protocol !== "http:" && url.protocol !== "https:") throw new TypeError("MEEKO_PUBLIC_ORIGIN must use http: or https:");
+  return url.origin;
 }
 
 /** Module-resolved paths are absolute; a key for a generated import is project-relative when possible. */

@@ -196,6 +196,15 @@ function rewrittenSpan(mappings: readonly SourceMapping[], generated: number): r
   return [span.originalStart, span.originalStart + span.originalLength];
 }
 
+/** The type error of `UntrustedHtmlMessage` that `checkTrustedHtml` reports for `html="expression"`. */
+const untrustedHtmlType = /\bMEEK107: /;
+
+/**
+ * Message of the `MEEK107` warning: the value of `html="expression"` is a `string` (or `any`)
+ * without the `TrustedHtml` brand. A warning in 1.x; it becomes an error in 2.0.
+ */
+export const untrustedHtmlMessage = "`html` inserta HTML sin escapar; un `string` puede venir de un usuario (XSS). Sanéelo y márquelo con `trustHtml(…)`, o use `{expr}`, que escapa.";
+
 /** The type error of `UnexposedRefMessage` that TypeScript reports for `await useElementRef(...)`. */
 const unexposedRefType = /\bMEEK080: /;
 
@@ -277,6 +286,9 @@ export async function checkSource(source: string, filename: string, options: Che
       const generated = generatedOffset(entry.code, diagnostic.line, diagnostic.column);
       const offset = originalOffset(entry.mappings, generated);
       if (unexposedRefType.test(diagnostic.message)) return unexposedRefDiagnostic(entry, generated, offset);
+      if (untrustedHtmlType.test(diagnostic.message)) {
+        return { code: "MEEK107", message: untrustedHtmlMessage, filename: entry.original, location: locate(entry.source, offset ?? 0), severity: "warning" };
+      }
       const result: CompileDiagnostic = {
         code: diagnostic.code,
         message: offset === undefined ? `TypeScript generado: ${diagnostic.message}` : diagnostic.message,
@@ -311,6 +323,7 @@ export async function checkSource(source: string, filename: string, options: Che
   const seen = new Set<string>();
   // Warnings of the checked component only; each imported component reports its own when checked.
   return [...mapped, ...graph.root.warnings].filter((item) => {
+    if (item.severity === "warning" && item.filename !== graph.root.original) return false;
     const span = approximate.get(item);
     if (span && mapped.some((other) => other !== item && !approximate.has(other) && sameError(other, item)
       && other.location.offset >= span[0] && other.location.offset < span[1])) return false;

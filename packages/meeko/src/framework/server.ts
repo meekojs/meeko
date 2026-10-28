@@ -22,7 +22,7 @@ import { fixedRoute, provideRoute, routeSnapshot } from "./navigation.js";
 import type { RouteSnapshot } from "./navigation.js";
 import type { PageRequest } from "./page-body.js";
 import type { ErrorPageRecord, RouteRecord } from "./router.js";
-import { documentHeadEntries, HeadCollector, provideHead, renderHeadDocument, resolveHead, routeHeadInput, withHeadLevel } from "./head.js";
+import { documentHeadEntries, HeadCollector, provideHead, renderHeadDocument, resolveHead, resolveSeo, routeHeadInput, withHeadLevel } from "./head.js";
 import type { DocumentConfig, HeadDocument, HeadInput } from "./head.js";
 import { emptyPluginState, notifyPluginErrorHandlers, runPlugins } from "./plugin.js";
 import type { PluginRegistration, PluginState } from "./plugin.js";
@@ -231,9 +231,13 @@ function documentParts(options: DocumentOptions | undefined, request: Request): 
  */
 export const DOCUMENT_HEAD_PREFIX = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,">';
 
-/** The head of a document: `document` of the configuration, the components' `useHead` and the route head. */
-function headDocument(options: DocumentOptions | undefined, nonce: string | undefined, collected: HeadCollector | undefined, route: HeadInput): HeadDocument {
-  return renderHeadDocument(resolveHead([...documentHeadEntries(options?.config, route), ...collected?.entries() ?? []]), nonce);
+/**
+ * The head of a document: `document` of the configuration, the components' `useHead` and the route
+ * head. `pathname` names the page for `document.seo`; an error document has none.
+ */
+function headDocument(options: DocumentOptions | undefined, nonce: string | undefined, collected: HeadCollector | undefined, route: HeadInput, pathname?: string): HeadDocument {
+  const page = { seo: resolveSeo(options?.config?.seo, "document.seo"), pathname };
+  return renderHeadDocument(resolveHead([...documentHeadEntries(options?.config, route), ...collected?.entries() ?? []], page), nonce);
 }
 
 /**
@@ -291,6 +295,11 @@ export interface PrerenderSource {
 /** Internal handler options used by `createServerApp`. */
 export interface PageHandlerOptions extends FrameworkHandlerOptions<unknown> {
   readonly prerendered?: PrerenderSource;
+  /**
+   * Every page request renders app/error.meeko with 404, as for a URL without a route: the
+   * `404.html` of a static build, whatever routes (a catch-all included) the app has.
+   */
+  readonly notFoundOnly?: boolean;
 }
 
 /** A typed sidecar may narrow callback arguments after its schemas validate them. */
@@ -603,7 +612,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     };
     try {
     const url = new URL(request.url);
-    const match = matchRoute(options.routes, url.pathname);
+    const match = options.notFoundOnly ? undefined : matchRoute(options.routes, url.pathname);
     route = routeSnapshot(url, match?.route.id ?? null, match ? match.params : {}, pageSearchObject(url.searchParams), false);
     const errorPage = options.errorPage;
     if (!match && !(errorPage && wantsPage(request, url.pathname))) return finish(new Response("Not Found", {
@@ -749,7 +758,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     }
     const host = documentParts(options.document, request);
     const nonceAttribute = host.nonceAttribute;
-    const documentHead = (): HeadDocument => headDocument(options.document, host.nonce, collected, routeHeadInput(head));
+    const documentHead = (): HeadDocument => headDocument(options.document, host.nonce, collected, routeHeadInput(head), url.pathname);
     const styleTags = [...new Set(styles)].map((css) => `<style${nonceAttribute}>${css.replaceAll("<", "\\3C ")}</style>`).join("");
     const headRequest = request.method === "HEAD";
     if (streaming) {

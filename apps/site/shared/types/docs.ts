@@ -1,3 +1,5 @@
+import type { TrustedHtml } from "@meekojs/meeko";
+
 /** A heading of a page, for its table of contents. */
 export interface TocEntry {
   readonly id: string;
@@ -24,8 +26,8 @@ export interface RenderedDoc {
   readonly title: string;
   /** Plain text of its first paragraph, for `<meta name="description">`. */
   readonly description: string;
-  /** HTML of the whole document, highlighted in the build. */
-  readonly html: string;
+  /** HTML of the whole document, highlighted in the build: Markdown of the repository, so trusted. */
+  readonly html: TrustedHtml;
   readonly toc: readonly TocEntry[];
   /** Path of the source in the repository, such as `docs/api.md`. */
   readonly source: string;

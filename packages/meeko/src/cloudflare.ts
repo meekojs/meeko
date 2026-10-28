@@ -7,6 +7,7 @@ import { setSocketAddress } from "./framework-server/env.js";
 import { fetchApp, positiveInteger, publicOriginOf, rebaseRequest } from "./framework-server/fetch-host.js";
 import { createDetachedPlatform } from "./framework-server/platform.js";
 import type { ServerPlatform } from "./framework-server/platform.js";
+import { watchIsolateErrors } from "./framework-server/process-errors.js";
 import type { SqlSessionDriver, SqlSessionRow } from "./framework-server/session-stores.js";
 import type { SocketMessage, SocketPeer, SocketPubSub, Unsubscribe } from "./framework-server/socket.js";
 import { createSocketUpgradeHandler, openSocketSession, socketPathnamePrefix } from "./framework-server/upgrade.js";
@@ -363,6 +364,8 @@ export function createWorker<Env = Record<string, unknown>>(app: CloudflareApp<E
         return errorResponse(error, requestId);
       }
       const report = options.onError ?? ((error: unknown, requestId: string) => instance.reportError(error, requestId));
+      // The isolate's unhandled rejections reach the application, once per application.
+      watchIsolateErrors(instance, options.onError);
       const platform: ServerPlatform<Env> = { name: "cloudflare", env, waitUntil: (promise) => ctx.waitUntil(promise) };
       // Cloudflare's edge sets CF-Connecting-IP and replaces any value the client sends.
       setSocketAddress(request, request.headers.get("cf-connecting-ip") ?? undefined);

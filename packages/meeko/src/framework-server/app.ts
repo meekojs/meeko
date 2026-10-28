@@ -10,7 +10,8 @@ import type { AssetManifest, AssetReader } from "./assets.js";
 import { createRequestContext } from "./context.js";
 import type { RequestContext } from "./context.js";
 import { errorResponse, observeServerError, reportServerError } from "./contracts.js";
-import type { ServerErrorObserver } from "./contracts.js";
+import type { ServerErrorInfo, ServerErrorObserver } from "./contracts.js";
+import { registerProcessErrors, withRequestScope } from "./process-errors.js";
 import { createContextDispatcher, createLocalServerFetch, loadSocketChannels } from "./discovery.js";
 import type { ServerManifest } from "./discovery.js";
 import { composeServerMiddleware } from "./middleware.js";
@@ -227,8 +228,11 @@ export interface ServerApp {
   readonly manifest: AppManifest;
   /** Origen público con el que se comprueba `Origin`. */
   readonly publicOrigin?: string;
-  /** Envía un fallo del transporte al mismo observador que los fallos de las peticiones. */
-  reportError(error: unknown, requestId: string): void;
+  /**
+   * Envía un fallo del transporte al mismo observador que los fallos de las peticiones. Desde
+   * `1.3`, `info` identifica un fallo del proceso y llega al observador como tercer argumento.
+   */
+  reportError(error: unknown, requestId: string, info?: ServerErrorInfo): void;
   /**
    * Espera las tareas en segundo plano registradas en la plataforma de la aplicación, como las de
    * los callbacks de Socket, y después cierra las sesiones y los recursos del runtime.
@@ -242,7 +246,16 @@ export interface ServerApp {
  */
 export const renderPage: unique symbol = Symbol.for("meeko.server-app.render-page") as never;
 
-export type InternalServerApp = ServerApp & { readonly [renderPage]: (request: Request) => Promise<Response> };
+/**
+ * Renders app/error.meeko as the 404 document of a URL without a route, for any URL: the
+ * `404.html` of a static build. A failed render rejects like {@link renderPage}.
+ */
+export const renderNotFound: unique symbol = Symbol.for("meeko.server-app.render-not-found") as never;
+
+export type InternalServerApp = ServerApp & {
+  readonly [renderPage]: (request: Request) => Promise<Response>;
+  readonly [renderNotFound]: (request: Request) => Promise<Response>;
+};
 
 function markup(value: DocumentMarkup | undefined, context: { readonly request: Request; readonly nonce: string | undefined }): string {
   return typeof value === "function" ? value(context) : value ?? "";
@@ -389,10 +402,13 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
     // A prerendered page fails the build with its full error, so the default
     // observer's private one-line report is left out while one is rendered.
     const prerenderFailures = new AsyncLocalStorage<unknown[]>();
-    const reportError: ServerErrorObserver = (error, requestId) => {
+    const reportError: ServerErrorObserver = (error, requestId, info) => {
       const failures = prerenderFailures.getStore();
       failures?.push(error);
-      if (!failures || runtime.onError) hostObserver(error, requestId);
+      if (!failures || runtime.onError) {
+        if (info) hostObserver(error, requestId, info);
+        else hostObserver(error, requestId);
+      }
     };
     reportBackground = (error) => observeServerError(error, crypto.randomUUID(), reportError);
     const platformStore = new AsyncLocalStorage<ServerPlatform>();
@@ -452,6 +468,7 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
     };
     const pages = createPageHandler(options.prerender ? { ...pageOptions, prerendered: options.prerender } : pageOptions);
     const renderOnly = createPageHandler(pageOptions);
+    const notFoundOnly = createPageHandler({ ...pageOptions, notFoundOnly: true });
     const serverMiddleware: ServerMiddleware[] = manifest.serverMiddleware.map((key) => async (request, next) =>
       (await loadDefault<ServerMiddleware>(load, key, "server middleware"))(request, next));
     const serverHandlers = new Map((manifest.serverHandlers ?? []).map(({ route, file }) => [route, file]));
@@ -511,7 +528,16 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
           return errorResponse(error, requestId);
         }
       });
-      return platformStore.run(platform, () => socketHub ? withSocketHub(socketHub, handle) : handle());
+      // The request scope lets a process failure of this request's asynchronous work name it.
+      return withRequestScope(() => platformStore.run(platform, () => socketHub ? withSocketHub(socketHub, handle) : handle()));
+    };
+    const renderForBuild = async (handler: (request: Request) => Promise<Response>, request: Request, expected: number): Promise<Response> => {
+      const failures: unknown[] = [];
+      const response = await prerenderFailures.run(failures, () => run(basePlatform, () => handler(withPublicOrigin(request))));
+      if (response.status === expected || failures.length === 0) return response;
+      // The developer runs the build: the page's own error explains the failed render.
+      await response.body?.cancel();
+      throw failures[0];
     };
     const app: InternalServerApp = {
       fetch(request, platform = basePlatform) {
@@ -524,20 +550,16 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
           return decorated(normalized);
         });
       },
-      [renderPage]: async (request) => {
-        const failures: unknown[] = [];
-        const response = await prerenderFailures.run(failures, () => run(basePlatform, () => renderOnly(withPublicOrigin(request))));
-        if (response.status === 200 || failures.length === 0) return response;
-        // The developer runs the build: the page's own error explains the failed render.
-        await response.body?.cancel();
-        throw failures[0];
-      },
+      [renderPage]: (request) => renderForBuild(renderOnly, request, 200),
+      [renderNotFound]: (request) => renderForBuild(notFoundOnly, request, 404),
       manifest,
       ...(socket ? { socket } : {}),
       ...(publicOrigin ? { publicOrigin } : {}),
-      reportError: (error, requestId) => observeServerError(error, requestId, reportError),
+      reportError: (error, requestId, info) => observeServerError(error, requestId, reportError, info),
       close,
     };
+    // The policy of `processErrors` and the application's own observer, for the hosts that apply it.
+    registerProcessErrors(app, runtime.processErrors, runtime.onError);
     return app;
   } catch (error) {
     try { await close(); }

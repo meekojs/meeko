@@ -25,7 +25,7 @@ async function freePort(): Promise<number> {
 test("the dev watcher skips .meeko except the generated entries Vite serves", () => {
   const root = resolve("project");
   for (const path of [".meeko/check/x/tsconfig.json", ".meeko/routes/routes.d.ts", ".meeko/types/app/x.d.meeko.ts", ".meeko/output/public/index.html",
-    ".meeko/build/app-data.json", ".meeko/manifests/client.json", ".meeko/tsconfig.app.json", ".meeko/stale/install/package.json", "layers/base/.meeko/types/x.ts"]) {
+    ".meeko/build/app-data.json", ".meeko/manifests/client.json", ".meeko/styles/main.css", ".meeko/tsconfig.app.json", ".meeko/stale/install/package.json", "layers/base/.meeko/types/x.ts"]) {
     assert.ok(isDevWatchIgnored(join(root, path), root), path);
   }
   for (const path of [".meeko", ".meeko/generated", ".meeko/generated/entry-client.ts", "app/pages/index.meeko", "meeko.config.ts", "../elsewhere/.meeko/check/x.ts"]) {
@@ -294,6 +294,54 @@ test("meeko dev serves a page added or removed while it runs", { timeout: 60_000
   await writeFile(join(root, ".meeko", "check", "probe", "tsconfig.json"), "{}\n");
   await new Promise((done) => setTimeout(done, 300));
   assert.doesNotMatch(logs, /tsconfig file detected/);
+});
+
+test("meeko dev makes a file added to an imports.appDirs folder available", { timeout: 60_000 }, async (context) => {
+  let child: ChildProcess | undefined;
+  const root = await tempProject(context, "dev-import-dirs", () => stopChild(child));
+  const repository = repositoryRoot;
+  await initFrameworkProject(root);
+  await writeFile(join(root, "meeko.config.ts"), 'export default { imports: { appDirs: ["app/services"], sharedDirs: ["shared/validators"] } };\n');
+  await writeFile(join(root, "app", "pages", "priced.meeko"), '<script lang="ts">\nconst label = `${formatPrice(3)} ${isEmail("a@b.c")}`;\n</script>\n<template><p id="priced">{label}</p></template>\n');
+  await mkdir(join(root, "shared", "validators"), { recursive: true });
+  await writeFile(join(root, "shared", "validators", "email.ts"), 'export function isEmail(value: string): boolean { return value.includes("@"); }\n');
+  await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
+  await symlink(repository, join(root, "node_modules", "@meekojs", "meeko"), "junction");
+  await symlink(join(repository, "node_modules", "vite"), join(root, "node_modules", "vite"), "junction");
+  const port = await freePort();
+  const hmrPort = await freePort();
+  const origin = `http://127.0.0.1:${port}`;
+  const running = spawn(process.execPath, [join(repository, "dist", "cli.js"), "dev", root], {
+    cwd: root, env: { ...process.env, PORT: String(port), MEEKO_HMR_PORT: String(hmrPort) }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
+  });
+  child = running;
+  let logs = "";
+  running.stdout?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
+  running.stderr?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
+  await new Promise<void>((done, fail) => {
+    const start = Date.now();
+    const timer = setInterval(() => {
+      if (logs.includes(origin)) { clearInterval(timer); done(); }
+      else if (running.exitCode !== null) { clearInterval(timer); fail(new Error(logs)); }
+      else if (Date.now() - start > 20_000) { clearInterval(timer); fail(new Error(`Starter did not listen: ${logs}`)); }
+    }, 25);
+  });
+  const get = async (): Promise<{ status: number; html: string }> => {
+    const response = await fetch(`${origin}/priced`, { headers: { accept: "text/html" } });
+    return { status: response.status, html: await response.text() };
+  };
+  // Without the module, `formatPrice` is no autoimport and the page fails.
+  assert.notEqual((await get()).status, 200, logs);
+  await mkdir(join(root, "app", "services"), { recursive: true });
+  await writeFile(join(root, "app", "services", "price.ts"), "export function formatPrice(value: number): string { return `price-${value}`; }\n");
+  const start = Date.now();
+  let result = await get();
+  while (result.status !== 200 && Date.now() - start < 20_000) {
+    await new Promise((done) => setTimeout(done, 100));
+    result = await get();
+  }
+  assert.equal(result.status, 200, logs);
+  assert.match(result.html, /price-3 true/);
 });
 
 // Vite replaces its watcher when it restarts (a changed `.env`, `server.restart()`):

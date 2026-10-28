@@ -217,6 +217,15 @@ export class MeekoProject {
     return this.entries.get(pathKey(filename))?.component;
   }
 
+  /**
+   * Los `.meeko` del proyecto con su texto: el del editor si están abiertos, si no el guardado.
+   * Lo leen los índices que no necesitan el modelo, como el de clases CSS.
+   */
+  componentSources(): readonly { readonly filename: string; readonly source: string }[] {
+    this.scan();
+    return [...this.entries.values()];
+  }
+
   /** Error que impidió modelar un componente, por ejemplo HTML inválido. */
   componentError(filename: string): unknown {
     return this.entries.get(pathKey(filename))?.error;

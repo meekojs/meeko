@@ -1,5 +1,22 @@
+import type { ContentSecurityPolicy } from "../framework-server/csp.js";
 import type { DocumentConfig } from "./head.js";
 import type { MeekoModuleEntry } from "./module.js";
+
+/**
+ * Archivo de cabeceras que escribe el adaptador `static` en su salida: `"_headers"` es el formato
+ * de Netlify y Cloudflare Pages (`/_headers`); `"nginx"`, un archivo de directivas `add_header`
+ * en `/_meeko/headers.conf` para incluir con `include` en cada `location`.
+ *
+ * @since 1.3.0
+ * @example
+ * ```ts
+ * import type { StaticHeaderFile } from "@meekojs/meeko/framework";
+ *
+ * const files: StaticHeaderFile[] = process.env.NETLIFY ? ["_headers"] : ["nginx"];
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#sitio-estático
+ */
+export type StaticHeaderFile = "_headers" | "nginx";
 
 /**
  * Destino de ejecución de `meeko build`, una unión discriminada por `adapter`. Cada adaptador
@@ -49,10 +66,41 @@ export type MeekoServerConfig =
   | {
     /** Servidor Bun en `.meeko/output/bun/`. */
     readonly adapter: "bun";
+  }
+  | {
+    /**
+     * Sitio estático en `.meeko/output/static/`, sin servidor: los assets, `public/`, cada página
+     * prerenderizada como `<ruta>/index.html` con su payload `<ruta>/index.meeko.json` y
+     * `404.html` de `app/error.meeko`. Todas las páginas deben usar `render: "prerender"`, y la
+     * aplicación no puede tener API, RPC, Socket ni middleware de servidor.
+     * @since 1.3.0
+     */
+    readonly adapter: "static";
+    /**
+     * Política `Content-Security-Policy` de todas las páginas, por directiva. El build añade a
+     * `script-src` el hash SHA-256 de cada `<script>` en línea que ejecutan las páginas, y falla si
+     * una página tiene JavaScript que un hash no puede permitir (atributos `on*` o URL
+     * `javascript:`). Se escribe en `headerFiles`.
+     * @since 1.3.0
+     */
+    readonly contentSecurityPolicy?: ContentSecurityPolicy;
+    /**
+     * Otras cabeceras de todas las respuestas, como `Referrer-Policy` o `Permissions-Policy`. Se
+     * escriben en `headerFiles` después de la CSP.
+     * @since 1.3.0
+     */
+    readonly headers?: Readonly<Record<string, string>>;
+    /**
+     * Archivos de cabeceras para el hosting: `"_headers"` (Netlify, Cloudflare Pages) y `"nginx"`
+     * (`_meeko/headers.conf`). Por defecto, ninguno: el hosting configura sus cabeceras.
+     * @since 1.3.0
+     */
+    readonly headerFiles?: readonly StaticHeaderFile[];
   };
 
 /**
- * Nombre de un adaptador de build: `"node"`, `"cloudflare"`, `"deno"` o `"bun"`.
+ * Nombre de un adaptador de build: `"node"`, `"cloudflare"`, `"deno"`, `"bun"` o, desde `1.3`,
+ * `"static"`.
  *
  * @example
  * ```ts
@@ -62,6 +110,45 @@ export type MeekoServerConfig =
  * ```
  */
 export type MeekoAdapterName = MeekoServerConfig["adapter"];
+
+/**
+ * Opciones de `sitemap` en `meeko.config.ts`.
+ *
+ * @since 1.3.0
+ * @example
+ * ```ts
+ * import type { SitemapConfig } from "@meekojs/meeko/framework";
+ *
+ * const sitemap: SitemapConfig = { exclude: ["/admin", "/admin/*", "/borradores/*"] };
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#sitemapxml-y-robotstxt
+ */
+export interface SitemapConfig {
+  /**
+   * Rutas (`pathname`) que no se listan. `*` sustituye a cualquier secuencia de caracteres, `/`
+   * incluida: `"/admin/*"` excluye todo lo que hay bajo `/admin/`, pero no `/admin`.
+   */
+  readonly exclude?: readonly string[];
+}
+
+/**
+ * Opciones de `robots` en `meeko.config.ts`: las reglas para `User-agent: *`.
+ *
+ * @since 1.3.0
+ * @example
+ * ```ts
+ * import type { RobotsConfig } from "@meekojs/meeko/framework";
+ *
+ * const robots: RobotsConfig = { disallow: ["/admin/"] };
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#sitemapxml-y-robotstxt
+ */
+export interface RobotsConfig {
+  /** Prefijos permitidos (`Allow:`). Por defecto, `["/"]` si no hay `disallow`. */
+  readonly allow?: readonly string[];
+  /** Prefijos prohibidos (`Disallow:`). */
+  readonly disallow?: readonly string[];
+}
 
 /**
  * Configuración de proyecto de `meeko.config.ts`. Créela con {@link defineMeekoConfig}.
@@ -95,8 +182,35 @@ export interface MeekoConfig {
    * `app/pages`; esas carpetas siguen funcionando como layers en `1.x`, con un aviso (use `layers`).
    */
   readonly modules?: readonly MeekoModuleEntry[];
-  /** `serverDirs` añade directorios de autoimports exclusivos del servidor. */
-  readonly imports?: { readonly serverDirs?: readonly string[] };
+  /**
+   * Carpetas de autoimports además de las de por defecto, relativas a la raíz del proyecto y de
+   * cada layer. Cada carpeta toma el ámbito de la carpeta que la contiene, como las de por defecto.
+   */
+  readonly imports?: {
+    /**
+     * Carpetas dentro de `app/` cuyos exports se autoimportan con el ámbito de `app/`: en el
+     * navegador y en SSR (componentes, páginas y `.ts` de `app/`), no en `shared/` ni en `server/`.
+     * Sólo exports: los `.meeko` de estas carpetas no se registran como componentes.
+     * @since 1.3.0
+     * @example
+     * ```ts
+     * imports: { appDirs: ["app/services", "app/features/cart"] }
+     * ```
+     */
+    readonly appDirs?: readonly string[];
+    /**
+     * Carpetas dentro de `shared/` cuyos exports se autoimportan con el ámbito de `shared/`: en
+     * `app/`, en `server/` y en el propio `shared/`.
+     * @since 1.3.0
+     * @example
+     * ```ts
+     * imports: { sharedDirs: ["shared/validators"] }
+     * ```
+     */
+    readonly sharedDirs?: readonly string[];
+    /** Carpetas dentro de `server/` cuyos exports se autoimportan sólo en el código de servidor. */
+    readonly serverDirs?: readonly string[];
+  };
   /** Destino del servidor de producción. Por defecto, `{ adapter: "node" }`. */
   readonly server?: MeekoServerConfig;
   /**
@@ -116,6 +230,45 @@ export interface MeekoConfig {
    * @since 1.2.0
    */
   readonly document?: DocumentConfig;
+  /**
+   * Opciones de `meeko dev`; no afectan a `meeko build` ni a `meeko start`. `serverLogs: false`
+   * deja de reenviar a la consola del navegador lo que el código de servidor escribe con
+   * `console.log`, `info`, `warn`, `error` o `debug` mientras atiende una petición (activado por
+   * defecto). La terminal lo muestra igual en ambos casos.
+   * @since 1.3.0
+   * @example
+   * ```ts
+   * import { defineMeekoConfig } from "@meekojs/meeko/framework";
+   *
+   * export default defineMeekoConfig({ dev: { serverLogs: false } });
+   * ```
+   */
+  readonly dev?: {
+    /** Reenvía los logs del servidor a la consola del navegador en `meeko dev`. Por defecto, `true`. */
+    readonly serverLogs?: boolean;
+  };
+  /**
+   * URL pública del sitio, de la que sólo cuenta el origen (`https://example.com`, sin ruta). La
+   * usan `sitemap.xml`, `robots.txt` y, con `document.seo`, `<link rel="canonical">` y `og:url`.
+   * Sin ella se usa `MEEKO_PUBLIC_ORIGIN` del entorno del build. Se fija en el build; no cambia
+   * las comprobaciones de `Origin`, que siguen leyendo `MEEKO_PUBLIC_ORIGIN` o `publicOrigin` de
+   * `server/runtime.ts` al ejecutarse.
+   * @since 1.3.0
+   */
+  readonly site?: string;
+  /**
+   * Escribe `sitemap.xml` con las páginas prerenderizadas y las rutas sin parámetros, salvo las
+   * excluidas y las prerenderizadas con `<meta name="robots">` `noindex`. Necesita `site` o
+   * `MEEKO_PUBLIC_ORIGIN`.
+   * @since 1.3.0
+   */
+  readonly sitemap?: boolean | SitemapConfig;
+  /**
+   * Escribe `robots.txt` con las reglas de `User-agent: *` y, con `sitemap`, su URL absoluta. No
+   * puede convivir con un `public/robots.txt`.
+   * @since 1.3.0
+   */
+  readonly robots?: boolean | RobotsConfig;
 }
 
 /**
@@ -132,7 +285,11 @@ export interface MeekoConfig {
  * export default defineMeekoConfig({
  *   layers: ["./layers/base"],
  *   modules: ["@acme/seo"],
- *   imports: { serverDirs: ["server/services", "server/repositories"] },
+ *   imports: {
+ *     appDirs: ["app/services"],
+ *     sharedDirs: ["shared/validators"],
+ *     serverDirs: ["server/services", "server/repositories"],
+ *   },
  * });
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#layers

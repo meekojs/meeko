@@ -36,6 +36,8 @@ export interface RunningOutput {
   readonly origin: string;
   readonly output: string;
   readonly workerd?: WorkerdControls;
+  /** Exit code of the output's process (Node, Bun and Deno); `undefined` on workerd. */
+  readonly exited?: Promise<number | null>;
   logs(): string;
   stop(): Promise<void>;
 }
@@ -208,6 +210,7 @@ export async function startConformanceOutput(adapter: ConformanceAdapter): Promi
       cwd: root, env: { ...process.env, PORT: "0", MEEKO_HOST: "127.0.0.1", NO_COLOR: "1" }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
     });
     const running = child;
+    const exited = new Promise<number | null>((done) => running.once("exit", (code) => done(code)));
     running.stdout?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
     running.stderr?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
     const origin = await new Promise<string>((done, fail) => {
@@ -219,7 +222,7 @@ export async function startConformanceOutput(adapter: ConformanceAdapter): Promi
         else if (Date.now() - start > 30_000) { clearInterval(timer); fail(new Error(`${adapter} output did not listen: ${logs}`)); }
       }, 25);
     });
-    return { origin, output: result.output, logs: () => logs, stop };
+    return { origin, output: result.output, exited, logs: () => logs, stop };
   } catch (error) {
     await stop().catch(() => {});
     throw error;

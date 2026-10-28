@@ -434,6 +434,13 @@ test("meeko check types exports in the page, rejects misuse and checks usePage a
     const dated = await diagnosticsOf(userPage.replace("export const visits = hit();", "export const visits = hit();\nexport const when = new Date();\nexport const format = () => 1;"));
     assert.deepEqual(dated.map((item) => [item.code, item.text.slice(0, 6)]).sort(), [["TS2344", "format"], ["TS2344", "when =" ]], JSON.stringify(dated));
     assert.match(dated[0]!.message, /not serializable to JSON/);
+    // A TrustedHtml export keeps its brand in the template (the payload is JSON; the brand is only
+    // a type); a plain string export gets the MEEK107 warning.
+    const html = await diagnosticsOf(userPage
+      .replace('import { definePage } from "@meekojs/meeko/framework";', 'import { definePage } from "@meekojs/meeko/framework";\nimport { trustHtml } from "@meekojs/meeko";')
+      .replace("export const visits = hit();", 'export const visits = hit();\nexport const bio = trustHtml("<p>" + row.name + "</p>");\nexport const raw = "<p>" + row.name + "</p>";')
+      .replace("<template><h1>", '<template><div html="bio"></div><div html="raw"></div><h1>'));
+    assert.deepEqual(html.map((item) => [item.code, item.text.slice(0, 3)]), [["MEEK107", "raw"]], JSON.stringify(html));
     // A page that still declares data in its props is compared with the exports.
     const declared = (type: string) => userPage.replace("const label = signal(user.name);", `const props = defineProps<{ params: { id: number }; data: { user: { name: ${type} } } }>();\nconst label = signal(user.name);`);
     await writeFile(pageFile, declared("string"));

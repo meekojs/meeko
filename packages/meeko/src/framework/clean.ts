@@ -71,7 +71,8 @@ async function isFile(path: string): Promise<boolean> {
   catch { return false; }
 }
 
-async function isMeekoProject(root: string): Promise<boolean> {
+/** `meeko.config.*` in `root`, or a `package.json` there that depends on `@meekojs/meeko`. */
+export async function isMeekoProject(root: string): Promise<boolean> {
   for (const name of configFiles) if (await isFile(join(root, name))) return true;
   let manifest: unknown;
   try { manifest = JSON.parse(await readFile(join(root, "package.json"), "utf8")); }

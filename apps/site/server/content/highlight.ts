@@ -1,3 +1,5 @@
+import { trustHtml } from "@meekojs/meeko";
+import type { TrustedHtml } from "@meekojs/meeko";
 import { createHighlighterCore } from "shiki/core";
 import type { HighlighterCore, LanguageRegistration } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
@@ -103,11 +105,12 @@ const themeOptions = {
 
 /**
  * A synchronous highlighter, once the grammars are loaded: the HTML of a block with both themes as
- * CSS variables (`--shiki-light`, `--shiki-dark`), from which the stylesheet picks one.
+ * CSS variables (`--shiki-light`, `--shiki-dark`), from which the stylesheet picks one. It is trusted
+ * HTML: Shiki escapes the code and writes only its own `<pre>`, `<code>` and `<span>` markup.
  */
-export async function createHighlight(): Promise<(code: string, lang: string) => string> {
+export async function createHighlight(): Promise<(code: string, lang: string) => TrustedHtml> {
   const shiki = await load();
-  return (code, lang) => shiki.codeToHtml(code, { lang, ...themeOptions });
+  return (code, lang) => trustHtml(shiki.codeToHtml(code, { lang, ...themeOptions }));
 }
 
 /** A highlighted token: its text and the inline style with the colors of both themes. */

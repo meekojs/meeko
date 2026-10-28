@@ -1,11 +1,10 @@
-import postcss from "postcss";
-import selectorParser from "postcss-selector-parser";
 import { getCSSLanguageService } from "vscode-css-languageservice";
 import type { Color, ColorInformation, ColorPresentation } from "vscode-css-languageservice";
 import { getDefaultHTMLDataProvider, getLanguageService as getHtmlLanguageService } from "vscode-html-languageservice";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { CompletionItemKind, DiagnosticSeverity, DiagnosticTag, InsertTextFormat } from "vscode-languageserver/node";
-import type { CompletionItem, CompletionList, Diagnostic, Hover, Location, MarkupContent, Position, Range } from "vscode-languageserver/node";
+import type { CompletionItem, CompletionList, Diagnostic, Hover, MarkupContent, Position, Range } from "vscode-languageserver/node";
+import { cssClassRules } from "./class-rules.js";
 
 // HTML of the template and CSS of `<style>`, outside the TypeScript model: what the editor offers
 // while writing markup and styles. Every function reads the text, so it works while a tag or a
@@ -242,59 +241,8 @@ export interface StyleClass {
 export function styleClasses(source: string): StyleClass[] {
   const style = styleRegion(source);
   if (!style) return [];
-  let root: postcss.Root;
-  try { root = postcss.parse(source.slice(style.contentStart, style.contentEnd)); }
-  catch { return []; }
-  const found: StyleClass[] = [];
-  root.walkRules((rule) => {
-    const base = rule.source?.start?.offset;
-    if (base === undefined) return;
-    try {
-      selectorParser((selectors) => {
-        selectors.walkClasses((node) => {
-          let global = false;
-          for (let parent = node.parent; parent; parent = parent.parent) {
-            if (parent.type === "pseudo" && parent.value === ":global") global = true;
-          }
-          const start = style.contentStart + base + (node.sourceIndex ?? 0);
-          found.push({ name: node.value, start, end: start + node.value.length + 1, global });
-        });
-      }).processSync(rule.selector);
-    } catch { /* A selector being typed. */ }
-  });
-  return found;
-}
-
-/** Inside `class="…"` of an element: the classes that `<style>` defines. */
-export function classCompletion(document: TextDocument, position: Position): CompletionItem[] | undefined {
-  const source = document.getText();
-  const offset = document.offsetAt(position);
-  const context = tagAt(source, offset);
-  if (!context?.value || context.value.attribute !== "class") return undefined;
-  const word = /[\w-]*$/.exec(source.slice(context.value.start, offset))![0];
-  const written = new Set(source.slice(context.value.start, offset - word.length).split(/\s+/));
-  const start = document.positionAt(offset - word.length);
-  const names = [...new Set(styleClasses(source).map((entry) => entry.name))].filter((name) => !written.has(name));
-  return names.map((name): CompletionItem => ({
-    label: name, kind: CompletionItemKind.Value, detail: "<style>",
-    textEdit: { range: { start, end: position }, newText: name },
-  }));
-}
-
-/** From a class in `class="…"` to its selectors in `<style>`. */
-export function classDefinition(document: TextDocument, position: Position): Location[] | undefined {
-  const source = document.getText();
-  const offset = document.offsetAt(position);
-  const context = tagAt(source, offset);
-  if (!context?.value || context.value.attribute !== "class") return undefined;
-  const before = /[\w-]*$/.exec(source.slice(context.value.start, offset))![0];
-  const after = /^[\w-]*/.exec(source.slice(offset))![0];
-  const name = before + after;
-  if (!name) return undefined;
-  const targets = styleClasses(source).filter((entry) => entry.name === name);
-  return targets.length
-    ? targets.map((entry) => ({ uri: document.uri, range: { start: document.positionAt(entry.start), end: document.positionAt(entry.end) } }))
-    : undefined;
+  return (cssClassRules(source.slice(style.contentStart, style.contentEnd), style.contentStart) ?? [])
+    .map((rule) => ({ name: rule.name, start: rule.start, end: rule.end, global: rule.global }));
 }
 
 /**

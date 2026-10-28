@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { TextDocument } from "vscode-languageserver-textdocument";
+import { classCompletion, classDefinition } from "../src/language-server/classes.ts";
 import {
-  classCompletion, classDefinition, cssCompletion, cssHover, documentColors, hoverText, htmlCompletion, htmlHover,
-  linkedEditingRanges, styleClasses, styleDiagnostics, tagCompletion,
+  cssCompletion, cssHover, documentColors, hoverText, htmlCompletion, htmlHover, linkedEditingRanges, styleClasses, styleDiagnostics, tagCompletion,
 } from "../src/language-server/embedded.ts";
 
 /** A component and the position of `|` in it. */

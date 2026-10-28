@@ -41,6 +41,7 @@ async function prerenderSource(): Promise<PrerenderSource | undefined> {
 /** Bun adapter entry; \`meeko build --adapter bun\` bundles it to .meeko/output/bun/index.js. */
 export const bunEntrySource = `import { createBunAssetReader, createBunServer } from "@meekojs/meeko/bun";
 import { meekoEnv } from "@meekojs/meeko/internal";
+import { handleProcessErrors } from "@meekojs/meeko/server";
 import type { PrerenderSource, PrerenderedPage } from "@meekojs/meeko/server";
 import { createApp, load, manifest } from "./entry-server.ts";
 
@@ -96,6 +97,8 @@ export async function start() {
   };
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);
+  // Rejections and exceptions outside a request follow processErrors of server/runtime.ts.
+  handleProcessErrors(app, { close: async () => { try { await server.stop(); } finally { await app.close(); } } });
   return server;
 }
 

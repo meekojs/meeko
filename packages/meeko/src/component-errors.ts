@@ -1,10 +1,13 @@
-import { logClientError, observeCallback } from "./error-observer.js";
+import { logClientError, markingObserver, observeCallback } from "./error-observer.js";
 import { createContext, findContext, onCleanup, provide, provideAsyncFailureReporter } from "./reactivity.js";
 
 /**
  * Dónde se observó un fallo del navegador: un handler `on:` (`"event"`), un `effect`, una
  * limpieza, `onMounted` o la continuación de un setup con `await` (`"mounted"`, desde 1.1), la
- * navegación o un cliente Socket. Puede ganar miembros en un minor: un `switch` exhaustivo
+ * navegación o un cliente Socket. Desde 1.3, en una aplicación montada, también una excepción no
+ * capturada (`"uncaught"`, el evento `error` de `window`) o una promesa rechazada sin manejar
+ * (`"rejection"`, el evento `unhandledrejection`) del código que no pasa por Meeko, como un
+ * `setTimeout` o una librería. Puede ganar miembros en un minor: un `switch` exhaustivo
  * necesita rama por defecto.
  *
  * @example
@@ -21,7 +24,7 @@ import { createContext, findContext, onCleanup, provide, provideAsyncFailureRepo
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#componentes-meeko
  */
-export type ErrorSource = "event" | "effect" | "cleanup" | "mounted" | "navigation" | "socket";
+export type ErrorSource = "event" | "effect" | "cleanup" | "mounted" | "navigation" | "socket" | "uncaught" | "rejection";
 
 /**
  * Observador de fallos de la raíz actual y sus descendientes. `error` es `unknown`: refínelo antes
@@ -53,7 +56,9 @@ export interface AppErrorChannel {
 }
 
 /** A private observer registry owned by one mounted browser application. */
-export function createAppErrorChannel(onError?: ComponentErrorHandler): AppErrorChannel {
+export function createAppErrorChannel(observer?: ComponentErrorHandler): AppErrorChannel {
+  // What reaches the application observer is not reported again if it escapes to `window`.
+  const onError = observer && markingObserver(observer);
   const handlers: Array<{ handler: ComponentErrorHandler }> = [];
   const resources = new Set<() => void>();
   return {
@@ -118,11 +123,13 @@ export function currentAppErrorChannel(): AppErrorChannel | undefined {
  * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#componentes-meeko
  */
 export function provideErrorHandler(handler: ComponentErrorHandler): void {
-  provide(errorHandlerKey, handler);
-  provideAsyncFailureReporter(handler);
+  // What reaches this observer is not reported again if it escapes to `window`.
+  const observer = markingObserver(handler);
+  provide(errorHandlerKey, observer);
+  provideAsyncFailureReporter(observer);
   const channel = findContext(appErrorChannelKey);
   if (channel) {
-    onCleanup(channel.register(handler));
+    onCleanup(channel.register(observer));
   }
 }
 

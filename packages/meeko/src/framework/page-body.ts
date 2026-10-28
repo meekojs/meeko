@@ -31,7 +31,10 @@ export interface PageRequest<P = Readonly<Record<string, string>>, S = Readonly<
   readonly search: S;
   /** Petición HTTP original. */
   readonly request: Request;
-  /** Contexto de la petición de `createServerApp`: sesión, servicios y plataforma. */
+  /**
+   * Contexto de la petición de `createServerApp`: sesión, servicios y plataforma. Con
+   * `createFrameworkHandler` sin `createContext`, leerlo lanza un error.
+   */
   readonly context: RequestContext;
   /** Se aborta si el cliente se desconecta, se revoca la sesión o se cancela la respuesta. */
   readonly signal: AbortSignal;
@@ -66,8 +69,9 @@ export type PageRequestOf<Route, Id extends string = string> = PageRequest<
 >;
 
 /**
- * Tipo de `export const head` en el código de nivel superior de un `<script server>`: el `title` y la
- * `description` de la página, o una función que los devuelve. No llega al navegador como dato.
+ * Tipo de `export const head` en el código de nivel superior de un `<script server>`: el head de la
+ * página ({@link PageHead}: `title`, `description` y, desde `1.2`, las etiquetas de `useHead`), o una
+ * función sin argumentos que lo devuelve. No llega al navegador como dato.
  *
  * @since 1.1.0
  * @example
@@ -193,7 +197,8 @@ function activePage(name: string): PageRequest<unknown, unknown> {
  * ID de la ruta.
  *
  * @returns La {@link PageRequest} en curso.
- * @throws {Error} `MEEK073` si se llama fuera de ese código, por ejemplo en un `load`.
+ * @throws {Error} `MEEK073` si se llama fuera de ese código, por ejemplo en un `load`. En el `<script>`
+ * o la plantilla del componente, `MEEK073` es un error de compilación.
  * @since 1.1.0
  * @example
  * ```html

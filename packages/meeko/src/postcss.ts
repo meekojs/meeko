@@ -13,6 +13,7 @@ export { defineUtilities, meekoUtilities, meekoUtilities as default } from "./po
 export type {
   MeekoUtilitiesOptions,
   UtilityAtRule,
+  UtilityAtRuleDeclarations,
   UtilityCss,
   UtilityDeclarations,
   UtilityFunction,

@@ -41,8 +41,8 @@ test("an unknown command names the command before the usage and fails", () => {
 
 test("meeko --help lists build adapters and preview", () => {
   const result = cli("--help");
-  assert.match(result.stdout, /meeko build \[directorio\] \[--adapter <node\|cloudflare\|deno\|bun>\]/);
-  assert.match(result.stdout, /meeko preview \[directorio\] \[--adapter <node\|cloudflare\|bun\|deno>\]/);
+  assert.match(result.stdout, /meeko build \[directorio\] \[--adapter <node\|cloudflare\|deno\|bun\|static>\]/);
+  assert.match(result.stdout, /meeko preview \[directorio\] \[--adapter <node\|cloudflare\|bun\|deno\|static>\]/);
 });
 
 test("meeko build rejects unknown adapters before building", async () => {
@@ -50,7 +50,7 @@ test("meeko build rejects unknown adapters before building", async () => {
   try {
     const unknown = cli("build", root, "--adapter", "lambda");
     assert.equal(unknown.status, 1);
-    assert.match(unknown.stderr, /Adaptador desconocido: lambda; usa node, cloudflare, deno o bun/);
+    assert.match(unknown.stderr, /Adaptador desconocido: lambda; usa node, cloudflare, deno, bun o static/);
     const missing = cli("build", root, "--adapter");
     assert.equal(missing.status, 1);
     assert.match(missing.stderr, /^Falta el nombre del adaptador en --adapter de build\n\nUso: meeko dev/);

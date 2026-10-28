@@ -1,16 +1,20 @@
+import { trustHtml } from "@meekojs/meeko";
+import type { TrustedHtml } from "@meekojs/meeko";
+
 /** A section of a page that matches the query. */
 export interface SearchSection {
   readonly url: string;
   readonly title: string;
   /** HTML from Pagefind: the escaped text of the page with `<mark>` around the matches. */
-  readonly excerpt: string;
+  readonly excerpt: TrustedHtml;
 }
 
 /** A page that matches the query, with its best sections. */
 export interface SearchResult {
   readonly url: string;
   readonly title: string;
-  readonly excerpt: string;
+  /** HTML from Pagefind, as in {@link SearchSection}. */
+  readonly excerpt: TrustedHtml;
   readonly sections: readonly SearchSection[];
 }
 
@@ -52,6 +56,15 @@ export function preloadSearch(): void {
   load().catch(() => {});
 }
 
+/**
+ * An excerpt of Pagefind as trusted HTML. The index is built by `postbuild` from the prerendered
+ * pages of this site, never from visitors, and Pagefind escapes `<` and `>` of the indexed text
+ * before it adds the `<mark>` around the matches, so the query itself never becomes markup.
+ */
+function excerptHtml(excerpt: string): TrustedHtml {
+  return trustHtml(excerpt);
+}
+
 /** The first `limit` pages that match `query`, with up to three sections each. */
 export async function searchDocs(query: string, limit = 8): Promise<SearchResult[]> {
   const engine = await load();
@@ -60,11 +73,11 @@ export async function searchDocs(query: string, limit = 8): Promise<SearchResult
   return pages.map((page) => ({
     url: siteUrl(page.url),
     title: page.meta?.title ?? siteUrl(page.url),
-    excerpt: page.excerpt,
+    excerpt: excerptHtml(page.excerpt),
     sections: (page.sub_results ?? [])
       // The first section is often the page heading itself.
       .filter((section) => siteUrl(section.url) !== siteUrl(page.url) && section.title !== page.meta?.title)
       .slice(0, 3)
-      .map((section) => ({ url: siteUrl(section.url), title: section.title, excerpt: section.excerpt })),
+      .map((section) => ({ url: siteUrl(section.url), title: section.title, excerpt: excerptHtml(section.excerpt) })),
   }));
 }

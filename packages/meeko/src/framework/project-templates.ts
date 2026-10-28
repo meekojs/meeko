@@ -45,6 +45,13 @@ await mountClientApp({
 performance.measure("meeko-hydration", { start: hydrationStart, end: performance.now() });
 `;
 
+/**
+ * The client entry of the static adapter: navigation reads each page's payload file,
+ * `<path>/index.meeko.json`, because a static host does not negotiate `Accept`.
+ */
+export const staticClientEntrySource = clientEntrySource.replace("serverData: true,", 'serverData: "static",');
+if (staticClientEntrySource === clientEntrySource) throw new Error("The static client entry template lost its serverData option");
+
 /** Adapter-neutral application entry: the baked manifest plus its module map. */
 export const serverEntrySource = `import { createServerApp, type ServerApp, type ServerAppOptions } from "@meekojs/meeko/server";
 import { appName, load, loadRedis, manifest, plugins, runtime } from "virtual:meeko-server-app";

@@ -179,3 +179,40 @@ test("Socket contracts accept shared schemas reached through autoimports", async
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("meeko check sees imports.appDirs in components and imports.sharedDirs in server/, each in its scope", { timeout: 180_000 }, async () => {
+  const pageWith = (script: string) => `<script lang="ts">\n${script}\n</script>\n<template><p>{label}</p></template>\n`;
+  const root = await project("check-import-dirs-", {
+    "meeko.config.ts": 'export default { imports: { appDirs: ["app/services"], sharedDirs: ["shared/validators"] } };\n',
+    "app/services/price.ts": "export function formatPrice(value: number): string { return `$${value.toFixed(2)}`; }\n",
+    "app/services/secret.server.ts": "export function readSecret(): string { return \"secret\"; }\n",
+    "shared/validators/email.ts": "export function isEmail(value: string): boolean { return /^[^@\s]+@[^@\s]+$/.test(value); }\n",
+    "app/pages/index.meeko": pageWith('const label: string = `${formatPrice(3)} ${isEmail("a@b.c")}`;'),
+    "shared/schemas/signup.ts": [
+      "export const signupResult = { \"~standard\": {",
+      "  version: 1 as const, vendor: \"test\", validate: (value: unknown) => ({ value: value as { valid: boolean } }),",
+      "  types: undefined as unknown as { input: { valid: boolean }; output: { valid: boolean } },",
+      "} };",
+      "",
+    ].join("\n"),
+    "server/api/signup.post.ts": 'export default defineApiRoute({ response: signupResult, handler: () => ({ valid: isEmail("a@b.c") }) });\n',
+  });
+  try {
+    await checkFrameworkProject(root);
+
+    // An app/ folder is not available to shared/.
+    const shared = join(root, "shared", "utils", "total.ts");
+    await mkdir(dirname(shared), { recursive: true });
+    await writeFile(shared, "export const total: string = formatPrice(1);\n");
+    await assert.rejects(checkFrameworkProject(root), /shared[\/]utils[\/]total\.ts.*TS2304.*formatPrice/s);
+    await rm(shared);
+
+    // A `.server.ts` module of an app/ folder is server-only: MEEK108 in a component.
+    await writeFile(join(root, "app", "pages", "index.meeko"), pageWith("const label: string = readSecret();"));
+    const diagnostics = await checkApp(root);
+    assert.deepEqual(diagnostics.map((item) => item.code), ["MEEK108"]);
+    assert.match(diagnostics[0]!.message, /readSecret viene de .*secret\.server\.ts/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

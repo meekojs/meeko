@@ -1,4 +1,4 @@
-import { dirname, relative } from "node:path";
+import { dirname, isAbsolute, join, relative } from "node:path";
 import ts from "@typescript/typescript6";
 import { getCSSLanguageService } from "vscode-css-languageservice";
 import { getLanguageService as getHtmlLanguageService } from "vscode-html-languageservice";
@@ -14,6 +14,7 @@ import type {
 import { autoImportedValues } from "../autoimports.js";
 import type { AutoImport } from "../autoimports.js";
 import { shadowedBuiltinTags } from "../compiler.js";
+import { serverOnlyCompletion } from "../compiler/client-boundary.js";
 import { parseSfc } from "../compiler/sfc.js";
 import type { SfcSection } from "../compiler/sfc.js";
 import { eachKeyActions, sidecarActions } from "./actions.js";
@@ -482,7 +483,17 @@ export function completionList(base: FeatureContext, position: Position, trigger
   if (triggerCharacter && !("triggerCharacter" in trigger)) return undefined;
   const result = context.project.service.getCompletionsAtPosition(context.component.virtualFilename, offset, { ...userPreferences, ...trigger });
   if (!result) return undefined;
-  return list(result.entries.map((entry) => {
+  // The script and template of a component outside server/ also run in the browser: no server
+  // APIs and no route options there (MEEK108, MEEK073, MEEK109). `<script server>` keeps them all.
+  const serverDirectories = context.project.sourceRoots().map((root) => join(root, "server"));
+  const browser = context.component === base.component && !serverDirectories.some((directory) => {
+    const path = relative(directory, context.component.filename);
+    return !path.startsWith("..") && !isAbsolute(path);
+  });
+  const entries = browser
+    ? result.entries.filter((entry) => ![entry.source, entry.data?.moduleSpecifier, entry.data?.fileName].some((module) => serverOnlyCompletion(entry.name, module, serverDirectories)))
+    : result.entries;
+  return list(entries.map((entry) => {
     const item: CompletionItem = { label: entry.name, kind: completionKind(entry.kind), sortText: entry.sortText };
     if (entry.insertText !== undefined) item.insertText = entry.insertText;
     if (entry.filterText !== undefined) item.filterText = entry.filterText;

@@ -382,6 +382,38 @@ export class ClientError extends Error {
   }
 }
 
+/** Brand of `ClientError`; `Symbol.for` so two copies of Meeko in one page recognize each other's. */
+const clientErrorBrand: unique symbol = Symbol.for("meeko.client-error") as never;
+Object.defineProperty(ClientError.prototype, clientErrorBrand, { value: true });
+
+/**
+ * Comprueba si `error` es un {@link ClientError} y, con `code`, si tiene ese código. Sirve en los
+ * observadores de errores, que reciben `unknown`, y reconoce también el `ClientError` de otra copia
+ * de Meeko en la misma página, donde `instanceof` falla.
+ *
+ * @param error Valor que se comprueba, como el `error` de `onError`.
+ * @param code Código esperado, como `UNAUTHENTICATED` o `NOT_FOUND`; sin él, cualquier código.
+ * @returns `true` si es un `ClientError` con ese código.
+ * @since 1.3.0
+ * @example
+ * ```ts
+ * import { isClientError, mountClientApp } from "@meekojs/meeko/framework";
+ *
+ * await mountClientApp({
+ *   ...options,
+ *   onError(error, source) {
+ *     if (isClientError(error, "UNAUTHENTICATED")) location.assign("/login");
+ *     else if (isClientError(error)) console.warn(source, error.code, error.requestId);
+ *     else console.error(source, error);
+ *   },
+ * });
+ * ```
+ */
+export function isClientError<const Code extends string = string>(error: unknown, code?: Code): error is ClientError & { readonly code: Code } {
+  if (!(error instanceof ClientError) && !(typeof error === "object" && error !== null && (error as { [clientErrorBrand]?: unknown })[clientErrorBrand] === true)) return false;
+  return code === undefined || (error as ClientError).code === code;
+}
+
 /**
  * Opciones de transporte de los clientes de API y RPC y de los composables de datos. Las que
  * aceptan una función la evalúan en cada petición.

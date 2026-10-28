@@ -68,7 +68,8 @@ let mutable = 1;
 '@
   Set-Content -LiteralPath (Join-Path $consumer 'answer.ts') -Encoding utf8 -Value 'export const answer = "ok";'
   Set-Content -LiteralPath (Join-Path $consumer 'Imported.meeko') -Encoding utf8 -Value '<script lang="ts">import { answer } from "./answer.js"; const text: string = answer;</script><template>{text}</template>'
-  New-Item -ItemType Directory -Path (Join-Path $consumer 'app/pages'), (Join-Path $consumer 'app/layouts') -Force | Out-Null
+  New-Item -ItemType Directory -Path (Join-Path $consumer 'app/pages'), (Join-Path $consumer 'app/layouts'), (Join-Path $consumer 'app/styles') -Force | Out-Null
+  Set-Content -LiteralPath (Join-Path $consumer 'app/styles/main.css') -Encoding utf8 -Value '.btn-primary { color: white; background: navy; }'
   Set-Content -LiteralPath (Join-Path $consumer 'app/pages/index.meeko') -Encoding utf8 -Value '<script lang="ts"></script><template><p>Home</p></template>'
   Set-Content -LiteralPath (Join-Path $consumer 'contract-data.ts') -Encoding utf8 -Value 'export type Data = string;'
   Set-Content -LiteralPath (Join-Path $consumer 'app/pages/dependent.meeko') -Encoding utf8 -Value '<script lang="ts">const props = defineProps<{ data: string }>();</script><template><p>{props.data}</p></template>'

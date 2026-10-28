@@ -11,6 +11,7 @@ import type { RouteRecord } from "./router.js";
 import { DOCUMENT_HEAD_PREFIX } from "./server.js";
 import { loadConfiguredModules } from "./config.js";
 import type { PageRoute } from "./server.js";
+import { inlineScriptHashes } from "./script-hashes.js";
 
 /**
  * Opciones de {@link prerenderRoutes}.
@@ -69,10 +70,19 @@ export interface PrerenderIndex {
   /** Versión del formato. */
   readonly version: 1;
   /**
-   * Páginas por ruta: archivo HTML, posición donde se inserta la meta CSRF, `ETag` y, si existe,
-   * el payload de navegación `index.meeko.json`.
+   * Páginas por ruta: archivo HTML, posición donde se inserta la meta CSRF, `ETag`, si existe, el
+   * payload de navegación `index.meeko.json` y, desde `1.3`, `scriptHashes`: las fuentes CSP
+   * `'sha256-…'` de los scripts en línea que ejecuta la página (véase `inlineScriptHashes`), para
+   * construir su `Content-Security-Policy` con `contentSecurityPolicy`. Un índice escrito por una
+   * versión anterior no tiene `scriptHashes`.
    */
-  readonly pages: Readonly<Record<string, { readonly file: string; readonly headOffset: number; readonly etag: string; readonly payload?: string }>>;
+  readonly pages: Readonly<Record<string, {
+    readonly file: string;
+    readonly headOffset: number;
+    readonly etag: string;
+    readonly payload?: string;
+    readonly scriptHashes?: readonly string[];
+  }>>;
 }
 
 function hasParams(id: string): boolean {
@@ -222,7 +232,10 @@ export async function prerenderRoutes(options: PrerenderOptions): Promise<string
       payload = [...parts, "index.meeko.json"].join("/");
       await writeFile(resolve(outputRoot, ...parts, "index.meeko.json"), navigationPayload, "utf8");
     }
-    pages[pathname] = { file, headOffset: headOffset(pathname, html), etag: contentTag(html), ...(payload ? { payload } : {}) };
+    pages[pathname] = {
+      file, headOffset: headOffset(pathname, html), etag: contentTag(html), ...(payload ? { payload } : {}),
+      scriptHashes: inlineScriptHashes(html).hashes,
+    };
   }
   const index: PrerenderIndex = { version: 1, pages };
   await writeFile(join(outputRoot, "manifest.json"), serializeJson(index) + "\n", "utf8");

@@ -395,7 +395,8 @@ test("module setup and server plugins never reach the client bundle", { timeout:
   // The page imports it (a client module of the project), or a module file outside the project does.
   const serverOnly = (file: string): RegExp => new RegExp(`imports server-only module \\S*${file}|Server-only module reached the client bundle: \\S*${file}`);
   for (const [specifier, error] of [
-    ["../../modules/hello/runtime/stats.server.ts", serverOnly("stats\\.server\\.ts")],
+    // A `*.server.*` import in a component is MEEK108 before the bundle boundary sees it.
+    ["../../modules/hello/runtime/stats.server.ts", /MEEK108: \.\.\/\.\.\/modules\/hello\/runtime\/stats\.server\.ts es un módulo de servidor/],
     ["../../modules/hello/runtime/header.ts", serverOnly("header\\.ts")],
     ["../../modules/hello/runtime/stats-handler.ts", serverOnly("stats-handler\\.ts")],
     ["../../modules/hello/index.ts", /Meeko module setup reached the client bundle: \S*index\.ts/],

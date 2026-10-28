@@ -93,6 +93,15 @@ exports.run = async function run() {
   const completions = await vscode.commands.executeCommand("vscode.executeCompletionItemProvider", uri, document.positionAt(use + "count.".length));
   assert.ok(completions.items.some((item) => item.label === "value"), "Completado de señal");
 
+  // Clases en class="…": las del <style> propio y las de app/styles/main.css, con la regla al resolver.
+  const classPosition = document.positionAt(source.indexOf('class="counter"') + 'class="'.length);
+  const classes = await vscode.commands.executeCommand("vscode.executeCompletionItemProvider", uri, classPosition, undefined, 20);
+  const labelOf = (item) => typeof item.label === "string" ? item.label : item.label.label;
+  const globalClass = classes.items.find((item) => labelOf(item) === "btn-primary");
+  assert.ok(globalClass && classes.items.some((item) => labelOf(item) === "counter"), `Completado de clases: ${classes.items.map(labelOf).join(", ")}`);
+  assert.equal(globalClass.detail, "main.css (global)");
+  assert.match(String(globalClass.documentation?.value ?? globalClass.documentation ?? ""), /\.btn-primary \{/, "Documentación con la regla de la clase");
+
   const references = await vscode.commands.executeCommand("vscode.executeReferenceProvider", uri, position);
   assert.ok(references.filter((item) => item.uri.toString() === uri.toString()).length >= 3, `Referencias en script y plantilla: ${references.length}`);
 

@@ -10,7 +10,7 @@ Este proyecto está dedicado a mi gatita Meeko. Su carita inspira el logo que lo
 
 El código se distribuye bajo la [licencia MIT](https://github.com/meekojs/meeko/blob/main/LICENSE). El paquete público se llama `@meekojs/meeko`; la CLI se invoca como `meeko` y el plugin de Vite se importa desde `@meekojs/meeko/vite`.
 
-A partir de 1.0, Meeko sigue SemVer. La [política de estabilidad](https://github.com/meekojs/meeko/blob/main/docs/stability.md) define qué es API pública: subrutas, CLI, convenciones de archivos y formatos de red. También fija cómo se depreca una API y qué entornos se admiten. La [guía de migración](https://github.com/meekojs/meeko/blob/main/docs/migration-1.0.md) explica cómo actualizar desde `0.1.0`, y [Actualizar de 1.0 a 1.1](https://github.com/meekojs/meeko/blob/main/docs/migration-1.1.md) recoge los cambios de comportamiento de `1.1`, y [Actualizar de 1.1 a 1.2](https://github.com/meekojs/meeko/blob/main/docs/migration-1.2.md), los de `1.2`.
+A partir de 1.0, Meeko sigue SemVer. La [política de estabilidad](https://github.com/meekojs/meeko/blob/main/docs/stability.md) define qué es API pública: subrutas, CLI, convenciones de archivos y formatos de red. También fija cómo se depreca una API y qué entornos se admiten. La [guía de migración](https://github.com/meekojs/meeko/blob/main/docs/migration-1.0.md) explica cómo actualizar desde `0.1.0`, y [Actualizar de 1.0 a 1.1](https://github.com/meekojs/meeko/blob/main/docs/migration-1.1.md) recoge los cambios de comportamiento de `1.1`; [Actualizar de 1.1 a 1.2](https://github.com/meekojs/meeko/blob/main/docs/migration-1.2.md), los de `1.2`, y [Actualizar de 1.2 a 1.3](https://github.com/meekojs/meeko/blob/main/docs/migration-1.3.md), los de `1.3`.
 
 - [Arquitectura y contratos](https://github.com/meekojs/meeko/blob/main/docs/architecture.md)
 - [API del motor de componentes](https://github.com/meekojs/meeko/blob/main/docs/api.md)
@@ -19,6 +19,7 @@ A partir de 1.0, Meeko sigue SemVer. La [política de estabilidad](https://githu
 - [Migrar de 0.1.0 a 1.0](https://github.com/meekojs/meeko/blob/main/docs/migration-1.0.md)
 - [Actualizar de 1.0 a 1.1](https://github.com/meekojs/meeko/blob/main/docs/migration-1.1.md)
 - [Actualizar de 1.1 a 1.2](https://github.com/meekojs/meeko/blob/main/docs/migration-1.2.md)
+- [Actualizar de 1.2 a 1.3](https://github.com/meekojs/meeko/blob/main/docs/migration-1.3.md)
 - [Editores y servidor de lenguaje](https://github.com/meekojs/meeko/blob/main/docs/editors.md)
 - [Plan de desarrollo](https://github.com/meekojs/meeko/blob/main/docs/roadmap.md)
 - [Comparativa reproducible con Vue](https://github.com/meekojs/meeko/blob/main/docs/benchmarks.md)
@@ -96,7 +97,7 @@ Cada script tiene su función:
 
 - `check` genera los contratos y comprueba los tipos.
 - `build` produce en `.meeko/output/node/` el cliente, el servidor Node y las páginas prerenderizadas, que se ejecutan sin las fuentes de la aplicación.
-- `meeko build --adapter bun`, `--adapter deno` o `--adapter cloudflare` generan en su lugar una salida autónoma para Bun, Deno o Cloudflare Workers.
+- `meeko build --adapter bun`, `--adapter deno` o `--adapter cloudflare` generan en su lugar una salida autónoma para Bun, Deno o Cloudflare Workers, y `--adapter static` (desde `1.3`) un sitio de archivos prerenderizados para un hosting estático.
 - `start` sirve SSR de producción con Node 24 y requiere configurar sesiones persistentes en `server/runtime.ts`.
 - `meeko clean` borra todo lo que genera Meeko (`.meeko/` y la caché de Vite); `meeko clean --all` también borra `node_modules`. `--dry-run` muestra qué borraría sin tocar nada.
 

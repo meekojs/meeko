@@ -7,6 +7,8 @@ import type { BuiltinEntry } from './api-builtins.js'
 import { apiGroups, groupHref, referenceHref } from './api-groups.js'
 import type { ApiGroup } from './api-groups.js'
 import { catalog } from './catalog.js'
+import { trustHtml } from '@meekojs/meeko'
+import type { TrustedHtml } from '@meekojs/meeko'
 import { blockLanguage, createTokenizer } from './highlight.js'
 import type { HighlightedToken } from './highlight.js'
 import { codeBlockHtml, documentHeadings, escapeHtml, renderFragment, renderInline, rewriteHref } from './markdown.js'
@@ -975,8 +977,11 @@ function builtinModel(entry: BuiltinEntry, target: Target, docs: SourceDocs): Sy
 
 let tokenizer: Promise<(code: string, lang: string) => HighlightedToken[][]> | undefined
 
-/** Highlighted `<pre>` of code, with the names in `links` as links to their pages. */
-async function highlightCode(code: string, lang: string, links: ReadonlyMap<string, string>, context?: 'interface' | 'class'): Promise<string> {
+/**
+ * Highlighted `<pre>` of code, with the names in `links` as links to their pages. Trusted HTML: the
+ * code comes from the package, and every token and link is escaped.
+ */
+async function highlightCode(code: string, lang: string, links: ReadonlyMap<string, string>, context?: 'interface' | 'class'): Promise<TrustedHtml> {
 	tokenizer ??= createTokenizer()
 	const tokenize = await tokenizer
 	const wrapped = context === 'interface' ? `interface __ {\n${code}\n}` : context === 'class' ? `declare class __ {\n${code}\n}` : code
@@ -990,7 +995,7 @@ async function highlightCode(code: string, lang: string, links: ReadonlyMap<stri
 			return `<span class="line">${tokens.join('')}</span>`
 		})
 		.join('\n')
-	return `<pre class="shiki shiki-themes github-light-default github-dark-default" tabindex="0"><code>${html}</code></pre>`
+	return trustHtml(`<pre class="shiki shiki-themes github-light-default github-dark-default" tabindex="0"><code>${html}</code></pre>`)
 }
 
 /** Escaped code with links on the PascalCase names of `links`. */
@@ -1002,13 +1007,13 @@ function linkTypes(html: string, links: ReadonlyMap<string, string>): string {
 	})
 }
 
-/** Inline code of a type, with links on the names of `links`. */
-function inlineType(text: string, links: ReadonlyMap<string, string>): string {
-	return text ? `<code>${linkTypes(escapeHtml(text), links)}</code>` : ''
+/** Inline code of a type, with links on the names of `links`; empty without a type. */
+function inlineType(text: string, links: ReadonlyMap<string, string>): TrustedHtml {
+	return trustHtml(text ? `<code>${linkTypes(escapeHtml(text), links)}</code>` : '')
 }
 
-/** Label of a "see also" link to a document, from its heading. */
-async function seeEntry(see: string, source: string): Promise<string> {
+/** Label of a "see also" link to a document, from its heading; its text is escaped. */
+async function seeEntry(see: string, source: string): Promise<TrustedHtml> {
 	const url = see.trim()
 	const documentLink = /^(?:https:\/\/github\.com\/meekojs\/meeko\/blob\/main\/)?([\w./-]+\.md)(?:#(.+))?$/.exec(url)
 	if (documentLink) {
@@ -1024,10 +1029,10 @@ async function seeEntry(see: string, source: string): Promise<string> {
 		}
 		if (anchor && !heading) console.warn(`[api] ${source}: ${path}#${anchor} is not a heading of the document`)
 		const title = page?.label ?? sitePath(path)
-		return `<a href="${escapeHtml(href)}">${escapeHtml(heading ?? title)}</a>${heading ? ` <span class="api-see-source">${escapeHtml(title)}</span>` : ''}`
+		return trustHtml(`<a href="${escapeHtml(href)}">${escapeHtml(heading ?? title)}</a>${heading ? ` <span class="api-see-source">${escapeHtml(title)}</span>` : ''}`)
 	}
-	if (/^https?:\/\/\S+$/.test(url)) return `<a href="${escapeHtml(url)}" rel="noopener">${escapeHtml(url.replace(/^https?:\/\//, ''))}</a>`
-	return (await renderFragment(url, source)).replace(/^<p>|<\/p>\n?$/g, '')
+	if (/^https?:\/\/\S+$/.test(url)) return trustHtml(`<a href="${escapeHtml(url)}" rel="noopener">${escapeHtml(url.replace(/^https?:\/\//, ''))}</a>`)
+	return trustHtml((await renderFragment(url, source)).replace(/^<p>|<\/p>\n?$/g, ''))
 }
 
 /** Id of a member heading. */
@@ -1037,7 +1042,7 @@ function memberId(name: string): string {
 
 async function renderPage(model: SymbolModel, api: ApiModel): Promise<ApiPage> {
 	const source = model.source?.path ?? model.editPath
-	const fragment = (text: string): Promise<string> => (text ? renderFragment(text, source) : Promise.resolve(''))
+	const fragment = (text: string): Promise<TrustedHtml> => (text ? renderFragment(text, source) : Promise.resolve(trustHtml('')))
 	const target = (name: string): Target | undefined => {
 		const resolved = api.resolve(name, model.group)
 		return resolved && resolved.slug !== model.slug ? resolved : undefined
@@ -1107,7 +1112,7 @@ async function renderPage(model: SymbolModel, api: ApiModel): Promise<ApiPage> {
 		typeParameters: await Promise.all(model.typeParameters.map(parameter)),
 		parameters: await Promise.all(model.parameters.map(parameter)),
 		returns: model.returns ? { type: inlineType(model.returns.type, links), description: await fragment(model.returns.description) } : null,
-		throws: await Promise.all(model.throws.map(async (entry) => ({ type: entry.type ? inlineType(entry.type, links) : '', description: await fragment(entry.description) }))),
+		throws: await Promise.all(model.throws.map(async (entry) => ({ type: inlineType(entry.type, links), description: await fragment(entry.description) }))),
 		examples: await Promise.all(model.examples.map(fragment)),
 		membersTitle: model.membersTitle,
 		members: await Promise.all(
