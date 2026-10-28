@@ -285,6 +285,9 @@ test("generated starter reloads edited pages in SSR and Chrome development", { t
   await writeFile(layoutFile, layoutSource.replace("<MeekoLink to=\"/\">Meeko</MeekoLink>", "<MeekoLink to=\"/\">Updated shell</MeekoLink>"), "utf8");
   await page.waitForFunction(() => document.querySelector("header")?.textContent?.includes("Updated shell"), undefined, { timeout: 15_000 });
   assert.match(await (await fetch(origin)).text(), /Updated shell/);
+  // Editing a layout reloads the document, whose server HTML already shows the new header: a click
+  // before hydration ends reaches a button without its handler and is lost.
+  await page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length > 0, undefined, { timeout: 15_000 });
   await page.getByRole("button", { name: "Count: 0" }).click();
   assert.equal(await page.getByRole("button").innerText(), "Count: 1");
   assert.deepEqual(errors, []);

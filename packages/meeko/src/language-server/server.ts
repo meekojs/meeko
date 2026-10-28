@@ -143,7 +143,14 @@ export function startLanguageServer(connection: Connection): void {
   let formatFallback: MeekoFormatSettings = {};
   /** Workspace folders of the client, the reference of {@link ignoredChange}. */
   let folders: string[] = [];
-  const log = (message: string): void => connection.console.log(message);
+  /** After `shutdown` nothing reaches the client: late results of running work are dropped. */
+  let stopped = false;
+  /** Writes to the client log; silent once stopped or when the connection is already closed. */
+  const log = (message: string): void => {
+    if (stopped) return;
+    try { connection.console.log(message); }
+    catch { /* The client closed the connection: there is nobody to tell. */ }
+  };
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
   const openVersions = new Map<string, number>();
   const ownDiagnostics = new Map<string, Diagnostic[]>();
@@ -195,11 +202,13 @@ export function startLanguageServer(connection: Connection): void {
     return { uri, document: TextDocument.create(uri, filename.endsWith(".meeko") ? "meeko" : "typescript", 0, text) };
   };
 
-  let stopped = false;
   const publish = (uri: string): void => {
     if (stopped) return;
-    connection.sendDiagnostics({ uri, diagnostics: [...(ownDiagnostics.get(uri) ?? []), ...(contractDiagnostics.get(uri) ?? []), ...(configDiagnostics.get(uri) ?? [])] })
-      .catch((error: unknown) => log(`${uri}: no se pudieron publicar los diagnósticos: ${error instanceof Error ? error.message : String(error)}`));
+    const failed = (error: unknown): void => log(`${uri}: no se pudieron publicar los diagnósticos: ${error instanceof Error ? error.message : String(error)}`);
+    try {
+      connection.sendDiagnostics({ uri, diagnostics: [...(ownDiagnostics.get(uri) ?? []), ...(contractDiagnostics.get(uri) ?? []), ...(configDiagnostics.get(uri) ?? [])] })
+        .catch(failed);
+    } catch (error) { failed(error); }
   };
 
   /** Publishes a configuration failure on `meeko.config.*` itself, once; `[]` clears it. */
@@ -239,7 +248,7 @@ export function startLanguageServer(connection: Connection): void {
 
   const scheduleCheck = (document: TextDocument): void => {
     const filename = uriToPath(document.uri);
-    if (!filename?.endsWith(".meeko")) return;
+    if (stopped || !filename?.endsWith(".meeko")) return;
     clearTimeout(timers.get(document.uri));
     const version = document.version;
     timers.set(document.uri, setTimeout(() => {
@@ -261,7 +270,7 @@ export function startLanguageServer(connection: Connection): void {
    * diagnostic of the previous one, its failure included.
    */
   const scheduleContractCheck = (root: string, trigger?: TextDocument): void => {
-    if (!workspace.options.trusted || !contracts) return;
+    if (stopped || !workspace.options.trusted || !contracts) return;
     const key = pathKey(root);
     clearTimeout(contractTimers.get(key));
     const version = (contractVersions.get(key) ?? 0) + 1;
@@ -294,11 +303,11 @@ export function startLanguageServer(connection: Connection): void {
         contractUris.set(key, new Set(grouped.keys()));
       };
       const run = previous.then(async () => {
-        if (contractVersions.get(key) !== version) return;
+        if (stopped || contractVersions.get(key) !== version) return;
         // Open components count with their unsaved text, like their own diagnostics; one being
         // written (empty, or with a syntax error) does not stop the check of the others.
         const found = await checkFrameworkPageContracts(root, { read: (filename) => openDocument(filename)?.getText(), onError: componentFailure });
-        if (contractVersions.get(key) !== version) return;
+        if (stopped || contractVersions.get(key) !== version) return;
         for (const item of found) {
           const target = locate(item.filename);
           if (!target) continue;
@@ -307,7 +316,8 @@ export function startLanguageServer(connection: Connection): void {
         }
         apply();
       }).catch((error: unknown) => {
-        if (contractVersions.get(key) !== version) return;
+        // A check stopped by shutdown fails on its own (its project may be gone): nobody reads it.
+        if (stopped || contractVersions.get(key) !== version) return;
         const message = error instanceof Error ? error.message : String(error);
         log(`${root}: falló la comprobación de contratos del proyecto: ${message}`);
         // A file that breaks the check (a page that does not compile) gets the error; otherwise the
@@ -602,11 +612,14 @@ export function startLanguageServer(connection: Connection): void {
     return tokens;
   });
 
-  connection.onShutdown(() => {
+  // Pending checks are cancelled and running project checks are awaited, not abandoned: they
+  // load configuration and write under `.meeko/`, so after the reply nothing touches the workspace.
+  connection.onShutdown(async () => {
     stopped = true;
     for (const timer of [...timers.values(), ...contractTimers.values()]) clearTimeout(timer);
     timers.clear();
     contractTimers.clear();
+    await Promise.allSettled([...contractRuns.values()]);
     workspace.dispose();
   });
 
@@ -625,11 +638,16 @@ export function runLanguageServer(argv: readonly string[]): boolean {
     return false;
   }
   const connection = transport === "--stdio" ? createConnection(process.stdin, process.stdout) : createConnection();
-  // stdout carries the protocol; route stray console output to the client log.
-  console.log = (...values: unknown[]) => connection.console.log(values.map(String).join(" "));
-  console.info = (...values: unknown[]) => connection.console.info(values.map(String).join(" "));
-  console.warn = (...values: unknown[]) => connection.console.warn(values.map(String).join(" "));
-  console.error = (...values: unknown[]) => connection.console.error(values.map(String).join(" "));
+  // stdout carries the protocol; route stray console output to the client log. Output that comes
+  // after the client closed the connection (a module still running) is dropped, never thrown.
+  const forward = (level: "log" | "info" | "warn" | "error") => (...values: unknown[]): void => {
+    try { connection.console[level](values.map(String).join(" ")); }
+    catch { /* The connection is closed. */ }
+  };
+  console.log = forward("log");
+  console.info = forward("info");
+  console.warn = forward("warn");
+  console.error = forward("error");
   console.debug = console.log;
   startLanguageServer(connection);
   connection.listen();

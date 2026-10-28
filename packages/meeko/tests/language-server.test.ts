@@ -492,6 +492,31 @@ describe("Meeko language server configuration and contracts", () => {
     } finally { await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
   });
 
+  // A check left running after shutdown failed once its project was removed, and its log reached
+  // a closed connection: "Connection is disposed" escaped as an unhandled rejection.
+  test("shutdown waits for a running project check, which never writes to the closed connection", async () => {
+    const root = await project("lsp-shutdown-", {
+      "app/pages/index.meeko": '<script lang="ts">\nconst text: string = "hi";\n</script>\n<template><p>{text}</p></template>\n',
+      "app/pages/about.meeko": '<script lang="ts"></script>\n<template><p>About</p></template>\n',
+    });
+    try {
+      const client = await inProcess(root, { trusted: true });
+      let closed = false;
+      try {
+        await client.open(join(root, "app", "pages", "index.meeko"));
+        // The project check starts after its debounce and first generates `.meeko/generated`.
+        const generated = join(root, ".meeko", "generated");
+        const deadline = Date.now() + 30_000;
+        while (!existsSync(generated) && Date.now() < deadline) await new Promise((done) => setTimeout(done, 5));
+        assert.ok(existsSync(generated), "the project check did not start");
+        closed = true;
+        await client.close();
+        // The check got past its own tsconfig and ran tsc before the reply.
+        assert.ok(existsSync(join(root, ".meeko", "tsconfig.page-contracts.json")), "shutdown replied while the project check was running");
+      } finally { if (!closed) await client.close(); }
+    } finally { await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
+  });
+
   test("imports.appDirs and sharedDirs reach completion, hover and definition, trusted or not", async () => {
     const root = await project("lsp-import-dirs-", {
       "meeko.config.ts": 'export default { imports: { appDirs: ["app/services"], sharedDirs: ["shared/validators"] } };\n',
