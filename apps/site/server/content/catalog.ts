@@ -25,6 +25,7 @@ export const catalog: readonly CatalogEntry[] = [
   { slug: "devtools", href: "/docs/devtools", source: "docs/devtools.md", label: "DevTools", section: "Herramientas" },
   { slug: "stability", href: "/docs/stability", source: "docs/stability.md", label: "Estabilidad 1.x", section: "Referencia" },
   { slug: "architecture", href: "/docs/architecture", source: "docs/architecture.md", label: "Arquitectura", section: "Referencia" },
+  { slug: "migration-1.5", href: "/docs/migration-1.5", source: "docs/migration-1.5.md", label: "Actualizar a 1.5", section: "Referencia" },
   { slug: "migration-1.4", href: "/docs/migration-1.4", source: "docs/migration-1.4.md", label: "Actualizar a 1.4", section: "Referencia" },
   { slug: "migration-1.3", href: "/docs/migration-1.3", source: "docs/migration-1.3.md", label: "Actualizar a 1.3", section: "Referencia" },
   { slug: "migration-1.2", href: "/docs/migration-1.2", source: "docs/migration-1.2.md", label: "Actualizar a 1.2", section: "Referencia" },

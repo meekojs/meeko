@@ -1,6 +1,6 @@
 {
   "name": "@meekojs/meeko",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "packageManager": "pnpm@12.14.0",
   "description": "Typed .meeko component engine with SSR, hydration, signals, Vite, and DevTools.",
   "license": "MIT",
