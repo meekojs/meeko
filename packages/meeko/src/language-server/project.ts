@@ -8,6 +8,8 @@ import { projectRoot } from "../compiler/project-root.js";
 import { readMeekoConfigSync, readThemeOptionSync, resolveConfigSources } from "../framework/config.js";
 import { generatedThemeLines } from "../framework/generate.js";
 import { resolveThemeConfig } from "../framework/theme.js";
+import { resolveProjectAliases, resolveProjectAliasesSync } from "../framework/aliases.js";
+import type { ProjectAliases } from "../framework/aliases.js";
 import { emptyAppIndex, loadAppIndex } from "./app-index.js";
 import type { AppIndex } from "./app-index.js";
 import { createVirtualComponent, diskVersion, resolveProjectCompilerOptions, serverVirtualSuffix, virtualFilenameOf } from "./model.js";
@@ -173,6 +175,8 @@ export class MeekoProject {
   private invalidatedFiles = new Set<string>();
   private registry: readonly AutoImport[] = [];
   private registryKey = "";
+  /** The path aliases in the compiler options: read statically first, then as the configuration gives them. */
+  private aliases: ProjectAliases;
   private roots: readonly string[];
   private readonly entries = new Map<string, ComponentEntry>();
   private loading: Promise<void>;
@@ -188,7 +192,8 @@ export class MeekoProject {
 
   constructor(root: string, private readonly options: WorkspaceOptions) {
     this.root = resolve(root);
-    this.compiler = resolveProjectCompilerOptions(this.root);
+    this.aliases = resolveProjectAliasesSync(this.root);
+    this.compiler = resolveProjectCompilerOptions(this.root, this.aliases);
     this.theme = editorThemeDeclaration(this.root, this.compiler, undefined);
     this.moduleCache = this.createModuleCache();
     this.specifierCache = createSpecifierCache(this.root);
@@ -423,7 +428,8 @@ export class MeekoProject {
       this.packageFiles = null;
     }
     if (configuration) {
-      this.compiler = resolveProjectCompilerOptions(this.root);
+      this.aliases = resolveProjectAliasesSync(this.root);
+      this.compiler = resolveProjectCompilerOptions(this.root, this.aliases);
       this.theme = editorThemeDeclaration(this.root, this.compiler, this.theme);
     }
     // A file created, removed or renamed can change where an import resolves.
@@ -553,11 +559,28 @@ export class MeekoProject {
       }
     } else registry = this.staticRegistry();
     this.roots = await this.resolveSourceRoots();
+    await this.reloadAliases();
     const key = JSON.stringify(registry);
     if (key === this.registryKey) return;
     this.registry = registry;
     this.registryKey = key;
     for (const entry of this.entries.values()) this.rebuild(entry);
+  }
+
+  /**
+   * The path aliases as `meeko check` reads them in a trusted workspace (a computed `alias`, the
+   * layers of the modules); the compiler options change only when they differ from the static ones.
+   */
+  private async reloadAliases(): Promise<void> {
+    if (!this.options.trusted) return;
+    const aliases = await resolveProjectAliases(this.root, undefined, { warn: false }).catch(() => this.aliases);
+    if (JSON.stringify(aliases) === JSON.stringify(this.aliases)) return;
+    this.aliases = aliases;
+    this.compiler = resolveProjectCompilerOptions(this.root, aliases);
+    this.theme = editorThemeDeclaration(this.root, this.compiler, this.theme);
+    this.moduleCache = this.createModuleCache();
+    this.specifierCache?.clear();
+    this.invalidatedFiles = new Set(this.resolvedFiles);
   }
 
   /** Como `meeko check`: la configuración se ejecuta sólo en un workspace de confianza. */

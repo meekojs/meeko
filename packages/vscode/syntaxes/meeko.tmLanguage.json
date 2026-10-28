@@ -50,6 +50,7 @@
       "patterns": [
         { "include": "#nestedTemplate" },
         { "include": "#interpolation" },
+        { "include": "#awaitTag" },
         { "include": "#componentTag" },
         { "include": "#renderTag" },
         { "include": "#customElementTag" },
@@ -87,6 +88,7 @@
         },
         { "include": "#nestedTemplate" },
         { "include": "#interpolation" },
+        { "include": "#awaitTag" },
         { "include": "#componentTag" },
         { "include": "#renderTag" },
         { "include": "#customElementTag" },
@@ -105,6 +107,36 @@
       "endCaptures": { "2": { "name": "entity.name.tag.meeko" } },
       "contentName": "meta.embedded.block.css",
       "patterns": [{ "include": "source.css" }]
+    },
+    "awaitTag": {
+      "comment": "<MeekoAwait for=\"items\">: a component tag whose for is TypeScript, like each:of.",
+      "begin": "(<)(MeekoAwait)(?=[\\s/>])",
+      "end": "(/?>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.type.class.component.meeko", "patterns": [{ "include": "#builtinTagName" }] }
+      },
+      "endCaptures": { "1": { "name": "punctuation.definition.tag.end.html" } },
+      "patterns": [
+        { "include": "#awaitForAttribute" },
+        { "include": "#expressionAttribute" },
+        { "name": "string.quoted.double.html", "begin": "\"", "end": "\"" },
+        { "name": "string.quoted.single.html", "begin": "'", "end": "'" },
+        { "name": "entity.other.attribute-name.directive.meeko", "match": "\\bref:[A-Za-z_$][\\w$]*" },
+        { "name": "entity.other.attribute-name.html", "match": "\\b[\\w:-]+\\b" }
+      ]
+    },
+    "awaitForAttribute": {
+      "begin": "(?<![\\w:-])(for)(\\s*=\\s*)([\"'])",
+      "end": "\\3",
+      "beginCaptures": {
+        "1": { "name": "entity.other.attribute-name.directive.meeko" },
+        "2": { "name": "keyword.operator.assignment.meeko" },
+        "3": { "name": "punctuation.definition.string.begin.html" }
+      },
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.html" } },
+      "contentName": "meta.embedded.inline.typescript",
+      "patterns": [{ "include": "source.ts" }]
     },
     "componentTag": {
       "begin": "(</?)([A-Z][\\w$]*)(?=[\\s/>])",
@@ -189,8 +221,8 @@
       }
     },
     "builtinTagName": {
-      "comment": "Meeko's own tags read as built-ins: <component>, <snippet>, <render>, <MeekoLink>, <MeekoOutlet> and <MeekoThemeToggle>.",
-      "match": "(?<![\\w.:-])(?:component|snippet|render|MeekoLink|MeekoOutlet|MeekoThemeToggle)(?![\\w.:-])",
+      "comment": "Meeko's own tags read as built-ins: <component>, <snippet>, <render>, <MeekoLink>, <MeekoOutlet>, <MeekoThemeToggle>, <MeekoAwait>, <MeekoTeleport>, <MeekoPopover> and <MeekoSelect>.",
+      "match": "(?<![\\w.:-])(?:component|snippet|render|MeekoLink|MeekoOutlet|MeekoThemeToggle|MeekoAwait|MeekoTeleport|MeekoPopover|MeekoSelect)(?![\\w.:-])",
       "name": "entity.name.function.builtin.meeko"
     },
     "directiveName": {
@@ -230,7 +262,7 @@
       "patterns": [{ "include": "source.ts" }]
     },
     "expressionAttribute": {
-      "begin": "(?<![\\w:-])((?:bind|on|if|each|model):[\\w-]+|model|is)(\\s*=\\s*)([\"'])",
+      "begin": "(?<![\\w:-])((?:bind|on|if|each|model):[\\w-]+|model|bind|is)(\\s*=\\s*)([\"'])",
       "end": "\\3",
       "beginCaptures": {
         "1": { "name": "entity.other.attribute-name.directive.meeko", "patterns": [{ "include": "#directiveName" }] },

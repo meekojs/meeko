@@ -2,6 +2,7 @@ export { batch, computed, createContext, createRoot, effect, inject, onCleanup, 
 export type { ContextKey, ReadonlySignal, Signal } from "./reactivity.js";
 export { provideErrorHandler } from "./component-errors.js";
 export { onMounted } from "./lifecycle.js";
+export { useId } from "./ids.js";
 export type { ComponentErrorHandler, ErrorSource } from "./component-errors.js";
 export { serializeJson } from "./server.js";
 export { trustHtml } from "./trusted-html.js";
@@ -9,6 +10,7 @@ export type { TrustedHtml } from "./trusted-html.js";
 export type { Component, ComponentModule, ComponentRelease, DomScope } from "./dom.js";
 export type { HotState } from "./hmr.js";
 export type { Snippet } from "./snippets.js";
+export type { ElementAttributes, TagName } from "./dynamic-tag.js";
 export type {
   DevtoolsAssignmentSite, DevtoolsCommandResult, DevtoolsEditSite, DevtoolsEvent, DevtoolsEventKind, DevtoolsHook,
   DevtoolsInstance, DevtoolsProtocolVersion, DevtoolsReadKind, DevtoolsReadSite, DevtoolsRegistration, DevtoolsSignalSite,

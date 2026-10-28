@@ -119,11 +119,14 @@ test("app/error.meeko backs routes without +error.meeko and conflicts with app/p
     assert.deepEqual(await discoverErrorPage(root), {
       file: join(root, "app/error.meeko"),
       layouts: [join(root, "app/app.meeko"), join(root, "app/layouts/default.meeko")],
+      layout: { name: "default", file: join(root, "app/layouts/default.meeko") },
     });
     const { manifest, modules } = await discoverAppManifest(root, { entry: "/client.js", css: [], preload: [] });
-    assert.deepEqual(manifest.errorPage, { file: "/app/error.meeko", layouts: ["/app/app.meeko", "/app/layouts/default.meeko"] });
+    assert.deepEqual(manifest.errorPage, {
+      file: "/app/error.meeko", layouts: ["/app/app.meeko", "/app/layouts/default.meeko"], layout: { name: "default", file: "/app/layouts/default.meeko" },
+    });
     assert.ok(modules.includes("/app/error.meeko"));
-    assert.match(await clientRoutesSource(root), /export const errorPage = \{"file":"\/app\/error\.meeko","layouts":\["\/app\/app\.meeko","\/app\/layouts\/default\.meeko"\]\};/);
+    assert.match(await clientRoutesSource(root), /export const errorPage = \{"file":"\/app\/error\.meeko","layouts":\["\/app\/app\.meeko","\/app\/layouts\/default\.meeko"\],"layout":\{"name":"default","file":"\/app\/layouts\/default\.meeko"\}\};/);
     await writeFile(join(root, "app/pages/+error.meeko"), "");
     await assert.rejects(discoverRoutes(root), /error\.meeko y .*\+error\.meeko definen los dos la página de error raíz/);
     await assert.rejects(discoverErrorPage(root), /la página de error raíz/);

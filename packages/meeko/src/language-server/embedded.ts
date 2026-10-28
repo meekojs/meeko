@@ -2,10 +2,12 @@ import { getCSSLanguageService } from "vscode-css-languageservice";
 import type { Color, ColorInformation, ColorPresentation } from "vscode-css-languageservice";
 import { getDefaultHTMLDataProvider, getLanguageService as getHtmlLanguageService } from "vscode-html-languageservice";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import { CompletionItemKind, DiagnosticSeverity, DiagnosticTag, InsertTextFormat } from "vscode-languageserver/node";
+import { CompletionItemKind, DiagnosticSeverity, DiagnosticTag, InsertTextFormat, MarkupKind } from "vscode-languageserver/node";
 import type { CompletionItem, CompletionList, Diagnostic, Hover, MarkupContent, Position, Range } from "vscode-languageserver/node";
 import { builtinTag } from "./builtin-tags.js";
 import { cssClassRules } from "./class-rules.js";
+import { isCandidates } from "../compiler/dynamic-tag.js";
+import { elementAccepts } from "../html-attributes.js";
 
 // HTML of the template and CSS of `<style>`, outside the TypeScript model: what the editor offers
 // while writing markup and styles. Every function reads the text, so it works while a tag or a
@@ -127,6 +129,82 @@ export function domEventCompletion(document: TextDocument, position: Position, c
         textEdit: { range: { start, end: position }, newText: `on:${event}="$1"` },
       };
     });
+}
+
+/**
+ * The tags that `<component is="...">` renders when every result of its expression is a string
+ * literal (`href ? 'a' : 'button'`); `undefined` for another tag, an expression that may give a
+ * component, or a tag without `is`.
+ */
+export function dynamicTags(source: string, context: TagContext): string[] | undefined {
+  // The whole name: `context.tag` ends at the cursor when it is on the name.
+  if (/^<([A-Za-z][\w$.-]*)/.exec(source.slice(context.tagStart, context.tagEnd))?.[1] !== "component") return undefined;
+  const value = /(?:^|\s)is\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(source.slice(context.tagStart, context.tagEnd));
+  const expression = value?.[1] ?? value?.[2];
+  if (!expression?.trim()) return undefined;
+  const candidates = isCandidates(expression);
+  return candidates.others.length === 0 && candidates.tags.length > 0 ? [...new Set(candidates.tags.map((literal) => literal.tag))] : undefined;
+}
+
+/**
+ * HTML attributes of the tags of `<component is>`, from the HTML data of VS Code: the ones of any of
+ * them, as Meeko only writes each one while the current tag accepts it. Handlers are left out.
+ */
+export function dynamicTagAttributeCompletion(document: TextDocument, position: Position, word: string, tags: readonly string[], present: ReadonlySet<string>): CompletionItem[] {
+  const start = document.positionAt(document.offsetAt(position) - word.length);
+  const seen = new Map<string, { tags: string[]; description?: string | MarkupContent }>();
+  for (const tag of tags) {
+    for (const attribute of htmlData.provideAttributes(tag)) {
+      if (/^on[a-z]/.test(attribute.name) || present.has(attribute.name) || seen.has(attribute.name)) continue;
+      // Which tags write it, by the same data as the compiler (no `type` on `<a>`, for example).
+      const accepting = tags.filter((candidate) => elementAccepts(candidate, attribute.name));
+      if (accepting.length) seen.set(attribute.name, { tags: accepting, ...(attribute.description ? { description: attribute.description } : {}) });
+    }
+  }
+  return [...seen].map(([name, entry]): CompletionItem => ({
+    label: name,
+    kind: CompletionItemKind.Property,
+    // Global attributes apply to every tag; the others say which ones they apply to.
+    ...(entry.tags.length < tags.length ? { detail: `Sólo en ${entry.tags.map((tag) => `<${tag}>`).join(", ")}` } : {}),
+    ...(entry.description ? { documentation: entry.description } : {}),
+    sortText: `1${entry.tags.length < tags.length ? "0" : "1"}${name}`,
+    insertTextFormat: InsertTextFormat.Snippet,
+    textEdit: { range: { start, end: position }, newText: `${name}="$1"` },
+  }));
+}
+
+/**
+ * Hover of the name of `<component is>` with HTML tags: the elements it may render and the rule of
+ * its attributes, with the MDN description of each tag.
+ */
+export function dynamicTagHover(document: TextDocument, position: Position): Hover | undefined {
+  const source = document.getText();
+  const offset = document.offsetAt(position);
+  const context = tagAt(source, offset);
+  if (!context || offset > context.tagStart + 1 + "component".length) return undefined;
+  const tags = dynamicTags(source, context);
+  if (!tags) return undefined;
+  const descriptions = htmlData.provideTags();
+  const lines = tags.map((tag) => {
+    const description = descriptions.find((item) => item.name === tag)?.description;
+    const text = typeof description === "string" ? description : description?.value;
+    return `- \`<${tag}>\`${text ? `: ${text.split("\n")[0]}` : ""}`;
+  });
+  return {
+    contents: {
+      kind: MarkupKind.Markdown,
+      value: [
+        "```typescript",
+        `(elemento) ${tags.map((tag) => `<${tag}>`).join(" | ")}`,
+        "```",
+        "",
+        "`<component is>` renderiza una de estas etiquetas según `is`. Un atributo que la etiqueta del momento no admite no se escribe; los globales (`class`, `id`, `aria-*`, `data-*`…) y los eventos, siempre. Al cambiar la etiqueta, el contenido pasa al elemento nuevo con su estado.",
+        "",
+        ...lines,
+      ].join("\n"),
+    },
+    range: { start: document.positionAt(context.tagStart + 1), end: document.positionAt(context.tagStart + 1 + "component".length) },
+  };
 }
 
 /**

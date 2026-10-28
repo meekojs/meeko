@@ -5,6 +5,7 @@ import { discoverAutoImports } from "../autoimports.js";
 import { autoImportCompilerHost, autoImportSourceReader } from "../autoimports-ts.js";
 import { discoverServerManifest } from "../framework-server/manifest-discovery.js";
 import type { ApiEndpoint, RpcEndpoint } from "../framework-server/discovery.js";
+import { resolveProjectAliases, withAliasPaths } from "./aliases.js";
 import { resolveConfigSources } from "./config.js";
 import { generateSocketContracts } from "./socket-contracts-generate.js";
 import { standardSchemaTypes } from "./standard-schema-types.js";
@@ -229,7 +230,8 @@ export async function generateServerContracts(projectRoot: string): Promise<Gene
   const types = join(outputDir, "server-contracts.d.ts");
   const manifest = join(root, ".meeko", "manifests", "server.json");
   const generatedDir = join(root, ".meeko", "generated");
-  const options = optionsFor(root);
+  // A schema imported through an alias (`#shared/schemas/auth`) resolves to its file, as in Vite.
+  const options = withAliasPaths(optionsFor(root), await resolveProjectAliases(root), "server");
   const files = [...discovered.api, ...discovered.rpc].map((entry) => entry.file);
   // Handlers and shared schemas are read as Vite runs them, so an autoimported schema
   // resolves to its shared/ file instead of an unknown global.

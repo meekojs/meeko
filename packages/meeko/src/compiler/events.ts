@@ -10,8 +10,10 @@ export const templateEventDeclaration = "type __MeekoEventOf<Name extends string
  * a native element, with `currentTarget` typed as the element of the tag, like `ref:`. `prefix`
  * names the helpers of each side: `__meeko.` (`EventOf`, `ElementOf` of the package) in the
  * compiled component, `__Meeko` in the editor's virtual document. The intersection stays inline
- * so the editor's hover shows the event, not a helper name.
+ * so the editor's hover shows the event, not a helper name. `tagType`, a type expression such as
+ * `typeof __meeko_tag_3`, replaces the tag for `<component is>`: `currentTarget` is then the
+ * union of the elements of its possible tags.
  */
-export function templateEventType(prefix: "__meeko." | "__Meeko", name: string, tag: string, svg: boolean): string {
-  return `${prefix}EventOf<${JSON.stringify(name)}, ${svg}> & { readonly currentTarget: ${prefix}ElementOf<${JSON.stringify(tag)}, ${svg}> }`;
+export function templateEventType(prefix: "__meeko." | "__Meeko", name: string, tag: string, svg: boolean, tagType?: string): string {
+  return `${prefix}EventOf<${JSON.stringify(name)}, ${svg}> & { readonly currentTarget: ${prefix}ElementOf<${tagType ?? JSON.stringify(tag)}, ${svg}> }`;
 }

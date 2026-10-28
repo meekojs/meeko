@@ -464,6 +464,8 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
       onError: reportError,
       clientEntry: manifest.client.entry,
       document,
+      // A `<MeekoTeleport>` without its target fails the render in development.
+      production: options.production,
       ...(options.plugins?.length ? { plugins: options.plugins } : {}),
     };
     const pages = createPageHandler(options.prerender ? { ...pageOptions, prerendered: options.prerender } : pageOptions);

@@ -5,7 +5,8 @@ import { discoverServerManifest } from "../framework-server/manifest-discovery.j
 import { clientSegment } from "../framework-server/discovery.js";
 import type { ApiEndpoint, RpcEndpoint } from "../framework-server/discovery.js";
 import { composeFrameworkRoutes } from "../framework/modules.js";
-import { discoverConfiguredRoutes, readMeekoConfigSync, resolveConfigSources } from "../framework/config.js";
+import { discoverConfiguredLayouts, discoverConfiguredRoutes, readMeekoConfigSync, resolveConfigSources } from "../framework/config.js";
+import { discoverLayouts } from "../framework/routes-discovery.js";
 import type { RouteRecord } from "../framework/router.js";
 import { nodeAt } from "./reactivity.js";
 
@@ -18,9 +19,25 @@ export interface AppIndex {
   readonly routes: readonly RouteRecord[];
   readonly api: readonly ApiEndpoint[];
   readonly rpc: readonly RpcEndpoint[];
+  /** Named layouts by name (`app/layouts`, layers and, in a trusted workspace, the modules'). */
+  readonly layouts?: Readonly<Record<string, string>>;
 }
 
 export const emptyAppIndex: AppIndex = { routes: [], api: [], rpc: [] };
+
+async function layoutsOf(root: string, trusted: boolean): Promise<Readonly<Record<string, string>>> {
+  if (trusted) {
+    try { return await discoverConfiguredLayouts(root); }
+    catch { /* The static reader below still finds those of the project and its layers. */ }
+  }
+  const result: Record<string, string> = {};
+  try {
+    for (const source of await resolveConfigSources(root, readMeekoConfigSync(root))) {
+      for (const [name, file] of Object.entries(await discoverLayouts(source.root))) if (!Object.hasOwn(result, name)) result[name] = file;
+    }
+  } catch { /* `meeko check` reports a broken configuration. */ }
+  return result;
+}
 
 /** The routes of `.meeko/manifests/routes.json`, with absolute files, if discovery fails. */
 async function generatedRoutes(root: string): Promise<readonly RouteRecord[]> {
@@ -54,7 +71,7 @@ export async function loadAppIndex(root: string, trusted: boolean): Promise<AppI
   let rpc: readonly RpcEndpoint[] = [];
   try { ({ api, rpc } = await discoverServerManifest(root)); }
   catch { /* A collision is reported by `meeko check`; the editor keeps the routes. */ }
-  return { routes, api, rpc };
+  return { routes, api, rpc, layouts: await layoutsOf(root, trusted) };
 }
 
 /** Parameters of a route id, such as `id` in `/users/[id]` and `path` in `/docs/[...path]`. */
@@ -125,7 +142,8 @@ export function handlerContract(file: string, kind: "api" | "rpc", text = ts.sys
 export type AppTarget =
   | { readonly kind: "route"; readonly id: string; readonly route?: RouteRecord; readonly node: ts.Node }
   | { readonly kind: "api"; readonly label: string; readonly endpoints: readonly ApiEndpoint[]; readonly node: ts.Node }
-  | { readonly kind: "rpc"; readonly id: string; readonly endpoint?: RpcEndpoint; readonly node: ts.Node };
+  | { readonly kind: "rpc"; readonly id: string; readonly endpoint?: RpcEndpoint; readonly node: ts.Node }
+  | { readonly kind: "layout"; readonly name: string; readonly file?: string; readonly node: ts.Node };
 
 const apiMethods = new Set(["get", "post", "put", "patch", "delete"]);
 
@@ -208,6 +226,14 @@ export function appTargetAt(program: ts.Program, fileName: string, offset: numbe
   if (link && ts.isStringLiteralLike(node)) {
     const route = index.routes.find((candidate) => candidate.id === node.text);
     return { kind: "route", id: node.text, ...(route ? { route } : {}), node };
+  }
+  // `layout: "dashboard"` of `definePage({ ... })` or `defineGroup({ ... })`.
+  const options = property && ts.isIdentifier(property.name) && property.name.text === "layout" && ts.isObjectLiteralExpression(property.parent)
+    ? property.parent.parent : undefined;
+  if (options && ts.isCallExpression(options) && ts.isIdentifier(options.expression)
+    && (options.expression.text === "definePage" || options.expression.text === "defineGroup") && ts.isStringLiteralLike(node)) {
+    const file = index.layouts?.[node.text];
+    return { kind: "layout", name: node.text, ...(file ? { file } : {}), node };
   }
   if (ts.isStringLiteralLike(node) && ts.isCallExpression(node.parent)) {
     const call = node.parent;

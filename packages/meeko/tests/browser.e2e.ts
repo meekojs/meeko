@@ -9,6 +9,8 @@ import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
 import { createServer, preview } from "vite";
 import { createExampleServer } from "../examples/counter/server.ts";
+import { generateServerContracts } from "../src/framework/contracts-generate.ts";
+import { prepareFrameworkTypes } from "../src/framework/check-project.ts";
 import { buildProject } from "../src/framework/project.ts";
 import { previewStatic } from "../src/framework/static-adapter.ts";
 import { startConformanceOutput } from "./conformance/harness.ts";
@@ -713,6 +715,611 @@ test("<MeekoThemeToggle> shows the right icon in the first frame, cycles with Ja
     assert.deepEqual(await shown(), ["dark"]);
     assert.deepEqual(consoleErrors.filter((message) => /Content Security Policy/i.test(message)), []);
     await plain.close();
+  } finally {
+    await browser?.close();
+    if (server) await new Promise<void>((done) => server!.close(() => done()));
+    await app?.close();
+    await project.remove();
+  }
+});
+
+const signupSchemas = `export interface SignupInput { email: string; password: string; confirm: string }
+export interface SignupResult { email: string }
+type Issue = { message: string; path: { key: string }[] };
+type Validation<T> = { value: T; issues?: undefined } | { issues: Issue[] };
+
+/** As Valibot would write it, with v.forward(v.partialCheck(...), ["confirm"]) for the confirmation. */
+export const signupInput = {
+  "~standard": {
+    version: 1 as const,
+    vendor: "e2e",
+    types: undefined as { input: SignupInput; output: SignupInput } | undefined,
+    validate(value: unknown): Validation<SignupInput> {
+      const input = value as SignupInput;
+      const issues: Issue[] = [];
+      if (!input.email.includes("@")) issues.push({ message: "Escribe un correo válido.", path: [{ key: "email" }] });
+      if (input.password.length < 10) issues.push({ message: "Usa al menos 10 caracteres.", path: [{ key: "password" }] });
+      if (input.password !== input.confirm) issues.push({ message: "Las contraseñas no coinciden.", path: [{ key: "confirm" }] });
+      return issues.length ? { issues } : { value: input };
+    },
+  },
+};
+
+export const signupResult = {
+  "~standard": {
+    version: 1 as const,
+    vendor: "e2e",
+    types: undefined as { input: SignupResult; output: SignupResult } | undefined,
+    validate(value: unknown): Validation<SignupResult> { return { value: value as SignupResult }; },
+  },
+};
+`;
+
+const signupRoute = `import { ApiError, defineApiRoute } from "@meekojs/meeko/server";
+import { signupInput, signupResult } from "../../shared/schemas/signup.js";
+
+export default defineApiRoute({
+  body: signupInput,
+  response: signupResult,
+  status: 201,
+  handler: ({ body }) => {
+    if (body.email === "ada@example.com") {
+      throw new ApiError("EMAIL_TAKEN", 409, { message: "duplicate key users_email", issues: [{ path: "email", message: "Ese correo ya tiene una cuenta." }] });
+    }
+    return { email: body.email };
+  },
+});
+`;
+
+const signupField = `<script lang="ts">
+import type { FormField } from "@meekojs/meeko/framework";
+const props = defineProps<{ field: FormField<string>; label: string }>();
+</script>
+<template>
+  <div class="field">
+    <label bind:for="props.field.id">{props.label}</label>
+    <input type="text" bind:id="props.field.id" bind:name="props.field.name" model="props.field.value"
+      bind:aria-invalid="props.field.invalid.value ? 'true' : null" bind:aria-describedby="props.field.describedBy.value ?? null">
+    <p class="error" if:when="props.field.error.value" bind:id="props.field.errorId">{props.field.error.value}</p>
+  </div>
+</template>
+`;
+
+const signupPage = `<script lang="ts">
+import { signupInput } from "../../shared/schemas/signup.js";
+const form = useForm({
+  schema: signupInput,
+  initial: { email: "", password: "", confirm: "" },
+  submit: (values) => api.signup.post({ body: values }),
+  focusInvalid: true,
+  errorMessage: (failure) => isClientError(failure) ? failure.code : "network",
+});
+const created = signal("");
+async function send(event: SubmitEvent): Promise<void> {
+  const outcome = await form.trySubmit(event);
+  if (outcome.ok) created.value = outcome.result.email;
+}
+</script>
+<template>
+  <form on:submit="send" novalidate>
+    <AppField bind:field="form.field('email')" label="Correo" />
+    <AppField bind:field="form.field('password')" label="Contraseña" />
+    <AppField bind:field="form.field('confirm')" label="Repite la contraseña" />
+    <p id="form-error">{form.error.value ?? ""}</p>
+    <button id="send">Crear cuenta</button>
+    <p id="created">{created.value}</p>
+  </form>
+</template>
+`;
+
+test("useForm en Chrome real: revalida la confirmación, lleva el 409 con issues al campo y enfoca el primer inválido", { timeout: 240_000 }, async () => {
+  const project = await createTempProject("form-e2e");
+  const root = project.root;
+  type ServerModule = typeof import("../src/framework-server.ts");
+  type NodeModule = typeof import("../src/node.ts");
+  let server: import("node:http").Server | undefined;
+  let app: Awaited<ReturnType<ServerModule["createServerApp"]>> | undefined;
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  try {
+    const files: Record<string, string> = {
+      "package.json": '{"name":"form-app","private":true,"type":"module"}\n',
+      "meeko.config.mjs": 'export default { document: { idPrefix: "signup" } };\n',
+      "shared/schemas/signup.ts": signupSchemas,
+      "server/api/signup.post.ts": signupRoute,
+      "app/components/AppField.meeko": signupField,
+      "app/pages/index.meeko": signupPage,
+    };
+    for (const [file, contents] of Object.entries(files)) {
+      await mkdir(dirname(join(root, file)), { recursive: true });
+      await writeFile(join(root, file), contents);
+    }
+    await linkRepositoryPackages(root, ["@meekojs/meeko", "vite"]);
+    // The api.* client of the page, as `meeko routes` and `meeko dev` generate it.
+    await generateServerContracts(root);
+    const built = await buildProject(root);
+    const { createServerApp } = await import(pathToFileURL(resolve("dist/framework-server.js")).href) as ServerModule;
+    const { createNodeAssetReader, toNodeListener } = await import(pathToFileURL(resolve("dist/node.js")).href) as NodeModule;
+    const output = await import(pathToFileURL(join(built.output, "index.mjs")).href) as Pick<Parameters<ServerModule["createServerApp"]>[0], "load" | "manifest">;
+    app = await createServerApp({
+      manifest: output.manifest, load: output.load, production: false,
+      assets: createNodeAssetReader({ root: join(built.output, "client"), assets: output.manifest.assets ?? {} }),
+    });
+    const running = app;
+    server = createHttpServer(toNodeListener((request) => running.fetch(request)));
+    await new Promise<void>((ready) => server!.listen(0, "127.0.0.1", ready));
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    browser = await chromium.launch({
+      ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: "chrome" as const }),
+      headless: true,
+    });
+    const page = await browser.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => { if (message.type() === "error" && !/409 \(Conflict\)/.test(message.text())) errors.push(message.text()); });
+    await page.goto(`${origin}/`);
+    await page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length > 0);
+
+    const input = (name: string) => page.locator(`input[name="${name}"]`);
+    const message = (name: string) => page.locator(".field", { has: input(name) }).locator(".error");
+    const focused = () => page.evaluate(() => document.activeElement?.getAttribute("name") ?? null);
+
+    // The IDs of form.field link label, control and message, with the prefix of meeko.config.
+    const emailId = await input("email").getAttribute("id");
+    assert.match(emailId ?? "", /^signup-[A-Za-z0-9_-]+-email$/);
+    assert.equal(await page.locator("label", { hasText: "Correo" }).getAttribute("for"), emailId);
+
+    // 1. The schema fails in two fields: the focus goes to the first one, once the messages are painted.
+    await input("email").fill("ada@example.com");
+    await input("password").fill("corta1");
+    await input("confirm").fill("contrasena123");
+    await page.locator("#send").click();
+    await message("confirm").waitFor();
+    assert.equal(await message("password").innerText(), "Usa al menos 10 caracteres.");
+    assert.equal(await message("confirm").innerText(), "Las contraseñas no coinciden.");
+    await page.waitForFunction(() => document.activeElement?.getAttribute("name") === "password");
+    assert.equal(await input("password").getAttribute("aria-invalid"), "true");
+    assert.equal(await input("confirm").getAttribute("aria-describedby"), await message("confirm").getAttribute("id"));
+
+    // 2. Fixing the password also clears the confirmation that depended on it.
+    await input("password").fill("contrasena123");
+    assert.equal(await page.locator(".error").count(), 0);
+    assert.equal(await input("confirm").getAttribute("aria-invalid"), null);
+
+    // 3. The server's 409 carries issues: the message lands on the email field, which takes the focus.
+    await page.locator("#send").click();
+    await message("email").waitFor();
+    assert.equal(await message("email").innerText(), "Ese correo ya tiene una cuenta.");
+    assert.equal(await page.locator("#form-error").innerText(), "");
+    await page.waitForFunction(() => document.activeElement?.getAttribute("name") === "email");
+    assert.equal(await focused(), "email");
+    assert.equal(await input("email").getAttribute("aria-describedby"), await message("email").getAttribute("id"));
+
+    // 4. Changing the email drops the server's message; the next submission succeeds.
+    await input("email").fill("grace@example.com");
+    assert.equal(await message("email").count(), 0);
+    await page.locator("#send").click();
+    await page.locator("#created", { hasText: "grace@example.com" }).waitFor();
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser?.close();
+    if (server) await new Promise<void>((done) => server!.close(() => done()));
+    await app?.close();
+    await project.remove();
+  }
+});
+
+test("named layouts: the page chooses the layout and its props, the same layout keeps its state and another replaces it", { timeout: 240_000 }, async () => {
+  const project = await createTempProject("named-layouts-e2e");
+  const root = project.root;
+  type ServerModule = typeof import("../src/framework-server.ts");
+  type NodeModule = typeof import("../src/node.ts");
+  let server: import("node:http").Server | undefined;
+  let app: Awaited<ReturnType<ServerModule["createServerApp"]>> | undefined;
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  try {
+    const files: Record<string, string> = {
+      "package.json": '{"name":"layouts-app","private":true,"type":"module"}\n',
+      "app/app.meeko": '<template><div id="shell"><MeekoOutlet /></div></template>\n',
+      "app/layouts/dashboard.meeko": `<script lang="ts">
+export interface Props { title?: string; showAlert?: boolean }
+const props = defineProps<Props>({ title: "Panel", showAlert: false });
+const filter = signal("");
+</script>
+<template><header id="title">{props.title}</header><p id="alert" if:when="props.showAlert">Revisa las conexiones</p><input id="sidebar" model="filter"><nav><MeekoLink to="/a" id="to-a">A</MeekoLink><MeekoLink to="/c" id="to-c">C</MeekoLink><MeekoLink to="/b" id="to-b">B</MeekoLink></nav><main><MeekoOutlet /></main></template>
+`,
+      "app/layouts/auth.meeko": '<template><section id="auth"><MeekoLink to="/a" id="auth-to-a">A</MeekoLink><MeekoOutlet /></section></template>\n',
+      "app/pages/(dashboard)/+group.ts": 'export default defineGroup({ layout: "dashboard" });\n',
+      "app/pages/(dashboard)/a.meeko": `<script server lang="ts">
+export const route = definePage({ layoutProps: { title: "Conexiones", showAlert: true } });
+</script>
+<template><p id="page">a</p></template>
+`,
+      "app/pages/(dashboard)/c.meeko": `<script lang="ts">
+const layout = useLayout();
+const title = signal("Informe");
+layout.set({ title: title.value });
+effect(() => layout.set({ title: title.value }));
+</script>
+<template><p id="page">c</p><input id="c-title" model="title"></template>
+`,
+      "app/pages/b.meeko": `<script server lang="ts">
+export const route = definePage({ layout: "auth" });
+</script>
+<template><p id="page">b</p></template>
+`,
+    };
+    for (const [file, contents] of Object.entries(files)) {
+      await mkdir(dirname(join(root, file)), { recursive: true });
+      await writeFile(join(root, file), contents);
+    }
+    await linkRepositoryPackages(root, ["@meekojs/meeko", "vite"]);
+    const built = await buildProject(root);
+    const { createServerApp } = await import(pathToFileURL(resolve("dist/framework-server.js")).href) as ServerModule;
+    const { createNodeAssetReader, toNodeListener } = await import(pathToFileURL(resolve("dist/node.js")).href) as NodeModule;
+    const output = await import(pathToFileURL(join(built.output, "index.mjs")).href) as Pick<Parameters<ServerModule["createServerApp"]>[0], "load" | "manifest">;
+    app = await createServerApp({
+      manifest: output.manifest, load: output.load, production: false,
+      assets: createNodeAssetReader({ root: join(built.output, "client"), assets: output.manifest.assets ?? {} }),
+    });
+    const running = app;
+    server = createHttpServer(toNodeListener((request) => running.fetch(request)));
+    await new Promise<void>((ready) => server!.listen(0, "127.0.0.1", ready));
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    // What the page writes during its setup is in the first HTML, before any script runs.
+    const ssr = (await (await fetch(`${origin}/c`)).text()).replace(/<!--[^>]*-->/g, "");
+    assert.match(ssr, /<header id="title">Informe<\/header>/);
+    browser = await chromium.launch({
+      ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: "chrome" as const }),
+      headless: true,
+    });
+    const page = await browser.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+    await page.goto(`${origin}/a`);
+    await page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length > 0);
+    assert.equal(await page.locator("#title").innerText(), "Conexiones");
+    assert.equal(await page.locator("#alert").innerText(), "Revisa las conexiones");
+    // State of the layout: what the user typed and a mark on its node.
+    await page.locator("#sidebar").fill("búsqueda");
+    await page.evaluate(() => { (document.getElementById("sidebar") as HTMLInputElement & { mark?: number }).mark = 1; (window as unknown as { kept: number }).kept = 1; });
+    await page.locator("#to-c").click();
+    await page.locator("#page", { hasText: "c" }).waitFor();
+    // Same layout: same node, same value; the props are those of c, nothing of a stays.
+    assert.equal(await page.evaluate(() => (document.getElementById("sidebar") as HTMLInputElement & { mark?: number }).mark), 1);
+    assert.equal(await page.locator("#sidebar").inputValue(), "búsqueda");
+    assert.equal(await page.locator("#title").innerText(), "Informe");
+    assert.equal(await page.locator("#alert").count(), 0);
+    // The page writes the layout's title reactively.
+    await page.locator("#c-title").fill("Informe mensual");
+    await page.locator("#title", { hasText: "Informe mensual" }).waitFor();
+    assert.equal(await page.evaluate(() => (document.getElementById("sidebar") as HTMLInputElement & { mark?: number }).mark), 1, "a prop change does not remount the layout");
+    // Another layout replaces the dashboard.
+    await page.locator("#to-b").click();
+    await page.locator("#auth").waitFor();
+    assert.equal(await page.locator("#sidebar").count(), 0);
+    assert.equal(await page.locator("#alert").count(), 0);
+    await page.locator("#auth-to-a").click();
+    await page.locator("#alert").waitFor();
+    assert.equal(await page.locator("#title").innerText(), "Conexiones");
+    assert.equal(await page.locator("#sidebar").inputValue(), "", "a new dashboard starts empty");
+    assert.equal(await page.evaluate(() => (window as unknown as { kept?: number }).kept), 1, "every navigation stayed in the client");
+    // Straight to /c: it hydrates the title its setup wrote on the server, without a mismatch.
+    await page.goto(`${origin}/c`);
+    await page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length > 0);
+    assert.equal(await page.locator("#title").innerText(), "Informe");
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser?.close();
+    if (server) await new Promise<void>((done) => server!.close(() => done()));
+    await app?.close();
+    await project.remove();
+  }
+});
+
+/** What `<MeekoAwait>` showed in the first frame, every layout shift and the CSP violations. */
+type AwaitProbe = {
+  first?: { state: string | null; height: number; skeleton: boolean };
+  /** Every `layout-shift` entry, with what moved (`NODE.class YxH->YxH`, top and height) to explain a failure. */
+  shifts: Array<{ value: number; time: number; recent: boolean; sources: string }>;
+  lists: number[];
+};
+
+/** Records, from the start of each document, the first frame of the zone and every `layout-shift` entry. */
+const awaitProbe = (): void => {
+  // No named function inside: the test runner would wrap it with a helper that the page lacks.
+  const probe: AwaitProbe = { shifts: [], lists: [] };
+  Object.assign(window, { __await: probe });
+  new PerformanceObserver((list) => {
+    for (const entry of list.getEntries() as unknown as Array<{ value: number; startTime: number; hadRecentInput: boolean; sources?: Array<{ node?: Node; previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly }> }>) {
+      probe.shifts.push({ value: entry.value, time: entry.startTime, recent: entry.hadRecentInput, sources: (entry.sources ?? []).map((source) => `${source.node?.nodeName}.${(source.node as Element | undefined)?.className ?? ""} ${source.previousRect.y}x${source.previousRect.height}->${source.currentRect.y}x${source.currentRect.height}`).join(" | ") });
+    }
+  }).observe({ type: "layout-shift", buffered: true });
+  // The first frame: rendering waits for <head>, so this is what the first paint shows.
+  requestAnimationFrame(() => {
+    const zone = document.querySelector("[data-meeko-await]");
+    if (zone) probe.first = { state: zone.getAttribute("data-meeko-await"), height: zone.getBoundingClientRect().height, skeleton: zone.querySelector(".skeleton") !== null };
+  });
+  const violations: string[] = [];
+  Object.assign(window, { __cspViolations: violations });
+  document.addEventListener("securitypolicyviolation", (event) => violations.push(`${event.violatedDirective} ${event.blockedURI}`));
+};
+
+/** A card that lists items loaded without await; `reserve` decides whether the zone remembers its height. */
+const awaitCard = (reserve: boolean): string => `<script lang="ts">
+const items = useApi("/api/items");
+</script>
+<template><main><MeekoLink id="back" to="/">Inicio</MeekoLink><section class="card"><h2>Items</h2><MeekoAwait for="items"${reserve ? " reserve" : ""}><snippet name="pending"><p class="skeleton">Cargando…</p></snippet><snippet name="error" params="error, retry"><p role="alert">No se pudo cargar. <button on:click="retry">Reintentar</button></p></snippet><ul class="items"><li each:of="items.data.value" each:as="item" each:key="item.id">{item.name}</li></ul></MeekoAwait><button id="reload" type="button" on:click="() => items.refresh()">Recargar</button></section><footer class="after">Pie de página</footer></main></template>
+`;
+
+test("<MeekoAwait reserve> keeps a card with late data from shifting the page on a second visit, under a strict CSP", { timeout: 300_000 }, async () => {
+  const project = await createTempProject("await-e2e");
+  const root = project.root;
+  type ServerModule = typeof import("../src/framework-server.ts");
+  type NodeModule = typeof import("../src/node.ts");
+  let server: import("node:http").Server | undefined;
+  let app: Awaited<ReturnType<ServerModule["createServerApp"]>> | undefined;
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  try {
+    const files: Record<string, string> = {
+      "package.json": '{"name":"await-app","private":true,"type":"module"}\n',
+      "app/styles/main.css": [
+        "body { margin: 0; font: 16px/20px sans-serif; }",
+        "p { margin: 0; }",
+        ".card { width: 420px; padding: 8px; }",
+        "h2 { margin: 0; height: 30px; }",
+        ".skeleton { margin: 0; height: 60px; }",
+        ".items { margin: 0; padding: 0; list-style: none; }",
+        ".items li { height: 40px; }",
+        ".after { height: 400px; background: #eee; }",
+      ].join("\n"),
+      "app/pages/index.meeko": '<template><main><p id="home">Inicio</p><MeekoLink id="to-reserve" to="/reserve">Con reserva</MeekoLink> <MeekoLink id="to-plain" to="/plain">Sin reserva</MeekoLink></main></template>\n',
+      "app/pages/reserve.meeko": awaitCard(true),
+      "app/pages/plain.meeko": awaitCard(false),
+      // Latency: the data arrives well after the first paint and after the 500 ms that follow a click.
+      "shared/schemas/items.ts": `export type Item = { id: number; name: string };
+export const items = { "~standard": { version: 1 as const, vendor: "e2e", types: undefined as unknown as { input: Item[]; output: Item[] }, validate: (value: unknown) => ({ value: value as Item[] }) } };
+`,
+      "server/api/items/index.get.ts": `import { items } from "../../../shared/schemas/items.js";
+export default defineApiRoute({
+  response: items,
+  handler: async () => {
+    await new Promise((done) => setTimeout(done, 900));
+    return Array.from({ length: 8 }, (_, index) => ({ id: index + 1, name: \`Item \${index + 1}\` }));
+  },
+});
+`,
+    };
+    for (const [file, contents] of Object.entries(files)) {
+      await mkdir(dirname(join(root, file)), { recursive: true });
+      await writeFile(join(root, file), contents);
+    }
+    await linkRepositoryPackages(root, ["@meekojs/meeko", "vite"]);
+    // The generated clients autoimport useApi, as meeko build and meeko check prepare them.
+    await prepareFrameworkTypes(root);
+    const built = await buildProject(root);
+    const { createServerApp } = await import(pathToFileURL(resolve("dist/framework-server.js")).href) as ServerModule;
+    const { createNodeAssetReader, toNodeListener } = await import(pathToFileURL(resolve("dist/node.js")).href) as NodeModule;
+    const output = await import(pathToFileURL(join(built.output, "index.mjs")).href) as Pick<Parameters<ServerModule["createServerApp"]>[0], "load" | "manifest">;
+    const nonce = randomUUID().replaceAll("-", "");
+    // No 'unsafe-inline': the script of the memory runs by its nonce, its rules go through the CSSOM.
+    const policy = `default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'nonce-${nonce}'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'`;
+    app = await createServerApp({
+      manifest: output.manifest, load: output.load, production: false,
+      assets: createNodeAssetReader({ root: join(built.output, "client"), assets: output.manifest.assets ?? {} }),
+      document: { nonce: () => nonce },
+    });
+    const running = app;
+    server = createHttpServer(toNodeListener(async (request) => {
+      const response = await running.fetch(request);
+      const headers = new Headers(response.headers);
+      headers.set("content-security-policy", policy);
+      return new Response(response.body, { status: response.status, headers });
+    }));
+    await new Promise<void>((ready) => server!.listen(0, "127.0.0.1", ready));
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    browser = await chromium.launch({
+      ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: "chrome" as const }),
+      headless: true,
+    });
+    const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
+    await context.addInitScript(awaitProbe);
+    const page = await context.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+    const probe = () => page.evaluate(() => (window as unknown as { __await: AwaitProbe }).__await);
+    /** Layout shifts since `since` (ms of the document): every entry, also those right after a click. */
+    const shiftsSince = async (since: number): Promise<number> => (await probe()).shifts.filter((entry) => entry.time >= since).reduce((total, entry) => total + entry.value, 0);
+    /** Waits for the data and for the layout-shift entries of its frame. */
+    const ready = async (): Promise<void> => {
+      await page.waitForSelector("[data-meeko-await=ready] .items li");
+      await page.waitForTimeout(400);
+    };
+    const load = async (path: string): Promise<void> => {
+      await page.goto(`${origin}${path}`);
+      await page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length > 0);
+    };
+    const navigate = async (link: string): Promise<number> => {
+      const since = await page.evaluate(() => performance.now());
+      await page.locator(link).click();
+      return since;
+    };
+    const measures: Record<string, number> = {};
+
+    // 1. First visit: the skeleton in the first frame; without memory the zone grows once, no more than without reserve.
+    await load("/reserve");
+    const first = (await probe()).first;
+    assert.equal(first?.state, "pending");
+    assert.equal(first?.skeleton, true);
+    assert.equal(await page.locator("[data-meeko-await]").getAttribute("aria-busy"), "true");
+    await ready();
+    measures.firstReserve = await shiftsSince(0);
+    const zoneHeight = await page.locator("[data-meeko-await]").evaluate((zone) => zone.getBoundingClientRect().height);
+    assert.equal(zoneHeight, 320);
+    const memory = JSON.parse(await page.evaluate(() => sessionStorage.getItem("meeko:await") ?? "{}")) as Record<string, number>;
+    assert.deepEqual(Object.values(memory), [320], "the height with data is remembered");
+    await load("/plain");
+    await ready();
+    measures.firstPlain = await shiftsSince(0);
+    assert.ok(measures.firstPlain > 0.05, `the card shifts the page without a reserve: ${measures.firstPlain}`);
+    assert.ok(measures.firstReserve <= measures.firstPlain + 0.005, `the first visit shifts no more than the skeleton: ${JSON.stringify(measures)}`);
+
+    // 2. Second visit by client navigation: the zone is inserted with the remembered height.
+    await load("/");
+    let since = await navigate("#to-reserve");
+    await page.waitForSelector("[data-meeko-await=pending]");
+    assert.equal(await page.locator("[data-meeko-await]").evaluate((zone) => zone.getBoundingClientRect().height), 320, "reserved while pending");
+    await ready();
+    measures.navigationReserve = await shiftsSince(since);
+    since = await navigate("#back");
+    await page.waitForSelector("#to-plain");
+    since = await navigate("#to-plain");
+    await ready();
+    measures.navigationPlain = await shiftsSince(since);
+    assert.ok(measures.navigationReserve < 0.01, `no shift with the memory: ${JSON.stringify(measures)} ${JSON.stringify((await probe()).shifts)}`);
+    assert.ok(measures.navigationPlain > 0.05, `the same navigation shifts without reserve: ${JSON.stringify(measures)}`);
+
+    // 3. Second visit by a full load: the script of <head> reserves the height before the first paint.
+    await load("/reserve");
+    const reloaded = (await probe()).first;
+    assert.equal(reloaded?.state, "pending");
+    assert.equal(reloaded?.height, 320, "the first frame already has the remembered height");
+    await ready();
+    measures.reloadReserve = await shiftsSince(0);
+    await load("/plain");
+    await ready();
+    measures.reloadPlain = await shiftsSince(0);
+    assert.ok(measures.reloadReserve < 0.01, `no shift on a reload with the memory: ${JSON.stringify(measures)}`);
+    assert.ok(measures.reloadPlain > 0.05, JSON.stringify(measures));
+
+    // 4. A refresh keeps the list on screen (keepPrevious), marks the zone and never empties it.
+    await load("/reserve");
+    await ready();
+    await page.evaluate(() => {
+      const probe = (window as unknown as { __await: AwaitProbe }).__await;
+      new MutationObserver(() => { probe.lists.push(document.querySelectorAll(".items li").length); })
+        .observe(document.querySelector("[data-meeko-await]")!, { subtree: true, childList: true, attributes: true });
+    });
+    since = await navigate("#reload");
+    await page.waitForSelector("[data-meeko-await][data-meeko-refreshing][aria-busy=true]");
+    assert.equal(await page.locator(".items li").count(), 8);
+    await page.waitForSelector("[data-meeko-await]:not([data-meeko-refreshing]):not([aria-busy])");
+    const lists = (await probe()).lists;
+    assert.ok(lists.length > 0 && lists.every((count) => count === 8), `the list never emptied: ${JSON.stringify(lists)}`);
+    measures.refresh = await shiftsSince(since);
+    assert.ok(measures.refresh < 0.01, JSON.stringify(measures));
+
+    assert.deepEqual(await page.evaluate(() => (window as unknown as { __cspViolations: string[] }).__cspViolations), []);
+    assert.deepEqual(errors, []);
+    console.log(`[await e2e] layout shift (CLS) by visit: ${JSON.stringify(Object.fromEntries(Object.entries(measures).map(([name, value]) => [name, Number(value.toFixed(4))])))}`);
+    await context.close();
+  } finally {
+    await browser?.close();
+    if (server) await new Promise<void>((done) => server!.close(() => done()));
+    await app?.close();
+    await project.remove();
+  }
+});
+
+/** A button that is a link when it receives `href`, with one template for both tags. */
+const dynamicButton = `<script lang="ts">
+import { computed } from "@meekojs/meeko";
+const props = defineProps<{ href?: string; target?: string; type?: "button" | "submit" | "reset"; disabled?: boolean; loading?: boolean }>();
+const emit = defineEmits<{ click: [event: MouseEvent] }>();
+const snippets = defineSnippets<{ default?: []; leading?: []; trailing?: [] }>();
+const inactive = computed(() => Boolean(props.disabled || props.loading));
+const rel = computed(() => props.target === "_blank" ? "noopener noreferrer" : undefined);
+const state = computed(() => ({ "data-loading": props.loading ? "" : undefined, "aria-disabled": inactive.value ? "true" : undefined }));
+function onClick(event: MouseEvent): void {
+  if (inactive.value) {
+    event.preventDefault();
+    return;
+  }
+  emit("click", event);
+}
+</script>
+<template>
+  <component is="props.href ? 'a' : 'button'" class="button" bind="state.value" on:click="onClick"
+    bind:href="inactive.value ? undefined : props.href" bind:target="props.target" bind:rel="rel.value"
+    bind:type="props.type" bind:disabled="props.disabled">
+    <span if:when="props.loading" class="button__spinner" aria-hidden="true"></span>
+    <span class="button__label"><render snippet="snippets.leading" /><render snippet="snippets.default" /><render snippet="snippets.trailing" /></span>
+  </component>
+</template>
+`;
+
+test("un <component is> con etiqueta pasa de <button> a <a> al recibir href y conserva el foco y el texto", { timeout: 240_000 }, async () => {
+  const project = await createTempProject("dynamic-tag-e2e");
+  const root = project.root;
+  type ServerModule = typeof import("../src/framework-server.ts");
+  type NodeModule = typeof import("../src/node.ts");
+  let server: import("node:http").Server | undefined;
+  let app: Awaited<ReturnType<ServerModule["createServerApp"]>> | undefined;
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  try {
+    const files: Record<string, string> = {
+      "package.json": '{"name":"dynamic-tag-app","private":true,"type":"module"}\n',
+      "meeko.config.mjs": "export default {};\n",
+      "app/components/Button.meeko": dynamicButton,
+      "app/pages/index.meeko": `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const href = signal("");
+const clicks = signal(0);
+function open(): void {
+  clicks.value++;
+  href.value = "/docs";
+}
+</script>
+<template><main><Button bind:href="href.value || undefined" type="button" on:click="open"><input class="inside" value="">Abrir</Button><p id="clicks">{clicks.value}</p></main></template>
+`,
+    };
+    for (const [file, contents] of Object.entries(files)) {
+      await mkdir(dirname(join(root, file)), { recursive: true });
+      await writeFile(join(root, file), contents);
+    }
+    await linkRepositoryPackages(root, ["@meekojs/meeko", "vite"]);
+    const built = await buildProject(root);
+    const { createServerApp } = await import(pathToFileURL(resolve("dist/framework-server.js")).href) as ServerModule;
+    const { createNodeAssetReader, toNodeListener } = await import(pathToFileURL(resolve("dist/node.js")).href) as NodeModule;
+    const output = await import(pathToFileURL(join(built.output, "index.mjs")).href) as Pick<Parameters<ServerModule["createServerApp"]>[0], "load" | "manifest">;
+    app = await createServerApp({
+      manifest: output.manifest, load: output.load, production: false,
+      assets: createNodeAssetReader({ root: join(built.output, "client"), assets: output.manifest.assets ?? {} }),
+    });
+    const running = app;
+    server = createHttpServer(toNodeListener((request) => running.fetch(request)));
+    await new Promise<void>((ready) => server!.listen(0, "127.0.0.1", ready));
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const html = await (await fetch(`${origin}/`)).text();
+    // The server renders a <button> with its type and without target or href.
+    assert.match(html, /<button class="button" type="button" data-meeko="0">/);
+    browser = await chromium.launch({
+      ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: "chrome" as const }),
+      headless: true,
+    });
+    const page = await browser.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+    await page.goto(`${origin}/`);
+    await page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length > 0);
+    // The text typed in a control inside the button survives the change of tag.
+    await page.locator("input.inside").fill("hola");
+    await page.locator("button.button").focus();
+    await page.keyboard.press("Enter");
+    await page.locator("a.button").waitFor();
+    assert.equal(await page.locator("#clicks").innerText(), "1");
+    const link = await page.evaluate(() => {
+      const active = document.activeElement as HTMLElement | null;
+      const anchor = document.querySelector("a.button") as HTMLAnchorElement;
+      return {
+        focused: active === anchor, href: anchor.getAttribute("href"), type: anchor.hasAttribute("type"),
+        text: anchor.innerText.trim(), input: (anchor.querySelector("input.inside") as HTMLInputElement).value, buttons: document.querySelectorAll("button.button").length,
+      };
+    });
+    assert.deepEqual(link, { focused: true, href: "/docs", type: false, text: "Abrir", input: "hola", buttons: 0 });
+    assert.deepEqual(errors, []);
   } finally {
     await browser?.close();
     if (server) await new Promise<void>((done) => server!.close(() => done()));

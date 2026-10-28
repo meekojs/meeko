@@ -1,9 +1,12 @@
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import ts from "@typescript/typescript6";
 import { compileWithAutoImports } from "./autoimports.js";
 import { moduleSpecifiers, replaceModuleSpecifiers } from "./compiler/import-graph.js";
 import { projectRoot } from "./compiler/project-root.js";
+import { aliasCandidates } from "./compiler/aliases.js";
+import { resolveProjectAliases } from "./framework/aliases.js";
 
 /** Stable ownership marker for generated component declarations. */
 export const componentTypeDeclarationMarker = "// @meeko-generated component-declaration v1";
@@ -23,11 +26,12 @@ export interface GenerateTypesOptions {
 export async function generateTypes(source: string, filename: string, options: GenerateTypesOptions = {}): Promise<string[]> {
   if (!filename.endsWith(".meeko")) throw new TypeError("Type generation requires a .meeko input file");
   const root = projectRoot(filename);
+  const aliases = await resolveProjectAliases(root);
   const declarations = new Map<string, string>();
   async function collect(content: string, path: string): Promise<void> {
     if (declarations.has(path)) return;
     const target = relative(root, path).split(/[\\/]/)[0] === "server" ? "server" : "client";
-    const generated = (await compileWithAutoImports(content, path, {}, target)).code;
+    const generated = (await compileWithAutoImports(content, path, {}, target, undefined, aliases)).code;
     const result = ts.transpileDeclaration(generated, {
       fileName: `${path}.ts`,
       compilerOptions: { declaration: true, emitDeclarationOnly: true },
@@ -41,8 +45,11 @@ export async function generateTypes(source: string, filename: string, options: G
     declarations.set(path, `${componentTypeDeclarationMarker}\n${result.outputText}`);
     for (const { value: specifier } of moduleSpecifiers(generated, path)) {
       if (!specifier.endsWith(".meeko")) continue;
-      if (!specifier.startsWith(".")) continue;
-      const child = resolve(dirname(path), specifier);
+      // A component imported through a path alias (`@/widgets/Chart.meeko`): the first file that exists.
+      const aliased = specifier.startsWith(".") ? undefined : aliasCandidates(aliases.aliases, specifier);
+      if (!specifier.startsWith(".") && !aliased) continue;
+      const child = aliased ? aliased.find((candidate) => existsSync(candidate)) : resolve(dirname(path), specifier);
+      if (!child) continue;
       await collect(options.read?.(child) ?? await readFile(child, "utf8"), child);
     }
   }

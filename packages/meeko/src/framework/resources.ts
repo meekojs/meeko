@@ -38,12 +38,22 @@ import type { MutationOptions, RetrySafeMutation, RetrySafeOptions } from "./mut
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#datos-en-componentes-useapi-userpcquery-y-userpcmutation
  */
 export interface DataResource<T> extends PromiseLike<LoadedResource<T>> {
-  /** Datos de la última carga correcta, o `null` antes de la primera. */
+  /**
+   * Datos de la última carga correcta, o `null` antes de la primera. Una recarga (`refresh()` o un
+   * cambio de la entrada) los conserva hasta que llegan los nuevos; desde `1.5`, con
+   * `keepPrevious: false`, un cambio de la entrada los vacía.
+   */
   readonly data: ReadonlySignal<T | null>;
   /** Fallo de la última carga, o `null`. */
   readonly error: ReadonlySignal<Error | null>;
   /** `true` mientras hay una carga en curso. */
   readonly pending: ReadonlySignal<boolean>;
+  /**
+   * `true` mientras hay una recarga en curso y `data` conserva los datos de una carga anterior: la
+   * primera carga es `pending` sin `refreshing`. Sirve para un indicador discreto que no oculta los
+   * datos (desde `1.5`).
+   */
+  readonly refreshing: ReadonlySignal<boolean>;
   /** Vuelve a pedir los datos con la entrada actual; un fallo sólo actualiza `error`. */
   refresh(): Promise<void>;
 }
@@ -71,8 +81,40 @@ export interface LoadedResource<T> {
   readonly error: ReadonlySignal<Error | null>;
   /** `true` mientras hay una recarga en curso. */
   readonly pending: ReadonlySignal<boolean>;
+  /** `true` mientras hay una recarga en curso; `data` conserva los datos anteriores (desde `1.5`). */
+  readonly refreshing: ReadonlySignal<boolean>;
   /** Vuelve a pedir los datos con la entrada actual; un fallo sólo actualiza `error`. */
   refresh(): Promise<void>;
+}
+
+/**
+ * Opciones de recarga de `useApi` y `useRpcQuery`: su último argumento, después de las opciones de
+ * la petición o de la entrada.
+ *
+ * @since 1.5.0
+ * @example
+ * ```html
+ * <script lang="ts">
+ * const props = defineProps<{ params: { id: string }; search: Record<string, string | string[]> }>();
+ * // Al cambiar de usuario, data vuelve a null en lugar de mostrar el anterior mientras carga.
+ * const user = useApi("/api/users/[id]", () => ({ params: { id: props.params.id } }), { keepPrevious: false });
+ * // Por defecto, data conserva la página anterior mientras llega la siguiente.
+ * const page = signal("1");
+ * const list = useApi("/api/users", { query: { page } });
+ * </script>
+ * <template><p if:when="list.refreshing.value">Actualizando…</p></template>
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#datos-anteriores-durante-una-recarga-keepprevious
+ */
+export interface DataResourceOptions {
+  /**
+   * Si `data` conserva el valor anterior cuando cambia la entrada (sus señales) mientras llegan los
+   * datos nuevos, con `pending` y `refreshing` en `true`. Por defecto `true`, como hasta `1.4`.
+   * Con `false`, un cambio de la entrada vacía `data` y `error` y vuelve a ser una primera carga
+   * (`pending` sin `refreshing`). `refresh()` conserva siempre los datos, y un recurso esperado con
+   * `await`, cuyo `data` nunca es `null`, también.
+   */
+  readonly keepPrevious?: boolean;
 }
 
 /**
@@ -182,11 +224,12 @@ type QueryOption<Q> = [Q] extends [undefined] ? { readonly query?: never }
 export type ApiQueryOptions<O extends AnyApiOperation> = ParamsOption<O["params"]> & QueryOption<O["query"]>;
 type ApiQueryInput<O extends AnyApiOperation> = ApiQueryOptions<O> | (() => ApiQueryOptions<O>);
 type ApiQueryArguments<O extends AnyApiOperation> = [O["params"]] extends [undefined]
-  ? [O["query"]] extends [undefined] ? [options?: ApiQueryInput<O>] : {} extends O["query"] ? [options?: ApiQueryInput<O>] : [options: ApiQueryInput<O>]
-  : [options: ApiQueryInput<O>];
+  ? [O["query"]] extends [undefined] ? [options?: ApiQueryInput<O>, resource?: DataResourceOptions]
+    : {} extends O["query"] ? [options?: ApiQueryInput<O>, resource?: DataResourceOptions] : [options: ApiQueryInput<O>, resource?: DataResourceOptions]
+  : [options: ApiQueryInput<O>, resource?: DataResourceOptions];
 type RpcQueryInput<I> = Reactive<ReactiveFields<I>> | (() => I);
 /** An input that accepts `{}` may be left out; the request then sends `{}`. */
-type RpcQueryArguments<I> = {} extends I ? [input?: RpcQueryInput<I>] : [input: RpcQueryInput<I>];
+type RpcQueryArguments<I> = {} extends I ? [input?: RpcQueryInput<I>, resource?: DataResourceOptions] : [input: RpcQueryInput<I>, resource?: DataResourceOptions];
 
 type GetEndpoint<M> = M extends { readonly api: readonly (infer E)[] }
   ? Extract<E, { readonly method: "GET"; readonly pathname: string; readonly clientKey: string }>
@@ -216,9 +259,10 @@ export type ApiQueryContract<Manifest, Contract> = {
 
 type QueryOf<Queries, Path extends keyof Queries> = Extract<Queries[Path], AnyApiOperation>;
 /**
- * Firma de `useApi(ruta, opciones?)`: lee un endpoint GET por su ruta y devuelve un
+ * Firma de `useApi(ruta, opciones?, recarga?)`: lee un endpoint GET por su ruta y devuelve un
  * {@link DataResource}. Sólo se llama en el nivel superior del `<script>` (`MEEK054`); con `await`,
- * la página no se renderiza hasta tener los datos.
+ * la página no se renderiza hasta tener los datos. Desde `1.5`, el tercer argumento son las
+ * {@link DataResourceOptions} (`keepPrevious`).
  *
  * @typeParam Queries Operaciones GET por ruta, normalmente un {@link ApiQueryContract}.
  * @since 1.1.0
@@ -235,9 +279,10 @@ type QueryOf<Queries, Path extends keyof Queries> = Extract<Queries[Path], AnyAp
 export type UseApi<Queries> =
   <Path extends keyof Queries & string>(path: Path, ...options: ApiQueryArguments<QueryOf<Queries, Path>>) => DataResource<QueryOf<Queries, Path>["output"]>;
 /**
- * Firma de `useRpcQuery(procedimiento, input?)`: lee datos mediante un procedimiento RPC y devuelve
- * un {@link DataResource}. `input` puede contener señales o ser una función que las lee; un cambio
- * vuelve a pedir los datos. Sólo en el nivel superior del `<script>` (`MEEK054`).
+ * Firma de `useRpcQuery(procedimiento, input?, recarga?)`: lee datos mediante un procedimiento RPC y
+ * devuelve un {@link DataResource}. `input` puede contener señales o ser una función que las lee; un
+ * cambio vuelve a pedir los datos. Sólo en el nivel superior del `<script>` (`MEEK054`). Desde `1.5`,
+ * el tercer argumento son las {@link DataResourceOptions} (`keepPrevious`).
  *
  * @typeParam Contract Contrato `RpcContract` generado, indexado por ID de procedimiento.
  * @since 1.1.0
@@ -485,6 +530,17 @@ function requireSetup(label: string): "render" | "mount" {
   return phase;
 }
 
+/** What `<MeekoAwait>` reads of a resource besides its public signals. */
+export interface ResourceInternals {
+  /** Request key of the current input, as in the page payload. */
+  readonly key: ReadonlySignal<string>;
+  /** Whether `data` holds the result of a load. */
+  readonly loaded: ReadonlySignal<boolean>;
+}
+
+/** Key of {@link ResourceInternals} on the resources of `useApi` and `useRpcQuery`. */
+export const resourceInternals: unique symbol = Symbol("meeko.resource");
+
 interface ResourceSource {
   readonly label: string;
   readonly read: () => unknown;
@@ -492,13 +548,22 @@ interface ResourceSource {
   readonly fetch: (input: unknown, signal: AbortSignal | undefined) => Promise<unknown>;
 }
 
-function createResource<T>(source: ResourceSource): DataResource<T> {
+function createResource<T>(source: ResourceSource, options: DataResourceOptions | undefined): DataResource<T> {
   const phase = requireSetup(source.label);
+  if (options !== undefined && (typeof options !== "object" || options === null)) {
+    throw new TypeError(`${source.label}: the last argument must be an object such as { keepPrevious: false }`);
+  }
+  const keepPrevious = options?.keepPrevious !== false;
   const data = signal<T | null>(null);
   const error = signal<Error | null>(null);
   const pending = signal(true);
+  const refreshing = signal(false);
+  /** Whether `data` holds the result of a load: `null` may be a real output. */
+  const loadedOnce = signal(false);
   let input = untrack(source.read);
   let key = source.key(input);
+  /** `key` for readers outside: `<MeekoAwait>` follows it. */
+  const keySignal = signal(key);
   const cache = findContext(cacheKey);
   let awaited = false;
   let started = false;
@@ -513,23 +578,27 @@ function createResource<T>(source: ResourceSource): DataResource<T> {
     controller = current;
     const id = ++generation;
     const requestKey = key;
-    pending.value = true;
+    batch(() => {
+      pending.value = true;
+      refreshing.value = untrack(() => loadedOnce.value);
+    });
     const run = source.fetch(input, current.signal).then((value) => {
       if (id !== generation || released) return;
-      batch(() => { data.value = value as T; error.value = null; pending.value = false; });
+      batch(() => { data.value = value as T; error.value = null; pending.value = false; refreshing.value = false; loadedOnce.value = true; });
       cache?.set(requestKey, value);
     }, (failure: unknown) => {
       if (id !== generation || released || current.signal.aborted) return;
-      batch(() => { error.value = toError(failure); pending.value = false; });
+      batch(() => { error.value = toError(failure); pending.value = false; refreshing.value = false; });
     }).finally(() => { if (inflight === run) inflight = undefined; });
     inflight = run;
     return run;
   };
   const loaded = (value: unknown): LoadedResource<T> => {
-    batch(() => { data.value = value as T; error.value = null; pending.value = false; });
+    batch(() => { data.value = value as T; error.value = null; pending.value = false; refreshing.value = false; loadedOnce.value = true; });
     return view;
   };
-  const view: LoadedResource<T> = { data: data as ReadonlySignal<T>, error, pending, refresh: () => load() };
+  const internals: ResourceInternals = { key: keySignal, loaded: loadedOnce };
+  const view: LoadedResource<T> = Object.assign({ data: data as ReadonlySignal<T>, error, pending, refreshing, refresh: () => load() }, { [resourceInternals]: internals });
   const settle = (): Promise<LoadedResource<T>> => {
     awaited = true;
     const ready = untrack(() => !pending.value && error.value === null);
@@ -572,14 +641,22 @@ function createResource<T>(source: ResourceSource): DataResource<T> {
       if (nextKey === key) return;
       input = next;
       key = nextKey;
-      untrack(() => { void load(); });
+      untrack(() => {
+        // `keepPrevious: false`: the data of another input is not shown while the new one loads.
+        batch(() => {
+          keySignal.value = nextKey;
+          if (!keepPrevious && !awaited) { data.value = null; error.value = null; loadedOnce.value = false; }
+        });
+        void load();
+      });
     });
     // Without await, the browser loads the data once the component is mounted.
     whenMounted(() => { if (!awaited && !started) void load(); });
   }
   const resource = {
-    data, error, pending,
+    data, error, pending, refreshing,
     refresh: () => load(),
+    [resourceInternals]: internals,
     then<R1 = LoadedResource<T>, R2 = never>(onfulfilled?: ((value: LoadedResource<T>) => R1 | PromiseLike<R1>) | null, onrejected?: ((reason: unknown) => R2 | PromiseLike<R2>) | null): PromiseLike<R1 | R2> {
       return settle().then(onfulfilled, onrejected);
     },
@@ -608,7 +685,7 @@ function createResource<T>(source: ResourceSource): DataResource<T> {
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#load-o-composables
  */
 export function createUseApi<Contract extends Record<string, Record<string, AnyApiOperation>>, Manifest extends Pick<PublicServerManifest, "api">>(manifest: Manifest, options: ClientOptions = {}): UseApi<ApiQueryContract<Manifest, Contract>> {
-  const useApi = (path: string, input?: unknown): DataResource<unknown> => {
+  const useApi = (path: string, input?: unknown, resource?: DataResourceOptions): DataResource<unknown> => {
     const endpoint = manifest.api.find((entry) => entry.pathname === path && entry.method === "GET");
     if (!endpoint) throw new TypeError(`useApi: no GET endpoint at ${path}`);
     return createResource({
@@ -616,7 +693,7 @@ export function createUseApi<Contract extends Record<string, Record<string, AnyA
       read: readerOf(input),
       key: (value) => `GET ${path} ${stableJson(value ?? {})}`,
       fetch: (value, signal) => requestApi(endpoint, { ...(value as ApiRequestInput | undefined), ...(signal ? { signal } : {}) }, options),
-    });
+    }, resource);
   };
   return useApi as never;
 }
@@ -646,7 +723,7 @@ function rpcEndpoint(manifest: Pick<PublicServerManifest, "rpc">, procedure: str
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#load-o-composables
  */
 export function createUseRpcQuery<Contract extends Record<string, RpcOperation>>(manifest: Pick<PublicServerManifest, "rpc">, options: ClientOptions = {}): UseRpcQuery<Contract> {
-  const useRpcQuery = (procedure: string, input?: unknown): DataResource<unknown> => {
+  const useRpcQuery = (procedure: string, input?: unknown, resource?: DataResourceOptions): DataResource<unknown> => {
     const endpoint = rpcEndpoint(manifest, procedure, "useRpcQuery");
     return createResource({
       label: `useRpcQuery("${procedure}")`,
@@ -654,7 +731,7 @@ export function createUseRpcQuery<Contract extends Record<string, RpcOperation>>
       read: readerOf(input === undefined ? {} : input),
       key: (value) => `RPC ${procedure} ${stableJson(value)}`,
       fetch: (value, signal) => requestRpc(endpoint, value, signal ? { signal } : {}, options),
-    });
+    }, resource);
   };
   return useRpcQuery as never;
 }

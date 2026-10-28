@@ -70,14 +70,15 @@ let groups: readonly ApiGroup[] | undefined
 
 /**
  * The groups of the reference: the syntax of `.meeko`, then every public subpath of
- * `package.json#exports` except `./internal`, which only compiled components import.
+ * `package.json#exports` except `./internal` and `./builtins/*`, which only compiled components
+ * import (the types of the built-in tags are documented through `./framework`).
  */
 export function apiGroups(): readonly ApiGroup[] {
 	if (groups) return groups
 	const manifest = JSON.parse(readRepositoryFile(`${packageFolder}/package.json`)) as {
 		exports: Readonly<Record<string, { readonly default?: string }>>
 	}
-	const subpaths = Object.entries(manifest.exports).filter(([subpath, target]) => subpath !== './internal' && typeof target.default === 'string')
+	const subpaths = Object.entries(manifest.exports).filter(([subpath, target]) => subpath !== './internal' && subpath !== './builtins/*' && typeof target.default === 'string')
 	const order = Object.keys(known)
 	const rank = (subpath: string): number => (order.includes(subpath) ? order.indexOf(subpath) : order.length)
 	subpaths.sort(([left], [right]) => rank(left) - rank(right))

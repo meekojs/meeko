@@ -179,7 +179,8 @@ function isExpressionAttribute(name: string, element: HtmlNode | undefined): boo
   // On a custom element (`<x-markdown html="intro">`), `html` and `model` are plain HTML attributes;
   // the reserved SVG/MathML names (`<font-face>`) are standard elements, as in the compiler.
   const custom = tag !== undefined && !/^[A-Z]/.test(tag) && isCustomElementTag(tag);
-  if (name === "model" || /^model:./.test(name)) return !custom;
+  // `bind="obj"` (since 1.5) on an element or a component; on a custom element it stays an attribute.
+  if (name === "model" || name === "bind" || /^model:./.test(name)) return !custom;
   if (/^(?:bind|on):./.test(name) || name === "if:when" || name === "each:of" || name === "each:key") return true;
   if (name === "is") return tag === "component";
   // `html="expression"` on a standard element; a component tag rejects it (MEEK032).

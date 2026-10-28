@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import ts from "@typescript/typescript6";
 import { parseSfc } from "../compiler/sfc.js";
+import { frameworkTsconfigPaths, resolveProjectAliases } from "./aliases.js";
 import type { AppTypesOptions } from "./check-app.js";
 import { prepareFrameworkTypeDeclarations } from "./type-declarations.js";
 
@@ -14,7 +15,7 @@ const typescriptPackage = fileURLToPath(import.meta.resolve("typescript/package.
 export interface PageContractDiagnostic {
   readonly filename: string;
   readonly offset: number;
-  readonly code: "MEEK_PAGE_PROPS" | "MEEK_LAYOUT_PROPS" | "MEEK_ERROR_PROPS";
+  readonly code: "MEEK_PAGE_PROPS" | "MEEK_LAYOUT_PROPS" | "MEEK_ERROR_PROPS" | "MEEK_PAGE_LAYOUT_PROPS";
   readonly message: string;
 }
 
@@ -44,9 +45,11 @@ function contractAliases(source: string, filename: string): Map<number, { file: 
     if (!check || !ts.isTypeReferenceNode(check)) continue;
     const file = literal(check.typeArguments?.[2]);
     if (!file) continue;
-    const kind = statement.name.text.startsWith("__layout") ? "MEEK_LAYOUT_PROPS"
-      : statement.name.text.startsWith("__error") ? "MEEK_ERROR_PROPS" : "MEEK_PAGE_PROPS";
-    const sidecar = kind === "MEEK_PAGE_PROPS" ? literal(check.typeArguments?.[3]) : undefined;
+    const kind = statement.name.text.startsWith("__layoutprops") ? "MEEK_PAGE_LAYOUT_PROPS"
+      : statement.name.text.startsWith("__layout") ? "MEEK_LAYOUT_PROPS"
+        : statement.name.text.startsWith("__error") ? "MEEK_ERROR_PROPS" : "MEEK_PAGE_PROPS";
+    // The page's sidecar, or the layout that the layoutProps of a page or +group.ts are for.
+    const sidecar = kind === "MEEK_PAGE_PROPS" || kind === "MEEK_PAGE_LAYOUT_PROPS" ? literal(check.typeArguments?.[3]) : undefined;
     aliases.set(ast.getLineAndCharacterOfPosition(statement.getStart(ast)).line + 1, {
       file, kind, ...(sidecar === undefined ? {} : { sidecar }),
     });
@@ -73,11 +76,14 @@ export async function checkFrameworkPageContracts(projectRoot: string, options: 
   // The editor's isolated consumer may not install the optional Vite peer or
   // @types/node. The contract itself only needs component declarations.
   const config = join(root, ".meeko", "tsconfig.page-contracts.json");
+  // A component's props may name types through a path alias; the contract runs on the server.
+  const paths = frameworkTsconfigPaths(root, await resolveProjectAliases(root), "server", dirname(config));
   const configSource = `${JSON.stringify({
     compilerOptions: {
       target: "ES2022", module: "ESNext", moduleResolution: "Bundler", lib: ["ES2022", "DOM"],
       types: [], strict: true, noEmit: true, skipLibCheck: true, allowArbitraryExtensions: true,
       rootDirs: ["..", "./types"],
+      ...(Object.keys(paths).length ? { paths } : {}),
     },
     include: ["generated/page-contracts.server.ts", "types/**/*.d.meeko.ts", "types/routes.d.ts"],
   }, null, 2)}\n`;
@@ -100,6 +106,13 @@ export async function checkFrameworkPageContracts(projectRoot: string, options: 
     if (!alias) continue;
     const filename = resolve(root, alias.file);
     const source = options.read?.(filename) ?? await readFile(filename, "utf8");
+    if (alias.kind === "MEEK_PAGE_LAYOUT_PROPS") {
+      // A +group.ts or a page: the error points at its layoutProps.
+      const at = source.indexOf("layoutProps");
+      const offset = at >= 0 ? at : filename.endsWith(".meeko") ? contractSourceOffset(source, filename) : 0;
+      diagnostics.push({ filename, offset, code: alias.kind, message: `Las layoutProps de ${alias.file} no coinciden con las props del layout ${alias.sidecar ?? ""}` });
+      continue;
+    }
     const unsafe = match[3]!.includes("no pueden ser any, never ni unknown");
     // Whole phrases, so each kind keeps its own article and contraction.
     const owner = alias.kind === "MEEK_PAGE_PROPS" ? "Las props de la página" : alias.kind === "MEEK_LAYOUT_PROPS" ? "Las props del layout" : "Las props de la página de error";

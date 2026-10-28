@@ -19,7 +19,7 @@ import { serverOnlyCompletion } from "../compiler/client-boundary.js";
 import { parseSfc } from "../compiler/sfc.js";
 import type { SfcSection } from "../compiler/sfc.js";
 import { eachKeyActions, sidecarActions } from "./actions.js";
-import { domEventCompletion, htmlAttributeCompletion, tagAt } from "./embedded.js";
+import { domEventCompletion, dynamicTagAttributeCompletion, dynamicTagHover, dynamicTags, htmlAttributeCompletion, tagAt } from "./embedded.js";
 import { builtinTag, builtinTags } from "./builtin-tags.js";
 import { builtinTagDefinition, builtinTagHover } from "./builtins.js";
 import { componentSummaryMarkdown, documentationMarkdown, memberDocumentation, tagSummary } from "./components.js";
@@ -543,6 +543,7 @@ const templateDirectives: readonly TemplateDirective[] = [
   { name: "ref:", detail: "Referencia a la etiqueta para useElementRef", insert: "ref:$1", on: "all" },
   { name: "model", detail: "Enlaza el valor del control con una señal", insert: 'model="$1"', on: "element", elements: ["input", "textarea", "select"] },
   { name: "html", detail: "Inserta la expresión como HTML sin escapar", insert: 'html="$1"', on: "element" },
+  { name: "bind", detail: "Atributos (o props de un componente) desde un objeto; los explícitos ganan", insert: 'bind="$1"', on: "all" },
   { name: "model:", detail: "Enlaza un modelo del componente (defineModel) con una señal", insert: "model:", on: "component" },
 ];
 
@@ -578,7 +579,9 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
   // component tag, with its own props.
   // `<MeekoThemeToggle>` is a component that Meeko ships: its props, then a component tag's directives.
   const builtin = shadowed.has(context.tag) ? undefined : builtinTag(context.tag);
-  const component = context.component && (!builtin || builtin.component === true);
+  // `<component is="href ? 'a' : 'button'">` is an element: the attributes of its tags.
+  const tags = builtin ? undefined : dynamicTags(source, context);
+  const component = context.component && (!builtin || builtin.component === true) && !tags;
   const start = document.positionAt(offset - word.length);
   const present = new Set([...source.slice(context.tagStart, context.tagEnd).matchAll(/\s([^\s=/>"']+)/g)].map((match) => match[1]!));
   present.delete(word);
@@ -613,7 +616,8 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
   // The HTML attributes of an element (`type`, `href`, `aria-*`…) after Meeko's directives.
   if (component) return [...ownProps, ...directives];
   const rejected = new Set(builtin?.rejected ?? []);
-  const html = htmlAttributeCompletion(document, position, present, builtin?.element).filter((item) => !rejected.has(item.label));
+  const html = tags ? dynamicTagAttributeCompletion(document, position, word, tags, present)
+    : htmlAttributeCompletion(document, position, present, builtin?.element).filter((item) => !rejected.has(item.label));
   return [...ownProps, ...directives, ...html];
 }
 
@@ -784,6 +788,9 @@ export function hover(base: FeatureContext, position: Position): Hover | undefin
       range: toRange(base.document, tagStart!, tagStart! + tag.name.length),
     };
   }
+  // `<component is>` with HTML tags: the elements it may render.
+  const element = dynamicTagHover(base.document, position);
+  if (element) return element;
   // The `html` directive inserts unescaped HTML: its hover carries the safety warning.
   const htmlDirective = base.component.htmlDirectives?.find((span) => sourceOffset >= span.start && sourceOffset < span.end);
   if (htmlDirective) {

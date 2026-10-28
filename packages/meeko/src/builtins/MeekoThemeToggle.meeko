@@ -1,10 +1,12 @@
 <script lang="ts">
 // <MeekoThemeToggle>, Meeko's own tag with `theme` in meeko.config.ts. `pnpm run builtins` compiles
-// this file into theme-toggle.compiled.ts, which the package ships; edit this file, not that one.
+// this file into theme-toggle.compiled.ts, which the package ships as
+// @meekojs/meeko/builtins/theme-toggle and which only the components that use the tag import; edit
+// this file, not that one.
 import { computed } from "../reactivity.js";
-import { useRoute } from "./navigation.js";
-import { themeToggleGroupLabel, themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus, useThemeToggle } from "./theme.js";
-import type { ThemeChoice, ThemeToggleItem, ThemeToggleMessages, ThemeToggleSnippets } from "./theme.js";
+import { useRoute } from "../framework/navigation.js";
+import { themeToggleGroupLabel, themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus, useThemeToggle } from "../framework/theme.js";
+import type { ThemeChoice, ThemeToggleItem, ThemeToggleMessages, ThemeToggleSnippets } from "../framework/theme.js";
 
 interface Props {
   /** `"cycle"` (por defecto), un botón que pasa al tema siguiente; `"select"`, un grupo de radios. */

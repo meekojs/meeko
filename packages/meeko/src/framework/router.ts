@@ -34,6 +34,40 @@ export interface RouteRecord {
   readonly sidecar?: string;
   /** Modo de render leído estáticamente del sidecar al descubrir la ruta; sin él, SSR. */
   readonly render?: PageRender;
+  /**
+   * Layout con nombre de `app/layouts` que envuelve la página, con su archivo (que también está en
+   * {@link RouteRecord.layouts}) y las `layoutProps` de los `+group.ts` de sus carpetas. Sin él, la
+   * página no tiene layout con nombre (`layout: false`, o sin `app/layouts/default.meeko`).
+   * @since 1.5.0
+   */
+  readonly layout?: NamedLayoutRecord;
+}
+
+/**
+ * Layout con nombre de una ruta o de la página de error: su nombre (`"default"`, `"dashboard"`,
+ * `"admin/panel"`), su archivo y las props estáticas que le pasan los `+group.ts` de las carpetas de
+ * la página. Las `layoutProps` de la propia página se aplican encima en cada petición.
+ *
+ * @since 1.5.0
+ * @example
+ * ```ts
+ * import type { NamedLayoutRecord } from "@meekojs/meeko/framework";
+ *
+ * const layout: NamedLayoutRecord = {
+ *   name: "dashboard",
+ *   file: "app/layouts/dashboard.meeko",
+ *   props: { showAlert: false },
+ * };
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#layouts-con-nombre
+ */
+export interface NamedLayoutRecord {
+  /** Nombre del layout: su ruta bajo `app/layouts`, sin `.meeko` y con `/`. */
+  readonly name: string;
+  /** Archivo `.meeko` del layout; es uno de los `layouts` de la ruta. */
+  readonly file: string;
+  /** `layoutProps` de los `+group.ts` de las carpetas de la página, de fuera hacia dentro. */
+  readonly props?: Readonly<Record<string, unknown>>;
 }
 
 /**
@@ -76,6 +110,11 @@ export interface ErrorPageRecord {
   readonly file: string;
   /** Cadena de layouts raíz, de fuera hacia dentro: `app/app.meeko` y después el layout raíz. */
   readonly layouts: readonly string[];
+  /**
+   * Layout `default` que la envuelve, si existe: una URL sin ruta se muestra con él.
+   * @since 1.5.0
+   */
+  readonly layout?: NamedLayoutRecord;
 }
 
 /** Manifest of the request the server is rendering; registered by the page handler. */

@@ -1,6 +1,7 @@
 import type { StateStore } from "./state.js";
 import { normalizeHeadInput } from "./head.js";
 import type { HeadInput } from "./head.js";
+import type { LayoutProps, PageLayoutOptions } from "./layout.js";
 
 /**
  * Subconjunto de Standard Schema v1 que se puede usar en el navegador, como el que implementan los
@@ -238,6 +239,22 @@ export interface PageDefinition<P extends PageSchema | undefined, S extends Page
    * configuración.
    */
   readonly head?: (args: PageLoadContext<P, S, C> & { data: D }) => PageHead;
+  /**
+   * Layout con nombre de la página (`app/layouts/<nombre>.meeko`), o `false` para quitarlo y dejar
+   * sólo `app/app.meeko`. Sin él, el de los `+group.ts` de sus carpetas o `default`. Debe ser un
+   * literal, porque `meeko build` lo lee sin ejecutar el archivo. En `definePage`, su tipo es la unión
+   * de los layouts de la aplicación.
+   * @since 1.5.0
+   */
+  readonly layout?: unknown;
+  /**
+   * Props para el layout de la página: un objeto o una función que las calcula con el contexto de
+   * `head` (`data` incluido). Se combinan con las de los `+group.ts`, a las que ganan. Llegan en el
+   * HTML del servidor y en el payload, así que deben poder serializarse en JSON. En `definePage` se
+   * tipan contra las props del layout que elige `layout`.
+   * @since 1.5.0
+   */
+  readonly layoutProps?: unknown;
 }
 
 /**
@@ -279,7 +296,39 @@ export interface ClientPageDefinition<P extends PageSchema | undefined, S extend
   readonly load?: (args: ClientPageLoadContext<P, S>) => Promise<D> | D;
   /** Se ejecuta en el navegador después de `load`; su head se aplica al confirmar la página. */
   readonly head?: (args: ClientPageLoadContext<P, S> & { data: D }) => PageHead;
+  /**
+   * Layout con nombre de la página, como en {@link PageDefinition.layout}.
+   * @since 1.5.0
+   */
+  readonly layout?: unknown;
+  /**
+   * Props para el layout: un objeto, que el servidor ya aplica al HTML de los layouts, o una función
+   * que se ejecuta en el navegador después de `load`.
+   * @since 1.5.0
+   */
+  readonly layoutProps?: unknown;
 }
+
+/** `layout` and `layoutProps` of server route options, typed against the chosen layout. */
+type ServerLayout<P extends PageSchema | undefined, S extends PageSchema | undefined, D, C> = PageLayoutOptions<PageLoadContext<P, S, C> & { data: D }>;
+/** `layout` and `layoutProps` of browser route options, typed against the chosen layout. */
+type ClientLayout<P extends PageSchema | undefined, S extends PageSchema | undefined, D> = PageLayoutOptions<ClientPageLoadContext<P, S> & { data: D }>;
+/** Route options of any mode, with their layout options. */
+type AnyPageDefinition<P extends PageSchema | undefined, S extends PageSchema | undefined, D, C> =
+  | (PageDefinition<P, S, D, C> & ServerLayout<P, S, D, C>)
+  | (ClientPageDefinition<P, S, D> & ClientLayout<P, S, D>);
+/** What `definePage` reads from the options as written: any of them, so options with only `layout` are options too. */
+interface WrittenOptions { readonly render?: PageRender; readonly load?: unknown; readonly layout?: unknown; readonly layoutProps?: unknown }
+/**
+ * `T` absorbs the keys it is written with, so a key that the chosen layout does not declare would
+ * pass: it must be `never`.
+ */
+type ExactLayoutProps<T> = T extends { readonly layout: infer L extends string; readonly layoutProps: infer O }
+  ? O extends (...args: never[]) => infer R ? { readonly layoutProps: (...args: never[]) => ExactProps<R, LayoutProps<L>> }
+    : { readonly layoutProps: ExactProps<O, LayoutProps<L>> }
+  : unknown;
+/** `Written` with each key of `Declared` at its declared type, and every other key `never`. */
+type ExactProps<Written, Declared> = { readonly [K in keyof Written]: K extends keyof Declared ? Declared[K] : never };
 
 declare const typeArgumentsNotWritten: unique symbol;
 /**
@@ -293,7 +342,11 @@ interface TypeArgumentsNotWritten { readonly [typeArgumentsNotWritten]: true }
 type WhenWritten<D, X> = [D] extends [TypeArgumentsNotWritten] ? TypeArgumentsNotWritten : X;
 
 /** The result of `definePage` for the options `T` as written: the type of their mode, with `load` required when declared. */
-type DefinedPage<P extends PageSchema | undefined, S extends PageSchema | undefined, D, C, T> = T extends { readonly render: "client" }
+type DefinedPage<P extends PageSchema | undefined, S extends PageSchema | undefined, D, C, T> = DefinedMode<P, S, D, C, T> & WrittenLayout<T>;
+/** The layout options as written, which `meeko check` compares with the layout the page inherits. */
+type WrittenLayout<T> = (T extends { readonly layout: infer L } ? { readonly layout: L } : unknown) & (T extends { readonly layoutProps: infer L } ? { readonly layoutProps: L } : unknown);
+/** The options of the mode of `T`. */
+type DefinedMode<P extends PageSchema | undefined, S extends PageSchema | undefined, D, C, T> = T extends { readonly render: "client" }
   ? T extends { readonly load: unknown }
     ? ClientPageDefinition<P, S, D> & { readonly load: NonNullable<ClientPageDefinition<P, S, D>["load"]> }
     : ClientPageDefinition<P, S, D>
@@ -356,8 +409,8 @@ export function definePage<
   const S extends PageSchema | undefined = undefined,
   D = unknown,
   C = unknown,
-  const T extends { readonly render?: PageRender; readonly load?: unknown } | TypeArgumentsNotWritten = TypeArgumentsNotWritten,
->(definition: T & (PageDefinition<P, S, D, C> | ClientPageDefinition<P, S, D>)): DefinedPage<P, S, D, C, T>;
+  const T extends WrittenOptions | TypeArgumentsNotWritten = TypeArgumentsNotWritten,
+>(definition: T & AnyPageDefinition<P, S, D, C> & ExactLayoutProps<T>): DefinedPage<P, S, D, C, T>;
 /**
  * `definePage<P, S, D>(…)` con argumentos de tipo explícitos y `render: "client"` con `load`: los datos
  * son obligatorios para la página.
@@ -409,8 +462,8 @@ export function definePage<
   const S extends PageSchema | undefined = undefined,
   D = unknown,
   C = unknown,
-  const T extends { readonly render?: PageRender; readonly load?: unknown } = {},
->(definition: T & (PageDefinition<P, S, D, C> | ClientPageDefinition<P, S, D>)): DefinedPage<P, S, D, C, T>;
+  const T extends WrittenOptions = {},
+>(definition: T & AnyPageDefinition<P, S, D, C> & ExactLayoutProps<T>): DefinedPage<P, S, D, C, T>;
 export function definePage(definition: unknown): unknown {
   if (typeof definition === "object" && definition !== null && "render" in definition && definition.render === "client"
     && "prerenderEntries" in definition && definition.prerenderEntries !== undefined) {

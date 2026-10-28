@@ -4,17 +4,16 @@ import { createAppErrorChannel, provideAppErrorChannel } from "../component-erro
 import { markingObserver } from "../error-observer.js";
 import type { ComponentErrorHandler } from "../component-errors.js";
 import { batch, finishWithCleanup, runDry, signal } from "../reactivity.js";
-import type { Signal } from "../reactivity.js";
 import { ERROR_PAGE_TITLE, PAYLOAD_VERSION, PageInputError, pageSearchObject, payloadHead, validatePageInputs } from "./page.js";
 import type { PageHead, PageRender, PageSchema } from "./page.js";
 import { ClientError } from "./clients.js";
 import { runRouteMiddleware } from "./middleware.js";
-import { fixedRoute, liveRoute, provideNavigation, provideRoute, routeSnapshot } from "./navigation.js";
+import { fixedRoute, liveRoute, provideNavigation, provideRoute, routeIsActive, routeSnapshot } from "./navigation.js";
 import type { LiveRoute, NavigationState, RouteState } from "./navigation.js";
 import type { RouteMiddleware } from "./middleware.js";
 import { activateRouteManifest, createAppNavigator, matchRoute, reportNavigationError, sameDocument } from "./router.js";
 import { watchGlobalErrors } from "./global-errors.js";
-import type { ErrorPageRecord, NavigationContext, Navigator, RouteMatch, RouteRecord, UnmatchedNavigationContext } from "./router.js";
+import type { ErrorPageRecord, NamedLayoutRecord, NavigationContext, Navigator, RouteMatch, RouteRecord, UnmatchedNavigationContext } from "./router.js";
 import { hydrateWithStateStore, StateStore, withStateStore } from "./state.js";
 import { createDeferred, deferredSettle, deferredSource, extractDeferred, placeDeferred } from "./deferred.js";
 import { provideResourceCache, ResourceCache, ResourceScope, withResourceScope } from "./resources.js";
@@ -25,7 +24,10 @@ import { notifyPluginErrorHandlers, runPlugins } from "./plugin.js";
 import type { PluginRegistration } from "./plugin.js";
 import type { DeferredError, DeferredInternals, DeferredOutcome } from "./deferred.js";
 import { BrowserHead, provideHead, routeHeadInput, withHeadLevel } from "./head.js";
+import { browserLayoutWriter, createLayoutSlot, resolveLayoutProps, withLayoutWriter } from "./layout.js";
+import type { BrowserLayoutWriter, LayoutSlot } from "./layout.js";
 import { BrowserTheme, registerBrowserTheme, resolveThemeConfig, THEME_STATE_KEY } from "./theme.js";
+import { withIdRoot } from "../ids.js";
 import type { DocumentConfig, HeadInput } from "./head.js";
 
 export { useNavigation, useRoute } from "./navigation.js";
@@ -80,6 +82,11 @@ export interface ClientRoute {
   load?: (context: ClientRouteContext) => Promise<unknown> | unknown;
   /** Calcula el `title` y la `description` con los datos del loader; se aplican al documento. */
   head?: (context: ClientRouteContext & { data: unknown }) => PageHead;
+  /**
+   * Props del layout con nombre: un objeto o una función que las calcula con los datos del loader.
+   * @since 1.5.0
+   */
+  layoutProps?: unknown;
 }
 
 type ClientRouteContext = NavigationContext & {
@@ -204,6 +211,8 @@ interface HydrationPayload {
   deferred: readonly PayloadDeferred[];
   /** Data of the top-level data awaits that the server rendered, by request key. */
   resources: Record<string, unknown>;
+  /** Props the named layout rendered with, when the page has one. */
+  layoutProps: Record<string, unknown> | undefined;
 }
 
 const pageRenders: readonly string[] = ["ssr", "stream", "prerender", "client"] satisfies readonly PageRender[];
@@ -240,7 +249,15 @@ function errorPageProps(error: unknown): { status: number; message: string } {
 
 interface LayoutInstance {
   file: string;
-  outlet: Signal<Component<Record<string, unknown>>>;
+  outlet: { value: Component<Record<string, unknown>> };
+  /** The props of a named layout, which the page writes with `useLayout()`. */
+  slot?: LayoutSlot;
+}
+
+/** The named layout of a tree: its record and the props its page declares. */
+interface TreeLayout {
+  readonly record: NamedLayoutRecord | undefined;
+  readonly declared: Record<string, unknown>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -263,6 +280,7 @@ function readPayload(value: unknown): HydrationPayload {
   } else if (!isRecord(parsed.props.params) || !isRecord(parsed.props.search)) throw new TypeError("Invalid Meeko route props");
   if (parsed.sharedState !== undefined && !isRecord(parsed.sharedState)) throw new TypeError("Invalid Meeko shared state");
   if (parsed.resources !== undefined && !isRecord(parsed.resources)) throw new TypeError("Invalid Meeko page data");
+  if (parsed.layoutProps !== undefined && !isRecord(parsed.layoutProps)) throw new TypeError("Invalid Meeko layout props");
   const render = parsed.render ?? "ssr";
   if (typeof render !== "string" || !pageRenders.includes(render) || (error && render !== "ssr")) throw new TypeError("Invalid Meeko page render mode");
   let head: PageHead;
@@ -273,6 +291,7 @@ function readPayload(value: unknown): HydrationPayload {
     sharedState: parsed.sharedState ?? {}, head,
     deferred: readDeferredEntries(parsed.deferred),
     resources: (parsed.resources as Record<string, unknown> | undefined) ?? {},
+    layoutProps: parsed.layoutProps as Record<string, unknown> | undefined,
   };
 }
 
@@ -543,26 +562,44 @@ async function createTree(
   loadPage: ClientAppOptions["loadPage"],
   fromLayout: number,
   leaf: string | Component<Record<string, unknown>>,
-): Promise<{ component: Component<Record<string, unknown>>; layouts: LayoutInstance[]; modules: unknown[] }> {
+  named: TreeLayout = { record: undefined, declared: {} },
+  retainedLayouts: readonly LayoutInstance[] = [],
+): Promise<{ component: Component<Record<string, unknown>>; layouts: LayoutInstance[]; modules: unknown[]; writer: BrowserLayoutWriter; declared: Record<string, unknown> }> {
   const page = typeof leaf === "string" ? await loadPage(leaf) : undefined;
+  const namedIndex = named.record ? chain.indexOf(named.record.file) : -1;
+  // A named layout that the navigation keeps receives the new page's props at the commit.
+  const owner = {};
+  const retainedSlot = namedIndex >= 0 && namedIndex < fromLayout ? retainedLayouts[namedIndex]?.slot : undefined;
+  let writer = browserLayoutWriter(retainedSlot, owner);
   // useHead of the page outranks its layouts', and a layout's outranks app.meeko's, as in SSR.
   let component = page ? withHeadLevel(bind(page, props), chain.length) : leaf as Component<Record<string, unknown>>;
+  // useLayout() reaches the page from what the named layout wraps, or from the page itself.
+  if (namedIndex < 0 || namedIndex < fromLayout) component = withLayoutWriter(component, writer);
   const layouts: LayoutInstance[] = [];
   /** The compiled modules that render the tree, for `mayAwaitData`; an empty outlet renders none. */
   const modules: unknown[] = page ? [page] : [];
   for (let index = chain.length - 1; index >= fromLayout; index--) {
     const file = chain[index]!;
+    const layout = await loadPage(file);
+    modules.push(layout);
+    if (index === namedIndex) {
+      // The named layout's props are reactive: the page changes them without remounting it.
+      const slot = createLayoutSlot(named.record!.name, named.declared, component, owner);
+      writer = browserLayoutWriter(slot, owner);
+      slot.outlet.value = withLayoutWriter(component, writer);
+      component = withHeadLevel(bind(layout, slot.props), index);
+      layouts.unshift({ file, outlet: slot.outlet, slot });
+      continue;
+    }
     const outlet = signal(component);
     const layoutProps = Object.defineProperty({}, "outlet", {
       enumerable: true,
       get: () => outlet.value,
     }) as Record<string, unknown>;
-    const layout = await loadPage(file);
-    modules.push(layout);
     component = withHeadLevel(bind(layout, layoutProps), index);
     layouts.unshift({ file, outlet });
   }
-  return { component, layouts, modules };
+  return { component, layouts, modules, writer, declared: named.declared };
 }
 
 /**
@@ -625,12 +662,13 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   // The route of the plugins follows the committed route, also when a navigation replaces the
   // whole tree (and its live route): reading it also reads `routeGeneration`.
   const routeGeneration = signal(0);
-  const followCommitted = <K extends keyof RouteState>(key: K): RouteState[K] => Object.freeze({
+  const followCommitted = <K extends Exclude<keyof RouteState, "isActive">>(key: K): RouteState[K] => Object.freeze({
     get value() { void routeGeneration.value; return committedRoute.state[key].value; },
   }) as RouteState[K];
+  const pluginPath = followCommitted("path");
   const pluginRoute: RouteState = Object.freeze({
-    url: followCommitted("url"), path: followCommitted("path"), id: followCommitted("id"),
-    params: followCommitted("params"), search: followCommitted("search"),
+    url: followCommitted("url"), path: pluginPath, id: followCommitted("id"),
+    params: followCommitted("params"), search: followCommitted("search"), isActive: routeIsActive(pluginPath),
   });
   // href(id) already resolves while the plugins start.
   const releasePluginManifest = activateRouteManifest(options.routes);
@@ -687,18 +725,23 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   const theme = themeConfig ? new BrowserTheme(browser, themeConfig, documentHead, payload.sharedState[THEME_STATE_KEY]) : undefined;
   const releaseTheme = theme ? registerBrowserTheme(browser, theme) : () => {};
   try {
+    // The named layout hydrates with the props the server rendered it with.
+    const initialLayout = initial ? initial.route.layout : appError!.layout;
+    const named: TreeLayout = { record: initialLayout, declared: payload.layoutProps ?? { ...initialLayout?.props } };
     first = initial
-      ? await createTree(initial.route.layouts, payload.props, options.loadPage, 0, clientFirst ? emptyOutlet : initial.route.file)
-      : await createTree(appError!.layouts, payload.props, options.loadPage, 0, appError!.file);
+      ? await createTree(initial.route.layouts, payload.props, options.loadPage, 0, clientFirst ? emptyOutlet : initial.route.file, named)
+      : await createTree(appError!.layouts, payload.props, options.loadPage, 0, appError!.file, named);
     // Awaited data comes from the payload: hydration stays synchronous and never requests it again.
     const initialData = new ResourceScope("read", payload.resources);
     // onMounted callbacks run once the whole tree has hydrated. The head adopts the SSR tags once,
     // with every useHead of the hydrated tree registered.
     release = documentHead.hold(() => {
       documentHead.setRoute(routeHead(payload.head, payload.error), payload.error ? undefined : initialUrl.pathname);
-      return withResourceScope(initialData, () => hydrateApp(committedRoute.state, () => mountBatch(() => first.component.hydrateScope({ root: options.root }, {}, payload.state))));
+      return withResourceScope(initialData, () => hydrateApp(committedRoute.state, () => mountBatch(() => withIdRoot(options.document?.idPrefix, () => first.component.hydrateScope({ root: options.root }, {}, payload.state)))));
     });
     resourceCache.merge(initialData.loadedData());
+    // What the page wrote with useLayout() while it hydrated; the server already rendered it.
+    first.writer.activate();
     // Components that read the theme already settled at the end of the hydration batch.
     theme?.settle();
   } catch (error) {
@@ -794,6 +837,9 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     let routeParams: Readonly<Record<string, unknown>> = match?.params ?? {};
     let routeSearch: Readonly<Record<string, unknown>> = pageSearchObject(context.url.searchParams);
     const route = match?.route;
+    // Props of the named layout: those of the +group.ts files until the page's arrive.
+    const groupLayoutProps = (): Record<string, unknown> => ({ ...(route ? route.layout : appError?.layout)?.props });
+    let layoutDeclared = groupLayoutProps();
     /** Aborted when this navigation is superseded before its commit, or by the next commit or dispose. */
     const routeWork = (): AbortSignal => {
       if (!stream.control) {
@@ -820,6 +866,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
           ...(data === undefined ? {} : { data }),
         };
         head = sidecar?.head?.({ ...routeContext, data }) ?? {};
+        layoutDeclared = { ...groupLayoutProps(), ...resolveLayoutProps(sidecar?.layoutProps, { ...routeContext, data }) };
       } catch (error) {
         if (!onLoaderError || context.signal.aborted || disposed) throw error;
         onLoaderError(error);
@@ -852,6 +899,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         props = failure;
         head = {};
         errorPage = routeError;
+        layoutDeclared = groupLayoutProps();
       } : undefined);
     } else if (options.serverData && !options.loadRoute) {
       // A static host serves each page's payload as a file next to its index.html.
@@ -891,6 +939,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         serverCsrfToken = response.headers.get("x-meeko-csrf-token");
         props = { status: 404, message: typeof failure?.code === "string" && failure.code ? failure.code : "NOT_FOUND" };
         errorPage = notFoundPage;
+        layoutDeclared = groupLayoutProps();
       } else {
         if (!response.ok) throw new Error(`Route data request failed: HTTP ${response.status}`);
         // A server that does not speak Meeko's protocol (a static host serving the prerendered
@@ -923,6 +972,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         routeParams = payload.props.params as Record<string, unknown>;
         routeSearch = payload.props.search as Record<string, unknown>;
         head = payload.head;
+        layoutDeclared = payload.layoutProps ?? groupLayoutProps();
       }
     } else {
       const sidecar = route.sidecar && options.loadRoute ? await options.loadRoute(route.sidecar) : undefined;
@@ -931,7 +981,8 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     if (context.signal.aborted || disposed) return;
     const target = routeSnapshot(context.url, route?.id ?? null, routeParams, routeSearch, true);
     const retained = Math.min(context.retainedLayouts, layouts.length);
-    let next = await createTree(route ? route.layouts : appError!.layouts, props, options.loadPage, retained, errorPage ?? route!.file);
+    const namedLayout = (): TreeLayout => ({ record: route ? route.layout : appError?.layout, declared: layoutDeclared });
+    let next = await createTree(route ? route.layouts : appError!.layouts, props, options.loadPage, retained, errorPage ?? route!.file, namedLayout(), layouts);
     if (context.signal.aborted || disposed) return;
     // The new page and its components load their top-level data awaits before the commit, while
     // the previous page stays visible. These passes are dry, like SSR: a throwaway state keeps them
@@ -948,7 +999,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
           provideRoute(fixedRoute(target));
           provideBrowserWindow(browser);
           plugins.apply();
-          return tree.component.renderWithState({});
+          return withIdRoot(options.document?.idPrefix, () => tree.component.renderWithState({}));
         })));
       }, { signal: context.signal });
       return scope;
@@ -967,7 +1018,8 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       props = failure;
       head = {};
       errorPage = routeError;
-      next = await createTree(route ? route.layouts : appError!.layouts, props, options.loadPage, retained, routeError);
+      layoutDeclared = groupLayoutProps();
+      next = await createTree(route ? route.layouts : appError!.layouts, props, options.loadPage, retained, routeError, namedLayout(), layouts);
       if (context.signal.aborted || disposed) return;
       pageData = await prepare(next);
     }
@@ -981,20 +1033,30 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         const outlet = layouts[retained - 1]!.outlet;
         const previous = outlet.value;
         const previousRoute = committedRoute.current();
+        // A named layout that stays receives the new page's props in the same batch: nothing of
+        // the previous page's stays. One created by the new tree already has them.
+        const keptSlot = next.writer.slot && !next.layouts.some((layout) => layout.slot === next.writer.slot) ? next.writer.slot : undefined;
+        const restoreSlot = keptSlot?.save();
         // One batch, outlet first: the outlet releases the previous page before any effect
         // that reads the route runs, and the new page renders with the new route.
         try {
-          withStateStore(stateStore, () => batch(() => { outlet.value = next.component; committedRoute.set(target); }));
+          withStateStore(stateStore, () => batch(() => {
+            keptSlot?.reset(next.declared, next.writer.owner);
+            outlet.value = next.component;
+            committedRoute.set(target);
+          }));
         } catch (error) {
           // The outlet binding restores and rehydrates its previous page; only
           // a failed restoration leaves a region that needs a full reload.
           if (hasRegionRecoveryFailure(error)) recoverCommitFailure(error);
-          try { withStateStore(stateStore, () => batch(() => { outlet.value = previous; committedRoute.set(previousRoute); })); }
+          try { withStateStore(stateStore, () => batch(() => { restoreSlot?.(); outlet.value = previous; committedRoute.set(previousRoute); })); }
           catch (restoreError) { recoverCommitFailure(new AggregateError([error, restoreError], "Meeko navigation could not restore the previous outlet")); }
           throw error;
         }
         layouts = [...layouts.slice(0, retained), ...next.layouts];
         stableUrl = context.url.href;
+        // What the new page wrote with useLayout() while it rendered.
+        withStateStore(stateStore, () => next.writer.activate());
         return;
       }
       // A new tree reads its own route; the previous one keeps its values until it is released.
@@ -1003,7 +1065,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         provideRoute(nextRoute.state);
         provideBrowserWindow(browser);
         plugins.apply();
-        return next.component.renderWithState({});
+        return withIdRoot(options.document?.idPrefix, () => next.component.renderWithState({}));
       });
       // Hydrate the next view after the committed one, between private markers,
       // so a failure leaves the visible route and its bindings untouched.
@@ -1014,7 +1076,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       let nextRelease: () => void;
       try {
         options.root.insertBefore(parseRegionHtml(options.root, rendered.html), end);
-        nextRelease = hydrateApp(nextRoute.state, () => next.component.hydrateScope({ root: options.root, start, end }, {}, rendered.state));
+        nextRelease = hydrateApp(nextRoute.state, () => withIdRoot(options.document?.idPrefix, () => next.component.hydrateScope({ root: options.root, start, end }, {}, rendered.state)));
       } catch (error) {
         for (let node: ChildNode | null = start; node;) {
           const following: ChildNode | null = node === end ? null : node.nextSibling;
@@ -1029,6 +1091,8 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       routeGeneration.value++;
       layouts = next.layouts;
       stableUrl = context.url.href;
+      // The layout hydrated with the declared props; what the page wrote while it rendered applies now.
+      withStateStore(stateStore, () => next.writer.activate());
       while (options.root.firstChild && options.root.firstChild !== start) options.root.firstChild.remove();
       // The new route is committed; a cleanup failure of the old one is observed, not rolled back.
       try { previousRelease(); }

@@ -32,10 +32,19 @@ type Input<S> = S extends Schema<infer I, unknown> ? I : never;
 type Output<S> = S extends Schema<unknown, infer O> ? O : never;
 type OptionalOutput<S> = S extends Schema ? Output<S> : undefined;
 
+/** Marks the ApiErrors of every copy of Meeko: only theirs carry public `issues` through {@link normalizeServerError}. */
+const apiErrorMark = Symbol.for("meeko.apiError");
+
 /**
  * Error público de API, RPC, Socket y loaders: conserva `code` y `status` en la respuesta, que
  * añade `requestId`. Cualquier otro error se responde como `INTERNAL_ERROR`/`500` sin exponer su
  * mensaje.
+ *
+ * Desde `1.5`, el tercer argumento también puede ser `{ message, issues }`: `issues` son mensajes
+ * públicos por campo, con la misma forma `{ path, message }` que los de un `400` de validación, y
+ * viajan en la respuesta de API y RPC (como mucho 20, y sólo con un estado `4xx`). En el cliente
+ * llegan en `ClientError.issues`, y `useForm` los lleva a cada campo. `message` sigue siendo
+ * interno.
  *
  * @example
  * ```ts
@@ -52,18 +61,87 @@ type OptionalOutput<S> = S extends Schema ? Output<S> : undefined;
  *   },
  * });
  * ```
+ * Un conflicto que pertenece a un campo:
+ * ```ts
+ * if (await emailTaken(body.email)) {
+ *   throw new ApiError("EMAIL_TAKEN", 409, { issues: [{ path: "email", message: "Ese correo ya tiene una cuenta." }] });
+ * }
+ * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#api-y-rpc
  */
 export class ApiError extends Error {
   /**
+   * Mensajes públicos por campo (desde `1.5`), o `undefined`. Se envían con un estado `4xx`.
+   * @since 1.5.0
+   */
+  declare public readonly issues?: readonly ApiErrorIssue[];
+
+  /**
    * @param code Código público, como `USER_NOT_FOUND`.
    * @param status Estado HTTP entre 400 y 599.
-   * @param message Mensaje interno; no se envía al cliente. Por defecto, el código.
+   * @param message Mensaje interno; no se envía al cliente. Por defecto, el código. Desde `1.5`,
+   * también `{ message, issues }`, con los mensajes públicos por campo.
+   * @throws {TypeError} Si un issue no tiene `path` y `message` de texto.
    */
-  constructor(public readonly code: string, public readonly status: number, message = code) {
-    super(message);
+  constructor(public readonly code: string, public readonly status: number, message: string | ApiErrorOptions = code) {
+    const options = typeof message === "string" ? { message } : message;
+    super(options.message ?? code);
     this.name = "ApiError";
+    Object.defineProperty(this, apiErrorMark, { value: true });
+    if (options.issues !== undefined) this.issues = checkedIssues(options.issues);
   }
+}
+
+/**
+ * Un mensaje público de un campo, como los `issues` de un `400` de validación: `path` son las claves
+ * unidas con `.` (`"email"`, `"items.0.name"`), o `""` para el formulario completo.
+ *
+ * @since 1.5.0
+ * @example
+ * ```ts
+ * import type { ApiErrorIssue } from "@meekojs/meeko/server";
+ * const issue: ApiErrorIssue = { path: "email", message: "Ese correo ya tiene una cuenta." };
+ * ```
+ */
+export interface ApiErrorIssue {
+  /** Ruta del campo, con las claves unidas con `.`, o `""` para el formulario completo. */
+  readonly path: string;
+  /** Mensaje público para el usuario. */
+  readonly message: string;
+}
+
+/**
+ * Tercer argumento de {@link ApiError} con opciones.
+ *
+ * @since 1.5.0
+ * @example
+ * ```ts
+ * import { ApiError } from "@meekojs/meeko/server";
+ * import type { ApiErrorOptions } from "@meekojs/meeko/server";
+ * const options: ApiErrorOptions = { message: "duplicate key users_email", issues: [{ path: "email", message: "Ese correo ya existe." }] };
+ * throw new ApiError("EMAIL_TAKEN", 409, options);
+ * ```
+ */
+export interface ApiErrorOptions {
+  /** Mensaje interno; no se envía al cliente. Por defecto, el código. */
+  readonly message?: string;
+  /** Mensajes públicos por campo, que el cliente recibe en `ClientError.issues`. */
+  readonly issues?: readonly ApiErrorIssue[];
+}
+
+function checkedIssues(issues: unknown): readonly ApiErrorIssue[] {
+  if (!Array.isArray(issues)) throw new TypeError("ApiError issues must be an array of { path, message }");
+  return Object.freeze(issues.map((issue: unknown) => {
+    const { path, message } = (issue ?? {}) as { path?: unknown; message?: unknown };
+    if (typeof path !== "string" || typeof message !== "string" || !message) throw new TypeError("Each ApiError issue needs a string path and a nonempty string message");
+    return Object.freeze({ path, message });
+  }));
+}
+
+/** The issues of an `ApiError` that reach the client: only with a 4xx status, at most 20. */
+function sentIssues(error: ApiError): readonly ApiErrorIssue[] | undefined {
+  if (error.status >= 500 || !error.issues?.length) return undefined;
+  return error.issues.slice(0, maxPublicIssues);
 }
 
 /**
@@ -96,8 +174,8 @@ const maxPublicIssues = 20;
 
 /** Invalid input: a `400` whose schema messages reach the client as `issues`. */
 class InvalidInputError extends ApiError {
-  constructor(code: string, readonly issues: readonly { readonly path: string; readonly message: string }[]) {
-    super(code, 400);
+  constructor(code: string, issues: readonly ApiErrorIssue[]) {
+    super(code, 400, { issues });
   }
 }
 
@@ -133,7 +211,14 @@ export function normalizeServerError(error: unknown): ApiError {
     if (typeof candidate.code === "string" && candidate.code.length > 0
       && typeof candidate.status === "number" && Number.isInteger(candidate.status)
       && candidate.status >= 400 && candidate.status <= 599) {
-      return error instanceof ApiError ? error : new ApiError(candidate.code, candidate.status);
+      if (error instanceof ApiError) return error;
+      // An ApiError of another module graph keeps its public issues, checked again here. Another
+      // error with its name (an SDK's, or a service's issues) keeps only its code and status.
+      const own = (candidate as unknown as Record<symbol, unknown>)[apiErrorMark] === true;
+      let issues: readonly ApiErrorIssue[] | undefined;
+      try { issues = !own || (candidate as { issues?: unknown }).issues === undefined ? undefined : checkedIssues((candidate as { issues?: unknown }).issues); }
+      catch { issues = undefined; }
+      return new ApiError(candidate.code, candidate.status, issues ? { issues } : candidate.code);
     }
   }
   return new ApiError("INTERNAL_ERROR", 500);
@@ -650,7 +735,7 @@ export async function executeRpc<I extends Schema, O extends Schema, S, L = unde
  */
 export function errorResponse(error: unknown, requestId: string): Response {
   const known = normalizeServerError(error);
-  const issues = known instanceof InvalidInputError && known.issues.length ? known.issues : undefined;
+  const issues = sentIssues(known);
   const headers: Record<string, string> = { "content-type": "application/json; charset=utf-8", "x-request-id": requestId };
   if (known instanceof RateLimitedError) headers["retry-after"] = String(known.retryAfter);
   return new Response(serializeJson({ code: known.code, status: known.status, requestId, ...(issues ? { issues } : {}) }), { status: known.status, headers });

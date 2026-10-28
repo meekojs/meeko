@@ -92,9 +92,20 @@ const route = useRoute();
 </script>
 <template><p class="error">{props.status}:{route.id.value ?? "none"}:{route.url.value}:{JSON.stringify(route.search.value)}</p></template>`;
 
+// A section menu: <MeekoLink match> and useRoute().isActive, kept between the pages of /dashboard.
+const sections = `<script lang="ts">
+import { signal, type Component } from "@meekojs/meeko";
+import { useRoute } from "@meekojs/meeko/framework";
+const props = defineProps<{ outlet: Component<Record<string, unknown>> }>();
+const route = useRoute();
+const mode = signal<"exact" | "prefix">("prefix");
+</script>
+<template><nav><MeekoLink class="root" to="/" match="prefix">Inicio</MeekoLink><MeekoLink class="dash" to="/dashboard" match="prefix">Panel</MeekoLink><MeekoLink class="dash-exact" to="/dashboard">Panel</MeekoLink><MeekoLink class="dash-bound" to="/dashboard" bind:match="mode.value">Panel</MeekoLink><MeekoLink class="report" to="/dashboard/[id]" bind:params="{ id: 'r 1' }" match="prefix">Informe</MeekoLink><a class="custom" href="/dashboard" bind:aria-current="route.isActive('/dashboard', { prefix: true })">Panel</a></nav><button class="mode" on:click="() => mode.value = mode.value === 'prefix' ? 'exact' : 'prefix'">{mode.value}</button><p class="active">{String(route.isActive("/dashboard/[id]", { params: { id: "r 1" } }))}</p><main><component is="props.outlet"></component></main></template>`;
+
 const sources: Record<string, string> = {
   "app.meeko": appShell, "shell.meeko": shell, "home.meeko": homePage, "user.meeko": userPage,
   "note.meeko": notePage, "data-page.meeko": dataPage, "bare.meeko": barePage, "error.meeko": errorPage,
+  "sections.meeko": sections,
 };
 
 /** Compiles the components against the source runtime, so the test does not depend on dist/. */
@@ -109,9 +120,9 @@ async function loadModules(): Promise<{ modules: Record<string, ClientComponent>
   const modules: Record<string, ClientComponent> = {};
   for (const [file, source] of Object.entries(sources)) {
     const code = compile(source, join(directory, file)).code
-      .replace(`from "@meekojs/meeko/internal"`, `from ${runtimePath("src/internal.ts")}`)
-      .replace(`from "@meekojs/meeko/framework"`, `from ${runtimePath("src/framework.ts")}`)
-      .replace(`from "@meekojs/meeko"`, `from ${runtimePath("src/index.ts")}`);
+      .replaceAll(`from "@meekojs/meeko/internal"`, `from ${runtimePath("src/internal.ts")}`)
+      .replaceAll(`from "@meekojs/meeko/framework"`, `from ${runtimePath("src/framework.ts")}`)
+      .replaceAll(`from "@meekojs/meeko"`, `from ${runtimePath("src/index.ts")}`);
     const target = join(directory, file.replace(/\.meeko$/, ".ts"));
     await writeFile(target, code);
     modules[file] = await import(pathToFileURL(target).href) as ClientComponent;
@@ -135,6 +146,9 @@ const routes: readonly RouteRecord[] = createRouteManifest([
   { id: "/data/[id]", file: "data-page.meeko", layouts },
   { id: "/about", file: "home.meeko", layouts, sidecar: "about.route.ts", render: "prerender" },
   { id: "/bare", file: "bare.meeko", layouts: [] },
+  { id: "/dashboard", file: "home.meeko", layouts: ["app.meeko", "sections.meeko"] },
+  { id: "/dashboard/[id]", file: "home.meeko", layouts: ["app.meeko", "sections.meeko"] },
+  { id: "/dashboards", file: "home.meeko", layouts: ["app.meeko", "sections.meeko"] },
 ]);
 const appError: ErrorPageRecord = { file: "error.meeko", layouts: ["app.meeko"] };
 
@@ -158,7 +172,7 @@ const flush = async (): Promise<void> => {
   for (let index = 0; index < 10; index++) await new Promise((done) => setTimeout(done, 0));
 };
 
-type Root = { querySelector(selector: string): { textContent: string | null; getAttribute(name: string): string | null } | null };
+type Root = { querySelector(selector: string): { textContent: string | null; getAttribute(name: string): string | null; click?(): void } | null };
 const text = (root: Root, selector: string): string | null | undefined => root.querySelector(selector)?.textContent;
 const current = (root: Root, selector: string): string | null | undefined => root.querySelector(selector)?.getAttribute("aria-current");
 
@@ -225,6 +239,54 @@ test("SSR gives layouts and app.meeko the route of the request, and hydration ke
     assert.equal(text(root, ".route"), '/users/[id]|/users/7?tab=a|{"id":"7"}|{"tab":"a"}');
     assert.equal(current(root, ".home"), null);
     assert.equal(text(root, ".user-page"), "7");
+    assert.deepEqual(errors, []);
+  } finally {
+    closeAll();
+    await cleanup();
+  }
+});
+
+test("<MeekoLink match> and isActive mark the page and its section in SSR, hydration and a kept layout", { timeout: 30_000 }, async () => {
+  globals.meekoRouteCalls = [];
+  const { modules, cleanup } = await loadModules();
+  try {
+    const { app, browser, root, errors } = await boot(modules, "https://example.test/dashboard/r 1?tab=a");
+    const links = [".root", ".dash", ".dash-exact", ".dash-bound", ".report", ".custom"];
+    const state = () => [...links.map((selector) => current(root, selector) ?? null), text(root, ".active")];
+    // The SSR document, before hydration: /dashboard/r%201 is below /dashboard and is the report itself.
+    const document = new HappyWindow({ url: "https://example.test/" });
+    document.document.write(await (await (await serve(modules, { promise: undefined }))(new Request("https://example.test/dashboard/r%201?tab=a", { headers: { accept: "text/html" } }))).text());
+    const ssr = document.document.getElementById("app") as unknown as Root;
+    const expected = [null, "true", null, "true", "page", "true", "page"];
+    assert.deepEqual([...links.map((selector) => current(ssr, selector) ?? null), text(ssr, ".active")], expected);
+    document.happyDOM.abort();
+    // Hydration checks every attribute binding: it did not throw, so the values matched.
+    assert.deepEqual(state(), expected);
+    const kept = root.querySelector(".dash");
+
+    // The layout is kept: the same link moves from the section to the page and then to nothing.
+    assert.equal(await app.navigate("/dashboard?tab=b#top"), true);
+    assert.equal(root.querySelector(".dash"), kept, "the layout was kept, not rendered again");
+    assert.deepEqual(state(), [null, "page", "page", "page", null, "page", "false"]);
+    assert.equal(await app.navigate("/dashboards"), true);
+    assert.equal(root.querySelector(".dash"), kept);
+    assert.deepEqual(state(), [null, null, null, null, null, null, "false"], "/dashboard does not cover /dashboards");
+    assert.equal(await app.navigate("/dashboard/stats"), true);
+    assert.deepEqual(state(), [null, "true", null, "true", null, "true", "false"]);
+    // bind:match follows its signal.
+    root.querySelector(".mode")!.click!();
+    await flush();
+    assert.equal(current(root, ".dash-bound"), null);
+    root.querySelector(".mode")!.click!();
+    await flush();
+    assert.equal(current(root, ".dash-bound"), "true");
+    // Back through the history, to the report.
+    const popped = new Promise<void>((done) => browser.addEventListener("popstate", () => done(), { once: true }));
+    browser.history.go(-3);
+    await popped;
+    await flush();
+    assert.equal(browser.location.pathname, "/dashboard/r%201");
+    assert.deepEqual(state(), expected);
     assert.deepEqual(errors, []);
   } finally {
     closeAll();
@@ -429,6 +491,57 @@ test("meeko check types the useRoute autoimport in a layout", { timeout: 120_000
     const invalid = await checkApp(root);
     assert.ok(invalid.some((item) => item.filename === layout && /TS18047/.test(item.code)), JSON.stringify(invalid));
     assert.ok(invalid.some((item) => item.filename === layout && /TS2540/.test(item.code)), JSON.stringify(invalid));
+  } finally {
+    await project.remove();
+  }
+});
+
+const sectionsLayout = (nav: string) => `<script lang="ts">
+const route = useRoute();
+const mode = signal<"exact" | "prefix">("prefix");
+const inUsers = computed(() => route.isActive("/users/[id]", { params: { id: "1" }, prefix: true }) !== false);
+const links = [{ to: "/", label: "Inicio" }, { to: "/settings", label: "Ajustes" }] as const;
+</script>
+<template><nav>${nav}</nav><p if:when="inUsers.value">Usuarios</p><main><MeekoOutlet /></main></template>
+`;
+
+test("meeko check types match of <MeekoLink> and the route and params of isActive", { timeout: 180_000 }, async () => {
+  const project = await createTempProject("route-active-check");
+  const root = project.root;
+  try {
+    await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}\n');
+    await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
+    await symlink(resolve("."), join(root, "node_modules", "@meekojs", "meeko"), "junction");
+    await mkdir(join(root, "app", "layouts"), { recursive: true });
+    await mkdir(join(root, "app", "pages", "users"), { recursive: true });
+    await writeFile(join(root, "app", "pages", "index.meeko"), "<template><h1>Inicio</h1></template>\n");
+    await writeFile(join(root, "app", "pages", "users", "[id].meeko"), "<template><h1>Usuario</h1></template>\n");
+    await writeFile(join(root, "app", "pages", "settings.meeko"), "<template><h1>Ajustes</h1></template>\n");
+    const layout = join(root, "app", "layouts", "default.meeko");
+    const check = async (nav: string) => {
+      await writeFile(layout, sectionsLayout(nav));
+      return (await checkApp(root)).map((item) => `${item.code}: ${item.message}`);
+    };
+    await prepareFrameworkTypeDeclarations(root);
+    const valid = '<MeekoLink to="/" match="prefix">Inicio</MeekoLink>'
+      + '<MeekoLink to="/users/[id]" bind:params="{ id: \'1\' }" bind:match="mode.value">Usuario</MeekoLink>'
+      + '<MeekoLink to="/" match="exact">Inicio</MeekoLink>'
+      + '<a href="/" bind:aria-current="route.isActive(\'/\')">Inicio</a>'
+      // The list of docs/framework.md: a union of static routes.
+      + '<a each:of="links" each:as="link" each:key="link.to" bind:href="href(link.to)" bind:aria-current="route.isActive(link.to, { prefix: true })">{link.label}</a>';
+    assert.deepEqual(await check(valid), []);
+    const wrong: Array<[string, RegExp]> = [
+      ['<MeekoLink to="/" bind:match="\'partial\'">x</MeekoLink>', /partial/],
+      ['<MeekoLink to="/" match="partial">x</MeekoLink>', /^MEEK105: match de <MeekoLink>/],
+      ['<a bind:aria-current="route.isActive(\'/users/[id]\')">x</a>', /^TS2554:/],
+      ['<a bind:aria-current="route.isActive(\'/missing\')">x</a>', /\/missing/],
+      ['<a bind:aria-current="route.isActive(\'/\', { params: { id: \'1\' } })">x</a>', /^TS2322:/],
+      ['<a bind:aria-current="route.isActive(\'/\', { prefix: \'yes\' })">x</a>', /^TS2322:/],
+    ];
+    for (const [nav, message] of wrong) {
+      const diagnostics = await check(nav);
+      assert.ok(diagnostics.some((item) => message.test(item)), `${nav}: ${JSON.stringify(diagnostics)}`);
+    }
   } finally {
     await project.remove();
   }

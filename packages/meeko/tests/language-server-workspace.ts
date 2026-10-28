@@ -47,6 +47,7 @@ export async function languageProject(prefix: string, files: Record<string, stri
         "@meekojs/meeko/framework": ["../../src/framework.ts"],
         "@meekojs/meeko/server": ["../../src/framework-server.ts"],
         "@meekojs/meeko/internal": ["../../src/internal.ts"],
+        "@meekojs/meeko/builtins/*": ["../../src/builtins/*.compiled.ts"],
         "@meekojs/meeko": ["../../src/index.ts"],
       },
     },

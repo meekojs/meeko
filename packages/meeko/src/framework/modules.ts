@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { createRouteManifest } from "./router.js";
 import type { RouteRecord } from "./router.js";
-import { discoverRoutes } from "./routes-discovery.js";
+import { discoverLayouts, discoverRoutes } from "./routes-discovery.js";
 
 /**
  * Un layer de rutas: una carpeta con su propio árbol `app/pages`, cuyas páginas se muestran dentro
@@ -61,6 +61,12 @@ export interface ComposeRoutesOptions {
   readonly layers?: readonly RouteLayer[];
   /** Módulos programáticos, después de los layers. */
   readonly modules?: readonly RouteModule[];
+  /**
+   * Layouts con nombre que añaden los módulos de Meeko (`meeko.addLayout`), por nombre. Los del
+   * proyecto y los de los layers ganan a estos.
+   * @since 1.5.0
+   */
+  readonly layouts?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -91,13 +97,21 @@ export async function composeFrameworkRoutes(options: ComposeRoutesOptions): Pro
     }
     names.add(source.name);
   }
-  const routes: RouteRecord[] = [...await discoverRoutes(options.projectRoot)];
+  // Named layouts of the layers (each layer's `default` only serves its own pages), then the modules'.
+  const layouts: Record<string, string> = {};
+  for (const layer of options.layers ?? []) {
+    for (const [name, file] of Object.entries(await discoverLayouts(resolve(layer.root)))) {
+      if (name !== "default" && !Object.hasOwn(layouts, name)) layouts[name] = file;
+    }
+  }
+  for (const [name, file] of Object.entries(options.layouts ?? {})) if (!Object.hasOwn(layouts, name)) layouts[name] = file;
+  const routes: RouteRecord[] = [...await discoverRoutes(options.projectRoot, { layouts })];
   for (const layer of options.layers ?? []) {
     const root = resolve(layer.root);
     if (roots.has(root.toLowerCase())) throw new Error(`Duplicate route root: ${root}`);
     roots.add(root.toLowerCase());
     // Layer pages render inside the project's shell and fall back to its error page.
-    routes.push(...await discoverRoutes(root, { shell: options.projectRoot }));
+    routes.push(...await discoverRoutes(root, { shell: options.projectRoot, layouts }));
   }
   for (const module of options.modules ?? []) routes.push(...await module.routes());
   return createRouteManifest(routes);

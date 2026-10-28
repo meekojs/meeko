@@ -1153,10 +1153,11 @@ describe("Meeko language server built-in tags, component hover and completion", 
       };
       const link = await hoverAt("<MeekoLink", 3);
       assert.equal(link.range, "MeekoLink");
-      assert.match(link.value, /^```ts\n<MeekoLink\n {2}to: "\/users\/\[id\]"\n {2}bind:params\?: [^\n]+\n {2}bind:search\?: Readonly<Record<string, [^\n]+>>\n>\n {2}default\?\(\)\n<\/MeekoLink>\n```/);
+      assert.match(link.value, /^```ts\n<MeekoLink\n {2}to: "\/users\/\[id\]"\n {2}bind:params\?: [^\n]+\n {2}bind:search\?: Readonly<Record<string, [^\n]+>>\n {2}match\?: "exact" \| "prefix"\n>\n {2}default\?\(\)\n<\/MeekoLink>\n```/);
       assert.doesNotMatch(link.value, /\bany\b/);
       assert.match(link.value, /props: \[`MeekoLinkProps`\]\(file:\/\/\/[^)]+framework\.d\.ts#L\d+,\d+\)/);
       assert.match(link.value, /- `bind:params`: Parámetros de una ruta dinámica/);
+      assert.match(link.value, /- `match`: Cuándo el enlace está activo/);
       assert.match(link.value, /\[Guía de `<MeekoLink>`\]\(https:\/\/github\.com\/meekojs\/meeko\/blob\/main\/docs\/framework\.md#meekooutlet--y-meekolink\)/);
       // The closing tag hovers the same.
       assert.equal((await hoverAt("/MeekoLink", 3)).range, "MeekoLink");
@@ -1182,7 +1183,7 @@ describe("Meeko language server built-in tags, component hover and completion", 
 
       // Completion: the props of the tag and the attributes of the <a> it renders, never href.
       const attributes = itemsOf(await client.connection.sendRequest(CompletionRequest.type, { textDocument: { uri }, position: client.position(uri, ' class="brand"', 1) })).map((item) => item.label);
-      assert.ok(attributes.includes("bind:search") && attributes.includes("target") && attributes.includes("on:"), JSON.stringify(attributes));
+      assert.ok(attributes.includes("bind:search") && attributes.includes("match") && attributes.includes("target") && attributes.includes("on:"), JSON.stringify(attributes));
       assert.ok(!attributes.includes("href") && !attributes.includes("to") && !attributes.includes("bind:params"), JSON.stringify(attributes));
     } finally {
       await client.close();

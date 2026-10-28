@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { applyAutoImports, compileWithAutoImports, discoverAutoImports } from "./autoimports.js";
 import type { AutoImport } from "./autoimports.js";
+import { aliasCandidates } from "./compiler/aliases.js";
 import { originalOffset } from "./compiler/mapping.js";
 import type { SourceMapping } from "./compiler/mapping.js";
 import { moduleSpecifiers, replaceModuleSpecifiers } from "./compiler/import-graph.js";
@@ -18,6 +19,8 @@ import type { CompileDiagnostic } from "./compiler/sfc.js";
 import { UnexposedRefError } from "./element-refs.js";
 import { routeBlockTypeSource } from "./framework/route-block-types.js";
 import { pageRouteId } from "./framework/server-script.js";
+import { resolveProjectAliases, resolveProjectAliasesSync } from "./framework/aliases.js";
+import type { ProjectAliases } from "./framework/aliases.js";
 
 const execFileAsync = promisify(execFile);
 const typescriptPackage = fileURLToPath(import.meta.resolve("typescript/package.json"));
@@ -44,6 +47,17 @@ interface GeneratedEntry {
 export interface CheckSourceOptions {
   /** Registro de autoimports por raíz de proyecto; por defecto se carga la configuración como el CLI. */
   readonly autoImports?: (projectRoot: string) => readonly AutoImport[] | Promise<readonly AutoImport[]>;
+  /**
+   * Aliases de ruta por raíz de proyecto; por defecto se leen de la configuración como el CLI, o sin
+   * ejecutarla si se da `autoImports`.
+   */
+  readonly aliases?: (projectRoot: string) => ProjectAliases | Promise<ProjectAliases>;
+}
+
+/** The path aliases of a project, as `options` gives them or as `meeko check` (or the static reader) reads them. */
+async function projectAliasesFor(root: string, options: CheckSourceOptions): Promise<ProjectAliases> {
+  if (options.aliases) return options.aliases(root);
+  return options.autoImports ? resolveProjectAliasesSync(root) : resolveProjectAliases(root);
 }
 
 function componentTarget(rootDirectory: string, filename: string): "client" | "server" {
@@ -73,7 +87,8 @@ async function compileGraph(source: string, filename: string, options: CheckSour
     if (previous) return previous;
     const target = componentTarget(rootDirectory, original);
     const registry = options.autoImports ? await options.autoImports(projectRoot(original)) : undefined;
-    const compiled = await compileWithAutoImports(content, original, { typeCheck: true }, target, registry);
+    const aliases = await projectAliasesFor(projectRoot(original), options);
+    const compiled = await compileWithAutoImports(content, original, { typeCheck: true }, target, registry, aliases);
     const entry: GeneratedEntry = {
       original, source: content, code: compiled.code,
       generated: join(generatedDirectory, relative(rootDirectory, original) + ".ts"),
@@ -91,12 +106,14 @@ async function compileGraph(source: string, filename: string, options: CheckSour
       const { value, start, end } = specifier;
       if (entry.server && value === serverSpecifier) continue;
       if (!value.endsWith(".meeko") && !value.startsWith(".")) continue;
-      if (value.endsWith(".meeko") && !value.startsWith(".")) {
-        throw compileError(content, original, "MEEK033", "Los imports de componentes deben usar rutas .meeko relativas", originalOffset(entry.mappings, start) ?? 0);
+      // Since 1.5 a path alias also names a component (`@/components/Card.meeko`): the first file that exists.
+      const aliased = value.startsWith(".") ? undefined : aliasCandidates(aliases.aliases, value);
+      if (value.endsWith(".meeko") && !value.startsWith(".") && !aliased) {
+        throw compileError(content, original, "MEEK033", "Los imports de componentes deben usar rutas .meeko relativas o un alias de ruta (@/, ~/…)", originalOffset(entry.mappings, start) ?? 0);
       }
       let destination: string;
       if (value.endsWith(".meeko")) {
-        const childFilename = resolve(dirname(original), value);
+        const childFilename = aliased?.find((candidate) => existsSync(candidate)) ?? aliased?.[0] ?? resolve(dirname(original), value);
         let childSource: string;
         try {
           childSource = await readFile(childFilename, "utf8");
@@ -149,12 +166,12 @@ const resolutionOptions = ["types", "typeRoots", "customConditions", "resolveJso
 /**
  * Reads the module resolution options of `<root>/tsconfig.json` (the file the editor uses for hover
  * and navigation) so a `paths` alias that the editor resolves is not reported by `meeko check`.
- * Type-checking flags stay fixed. TypeScript 7 has no `baseUrl`: it becomes a `*` mapping.
+ * Type-checking flags stay fixed. TypeScript 7 has no `baseUrl`: it becomes a `*` mapping. Since
+ * 1.5 the project's path aliases are `paths` too, also without a tsconfig.
  */
-async function projectResolutionOptions(root: string): Promise<Record<string, unknown> | undefined> {
-  if (!existsSync(join(root, "tsconfig.json"))) return undefined;
+async function projectResolutionOptions(root: string, aliases: ProjectAliases): Promise<Record<string, unknown> | undefined> {
   const { resolveProjectCompilerOptions } = await import("./language-server/model.js");
-  const { options } = resolveProjectCompilerOptions(root);
+  const { options } = resolveProjectCompilerOptions(root, aliases);
   const baseUrl = typeof options.baseUrl === "string" ? options.baseUrl : undefined;
   const pathsBase = baseUrl ?? (typeof options["pathsBasePath"] === "string" ? options["pathsBasePath"] : root);
   const absolute = (target: string): string => resolve(pathsBase, target).replaceAll("\\", "/");
@@ -216,6 +233,21 @@ export function requiredSnippetMessage(name: string): string {
   return `if:when en <snippet name="${name}"> deja de pasar el snippet cuando la condición es falsa, pero el hijo declara ${name} como obligatorio. Decláralo opcional en el defineSnippets del hijo (${name}?: [...]) o quita if:when`;
 }
 
+/**
+ * Type errors of `<component is>` with a tag (MEEK112, and MEEK031 for a void tag with content) and
+ * of `bind="obj"` (MEEK113): the type text carries the code and the message, which the diagnostic
+ * keeps without TypeScript's wrapping.
+ */
+const meekTypeText = /"(MEEK(?:031|112|113)): ([^"]+)"/;
+
+/** Message of a MEEK112, MEEK113 or MEEK031 type error, with what to do about it. */
+function meekTypeMessage(code: string, text: string): string {
+  if (code === "MEEK112" && text.endsWith("no se aplica a ninguna etiqueta posible de is")) {
+    return `${text}: Meeko no lo escribiría nunca; quítalo o añade a is una etiqueta que lo admita`;
+  }
+  return text;
+}
+
 /** The type error of `UnexposedRefMessage` that TypeScript reports for `await useElementRef(...)`. */
 const unexposedRefType = /\bMEEK080: /;
 
@@ -262,8 +294,14 @@ export async function checkSource(source: string, filename: string, options: Che
     // Options such as `paths` only exist in a tsconfig, so they go into a temporary one; the
     // command-line flags below still override every type-checking option.
     const rootDirectory = projectRoot(absolute);
-    const resolution = await projectResolutionOptions(rootDirectory);
+    const projectResolution = await projectResolutionOptions(rootDirectory, await projectAliasesFor(rootDirectory, options));
     const files = [graph.root.generated, ...generatedDeclarations(rootDirectory, absolute), ...projectDeclarationFiles(rootDirectory)];
+    // The generated declarations name components by their `.meeko` path (the props of each named
+    // layout in routes.d.ts), which the declaration tree resolves as in the framework tsconfigs.
+    const declarationTree = join(rootDirectory, ".meeko", "types");
+    const resolution = existsSync(join(declarationTree, "routes.d.ts"))
+      ? { ...projectResolution, rootDirs: [rootDirectory, declarationTree], allowArbitraryExtensions: true }
+      : projectResolution;
     const project = resolution ? join(graph.tempDirectory, "tsconfig.json") : undefined;
     if (project) await writeFile(project, JSON.stringify({ compilerOptions: resolution, files }), { encoding: "utf8", flag: "wx" });
     try {
@@ -303,6 +341,10 @@ export async function checkSource(source: string, filename: string, options: Che
       }
       if (untrustedHtmlType.test(diagnostic.message)) {
         return { code: "MEEK107", message: untrustedHtmlMessage, filename: entry.original, location: locate(entry.source, offset ?? 0), severity: "warning" };
+      }
+      const meekType = meekTypeText.exec(diagnostic.message);
+      if (meekType) {
+        return { code: meekType[1]!, message: meekTypeMessage(meekType[1]!, meekType[2]!), filename: entry.original, location: locate(entry.source, offset ?? 0) };
       }
       const result: CompileDiagnostic = {
         code: diagnostic.code,

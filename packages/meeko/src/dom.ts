@@ -14,6 +14,9 @@ import { snippetOf } from "./snippets.js";
 import type { Snippet, SnippetData } from "./snippets.js";
 import { reactiveProps } from "./props.js";
 import type { PropsSource } from "./props.js";
+import { childIdBase, currentIdBase, withIdBase } from "./ids.js";
+import { closeTag, dynamicTagName } from "./dynamic-tag.js";
+import type { TagPart } from "./dynamic-tag.js";
 
 /**
  * Fragmento de DOM que pertenece a una instancia o a una región dinámica: los hijos de `root` o,
@@ -125,20 +128,25 @@ export function withStateSnapshot<Exposed = null>(release: () => void, snapshot:
 
 const componentStart = /^meeko:component:\d+(?::.*)?$/;
 const snippetStart = /^meeko:snippet:\d+$/;
+/** The content of a `<MeekoTeleport>`, in its place or in its target; see `teleport.ts`. */
+const portalStart = /^meeko:portal(?::[\w-]+)?$/;
 
 /**
- * Kind of a region that a search skips: a child component, whose markers belong to it, or a
- * snippet that the child renders, whose markers belong to the parent that wrote it.
+ * Kind of a region that a search skips: a child component, whose markers belong to it, a
+ * snippet that the child renders, whose markers belong to the parent that wrote it, or the content
+ * of a `<MeekoTeleport>`, which its teleport hydrates wherever it is, also inside an element of
+ * another component.
  */
-function nestedRegion(data: string): "component" | "snippet" | undefined {
+function nestedRegion(data: string): "component" | "snippet" | "portal" | undefined {
   if (componentStart.test(data)) return "component";
   if (snippetStart.test(data)) return "snippet";
+  if (portalStart.test(data)) return "portal";
   return undefined;
 }
 
 function regionEnd(start: Node): Node {
   const kind = nestedRegion((start as Comment).data)!;
-  const end = kind === "component" ? /^\/meeko:component:\d+$/ : /^\/meeko:snippet:\d+$/;
+  const end = kind === "component" ? /^\/meeko:component:\d+$/ : kind === "snippet" ? /^\/meeko:snippet:\d+$/ : /^\/meeko:portal(?::[\w-]+)?$/;
   let depth = 0;
   for (let node: Node | null = start; node; node = node.nextSibling) {
     if (node.nodeType !== 8) continue;
@@ -304,12 +312,14 @@ export function renderComponent<Props extends object>(id: number, component: Com
 function renderComponentHtml<Props extends object>(id: number, component: ComponentModule<Props>, props: Props, transferState: boolean): string {
   const css = (component as { readonly css?: unknown }).css;
   if (renderedStyles && typeof css === "string" && css) renderedStyles.add(css);
+  // The child's useId calls take its position in this template, as bindComponent gives it.
+  const at = childIdBase(currentIdBase(), String(id));
   if (transferState) {
     if (!component.renderWithState) throw new TypeError(`Component ${id} cannot transfer SSR state`);
-    const rendered = component.renderWithState(props);
+    const rendered = withIdBase(at, () => component.renderWithState!(props));
     return `<!--meeko:component:${id}:${encodeURIComponent(serializeJson(rendered.state))}-->${rendered.html}<!--/meeko:component:${id}-->`;
   }
-  return `<!--meeko:component:${id}-->${component.renderToString(props)}<!--/meeko:component:${id}-->`;
+  return `<!--meeko:component:${id}-->${withIdBase(at, () => component.renderToString(props))}<!--/meeko:component:${id}-->`;
 }
 
 function componentRegion(scope: DomScope, id: number): { inner: DomScope; state?: Record<string, unknown> } {
@@ -381,6 +391,8 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
   }
   const owner = currentEffectOwner();
   const report = componentErrorReporter("mounted");
+  // Every render and hydration of the child, also later ones, takes the position it had in SSR.
+  const at = childIdBase(currentIdBase(), String(id));
   const resolveComponent = (): ComponentModule<Props> => typeof input === "function" ? input() : input;
   const unmounted: ComponentRelease = () => {};
   let component = resolveComponent();
@@ -394,7 +406,7 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
   // The child's setup reads its props and other signals: none of them belongs to the observer that mounts it.
   const hydrateChild = (target: ComponentModule<Props>, targetProps: Props, targetState: Record<string, unknown> | undefined): ComponentRelease => {
     const nextSource = acceptsReactiveProps(target) ? reactiveProps(targetProps) : undefined;
-    const hydrated = untrack(() => target.hydrateScope(inner, nextSource ? nextSource.props : targetProps, targetState));
+    const hydrated = untrack(() => withIdBase(at, () => target.hydrateScope(inner, nextSource ? nextSource.props : targetProps, targetState)));
     source = nextSource;
     return hydrated;
   };
@@ -405,7 +417,7 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
   const defer = (target: ComponentModule<Props>, targetProps: Props, targetState: Record<string, unknown> | undefined, attempt = 1): void => {
     const control = new AbortController();
     loading = control;
-    const render = (): string => target.renderToString(targetProps, targetState);
+    const render = (): string => withIdBase(at, () => target.renderToString(targetProps, targetState));
     loadDeferred(owner, render, control.signal).then((data) => {
       if (control.signal.aborted) return;
       const restore = switchOwner(owner);
@@ -469,7 +481,7 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
     const previousState = release.snapshot?.();
     const state = nextComponent === component ? previousState : undefined;
     let html: string;
-    try { html = lateRender(() => nextComponent.renderToString(next, state)); }
+    try { html = lateRender(() => withIdBase(at, () => nextComponent.renderToString(next, state))); }
     catch (error) {
       if (!isLateSuspension(error)) throw error;
       // It waits for data: release the current child and leave the region empty until the data loads.
@@ -518,6 +530,217 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
     try { release(); }
     finally { expose?.(null); }
   };
+}
+
+/**
+ * Replaces `target` with the element of `html` (an opening tag and its closing tag, without
+ * content). The children move into the new element with their nodes, so their bindings, the state
+ * of their components and the values of their controls survive; the focus stays on the moved node
+ * that had it, or on the new element if the old one had it and the new one can take it.
+ */
+function retag(target: Element, html: string): Element {
+  const parent = target.parentNode;
+  if (!parent) throw new Error("Detached Meeko element");
+  const next = parseRegionHtml(parent, html).firstChild;
+  if (!next || next.nodeType !== 1) throw new Error("Invalid Meeko element render");
+  const active = target.ownerDocument.activeElement;
+  const focused = active === target ? next : active && target.contains(active) ? active : null;
+  while (target.firstChild) next.appendChild(target.firstChild);
+  parent.replaceChild(next, target);
+  const focus = (focused as Partial<HTMLElement> | null)?.focus;
+  if (focused && typeof focus === "function") focus.call(focused);
+  return next as Element;
+}
+
+/** The first element of a region: the element of `<component is>` with a tag. */
+function regionElement(inner: DomScope): Element {
+  for (let node = inner.start!.nextSibling; node && node !== inner.end; node = node.nextSibling) {
+    if (node.nodeType === 1) return node as Element;
+  }
+  throw new Error("Missing Meeko element in its region");
+}
+
+/**
+ * Hidrata `<component is>` cuya expresión es siempre una etiqueta, en el elemento marcado
+ * `element`. Si la etiqueta cambia, un elemento nuevo sustituye al anterior: sus hijos se mueven
+ * dentro con sus nodos, sus enlaces y su estado, el foco se conserva y los enlaces propios del
+ * elemento (atributos, eventos, `ref:`, `html` y `bind`) se hidratan de nuevo en él.
+ */
+export function bindElementTag<const T>(scope: DomScope, element: number, read: () => T, content: boolean, open: (tag: TagPart<T>) => string, hydrate: (tag: TagPart<T>, scope: DomScope) => () => void, location: string): () => void {
+  let target = findMarked(scope, element);
+  let tag = dynamicTagName(untrack(read), content) as TagPart<T>;
+  if (target.localName !== tag) throw new Error(`Hydration mismatch in ${location}: expected <${tag}>, found <${target.localName}>`);
+  // The element's bindings hydrate first; the tag still updates before they run.
+  const order = reserveUpdateOrder();
+  let release = untrack(() => hydrate(tag, scope));
+  let stop = () => {};
+  stop = effectInOrder(order, () => mountBatch(() => {
+    const next = dynamicTagName(read(), content) as TagPart<T>;
+    if (next === tag) return;
+    untrack(() => {
+      const html = open(next) + closeTag(next);
+      const previous = release;
+      release = () => {};
+      previous();
+      target = retag(target, html);
+      tag = next;
+      release = hydrate(next, scope);
+    });
+  }));
+  return () => {
+    stop();
+    release();
+  };
+}
+
+/** Element half of {@link bindDynamic}: how the tag renders and hydrates its element. */
+export interface DynamicElement<Tag extends string = string> {
+  /** Data number of the element. */
+  readonly element: number;
+  /** The tag has content, so a void tag is an error (MEEK031). */
+  readonly content: boolean;
+  /** Inside `<svg>`, where `is` only admits components. */
+  readonly svg: boolean;
+  /** Opening tag with the current attributes. */
+  readonly open: (tag: Tag) => string;
+  /** The whole element with its content, for a region that held a component. */
+  readonly render: (tag: Tag) => string;
+  /** Bindings of the element itself (attributes, events, `ref:`, `html`, `bind`), which a new tag hydrates again. */
+  readonly hydrate: (tag: Tag, scope: DomScope) => () => void;
+  /** Bindings of its content, which stay hydrated while the tag changes: the content moves with its nodes. */
+  readonly hydrateContent: (scope: DomScope) => () => void;
+}
+
+/**
+ * Hidrata `<component is>` cuya expresión puede ser una etiqueta o un componente, dentro del rango
+ * de comentarios del componente. Un componente se hidrata como en `bindComponent`; una etiqueta, como
+ * en `bindElementTag`. Al pasar de un tipo a otro, el rango se vacía y se monta de nuevo.
+ */
+export function bindDynamic<const T, Props extends object>(scope: DomScope, id: number, read: () => T, location: string, element: DynamicElement<TagPart<T>>, component: { readonly read: () => Props; readonly expose?: (value: unknown, hydrated?: boolean) => void }): () => void {
+  let inner: DomScope;
+  try { ({ inner } = componentRegion(scope, id)); }
+  catch (error) {
+    throw new Error(`Hydration mismatch in ${location}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+  }
+  // The element or the child hydrates first; the value still updates before they react.
+  const order = reserveUpdateOrder();
+  // A later swap renders and hydrates in the effect: it takes the position the SSR gave this tag.
+  const at = currentIdBase();
+  let tag: TagPart<T> | undefined;
+  let target: Element | undefined;
+  /** The component of the last value that was one, which `bindComponent` keeps while the value is a tag. */
+  let last: unknown;
+  /** The element's own bindings, or the child component's binding. */
+  let release: () => void = () => {};
+  /** Bindings of the element's content, which survive a change of tag. */
+  let releaseContent: () => void = () => {};
+  const mountComponent = (): (() => void) => bindComponent(scope, id, () => {
+    const current = read();
+    return (typeof current === "string" ? last : current) as ComponentModule<Props>;
+  }, component.read, location, component.expose);
+  const mountElement = (next: TagPart<T>): void => {
+    target = regionElement(inner);
+    if (target.localName !== next) throw new Error(`Hydration mismatch in ${location}: expected <${next}>, found <${target.localName}>`);
+    releaseContent = element.hydrateContent(inner);
+    release = element.hydrate(next, inner);
+    tag = next;
+  };
+  const unmount = (): void => {
+    const previous = release;
+    const previousContent = releaseContent;
+    release = () => {};
+    releaseContent = () => {};
+    tag = undefined;
+    target = undefined;
+    try { releaseAll([previousContent, previous]); }
+    finally { clearRegion(inner); }
+  };
+  const initial = untrack(read);
+  if (typeof initial === "string") {
+    const initialTag = dynamicTagName(initial, element.content, element.svg) as TagPart<T>;
+    untrack(() => mountElement(initialTag));
+  } else {
+    last = initial;
+    release = untrack(mountComponent);
+  }
+  let stop = () => {};
+  stop = effectInOrder(order, () => mountBatch(() => {
+    const next = read();
+    if (typeof next !== "string") {
+      if (tag === undefined) {
+        // Another component: `bindComponent` replaces it.
+        last = next;
+        return;
+      }
+      untrack(() => withIdBase(at, () => {
+        unmount();
+        last = next;
+        let html: string;
+        try { html = lateRender(() => withIdBase(childIdBase(at, String(id)), () => (next as ComponentModule<Props>).renderToString(component.read()))); }
+        catch (error) {
+          if (!isLateSuspension(error)) throw error;
+          // `bindComponent` loads its data and mounts it.
+          html = `<!--${waitingMarker}-->`;
+        }
+        insertHtml(inner.end!, html);
+        release = mountComponent();
+      }));
+      return;
+    }
+    const nextTag = dynamicTagName(next, element.content, element.svg) as TagPart<T>;
+    if (nextTag === tag) return;
+    untrack(() => withIdBase(at, () => {
+      if (tag !== undefined && target) {
+        // Element to element: the content moves into the new element and stays hydrated.
+        const previous = release;
+        release = () => {};
+        previous();
+        target = retag(target, element.open(nextTag) + closeTag(nextTag));
+        tag = nextTag;
+        release = element.hydrate(nextTag, inner);
+        return;
+      }
+      unmount();
+      insertHtml(inner.end!, lateRender(() => element.render(nextTag)));
+      mountElement(nextTag);
+    }));
+  }));
+  return () => {
+    stop();
+    releaseAll([releaseContent, release]);
+  };
+}
+
+/**
+ * Conecta `bind="obj"` de un elemento: escribe sus atributos, quita los que el objeto deja de
+ * tener y comprueba los del SSR al hidratar. `read` devuelve los pares nombre-valor ya resueltos.
+ */
+export function bindSpread(scope: DomScope, id: number, read: () => ReadonlyArray<readonly [string, string]>, location: string): () => void {
+  const target = findMarked(scope, id);
+  let current = new Map(read());
+  for (const [name, value] of current) {
+    if (target.getAttribute(name) !== value) throw new Error(`Hydration mismatch in ${location}: attribute ${name}`);
+  }
+  let first = true;
+  return effect(() => {
+    const next = new Map(read());
+    if (first) {
+      first = false;
+      current = next;
+      return;
+    }
+    for (const name of current.keys()) {
+      if (next.has(name)) continue;
+      target.removeAttribute(name);
+      syncFormState(target, name, null);
+    }
+    for (const [name, value] of next) {
+      if (current.get(name) === value && target.getAttribute(name) === value) continue;
+      target.setAttribute(name, value);
+      syncFormState(target, name, value);
+    }
+    current = next;
+  });
 }
 
 /** Publishes the element of a `ref:` directive while its region stays hydrated. */
@@ -767,6 +990,8 @@ export function bindIf(scope: DomScope, id: number, read: () => unknown, render:
   const inner = region(scope, "if", id);
   // Its content hydrates first; the condition still updates before that content does.
   const order = reserveUpdateOrder();
+  // Content that appears later renders at the position of this template, as in SSR.
+  const at = currentIdBase();
   let active = Boolean(read());
   if (!active && inner.start?.nextSibling !== inner.end) throw new Error(`Hydration mismatch in condition ${id}`);
   let release = active ? hydrate(inner) : undefined;
@@ -775,11 +1000,11 @@ export function bindIf(scope: DomScope, id: number, read: () => unknown, render:
     const next = Boolean(read());
     if (next === active) return;
     if (next) {
-      const html = lateRender(render);
+      const html = withIdBase(at, () => lateRender(render));
       try {
         clearRegion(inner);
         insertHtml(inner.end!, html);
-        release = hydrate(inner);
+        release = withIdBase(at, () => hydrate(inner));
         active = true;
       } catch (error) {
         try { clearRegion(inner); }
@@ -810,7 +1035,8 @@ export function bindIf(scope: DomScope, id: number, read: () => unknown, render:
  */
 export function renderSnippet<Args extends readonly unknown[]>(id: number, snippet: Snippet<Args> | undefined, args: NoInfer<Args>): string {
   const data = snippetOf(snippet);
-  return `<!--meeko:snippet:${id}-->${data ? data.render(...args) : ""}<!--/meeko:snippet:${id}-->`;
+  const content = data ? withIdBase(childIdBase(currentIdBase(), `s${id}`), () => data.render(...args)) : "";
+  return `<!--meeko:snippet:${id}-->${content}<!--/meeko:snippet:${id}-->`;
 }
 
 function sameArguments(first: readonly unknown[], second: readonly unknown[]): boolean {
@@ -845,6 +1071,7 @@ function hydrateSnippet(data: SnippetData, inner: DomScope, args: Signal<readonl
  */
 export function bindSnippet(scope: DomScope, id: number, read: () => unknown, readArgs: () => readonly unknown[]): () => void {
   const inner = region(scope, "snippet", id);
+  const at = childIdBase(currentIdBase(), `s${id}`);
   let current: SnippetData | undefined;
   let release: (() => void) | undefined;
   const args = signal<readonly unknown[]>(untrack(readArgs));
@@ -856,7 +1083,7 @@ export function bindSnippet(scope: DomScope, id: number, read: () => unknown, re
       first = false;
       current = next;
       if (!next && inner.start?.nextSibling !== inner.end) throw new Error(`Hydration mismatch in snippet ${id}`);
-      if (next) release = hydrateSnippet(next, inner, args);
+      if (next) release = withIdBase(at, () => hydrateSnippet(next, inner, args));
       return;
     }
     if (next === current) return;
@@ -866,8 +1093,8 @@ export function bindSnippet(scope: DomScope, id: number, read: () => unknown, re
     try { previous?.(); }
     finally { clearRegion(inner); }
     if (next) {
-      insertHtml(inner.end!, lateRender(() => next.render(...untrack(() => args.value))));
-      release = hydrateSnippet(next, inner, args);
+      insertHtml(inner.end!, withIdBase(at, () => lateRender(() => next.render(...untrack(() => args.value)))));
+      release = withIdBase(at, () => hydrateSnippet(next, inner, args));
     }
   }));
   let stopArgs = () => {};
@@ -913,7 +1140,8 @@ export function renderFor<T>(id: number, items: Iterable<T>, keyOf: (item: T, in
     const key = keyToken(keyOf(item, index));
     if (seen.has(key)) throw new Error(`Duplicate Meeko list key ${key}`);
     seen.add(key);
-    html += `<!--meeko:item:${id}:${key}-->${render(item, index)}<!--/meeko:item:${id}:${key}-->`;
+    const row = withIdBase(childIdBase(currentIdBase(), `f${id}${key}`), () => render(item, index));
+    html += `<!--meeko:item:${id}:${key}-->${row}<!--/meeko:item:${id}:${key}-->`;
     index++;
   }
   return `${html}<!--/meeko:for:${id}-->`;
@@ -994,6 +1222,9 @@ export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>,
   const outer = region(scope, "for", id);
   // The rows hydrate first; the list still updates (and drops rows) before their bindings run.
   const order = reserveUpdateOrder();
+  // Each row renders and hydrates at the position of its key, as in SSR.
+  const parent = currentIdBase();
+  const rowAt = (key: string) => childIdBase(parent, `f${id}${key}`);
   const entries = new Map<string, ListEntry<T>>();
   const initial = [...read()];
   let currentKeys: string[] = [];
@@ -1013,7 +1244,7 @@ export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>,
       const value = signal(item);
       const position = trackIndex ? signal(index) : undefined;
       const release = createRoot((dispose) => {
-        const cleanup = hydrate(value, position as Signal<number>, { root: scope.root, start, end: end as Comment });
+        const cleanup = withIdBase(rowAt(key), () => hydrate(value, position as Signal<number>, { root: scope.root, start, end: end as Comment }));
         return () => finishWithCleanup(cleanup, dispose);
       });
       entries.set(key, { key, start, end: end as Comment, value, index: position, release });
@@ -1043,7 +1274,7 @@ export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>,
     const stable = stableListPositions(oldIndices);
     const newRows = items.flatMap((item, index) => entries.has(nextKeys[index]!) ? [] : [{
       key: nextKeys[index]!, index, item,
-      html: `<!--meeko:item:${id}:${nextKeys[index]}-->${lateRender(() => render(item, index))}<!--/meeko:item:${id}:${nextKeys[index]}-->`,
+      html: `<!--meeko:item:${id}:${nextKeys[index]}-->${withIdBase(rowAt(nextKeys[index]!), () => lateRender(() => render(item, index)))}<!--/meeko:item:${id}:${nextKeys[index]}-->`,
     }]);
     const staged = new Map<string, ListEntry<T>>();
     const inserted: Array<{ start: Comment; end: Comment }> = [];
@@ -1060,7 +1291,7 @@ export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>,
         const value = signal(row.item);
         const position = trackIndex ? signal(row.index) : undefined;
         const release = createRoot((dispose) => {
-          const cleanup = hydrate(value, position as Signal<number>, { root: scope.root, start: start as Comment, end });
+          const cleanup = withIdBase(rowAt(row.key), () => hydrate(value, position as Signal<number>, { root: scope.root, start: start as Comment, end }));
           return () => finishWithCleanup(cleanup, dispose);
         });
         staged.set(row.key, { key: row.key, start: start as Comment, end, value, index: position, release });
@@ -1130,4 +1361,17 @@ export function bindFor<T>(scope: DomScope, id: number, read: () => Iterable<T>,
     try { releaseAll([...entries.values()].map((entry) => entry.release)); }
     finally { entries.clear(); }
   };
+}
+
+/**
+ * @internal The region between `<!--meeko:kind:id-->` and `<!--/meeko:kind:id-->` in `scope`, for
+ * bindings that live outside this module, such as `<MeekoTeleport>`.
+ */
+export function markerRegion(scope: DomScope, kind: string, id: number): DomScope {
+  return region(scope, kind, id);
+}
+
+/** @internal The end marker of the nested region (a child component, a snippet or a portal) that `start` opens. */
+export function nestedRegionEnd(start: Comment): Comment {
+  return regionEnd(start) as Comment;
 }

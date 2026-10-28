@@ -26,6 +26,7 @@ import { createComponentActions, listItemActions, propsReadActions } from "./qui
 import { documentLinks, inlayHints, linkRouteCompletion, workspaceSymbols } from "./nav.js";
 import { MeekoWorkspace, pathKey } from "./project.js";
 import type { MeekoProject } from "./project.js";
+import { teleportCompletion, teleportHover } from "./teleport.js";
 import { executionZones } from "./zones.js";
 import type { ExecutionZoneKind, ExecutionZoneReason } from "./zones.js";
 
@@ -499,6 +500,9 @@ export function startLanguageServer(connection: Connection): void {
       if (tags) return tags;
       // `each:`, `if:when`, `bind:`… in a tag, also a component tag; the tag may not parse yet.
       const shadowed = shadowedTagsOf(project, document.getText());
+      // `<MeekoTeleport>`: its attributes and the targets of to="…".
+      const teleport = teleportCompletion(document, position, shadowed, project.root);
+      if (teleport) return teleport;
       const directives = directiveNameCompletion(document, position, shadowed);
       if (directives) return directives;
       const classes = classCompletion(document, position, filename, classesOf(project), project.componentSources());
@@ -525,6 +529,8 @@ export function startLanguageServer(connection: Connection): void {
     const open = await componentOf(textDocument.uri);
     const classes = open && classHover(open.document, position, open.filename, classesOf(open.project), open.project.componentSources());
     if (classes) return classes;
+    const teleport = open && teleportHover(open.document, position, shadowedTagsOf(open.project, open.document.getText()));
+    if (teleport) return teleport;
     const typed = await withContext(textDocument.uri, (context) => hover(context, position), true);
     const document = documents.get(textDocument.uri);
     if (typed || !document) return typed;

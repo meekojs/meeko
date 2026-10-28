@@ -277,3 +277,131 @@ test("<MeekoThemeToggle> is a built-in tag, also when it closes, and a longer na
   assert.ok(!tokens.some((token) => token.text.startsWith("MeekoThemeToggles") && token.scopes.includes(builtin)), "a longer name keeps the component color");
   assert.ok(tokens.some((token) => token.text === "value" && token.scopes.includes("meta.embedded.inline.typescript")), "bind:themes is TypeScript");
 });
+
+test("match of <MeekoLink> is a plain attribute with a string value, and bind:match is TypeScript", async () => {
+  const require = createRequire(import.meta.url);
+  await loadWASM(readFileSync(require.resolve("vscode-oniguruma/release/onig.wasm")));
+  const registry = new Registry({
+    onigLib: Promise.resolve({ createOnigScanner, createOnigString }),
+    loadGrammar: async (scope) => scope === "source.meeko"
+      ? parseRawGrammar(readFileSync(grammarFile, "utf8"), grammarFile)
+      : fixtureGrammars.get(scope) ?? null,
+  });
+  const grammar = await registry.loadGrammarWithConfiguration("source.meeko", 1, {
+    embeddedLanguages: { "meta.embedded.inline.typescript": 2, "meta.embedded.block.html": 3 },
+  });
+  assert.ok(grammar);
+  const line = '<template><MeekoLink to="/dashboard" match="prefix">Panel</MeekoLink><MeekoLink to="/" bind:match="value">Inicio</MeekoLink></template>';
+  const tokens = grammar.tokenizeLine(line, null).tokens.map((token) => ({ text: line.slice(token.startIndex, token.endIndex), scopes: token.scopes }));
+  const typescript = "meta.embedded.inline.typescript";
+  assert.equal(tokens.filter((token) => token.text === "MeekoLink" && token.scopes.includes("entity.name.function.builtin.meeko")).length, 4, "<MeekoLink> and </MeekoLink> are built-ins");
+  assert.ok(tokens.some((token) => token.text === "match" && token.scopes.includes("entity.other.attribute-name.html")), "match is a plain attribute");
+  assert.ok(tokens.some((token) => token.text === "prefix" && !token.scopes.includes(typescript)), "its value is a string, not TypeScript");
+  assert.ok(tokens.some((token) => token.text === "value" && token.scopes.includes(typescript)), "bind:match is TypeScript");
+});
+
+test("<MeekoAwait> is a built-in tag whose for is TypeScript, and for stays an attribute elsewhere", async () => {
+  const require = createRequire(import.meta.url);
+  await loadWASM(readFileSync(require.resolve("vscode-oniguruma/release/onig.wasm")));
+  const registry = new Registry({
+    onigLib: Promise.resolve({ createOnigScanner, createOnigString }),
+    loadGrammar: async (scope) => scope === "source.meeko"
+      ? parseRawGrammar(readFileSync(grammarFile, "utf8"), grammarFile)
+      : fixtureGrammars.get(scope) ?? null,
+  });
+  const grammar = await registry.loadGrammarWithConfiguration("source.meeko", 1, {
+    embeddedLanguages: { "meta.embedded.inline.typescript": 2, "meta.embedded.block.html": 3 },
+  });
+  assert.ok(grammar);
+  const line = '<template><MeekoAwait for="items" reserve><snippet name="pending">x</snippet><p>{count}</p></MeekoAwait><AppField for="email" /><MeekoAwaits /></template>';
+  const tokens = grammar.tokenizeLine(line, null).tokens.map((token) => ({ text: line.slice(token.startIndex, token.endIndex), scopes: token.scopes }));
+  const builtin = "entity.name.function.builtin.meeko";
+  const typescript = "meta.embedded.inline.typescript";
+  assert.equal(tokens.filter((token) => token.text === "MeekoAwait" && token.scopes.includes(builtin)).length, 2, "<MeekoAwait> and </MeekoAwait> are built-ins");
+  assert.ok(tokens.some((token) => token.text === "items" && token.scopes.includes(typescript)), "for is TypeScript");
+  assert.ok(tokens.some((token) => token.text === "for" && token.scopes.includes("entity.other.attribute-name.directive.meeko")), "for reads as a directive");
+  assert.ok(!tokens.some((token) => token.text.includes("email") && token.scopes.includes(typescript)), "for of another component is text");
+  assert.ok(!tokens.some((token) => token.text.startsWith("MeekoAwaits") && token.scopes.includes(builtin)), "a longer name keeps the component color");
+});
+
+test("<MeekoTeleport> is a built-in tag whose bind:disabled is TypeScript", async () => {
+  const require = createRequire(import.meta.url);
+  await loadWASM(readFileSync(require.resolve("vscode-oniguruma/release/onig.wasm")));
+  const registry = new Registry({
+    onigLib: Promise.resolve({ createOnigScanner, createOnigString }),
+    loadGrammar: async (scope) => scope === "source.meeko"
+      ? parseRawGrammar(readFileSync(grammarFile, "utf8"), grammarFile)
+      : fixtureGrammars.get(scope) ?? null,
+  });
+  const grammar = await registry.loadGrammarWithConfiguration("source.meeko", 1, {
+    embeddedLanguages: { "meta.embedded.inline.typescript": 2, "meta.embedded.block.html": 3 },
+  });
+  assert.ok(grammar);
+  const line = '<template><MeekoTeleport to="#toolbar" bind:disabled="count"><AppButton on:click="value" /></MeekoTeleport><MeekoTeleports /></template>';
+  const tokens = grammar.tokenizeLine(line, null).tokens.map((token) => ({ text: line.slice(token.startIndex, token.endIndex), scopes: token.scopes }));
+  const builtin = "entity.name.function.builtin.meeko";
+  assert.equal(tokens.filter((token) => token.text === "MeekoTeleport" && token.scopes.includes(builtin)).length, 2, "<MeekoTeleport> and </MeekoTeleport> are built-ins");
+  assert.ok(!tokens.some((token) => token.text === "MeekoTeleports" && token.scopes.includes(builtin)), "a longer name is a component");
+  assert.ok(tokens.some((token) => token.text === "#toolbar" && token.scopes.includes("string.quoted.double.html") && !token.scopes.includes("meta.embedded.inline.typescript")), "to is text");
+  assert.ok(tokens.some((token) => token.text === "count" && token.scopes.includes("meta.embedded.inline.typescript") && token.scopes.includes("variable.other.readwrite.ts")), "bind:disabled is TypeScript");
+  assert.ok(tokens.some((token) => token.text === "AppButton" && !token.scopes.includes(builtin)), "its content keeps its own tags");
+});
+
+test("bind without a name is a directive with a TypeScript value, except on a custom element", async () => {
+  const require = createRequire(import.meta.url);
+  await loadWASM(readFileSync(require.resolve("vscode-oniguruma/release/onig.wasm")));
+  const registry = new Registry({
+    onigLib: Promise.resolve({ createOnigScanner, createOnigString }),
+    loadGrammar: async (scope) => scope === "source.meeko"
+      ? parseRawGrammar(readFileSync(grammarFile, "utf8"), grammarFile)
+      : fixtureGrammars.get(scope) ?? null,
+  });
+  const grammar = await registry.loadGrammarWithConfiguration("source.meeko", 1, {
+    embeddedLanguages: { "meta.embedded.inline.typescript": 2, "meta.embedded.block.html": 3 },
+  });
+  assert.ok(grammar);
+  const tokenize = (line: string) => grammar.tokenizeLine(`<template>${line}</template>`, null).tokens.map((token) => ({
+    text: `<template>${line}</template>`.slice(token.startIndex, token.endIndex),
+    scopes: token.scopes,
+  }));
+  const directive = "entity.other.attribute-name.directive.meeko";
+  const typescript = "meta.embedded.inline.typescript";
+  for (const line of [
+    '<p class="plain" bind="state" data-bind="plain">x</p>',
+    '<AppCard bind="state" />',
+    "<component is=\"href ? 'a' : 'button'\" bind=\"state\"></component>",
+  ]) {
+    const tokens = tokenize(line);
+    assert.ok(tokens.some((token) => token.text === "bind" && token.scopes.includes(directive)), `bind directive in ${line}`);
+    assert.ok(tokens.some((token) => token.text === "state" && token.scopes.includes(typescript)), `bind value is TypeScript in ${line}`);
+  }
+  const plain = tokenize('<p data-bind="plain">x</p>');
+  assert.ok(plain.some((token) => token.text === "data-bind" && !token.scopes.includes(directive)), "data-bind is an HTML attribute");
+  const custom = tokenize('<x-card bind="state"></x-card>');
+  assert.ok(custom.some((token) => token.text === "bind" && !token.scopes.includes(directive)), "bind on a custom element is an HTML attribute");
+  assert.ok(custom.some((token) => token.text === "state" && !token.scopes.includes(typescript)), "its value is text");
+  const tag = tokenize("<component is=\"count ? 'a' : 'button'\"></component>");
+  assert.ok(tag.some((token) => token.text.includes("'a'") && token.scopes.includes(typescript)), "the tags of is are TypeScript");
+});
+
+test("<MeekoPopover> and <MeekoSelect> are built-in tags, also when they close, and longer names are not", async () => {
+  const require = createRequire(import.meta.url);
+  await loadWASM(readFileSync(require.resolve("vscode-oniguruma/release/onig.wasm")));
+  const registry = new Registry({
+    onigLib: Promise.resolve({ createOnigScanner, createOnigString }),
+    loadGrammar: async (scope) => scope === "source.meeko"
+      ? parseRawGrammar(readFileSync(grammarFile, "utf8"), grammarFile)
+      : fixtureGrammars.get(scope) ?? null,
+  });
+  const grammar = await registry.loadGrammarWithConfiguration("source.meeko", 1, {
+    embeddedLanguages: { "meta.embedded.inline.typescript": 2, "meta.embedded.block.html": 3 },
+  });
+  assert.ok(grammar);
+  const line = '<template><MeekoPopover role="menu"><snippet name="trigger">x</snippet></MeekoPopover><MeekoSelect model="color" bind:options="colors" /><MeekoSelects /></template>';
+  const tokens = grammar.tokenizeLine(line, null).tokens.map((token) => ({ text: line.slice(token.startIndex, token.endIndex), scopes: token.scopes }));
+  const builtin = "entity.name.function.builtin.meeko";
+  assert.equal(tokens.filter((token) => token.text === "MeekoPopover" && token.scopes.includes(builtin)).length, 2, "<MeekoPopover> and </MeekoPopover> are built-ins");
+  assert.equal(tokens.filter((token) => token.text === "MeekoSelect" && token.scopes.includes(builtin)).length, 1, "<MeekoSelect /> is a built-in");
+  assert.ok(!tokens.some((token) => token.text.startsWith("MeekoSelects") && token.scopes.includes(builtin)), "a longer name keeps the component color");
+  assert.ok(tokens.some((token) => token.text === "colors" && token.scopes.includes("meta.embedded.inline.typescript")), "bind:options is TypeScript");
+});

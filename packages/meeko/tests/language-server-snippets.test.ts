@@ -87,6 +87,16 @@ describe("language server: defineModel, defineSnippets, <snippet>, <render> and 
     assert.match(hoverText(child, child.at("actions\" args", 0)), /actions\?: Snippet<\[close: \(\) => void, label: string\]>/);
   });
 
+  test("defineModel with options and no name makes the default model optional, like the name \"default\"", () => {
+    for (const [name, declaration] of [["AppSearch.meeko", `defineModel<string>({ default: "" })`], ["AppNamed.meeko", `defineModel<string>("default", { default: "" })`]] as const) {
+      const child = open(name, `<script lang="ts">\nconst query = ${declaration};\n</script>\n<template><input model="query" /></template>`);
+      assert.deepEqual(virtualErrors(child), [], name);
+      assert.match(child.component.code, /export type ComponentModels = \{ "default"\?: import\("@meekojs\/meeko"\)\.Signal<string> \};/, name);
+    }
+    const parent = open("SearchPage.meeko", page(`<AppSearch /><AppSearch model="name" /><AppNamed />`).replace(`import * as AppDialog from "./AppDialog.meeko";`, `import * as AppSearch from "./AppSearch.meeko";\nimport * as AppNamed from "./AppNamed.meeko";`));
+    assert.deepEqual(virtualErrors(parent), []);
+  });
+
   test("the parent types <snippet params> from the child and completes names and parameters", () => {
     open("AppDialog.meeko", dialog);
     const parent = open("Page.meeko", valid);

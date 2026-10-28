@@ -1,4 +1,5 @@
 import { isAbsolute, relative } from "node:path";
+import { builtinComponentModules } from "../compiler.js";
 
 /**
  * Files whose addition or removal changes what Meeko discovers: routes,
@@ -13,6 +14,23 @@ export function isDiscoverySource(file: string, sourceRoots: readonly string[]):
     const path = relative(root, file).replaceAll("\\", "/");
     return !path.startsWith("../") && path !== ".." && discoveryPath.test(path);
   });
+}
+
+/**
+ * Whether `file` holds route options that discovery reads without running them: a page (its
+ * `<script server>`), a `*.route.ts` sidecar or a `+group.ts` under `app/pages` of a source root.
+ * Editing one may change `render` or the layout of routes.
+ */
+export function isRouteOptionsSource(file: string, sourceRoots: readonly string[]): boolean {
+  return sourceRoots.some((root) => {
+    const path = relative(root, file).replaceAll("\\", "/");
+    return path.startsWith("app/pages/") && (path.endsWith(".meeko") || path.endsWith(".route.ts") || path.endsWith("/+group.ts"));
+  });
+}
+
+/** What a route manifest says about each route's render and layouts, to compare two discoveries. */
+export function routeOptionsKey(routes: readonly { readonly id: string; readonly layouts: readonly string[]; readonly render?: string; readonly layout?: unknown }[]): string {
+  return JSON.stringify(routes.map((route) => [route.id, route.layouts, route.render ?? null, route.layout ?? null]));
 }
 
 /**
@@ -148,3 +166,17 @@ export function createDevAppReloader<T>(
  * patterns, relative to the Vite root.
  */
 export const devScanIgnored: readonly string[] = ["!**/.meeko/**"];
+
+/**
+ * `optimizeDeps.include` of the browser in `meeko dev`: the modules of Meeko's own components
+ * (`@meekojs/meeko/builtins/*`), which only the pages that use their tags import. Pages load
+ * with `import()`, so Vite would find them on the first visit to such a page, optimize them
+ * again and reload it. Only when Vite optimizes Meeko (installed in `node_modules`, not linked
+ * from a workspace and not in `optimizeDeps.exclude`): including them from a linked copy would
+ * bundle a second runtime.
+ */
+export function builtinOptimizeInclude(runtime: string, exclude: readonly string[] | undefined): string[] {
+  if (!runtime.replaceAll("\\", "/").includes("/node_modules/")) return [];
+  if (exclude?.some((entry) => entry === "@meekojs/meeko" || entry.startsWith("@meekojs/meeko/"))) return [];
+  return Object.values(builtinComponentModules).map((module) => module.specifier);
+}

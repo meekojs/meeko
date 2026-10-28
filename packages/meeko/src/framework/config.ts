@@ -5,6 +5,7 @@ import { basename, extname, isAbsolute, relative, resolve, sep } from "node:path
 import { pathToFileURL } from "node:url";
 import ts from "@typescript/typescript6";
 import { composeFrameworkRoutes } from "./modules.js";
+import { discoverLayouts } from "./routes-discovery.js";
 import { contentSecurityPolicy } from "../framework-server/csp.js";
 import type { ContentSecurityPolicy } from "../framework-server/csp.js";
 import { normalizeDocumentConfig, siteOrigin } from "./head.js";
@@ -125,6 +126,7 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
       }
     });
   }
+  validateAliasOption(config.alias, file, root);
   const modules = config.modules as unknown;
   if (modules !== undefined) {
     const reference = (value: unknown): boolean => (typeof value === "string" && value !== "") || isMeekoModule(value);
@@ -201,6 +203,40 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
+/** A prefix of `alias`: ends in `/`, without spaces, `*` or `\`, and does not start with `.` or `/`. */
+const aliasPrefix = /^[^\s*?\\./][^\s*?\\]*\/$/;
+
+/** Checks `alias`: prefixes that end in `/`, each with a folder inside the project or `false`. */
+function validateAliasOption(value: unknown, file: string, root: string): void {
+  if (value === undefined) return;
+  if (!isPlainObject(value)) throw new TypeError(`${file}: alias must be an object of path prefixes and project folders, like { "lib/": "app/lib/" }`);
+  for (const [prefix, target] of Object.entries(value)) {
+    if (!aliasPrefix.test(prefix) || prefix.includes("//")) {
+      throw new TypeError(`${file}: alias ${JSON.stringify(prefix)} must be a prefix that ends in / (like "@/", "~/" or "lib/"), without spaces, * or \\, and that does not start with . or /`);
+    }
+    if (target === false) continue;
+    if (typeof target !== "string" || !target.trim()) {
+      throw new TypeError(`${file}: alias ${JSON.stringify(prefix)} must name a folder of the project (a path relative to its root) or be false`);
+    }
+    if (isAbsolute(target) || !inside(root, resolve(root, target))) {
+      throw new TypeError(`${file}: alias ${JSON.stringify(prefix)} must be a relative path inside the project (its folder or a layer's): ${target}`);
+    }
+  }
+}
+
+/** `alias` of a configuration read without running it: an object literal of strings and `false`, or `undefined`. */
+function staticAliasOption(config: ts.ObjectLiteralExpression): Record<string, string | false> | undefined {
+  const value = property(config, "alias");
+  const literal = value && literalValue(value)?.value;
+  if (!isPlainObject(literal)) return undefined;
+  const result: Record<string, string | false> = {};
+  for (const [prefix, target] of Object.entries(literal)) {
+    if (!aliasPrefix.test(prefix) || (target !== false && (typeof target !== "string" || !target.trim()))) return undefined;
+    result[prefix] = target as string | false;
+  }
+  return result;
+}
+
 function stringList(value: unknown, label: string, check?: (entry: string) => boolean): void {
   if (value === undefined) return;
   if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string" || !entry || (check !== undefined && !check(entry)))) {
@@ -262,13 +298,19 @@ function validateStaticServer(server: Record<string, unknown>, file: string): vo
 /** Configurations that `loadMeekoConfig` executed: only their modules may run. */
 const executedConfigs = new WeakSet<object>();
 
+/** Whether `loadMeekoConfig` executed `config`, so its modules may run (not a static reading). */
+export function isExecutedConfig(config: MeekoConfig): boolean {
+  return executedConfigs.has(config);
+}
+
 /**
  * Lee `layers`, `extends`, `modules` e `imports` (`appDirs`, `sharedDirs` y `serverDirs`) de la
  * configuración sin ejecutarla, analizando el archivo; es lo que usa el editor en un workspace no
  * confiable. `layers`, `extends` y las listas de `imports` deben ser arrays literales de cadenas
  * (`appDirs` y `sharedDirs` se leen desde 1.3.0); de `modules` sólo se leen las cadenas literales,
- * porque un módulo importado no se conoce sin ejecutar la configuración. Los demás campos no se
- * leen.
+ * porque un módulo importado no se conoce sin ejecutar la configuración. Desde 1.5.0 lee también
+ * `alias` cuando es un objeto literal de cadenas y `false`; si no lo es, lo omite (sin error) y el
+ * editor usa los aliases por defecto. Los demás campos no se leen.
  *
  * @param projectRoot Carpeta del proyecto.
  * @returns Los campos estáticos encontrados, o `{}`.
@@ -307,7 +349,10 @@ export function readMeekoConfigSync(projectRoot: string): MeekoConfig {
   const modules = moduleList && ts.isArrayLiteralExpression(moduleList)
     ? moduleList.elements.filter(ts.isStringLiteral).map((entry) => entry.text)
     : undefined;
+  // Only a literal object is known; otherwise the editor uses the default aliases.
+  const alias = staticAliasOption(config);
   return {
+    ...(alias ? { alias } : {}),
     ...(layers ? { layers } : {}),
     ...(extensions ? { extends: extensions } : {}),
     ...(modules ? { modules } : {}),
@@ -476,11 +521,36 @@ export async function resolveConfigSources(projectRoot: string, config?: MeekoCo
  * ```
  */
 export async function discoverConfiguredRoutes(projectRoot: string): Promise<readonly RouteRecord[]> {
-  const sources = await resolveConfigSources(projectRoot);
+  const config = await loadMeekoConfig(projectRoot);
+  const sources = await resolveConfigSources(projectRoot, config);
+  const layouts = await configuredModuleLayouts(projectRoot, config);
   return composeFrameworkRoutes({
     projectRoot,
     layers: sources.slice(1).map(({ name, root }) => ({ name, root })),
+    ...(Object.keys(layouts).length ? { layouts } : {}),
   });
+}
+
+/**
+ * Every named layout a page may choose, by name: the project's, then those of each layer and then
+ * those of the modules; the first source with a name wins.
+ */
+export async function discoverConfiguredLayouts(projectRoot: string): Promise<Readonly<Record<string, string>>> {
+  const config = await loadMeekoConfig(projectRoot);
+  const result: Record<string, string> = {};
+  for (const source of await resolveConfigSources(projectRoot, config)) {
+    for (const [name, file] of Object.entries(await discoverLayouts(source.root))) if (!Object.hasOwn(result, name)) result[name] = file;
+  }
+  for (const [name, file] of Object.entries(await configuredModuleLayouts(projectRoot, config))) if (!Object.hasOwn(result, name)) result[name] = file;
+  return result;
+}
+
+/** Named layouts that the modules of the configuration add with `meeko.addLayout`, by name. */
+export async function configuredModuleLayouts(projectRoot: string, config?: MeekoConfig): Promise<Readonly<Record<string, string>>> {
+  config ??= await loadMeekoConfig(projectRoot);
+  if (!executedConfigs.has(config)) return {};
+  const modules = await resolveMeekoModules(resolve(projectRoot), config);
+  return Object.fromEntries(modules.layouts.map(({ name, file }) => [name, file]));
 }
 
 /** The executed configuration of a project and what its modules added. */

@@ -480,3 +480,15 @@ test("meeko dev keeps serving pages across Vite restarts", { timeout: 90_000 }, 
   assert.equal(running.exitCode, null, logs);
   assert.doesNotMatch(logs, /request error|module runner has been closed/i);
 });
+
+test("meeko dev optimizes the modules of Meeko's own components up front only when Vite optimizes Meeko", async () => {
+  const { builtinOptimizeInclude } = await import("../src/framework/dev-watch.ts");
+  const builtins = ["@meekojs/meeko/builtins/theme-toggle", "@meekojs/meeko/builtins/await", "@meekojs/meeko/builtins/popover", "@meekojs/meeko/builtins/select"];
+  // Installed from npm (also through pnpm's store): a page with <MeekoAwait> must not reload on its first visit.
+  assert.deepEqual(builtinOptimizeInclude(String.raw`C:\app\node_modules\.pnpm\@meekojs+meeko@1.5.0\node_modules\@meekojs\meeko\dist`, undefined), builtins);
+  assert.deepEqual(builtinOptimizeInclude("/app/node_modules/@meekojs/meeko/dist/", ["left-pad"]), builtins);
+  // Linked from a workspace, or excluded: Vite serves Meeko as source, and one runtime must stay one.
+  assert.deepEqual(builtinOptimizeInclude("/work/meeko/packages/meeko/dist/", undefined), []);
+  assert.deepEqual(builtinOptimizeInclude("/app/node_modules/@meekojs/meeko/dist/", ["@meekojs/meeko"]), []);
+  assert.deepEqual(builtinOptimizeInclude("/app/node_modules/@meekojs/meeko/dist/", ["@meekojs/meeko/internal"]), []);
+});

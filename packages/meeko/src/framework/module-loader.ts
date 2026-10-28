@@ -215,6 +215,8 @@ export interface ResolvedModules {
   readonly entryFiles: readonly string[];
   readonly layers: readonly string[];
   readonly componentsDirs: readonly { readonly dir: string; readonly prefix: string }[];
+  /** Named layouts of `addLayout`, in the order the modules add them. */
+  readonly layouts: readonly { readonly name: string; readonly file: string; readonly module: string }[];
   readonly autoImports: readonly ResolvedModuleAutoImport[];
   readonly autoImportsDirs: readonly { readonly dir: string; readonly scope: "app" | "server" | "shared" }[];
   readonly plugins: readonly ResolvedModulePlugin[];
@@ -231,7 +233,7 @@ export interface ResolvedModules {
 }
 
 const emptyModules: ResolvedModules = Object.freeze({
-  names: [], entryFiles: [], layers: [], componentsDirs: [], autoImports: [], autoImportsDirs: [], plugins: [],
+  names: [], entryFiles: [], layers: [], componentsDirs: [], layouts: [], autoImports: [], autoImportsDirs: [], plugins: [],
   serverMiddleware: [], serverHandlers: [], publicFiles: new Map(), head: undefined, vitePlugins: [], viteExtenders: [], ownedDirectories: [],
   callHook: async () => {},
 });
@@ -243,11 +245,11 @@ const emptyModules: ResolvedModules = Object.freeze({
  */
 const ownConfigKeys = Object.keys({
   layers: true, extends: true, modules: true, imports: true, server: true, css: true, document: true,
-  dev: true, site: true, sitemap: true, robots: true, theme: true,
+  dev: true, site: true, sitemap: true, robots: true, theme: true, alias: true,
 } satisfies Record<keyof MeekoConfig, true>);
 
 /** Version of Meeko that added each key of `ownConfigKeys` after 1.2, for the message. */
-const ownConfigKeySince: Readonly<Record<string, string>> = { dev: "1.3", site: "1.3", sitemap: "1.3", robots: "1.3", theme: "1.4" };
+const ownConfigKeySince: Readonly<Record<string, string>> = { dev: "1.3", site: "1.3", sitemap: "1.3", robots: "1.3", theme: "1.4", alias: "1.5" };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
@@ -344,6 +346,7 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
   const entryFiles: string[] = [];
   const layers: string[] = [];
   const componentsDirs: Array<{ dir: string; prefix: string }> = [];
+  const layouts: Array<{ name: string; file: string; module: string }> = [];
   const autoImports: ResolvedModuleAutoImport[] = [];
   const autoImportsDirs: Array<{ dir: string; scope: "app" | "server" | "shared" }> = [];
   const plugins: ResolvedModulePlugin[] = [];
@@ -408,6 +411,16 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
         if (componentOptions?.prefix !== undefined && !/^[A-Z][A-Za-z0-9]*$/.test(prefix)) throw new TypeError(`Meeko module ${name}: invalid component prefix ${componentOptions.prefix}`);
         componentsDirs.push({ dir: existingDirectory(dir, "components directory"), prefix });
       },
+      addLayout(layoutName: string, file: string | URL) {
+        if (typeof layoutName !== "string" || !/^[A-Za-z0-9][\w-]*(?:\/[A-Za-z0-9][\w-]*)*$/.test(layoutName)) {
+          throw new TypeError(`Meeko module ${name}: invalid layout name ${String(layoutName)}; use letters, digits, - and _, with / between folders`);
+        }
+        const layoutFile = existingFile(file, `layout ${layoutName}`);
+        if (!layoutFile.endsWith(".meeko")) throw new TypeError(`Meeko module ${name}: layout ${layoutName} must be a .meeko file`);
+        const previous = layouts.find((entry) => entry.name === layoutName);
+        if (previous) throw new Error(`Meeko module ${name}: layout ${layoutName} is already added by ${previous.module}`);
+        layouts.push({ name: layoutName, file: layoutFile, module: name });
+      },
       addAutoImports(entries: ModuleAutoImport | readonly ModuleAutoImport[]) {
         for (const item of (Array.isArray(entries) ? entries : [entries]) as readonly ModuleAutoImport[]) {
           if (!item || typeof item.name !== "string" || !/^[A-Za-z_$][\w$]*$/.test(item.name)) throw new TypeError(`Meeko module ${name}: invalid autoimport name ${String(item?.name)}`);
@@ -460,7 +473,7 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
     catch (error) { throw new Error(`Meeko module ${name} failed during setup: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
   }
   const resolved: ResolvedModules = {
-    names, entryFiles, layers, componentsDirs, autoImports, autoImportsDirs, plugins, serverMiddleware, serverHandlers,
+    names, entryFiles, layers, componentsDirs, layouts, autoImports, autoImportsDirs, plugins, serverMiddleware, serverHandlers,
     publicFiles, head, vitePlugins, viteExtenders, ownedDirectories: [...ownedDirectories],
     async callHook(hookName, ...args) {
       for (const handler of [...hooks.get(hookName) ?? []]) await (handler as (...values: unknown[]) => unknown)(...args);

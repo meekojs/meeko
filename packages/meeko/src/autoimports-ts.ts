@@ -5,6 +5,8 @@ import { applyAutoImports, discoverAutoImports } from "./autoimports.js";
 import type { AutoImport, ImportScope } from "./autoimports.js";
 import { readMeekoConfigSync } from "./framework/config.js";
 import { legacyLayerEntries } from "./framework/module-loader.js";
+import { aliasTsconfigPaths } from "./compiler/aliases.js";
+import { aliasesForScope, resolveProjectAliasesSync } from "./framework/aliases.js";
 
 export type TypeScriptScope = Exclude<ImportScope, "app">;
 
@@ -60,7 +62,7 @@ function publicSpecifier(outputDirectory: string, entry: AutoImport): string {
 }
 
 function scopeEntries(registry: readonly AutoImport[], scope: TypeScriptScope): AutoImport[] {
-  return registry.filter((entry) => entry.scope === "shared" || (scope !== "shared" && (entry.scope === scope || entry.scope === "app")));
+  return registry.filter((entry) => entry.scope === "shared" || (scope !== "shared" && (entry.scope === scope || entry.scope === "app") && !(entry.browserCode && scope === "server")));
 }
 
 function assertNoCollisions(entries: readonly AutoImport[], scope: TypeScriptScope): void {
@@ -78,6 +80,8 @@ interface TypeTarget {
 }
 
 function projectCompilerOptions(root: string): ts.CompilerOptions {
+  // A type that an autoimport folder re-exports through a path alias (`#shared/types/user`).
+  const aliases = aliasTsconfigPaths(aliasesForScope(resolveProjectAliasesSync(root).aliases, "all"), (target) => target.replaceAll("\\", "/"));
   const config = ts.findConfigFile(root, ts.sys.fileExists, "tsconfig.json");
   if (!config) return {
     target: ts.ScriptTarget.Latest,
@@ -85,10 +89,12 @@ function projectCompilerOptions(root: string): ts.CompilerOptions {
     moduleResolution: ts.ModuleResolutionKind.Bundler,
     noEmit: true,
     skipLibCheck: true,
+    paths: aliases,
   };
   const loaded = ts.readConfigFile(config, ts.sys.readFile);
   if (loaded.error) throw new Error(ts.flattenDiagnosticMessageText(loaded.error.messageText, "\n"));
-  return { ...ts.parseJsonConfigFileContent(loaded.config, ts.sys, dirname(config)).options, noEmit: true };
+  const options = ts.parseJsonConfigFileContent(loaded.config, ts.sys, dirname(config)).options;
+  return { ...options, paths: { ...aliases, ...options.paths }, noEmit: true };
 }
 
 /** A type export of a TypeScript module, whose declaration may live in another file. */
@@ -195,7 +201,8 @@ export function transformTypeScriptAutoImports(source: string, filename: string,
       scope = "server";
     } else scope = "client";
   } else scope = detected;
-  const transformed = applyAutoImports(source, filename, registry, scope);
+  // A plain app/ module in the SSR graph keeps the names of the browser scope, such as ClientError.
+  const transformed = applyAutoImports(source, filename, registry, scope, detected === "app" && !scopeOverride ? "app" : scope);
   return transformed === source ? undefined : transformed;
 }
 

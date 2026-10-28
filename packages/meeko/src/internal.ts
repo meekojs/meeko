@@ -8,9 +8,11 @@ export { createRoot, finishWithCleanup, trackReadSite, withReadSite } from "./re
 export { attributeValue, escapeHtml, rawHtml, renderAttribute, serializeJson } from "./server.js";
 export { checkTrustedHtml } from "./trusted-html.js";
 export type { TrustedHtmlCheck, UntrustedHtmlMessage } from "./trusted-html.js";
-export { bindAttribute, bindComponent, bindElementRef, bindEvent, bindFor, bindHtml, bindIf, bindModel, bindSnippet, bindText, componentProps, indexKey, keyToken, releaseAll, renderComponent, renderFor, renderIf, renderSnippet, withStateSnapshot } from "./dom.js";
-export type { ComponentModule, ComponentRelease, DomScope } from "./dom.js";
-export { enableHotModule, registerHotInstance, registerHotScope, replaceHotModule, replaceHotStyle, restoreSignals, snapshotSignals } from "./hmr.js";
+export { bindAttribute, bindComponent, bindDynamic, bindElementRef, bindElementTag, bindEvent, bindFor, bindHtml, bindIf, bindModel, bindSnippet, bindSpread, bindText, componentProps, indexKey, keyToken, releaseAll, renderComponent, renderFor, renderIf, renderSnippet, withStateSnapshot } from "./dom.js";
+export type { ComponentModule, ComponentRelease, DomScope, DynamicElement } from "./dom.js";
+export { checkDynamicFeature, checkTag, closeTag, componentPart, renderDynamic, renderElementTag, renderSpread, spreadEntries, spreadProps, tagAccepts, tagAttribute } from "./dynamic-tag.js";
+export type { AttributeSpreadCheck, ComponentPart, DynamicFeatureCheck, DynamicRefOf, PropsSpreadCheck, SpreadExplicit, TagAttributeCheck, TagCheck, TagPart } from "./dynamic-tag.js";
+export { enableHotModule, registerHotInstance, registerHotScope, replaceHotModule, replaceHotStyle, restoreSignals, snapshotSignals, transferState } from "./hmr.js";
 export type { HotComponent, HotState } from "./hmr.js";
 export { devtoolsUpdate, devtoolsWrite, registerDevtoolsInstance } from "./devtools.js";
 export { linkCurrent } from "./link.js";
@@ -37,5 +39,5 @@ export type { Signal } from "./reactivity.js";
 export { definePageBody, pageData } from "./framework/page-body.js";
 export type { JsonShape, SerializableExport, ServerData } from "./framework/page-body.js";
 export { meekoEnv } from "./framework-server/env.js";
-/** `<MeekoThemeToggle>`: Meeko's own component, compiled from `framework/MeekoThemeToggle.meeko`. */
-export * as MeekoThemeToggle from "./framework/theme-toggle.compiled.js";
+export { bindTeleport, renderTeleport } from "./teleport.js";
+export type { MeekoTeleportTarget } from "./teleport.js";

@@ -76,6 +76,19 @@ describe("Prettier plugin for .meeko", () => {
     assert.match(formatted, /<render snippet="rows\[0\]" args="\[count\.value, 2\]"><\/render>/);
   });
 
+  test("formats bind=\"obj\" and the tag of <component is> as TypeScript expressions", async () => {
+    const formatted = templateOf(await formatStable(component([
+      '<p class="x" bind="{id:count.value,\'data-n\':count.value+1}">a</p>',
+      '<component is="count.value>1?\'a\':\'button\'" bind="attrs" bind:href="count.value>1?\'/x\':undefined">b</component>',
+      '<x-card bind="raw   text"></x-card>',
+    ].join("\n"), "const count = signal(0);\nconst attrs = { title: \"t\" };\n")));
+    assert.match(formatted, /<p class="x" bind="\{ id: count\.value, 'data-n': count\.value \+ 1 \}">a<\/p>/);
+    assert.match(formatted, /is="count\.value > 1 \? 'a' : 'button'"/);
+    assert.match(formatted, /bind:href="count\.value > 1 \? '\/x' : undefined"/);
+    // On a custom element `bind` is an HTML attribute: its text stays as written.
+    assert.match(formatted, /<x-card bind="raw   text"><\/x-card>/);
+  });
+
   test("uses single quotes in attribute expressions and keeps strings with double quotes valid", async () => {
     const formatted = templateOf(await formatStable(component('<p bind:title="count.value ? \'a\' : &quot;b&quot;">x</p>')));
     assert.equal(formatted, "<p bind:title=\"count.value ? 'a' : 'b'\">x</p>");

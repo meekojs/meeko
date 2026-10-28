@@ -32,10 +32,30 @@ function rootErrorConflict(appError: string, rootError: string): Error {
 }
 
 /**
- * Descubre `app/error.meeko` con los layouts raíz que lo envuelven: `app/app.meeko` y
- * `app/layouts/default.meeko` (o `app/pages/+layout.meeko`).
+ * Opciones de {@link discoverErrorPage}.
+ *
+ * @since 1.5.0
+ * @example
+ * ```ts
+ * import { discoverErrorPage } from "@meekojs/meeko/build";
+ *
+ * const errorPage = await discoverErrorPage(process.cwd(), { layouts: { default: "/srv/ui/layouts/default.meeko" } });
+ * ```
+ */
+export interface DiscoverErrorPageOptions {
+  /**
+   * Layouts con nombre de los módulos (`meeko.addLayout`), por nombre. Su `default` envuelve la
+   * página de error si el proyecto no tiene `app/layouts/default.meeko`.
+   */
+  readonly layouts?: Readonly<Record<string, string>>;
+}
+
+/**
+ * Descubre `app/error.meeko` con los layouts raíz que lo envuelven: `app/app.meeko`, el layout
+ * `default` (`app/layouts/default.meeko` o, desde `1.5`, el de un módulo) y `app/pages/+layout.meeko`.
  *
  * @param projectRoot Carpeta del proyecto.
+ * @param options Layouts con nombre de los módulos, desde `1.5`.
  * @returns La página de error con rutas absolutas, o `undefined` si no existe `app/error.meeko`.
  * @throws {Error} Si también existe `app/pages/+error.meeko`, que define el mismo nivel.
  * @since 1.1.0
@@ -49,14 +69,15 @@ function rootErrorConflict(appError: string, rootError: string): Error {
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#página-de-error-de-la-aplicación-apperrormeeko
  */
-export async function discoverErrorPage(projectRoot: string): Promise<ErrorPageRecord | undefined> {
+export async function discoverErrorPage(projectRoot: string, options: DiscoverErrorPageOptions = {}): Promise<ErrorPageRecord | undefined> {
   const root = await rootFiles(projectRoot);
   if (!root.hasAppError) return undefined;
   if (await isFile(root.rootError)) throw rootErrorConflict(root.appError, root.rootError);
   const layouts: string[] = root.hasAppShell ? [root.appShell] : [];
-  if (root.hasDefaultLayout) layouts.push(root.defaultLayout);
-  else if (await isFile(root.rootLayout)) layouts.push(root.rootLayout);
-  return { file: root.appError, layouts };
+  const defaultFile = root.hasDefaultLayout ? root.defaultLayout : options.layouts?.default;
+  if (defaultFile) layouts.push(defaultFile);
+  if (!root.hasDefaultLayout && await isFile(root.rootLayout)) layouts.push(root.rootLayout);
+  return { file: root.appError, layouts, ...(defaultFile ? { layout: { name: "default", file: defaultFile } } : {}) };
 }
 
 const renderModes: readonly PageRender[] = ["ssr", "stream", "prerender", "client"];
@@ -96,11 +117,48 @@ function literalRender(file: string, value: ts.Expression): PageRender {
   return render;
 }
 
+/** `layout` of route or group options: a string literal naming a layout of `app/layouts`, or `false`. */
+function literalLayout(file: string, value: ts.Expression): string | false {
+  const expression = unwrap(value);
+  if (expression.kind === ts.SyntaxKind.FalseKeyword) return false;
+  if (!ts.isStringLiteral(expression) && !ts.isNoSubstitutionTemplateLiteral(expression)) {
+    throw new Error(`${file}: layout debe ser un literal de texto (el nombre de un layout de app/layouts) o false para que Meeko pueda leerlo durante el build`);
+  }
+  if (!layoutNamePattern.test(expression.text)) throw new Error(`${file}: "${expression.text}" no es un nombre de layout válido`);
+  return expression.text;
+}
+
+/**
+ * Opciones de ruta que Meeko lee sin ejecutar el archivo: `render` y, desde `1.5`, `layout`.
+ *
+ * @since 1.5.0
+ * @example
+ * ```ts
+ * import type { StaticRouteOptions } from "@meekojs/meeko/build";
+ *
+ * const options: StaticRouteOptions = { render: "prerender", layout: "dashboard" };
+ * ```
+ */
+export interface StaticRouteOptions {
+  /** Modo de render, si lo declara. */
+  readonly render?: PageRender;
+  /** Layout con nombre que elige la página, o `false` para quitarlo; sin él, el heredado. */
+  readonly layout?: string | false;
+}
+
 /**
  * Reads `render` from a route sidecar without executing it. The value must be
  * a string literal in the exported `definePage({...})` call or object literal.
  */
 export function extractRouteRender(file: string, source: string): PageRender | undefined {
+  return extractRouteOptions(file, source).render;
+}
+
+/**
+ * Reads `render` and `layout` from route options without executing them. Each must be a literal
+ * in the exported `definePage({...})` call or object literal.
+ */
+export function extractRouteOptions(file: string, source: string): StaticRouteOptions {
   const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   let routeExport: ts.Expression | undefined;
   let defaultExport: ts.Expression | undefined;
@@ -123,7 +181,7 @@ export function extractRouteRender(file: string, source: string): PageRender | u
   const definition = routeExport ?? defaultExport;
   if (!definition) {
     if (opaque) throw new Error(`${file}: las opciones de ruta reexportadas no se pueden leer durante el build; exporta definePage({ ... }) desde este archivo`);
-    return namedRender ? literalRender(file, namedRender) : undefined;
+    return namedRender ? { render: literalRender(file, namedRender) } : {};
   }
   // Options may live in a module-level `const` of the same file.
   const constants = new Map<string, ts.Expression>();
@@ -143,6 +201,7 @@ export function extractRouteRender(file: string, source: string): PageRender | u
     throw new Error(`${file}: exporta definePage({ ... }) o un objeto literal para que Meeko pueda leer render durante el build`);
   }
   let render: PageRender | undefined;
+  let layout: string | false | undefined;
   // Members after the last explicit render that could set it at run time.
   let spread = false;
   let computed = false;
@@ -152,6 +211,13 @@ export function extractRouteRender(file: string, source: string): PageRender | u
     if (property.name && ts.isComputedPropertyName(property.name)) { computed = true; continue; }
     const name = property.name ? propertyName(property.name) : undefined;
     if (name === "prerenderEntries") prerenderEntries = true;
+    if (name === "layout") {
+      if (!ts.isPropertyAssignment(property)) {
+        throw new Error(`${file}: layout debe ser un literal de texto (el nombre de un layout de app/layouts) o false para que Meeko pueda leerlo durante el build`);
+      }
+      layout = literalLayout(file, property.initializer);
+      continue;
+    }
     if (name !== "render") continue;
     if (!ts.isPropertyAssignment(property)) throw new Error(`${file}: render debe ser un literal de texto para que Meeko pueda leerlo durante el build`);
     render = literalRender(file, property.initializer);
@@ -164,7 +230,156 @@ export function extractRouteRender(file: string, source: string): PageRender | u
   if (render === "client" && prerenderEntries) {
     throw new Error(`${file}: una página render: "client" no se puede prerenderizar; quita prerenderEntries o usa render: "prerender"`);
   }
-  return render;
+  return { ...(render ? { render } : {}), ...(layout === undefined ? {} : { layout }) };
+}
+
+/**
+ * Opciones de un `+group.ts`, leídas sin ejecutarlo.
+ *
+ * @since 1.5.0
+ * @example
+ * ```ts
+ * import type { StaticGroupOptions } from "@meekojs/meeko/build";
+ *
+ * const group: StaticGroupOptions = { layout: "dashboard", layoutProps: { showAlert: false } };
+ * ```
+ */
+export interface StaticGroupOptions {
+  /** Layout con nombre de las páginas de la carpeta, o `false`. */
+  readonly layout?: string | false;
+  /** Props del layout, que heredan las páginas de la carpeta y de sus subcarpetas. */
+  readonly layoutProps?: Readonly<Record<string, unknown>>;
+}
+
+/** Like {@link unwrap}, without entering calls: a literal value is never a call. */
+function unwrapValue(expression: ts.Expression): ts.Expression {
+  let current = expression;
+  while (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isSatisfiesExpression(current)
+    || ts.isNonNullExpression(current) || ts.isTypeAssertionExpression(current)) current = current.expression;
+  return current;
+}
+
+/** A JSON value written as a literal: strings, numbers, booleans, null, arrays and plain objects. */
+function literalValue(file: string, value: ts.Expression, path: string): unknown {
+  const expression = unwrapValue(value);
+  if (ts.isStringLiteral(expression) || ts.isNoSubstitutionTemplateLiteral(expression)) return expression.text;
+  if (ts.isNumericLiteral(expression)) return Number(expression.text);
+  if (ts.isPrefixUnaryExpression(expression) && expression.operator === ts.SyntaxKind.MinusToken && ts.isNumericLiteral(expression.operand)) {
+    return -Number(expression.operand.text);
+  }
+  if (expression.kind === ts.SyntaxKind.TrueKeyword) return true;
+  if (expression.kind === ts.SyntaxKind.FalseKeyword) return false;
+  if (expression.kind === ts.SyntaxKind.NullKeyword) return null;
+  if (ts.isArrayLiteralExpression(expression)) return expression.elements.map((element, index) => literalValue(file, element, `${path}[${index}]`));
+  if (ts.isObjectLiteralExpression(expression)) {
+    const result: Record<string, unknown> = {};
+    for (const property of expression.properties) {
+      const name = property.name && !ts.isComputedPropertyName(property.name) ? propertyName(property.name) : undefined;
+      if (!ts.isPropertyAssignment(property) || name === undefined || name === "__proto__") {
+        throw new Error(`${file}: ${path} debe ser un objeto literal con claves normales para que Meeko pueda leerlo durante el build`);
+      }
+      result[name] = literalValue(file, property.initializer, `${path}.${name}`);
+    }
+    return result;
+  }
+  throw new Error(`${file}: ${path} debe ser un valor literal (texto, número, booleano, null, array u objeto) para que Meeko pueda leerlo durante el build`);
+}
+
+/**
+ * Reads the options of a `+group.ts` without executing it: `export default defineGroup({ ... })`
+ * (or an object literal) with a literal `layout` and literal `layoutProps`.
+ */
+export function extractGroupOptions(file: string, source: string): StaticGroupOptions {
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  let definition: ts.Expression | undefined;
+  for (const statement of sourceFile.statements) {
+    if (ts.isExportAssignment(statement) && !statement.isExportEquals) definition = statement.expression;
+    else if (ts.isExportDeclaration(statement) && (!statement.exportClause || (ts.isNamedExports(statement.exportClause)
+      && statement.exportClause.elements.some((element) => element.name.text === "default")))) {
+      throw new Error(`${file}: las opciones del grupo reexportadas no se pueden leer durante el build; escribe export default defineGroup({ ... }) en este archivo`);
+    }
+  }
+  if (!definition) throw new Error(`${file}: un +group.ts debe exportar por defecto defineGroup({ ... })`);
+  const constants = new Map<string, ts.Expression>();
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement) || !(statement.declarationList.flags & ts.NodeFlags.Const)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name) && declaration.initializer) constants.set(declaration.name.text, declaration.initializer);
+    }
+  }
+  let object = unwrap(definition);
+  const visited = new Set<string>();
+  while (ts.isIdentifier(object) && constants.has(object.text) && !visited.has(object.text)) {
+    visited.add(object.text);
+    object = unwrap(constants.get(object.text)!);
+  }
+  if (!ts.isObjectLiteralExpression(object)) {
+    throw new Error(`${file}: exporta por defecto defineGroup({ ... }) con un objeto literal para que Meeko pueda leerlo durante el build`);
+  }
+  let layout: string | false | undefined;
+  let layoutProps: Record<string, unknown> | undefined;
+  for (const property of object.properties) {
+    const name = property.name && !ts.isComputedPropertyName(property.name) ? propertyName(property.name) : undefined;
+    if (!ts.isPropertyAssignment(property) || name === undefined) {
+      throw new Error(`${file}: las opciones del grupo deben ser propiedades normales (sin spread, métodos ni claves calculadas) para que Meeko pueda leerlas durante el build`);
+    }
+    if (name === "layout") layout = literalLayout(file, property.initializer);
+    else if (name === "layoutProps") {
+      const value = literalValue(file, property.initializer, "layoutProps");
+      if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`${file}: layoutProps debe ser un objeto literal`);
+      layoutProps = value as Record<string, unknown>;
+    } else if (name === "middleware") {
+      throw new Error(`${file}: middleware no se admite en +group.ts: el middleware de ruta de app/middleware se ejecuta en todas las rutas y elige las suyas con match.route.id`);
+    } else throw new Error(`${file}: opción de grupo desconocida "${name}"; un +group.ts admite layout y layoutProps`);
+  }
+  return { ...(layout === undefined ? {} : { layout }), ...(layoutProps ? { layoutProps } : {}) };
+}
+
+/** Names of named layouts: the path under `app/layouts` without `.meeko`, with `/` between folders. */
+const layoutNamePattern = /^[A-Za-z0-9][\w-]*(?:\/[A-Za-z0-9][\w-]*)*$/;
+
+/**
+ * Descubre los layouts con nombre de `app/layouts` de un proyecto, layer o módulo: cada
+ * `app/layouts/<nombre>.meeko`, también en subcarpetas (`app/layouts/admin/panel.meeko` es
+ * `"admin/panel"`). Los enlaces simbólicos no cuentan, como `app/layouts/default.meeko` hasta `1.4`,
+ * y un archivo cuya ruta no es un nombre válido (`_partes.meeko`, `mi layout.meeko`) tampoco.
+ *
+ * @param sourceRoot Carpeta que contiene `app/layouts`.
+ * @returns El archivo absoluto de cada layout, por nombre.
+ * @since 1.5.0
+ * @example
+ * ```ts
+ * import { discoverLayouts } from "@meekojs/meeko/build";
+ *
+ * const layouts = await discoverLayouts(process.cwd());
+ * console.log(Object.keys(layouts)); // ["admin/panel", "dashboard", "default"]
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#layouts-con-nombre
+ */
+export async function discoverLayouts(sourceRoot: string): Promise<Readonly<Record<string, string>>> {
+  const base = resolve(sourceRoot, "app", "layouts");
+  const result: Record<string, string> = {};
+  async function walk(directory: string): Promise<void> {
+    let entries;
+    try { entries = await readdir(directory, { withFileTypes: true }); }
+    catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT" || code === "ENOTDIR") return;
+      throw error;
+    }
+    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) await walk(path);
+      else if (entry.isFile() && entry.name.endsWith(".meeko")) {
+        const name = relative(base, path).slice(0, -".meeko".length).split(sep).join("/");
+        // A file whose path is not a layout name (`_parts.meeko`, `my layout.meeko`) is not a
+        // layout: before 1.5 only default.meeko was, and such files may hold other components.
+        if (layoutNamePattern.test(name)) result[name] = path;
+      }
+    }
+  }
+  await walk(base);
+  return result;
 }
 
 /**
@@ -185,39 +400,56 @@ export interface DiscoverRoutesOptions {
    * módulo. Su `app/app.meeko` y su `app/layouts/default.meeko` (o `app/pages/+layout.meeko`) van
    * primero y sustituyen a los archivos de la fuente con el mismo papel; los `+layout.meeko` de la
    * fuente se anidan dentro. Sin `+error.meeko` ni `app/error.meeko` en la fuente, sus páginas usan
-   * la página de error raíz del proyecto.
+   * la página de error raíz del proyecto. Desde `1.5`, sus layouts con nombre ganan a los de la
+   * fuente.
    */
   readonly shell?: string;
+  /**
+   * Layouts con nombre de las demás fuentes (layers y módulos), por nombre, para los nombres que no
+   * tienen ni el proyecto ni la fuente. `composeFrameworkRoutes` los reúne: los de los layers sin su
+   * `default` y después los de `meeko.addLayout`.
+   * @since 1.5.0
+   */
+  readonly layouts?: Readonly<Record<string, string>>;
 }
 
 /** The shell, root layout and root error page that a project lends to its layers and modules. */
-async function projectShell(projectRoot: string): Promise<{ appShell?: string; rootLayout?: string; error?: string }> {
+async function projectShell(projectRoot: string): Promise<{ appShell?: string; plusLayout?: string; error?: string; layouts: Readonly<Record<string, string>> }> {
   const root = await rootFiles(projectRoot);
-  const rootLayout = root.hasDefaultLayout ? root.defaultLayout : await isFile(root.rootLayout) ? root.rootLayout : undefined;
+  // The project's app/pages/+layout.meeko stays the root layout of its layers, as before 1.5.
+  const plusLayout = !root.hasDefaultLayout && await isFile(root.rootLayout) ? root.rootLayout : undefined;
   const error = root.hasAppError ? root.appError : await isFile(root.rootError) ? root.rootError : undefined;
   return {
     ...(root.hasAppShell ? { appShell: root.appShell } : {}),
-    ...(rootLayout ? { rootLayout } : {}),
+    ...(plusLayout ? { plusLayout } : {}),
     ...(error ? { error } : {}),
+    layouts: await discoverLayouts(projectRoot),
   };
 }
 
+const groupFile = "+group.ts";
+
 /**
  * Descubre las páginas de `app/pages` con sus layouts, su `+error.meeko` más cercano y sus opciones
- * de ruta (`<script server>` o sidecar `*.route.ts`), y lee `render` sin ejecutar código. El
- * manifiesto resultante se puede serializar para el navegador.
+ * de ruta (`<script server>` o sidecar `*.route.ts`), y lee `render` y, desde `1.5`, `layout` y los
+ * `+group.ts` de sus carpetas sin ejecutar código. El manifiesto resultante se puede serializar para
+ * el navegador.
+ *
+ * Los layouts de una página van de fuera hacia dentro: `app/app.meeko`, el layout con nombre que
+ * elige (o hereda de sus `+group.ts`, o `default`) y los `+layout.meeko` de sus carpetas.
  *
  * @param projectRoot Carpeta que contiene `app/pages`.
- * @param options `shell` para descubrir un layer o módulo dentro del proyecto.
+ * @param options `shell` para descubrir un layer o módulo dentro del proyecto y `layouts` de las
+ * demás fuentes.
  * @returns El manifiesto de rutas ordenado, con rutas de archivo absolutas.
  * @throws {Error} Si hay dos layouts o páginas de error raíz, una página declara sus opciones dos
- * veces, `render` no es un literal válido o dos rutas colisionan.
+ * veces, `render` o `layout` no son literales válidos, un layout no existe o dos rutas colisionan.
  * @example
  * ```ts
  * import { discoverRoutes } from "@meekojs/meeko/build";
  *
  * const routes = await discoverRoutes(process.cwd());
- * for (const route of routes) console.log(route.id, route.render ?? "ssr");
+ * for (const route of routes) console.log(route.id, route.render ?? "ssr", route.layout?.name ?? "(sin layout)");
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#routing-layouts-y-ssr
  */
@@ -226,11 +458,20 @@ export async function discoverRoutes(projectRoot: string, options: DiscoverRoute
   const shell = options.shell !== undefined && resolve(options.shell).toLowerCase() !== resolve(projectRoot).toLowerCase()
     ? await projectShell(options.shell) : undefined;
   // The project's files win over the source's files of the same role, as in a single application.
-  const shellLayouts: string[] = [];
   const shellApp = shell?.appShell ?? (hasAppShell ? appShell : undefined);
-  if (shellApp) shellLayouts.push(shellApp);
-  if (shell?.rootLayout) shellLayouts.push(shell.rootLayout);
-  else if (hasDefaultLayout) shellLayouts.push(defaultLayout);
+  const own = await discoverLayouts(projectRoot);
+  const projectLayouts = shell?.layouts ?? own;
+  const others = options.layouts ?? {};
+  // `default` comes from the project, then from the source itself (unless the project's
+  // app/pages/+layout.meeko is the root layout), then from a module.
+  const implicitDefault = projectLayouts.default ?? (shell?.plusLayout ? undefined : own.default ?? others.default);
+  const available = (): string => [...new Set([...Object.keys(projectLayouts), ...Object.keys(own), ...Object.keys(others)])].sort()
+    .map((name) => `"${name}"`).join(", ") || "ninguno";
+  const named = (name: string, file: string): string => {
+    const found = name === "default" ? implicitDefault : projectLayouts[name] ?? own[name] ?? others[name];
+    if (!found) throw new Error(`${file}: el layout "${name}" no existe; crea app/layouts/${name}.meeko (layouts disponibles: ${available()})`);
+    return found;
+  };
   const files = new Set<string>();
   async function walk(directory: string): Promise<void> {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -244,6 +485,8 @@ export async function discoverRoutes(projectRoot: string, options: DiscoverRoute
     throw new Error(`${defaultLayout} y ${join(pagesRoot, "+layout.meeko")} definen los dos el layout raíz`);
   }
   if (hasAppError && files.has(join(pagesRoot, "+error.meeko"))) throw rootErrorConflict(appError, join(pagesRoot, "+error.meeko"));
+  const groups = new Map<string, StaticGroupOptions>();
+  for (const file of files) if (basename(file) === groupFile) groups.set(dirname(file), extractGroupOptions(file, await readFile(file, "utf8")));
   const routes: RouteRecord[] = [];
   for (const file of files) {
     if (!file.endsWith(".meeko")) continue;
@@ -254,14 +497,11 @@ export async function discoverRoutes(projectRoot: string, options: DiscoverRoute
       continue;
     }
     const directory = dirname(file);
-    const layouts: string[] = [...shellLayouts];
-    let cursor = pagesRoot;
+    // The folders from app/pages down to the page's, outermost first.
+    const folders = [pagesRoot];
     const relativeDirectory = relative(pagesRoot, directory);
-    if (files.has(join(cursor, "+layout.meeko"))) layouts.push(join(cursor, "+layout.meeko"));
-    if (relativeDirectory) for (const segment of relativeDirectory.split(sep)) {
-      cursor = join(cursor, segment);
-      if (files.has(join(cursor, "+layout.meeko"))) layouts.push(join(cursor, "+layout.meeko"));
-    }
+    if (relativeDirectory) for (const segment of relativeDirectory.split(sep)) folders.push(join(folders.at(-1)!, segment));
+    const plusLayouts = folders.map((folder) => join(folder, "+layout.meeko")).filter((candidate) => files.has(candidate));
     let error: string | undefined;
     let errorCursor = directory;
     while (errorCursor.startsWith(pagesRoot)) {
@@ -280,15 +520,47 @@ export async function discoverRoutes(projectRoot: string, options: DiscoverRoute
     }
     const sidecar = block !== undefined ? routeBlockId(file) : files.has(sidecarFile) ? sidecarFile : undefined;
     const hasSidecar = sidecar !== undefined;
-    const render = block !== undefined ? extractRouteRender(file, block)
-      : hasSidecar ? extractRouteRender(sidecar, await readFile(sidecar, "utf8")) : undefined;
+    const optionsFile = block !== undefined ? file : sidecar;
+    const routeOptions = block !== undefined ? extractRouteOptions(file, block)
+      : hasSidecar ? extractRouteOptions(sidecar, await readFile(sidecar, "utf8")) : {};
+    // The layout cascades from the outermost +group.ts to the page. Props inherited for one layout
+    // do not reach another: choosing a different layout starts with its own props.
+    let layoutName: string | false = "default";
+    let explicit = false;
+    let chosenIn = file;
+    let props: Record<string, unknown> = {};
+    const choose = (layout: string | false | undefined, origin: string): void => {
+      if (layout === undefined) return;
+      if (layout !== layoutName) props = {};
+      layoutName = layout;
+      explicit = true;
+      chosenIn = origin;
+    };
+    for (const folder of folders) {
+      const group = groups.get(folder);
+      if (!group) continue;
+      choose(group.layout, join(folder, groupFile));
+      if (group.layoutProps) props = { ...props, ...group.layoutProps };
+    }
+    choose(routeOptions.layout, optionsFile ?? file);
+    const finalName = layoutName as string | false;
+    const layoutFile = finalName === false ? undefined : explicit ? named(finalName, chosenIn) : implicitDefault;
+    const layouts: string[] = [
+      ...shellApp ? [shellApp] : [],
+      ...layoutFile ? [layoutFile] : [],
+      ...shell?.plusLayout ? [shell.plusLayout] : [],
+      ...plusLayouts,
+    ];
     routes.push({
       id: routeId(relative(pagesRoot, file)),
       file,
       layouts,
       ...(error ? { error } : {}),
       ...(hasSidecar ? { sidecar } : {}),
-      ...(render ? { render } : {}),
+      ...(routeOptions.render ? { render: routeOptions.render } : {}),
+      ...(layoutFile && finalName !== false
+        ? { layout: { name: finalName, file: layoutFile, ...(Object.keys(props).length ? { props } : {}) } }
+        : {}),
     });
   }
   return createRouteManifest(routes);

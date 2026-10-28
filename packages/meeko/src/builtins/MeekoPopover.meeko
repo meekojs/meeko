@@ -1,0 +1,22 @@
+<script lang="ts">
+// <MeekoPopover>, Meeko's own tag since 1.5. `pnpm run builtins` compiles this file into
+// popover.compiled.ts, which the package ships as @meekojs/meeko/builtins/popover and which only the
+// components that use the tag import; edit this file, not that one.
+import { useId } from "../ids.js";
+import { onMounted } from "../lifecycle.js";
+import { createPopover } from "./popover.js";
+import type { MeekoPopoverProps, PopoverSnippets, PopoverToggleEvent } from "./popover.js";
+
+const props = defineProps<MeekoPopoverProps>();
+const snippets = defineSnippets<PopoverSnippets>();
+const emit = defineEmits<{ toggle: [event: PopoverToggleEvent] }>();
+const open = defineModel<boolean>({ default: false });
+const content = useElementRef("content");
+// The IDs of the trigger and the content come from useId: the same in SSR and hydration.
+const popover = createPopover(props, open, useId(), (now) => emit("toggle", { open: now }));
+onMounted(() => popover.mount(content.value));
+defineExpose({ show: popover.show, hide: popover.hide, toggle: popover.toggle });
+</script>
+
+<!-- No whitespace between the tags: it would be text inside the button and the content. -->
+<template><button if:when="!snippets.anchor && snippets.trigger" type="button" data-meeko-popover-trigger bind:id="popover.trigger.value.id" bind:class="props.triggerClass" bind:popovertarget="popover.trigger.value.popovertarget" bind:aria-controls="popover.trigger.value['aria-controls']" bind:aria-expanded="popover.trigger.value['aria-expanded']" bind:aria-haspopup="popover.trigger.value['aria-haspopup']" bind:aria-describedby="popover.trigger.value['aria-describedby']"><render snippet="snippets.trigger" /></button><render if:when="snippets.anchor" snippet="snippets.anchor" args="popover.trigger.value" /><div ref:content data-meeko-popover bind:id="popover.contentId" bind:popover="popover.mode.value" bind:role="popover.role.value" bind:aria-label="props.label" bind:aria-labelledby="popover.labelledBy.value" bind:tabindex="popover.role.value === 'dialog' ? '-1' : undefined" bind:class="props.class" bind:data-placement="popover.placement.value" bind:data-match-width="props.matchWidth ? '' : undefined"><render snippet="snippets.default" /></div></template>

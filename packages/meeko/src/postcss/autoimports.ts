@@ -24,6 +24,12 @@ export interface UtilityAutoImports {
   readonly key: string;
   /** The module with its autoimports; `undefined` when nothing changes. */
   transform(code: string, id: string): string | undefined;
+  /**
+   * The files a path alias of the project (`~/`, `@/`, `#shared/`, `#server/` and those of `alias`)
+   * names from `importer`, in order; `undefined` when `specifier` has no alias. Throws `MEEK108` or
+   * `MEEK118` for an alias that the importer's folder does not see.
+   */
+  resolveAlias?(specifier: string, importer: string): readonly string[] | undefined;
 }
 
 const configFiles = ["meeko.config.ts", "meeko.config.mts", "meeko.config.js", "meeko.config.mjs"];
@@ -62,21 +68,30 @@ function dependsOnMeeko(manifest: string): boolean {
 
 /** Reads the registry of `root` now; call it again to see added or removed exports. */
 export async function utilityAutoImports(root: string): Promise<UtilityAutoImports> {
-  const [autoimports, autoimportsTs, config] = await Promise.all([
-    import("../autoimports.js"), import("../autoimports-ts.js"), import("../framework/config.js"),
+  const [autoimports, autoimportsTs, config, aliases, aliasMatching] = await Promise.all([
+    import("../autoimports.js"), import("../autoimports-ts.js"), import("../framework/config.js"), import("../framework/aliases.js"), import("../compiler/aliases.js"),
   ]);
   const registry = await autoimports.discoverAutoImports(root);
   const sourceRoots = (await config.resolveConfigSources(root)).map((source) => source.root);
+  const project = await aliases.resolveProjectAliases(root);
   const available = registry.filter((entry) => isAvailable(entry, autoimports.isGeneratedClient));
   const availableNames = new Set(available.map((entry) => entry.name));
   const unavailable = new Map<string, AutoImport>();
   for (const entry of registry) {
     if (!entry.typeOnly && !availableNames.has(entry.name) && !unavailable.has(entry.name)) unavailable.set(entry.name, entry);
   }
-  const key = createHash("sha256").update(JSON.stringify([root, sourceRoots, registry])).digest("hex");
+  const key = createHash("sha256").update(JSON.stringify([root, sourceRoots, registry, project.aliases])).digest("hex");
   return {
     root,
     key,
+    resolveAlias(specifier, importer) {
+      const match = aliasMatching.matchPathAlias(project.aliases, specifier);
+      if (!match) return undefined;
+      const scope = aliasMatching.aliasImporterScope(importer, project.sourceRoots);
+      const problem = scope && aliasMatching.aliasScopeProblem(match.alias, scope, specifier);
+      if (problem) throw new Error(`${problem.code}: ${relative(root, importer).replaceAll("\\", "/")}: ${problem.message}`);
+      return match.alias.targets.map((target) => join(target, match.rest));
+    },
     transform(code, id) {
       // Like the editor and `meeko check`: TypeScript under app/, shared/ or server/ of a source root.
       if (!/\.[cm]?ts$/.test(id) || /[\\/]node_modules[\\/]/.test(id)) return undefined;

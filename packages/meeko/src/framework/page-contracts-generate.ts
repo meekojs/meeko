@@ -1,9 +1,10 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
-import { discoverConfiguredRoutes } from "./config.js";
-import { discoverErrorPage } from "./routes-discovery.js";
-import { routeBlockFile } from "./route-block.js";
+import { configuredModuleLayouts, discoverConfiguredRoutes } from "./config.js";
+import { discoverErrorPage, extractGroupOptions, extractRouteOptions } from "./routes-discovery.js";
+import type { StaticGroupOptions } from "./routes-discovery.js";
+import { routeBlockFile, routeBlockSource } from "./route-block.js";
 import { routeBlockTypeFile } from "./route-block-types.js";
 import { MeekoCompileError } from "../compiler/sfc.js";
 import type { ServerScript } from "../compiler/server-script.js";
@@ -69,7 +70,27 @@ export async function generatePageContracts(projectRoot: string): Promise<string
     '// Owner is the whole subject ("Las props del layout"), so each kind keeps its article.',
     'type __CheckShell<Actual, Expected, File extends string, Owner extends string> = __UnsafeProps<Actual> extends true ? `${Owner} ${File} no pueden ser any, never ni unknown` : Actual extends Record<string, never> ? true : Expected extends Actual ? true : `${Owner} ${File} no coinciden con los valores que aporta Meeko`;',
     'type __RequireTrue<Result extends true> = Result;',
+    '// layoutProps of +group.ts files and of pages that inherit their layout, against the props of that layout.',
+    'type __LayoutOwn<P> = { [K in keyof P as K extends "outlet" ? never : K]: P[K] };',
+    'type __WrittenLayoutProps<Route> = Route extends { readonly layoutProps: infer L } ? L extends (...args: never[]) => infer R ? R : L : never;',
+    'type __CheckLayoutProps<Actual, Layout, File extends string, Name extends string> = [Actual] extends [never] ? true : [Actual] extends [undefined] ? true : Actual extends Partial<__LayoutOwn<Layout>> ? [Exclude<keyof Actual, keyof __LayoutOwn<Layout>>] extends [never] ? true : `Las layoutProps de ${File} no coinciden con las props del layout ${Name}` : `Las layoutProps de ${File} no coinciden con las props del layout ${Name}`;',
   ];
+  // Layouts of installed packages have no generated declaration to check against.
+  const declared = (file: string): boolean => {
+    const path = relative(root, file).replaceAll("\\", "/");
+    return !path.startsWith("../") && !path.split("/").includes("node_modules");
+  };
+  const groupOptions = new Map<string, StaticGroupOptions | undefined>();
+  const readGroup = async (file: string): Promise<StaticGroupOptions | undefined> => {
+    if (!groupOptions.has(file)) {
+      let source: string | undefined;
+      try { source = await readFile(file, "utf8"); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+      groupOptions.set(file, source === undefined ? undefined : extractGroupOptions(file, source));
+    }
+    return groupOptions.get(file);
+  };
+  const layoutChecks = new Set<string>();
   const layouts = new Set<string>();
   const errors = new Set<string>();
   for (const [index, route] of routes.entries()) {
@@ -92,14 +113,50 @@ export async function generatePageContracts(projectRoot: string): Promise<string
     }
     for (const layout of route.layouts) layouts.add(layout);
     if (route.error) errors.add(route.error);
+    const named = route.layout;
+    if (!named || !declared(named.file)) continue;
+    const layoutProps = `import(${JSON.stringify(importPath(output, named.file))}).ComponentProps`;
+    const name = JSON.stringify(named.name);
+    // The +group.ts files whose props reach the page: those after the last change of layout.
+    const marker = `${sep}app${sep}pages${sep}`;
+    const pagesRoot = route.file.slice(0, route.file.lastIndexOf(marker) + marker.length - 1);
+    const folders = [pagesRoot];
+    for (const segment of relative(pagesRoot, dirname(route.file)).split(sep).filter(Boolean)) folders.push(join(folders.at(-1)!, segment));
+    let current: string | false = "default";
+    let contributing: Array<{ file: string; props: Readonly<Record<string, unknown>> }> = [];
+    for (const folder of folders) {
+      const groupFile = join(folder, "+group.ts");
+      const group = await readGroup(groupFile);
+      if (!group) continue;
+      if (group.layout !== undefined && group.layout !== current) { current = group.layout; contributing = []; }
+      if (group.layoutProps) contributing.push({ file: groupFile, props: group.layoutProps });
+    }
+    const pageOptions = blockPage ? extractRouteOptions(blockPage, routeBlockSource(await readFile(blockPage, "utf8"), blockPage) ?? "")
+      : route.sidecar ? extractRouteOptions(route.sidecar, await readFile(route.sidecar, "utf8")) : {};
+    if (pageOptions.layout !== undefined && pageOptions.layout !== current) contributing = [];
+    for (const group of contributing) {
+      const key = `${group.file}\0${named.name}`;
+      if (layoutChecks.has(key)) continue;
+      layoutChecks.add(key);
+      lines.push(`type __layoutprops${layoutChecks.size} = __RequireTrue<__CheckLayoutProps<${JSON.stringify(group.props)}, ${layoutProps}, ${JSON.stringify(displayPath(root, group.file))}, ${name}>>;`);
+    }
+    // A page that chooses its layout in definePage is checked there; one that inherits it, here.
+    if (pageOptions.layout === undefined && routeModule) {
+      const routeType = body ? (body.route ? `typeof import(${JSON.stringify(importPath(output, routeModule))})["route"]` : undefined)
+        : `typeof import(${JSON.stringify(importPath(output, routeModule))}).route`;
+      if (routeType) {
+        layoutChecks.add(`${route.file}\0page`);
+        lines.push(`type __layoutprops${layoutChecks.size} = __RequireTrue<__CheckLayoutProps<__WrittenLayoutProps<${routeType}>, ${layoutProps}, ${page}, ${name}>>;`);
+      }
+    }
   }
   // app/error.meeko also renders URLs without a route, inside the root layouts.
-  const appError = await discoverErrorPage(root);
+  const appError = await discoverErrorPage(root, { layouts: await configuredModuleLayouts(root) });
   if (appError) {
     errors.add(appError.file);
     for (const layout of appError.layouts) layouts.add(layout);
   }
-  for (const [index, layout] of [...layouts].entries()) {
+  for (const [index, layout] of [...layouts].filter(declared).entries()) {
     const file = JSON.stringify(displayPath(root, layout));
     const props = `import(${JSON.stringify(importPath(output, layout))}).ComponentProps`;
     const supplied = '{ outlet: import("@meekojs/meeko").Component<Record<string, unknown>> }';

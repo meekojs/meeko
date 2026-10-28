@@ -372,7 +372,7 @@ function save(): void {
 <template><button on:click="save">Save</button></template>
 ```
 
-Para componer componentes, importa el módulo hijo en el script y usa `<component is="Child" bind:label="expression"></component>`. `is` acepta una expresión de módulo y cada `bind:` define una prop tipada (véanse también las [props estáticas](#props-estáticas)). CLI y VS Code comprueban las props requeridas, los nombres y los tipos de los valores contra las props que declara el hijo; el editor ofrece completado y ubica el diagnóstico en la expresión original. Desde `1.1` los nombres se comprueban también cuando la etiqueta pasa otras props válidas: antes, una prop desconocida junto a una conocida no daba error. Una prop obligatoria que falta se señala en la etiqueta. `<component>` requiere cierre explícito y no admite contenido interno. El HTML SSR marca un rango de comentarios para hidratar el hijo sin elemento envolvente; los hijos pueden aparecer en condiciones y listas.
+Para componer componentes, importa el módulo hijo en el script y usa `<component is="Child" bind:label="expression"></component>`. `is` acepta una expresión de módulo y cada `bind:` define una prop tipada (véanse también las [props estáticas](#props-estáticas)). CLI y VS Code comprueban las props requeridas, los nombres y los tipos de los valores contra las props que declara el hijo; el editor ofrece completado y ubica el diagnóstico en la expresión original. Desde `1.1` los nombres se comprueban también cuando la etiqueta pasa otras props válidas: antes, una prop desconocida junto a una conocida no daba error. Una prop obligatoria que falta se señala en la etiqueta. `<component>` se cierra con `</component>` o solo (`<component is="..." />`); desde `1.5` su contenido son los snippets del componente, como en su etiqueta (véase [Snippets](#snippets-con-definesnippets)), y `is` también acepta etiquetas HTML (véase [Etiquetas HTML en `<component is>`](#etiquetas-html-en-component-is)). El HTML SSR marca un rango de comentarios para hidratar el hijo sin elemento envolvente; los hijos pueden aparecer en condiciones y listas.
 
 `is` también acepta una expresión que devuelva un módulo de componente. Esto permite pasar contenido como una prop `Component<Props>` y renderizarlo dentro de otro componente con props comprobadas por TypeScript:
 
@@ -392,7 +392,7 @@ Para componer componentes, importa el módulo hijo en el script y usa `<componen
 </template>
 ```
 
-El padre puede usar `<component is="Card" bind:content="Content" bind:label="'Hola'"></component>`, donde `Content` es un módulo `.meeko` importado. Si la expresión `is` cambia reactivamente, Meeko libera la instancia anterior y renderiza e hidrata la nueva dentro de los mismos marcadores. El contenido se crea como componente independiente, con su propio estado y limpieza. Para pasar contenido inline, use una etiqueta de componente con snippets (véase [Snippets](#snippets-con-definesnippets)); `<component is>` sigue sin admitir contenido (`MEEK031`).
+El padre puede usar `<component is="Card" bind:content="Content" bind:label="'Hola'"></component>`, donde `Content` es un módulo `.meeko` importado. Si la expresión `is` cambia reactivamente, Meeko libera la instancia anterior y renderiza e hidrata la nueva dentro de los mismos marcadores. El contenido se crea como componente independiente, con su propio estado y limpieza. Para pasar contenido inline, escríbalo entre las etiquetas: hasta `1.4`, `<component is>` no admitía contenido (`MEEK031`); desde `1.5` el contenido suelto llena el snippet `default` y cada `<snippet name>`, el suyo, igual que en una etiqueta de componente. Un componente tipado sólo como `Component<Props>` no declara snippets, así que pasarle contenido es un error de tipos; tipe la prop con el módulo (`typeof Card`) para pasarle contenido.
 
 `<component is>` exige `Component<Props>`: su función `renderWithState` es obligatoria para transferir el estado SSR del hijo. `ComponentModule<Props>` conserva esa función como opcional para usos de bajo nivel que renderizan sin transferencia. El outlet de `app/app.meeko` y de los layouts también se declara como `Component<Record<string, unknown>>`. CLI y VS Code diagnostican un módulo que no satisface este contrato.
 
@@ -412,6 +412,76 @@ Desde `1.1`, una etiqueta cuyo nombre empieza por mayúscula es un componente: `
 
 Use `<component is="expression">` cuando el componente se elige con una expresión, como `props.outlet` o `props.content`; para un componente fijo, la etiqueta es más corta. El editor completa los nombres tras `<` y lleva de la etiqueta al archivo `.meeko`.
 
+### Etiquetas HTML en `<component is>`
+
+Desde `1.5`, `is` también acepta una etiqueta HTML: un literal de texto (`'a'`), una expresión cuyo tipo sea una unión de etiquetas (`props.href ? 'a' : 'button'`, o una prop `as: "section" | "article"`), un componente o una unión de etiquetas y componentes. Con una etiqueta, `<component is>` es ese elemento, con sus atributos, eventos `on:`, `ref:`, `html` y `bind="obj"`, y con su **contenido**: hijos, `if:when`, `each:of`, `<render>` y componentes. Con un componente, el contenido son sus snippets, como en una etiqueta de componente.
+
+Un botón que es un enlace cuando recibe `href`, con una sola plantilla:
+
+```html
+<!-- Button.meeko -->
+<script lang="ts">
+import { computed } from "@meekojs/meeko";
+const props = defineProps<{ href?: string; target?: string; type?: "button" | "submit" | "reset"; disabled?: boolean; loading?: boolean }>();
+const emit = defineEmits<{ click: [event: MouseEvent] }>();
+const snippets = defineSnippets<{ default?: []; leading?: []; trailing?: [] }>();
+const inactive = computed(() => Boolean(props.disabled || props.loading));
+const rel = computed(() => props.target === "_blank" ? "noopener noreferrer" : undefined);
+const state = computed(() => ({ "data-loading": props.loading ? "" : undefined, "aria-disabled": inactive.value ? "true" : undefined }));
+function onClick(event: MouseEvent): void {
+  if (inactive.value) {
+    event.preventDefault();
+    return;
+  }
+  emit("click", event);
+}
+</script>
+<template>
+  <component is="props.href ? 'a' : 'button'" class="button" bind="state.value" on:click="onClick"
+    bind:href="inactive.value ? undefined : props.href" bind:target="props.target" bind:rel="rel.value"
+    bind:type="props.type" bind:disabled="props.disabled">
+    <span if:when="props.loading" class="button__spinner" aria-hidden="true"></span>
+    <span class="button__label"><render snippet="snippets.leading" /><render snippet="snippets.default" /><render snippet="snippets.trailing" /></span>
+  </component>
+</template>
+```
+
+Sin `href` renderiza `<button class="button" type="button" data-meeko="0">…</button>`; con `href`, `<a class="button" href="/docs" target="_blank" rel="noopener noreferrer" data-meeko="0">…</a>`. `type` y `disabled` no se escriben en `<a>`, ni `href`, `target` y `rel` en `<button>` (véase [Atributos según la etiqueta](#atributos-según-la-etiqueta)).
+
+- **Tipos.** Meeko deduce la unión de etiquetas del tipo de `is`. `event.currentTarget` de un `on:` es la unión de sus elementos (`HTMLAnchorElement | HTMLButtonElement`, con los eventos tipados por elemento de `1.2`) y `useElementRef` de un `ref:` también. Un valor de `is` que no es una etiqueta permitida ni un componente es un error de tipos (`MEEK112`), igual que un `string` cualquiera: tipe la etiqueta como una unión de literales o use el tipo `TagName`. Una etiqueta sin contenido (`img`, `input`, `hr`…) con contenido da `MEEK031`.
+- **Etiquetas permitidas.** Las de los datos HTML de Meeko (los de MDN que usa el editor), salvo `script`, `style`, `iframe`, `object`, `embed`, `template`, `slot`, `textarea`, `title`, `base`, `link`, `meta`, `head`, `html`, `body`, `noscript`, `param` y `fencedframe`. El tipo público `TagName` es esa unión. Un literal no permitido es el error de compilación `MEEK112`; un valor no permitido que llega en ejecución (con `as any`, por ejemplo) lanza `TypeError` con `MEEK112` en SSR y en el navegador antes de escribir HTML: el nombre de la etiqueta nunca inyecta marcado. Los elementos personalizados (`x-card`) y las etiquetas SVG no se admiten como valor de `is`; dentro de `<svg>`, `is` sólo admite componentes.
+- **SSR e hidratación.** Meeko lee los resultados de `is` de su sintaxis (las ramas de `?:`, sin `as` ni paréntesis). Si todos son literales, el SSR escribe el elemento tal cual, sin marcadores. Si todos son nombres en PascalCase o imports de un `.meeko` (`is="open ? Dialog : Sheet"`), es un componente, como antes de `1.5` (una constante con una etiqueta debe tener un nombre en minúscula). En los demás casos (`props.as`, `view()`) el tipo decide en ejecución: el elemento va entre los comentarios de rango del componente y su contenido, en un rango de snippet.
+- **Cambio de etiqueta.** Si la etiqueta cambia en el navegador, un elemento nuevo sustituye al anterior: los hijos se **mueven** a él con sus nodos, así que conservan su estado reactivo, el de sus componentes, el valor de sus controles y el foco; si el foco estaba en el elemento, pasa al nuevo. Los atributos, eventos, `ref:`, `html` y `bind` del elemento se vuelven a enlazar en el nuevo. Al pasar de una etiqueta a un componente, o al revés, el rango se vacía y el contenido se monta de nuevo.
+- **Etiqueta o componente.** Con una unión de los dos, cada atributo se comprueba contra lo que lo admite: `aria-label`, `html` o `data-*` sólo valen si `is` es una etiqueta, y `model`, `model:x` o `<snippet name>` sólo si es un componente (`MEEK112` en `meeko check` y el editor cuando el tipo de `is` admite el otro tipo).
+- **`<MeekoLink>` no es un valor.** `<MeekoLink>` es una etiqueta del compilador, no un componente que se pueda pasar a `is`: `is="internal ? MeekoLink : 'a'"` no es válido. Use dos ramas con `if:when` o un componente propio que envuelva a `<MeekoLink>`.
+- **Límites.** El contenido debe ser válido dentro de cada etiqueta posible (un `<div>` dentro de `<p>` lo saca el navegador y la hidratación no coincide), y `<component is>` dentro de `<table>` sigue las reglas de ese contenedor. `model` en un `<component is>` cuyos resultados son etiquetas da `MEEK112`: use un control de formulario.
+
+### Atributos según la etiqueta
+
+En un `<component is>` con etiquetas, Meeko escribe cada atributo sólo mientras la etiqueta del momento lo admite según sus datos HTML, sin ternarios: `bind:href`, `target` y `rel` sólo en `<a>`, `bind:type` y `disabled` sólo en `<button>`. Los atributos globales (`class`, `id`, `style`, `title`, `hidden`, `tabindex`, `role`, `lang`, `dir`, `aria-*`, `data-*`…) y los eventos `on:` se escriben siempre; `aria-disabled` es global, así que vale para un enlace desactivado. `type` no cuenta como atributo de `<a>` ni de `<area>`, donde sólo es una sugerencia de tipo MIME. En los elementos normales nada cambia.
+
+`meeko check` y el editor dan el error `MEEK112` en un atributo que no admite **ninguna** de las etiquetas posibles (`bind:colspan` en `'a' | 'button'`): Meeko no lo escribiría nunca. Cuando `is` escribe sus etiquetas como literales, el editor completa sus atributos e indica en cuáles se aplica cada uno, y el hover de `component` muestra los elementos posibles.
+
+### Atributos en bloque con `bind`
+
+Desde `1.5`, `bind="obj"` escribe las claves de un objeto como atributos de un elemento, de `<component is>` o, en una etiqueta de componente, como sus props:
+
+```html
+<script lang="ts">
+import { computed } from "@meekojs/meeko";
+import type { ElementAttributes } from "@meekojs/meeko";
+const props = defineProps<{ busy: boolean; id: string }>();
+const attrs = computed((): ElementAttributes<"section"> => ({ id: props.id, "aria-busy": props.busy, hidden: false }));
+</script>
+<template><section class="panel" bind="attrs.value">...</section></template>
+```
+
+- **Tipos.** El objeto se comprueba contra los atributos de la etiqueta (o de alguna de las de `<component is>`), o contra las props del componente: una clave que no lo es da `MEEK113`. `ElementAttributes<Tag>` tipa el objeto. En un elemento personalizado (`<x-card bind="...">`), `bind` sigue siendo un atributo HTML, como `html` y `model`.
+- **Valores.** Las claves con `undefined`, `null` o `false` no se escriben, igual que con `bind:x`; `true` escribe el atributo vacío. En un componente, una clave `undefined` es una prop ausente.
+- **Orden.** Un `bind:x` explícito o un atributo estático gana sobre la misma clave del objeto. `class` y `style` se **combinan**: las clases explícitas y las del objeto se juntan, y las declaraciones de `style` del objeto van antes de las explícitas, que ganan. En un componente no se combinan: la prop explícita gana.
+- **Sin manejadores.** Una clave que empieza por `on` es un error de tipos (`MEEK113`) y, en ejecución, un `TypeError`: los manejadores de eventos no se crean desde datos; use `on:evento`. Tampoco se admiten las claves `data-meeko*`, reservadas a Meeko. Como en HTML, los nombres se comparan sin distinguir mayúsculas: `Data-Meeko` también se rechaza, y una clave `ID` junto a `bind:id` no escribe un segundo `id`.
+- **Reactivo.** Si el objeto cambia, Meeko escribe los atributos nuevos y quita los que ya no tiene; un componente recibe las props nuevas en su sitio. `bind=""` o `bind` sin valor da `MEEK113`, igual que en `<template>`.
+
 ### Props estáticas
 
 Desde `1.1`, un atributo sin prefijo en una etiqueta de componente o en `<component is>` pasa una prop estática, como en un elemento HTML:
@@ -421,7 +491,7 @@ Desde `1.1`, un atributo sin prefijo en una etiqueta de componente o en `<compon
 ```
 
 - **Valor.** El texto del atributo llega como un literal de texto (`"primary"`, con su tipo literal) y un atributo sin valor llega como `true`. Ambos se comprueban con tipos contra las props del hijo, igual que `bind:`: `variant="tertiary"` frente a `variant: "primary" | "secondary"` es un error en el atributo.
-- **Nombres reservados.** `is`, `ref` y `html` no son props estáticas, y tampoco los nombres con guiones (`data-label`, `aria-label`) ni los que llevan `:` sin ser una directiva (`bind:`, `on:`, `model:`, `ref:`, `if:when`, `each:*`): todos dan `MEEK032`. Para pasar una prop llamada `ref` use `bind:ref`.
+- **Nombres reservados.** `is`, `ref` y `html` no son props estáticas, ni `bind`, que desde `1.5` pasa props en bloque (véase [Atributos en bloque con `bind`](#atributos-en-bloque-con-bind)), y tampoco los nombres con guiones (`data-label`, `aria-label`) ni los que llevan `:` sin ser una directiva (`bind:`, `on:`, `model:`, `ref:`, `if:when`, `each:*`): todos dan `MEEK032`. Para pasar una prop llamada `ref` use `bind:ref`.
 - **Conflictos.** La misma prop como texto estático y con `bind:` u `on:` (`variant="primary" bind:variant="x"`) da `MEEK090`. `on:save` junto a `bind:onSave` sigue siendo `MEEK048`.
 
 ### Eventos de componente: `defineEmits` y `on:`
@@ -465,6 +535,7 @@ Desde `1.1`, un componente declara con la macro `defineModel<T>()` un valor que 
 <script lang="ts">
 const value = defineModel<string>();                                  // modelo por defecto
 const open = defineModel<boolean>("open", { default: false });       // modelo con nombre, opcional
+// Para que el modelo por defecto sea opcional: defineModel<string>({ default: "" })
 </script>
 <template>
     <input model="value">
@@ -480,6 +551,7 @@ El padre pasa sus señales con `model` (el modelo por defecto) y `model:nombre`,
 
 - **La señal del padre.** Si el padre pasa una señal, `defineModel` devuelve esa misma señal: leer y escribir en el hijo lee y escribe la del padre. El padre es su dueño, así que la señal no forma parte del estado que el hijo transfiere en SSR ni del que conserva en HMR.
 - **Obligatorio u opcional.** Un modelo sin `default` es obligatorio: omitirlo en el padre es un error de tipos y, en ejecución, lanza un `TypeError`. Con `{ default: valor }` es opcional; si el padre no lo pasa, el hijo usa una señal local con ese valor inicial.
+- **Modelo por defecto opcional.** Las opciones van sin nombre para el modelo por defecto: `defineModel<string>({ default: "" })` lo hace opcional, igual que `defineModel<string>("default", { default: "" })`, que es la misma declaración con el nombre escrito. Con `defineModel<string>()`, en cambio, un padre que no pasa `model` (por ejemplo, porque el campo recibe un `FormField` en `bind:field`) da `TS2741` («Property '"default"' is missing in type '{}' but required in type 'ComponentModels'»). No hay ambigüedad entre las dos formas: el nombre es siempre un literal de texto y las opciones, un objeto literal.
 - **Señal escribible.** La expresión del padre debe ser una `Signal<T>` escribible. Un `computed`, una señal de sólo lectura o un valor normal es un error de tipos y, en ejecución, un `TypeError`.
 - **No son props.** Los modelos no aparecen en `ComponentProps`; el módulo compilado exporta su tipo en `ComponentModels`. El SSR lee el valor de la señal y la hidratación conecta la misma señal.
 
@@ -651,7 +723,7 @@ Con `users` de tipo `Signal<User[]>`, `T` es `User`. Con ese `T` se comprueban e
 
 - `T` sólo se infiere de las props. Los modelos, los snippets y las refs no participan: se comprueban con el `T` que dan las props, y si ninguna prop lo determina, TypeScript usa la restricción (o `unknown`).
 - Una `ref:` en una etiqueta dentro de `each:of` tipa el valor expuesto de cada fila con la restricción de `T`, no con el `T` inferido.
-- `<component is>` no admite contenido (`MEEK031`), así que un componente con snippets obligatorios, genérico o no, sólo puede usarse con su etiqueta: con `<component is>`, el snippet que falta es un error de tipos.
+- Desde `1.5`, `<component is>` admite contenido como snippets, igual que la etiqueta: un componente genérico con snippets obligatorios puede usarse con los dos. Hasta `1.4` no lo admitía (`MEEK031`), así que sólo podía usarse con su etiqueta.
 - Las páginas, los layouts, `app/app.meeko` y `app/error.meeko` no pueden ser genéricos, porque Meeko les pasa sus props (véase [framework](framework.md#routing-layouts-y-ssr)). Tampoco un `<script server>` lleva `generic`.
 
 `MEEK100` señala un `generic` vacío o que no es una lista de parámetros de tipo válida (también si cierra la lista antes de tiempo, como `generic="T> = string; type X<U"`), un parámetro con modificadores (`const`, `in`, `out`), con un nombre que empieza por `__` o repetido, `generic` en `<script server>` o en una página, un layout, `app.meeko` o `error.meeko`, y una declaración de tipo del script que usa un parámetro.
@@ -670,6 +742,8 @@ El setup sigue siendo síncrono, con una excepción: admite `await` de nivel sup
 | `await useElementRef(...)`, `await useSocket(...)`, `await useSocketClient(...)` | Sólo en el navegador, tras montar | El elemento, o el socket una vez abierto |
 
 El `await` debe ser la sentencia completa o el inicializador completo de una declaración (`const notes = await useApi(...)`), con uno por sentencia. Cualquier otro `await` de nivel superior, `await useRpcMutation(...)`, `for await` y `await using` dan `MEEK055`; lleve ese trabajo a una función o a `onMounted`.
+
+Sin `await`, `useApi` y `useRpcQuery` devuelven el recurso enseguida, con `data` en `null` hasta que la petición, que empieza en el navegador al montar, termina. Su zona sale vacía en el HTML del servidor y crece al llegar los datos; desde `1.5`, `<MeekoAwait for="recurso" reserve>` la envuelve con sus estados y reserva su altura (véase [Evitar saltos de altura](framework.md#evitar-saltos-de-altura-cls)).
 
 El primer `await` de navegador divide el setup:
 
@@ -710,6 +784,8 @@ const release = hydrate(document.querySelector('#counter')!, props, state)
 ```
 
 Desde `1.4`, cada componente autoimportado también tiene esos cuatro tipos con su nombre de etiqueta, sin import: `<AppCard>` (`app/components/App/Card.meeko`) da `AppCardProps`, `AppCardSnippets`, `AppCardModels` y `AppCardExposed`, que son exactamente su `ComponentProps`, `ComponentSnippets`, `ComponentModels` y `ComponentExposed`, `null` incluido (véase [Tipos de cada componente](framework.md#tipos-de-cada-componente)). El módulo `.meeko` no los exporta con ese nombre, porque el nombre depende de dónde lo autoimporta el proyecto (carpeta y prefijo de módulo), no del componente: desde un import explícito siguen siendo `import type { ComponentSnippets as CardSnippets } from "./Card.meeko"`.
+
+Desde `1.5`, una señal del script que vale `undefined` viaja en el estado de `renderWithState` (bajo la clave `"meeko:undefined"`, que lista sus nombres) y se hidrata como `undefined`, aunque el script del navegador la cree con otro valor. Un valor que JSON no representa fielmente (una fecha, un `Map`, una instancia de clase o un `undefined` dentro de un objeto) falla con el componente y la señal, y una pista: `app/pages/agenda.meeko: the signal "when" cannot be sent to the browser with the SSR state (Non-plain object at $.when)`. Sólo viajan las señales editables del nivel superior del script: un `computed`, una constante o una señal guardada dentro de un objeto no forman parte del estado.
 
 Para transferir props o estado en una etiqueta `<script>`, usa `serializeJson(value)`; comprueba que el dato pueda representarse fielmente en JSON y escapa caracteres que podrían cerrar la etiqueta. `renderToString` sigue disponible cuando el estado inicial se deriva de forma determinista de las props y no se necesita una captura explícita. `renderToString` y `renderWithState` son síncronos: fuera del render del framework no pueden esperar un `await useApi(...)` o `await useRpcQuery(...)`, y un componente que lo necesita lanza un error con el código `MEEKO_SUSPENDED`. Use el componente desde una página del framework o use el composable sin `await`. Dentro del framework, un componente que se monta en el navegador después de la página espera sus datos con la zona vacía en lugar de lanzar ese error (véase [Componentes que se montan más tarde](framework.md#componentes-que-se-montan-más-tarde)). Los módulos compilados exportan además `hasDataAwait` y `__meekoChildren`, marcas que el framework lee para saltarse la carga previa de una navegación, `__meekoReactiveProps` (desde `1.2`), que indica al padre que puede actualizar las props del hijo sin volver a montarlo, y `__meekoChannels` y `__meekoTag`, que sólo tipan las etiquetas del padre; ninguna forma parte del contrato. Al cambiar las props de un hijo, Meeko actualiza en su sitio los bindings que las leen (véase [Props reactivas](#props-reactivas)); cuando el hijo se vuelve a montar, conserva sus señales editables por nombre.
 
@@ -758,7 +834,206 @@ No hay `onUpdated`: para reaccionar a cambios, use `effect`.
 
 Los observadores creados durante `hydrate` pertenecen a esa instancia. Durante HMR de Vite se conservan por nombre las señales editables del script; los valores derivados se calculan otra vez. Este estado en memoria de HMR es independiente de la transferencia JSON entre servidor y navegador.
 
-La raíz `@meekojs/meeko` exporta exactamente `signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `onMounted`, `createContext`, `provide`, `inject`, `provideErrorHandler`, `serializeJson` y, desde `1.3`, `trustHtml`, más los tipos de señales, contexto, componentes, `HotState`, DevTools y, desde `1.3`, `TrustedHtml`. Este motor documenta además `@meekojs/meeko/vite` y `@meekojs/meeko/devtools-ui`. Las subrutas del framework y de los adaptadores (`/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare` y `/build`) se describen en la [guía del framework](framework.md). El compilador importa sus funciones de DOM, HMR y registro de DevTools desde `@meekojs/meeko/internal`. Esa ruta es un contrato entre el compilador y su runtime de la **misma versión exacta**, y no está destinada a imports manuales. Un módulo generado debe compilarse con la misma versión del paquete que lo ejecuta, así que hay que volver a compilarlo al actualizar Meeko.
+La raíz `@meekojs/meeko` exporta exactamente `signal`, `computed`, `effect`, `batch`, `untrack`, `createRoot`, `onCleanup`, `onMounted`, `createContext`, `provide`, `inject`, `provideErrorHandler`, `serializeJson`, desde `1.3`, `trustHtml` y, desde `1.5`, `useId`, más los tipos de señales, contexto, componentes, `HotState`, DevTools y, desde `1.3`, `TrustedHtml`. Este motor documenta además `@meekojs/meeko/vite` y `@meekojs/meeko/devtools-ui`. Las subrutas del framework y de los adaptadores (`/framework`, `/server`, `/node`, `/bun`, `/deno`, `/cloudflare` y `/build`) se describen en la [guía del framework](framework.md). El compilador importa sus funciones de DOM, HMR y registro de DevTools desde `@meekojs/meeko/internal`. Esa ruta es un contrato entre el compilador y su runtime de la **misma versión exacta**, y no está destinada a imports manuales. Un módulo generado debe compilarse con la misma versión del paquete que lo ejecuta, así que hay que volver a compilarlo al actualizar Meeko.
+
+### IDs estables: `useId`
+
+Desde `1.5`, `useId()` devuelve un ID para los atributos que enlazan elementos (`id`, `for`, `aria-describedby`, `aria-controls`, `aria-labelledby`): el mismo en el HTML del servidor y al hidratar, y distinto en cada instancia del componente. Se exporta desde la raíz y se autoimporta en las aplicaciones del framework; un export propio del proyecto con el mismo nombre tiene prioridad.
+
+```html
+<!-- app/components/AppSwitch.meeko -->
+<script lang="ts">
+const props = defineProps<{ label: string; hint?: string }>();
+const on = defineModel<boolean>();
+const id = useId();
+</script>
+<template>
+    <input type="checkbox" role="switch" bind:id="id" bind:aria-describedby="props.hint ? `${id}-hint` : null" model="on">
+    <label bind:for="id">{props.label}</label>
+    <p if:when="props.hint" bind:id="`${id}-hint`">{props.hint}</p>
+</template>
+```
+
+- **Determinista.** El ID no viaja en el estado: sale de la posición de la instancia en el árbol (el componente que la contiene, la clave de su fila en un `each:` y el `if:` o el snippet que la pintan) y del orden de la llamada en su script. El servidor y el navegador recorren las mismas posiciones, así que la hidratación encuentra el mismo `id` en cada atributo.
+- **Único.** Dos instancias nunca comparten ID, tampoco las filas de una lista ni el contenido que un `if:` o un snippet pinta más tarde en el navegador. Una fila con `each:key` conserva su ID al reordenarse la lista, y un componente que un `if:` vuelve a crear recupera el que tenía.
+- **Dónde llamarlo.** En el nivel superior del script, como `onMounted`, y antes de cualquier `await`. Cada llamada da un ID nuevo (`id` y `hint`, no uno para todo); para varios elementos de un mismo campo, derive sufijos de uno solo: `` `${id}-hint` ``. Fuera del script de un componente (en un manejador de eventos o en un test) devuelve un ID único que no coincide entre servidor y navegador.
+- **Formato.** Prefijo de la aplicación, `-`, la posición y el contador: `m-0`, `m-2_f0n3-1`; una posición con claves de texto largas o con otros caracteres se resume en un hash (`m-h1x2y3…-0`). Sólo lleva letras, números, `-` y `_`, así que sirve también en un selector CSS. No dependa de su forma, que puede cambiar entre versiones.
+- **Prefijo.** `document.idPrefix` de `meeko.config.ts` (una letra seguida de letras, números, `-` o `_`; `m` por defecto) lo cambia en el servidor y en el navegador a la vez. Distíngalo cuando dos aplicaciones Meeko compartan una página. Un host propio pasa el mismo valor en `DocumentOptions.config` y `mountClientApp({ document })`.
+- **Raíces sueltas.** Con `hydrate` o `renderWithState` sin el framework, cada raíz empieza en la posición vacía: dos raíces independientes de la misma página repetirían sus IDs.
+
+`useForm` lo usa para los IDs de [`form.field`](framework.md#componentes-de-campo-formfield).
+
+## Componentes integrados
+
+Desde `1.5`, Meeko trae dos componentes accesibles, `<MeekoPopover>` y `<MeekoSelect>`, como etiquetas propias: no se importan y funcionan igual en el motor independiente y en el framework. No tienen estilos visuales; exponen su estado con atributos `data-*` y ARIA para que la aplicación los estilice.
+
+- **Peso.** Cada etiqueta es un módulo propio (`@meekojs/meeko/builtins/popover` y `@meekojs/meeko/builtins/select`), que el compilador importa sólo en los componentes que la usan. Una aplicación que no las escribe no carga su código, y `<MeekoSelect>` lleva consigo `<MeekoPopover>`. Esas rutas son, como `@meekojs/meeko/internal`, un contrato entre el compilador y su runtime de la misma versión: no las importe a mano.
+- **SSR e hidratación.** El HTML del servidor trae el disparador (con el valor elegido en un select) y el contenido oculto por su atributo `popover`, sin parpadeo. Los IDs que enlazan disparador, contenido y opciones salen de [`useId`](#ids-estables-useid): son los mismos al hidratar.
+- **CSP.** Nada va en atributos `style="…"`. El anclaje es una hoja construida (`adoptedStyleSheets`) en la capa de cascada `meeko`, compartida por todos, y cada instancia pasa sus valores en propiedades personalizadas por CSSOM; una CSP sin `'unsafe-inline'` basta. Como está en una capa, cualquier regla de la aplicación tiene prioridad.
+- **Nombres.** Un componente del proyecto llamado `MeekoPopover` o `MeekoSelect` tiene prioridad sobre la etiqueta, con el aviso `MEEK106`. Los tipos de sus props, `MeekoPopoverProps` y `MeekoSelectProps`, se exportan desde `@meekojs/meeko/framework` y se autoimportan en `app/`.
+
+### Popover: `<MeekoPopover>`
+
+Un contenido en la capa superior del navegador (la API `popover`), anclado a su disparador con *CSS anchor positioning*:
+
+```html
+<script lang="ts">
+const open = signal(false);
+</script>
+<template>
+    <MeekoPopover placement="bottom-start" bind:offset="8" model="open" role="menu" on:toggle="(event) => console.log(event.open)">
+        <snippet name="trigger">Opciones ▾</snippet>
+        <button role="menuitem" on:click="rename">Renombrar</button>
+        <button role="menuitem" on:click="duplicate">Duplicar</button>
+        <button role="menuitem" on:click="remove">Eliminar</button>
+    </MeekoPopover>
+</template>
+```
+
+Meeko pinta un `<button>` con `popovertarget`, `aria-expanded`, `aria-controls` y `aria-haspopup` (según `role`), cuyo contenido es el snippet `trigger`, y el contenido suelto dentro de un elemento con `popover` y `data-meeko-popover`. Con `popovertarget`, el botón abre y cierra el contenido incluso antes de hidratar.
+
+| Prop | Por defecto | Qué hace |
+| --- | --- | --- |
+| `mode` | `"auto"` | `"auto"` se cierra al pulsar fuera y con `Esc`; `"manual"` sólo desde el disparador, `Esc` o el modelo; `"hint"` es un tooltip (abajo). |
+| `placement` | `"bottom-start"` | `top`, `bottom`, `left` o `right`, con `-start` o `-end` para alinearlo con un borde del disparador. |
+| `offset` | `0` | Separación en píxeles con el disparador. |
+| `role` | — | `"menu"`, `"dialog"` o `"tooltip"` (por defecto con `mode="hint"`): el patrón ARIA del contenido. |
+| `label` | — | `aria-label` del contenido; sin ella, un menú o un diálogo se nombran con el disparador (`aria-labelledby`). |
+| `class`, `triggerClass` | — | Clases del contenido y del botón. |
+| `triggerId` | `useId` | `id` del disparador; con un disparador propio, el `id` que lleva. |
+| `matchWidth` | `false` | El contenido mide al menos lo que el disparador (`anchor-size(width)`). |
+| `delay`, `closeDelay` | `300`, `150` | Con `mode="hint"`, milisegundos antes de abrir y de cerrar con el puntero. |
+
+`model` (el modelo por defecto) es la señal de apertura: asignarla abre o cierra el contenido, y el usuario la cambia al abrirlo o cerrarlo. `on:toggle` emite `{ open }` (tipo `PopoverToggleEvent`) con cada cambio. Una `ref:` recibe `show()`, `hide()` y `toggle()`.
+
+**Teclado y foco.**
+
+- `Esc` cierra y devuelve el foco al disparador. Pulsar fuera cierra un `mode="auto"` sin mover el foco.
+- Con `role="menu"`, el contenido sigue el patrón de menú: `Intro`, `Espacio` o `↓` en el disparador abren el menú con el foco en el primer `menuitem` (`↑`, en el último); las flechas lo mueven (dando la vuelta), `Inicio` y `Fin` van a los extremos y las primeras letras buscan un elemento. Los elementos con `disabled` o `aria-disabled="true"` se saltan. Elegir un `role="menuitem"` cierra el menú y devuelve el foco; un `menuitemcheckbox` o `menuitemradio` lo deja abierto. `Tab` cierra el menú. Marque los elementos con `role="menuitem"`: Meeko no cambia el rol de su contenido.
+- Con `role="dialog"`, el foco entra en el primer control (o en el elemento con `autofocus`) al abrirse.
+
+**Tooltip.** `mode="hint"` usa `popover="hint"`: se abre al pasar el puntero (tras `delay`) o al enfocar el disparador, se queda abierto mientras el puntero está sobre él o sobre el contenido, se cierra con `Esc` o al perder el foco y nunca toma el foco. El disparador lleva `aria-describedby` con el contenido, que es `role="tooltip"`.
+
+```html
+<MeekoPopover mode="hint"><snippet name="trigger">?</snippet>El código está en el reverso de la tarjeta.</MeekoPopover>
+```
+
+**Posición.** El contenido usa `position-anchor`, `position-area` y `position-try-fallbacks: flip-block, flip-inline`, así que se coloca al otro lado si no cabe. En un navegador sin anchor positioning, Meeko lo marca con `data-meeko-popover-fallback` y calcula su posición en JavaScript al abrirse y con cada `resize` o `scroll`: también se da la vuelta y nunca sale del viewport, y el lado elegido queda en `data-side`. El contenido abierto lleva `data-open`.
+
+**Disparador propio.** El snippet `anchor` sustituye el botón: recibe en `trigger` (tipo `PopoverTrigger`) los atributos que el disparador debe llevar, con el nombre de cada atributo como clave, así que basta con [`bind="trigger"`](#atributos-en-bloque-con-bind). `<MeekoPopover>` encuentra el elemento por su `id` al montarse y le añade el teclado y el anclaje:
+
+```html
+<MeekoPopover role="menu">
+    <snippet name="anchor" params="trigger">
+        <button type="button" class="avatar" bind="trigger"><img src="/me.png" alt="Mi cuenta"></button>
+    </snippet>
+    <a role="menuitem" href="/perfil">Perfil</a>
+</MeekoPopover>
+```
+
+Con un componente propio, `<AppButton bind="trigger">` le pasa esas claves como props: el componente debe declararlas (por ejemplo, `defineProps<Partial<PopoverTrigger> & { variant?: "ghost" }>()`) y ponerlas en su `<button>`, que es el elemento que lleva el `id`.
+
+Un disparador que no es un `<button>` (sin `popovertarget`) abre el contenido con el modelo: `on:click="() => open.value = !open.value"`.
+
+### Select: `<MeekoSelect>`
+
+Un select accesible construido sobre `<MeekoPopover>`. `model` es el valor y su tipo sale de `options`:
+
+```html
+<script lang="ts">
+interface User { id: number; name: string; team: string }
+const colors = ["Rojo", "Verde", "Azul"];
+const color = signal<string | null>(null);
+const users = signal<User[]>([]);
+const user = signal<User | null>(null);
+const tags = signal<string[]>([]);
+</script>
+<template>
+    <label for="color">Color</label>
+    <MeekoSelect id="color" model="color" bind:options="colors" placeholder="Elige un color" name="color" />
+
+    <MeekoSelect model="user" bind:options="users.value" by="id" label="Responsable">
+        <snippet name="option" params="user, state">{user.name} <span if:when="state.selected">✓</span></snippet>
+        <snippet name="value" params="user">{user.name}</snippet>
+    </MeekoSelect>
+
+    <MeekoSelect model="tags" multiple searchable bind:options="colors" bind:max="2" name="tags" />
+</template>
+```
+
+| Prop | Qué hace |
+| --- | --- |
+| `options` | Las opciones, primitivos u objetos. Es reactiva. |
+| `multiple` | El modelo es un array y cada opción se alterna. |
+| `by` | Cómo se compara una opción con el valor: una clave (`by="id"`) o una función `(a, b) => boolean`. Por defecto, `Object.is`. |
+| `labelBy`, `disabledBy`, `groupBy` | La etiqueta (por defecto, el texto del primitivo o `label`/`name` del objeto), si está deshabilitada (por defecto, `disabled: true`) y el grupo de cada opción: una clave o una función. |
+| `placeholder` | Texto sin valor elegido. |
+| `name` | `name` de los `<input type="hidden">` que se envían con el `<form>`. |
+| `required`, `disabled` | Como en un control nativo. |
+| `searchable` | El disparador es un `<input>` que filtra las opciones. |
+| `filter` | Búsqueda propia, síncrona o asíncrona. |
+| `max` | Con `multiple`, cuántas opciones se pueden elegir como mucho. |
+| `field` | El campo de `useForm`: `bind:field="form.field('color')"`. |
+| `id`, `label`, `describedBy`, `invalid` | `id` del disparador (para `<label for>`), su `aria-label`, `aria-describedby` y `aria-invalid`. |
+| `class`, `listClass`, `placement`, `offset` | Clases de la raíz y de la lista, y la posición de la lista. |
+
+`on:change` emite el valor nuevo con cada elección del usuario. Los snippets son `option` (`[option, state]`, con `state.selected`, `state.active` y `state.disabled`), `value` (cómo se ve cada valor elegido en el disparador; sin él, las etiquetas separadas por comas), `group` (el encabezado de un grupo), `empty` (sin opciones; por defecto, «Sin resultados») y `loading` (mientras carga una búsqueda asíncrona).
+
+**Tipos.** `meeko check` y el editor infieren de la etiqueta el tipo de las opciones (`T`) y si es múltiple: el modelo de un select simple es una `Signal<T | null>` y el de uno múltiple, `Signal<T[]>`; `by`, `labelBy` y `groupBy` sólo admiten claves de `T`, y los parámetros de los snippets tienen el tipo `T`. El tipo `SelectModel<T, Multiple>` describe el valor.
+
+**ARIA y teclado.** El disparador es un `role="combobox"` (un `<button>` o, con `searchable`, un `<input>` con `aria-autocomplete="list"`) con `aria-expanded`, `aria-controls`, `aria-haspopup="listbox"` y `aria-activedescendant`: el foco nunca sale de él. La lista es un `role="listbox"` (con `aria-multiselectable` en un select múltiple) de `role="option"` con `aria-selected` y `aria-disabled`, agrupadas en `role="group"` con `groupBy`. Un `<label for>` externo nombra el disparador por su `id`.
+
+- `↓`, `↑`, `Intro` o `Espacio` abren la lista sobre la opción elegida (o la primera); `Inicio` y `Fin` abren en un extremo; las letras abren y buscan.
+- Con la lista abierta, las flechas, `Inicio`, `Fin`, `RePág` y `AvPág` mueven la opción activa (sin dar la vuelta, saltando las deshabilitadas) y la desplazan hasta verla; las letras buscan por el principio de la etiqueta, sin distinguir acentos.
+- `Intro` elige la opción activa; `Espacio` también, salvo con `searchable`, donde escribe un espacio. En un select simple, elegir cierra la lista; en uno múltiple, alterna la opción y la lista sigue abierta. `Alt+↑` elige y cierra.
+- `Esc` cierra sin cambiar el valor y `Tab` cierra. Pulsar fuera o mover el foco fuera también cierran.
+- Con el ratón, un clic en una opción la elige; pasar el puntero la activa. Pulsar en la lista no quita el foco al disparador.
+
+Con `max`, en cuanto hay `max` opciones elegidas las demás quedan `aria-disabled="true"` y `data-disabled` hasta que se quite una.
+
+**Atributos de estado.** Las opciones llevan `data-active`, `data-selected` y `data-disabled`, y la raíz (`data-meeko-select`) `data-open`, `data-multiple`, `data-disabled` y `data-loading`. La lista mide al menos lo que el disparador (`anchor-size(width)` o, sin anchor positioning, el ancho calculado), tiene una altura máxima y se desplaza; ambas reglas están en la capa `meeko`, así que su CSS las sustituye:
+
+```css
+[data-meeko-select] [role="option"][data-active] { background: var(--hover); }
+[data-meeko-select] [role="option"][data-selected]::after { content: " ✓"; }
+[data-meeko-select] [data-meeko-popover] { max-height: 16rem; }
+```
+
+**Búsqueda.** Con `searchable`, escribir filtra las opciones cuya etiqueta contiene el texto, sin distinguir mayúsculas ni acentos («amb» encuentra «Ámbar»). `filter(query, { options, signal })` sustituye ese filtro: devuelve las opciones que se muestran o una promesa de ellas para buscar en el servidor. Mientras la promesa no resuelve, la raíz lleva `data-loading`, la lista `aria-busy="true"` y se muestra el snippet `loading`; una búsqueda nueva aborta la anterior (`signal`) y descarta su respuesta. Con la búsqueda vacía se muestran `options`, sin llamar a `filter`, así que la búsqueda nunca se ejecuta en el servidor.
+
+```html
+<script lang="ts">
+interface City { code: string; name: string }
+const city = signal<City | null>(null);
+const search = (query: string, { signal }: { signal: AbortSignal }): Promise<City[]> =>
+    fetch(`/api/cities?q=${encodeURIComponent(query)}`, { signal }).then((response) => response.json());
+</script>
+<template>
+    <MeekoSelect model="city" bind:options="[]" by="code" searchable bind:filter="search" placeholder="Busca una ciudad">
+        <snippet name="loading">Buscando…</snippet>
+        <snippet name="empty">Ninguna ciudad con ese nombre</snippet>
+    </MeekoSelect>
+</template>
+```
+
+**Formularios.** Con `name`, el select envía un `<input type="hidden">` por valor (uno vacío en un select simple sin valor, ninguno en uno múltiple vacío), como un `<select>` nativo; con `disabled` no envía nada. El valor de cada opción es su clave de `by`, el propio primitivo o su etiqueta. `required` impide enviar el `<form>` sin valor: el disparador recibe el foco y `aria-invalid="true"` hasta que se elige una opción. Con `useForm`, `model="form.fields.color"` funciona como en cualquier control, y `bind:field="form.field('color')"` da además el valor, el `id` del campo (para su `<label for>`), el `name`, `aria-invalid` y `aria-describedby` con el mensaje de error; `focusInvalid` lleva el foco al select cuando falla la validación. El valor inicial `""` de un campo cuenta como «sin valor» (salvo que una opción sea `""`).
+
+```html
+<form on:submit="form.submit" novalidate>
+    <label bind:for="form.field('country').id">País</label>
+    <MeekoSelect bind:field="form.field('country')" bind:options="countries" placeholder="Elige un país" />
+    <p if:when="form.errors.value.country" bind:id="form.field('country').errorId">{form.errors.value.country}</p>
+    <button>Guardar</button>
+</form>
+```
+
+**Listas largas.** `<MeekoSelect>` pinta todas las opciones (en el HTML del servidor también). Para miles de opciones, use `searchable` con un `filter` que devuelva sólo las primeras coincidencias; una lista virtual que sólo pinte las visibles (`virtual`) no está disponible en `1.5`.
+
+**Alternativa nativa.** Para un caso simple, sin búsqueda ni opciones con contenido propio, un `<select>` nativo con `model` sigue siendo la opción más ligera. En los navegadores que lo admiten, `appearance: base-select` permite estilizarlo por completo y conserva el teclado, la accesibilidad y el envío del formulario del navegador:
+
+```css
+select, ::picker(select) { appearance: base-select; }
+```
 
 ## Herramientas
 

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizePath, resolveConfig, transformWithOxc } from "vite";
 import type { Plugin } from "vite";
@@ -13,9 +13,12 @@ import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resol
 import { clientPluginsSource, clientRoutesSource, clientSidecarsSource, readBuildAppData, serverAppSource } from "./framework/app-manifest.js";
 import { assertRouteBlockPlacement, isPageFile, routeBlockFile, routeBlockId, routeBlockSource, withoutRouteBlock } from "./framework/route-block.js";
 import { extractRouteRender } from "./framework/routes-discovery.js";
-import { devScanIgnored, isDevWatchIgnored, isDiscoverySource } from "./framework/dev-watch.js";
+import { builtinOptimizeInclude, devScanIgnored, isDevWatchIgnored, isDiscoverySource } from "./framework/dev-watch.js";
 import { serverScriptModule } from "./framework/server-script.js";
 import { editorBridgeDirectory } from "./framework/editor-bridge.js";
+import { aliasImporterScope, aliasScopeProblem, matchPathAlias } from "./compiler/aliases.js";
+import { resolveProjectAliases, resolveProjectAliasesSync } from "./framework/aliases.js";
+import type { ProjectAliases } from "./framework/aliases.js";
 
 /**
  * A component's CSS is the module `Card.meeko?meeko-style=<hash>&lang.css`: a real path, as Vue
@@ -114,6 +117,14 @@ export function meeko(): Plugin {
   let ssrBuild = false;
   let workerBuild = false;
   let root = "";
+  // The project's path aliases (`~/`, `@/`, `#shared/`, `#server/` and those of `alias`), read once
+  // per configuration: a change of `meeko.config.*` reads them again.
+  let aliasState: Promise<ProjectAliases> | undefined;
+  // Vite's `resolve.alias` (the project's and the modules') runs first: Meeko leaves out the prefixes it takes.
+  let viteAlias: unknown;
+  const projectAliases = (): Promise<ProjectAliases> => aliasState ??= resolveProjectAliases(root, undefined, { viteAlias })
+    // A configuration that fails is reported where it is loaded; resolution keeps the static reading.
+    .catch(() => resolveProjectAliasesSync(root));
   // The CSS of each compiled component by hash, and the hashes of each file, newest last. Only the
   // last two of a file are kept: the browser and SSR transforms of one edit may finish in either
   // order, and older stylesheets would otherwise pile up for as long as `meeko dev` runs.
@@ -147,6 +158,32 @@ export function meeko(): Plugin {
     }
     return false;
   };
+  /**
+   * Resolves a path alias from `importer`: the project first, then each layer, the first folder
+   * where the file exists. `null` when `id` has no alias. Throws `MEEK118` for `@/` in shared/ and,
+   * in the browser graph, `MEEK108` for `#server/` outside the server; the SSR graph still loads
+   * server code from app/, as with a relative import (an email template rendered by an API route).
+   */
+  const resolveAlias = async (
+    context: { resolve(source: string, importer?: string, options?: { skipSelf?: boolean }): Promise<{ id: string } | null> },
+    id: string, importer: string, ssr: boolean, options?: object,
+  ): Promise<{ id: string } | null> => {
+    if (id.startsWith(".") || id.startsWith("/") || id.startsWith("\0") || isAbsolute(id) || !id.includes("/")) return null;
+    const importerFile = importer.replace(/[?#].*$/, "");
+    // A package's own `#imports` and paths are its business.
+    if (/[\\/]node_modules[\\/]/.test(importerFile)) return null;
+    const project = await projectAliases();
+    const match = matchPathAlias(project.aliases, id);
+    if (!match) return null;
+    const scope = aliasImporterScope(importerFile, project.sourceRoots);
+    const problem = scope && aliasScopeProblem(match.alias, scope, id);
+    if (problem && (problem.code !== "MEEK108" || !ssr)) throw new Error(`${problem.code}: ${normalizePath(importerFile)}: ${problem.message}`);
+    for (const target of match.alias.targets) {
+      const resolved = await context.resolve(normalizePath(join(target, match.rest)), importer, { ...options, skipSelf: true });
+      if (resolved) return resolved;
+    }
+    return null;
+  };
   return {
     name: "meeko:components",
     enforce: "pre",
@@ -156,15 +193,19 @@ export function meeko(): Plugin {
       // Workers have no TCP: their bundle never carries the redis package.
       workerBuild = config.ssr?.target === "webworker";
       root = config.root;
+      // A host may resolve a configuration of its own without `resolve`.
+      viteAlias = (config as { readonly resolve?: { readonly alias?: unknown } }).resolve?.alias;
+      aliasState = undefined;
     },
-    async resolveId(id, importer) {
+    async resolveId(id, importer, options) {
       if (virtualModules.has(id)) return `\0${id}`;
       const page = routeBlockFile(id);
       if (page !== undefined) {
         const resolved = await this.resolve(page, importer, { skipSelf: true });
         return resolved ? routeBlockId(resolved.id) : null;
       }
-      return null;
+      // Path aliases. A `resolve.alias` of the project or of a module runs before this plugin and wins.
+      return importer ? resolveAlias(this, id, importer, Boolean(options?.ssr || ssrBuild), options) : null;
     },
     async load(id, options) {
       const page = routeBlockFile(id);
@@ -247,7 +288,8 @@ export function meeko(): Plugin {
         if (!clientModule) return;
         const autoimported = original === undefined ? new Map<string, string[]>() : autoimportedSpecifiers(code.slice(0, code.length - original.length));
         for (const { value } of moduleSpecifiers(code, id)) {
-          const dependency = await this.resolve(value, id, { skipSelf: true });
+          // `skipSelf` also skips this plugin's aliases: resolve them here.
+          const dependency = await resolveAlias(this, value, id, false) ?? await this.resolve(value, id, { skipSelf: true });
           if (dependency && serverOnly(normalizePath(dependency.id))) {
             const names = autoimported.get(value);
             throw new Error(names
@@ -293,7 +335,9 @@ export function meeko(): Plugin {
       // A component outside server/ may run in the browser: the browser graph stops at MEEK108. The SSR
       // graph does not, so a component that only server code imports (an email template in
       // app/emails/ rendered by an API route) keeps compiling there, as in 1.2.
-      if (!serverTransform && !serverDirectories.some((directory) => filename.startsWith(directory))) checkComponentBoundary(source, filename, result, registry, serverDirectories);
+      if (!serverTransform && !serverDirectories.some((directory) => filename.startsWith(directory))) {
+        checkComponentBoundary(source, filename, result, registry, serverDirectories, (await projectAliases()).aliases);
+      }
       const styleHash = createHash("sha256").update(filename).update("\0").update(result.css).digest("hex");
       if (result.css) keepStyle(filename, styleHash, result.css);
       const cssImport = result.css ? `\nimport ${JSON.stringify(`${filename}?meeko-style=${styleHash}&lang.css`)};` : "";
@@ -326,15 +370,19 @@ export function meeko(): Plugin {
     configEnvironment: {
       // After every other plugin, so an input another plugin sets still wins over the HTML crawl.
       order: "post",
-      handler(_name, config, env) {
+      handler(name, config, env) {
         if (env.command !== "serve") return undefined;
+        const include = name === "client" ? builtinOptimizeInclude(runtimeDirectory, config.optimizeDeps?.exclude) : [];
+        const included = include.length ? { include } : {};
         const entries = config.optimizeDeps?.entries;
         // Explicit entries stay; Vite appends the exclusion to them.
-        if (entries !== undefined) return { optimizeDeps: { entries: [...devScanIgnored] } };
+        if (entries !== undefined) return { optimizeDeps: { entries: [...devScanIgnored], ...included } };
         // An input names the scan entries itself; explicit entries would replace it.
-        if (config.input !== undefined || config.build?.rolldownOptions?.input !== undefined || config.build?.rollupOptions?.input !== undefined) return undefined;
+        if (config.input !== undefined || config.build?.rolldownOptions?.input !== undefined || config.build?.rollupOptions?.input !== undefined) {
+          return include.length ? { optimizeDeps: included } : undefined;
+        }
         // Vite's default crawl, every HTML file except tests and coverage, now outside `.meeko`.
-        return { optimizeDeps: { entries: ["**/*.html", "!**/__tests__/**", "!**/coverage/**", ...devScanIgnored] } };
+        return { optimizeDeps: { entries: ["**/*.html", "!**/__tests__/**", "!**/coverage/**", ...devScanIgnored], ...included } };
       },
     },
     configureServer(server) {
@@ -353,6 +401,7 @@ export function meeko(): Plugin {
     async handleHotUpdate({ file, server }) {
       const normalized = normalizePath(file);
       const configFile = normalized.startsWith(`${normalizePath(root)}/meeko.config.`);
+      if (configFile) aliasState = undefined;
       if (!normalized.startsWith(runtimeDirectory) && !configFile && !await watchedSource(file)) return;
       server.moduleGraph.invalidateAll();
       server.ws.send({ type: "full-reload" });

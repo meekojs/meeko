@@ -516,3 +516,32 @@ test("meeko check types models: names, value types, writability and required one
     await cleanup();
   }
 });
+
+test("defineModel with options and no name makes the default model optional; without them a parent that omits it fails", { timeout: 90_000 }, async () => {
+  const field = (declaration: string): string => `<script lang="ts">\nconst query = ${declaration};\n</script><template><input model="query" /></template>`;
+  const children = {
+    "Required.meeko": field("defineModel<string>()"),
+    "Optional.meeko": field(`defineModel<string>({ default: "" })`),
+    "Named.meeko": field(`defineModel<string>("default", { default: "" })`),
+  };
+  for (const [name, source] of Object.entries(children)) {
+    const models = /export type ComponentModels = [^\n]*/.exec(compile(source, join(process.cwd(), name), { typeCheck: true }).code)?.[0];
+    assert.equal(models, `export type ComponentModels = { "default"${name === "Required.meeko" ? "" : "?"}: __meeko.Signal<__MeekoModels["default"]> };`, name);
+  }
+  const { root, cleanup } = await typeProject(children);
+  const parentOf = (template: string): string => `<script lang="ts">\nimport { signal } from "@meekojs/meeko";\nimport * as Required from "./Required.meeko";\nimport * as Optional from "./Optional.meeko";\nimport * as Named from "./Named.meeko";\nconst query = signal("");\n</script><template>${template}</template>`;
+  const cases = [
+    { name: "OmitsOptional", source: parentOf(`<Optional /><Named /><Optional model="query" /><Named model="query" /><Required model="query" />`), codes: [] as string[] },
+    { name: "OmitsRequired", source: parentOf(`<Required />`), codes: ["TS2741"] },
+  ];
+  try {
+    for (const item of cases) {
+      const diagnostics = await checkSource(item.source, join(root, `${item.name}.meeko`));
+      const messages = JSON.stringify(diagnostics);
+      assert.deepEqual(diagnostics.map((diagnostic) => diagnostic.code), item.codes, `${item.name}: ${messages}`);
+      if (item.codes.length) assert.equal(diagnostics[0]!.location.offset, item.source.indexOf("<Required />"), messages);
+    }
+  } finally {
+    await cleanup();
+  }
+});

@@ -1,5 +1,8 @@
+import type { GeneratedRoutes, RouteId } from "../framework.js";
+import { routeCurrent } from "../link.js";
 import { batch, createContext, findContext, provide, signal } from "../reactivity.js";
 import type { ReadonlySignal } from "../reactivity.js";
+import { activeRouteManifest, href } from "./router.js";
 
 /**
  * Estado de navegación de la aplicación del navegador que renderiza un componente. Lo devuelve
@@ -78,6 +81,56 @@ export interface RouteState {
   readonly params: ReadonlySignal<Readonly<Record<string, unknown>>>;
   /** Parámetros de búsqueda, con la misma forma que recibe la página (validados por su schema). */
   readonly search: ReadonlySignal<Readonly<Record<string, unknown>>>;
+  /**
+   * Indica si la ruta `to` está activa, con la misma regla que `<MeekoLink>` y su atributo
+   * `match`: `"page"` cuando la ruta confirmada es exactamente la de `to` (con sus `params`) y,
+   * con `prefix: true`, `"true"` cuando está por debajo de ella por segmentos completos
+   * (`/dashboard` cubre `/dashboard/stats`, no `/dashboards`); si no, `false`. `"/"` sólo
+   * coincide exacta, también con `prefix`. Ignora la query string y el fragmento, y compara las
+   * rutas codificadas como `href()`. El resultado sirve tal cual para `bind:aria-current`
+   * (`false` quita el atributo) y como condición. Es reactivo: lee `path`, así que una plantilla o
+   * un `computed` que lo usan se actualizan al navegar; en SSR y al hidratar devuelve lo mismo.
+   *
+   * @param to ID de la ruta, como `"/users/[id]"`: sólo las rutas que existen.
+   * @param options `params` de una ruta dinámica (obligatorios en ella) y `prefix`.
+   * @returns `"page"`, `"true"` o `false`, el valor de `aria-current`.
+   * @throws {Error} Si la ruta no existe o los `params` no coinciden con ella, como `href()`.
+   * @since 1.5.0
+   * @example
+   * ```html
+   * <!-- app/components/SectionTab.meeko -->
+   * <script lang="ts">
+   * const route = useRoute();
+   * const inSettings = computed(() => route.isActive("/settings", { prefix: true }) !== false);
+   * </script>
+   * <template>
+   *   <a href="/settings" bind:aria-current="route.isActive('/settings', { prefix: true })">Ajustes</a>
+   *   <p if:when="inSettings.value">Estás en Ajustes</p>
+   * </template>
+   * ```
+   */
+  isActive<K extends RouteId>(to: K, ...options: ActiveArguments<K>): "page" | "true" | false;
+}
+
+// The params rule of href(): required by a dynamic route, rejected by a static one and free
+// without the generated declarations.
+type ActiveParamsOption<K extends string> = K extends keyof GeneratedRoutes
+  ? keyof GeneratedRoutes[K] extends never ? { params?: never } : { params: GeneratedRoutes[K] }
+  : { params?: Readonly<Record<string, string>> };
+type ActiveOptions<K extends string> = ActiveParamsOption<K> & {
+  /** `true` para que también cuenten las rutas por debajo de `to`, con `"true"`. */
+  prefix?: boolean;
+};
+type ActiveArguments<K extends string> = K extends keyof GeneratedRoutes
+  ? keyof GeneratedRoutes[K] extends never ? [options?: ActiveOptions<K>] : [options: ActiveOptions<K>]
+  : [options?: ActiveOptions<K>];
+
+/** `isActive` of a `RouteState` whose committed path is `path`; reading it tracks `path`. */
+export function routeIsActive(path: ReadonlySignal<string>): RouteState["isActive"] {
+  return ((to: string, options?: { readonly params?: Readonly<Record<string, string>>; readonly prefix?: boolean }) => {
+    const target = href(activeRouteManifest(), to, options?.params ? { params: options.params } : {});
+    return routeCurrent(path.value, target, options?.prefix === true);
+  }) as RouteState["isActive"];
 }
 
 /** Values of a committed route, as `RouteState` exposes them. */
@@ -136,9 +189,10 @@ export function provideRoute(route: RouteState): void {
 /** A route whose values never change: a server render or the dry pass of a navigation. */
 export function fixedRoute(snapshot: RouteSnapshot): RouteState {
   const read = <T>(value: T): ReadonlySignal<T> => Object.freeze({ value });
+  const path = read(snapshot.path);
   return Object.freeze({
-    url: read(snapshot.url), path: read(snapshot.path), id: read(snapshot.id),
-    params: read(snapshot.params), search: read(snapshot.search),
+    url: read(snapshot.url), path, id: read(snapshot.id),
+    params: read(snapshot.params), search: read(snapshot.search), isActive: routeIsActive(path),
   });
 }
 
@@ -158,7 +212,7 @@ export function liveRoute(initial: RouteSnapshot): LiveRoute {
   const read = <T>(source: { readonly value: T }): ReadonlySignal<T> => Object.freeze({ get value() { return source.value; } });
   let snapshot = initial;
   return {
-    state: Object.freeze({ url: read(url), path: read(path), id: read(id), params: read(params), search: read(search) }),
+    state: Object.freeze({ url: read(url), path: read(path), id: read(id), params: read(params), search: read(search), isActive: routeIsActive(path) }),
     current: () => snapshot,
     set(next) {
       snapshot = next;

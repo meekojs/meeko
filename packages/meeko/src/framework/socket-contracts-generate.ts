@@ -3,6 +3,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
 import { discoverAutoImports } from "../autoimports.js";
 import { autoImportCompilerHost, autoImportSourceReader } from "../autoimports-ts.js";
+import { resolveProjectAliases, withAliasPaths } from "./aliases.js";
 import { resolveConfigSources } from "./config.js";
 import { discoverServerManifest } from "../framework-server/manifest-discovery.js";
 import { standardSchemaTypes } from "./standard-schema-types.js";
@@ -120,7 +121,8 @@ export async function generateSocketContracts(projectRoot: string): Promise<{ fi
   const root = resolve(projectRoot);
   const manifest = await discoverServerManifest(root);
   const output = join(root, ".meeko", "generated", "socket-contracts.ts");
-  const options = compilerOptions(root);
+  // A schema imported through an alias (`#shared/schemas/chat`) resolves to its file, as in Vite.
+  const options = withAliasPaths(compilerOptions(root), await resolveProjectAliases(root), "server");
   const files = (manifest.socket ?? []).map((endpoint) => endpoint.file);
   // Channels and shared schemas are read as Vite runs them, so an autoimported schema
   // resolves to its shared/ file instead of an unknown global.

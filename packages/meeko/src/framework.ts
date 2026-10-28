@@ -1,6 +1,11 @@
 import { activeRouteManifest, href as runtimeHref } from "./framework/router.js";
 import type { RouteRecord } from "./framework/router.js";
 import type { ThemeChoice, ThemeToggleMessages } from "./framework/theme.js";
+import type { LayoutName as NamedLayoutName, LayoutProps as NamedLayoutProps } from "./framework/layout.js";
+import type { AwaitMessages, AwaitResource } from "./framework/await.js";
+import type { MeekoPopoverProps as PopoverProps } from "./builtins/popover.js";
+import type { MeekoTeleportProps as TeleportProps } from "./teleport.js";
+import type { MeekoSelectProps as SelectProps } from "./builtins/select.js";
 
 export { createNavigator, createRouteManifest, matchRoute } from "./framework/router.js";
 export { defineMeekoConfig } from "./framework/config-type.js";
@@ -9,7 +14,9 @@ export { defineMeekoModule } from "./framework/module.js";
 export type { MeekoHookable, MeekoHooks, MeekoModule, MeekoModuleContext, MeekoModuleDefinition, MeekoModuleEntry, MeekoModuleMeta, ModuleAutoImport, ModulePlugin, ModuleServerHandler } from "./framework/module.js";
 export { definePlugin } from "./framework/plugin.js";
 export type { MeekoPlugin, PluginApp, PluginErrorHandler, PluginErrorInfo, PluginRegistration } from "./framework/plugin.js";
-export type { ErrorPageRecord, NavigationContext, Navigator, RouteMatch, RouteRecord } from "./framework/router.js";
+export type { ErrorPageRecord, NamedLayoutRecord, NavigationContext, Navigator, RouteMatch, RouteRecord } from "./framework/router.js";
+export { defineGroup, useLayout } from "./framework/layout.js";
+export type { GroupDefinition, LayoutHandle, LayoutName, LayoutPropsInput, PageLayout, PageLayoutOptions } from "./framework/layout.js";
 export { mountClientApp } from "./framework/client.js";
 export type { ClientApp, ClientAppOptions, ClientComponent, ClientRoute } from "./framework/client.js";
 export { useNavigation, useRoute } from "./framework/navigation.js";
@@ -20,13 +27,16 @@ export { notFound, redirect, usePage } from "./framework/page-body.js";
 export type { JsonShape, PageBodyHead, PageRequest, PageRequestOf, SerializableExport, ServerData } from "./framework/page-body.js";
 export { StateStore, useState } from "./framework/state.js";
 export { useForm } from "./framework/form.js";
-export type { Form } from "./framework/form.js";
+export type { Form, FormField, FormSubmission } from "./framework/form.js";
 export { useStorage } from "./framework/storage.js";
 export { useHead, useSeoMeta } from "./framework/head.js";
 export type { DocumentConfig, DocumentHead, DocumentSeo, HeadInput, HeadLink, HeadMeta, HeadScript, HeadStyle, SeoMetaInput } from "./framework/head.js";
 export type { StorageArea, StorageOptions } from "./framework/storage.js";
 export { useTheme } from "./framework/theme.js";
 export type { ThemeChoice, ThemeConfig, ThemeName, ThemeState, ThemeToggleMessages, ThemeToggleSnippets } from "./framework/theme.js";
+// Types only: the code of <MeekoPopover> and <MeekoSelect> reaches a bundle only through the tags.
+export type { PopoverExposed, PopoverMode, PopoverPlacement, PopoverRole, PopoverSnippets, PopoverToggleEvent, PopoverTrigger } from "./builtins/popover.js";
+export type { SelectField, SelectFilter, SelectFilterContext, SelectModel, SelectOptionState, SelectSnippets } from "./builtins/select.js";
 export { defer } from "./framework/deferred.js";
 export type { DeferOptions, Deferred, DeferredError, DeferredFactory, DeferredStatus } from "./framework/deferred.js";
 export { defineRouteMiddleware } from "./framework/middleware.js";
@@ -35,9 +45,11 @@ export { ClientError, createApiClient, createBrowserClientOptions, createPublicS
 export type { ApiClient, ApiMutationInput, ApiOperation, ClientOptions, PublicApiEndpoint, PublicRpcEndpoint, PublicServerManifest, RpcClient, RpcOperation, ValidationIssue } from "./framework/clients.js";
 export { createSocketClient, createSocketRegistry, useSocket, useSocketChannel, useSocketClient } from "./framework/socket.js";
 export { createUseApi, createUseApiMutation, createUseRpcMutation, createUseRpcQuery } from "./framework/resources.js";
-export type { ApiMutation, ApiMutationContract, ApiQueryContract, ApiQueryOptions, DataResource, LoadedResource, Reactive, RpcMutation, UseApi, UseApiMutation, UseRpcMutation, UseRpcQuery } from "./framework/resources.js";
+export type { ApiMutation, ApiMutationContract, ApiQueryContract, ApiQueryOptions, DataResource, DataResourceOptions, LoadedResource, Reactive, RpcMutation, UseApi, UseApiMutation, UseRpcMutation, UseRpcQuery } from "./framework/resources.js";
+export type { AwaitMessages, AwaitResource, MeekoAwaitSnippets } from "./framework/await.js";
 export type { MutationAttempt, MutationFailure, MutationOptions, RetrySafeMutation, RetrySafeOptions, UncertainMutation } from "./framework/mutations.js";
 export type { SocketClient, SocketContract, SocketSchema, SocketClientOptions, SocketRegistry, SocketRegistryOptions } from "./framework/socket.js";
+export type { MeekoTeleportTarget } from "./teleport.js";
 
 /**
  * Rutas de la aplicación con sus parámetros, por ID. Está vacía en el paquete: la amplían las
@@ -77,6 +89,64 @@ export interface GeneratedRoutes {}
  */
 export interface GeneratedTheme {}
 
+/**
+ * Layouts con nombre de la aplicación, con las props de cada uno. Está vacía en el paquete: la
+ * amplían las declaraciones generadas en `.meeko/types/routes.d.ts` (`meeko check`, `meeko dev`), y
+ * con ellas `layout` y `layoutProps` de `definePage` y de `defineGroup`, y `useLayout()`, se tipan
+ * con los nombres y las props de cada layout. Sin esas declaraciones, cualquier nombre vale.
+ *
+ * @since 1.5.0
+ * @example
+ * ```ts
+ * // .meeko/types/routes.d.ts (generado por meeko check)
+ * declare module "@meekojs/meeko/framework" {
+ *   interface GeneratedLayouts {
+ *     "default": import("../../app/layouts/default.meeko").ComponentProps;
+ *     "dashboard": import("../../app/layouts/dashboard.meeko").ComponentProps;
+ *   }
+ * }
+ * ```
+ */
+export interface GeneratedLayouts {}
+
+/**
+ * Layout con nombre de cada página, por ID de ruta: un nombre de {@link GeneratedLayouts}, o `false`
+ * para una página sin layout con nombre. Está vacía en el paquete: la amplían las declaraciones
+ * generadas en `.meeko/types/routes.d.ts`, y con ellas `useLayout()` se tipa en cada página con su
+ * layout.
+ *
+ * @since 1.5.0
+ * @example
+ * ```ts
+ * // .meeko/types/routes.d.ts (generado por meeko check)
+ * declare module "@meekojs/meeko/framework" {
+ *   interface GeneratedPageLayouts {
+ *     "/": "default";
+ *     "/connections": "dashboard";
+ *     "/print": false;
+ *   }
+ * }
+ * ```
+ */
+export interface GeneratedPageLayouts {}
+
+/**
+ * Props que una página puede pasar al layout con nombre `L`: las `Props` que declara el layout, sin
+ * `outlet`. Con `false` (página sin layout con nombre) no admite ninguna; sin las declaraciones
+ * generadas, es `Record<string, unknown>`. Se autoimporta en las aplicaciones; un tipo propio del
+ * proyecto con el mismo nombre tiene prioridad.
+ *
+ * @typeParam L Nombre del layout, o `false`.
+ * @since 1.5.0
+ * @example
+ * ```ts
+ * // Con app/layouts/dashboard.meeko declarando { title?: string; showAlert?: boolean }:
+ * const props: LayoutProps<"dashboard"> = { title: "Conexiones", showAlert: true };
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#props-del-layout-desde-la-página
+ */
+export type LayoutProps<L extends string | false = NamedLayoutName> = NamedLayoutProps<L>;
+
 type RouteKey = keyof GeneratedRoutes extends never ? string : keyof GeneratedRoutes & string;
 type RouteParams<K extends string> = K extends keyof GeneratedRoutes ? GeneratedRoutes[K] : Record<string, string>;
 type HrefOptions<K extends string> = (keyof RouteParams<K> extends never
@@ -110,7 +180,8 @@ export type RouteId = RouteKey;
 
 /**
  * Props de la etiqueta propia `<MeekoLink>`, que renderiza un `<a>` cuyo `href` construye
- * {@link href}. `to` es el ID de la ruta; `params` y `search` se escriben con `bind:`. El resto de
+ * {@link href}. `to` es el ID de la ruta; `params` y `search` se escriben con `bind:`; `match`
+ * elige si el enlace está activo sólo en su ruta o también por debajo (desde 1.5.0). El resto de
  * atributos (`class`, `target`, `aria-*`, `on:click`…) y el contenido pasan al `<a>`. El editor
  * muestra estas props en el hover de la etiqueta y lleva aquí con «Ir a definición». Sólo es un
  * tipo: sirve, por ejemplo, para un componente que envuelve `<MeekoLink>`. Se autoimporta en `app/`
@@ -146,6 +217,23 @@ export interface MeekoLinkProps<K extends RouteId = RouteId> {
    * Query string, con `bind:search="{ tab: 'perfil' }"`. Omite `null` y `undefined`.
    */
   readonly search?: Readonly<Record<string, string | number | boolean | null | undefined>>;
+  /**
+   * Cuándo el enlace está activo. `"exact"` (por defecto): sólo en su ruta, con
+   * `aria-current="page"`. `"prefix"`: también en las rutas por debajo, por segmentos completos
+   * (`/dashboard` cubre `/dashboard/stats`, no `/dashboards`), con `aria-current="true"`, la
+   * sección actual; en su propia ruta sigue siendo `"page"`. `to="/"` sólo coincide exacta. Se
+   * escribe `match="prefix"` o `bind:match`.
+   *
+   * @since 1.5.0
+   * @example
+   * ```html
+   * <nav>
+   *   <MeekoLink to="/">Inicio</MeekoLink>
+   *   <MeekoLink to="/dashboard" match="prefix">Panel</MeekoLink>
+   * </nav>
+   * ```
+   */
+  readonly match?: "exact" | "prefix";
 }
 
 /**
@@ -202,6 +290,127 @@ export interface MeekoThemeToggleProps {
   /** `id` del elemento raíz, el `<form>`. */
   readonly id?: string;
 }
+
+/**
+ * Props de la etiqueta propia `<MeekoAwait>`, la zona de unos datos que llegan después del primer
+ * pintado (`useApi` o `useRpcQuery` sin `await`). Pinta su snippet `pending` en la primera carga,
+ * `error` si falla y su contenido cuando hay datos, que conserva durante las recargas. Con
+ * `reserve`, mientras espera ocupa la altura que tuvo con datos la última vez. Además admite los
+ * snippets de {@link MeekoAwaitSnippets}. El editor muestra estas props en el hover de la etiqueta y
+ * lleva aquí con «Ir a definición». Se autoimporta en `app/` y en los componentes, como
+ * `MeekoLinkProps`; un tipo propio del proyecto con el mismo nombre tiene prioridad.
+ *
+ * @since 1.5.0
+ * @example
+ * ```html
+ * <!-- app/components/ItemsCard.meeko -->
+ * <script lang="ts">
+ * const items = useApi("/api/items");
+ * </script>
+ * <template>
+ *   <section class="card">
+ *     <MeekoAwait for="items" reserve>
+ *       <snippet name="pending"><ItemsSkeleton /></snippet>
+ *       <snippet name="error" params="error, retry"><p role="alert">No se pudo cargar. <button on:click="retry">Reintentar</button></p></snippet>
+ *       <ItemsList bind:items="items.data.value" />
+ *     </MeekoAwait>
+ *   </section>
+ * </template>
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#meekoawait
+ */
+export interface MeekoAwaitProps {
+  /**
+   * Recurso que espera: el resultado de `useApi` o `useRpcQuery` sin `await`, o una lista
+   * (`for="[items, stats]"`). Es una expresión, como `each:of`; también admite `bind:for`. Dentro
+   * del contenido, `meeko check` y el editor leen `items.data.value` como cargado.
+   */
+  readonly for: AwaitResource | readonly AwaitResource[];
+  /**
+   * Reserva de altura: `reserve` recuerda la altura que tuvo la zona con datos y la aplica mientras
+   * espera otra vez (en `sessionStorage`, por ruta, petición e instancia); `reserve="320px"` fija
+   * además un mínimo, también en la primera visita.
+   */
+  readonly reserve?: boolean | string;
+  /** Textos del aviso de error por defecto, sin el snippet `error`. */
+  readonly messages?: AwaitMessages;
+  /** Clases del contenedor, un `<div>`. */
+  readonly class?: string;
+  /** `id` del contenedor. */
+  readonly id?: string;
+}
+
+/**
+ * Props de la etiqueta propia `<MeekoTeleport>`, que pinta su contenido (el snippet `default`) en
+ * otro lugar del documento sin sacarlo del componente que lo declara: conserva su ámbito reactivo,
+ * sus eventos, sus snippets, `provide`/`inject`, sus manejadores de errores y el CSS `scoped`. El
+ * HTML del servidor ya trae el contenido en su destino. El editor muestra estas props en el hover
+ * de la etiqueta. Se autoimporta en `app/` y en los componentes, como `MeekoLinkProps`.
+ *
+ * @since 1.5.0
+ * @example
+ * ```html
+ * <script lang="ts">
+ * const isMobile = signal(false);
+ * function save(): void {}
+ * </script>
+ * <template>
+ *   <MeekoTeleport to="#toolbar" bind:disabled="isMobile.value">
+ *     <button type="button" on:click="save">Guardar</button>
+ *   </MeekoTeleport>
+ * </template>
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#meekoteleport
+ */
+export interface MeekoTeleportProps extends TeleportProps {}
+
+/**
+ * Props de la etiqueta propia `<MeekoPopover>`: un contenido en la capa superior (`popover`),
+ * anclado a su disparador con *CSS anchor positioning* (con un cálculo en JavaScript donde el
+ * navegador no lo tiene). El modelo por defecto (`model="open"`) es la señal de apertura y
+ * `on:toggle` emite `{ open }`. El editor muestra estas props en el hover de la etiqueta y lleva
+ * aquí con «Ir a definición». Se autoimporta en `app/` y en los componentes, como `MeekoLinkProps`.
+ *
+ * @since 1.5.0
+ * @example
+ * ```html
+ * <!-- app/components/ActionsMenu.meeko: un menú que recibe dónde se abre -->
+ * <script lang="ts">
+ * const props = defineProps<{ placement?: MeekoPopoverProps["placement"] }>();
+ * </script>
+ * <template>
+ *   <MeekoPopover role="menu" bind:placement="props.placement">
+ *     <snippet name="trigger">Acciones</snippet>
+ *     <button role="menuitem">Archivar</button>
+ *   </MeekoPopover>
+ * </template>
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#popover-meekopopover
+ */
+export interface MeekoPopoverProps extends PopoverProps {}
+
+/**
+ * Props de la etiqueta propia `<MeekoSelect>`, un select accesible sobre `<MeekoPopover>`. `T` es
+ * el tipo de cada opción y `Multiple`, si se eligen varias: en la etiqueta se infieren de
+ * `options` y de `multiple`, y el modelo es `SelectModel<T, Multiple>`. Se autoimporta en `app/`
+ * y en los componentes, como `MeekoLinkProps`.
+ *
+ * @since 1.5.0
+ * @example
+ * ```html
+ * <!-- app/components/UserPicker.meeko: envuelve el select con sus opciones -->
+ * <script lang="ts">
+ * interface User { id: number; name: string }
+ * const props = defineProps<{ users: MeekoSelectProps<User>["options"] }>();
+ * const user = defineModel<User | null>();
+ * </script>
+ * <template>
+ *   <MeekoSelect model="user" bind:options="props.users" by="id" placeholder="Elige" />
+ * </template>
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#select-meekoselect
+ */
+export interface MeekoSelectProps<T, Multiple extends boolean = false> extends SelectProps<T, Multiple> {}
 
 /**
  * Construye una URL comprobada con el manifiesto de la aplicación en ejecución: en el servidor, el

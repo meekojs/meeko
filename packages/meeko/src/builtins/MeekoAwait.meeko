@@ -1,0 +1,29 @@
+<script lang="ts">
+// <MeekoAwait>, Meeko's own tag for data that loads after the first paint. `pnpm run builtins`
+// compiles this file into await.compiled.ts, which the package ships as @meekojs/meeko/builtins/await
+// and which only the components that use the tag import; edit this file, not that one.
+import { useAwaitZone } from "../framework/await.js";
+import type { AwaitMessages, AwaitResource, MeekoAwaitSnippets } from "../framework/await.js";
+
+interface Props {
+  /** Recurso de `useApi` o `useRpcQuery` sin `await`, o una lista de recursos: `for="items"`. */
+  for: AwaitResource | readonly AwaitResource[];
+  /** Reserva la altura que tuvo la zona con datos; `reserve="320px"` fija además un mínimo. */
+  reserve?: boolean | string;
+  /** Textos del aviso de error por defecto, sin el snippet `error`. */
+  messages?: AwaitMessages;
+  /** Clases del contenedor. */
+  class?: string;
+  /** `id` del contenedor. */
+  id?: string;
+}
+
+const props = defineProps<Props>();
+const snippets = defineSnippets<MeekoAwaitSnippets>();
+const box = useElementRef("box");
+const zone = useAwaitZone(props, box);
+</script>
+
+<!-- No whitespace between the tags: it would be text inside the zone. The zone never changes
+     element, so its focus, its reserve and its attributes survive every state. -->
+<template><div ref:box bind:id="props.id" bind:class="props.class" bind:data-meeko-await="zone.state.value" bind:aria-busy="zone.busy.value" bind:data-meeko-refreshing="zone.refreshing.value ? '' : undefined" bind:data-meeko-reserve="zone.reserve.value" bind:data-meeko-reserve-min="zone.minimum.value"><render if:when="zone.state.value === 'ready'" snippet="snippets.default" args="zone.refreshing.value" /><render if:when="zone.state.value === 'pending'" snippet="snippets.pending" /><template if:when="zone.state.value === 'error'"><render if:when="snippets.error" snippet="snippets.error" args="zone.error.value, zone.retry" /><p if:when="!snippets.error" role="alert">{zone.messages.value.error} <button type="button" on:click="zone.retry">{zone.messages.value.retry}</button></p></template></div></template>

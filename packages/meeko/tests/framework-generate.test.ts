@@ -37,6 +37,7 @@ test("routes command emits typed IDs and portable manifest under .meeko", async 
     assert.match(cli.stdout, /\.meeko[\\/]manifests[\\/]routes\.json/);
     const consumer = join(root, "consumer.ts");
     await writeFile(consumer, `import { href } from "@meekojs/meeko/framework";
+import type { MeekoLinkProps, RouteState } from "@meekojs/meeko/framework";
 const routes = [] as const;
 href(routes, "/");
 href(routes, "/users/[id]", { params: { id: "123" } });
@@ -58,6 +59,19 @@ href("/missing");
 // @ts-expect-error unknown parameter
 href("/users/[id]", { params: { slug: "x" } });
 void short;
+declare const route: RouteState;
+const active: "page" | "true" | false = route.isActive("/", { prefix: true });
+route.isActive("/users/[id]", { params: { id: "1" }, prefix: true });
+// @ts-expect-error dynamic route requires params
+route.isActive("/users/[id]");
+// @ts-expect-error unknown route ID
+route.isActive("/missing");
+// @ts-expect-error static route rejects params
+route.isActive("/", { params: { id: "x" } });
+const section: MeekoLinkProps<"/"> = { to: "/", match: "prefix" };
+// @ts-expect-error match is "exact" or "prefix"
+const partial: MeekoLinkProps<"/"> = { to: "/", match: "partial" };
+void active; void section; void partial;
 `);
     const config = join(root, "tsconfig.json");
     await writeFile(config, JSON.stringify({ compilerOptions: {

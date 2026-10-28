@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import ts from "@typescript/typescript6";
 import type { AutoImport, FreeReference } from "../autoimports.js";
+import { aliasCandidates, aliasScopeProblem, matchPathAlias } from "./aliases.js";
+import type { PathAlias } from "./aliases.js";
 import type { SourceMapping } from "./mapping.js";
 import { frameworkModule, pageRequestApis } from "./server-script.js";
 import { compileError, locate, parseSfc } from "./sfc.js";
@@ -101,6 +103,8 @@ export interface ClientBoundaryInput {
   readonly registry: readonly AutoImport[];
   /** The `server/` folders of the project and its layers. */
   readonly serverDirectories: readonly string[];
+  /** The path aliases of the project (`~/`, `@/`, `#shared/`, `#server/` and those of `alias`). */
+  readonly aliases?: readonly PathAlias[];
 }
 
 interface Finding {
@@ -130,9 +134,13 @@ function sourceOffset(input: ClientBoundaryInput, reference: FreeReference): num
   return match ? span.originalStart + match.index : undefined;
 }
 
-/** Whether a relative import of the component names a module that only runs on the server. */
+/** Whether a relative or aliased import of the component names a module that only runs on the server. */
 function serverModule(input: ClientBoundaryInput, specifier: string): boolean {
-  const target = resolve(dirname(input.filename), specifier);
+  if (!specifier.startsWith(".")) return (input.aliases && aliasCandidates(input.aliases, specifier)?.some((target) => serverModuleAt(input, target))) ?? false;
+  return serverModuleAt(input, resolve(dirname(input.filename), specifier));
+}
+
+function serverModuleAt(input: ClientBoundaryInput, target: string): boolean {
   if (/\.server(?:\.[cm]?[jt]sx?)?$/.test(basename(target))) return true;
   if (input.serverDirectories.some((directory) => within(directory, target))) return true;
   const stem = target.replace(/\.[cm]?[jt]sx?$/, "");
@@ -149,8 +157,9 @@ function origin(input: ClientBoundaryInput, entry: AutoImport): string {
 /**
  * Checks that a component's `<script>` and template only use what exists in the browser, where
  * they also run. Errors, for what already fails today: `MEEK108` for a server-only autoimport, a
- * value import of `/server` or `/cloudflare` (they fail to load in the browser) and an import of
- * `server/` or of a `*.server.*` module; `MEEK073` for the request APIs of `<script server>`
+ * value import of `/server` or `/cloudflare` (they fail to load in the browser), an import of
+ * `server/` or of a `*.server.*` module (relative or through a path alias) and any import through
+ * `#server/` or another alias of a server folder; `MEEK073` for the request APIs of `<script server>`
  * (`usePage`, `redirect`, `notFound`). Warnings, returned, for what compiles and loads today and
  * becomes an error in 2.0: `MEEK109` for `definePage`, which has no effect there, and for a value
  * import of `/node`, `/bun`, `/deno`, `/password` or `/build`. Throws the first error.
@@ -175,6 +184,13 @@ export function checkClientBoundary(input: ClientBoundaryInput): CompileDiagnost
     for (const statement of file.statements) {
       if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
       const clause = statement.importClause;
+      // `#server/` does not exist in the browser's TypeScript project, not even for a type.
+      const aliased = input.aliases && matchPathAlias(input.aliases, statement.moduleSpecifier.text);
+      const outOfScope = aliased && aliasScopeProblem(aliased.alias, "client", statement.moduleSpecifier.text);
+      if (outOfScope) {
+        add(outOfScope.code, outOfScope.message, script.contentStart + statement.moduleSpecifier.getStart(file));
+        continue;
+      }
       if (clause?.isTypeOnly) continue;
       const named = clause?.namedBindings && ts.isNamedImports(clause.namedBindings) ? clause.namedBindings.elements : undefined;
       // `import { type A } from "x"` loads nothing under verbatimModuleSyntax only if every name is a type.
@@ -185,7 +201,7 @@ export function checkClientBoundary(input: ClientBoundaryInput): CompileDiagnost
         add("MEEK108", `${specifier} sólo existe en el servidor y no se puede cargar en el navegador: ${browserScope}. Mueve ese código a <script server> o a server/; para usar sus tipos, impórtalos con import type`, at);
       } else if (values && runtimeEntries.has(specifier)) {
         add("MEEK109", `${specifier} sólo funciona en el servidor: ${browserScope}, donde sus funciones fallan. Mueve ese código a <script server> o a server/; para usar sus tipos, impórtalos con import type. Desde 2.0 será un error`, at, false);
-      } else if (values && specifier.startsWith(".") && serverModule(input, specifier)) {
+      } else if (values && (specifier.startsWith(".") || aliased) && serverModule(input, specifier)) {
         add("MEEK108", `${specifier} es un módulo de servidor (server/ o *.server.*) y no puede llegar al bundle del navegador: ${browserScope}. Úsalo en <script server> o pide los datos con useApi o useRpcQuery; para sus tipos, usa import type`, at);
       } else if (specifier === frameworkModule && named) {
         for (const element of named) {

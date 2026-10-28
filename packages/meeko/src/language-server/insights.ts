@@ -171,7 +171,17 @@ function targetMarkdown(context: FeatureContext, target: AppTarget): string {
       "",
       `- params: ${params.length ? `\`{ ${params.map((param) => `${param.name}: string`).join("; ")} }\`` : "ninguno"}`,
       `- render: ${route.render ?? "ssr"}`,
+      `- layout: ${route.layout ? `\`${route.layout.name}\`` : "ninguno"}`,
       `- layouts: ${route.layouts.length ? route.layouts.map((layout) => projectPath(root, layout)).join(" › ") : "ninguno"}`,
+    ].join("\n");
+  }
+  if (target.kind === "layout") {
+    if (!target.file) return `**Layout** \`${target.name}\` no existe: crea \`app/layouts/${target.name}.meeko\`.`;
+    const pages = (context.app?.routes ?? []).filter((route) => route.layout?.name === target.name).map((route) => `\`${route.id}\``);
+    return [
+      `**Layout** \`${target.name}\` → [${projectPath(root, target.file)}](${fileUri(context, target.file)})`,
+      "",
+      `- páginas: ${pages.length ? pages.join(", ") : "ninguna"}`,
     ].join("\n");
   }
   if (target.kind === "api") {
@@ -215,6 +225,7 @@ export function appTargetDefinition(context: FeatureContext, generatedOffset: nu
   if (!target) return undefined;
   const start = { line: 0, character: 0 };
   if (target.kind === "route") return target.route ? [{ uri: fileUri(context, target.route.file), range: { start, end: start } }] : undefined;
+  if (target.kind === "layout") return target.file ? [{ uri: fileUri(context, target.file), range: { start, end: start } }] : undefined;
   const files = target.kind === "api" ? target.endpoints.map((endpoint) => endpoint.file) : target.endpoint ? [target.endpoint.file] : [];
   const locations = files.map((file): Location => {
     const contract = handlerContract(file, target.kind === "api" ? "api" : "rpc");

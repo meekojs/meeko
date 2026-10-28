@@ -153,8 +153,9 @@ test("la sintaxis de composición rechaza referencias, contenido y props no comp
   const script = `<script lang="ts">const Child = 1;</script>`;
   const cases = [
     { template: `<component bind:label="'x'"></component>`, code: "MEEK030" },
-    { template: `<component is="Child"><span>nested</span></component>`, code: "MEEK031" },
-    { template: `<component is="Child" data-label="x"></component>`, code: "MEEK032" },
+    // Since 1.5 children are allowed: a void tag of `is` with content is MEEK031.
+    { template: `<component is="'img'"><span>nested</span></component>`, code: "MEEK031" },
+    { template: `<AppChild data-label="x"></AppChild>`, code: "MEEK032" },
   ];
   for (const { template, code } of cases) {
     const source = `${script}\n<template>${template}</template>`;

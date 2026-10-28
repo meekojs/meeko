@@ -1,6 +1,7 @@
 import { createContext, createRoot, effect, findContext, finishWithCleanup, isDryRender, onCleanup, provide } from "../reactivity.js";
 import type { ReadonlySignal } from "../reactivity.js";
 import { escapeHtml } from "../server.js";
+import { isIdPrefix } from "../ids.js";
 import type { ComponentRelease, DomScope } from "../dom.js";
 import { applyColorScheme, applyThemeClass, resolveThemeConfig, themeScript, themeStyle, withThemeAttributes } from "./theme.js";
 import type { DocumentTheme, ThemeConfig, ThemeHead } from "./theme.js";
@@ -245,6 +246,13 @@ export interface DocumentConfig {
    * @since 1.4.0
    */
   theme?: ThemeConfig;
+  /**
+   * Prefijo de los IDs de `useId` (y de `form.field`): una letra seguida de letras, números, `-` o
+   * `_`, hasta 32 caracteres. Por defecto, `m`. Distíngalo cuando dos aplicaciones Meeko compartan
+   * una página.
+   * @since 1.5.0
+   */
+  idPrefix?: string;
 }
 
 /**
@@ -532,15 +540,16 @@ export function normalizeHeadInput(value: unknown, label: string, options: Norma
 export function normalizeDocumentConfig(value: unknown, label: string): DocumentConfig | undefined {
   if (value === undefined) return undefined;
   if (!isRecord(value)) fail(label, "must be an object");
-  for (const name of Object.keys(value)) if (!["lang", "head", "seo", "theme"].includes(name)) fail(label, `unknown field ${name}`);
+  for (const name of Object.keys(value)) if (!["lang", "head", "seo", "theme", "idPrefix"].includes(name)) fail(label, `unknown field ${name}`);
   if (value.lang !== undefined && (typeof value.lang !== "string" || !value.lang)) fail(label, "lang must be a nonempty string");
+  if (value.idPrefix !== undefined && !isIdPrefix(value.idPrefix)) fail(label, "idPrefix must start with a letter and contain only letters, digits, - and _ (at most 32 characters)");
   // Serializable: its titleTemplate is a string, as DocumentHead says.
   const head = value.head === undefined ? undefined : normalizeHeadInput(value.head, `${label}.head`, { serializable: true }) as DocumentHead;
   const seo = resolveSeo(value.seo, `${label}.seo`);
   const theme = resolveThemeConfig(value.theme, `${label}.theme`);
   return {
     ...(value.lang === undefined ? {} : { lang: value.lang as string }), ...(head ? { head } : {}), ...(seo ? { seo: { ...seo } } : {}),
-    ...(theme ? { theme } : {}),
+    ...(theme ? { theme } : {}), ...(value.idPrefix === undefined ? {} : { idPrefix: value.idPrefix as string }),
   };
 }
 
@@ -580,10 +589,11 @@ export function resolveDocumentConfig(config: DocumentConfig | undefined, module
   const seo = resolveSeo(config?.seo, "document.seo", origin);
   // `theme` of meeko.config.ts, with every option decided: the server and the browser read the same.
   const theme = resolveThemeConfig(themeOption ?? config?.theme);
-  if (lang === undefined && !seo && !theme && (!head || Object.keys(head).length === 0)) return undefined;
+  const idPrefix = config?.idPrefix;
+  if (lang === undefined && !seo && !theme && idPrefix === undefined && (!head || Object.keys(head).length === 0)) return undefined;
   return {
     ...(lang === undefined ? {} : { lang }), ...(head && Object.keys(head).length ? { head } : {}), ...(seo ? { seo: { ...seo } } : {}),
-    ...(theme ? { theme } : {}),
+    ...(theme ? { theme } : {}), ...(idPrefix === undefined ? {} : { idPrefix }),
   };
 }
 

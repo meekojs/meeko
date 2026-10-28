@@ -14,6 +14,10 @@ import { StateStore, withStateStore } from "./state.js";
 import { ResourceScope, withResourceScope } from "./resources.js";
 import { renderWithSuspense } from "../suspense.js";
 import { collectStyles } from "../dom.js";
+import { withIdRoot } from "../ids.js";
+import { collectTeleports, TeleportCollector } from "../teleport.js";
+import type { TeleportEntry } from "../teleport.js";
+import { placeTeleports } from "./teleports.js";
 import { deferredSettle, deferredSource, extractDeferred } from "./deferred.js";
 import type { DeferredInternals, DeferredOutcome } from "./deferred.js";
 import { matchRoute, provideServerRouteManifest } from "./router.js";
@@ -22,6 +26,8 @@ import { fixedRoute, provideRoute, routeSnapshot } from "./navigation.js";
 import type { RouteSnapshot } from "./navigation.js";
 import type { PageRequest } from "./page-body.js";
 import type { ErrorPageRecord, RouteRecord } from "./router.js";
+import { definedLayoutProps, resolveLayoutProps, serverLayoutWriter, withLayoutWriter } from "./layout.js";
+import type { LayoutWriter, ServerLayoutWriter } from "./layout.js";
 import { documentHeadEntries, HeadCollector, provideHead, renderHeadDocument, resolveHead, resolveSeo, routeHeadInput, withHeadLevel } from "./head.js";
 import type { DocumentConfig, HeadDocument, HeadInput } from "./head.js";
 import { emptyPluginState, notifyPluginErrorHandlers, runPlugins } from "./plugin.js";
@@ -91,6 +97,16 @@ export interface PageRoute {
   render?: PageRender;
   /** Parámetros de cada URL que se prerenderiza. */
   prerenderEntries?: readonly Readonly<Record<string, string>>[] | (() => Promise<readonly Readonly<Record<string, string>>[]>);
+  /**
+   * Layout con nombre de la página, o `false`; `meeko build` lo lee del archivo y lo deja en el manifiesto.
+   * @since 1.5.0
+   */
+  layout?: unknown;
+  /**
+   * Props del layout: un objeto o una función del contexto de `head`.
+   * @since 1.5.0
+   */
+  layoutProps?: unknown;
 }
 
 /**
@@ -323,6 +339,11 @@ export interface PageHandlerOptions extends FrameworkHandlerOptions<unknown> {
    * `404.html` of a static build, whatever routes (a catch-all included) the app has.
    */
   readonly notFoundOnly?: boolean;
+  /**
+   * A `<MeekoTeleport>` whose target the page does not render fails the render with `false`
+   * (development); otherwise its content renders in its place with a warning.
+   */
+  readonly production?: boolean;
 }
 
 /** A typed sidecar may narrow callback arguments after its schemas validate them. */
@@ -345,6 +366,56 @@ function wantsPage(request: Request, pathname: string): boolean {
   return request.headers.get("accept")?.split(",").some((value) => value.trim().toLowerCase().startsWith("text/html")) ?? false;
 }
 
+/** The named layout of a server render: its record, the props it renders with and the page's writer. */
+interface ServerNamedLayout {
+  readonly file: string | undefined;
+  readonly props: Record<string, unknown>;
+  readonly writer: LayoutWriter;
+}
+
+type RenderedTree = { rendered: { html: string; state: Record<string, unknown> }; store: StateStore; resources: Record<string, unknown> | undefined; styles: string[]; head: HeadCollector; teleports: readonly TeleportEntry[] };
+
+/** Renders written by the page with `useLayout()` that a request repeats at most. */
+const layoutRenderAttempts = 3;
+
+/**
+ * Renders a page tree whose named layout receives `declared`. The layout renders before the page,
+ * so what the page writes with `useLayout()` during its render reaches the HTML in a second render
+ * with those props, from the same request state and data; the browser then hydrates the same props.
+ */
+async function renderWithLayoutProps(
+  name: string | undefined,
+  declared: Record<string, unknown>,
+  initial: StateStore,
+  render: (named: ServerNamedLayout & { readonly writer: ServerLayoutWriter }, store: StateStore, seed: Record<string, unknown> | undefined) => Promise<RenderedTree & { readonly treeStyles: readonly string[] }>,
+  file: string | undefined,
+  page: string,
+): Promise<{ tree: RenderedTree & { readonly treeStyles: readonly string[] }; layoutProps: Record<string, unknown> }> {
+  const baseline = initial.snapshot();
+  let props = checkLayoutProps(definedLayoutProps(declared), page, name);
+  let seed: Record<string, unknown> | undefined;
+  for (let attempt = 1; ; attempt++) {
+    const writer = serverLayoutWriter(name, props);
+    const tree = await render({ file, props, writer }, attempt === 1 ? initial : new StateStore(baseline), seed);
+    // An `undefined` written by the page removes the prop: the layout takes its default, as in the browser.
+    const next = checkLayoutProps(definedLayoutProps({ ...props, ...writer.written }), page, name);
+    if (name === undefined || attempt >= layoutRenderAttempts || serializeJson(next) === serializeJson(props)) return { tree, layoutProps: props };
+    props = next;
+    seed = tree.resources;
+  }
+}
+
+/** Layout props travel in the payload: one that JSON cannot carry fails naming the page, the layout and the prop. */
+function checkLayoutProps(props: Record<string, unknown>, page: string, layout: string | undefined): Record<string, unknown> {
+  for (const [key, value] of Object.entries(props)) {
+    try { serializeJson(value); }
+    catch (error) {
+      throw new TypeError(`layoutProps of ${page} for the layout "${layout ?? "(none)"}": the prop "${key}" cannot travel in the payload as JSON (${error instanceof Error ? error.message : String(error)}). Pass a string, number, boolean, null, array or plain object, or omit the prop.`, { cause: error });
+    }
+  }
+  return props;
+}
+
 /** Wraps a page in its layouts (outermost first) and collects their CSS in document order. */
 async function wrapInLayouts(
   loadPage: (file: string) => Promise<PageModule>,
@@ -352,12 +423,16 @@ async function wrapInLayouts(
   props: Record<string, unknown>,
   layouts: readonly string[],
   styles: string[],
+  named: ServerNamedLayout = { file: undefined, props: {}, writer: serverLayoutWriter(undefined, {}) },
 ): Promise<{ module: PageModule; input: Record<string, unknown> }> {
+  const namedIndex = named.file === undefined ? -1 : layouts.indexOf(named.file);
   // useHead of the page and its components outranks its layouts', and a layout's outranks app.meeko's.
   let module = withHeadLevel(page, layouts.length);
+  // useLayout() in the page (and in what the named layout wraps) reaches the writer.
+  if (namedIndex < 0) module = withLayoutWriter(module, named.writer);
   let input = props;
   for (const [index, layout] of [...layouts.entries()].reverse()) {
-    const child = module;
+    const child = index === namedIndex ? withLayoutWriter(module, named.writer) : module;
     const childInput = input;
     const outlet = {
       renderWithState: () => child.renderWithState(childInput),
@@ -367,7 +442,7 @@ async function wrapInLayouts(
     const loaded = await loadPage(layout);
     if (loaded.css) styles.unshift(loaded.css);
     module = withHeadLevel(loaded, index);
-    input = { outlet };
+    input = index === namedIndex ? { ...named.props, outlet } : { outlet };
   }
   return { module, input };
 }
@@ -385,8 +460,13 @@ async function renderPageTree(
   plugins: PluginState,
   signal?: AbortSignal,
   theme?: ServerTheme,
-): Promise<{ rendered: { html: string; state: Record<string, unknown> }; store: StateStore; resources: Record<string, unknown> | undefined; styles: string[]; head: HeadCollector }> {
-  const scope = new ResourceScope("collect", {}, signal);
+  idPrefix?: string,
+  /** Data an earlier render of the same request already loaded. */
+  seed?: Record<string, unknown>,
+): Promise<RenderedTree> {
+  const scope = new ResourceScope("collect", seed ?? {}, signal);
+  // The content of the `<MeekoTeleport>` tags of the last pass, which the document places in their targets.
+  const teleports = new TeleportCollector();
   // useRoute() in the page, its layouts and app.meeko reads the route of this request.
   const routeState = fixedRoute(route);
   let baseline: Record<string, unknown> | undefined;
@@ -401,17 +481,38 @@ async function renderPageTree(
     scope.beginPass();
     styles.clear();
     head.clear();
-    return collectStyles(styles, () => withResourceScope(scope, () => withStateStore(store, () => {
+    teleports.clear();
+    return collectTeleports(teleports, () => collectStyles(styles, () => withResourceScope(scope, () => withStateStore(store, () => {
       provideRoute(routeState);
       provideHead(head);
       if (theme) provideServerTheme(theme);
       // Values of the app plugins, which ran for this request.
       plugins.apply();
-      return module.renderWithState(input);
-    })));
+      return withIdRoot(idPrefix, () => module.renderWithState(input));
+    }))));
   }, signal ? { signal } : {});
   const used = scope.usedData();
-  return { rendered, store, resources: Object.keys(used).length ? used : undefined, styles: [...styles], head };
+  return { rendered, store, resources: Object.keys(used).length ? used : undefined, styles: [...styles], head, teleports: teleports.entries };
+}
+
+/** Production warnings already printed, so a missing teleport target is reported once per message. */
+const teleportWarnings = new Set<string>();
+
+/**
+ * The application HTML with the content of its `<MeekoTeleport>` tags in their targets, and the
+ * content for `body`, which goes after the application and before Meeko's scripts.
+ */
+function documentBody(html: string, teleports: readonly TeleportEntry[], production: boolean): { app: string; body: string } {
+  if (!teleports.length) return { app: html, body: "" };
+  const placed = placeTeleports(html, teleports, {
+    production,
+    warn: (message) => {
+      if (teleportWarnings.has(message)) return;
+      teleportWarnings.add(message);
+      console.warn(message);
+    },
+  });
+  return { app: placed.html, body: placed.body };
 }
 
 /** Props of the application error page for a URL without a route. */
@@ -661,18 +762,22 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     if (!match) {
       // A URL without a route: app/error.meeko inside the root layouts, hydrated like a page.
       const renderNotFound = async (): Promise<Response> => {
-        const styles: string[] = [];
         const page = await options.loadPage(errorPage!.file);
-        if (page.css) styles.push(page.css);
-        const { module, input } = await wrapInLayouts(options.loadPage, page, { ...notFoundProps }, errorPage!.layouts, styles);
-        const { rendered, store, resources, styles: childStyles, head: collected } = await renderPageTree(module, input, stateStore, route!, await startPlugins(), request.signal, theme);
-        styles.push(...childStyles);
+        const plugins = await startPlugins();
+        const { tree, layoutProps } = await renderWithLayoutProps(errorPage!.layout?.name, {}, stateStore, async (named, store, seed) => {
+          const treeStyles: string[] = page.css ? [page.css] : [];
+          const { module, input } = await wrapInLayouts(options.loadPage, page, { ...notFoundProps }, errorPage!.layouts, treeStyles, named);
+          return { ...await renderPageTree(module, input, store, route!, plugins, request.signal, theme, options.document?.config?.idPrefix, seed), treeStyles };
+        }, errorPage!.layout?.file, errorPage!.file);
+        const { rendered, store, resources, head: collected, teleports } = tree;
+        const styles = [...tree.treeStyles, ...tree.styles];
         pageStore = store;
         store.seal();
         const payload = serializeJson({
           v: PAYLOAD_VERSION, error: true, render: "ssr",
           props: notFoundProps, state: rendered.state, sharedState: store.snapshot(), head: { title: ERROR_PAGE_TITLE },
           ...(resources ? { resources } : {}),
+          ...(errorPage!.layout ? { layoutProps } : {}),
         });
         const headRequest = request.method === "HEAD";
         if (wantsPayload(request)) {
@@ -687,7 +792,8 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
         // Titled like the error document of a matched route; the payload head carries the same
         // title, so hydration still finds the host <title> after the managed head.
         const head = headDocument(options.document, host.nonce, collected, routeHeadInput({}, ERROR_PAGE_TITLE), undefined, theme);
-        const document = `${head.prefix}${csrfMeta}${styleTags}${head.head}${host.head}</head>${head.bodyOpen}<div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
+        const placed = documentBody(rendered.html, teleports, options.production ?? true);
+        const document = `${head.prefix}${csrfMeta}${styleTags}${head.head}${host.head}</head>${head.bodyOpen}<div id="app">${placed.app}</div>${placed.body}<script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
         return finish(new Response(headRequest ? null : document, {
           status: 404, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
         }), true);
@@ -709,6 +815,10 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     const sidecar = match.route.sidecar && options.loadRoute ? await options.loadRoute(match.route.sidecar) as PageRoute : undefined;
     const renderMode = routeRender(match.route, sidecar);
     const clientPage = renderMode === "client";
+    // Like render, the layout comes from the manifest that the build read from the file.
+    if (sidecar?.layout !== undefined && sidecar.layout !== (match.route.layout?.name ?? false)) {
+      throw new Error(`Route ${match.route.id} declares layout ${JSON.stringify(sidecar.layout)} but its manifest says ${JSON.stringify(match.route.layout?.name ?? false)}; rebuild the application`);
+    }
     const validated = await validatePageInputs(sidecar, match.params, pageSearchObject(url.searchParams));
     route = routeSnapshot(url, match.route.id, validated.params, validated.search, false);
     // Client disconnect, session revocation, a cancelled stream or a HEAD
@@ -762,17 +872,29 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       search: validated.search,
       ...(data === undefined ? {} : { data: extracted.value }),
     };
-    const styles: string[] = [];
     let page: PageModule = emptyOutlet;
-    if (!clientPage) {
-      page = await options.loadPage(match.route.file);
-      if (page.css) styles.push(page.css);
-    }
-    const { module, input } = await wrapInLayouts(options.loadPage, page, clientPage ? {} : props, match.route.layouts, styles);
+    if (!clientPage) page = await options.loadPage(match.route.file);
+    const namedLayout = match.route.layout;
+    // The layout props of the +group.ts files, then the page's. A client page's function runs in
+    // the browser after its loader; its object already reaches the server HTML.
+    const declaredLayoutProps = namedLayout ? {
+      ...namedLayout.props,
+      ...clientPage
+        ? typeof sidecar?.layoutProps === "function" ? {} : resolveLayoutProps(sidecar?.layoutProps, undefined)
+        : resolveLayoutProps(sidecar?.layoutProps, { ...context, data }),
+    } : {};
+    const plugins = await startPlugins();
     // Top-level data awaits load before the HTML, also before the first byte of a stream.
-    const { rendered, store, resources, styles: childStyles, head: collected } = await renderPageTree(module, input, stateStore, route, await startPlugins(), driverSignal, theme);
+    const { tree, layoutProps } = await renderWithLayoutProps(namedLayout?.name, declaredLayoutProps, stateStore, async (named, initial, seed) => {
+      const treeStyles: string[] = page.css ? [page.css] : [];
+      const { module, input } = await wrapInLayouts(options.loadPage, page, clientPage ? {} : props, match.route.layouts, treeStyles, named);
+      return { ...await renderPageTree(module, input, initial, route!, plugins, driverSignal, theme, options.document?.config?.idPrefix, seed), treeStyles };
+    }, namedLayout?.file, match.route.id);
+    const { rendered, store, resources, head: collected, teleports } = tree;
+    // A document places its teleports before the first byte, also in a stream; a navigation payload renders them in the browser.
+    const placed = wantsPayload(request) ? { app: rendered.html, body: "" } : documentBody(rendered.html, teleports, options.production ?? true);
     // Child components link their CSS in the document too, not only once the client bundle loads.
-    styles.push(...childStyles);
+    const styles = [...tree.treeStyles, ...tree.styles];
     pageStore = store;
     // head reads the state the render produced; anything it adds cannot change that render.
     const head: PageHead = payloadHead(clientPage ? {} : sidecar?.head?.({ ...context, state: store, data }) ?? {});
@@ -784,6 +906,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       head,
       ...(deferredEntries.length ? { deferred: deferredEntries } : {}),
       ...(resources ? { resources } : {}),
+      ...(namedLayout ? { layoutProps } : {}),
     });
     // Status, headers and cookies are final from here on: session changes still
     // in flight finish first and later ones fail with SESSION_LOCKED. A session
@@ -829,7 +952,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       const script = options.clientEntry ? `<script type="module" async${nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
       const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
       const parts = documentHead();
-      const opening = `${parts.prefix}${csrfMeta}${styleTags}${parts.head}${host.head}</head>${parts.bodyOpen}<div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}`;
+      const opening = `${parts.prefix}${csrfMeta}${styleTags}${parts.head}${host.head}</head>${parts.bodyOpen}<div id="app">${placed.app}</div>${placed.body}<script id="meeko-payload" type="application/json">${payload}</script>${script}`;
       return finish(new Response(body(opening, (text, id) => `<script type="application/json" data-meeko-deferred="${id}">${text}</script>`, `${host.bodyEnd}</body></html>`), {
         status: 200, headers: { "content-type": "text/html; charset=utf-8", ...streamHeaders },
       }), true);
@@ -842,7 +965,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     const script = options.clientEntry ? `<script type="module"${nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
     const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
     const parts = documentHead();
-    const document = `${parts.prefix}${csrfMeta}${styleTags}${parts.head}${host.head}</head>${parts.bodyOpen}<div id="app">${rendered.html}</div><script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
+    const document = `${parts.prefix}${csrfMeta}${styleTags}${parts.head}${host.head}</head>${parts.bodyOpen}<div id="app">${placed.app}</div>${placed.body}<script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
     return finish(new Response(headRequest ? null : document, {
       status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
     }), true);
@@ -869,14 +992,16 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
           const renderError = async (): Promise<Response> => {
             const errorPage = await options.loadPage(errorFile);
             // A failure after the render sealed the page state still renders its error page.
-            const { rendered: errorRendered, head: collected } = await renderPageTree(withHeadLevel(errorPage, 0), {
+            const { rendered: errorRendered, head: collected, teleports } = await renderPageTree(withLayoutWriter(withHeadLevel(errorPage, 0), serverLayoutWriter(undefined, {})), {
               status: known.status, message: known.status >= 500 ? "Internal Server Error" : known.code,
             }, pageStore.sealed ? new StateStore() : pageStore, route!,
             // Plugins that failed (perhaps the failure shown here) leave the error page without their values.
-            await startPlugins().catch(() => emptyPluginState), request.signal, theme);
+            await startPlugins().catch(() => emptyPluginState), request.signal, theme, options.document?.config?.idPrefix);
             const host = documentParts(options.document, request);
             const head = headDocument(options.document, host.nonce, collected, routeHeadInput({}, ERROR_PAGE_TITLE), undefined, theme);
-            const document = `${head.prefix}${head.head}${host.head}</head>${head.bodyOpen}<div id="app">${errorRendered.html}</div>${host.bodyEnd}</body></html>`;
+            // The error page is not hydrated, so a missing target only keeps its teleport in place.
+            const placed = documentBody(errorRendered.html, teleports, true);
+            const document = `${head.prefix}${head.head}${host.head}</head>${head.bodyOpen}<div id="app">${placed.app}</div>${placed.body}${host.bodyEnd}</body></html>`;
             return finish(new Response(request.method === "HEAD" ? null : document, {
               status: known.status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
             }), true);

@@ -13,7 +13,7 @@ function labels(template: string): string[] | undefined {
 
 test("component tags offer the list and condition directives, without the ones already there", () => {
   const offered = labels(`<AppCard\n  each:of="variants.value"\n  each:as="variant"\n  e|\n  bind:variant="variant"\n>`);
-  assert.deepEqual(offered, ["if:when", "each:key", "each:index", "bind:", "on:", "ref:", "model:"]);
+  assert.deepEqual(offered, ["if:when", "each:key", "each:index", "bind:", "on:", "ref:", "bind", "model:"]);
 });
 
 test("<snippet> offers name, params and if:when, without the ones already there", () => {

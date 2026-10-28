@@ -3,7 +3,7 @@ import { existsSync, statSync } from "node:fs";
 import ts from "@typescript/typescript6";
 import { applyAutoImports, autoImportedValues, discoverAutoImportsSync } from "../autoimports.js";
 import type { AutoImport } from "../autoimports.js";
-import { shadowedBuiltinTags } from "../compiler.js";
+import { awaitForReferences, shadowedBuiltinTags } from "../compiler.js";
 import { projectDeclarationFiles } from "../compiler/project-declarations.js";
 import { projectRoot } from "../compiler/project-root.js";
 import { GenericError, parseGeneric, sectionAttribute } from "../compiler/generic.js";
@@ -11,6 +11,7 @@ import type { GenericParameters } from "../compiler/generic.js";
 import { analyzePropsDefaults, PropsDefaultsError } from "../compiler/props.js";
 import { freeIdentifiers } from "../compiler/composables.js";
 import { templateEventDeclaration, templateEventType } from "../compiler/events.js";
+import { isCandidates } from "../compiler/dynamic-tag.js";
 import { scanInterpolations } from "../compiler/interpolation.js";
 import { MeekoCompileError, parseSfc } from "../compiler/sfc.js";
 import { analyzeServerScript } from "../compiler/server-script.js";
@@ -21,6 +22,9 @@ import { attributeValueStart, decodeTemplateText, isCustomElementTag, parseTempl
 import type { TemplateNode } from "../compiler/template.js";
 import { extractRouteRender } from "../framework/routes-discovery.js";
 import { builtinTag, builtinTagProp } from "./builtin-tags.js";
+import { aliasCandidates, aliasTsconfigPaths } from "../compiler/aliases.js";
+import { aliasesForScope, resolveProjectAliasesSync } from "../framework/aliases.js";
+import type { ProjectAliases } from "../framework/aliases.js";
 import type { BuiltinTag } from "./builtin-tags.js";
 
 /** Tramo equivalente entre el componente y el archivo TypeScript virtual. */
@@ -235,10 +239,10 @@ function jsdoc(...lines: string[]): string {
 const apiDocs = "https://github.com/meekojs/meeko/blob/main/docs/api.md";
 
 /**
- * `<MeekoThemeToggle>`: the virtual document declares it as the compiled component that Meeko
- * ships, so its props, its snippets and its hover come from that module, as for any tag.
+ * JSDoc of `<MeekoThemeToggle>`. The virtual document declares it as the compiled component that
+ * Meeko ships, so its props, its snippets and its hover come from that module, as for any tag.
  */
-const themeToggleDeclaration = `${jsdoc(
+const themeToggleDocs = jsdoc(
   "Etiqueta propia de Meeko (desde 1.4, con `theme` en `meeko.config.ts`): cambia el tema claro/oscuro.",
   "Pinta un icono por elección en `<span data-meeko-theme-icon>` y el CSS que Meeko añade a `<head>`",
   "muestra el de `data-theme-choice` de `<html>`, así que nunca salta. Sin JavaScript es un formulario",
@@ -258,7 +262,38 @@ const themeToggleDeclaration = `${jsdoc(
   "</MeekoThemeToggle>",
   "```",
   "@see https://github.com/meekojs/meeko/blob/main/docs/framework.md#meekothemetoggle",
-)}\ndeclare const MeekoThemeToggle: typeof import("@meekojs/meeko/internal").MeekoThemeToggle;\n`;
+);
+
+/** JSDoc of a built-in component with a module of its own, its own or from the editor's table. */
+function shippedTagDeclaration(tag: string): string {
+  if (tag === "MeekoThemeToggle") return themeToggleDocs;
+  if (tag === "MeekoAwait") return awaitDocs;
+  const entry = builtinTag(tag);
+  return entry ? jsdoc(entry.summary, "", `@see ${entry.guide}`) : "";
+}
+
+/**
+ * JSDoc of `<MeekoAwait>`: like `<MeekoThemeToggle>`, the compiled component that Meeko ships. Its
+ * `for` is an expression, and its content reads the data of `for` as loaded.
+ */
+const awaitDocs = jsdoc(
+  "Etiqueta propia de Meeko (desde 1.5): la zona de unos datos que llegan después del primer pintado,",
+  "el resultado de `useApi` o `useRpcQuery` sin `await`. Pinta el snippet `pending` en la primera carga,",
+  "`error` (con `error` y `retry`) si falla, y su contenido cuando hay datos, que conserva durante las",
+  "recargas (`refreshing`). `aria-busy` marca la zona mientras carga.",
+  "",
+  "- `for=\"items\"` o `for=\"[items, stats]\"`: los recursos, como expresión.",
+  "- `reserve`: mientras espera, la altura que tuvo con datos; `reserve=\"320px\"` añade un mínimo.",
+  "",
+  "@example",
+  "```html",
+  "<MeekoAwait for=\"items\" reserve>",
+  "  <snippet name=\"pending\"><ItemsSkeleton /></snippet>",
+  "  <ItemsList bind:items=\"items.data.value\" />",
+  "</MeekoAwait>",
+  "```",
+  "@see https://github.com/meekojs/meeko/blob/main/docs/framework.md#meekoawait",
+);
 
 /**
  * JSDoc de las macros de compilación. El documento virtual los antepone a sus declaraciones para
@@ -332,7 +367,8 @@ const macroDocs = {
     "Macro de compilación: declara un modelo, una señal escribible que el padre comparte con",
     "`model=\"señal\"` (el modelo sin nombre) o `model:nombre=\"señal\"`. El hijo lee y escribe la señal del",
     "padre; si el padre no pasa ninguna, usa una señal local creada con `default`. Un modelo sin",
-    "`default` es obligatorio para el padre.",
+    "`default` es obligatorio para el padre. El modelo sin nombre recibe las opciones solas:",
+    "`defineModel<string>({ default: \"\" })` lo hace opcional.",
     "",
     "Va en su propia declaración `const` de nivel superior y cada nombre se declara una sola vez (`MEEK063`).",
     "",
@@ -440,16 +476,30 @@ export const htmlDirectiveDocs = [
 ].join("\n");
 
 /** Type check of `html="..."`, declared only where the template has one. */
-/** Attributes of a component tag that are no static prop: `is`, `ref` and `html` (MEEK032) and the model `model`. */
-const reservedTagAttributes = new Set(["is", "ref", "html", "model"]);
+/** Attributes of a component tag that are no static prop: `is`, `ref` and `html` (MEEK032), the model `model` and `bind="obj"`. */
+const reservedTagAttributes = new Set(["is", "ref", "html", "model", "bind"]);
+
+/** Helpers of `<component is>` with an HTML tag and of `bind="obj"`, declared where the template has them. */
+const dynamicTagDeclarations = [
+  "declare function __meeko_tag_name(value: import(\"@meekojs/meeko\").TagName): void;",
+  "declare function __meeko_tag_of<const T extends string>(value: T): T;",
+  "declare function __meeko_dynamic(value: import(\"@meekojs/meeko\").TagName | import(\"@meekojs/meeko\").Component<never>): void;",
+  "declare function __meeko_component_part<T>(value: T): Exclude<T, string>;",
+  "",
+].join("\n");
+const spreadDeclarations = [
+  "declare function __meeko_spread<Tag extends string>(value: import(\"@meekojs/meeko\").ElementAttributes<Tag> | null | undefined): void;",
+  "declare function __meeko_props_spread<M>(component: M, value: { readonly [K in keyof __MeekoPropsOf<M>]?: __MeekoPropsOf<M>[K] } | null | undefined): void;",
+  "",
+].join("\n");
 
 const htmlDeclaration = `${jsdoc(...htmlDirectiveDocs.split("\n"))}\ndeclare function __meeko_html(html: string | null | undefined): void;\n`;
 
 /** Construye el TypeScript virtual que relaciona script y plantilla. */
 export function createVirtualComponent(source: string, filename: string, options: VirtualComponentOptions = {}): VirtualComponent {
   const document = parseSfc(source, filename);
-  /** `<MeekoThemeToggle>` in the template, unless a component of the project takes its name. */
-  let usesThemeToggle = false;
+  /** Built-in components with a module of their own (`<MeekoPopover>`), by tag. */
+  const shippedTags = new Map<string, string>();
   const spans: SourceSpan[] = [];
   let code = document.script.content;
   spans.push({
@@ -571,6 +621,10 @@ export function createVirtualComponent(source: string, filename: string, options
   const refs = new Map<string, { type: string; list: boolean }>();
   let listDepth = 0;
   let snippetDepth = 0;
+  /** Variables of the tags of `<component is>`, and whether the template needs their helpers or those of `bind="obj"`. */
+  let tagVariables = 0;
+  let dynamicTags = false;
+  let spreads = false;
   /** Copias sin mapear de la comprobación de etiqueta de cada ref a componente fuera de listas, para su tipo expuesto. */
   const refHelpers: string[] = [];
   /**
@@ -707,10 +761,19 @@ export function createVirtualComponent(source: string, filename: string, options
     const refDirective = attrs.find((attr) => attr.name.startsWith("ref:"));
     if (refDirective) {
       const name = /^[^\s=]+/.exec(source.slice(refDirective.start, refDirective.end))?.[0].slice(4) ?? "";
-      const reference = builtin ? undefined : node.componentName ?? (node.tagName === "component" ? attrs.find((attr) => attr.name === "is")?.value.trim() : undefined);
+      const dynamic = !builtin && node.componentName === undefined && node.tagName === "component" ? attrs.find((attr) => attr.name === "is")?.value.trim() : undefined;
+      const candidates = dynamic ? isCandidates(dynamic) : undefined;
+      // `<component is>` whose results are all tags is one of their elements; otherwise it may also be a component.
+      const tags = candidates && candidates.others.length === 0 ? candidates.tags.map((literal) => JSON.stringify(literal.tag)).join(" | ") : undefined;
+      const reference = builtin || tags ? undefined : node.componentName ?? dynamic;
       const listed = listDepth > 0 || list !== undefined;
       let type: string;
-      if (reference !== undefined && !listed && snippetDepth === 0 && reference.trim()) {
+      if (tags) type = `__MeekoElementOf<${tags}, false>`;
+      else if (candidates && candidates.tags.length > 0 && reference !== undefined && !listed && snippetDepth === 0) {
+        const helper = `__meeko_ref_${refHelpers.length}`;
+        refHelpers.push(`const ${helper} = () => (${reference});\n`);
+        type = `__MeekoElementOf<Extract<ReturnType<typeof ${helper}>, string>, false> | __MeekoExposedOf<Exclude<ReturnType<typeof ${helper}>, string>>`;
+      } else if (reference !== undefined && !listed && snippetDepth === 0 && reference.trim()) {
         // Like the compiled component, the exposed value comes from the tag check and its props.
         const helper = `__meeko_ref_${refHelpers.length}`;
         refHelpers.push(`const ${helper} = () => __meeko_tag((${reference}))(${tagProps(attrs)}, null!, null!, null!);\n`);
@@ -742,13 +805,30 @@ export function createVirtualComponent(source: string, filename: string, options
 
     // `<AppButton>` is `<component is="AppButton">` with the tag naming a script identifier.
     const componentName = builtin ? undefined : node.componentName;
-    const reference = componentName === undefined && node.tagName === "component" ? attrs.find((attr) => attr.name === "is") : undefined;
+    let reference = componentName === undefined && node.tagName === "component" ? attrs.find((attr) => attr.name === "is") : undefined;
     if (builtin) visitBuiltin(node, builtin);
+    // `<component is="href ? 'a' : 'button'">`: every result is a tag, so it is an element whose
+    // events and refs see the union of those elements, like the compiler's.
+    let tagType: string | undefined;
+    const referenceStart = reference ? attributeValueStart(source, reference) : undefined;
+    if (reference && referenceStart !== undefined && reference.value.trim()) {
+      const candidates = isCandidates(reference.value);
+      if (candidates.others.length === 0) {
+        // The mapped copy completes the tags that `is` admits; the other one keeps their literal types.
+        const variable = `__meeko_tag_${tagVariables++}`;
+        code += "__meeko_tag_name((";
+        mapped(reference.value, referenceStart);
+        code += `));\nconst ${variable} = __meeko_tag_of((${reference.value}));\n`;
+        tagType = `typeof ${variable}`;
+        dynamicTags = true;
+        reference = undefined;
+      }
+    }
     if (componentName !== undefined || reference) {
       const value = componentName ?? reference!.value;
       const valueStart = componentName !== undefined ? node.start + 1 : attributeValueStart(source, reference!) ?? reference!.start;
       if (componentName !== undefined) {
-        if (meekoTag?.name === "MeekoThemeToggle") usesThemeToggle = true;
+        if (meekoTag?.module) shippedTags.set(meekoTag.name, meekoTag.module);
         const endTag = node.selfClosing ? undefined : node.sourceCodeLocation?.endTag;
         componentTags.push({
           name: componentName,
@@ -759,14 +839,29 @@ export function createVirtualComponent(source: string, filename: string, options
       }
       // One tag call, like the compiled component: a generic child infers its type parameters from
       // the props, and they type the handlers, the models and the snippets.
-      code += "__meeko_tag((";
+      // `<component is>` may also give a tag: the props are checked against its components.
+      const dynamic = componentName === undefined;
+      // With a tag literal among its results, the first mapping of `is` completes the tags too.
+      const literals = dynamic && isCandidates(value).tags.length > 0;
+      if (literals) {
+        code += "void __meeko_dynamic((";
+        mapped(value, valueStart);
+        code += "));\n";
+        dynamicTags = true;
+      }
+      code += dynamic ? "__meeko_tag(__meeko_component_part((" : "__meeko_tag((";
       mapped(value, valueStart);
-      code += "))(";
+      code += dynamic ? ")))(" : "))(";
       mapped("{", valueStart);
       code += " ";
+      /** `bind="obj"`: its props come first, so the explicit ones win, as in the compiler. */
+      const spread = attrs.find((attribute) => attribute.name === "bind" && attribute.value.trim() !== "" && attributeValueStart(source, attribute) !== undefined);
+      if (spread) code += `...(${spread.value}), `;
       for (const attribute of attrs) {
         const rawName = /^[^\s=]+/.exec(source.slice(attribute.start, attribute.end))?.[0] ?? attribute.name;
         if (rawName.startsWith("bind:")) mapped(rawName.slice(5), attribute.start + 5);
+        // `<MeekoAwait for="items">`: `for` is an expression, as `bind:for`.
+        else if (rawName === "for" && meekoTag?.name === "MeekoAwait") mapped(rawName, attribute.start);
         else if (rawName.startsWith("on:") && rawName.length > 3) {
           // `on:save` sets the callback prop `onSave`; the event name keeps its own span.
           const event = rawName.slice(3);
@@ -809,12 +904,19 @@ export function createVirtualComponent(source: string, filename: string, options
       code += "}, ";
       visitModels(attrs);
       code += ", ";
-      // Children of `<AppDialog>` are snippets; `<component is>` rejects children (MEEK031).
-      if (componentName !== undefined) {
-        visitSnippets(node);
-        childrenVisited = true;
-      } else code += "{}";
+      // Children of `<AppDialog>` and, since 1.5, of `<component is>` are snippets.
+      // `<MeekoAwait for="items">` shows its content with the data: it reads `items.data.value` as loaded.
+      const forAttribute = meekoTag?.name === "MeekoAwait" ? attrs.find((attr) => /^(?:bind:)?for$/.test(rawNameOf(attr))) : undefined;
+      visitSnippets(node, forAttribute ? awaitForReferences(forAttribute.value).map(({ text }) => `${text}.data.value`) : []);
+      childrenVisited = true;
       code += ");\n";
+      if (spread) {
+        // The keys of `bind="obj"` are the child's props, which completion offers.
+        code += `__meeko_props_spread(${dynamic ? "__meeko_component_part(" : ""}(${value})${dynamic ? ")" : ""}, (`;
+        mapped(spread.value, attributeValueStart(source, spread)!);
+        code += "));\n";
+        spreads = true;
+      }
       for (const attribute of attrs) {
         const rawName = /^[^\s=]+/.exec(source.slice(attribute.start, attribute.end))?.[0] ?? attribute.name;
         if ((rawName !== "model" && !rawName.startsWith("model:")) || !attribute.value.trim()) continue;
@@ -823,9 +925,19 @@ export function createVirtualComponent(source: string, filename: string, options
         code += ");\n";
       }
       // After the tag call, whose mapping of the name comes first for hover and definition.
-      code += "void ((";
-      mapped(value, valueStart);
-      code += ") satisfies import(\"@meekojs/meeko\").Component<never>);\n";
+      if (dynamic) {
+        // A component or an HTML tag: completion offers both.
+        if (!literals) {
+          code += "void __meeko_dynamic((";
+          mapped(value, valueStart);
+          code += "));\n";
+        }
+        dynamicTags = true;
+      } else {
+        code += "void ((";
+        mapped(value, valueStart);
+        code += ") satisfies import(\"@meekojs/meeko\").Component<never>);\n";
+      }
     } else if (node.tagName === "render") {
       // `<render snippet="snippets.x" args="a, b" />`: the arguments must match the snippet.
       const snippet = attrs.find((attr) => attr.name === "snippet");
@@ -869,13 +981,23 @@ export function createVirtualComponent(source: string, filename: string, options
         }
       }
       for (const attr of elementAttrs) {
-        if (!/^(?:bind|on|if|each):/.test(attr.name) && !(element.tagName === "component" && attr.name === "is")) continue;
+        // `bind="obj"`: its keys are the attributes of the tag, which completion offers.
+        if (attr.name === "bind" && directives) {
+          const start = attributeValueStart(source, attr);
+          if (start === undefined || !attr.value.trim()) continue;
+          code += `__meeko_spread<${tagType ?? JSON.stringify(element.tagName ?? "")}>((`;
+          mapped(attr.value, start);
+          code += "));\n";
+          spreads = true;
+          continue;
+        }
+        if (!/^(?:bind|on|if|each):/.test(attr.name) && !(element.tagName === "component" && attr.name === "is" && tagType === undefined)) continue;
         if (["each:of", "each:as", "each:index"].includes(attr.name)) continue;
         if (attr === condition && narrows) continue;
         const start = attributeValueStart(source, attr);
         if (start === undefined) continue;
         if (attr.name.startsWith("on:")) {
-          const eventType = templateEventType("__Meeko", attr.name.slice(3), element.tagName ?? "", element.namespaceURI === "http://www.w3.org/2000/svg");
+          const eventType = templateEventType("__Meeko", attr.name.slice(3), element.tagName ?? "", element.namespaceURI === "http://www.w3.org/2000/svg", tagType);
           code += `void (((__meeko_handler: (event: ${eventType}) => unknown) => __meeko_handler)(`;
           mapped(attr.value, start);
           code += "));\n";
@@ -932,16 +1054,23 @@ export function createVirtualComponent(source: string, filename: string, options
    * Children of a component tag: loose content fills `default` and each `<snippet name params>`
    * fills its snippet, as a function whose parameters the child's defineSnippets types.
    */
-  const visitSnippets = (node: TemplateNode): void => {
+  const visitSnippets = (node: TemplateNode, defaultNarrowing: readonly string[] = []): void => {
     const children = node.childNodes ?? [];
     const loose = children.filter((child) => child.tagName !== "snippet");
+    /** The default snippet also runs behind `defaultNarrowing` (the data of `<MeekoAwait for>`). */
+    const narrowDefault = (): number => {
+      for (const text of defaultNarrowing) guards.push({ text, names: new Set(freeIdentifiers(text).map(({ name }) => name)) });
+      return defaultNarrowing.length;
+    };
     snippetDepth++;
     code += "{ ";
     if (loose.some((child) => child.nodeName !== "#comment" && (child.nodeName !== "#text" || Boolean(child.value?.trim())))) {
       code += "\"default\": __meeko_snippet(() => {\n";
+      const pushed = narrowDefault();
       const guarded = reguard([]);
       for (const child of loose) visit(child);
       code += guarded ? "}\n}),\n" : "}),\n";
+      guards.splice(guards.length - pushed, pushed);
     }
     for (const child of children) {
       if (child.tagName !== "snippet") continue;
@@ -975,9 +1104,11 @@ export function createVirtualComponent(source: string, filename: string, options
         mapped(paramsAttribute.value, paramsStart);
       }
       code += ") => {\n";
+      const pushed = name === "default" ? narrowDefault() : 0;
       const guarded = reguard((paramsAttribute?.value ?? "").split(",").map((param) => param.trim()).filter(Boolean));
       for (const grandchild of child.childNodes ?? []) visit(grandchild);
       code += guarded ? "}\n})" : "})";
+      guards.splice(guards.length - pushed, pushed);
       if (conditional) {
         code += " : undefined!";
         guards.pop();
@@ -1002,7 +1133,10 @@ export function createVirtualComponent(source: string, filename: string, options
   code += channelDeclarations;
   if (code.includes("__meeko_snippet(") || code.includes("__meeko_render(")) code += snippetDeclarations;
   if (code.includes("__meeko_html(")) code += htmlDeclaration;
-  if (usesThemeToggle) code += themeToggleDeclaration;
+  if (dynamicTags) code += dynamicTagDeclarations;
+  if (spreads) code += spreadDeclarations;
+  // `<MeekoThemeToggle>`, `<MeekoAwait>`, `<MeekoPopover>` and `<MeekoSelect>` are the compiled modules that the component imports.
+  for (const [tag, module] of shippedTags) code += `${shippedTagDeclaration(tag)}\ndeclare const ${tag}: typeof import(${JSON.stringify(module)});\n`;
   if (code.includes("__MeekoEventOf<")) code += `${templateEventDeclaration}\n`;
   // `useElementRef` is a compiler macro typed from the template, like the compiled component.
   code += "type __MeekoExposedOf<M> = M extends { readonly hydrateScope: (...args: never[]) => infer R } ? R extends { readonly exposed?: infer E } ? (unknown extends E ? null : E) : null : null;\n";
@@ -1092,9 +1226,14 @@ export function componentFiles(script: ts.SourceFile, filename: string, registry
     const specifier = statement.moduleSpecifier.text;
     const clause = statement.importClause;
     const names = [clause?.name?.text, clause?.namedBindings && ts.isNamespaceImport(clause.namedBindings) ? clause.namedBindings.name.text : undefined];
+    // A component imported through a path alias (`@/components/Card.meeko`): the first file that exists.
+    const aliased = !specifier.startsWith(".") && specifier.endsWith(".meeko")
+      ? aliasCandidates(resolveProjectAliasesSync(projectRoot(filename)).aliases, specifier)?.find((candidate) => existsSync(candidate))
+      : undefined;
     for (const name of names) {
       if (!name) continue;
       if (specifier.startsWith(".") && specifier.endsWith(".meeko")) files.set(name, resolve(dirname(filename), specifier));
+      else if (aliased) files.set(name, aliased);
       else files.delete(name);
     }
   }
@@ -1186,20 +1325,41 @@ const emitOptions = [
 ] as const;
 
 /**
+ * Adds the project's path aliases (`~/`, `@/`, `#shared/`, `#server/` and those of `alias`) to
+ * `options.paths` as absolute targets, every one of them: a component's `<script server>` sees
+ * `#server/`, and `MEEK108` stops it in the `<script>`. The project's own `paths` win.
+ */
+function withAliasPaths(options: ts.CompilerOptions, directory: string, project: ProjectAliases): ts.CompilerOptions {
+  const own = aliasTsconfigPaths(aliasesForScope(project.aliases, "all"), (target) => target.replaceAll("\\", "/"), {
+    root: directory, directory: join(directory, ".meeko", "types"),
+  });
+  if (Object.keys(own).length === 0) return options;
+  const result: ts.CompilerOptions = { ...options, paths: { ...own, ...options.paths } };
+  // `paths` without `baseUrl` resolve from the tsconfig's folder; the aliases are absolute.
+  if (result.baseUrl === undefined && (result as Record<string, unknown>)["pathsBasePath"] === undefined) {
+    (result as Record<string, unknown>)["pathsBasePath"] = directory;
+  }
+  return result;
+}
+
+/**
  * Lee el tsconfig.json de la raíz del proyecto. El editor conserva sus opciones de tipos
  * (paths, lib, types, strict...) y sólo fuerza lo necesario para analizar componentes:
- * sin emisión, extensiones arbitrarias y `rootDirs` sobre `.meeko/types`.
+ * sin emisión, extensiones arbitrarias y `rootDirs` sobre `.meeko/types`. Añade a `paths` los
+ * aliases de ruta del proyecto (`aliases`, o los de su configuración leída sin ejecutarla); los
+ * `paths` propios del tsconfig ganan.
  */
-export function resolveProjectCompilerOptions(root: string): ProjectCompilerOptions {
+export function resolveProjectCompilerOptions(root: string, aliases?: ProjectAliases): ProjectCompilerOptions {
   const directory = resolve(root);
+  const project = aliases ?? resolveProjectAliasesSync(directory);
   const configFile = join(directory, "tsconfig.json");
-  if (!existsSync(configFile)) return { options: defaultCompilerOptions(directory), fileNames: [] };
+  if (!existsSync(configFile)) return { options: withAliasPaths(defaultCompilerOptions(directory), directory, project), fileNames: [] };
   let failed = false;
   const parsed = ts.getParsedCommandLineOfConfigFile(configFile, {}, {
     ...ts.sys,
     onUnRecoverableConfigFileDiagnostic: () => { failed = true; },
   });
-  if (!parsed || failed) return { options: defaultCompilerOptions(directory), fileNames: [], configFile };
+  if (!parsed || failed) return { options: withAliasPaths(defaultCompilerOptions(directory), directory, project), fileNames: [], configFile };
   const options: ts.CompilerOptions = { ...parsed.options };
   for (const key of emitOptions) delete options[key];
   options.noEmit = true;
@@ -1210,7 +1370,7 @@ export function resolveProjectCompilerOptions(root: string): ProjectCompilerOpti
   }
   options.rootDirs = rootDirs;
   const fileNames = parsed.fileNames.filter((file) => /\.(?:[cm]?ts|tsx)$/.test(file) && !file.endsWith(".meeko.ts") && !file.endsWith(`.meeko${serverVirtualSuffix}`));
-  return { options, fileNames, configFile };
+  return { options: withAliasPaths(options, directory, project), fileNames, configFile };
 }
 
 /** Versión de un archivo en disco para que TypeScript detecte cambios guardados. */

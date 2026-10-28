@@ -1,5 +1,6 @@
 import { componentErrorReporter } from "./component-errors.js";
 import { observeCallback } from "./error-observer.js";
+import { enterIdInstance } from "./ids.js";
 import { currentEffectOwner, onCleanup, switchOwner, untrack } from "./reactivity.js";
 
 /**
@@ -86,13 +87,19 @@ export function enterMountedScope(): () => void {
 
 /**
  * Runs a component setup and collects its `onMounted` callbacks into `queue`; `null` discards
- * them. The generated module calls it; it is not part of the public API.
+ * them. It also starts the `useId` counter of the instance. The generated module calls it; it is
+ * not part of the public API.
  */
 export function collectMounted<T>(queue: MountedCallback[] | null, setup: () => T): T {
   const previous = activeQueue;
   activeQueue = queue;
+  // Each run of a component script is one instance: its `useId` calls count from zero.
+  const restoreIds = enterIdInstance();
   try { return setup(); }
-  finally { activeQueue = previous; }
+  finally {
+    activeQueue = previous;
+    restoreIds();
+  }
 }
 
 /** `onMounted` callbacks of one hydrated component, waiting for the end of its mount batch. */

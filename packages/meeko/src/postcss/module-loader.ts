@@ -116,6 +116,15 @@ async function importModule(file: string, autoImports: UtilityAutoImports | unde
       async resolveId(source, importer, extra) {
         if (!importer || source.startsWith("\0") || isRelativeOrAbsolute(source)) return null;
         if (isBuiltin(source)) return { id: source, external: true };
+        // A path alias of the Meeko project (`@/utils/tokens`) names local code: bundle and watch it.
+        const aliased = isAbsolute(importer) && !/[\\/]node_modules[\\/]/.test(importer) ? autoImports?.resolveAlias?.(source, importer) : undefined;
+        if (aliased) {
+          for (const candidate of aliased) {
+            const resolved = await this.resolve(candidate, importer, { ...extra, skipSelf: true });
+            if (resolved) return resolved;
+          }
+          return null;
+        }
         const resolved = await this.resolve(source, importer, { ...extra, skipSelf: true });
         if (!resolved || resolved.external || !isAbsolute(resolved.id)) return resolved;
         // A tsconfig path or `#imports` alias of the same package is local code: bundle and watch it.

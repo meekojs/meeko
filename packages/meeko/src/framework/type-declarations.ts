@@ -3,7 +3,8 @@ import { join, relative, resolve } from "node:path";
 import { generateTypeScriptAutoImports } from "../autoimports-ts.js";
 import { generateAppTypes } from "./check-app.js";
 import type { AppTypesOptions } from "./check-app.js";
-import { resolveConfigSources } from "./config.js";
+import { frameworkTsconfigPaths, resolveProjectAliases } from "./aliases.js";
+import { loadMeekoConfig, resolveConfigSources } from "./config.js";
 import { generateServerContracts } from "./contracts-generate.js";
 import { generateRoutes } from "./generate.js";
 import { generatePageContracts } from "./page-contracts-generate.js";
@@ -41,7 +42,9 @@ async function writeIfChanged(file: string, source: string): Promise<void> {
 /** Keeps TypeScript's three execution scopes under Meeko's generated directory. */
 export async function generateFrameworkTsconfigs(projectRoot: string): Promise<string[]> {
   const generatedRoot = join(resolve(projectRoot), ".meeko");
-  const sourceRoots = (await resolveConfigSources(projectRoot)).map(({ root }) => relative(generatedRoot, root).replaceAll("\\", "/"));
+  const config = await loadMeekoConfig(projectRoot);
+  const sourceRoots = (await resolveConfigSources(projectRoot, config)).map(({ root }) => relative(generatedRoot, root).replaceAll("\\", "/"));
+  const aliases = await resolveProjectAliases(projectRoot, config);
   await mkdir(generatedRoot, { recursive: true });
   const configs: string[] = [];
   for (const name of projectNames) {
@@ -60,8 +63,10 @@ export async function generateFrameworkTsconfigs(projectRoot: string): Promise<s
         excludes.push(`${root}/shared/**/*.client.ts`, `${root}/shared/**/*.server.ts`);
       }
     }
+    // `#server/` only in the server project, `@/` not in shared/: see `aliasesForScope`.
+    const paths = frameworkTsconfigPaths(projectRoot, aliases, name === "app" ? "client" : name, generatedRoot);
     const source = JSON.stringify({
-      compilerOptions: { ...compilerOptions, rootDirs: name === "shared" ? undefined : ["..", "./types"] },
+      compilerOptions: { ...compilerOptions, rootDirs: name === "shared" ? undefined : ["..", "./types"], ...(Object.keys(paths).length ? { paths } : {}) },
       include: includes,
       ...(excludes.length ? { exclude: excludes } : {}),
     }, null, 2) + "\n";

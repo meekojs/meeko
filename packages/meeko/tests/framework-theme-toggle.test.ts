@@ -51,17 +51,17 @@ test("the compiled <MeekoThemeToggle> that the package ships is up to date with 
     assert.equal(await readFile(output, "utf8"), code, `${output} is stale: run pnpm run builtins`);
   }
   // The form posts to the endpoint of the server.
-  assert.match(await readFile("src/framework/MeekoThemeToggle.meeko", "utf8"), new RegExp(`action="${THEME_ENDPOINT}"`));
+  assert.match(await readFile("src/builtins/MeekoThemeToggle.meeko", "utf8"), new RegExp(`action="${THEME_ENDPOINT}"`));
 });
 
 test("<MeekoThemeToggle> is the component that Meeko ships, with its props and snippets, and MEEK111 without theme", async () => {
   const { code } = compile(`<template>${iconToggle}<MeekoThemeToggle mode="select" bind:themes="['light', 'dark']" /></template>`, "/project/app/components/Nav.meeko");
-  assert.match(code, /__meeko\.renderComponent<any>\(0, __meeko\.MeekoThemeToggle, __meeko\.componentTag\(\(\) => __meeko\.MeekoThemeToggle\)\(\{ "class": "toggle" \}/);
+  assert.match(code, /__meeko\.renderComponent<any>\(0, __meeko_MeekoThemeToggle, __meeko\.componentTag\(\(\) => __meeko_MeekoThemeToggle\)\(\{ "class": "toggle" \}/);
   assert.match(code, /"light": __meeko\.snippet\(/);
   assert.match(code, /"system": __meeko\.snippet\(/);
   assert.match(code, /\{ "mode": "select", "themes": \['light', 'dark'\] \}/);
   // Its module counts among the children that a navigation may need to load.
-  assert.match(code, /__meekoChildren[^\n]*= \(\) => \[__meeko\.MeekoThemeToggle\]/);
+  assert.match(code, /__meekoChildren[^\n]*= \(\) => \[__meeko_MeekoThemeToggle\]/);
   // The project's theme decides whether the tag exists; a caller that does not know compiles it.
   assert.equal(errorCode(`<template>${iconToggle}</template>`, { theme: false }), "MEEK111");
   assert.equal(errorCode(`<template>${iconToggle}</template>`, { theme: true }), undefined);
@@ -72,7 +72,7 @@ test("a project component named MeekoThemeToggle wins over the built-in tag, wit
   const source = "<template><MeekoThemeToggle variant=\"x\" /></template>";
   const autoimported = compile(source, "/project/app/components/Nav.meeko", { projectComponents: ["MeekoThemeToggle"], theme: false });
   assert.match(autoimported.code, /__meeko\.renderComponent<any>\(0, MeekoThemeToggle,/);
-  assert.doesNotMatch(autoimported.code, /__meeko\.MeekoThemeToggle/);
+  assert.doesNotMatch(autoimported.code, /__meeko_MeekoThemeToggle/);
   assert.deepEqual(autoimported.warnings?.map((warning) => warning.code), ["MEEK106"]);
   assert.match(autoimported.warnings![0]!.message, /el selector del tema de theme/);
   const declared = compile("<script lang=\"ts\">\nimport MeekoThemeToggle from \"./Toggle.meeko\";\n</script>\n<template><MeekoThemeToggle /></template>", "/project/app/components/Nav.meeko");
@@ -91,7 +91,7 @@ test("meeko check and the editor read theme from meeko.config.* without running 
     const source = `<template>${iconToggle}</template>`;
     // Without a configuration nothing is known: the folder may be a layer with its own package.json.
     assert.equal(readThemeEnabledSync(root), undefined, "no configuration");
-    assert.match((await compileWithAutoImports(source, filename, {}, "client", [])).code, /__meeko\.MeekoThemeToggle/);
+    assert.match((await compileWithAutoImports(source, filename, {}, "client", [])).code, /__meeko_MeekoThemeToggle/);
     await writeFile(join(root, "meeko.config.mjs"), "export default {};\n");
     await assert.rejects(compileWithAutoImports(source, filename, {}, "client", []), /MEEK111/);
     const cases: Array<[string, boolean | undefined]> = [
@@ -108,7 +108,7 @@ test("meeko check and the editor read theme from meeko.config.* without running 
       assert.equal(readThemeEnabledSync(root), expected, config);
     }
     await writeFile(join(root, "meeko.config.mjs"), "export default { theme: true };\n");
-    assert.match((await compileWithAutoImports(source, filename, {}, "client", [])).code, /__meeko\.MeekoThemeToggle/);
+    assert.match((await compileWithAutoImports(source, filename, {}, "client", [])).code, /__meeko_MeekoThemeToggle/);
   } finally {
     await project.remove();
   }
@@ -292,6 +292,7 @@ async function loadModules(): Promise<{ modules: Record<string, ClientComponent>
   for (const [file, source] of Object.entries(sources)) {
     const code = compile(source, join(directory, file), { theme: true }).code
       .replaceAll(`from "@meekojs/meeko/internal"`, `from ${runtimePath("src/internal.ts")}`)
+      .replaceAll(`from "@meekojs/meeko/builtins/theme-toggle"`, `from ${runtimePath("src/builtins/theme-toggle.compiled.ts")}`)
       .replaceAll(`from "@meekojs/meeko/framework"`, `from ${runtimePath("src/framework.ts")}`)
       .replaceAll(`from "@meekojs/meeko"`, `from ${runtimePath("src/index.ts")}`);
     await writeFile(join(directory, file.replace(/\.meeko$/, ".ts")), code);

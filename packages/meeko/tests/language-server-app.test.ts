@@ -187,3 +187,32 @@ describe("language server: routes, API and RPC", () => {
     assert.deepEqual(hints, [[list.offset("user\" each:key", 4), ": User"], [list.offset("entry\">", 5), ": User"]]);
   });
 });
+
+describe("language server: named layouts", () => {
+  let workspace: LanguageProject;
+  let component: OpenedComponent;
+
+  before(async () => {
+    workspace = await languageProject("lsp-layouts-", {
+      "app/layouts/default.meeko": "<template><main><MeekoOutlet /></main></template>\n",
+      "app/layouts/dashboard.meeko": "<script lang=\"ts\">\nexport interface Props { title?: string }\nconst props = defineProps<Props>();\n</script>\n<template><h1>{props.title}</h1><MeekoOutlet /></template>\n",
+      "app/pages/index.meeko": "<template><p>Inicio</p></template>\n",
+      "app/pages/panel.meeko": "<script server lang=\"ts\">\nexport const route = definePage({ layout: \"dashboard\" });\n</script>\n<template><p>Panel</p></template>\n",
+    });
+    await workspace.project.ready();
+    component = await workspace.open("app/pages/panel.meeko");
+  });
+
+  after(async () => {
+    await workspace?.dispose();
+  });
+
+  test("the layout of definePage shows its file and pages and goes to the layout", () => {
+    assert.deepEqual(Object.keys(component.app?.layouts ?? {}).sort(), ["dashboard", "default"]);
+    const text = (hover(component, component.at("\"dashboard\"", 2))?.contents as MarkupContent | undefined)?.value ?? "";
+    assert.match(text, /\*\*Layout\*\* `dashboard` → \[app\/layouts\/dashboard\.meeko\]\(file:/);
+    assert.match(text, /páginas: `\/panel`/);
+    const [target] = definition(component, component.at("\"dashboard\"", 2)) as Location[];
+    assert.equal(fileURLToPath(target!.uri).toLowerCase(), workspace.file("app/layouts/dashboard.meeko").toLowerCase());
+  });
+});

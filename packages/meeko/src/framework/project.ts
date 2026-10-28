@@ -24,7 +24,7 @@ import { discoverErrorPage } from "./routes-discovery.js";
 import { robotsTxt, siteFilesOptions, sitemapPathnames, sitemapXml } from "./site-files.js";
 import { assertStaticApp, previewStatic, writeStaticOutput } from "./static-adapter.js";
 import type { ResolvedModules } from "./module-loader.js";
-import { createDevAppReloader, isDiscoverySource } from "./dev-watch.js";
+import { createDevAppReloader, isDiscoverySource, isRouteOptionsSource, routeOptionsKey } from "./dev-watch.js";
 import { supervisedHmrPortEnv, supervisedPortEnv } from "./dev-link.js";
 import { devHmrHost, devPortInUse, resolveDevPorts } from "./dev-port.js";
 import type { MeekoAdapterName } from "./config-type.js";
@@ -525,6 +525,8 @@ async function startDevelopment(root: string): Promise<Server> {
   let serverLogs: DevServerLogs | undefined;
   /** Rebuilds the app when a discovery source is added or removed; set once the app exists. */
   let onTreeChange: ((file: string) => void) | undefined;
+  /** Rebuilds the app when an edit changes the render or layout of a route; set once the app exists. */
+  let onOptionsChange: ((file: string) => void) | undefined;
   /** Runs a Vite restart once the app's work in flight drains, and rebuilds the app after it; set once the app exists. */
   let onRestart: ((start: () => Promise<void>) => Promise<void>) | undefined;
   // The processed global stylesheet on disk, for editor tools that read class names from CSS files.
@@ -557,6 +559,7 @@ async function startDevelopment(root: string): Promise<Server> {
         configureServer(server) {
           server.watcher.on("add", (file) => onTreeChange?.(file));
           server.watcher.on("unlink", (file) => onTreeChange?.(file));
+          server.watcher.on("change", (file) => onOptionsChange?.(file));
         },
       }, {
         name: "meeko:dev-restart",
@@ -685,6 +688,18 @@ async function startDevelopment(root: string): Promise<Server> {
       return next;
     });
     onTreeChange = (file) => { if (isDiscoverySource(resolve(file), sourceRoots)) reloader.rebuild(); };
+    // Since 1.5 an edit inside a page, a sidecar or a +group.ts may change a route's layout (or
+    // its render): the manifest the app was created with changes, so the app is built again.
+    let routeOptions = routeOptionsKey(await discoverConfiguredRoutes(root));
+    onOptionsChange = (file) => {
+      if (!isRouteOptionsSource(resolve(file), sourceRoots)) return;
+      void discoverConfiguredRoutes(root).then((routes) => {
+        const next = routeOptionsKey(routes);
+        if (next === routeOptions) return;
+        routeOptions = next;
+        reloader.rebuild();
+      }, () => reloader.rebuild());
+    };
     onRestart = (start) => {
       const restarted = reloader.restart(start);
       // The new server starts with an empty module graph: transforming the stylesheet fills in its dependencies again.

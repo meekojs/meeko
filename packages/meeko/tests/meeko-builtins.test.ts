@@ -7,7 +7,9 @@ import { compile, shadowedBuiltinTags } from "../src/compiler.ts";
 import { MeekoCompileError } from "../src/compiler/sfc.ts";
 import { directiveNameCompletion } from "../src/language-server/features.ts";
 import { linkRouteCompletion } from "../src/language-server/nav.ts";
-import { linkCurrent } from "../src/link.ts";
+import { linkCurrent, routeCurrent } from "../src/link.ts";
+import { fixedRoute } from "../src/framework/navigation.ts";
+import { activateRouteManifest, createRouteManifest } from "../src/framework/router.ts";
 import type { RouteRecord } from "../src/framework/router.ts";
 
 const layout = "/project/app/layouts/default.meeko";
@@ -78,6 +80,78 @@ test("aria-current compares the path of the link, without its query or fragment"
   assert.equal(linkCurrent(route, "/users/8"), undefined);
 });
 
+test("match=\"prefix\" marks the section with aria-current=\"true\", by whole segments", () => {
+  const at = (path: string) => ({ path: { value: path } });
+  // Exact, the default: only the link's own path, without its query or fragment.
+  assert.equal(linkCurrent(at("/dashboard"), "/dashboard"), "page");
+  assert.equal(linkCurrent(at("/dashboard/stats"), "/dashboard"), undefined);
+  assert.equal(linkCurrent(at("/dashboard/stats"), "/dashboard", "exact"), undefined);
+  // Prefix: the same page is still "page"; a route below it is the current section.
+  assert.equal(linkCurrent(at("/dashboard"), "/dashboard", "prefix"), "page");
+  assert.equal(linkCurrent(at("/dashboard/stats"), "/dashboard", "prefix"), "true");
+  assert.equal(linkCurrent(at("/dashboard/stats/2026"), "/dashboard?tab=a#top", "prefix"), "true", "query and fragment are ignored");
+  assert.equal(linkCurrent(at("/dashboard/"), "/dashboard", "prefix"), "true");
+  assert.equal(linkCurrent(at("/dashboard/stats"), "/dashboard/", "prefix"), "true", "a trailing slash on the link is the same section");
+  // Whole segments: /dash does not cover /dashboard, /dashboard does not cover /dashboards.
+  assert.equal(linkCurrent(at("/dashboard"), "/dash", "prefix"), undefined);
+  assert.equal(linkCurrent(at("/dashboards"), "/dashboard", "prefix"), undefined);
+  assert.equal(linkCurrent(at("/dashboard"), "/dashboard/stats", "prefix"), undefined, "a deeper link is not active on its parent");
+  // "/" with prefix only matches itself: otherwise it would cover every page.
+  assert.equal(linkCurrent(at("/"), "/", "prefix"), "page");
+  assert.equal(linkCurrent(at("/dashboard"), "/", "prefix"), undefined);
+  assert.equal(linkCurrent(at("/"), "/?q=1", "prefix"), "page");
+  // Dynamic routes compare the href with its params, encoded as href() encodes them.
+  assert.equal(linkCurrent(at("/users/a%20b/posts"), "/users/a%20b", "prefix"), "true");
+  assert.equal(linkCurrent(at("/users/a%20b/posts"), "/users/a b", "prefix"), "true");
+  assert.equal(linkCurrent(at("/users/a%20bc/posts"), "/users/a%20b", "prefix"), undefined);
+  assert.equal(linkCurrent(at("/categor%C3%ADas/men%C3%BA"), "/categorías", "prefix"), "true");
+  assert.equal(routeCurrent("/categor%C3%ADas/men%C3%BA", "/categor%C3%ADas", false), false);
+  // Anything but "prefix" from bind:match compares exactly.
+  assert.equal(linkCurrent(at("/dashboard/stats"), "/dashboard", "other" as "exact"), undefined);
+});
+
+test("useRoute().isActive has the rule of <MeekoLink>, with typed params and prefix", () => {
+  const routes = createRouteManifest([
+    { id: "/", file: "index.meeko", layouts: [] },
+    { id: "/dashboard", file: "dashboard.meeko", layouts: [] },
+    { id: "/dashboards", file: "dashboards.meeko", layouts: [] },
+    { id: "/users/[id]", file: "user.meeko", layouts: [] },
+  ]);
+  const route = (path: string) => fixedRoute({ url: path, path, id: null, params: {}, search: {} });
+  const release = activateRouteManifest(routes);
+  try {
+    const stats = route("/dashboard/stats");
+    assert.equal(stats.isActive("/dashboard"), false);
+    assert.equal(stats.isActive("/dashboard", { prefix: true }), "true");
+    assert.equal(stats.isActive("/dashboards", { prefix: true }), false);
+    assert.equal(stats.isActive("/", { prefix: true }), false, "/ only matches itself");
+    assert.equal(route("/").isActive("/", { prefix: true }), "page");
+    assert.equal(route("/dashboard").isActive("/dashboard", { prefix: true }), "page");
+    const user = route("/users/a%20b/posts");
+    assert.equal(user.isActive("/users/[id]", { params: { id: "a b" }, prefix: true }), "true");
+    assert.equal(user.isActive("/users/[id]", { params: { id: "a" }, prefix: true }), false);
+    assert.equal(route("/users/a%20b").isActive("/users/[id]", { params: { id: "a b" } }), "page");
+    assert.throws(() => stats.isActive("/missing"), /Unknown route/);
+    assert.throws(() => stats.isActive("/users/[id]", { params: {} as { id: string } }), /Missing route parameter/);
+  } finally {
+    release();
+  }
+});
+
+test("a <MeekoLink> passes match=\"prefix\" or bind:match to aria-current, and rejects any other value", () => {
+  const prefix = compile("<template><MeekoLink to=\"/docs\" match=\"prefix\">Docs</MeekoLink></template>", layout).code;
+  assert.match(prefix, /__meeko\.linkCurrent\(__meeko_route, "\/docs", "prefix"\)/);
+  assert.doesNotMatch(prefix, /match=/, "match is not an attribute of the <a>");
+  const exact = compile("<template><MeekoLink to=\"/docs\" match=\"exact\">Docs</MeekoLink></template>", layout).code;
+  assert.match(exact, /__meeko\.linkCurrent\(__meeko_route, "\/docs"\)/);
+  const bound = compile("<script lang=\"ts\">\nconst mode = signal<\"exact\" | \"prefix\">(\"prefix\");\n</script>\n<template><MeekoLink to=\"/users/[id]\" bind:params=\"{ id: '7' }\" bind:match=\"mode.value\">x</MeekoLink></template>", layout).code;
+  assert.match(bound, /__meeko\.linkCurrent\(__meeko_route, __meeko_href\([^\n]*\), mode\.value\)/);
+  assert.match(bound, /bindAttribute\(__scope, 0, "aria-current", \(\) => \(__meeko\.linkCurrent\(__meeko_route, [^\n]*mode\.value\)\)/);
+  assert.equal(errorCode("<template><MeekoLink to=\"/\" match=\"partial\">x</MeekoLink></template>", layout), "MEEK105");
+  assert.equal(errorCode("<template><MeekoLink to=\"/\" match>x</MeekoLink></template>", layout), "MEEK105");
+  assert.equal(errorCode("<template><MeekoLink to=\"/\" match=\"prefix\" bind:match=\"'exact'\">x</MeekoLink></template>", layout), "MEEK105");
+});
+
 test("a static <MeekoLink> with a non-ASCII path is encoded like href() and matches the route's path", () => {
   const { code } = compile("<template><MeekoLink to=\"/categorías/menú\">Categorías</MeekoLink></template>", layout);
   assert.match(code, / href=\\"\/categor%C3%ADas\/men%C3%BA\\"/, "the HTML href is the encoded path");
@@ -130,7 +204,9 @@ test("the editor completes the attributes of <MeekoLink> and the routes of to=\"
   const text = `<script lang="ts"></script>\n<template><MeekoLink c></MeekoLink><MeekoLink to=""></MeekoLink></template>`;
   const document = TextDocument.create("file:///Nav.meeko", "meeko", 1, text);
   const attributes = directiveNameCompletion(document, document.positionAt(text.indexOf("MeekoLink c") + 11))!.map((item) => item.label);
-  assert.deepEqual(attributes.slice(0, 3), ["to", "bind:params", "bind:search"]);
+  assert.deepEqual(attributes.slice(0, 4), ["to", "bind:params", "bind:search", "match"]);
+  const match = directiveNameCompletion(document, document.positionAt(text.indexOf("MeekoLink c") + 11))!.find((item) => item.label === "match");
+  assert.equal((match?.textEdit as { newText?: string } | undefined)?.newText, 'match="${1|exact,prefix|}"');
   assert.ok(attributes.includes("on:") && attributes.includes("if:when") && attributes.includes("class"), JSON.stringify(attributes));
   assert.ok(!attributes.includes("href") && !attributes.includes("model:"), "the href is built; MeekoLink is not a component");
   const routes: RouteRecord[] = [

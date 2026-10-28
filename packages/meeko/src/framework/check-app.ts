@@ -5,6 +5,7 @@ import { checkSource } from "../check.js";
 import { MeekoCompileError } from "../compiler/sfc.js";
 import type { CompileDiagnostic } from "../compiler/sfc.js";
 import { componentTypeDeclarationMarker, componentTypesPath, generateTypes } from "../types.js";
+import { checkAliasScopes, resolveProjectAliases } from "./aliases.js";
 import { loadConfiguredModules, resolveConfigSources } from "./config.js";
 import { assertRouteBlockPlacement } from "./route-block.js";
 
@@ -165,7 +166,61 @@ async function appMeekoFiles(projectRoot: string): Promise<string[]> {
   for (const { dir } of modules.componentsDirs) {
     if (inside(root, dir) && !relative(root, dir).split(sep).includes("node_modules")) await walk(dir);
   }
+  // So are the layouts that a module adds, whose props pages and +group.ts files are checked against.
+  for (const { file } of modules.layouts) {
+    if (inside(root, file) && !relative(root, file).split(sep).includes("node_modules")) files.push(file);
+  }
   return [...new Set(files)].sort();
+}
+
+/**
+ * `MEEK115`: a `+group.ts` that is not in `app/pages` of the project or a layer configures nothing.
+ * Only the `app` folder of each source is searched.
+ */
+async function strayGroupFiles(sourceRoots: readonly string[]): Promise<CompileDiagnostic[]> {
+  const diagnostics: CompileDiagnostic[] = [];
+  async function walk(directory: string, pages: string): Promise<void> {
+    let entries;
+    try { entries = await readdir(directory, { withFileTypes: true }); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return; throw error; }
+    for (const entry of entries) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) { if (path !== pages && entry.name !== "node_modules") await walk(path, pages); }
+      else if (entry.isFile() && entry.name === "+group.ts") {
+        diagnostics.push({
+          code: "MEEK115",
+          message: "+group.ts sólo configura las carpetas de app/pages; aquí no tiene efecto. Muévelo a la carpeta de app/pages cuyas páginas debe configurar.",
+          filename: path,
+          location: { offset: 0, line: 1, column: 1 },
+          severity: "warning",
+        });
+      }
+    }
+  }
+  for (const root of sourceRoots) await walk(join(root, "app"), join(root, "app", "pages"));
+  return diagnostics;
+}
+
+/** The TypeScript modules of `app/`, `shared/` and `server/` of each source, without `node_modules` nor declarations. */
+async function sourceTypeScriptFiles(sourceRoots: readonly string[]): Promise<string[]> {
+  const files: string[] = [];
+  async function walk(directory: string): Promise<void> {
+    let entries;
+    try { entries = await readdir(directory, { withFileTypes: true }); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return; throw error; }
+    for (const entry of entries) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) { if (entry.name !== "node_modules" && !entry.name.startsWith(".")) await walk(path); }
+      else if (entry.isFile() && /\.[cm]?tsx?$/.test(entry.name) && !/\.d\.[cm]?tsx?$/.test(entry.name)) files.push(path);
+    }
+  }
+  for (const root of sourceRoots) {
+    await walk(join(root, "app"));
+    await walk(join(root, "shared"));
+    // Only its `.client.ts` and `.shared.ts` run outside the server.
+    await walk(join(root, "server"));
+  }
+  return files;
 }
 
 /** Checks every discovered application component, including new pages and layouts. */
@@ -182,6 +237,10 @@ export async function checkApp(projectRoot: string): Promise<CompileDiagnostic[]
     }
     diagnostics.push(...await checkSource(source, file));
   }
+  diagnostics.push(...await strayGroupFiles(sourceRoots));
+  // `#server/` in app/ or shared/ and `@/` in shared/: TypeScript alone would only say the module does not exist.
+  const aliases = await resolveProjectAliases(projectRoot);
+  diagnostics.push(...await checkAliasScopes(aliases, await sourceTypeScriptFiles(sourceRoots), (file) => readFile(file, "utf8")));
   return diagnostics;
 }
 

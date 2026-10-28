@@ -6,11 +6,11 @@ import type { AppManifest, ClientAssets } from "../framework-server/app.js";
 import type { AssetManifest } from "../framework-server/assets.js";
 import { discoverServerManifest } from "../framework-server/manifest-discovery.js";
 import { serializeJson } from "../server.js";
-import { discoverConfiguredRoutes, loadConfiguredModules, resolveConfigSources } from "./config.js";
+import { configuredModuleLayouts, discoverConfiguredRoutes, loadConfiguredModules, resolveConfigSources } from "./config.js";
 import type { DocumentConfig } from "./head.js";
 import { importSpecifier, pluginMode, pluginName, resolvedDocument } from "./module-loader.js";
 import { discoverErrorPage } from "./routes-discovery.js";
-import type { ErrorPageRecord, RouteRecord } from "./router.js";
+import type { ErrorPageRecord, NamedLayoutRecord, RouteRecord } from "./router.js";
 
 export const frameworkClientEntry = ".meeko/generated/entry-client.ts";
 export const frameworkServerEntry = ".meeko/generated/entry-server.ts";
@@ -46,14 +46,23 @@ export function portableRoutes(root: string, routes: readonly RouteRecord[], opt
     ...(route.error ? { error: moduleKey(root, route.error) } : {}),
     ...(route.sidecar && keepSidecar(route) ? { sidecar: moduleKey(root, route.sidecar) } : {}),
     ...(route.render ? { render: route.render } : {}),
+    ...(route.layout ? { layout: portableLayout(root, route.layout) } : {}),
   }));
+}
+
+function portableLayout(root: string, layout: NamedLayoutRecord): NamedLayoutRecord {
+  return { name: layout.name, file: moduleKey(root, layout.file), ...(layout.props ? { props: layout.props } : {}) };
 }
 
 /** `app/error.meeko` of the project with module keys, or undefined without one. */
 export async function portableErrorPage(projectRoot: string): Promise<ErrorPageRecord | undefined> {
   const root = resolve(projectRoot);
-  const page = await discoverErrorPage(root);
-  return page && { file: moduleKey(root, page.file), layouts: page.layouts.map((layout) => moduleKey(root, layout)) };
+  const page = await discoverErrorPage(root, { layouts: await configuredModuleLayouts(root) });
+  return page && {
+    file: moduleKey(root, page.file),
+    layouts: page.layouts.map((layout) => moduleKey(root, layout)),
+    ...(page.layout ? { layout: portableLayout(root, page.layout) } : {}),
+  };
 }
 
 async function scripts(directory: string, exclude: RegExp): Promise<string[]> {

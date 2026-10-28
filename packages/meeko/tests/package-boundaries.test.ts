@@ -24,8 +24,27 @@ test("package.json exports exactly the public subpaths", async () => {
   const manifest = JSON.parse(await readFile(resolve("package.json"), "utf8")) as { exports: Record<string, unknown> };
   assert.deepEqual(Object.keys(manifest.exports), [
     ".", "./vite", "./framework", "./server", "./node", "./password", "./bun", "./deno", "./cloudflare",
-    "./build", "./prettier", "./postcss", "./internal", "./devtools-ui",
+    "./build", "./prettier", "./postcss", "./internal", "./builtins/*", "./devtools-ui",
   ]);
+});
+
+test("the runtime entries do not carry <MeekoPopover> nor <MeekoSelect>: only a component that uses the tag imports them", async () => {
+  const result = await build({
+    entryPoints: ["index", "framework", "internal"].map((entry) => resolve(`dist/${entry}.js`)),
+    bundle: true,
+    format: "esm",
+    platform: "browser",
+    write: false,
+    metafile: true,
+    outdir: "out",
+  });
+  const inputs = Object.keys(result.metafile.inputs).map((input) => input.replaceAll("\\", "/"));
+  assert.ok(!inputs.some((input) => /\/dist\/builtins\//.test(input)), inputs.filter((input) => input.includes("builtins")).join("\n"));
+  // Each tag is a module of its own, and <MeekoSelect> brings <MeekoPopover> with it.
+  const select = await build({ entryPoints: [resolve("dist/builtins/select.compiled.js")], bundle: true, format: "esm", platform: "browser", write: false, metafile: true, outdir: "out" });
+  const selectInputs = Object.keys(select.metafile.inputs).map((input) => input.replaceAll("\\", "/"));
+  assert.ok(selectInputs.some((input) => input.endsWith("dist/builtins/popover.compiled.js")));
+  assert.ok(!selectInputs.some((input) => /\/dist\/framework\//.test(input)), "no framework code in the select");
 });
 
 test("runtime entries never load the build-time PostCSS plugin", async () => {
@@ -50,7 +69,7 @@ test("the root entry exposes only the documented public runtime", async () => {
   const root = await import(pathToFileURL(resolve("dist/index.js")).href);
   assert.deepEqual(Object.keys(root).sort(), [
     "batch", "computed", "createContext", "createRoot", "effect", "inject",
-    "onCleanup", "onMounted", "provide", "provideErrorHandler", "serializeJson", "signal", "trustHtml", "untrack",
+    "onCleanup", "onMounted", "provide", "provideErrorHandler", "serializeJson", "signal", "trustHtml", "untrack", "useId",
   ]);
 });
 
@@ -79,7 +98,8 @@ test("published entry source maps carry their sources without local absolute pat
 });
 
 test("a component without the framework leaves the theme, the router state and <MeekoThemeToggle> out of its bundle", async () => {
-  // A compiled component imports `@meekojs/meeko/internal`, which also re-exports Meeko's own components.
+  // A compiled component imports `@meekojs/meeko/internal`; Meeko's own components come from
+  // `@meekojs/meeko/builtins/*`, which only a component that uses their tags imports.
   const { compile } = await import(pathToFileURL(resolve("dist/compiler.js")).href) as typeof import("../src/compiler.ts");
   const component = compile(`<script lang="ts">\nimport { signal } from "@meekojs/meeko";\nconst count = signal(0);\n</script>\n<template><button on:click="() => count.value++">{count.value}</button></template>\n`, resolve("Counter.meeko")).code;
   const result = await build({
@@ -98,8 +118,8 @@ test("a component without the framework leaves the theme, the router state and <
     assert.ok(!code.includes(marker), `${marker} reached the bundle`);
   }
   const output = Object.values(result.metafile.outputs)[0]!;
-  for (const module of ["navigation", "state", "storage", "theme-toggle.compiled"]) {
-    const input = Object.entries(output.inputs).find(([path]) => path.replaceAll("\\", "/").endsWith(`dist/framework/${module}.js`));
-    assert.equal(input?.[1].bytesInOutput ?? 0, 0, `dist/framework/${module}.js reached the bundle`);
+  for (const module of ["framework/navigation", "framework/state", "framework/storage", "builtins/theme-toggle.compiled", "builtins/await.compiled"]) {
+    const input = Object.entries(output.inputs).find(([path]) => path.replaceAll("\\", "/").endsWith(`dist/${module}.js`));
+    assert.equal(input?.[1].bytesInOutput ?? 0, 0, `dist/${module}.js reached the bundle`);
   }
 });

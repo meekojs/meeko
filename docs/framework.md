@@ -250,15 +250,16 @@ export default defineMeekoConfig({
   - `imports.sharedDirs` (desde `1.3`): carpetas dentro de `shared/` (`"shared/validators"`), con el ámbito de `shared/`: aplicación y servidor.
   - `imports.serverDirs`: carpetas dentro de `server/`, exclusivas del servidor.
 - `server`: el adaptador de `meeko build`; véase [Build, despliegue y verificación](#build-despliegue-y-verificación).
-- `document` (desde `1.2`): `lang` y las entradas de `<head>` de todos los documentos. Los módulos añaden las suyas con `meeko.addHead`; las de `document.head` se aplican después, así que el `title` del proyecto gana. Desde `1.3`, `document.seo` añade la URL canónica y Open Graph de cada página; véase [Canónica y Open Graph por página](#canónica-y-open-graph-por-página).
+- `document` (desde `1.2`): `lang` y las entradas de `<head>` de todos los documentos. Los módulos añaden las suyas con `meeko.addHead`; las de `document.head` se aplican después, así que el `title` del proyecto gana. Desde `1.3`, `document.seo` añade la URL canónica y Open Graph de cada página; véase [Canónica y Open Graph por página](#canónica-y-open-graph-por-página). Desde `1.5`, `document.idPrefix` es el prefijo de los IDs de [`useId`](api.md#ids-estables-useid) y de `form.field` (`m` por defecto).
 - `dev` (desde `1.3`): opciones de `meeko dev`. `serverLogs: false` desactiva los [logs del servidor en la consola del navegador](#logs-del-servidor-en-la-consola-del-navegador).
 - `site` (desde `1.3`): la URL pública del sitio (`"https://example.com"`, sólo el origen). Es el origen de las URL absolutas que escribe Meeko: `sitemap.xml`, `robots.txt` y `document.seo`. Sin `site`, el build usa `MEEKO_PUBLIC_ORIGIN`. No cambia las comprobaciones de `Origin`, que siguen leyendo `MEEKO_PUBLIC_ORIGIN` o `publicOrigin` de `server/runtime.ts` al ejecutarse.
 - `sitemap` y `robots` (desde `1.3`): `sitemap.xml` y `robots.txt` generados en el build; véase [`sitemap.xml` y `robots.txt`](#sitemapxml-y-robotstxt).
 - `theme` (desde `1.4`): el tema claro/oscuro, y temas propios, sin parpadeo, con `useTheme()`; véase [Tema claro/oscuro sin parpadeo](#tema-clarooscuro-sin-parpadeo).
+- `alias` (desde `1.5`): aliases de ruta propios, o cambios de `~/`, `@/`, `#shared/` y `#server/`, los que Meeko define por defecto; véase [Aliases de ruta](#aliases-de-ruta).
 
 Desde `1.2`, `css: { scopeAttribute: "matched" }` limita el atributo de `<style scoped>` a los elementos que algún selector con ámbito puede seleccionar; con `"all"`, el valor por defecto en `1.x`, va en todos los elementos de la plantilla. `"matched"` pasará a ser el valor por defecto en `2.0`. Véase [Estilos con ámbito](api.md#qué-elementos-reciben-el-atributo), con el caso de las clases que el script añade con la API del DOM.
 
-La configuración se ejecuta en `meeko dev`, `meeko build` y `meeko check`. En un workspace de confianza el servidor de lenguaje también la ejecuta, con sus módulos, por lo que las listas pueden construirse dinámicamente; en un workspace no confiable (o con `trusted: false`, ver [editores](editors.md)) el editor no ejecuta código del proyecto: lee `layers`, `extends`, `imports.appDirs`, `imports.sharedDirs` e `imports.serverDirs` como arrays literales de cadenas y, de `modules`, sólo las cadenas literales que son carpetas de layer. Los autoimports y componentes de los módulos no existen para ese editor hasta que se confía en el workspace.
+La configuración se ejecuta en `meeko dev`, `meeko build` y `meeko check`. En un workspace de confianza el servidor de lenguaje también la ejecuta, con sus módulos, por lo que las listas pueden construirse dinámicamente; en un workspace no confiable (o con `trusted: false`, ver [editores](editors.md)) el editor no ejecuta código del proyecto: lee `layers`, `extends`, `imports.appDirs`, `imports.sharedDirs` e `imports.serverDirs` como arrays literales de cadenas y, de `modules`, sólo las cadenas literales que son carpetas de layer. Desde `1.5` lee también `alias` cuando es un objeto literal de cadenas y `false`. Los autoimports y componentes de los módulos no existen para ese editor hasta que se confía en el workspace.
 
 El descubrimiento de servidor también rechaza árboles de cliente imposibles. Por ejemplo, no permite que `api.users.get()` sea a la vez una función y el padre de `api.users.get.post()`, ni que un procedimiento `rpc.users()` sea el padre de `rpc.users.get()`. El error se produce al generar el manifiesto e identifica ambos archivos, antes de inicializar el cliente o emitir tipos contradictorios.
 
@@ -323,9 +324,11 @@ export default defineMeekoConfig({
 
 El orden de las fuentes es: la aplicación, `extends`, `layers`, las carpetas de layer que quedan en `modules` (véase más abajo) y los layers que añaden los módulos con `meeko.addLayer`. Cada layer necesita su carpeta `app/pages` y un nombre de carpeta en minúsculas, dígitos y guiones que no se repita; aparece con ese nombre en los diagnósticos. Las rutas de `layers` y `extends` deben vivir dentro del proyecto, también después de resolver los enlaces.
 
-Las páginas de un layer se muestran dentro del shell del proyecto: `app/app.meeko` y el layout raíz de la aplicación (`app/layouts/default.meeko` o `app/pages/+layout.meeko`) envuelven también a las páginas de los layers, y los `+layout.meeko` propios del layer se anidan dentro. Si el proyecto tiene `app.meeko` o layout raíz, sustituyen a los equivalentes del layer; si no, se usan los del layer. Una página de layer que falla usa el `+error.meeko` más cercano de su propio árbol, después el `app/error.meeko` del layer y, por último, la página de error raíz del proyecto. La `404` de una URL sin ruta siempre usa la del proyecto. Los módulos de rutas programáticos (`RouteModule.routes()` de `composeFrameworkRoutes`) siguen declarando sus propios layouts. El manifiesto rechaza colisiones de URL y el registro rechaza nombres de autoimport repetidos; el diagnóstico incluye los archivos en conflicto.
+Las páginas de un layer se muestran dentro del shell del proyecto: `app/app.meeko` y el layout raíz de la aplicación (`app/layouts/default.meeko` o `app/pages/+layout.meeko`) envuelven también a las páginas de los layers, y los `+layout.meeko` propios del layer se anidan dentro. Desde `1.5`, los [layouts con nombre](#layouts-con-nombre) de un layer (`layers/base/app/layouts/docs.meeko`) también sirven a las páginas del proyecto y de los demás layers; véase [Layouts de layers y módulos](#layouts-de-layers-y-módulos). Si el proyecto tiene `app.meeko` o layout raíz, sustituyen a los equivalentes del layer; si no, se usan los del layer. Una página de layer que falla usa el `+error.meeko` más cercano de su propio árbol, después el `app/error.meeko` del layer y, por último, la página de error raíz del proyecto. La `404` de una URL sin ruta siempre usa la del proyecto. Los módulos de rutas programáticos (`RouteModule.routes()` de `composeFrameworkRoutes`) siguen declarando sus propios layouts. El manifiesto rechaza colisiones de URL y el registro rechaza nombres de autoimport repetidos; el diagnóstico incluye los archivos en conflicto.
 
 `extends` es el nombre que tenía `layers` hasta `1.1` y sigue funcionando en `1.x`, sin aviso; sus carpetas van antes que las de `layers`.
+
+Desde `1.5`, los [aliases de ruta](#aliases-de-ruta) `~/`, `@/`, `#shared/` y `#server/` se buscan en el proyecto y después en cada layer, en este mismo orden; véase [Aliases en los layers](#aliases-en-los-layers).
 
 ### Carpetas en `modules` (deprecado)
 
@@ -469,6 +472,7 @@ Los archivos de runtime de un módulo (plugins, componentes, autoimports, middle
 | `rootDir`, `dev`, `config` | Carpeta del proyecto, `true` en `meeko dev` y la configuración cargada. |
 | `addLayer(dir)` | Añade un layer, después de los de `layers`. Debe tener `app/pages` y estar dentro del proyecto; un paquete instalado en `node_modules` lo está, también con pnpm. |
 | `addComponentsDir(dir, { prefix })` | Autoimporta los `.meeko` de la carpeta y sus subcarpetas, con el nombre en PascalCase tras el prefijo (`components/picker.meeko` con `prefix: "Accent"` es `AccentPicker`). |
+| `addLayout(name, file)` | Desde `1.5`, añade un [layout con nombre](#layouts-con-nombre), como un archivo de `app/layouts`: `meeko.addLayout("docs", here("./docs-layout.meeko"))`. El archivo debe estar dentro del proyecto. Un layout del proyecto o de un layer con el mismo nombre gana; dos módulos con el mismo nombre son un error. |
 | `addAutoImports(entries)` | Autoimporta exports de un paquete o archivo: `{ name, as?, from, type?, scope? }`; `scope` es `"app"` por defecto (componentes y `app/`, en el navegador y en SSR), `"client"`, `"server"` o `"shared"`. |
 | `addAutoImportsDir(dir, { scope })` | Autoimporta los exports de los `.ts` de una carpeta, con ámbito `"app"`, `"server"` o `"shared"`; los sufijos `.client.ts`, `.server.ts` y `.shared.ts` mandan. |
 | `addPlugin({ src, mode?, options? })` | Añade un [plugin de aplicación](#plugins-de-aplicación). `mode` sale del sufijo del archivo o es `"universal"`. `options` debe ser JSON y llega al navegador si el plugin se ejecuta allí. |
@@ -572,7 +576,7 @@ Si un middleware servidor llama a `next()`, Meeko espera también ese trabajo au
 
 ## Routing, layouts y SSR
 
-`app/pages` admite `index.meeko`, `[id].meeko`, `[...slug].meeko`, grupos `(group)`, `+error.meeko` y, para las opciones de ruta, un bloque `<script server>` en la página o un sidecar `*.route.ts`. El layout compartido vive en `app/layouts/default.meeko` y recibe `props.outlet`; el navegador lo conserva entre rutas y libera las páginas salientes. Los `+layout.meeko` junto a páginas siguen admitidos para proyectos anteriores y layouts anidados; no se puede combinar uno en la raíz de `app/pages` con `app/layouts/default.meeko`. Un layer usa las mismas convenciones. `href` comprueba IDs y parámetros a partir del manifiesto generado.
+`app/pages` admite `index.meeko`, `[id].meeko`, `[...slug].meeko`, grupos `(group)`, `+error.meeko` y, para las opciones de ruta, un bloque `<script server>` en la página o un sidecar `*.route.ts`. El layout compartido vive en `app/layouts/default.meeko` y recibe `props.outlet`; el navegador lo conserva entre rutas y libera las páginas salientes. Desde `1.5`, cualquier `app/layouts/<nombre>.meeko` es un [layout con nombre](#layouts-con-nombre) que la página elige con `definePage({ layout })` o un `+group.ts`. Los `+layout.meeko` junto a páginas siguen admitidos para proyectos anteriores y layouts anidados; no se puede combinar uno en la raíz de `app/pages` con `app/layouts/default.meeko`. Un layer usa las mismas convenciones. `href` comprueba IDs y parámetros a partir del manifiesto generado.
 
 El tipo del outlet en `app/app.meeko` y en cada layout es `Component<Record<string, unknown>>` importado desde `@meekojs/meeko`. Incluye `renderWithState`, requerido por `<component is="props.outlet">` para transferir el estado SSR.
 
@@ -580,9 +584,10 @@ El tipo del outlet en `app/app.meeko` y en cada layout es `Component<Record<stri
 
 Desde `1.2`, dos etiquetas propias de Meeko sustituyen a esos patrones. No se importan: el compilador las reconoce.
 
-- **`<MeekoOutlet />`** pinta, en `app/app.meeko` y en los layouts (`app/layouts/*.meeko` o `+layout.meeko`), el layout o la página que van dentro. Lee el `outlet` que Meeko pasa, así que el layout no necesita declarar `defineProps<{ outlet }>()`; si declara sus props, `outlet` debe estar entre ellas. Equivale a `<component is="props.outlet">`: el navegador conserva el layout entre rutas y sólo cambia lo que hay dentro. En otro componente, o con atributos o contenido, da `MEEK104`.
-- **`<MeekoLink to="/users/[id]" bind:params="{ id: user.id }" bind:search="{ tab: 'perfil' }">`** renderiza un `<a>` cuyo `href` construye `href()`: `to` sólo admite rutas que existen, las rutas dinámicas exigen `bind:params` con sus claves y `bind:search` añade la query string. `meeko check` y el editor marcan el error en el atributo (`Argument of type '"/nowhere"' is not assignable…`). En la ruta activa (la misma ruta sin query ni fragmento) añade `aria-current="page"`, que la navegación actualiza. El resto de atributos y los hijos pasan al `<a>` tal cual: `class`, `target`, `rel`, `aria-*`, `data-*` y `on:click`. `href` y `bind:href` no se admiten, porque el enlace lo construye `to` (`MEEK105`).
-- **Tipos de sus props.** Desde `1.4`, `@meekojs/meeko/framework` exporta `MeekoLinkProps<K>` (`to`, `params` y `search` de la ruta `K`), `MeekoOutletProps` (sin props) y `MeekoThemeToggleProps` (las de [`<MeekoThemeToggle>`](#meekothemetoggle)), y `RouteId`, el ID de cualquier ruta de la aplicación (el tipo de `to`). Todos se autoimportan: los tipos de las props donde se usan los componentes, como los [tipos de cada componente](#tipos-de-cada-componente), y `RouteId` en todo el proyecto, como `href`. El editor muestra las props en el hover de las etiquetas y abre su tipo con «Ir a definición». Sirven para tipar un componente que recibe una ruta, sin import:
+- **`<MeekoOutlet />`** pinta, en `app/app.meeko` y en los layouts (`app/layouts/*.meeko` o `+layout.meeko`), el layout o la página que van dentro. Lee el `outlet` que Meeko pasa, así que el layout no necesita declarar `defineProps<{ outlet }>()`. Hasta `1.4`, si declaraba sus props, `outlet` debía estar entre ellas; desde `1.5`, un layout con `<MeekoOutlet />` declara sólo las suyas (`defineProps<{ title?: string }>()`) y Meeko añade `outlet` a su `ComponentProps`. Equivale a `<component is="props.outlet">`: el navegador conserva el layout entre rutas y sólo cambia lo que hay dentro. En otro componente, o con atributos o contenido, da `MEEK104`.
+- **`<MeekoLink to="/users/[id]" bind:params="{ id: user.id }" bind:search="{ tab: 'perfil' }">`** renderiza un `<a>` cuyo `href` construye `href()`: `to` sólo admite rutas que existen, las rutas dinámicas exigen `bind:params` con sus claves y `bind:search` añade la query string. `meeko check` y el editor marcan el error en el atributo (`Argument of type '"/nowhere"' is not assignable…`). En la ruta activa (la misma ruta sin query ni fragmento) añade `aria-current="page"`, que la navegación actualiza; con `match="prefix"`, también marca su sección (véase más abajo). El resto de atributos y los hijos pasan al `<a>` tal cual: `class`, `target`, `rel`, `aria-*`, `data-*` y `on:click`. `href` y `bind:href` no se admiten, porque el enlace lo construye `to` (`MEEK105`).
+- **`match`: la página o la sección.** Desde `1.5`, `match="exact"` (por defecto) marca el enlace sólo en su ruta, y `match="prefix"`, también en las rutas que están por debajo. En su propia ruta el enlace lleva `aria-current="page"`, y en una ruta por debajo, `aria-current="true"`, que significa «el elemento actual de un conjunto»: la sección en la que está la página. La comparación es por segmentos completos, sobre las rutas codificadas como `href()` y sin query ni fragmento: `/dashboard` cubre `/dashboard/stats` y `/dashboard/r%201`, pero no `/dashboards`; `/dash` no cubre `/dashboard`. `to="/"` sólo coincide exacta, también con `match="prefix"`, porque si no marcaría todas las páginas. En una ruta dinámica, la sección es la de sus `params`: `<MeekoLink to="/users/[id]" bind:params="{ id: '7' }" match="prefix">` cubre `/users/7/posts`, no `/users/8/posts`. `match` admite `bind:match` con una expresión de tipo `"exact" | "prefix"`; otro valor estático es `MEEK105`. El valor sale en el HTML del servidor, la hidratación no lo cambia y la navegación lo actualiza, también en un layout que el navegador conserva.
+- **Tipos de sus props.** Desde `1.4`, `@meekojs/meeko/framework` exporta `MeekoLinkProps<K>` (`to`, `params` y `search` de la ruta `K`; desde `1.5`, también `match`), `MeekoOutletProps` (sin props) y `MeekoThemeToggleProps` (las de [`<MeekoThemeToggle>`](#meekothemetoggle)), y `RouteId`, el ID de cualquier ruta de la aplicación (el tipo de `to`). Todos se autoimportan: los tipos de las props donde se usan los componentes, como los [tipos de cada componente](#tipos-de-cada-componente), y `RouteId` en todo el proyecto, como `href`. El editor muestra las props en el hover de las etiquetas y abre su tipo con «Ir a definición». Sirven para tipar un componente que recibe una ruta, sin import:
 
 ```html
 <!-- app/components/NavLink.meeko -->
@@ -609,13 +614,188 @@ a[aria-current="page"] { font-weight: 700; }
 </style>
 ```
 
+Un menú de secciones marca la sección en todas sus páginas y, de forma distinta, la página exacta. El CSS distingue los dos valores de `aria-current`, los mismos que leen los lectores de pantalla:
+
+```html
+<!-- app/layouts/default.meeko -->
+<template>
+  <nav aria-label="Secciones">
+    <MeekoLink to="/" match="prefix">Inicio</MeekoLink>
+    <MeekoLink to="/dashboard" match="prefix">Panel</MeekoLink>
+    <MeekoLink to="/users" match="prefix">Usuarios</MeekoLink>
+    <MeekoLink to="/settings" match="prefix">Ajustes</MeekoLink>
+  </nav>
+  <main><MeekoOutlet /></main>
+</template>
+
+<style scoped>
+/* La sección de la página actual: /dashboard/stats marca «Panel». */
+nav a[aria-current="true"] { border-bottom: 2px solid currentColor; }
+/* La página exacta: /dashboard marca «Panel» con más peso. */
+nav a[aria-current="page"] { border-bottom: 2px solid currentColor; font-weight: 700; }
+</style>
+```
+
+En `/dashboard/stats`, «Panel» lleva `aria-current="true"`; en `/dashboard`, `aria-current="page"`; en `/dashboards`, ninguno de los dos, y «Inicio» sólo se marca en `/`. Para un enlace o un componente propio, `useRoute().isActive()` aplica la misma regla (véase [Ruta actual](#ruta-actual)).
+
 En el editor, `to="` sugiere las rutas del proyecto y lleva a su página con Ctrl+clic. `meeko init-framework` genera el shell y el layout con estas etiquetas.
 
 Un proyecto anterior a `1.2` con un componente propio llamado `MeekoLink` o `MeekoOutlet` (en `app/components`, de un módulo o importado o declarado en el `<script>`) lo conserva: la etiqueta es ese componente, con sus props, y no la de Meeko. `meeko check`, `meeko build` y el editor lo avisan con `MEEK106`; renombre el componente para usar la etiqueta propia.
 
+### `<MeekoTeleport>`
+
+Desde `1.5`, `<MeekoTeleport to="…">` pinta su contenido en otro lugar del documento sin sacarlo del componente que lo declara. Tampoco se importa. El caso típico es que una página ponga sus acciones en la barra de su layout:
+
+```html
+<!-- app/layouts/default.meeko -->
+<template>
+  <header class="bar">
+    <MeekoLink to="/">Inicio</MeekoLink>
+    <div id="toolbar"></div>
+  </header>
+  <main><MeekoOutlet /></main>
+</template>
+
+<!-- app/pages/notes/[id].meeko -->
+<script lang="ts">
+const isMobile = signal(false);
+async function save(): Promise<void> { /* … */ }
+</script>
+<template>
+  <MeekoTeleport to="#toolbar" bind:disabled="isMobile.value">
+    <AppButton on:click="save">Guardar</AppButton>
+  </MeekoTeleport>
+  <article>…</article>
+</template>
+```
+
+- **Destino.** `to="body"` añade el contenido al final de `<body>` y `to="#id"`, dentro del elemento con ese `id`, después de lo que ya tiene. Sólo se admiten esas dos formas: `body`, o `#` seguido de una letra y de letras ASCII, dígitos, `-` o `_`. Meeko busca el `id` con `getElementById` y nunca interpreta `to` como selector CSS ni como HTML. Un `to` estático que no cumple esa forma da `MEEK114`; `bind:to` acepta una expresión de tipo ``"body" | `#${string}` `` (`MeekoTeleportTarget`) que se valida al renderizar. `<MeekoTeleport>` admite `to`, `bind:to`, `disabled`, `bind:disabled`, `if:when` y `each:of`; cualquier otro atributo da `MEEK114`.
+- **Ámbito del autor.** El contenido se compila en la plantilla del componente que lo declara, como el de un `if:when`: lee sus señales, sus eventos llaman a sus funciones, recibe su `provide`/`inject` y sus manejadores de errores, puede usar sus snippets y conserva el atributo de su `<style scoped>`. Se libera con el componente: al desmontarlo, al cambiar de página o cuando su `if:when` o su fila de `each:of` desaparecen, y sus nodos salen del destino con él.
+- **Primer HTML.** En SSR, `"stream"` y `"prerender"` (también con el adaptador `static`), el HTML ya trae el contenido en su destino, sin saltos al hidratar: el de `to="body"` va tras la aplicación y antes de los scripts de Meeko, y el de `to="#id"` dentro de ese elemento, se renderice éste antes o después que el teleport. Varios teleports al mismo destino conservan el orden en que aparecen en la página. La hidratación encuentra el contenido por sus marcadores (`<!--meeko:portal:…-->`) y no cambia el DOM.
+- **Destino inexistente.** Si la página no renderiza el elemento del `#id` (o es un elemento sin contenido, como `<input>`), el render falla con un error claro en desarrollo. En producción el contenido se pinta en su sitio, donde se hidrata, y el servidor avisa una vez con `console.warn`. En el navegador, un destino que no existe deja el contenido en su sitio con un aviso; el siguiente cambio de `to` o `disabled` vuelve a buscarlo.
+- **`disabled`.** Con `disabled` (o mientras `bind:disabled` es verdadero) el contenido se pinta en su sitio. Cambiarlo mueve los mismos nodos entre el destino y su sitio, sin volver a renderizarlos, así que conservan su estado; el elemento que tenía el foco lo pierde, como en cualquier movimiento del DOM.
+- **Navegador.** Lo que el navegador renderiza (una navegación, un `if:when` que aparece, una fila nueva o un hijo diferido) se pinta primero en su sitio y pasa a su destino al terminar ese montaje, antes del siguiente pintado, y se añade al final del destino. El destino debe vivir al menos tanto como el teleport: un elemento del layout o de `app/app.meeko` para una página, o del propio componente.
+
+Para modales, menús y tooltips no hace falta teleport: `<dialog>` con `showModal()` y el atributo `popover` ya los muestran en la *top layer* del navegador, por encima de todo y sin problemas de `z-index` u `overflow`, con el foco y `Escape` resueltos. Use `<MeekoTeleport>` cuando el contenido deba vivir en otro sitio del layout, como una barra de acciones, unas migas de pan o un aviso al final de `<body>`.
+
 Las páginas, los layouts, `app/app.meeko` y `app/error.meeko` no pueden ser [componentes genéricos](api.md#componentes-genéricos-generic): Meeko les pasa sus props y no puede elegir sus parámetros de tipo, así que `generic` en su `<script>` da `MEEK100`. Lleve el contenido genérico a un componente de `app/components` y úselo desde la página.
 
 Si una página falla y existe `+error.meeko`, Meeko la carga y renderiza con el mismo contexto de petición y estado SSR. El observador del servidor recibe el fallo original con su `requestId`; el HTML muestra un mensaje público y no incluye detalles privados. Si también falla la página de error, el servidor registra ese segundo fallo y entrega una respuesta segura.
+
+### Layouts con nombre
+
+Desde `1.5`, cada `app/layouts/<nombre>.meeko` es un layout con nombre: `default`, `dashboard`, `auth`, `blank`… Una subcarpeta forma parte del nombre: `app/layouts/admin/panel.meeko` es `"admin/panel"`. El nombre son letras, dígitos, `-` y `_` (y `/` entre carpetas), y empieza por una letra o un dígito; un archivo con otro nombre (`_partes.meeko`) no es un layout y puede guardar otros componentes. Un layout con nombre es un layout normal: pinta la página con `<MeekoOutlet />` y declara sus props con `defineProps`.
+
+La página elige su layout en sus opciones de ruta, en `<script server>` o en el sidecar `*.route.ts`:
+
+```html
+<!-- app/pages/connections.meeko -->
+<script server lang="ts">
+export const route = definePage({ layout: "dashboard" });
+</script>
+<template><h1>Conexiones</h1></template>
+```
+
+- **Sin `layout`**, la página usa el que heredan sus carpetas de sus [`+group.ts`](#opciones-por-carpeta-groupts) o, si no hay, `default`, como hasta `1.4`.
+- **`layout: false`** quita el layout con nombre: quedan `app/app.meeko` y los `+layout.meeko` de sus carpetas.
+- **Un literal.** Como `render`, `meeko build` lee `layout` sin ejecutar el archivo: debe ser un texto literal o `false` dentro de `definePage({ ... })`. Un valor calculado da `layout debe ser un literal de texto…` con el archivo. Un nombre que no existe detiene `meeko dev`, `meeko build` y `meeko check`: `el layout "nowhere" no existe; crea app/layouts/nowhere.meeko (layouts disponibles: …)`. En los tipos, `layout` es la unión de los layouts de la aplicación, con completado en el editor; el hover del nombre muestra su archivo y sus páginas, y Ctrl+clic lo abre.
+- **Orden de anidamiento.** `app/app.meeko` → el layout con nombre → los `+layout.meeko` de las carpetas y grupos, de fuera hacia dentro → la página. Los grupos `(group)` y los `+layout.meeko` funcionan igual que antes, dentro del layout con nombre. Sigue siendo un error tener a la vez `app/pages/+layout.meeko` y `app/layouts/default.meeko`; un `app/pages/+layout.meeko` sin `default` se anida dentro del layout con nombre que elija la página.
+
+```text
+app/app.meeko
+└─ app/layouts/dashboard.meeko        (layout: "dashboard")
+   └─ app/pages/(dashboard)/+layout.meeko
+      └─ app/pages/(dashboard)/connections.meeko
+```
+
+**Navegación.** El navegador conserva los layouts que comparten la página saliente y la nueva, como siempre: si las dos usan el mismo layout con nombre, sigue montado con su estado (el DOM, el foco, el scroll de la barra lateral, lo escrito en un campo) y sólo cambia lo de dentro; si usan otro, el layout se libera y se monta el nuevo. Vale igual para páginas SSR, `render: "stream"`, `render: "client"`, prerenderizadas y las del adaptador `static`.
+
+**Página de error.** Una página que falla en el navegador (su loader, `notFound()` o un dato) muestra su `+error.meeko` o `app/error.meeko` dentro de sus propios layouts, el layout con nombre incluido, con las props de sus `+group.ts` y sin las de la página. La `404` de una URL sin ruta usa el layout `default` (si existe), con sus valores por defecto. El documento de error que el servidor responde a una página que falla no tiene layouts, como hasta ahora.
+
+#### Opciones por carpeta: `+group.ts`
+
+Para no repetir `layout` en cada página, un `+group.ts` en cualquier carpeta de `app/pages` (un grupo `(dashboard)` o una carpeta normal) declara las opciones de su carpeta y sus subcarpetas. `defineGroup` se autoimporta:
+
+```ts
+// app/pages/(dashboard)/+group.ts
+export default defineGroup({ layout: "dashboard", layoutProps: { showAlert: false } });
+```
+
+- **Herencia en cascada.** Los `+group.ts` se aplican del exterior al interior y después la página. `layout` de la página, o del grupo más interior que lo declara, gana.
+- **`layoutProps` se combinan por clave** entre los grupos y la página, y la página gana. Un grupo o una página que elige un layout distinto del heredado empieza sin las props heredadas, que eran para otro layout.
+- **`layout: false`** en una página (o un grupo) dentro de un grupo quita el layout con nombre y deja sus `+layout.meeko`.
+- **Literales.** Meeko lee el archivo sin ejecutarlo, como `render`: `layout` es un literal o `false` y `layoutProps` un objeto literal de textos, números, booleanos, `null`, arrays y objetos. Un valor calculado, un spread o una opción desconocida detienen el descubrimiento con el archivo. Por eso funciona igual en el prerender y en el sitio estático.
+- **Sin `middleware`.** Las rutas no declaran middleware por nombre: los archivos de `app/middleware` se ejecutan en todas las rutas y eligen las suyas con `match.route.id` (véase [Middleware de rutas y servidor](#middleware-de-rutas-y-servidor)). `middleware` en un `+group.ts` es un error explicado; un guard de grupo se escribe así: `if (!match.route.file.includes("(dashboard)")) return;`.
+- **Tipos.** `defineGroup({ layout: "dashboard", layoutProps: { … } })` tipa `layoutProps` contra ese layout en el propio archivo. Un grupo que hereda el layout, y una página que no lo elige en su `definePage`, se comprueban en `meeko check` contra el heredado (`MEEK_PAGE_LAYOUT_PROPS`: `Las layoutProps de app/pages/(dashboard)/reports/+group.ts no coinciden con las props del layout dashboard`). Un `+group.ts` fuera de `app/pages` no configura nada: `meeko check` avisa con `MEEK115`.
+
+Para migrar un grupo con su propio layout, como `app/pages/(dashboard)/+layout.meeko`, mueva el archivo a `app/layouts/dashboard.meeko` y añada `app/pages/(dashboard)/+group.ts` con `export default defineGroup({ layout: "dashboard" })`. El layout ya no se anida dentro de `default`, sino que lo sustituye, y cualquier página de otra carpeta puede elegirlo; los `+layout.meeko` que queden en subcarpetas siguen anidándose dentro.
+
+#### Layouts de layers y módulos
+
+Un layer aporta sus `app/layouts/*.meeko` a toda la aplicación, y un módulo los suyos con `meeko.addLayout(name, file)` (véase [El objeto `meeko`](#el-objeto-meeko)). Ante dos layouts con el mismo nombre gana el del proyecto, después el del propio layer de la página, después los demás layers en su orden y por último los módulos; dos módulos con el mismo nombre son un error. `default` mantiene la regla de `1.4`: el del proyecto envuelve también a las páginas de los layers, el `default` de un layer sólo envuelve sus propias páginas cuando el proyecto no tiene uno (ni `app/pages/+layout.meeko`), y el de un módulo sirve cuando ni el proyecto ni el layer lo tienen.
+
+### Props del layout desde la página
+
+El layout declara props normales. La página se las pasa tipadas contra las `Props` del layout que elige, sin el `outlet`:
+
+```html
+<!-- app/layouts/dashboard.meeko -->
+<script lang="ts">
+export interface Props { title?: string; showAlert?: boolean }
+const props = defineProps<Props>({ showAlert: false });
+</script>
+<template>
+  <header>{props.title}</header>
+  <AppAlert if:when="props.showAlert" />
+  <main><MeekoOutlet /></main>
+</template>
+```
+
+Como Meeko renderiza el layout sin las props que una página no le pasa, las de un layout con nombre deben ser opcionales o tener valor por defecto; `meeko check` lo comprueba (`MEEK_LAYOUT_PROPS`).
+
+**1. Con las opciones de ruta (`layoutProps`).** Estáticas o calculadas con los datos del servidor, como `head`: llegan en el HTML del SSR desde el primer byte.
+
+```ts
+// app/pages/connections.route.ts (o export const route en <script server>)
+export const route = definePage({ layout: "dashboard", layoutProps: { title: "Conexiones", showAlert: true } });
+```
+
+```ts
+export const route = definePage({
+  layout: "dashboard",
+  load: async ({ context }) => ({ user: await users.current(context) }),
+  layoutProps: ({ data }) => ({ title: data.user.name }),
+});
+```
+
+La función recibe el mismo contexto que `head` (`params`, `search`, `request`, `context`, `signal`, `state` y `data`); con código de nivel superior en `<script server>`, `data` son sus exports. Se combinan con las de los `+group.ts`, y ganan. Viajan en el payload (`layoutProps`), así que deben poder serializarse en JSON: una prop con `undefined` (`{ title: data.user?.name }` sin usuario, o `layout.set({ title: undefined })`) deja la prop sin valor, así que el layout usa su valor por defecto, en el servidor y en el navegador; un valor que JSON no representa (una fecha, un `Map`, una instancia) hace fallar la página con un error que nombra la página, el layout y la prop. En una página `render: "client"`, el objeto ya llega al HTML del servidor y la función se ejecuta en el navegador después de `load`. `export const layoutProps` en `<script server>` no es una opción: sería un dato más de la página.
+
+**2. Desde el `<script>` de la página: `useLayout()`.** Se autoimporta y, en una página, su tipo sigue al layout que eligen su `definePage` o sus `+group.ts` (en otro componente, `useLayout<"dashboard">()`):
+
+```html
+<!-- app/pages/connections.meeko -->
+<script lang="ts">
+const layout = useLayout();                 // LayoutHandle de "dashboard"
+const failing = signal(false);
+effect(() => layout.set({ showAlert: failing.value }));
+</script>
+<template>
+  <p>Título actual: {layout.props.title}</p>
+  <button on:click="() => failing.value = !failing.value">Probar conexión</button>
+</template>
+```
+
+- `layout.set(patch)` cambia las props que nombra y conserva las demás; `layout.props` lee las que recibe el layout (reactivas); `layout.name` es el nombre del layout. Una prop que el layout no declara, o con otro tipo, es un error de tipos.
+- El layout no se vuelve a montar: con las props reactivas de `1.2`, sólo cambia lo que lee esas props.
+- **Nada queda pegado.** Al navegar a otra página, el layout recibe las props de la nueva (sus `layoutProps`, las de sus `+group.ts` y, para el resto, los valores por defecto del layout), también si el layout se conserva. Una página que ya se fue no puede escribir.
+- **SSR sin mismatch.** El layout se renderiza antes que la página, así que lo que el setup de la página escribe con `set` durante el render llega al HTML con un segundo render de la página en el servidor (con el mismo estado de la petición y los mismos datos, como un pase de `await`), y el payload lleva esas props: el navegador hidrata exactamente ese HTML. Un render que escribe valores distintos cada vez se detiene en el tercero. En el navegador, lo que la página escribe mientras se renderiza y se hidrata se aplica al terminar de montarla; después, cada `set` se aplica al momento.
+- Una página sin layout con nombre (`layout: false`) recibe un `useLayout()` que no hace nada. Fuera de una página que renderiza Meeko (una prueba unitaria), `useLayout()` lanza un error.
+
+**Markup en zonas del layout.** Las props son para datos. Para poner contenido de la página en una zona del layout (botones de la cabecera, migas de pan) use `<MeekoTeleport>`, que mueve markup de la página a un destino del layout.
+
+**Tipos.** `.meeko/types/routes.d.ts` declara `GeneratedLayouts` (las props de cada layout) y `GeneratedPageLayouts` (el layout de cada ruta). `LayoutProps<"dashboard">` (autoimportado) es el tipo de las props que una página puede pasar a `dashboard`; `LayoutName` es la unión de los nombres y `PageLayout<"/connections">`, el layout de una ruta.
+
+**Comparación con Nuxt.** En Nuxt, `definePageMeta({ layout: "dashboard" })` elige el layout, pero no hay una forma tipada de pasarle props: se recurre a `useState`, a `provide`/`inject` o a `route.meta` (como un `showAlert` en `meta`), sin tipos contra el layout y con estado que puede quedar de la página anterior. En Meeko, `layout` y `layoutProps` se comprueban contra las `Props` del layout, llegan en el HTML del servidor, `useLayout()` las cambia de forma reactiva y cada navegación vuelve a las de la página nueva.
 
 ### Página de error de la aplicación (`app/error.meeko`)
 
@@ -631,7 +811,7 @@ Si una página falla y existe `+error.meeko`, Meeko la carga y renderiza con el 
 Una página declara su código de servidor en un bloque `<script server lang="ts">` dentro del propio `.meeko`, de modo que `app/pages` sólo contiene archivos `.meeko`. El bloque admite dos formas. Pueden convivir en el mismo bloque, salvo `load`, que no se combina con código de nivel superior:
 
 - **Código de nivel superior** (desde `1.1`). El bloque es código de servidor normal: lee la petición, consulta la base de datos, redirige o responde `404`, y cada `export const` es un dato de la página que llega tipado al `<script>` y a la plantilla.
-- **Opciones de ruta.** `export const route = definePage({ params, search, render, prerenderEntries, load, head })`, la forma de `1.0`, que sigue funcionando sin cambios.
+- **Opciones de ruta.** `export const route = definePage({ params, search, render, prerenderEntries, load, head })`, la forma de `1.0`, que sigue funcionando sin cambios; desde `1.5`, también `layout` y `layoutProps` (véase [Layouts con nombre](#layouts-con-nombre)).
 
 #### Código de nivel superior y datos exportados
 
@@ -708,7 +888,7 @@ const props = defineProps<Props>();
 El bloque es un módulo TypeScript independiente del componente:
 
 - **Sólo servidor.** El componente compilado nunca lo incluye. Se ejecuta en el servidor con los autoimports de `server/utils` y puede importar `server/` y módulos `*.server.*`; sus imports relativos se resuelven desde la carpeta de la página. Sólo una ruta `render: "client"` lo envía al navegador (véase «Modos de render»).
-- **Opciones de ruta.** Igual que un sidecar: `export const route = definePage({ ... })` o, sin código de nivel superior, `export default`. `render` debe ser un literal que `meeko build` pueda leer sin ejecutarlo.
+- **Opciones de ruta.** Igual que un sidecar: `export const route = definePage({ ... })` o, sin código de nivel superior, `export default`. `render` y, desde `1.5`, `layout` deben ser literales que `meeko build` pueda leer sin ejecutarlo.
 - **Sólo en páginas.** Un `<script server>` en un componente, un layout, `+layout.meeko` o `+error.meeko` es un error (`MEEK044`). Un segundo bloque da `MEEK004`, sin `lang="ts"` da `MEEK006` y con un valor (`server="..."`) da `MEEK043`.
 - **Comprobación.** `meeko check` comprueba el bloque con TypeScript en el ámbito del servidor y compara su loader, o sus exports, con las props de la página; los errores señalan la línea y columna del `.meeko`.
 
@@ -849,6 +1029,7 @@ Desde `1.2`, `useRoute()` devuelve la ruta confirmada que renderiza el component
 | `id` | ID de la ruta en el manifiesto (`"/users/[id]"`), o `null` en la página `404` de `app/error.meeko` para una URL sin ruta. |
 | `params` | Parámetros de la ruta, con la misma forma que recibe la página (validados por su schema). |
 | `search` | Parámetros de búsqueda, con la misma forma que recibe la página; en la página `404`, la query string con las claves repetidas en arrays. |
+| `isActive(to, { params?, prefix? })` | Desde `1.5`, una función, no una señal: si la ruta `to` está activa, con la regla de `<MeekoLink match>`. Devuelve `"page"` en la ruta exacta y, con `prefix: true`, `"true"` en una ruta por debajo; si no, `false`. |
 
 Se autoimporta en las aplicaciones (un export propio llamado `useRoute` en `app/composables` u otra carpeta de autoimports tiene prioridad sobre el del framework) y, como `useNavigation`, puede llamarse también desde código anidado. Funciona en páginas, layouts, `app/app.meeko`, `app/error.meeko` y sus componentes:
 
@@ -857,30 +1038,30 @@ Se autoimporta en las aplicaciones (un export propio llamado `useRoute` en `app/
 - **Navegación.** Los valores cambian sólo cuando una navegación se confirma, a la vez que el outlet, nunca mientras `useNavigation().pending` vale `true`; la página anterior se libera antes de que se actualicen los efectos que leen la ruta. También cambian al volver atrás o adelante en el historial y en una navegación sólo de fragmento, donde `path` se mantiene y cambia `url`. El render previo que carga los `await` de datos de la página nueva ya ve la ruta de destino.
 - **Fuera de una aplicación.** Fuera de un render del framework o de `mountClientApp` (por ejemplo, en una prueba unitaria con `renderToString`), `useRoute()` lanza un error que lo explica, en lugar de inventar una ruta; pase la ruta al componente como prop en esas pruebas.
 
-Un layout con barra lateral marca así el enlace activo, igual en el HTML del servidor y después de cada navegación (`bind:` elimina el atributo cuando el valor es `null`):
+**`isActive`.** Desde `1.5`, `route.isActive(to, { params, prefix })` dice si una ruta está activa con la misma regla que [`<MeekoLink match>`](#meekooutlet--y-meekolink), para los enlaces y componentes propios. `to` es un `RouteId` y `params`, los de esa ruta, con el tipo de `href()`: obligatorios en una ruta dinámica, no admitidos en las demás, y una ruta que no existe es un error de tipos. Devuelve `"page"` cuando la ruta confirmada es la de `to`, `"true"` con `prefix: true` cuando está por debajo de ella por segmentos completos, y `false` en otro caso; `"/"` sólo coincide exacta. Ignora la query string y el fragmento y compara las rutas codificadas. El resultado sirve tal cual para `bind:aria-current`, porque `bind:` elimina el atributo cuando el valor es `false`, y como condición, porque `"page"` y `"true"` son verdaderos. Lee `path`, así que la plantilla, un `computed` o un `effect` que lo usan se actualizan al navegar; en SSR y al hidratar devuelve lo mismo, sin desajustes.
+
+Un layout con barra lateral marca así la sección activa, igual en el HTML del servidor y después de cada navegación:
 
 ```html
 <!-- app/layouts/default.meeko -->
 <script lang="ts">
-import type { Component } from "@meekojs/meeko";
-
-const props = defineProps<{ outlet: Component<Record<string, unknown>> }>();
 const route = useRoute();
 const links = [
-  { href: "/", label: "Inicio" },
-  { href: "/users", label: "Usuarios" },
-  { href: "/settings", label: "Ajustes" },
-];
-const isActive = (href: string): boolean => href === "/" ? route.path.value === "/" : route.path.value.startsWith(href);
+  { to: "/", label: "Inicio" },
+  { to: "/users", label: "Usuarios" },
+  { to: "/settings", label: "Ajustes" },
+] as const;
+const inSettings = computed(() => route.isActive("/settings", { prefix: true }) !== false);
 </script>
 
 <template>
   <aside>
     <nav>
-      <a each:of="links" each:as="link" each:key="link.href" bind:href="link.href" bind:aria-current="isActive(link.href) ? 'page' : null">{link.label}</a>
+      <a each:of="links" each:as="link" each:key="link.to" bind:href="href(link.to)" bind:aria-current="route.isActive(link.to, { prefix: true })">{link.label}</a>
     </nav>
+    <p if:when="inSettings.value">Los cambios se guardan al salir.</p>
   </aside>
-  <main><component is="props.outlet"></component></main>
+  <main><MeekoOutlet /></main>
 </template>
 ```
 
@@ -1217,6 +1398,87 @@ El compilador `.meeko` y la transformación `.ts` insertan imports ESM reales. L
 
 Al migrar código que no usaba esas opciones estrictas, cambie imports usados sólo como tipos a `import type`, compruebe el resultado de accesos por índice antes de usarlo y añada `| undefined` únicamente cuando la ausencia sea parte real del contrato. No silencie los diagnósticos ensanchando props o contratos públicos a `any`: Meeko usa esos tipos para generar el cliente, validar el servidor y mantener iguales CLI y editor.
 
+## Aliases de ruta
+
+Desde `1.5`, Meeko define cuatro aliases de ruta, sin configuración. Funcionan igual en Vite (`meeko dev` y `meeko build`, en el navegador y en SSR, con todos los adaptadores: `node`, `bun`, `deno`, `cloudflare` y `static`), en los `tsconfig` que genera Meeko (`.meeko/tsconfig.app.json`, `server` y `shared`, que usan `meeko check` y el editor) y en los módulos de [`@utilities`](#utilidades-generadas-con-typescript) y lo que importan (salvo con `meekoUtilities({ autoImports: false })`, que no lee la configuración):
+
+| Alias | Apunta a | Dónde se puede usar |
+| --- | --- | --- |
+| `~/` | La raíz del proyecto | Todo el proyecto |
+| `@/` | `app/` | `app/` (componentes, páginas y `.ts`, que se ejecutan en el navegador y en SSR) y el código de servidor; no en `shared/` |
+| `#shared/` | `shared/` | Todo el proyecto |
+| `#server/` | `server/` | Sólo el código de servidor: `server/`, los `*.server.ts`, los sidecars `*.route.ts` y `<script server>` |
+
+`~/` es la raíz y `@/` es `app/`: al revés que en Nuxt, a propósito. `~/app/utils/price` y `@/utils/price` son el mismo módulo.
+
+```ts
+// app/pages/products/[id].route.ts
+import { findProduct } from "#server/products";
+import { productSchema } from "#shared/schemas/product";
+
+export const route = definePage({ load: ({ params }) => productSchema.parse(findProduct(params.id)) });
+```
+
+```html
+<!-- app/pages/products/[id].meeko -->
+<script lang="ts">
+import { formatPrice } from "@/utils/price";
+import * as ProductCard from "@/components/catalog/ProductCard.meeko";
+</script>
+```
+
+Un componente también se puede importar con un alias (`@/components/Card.meeko`); `MEEK033` sigue señalando un import de `.meeko` que no es relativo ni un alias.
+
+Los schemas de los contratos de [API y RPC](#api-y-rpc) y de [WebSocket](#websocket) también se importan con un alias: `import { loginInput } from "#shared/schemas/auth"` en `server/api/auth/login.post.ts`, o con un alias propio que apunte a una carpeta de `shared/`. El generador de contratos resuelve el alias como `meeko check` y Vite, y los clientes generados (`api`, `rpc`, `socket`) nombran el archivo de `shared/` por su ruta, sin el alias. La regla es la misma que con una ruta relativa: el archivo debe estar en el `shared/` del proyecto, así que un alias que apunta a otra carpeta sigue dando `body debe venir de shared/`.
+
+### Ámbitos de los aliases
+
+Cada alias tiene el ámbito de la carpeta a la que apunta, como los [autoimports](#carpetas-de-autoimports): `#server/` sólo existe en el `tsconfig.server.json` generado, `@/` no existe en `tsconfig.shared.json` (porque `shared/` no ve `app/`) y `~/` y `#shared/` existen en los tres. Usar uno fuera de su ámbito es un error claro, antes de que TypeScript diga que el módulo no existe:
+
+- `#server/` en un componente (su `<script>` o su plantilla), en un `.ts` de `app/` o en `shared/` da `MEEK108` en `meeko check`, en el editor y en el build del navegador, también con `import type`. Para leer un tipo del servidor use `~/server/…`, que existe en todos los ámbitos; un import de valores de `server/` con `~/` (o con una ruta relativa) sigue dando `MEEK108`, como desde `1.3`.
+- `@/` en `shared/` (o en un `*.shared.ts`) da el nuevo error `MEEK118` en `meeko check`, en `meeko dev` y en el build. Mueva ese código a `shared/` o use el alias desde `app/` o el servidor.
+
+En el grafo de SSR, `meeko dev` y `meeko build` siguen cargando un `#server/` de `app/` que sólo usa el servidor (una plantilla de correo de `app/emails/` que renderiza una ruta de API), igual que un import relativo de `server/`; `meeko check` lo marca igualmente.
+
+En el editor, los aliases completan las carpetas y archivos tras `~/`, `@/`, `#shared/` y `#server/` (este último en `<script server>`), e «Ir a la definición» lleva al módulo. En los `.ts`, el servidor de TypeScript del editor usa los `tsconfig` generados: un `#server/` en `app/` aparece allí como un módulo que no existe, y `meeko check` le da su `MEEK108`.
+
+### Aliases propios: `alias`
+
+`alias` en `meeko.config.ts` añade aliases o cambia los de Meeko. Cada clave es un prefijo que termina en `/` y cada valor, una carpeta del proyecto relativa a su raíz (también la de un layer) o `false` para quitar el alias:
+
+```ts
+// meeko.config.ts
+import { defineMeekoConfig } from "@meekojs/meeko/framework";
+
+export default defineMeekoConfig({
+  alias: {
+    "ui/": "app/components/ui/",
+    "db/": "server/db/",
+    "#server/": false,
+  },
+});
+```
+
+- **Ámbito.** El de la carpeta a la que apunta, con la misma regla que los aliases de Meeko: dentro de `server/`, sólo en el código de servidor (`db/` en un componente da `MEEK108`); dentro de `app/`, en `app/` y en el servidor, no en `shared/` (`MEEK118`); en cualquier otra carpeta (`shared/`, la raíz, `lib/`), en todo el proyecto.
+- **Una sola carpeta.** Un alias propio apunta exactamente a su carpeta; no se busca en los layers como los de Meeko. Cambiar uno de Meeko (`"@/": "src/"`) lo convierte en un alias propio, con el ámbito de su carpeta nueva.
+- **Validación.** Una clave sin `/` final, con espacios, `*` o `\`, o que empieza por `.` o `/`, y un valor que no es una ruta relativa dentro del proyecto ni `false`, detienen `meeko dev`, `meeko build` y `meeko check` con un error de `meeko.config.ts` (`alias "lib" must be a prefix that ends in / …`), que el editor, en un workspace de confianza, marca en `alias` (`MEEK_CONFIG`). Una carpeta que no existe no es un error: el import falla al resolverse.
+- **Dónde se aplica.** En Vite, en los `tsconfig` generados, en el editor y en `@utilities`, igual que los de Meeko. En un workspace no confiable, el editor lee `alias` sin ejecutar la configuración sólo si es un objeto literal de cadenas y `false`; si no lo es, usa los aliases por defecto.
+
+Node carga `meeko.config.ts` directamente, sin Vite: la configuración y los módulos que importa no pueden usar los aliases.
+
+### Aliases en los layers
+
+Los aliases de Meeko se buscan en el proyecto y después en cada layer, en el orden de las fuentes (véase [Layers](#layers)); gana el primer archivo que existe. Así, en un archivo de `layers/base`, `@/lib/format` es `layers/base/app/lib/format.ts` mientras el proyecto no tenga `app/lib/format.ts`; si lo tiene, gana el del proyecto, como sus `app.meeko` y layout raíz sustituyen a los del layer. Para fijar el archivo del propio layer, use una ruta relativa.
+
+No se resuelven contra el `app/` del layer que importa porque los `paths` de TypeScript valen para todo un proyecto, no para cada archivo: con esta regla, Vite, `meeko check`, el editor y `@utilities` eligen siempre el mismo archivo. Los `tsconfig` generados lo declaran con una lista de carpetas por alias (`"@/*": ["../app/*", "./types/app/*", "../layers/base/app/*", …]`, donde `./types/…` son las declaraciones de los componentes).
+
+### Prioridad y conflictos de los aliases
+
+- **`paths` del `tsconfig.json` del proyecto.** Un patrón propio con el prefijo de un alias de Meeko que apunta a otra carpeta (`"@/*": ["./src/*"]`) gana y desactiva ese alias de Meeko en todo el proyecto: en el editor, en `meeko check`, en los `tsconfig` generados (que desde `1.5` copian también los `paths` del proyecto), en `meeko dev` y `meeko build` y en las comprobaciones de ámbito (`MEEK108` y `MEEK118`), así que importar `@/utils` desde `shared/` ya no es un error. `meeko dev`, `meeko build` y `meeko check` lo avisan una vez por proceso. Un patrón con las mismas carpetas que el de Meeko no lo desactiva. Vite no lee esos `paths`: para que el build resuelva ese prefijo, defínalo también con `alias` (`alias: { "@/": "src/" }`, que con la misma carpeta no cuenta como redefinición) o con un `resolve.alias`.
+- **`resolve.alias` de Vite.** El `resolve.alias` de un módulo de Meeko (`meeko.extendViteConfig`) o de un host de Vite propio se aplica antes que los aliases de Meeko. Si cubre todo un prefijo de Meeko (`{ find: "@", replacement: … }` o una expresión regular como `/^@\//`), desactiva también el alias de Meeko de ese prefijo y sus comprobaciones de ámbito, con el mismo aviso; uno que sólo cubre algunos especificadores (`/^@\/lib\/label$/`) gana para ellos y deja el de Meeko para los demás. El editor, que no ejecuta los módulos, no ve el `resolve.alias` de un módulo: para que coincida, desactive el alias con `alias: { "@/": false }`.
+- **`imports` de `package.json`.** Los aliases de Meeko que empiezan por `#` no chocan con los [*subpath imports*](https://nodejs.org/api/packages.html#subpath-imports) de Node mientras el proyecto no los declare. Si su `package.json` tiene en `"imports"` una entrada que empieza por `#shared/` o `#server/` (o un patrón como `"#*"`), gana la suya: Meeko no define ese alias en ninguna parte (ni en Vite ni en los `tsconfig`) y avisa una vez por proceso. Para quitar el aviso, desactive el alias con `alias: { "#shared/": false }`.
+- **Paquetes.** Los módulos de `node_modules` nunca reciben los aliases del proyecto: un `#…` de un paquete es suyo.
+
 ## API y RPC
 
 Los archivos `server/api/users/index.get.ts`, `index.post.ts` y `[id].get.ts` crean `/api/users` y `/api/users/:id`. Los procedimientos bajo `server/rpc/users/get.ts` crean `/_meeko/rpc/users/get`. Los schemas públicos residen en `shared/`. Los handlers usan `defineApiRoute` y `defineRpc`, y el servidor valida entrada, salida, sesión, autorización y CSRF.
@@ -1350,6 +1612,26 @@ Escriba mensajes propios en el schema: algunos mensajes por defecto de Valibot c
 
 `useForm` lleva estos `issues` a cada campo del formulario sin código propio (véase [Formularios: `useForm`](#formularios-useform)).
 
+### Errores de un campo: `ApiError` con `issues`
+
+Desde `1.5`, un error que no es de validación pero pertenece a un campo, como un correo que ya tiene cuenta, lleva `issues` con el tercer argumento de `ApiError`, que acepta `{ message, issues }` además del mensaje interno de siempre:
+
+```ts
+throw new ApiError("EMAIL_TAKEN", 409, {
+    message: `duplicate key for ${body.email}`, // interno: nunca se envía
+    issues: [{ path: "email", message: "Ese correo ya tiene una cuenta." }],
+});
+```
+
+```json
+{ "code": "EMAIL_TAKEN", "status": 409, "requestId": "…", "issues": [{ "path": "email", "message": "Ese correo ya tiene una cuenta." }] }
+```
+
+- Los `issues` tienen la forma de los de un `400` (`{ path, message }`, con `path` unido con `.` o `""` para el formulario completo) y se envían igual: como mucho 20, en las respuestas de API y RPC, también en el despacho local SSR. Son mensajes públicos, escritos para el usuario; el `message` del error sigue siendo interno.
+- Sólo viajan con un estado `4xx`: un `5xx` es un fallo del servidor y responde sin ellos. Un issue sin `path` o sin `message` de texto lanza un `TypeError` al crear el error.
+- Un `ApiError` de otro grafo de módulos (Vite) conserva sus `issues` en la normalización. Otro error con la misma forma, como el `ApiError` de un SDK o un `ClientError` de otro servicio Meeko que el handler deja escapar, no envía sus `issues`: Meeko sólo reenvía los de su propio `ApiError`.
+- En el cliente llegan en `ClientError.issues`, y `useForm` los reparte como los de un `400`.
+
 ### Valores por petición: `locals`
 
 Desde `1.2`, `defineApiRoute` y `defineRpc` aceptan `locals(context)`, que calcula un valor por petición (por ejemplo, el usuario actual) y se lo entrega al handler como `locals`, con el tipo inferido de lo que devuelve. Sin `locals`, el handler recibe `locals: undefined`. `authorize` no cambia y sigue devolviendo un booleano.
@@ -1430,8 +1712,8 @@ Desde `1.1`, un componente puede pedir sus propios datos con composables autoimp
 
 | Composable | Uso | Devuelve |
 | --- | --- | --- |
-| `useApi(ruta, opciones?)` | Lectura de un endpoint `GET` | `{ data, error, pending, refresh }` |
-| `useRpcQuery(procedimiento, input)` | Lectura mediante un procedimiento RPC | `{ data, error, pending, refresh }` |
+| `useApi(ruta, opciones?, recarga?)` | Lectura de un endpoint `GET` | `{ data, error, pending, refreshing, refresh }` |
+| `useRpcQuery(procedimiento, input, recarga?)` | Lectura mediante un procedimiento RPC | `{ data, error, pending, refreshing, refresh }` |
 | `useRpcMutation(procedimiento, opciones?)` | Escritura bajo demanda mediante RPC | `{ mutate(input), data, error, pending }` |
 | `useApiMutation(ruta, método, opciones?)` (desde `1.2`) | Escritura bajo demanda en un endpoint `POST`, `PUT`, `PATCH` o `DELETE` | `{ mutate({ params, query, body }), data, error, pending }` |
 
@@ -1469,7 +1751,7 @@ const users = useApi("/api/users");
 </template>
 ```
 
-Las opciones de `useApi` y el `input` de `useRpcQuery` pueden contener señales en sus campos, o ser una función que las lee. Cuando el componente ya está montado en el navegador, un cambio de esas señales vuelve a pedir los datos y actualiza `data`, `pending` y `error`; una petición anterior que sigue en curso se cancela. `refresh()` vuelve a pedir los datos con la entrada actual. Un fallo de una recarga o de `refresh()` sólo actualiza `error`: no muestra la página de error.
+Las opciones de `useApi` y el `input` de `useRpcQuery` pueden contener señales en sus campos, o ser una función que las lee. Cuando el componente ya está montado en el navegador, un cambio de esas señales vuelve a pedir los datos y actualiza `data`, `pending` y `error`; una petición anterior que sigue en curso se cancela. `refresh()` vuelve a pedir los datos con la entrada actual. Mientras llegan los datos nuevos, `data` conserva los anteriores (véase [Datos anteriores durante una recarga](#datos-anteriores-durante-una-recarga-keepprevious)). Un fallo de una recarga o de `refresh()` sólo actualiza `error`: no muestra la página de error.
 
 Las opciones son opcionales cuando el contrato no exige nada. `useApi(ruta)` admite omitirlas si el endpoint no tiene `params` y su `query` no existe o sólo tiene campos opcionales. `useRpcQuery(procedimiento)` admite omitir el `input` si el schema acepta `{}`, y entonces envía `{}`. Lo mismo vale para los clientes generados: `api.users.get()` se llama sin argumentos cuando el endpoint no tiene `params`, ni `query` obligatoria, ni cuerpo. La firma de `rpc.x(input)` no cambia.
 
@@ -1509,7 +1791,150 @@ Un componente que aparece después de hidratar o confirmar la página (cuando un
 - Si el componente se libera antes (el `if:` vuelve a ser falso o la fila desaparece), la petición se aborta y no se pinta nada, ni se ejecuta `onMounted`, ni se informa un error.
 - Si la petición falla, la zona queda vacía y el error llega, con la fuente `"mounted"`, al `provideErrorHandler` más cercano o, si no hay ninguno, al `onError` de `mountClientApp`.
 
-Para mostrar un indicador mientras tanto, use el composable sin `await` y lea `pending`, como en el ejemplo anterior. El error `MEEKO_SUSPENDED` sólo aparece al llamar a `renderToString` o `renderWithState` de un componente con un `await` de datos fuera del framework (véase [api.md](api.md#módulo-generado)).
+Para mostrar un indicador mientras tanto, use el composable sin `await` y lea `pending`, como en el ejemplo anterior, o envuelva la zona en [`<MeekoAwait>`](#meekoawait), que además puede reservar su altura. El error `MEEKO_SUSPENDED` sólo aparece al llamar a `renderToString` o `renderWithState` de un componente con un `await` de datos fuera del framework (véase [api.md](api.md#módulo-generado)).
+
+#### Datos anteriores durante una recarga: `keepPrevious`
+
+Desde `1.1`, una recarga no vacía `data`: tanto `refresh()` como un cambio de las señales de la entrada ponen `pending` en `true` y dejan los datos anteriores hasta que llegan los nuevos, que los sustituyen en la misma actualización que `pending` vuelve a `false`. Una lista no desaparece mientras se recarga. Desde `1.5`:
+
+- **`refreshing`.** Es `true` mientras hay una recarga y `data` conserva una carga anterior. La primera carga es `pending` sin `refreshing`. Sirve para un indicador discreto (atenuar la lista, un icono girando) sin ocultar los datos.
+- **`keepPrevious`.** El último argumento de `useApi` y `useRpcQuery` acepta `{ keepPrevious }`. Por defecto vale `true`, el comportamiento de siempre. Con `false`, un cambio de la entrada vacía `data` y `error` y vuelve a ser una primera carga: sirve cuando mostrar los datos de otra entrada confundiría (la ficha de otro usuario mientras llega la nueva). `refresh()` conserva siempre los datos, porque son de la misma entrada, y un recurso esperado con `await`, cuyo `data` nunca es `null`, también.
+
+```html
+<script lang="ts">
+const props = defineProps<{ params: { id: string }; search: Record<string, string | string[]> }>();
+const page = signal("1");
+// Por defecto: la página anterior sigue en pantalla mientras llega la siguiente.
+const orders = useApi("/api/orders", { query: { page } });
+// Otro usuario: mejor el esqueleto que la ficha del anterior.
+const user = useApi("/api/users/[id]", () => ({ params: { id: props.params.id } }), { keepPrevious: false });
+</script>
+<template>
+    <ul bind:class="orders.refreshing.value ? 'dimmed' : undefined" bind:aria-busy="orders.pending.value ? 'true' : undefined">
+        <li each:of="orders.data.value ?? []" each:as="order" each:key="order.id">{order.total}</li>
+    </ul>
+</template>
+```
+
+| Situación | `data` | `pending` | `refreshing` |
+| --- | --- | --- | --- |
+| Primera carga | `null` | `true` | `false` |
+| `refresh()` | La anterior | `true` | `true` |
+| Cambio de la entrada | La anterior (con `keepPrevious: false`, `null`) | `true` | `true` (con `keepPrevious: false`, `false`) |
+| Recarga fallida | La anterior; `error` dice por qué | `false` | `false` |
+
+`<MeekoAwait>` se apoya en este comportamiento: durante una recarga sigue mostrando su contenido y marca la zona con `data-meeko-refreshing` y `aria-busy`.
+
+#### `<MeekoAwait>`
+
+Desde `1.5`, `<MeekoAwait>` es una etiqueta propia de Meeko, como `<MeekoLink>`: no se importa y el compilador la convierte en un componente que Meeko compila y distribuye. Envuelve la zona de unos datos que llegan después del primer pintado, el resultado de `useApi` o `useRpcQuery` sin `await`:
+
+```html
+<!-- app/components/ItemsCard.meeko -->
+<script lang="ts">
+const items = useApi("/api/items");
+</script>
+<template>
+    <section class="card">
+        <h2>Items</h2>
+        <MeekoAwait for="items" reserve>
+            <snippet name="pending"><ItemsSkeleton /></snippet>
+            <snippet name="error" params="error, retry"><p role="alert">No se pudo cargar. <button on:click="retry">Reintentar</button></p></snippet>
+            <ItemsList bind:items="items.data.value" />
+        </MeekoAwait>
+    </section>
+</template>
+```
+
+- **`for`.** El recurso, como expresión (igual que `each:of`; también vale `bind:for`), o una lista: `for="[items, stats]"`. Falta o vacío es el error `MEEK116`; algo que no es un recurso, un error de tipos en `meeko check` y en el editor, y un `TypeError` al renderizar. Vale cualquier objeto con `data`, `error`, `pending` y `refresh` (el tipo `AwaitResource`).
+- **Estados.** El contenido de la etiqueta (`default`) se pinta cuando todos los recursos tienen datos. El snippet `pending`, en la primera carga: mientras un recurso no tiene datos y carga (o aún no empezó; sin `await` la petición empieza al montar). El snippet `error`, cuando un recurso sin datos falló: recibe el error y `retry`, que vuelve a pedir los recursos que fallaron y pasa otra vez por `pending`. Sin snippet `error`, pinta `<p role="alert">` con «No se pudieron cargar los datos.» y un botón «Reintentar» (tradúzcalos con `bind:messages="{ error, retry }"`). Un fallo de un recurso gana a otro que todavía carga, para ofrecer `retry` cuanto antes.
+- **Recargas.** Una recarga con datos (`refresh()`, un cambio de la entrada) no vuelve a `pending`: el contenido sigue montado, con su DOM, su foco y su estado, y el snippet `default` recibe `refreshing` (`<snippet name="default" params="refreshing">`) para un indicador discreto. Una recarga fallida conserva el contenido; `items.error.value` dice por qué. Con `keepPrevious: false`, un cambio de la entrada vacía los datos y la zona vuelve a `pending`.
+- **Tipos.** Dentro del contenido, `meeko check` y el editor leen `items.data.value` como cargado: no hace falta `!` ni `?.`, como dentro de `if:when="items.data.value"`. Vale para cada recurso de `for` escrito como nombre (`items`, `page.items`); con otra expresión, el contenido usa el tipo de siempre. `pending` y `error` no se estrechan. Las props son `MeekoAwaitProps` y los snippets, `MeekoAwaitSnippets`, de `@meekojs/meeko/framework`; `MeekoAwaitProps` se autoimporta como `MeekoLinkProps`.
+- **Marcado.** Un `<div>` con `class` e `id` si se pasan, que nunca cambia de elemento, y con `data-meeko-await="pending|error|ready"`, `aria-busy="true"` mientras carga o recarga, `data-meeko-refreshing` durante una recarga y, con `reserve`, `data-meeko-reserve` y `data-meeko-reserve-min`. No trae estilos.
+- **Accesibilidad.** `aria-busy` avisa a los lectores de pantalla de que la zona carga. El error se anuncia con `role="alert"`: el aviso por defecto lo lleva; póngalo también en su snippet `error`. Si el foco estaba dentro de un nodo que desaparece al cambiar de estado (el botón «Reintentar», un esqueleto enfocable), pasa a la zona (`tabindex="-1"`, sin desplazar la página) en lugar de perderse en `<body>`; al llegar los datos sigue ahí.
+- **SSR.** Sin `await`, la petición no se hace en el servidor: el HTML lleva el snippet `pending` y `aria-busy`, y la hidratación no cambia nada hasta que llegan los datos. Si el recurso ya tiene datos en el servidor (un `await useApi`, que también vale en `for`), el HTML lleva el contenido.
+- **Nombre propio.** Un componente del proyecto llamado `MeekoAwait` tiene prioridad sobre la etiqueta de Meeko, con el aviso `MEEK106`.
+
+##### Reservar la altura: `reserve`
+
+Con `reserve`, mientras la zona espera ocupa la altura que tuvo con datos la última vez:
+
+- **Memoria.** Al mostrar datos, un `ResizeObserver` mide la zona (después del layout, sin bloquear el render) y guarda su altura en `sessionStorage` (`meeko:await`) y en memoria, bajo una clave que combina la ruta, la clave de la petición (la del payload: método o procedimiento y entrada) y el orden de la zona entre las de la misma petición en la página. Guarda las 100 zonas más recientes. Si el navegador bloquea `sessionStorage` (modo privado, un sandbox), la memoria vive mientras la página está abierta.
+- **Aplicación.** Mientras la zona está en `pending`, una regla CSS le da `min-block-size` con la altura recordada. La regla vive en una hoja de estilos construida (`adoptedStyleSheets`) y la zona la recibe por sus atributos: no hay `style="…"` en el HTML, así que funciona con una CSP estricta sin `'unsafe-inline'` en `style-src`. Con datos, la zona vuelve a su altura natural.
+- **Mínimo explícito.** `reserve="320px"` (cualquier longitud CSS: `px`, `rem`, `vh`…) fija además un mínimo, también en la primera visita, y la memoria nunca reserva menos. Su regla va en un `<style>` de `<head>` con el nonce de la petición o, en un sitio estático, permitido por su hash (`inlineStyleHashes`). Otra cosa es un `TypeError`.
+- **Reactivo.** Con `bind:reserve` (por ejemplo, `bind:reserve="compact.value ? false : '320px'"`), activarlo, quitarlo o cambiar el mínimo en el navegador añade o quita el script y las reglas de `<head>` y empieza o deja de medir la zona.
+
+Qué pasa en cada caso:
+
+| Situación | Primer pintado | Al llegar los datos |
+| --- | --- | --- |
+| Primera visita de la pestaña (sin memoria) | El esqueleto, con su altura natural (o el mínimo de `reserve="320px"`) | La zona crece una vez hasta el contenido: el mismo salto que sin `reserve`, que sólo evita un esqueleto de la misma altura |
+| Carga completa de una página ya visitada en la pestaña (recarga, abrir un enlace) | El esqueleto con la altura recordada: un script en línea de `<head>`, que se ejecuta antes del primer pintado, lee `sessionStorage` y adopta las reglas | Sin salto si el contenido mide lo mismo |
+| Navegación en el cliente a una página ya visitada | La zona se inserta con la altura recordada: el componente adopta las reglas antes de insertarla | Sin salto |
+| Zona que se monta más tarde (un `if:`, una pestaña) | Igual que la navegación | Sin salto |
+| Recarga de datos | El contenido sigue en pantalla | Sin salto, salvo que el contenido nuevo mida distinto |
+
+El script de `<head>` es siempre el mismo texto, así que tiene un único hash para la CSP; lleva el nonce de la petición y un sitio estático lo permite con los hashes de `inlineScriptHashes`. Sólo toca el CSSOM, nunca el DOM, así que la hidratación encuentra el HTML del servidor. Meeko lo añade sólo a las páginas con `<MeekoAwait reserve>` (con `useHead`, en una ruta `render: "stream"` también en el primer envío). Sin hojas de estilos construidas (navegadores anteriores a 2023) la zona usa su altura natural.
+
+La altura depende del ancho: si la ventana cambia mucho entre visitas, la memoria se ajusta en la siguiente medida. Dos zonas con la misma petición en la misma página tienen claves distintas por su orden; si el orden cambia entre visitas, intercambian sus alturas.
+
+##### Una transición opcional
+
+`<MeekoAwait>` no anima nada. Si quiere suavizar el cambio de altura cuando la zona deja la reserva, en los navegadores con [`interpolate-size`](https://developer.mozilla.org/docs/Web/CSS/interpolate-size):
+
+```css
+@media (prefers-reduced-motion: no-preference) {
+    [data-meeko-await] {
+        interpolate-size: allow-keywords;
+        transition: min-block-size 200ms ease-out;
+    }
+}
+```
+
+Una transición de tamaño mueve lo que viene después en cada fotograma y el navegador lo cuenta como salto (CLS): suaviza la percepción, no la métrica. Para la métrica, lo que cuenta es que la altura reservada coincida con la del contenido.
+
+#### Evitar saltos de altura (CLS)
+
+Una card cuyos datos llegan después del primer pintado sale vacía en el HTML y crece al llegar la lista, empujando lo que viene después: un salto de diseño, que Core Web Vitals mide como CLS. En orden de preferencia:
+
+1. **`await` en la carga inicial.** Con `await useApi(...)`, el SSR espera los datos y pinta la lista: no hay nada que crezca. Es la recomendación para lo que se ve al cargar la página.
+
+   ```html
+   <!-- app/components/ItemsCard.meeko -->
+   <script lang="ts">
+   const items = await useApi("/api/items");
+   </script>
+   <template>
+       <section class="card">
+           <h2>Items</h2>
+           <ul><li each:of="items.data.value" each:as="item" each:key="item.id">{item.name}</li></ul>
+       </section>
+   </template>
+   ```
+
+2. **`<MeekoAwait reserve>`.** Para lo que no puede esperar el SSR: datos secundarios, zonas fuera de pantalla, componentes que se montan más tarde o datos que cambian con la interacción. Desde la segunda visita de la pestaña la zona sale con su altura (véase [Reservar la altura](#reservar-la-altura-reserve)).
+
+   ```html
+   <script lang="ts">
+   const items = useApi("/api/items");
+   </script>
+   <template>
+       <section class="card">
+           <h2>Items</h2>
+           <MeekoAwait for="items" reserve>
+               <snippet name="pending"><ul class="skeleton"><li each:of="[1, 2, 3, 4]" each:as="row"></li></ul></snippet>
+               <ul><li each:of="items.data.value" each:as="item" each:key="item.id">{item.name}</li></ul>
+           </MeekoAwait>
+       </section>
+   </template>
+   ```
+
+3. **Esqueletos de la misma altura.** El snippet `pending` con las mismas filas y alturas que el contenido evita también el salto de la primera visita. Si la lista tiene un tamaño conocido (una página de 20), dé al esqueleto ese tamaño; si no, `reserve="320px"` fija un mínimo razonable.
+4. **`keepPrevious`.** Por defecto, `refresh()` y un cambio de la entrada conservan la lista anterior hasta que llega la nueva: no la vacíe a mano antes de recargar (véase [Datos anteriores durante una recarga](#datos-anteriores-durante-una-recarga-keepprevious)).
+5. **`content-visibility` y `contain-intrinsic-size`.** Para secciones largas fuera de pantalla, `content-visibility: auto` con `contain-intrinsic-size: auto 320px` reserva un tamaño y el navegador recuerda el último que pintó (`auto`). Es CSS de la aplicación; combina bien con `<MeekoAwait>`.
+6. **`interpolate-size`.** Una transición suaviza el cambio, pero no lo quita de la métrica (véase [Una transición opcional](#una-transición-opcional)).
+
+`meeko check`, `meeko build` y el editor avisan con `MEEK117` de una página o un layout que pinta en un `each:of` los datos de un `useApi` o un `useRpcQuery` sin `await` sin ocuparse de su carga. Es una pista, nunca un error: desaparece al esperar los datos con `await`, envolver la lista en `<MeekoAwait>`, leer `pending` o `refreshing` del recurso (un esqueleto con `if:when="items.pending.value"`), poner la lista bajo un `if:when` que lea sus datos o pasar el recurso entero a otro componente (`bind:items="items"`), que puede ocuparse de su carga.
 
 #### Mutaciones
 
@@ -1662,13 +2087,13 @@ Un valor que no es un UUID rechaza con `TypeError` sin enviar la petición. La c
 | Datos lentos y secundarios en una ruta `"stream"` | Un export, o un campo de `load`, con `defer` |
 | Datos que pertenecen a un componente reutilizable o a un layout | `await useApi` / `await useRpcQuery` |
 | Datos que dependen de señales del componente y se recargan al cambiar | `useApi` / `useRpcQuery`, con o sin `await` |
-| Datos que pueden llegar después del primer pintado, con un indicador de carga | `useApi` / `useRpcQuery` sin `await` |
+| Datos que pueden llegar después del primer pintado, con un indicador de carga | `useApi` / `useRpcQuery` sin `await`, con [`<MeekoAwait>`](#meekoawait) para no saltar |
 | Escrituras | `useRpcMutation` / `useApiMutation`, o `api.*`/`rpc.*` en un handler |
 | Escrituras que no deben aplicarse dos veces si se pierde la respuesta (cobros, pasos de cocina) | `useRpcMutation` / `useApiMutation` con `retrySafe` |
 | Estado del navegador que debe sobrevivir a una recarga (un ticket abierto, la caja elegida) | [`useStorage`](#estado-persistente-usestorage) |
 | Formularios que envían datos, con validación y errores por campo | `useForm` con `api.*`/`rpc.*` en su `submit` |
 
-Las reglas de nivel superior de estos composables (`MEEK054`, `MEEK055`) se describen en [api.md](api.md#composables-de-nivel-superior-y-await). Un host propio puede crearlos con `createUseApi(manifest, options)`, `createUseRpcQuery(manifest, options)`, `createUseRpcMutation(manifest, options)` y, desde `1.2`, `createUseApiMutation(manifest, options)` de `@meekojs/meeko/framework`, que es lo que hacen los clientes generados; los tipos `DataResource`, `LoadedResource`, `RpcMutation`, `UseApi`, `UseRpcQuery`, `UseRpcMutation`, `ApiQueryContract`, `ApiQueryOptions` y `Reactive`, y desde `1.2` `ApiMutation`, `ApiMutationInput`, `ApiMutationContract`, `UseApiMutation`, `MutationOptions`, `RetrySafeOptions`, `RetrySafeMutation` y `UncertainMutation`, describen su forma.
+Las reglas de nivel superior de estos composables (`MEEK054`, `MEEK055`) se describen en [api.md](api.md#composables-de-nivel-superior-y-await). Un host propio puede crearlos con `createUseApi(manifest, options)`, `createUseRpcQuery(manifest, options)`, `createUseRpcMutation(manifest, options)` y, desde `1.2`, `createUseApiMutation(manifest, options)` de `@meekojs/meeko/framework`, que es lo que hacen los clientes generados; los tipos `DataResource`, `LoadedResource`, `RpcMutation`, `UseApi`, `UseRpcQuery`, `UseRpcMutation`, `ApiQueryContract`, `ApiQueryOptions` y `Reactive`, desde `1.2` `ApiMutation`, `ApiMutationInput`, `ApiMutationContract`, `UseApiMutation`, `MutationOptions`, `RetrySafeOptions`, `RetrySafeMutation` y `UncertainMutation`, y desde `1.5` `DataResourceOptions`, describen su forma.
 
 ### Estado persistente: `useStorage`
 
@@ -1783,6 +2208,8 @@ const form = useForm({
 | `initial` | Valor inicial de cada campo. Con `schema`, uno por cada clave de su entrada, también las opcionales (`undefined` si no hay valor). |
 | `submit(values)` | Envía los datos: recibe la salida del schema (o los valores de los campos, sin schema) y devuelve el resultado, o rechaza. |
 | `errorMessage(failure)` | Opcional. Texto de `error` para un fallo sin `issues`; por defecto, `failure.message`, que en un `ClientError` es su `code`. |
+| `onSuccess(result, form)` | Opcional, desde `1.5`. Se ejecuta tras un envío correcto, con `submitted` ya en `true`: por ejemplo, `(saved, form) => form.commit({ name: saved.name })`. |
+| `focusInvalid` | Opcional, desde `1.5`. Con `true`, tras un envío con errores en los campos mueve el foco al primer control inválido (véase [Foco en el primer error](#foco-en-el-primer-error)). |
 
 y devuelve un `Form`:
 
@@ -1796,7 +2223,10 @@ y devuelve un `Form`:
 | `submitted` | `true` cuando el último envío terminó bien. |
 | `dirty` | `true` si algún campo difiere de los valores iniciales (los arrays y objetos se comparan por contenido). |
 | `submit(event?)` | Envía el formulario; resuelve con lo que devuelve `submit`, o con `undefined`. Nunca rechaza. |
+| `trySubmit(event?)` | Desde `1.5`. Envía igual que `submit`, pero resuelve con un `FormSubmission` que dice cómo terminó. Nunca rechaza. |
 | `reset(values?)` | Vuelve a los valores iniciales, o a `initial` combinado con `values`. |
+| `commit(values?)` | Desde `1.5`. Escribe `values` y toma los valores de los campos como nuevos valores iniciales, sin borrar `submitted`. |
+| `field(name)` | Desde `1.5`. Las piezas de un campo para un componente propio: su señal, su mensaje e IDs estables (véase [Componentes de campo](#componentes-de-campo-formfield)). |
 
 Todas las señales salvo `fields` son de sólo lectura.
 
@@ -1809,7 +2239,36 @@ async function save(event: SubmitEvent): Promise<void> {
 }
 ```
 
+**Resultado del envío.** `submit` resuelve `undefined` tanto si los datos no son válidos como si falla la red o si `submit` devuelve `undefined`. Desde `1.5`, `form.trySubmit(event)` envía igual, pero resuelve con un `FormSubmission<Result>` discriminado por `ok` y `reason`:
+
+| Resultado | Cuándo |
+| --- | --- |
+| `{ ok: true, result }` | `submit` terminó bien y devolvió `result`. |
+| `{ ok: false, reason: "invalid", errors, error, failure }` | Los datos no superaron el schema del navegador (`failure` es `null`) o el servidor respondió con `issues` (`failure` es el `ClientError`). `errors` y `error` son los mensajes que muestra el formulario. |
+| `{ ok: false, reason: "error", error, failure }` | El envío falló sin `issues`, como un `409` o un fallo de red. `error` es el texto de `errorMessage`, o `null` si un `reset` lo descartó. |
+| `{ ok: false, reason: "skipped" }` | No se envió nada: ya había un envío en curso, el script se ejecuta sólo para producir HTML (SSR) o un `reset` descartó los valores mientras el schema validaba. |
+
+```ts
+async function send(event: SubmitEvent): Promise<void> {
+    const outcome = await form.trySubmit(event);
+    if (outcome.ok) created.value = outcome.result.username;
+    else if (outcome.reason === "error") console.warn(outcome.failure);
+}
+```
+
+`submit` no cambia: sigue resolviendo con el resultado o con `undefined`, y `on:submit="form.submit"` sigue siendo la forma corta cuando no hace falta el resultado.
+
+#### Foco en el primer error
+
+Con `focusInvalid: true`, un envío que termina con errores en los campos, del schema o de los `issues` del servidor, mueve el foco al primer control inválido una vez que los mensajes se han pintado (en el siguiente `requestAnimationFrame`). Busca, en el orden del documento dentro del `<form>` del evento (su `currentTarget`, o el formulario del botón que lo envió), un control cuyo `name` o cuyo `id` de `form.field` sea el de un campo con error, o que tenga `aria-invalid="true"`. Sin evento, busca en todo el documento. Un fallo sin `issues`, como un `409` sin ellos o un fallo de red, no mueve el foco.
+
+```ts
+const form = useForm({ schema: signupInput, initial: { email: "", password: "" }, submit: (values) => api.signup.post({ body: values }), focusInvalid: true });
+```
+
 **Validación.** El schema se ejecuta al enviar, no mientras se escribe. Cada issue va a `errors` con su ruta unida con `.`, como los `issues` del servidor: `"name"`, o `"items.0.name"` en un campo anidado. Si una ruta tiene varios, se conserva el primero. Un issue con ruta `""` (de una regla sobre el objeto completo) o de una clave que el formulario no tiene va a `error`. Tras un error, el campo se vuelve a validar cada vez que cambia: su mensaje se actualiza o desaparece en cuanto es válido, sin esperar al siguiente envío. Un campo sin error no se valida hasta el envío. Si el schema es asíncrono, `pending` vale `true` mientras valida.
+
+**Campos que dependen de otros.** Desde `1.5`, cada cambio vuelve a validar también los demás campos que ya muestran un error del schema, y el mensaje del formulario si vino del schema (un issue con ruta `""`). El schema se ejecuta siempre sobre el formulario entero, así que no cuesta más. Con una confirmación que Valibot lleva a su campo con `v.forward(v.partialCheck([["password"], ["confirm"]], …), ["confirm"])`, cambiar la contraseña quita el «Las contraseñas no coinciden» de `confirm` en cuanto coinciden, sin tocar la confirmación. Las reglas siguen sin añadir mensajes a un campo que no tenía error, y los mensajes del servidor de otro campo (un `issue` de un `400` o de un `ApiError`) no se borran por cambiar un campo distinto: sólo cuando cambia su propio campo. Con un schema asíncrono, sólo se aplica la validación más reciente, que cubre todos los campos cambiados desde la anterior.
 
 **Errores del servidor.** Un `ClientError` con `issues` (la respuesta `400` de una entrada que no supera el schema del servidor) se reparte igual: cada mensaje en su campo y los demás en `error`. Es útil sin schema en el navegador, o cuando el servidor tiene reglas que el formulario no comprueba. Sin schema, cambiar un campo borra sus mensajes del servidor:
 
@@ -1830,11 +2289,121 @@ const form = useForm({
 
 Con esa respuesta, `form.errors.value` vale `{ email: "Escribe un correo válido.", password: "Escribe tu contraseña." }`, `form.error.value` vale `null` y `form.failure.value` es el `ClientError`. Un `401` `INVALID_CREDENTIALS` deja `errors` vacío y `error` con el texto de `errorMessage`. Para marcar un campo desde el propio `submit` (por ejemplo, tras comprobar algo en el navegador), lance un `ClientError` con `issues`: `throw new ClientError("EMAIL_TAKEN", 409, undefined, [{ path: "email", message: "Ese correo ya tiene cuenta." }])`.
 
+Desde `1.5`, el servidor también puede atribuir a un campo un error que no es de validación, como un `409` de un correo que ya existe: `new ApiError(code, status, { issues })` envía esos `issues` con la misma forma que los de un `400` (véase [Errores de un campo: `ApiError` con `issues`](#errores-de-un-campo-apierror-con-issues)), y `useForm` los reparte igual: el mensaje en `errors.value.email`, `error` en `null` y el `ClientError` del `409` en `failure`.
+
+```ts
+// server/api/signup.post.ts
+export default defineApiRoute({
+    body: signupInput,
+    response: signupResult,
+    status: 201,
+    handler: async ({ body }) => {
+        if (await emailTaken(body.email)) throw new ApiError("EMAIL_TAKEN", 409, { issues: [{ path: "email", message: "Ese correo ya tiene una cuenta." }] });
+        return createUser(body);
+    },
+});
+```
+
+`ClientError` e `isClientError` se autoimportan desde `1.5` en los componentes y en los módulos de `app/` (no en `server/`, donde se lanza `ApiError`), como `useForm`: `errorMessage: (failure) => isClientError(failure, "INVALID_CREDENTIALS") ? "…" : "…"` no necesita import.
+
 **Otros fallos.** Un error sin `issues` pone en `error` el texto de `errorMessage(failure)` y en `failure` el error original, y `form.submit()` resuelve `undefined`. Un `ClientError` es una respuesta prevista del servidor y no se informa en otro sitio. Cualquier otro error (un fallo de red, un error de programación en `submit` o un schema que lanza) llega además al observador de errores del componente, `provideErrorHandler` o el `onError` de `mountClientApp`, con la fuente `"event"`; sin observador, se escribe en la consola. Así un fallo inesperado nunca se pierde en silencio, aunque la plantilla no muestre `error`.
 
 **`reset` y `dirty`.** `reset()` devuelve los campos a `initial`; `reset(values)` los lleva a `initial` combinado con `values`, por ejemplo para editar un registro existente: `form.reset({ name: category.name, description: category.description })`. Esos valores pasan a ser la referencia de `dirty`. `reset` borra `errors`, `error`, `failure` y `submitted`, y descarta el resultado de una validación o un envío que siga en curso (aunque `pending` sigue en `true` hasta que termine). Como con cualquier señal, sustituya los arrays y objetos en lugar de mutarlos: `form.fields.items.value = [...form.fields.items.value, item]`.
 
+**`commit`.** Desde `1.5`, `commit(values?)` escribe `values` en sus campos y toma los valores de todos los campos como los nuevos valores iniciales: `dirty` vuelve a `false` y un `reset()` posterior vuelve a ellos (y `reset(values)` combina `values` con ellos). A diferencia de `reset`, no borra `submitted`, `errors`, `error` ni `failure`, ni descarta un envío en curso. Sirve tras guardar, para que lo guardado sea la nueva referencia sin perder el «Guardado». Sin `values`, toma los valores actuales; si el usuario puede seguir escribiendo durante el envío, pase lo que devolvió el servidor. Con `onSuccess`, el formulario lo hace solo:
+
+```ts
+const profile = useForm({
+    schema: profileInput,
+    initial: { name: data.name, bio: data.bio },
+    submit: (values) => api.profile.put({ body: values }),
+    onSuccess: (saved, form) => form.commit({ name: saved.name, bio: saved.bio }),
+});
+```
+
+```html
+<p if:when="profile.submitted.value && !profile.dirty.value">Guardado.</p>
+```
+
 **Tipos.** Con `schema`, los campos tienen el tipo de la entrada del schema y `submit` recibe su salida: con un `v.transform`, el campo puede ser texto (`price: Signal<string>`) y `submit` recibir un número. Sin schema, los campos y los valores tienen el tipo de `initial`. `meeko check` comprueba `initial` contra la entrada del schema, rechaza un campo que no existe (`form.fields.nmae`) o una ruta de `errors` que no existe, y exige que el campo de un `model` tenga el tipo del control (un campo `number` no sirve para un `<input>` de texto). El tipo `Form<Values, Result>` describe el resultado, por ejemplo para pasar el formulario a un componente.
+
+#### Componentes de campo: `FormField`
+
+Desde `1.5`, `form.field(name)` devuelve lo que un componente de campo necesita, sin recibir el formulario entero: un `FormField<Value>` tipado por la clave del campo (`form.field("nmae")` es un error de tipos). Devuelve siempre el mismo objeto para el mismo campo, así que se puede pasar como prop en la plantilla.
+
+| Propiedad | Valor |
+| --- | --- |
+| `value` | La misma `Signal` que `form.fields[name]`, para `model`. |
+| `name` | El nombre del campo, para el atributo `name` (y para `focusInvalid`). |
+| `id`, `errorId`, `hintId` | IDs del control, de su mensaje (`${id}-error`) y de un texto de ayuda (`${id}-hint`). Salen de [`useId`](api.md#ids-estables-useid): coinciden entre SSR e hidratación y no se repiten entre formularios. |
+| `error` | Señal con el primer mensaje del campo (o de una ruta anidada, como `items.0.name`), o `undefined`. |
+| `invalid` | Señal: `true` si el campo tiene algún error. |
+| `describedBy` | Señal: `errorId` mientras hay error, o `undefined`; el valor de `aria-describedby`. |
+
+```html
+<!-- app/components/AppField.meeko -->
+<script lang="ts">
+import type { FormField } from "@meekojs/meeko/framework";
+const props = defineProps<{ field: FormField<string>; label: string; hint?: string }>();
+const describedBy = computed(() => [props.hint ? props.field.hintId : "", props.field.describedBy.value ?? ""].filter(Boolean).join(" ") || null);
+</script>
+<template>
+    <div class="field">
+        <label bind:for="props.field.id">{props.label}</label>
+        <input bind:id="props.field.id" bind:name="props.field.name" model="props.field.value"
+            bind:aria-invalid="props.field.invalid.value ? 'true' : null" bind:aria-describedby="describedBy.value">
+        <p if:when="props.hint" class="field-hint" bind:id="props.field.hintId">{props.hint}</p>
+        <p if:when="props.field.error.value" class="field-error" bind:id="props.field.errorId">{props.field.error.value}</p>
+    </div>
+</template>
+```
+
+```html
+<form on:submit="form.submit" novalidate>
+    <AppField bind:field="form.field('email')" label="Correo" />
+    <AppField bind:field="form.field('password')" label="Contraseña" hint="Al menos 10 caracteres." />
+</form>
+```
+
+**Un campo con `field` o con `model`.** Un componente de campo reutilizable puede servir dentro de un formulario, con `bind:field`, y fuera de él, con `model` o sin nada. Declare `field` opcional y el modelo por defecto con opciones sin nombre, `defineModel<string>({ default: "" })`, para que también sea opcional (véase [Modelos de componente](api.md#modelos-de-componente-definemodel-y-model)); con `defineModel<string>()`, `<AppTextField bind:field="…" />` da `TS2741` porque el modelo sería obligatorio. Elija entre los dos dentro de un `computed`:
+
+```html
+<!-- app/components/AppTextField.meeko -->
+<script lang="ts">
+import type { FormField } from "@meekojs/meeko/framework";
+const props = defineProps<{ field?: FormField<string>; label: string; hint?: string; error?: string }>();
+// Sin field, el valor es el modelo: la señal del padre (model="señal") o una propia.
+const model = defineModel<string>({ default: "" });
+const ownId = useId();
+const id = computed(() => props.field?.id ?? ownId);
+const hintId = computed(() => `${id.value}-hint`);
+const errorId = computed(() => `${id.value}-error`);
+const value = computed(() => props.field?.value ?? model);
+const error = computed(() => props.field ? props.field.error.value : props.error);
+const describedBy = computed(() => [props.hint ? hintId.value : "", error.value ? errorId.value : ""].filter(Boolean).join(" ") || null);
+</script>
+<template>
+    <div class="field">
+        <label bind:for="id.value">{props.label}</label>
+        <input bind:id="id.value" bind:name="props.field?.name" model="value.value"
+            bind:aria-invalid="error.value ? 'true' : null" bind:aria-describedby="describedBy.value">
+        <p if:when="props.hint" class="field-hint" bind:id="hintId.value">{props.hint}</p>
+        <p if:when="error.value" class="field-error" bind:id="errorId.value">{error.value}</p>
+    </div>
+</template>
+```
+
+```html
+<form on:submit="form.submit" novalidate>
+    <AppTextField bind:field="form.field('email')" label="Correo" />
+</form>
+<AppTextField model="query" label="Buscar" hint="Por nombre o correo." />
+<AppTextField label="Notas" />
+```
+
+`model="value.value"` enlaza la señal que elige el `computed`: la del campo o la del modelo. Los IDs del campo salen de `form.field` y, sin él, de `useId`, con los mismos sufijos `-hint` y `-error` que `hintId` y `errorId`. `const value = props.field?.value ?? model` en el setup daría el aviso `MEEK101`, y con razón: el setup se ejecuta una vez y, con props reactivas, el padre puede cambiar de campo sin volver a montar el hijo (`bind:field="editing.value ? form.field('email') : form.field('phone')"`). `form.field` devuelve el mismo objeto para el mismo campo, pero la prop puede pasar a otro; dentro de un `computed`, el valor y los IDs siguen ese cambio. Use `untrack(() => props.field)` sólo si el campo de esa instancia no cambia nunca.
+
+Para un campo de otro tipo, declare la prop con su tipo (`FormField<boolean>` en una casilla). Los IDs de `form.field` toman el prefijo de `document.idPrefix`. Llame a `useForm` en el nivel superior del script, como `useId`, para que sus IDs coincidan al hidratar.
 
 **SSR e hidratación.** En SSR el formulario se renderiza con `initial` y nunca envía: los eventos no existen en el servidor, y `form.submit()` no hace nada si se llama mientras el script se ejecuta para producir sólo HTML (SSR o la pasada en seco de una navegación). Los campos son estado del componente que no viaja en el payload: no forman parte del estado transferido ni del que conserva HMR, porque `form` no es una señal. Al hidratar, el navegador vuelve a ejecutar `useForm` con el mismo `initial`, así que `initial` debe depender sólo de props, datos de la ruta y estado, como la entrada de un `await useApi`. Lo que el usuario escriba antes de que la página se hidrate se conserva: `model` lo copia a la señal del campo al terminar la hidratación.
 

@@ -212,6 +212,27 @@ export interface MeekoConfig {
     /** Carpetas dentro de `server/` cuyos exports se autoimportan sólo en el código de servidor. */
     readonly serverDirs?: readonly string[];
   };
+  /**
+   * Aliases de ruta propios, o cambios de los de Meeko. Cada clave es un prefijo que termina en `/`
+   * y cada valor, una carpeta del proyecto (relativa a su raíz; también la de un layer) o `false`
+   * para quitar el alias. Por defecto existen `~/` (la raíz del proyecto), `@/` (`app/`),
+   * `#shared/` (`shared/`) y `#server/` (`server/`, sólo en el código de servidor). Un alias propio
+   * toma el ámbito de la carpeta a la que apunta, como los autoimports: dentro de `server/`, sólo
+   * en el servidor; dentro de `app/`, en `app/` y `server/` pero no en `shared/`; en otro lugar, en
+   * todo el proyecto. Se aplica en Vite (`meeko dev`, `meeko build` y todos los adaptadores), en los
+   * `tsconfig` generados, en el editor y en los módulos de `@utilities`.
+   * @since 1.5.0
+   * @example
+   * ```ts
+   * import { defineMeekoConfig } from "@meekojs/meeko/framework";
+   *
+   * export default defineMeekoConfig({
+   *   alias: { "ui/": "app/components/ui/", "#server/": false },
+   * });
+   * ```
+   * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#aliases-de-ruta
+   */
+  readonly alias?: Readonly<Record<string, string | false>>;
   /** Destino del servidor de producción. Por defecto, `{ adapter: "node" }`. */
   readonly server?: MeekoServerConfig;
   /**

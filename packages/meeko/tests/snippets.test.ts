@@ -440,9 +440,11 @@ test("snippets report MEEK059 to MEEK062 and children no longer give MEEK049", (
   assertCompileError(extra, "MEEK062", extra.indexOf(`class="a"`));
   // Children of a component tag compile into snippets; the type check decides if the child accepts them.
   assert.doesNotThrow(() => compile(template(`<Child>text</Child><div><Child><span></span></Child></div>`), "Snippets.meeko"));
-  // `<component is>` still rejects children.
-  const dynamic = template(`<component is="Child">text</component>`);
-  assertCompileError(dynamic, "MEEK031", dynamic.indexOf("<component"));
+  // Since 1.5, `<component is>` takes children too: snippets of a component, children of a tag.
+  assert.doesNotThrow(() => compile(template(`<component is="Child">text<snippet name="x">a</snippet></component>`), "Snippets.meeko"));
+  // A snippet with `ref:` is still MEEK052 there.
+  const dynamicRef = template(`<component is="Child"><p ref:p>a</p></component>`);
+  assertCompileError(dynamicRef, "MEEK052", dynamicRef.indexOf("ref:p"));
   // A late name inside snippet content is MEEK057, parameters are not.
   const lateName = `<script lang="ts">\nimport * as Child from "./Child.meeko";\nconst input = await useElementRef("input");\nconst later = 1;\n</script><template><input ref:input /><Child><snippet name="x" params="p">{p}{later}</snippet></Child></template>`;
   assertCompileError(lateName, "MEEK057", lateName.indexOf("later}"));

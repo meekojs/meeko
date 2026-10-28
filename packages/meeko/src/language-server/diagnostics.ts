@@ -339,8 +339,9 @@ export async function componentDiagnostics(
         if (range?.[0] === offset && range[1] > offset) { end = range[1]; break; }
       }
     }
-    // MEEK107 marks the whole value of `html="..."`, up to its closing quote.
-    if (end === undefined && item.code === "MEEK107") {
+    // MEEK107 marks the whole value of `html="..."`, up to its closing quote, and so do MEEK112,
+    // MEEK113 and MEEK031 when they are about a whole value (`is="..."`, `bind="..."`).
+    if (end === undefined && (item.code === "MEEK107" || item.code === "MEEK112" || item.code === "MEEK113" || item.code === "MEEK031")) {
       const quote = source[offset - 1];
       const close = quote === "\"" || quote === "'" ? source.indexOf(quote, offset) : -1;
       if (close > offset) end = close;

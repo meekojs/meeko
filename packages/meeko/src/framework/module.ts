@@ -208,6 +208,21 @@ export interface MeekoModuleContext {
   addLayer(dir: string | URL): void;
   /** Añade los componentes `.meeko` de una carpeta (y subcarpetas) al autoimport, con un prefijo opcional en PascalCase. */
   addComponentsDir(dir: string | URL, options?: { readonly prefix?: string }): void;
+  /**
+   * Añade un layout con nombre, como un archivo de `app/layouts`: las páginas lo eligen con
+   * `definePage({ layout: name })` o un `+group.ts`. Un layout del proyecto o de un layer con el
+   * mismo nombre gana; dos módulos con el mismo nombre son un error. Un `default` envuelve las
+   * páginas que no eligen layout si el proyecto no tiene `app/layouts/default.meeko`.
+   *
+   * @param name Nombre del layout: letras, dígitos, guiones y `_`, con `/` entre carpetas (`"admin/panel"`).
+   * @param file Archivo `.meeko` del layout.
+   * @since 1.5.0
+   * @example
+   * ```ts
+   * meeko.addLayout("docs", new URL("./runtime/docs-layout.meeko", import.meta.url));
+   * ```
+   */
+  addLayout(name: string, file: string | URL): void;
   /** Añade autoimports de un paquete o archivo. */
   addAutoImports(entries: ModuleAutoImport | readonly ModuleAutoImport[]): void;
   /**

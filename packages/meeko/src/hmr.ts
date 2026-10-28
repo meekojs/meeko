@@ -2,6 +2,7 @@ import { captureParentOwner, isExternalSignal, isWritableSignal } from "./reacti
 import { borrowedKey } from "./models.js";
 import { parseRegionHtml } from "./dom.js";
 import type { DomScope } from "./dom.js";
+import { serializeJson } from "./server.js";
 
 /**
  * Valores de las señales editables de un componente, por nombre, que HMR transfiere en memoria
@@ -56,13 +57,53 @@ export function snapshotSignals(bindings: Record<string, unknown>): HotState {
   return state;
 }
 
+/**
+ * Key of the transferred state that lists the signals holding `undefined`, which JSON cannot carry.
+ * It is not an identifier, so no binding of a component can have that name.
+ */
+const undefinedKey = "meeko:undefined";
+
+/**
+ * The editable signals of a server render, as they travel to the browser: checked as JSON, with
+ * the signals that hold `undefined` listed under {@link undefinedKey}. A value that JSON cannot
+ * carry fails with the component and the signal. The generated `renderWithState` calls it.
+ */
+export function transferState(bindings: Record<string, unknown>, component: string): HotState {
+  const state: HotState = {};
+  const missing: string[] = [];
+  for (const [name, value] of Object.entries(snapshotSignals(bindings))) {
+    if (value === undefined) {
+      missing.push(name);
+      continue;
+    }
+    try { serializeJson({ [name]: value }); }
+    catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new TypeError(`${component}: the signal "${name}" cannot be sent to the browser with the SSR state (${reason}). `
+        + "The signals of a component script travel as JSON: keep strings, finite numbers, booleans, null, arrays and plain objects in them, or undefined as the whole value "
+        + "(a Date as an ISO string, a Map as an object), or keep the value out of the state: only the writable signals declared at the top level of the script travel, not a constant, a computed or a signal kept inside an object.", { cause: error });
+    }
+    state[name] = value;
+  }
+  if (missing.length) state[undefinedKey] = missing;
+  return state;
+}
+
 /** Restaura señales compatibles antes de renderizar o hidratar la nueva versión. */
 export function restoreSignals(bindings: Record<string, unknown>, state?: HotState): void {
   if (!state) return;
-  for (const [name, value] of Object.entries(state)) {
+  const borrowed = (bindings as { [borrowedKey]?: ReadonlySet<unknown> })[borrowedKey];
+  const restore = (name: string, value: unknown): void => {
     const target = bindings[name];
-    if (isWritableSignal(target) && !isExternalSignal(target) && !(bindings as { [borrowedKey]?: ReadonlySet<unknown> })[borrowedKey]?.has(target)) target.value = value;
+    if (isWritableSignal(target) && !isExternalSignal(target) && !borrowed?.has(target)) target.value = value;
+  };
+  for (const [name, value] of Object.entries(state)) {
+    if (name === undefinedKey) continue;
+    restore(name, value);
   }
+  // Signals that held `undefined` in the server render (see `transferState`).
+  const missing = state[undefinedKey];
+  if (Array.isArray(missing)) for (const name of missing) if (typeof name === "string") restore(name, undefined);
 }
 
 /** Activa el seguimiento de instancias solo para módulos servidos por Vite. */

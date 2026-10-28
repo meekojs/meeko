@@ -5,8 +5,9 @@ import ts from "@typescript/typescript6";
 import { createEditorModel } from "../src/language-server/model.ts";
 
 /**
- * Every public subpath of `package.json#exports` and its source entry. `./internal` is left out:
- * only compiled `.meeko` modules import it.
+ * Every public subpath of `package.json#exports` and its source entry. `./internal` and
+ * `./builtins/*` are left out: only compiled `.meeko` modules import them. The types of the
+ * built-in tags are documented through `./framework`.
  */
 const entries: Readonly<Record<string, string>> = {
   ".": "src/index.ts",

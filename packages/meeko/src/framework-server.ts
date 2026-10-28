@@ -20,7 +20,7 @@ export type { MeekoSession, SessionCreateOptions, SessionData, SessionOptions, S
 export { RedisSessionStore, SqlSessionStore } from "./framework-server/session-stores.js";
 export type { RedisSessionClient, RedisSessionStoreOptions, SqlSessionDriver, SqlSessionRow, SqlSessionStoreOptions } from "./framework-server/session-stores.js";
 export { ApiError, SessionRevokedError, defineApiRoute, defineRpc, dispatchApiRoute, dispatchRpc, errorResponse, executeApiRoute, executeRpc } from "./framework-server/contracts.js";
-export type { ApiRouteDefinition, ApiSuccessStatus, RpcDefinition, Schema, ServerErrorInfo, ServerErrorObserver } from "./framework-server/contracts.js";
+export type { ApiErrorIssue, ApiErrorOptions, ApiRouteDefinition, ApiSuccessStatus, RpcDefinition, Schema, ServerErrorInfo, ServerErrorObserver } from "./framework-server/contracts.js";
 export type { RateLimitHit, RateLimitOptions } from "./framework-server/rate-limit.js";
 export { createLocalServerFetch, createServerDispatcher, loadSocketChannels } from "./framework-server/discovery.js";
 export type { ApiEndpoint, ApiMethod, RpcEndpoint, SocketEndpoint, ServerDispatcherOptions, ServerManifest, ServerModuleLoader } from "./framework-server/discovery.js";
