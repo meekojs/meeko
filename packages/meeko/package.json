@@ -1,6 +1,6 @@
 {
   "name": "@meekojs/meeko",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "packageManager": "pnpm@12.14.0",
   "description": "Typed .meeko component engine with SSR, hydration, signals, Vite, and DevTools.",
   "license": "MIT",
@@ -78,6 +78,7 @@
     "prepack": "tsc -p tsconfig.build.json",
     "build": "tsc -p tsconfig.build.json",
     "check": "tsc -p tsconfig.json --noEmit",
+    "builtins": "tsx scripts/builtin-components.ts",
     "test": "node scripts/clean-test-tmp.mjs && pnpm run build && pnpm run example:compile && tsx --test --test-concurrency=1 tests/*.test.ts",
     "example:compile": "node dist/cli.js compile examples/counter/Counter.meeko examples/counter/Counter.generated.ts && node dist/cli.js compile examples/attributes/Attributes.meeko examples/attributes/Attributes.generated.ts && node dist/cli.js compile examples/regions/Regions.meeko examples/regions/Regions.generated.ts && node dist/cli.js compile examples/primitives/Primitives.meeko examples/primitives/Primitives.generated.ts",
     "example:bundle": "pnpm run build && pnpm run example:compile && esbuild examples/counter/client.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=examples/counter/client.bundle.js",

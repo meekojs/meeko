@@ -12,7 +12,7 @@
                     "start":  "meeko start ."
                 },
     "dependencies":  {
-                         "@meekojs/meeko":  "1.3.0",
+                         "@meekojs/meeko":  "1.4.0",
                          "valibot":  "^1.5.0"
                      },
     "devDependencies":  {
