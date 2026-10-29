@@ -2,6 +2,7 @@ import { lstat, readFile, readdir, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
 import { routeBlockId, tryRouteBlockSource } from "./route-block.js";
+import { discoverRouteMiddleware, globalMiddlewareNames, isServerRouteMiddleware, routeMiddlewareNamePattern } from "./route-middleware-discovery.js";
 import { createRouteManifest } from "./router.js";
 import type { ErrorPageRecord, RouteRecord } from "./router.js";
 import type { PageRender } from "./page.js";
@@ -128,8 +129,23 @@ function literalLayout(file: string, value: ts.Expression): string | false {
   return expression.text;
 }
 
+/** `middleware` of route or group options: an array literal of names of `app/middleware`, or `false`. */
+function literalMiddleware(file: string, value: ts.Expression): readonly string[] | false {
+  const expression = unwrapValue(value);
+  if (expression.kind === ts.SyntaxKind.FalseKeyword) return false;
+  const message = `${file}: middleware debe ser un array literal de nombres de app/middleware, o false, para que Meeko pueda leerlo durante el build`;
+  if (!ts.isArrayLiteralExpression(expression)) throw new Error(message);
+  return expression.elements.map((element) => {
+    const item = unwrapValue(element);
+    if (!ts.isStringLiteral(item) && !ts.isNoSubstitutionTemplateLiteral(item)) throw new Error(message);
+    if (!routeMiddlewareNamePattern.test(item.text)) throw new Error(`${file}: "${item.text}" no es un nombre de middleware válido`);
+    return item.text;
+  });
+}
+
 /**
- * Opciones de ruta que Meeko lee sin ejecutar el archivo: `render` y, desde `1.5`, `layout`.
+ * Opciones de ruta que Meeko lee sin ejecutar el archivo: `render`, desde `1.5`, `layout` y, desde
+ * `1.6`, `middleware`.
  *
  * @since 1.5.0
  * @example
@@ -144,6 +160,12 @@ export interface StaticRouteOptions {
   readonly render?: PageRender;
   /** Layout con nombre que elige la página, o `false` para quitarlo; sin él, el heredado. */
   readonly layout?: string | false;
+  /**
+   * Middleware con nombre que añade la página a los heredados de sus `+group.ts`, o `false` para
+   * quitar los heredados.
+   * @since 1.6.0
+   */
+  readonly middleware?: readonly string[] | false;
 }
 
 /**
@@ -155,8 +177,8 @@ export function extractRouteRender(file: string, source: string): PageRender | u
 }
 
 /**
- * Reads `render` and `layout` from route options without executing them. Each must be a literal
- * in the exported `definePage({...})` call or object literal.
+ * Reads `render`, `layout` and `middleware` from route options without executing them. Each must
+ * be a literal in the exported `definePage({...})` call or object literal.
  */
 export function extractRouteOptions(file: string, source: string): StaticRouteOptions {
   const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -202,12 +224,19 @@ export function extractRouteOptions(file: string, source: string): StaticRouteOp
   }
   let render: PageRender | undefined;
   let layout: string | false | undefined;
+  let middleware: readonly string[] | false | undefined;
   // Members after the last explicit render that could set it at run time.
   let spread = false;
   let computed = false;
   let prerenderEntries = false;
+  // A spread after the last explicit middleware that may carry one: the build would not see it.
+  let middlewareSpread: ts.SpreadAssignment | undefined;
   for (const property of object.properties) {
-    if (ts.isSpreadAssignment(property)) { spread = true; continue; }
+    if (ts.isSpreadAssignment(property)) {
+      spread = true;
+      if (spreadMayDeclare(property.expression, "middleware", constants)) middlewareSpread = property;
+      continue;
+    }
     if (property.name && ts.isComputedPropertyName(property.name)) { computed = true; continue; }
     const name = property.name ? propertyName(property.name) : undefined;
     if (name === "prerenderEntries") prerenderEntries = true;
@@ -216,6 +245,14 @@ export function extractRouteOptions(file: string, source: string): StaticRouteOp
         throw new Error(`${file}: layout debe ser un literal de texto (el nombre de un layout de app/layouts) o false para que Meeko pueda leerlo durante el build`);
       }
       layout = literalLayout(file, property.initializer);
+      continue;
+    }
+    if (name === "middleware") {
+      if (!ts.isPropertyAssignment(property)) {
+        throw new Error(`${file}: middleware debe ser un array literal de nombres de app/middleware, o false, para que Meeko pueda leerlo durante el build`);
+      }
+      middleware = literalMiddleware(file, property.initializer);
+      middlewareSpread = undefined;
       continue;
     }
     if (name !== "render") continue;
@@ -227,10 +264,13 @@ export function extractRouteOptions(file: string, source: string): StaticRouteOp
   if (computed) throw new Error(`${file}: las claves calculadas de las opciones de ruta no se pueden leer durante el build; escribe render como una propiedad normal`);
   if (spread && render === undefined) throw new Error(`${file}: declara render de forma explícita; las opciones de ruta con spread no se pueden leer durante el build`);
   if (spread) throw new Error(`${file}: declara render después de cualquier spread; las opciones de ruta con spread no se pueden leer durante el build`);
+  if (middlewareSpread) {
+    throw new Error(`${file}: el spread ${middlewareSpread.expression.getText()} puede llevar middleware, que Meeko no lee durante el build y la ruta se serviría sin él; declara middleware de forma explícita después del último spread (middleware: ["auth"], o middleware: [] si no añade ninguno)`);
+  }
   if (render === "client" && prerenderEntries) {
     throw new Error(`${file}: una página render: "client" no se puede prerenderizar; quita prerenderEntries o usa render: "prerender"`);
   }
-  return { ...(render ? { render } : {}), ...(layout === undefined ? {} : { layout }) };
+  return { ...(render ? { render } : {}), ...(layout === undefined ? {} : { layout }), ...(middleware === undefined ? {} : { middleware }) };
 }
 
 /**
@@ -249,6 +289,31 @@ export interface StaticGroupOptions {
   readonly layout?: string | false;
   /** Props del layout, que heredan las páginas de la carpeta y de sus subcarpetas. */
   readonly layoutProps?: Readonly<Record<string, unknown>>;
+  /**
+   * Middleware con nombre de las páginas de la carpeta y de sus subcarpetas, después de los de los
+   * grupos exteriores, o `false` para quitar los heredados.
+   * @since 1.6.0
+   */
+  readonly middleware?: readonly string[] | false;
+}
+
+/**
+ * Whether the object that `expression` spreads may set `key`: a spread of a module-level `const`
+ * object literal of the same file is read (with its own spreads); anything else (an import, a
+ * call, a parameter) may set anything.
+ */
+function spreadMayDeclare(expression: ts.Expression, key: string, constants: ReadonlyMap<string, ts.Expression>, visited = new Set<string>()): boolean {
+  let object = unwrapValue(expression);
+  while (ts.isIdentifier(object) && constants.has(object.text) && !visited.has(object.text)) {
+    visited.add(object.text);
+    object = unwrapValue(constants.get(object.text)!);
+  }
+  if (!ts.isObjectLiteralExpression(object)) return true;
+  return object.properties.some((property) => {
+    if (ts.isSpreadAssignment(property)) return spreadMayDeclare(property.expression, key, constants, visited);
+    if (!property.name || ts.isComputedPropertyName(property.name)) return true;
+    return propertyName(property.name) === key;
+  });
 }
 
 /** Like {@link unwrap}, without entering calls: a literal value is never a call. */
@@ -287,7 +352,7 @@ function literalValue(file: string, value: ts.Expression, path: string): unknown
 
 /**
  * Reads the options of a `+group.ts` without executing it: `export default defineGroup({ ... })`
- * (or an object literal) with a literal `layout` and literal `layoutProps`.
+ * (or an object literal) with a literal `layout`, literal `layoutProps` and a literal `middleware`.
  */
 export function extractGroupOptions(file: string, source: string): StaticGroupOptions {
   const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -318,6 +383,7 @@ export function extractGroupOptions(file: string, source: string): StaticGroupOp
   }
   let layout: string | false | undefined;
   let layoutProps: Record<string, unknown> | undefined;
+  let middleware: readonly string[] | false | undefined;
   for (const property of object.properties) {
     const name = property.name && !ts.isComputedPropertyName(property.name) ? propertyName(property.name) : undefined;
     if (!ts.isPropertyAssignment(property) || name === undefined) {
@@ -328,11 +394,10 @@ export function extractGroupOptions(file: string, source: string): StaticGroupOp
       const value = literalValue(file, property.initializer, "layoutProps");
       if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`${file}: layoutProps debe ser un objeto literal`);
       layoutProps = value as Record<string, unknown>;
-    } else if (name === "middleware") {
-      throw new Error(`${file}: middleware no se admite en +group.ts: el middleware de ruta de app/middleware se ejecuta en todas las rutas y elige las suyas con match.route.id`);
-    } else throw new Error(`${file}: opción de grupo desconocida "${name}"; un +group.ts admite layout y layoutProps`);
+    } else if (name === "middleware") middleware = literalMiddleware(file, property.initializer);
+    else throw new Error(`${file}: opción de grupo desconocida "${name}"; un +group.ts admite layout, layoutProps y middleware`);
   }
-  return { ...(layout === undefined ? {} : { layout }), ...(layoutProps ? { layoutProps } : {}) };
+  return { ...(layout === undefined ? {} : { layout }), ...(layoutProps ? { layoutProps } : {}), ...(middleware === undefined ? {} : { middleware }) };
 }
 
 /** Names of named layouts: the path under `app/layouts` without `.meeko`, with `/` between folders. */
@@ -436,14 +501,21 @@ const groupFile = "+group.ts";
  * el navegador.
  *
  * Los layouts de una página van de fuera hacia dentro: `app/app.meeko`, el layout con nombre que
- * elige (o hereda de sus `+group.ts`, o `default`) y los `+layout.meeko` de sus carpetas.
+ * elige (o hereda de sus `+group.ts`, o `default`) y los `+layout.meeko` de sus carpetas. Desde
+ * `1.6`, el `middleware` de sus `+group.ts` y de la página se resuelve, de fuera hacia dentro y sin
+ * repetir, contra los middleware con nombre de `app/middleware` del proyecto (el de `shell`, si se
+ * pasa): los isomórficos van a `middleware` y los de servidor (`*.server.ts`), a `serverMiddleware`,
+ * que lleva la cadena completa de la ruta: los globales de servidor y después los con nombre (ninguno
+ * en las páginas `render: "client"` y `"prerender"`).
  *
  * @param projectRoot Carpeta que contiene `app/pages`.
  * @param options `shell` para descubrir un layer o módulo dentro del proyecto y `layouts` de las
  * demás fuentes.
  * @returns El manifiesto de rutas ordenado, con rutas de archivo absolutas.
  * @throws {Error} Si hay dos layouts o páginas de error raíz, una página declara sus opciones dos
- * veces, `render` o `layout` no son literales válidos, un layout no existe o dos rutas colisionan.
+ * veces, `render` o `layout` no son literales válidos, un layout no existe o dos rutas colisionan;
+ * desde `1.6`, también si un middleware no existe o es global, o si una página `render: "client"` o
+ * `"prerender"` pide un middleware de ruta de servidor (`*.server.ts`).
  * @example
  * ```ts
  * import { discoverRoutes } from "@meekojs/meeko/build";
@@ -472,6 +544,21 @@ export async function discoverRoutes(projectRoot: string, options: DiscoverRoute
     if (!found) throw new Error(`${file}: el layout "${name}" no existe; crea app/layouts/${name}.meeko (layouts disponibles: ${available()})`);
     return found;
   };
+  // Named route middleware lives in the project's app/middleware, which also serves its layers.
+  const middlewareRoot = options.shell ?? projectRoot;
+  const routeMiddleware = await discoverRouteMiddleware(middlewareRoot);
+  const globalMiddleware = globalMiddlewareNames(middlewareRoot, routeMiddleware);
+  const middlewareFile = (name: string, origin: string): string => {
+    const found = routeMiddleware.named[name];
+    if (found) return found;
+    const global = globalMiddleware.get(name);
+    if (global) {
+      const definition = isServerRouteMiddleware(global) ? "defineServerRouteMiddleware" : "defineRouteMiddleware";
+      throw new Error(`${origin}: el middleware "${name}" (${global}) es global y ya se ejecuta en todas las rutas; quítalo de middleware o decláralo con ${definition}(..., { global: false })`);
+    }
+    const available = Object.keys(routeMiddleware.named).sort().map((candidate) => `"${candidate}"`).join(", ") || "ninguno";
+    throw new Error(`${origin}: el middleware "${name}" no existe; crea app/middleware/${name}.ts con defineRouteMiddleware(..., { global: false }) (middleware con nombre disponibles: ${available}), o app/middleware/${name}.server.ts con defineServerRouteMiddleware para uno que sólo se ejecuta en el servidor`);
+  };
   const files = new Set<string>();
   async function walk(directory: string): Promise<void> {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -486,7 +573,13 @@ export async function discoverRoutes(projectRoot: string, options: DiscoverRoute
   }
   if (hasAppError && files.has(join(pagesRoot, "+error.meeko"))) throw rootErrorConflict(appError, join(pagesRoot, "+error.meeko"));
   const groups = new Map<string, StaticGroupOptions>();
-  for (const file of files) if (basename(file) === groupFile) groups.set(dirname(file), extractGroupOptions(file, await readFile(file, "utf8")));
+  for (const file of files) {
+    if (basename(file) !== groupFile) continue;
+    const group = extractGroupOptions(file, await readFile(file, "utf8"));
+    // A group without pages still names existing middleware.
+    if (group.middleware) for (const name of group.middleware) middlewareFile(name, file);
+    groups.set(dirname(file), group);
+  }
   const routes: RouteRecord[] = [];
   for (const file of files) {
     if (!file.endsWith(".meeko")) continue;
@@ -536,13 +629,42 @@ export async function discoverRoutes(projectRoot: string, options: DiscoverRoute
       explicit = true;
       chosenIn = origin;
     };
+    // Named middleware accumulates the same way, without repeats; false drops what is inherited.
+    // Server route middleware (*.server.ts) keeps its own list: it runs after the isomorphic one.
+    let middleware: string[] = [];
+    let serverMiddleware: { readonly name: string; readonly file: string; readonly origin: string }[] = [];
+    const use = (names: readonly string[] | false | undefined, origin: string): void => {
+      if (names === undefined) return;
+      if (names === false) { middleware = []; serverMiddleware = []; return; }
+      for (const name of names) {
+        const middlewareModule = middlewareFile(name, origin);
+        if (isServerRouteMiddleware(middlewareModule)) {
+          if (!serverMiddleware.some((entry) => entry.file === middlewareModule)) serverMiddleware.push({ name, file: middlewareModule, origin });
+        } else if (!middleware.includes(middlewareModule)) middleware.push(middlewareModule);
+      }
+    };
     for (const folder of folders) {
       const group = groups.get(folder);
       if (!group) continue;
       choose(group.layout, join(folder, groupFile));
       if (group.layoutProps) props = { ...props, ...group.layoutProps };
+      use(group.middleware, join(folder, groupFile));
     }
     choose(routeOptions.layout, optionsFile ?? file);
+    use(routeOptions.middleware, optionsFile ?? file);
+    // A client or prerendered page has no request of its own on which to check the session.
+    const render = routeOptions.render;
+    const guard = serverMiddleware[0];
+    if (guard && (render === "client" || render === "prerender")) {
+      const reason = render === "client"
+        ? "su navegación no pide datos al servidor, así que el middleware de servidor no tendría una petición en la que ejecutarse"
+        : "se renderiza al hacer el build, sin la petición ni la sesión de cada visitante";
+      throw new Error(`${guard.origin}: el middleware de servidor "${guard.name}" (${guard.file}) necesita una página con datos del servidor, pero ${optionsFile ?? file} usa render: "${render}" y ${reason}. Usa render: "ssr" o "stream", o quítalo de esa página con middleware: false`);
+    }
+    // The whole server chain: the global ones, which `middleware: false` does not drop, then the
+    // named ones. Pages that do not ask the server for their data run none.
+    const serverChain = render === "client" || render === "prerender" ? []
+      : [...routeMiddleware.serverGlobal, ...serverMiddleware.map((entry) => entry.file)];
     const finalName = layoutName as string | false;
     const layoutFile = finalName === false ? undefined : explicit ? named(finalName, chosenIn) : implicitDefault;
     const layouts: string[] = [
@@ -561,6 +683,8 @@ export async function discoverRoutes(projectRoot: string, options: DiscoverRoute
       ...(layoutFile && finalName !== false
         ? { layout: { name: finalName, file: layoutFile, ...(Object.keys(props).length ? { props } : {}) } }
         : {}),
+      ...(middleware.length ? { middleware } : {}),
+      ...(serverChain.length ? { serverMiddleware: serverChain } : {}),
     });
   }
   return createRouteManifest(routes);

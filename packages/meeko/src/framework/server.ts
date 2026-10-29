@@ -7,8 +7,8 @@ import { ApiError, errorResponse, normalizeServerError, observeServerError } fro
 import { lockSessionCookie } from "../framework-server/sessions.js";
 import { etagMatches } from "../framework-server/assets.js";
 import { ERROR_PAGE_TITLE, PAYLOAD_VERSION, PageInputError, pageSearchObject, payloadHead, validatePageInputs } from "./page.js";
-import { runRouteMiddleware } from "./middleware.js";
-import type { RouteMiddleware } from "./middleware.js";
+import { hasRouteMiddleware, routeMiddlewareChain, runRouteMiddleware, runServerRouteMiddleware, serverRouteMiddlewareChain } from "./middleware.js";
+import type { RouteMiddleware, ServerRouteMiddleware, ServerRouteMiddlewareContext } from "./middleware.js";
 import type { PageHead, PageRender, PageSchema } from "./page.js";
 import { StateStore, withStateStore } from "./state.js";
 import { ResourceScope, withResourceScope } from "./resources.js";
@@ -25,7 +25,7 @@ import { providePageScope } from "./page-body.js";
 import { fixedRoute, provideRoute, routeSnapshot } from "./navigation.js";
 import type { RouteSnapshot } from "./navigation.js";
 import type { PageRequest } from "./page-body.js";
-import type { ErrorPageRecord, RouteRecord } from "./router.js";
+import type { ErrorPageRecord, RouteMatch, RouteRecord } from "./router.js";
 import { definedLayoutProps, resolveLayoutProps, serverLayoutWriter, withLayoutWriter } from "./layout.js";
 import type { LayoutWriter, ServerLayoutWriter } from "./layout.js";
 import { documentHeadEntries, HeadCollector, provideHead, renderHeadDocument, resolveHead, resolveSeo, routeHeadInput, withHeadLevel } from "./head.js";
@@ -40,7 +40,10 @@ import type { ResolvedThemeConfig, ServerTheme } from "./theme.js";
 const requestManifest = new AsyncLocalStorage<readonly RouteRecord[]>();
 provideServerRouteManifest(() => requestManifest.getStore());
 
-/** Page whose top-level `<script server>` code is running, for `usePage()`, `redirect()` and `notFound()`. */
+/**
+ * Page whose top-level `<script server>` code (or, since 1.6, server route middleware) is running,
+ * for `usePage()`, `redirect()` and `notFound()`.
+ */
 const runningPage = new AsyncLocalStorage<PageRequest<unknown, unknown>>();
 providePageScope({ run: (page, body) => runningPage.run(page, body), current: () => runningPage.getStore() });
 
@@ -107,6 +110,12 @@ export interface PageRoute {
    * @since 1.5.0
    */
   layoutProps?: unknown;
+  /**
+   * Middleware con nombre de la página, o `false`; `meeko build` lo lee del archivo y lo deja en el
+   * manifiesto. Un nombre que el manifiesto de la ruta no lista hace fallar la petición.
+   * @since 1.6.0
+   */
+  middleware?: unknown;
 }
 
 /**
@@ -171,8 +180,24 @@ export interface FrameworkHandlerOptions<Route = PageRoute> {
   readonly loadPage: (file: string) => Promise<PageModule>;
   /** Carga las opciones de ruta de un sidecar o un bloque `<script server>`. */
   readonly loadRoute?: (file: string) => Promise<Route>;
-  /** Middleware de ruta isomórfico, que se evalúa antes del loader. */
+  /** Middleware de ruta isomórfico global, que se evalúa antes del loader en todas las rutas. */
   readonly loadMiddleware?: () => Promise<readonly RouteMiddleware[]>;
+  /**
+   * Carga un middleware con nombre de {@link RouteRecord.middleware} por su archivo. Se ejecuta
+   * después de los globales en las rutas que lo declaran; una ruta con middleware con nombre y sin
+   * este cargador falla en lugar de saltárselo.
+   * @since 1.6.0
+   */
+  readonly loadNamedMiddleware?: (file: string) => Promise<RouteMiddleware>;
+  /**
+   * Carga un middleware de ruta de servidor (`app/middleware/*.server.ts`) de
+   * {@link RouteRecord.serverMiddleware} por su archivo. Esa lista es la cadena completa de la ruta,
+   * los globales y después los con nombre, y se ejecuta después del middleware isomórfico y antes del
+   * sidecar y el loader. Una ruta que lista alguno y no tiene este cargador falla en lugar de
+   * saltárselo.
+   * @since 1.6.0
+   */
+  readonly loadServerMiddleware?: (file: string) => Promise<ServerRouteMiddleware>;
   /** Crea el contexto de cada petición: sesión, servicios y plataforma. */
   readonly createContext?: (request: Request) => RequestContext | Promise<RequestContext>;
   /** Despachador local opcional para las llamadas automáticas a API y RPC durante SSR. */
@@ -523,6 +548,22 @@ const notFoundProps = { status: 404, message: "NOT_FOUND" } as const;
  * runtime value means the server runs a stale build, and a client page served
  * as SSR (or the reverse) would hydrate the wrong tree.
  */
+/** The name of a route middleware from its file: `/app/middleware/10-auth.server.ts` is `auth`. */
+function middlewareFileName(file: string): string {
+  const path = file.replaceAll("\\", "/");
+  const at = path.lastIndexOf("app/middleware/");
+  const inside = at === -1 ? path.slice(path.lastIndexOf("/") + 1) : path.slice(at + "app/middleware/".length);
+  return inside.replace(/(?:\.server)?\.[cm]?[jt]s$/, "").split("/").map((part) => part.replace(/^\d+[-_.]/, "")).join("/");
+}
+
+/** The names that a page's options declare in `middleware` and its manifest does not list. */
+function staleMiddleware(route: RouteRecord, sidecar: PageRoute | undefined): readonly string[] {
+  const declared = sidecar?.middleware;
+  if (!Array.isArray(declared) || !declared.length) return [];
+  const listed = new Set([...route.middleware ?? [], ...route.serverMiddleware ?? []].map(middlewareFileName));
+  return declared.filter((name) => typeof name !== "string" || !listed.has(name)).map(String);
+}
+
 function routeRender(route: RouteRecord, sidecar: PageRoute | undefined): PageRender {
   const declared = sidecar?.render;
   const stale = sidecar !== undefined && (route.render !== undefined
@@ -699,6 +740,35 @@ export function createFrameworkHandler(options: FrameworkHandlerOptions<unknown>
   return createPageHandler(options);
 }
 
+/**
+ * Runs server route middleware with the context of `usePage()`, inside the page scope so that
+ * `redirect()` and `notFound()` stop the route as they do in `<script server>`.
+ */
+function runServerMiddleware(
+  middlewares: readonly ServerRouteMiddleware[], url: URL, match: RouteMatch,
+  request: Request, requestContext: RequestContext | undefined,
+): Promise<Response | undefined> {
+  const requireContext = (): RequestContext => {
+    if (!requestContext) throw new Error("Server route middleware needs a request context; createServerApp provides it, createFrameworkHandler needs createContext");
+    return requestContext;
+  };
+  const search = pageSearchObject(url.searchParams);
+  const signal = requestContext?.signal ?? request.signal;
+  const context: ServerRouteMiddlewareContext = {
+    url, match, params: match.params, search, request, signal,
+    get context() { return requireContext(); },
+    get session() { return requireContext().session; },
+    get services() { return requireContext().services; },
+    get platform() { return requireContext().platform; },
+    get requestId() { return requireContext().requestId; },
+  };
+  const page: PageRequest<unknown, unknown> = {
+    url, params: match.params, search, request, signal,
+    get context() { return requireContext(); },
+  };
+  return runningPage.run(page, () => runServerRouteMiddleware(middlewares, context));
+}
+
 export function createPageHandler(options: PageHandlerOptions): (request: Request) => Promise<Response> {
   const handle = async (request: Request): Promise<Response> => {
     const fallbackRequestId = crypto.randomUUID();
@@ -774,7 +844,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
         pageStore = store;
         store.seal();
         const payload = serializeJson({
-          v: PAYLOAD_VERSION, error: true, render: "ssr",
+          v: PAYLOAD_VERSION, error: true, render: "ssr", url: route!.url,
           props: notFoundProps, state: rendered.state, sharedState: store.snapshot(), head: { title: ERROR_PAGE_TITLE },
           ...(resources ? { resources } : {}),
           ...(errorPage!.layout ? { layoutProps } : {}),
@@ -801,10 +871,16 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       return requestContext ? await withRequestContext(requestContext, options.serverFetch, renderNotFound) : await renderNotFound();
     }
     const render = async (): Promise<Response> => {
-    const middlewareResponse = options.loadMiddleware && await runRouteMiddleware(await options.loadMiddleware(), {
+    const middlewareResponse = hasRouteMiddleware(match.route, options) ? await runRouteMiddleware(await routeMiddlewareChain(match.route, options), {
       url, match, signal: request.signal, phase: "server", request,
-    });
+    }) : undefined;
     if (middlewareResponse) return finish(middlewareResponse);
+    // Server route middleware runs next, on the server only, with the request context of the page.
+    const serverMiddleware = await serverRouteMiddlewareChain(match.route, options);
+    if (serverMiddleware.length) {
+      const serverResponse = await runServerMiddleware(serverMiddleware, url, match, request, requestContext);
+      if (serverResponse) return finish(serverResponse);
+    }
     if (options.prerendered && match.route.render === "prerender" && url.search === "" && !options.document?.nonce) {
       const page = await options.prerendered.get(url.pathname);
       if (page && !wantsPayload(request)) return finish(prerenderedResponse(page, request, requestContext));
@@ -818,6 +894,11 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     // Like render, the layout comes from the manifest that the build read from the file.
     if (sidecar?.layout !== undefined && sidecar.layout !== (match.route.layout?.name ?? false)) {
       throw new Error(`Route ${match.route.id} declares layout ${JSON.stringify(sidecar.layout)} but its manifest says ${JSON.stringify(match.route.layout?.name ?? false)}; rebuild the application`);
+    }
+    // So does its middleware: a name the manifest lacks was skipped, so the route must not go on.
+    const unlisted = staleMiddleware(match.route, sidecar);
+    if (unlisted.length) {
+      throw new Error(`Route ${match.route.id} declares middleware ${JSON.stringify(unlisted)} that its manifest does not list, so it did not run; rebuild the application`);
     }
     const validated = await validatePageInputs(sidecar, match.params, pageSearchObject(url.searchParams));
     route = routeSnapshot(url, match.route.id, validated.params, validated.search, false);
@@ -898,10 +979,11 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     pageStore = store;
     // head reads the state the render produced; anything it adds cannot change that render.
     const head: PageHead = payloadHead(clientPage ? {} : sidecar?.head?.({ ...context, state: store, data }) ?? {});
-    // The payload below is the only copy of this state the browser receives.
+    // The payload below is the only copy of this state the browser receives. `url` is the URL this
+    // render is for: a static host may serve the prerendered page under another one.
     store.seal();
     const payload = serializeJson({
-      v: PAYLOAD_VERSION, route: match.route.id, render: renderMode,
+      v: PAYLOAD_VERSION, route: match.route.id, render: renderMode, url: route.url,
       props: payloadProps, state: rendered.state, sharedState: store.snapshot(),
       head,
       ...(deferredEntries.length ? { deferred: deferredEntries } : {}),

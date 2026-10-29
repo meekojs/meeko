@@ -3,6 +3,7 @@ import { reactiveProps } from "../props.js";
 import type { PropsSource } from "../props.js";
 import type { Component, ComponentRelease, DomScope } from "../dom.js";
 import type { GeneratedLayouts, GeneratedPageLayouts } from "../framework.js";
+import type { RouteMiddlewareName } from "./middleware.js";
 
 /**
  * Nombre de un layout con nombre de la aplicación (`app/layouts/<nombre>.meeko`, los de los layers y
@@ -351,12 +352,20 @@ export interface GroupDefinition<L extends LayoutName | false = LayoutName> {
    * sin las props heredadas.
    */
   readonly layoutProps?: Partial<LayoutProps<L>>;
+  /**
+   * Middleware con nombre de `app/middleware` para las páginas del grupo, que se ejecutan después de
+   * los globales y de los de los grupos exteriores, o `false` para quitar los heredados. Una página
+   * puede añadir los suyos.
+   * @since 1.6.0
+   */
+  readonly middleware?: readonly RouteMiddlewareName[] | false;
 }
 
 /**
  * Declara las opciones de una carpeta de `app/pages` en su `+group.ts`: el layout con nombre y sus
- * props, que heredan todas las páginas de la carpeta y de sus subcarpetas. Se autoimporta. Meeko lee
- * el archivo sin ejecutarlo, así que sus valores deben ser literales.
+ * props y, desde `1.6`, el middleware con nombre, que heredan todas las páginas de la carpeta y de
+ * sus subcarpetas. Se autoimporta. Meeko lee el archivo sin ejecutarlo, así que sus valores deben
+ * ser literales.
  *
  * @typeParam L Layout del grupo, inferido de `layout`.
  * @param definition Opciones del grupo.
@@ -365,7 +374,7 @@ export interface GroupDefinition<L extends LayoutName | false = LayoutName> {
  * @example
  * ```ts
  * // app/pages/(dashboard)/+group.ts
- * export default defineGroup({ layout: "dashboard", layoutProps: { showAlert: false } });
+ * export default defineGroup({ layout: "dashboard", layoutProps: { showAlert: false }, middleware: ["auth"] });
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#opciones-por-carpeta-groupts
  */

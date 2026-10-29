@@ -18,19 +18,30 @@ export function isDiscoverySource(file: string, sourceRoots: readonly string[]):
 
 /**
  * Whether `file` holds route options that discovery reads without running them: a page (its
- * `<script server>`), a `*.route.ts` sidecar or a `+group.ts` under `app/pages` of a source root.
- * Editing one may change `render` or the layout of routes.
+ * `<script server>`), a `*.route.ts` sidecar or a `+group.ts` under `app/pages` of a source root,
+ * or (since 1.6) a route middleware of `app/middleware`, whose `{ global }` discovery reads. Editing
+ * one may change `render`, the layout or the middleware of routes.
  */
 export function isRouteOptionsSource(file: string, sourceRoots: readonly string[]): boolean {
   return sourceRoots.some((root) => {
     const path = relative(root, file).replaceAll("\\", "/");
+    if (path.startsWith("app/middleware/")) return path.endsWith(".ts");
     return path.startsWith("app/pages/") && (path.endsWith(".meeko") || path.endsWith(".route.ts") || path.endsWith("/+group.ts"));
   });
 }
 
-/** What a route manifest says about each route's render and layouts, to compare two discoveries. */
-export function routeOptionsKey(routes: readonly { readonly id: string; readonly layouts: readonly string[]; readonly render?: string; readonly layout?: unknown }[]): string {
-  return JSON.stringify(routes.map((route) => [route.id, route.layouts, route.render ?? null, route.layout ?? null]));
+/**
+ * What a route manifest says about each route's render, layouts and named middleware (isomorphic
+ * and server), and which route middleware is global, to compare two discoveries.
+ */
+export function routeOptionsKey(
+  routes: readonly {
+    readonly id: string; readonly layouts: readonly string[]; readonly render?: string; readonly layout?: unknown;
+    readonly middleware?: readonly string[]; readonly serverMiddleware?: readonly string[];
+  }[],
+  globalMiddleware: readonly string[] = [],
+): string {
+  return JSON.stringify([routes.map((route) => [route.id, route.layouts, route.render ?? null, route.layout ?? null, route.middleware ?? null, route.serverMiddleware ?? null]), globalMiddleware]);
 }
 
 /**

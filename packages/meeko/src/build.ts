@@ -5,6 +5,8 @@
  */
 export { discoverErrorPage, discoverLayouts, discoverRoutes } from "./framework/routes-discovery.js";
 export type { DiscoverErrorPageOptions, DiscoverRoutesOptions, StaticGroupOptions, StaticRouteOptions } from "./framework/routes-discovery.js";
+export { discoverRouteMiddleware } from "./framework/route-middleware-discovery.js";
+export type { RouteMiddlewareDiscovery } from "./framework/route-middleware-discovery.js";
 export { composeFrameworkRoutes } from "./framework/modules.js";
 export type { ComposeRoutesOptions, RouteLayer, RouteModule } from "./framework/modules.js";
 export { discoverConfiguredRoutes, loadMeekoConfig, readMeekoConfigSync, resolveConfigSources } from "./framework/config.js";

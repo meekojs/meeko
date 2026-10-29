@@ -10,8 +10,9 @@
 	box-sizing: border-box;
 }
 html {
-	scroll-padding-top: calc(var(--header-height) + 1rem);
+	scroll-padding-top: calc(var(--header-height) + 1.25rem);
 	-webkit-text-size-adjust: 100%;
+	accent-color: var(--accent);
 }
 @media (prefers-reduced-motion: no-preference) {
 	html {
@@ -23,8 +24,12 @@ body {
 	background: var(--bg);
 	color: var(--ink);
 	font: 400 1rem/1.6 var(--font-ui);
+	font-feature-settings: 'cv11', 'ss03';
+	font-optical-sizing: auto;
+	letter-spacing: -0.006em;
 	text-rendering: optimizeLegibility;
 	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 }
 .site-root {
 	display: flex;
@@ -40,19 +45,63 @@ svg {
 }
 a {
 	color: var(--accent-ink);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.2em;
+}
+button,
+input {
+	font: inherit;
+	letter-spacing: inherit;
 }
 code,
 kbd,
-pre {
+pre,
+samp {
 	font-family: var(--font-mono);
 	font-variant-ligatures: none;
+	letter-spacing: 0;
 }
 ::selection {
-	background: var(--accent-soft);
+	background: var(--mark);
+	color: var(--ink);
+}
+::placeholder {
+	color: var(--muted);
+	opacity: 1;
 }
 :focus-visible {
 	outline: 2px solid var(--accent);
 	outline-offset: 2px;
+}
+/* Chromium paints these; scrollbar-color would override them and bring back the Windows arrow buttons. */
+@supports not selector(::-webkit-scrollbar) {
+	html,
+	.table-wrap,
+	.shiki {
+		scrollbar-color: var(--surface-3) transparent;
+	}
+	.table-wrap,
+	.shiki {
+		scrollbar-width: thin;
+	}
+}
+::-webkit-scrollbar-button {
+	display: none;
+}
+::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+::-webkit-scrollbar-thumb {
+	border: 3px solid transparent;
+	border-radius: 999px;
+	background: var(--surface-3) padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+	background-color: var(--muted);
 }
 
 .sr-only {
@@ -67,48 +116,96 @@ pre {
 	white-space: nowrap;
 }
 
-/* Long-form documents rendered from Markdown. */
+/* Two-tone section titles: the statement in ink, its continuation in gray. */
+.tone-soft {
+	color: var(--muted);
+}
+
+/* Figure captions in the manner of a technical drawing: "FIG. 02 — …". */
+.fig-label {
+	display: flex;
+	align-items: baseline;
+	gap: 0.6rem;
+	margin: 0;
+	color: var(--muted);
+	font: 500 0.72rem/1.5 var(--font-mono);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+.fig-label b {
+	flex: none;
+	color: var(--ink-soft);
+	font-weight: 500;
+}
+
+/* Keyboard keys, everywhere the site names a shortcut. */
+kbd {
+	display: inline-block;
+	border: 1px solid var(--line-strong);
+	border-radius: 5px;
+	background: var(--surface-2);
+	padding: 0 0.38em;
+	min-width: 1.5em;
+	color: var(--ink-soft);
+	font-weight: 500;
+	font-size: 0.78em;
+	line-height: 1.6;
+	text-align: center;
+}
+
+/* Long-form documents rendered from Markdown: a calm column at a real measure. */
 .prose {
-	max-width: 48rem;
-	color: var(--ink);
-	font-size: 1.02rem;
+	max-width: 70ch;
+	color: var(--ink-soft);
+	font-size: 1rem;
 	line-height: 1.72;
 	overflow-wrap: break-word;
 }
 .prose > :first-child {
 	margin-top: 0;
 }
+.prose > :is(p, ul, ol, dl, blockquote, h1, h2, h3, h4, hr) {
+	max-width: 36rem;
+}
 .prose h1,
 .prose h2,
 .prose h3,
 .prose h4 {
 	position: relative;
-	line-height: 1.22;
+	color: var(--ink);
 	font-family: var(--font-display);
-	letter-spacing: -0.015em;
 	text-wrap: balance;
 }
 .prose h1 {
-	margin: 0 0 1.2rem;
-	font-weight: 800;
-	font-size: clamp(2rem, 4.2vw, 2.65rem);
+	margin: 0 0 1.1rem;
+	font-weight: var(--weight-display);
+	font-size: clamp(2rem, 3.6vw, 2.6rem);
+	line-height: 1.1;
+	letter-spacing: var(--tracking-display);
 }
 .prose h2 {
-	margin: 2.8rem 0 0.9rem;
-	border-top: 1px solid var(--line);
-	padding-top: 1.6rem;
-	font-weight: 780;
-	font-size: 1.6rem;
+	margin: 3rem 0 0.85rem;
+	font-weight: 560;
+	font-size: 1.5rem;
+	line-height: 1.25;
+	letter-spacing: -0.022em;
 }
 .prose h3 {
-	margin: 2rem 0 0.7rem;
-	font-weight: 740;
-	font-size: 1.25rem;
+	margin: 2.1rem 0 0.6rem;
+	font-weight: 580;
+	font-size: 1.15rem;
+	line-height: 1.35;
+	letter-spacing: -0.014em;
 }
 .prose h4 {
-	margin: 1.6rem 0 0.6rem;
-	font-weight: 720;
-	font-size: 1.05rem;
+	margin: 1.7rem 0 0.5rem;
+	font-weight: 600;
+	font-size: 1rem;
+	line-height: 1.4;
+}
+.prose h1 + p {
+	color: var(--ink-soft);
+	font-size: 1.08rem;
 }
 .prose h2 code,
 .prose h3 code,
@@ -118,83 +215,97 @@ pre {
 .heading-anchor {
 	opacity: 0;
 	transition: opacity 0.15s;
-	margin-left: 0.4rem;
+	margin-left: 0.45rem;
 	color: var(--muted);
-	font-weight: 500;
+	font-weight: 400;
 	text-decoration: none;
 }
 .prose :is(h2, h3, h4):hover .heading-anchor,
 .heading-anchor:focus-visible {
 	opacity: 1;
 }
+.heading-anchor:hover {
+	color: var(--accent-ink);
+}
 .prose p,
 .prose ul,
 .prose ol,
-.prose blockquote {
-	margin: 0 0 1.1rem;
+.prose blockquote,
+.prose dl {
+	margin: 0 0 1.15rem;
 }
 .prose ul,
 .prose ol {
-	padding-left: 1.4rem;
+	padding-left: 1.3rem;
 }
 .prose li {
-	margin: 0.3rem 0;
+	margin: 0.35rem 0;
+	padding-left: 0.2rem;
 }
 .prose li > ul,
 .prose li > ol {
-	margin: 0.3rem 0 0;
+	margin: 0.35rem 0 0;
 }
 .prose li::marker {
 	color: var(--muted);
 }
 .prose strong {
 	color: var(--ink);
-	font-weight: 700;
+	font-weight: 600;
 }
 .prose a {
-	text-decoration-thickness: 1px;
-	text-underline-offset: 0.18em;
+	color: var(--accent-ink);
+	text-decoration-color: var(--accent-line);
 }
 .prose a:hover {
-	text-decoration-thickness: 2px;
+	text-decoration-color: currentColor;
 }
 .prose blockquote {
-	border-left: 3px solid var(--nose);
-	border-radius: 0 10px 10px 0;
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
 	background: var(--surface);
-	padding: 0.4rem 1rem;
+	padding: 0.85rem 1.1rem;
 	color: var(--ink-soft);
 }
+.prose blockquote > :last-child {
+	margin-bottom: 0;
+}
 .prose hr {
-	margin: 2.5rem 0;
+	margin: 2.75rem 0;
 	border: 0;
 	border-top: 1px solid var(--line);
 }
 .prose img {
 	height: auto;
 }
+/* Inline code stays below the prose: a faint chip, lighter than a code block's surface. */
 .prose :not(pre) > code {
-	border: 1px solid var(--code-line);
-	border-radius: 6px;
-	background: var(--code-bg);
-	padding: 0.12em 0.36em;
-	color: var(--ink);
-	font-size: 0.86em;
+	border-radius: 4px;
+	background: color-mix(in oklab, var(--surface-2) 55%, transparent);
+	padding: 0.1em 0.32em;
+	color: var(--ink-soft);
+	/* Cascadia Code, the usual system mono on Windows, is variable: 350 keeps it from reading bold. */
+	font-weight: 350;
+	font-size: 0.82em;
 	overflow-wrap: anywhere;
+}
+.prose a > code {
+	color: var(--accent-ink);
 }
 
 /* Tables scroll inside their wrapper on narrow screens. */
 .table-wrap {
-	margin: 0 0 1.4rem;
+	margin: 0 0 1.5rem;
 	border: 1px solid var(--line);
-	border-radius: 12px;
+	border-radius: var(--radius);
 	overflow-x: auto;
 }
 .prose table {
 	border-collapse: collapse;
 	width: 100%;
-	font-size: 0.93rem;
-	line-height: 1.5;
+	font-size: 0.9rem;
+	font-variant-numeric: tabular-nums;
+	line-height: 1.55;
 }
 .prose th,
 .prose td {
@@ -205,7 +316,9 @@ pre {
 }
 .prose th {
 	background: var(--surface);
-	font-weight: 700;
+	color: var(--ink);
+	font-weight: 560;
+	font-size: 0.82rem;
 	white-space: nowrap;
 }
 .prose tr:last-child td {
@@ -217,9 +330,9 @@ pre {
 
 /* Highlighted code: Shiki writes both themes as variables and the active theme picks one. */
 .code-block {
-	margin: 0 0 1.4rem;
+	margin: 0 0 1.5rem;
 	border: 1px solid var(--code-line);
-	border-radius: 12px;
+	border-radius: var(--radius);
 	background: var(--code-bg);
 	overflow: hidden;
 }
@@ -229,41 +342,42 @@ pre {
 	align-items: center;
 	gap: 1rem;
 	border-bottom: 1px solid var(--code-line);
-	padding: 0.35rem 0.45rem 0.35rem 0.9rem;
+	padding: 0.3rem 0.4rem 0.3rem 0.9rem;
+	min-height: 2.2rem;
 	color: var(--muted);
-	font: 600 0.75rem/1.6 var(--font-mono);
-	letter-spacing: 0.02em;
+	font: 500 0.72rem/1.6 var(--font-mono);
+	letter-spacing: 0.04em;
 }
 .code-copy {
+	transition:
+		color 0.15s,
+		background-color 0.15s;
 	cursor: pointer;
-	border: 1px solid var(--code-line);
-	border-radius: 7px;
-	background: var(--bg);
-	padding: 0.2rem 0.6rem;
-	color: var(--ink-soft);
-	font: 600 0.75rem/1.5 var(--font-ui);
+	border: 0;
+	border-radius: var(--radius-s);
+	background: transparent;
+	padding: 0.2rem 0.55rem;
+	color: var(--muted);
+	font: 500 0.75rem/1.5 var(--font-ui);
+	letter-spacing: 0;
 }
 .code-copy:hover {
-	border-color: var(--accent);
-	color: var(--accent-ink);
+	background: var(--surface-2);
+	color: var(--ink);
 }
 .code-copy[data-state='done'] {
-	border-color: #3b8a5a;
-	color: #2f7a4c;
-}
-:root[data-theme='dark'] .code-copy[data-state='done'] {
-	color: #7fd1a0;
+	color: var(--success);
 }
 .code-copy[data-state='error'] {
-	border-color: var(--nose);
+	color: var(--danger);
 }
 .shiki {
 	margin: 0;
 	background: transparent !important;
-	padding: 0.95rem 1.05rem;
+	padding: 0.9rem 1.05rem;
 	overflow-x: auto;
-	font-size: 0.86rem;
-	line-height: 1.65;
+	font-size: 0.84rem;
+	line-height: 1.7;
 	tab-size: 2;
 }
 .shiki code {
@@ -271,27 +385,62 @@ pre {
 	font-variant-ligatures: none;
 }
 .shiki span {
-	color: var(--shiki-light);
-}
-:root[data-theme='dark'] .shiki span {
 	color: var(--shiki-dark);
 }
-@media (prefers-color-scheme: dark) {
-	:root:not([data-theme='light']) .shiki span {
-		color: var(--shiki-dark);
-	}
+:root[data-theme='light'] .shiki span {
+	color: var(--shiki-light);
 }
 
 @media (max-width: 640px) {
-	.prose {
-		font-size: 1rem;
-		line-height: 1.68;
+	.prose h1 {
+		font-size: 1.9rem;
 	}
 	.prose h2 {
-		font-size: 1.4rem;
+		font-size: 1.32rem;
 	}
 	.shiki {
-		padding: 0.85rem 0.9rem;
+		padding: 0.8rem 0.9rem;
 		font-size: 0.8rem;
 	}
+}
+
+/* Isometric line figures (FIG. 0x): hairline strokes, faces filled with the ground they sit on. */
+.iso {
+	display: block;
+	width: 100%;
+	height: auto;
+	overflow: visible;
+}
+.iso .l {
+	fill: none;
+	stroke: var(--figure);
+	stroke-width: 1;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	vector-effect: non-scaling-stroke;
+}
+.iso .f {
+	fill: var(--fig-ground, var(--bg));
+}
+.iso .s {
+	stroke: var(--figure-soft);
+}
+.iso .d {
+	stroke-dasharray: 3 4;
+}
+.iso .a {
+	fill: none;
+	stroke: var(--accent);
+	stroke-width: 1.25;
+	stroke-linecap: round;
+	vector-effect: non-scaling-stroke;
+}
+.iso circle.a {
+	fill: var(--accent);
+	stroke: none;
+}
+.iso text {
+	fill: var(--muted);
+	font: 500 var(--fig-text, 9px) var(--font-mono);
+	letter-spacing: 0.08em;
 }

@@ -1,7 +1,7 @@
 import { trustHtml } from "@meekojs/meeko";
 import type { TrustedHtml } from "@meekojs/meeko";
 import { createHighlighterCore } from "shiki/core";
-import type { HighlighterCore, LanguageRegistration } from "shiki/core";
+import type { HighlighterCore, LanguageRegistration, ThemeRegistration } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 import { readRepositoryFile } from "./repository.js";
 
@@ -50,12 +50,88 @@ function meekoLanguages(): LanguageRegistration[] {
   return [component, template];
 }
 
+/** The few colors of a code theme of the site; each one is at least 4.5:1 on its code background. */
+interface CodePalette {
+  readonly background: string;
+  readonly foreground: string;
+  readonly comment: string;
+  readonly keyword: string;
+  readonly string: string;
+  readonly constant: string;
+  readonly func: string;
+  readonly type: string;
+  readonly tag: string;
+  readonly attribute: string;
+  readonly punctuation: string;
+}
+
+/** On the dark code ground (#0e0f12): cool and quiet, with the blue of Meeko's eyes for calls. */
+const nightPalette: CodePalette = {
+  background: "#0e0f12",
+  foreground: "#d4d7dd",
+  comment: "#7d828c",
+  keyword: "#c3abf5",
+  string: "#9fd3b4",
+  constant: "#e9c48e",
+  func: "#8fb4ff",
+  type: "#7ccfe0",
+  tag: "#8cc4f0",
+  attribute: "#a9b3c6",
+  punctuation: "#8b909a",
+};
+
+/** The same roles on the light code ground (#f6f7f9). */
+const dayPalette: CodePalette = {
+  background: "#f6f7f9",
+  foreground: "#24272d",
+  comment: "#646973",
+  keyword: "#6a3fc4",
+  string: "#1d7449",
+  constant: "#9a5410",
+  func: "#2556c4",
+  type: "#0a6a80",
+  tag: "#155f9e",
+  attribute: "#4f586b",
+  punctuation: "#5f636c",
+};
+
+/**
+ * A TextMate theme of the site from a palette: few colors, so code reads as text with a little
+ * structure instead of a rainbow. Meeko directives (`bind:`, `on:`) take the keyword color.
+ */
+function meekoTheme(name: string, type: "light" | "dark", palette: CodePalette): ThemeRegistration {
+  const rule = (scope: string[], foreground: string, fontStyle?: string): NonNullable<ThemeRegistration["tokenColors"]>[number] => ({ scope, settings: fontStyle ? { foreground, fontStyle } : { foreground } });
+  return {
+    name,
+    type,
+    colors: { "editor.background": palette.background, "editor.foreground": palette.foreground },
+    fg: palette.foreground,
+    bg: palette.background,
+    tokenColors: [
+      { settings: { foreground: palette.foreground } },
+      rule(["comment", "punctuation.definition.comment", "string.comment"], palette.comment),
+      rule(["punctuation", "meta.brace", "keyword.operator", "punctuation.definition.tag", "punctuation.separator", "punctuation.terminator"], palette.punctuation),
+      rule(["keyword", "storage", "storage.type", "storage.modifier", "keyword.control", "keyword.operator.new", "keyword.operator.expression", "keyword.operator.logical", "variable.language.this"], palette.keyword),
+      rule(["string", "punctuation.definition.string", "string.template", "markup.inline.raw"], palette.string),
+      rule(["constant.numeric", "constant.language", "constant.character", "support.constant", "constant.other", "variable.other.constant", "variable.other.enummember"], palette.constant),
+      rule(["entity.name.function", "support.function", "meta.function-call entity.name.function", "variable.function", "punctuation.section.embedded", "entity.name.function.builtin"], palette.func),
+      rule(["entity.name.type", "entity.name.class", "support.type", "support.class", "entity.other.inherited-class", "entity.name.type.class.component", "storage.type.primitive", "support.type.primitive"], palette.type),
+      rule(["entity.name.tag", "support.class.component"], palette.tag),
+      rule(["entity.other.attribute-name", "support.type.property-name", "meta.object-literal.key", "variable.parameter"], palette.attribute),
+      rule(["variable", "variable.other", "variable.other.readwrite", "meta.definition.variable", "variable.other.property", "support.variable.property"], palette.foreground),
+      rule(["entity.other.attribute-name.directive", "keyword.control.flow"], palette.keyword),
+      rule(["markup.heading", "markup.bold"], palette.foreground, "bold"),
+      rule(["markup.italic"], palette.foreground, "italic"),
+    ],
+  };
+}
+
 let highlighter: Promise<HighlighterCore> | undefined;
 
 function load(): Promise<HighlighterCore> {
   highlighter ??= createHighlighterCore({
     engine: createJavaScriptRegexEngine(),
-    themes: [import("shiki/themes/github-light-default.mjs"), import("shiki/themes/github-dark-default.mjs")],
+    themes: [meekoTheme("meeko-night", "dark", nightPalette), meekoTheme("meeko-day", "light", dayPalette)],
     langs: [
       import("shiki/langs/typescript.mjs"),
       import("shiki/langs/javascript.mjs"),
@@ -97,10 +173,8 @@ export function blockLanguage(info: string, code: string): { readonly lang: stri
 
 /** Themes of every highlighted block: both as CSS variables, from which the stylesheet picks one. */
 const themeOptions = {
-  themes: { light: "github-light-default", dark: "github-dark-default" },
+  themes: { light: "meeko-day", dark: "meeko-night" },
   defaultColor: false,
-  // The light theme's comment gray falls below 4.5:1 on the site's cream code background.
-  colorReplacements: { "github-light-default": { "#6e7781": "#59636e" } },
 } as const;
 
 /**

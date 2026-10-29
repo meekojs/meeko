@@ -182,7 +182,7 @@ providePageHeadSink((read) => {
 });
 
 function outside(name: string): Error {
-  return new Error(`MEEK073: ${name}() sólo está disponible mientras se ejecuta el código de nivel superior del <script server> de una página`);
+  return new Error(`MEEK073: ${name}() sólo está disponible mientras se ejecuta el código de nivel superior del <script server> de una página o, desde 1.6, un middleware de ruta de servidor`);
 }
 
 function activePage(name: string): PageRequest<unknown, unknown> {

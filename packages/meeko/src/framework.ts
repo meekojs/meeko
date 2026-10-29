@@ -39,8 +39,8 @@ export type { PopoverExposed, PopoverMode, PopoverPlacement, PopoverRole, Popove
 export type { SelectField, SelectFilter, SelectFilterContext, SelectModel, SelectOptionState, SelectSnippets } from "./builtins/select.js";
 export { defer } from "./framework/deferred.js";
 export type { DeferOptions, Deferred, DeferredError, DeferredFactory, DeferredStatus } from "./framework/deferred.js";
-export { defineRouteMiddleware } from "./framework/middleware.js";
-export type { RouteMiddleware, RouteMiddlewareContext } from "./framework/middleware.js";
+export { defineRouteMiddleware, defineServerRouteMiddleware } from "./framework/middleware.js";
+export type { RouteMiddleware, RouteMiddlewareContext, RouteMiddlewareName, RouteMiddlewareOptions, ServerRouteMiddleware, ServerRouteMiddlewareContext } from "./framework/middleware.js";
 export { ClientError, createApiClient, createBrowserClientOptions, createPublicServerManifest, createRpcClient, isClientError } from "./framework/clients.js";
 export type { ApiClient, ApiMutationInput, ApiOperation, ClientOptions, PublicApiEndpoint, PublicRpcEndpoint, PublicServerManifest, RpcClient, RpcOperation, ValidationIssue } from "./framework/clients.js";
 export { createSocketClient, createSocketRegistry, useSocket, useSocketChannel, useSocketClient } from "./framework/socket.js";
@@ -129,6 +129,27 @@ export interface GeneratedLayouts {}
  * ```
  */
 export interface GeneratedPageLayouts {}
+
+/**
+ * Middleware de ruta con nombre de la aplicación (`app/middleware/*.ts` con
+ * `defineRouteMiddleware(fn, { global: false })`), por nombre, con su archivo. Está vacía en el
+ * paquete: la amplían las declaraciones generadas en `.meeko/types/routes.d.ts` (`meeko check`,
+ * `meeko dev`), y con ellas `middleware` de `definePage` y de `defineGroup` se tipa con sus nombres.
+ * Sin esas declaraciones, cualquier nombre vale.
+ *
+ * @since 1.6.0
+ * @example
+ * ```ts
+ * // .meeko/types/routes.d.ts (generado por meeko check)
+ * declare module "@meekojs/meeko/framework" {
+ *   interface GeneratedRouteMiddleware {
+ *     "auth": "app/middleware/auth.ts";
+ *     "admin": "app/middleware/20-admin.ts";
+ *   }
+ * }
+ * ```
+ */
+export interface GeneratedRouteMiddleware {}
 
 /**
  * Props que una página puede pasar al layout con nombre `L`: las `Props` que declara el layout, sin

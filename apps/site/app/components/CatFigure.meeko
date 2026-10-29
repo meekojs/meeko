@@ -1,0 +1,138 @@
+<script lang="ts">
+	interface Props {
+		/** Caption under the drawing, after its figure number. */
+		caption: string
+		/** Figure number, such as "FIG. 04". */
+		label: string
+		/** Optional note drawn under the editor, such as "HOVER · COUNT = 3". */
+		note?: string
+	}
+
+	const props = defineProps<Props>()
+</script>
+
+<template>
+	<figure class="cat-figure">
+		<svg
+			class="iso"
+			viewBox="-108.2 -91.8 249.7 233.8"
+			role="img"
+			aria-label="Dibujo de línea: Meeko, la gatita, asomada detrás de un editor en perspectiva isométrica; una tarjeta flota sobre una línea resaltada del código."
+		>
+			<g transform="translate(-51.5 -77.8) scale(0.95)">
+				<path
+					class="l f"
+					d="M24 42L17 7L46 26Q60 21 74 26L103 7L96 42Q109 62 99 82Q87 102 60 104Q33 102 21 82Q11 62 24 42Z"
+				/>
+				<path
+					class="l s"
+					d="M25 31L22 15L37 26M95 31L98 15L83 26"
+				/>
+				<path
+					class="l s"
+					d="M51 38Q60 48 60 66M69 38Q60 48 60 66"
+				/>
+				<path
+					class="a"
+					d="M35 59Q44 50 53 59Q44 66 35 59Z"
+				/>
+				<path
+					class="a"
+					d="M67 59Q76 50 85 59Q76 66 67 59Z"
+				/>
+				<circle
+					class="a"
+					cx="44"
+					cy="59"
+					r="2.4"
+				/>
+				<circle
+					class="a"
+					cx="76"
+					cy="59"
+					r="2.4"
+				/>
+				<path
+					class="l"
+					d="M56 71L64 71L60 76ZM60 76Q60 81 54 82M60 76Q60 81 66 82"
+				/>
+				<path
+					class="l s"
+					d="M31 75L7 70M31 80L9 84M89 75L113 70M89 80L111 84"
+				/>
+			</g>
+			<path
+				class="l f"
+				d="M-94.2 49.3L33.3 122.9L33.3 128L-94.2 54.4Z"
+			/>
+			<path
+				class="l f"
+				d="M127.5 68.5L33.3 122.9L33.3 128L127.5 73.6Z"
+			/>
+			<path
+				class="l f"
+				d="M0 -5.1L127.5 68.5L33.3 122.9L-94.2 49.3Z"
+			/>
+			<path
+				class="l s"
+				d="M12.5 2.1L-81.8 56.5M-2.8 22.1L52.7 54.1M-11.1 26.9L27.7 49.3M-36 41.3L13.9 70.1M-44.3 46.1L27.7 87.7M-52.7 50.9L-19.4 70.1"
+			/>
+			<path
+				class="a"
+				d="M-19.4 31.7L47.1 70.1"
+			/>
+			<path
+				class="a d"
+				d="M30.5 60.5L30.5 35.2"
+			/>
+			<path
+				class="l f"
+				d="M0 38.1L55.4 70.1L55.4 72L0 40Z"
+			/>
+			<path
+				class="l f"
+				d="M83.1 54.1L55.4 70.1L55.4 72L83.1 56Z"
+			/>
+			<path
+				class="l f"
+				d="M27.7 22.1L83.1 54.1L55.4 70.1L0 38.1Z"
+			/>
+			<path
+				class="l s"
+				d="M26.3 30.9L63.7 52.5"
+			/>
+			<path
+				class="a"
+				d="M18 35.7L44.3 50.9"
+			/>
+			<text
+				if:when="props.note"
+				x="-66"
+				y="104"
+				text-anchor="middle"
+			>
+				{props.note}
+			</text>
+		</svg>
+		<figcaption class="fig-label">
+			<b>{props.label}</b>
+			<span>{props.caption}</span>
+		</figcaption>
+	</figure>
+</template>
+
+<style scoped>
+	.cat-figure {
+		display: grid;
+		gap: 1.25rem;
+		margin: 0;
+	}
+	svg {
+		margin-inline: auto;
+		max-width: 26rem;
+	}
+	/* About 11px at full size, like the labels of the other figures. */
+	.cat-figure svg {
+		--fig-text: 6.6px;
+	}
+</style>

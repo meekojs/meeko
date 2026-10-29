@@ -42,14 +42,17 @@ async function boundedText(request: Request, limit: number): Promise<string | un
 /**
  * The page to return to: a path of this origin (`/docs?tab=a`), never another site. A protocol-relative
  * `//evil.example`, a backslash that browsers read as a slash, an absolute URL or control characters
- * are not a path of this origin, so they go back to `/`.
+ * are not a path of this origin, so they go back to `/`. Neither is a path whose dot segments
+ * leave `//` at its start (`/.//evil.example`, `/a/..//evil.example`): as a `Location` it would be
+ * protocol-relative.
  */
 export function themeReturnPath(value: string | null, origin: string): string {
   if (!value || !value.startsWith("/") || value.startsWith("//") || /[\\\u0000-\u001f\u007f]/.test(value)) return "/";
   let target: URL;
   try { target = new URL(value, origin); }
   catch { return "/"; }
-  return target.origin === origin ? `${target.pathname}${target.search}${target.hash}` : "/";
+  if (target.origin !== origin || target.pathname.startsWith("//")) return "/";
+  return `${target.pathname}${target.search}${target.hash}`;
 }
 
 /**

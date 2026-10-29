@@ -12,7 +12,7 @@
 	const { params } = usePage()
 	const entry = catalogEntry(params.slug)
 	if (!entry) notFound()
-	export const doc = await renderSource(entry.source)
+	export const doc = await renderSource(entry.source, entry.transform)
 	export const nav = navigation()
 	export const pages = pager(entry.href)
 	export const current = entry.href

@@ -19,7 +19,7 @@ function inlineText(token: Token | undefined): string {
 }
 
 /**
- * `x.md#y` → `/docs/x#y`, the package README → `/`, other repository files → GitHub. Relative links
+ * `x.md#y` → `/docs/x#y`, the package README → `/docs/inicio-rapido`, other repository files → GitHub. Relative links
  * resolve from the real location of `from` in the repository (`CHANGELOG.md` lives in `packages/meeko/`).
  */
 export function rewriteHref(href: string, from: string): string {

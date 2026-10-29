@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { createRouteManifest } from "./router.js";
 import type { RouteRecord } from "./router.js";
+import { discoverRouteMiddleware } from "./route-middleware-discovery.js";
 import { discoverLayouts, discoverRoutes } from "./routes-discovery.js";
 
 /**
@@ -113,6 +114,13 @@ export async function composeFrameworkRoutes(options: ComposeRoutesOptions): Pro
     // Layer pages render inside the project's shell and fall back to its error page.
     routes.push(...await discoverRoutes(root, { shell: options.projectRoot, layouts }));
   }
-  for (const module of options.modules ?? []) routes.push(...await module.routes());
+  // The routes of a module run the project's global server route middleware too, like its pages.
+  const { serverGlobal } = await discoverRouteMiddleware(options.projectRoot);
+  for (const module of options.modules ?? []) {
+    for (const route of await module.routes()) {
+      const serverMiddleware = [...new Set([...serverGlobal, ...route.serverMiddleware ?? []])];
+      routes.push(serverMiddleware.length && route.render !== "client" && route.render !== "prerender" ? { ...route, serverMiddleware } : route);
+    }
+  }
   return createRouteManifest(routes);
 }

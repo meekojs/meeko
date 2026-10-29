@@ -7,6 +7,7 @@ import type { ApiEndpoint, RpcEndpoint } from "../framework-server/discovery.js"
 import { composeFrameworkRoutes } from "../framework/modules.js";
 import { discoverConfiguredLayouts, discoverConfiguredRoutes, readMeekoConfigSync, resolveConfigSources } from "../framework/config.js";
 import { discoverLayouts } from "../framework/routes-discovery.js";
+import { discoverRouteMiddleware, globalMiddlewareNames } from "../framework/route-middleware-discovery.js";
 import type { RouteRecord } from "../framework/router.js";
 import { nodeAt } from "./reactivity.js";
 
@@ -21,6 +22,8 @@ export interface AppIndex {
   readonly rpc: readonly RpcEndpoint[];
   /** Named layouts by name (`app/layouts`, layers and, in a trusted workspace, the modules'). */
   readonly layouts?: Readonly<Record<string, string>>;
+  /** Route middleware of `app/middleware` by name: the named ones and the global ones. */
+  readonly middleware?: { readonly named: Readonly<Record<string, string>>; readonly global: ReadonlyMap<string, string> };
 }
 
 export const emptyAppIndex: AppIndex = { routes: [], api: [], rpc: [] };
@@ -49,6 +52,8 @@ async function generatedRoutes(root: string): Promise<readonly RouteRecord[]> {
       layouts: route.layouts.map((layout) => resolve(root, layout)),
       ...(route.error ? { error: resolve(root, route.error) } : {}),
       ...(route.sidecar ? { sidecar: resolve(root, route.sidecar) } : {}),
+      ...(route.middleware ? { middleware: route.middleware.map((file) => resolve(root, file)) } : {}),
+      ...(route.serverMiddleware ? { serverMiddleware: route.serverMiddleware.map((file) => resolve(root, file)) } : {}),
     }));
   } catch { return []; }
 }
@@ -71,7 +76,13 @@ export async function loadAppIndex(root: string, trusted: boolean): Promise<AppI
   let rpc: readonly RpcEndpoint[] = [];
   try { ({ api, rpc } = await discoverServerManifest(root)); }
   catch { /* A collision is reported by `meeko check`; the editor keeps the routes. */ }
-  return { routes, api, rpc, layouts: await layoutsOf(root, trusted) };
+  let middleware: AppIndex["middleware"];
+  try {
+    const discovered = await discoverRouteMiddleware(root);
+    middleware = { named: discovered.named, global: globalMiddlewareNames(root, discovered) };
+  }
+  catch { /* `meeko check` reports a middleware whose options cannot be read. */ }
+  return { routes, api, rpc, layouts: await layoutsOf(root, trusted), ...(middleware ? { middleware } : {}) };
 }
 
 /** Parameters of a route id, such as `id` in `/users/[id]` and `path` in `/docs/[...path]`. */
@@ -143,7 +154,8 @@ export type AppTarget =
   | { readonly kind: "route"; readonly id: string; readonly route?: RouteRecord; readonly node: ts.Node }
   | { readonly kind: "api"; readonly label: string; readonly endpoints: readonly ApiEndpoint[]; readonly node: ts.Node }
   | { readonly kind: "rpc"; readonly id: string; readonly endpoint?: RpcEndpoint; readonly node: ts.Node }
-  | { readonly kind: "layout"; readonly name: string; readonly file?: string; readonly node: ts.Node };
+  | { readonly kind: "layout"; readonly name: string; readonly file?: string; readonly node: ts.Node }
+  | { readonly kind: "middleware"; readonly name: string; readonly file?: string; readonly node: ts.Node };
 
 const apiMethods = new Set(["get", "post", "put", "patch", "delete"]);
 
@@ -234,6 +246,16 @@ export function appTargetAt(program: ts.Program, fileName: string, offset: numbe
     && (options.expression.text === "definePage" || options.expression.text === "defineGroup") && ts.isStringLiteralLike(node)) {
     const file = index.layouts?.[node.text];
     return { kind: "layout", name: node.text, ...(file ? { file } : {}), node };
+  }
+  // `middleware: ["auth"]` of `definePage({ ... })` or `defineGroup({ ... })`.
+  const list = ts.isStringLiteralLike(node) && ts.isArrayLiteralExpression(node.parent) && ts.isPropertyAssignment(node.parent.parent)
+    && node.parent.parent.initializer === node.parent ? node.parent.parent : undefined;
+  const middlewareOptions = list && ts.isIdentifier(list.name) && list.name.text === "middleware" && ts.isObjectLiteralExpression(list.parent)
+    ? list.parent.parent : undefined;
+  if (middlewareOptions && ts.isCallExpression(middlewareOptions) && ts.isIdentifier(middlewareOptions.expression)
+    && (middlewareOptions.expression.text === "definePage" || middlewareOptions.expression.text === "defineGroup") && ts.isStringLiteralLike(node)) {
+    const file = index.middleware?.named[node.text];
+    return { kind: "middleware", name: node.text, ...(file ? { file } : {}), node };
   }
   if (ts.isStringLiteralLike(node) && ts.isCallExpression(node.parent)) {
     const call = node.parent;

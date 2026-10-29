@@ -21,7 +21,7 @@ import { prepareFrameworkTypeDeclarations } from "../src/framework/type-declarat
 import type { ClientComponent } from "../src/framework/client.ts";
 import type { DocumentConfig } from "../src/framework/head.ts";
 import { createRouteManifest } from "../src/framework/router.ts";
-import type { RouteRecord } from "../src/framework/router.ts";
+import type { ErrorPageRecord, RouteRecord } from "../src/framework/router.ts";
 import { themeEndpoint, themeReturnPath } from "../src/framework/theme-endpoint.ts";
 import { resolveThemeConfig, THEME_ENDPOINT, themeStyle, themeToggleGroupLabel, themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from "../src/framework/theme.ts";
 import type { ResolvedThemeConfig, ThemeToggleContext, ThemeToggleOptions } from "../src/framework/theme.ts";
@@ -244,7 +244,9 @@ test("POST /_meeko/theme validates the theme and the Origin, writes the cookie a
   assert.equal(done.headers.get("cache-control"), "no-store");
   assert.equal((await themeEndpoint(config, new Request("http://localhost/_meeko/theme", { method: "POST", body: "theme=system", headers: { origin: "http://localhost", "content-type": "application/x-www-form-urlencoded; charset=UTF-8" } }))).headers.get("set-cookie"), "meeko-theme=system; Path=/; Max-Age=31536000; SameSite=Lax");
   // Never an open redirect: anything that is not a path of this origin goes back to /.
-  for (const target of ["https://evil.example/", "//evil.example/x", "/\\evil.example", "/\tx", "javascript:alert(1)", "docs", ""]) {
+  for (const target of ["https://evil.example/", "//evil.example/x", "/\\evil.example", "/\tx", "javascript:alert(1)", "docs", "",
+    // Dot segments that leave `//` at the start: a protocol-relative Location once resolved.
+    "/.//evil.example", "/..//evil.example", "/a/..//evil.example/x", "/%2e//evil.example", "/%2E%2e//evil.example"]) {
     assert.equal(themeReturnPath(target, origin), "/", JSON.stringify(target));
     assert.equal((await post(`theme=dark&return=${encodeURIComponent(target)}`)).headers.get("location"), "/", JSON.stringify(target));
   }
@@ -282,6 +284,12 @@ const props = defineProps<{ outlet: Component<Record<string, unknown>> }>();
 </script>
 <template><div class="shell"><component is="props.outlet"></component></div></template>`,
   "toggle.meeko": `<template>${iconToggle}<MeekoThemeToggle mode="select" id="picker" bind:themes="['light', 'dark', 'system']" /></template>`,
+  // The 404 page of the static adapter: rendered once for /404.html, served for any missing URL.
+  "error.meeko": `<script lang="ts">
+import { useRoute } from "@meekojs/meeko/framework";
+const route = useRoute();
+</script>
+<template><p id="where">{route.url.value}</p>${iconToggle}<MeekoThemeToggle mode="select" id="picker" /></template>`,
 };
 
 async function loadModules(): Promise<{ modules: Record<string, ClientComponent>; cleanup: () => Promise<void> }> {
@@ -466,6 +474,61 @@ test("hydration changes nothing visible, and with JavaScript the form changes th
     assert.equal(stored.document.querySelector("[role=radio][value=dark]")!.getAttribute("aria-checked"), "true");
     assert.equal(stored.root.getAttribute("data-theme-choice"), "dark");
     assert.deepEqual(stored.errors, []);
+  } finally {
+    closeAll();
+    await cleanup();
+  }
+});
+
+test("a page rendered for one URL hydrates under another: the static 404.html at any URL and a prerendered page with a query", { timeout: 30_000 }, async () => {
+  const { modules, cleanup } = await loadModules();
+  try {
+    const { createFrameworkHandler, mountClientApp } = await runtime();
+    const config: DocumentConfig = { theme: resolved() };
+    const errorPage: ErrorPageRecord = { file: "error.meeko", layouts: ["app.meeko"] };
+    const server = createFrameworkHandler({ routes, errorPage, loadPage: async (file) => modules[file]!, clientEntry: "/entry.js", onError: () => {}, document: { config } });
+    /** The document that the server rendered for `rendered`, hydrated in a browser at `visited`. */
+    const visit = async (rendered: string, visited: string) => {
+      const response = await server(page(rendered));
+      const browser = new HappyWindow({ url: visited });
+      browser.document.write(await response.text());
+      opened.push(() => browser.happyDOM.abort());
+      const errors: unknown[] = [];
+      const app = await mountClientApp({
+        routes, errorPage, document: config, root: browser.document.getElementById("app") as unknown as Element,
+        payload: browser.document.getElementById("meeko-payload")!.textContent!, loadPage: async (file) => modules[file]!, serverData: true,
+        fetch: ((input: RequestInfo | URL, init?: RequestInit) => server(new Request(input, init))) as typeof fetch,
+        onError: (error) => { errors.push(error); }, browser: browser as unknown as Window,
+      });
+      opened.push(() => app.dispose());
+      const returns = [...browser.document.querySelectorAll("input[name=return]")].map((input) => input.getAttribute("value"));
+      return { status: response.status, browser, document: browser.document, returns, errors };
+    };
+
+    // The static adapter renders app/error.meeko for /404.html; the host serves it for any missing
+    // file. Hydration starts from the URL the server rendered and then takes the browser's.
+    const missing = await visit("https://example.test/404.html", "https://example.test/cualquier-cosa?x=1#top");
+    assert.equal(missing.status, 404);
+    assert.deepEqual(missing.errors, []);
+    assert.equal(missing.document.getElementById("where")!.textContent, "/cualquier-cosa?x=1#top");
+    // Without JavaScript the theme form would return to the page the visitor is on.
+    assert.deepEqual(missing.returns, ["/cualquier-cosa?x=1#top", "/cualquier-cosa?x=1#top"]);
+    closeAll();
+
+    // A static host ignores the query string: the prerendered page of / answers /?utm=mail.
+    const query = await visit("https://example.test/", "https://example.test/?utm=mail");
+    assert.equal(query.status, 200);
+    assert.deepEqual(query.errors, []);
+    assert.deepEqual(query.returns, ["/?utm=mail", "/?utm=mail"]);
+    // The URL of the payload is a path of this origin, without a fragment.
+    const payload = JSON.parse(query.document.getElementById("meeko-payload")!.textContent!) as Record<string, unknown>;
+    assert.equal(payload.url, "/");
+    for (const url of ["https://evil.example/", "evil", "/#x", 7]) {
+      await assert.rejects(mountClientApp({
+        routes, root: query.document.getElementById("app") as unknown as Element, payload: { ...payload, url },
+        loadPage: async (file) => modules[file]!, browser: query.browser as unknown as Window,
+      }), /Invalid Meeko payload URL/, JSON.stringify(url));
+    }
   } finally {
     closeAll();
     await cleanup();

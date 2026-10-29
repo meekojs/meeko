@@ -1,5 +1,9 @@
 # Cambios de Meeko Language
 
+## [1.6.0] - 2026-10-28
+
+- Middleware de ruta con nombre de Meeko 1.6: en `definePage` y en `defineGroup`, el editor completa los nombres de `middleware: [...]` con los middleware con nombre de la aplicación; el hover de un nombre muestra su archivo de `app/middleware` y sus páginas (o avisa de que es global o no existe), y Ctrl+clic lo abre. Un middleware de ruta de servidor (`app/middleware/*.server.ts`) aparece en el completado como uno más y su hover indica que es «sólo servidor».
+
 ## [1.5.0] - 2026-10-28
 
 - Resaltado: `<MeekoAwait>`, la etiqueta de Meeko 1.5 para datos que llegan después del primer pintado, se colorea como etiqueta integrada y el valor de su `for` como TypeScript, como `each:of`. El completado, el hover y los tipos de su contenido los da el servidor de lenguaje de Meeko 1.5.

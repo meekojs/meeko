@@ -12,6 +12,8 @@
 	/** URLs of every link of the results in order: each page, then its sections. */
 	const order = computed(() => results.value.flatMap((result) => [result.url, ...result.sections.map((section) => section.url)]))
 	const activeUrl = computed(() => order.value[active.value])
+	/** The modifier of the shortcut: Ctrl until the browser says it runs on an Apple platform. */
+	const modifier = signal('Ctrl')
 	let request = 0
 	let timer: ReturnType<typeof setTimeout> | undefined
 
@@ -88,6 +90,7 @@
 	})
 
 	onMounted(() => {
+		if (/Mac|iPhone|iPad/.test(navigator.userAgent)) modifier.value = '⌘'
 		const onShortcut = (event: KeyboardEvent): void => {
 			const target = event.target as HTMLElement | null
 			const typing = target?.isContentEditable || /^(?:input|textarea|select)$/i.test(target?.tagName ?? '')
@@ -125,8 +128,14 @@
 			/>
 			<path d="m20 20-3.5-3.5" />
 		</svg>
-		<span class="label">Buscar</span>
-		<kbd>/</kbd>
+		<span class="label">Buscar…</span>
+		<span
+			class="keys"
+			aria-hidden="true"
+		>
+			<kbd>{modifier.value}</kbd>
+			<kbd>K</kbd>
+		</span>
 	</button>
 	<dialog
 		ref:dialog
@@ -171,11 +180,13 @@
 				class="hint"
 				if:when="status.value === 'idle'"
 			>
-				Escribe para buscar en toda la documentación. Abre la búsqueda con
+				Escribe para buscar en las guías y en la referencia de la API. Ábrela desde cualquier página con
 				<kbd>/</kbd>
 				o
-				<kbd>Ctrl</kbd>
+				<kbd>{modifier.value}</kbd>
 				<kbd>K</kbd>
+				; muévete con las flechas y entra con
+				<kbd>Intro</kbd>
 				.
 			</p>
 			<p
@@ -255,58 +266,69 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.5rem;
+		transition:
+			border-color 0.15s,
+			background-color 0.15s,
+			color 0.15s;
 		cursor: pointer;
+		margin-right: 0.25rem;
 		border: 1px solid var(--line);
-		border-radius: 10px;
+		border-radius: 8px;
 		background: var(--surface);
-		padding: 0 0.5rem 0 0.75rem;
-		min-width: 11rem;
-		height: 38px;
+		padding: 0 0.35rem 0 0.65rem;
+		min-width: 12.5rem;
+		height: 32px;
 		color: var(--muted);
-		font: inherit;
-		font-size: 0.9rem;
+		font-size: 0.84rem;
 	}
 	.search-trigger:hover {
-		border-color: var(--accent);
-		color: var(--ink);
+		border-color: var(--line-strong);
+		background: var(--surface-2);
+		color: var(--ink-soft);
 	}
 	.search-trigger .label {
 		flex: 1;
 		text-align: left;
+	}
+	.keys {
+		display: inline-flex;
+		gap: 0.2rem;
+	}
+	.keys kbd {
+		font-size: 0.7rem;
 	}
 	svg {
 		flex: none;
 		fill: none;
 		stroke: currentColor;
 		stroke-linecap: round;
-		stroke-width: 2;
-		width: 17px;
-		height: 17px;
-	}
-	kbd {
-		border: 1px solid var(--line);
-		border-bottom-width: 2px;
-		border-radius: 5px;
-		background: var(--bg);
-		padding: 0.05rem 0.4rem;
-		color: var(--muted);
-		font: 600 0.75rem/1.4 var(--font-mono);
+		stroke-width: 1.6;
+		width: 15px;
+		height: 15px;
 	}
 	.search {
-		margin: 8vh auto auto;
+		margin: 12vh auto auto;
 		box-shadow: var(--shadow-lg);
-		border: 1px solid var(--line);
-		border-radius: 16px;
-		background: var(--bg);
+		border: 1px solid var(--line-strong);
+		border-radius: var(--radius-l);
+		background: var(--surface-2);
 		padding: 0;
-		width: min(42rem, calc(100vw - 2rem));
-		max-height: min(36rem, calc(100dvh - 4rem));
+		width: min(40rem, calc(100vw - 2rem));
+		max-height: min(34rem, calc(100dvh - 4rem));
 		overflow: hidden;
 		color: var(--ink);
 	}
+	.search[open] {
+		animation: open 0.22s var(--ease-out);
+	}
+	@keyframes open {
+		from {
+			transform: translateY(-6px) scale(0.985);
+			opacity: 0;
+		}
+	}
 	.search::backdrop {
-		backdrop-filter: blur(3px);
-		background: rgb(22 16 13 / 0.45);
+		background: var(--scrim);
 	}
 	.panel {
 		display: flex;
@@ -316,10 +338,14 @@
 	.field {
 		display: flex;
 		align-items: center;
-		gap: 0.6rem;
+		gap: 0.7rem;
 		border-bottom: 1px solid var(--line);
-		padding: 0.85rem 1rem;
+		padding: 0.95rem 1rem;
 		color: var(--muted);
+	}
+	.field svg {
+		width: 17px;
+		height: 17px;
 	}
 	.field input {
 		flex: 1;
@@ -328,30 +354,38 @@
 		background: transparent;
 		min-width: 0;
 		color: var(--ink);
-		font: inherit;
-		font-size: 1.05rem;
+		font-size: 1.02rem;
+		caret-color: var(--accent);
+	}
+	.field input::-webkit-search-cancel-button {
+		display: none;
 	}
 	.close {
 		cursor: pointer;
-		border: 1px solid var(--line);
-		border-radius: 6px;
-		background: var(--surface);
-		padding: 0.2rem 0.45rem;
+		border: 1px solid var(--line-strong);
+		border-radius: 5px;
+		background: var(--surface-3);
+		padding: 0.1rem 0.45rem;
 		color: var(--muted);
-		font: 600 0.75rem var(--font-mono);
+		font: 500 0.72rem/1.5 var(--font-mono);
+	}
+	.close:hover {
+		color: var(--ink);
 	}
 	.hint {
 		margin: 0;
-		padding: 1.25rem 1rem;
+		padding: 1.1rem 1.1rem 1.25rem;
 		color: var(--muted);
-		font-size: 0.92rem;
+		font-size: 0.88rem;
+		line-height: 1.7;
 	}
 	.hint code {
+		color: var(--ink-soft);
 		font-size: 0.85em;
 	}
 	.results {
 		margin: 0;
-		padding: 0.5rem;
+		padding: 0.4rem;
 		overflow-y: auto;
 		list-style: none;
 	}
@@ -359,52 +393,69 @@
 		margin: 0;
 	}
 	.sections {
-		margin: 0 0 0.35rem 1rem;
-		border-left: 2px solid var(--line);
-		padding: 0 0 0 0.6rem;
+		margin: 0 0 0.3rem 0.9rem;
+		border-left: 1px solid var(--line-strong);
+		padding: 0 0 0 0.45rem;
 		list-style: none;
 	}
 	a {
 		display: block;
-		border-radius: 10px;
-		padding: 0.55rem 0.75rem;
+		border-radius: var(--radius-s);
+		padding: 0.5rem 0.7rem;
 		color: var(--ink);
 		text-decoration: none;
 	}
 	a strong {
 		display: block;
-		font-size: 0.95rem;
+		font-weight: 520;
+		font-size: 0.9rem;
 	}
 	a:hover,
 	a.active {
-		background: var(--accent-soft);
+		background: var(--surface-3);
+	}
+	a.active {
+		box-shadow: inset 0 0 0 1px var(--accent-line);
 	}
 	.excerpt {
 		display: block;
-		margin-top: 0.15rem;
+		margin-top: 0.1rem;
 		color: var(--muted);
-		font-size: 0.85rem;
-		line-height: 1.45;
+		font-size: 0.82rem;
+		line-height: 1.5;
 	}
 	.excerpt :global(mark) {
 		border-radius: 3px;
 		background: var(--mark);
 		padding: 0 1px;
-		color: inherit;
+		color: var(--ink);
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.search[open] {
+			animation: none;
+		}
+	}
+	@media (max-width: 1080px) {
+		.search-trigger {
+			min-width: 9.5rem;
+		}
 	}
 	@media (max-width: 640px) {
 		.search-trigger {
 			justify-content: center;
+			margin-right: 0;
+			border-color: transparent;
+			background: transparent;
 			padding: 0;
-			width: 38px;
+			width: 32px;
 			min-width: 0;
 		}
 		.search-trigger .label,
-		.search-trigger kbd {
+		.search-trigger .keys {
 			display: none;
 		}
 		.search {
-			margin-top: 1rem;
+			margin-top: 0.75rem;
 		}
 	}
 </style>

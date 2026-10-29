@@ -7,7 +7,7 @@ import { batch, finishWithCleanup, runDry, signal } from "../reactivity.js";
 import { ERROR_PAGE_TITLE, PAYLOAD_VERSION, PageInputError, pageSearchObject, payloadHead, validatePageInputs } from "./page.js";
 import type { PageHead, PageRender, PageSchema } from "./page.js";
 import { ClientError } from "./clients.js";
-import { runRouteMiddleware } from "./middleware.js";
+import { hasRouteMiddleware, routeMiddlewareChain, runRouteMiddleware } from "./middleware.js";
 import { fixedRoute, liveRoute, provideNavigation, provideRoute, routeIsActive, routeSnapshot } from "./navigation.js";
 import type { LiveRoute, NavigationState, RouteState } from "./navigation.js";
 import type { RouteMiddleware } from "./middleware.js";
@@ -137,8 +137,15 @@ export interface ClientAppOptions {
    * datos de este loader, también con `serverData`; por defecto, `loadRoute`.
    */
   readonly loadClientRoute?: (file: string) => Promise<ClientRoute>;
-  /** Carga el middleware de ruta, que se ejecuta como en SSR antes de pedir cada navegación. */
+  /** Carga el middleware de ruta global, que se ejecuta como en SSR antes de pedir cada navegación. */
   readonly loadMiddleware?: () => Promise<readonly RouteMiddleware[]>;
+  /**
+   * Carga un middleware con nombre de {@link RouteRecord.middleware} por su archivo, la primera vez
+   * que se navega a una ruta que lo declara. Se ejecuta después de los globales, como en SSR; una
+   * ruta con middleware con nombre y sin este cargador falla en lugar de saltárselo.
+   * @since 1.6.0
+   */
+  readonly loadNamedMiddleware?: (file: string) => Promise<RouteMiddleware>;
   /**
    * Pide al servidor los datos públicos del loader al navegar. Con `true`, la misma URL con
    * `Accept: application/meeko+json`; desde `1.3`, con `"static"`, el archivo
@@ -213,6 +220,11 @@ interface HydrationPayload {
   resources: Record<string, unknown>;
   /** Props the named layout rendered with, when the page has one. */
   layoutProps: Record<string, unknown> | undefined;
+  /**
+   * The URL the server rendered (path and query), when the payload says it. A prerendered page or
+   * the `404.html` of a static host may be served under another URL.
+   */
+  url: string | undefined;
 }
 
 const pageRenders: readonly string[] = ["ssr", "stream", "prerender", "client"] satisfies readonly PageRender[];
@@ -235,6 +247,21 @@ function staticPayloadUrl(url: URL): string {
   target.search = "";
   target.hash = "";
   return target.href;
+}
+
+/**
+ * The URL a document was rendered for: `rendered` (the path and query of the payload) on the
+ * browser's origin, or the browser's URL when the payload does not say it. The path is set as it
+ * came, never resolved against the origin, so `//x` stays a path.
+ */
+function renderedUrl(rendered: string | undefined, browserUrl: URL): URL {
+  if (rendered === undefined) return browserUrl;
+  const query = rendered.indexOf("?");
+  const url = new URL(browserUrl.href);
+  url.pathname = query < 0 ? rendered : rendered.slice(0, query);
+  url.search = query < 0 ? "" : rendered.slice(query);
+  url.hash = "";
+  return url;
 }
 
 /** A navigation to a route, or without `match` to a URL that renders the application error page. */
@@ -281,6 +308,10 @@ function readPayload(value: unknown): HydrationPayload {
   if (parsed.sharedState !== undefined && !isRecord(parsed.sharedState)) throw new TypeError("Invalid Meeko shared state");
   if (parsed.resources !== undefined && !isRecord(parsed.resources)) throw new TypeError("Invalid Meeko page data");
   if (parsed.layoutProps !== undefined && !isRecord(parsed.layoutProps)) throw new TypeError("Invalid Meeko layout props");
+  // A path and its query, as the server saw them: never another origin nor a fragment.
+  if (parsed.url !== undefined && (typeof parsed.url !== "string" || !parsed.url.startsWith("/") || parsed.url.includes("#"))) {
+    throw new TypeError("Invalid Meeko payload URL");
+  }
   const render = parsed.render ?? "ssr";
   if (typeof render !== "string" || !pageRenders.includes(render) || (error && render !== "ssr")) throw new TypeError("Invalid Meeko page render mode");
   let head: PageHead;
@@ -292,6 +323,7 @@ function readPayload(value: unknown): HydrationPayload {
     deferred: readDeferredEntries(parsed.deferred),
     resources: (parsed.resources as Record<string, unknown> | undefined) ?? {},
     layoutProps: parsed.layoutProps as Record<string, unknown> | undefined,
+    url: parsed.url as string | undefined,
   };
 }
 
@@ -652,12 +684,14 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     if (JSON.stringify(initial.params) !== JSON.stringify(payload.props.params)) throw new Error("Meeko route parameters do not match SSR");
   }
   const stateStore = new StateStore(payload.sharedState);
-  // The route of useRoute(): the server's values, so hydration matches; the fragment the server
-  // never saw is applied right after hydration.
+  // The route of useRoute(): the server's values, so hydration matches, also when the document was
+  // rendered for another URL (a static host serves 404.html for any missing file and a prerendered
+  // page whatever the query). The browser's URL and its fragment arrive right after hydration.
   const initialUrl = new URL(browser.location.href);
+  const serverUrl = renderedUrl(payload.url, initialUrl);
   let committedRoute: LiveRoute = liveRoute(payload.error
-    ? routeSnapshot(initialUrl, null, {}, pageSearchObject(initialUrl.searchParams), false)
-    : routeSnapshot(initialUrl, payload.route, payload.props.params as Record<string, unknown>, payload.props.search as Record<string, unknown>, false));
+    ? routeSnapshot(serverUrl, null, {}, pageSearchObject(serverUrl.searchParams), false)
+    : routeSnapshot(serverUrl, payload.route, payload.props.params as Record<string, unknown>, payload.props.search as Record<string, unknown>, false));
   const resourceCache = new ResourceCache();
   // The route of the plugins follows the committed route, also when a navigation replaces the
   // whole tree (and its live route): reading it also reads `routeGeneration`.
@@ -766,6 +800,17 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     try { committedRoute.set({ ...committed, url: href + url.hash }); }
     catch (error) { reportNavigationError(browser, error, observeNavigationError); }
   };
+  // A document rendered for another URL: once hydrated, useRoute() says the browser's. The page
+  // keeps the parameters and search the server validated; an error page reads the query as SSR.
+  const hydrated = committedRoute.current();
+  if (hydrated.url !== initialUrl.pathname + initialUrl.search) {
+    try {
+      committedRoute.set({
+        ...hydrated, url: initialUrl.pathname + initialUrl.search + initialUrl.hash, path: initialUrl.pathname,
+        ...payload.error ? { search: pageSearchObject(initialUrl.searchParams) } : {},
+      });
+    } catch (error) { reportNavigationError(browser, error, observeNavigationError); }
+  }
   syncFragment(initialUrl);
   const recoverCommitFailure = (error: unknown): never => {
     // A failed outlet update or hydration can leave live scopes attached to a
@@ -809,8 +854,8 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   };
   const renderRouteData = async (context: RenderContext, initialLoad: boolean, stream: { control?: AbortController; committed?: boolean }): Promise<void | boolean> => {
     const match = context.match;
-    if (match && options.loadMiddleware && !initialLoad) {
-      const response = await runRouteMiddleware(await options.loadMiddleware(), {
+    if (match && hasRouteMiddleware(match.route, options) && !initialLoad) {
+      const response = await runRouteMiddleware(await routeMiddlewareChain(match.route, options), {
         url: context.url, match, signal: context.signal, phase: "client",
       });
       if (context.signal.aborted || disposed) return false;

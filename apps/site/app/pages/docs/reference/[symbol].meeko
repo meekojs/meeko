@@ -430,7 +430,7 @@
 		border: 0;
 		background: none;
 		padding: 0;
-		font-weight: 700;
+		font-weight: 600;
 		font-size: 0.86em;
 		letter-spacing: -0.01em;
 	}
@@ -446,7 +446,7 @@
 		background: var(--surface);
 		padding: 0.08rem 0.6rem;
 		color: var(--ink-soft);
-		font: 600 0.78rem/1.6 var(--font-ui);
+		font: 500 0.78rem/1.6 var(--font-ui);
 	}
 	.badge.kind {
 		border-color: transparent;
@@ -454,15 +454,15 @@
 		color: var(--accent-ink);
 	}
 	.badge.deprecated {
-		border-color: var(--nose);
-		background: color-mix(in oklab, var(--nose) 16%, transparent);
+		border-color: var(--line-strong);
+		background: var(--surface-2);
 		color: var(--ink);
 	}
 	.note {
 		margin: 0 0 1.4rem;
-		border: 1px solid var(--nose);
-		border-radius: 12px;
-		background: color-mix(in oklab, var(--nose) 10%, var(--bg));
+		border: 1px solid var(--line-strong);
+		border-radius: var(--radius);
+		background: var(--surface);
 		padding: 0.75rem 1rem;
 	}
 	.note :global(p) {
@@ -542,7 +542,7 @@
 		display: none;
 	}
 	.parameter-name {
-		font-weight: 700;
+		font-weight: 600;
 	}
 	.parameter-type :global(code),
 	code.parameter-type {
@@ -557,7 +557,7 @@
 		border-radius: 999px;
 		padding: 0 0.45rem;
 		color: var(--muted);
-		font: 600 0.72rem/1.5 var(--font-ui);
+		font: 500 0.72rem/1.5 var(--font-ui);
 	}
 	:global(.api-type-link) {
 		color: var(--accent-ink);
@@ -598,20 +598,22 @@
 	}
 	.member-meta .obsolete {
 		color: var(--ink);
-		font-weight: 650;
+		font-weight: 560;
 	}
 	.member-signature :global(.shiki) {
 		margin: 0 0 0.7rem;
 		border: 1px solid var(--code-line);
-		border-radius: 10px;
+		border-radius: var(--radius);
 		background: var(--code-bg) !important;
 		padding: 0.6rem 0.85rem;
 		font-size: 0.82rem;
 	}
 	.member-deprecation {
 		margin: 0 0 0.6rem;
-		border-left: 1px solid var(--nose);
-		padding-left: 0.75rem;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-s);
+		background: var(--surface);
+		padding: 0.45rem 0.75rem;
 		color: var(--ink-soft);
 		font-size: 0.92rem;
 	}
@@ -647,7 +649,7 @@
 		display: inline-block;
 		transition: border-color 0.15s;
 		border: 1px solid var(--line);
-		border-radius: 8px;
+		border-radius: var(--radius-s);
 		background: var(--surface);
 		padding: 0.2rem 0.55rem;
 		text-decoration: none;

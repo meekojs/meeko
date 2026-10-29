@@ -216,3 +216,40 @@ describe("language server: named layouts", () => {
     assert.equal(fileURLToPath(target!.uri).toLowerCase(), workspace.file("app/layouts/dashboard.meeko").toLowerCase());
   });
 });
+
+describe("language server: named route middleware", () => {
+  let workspace: LanguageProject;
+  let component: OpenedComponent;
+
+  before(async () => {
+    workspace = await languageProject("lsp-middleware-", {
+      "app/middleware/10-locale.ts": "export default defineRouteMiddleware(() => undefined);\n",
+      "app/middleware/20-auth.ts": "export default defineRouteMiddleware(() => undefined, { global: false });\n",
+      "app/middleware/owner.server.ts": "export default defineServerRouteMiddleware(() => undefined, { global: false });\n",
+      "app/pages/index.meeko": "<template><p>Inicio</p></template>\n",
+      "app/pages/panel.meeko": "<script server lang=\"ts\">\nexport const route = definePage({ middleware: [\"auth\", \"locale\", \"owner\"] });\n</script>\n<template><p>Panel</p></template>\n",
+    });
+    await workspace.project.ready();
+    component = await workspace.open("app/pages/panel.meeko");
+  });
+
+  after(async () => {
+    await workspace?.dispose();
+  });
+
+  test("a name of middleware shows its file and pages and goes to the middleware; a global one says so", () => {
+    assert.deepEqual(Object.keys(component.app?.middleware?.named ?? {}), ["auth", "owner"]);
+    const text = (hover(component, component.at("\"auth\"", 2))?.contents as MarkupContent | undefined)?.value ?? "";
+    assert.match(text, /\*\*Middleware\*\* `auth` → \[app\/middleware\/20-auth\.ts\]\(file:/);
+    const [target] = definition(component, component.at("\"auth\"", 2)) as Location[];
+    assert.equal(fileURLToPath(target!.uri).toLowerCase(), workspace.file("app/middleware/20-auth.ts").toLowerCase());
+    const global = (hover(component, component.at("\"locale\"", 2))?.contents as MarkupContent | undefined)?.value ?? "";
+    assert.match(global, /\*\*Middleware\*\* `locale` es global \(\[app\/middleware\/10-locale\.ts\]/);
+    assert.deepEqual(definition(component, component.at("\"locale\"", 2)) ?? [], []);
+    // A server route middleware says that it only runs on the server.
+    const server = (hover(component, component.at("\"owner\"", 2))?.contents as MarkupContent | undefined)?.value ?? "";
+    assert.match(server, /\*\*Middleware\*\* `owner` → \[app\/middleware\/owner\.server\.ts\]\(file:/);
+    assert.match(server, /- sólo servidor: se ejecuta en el servidor/);
+    assert.doesNotMatch(text, /sólo servidor/);
+  });
+});

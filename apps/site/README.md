@@ -29,6 +29,9 @@ pnpm run build:static                # lo mismo que build; lo usan la raíz y el
   tocar la política; un atributo `on*` o una URL `javascript:` hacen fallar el build.
   `deploy/nginx.conf` incluye ese archivo desde la raíz web en cada `location` y responde 404 a
   `/_meeko/`.
+- La tipografía es Inter variable (ejes `opsz` y `wght`, subconjunto latino), autoalojada en
+  `public/fonts/` bajo la SIL Open Font License 1.1 (`public/fonts/Inter-OFL.txt`); sale de
+  `@fontsource-variable/inter` 5.3.0. La CSP sólo admite fuentes de `'self'`: no use un CDN.
 - `scripts/` sólo tiene lo propio del sitio: `assets.mjs` deriva las imágenes de `public/brand/` del
   logo del repositorio, y `postbuild.mjs` indexa las páginas con Pagefind en `pagefind/` de la salida
   y la copia a `dist-static/`, la carpeta que sirve `deploy/nginx.conf`.

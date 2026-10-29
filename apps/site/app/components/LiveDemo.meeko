@@ -1,0 +1,624 @@
+<script lang="ts">
+	import { computed, signal } from '@meekojs/meeko'
+	import type { DemoSource } from '../../shared/types/demo.js'
+
+	interface Props {
+		/** The counter example of the package, highlighted on the server line by line. */
+		source: DemoSource
+	}
+
+	/** A write to `count`, as the DevTools timeline lists it. */
+	interface SignalEvent {
+		readonly id: number
+		readonly from: number
+		readonly to: number
+	}
+
+	const props = defineProps<Props>()
+
+	// The same state as examples/counter/Counter.meeko, rendered on the server and hydrated here.
+	const count = signal(0)
+	const doubled = computed(() => count.value * 2)
+	const events = signal<readonly SignalEvent[]>([])
+	const fileName = computed(() => props.source.file.split('/').pop() ?? props.source.file)
+	/** Alternates on every change so the CSS flash restarts; absent until the first change. */
+	const pulse = computed(() => {
+		const latest = events.value[0]
+		return latest === undefined ? undefined : latest.id % 2 ? 'a' : 'b'
+	})
+	const announcement = computed(() => (events.value.length ? `count vale ${count.value}; doubled vale ${doubled.value}.` : ''))
+
+	function increment(): void {
+		const from = count.value
+		count.value++
+		const id = (events.value[0]?.id ?? 0) + 1
+		events.value = [{ id, from, to: count.value }, ...events.value].slice(0, 4)
+	}
+
+	function reset(): void {
+		count.value = 0
+		events.value = []
+	}
+</script>
+
+<template>
+	<figure
+		class="demo"
+		aria-labelledby="demo-caption"
+	>
+		<div class="window">
+			<div class="titlebar">
+				<p class="path">
+					<svg
+						viewBox="0 0 16 16"
+						aria-hidden="true"
+					>
+						<path d="M4 1.5h5.5L13 5v9.5H4z M9.5 1.5V5H13" />
+					</svg>
+					<span class="dir">examples / counter /</span>
+					<b>{fileName.value}</b>
+				</p>
+				<button
+					type="button"
+					class="reset"
+					on:click="reset"
+					bind:disabled="events.value.length === 0"
+				>
+					Reiniciar
+				</button>
+			</div>
+			<div class="panes">
+				<section
+					class="pane code"
+					aria-label="Código de Counter.meeko"
+				>
+					<header class="pane-head">
+						<span>Editor</span>
+						<a
+							bind:href="props.source.url"
+							rel="noopener"
+						>
+							Ver en GitHub
+						</a>
+					</header>
+					<pre
+						class="shiki source"
+						tabindex="0"
+						aria-label="Counter.meeko"
+						bind:data-pulse="pulse.value"
+					><code><span
+							class="line"
+							each:of="props.source.lines"
+							each:as="line"
+							each:index="index"
+							bind:data-mark="line.mark"
+						><span
+								class="ln"
+								aria-hidden="true"
+							>{index + 1}</span><span
+								class="text"
+								html="line.html"
+							></span></span></code></pre>
+				</section>
+				<section
+					class="pane result"
+					aria-label="Resultado en el navegador"
+				>
+					<header class="pane-head">
+						<span>Resultado</span>
+						<span class="note">SSR e hidratado en esta página</span>
+					</header>
+					<div class="stage">
+						<button
+							type="button"
+							class="counter"
+							on:click="increment"
+						>
+							{count.value} · doble: {doubled.value}
+						</button>
+						<p class="hint">Pulsa el botón: cambia la señal y sólo se actualiza su texto.</p>
+					</div>
+				</section>
+				<section
+					class="pane devtools"
+					aria-label="Representación de DevTools"
+				>
+					<header class="pane-head">
+						<span>DevTools</span>
+						<span class="tag">representación</span>
+					</header>
+					<div class="tree">
+						<span class="node">&lt;Counter&gt;</span>
+						<span class="instance">#1</span>
+					</div>
+					<p class="group-title">Props</p>
+					<dl class="rows">
+						<div class="row">
+							<dt>initial</dt>
+							<dd class="value muted">undefined</dd>
+							<dd class="site"></dd>
+						</div>
+					</dl>
+					<p class="group-title">Señales</p>
+					<dl class="rows">
+						<div
+							class="row signal"
+							bind:data-flash="pulse.value"
+						>
+							<dt>count</dt>
+							<dd class="value">{count.value}</dd>
+							<dd class="site">{fileName.value}:{props.source.countLine}</dd>
+						</div>
+						<div
+							class="row derived"
+							bind:data-flash="pulse.value"
+						>
+							<dt>
+								doubled
+								<span class="kind">computed</span>
+							</dt>
+							<dd class="value">{doubled.value}</dd>
+							<dd class="site">{fileName.value}:{props.source.doubledLine}</dd>
+						</div>
+					</dl>
+					<p class="group-title">Línea de tiempo</p>
+					<ol class="timeline">
+						<li
+							each:of="events.value"
+							each:as="event"
+							each:key="event.id"
+						>
+							<span class="seq">{event.id}</span>
+							<span class="name">count</span>
+							<span class="change">{event.from} → {event.to}</span>
+						</li>
+					</ol>
+					<p
+						class="empty"
+						if:when="events.value.length === 0"
+					>
+						Sin cambios todavía.
+					</p>
+					<p class="disclaimer">El panel real existe sólo en desarrollo, dentro de la página o en Chrome DevTools.</p>
+				</section>
+			</div>
+		</div>
+		<figcaption
+			id="demo-caption"
+			class="fig-label"
+		>
+			<b>FIG. 01</b>
+			<span>Counter.meeko del repositorio, su resultado y una representación de DevTools</span>
+		</figcaption>
+		<p
+			class="sr-only"
+			aria-live="polite"
+		>
+			{announcement.value}
+		</p>
+	</figure>
+</template>
+
+<style scoped>
+	.demo {
+		position: relative;
+		margin: 0;
+	}
+	.window {
+		position: relative;
+		mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent);
+		box-shadow: var(--shadow-window);
+		border: 1px solid var(--line-strong);
+		border-bottom: 0;
+		/* The window melts into the ground instead of ending on a hard edge (mask-image above). */
+		border-radius: var(--radius-l) var(--radius-l) 0 0;
+		background: var(--bg-raised);
+		overflow: hidden;
+	}
+	.titlebar {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 1rem;
+		border-bottom: 1px solid var(--line);
+		background: var(--surface);
+		padding: 0 0.6rem 0 1rem;
+		height: 2.6rem;
+	}
+	.path {
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		margin: 0;
+		min-width: 0;
+		color: var(--muted);
+		font: 400 0.8rem/1 var(--font-mono);
+		white-space: nowrap;
+	}
+	.path b {
+		color: var(--ink);
+		font-weight: 500;
+	}
+	.path svg,
+	.pane-head svg {
+		flex: none;
+		fill: none;
+		stroke: currentColor;
+		stroke-linejoin: round;
+		stroke-width: 1.2;
+		width: 14px;
+		height: 14px;
+	}
+	.reset {
+		transition:
+			color 0.15s,
+			background-color 0.15s;
+		cursor: pointer;
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		background: transparent;
+		padding: 0.2rem 0.75rem;
+		color: var(--ink-soft);
+		font-weight: 500;
+		font-size: 0.78rem;
+	}
+	.reset:hover:not(:disabled) {
+		background: var(--surface-2);
+		color: var(--ink);
+	}
+	.reset:disabled {
+		cursor: default;
+		color: var(--muted);
+		opacity: 0.5;
+	}
+	.panes {
+		display: grid;
+		grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr);
+	}
+	.pane {
+		min-width: 0;
+		padding-bottom: 3rem;
+	}
+	.pane + .pane {
+		border-left: 1px solid var(--line);
+	}
+	.pane-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.75rem;
+		border-bottom: 1px solid var(--line-soft);
+		padding: 0 1rem;
+		height: 2.4rem;
+		color: var(--ink-soft);
+		font-weight: 500;
+		font-size: 0.8rem;
+	}
+	.pane-head a {
+		color: var(--muted);
+		font-weight: 400;
+		text-decoration: none;
+	}
+	.pane-head a:hover {
+		color: var(--accent-ink);
+	}
+	.note {
+		color: var(--muted);
+		font-weight: 400;
+	}
+	.tag {
+		border: 1px solid var(--line-strong);
+		border-radius: 999px;
+		padding: 0 0.5rem;
+		color: var(--muted);
+		font: 400 0.7rem/1.6 var(--font-mono);
+	}
+
+	/* Editor */
+	/* Long lines wrap under their own text (hanging indent), never past the pane; the line
+	   number stays in its column. */
+	.source {
+		padding: 0.75rem 0;
+		overflow: visible;
+		font-size: 0.76rem;
+		line-height: 1.75;
+	}
+	.source:focus-visible {
+		outline-offset: -2px;
+	}
+	.line {
+		display: grid;
+		grid-template-columns: 3.4rem minmax(0, 1fr);
+		transition: background-color 0.4s var(--ease-out);
+		padding-right: 1rem;
+		min-height: 1.75em;
+	}
+	.text {
+		padding-left: 2ch;
+		text-indent: -2ch;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+	.ln {
+		padding-right: 1.1rem;
+		color: var(--muted);
+		text-align: right;
+		opacity: 0.6;
+		font-variant-numeric: tabular-nums;
+		user-select: none;
+	}
+	.source[data-pulse] .line[data-mark] {
+		background: var(--accent-soft);
+	}
+	.source[data-pulse] .line[data-mark] .ln {
+		color: var(--accent-ink);
+		opacity: 1;
+	}
+	.source[data-pulse='a'] .line[data-mark='count'] {
+		animation: line-a 0.9s var(--ease-out);
+	}
+	.source[data-pulse='b'] .line[data-mark='count'] {
+		animation: line-b 0.9s var(--ease-out);
+	}
+	@keyframes line-a {
+		from {
+			background-color: color-mix(in oklab, var(--accent) 34%, transparent);
+		}
+	}
+	@keyframes line-b {
+		from {
+			background-color: color-mix(in oklab, var(--accent) 34%, transparent);
+		}
+	}
+
+	/* Result */
+	.stage {
+		display: grid;
+		place-content: center;
+		justify-items: center;
+		gap: 1rem;
+		padding: 3rem 1.25rem 1rem;
+		min-height: 15rem;
+		background:
+			radial-gradient(circle at center, var(--line) 1px, transparent 1.5px) 0 0 / 18px 18px,
+			transparent;
+	}
+	.counter {
+		transition:
+			border-color 0.15s,
+			background-color 0.15s,
+			transform 0.12s var(--ease-out);
+		cursor: pointer;
+		box-shadow: var(--shadow-lg);
+		border: 1px solid var(--line-strong);
+		border-radius: var(--radius);
+		background: var(--surface-2);
+		padding: 0.75rem 1.4rem;
+		color: var(--ink);
+		font-weight: 500;
+		font-size: 1rem;
+		font-variant-numeric: tabular-nums;
+	}
+	.counter:hover {
+		border-color: var(--accent-line);
+		background: var(--surface-3);
+	}
+	.counter:active {
+		transform: scale(0.97);
+	}
+	.counter:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 3px;
+	}
+	.hint {
+		margin: 0;
+		max-width: 16rem;
+		color: var(--muted);
+		font-size: 0.8rem;
+		line-height: 1.5;
+		text-align: center;
+	}
+
+	/* DevTools */
+	.devtools {
+		background: var(--surface);
+		font-size: 0.8rem;
+	}
+	.tree {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin: 0.75rem 0.75rem 0;
+		border-radius: var(--radius-s);
+		background: var(--accent-soft);
+		padding: 0.35rem 0.6rem;
+		font-family: var(--font-mono);
+	}
+	.node {
+		color: var(--accent-ink);
+	}
+	.instance {
+		color: var(--muted);
+	}
+	.group-title {
+		margin: 1rem 1rem 0.35rem;
+		color: var(--muted);
+		font-weight: 500;
+		font-size: 0.72rem;
+	}
+	.rows {
+		margin: 0;
+		border-top: 1px solid var(--line-soft);
+	}
+	.row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: baseline;
+		gap: 0 0.75rem;
+		border-bottom: 1px solid var(--line-soft);
+		padding: 0.4rem 1rem;
+		font-family: var(--font-mono);
+	}
+	.row dt {
+		color: var(--ink);
+	}
+	.row dd {
+		margin: 0;
+	}
+	.value {
+		color: var(--ink);
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+	}
+	.value.muted {
+		color: var(--muted);
+	}
+	.site {
+		grid-column: 1 / -1;
+		color: var(--muted);
+		font-size: 0.7rem;
+	}
+	.site:empty {
+		display: none;
+	}
+	.kind {
+		margin-left: 0.35rem;
+		color: var(--muted);
+		font-size: 0.7rem;
+	}
+	/* The pink of Meeko's nose: only the instant a signal changes. */
+	.signal[data-flash='a'] {
+		animation: flash-a 1.1s var(--ease-out);
+	}
+	.signal[data-flash='b'] {
+		animation: flash-b 1.1s var(--ease-out);
+	}
+	.signal[data-flash='a'] .value {
+		animation: nose-a 1.1s var(--ease-out);
+	}
+	.signal[data-flash='b'] .value {
+		animation: nose-b 1.1s var(--ease-out);
+	}
+	.derived[data-flash] .value {
+		color: var(--accent-ink);
+	}
+	@keyframes flash-a {
+		from {
+			background-color: var(--nose-soft);
+		}
+	}
+	@keyframes flash-b {
+		from {
+			background-color: var(--nose-soft);
+		}
+	}
+	@keyframes nose-a {
+		from,
+		30% {
+			color: var(--nose);
+		}
+	}
+	@keyframes nose-b {
+		from,
+		30% {
+			color: var(--nose);
+		}
+	}
+	.timeline {
+		margin: 0;
+		padding: 0 1rem;
+		list-style: none;
+		font-family: var(--font-mono);
+	}
+	.timeline li {
+		display: grid;
+		grid-template-columns: 1.6rem auto 1fr;
+		gap: 0.5rem;
+		padding: 0.22rem 0;
+		color: var(--ink-soft);
+	}
+	.timeline li:first-child .change {
+		color: var(--ink);
+	}
+	.seq {
+		color: var(--muted);
+		font-variant-numeric: tabular-nums;
+	}
+	.change {
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+	}
+	.empty {
+		margin: 0;
+		padding: 0.2rem 1rem;
+		color: var(--muted);
+	}
+	.disclaimer {
+		margin: 1rem 1rem 0;
+		color: var(--muted);
+		font-size: 0.72rem;
+		line-height: 1.5;
+	}
+	.fig-label {
+		margin-top: 1rem;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.source[data-pulse] .line[data-mark='count'],
+		.signal[data-flash],
+		.signal[data-flash] .value {
+			animation: none;
+		}
+		.line {
+			transition: none;
+		}
+	}
+	@media (max-width: 1080px) {
+		.panes {
+			grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		}
+		.code {
+			grid-column: 1 / -1;
+		}
+		.pane + .pane {
+			border-left: 0;
+		}
+		.result {
+			border-top: 1px solid var(--line);
+		}
+		.devtools {
+			border-top: 1px solid var(--line);
+			border-left: 1px solid var(--line) !important;
+		}
+	}
+	@media (max-width: 640px) {
+		.panes {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.devtools {
+			border-left: 0 !important;
+		}
+		.pane {
+			padding-bottom: 1.5rem;
+		}
+		.devtools {
+			padding-bottom: 3rem;
+		}
+		.dir {
+			display: none;
+		}
+		.stage {
+			padding-top: 2rem;
+			min-height: 11rem;
+		}
+		.line {
+			grid-template-columns: 2.4rem minmax(0, 1fr);
+		}
+		.ln {
+			padding-right: 0.8rem;
+		}
+		.fig-label {
+			padding: 0 1rem;
+		}
+	}
+</style>

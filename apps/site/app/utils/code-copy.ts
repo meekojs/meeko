@@ -1,5 +1,5 @@
 /** Writes `text` to the clipboard, with a selection fallback where the Clipboard API is missing. */
-async function writeClipboard(text: string): Promise<void> {
+export async function copyText(text: string): Promise<void> {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text);
     return;
@@ -38,5 +38,5 @@ export function copyCodeBlock(event: MouseEvent): void {
   const button = target.closest<HTMLButtonElement>("button[data-copy]");
   const code = button?.closest(".code-block")?.querySelector("pre code")?.textContent;
   if (!button || code === undefined || code === null) return;
-  writeClipboard(code).then(() => flash(button, "Copiado"), () => flash(button, "Error"));
+  copyText(code).then(() => flash(button, "Copiado"), () => flash(button, "Error"));
 }

@@ -1,21 +1,39 @@
 <script server lang="ts">
+	import { trustHtml } from '@meekojs/meeko'
 	import { definePage } from '@meekojs/meeko/framework'
-	import { navigation, pager } from '../../server/content/catalog.js'
-	import { createHighlight } from '../../server/content/highlight.js'
-	import { renderSource } from '../../server/content/markdown.js'
+	import type { DemoMark, DemoSource } from '../../shared/types/demo.js'
+	import { createHighlight, createTokenizer } from '../../server/content/highlight.js'
+	import { codeBlockHtml, escapeHtml } from '../../server/content/markdown.js'
 	import { githubUrl, readRepositoryFile } from '../../server/content/repository.js'
 
 	export const route = definePage({ render: 'prerender' })
 
-	// The README is the quick start; the hero already shows its title and logo.
-	export const readme = await renderSource('README.md', (text) => text.replace(/^# Meeko\n+<p align="center">[\s\S]*?<\/p>\n+/, ''))
-	const highlight = await createHighlight()
+	// The live demo runs the counter example of the package; its source is tokenized here, line by
+	// line, so the page can light the lines that declare and read the signal.
+	const tokenize = await createTokenizer()
 	const exampleFile = 'examples/counter/Counter.meeko'
-	export const example = { file: exampleFile, url: githubUrl(exampleFile), html: highlight(readRepositoryFile(exampleFile).trim(), 'meeko') }
-	export const install = highlight('pnpm add @meekojs/meeko\npnpm exec meeko init-framework mi-app', 'shellscript')
+	const exampleText = readRepositoryFile(exampleFile).trim()
+	const exampleLines = exampleText.split('\n')
+	const markOf = (text: string): DemoMark | undefined => (/\bsignal\(/.test(text) ? 'count' : /\bcomputed\(/.test(text) ? 'doubled' : /\{count\.value\}/.test(text) ? 'render' : undefined)
+	export const demo: DemoSource = {
+		file: exampleFile,
+		url: githubUrl(exampleFile),
+		lines: tokenize(exampleText, 'meeko').map((tokens, index) => {
+			const html = trustHtml(tokens.map((token) => `<span style="${escapeHtml(token.style)}">${escapeHtml(token.content)}</span>`).join(''))
+			// The page state is JSON: a line without a mark leaves the key out instead of `undefined`.
+			const mark = markOf(exampleLines[index] ?? '')
+			return mark ? { html, mark } : { html }
+		}),
+		countLine: exampleLines.findIndex((line) => markOf(line) === 'count') + 1,
+		doubledLine: exampleLines.findIndex((line) => markOf(line) === 'doubled') + 1,
+	}
+	// The editor frame shows the declarations and the template of the same file, lines 10 to 17.
+	export const editorLines = demo.lines.slice(9, 17).map((line, index) => ({ html: line.html, number: index + 10, count: line.mark === 'count' }))
+	export const command = 'pnpm exec meeko init-framework mi-app'
+	// The quick start of the README (packages/meeko/README.md, «Crear una aplicación full-stack»).
+	const highlight = await createHighlight()
+	export const quickStart = codeBlockHtml('terminal', highlight([command, 'cd mi-app', 'npm install', 'npm run dev'].join('\n'), 'shellscript'))
 	export const version = (JSON.parse(readRepositoryFile('package.json')) as { version: string }).version
-	export const nav = navigation()
-	export const pages = pager('/')
 	export const head = {
 		title: 'Meeko · Componentes .meeko tipados, SSR e hidratación para TypeScript',
 		description: 'Meeko es un motor de componentes para TypeScript y un framework full-stack: archivos .meeko tipados, signals, SSR con hidratación, API y RPC tipados y despliegue en Node, Bun, Deno y Cloudflare.',
@@ -23,6 +41,8 @@
 </script>
 
 <script lang="ts">
+	import { signal } from '@meekojs/meeko'
+
 	export interface Props {
 		params: Record<string, string>
 		search: Record<string, string | string[]>
@@ -31,434 +51,1255 @@
 	const api = href('/docs/[slug]', { params: { slug: 'api' } })
 	const framework = href('/docs/[slug]', { params: { slug: 'framework' } })
 	const editors = href('/docs/[slug]', { params: { slug: 'editors' } })
+	const devtools = href('/docs/[slug]', { params: { slug: 'devtools' } })
 	const stability = href('/docs/[slug]', { params: { slug: 'stability' } })
+	const quickStartPage = href('/docs/[slug]', { params: { slug: 'inicio-rapido' } })
+	const copied = signal<'idle' | 'done' | 'error'>('idle')
+	let reset: ReturnType<typeof setTimeout> | undefined
+
+	function copyCommand(): void {
+		copyText(command).then(
+			() => (copied.value = 'done'),
+			() => (copied.value = 'error'),
+		)
+		if (reset !== undefined) clearTimeout(reset)
+		reset = setTimeout(() => (copied.value = 'idle'), 1800)
+	}
 </script>
 
 <template>
-	<section class="hero">
-		<div class="hero-text">
-			<p class="eyebrow">
-				<span class="dot"></span>
-				Meeko {version} · licencia MIT
-			</p>
-			<h1>
-				Componentes
-				<code>.meeko</code>
-				tipados, del servidor al navegador.
+	<section
+		class="hero"
+		aria-labelledby="hero-title"
+	>
+		<div class="hero-copy">
+			<h1 id="hero-title">
+				<span class="line">
+					Componentes
+					<code>.meeko</code>
+					tipados,
+				</span>
+				<span class="line tone-soft">del servidor al navegador.</span>
 			</h1>
-			<p class="lead">Meeko es un motor de componentes para TypeScript y un framework full-stack. Lógica, plantilla y estilos viven en un archivo; el compilador produce el HTML del servidor y, al hidratar, conecta la reactividad al HTML que ya existe.</p>
-			<p class="actions">
+			<p class="lead">Un motor de componentes para TypeScript y un framework full-stack. Un solo archivo da el HTML del servidor y la reactividad que lo actualiza, sin DOM virtual.</p>
+			<div class="actions">
 				<a
-					class="button primary"
+					class="pill"
 					href="#inicio-rápido"
 				>
 					Empezar
 				</a>
-				<a
-					class="button"
-					bind:href="api"
-				>
-					Ver la API
-				</a>
-			</p>
-			<div
-				class="install code-block"
-				data-lang="sh"
-				on:click="copyCodeBlock"
-			>
-				<div class="code-head">
-					<span class="code-lang">terminal</span>
-					<button
-						type="button"
-						class="code-copy"
-						data-copy
-					>
-						Copiar
-					</button>
-				</div>
-				<div html="install"></div>
-			</div>
-		</div>
-		<div class="hero-art">
-			<img
-				src="/brand/meeko-logo.webp"
-				width="320"
-				height="320"
-				alt="Carita de Meeko, una gatita de ojos azules, orejas oscuras y pelaje crema"
-				fetchpriority="high"
-			/>
-		</div>
-	</section>
-
-	<section
-		class="features"
-		aria-labelledby="features-title"
-	>
-		<h2
-			id="features-title"
-			class="sr-only"
-		>
-			Qué ofrece Meeko
-		</h2>
-		<article>
-			<h3>
-				<span class="icon">⌘</span>
-				Un archivo
-				<code>.meeko</code>
-				tipado
-			</h3>
-			<p>
-				Script, plantilla y estilos juntos. TypeScript comprueba props, eventos, modelos y cada expresión de la plantilla, con el error en la línea del
-				<code>.meeko</code>
-				.
-			</p>
-			<a bind:href="api">Componentes y API</a>
-		</article>
-		<article>
-			<h3>
-				<span class="icon">∿</span>
-				Signals sin DOM virtual
-			</h3>
-			<p>
-				<code>signal</code>
-				,
-				<code>computed</code>
-				y
-				<code>effect</code>
-				actualizan sólo el texto o el atributo que cambia. Las listas conservan sus nodos por clave.
-			</p>
-			<a href="/docs/api#reactividad">Reactividad</a>
-		</article>
-		<article>
-			<h3>
-				<span class="icon">⇅</span>
-				SSR más hidratación
-			</h3>
-			<p>El servidor envía la página completa y el estado de cada señal; el navegador la hidrata sin volver a pintarla. También streaming, prerender y páginas de cliente.</p>
-			<a href="/docs/framework#modos-de-render">Modos de render</a>
-		</article>
-		<article>
-			<h3>
-				<span class="icon">◎</span>
-				Full-stack de serie
-			</h3>
-			<p>Rutas por archivos, layouts, código de servidor en la propia página, API y RPC tipados, sesiones con revocación y WebSocket entre instancias.</p>
-			<a bind:href="framework">Guía del framework</a>
-		</article>
-		<article>
-			<h3>
-				<span class="icon">✦</span>
-				Un editor con superpoderes
-			</h3>
-			<p>
-				Servidor de lenguaje con los diagnósticos de
-				<code>meeko check</code>
-				, zonas de ejecución servidor/navegador, hover de señales y valores en vivo desde
-				<code>meeko dev</code>
-				.
-			</p>
-			<a bind:href="editors">Editores</a>
-		</article>
-		<article>
-			<h3>
-				<span class="icon">▲</span>
-				Node, Bun, Deno y Cloudflare
-			</h3>
-			<p>Un build autónomo por adaptador, comprobado por la misma suite de conformidad. SemVer desde 1.0, con una política de estabilidad explícita.</p>
-			<a bind:href="stability">Estabilidad 1.x</a>
-		</article>
-	</section>
-
-	<section
-		class="example"
-		aria-labelledby="example-title"
-	>
-		<div class="example-text">
-			<h2 id="example-title">Un componente, entero</h2>
-			<p>
-				Este contador es el ejemplo de referencia del repositorio.
-				<code>defineProps</code>
-				tipa sus props,
-				<code>signal</code>
-				y
-				<code>computed</code>
-				llevan el estado y la plantilla lo muestra con
-				<code>{'{'}…{'}'}</code>
-				y
-				<code>on:click</code>
-				. El servidor lo renderiza a HTML y el navegador sólo engancha el clic y los dos textos que cambian.
-			</p>
-			<p>
-				<a
-					bind:href="example.url"
-					rel="noopener"
-				>
-					Ver
-					<code>{example.file}</code>
-					en GitHub
-				</a>
-			</p>
-		</div>
-		<div
-			class="code-block example-code"
-			data-lang="meeko"
-			on:click="copyCodeBlock"
-		>
-			<div class="code-head">
-				<span class="code-lang">Counter.meeko</span>
 				<button
 					type="button"
-					class="code-copy"
-					data-copy
+					class="command"
+					on:click="copyCommand"
+					bind:data-state="copied.value"
 				>
-					Copiar
+					<span
+						class="prompt"
+						aria-hidden="true"
+					>
+						$
+					</span>
+					<code>{command}</code>
+					<span class="copy-state">{copied.value === 'done' ? 'Copiado' : copied.value === 'error' ? 'Error' : 'Copiar'}</span>
 				</button>
 			</div>
-			<div html="example.html"></div>
+			<p class="meta">
+				<span>v{version}</span>
+				<span>Licencia MIT</span>
+				<span>
+					Requiere Node 24 y
+					<code>pnpm add @meekojs/meeko</code>
+				</span>
+			</p>
+		</div>
+		<div class="hero-demo">
+			<LiveDemo bind:source="demo" />
 		</div>
 	</section>
 
-	<DocsLayout
-		bind:nav="nav"
-		bind:current="'/'"
-		bind:toc="readme.toc"
-		bind:pager="pages"
-		bind:editUrl="readme.editUrl"
-		bind:source="readme.source"
+	<section
+		class="chapter chapter-flow"
+		aria-labelledby="flow-title"
 	>
-		<h2
-			class="quick-start"
-			id="inicio-rápido"
-		>
-			Inicio rápido
-		</h2>
-		<article
-			class="prose"
-			data-pagefind-body
-			html="readme.html"
-			on:click="copyCodeBlock"
-		></article>
-	</DocsLayout>
+		<div class="chapter-inner">
+			<h2
+				id="flow-title"
+				class="chapter-title"
+			>
+				Un archivo tipado.
+				<span class="tone-soft">El servidor envía HTML y el navegador sólo conecta lo que cambia.</span>
+			</h2>
+			<div class="split">
+				<ul class="facts">
+					<li>
+						<h3>
+							Un archivo
+							<code>.meeko</code>
+							tipado
+						</h3>
+						<p>Script, plantilla y estilos juntos. TypeScript comprueba props, eventos, modelos y cada expresión de la plantilla, con el error en la línea del <code>.meeko</code>.</p>
+						<a bind:href="api">
+							Componentes y API
+							<svg
+								class="arrow"
+								viewBox="0 0 16 16"
+								aria-hidden="true"
+							>
+								<path d="M3 8h9.5M8.5 4l4 4-4 4" />
+							</svg>
+						</a>
+					</li>
+					<li>
+						<h3>Signals sin DOM virtual</h3>
+						<p><code>signal</code>, <code>computed</code> y <code>effect</code> actualizan sólo el texto o el atributo que cambia. Las listas conservan sus nodos por clave.</p>
+						<a href="/docs/api#reactividad">
+							Reactividad
+							<svg
+								class="arrow"
+								viewBox="0 0 16 16"
+								aria-hidden="true"
+							>
+								<path d="M3 8h9.5M8.5 4l4 4-4 4" />
+							</svg>
+						</a>
+					</li>
+					<li>
+						<h3>SSR más hidratación</h3>
+						<p>El servidor envía la página completa y el estado de cada señal; el navegador la hidrata sin volver a pintarla. También streaming, prerender y páginas de cliente.</p>
+						<a href="/docs/framework#modos-de-render">
+							Modos de render
+							<svg
+								class="arrow"
+								viewBox="0 0 16 16"
+								aria-hidden="true"
+							>
+								<path d="M3 8h9.5M8.5 4l4 4-4 4" />
+							</svg>
+						</a>
+					</li>
+				</ul>
+				<figure class="figure">
+					<svg
+						class="iso fig-flow"
+						viewBox="-101.1 -18.2 400.9 247.7"
+						role="img"
+						aria-label="Dibujo isométrico: el archivo Counter.meeko pasa al servidor, que envía HTML; el navegador lo hidrata y recibe el estado de las señales."
+					>
+						<path
+							class="l d"
+							d="M28.6 58.5L67.5 81M132.5 118.5L176.7 144"
+						/>
+						<path
+							class="l f"
+							d="M-72.7 37.8L-15.6 70.8L-15.6 75L-72.7 42Z"
+						/>
+						<path
+							class="l f"
+							d="M57.2 28.8L-15.6 70.8L-15.6 75L57.2 33Z"
+						/>
+						<path
+							class="l f"
+							d="M0 -4.2L57.2 28.8L-15.6 70.8L-72.7 37.8Z"
+						/>
+						<path
+							class="l s"
+							d="M-1.3 5.5L32.5 25.1M-7.8 9.3L15.6 22.8M-14.3 13L15.6 30.3M-44.2 30.3L-26 40.8M-50.7 34L-24.7 49"
+						/>
+						<path
+							class="l"
+							d="M-26 19.8L13 42.3M-32.5 23.5L-11.7 35.6"
+						/>
+						<circle
+							class="a"
+							cx="29.9"
+							cy="31"
+							r="2.6"
+						/>
+						<path
+							class="l f"
+							d="M44.2 55.5L96.1 85.5L96.1 130.5L44.2 100.5Z"
+						/>
+						<path
+							class="l f"
+							d="M153.3 52.5L96.1 85.5L96.1 130.5L153.3 97.5Z"
+						/>
+						<path
+							class="l f"
+							d="M101.3 22.5L153.3 52.5L96.1 85.5L44.2 55.5Z"
+						/>
+						<path
+							class="l s"
+							d="M145.5 91.5L103.9 115.5M145.5 82.5L103.9 106.5M145.5 73.5L103.9 97.5M145.5 64.5L103.9 88.5"
+						/>
+						<circle
+							class="a"
+							cx="65"
+							cy="79.5"
+							r="2.6"
+						/>
+						<path
+							class="l f"
+							d="M135.1 123L150.7 132L150.7 141L135.1 132Z"
+						/>
+						<path
+							class="l f"
+							d="M171.5 120L150.7 132L150.7 141L171.5 129Z"
+						/>
+						<path
+							class="l f"
+							d="M155.9 111L171.5 120L150.7 132L135.1 123Z"
+						/>
+						<path
+							class="l f"
+							d="M145.5 163.8L213 202.8L213 207L145.5 168Z"
+						/>
+						<path
+							class="l f"
+							d="M285.8 160.8L213 202.8L213 207L285.8 165Z"
+						/>
+						<path
+							class="l f"
+							d="M218.2 121.8L285.8 160.8L213 202.8L145.5 163.8Z"
+						/>
+						<path
+							class="l s"
+							d="M229.9 128.5L157.2 170.5"
+						/>
+						<path
+							class="l f"
+							d="M205.2 152.7L236.4 170.7L236.4 174.3L205.2 156.3Z"
+						/>
+						<path
+							class="l f"
+							d="M262.4 155.7L236.4 170.7L236.4 174.3L262.4 159.3Z"
+						/>
+						<path
+							class="l f"
+							d="M231.2 137.7L262.4 155.7L236.4 170.7L205.2 152.7Z"
+						/>
+						<circle
+							class="a"
+							cx="233.8"
+							cy="154.2"
+							r="2.6"
+						/>
+						<circle
+							class="a"
+							cx="215.6"
+							cy="183.3"
+							r="2.6"
+						/>
+						<path
+							class="l s"
+							d="M200.1 165.3L228.6 181.8M184.5 174.3L202.6 184.8"
+						/>
+						<path
+							class="a d"
+							d="M98.7 54L98.7 30L233.8 93L233.8 153"
+						/>
+						<text
+							x="-44.2"
+							y="84.5"
+							text-anchor="middle"
+						>
+							COUNTER.MEEKO
+						</text>
+						<text
+							x="70.1"
+							y="141.5"
+							text-anchor="middle"
+						>
+							SSR · HTML
+						</text>
+						<text
+							x="179.3"
+							y="213.5"
+							text-anchor="middle"
+						>
+							HIDRATAR
+						</text>
+						<text
+							x="207.7"
+							y="46.5"
+							text-anchor="middle"
+						>
+							ESTADO DE LAS SEÑALES
+						</text>
+					</svg>
+					<figcaption class="fig-label">
+						<b>FIG. 02</b>
+						<span>Compilar, renderizar en el servidor, hidratar</span>
+					</figcaption>
+				</figure>
+			</div>
+		</div>
+	</section>
+
+	<section
+		class="chapter chapter-deploy"
+		aria-labelledby="deploy-title"
+	>
+		<div class="chapter-inner">
+			<h2
+				id="deploy-title"
+				class="chapter-title"
+			>
+				Full-stack de serie.
+				<span class="tone-soft">Un build autónomo por adaptador y la misma suite de conformidad para los cuatro.</span>
+			</h2>
+			<div class="split reverse">
+				<figure class="figure">
+					<svg
+						class="iso fig-deploy"
+						viewBox="-166.8 -54.6 492.9 296.8"
+						role="img"
+						aria-label="Dibujo isométrico: meeko build con un adaptador alimenta cuatro plataformas, Node, Bun, Deno y Workers, dentro del marco de una misma suite de conformidad."
+					>
+						<path
+							class="l d s"
+							d="M-89.7 40.6L172.2 191.8L109.1 228.2L-152.8 77Z"
+						/>
+						<path
+							class="a"
+							d="M-29.1 44.8L-42.4 52.5L146.7 161.7M-42.4 52.5L-63 64.4M20.6 88.9L0 100.8M83.7 125.3L63 137.2M146.7 161.7L126.1 173.6"
+						/>
+						<path
+							class="l f"
+							d="M-53.3 -2.8L-4.8 25.2L-4.8 58.8L-53.3 30.8Z"
+						/>
+						<path
+							class="l f"
+							d="M48.5 -5.6L-4.8 25.2L-4.8 58.8L48.5 28Z"
+						/>
+						<path
+							class="l f"
+							d="M0 -33.6L48.5 -5.6L-4.8 25.2L-53.3 -2.8Z"
+						/>
+						<path
+							class="l s"
+							d="M38.8 11.2L4.8 30.8M38.8 19.6L14.5 33.6"
+						/>
+						<circle
+							class="a"
+							cx="-2.4"
+							cy="-4.2"
+							r="2.6"
+						/>
+						<path
+							class="l f"
+							d="M-135.8 74.5L-87.3 102.5L-87.3 106.4L-135.8 78.4Z"
+						/>
+						<path
+							class="l f"
+							d="M-38.8 74.5L-87.3 102.5L-87.3 106.4L-38.8 78.4Z"
+						/>
+						<path
+							class="l f"
+							d="M-87.3 46.5L-38.8 74.5L-87.3 102.5L-135.8 74.5Z"
+						/>
+						<path
+							class="l f"
+							d="M-106.7 60.5L-87.3 71.7L-87.3 85.7L-106.7 74.5Z"
+						/>
+						<path
+							class="l f"
+							d="M-67.9 60.5L-87.3 71.7L-87.3 85.7L-67.9 74.5Z"
+						/>
+						<path
+							class="l f"
+							d="M-87.3 49.3L-67.9 60.5L-87.3 71.7L-106.7 60.5Z"
+						/>
+						<path
+							class="l f"
+							d="M-72.7 110.9L-24.2 138.9L-24.2 142.8L-72.7 114.8Z"
+						/>
+						<path
+							class="l f"
+							d="M24.2 110.9L-24.2 138.9L-24.2 142.8L24.2 114.8Z"
+						/>
+						<path
+							class="l f"
+							d="M-24.2 82.9L24.2 110.9L-24.2 138.9L-72.7 110.9Z"
+						/>
+						<path
+							class="l f"
+							d="M-43.6 96.9L-24.2 108.1L-24.2 122.1L-43.6 110.9Z"
+						/>
+						<path
+							class="l f"
+							d="M-4.8 96.9L-24.2 108.1L-24.2 122.1L-4.8 110.9Z"
+						/>
+						<path
+							class="l f"
+							d="M-24.2 85.7L-4.8 96.9L-24.2 108.1L-43.6 96.9Z"
+						/>
+						<path
+							class="l f"
+							d="M-9.7 147.3L38.8 175.3L38.8 179.2L-9.7 151.2Z"
+						/>
+						<path
+							class="l f"
+							d="M87.3 147.3L38.8 175.3L38.8 179.2L87.3 151.2Z"
+						/>
+						<path
+							class="l f"
+							d="M38.8 119.3L87.3 147.3L38.8 175.3L-9.7 147.3Z"
+						/>
+						<path
+							class="l f"
+							d="M19.4 133.3L38.8 144.5L38.8 158.5L19.4 147.3Z"
+						/>
+						<path
+							class="l f"
+							d="M58.2 133.3L38.8 144.5L38.8 158.5L58.2 147.3Z"
+						/>
+						<path
+							class="l f"
+							d="M38.8 122.1L58.2 133.3L38.8 144.5L19.4 133.3Z"
+						/>
+						<path
+							class="l f"
+							d="M53.3 183.7L101.8 211.7L101.8 215.6L53.3 187.6Z"
+						/>
+						<path
+							class="l f"
+							d="M150.3 183.7L101.8 211.7L101.8 215.6L150.3 187.6Z"
+						/>
+						<path
+							class="l f"
+							d="M101.8 155.7L150.3 183.7L101.8 211.7L53.3 183.7Z"
+						/>
+						<path
+							class="l f"
+							d="M82.4 169.7L101.8 180.9L101.8 194.9L82.4 183.7Z"
+						/>
+						<path
+							class="l f"
+							d="M121.2 169.7L101.8 180.9L101.8 194.9L121.2 183.7Z"
+						/>
+						<path
+							class="l f"
+							d="M101.8 158.5L121.2 169.7L101.8 180.9L82.4 169.7Z"
+						/>
+						<text
+							x="-111.5"
+							y="116.4"
+							text-anchor="middle"
+						>
+							NODE
+						</text>
+						<text
+							x="-48.5"
+							y="152.8"
+							text-anchor="middle"
+						>
+							BUN
+						</text>
+						<text
+							x="14.5"
+							y="189.2"
+							text-anchor="middle"
+						>
+							DENO
+						</text>
+						<text
+							x="77.6"
+							y="225.6"
+							text-anchor="middle"
+						>
+							WORKERS
+						</text>
+						<text
+							x="14.2"
+							y="-42"
+							text-anchor="middle"
+						>
+							MEEKO BUILD --ADAPTER
+						</text>
+						<text
+							x="180.2"
+							y="187.8"
+							text-anchor="start"
+						>
+							SUITE DE CONFORMIDAD
+						</text>
+					</svg>
+					<figcaption class="fig-label">
+						<b>FIG. 03</b>
+						<span>Un build, cuatro destinos</span>
+					</figcaption>
+				</figure>
+				<ul class="facts">
+					<li>
+						<h3>Full-stack de serie</h3>
+						<p>Rutas por archivos, layouts, código de servidor en la propia página, API y RPC tipados, sesiones con revocación y WebSocket entre instancias.</p>
+						<a bind:href="framework">
+							Guía del framework
+							<svg
+								class="arrow"
+								viewBox="0 0 16 16"
+								aria-hidden="true"
+							>
+								<path d="M3 8h9.5M8.5 4l4 4-4 4" />
+							</svg>
+						</a>
+					</li>
+					<li>
+						<h3>Node, Bun, Deno y Cloudflare</h3>
+						<p>Un build autónomo por adaptador, comprobado por la misma suite de conformidad. SemVer desde 1.0, con una política de estabilidad explícita.</p>
+						<a bind:href="stability">
+							Estabilidad 1.x
+							<svg
+								class="arrow"
+								viewBox="0 0 16 16"
+								aria-hidden="true"
+							>
+								<path d="M3 8h9.5M8.5 4l4 4-4 4" />
+							</svg>
+						</a>
+					</li>
+				</ul>
+			</div>
+		</div>
+	</section>
+
+	<section
+		class="chapter chapter-tools"
+		aria-labelledby="tools-title"
+	>
+		<div class="chapter-inner">
+			<h2
+				id="tools-title"
+				class="chapter-title"
+			>
+				Herramientas que ven el runtime.
+				<span class="tone-soft">El editor y DevTools muestran las señales reales de cada instancia.</span>
+			</h2>
+			<figure
+				class="editor-frame"
+				aria-labelledby="editor-caption"
+			>
+				<div class="editor-window">
+					<div class="editor-tabs">
+						<span class="editor-tab">Counter.meeko</span>
+						<span class="editor-path">examples / counter</span>
+					</div>
+					<div class="editor-body">
+						<pre
+							class="shiki editor-code"
+							aria-label="Líneas 10 a 17 de Counter.meeko"
+						><code><span
+								class="line"
+								each:of="editorLines"
+								each:as="line"
+								each:key="line.number"
+								bind:data-live="line.count ? 'on' : undefined"
+							><span
+									class="ln"
+									aria-hidden="true"
+								>{line.number}</span><span
+									class="text"
+									html="line.html"
+								></span><span
+									class="live"
+									if:when="line.count"
+								>count = 3</span></span></code></pre>
+						<div
+							class="hover-card"
+							role="note"
+							aria-label="Hover de la señal count"
+						>
+							<p class="hover-sig"><code>const count: Signal&lt;number&gt;</code></p>
+							<p class="hover-value">
+								<span>Counter.meeko · 1 instancia</span>
+								<code>count = 3</code>
+							</p>
+							<p class="hover-action">Editar valor</p>
+						</div>
+					</div>
+					<div class="editor-status">
+						<span class="live-dot"></span>
+						Meeko live
+						<span class="status-note">conectado a meeko dev</span>
+					</div>
+				</div>
+				<figcaption
+					id="editor-caption"
+					class="fig-label"
+				>
+					<b>FIG. 04</b>
+					<span>Representación de la extensión de VS Code con meeko dev en marcha: el valor de cada señal al final de su línea y en el hover</span>
+				</figcaption>
+			</figure>
+			<div class="tools-row">
+				<div class="fact">
+					<h3>Un editor con superpoderes</h3>
+					<p>Servidor de lenguaje con los diagnósticos de <code>meeko check</code>, zonas de ejecución servidor/navegador, hover de señales y valores en vivo desde <code>meeko dev</code>.</p>
+					<a bind:href="editors">
+						Editores
+						<svg
+							class="arrow"
+							viewBox="0 0 16 16"
+							aria-hidden="true"
+						>
+							<path d="M3 8h9.5M8.5 4l4 4-4 4" />
+						</svg>
+					</a>
+				</div>
+				<div class="fact">
+					<h3>DevTools por instancia</h3>
+					<p>Un árbol de instancias con sus props y señales, una línea de tiempo filtrable y un punto de parada por instancia, dentro de la página o en un panel de Chrome DevTools. Sólo existe en desarrollo.</p>
+					<a bind:href="devtools">
+						DevTools
+						<svg
+							class="arrow"
+							viewBox="0 0 16 16"
+							aria-hidden="true"
+						>
+							<path d="M3 8h9.5M8.5 4l4 4-4 4" />
+						</svg>
+					</a>
+				</div>
+				<div class="tools-cat">
+					<CatFigure
+						label="FIG. 05"
+						caption="Meeko asomada al editor"
+						note="HOVER · COUNT = 3"
+					/>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<section
+		class="chapter chapter-start"
+		aria-labelledby="inicio-rápido"
+	>
+		<div class="chapter-inner">
+			<h2
+				id="inicio-rápido"
+				class="chapter-title"
+			>
+				Inicio rápido.
+				<span class="tone-soft">Un comando crea la aplicación full-stack; sus scripts la llevan a producción.</span>
+			</h2>
+			<div class="start">
+				<div
+					class="start-code"
+					html="quickStart"
+					on:click="copyCodeBlock"
+				></div>
+				<div class="start-text">
+					<dl class="scripts">
+						<div>
+							<dt><code>dev</code></dt>
+							<dd>Arranca el servidor de desarrollo.</dd>
+						</div>
+						<div>
+							<dt><code>check</code></dt>
+							<dd>Genera los contratos y comprueba los tipos.</dd>
+						</div>
+						<div>
+							<dt><code>build</code></dt>
+							<dd>Cliente, servidor y páginas prerenderizadas; con <code>--adapter</code>, una salida para Bun, Deno, Cloudflare o un hosting estático.</dd>
+						</div>
+						<div>
+							<dt><code>start</code></dt>
+							<dd>SSR de producción con Node 24.</dd>
+						</div>
+					</dl>
+					<p class="start-links">
+						<a
+							class="pill"
+							bind:href="quickStartPage"
+						>
+							Inicio rápido completo
+						</a>
+						<a
+							class="ghost"
+							bind:href="framework"
+						>
+							Guía del framework
+						</a>
+					</p>
+				</div>
+			</div>
+		</div>
+	</section>
 </template>
 
 <style scoped>
+	/* One authored entrance: the headline settles line by line, then the product window rises. */
+	@keyframes settle {
+		from {
+			transform: translateY(0.4em);
+			filter: blur(6px);
+			opacity: 0;
+		}
+	}
+	@keyframes rise {
+		from {
+			transform: translateY(28px) scale(0.985);
+			opacity: 0;
+		}
+	}
+
 	.hero {
-		display: grid;
-		grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
-		align-items: center;
-		gap: 3rem;
 		margin: 0 auto;
-		padding: 4.5rem 1.5rem 3rem;
+		padding: clamp(3rem, 8vh, 5.5rem) 1.5rem 0;
+		max-width: 80rem;
 	}
-
-	.eyebrow {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin: 0 0 1.1rem;
-		border: 1px solid var(--line);
-		border-radius: 999px;
-		background: var(--surface);
-		padding: 0.3rem 0.75rem;
-		color: var(--ink-soft);
-		font: 600 0.82rem var(--font-ui);
+	.hero-copy {
+		max-width: 62rem;
 	}
-
-	.dot {
-		box-shadow: 0 0 0 3px color-mix(in oklab, var(--nose) 30%, transparent);
-		border-radius: 50%;
-		background: var(--nose);
-		width: 8px;
-		height: 8px;
-	}
-
 	h1 {
 		margin: 0;
-		font: 800 clamp(2.2rem, 5.2vw, 3.6rem)/1.05 var(--font-display);
-		letter-spacing: -0.025em;
-		text-wrap: balance;
+		font-weight: var(--weight-display);
+		font-size: clamp(2.6rem, 5.4vw, 4.5rem);
+		line-height: 1.04;
+		letter-spacing: var(--tracking-display);
+	}
+	h1 .line {
+		display: block;
 	}
 	h1 code {
-		border-radius: 0.2em;
-		background: var(--accent-soft);
-		padding: 0 0.15em;
-		color: var(--accent-ink);
-		font: inherit;
+		font-weight: 450;
 		font-size: 0.86em;
-		font-family: var(--font-mono);
 		letter-spacing: -0.04em;
 	}
 	.lead {
-		margin: 1.3rem 0 0;
-		max-width: 38rem;
-		color: var(--ink-soft);
-		font-size: 1.15rem;
-		line-height: 1.65;
+		margin: 1.5rem 0 0;
+		max-width: 46rem;
+		color: var(--muted);
+		font-size: clamp(1.05rem, 1.4vw, 1.2rem);
+		line-height: 1.55;
+		letter-spacing: -0.012em;
 	}
 	.actions {
 		display: flex;
 		flex-wrap: wrap;
+		align-items: center;
 		gap: 0.75rem;
-		margin: 1.8rem 0 0;
+		margin-top: 2.25rem;
 	}
-	.button {
+	.pill {
 		display: inline-flex;
 		align-items: center;
-		transition:
-			transform 0.15s,
-			border-color 0.15s;
-		border: 1px solid var(--line);
-		border-radius: 12px;
-		background: var(--bg);
-		padding: 0.75rem 1.25rem;
-		color: var(--ink);
-		font-weight: 700;
+		transition: background-color 0.15s;
+		border-radius: 999px;
+		background: var(--pill);
+		padding: 0 1.25rem;
+		height: 2.6rem;
+		color: var(--on-pill);
+		font-weight: 520;
+		font-size: 0.95rem;
 		text-decoration: none;
 	}
-	.button:hover {
-		transform: translateY(-1px);
-		border-color: var(--accent);
+	.pill:hover {
+		background: var(--pill-hover);
 	}
-	.button.primary {
-		border-color: var(--accent);
-		background: var(--accent);
-		color: var(--on-accent);
-	}
-	.install {
-		margin-top: 1.6rem;
-		max-width: 34rem;
-	}
-	.hero-art {
-		display: grid;
-		place-items: center;
-	}
-	.hero-art img {
-		filter: drop-shadow(0 24px 40px rgb(60 40 30 / 0.22));
-		animation: float 7s ease-in-out infinite;
-		width: min(100%, 320px);
-		height: auto;
-	}
-	@keyframes float {
-		50% {
-			transform: translateY(-8px) rotate(-1.5deg);
-		}
-	}
-	@media (prefers-reduced-motion: reduce) {
-		.hero-art img {
-			animation: none;
-		}
-	}
-	.features {
-		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-		gap: 1rem;
-		margin: 0 auto;
-		padding: 1rem 1.5rem 2.5rem;
-		max-width: 76rem;
-	}
-	.features article {
-		display: flex;
-		flex-direction: column;
-		border: 1px solid var(--line);
-		border-radius: 16px;
-		background: var(--surface);
-		padding: 1.35rem 1.4rem;
-	}
-	.features h3 {
-		display: flex;
+	.command {
+		display: inline-flex;
 		align-items: center;
-		gap: 0.6rem;
-		margin: 0 0 0.6rem;
-		font: 750 1.08rem/1.3 var(--font-display);
+		gap: 0.65rem;
+		transition:
+			border-color 0.15s,
+			background-color 0.15s;
+		cursor: pointer;
+		border: 1px solid var(--line-strong);
+		border-radius: 999px;
+		background: var(--surface);
+		padding: 0 0.4rem 0 1rem;
+		max-width: 100%;
+		height: 2.6rem;
+		color: var(--ink);
 	}
-	.icon {
-		display: grid;
-		flex: none;
-		place-items: center;
-		border-radius: 10px;
-		background: var(--accent-soft);
-		width: 32px;
-		height: 32px;
-		color: var(--accent-ink);
-		font-size: 1rem;
+	.command:hover {
+		border-color: var(--accent-line);
+		background: var(--surface-2);
 	}
-	.features p {
-		flex: 1;
-		margin: 0 0 0.9rem;
+	.command code {
+		overflow: hidden;
+		font-size: 0.85rem;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.prompt {
+		color: var(--muted);
+		font-family: var(--font-mono);
+	}
+	.copy-state {
+		border-radius: 999px;
+		background: var(--surface-3);
+		padding: 0.2rem 0.65rem;
 		color: var(--ink-soft);
+		font-weight: 500;
+		font-size: 0.75rem;
+	}
+	.command[data-state='done'] .copy-state {
+		color: var(--success);
+	}
+	.command[data-state='error'] .copy-state {
+		color: var(--danger);
+	}
+	.meta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem 1.25rem;
+		margin: 1.25rem 0 0;
+		color: var(--muted);
+		font-size: 0.82rem;
+	}
+	.meta code {
+		color: var(--ink-soft);
+		font-size: 0.92em;
+	}
+	.hero-demo {
+		margin-top: clamp(2.5rem, 6vh, 3.75rem);
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		h1 .line,
+		.lead,
+		.actions,
+		.meta {
+			animation: settle 0.9s var(--ease-out) both;
+		}
+		h1 .line + .line {
+			animation-delay: 0.08s;
+		}
+		.lead {
+			animation-delay: 0.16s;
+		}
+		.actions {
+			animation-delay: 0.24s;
+		}
+		.meta {
+			animation-delay: 0.3s;
+		}
+		.hero-demo {
+			animation: rise 1.1s var(--ease-out) 0.36s both;
+		}
+	}
+
+	/* Chapters: a two-tone statement, then the facts beside a technical figure. */
+	.chapter {
+		border-top: 1px solid var(--line);
+	}
+	.chapter-inner {
+		margin: 0 auto;
+		padding: clamp(4.5rem, 10vw, 7.5rem) 1.5rem clamp(3.5rem, 7vw, 5.5rem);
+		max-width: 80rem;
+	}
+	.chapter-flow {
+		border-top: 0;
+	}
+	.chapter-title {
+		margin: 0;
+		max-width: 52rem;
+		font-weight: var(--weight-display);
+		font-size: clamp(1.9rem, 3.6vw, 3rem);
+		line-height: 1.1;
+		letter-spacing: -0.03em;
+		text-wrap: balance;
+	}
+	.split {
+		display: grid;
+		grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+		align-items: center;
+		gap: clamp(2.5rem, 6vw, 6rem);
+		margin-top: clamp(2.5rem, 5vw, 4rem);
+	}
+	.split.reverse {
+		grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+	}
+	.facts {
+		display: grid;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.facts li {
+		border-top: 1px solid var(--line);
+		padding: 1.4rem 0 1.6rem;
+	}
+	.facts li:last-child {
+		border-bottom: 1px solid var(--line);
+	}
+	.facts h3 {
+		margin: 0 0 0.45rem;
+		color: var(--ink);
+		font-weight: 560;
+		font-size: 1.02rem;
+		letter-spacing: -0.012em;
+	}
+	.facts p {
+		margin: 0 0 0.75rem;
+		max-width: 34rem;
+		color: var(--muted);
 		font-size: 0.95rem;
 		line-height: 1.6;
 	}
-	.features a {
-		color: var(--accent-ink);
-		font-weight: 650;
-		font-size: 0.92rem;
+	.facts code {
+		color: var(--ink-soft);
+		font-size: 0.88em;
+	}
+	.facts a,
+	.fact a {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		color: var(--ink-soft);
+		font-weight: 500;
+		font-size: 0.88rem;
 		text-decoration: none;
 	}
-	.features a::after {
-		content: ' →';
+	.arrow {
+		flex: none;
+		transition: transform 0.2s var(--ease-out);
+		fill: none;
+		stroke: var(--muted);
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-width: 1.4;
+		width: 14px;
+		height: 14px;
 	}
-	.features a:hover {
-		text-decoration: underline;
-	}
-	.example {
-		display: grid;
-		grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-		align-items: center;
-		gap: 2.5rem;
-		margin: 0 auto;
-		padding: 2.5rem 1.5rem 3.5rem;
-		max-width: 76rem;
-	}
-	.example h2 {
-		margin: 0 0 0.9rem;
-		font: 800 1.9rem/1.15 var(--font-display);
-		letter-spacing: -0.02em;
-	}
-	.example p {
-		color: var(--ink-soft);
-		line-height: 1.7;
-	}
-	.example a {
+	.facts a:hover,
+	.fact a:hover {
 		color: var(--accent-ink);
-		font-weight: 650;
 	}
-	.example-code {
+	.facts a:hover .arrow,
+	.fact a:hover .arrow {
+		transform: translateX(3px);
+		stroke: currentColor;
+	}
+	.figure {
+		display: grid;
+		gap: 1.25rem;
 		margin: 0;
 	}
-	.quick-start {
-		margin: 0 0 1.2rem;
-		font: 800 clamp(1.9rem, 4vw, 2.4rem)/1.15 var(--font-display);
-		letter-spacing: -0.02em;
+	.figure .iso {
+		margin-inline: auto;
+		max-width: 38rem;
 	}
+	/* Figure labels render at about 11px at full size whatever the drawing's own scale. */
+	.fig-flow {
+		--fig-text: 7.3px;
+	}
+	.fig-deploy {
+		--fig-text: 8.9px;
+	}
+	.tools-cat :global(.cat-figure svg) {
+		--fig-text: 8.2px;
+	}
+
+	/* FIG. 04: a large product frame, the editor with the live value of a signal. */
+	.editor-frame {
+		display: grid;
+		gap: 1rem;
+		margin: clamp(2.5rem, 5vw, 4rem) 0 0;
+	}
+	.editor-window {
+		border: 1px solid var(--line-strong);
+		border-radius: var(--radius-l);
+		background: var(--bg-raised);
+		overflow: hidden;
+	}
+	.editor-tabs {
+		display: flex;
+		align-items: stretch;
+		gap: 1rem;
+		border-bottom: 1px solid var(--line);
+		background: var(--surface);
+		padding-right: 1rem;
+		height: 2.5rem;
+		font: 400 0.78rem/1 var(--font-mono);
+	}
+	.editor-tab {
+		display: inline-flex;
+		align-items: center;
+		border-right: 1px solid var(--line);
+		background: var(--bg-raised);
+		padding: 0 1.1rem;
+		color: var(--ink);
+	}
+	.editor-path {
+		display: inline-flex;
+		align-items: center;
+		color: var(--muted);
+	}
+	.editor-body {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: start;
+		font-size: 0.86rem;
+	}
+	.editor-code {
+		padding: 1.1rem 0;
+		overflow: visible;
+		font-size: 1em;
+		line-height: 1.85;
+	}
+	.editor-code .line {
+		display: grid;
+		grid-template-columns: 3.4rem minmax(0, 1fr);
+		padding-right: 1.25rem;
+		min-height: 1.85em;
+	}
+	.editor-code .ln {
+		padding-right: 1.25rem;
+		color: var(--muted);
+		text-align: right;
+		opacity: 0.6;
+		font-variant-numeric: tabular-nums;
+		user-select: none;
+	}
+	.editor-code .text {
+		padding-left: 2ch;
+		text-indent: -2ch;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+	.editor-code .line[data-live] {
+		grid-template-columns: 3.4rem auto minmax(0, 1fr);
+		background: var(--accent-soft);
+	}
+	.editor-code .line[data-live] .ln {
+		color: var(--accent-ink);
+		opacity: 1;
+	}
+	.live {
+		padding-left: 2.5ch;
+		color: var(--muted);
+		font-style: italic;
+	}
+	/* The card sits beside the code, level with the live line, so it never covers what the frame shows. */
+	.hover-card {
+		margin: calc(1.1rem + 1.85em + 0.35rem) 1.25rem 1.1rem 0;
+		box-shadow: var(--shadow-lg);
+		border: 1px solid var(--line-strong);
+		border-radius: var(--radius);
+		background: var(--surface-2);
+		padding: 0.15rem 0;
+		min-width: 19rem;
+		font-size: 0.8rem;
+	}
+	.hover-card p {
+		margin: 0;
+		padding: 0.5rem 0.85rem;
+	}
+	.hover-card p + p {
+		border-top: 1px solid var(--line);
+	}
+	.hover-sig code {
+		color: var(--ink);
+	}
+	.hover-value {
+		display: flex;
+		justify-content: space-between;
+		gap: 1.5rem;
+		color: var(--muted);
+	}
+	.hover-value code {
+		color: var(--ink);
+	}
+	.hover-action {
+		color: var(--accent-ink);
+	}
+	.editor-status {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		border-top: 1px solid var(--line);
+		background: var(--surface);
+		padding: 0 1rem;
+		height: 2rem;
+		color: var(--ink-soft);
+		font-size: 0.75rem;
+	}
+	.live-dot {
+		border-radius: 50%;
+		background: var(--success);
+		width: 6px;
+		height: 6px;
+	}
+	.status-note {
+		color: var(--muted);
+	}
+	.tools-row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr);
+		align-items: start;
+		gap: clamp(2rem, 4vw, 3.5rem);
+		margin-top: clamp(2.5rem, 5vw, 3.5rem);
+	}
+	.fact {
+		border-top: 1px solid var(--line);
+		padding-top: 1.4rem;
+	}
+	.fact h3 {
+		margin: 0 0 0.45rem;
+		color: var(--ink);
+		font-weight: 560;
+		font-size: 1.02rem;
+		letter-spacing: -0.012em;
+	}
+	.fact p {
+		margin: 0 0 0.75rem;
+		color: var(--muted);
+		font-size: 0.95rem;
+		line-height: 1.6;
+	}
+	.fact code {
+		color: var(--ink-soft);
+		font-size: 0.88em;
+	}
+
+	/* Quick start: the init command, the scripts and the way to the guide. */
+	.start {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		align-items: start;
+		gap: clamp(2rem, 5vw, 4.5rem);
+		margin-top: clamp(2.5rem, 5vw, 3.5rem);
+	}
+	.start-code :global(.code-block) {
+		margin: 0;
+	}
+	.scripts {
+		margin: 0;
+		border-top: 1px solid var(--line);
+	}
+	.scripts div {
+		display: grid;
+		grid-template-columns: 5rem minmax(0, 1fr);
+		gap: 1rem;
+		border-bottom: 1px solid var(--line);
+		padding: 0.8rem 0;
+	}
+	.scripts dt code {
+		color: var(--ink);
+		font-size: 0.85rem;
+	}
+	.scripts dd {
+		margin: 0;
+		color: var(--muted);
+		font-size: 0.92rem;
+		line-height: 1.55;
+	}
+	.scripts dd code {
+		color: var(--ink-soft);
+		font-size: 0.88em;
+	}
+	.start-links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.6rem;
+		margin: 1.75rem 0 0;
+	}
+	.ghost {
+		display: inline-flex;
+		align-items: center;
+		transition: background-color 0.15s;
+		border: 1px solid var(--line-strong);
+		border-radius: 999px;
+		padding: 0 1.15rem;
+		height: 2.6rem;
+		color: var(--ink);
+		font-weight: 500;
+		font-size: 0.95rem;
+		text-decoration: none;
+	}
+	.ghost:hover {
+		background: var(--surface-2);
+	}
+	.chapter-start .chapter-inner {
+		padding-bottom: clamp(5rem, 10vw, 8rem);
+	}
+
 	@media (max-width: 960px) {
-		.hero,
-		.example {
-			grid-template-columns: 1fr;
+		.split,
+		.split.reverse,
+		.start {
+			grid-template-columns: minmax(0, 1fr);
 		}
-		.hero {
-			gap: 1.5rem;
-			padding-top: 3rem;
+		.split.reverse .figure {
+			order: 1;
 		}
-		.hero-art {
-			order: -1;
+		.figure .iso {
+			max-width: 28rem;
 		}
-		.hero-art img {
-			width: 150px;
+		.tools-row {
+			grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 		}
-		.features {
-			grid-template-columns: repeat(2, minmax(0, 1fr));
+		.tools-cat {
+			grid-column: 1 / -1;
+			justify-self: center;
+			width: min(100%, 22rem);
+		}
+	}
+	@media (max-width: 760px) {
+		.editor-body {
+			padding-bottom: 1rem;
+			font-size: 0.78rem;
+		}
+		.editor-code .line,
+		.editor-code .line[data-live] {
+			grid-template-columns: 2.4rem minmax(0, 1fr);
+		}
+		.editor-code .ln {
+			padding-right: 0.8rem;
+		}
+		.live {
+			grid-column: 2;
+			padding-left: 0;
+		}
+		.editor-body {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.hover-card {
+			margin: 0 1rem 0.5rem;
+			min-width: 0;
+		}
+		.editor-path {
+			display: none;
+		}
+		.tools-row {
+			grid-template-columns: minmax(0, 1fr);
 		}
 	}
 	@media (max-width: 640px) {
-		.hero,
-		.features,
-		.example {
-			padding-right: 1.1rem;
-			padding-left: 1.1rem;
+		.hero {
+			padding-right: 1rem;
+			padding-left: 1rem;
 		}
-		.features {
-			grid-template-columns: 1fr;
+		.chapter-inner {
+			padding-right: 1rem;
+			padding-left: 1rem;
+		}
+		.hero-demo {
+			margin-right: -1rem;
+			margin-left: -1rem;
+		}
+		.command {
+			gap: 0.5rem;
+			padding-left: 0.85rem;
+			width: 100%;
+		}
+		.command code {
+			flex: 1;
+			font-size: 0.75rem;
+			text-align: left;
+		}
+		.prompt {
+			display: none;
+		}
+		.copy-state {
+			padding: 0.2rem 0.55rem;
+			font-size: 0.7rem;
 		}
 	}
 </style>

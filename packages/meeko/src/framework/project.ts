@@ -21,6 +21,7 @@ import { contentTypes } from "./content-types.js";
 import { resolvedDocument, resolveSiteOrigin, setModuleDevelopmentMode } from "./module-loader.js";
 import type { PrerenderIndex } from "./prerender.js";
 import { discoverErrorPage } from "./routes-discovery.js";
+import { discoverRouteMiddleware } from "./route-middleware-discovery.js";
 import { robotsTxt, siteFilesOptions, sitemapPathnames, sitemapXml } from "./site-files.js";
 import { assertStaticApp, previewStatic, writeStaticOutput } from "./static-adapter.js";
 import type { ResolvedModules } from "./module-loader.js";
@@ -689,12 +690,16 @@ async function startDevelopment(root: string): Promise<Server> {
     });
     onTreeChange = (file) => { if (isDiscoverySource(resolve(file), sourceRoots)) reloader.rebuild(); };
     // Since 1.5 an edit inside a page, a sidecar or a +group.ts may change a route's layout (or
-    // its render): the manifest the app was created with changes, so the app is built again.
-    let routeOptions = routeOptionsKey(await discoverConfiguredRoutes(root));
+    // its render), and since 1.6 its middleware, as may `{ global }` of a route middleware: the
+    // manifest the app was created with changes, so the app is built again.
+    const currentOptions = async (): Promise<string> => {
+      const middleware = await discoverRouteMiddleware(root);
+      return routeOptionsKey(await discoverConfiguredRoutes(root), [...middleware.global, ...middleware.serverGlobal]);
+    };
+    let routeOptions = await currentOptions();
     onOptionsChange = (file) => {
       if (!isRouteOptionsSource(resolve(file), sourceRoots)) return;
-      void discoverConfiguredRoutes(root).then((routes) => {
-        const next = routeOptionsKey(routes);
+      void currentOptions().then((next) => {
         if (next === routeOptions) return;
         routeOptions = next;
         reloader.rebuild();

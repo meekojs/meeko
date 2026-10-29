@@ -10,6 +10,7 @@ import type { InternalServerApp } from "../framework-server/app.js";
 import { discoverAppManifest } from "./app-manifest.js";
 import type { MeekoServerConfig } from "./config-type.js";
 import { contentTypes } from "./content-types.js";
+import { discoverRouteMiddleware } from "./route-middleware-discovery.js";
 import { importNodeOutput } from "./prerender.js";
 import type { PrerenderIndex } from "./prerender.js";
 import { inlineScriptHashes, inlineStyleHashes } from "./script-hashes.js";
@@ -25,7 +26,8 @@ export const nginxHeadersPath = "_meeko/headers.conf";
  * Fails, before anything is built, when the application needs a server: a page that is not
  * `render: "prerender"`, API or RPC endpoints, Socket channels, server middleware or the server
  * handlers of modules. Route middleware only warns: it runs while prerendering and on client
- * navigation, never on the first load of a page.
+ * navigation, never on the first load of a page. Global server route middleware warns too: it
+ * never runs on a prerendered page.
  */
 export async function assertStaticApp(projectRoot: string): Promise<void> {
   const root = resolve(projectRoot);
@@ -45,9 +47,17 @@ export async function assertStaticApp(projectRoot: string): Promise<void> {
     throw new Error(`El adaptador static genera un sitio sin servidor, pero la aplicación necesita uno:\n${problems.map((problem) => `- ${problem}`).join("\n")}\n`
       + "Usa render: \"prerender\" (con prerenderEntries en las rutas dinámicas) y quita lo que se ejecuta en el servidor, o elige otro adaptador.");
   }
-  if (manifest.routeMiddleware.length) {
-    process.stderr.write(`[meeko] Con el adaptador static, el middleware de ruta (${manifest.routeMiddleware.map((file) => file.slice(1)).join(", ")}) `
+  // The global route middleware and the named middleware that some route declares.
+  const routeMiddleware = [...new Set([...manifest.routeMiddleware, ...manifest.routes.flatMap((route) => route.middleware ?? [])])];
+  if (routeMiddleware.length) {
+    process.stderr.write(`[meeko] Con el adaptador static, el middleware de ruta (${routeMiddleware.map((file) => file.slice(1)).join(", ")}) `
       + "se ejecuta al prerenderizar y al navegar en el cliente, pero no en la primera carga de una página.\n");
+  }
+  // Server route middleware never runs on prerendered pages; a route that asks for one fails discovery.
+  const serverRouteMiddleware = (await discoverRouteMiddleware(root)).serverGlobal.map((file) => relative(root, file).split(sep).join("/"));
+  if (serverRouteMiddleware.length) {
+    process.stderr.write(`[meeko] Con el adaptador static, el middleware de ruta de servidor (${serverRouteMiddleware.join(", ")}) `
+      + "no se ejecuta: un sitio estático no tiene una petición en la que comprobar la sesión.\n");
   }
 }
 

@@ -15,9 +15,10 @@ export default defineMeekoConfig({
   sitemap: true,
   robots: true,
   // Light, dark or the system's, in the cookie and localStorage "meeko-theme" (the key the site
-  // used before, so earlier choices still apply). Every page is prerendered, so Meeko's inline
-  // script in <head> applies the stored theme before the first paint, and useTheme() follows it.
-  theme: true,
+  // used before, so earlier choices still apply). Dark until the visitor chooses. Every page is
+  // prerendered, so Meeko's inline script in <head> applies the stored theme before the first
+  // paint, and the ThemeToggle of the layout (useTheme) follows it.
+  theme: { default: "dark" },
   // Every page is prerendered: the build is a folder of files for nginx (deploy/nginx.conf).
   server: {
     adapter: "static",
@@ -64,12 +65,13 @@ export default defineMeekoConfig({
     seo: true,
     head: {
       link: [
+        // Inter, self-hosted (app/styles/tokens.css): preloaded so the first paint already uses it.
+        { rel: "preload", href: "/fonts/inter-latin-opsz-normal.woff2", as: "font", type: "font/woff2", crossorigin: "anonymous" },
         { rel: "icon", type: "image/png", sizes: "64x64", href: "/brand/favicon-64.png" },
         { rel: "apple-touch-icon", href: "/brand/apple-touch-icon.png" },
       ],
       meta: [
-        { name: "theme-color", content: "#fffaf3", media: "(prefers-color-scheme: light)" },
-        { name: "theme-color", content: "#16100e", media: "(prefers-color-scheme: dark)" },
+        { name: "theme-color", content: "#0a0b0d" },
         { property: "og:type", content: "website" },
         { property: "og:site_name", content: "Meeko" },
         { property: "og:locale", content: "es_ES" },

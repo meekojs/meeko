@@ -428,7 +428,7 @@ test("without a document config every document starts as before", { timeout: 30_
       loadPage: async (file) => modules[file]!,
     });
     const html = await (await server(page("https://example.test/"))).text();
-    assert.equal(html, `${DOCUMENT_HEAD_PREFIX}<!--meeko:head--><!--/meeko:head--></head><body><div id="app"><p class="plain">plain</p></div><script id="meeko-payload" type="application/json">{"v":2,"route":"/","render":"ssr","props":{"params":{},"search":{}},"state":{},"sharedState":{},"head":{}}</script></body></html>`);
+    assert.equal(html, `${DOCUMENT_HEAD_PREFIX}<!--meeko:head--><!--/meeko:head--></head><body><div id="app"><p class="plain">plain</p></div><script id="meeko-payload" type="application/json">{"v":2,"route":"/","render":"ssr","url":"/","props":{"params":{},"search":{}},"state":{},"sharedState":{},"head":{}}</script></body></html>`);
   } finally {
     await cleanup();
   }

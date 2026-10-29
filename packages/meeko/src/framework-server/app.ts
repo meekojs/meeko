@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { RouteMiddleware } from "../framework/middleware.js";
+import type { RouteMiddleware, ServerRouteMiddleware } from "../framework/middleware.js";
 import type { ErrorPageRecord, RouteRecord } from "../framework/router.js";
 import { createPageHandler, withRouteManifest } from "../framework/server.js";
 import type { DocumentMarkup, DocumentOptions, PageHandlerOptions, PageModule, PageRoute, PrerenderSource } from "../framework/server.js";
@@ -81,7 +81,10 @@ export interface AppManifest {
   readonly errorPage?: ErrorPageRecord | undefined;
   /** Endpoints de API, procedimientos RPC y canales Socket. */
   readonly server: ServerManifest;
-  /** Módulos de `app/middleware`, en orden de ejecución. */
+  /**
+   * Módulos de `app/middleware` globales, en orden de ejecución. Desde `1.6`, los middleware con
+   * nombre no están aquí: cada ruta lista los suyos en {@link RouteRecord.middleware}.
+   */
   readonly routeMiddleware: readonly string[];
   /** Módulos de `server/middleware`, en orden de ejecución; los que añaden los módulos van primero. */
   readonly serverMiddleware: readonly string[];
@@ -459,6 +462,8 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
         return (module.route ?? module.default ?? module) as PageRoute;
       },
       loadMiddleware: () => Promise.all(manifest.routeMiddleware.map((key) => loadDefault<RouteMiddleware>(load, key, "route middleware"))),
+      loadNamedMiddleware: (key) => loadDefault<RouteMiddleware>(load, key, "route middleware"),
+      loadServerMiddleware: (key) => loadDefault<ServerRouteMiddleware>(load, key, "server route middleware"),
       createContext,
       serverFetch: createLocalServerFetch({ manifest: manifest.server, sessions, load, onError: reportError }),
       onError: reportError,

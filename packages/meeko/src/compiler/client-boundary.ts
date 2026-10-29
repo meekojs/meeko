@@ -30,6 +30,7 @@ const serverHints: Readonly<Record<string, string>> = {
   defineApiRoute: "en los handlers de server/api",
   defineRpc: "en los procedimientos de server/rpc",
   defineServerMiddleware: "en server/middleware",
+  defineServerRouteMiddleware: "en app/middleware/*.server.ts",
   defineSocketChannel: "en los canales de server/socket",
   defineServerRuntime: "en server/runtime.ts",
   ApiError: "en server/, en <script server> o en un loader; en el navegador, los errores de API llegan como ClientError",
@@ -226,7 +227,11 @@ export function checkClientBoundary(input: ClientBoundaryInput): CompileDiagnost
     } else if (server) {
       const entry = candidates[0]!;
       const where = serverHints[reference.name] ?? "en <script server>, en server/ o en un módulo *.server.ts; en el componente, pide los datos con useApi o useRpcQuery";
-      add("MEEK108", `${reference.name} viene de ${origin(input, entry)}, que sólo existe en el servidor: ${browserScope}. Úsalo ${where}`, offset);
+      // A server-only API of the isomorphic framework entry, such as defineServerRouteMiddleware.
+      const source = entry.specifier === frameworkModule
+        ? `${reference.name} es una API de ${frameworkModule} que sólo funciona en el servidor`
+        : `${reference.name} viene de ${origin(input, entry)}, que sólo existe en el servidor`;
+      add("MEEK108", `${source}: ${browserScope}. Úsalo ${where}`, offset);
     } else pageOptions(offset);
   }
 

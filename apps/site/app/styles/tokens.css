@@ -1,64 +1,102 @@
-:root {
-	color-scheme: light;
-
-	--bg: #fffaf3;
-	--surface: #f8f0e5;
-	--ink: #2a1f1a;
-	--ink-soft: #4f4038;
-	--muted: #776659;
-	--line: #e8dccc;
-	--accent: #3a68a8;
-	--accent-ink: #2c5490;
-	--accent-soft: #e2ebf7;
-	--on-accent: #ffffff;
-	--nose: #e48d95;
-	--mark: #ffe39a;
-	--code-bg: #fdf7ef;
-	--code-line: #eadfce;
-	--shadow-lg: 0 24px 60px -20px rgb(60 38 26 / 0.35);
-	--font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
-	--font-display: ui-rounded, 'SF Pro Rounded', 'Nunito', 'Varela Round', 'Segoe UI Variable Display', system-ui, sans-serif;
-	--font-mono: ui-monospace, 'Cascadia Code', 'JetBrains Mono', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
-	--header-height: 64px;
+/*
+ * Inter variable (opsz + wght), latin subset, self-hosted under the SIL Open Font License 1.1
+ * (public/fonts/Inter-OFL.txt). From @fontsource-variable/inter 5.3.0, file
+ * files/inter-latin-opsz-normal.woff2; the site's CSP allows fonts from 'self' only.
+ */
+@font-face {
+	font-family: 'Inter Variable';
+	font-style: normal;
+	font-weight: 100 900;
+	font-display: swap;
+	src: url('/fonts/inter-latin-opsz-normal.woff2') format('woff2-variations');
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-:root[data-theme='dark'] {
+/*
+ * Dark is the default world: near-black ground, stepped surfaces, white hairlines at 7–10 %.
+ * The accent is the blue of Meeko's eyes; the pink of her nose (--nose) only marks the moment a
+ * signal changes. `theme` in meeko.config.ts writes data-theme on <html> before the first paint.
+ */
+:root {
 	color-scheme: dark;
 
-	--bg: #16100e;
-	--surface: #201814;
-	--ink: #f4eadf;
-	--ink-soft: #d8cabd;
-	--muted: #a69486;
-	--line: #3a2d26;
-	--accent: #7ea9e3;
-	--accent-ink: #a3c3f1;
-	--accent-soft: #1e2a3c;
-	--on-accent: #0e1520;
-	--nose: #f0a1a8;
-	--mark: #6a5218;
-	--code-bg: #1c1511;
-	--code-line: #33271f;
-	--shadow-lg: 0 24px 60px -20px rgb(0 0 0 / 0.7);
+	--bg: #0a0b0d;
+	--bg-raised: #0d0e11;
+	--surface: #101115;
+	--surface-2: #16181d;
+	--surface-3: #1d2026;
+	--ink: #eef0f3;
+	--ink-soft: #c5c9d0;
+	--muted: #8b909a;
+	--line: rgb(255 255 255 / 0.08);
+	--line-soft: rgb(255 255 255 / 0.05);
+	--line-strong: rgb(255 255 255 / 0.14);
+	--accent: #8fb4ff;
+	--accent-ink: #a6c3ff;
+	--accent-soft: rgb(143 180 255 / 0.12);
+	--accent-line: rgb(143 180 255 / 0.34);
+	--on-accent: #0a0b0d;
+	--nose: #f4a3b1;
+	--nose-soft: rgb(244 163 177 / 0.18);
+	--mark: rgb(143 180 255 / 0.28);
+	--pill: #eef0f3;
+	--pill-hover: #ffffff;
+	--on-pill: #0a0b0d;
+	--code-bg: #0e0f12;
+	--code-line: rgb(255 255 255 / 0.07);
+	--figure: rgb(238 240 243 / 0.55);
+	--figure-soft: rgb(238 240 243 / 0.18);
+	--success: #8fd6ae;
+	/* Failures (a copy that did not reach the clipboard): warm amber, never the signal pink. */
+	--danger: #f0b46a;
+	--scrim: rgb(4 5 6 / 0.66);
+	--shadow-lg: 0 24px 64px -24px rgb(0 0 0 / 0.8), 0 2px 8px -2px rgb(0 0 0 / 0.5);
+	--shadow-window: 0 40px 120px -40px rgb(0 0 0 / 0.9), 0 0 0 1px rgb(255 255 255 / 0.04);
+
+	--font-ui: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--font-display: var(--font-ui);
+	--font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+	--weight-display: 510;
+	--tracking-display: -0.032em;
+	--radius-s: 6px;
+	--radius: 10px;
+	--radius-l: 14px;
+	--header-height: 56px;
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@media (prefers-color-scheme: dark) {
-	:root:not([data-theme='light']) {
-		color-scheme: dark;
-		--bg: #16100e;
-		--surface: #201814;
-		--ink: #f4eadf;
-		--ink-soft: #d8cabd;
-		--muted: #a69486;
-		--line: #3a2d26;
-		--accent: #7ea9e3;
-		--accent-ink: #a3c3f1;
-		--accent-soft: #1e2a3c;
-		--on-accent: #0e1520;
-		--nose: #f0a1a8;
-		--mark: #6a5218;
-		--code-bg: #1c1511;
-		--code-line: #33271f;
-		--shadow-lg: 0 24px 60px -20px rgb(0 0 0 / 0.7);
-	}
+:root[data-theme='light'] {
+	color-scheme: light;
+
+	--bg: #fbfbfc;
+	--bg-raised: #ffffff;
+	--surface: #f4f5f7;
+	--surface-2: #eceef1;
+	--surface-3: #e3e6ea;
+	--ink: #0d0e10;
+	--ink-soft: #33373e;
+	--muted: #5f636c;
+	--line: rgb(0 0 0 / 0.08);
+	--line-soft: rgb(0 0 0 / 0.05);
+	--line-strong: rgb(0 0 0 / 0.14);
+	--accent: #2f63d6;
+	--accent-ink: #2556c4;
+	--accent-soft: rgb(47 99 214 / 0.09);
+	--accent-line: rgb(47 99 214 / 0.32);
+	--on-accent: #ffffff;
+	--nose: #d4486a;
+	--nose-soft: rgb(212 72 106 / 0.13);
+	--mark: rgb(47 99 214 / 0.18);
+	--pill: #0d0e10;
+	--pill-hover: #26292f;
+	--on-pill: #fbfbfc;
+	--code-bg: #f6f7f9;
+	--code-line: rgb(0 0 0 / 0.07);
+	--figure: rgb(13 14 16 / 0.62);
+	--figure-soft: rgb(13 14 16 / 0.16);
+	--success: #23794c;
+	--danger: #9a5a0c;
+	--scrim: rgb(13 14 16 / 0.34);
+	--shadow-lg: 0 24px 64px -28px rgb(13 14 16 / 0.28), 0 2px 8px -2px rgb(13 14 16 / 0.08);
+	--shadow-window: 0 40px 100px -48px rgb(13 14 16 / 0.35), 0 0 0 1px rgb(0 0 0 / 0.02);
 }

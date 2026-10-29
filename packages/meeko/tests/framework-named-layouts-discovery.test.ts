@@ -50,7 +50,8 @@ test("+group.ts options are read as literals", () => {
   assert.deepEqual(extractGroupOptions(group, "const options = { layout: false } as const;\nexport default options;\n"), { layout: false });
   assert.throws(() => extractGroupOptions(group, 'const title = "x";\nexport default defineGroup({ layoutProps: { title } });\n'), /\+group\.ts: layoutProps debe ser un objeto literal con claves normales/);
   assert.throws(() => extractGroupOptions(group, "export default defineGroup({ layoutProps: { at: Date.now() } });\n"), /layoutProps\.at debe ser un valor literal/);
-  assert.throws(() => extractGroupOptions(group, 'export default defineGroup({ middleware: ["auth"] });\n'), /middleware no se admite en \+group\.ts/);
+  // Since 1.6 a group names route middleware (see framework-named-middleware-discovery.test.ts).
+  assert.deepEqual(extractGroupOptions(group, 'export default defineGroup({ middleware: ["auth"] });\n'), { middleware: ["auth"] });
   assert.throws(() => extractGroupOptions(group, 'export default defineGroup({ title: "x" });\n'), /opción de grupo desconocida "title"/);
   assert.throws(() => extractGroupOptions(group, "export const layout = 'x';\n"), /debe exportar por defecto defineGroup/);
   assert.throws(() => extractGroupOptions(group, "const base = {};\nexport default defineGroup({ ...base });\n"), /propiedades normales/);

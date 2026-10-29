@@ -4,15 +4,22 @@ import { modules as pages } from "virtual:meeko-client-pages";
 import { modules as clientRoutes } from "virtual:meeko-client-routes";
 import { documentConfig, errorPage, routes } from "virtual:meeko-manifest/client";
 import { plugins } from "virtual:meeko-plugins/client";
+import { middleware as middlewareModules, namedMiddleware } from "virtual:meeko-middleware/client";
 
-const middlewareModules = import.meta.glob(["/app/middleware/**/*.ts", "!/app/middleware/**/*.test.ts", "!/app/middleware/**/*.spec.ts", "!/app/middleware/**/*.d.ts", "!/app/middleware/**/*.server.ts", "!/app/middleware/**/*.client.ts"], { eager: true });
-const loadMiddleware = async (): Promise<RouteMiddleware[]> => Object.entries(middlewareModules)
-  .sort(([left], [right]) => left.localeCompare(right))
-  .map(([file, module]) => {
-    const middleware = (module as { default?: unknown }).default;
-    if (typeof middleware !== "function") throw new Error(file + ": route middleware requires a default function export");
-    return middleware as RouteMiddleware;
-  });
+const routeMiddleware = (file: string, module: unknown): RouteMiddleware => {
+  const middleware = (module as { default?: unknown }).default;
+  if (typeof middleware !== "function") throw new Error(file + ": route middleware requires a default function export");
+  return middleware as RouteMiddleware;
+};
+// Global middleware runs on every navigation, in the server's order.
+// The parameters are typed here so that the entry does not depend on the virtual module's declaration.
+const loadMiddleware = async (): Promise<RouteMiddleware[]> => middlewareModules.map(([file, module]: readonly [string, unknown]) => routeMiddleware(file, module));
+// Named middleware loads with the first navigation to a route that declares it.
+const loadNamedMiddleware = async (file: string): Promise<RouteMiddleware> => {
+  const load = namedMiddleware[file];
+  if (!load) throw new Error("Route middleware module missing: " + file);
+  return routeMiddleware(file, await load());
+};
 
 // app/error.meeko joins the bundle even when no route falls back to it.
 const errorPages = import.meta.glob("/app/error.meeko");
@@ -26,7 +33,7 @@ if (!root || !payload) throw new Error("Missing Meeko SSR data");
 
 const hydrationStart = performance.now();
 await mountClientApp({
-  root, payload, routes, errorPage, serverData: true, loadMiddleware, plugins,
+  root, payload, routes, errorPage, serverData: true, loadMiddleware, loadNamedMiddleware, plugins,
   // The head that the server renders from meeko.config.ts and the modules; useHead and navigation update it.
   ...(documentConfig ? { document: documentConfig } : {}),
   async loadPage(file) {

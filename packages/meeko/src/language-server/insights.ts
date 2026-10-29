@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import ts from "@typescript/typescript6";
 import type { Location } from "vscode-languageserver/node";
 import { appTargetAt, handlerContract, routeParams } from "./app-index.js";
+import { isServerRouteMiddleware } from "../framework/route-middleware-discovery.js";
 import type { AppTarget } from "./app-index.js";
 import { componentSummary, componentSummaryMarkdown } from "./components.js";
 import type { FeatureContext } from "./features.js";
@@ -184,6 +185,23 @@ function targetMarkdown(context: FeatureContext, target: AppTarget): string {
       `- páginas: ${pages.length ? pages.join(", ") : "ninguna"}`,
     ].join("\n");
   }
+  if (target.kind === "middleware") {
+    if (!target.file) {
+      const global = context.app?.middleware?.global.get(target.name);
+      return global
+        ? `**Middleware** \`${target.name}\` es global ([${projectPath(root, global)}](${fileUri(context, global)})): ya se ejecuta en todas las rutas.`
+        : `**Middleware** \`${target.name}\` no existe: crea \`app/middleware/${target.name}.ts\` con \`defineRouteMiddleware(..., { global: false })\`, o \`app/middleware/${target.name}.server.ts\` con \`defineServerRouteMiddleware\` para uno de servidor.`;
+    }
+    const file = target.file;
+    const pages = (context.app?.routes ?? []).filter((route) => route.middleware?.includes(file) || route.serverMiddleware?.includes(file)).map((route) => `\`${route.id}\``);
+    return [
+      `**Middleware** \`${target.name}\` → [${projectPath(root, file)}](${fileUri(context, file)})`,
+      "",
+      // Since 1.6, `*.server.ts` route middleware runs only on the server.
+      ...isServerRouteMiddleware(file) ? ["- sólo servidor: se ejecuta en el servidor, con la sesión de la petición, y nunca llega al navegador"] : [],
+      `- páginas: ${pages.length ? pages.join(", ") : "ninguna"}`,
+    ].join("\n");
+  }
   if (target.kind === "api") {
     if (!target.endpoints.length) return `**API** \`${target.label}\` no tiene un handler GET en \`server/api\`.`;
     return target.endpoints.map((endpoint) => {
@@ -225,7 +243,7 @@ export function appTargetDefinition(context: FeatureContext, generatedOffset: nu
   if (!target) return undefined;
   const start = { line: 0, character: 0 };
   if (target.kind === "route") return target.route ? [{ uri: fileUri(context, target.route.file), range: { start, end: start } }] : undefined;
-  if (target.kind === "layout") return target.file ? [{ uri: fileUri(context, target.file), range: { start, end: start } }] : undefined;
+  if (target.kind === "layout" || target.kind === "middleware") return target.file ? [{ uri: fileUri(context, target.file), range: { start, end: start } }] : undefined;
   const files = target.kind === "api" ? target.endpoints.map((endpoint) => endpoint.file) : target.endpoint ? [target.endpoint.file] : [];
   const locations = files.map((file): Location => {
     const contract = handlerContract(file, target.kind === "api" ? "api" : "rpc");

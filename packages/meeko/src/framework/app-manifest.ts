@@ -10,6 +10,7 @@ import { configuredModuleLayouts, discoverConfiguredRoutes, loadConfiguredModule
 import type { DocumentConfig } from "./head.js";
 import { importSpecifier, pluginMode, pluginName, resolvedDocument } from "./module-loader.js";
 import { discoverErrorPage } from "./routes-discovery.js";
+import { discoverRouteMiddleware } from "./route-middleware-discovery.js";
 import type { ErrorPageRecord, NamedLayoutRecord, RouteRecord } from "./router.js";
 
 export const frameworkClientEntry = ".meeko/generated/entry-client.ts";
@@ -35,7 +36,7 @@ export function moduleKey(root: string, file: string): string {
 /**
  * Route records whose files are module keys instead of absolute paths.
  * `sidecars: "client"` keeps only the sidecars of `render: "client"` routes,
- * which are the only ones the browser may import.
+ * which are the only ones the browser may import, and leaves out the server route middleware.
  */
 export function portableRoutes(root: string, routes: readonly RouteRecord[], options: { sidecars: boolean | "client" }): RouteRecord[] {
   const keepSidecar = (route: RouteRecord): boolean => options.sidecars === "client" ? route.render === "client" : options.sidecars;
@@ -47,6 +48,8 @@ export function portableRoutes(root: string, routes: readonly RouteRecord[], opt
     ...(route.sidecar && keepSidecar(route) ? { sidecar: moduleKey(root, route.sidecar) } : {}),
     ...(route.render ? { render: route.render } : {}),
     ...(route.layout ? { layout: portableLayout(root, route.layout) } : {}),
+    ...(route.middleware?.length ? { middleware: route.middleware.map((file) => moduleKey(root, file)) } : {}),
+    ...(route.serverMiddleware?.length && options.sidecars !== "client" ? { serverMiddleware: route.serverMiddleware.map((file) => moduleKey(root, file)) } : {}),
   }));
 }
 
@@ -147,7 +150,9 @@ export async function discoverAppManifest(projectRoot: string, client: ClientAss
   const routes = portableRoutes(root, await discoverConfiguredRoutes(root), { sidecars: true });
   const server = await discoverServerManifest(root);
   const { config, modules: projectModules } = await loadConfiguredModules(root);
-  const routeMiddleware = (await scripts(resolve(root, "app", "middleware"), /\.(?:test|spec|d|server|client)\.ts$/)).map((file) => moduleKey(root, file)).sort();
+  // Global isomorphic route middleware; each route lists its named middleware and its whole
+  // server route middleware chain (global and named).
+  const routeMiddleware = (await discoverRouteMiddleware(root)).global.map((file) => moduleKey(root, file));
   // Module middleware runs first, in the order the modules add it.
   const serverMiddleware = [
     ...projectModules.serverMiddleware.map((file) => importSpecifier(root, file)),
@@ -174,7 +179,7 @@ export async function discoverAppManifest(projectRoot: string, client: ClientAss
   };
   const modules = new Set<string>();
   for (const route of routes) {
-    for (const key of [route.file, ...route.layouts, ...(route.error ? [route.error] : []), ...(route.sidecar ? [route.sidecar] : [])]) modules.add(key);
+    for (const key of [route.file, ...route.layouts, ...(route.error ? [route.error] : []), ...(route.sidecar ? [route.sidecar] : []), ...route.middleware ?? [], ...route.serverMiddleware ?? []]) modules.add(key);
   }
   if (errorPage) for (const key of [errorPage.file, ...errorPage.layouts]) modules.add(key);
   for (const endpoint of [...manifest.server.api, ...manifest.server.rpc, ...manifest.server.socket ?? []]) modules.add(endpoint.file);
@@ -268,6 +273,25 @@ export async function clientSidecarsSource(projectRoot: string): Promise<string>
   const keys = [...new Set(routes.flatMap((route) => route.sidecar ? [route.sidecar] : []))].sort();
   const entries = keys.map((key) => `${JSON.stringify(key)}: () => import(${JSON.stringify(key)})`);
   return `export const modules = {${entries.join(",")}};\n`;
+}
+
+/**
+ * Source of `virtual:meeko-middleware/client`: the global route middleware, imported with the
+ * entry and in execution order, and a lazy import of each named middleware that some route uses,
+ * which the browser loads the first time it navigates to one of them. Server route middleware
+ * (`*.server.ts`) never joins it.
+ */
+export async function clientMiddlewareSource(projectRoot: string): Promise<string> {
+  const root = resolve(projectRoot);
+  const global = (await discoverRouteMiddleware(root)).global.map((file) => moduleKey(root, file));
+  const routes = portableRoutes(root, await discoverConfiguredRoutes(root), { sidecars: false });
+  const named = [...new Set(routes.flatMap((route) => route.middleware ?? []))].sort();
+  return [
+    ...global.map((key, index) => `import * as middleware${index} from ${JSON.stringify(key)};`),
+    `export const middleware = [${global.map((key, index) => `[${JSON.stringify(key)}, middleware${index}]`).join(", ")}];`,
+    `export const namedMiddleware = {${named.map((key) => `${JSON.stringify(key)}: () => import(${JSON.stringify(key)})`).join(", ")}};`,
+    "",
+  ].join("\n");
 }
 
 /** Reads the client build data written by `meeko build`. */

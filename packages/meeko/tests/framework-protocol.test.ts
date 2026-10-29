@@ -36,7 +36,7 @@ const server = createFrameworkHandler({
 test("the payload carries its protocol version, render mode and head", async () => {
   const response = await server(new Request("https://example.test/b", { headers: { accept: "application/meeko+json" } }));
   assert.deepEqual(await response.json(), {
-    v: 2, route: "/b", render: "prerender", props: { params: {}, search: {} }, state: {}, sharedState: {}, head: { title: "Page <B>" },
+    v: 2, route: "/b", render: "prerender", url: "/b", props: { params: {}, search: {} }, state: {}, sharedState: {}, head: { title: "Page <B>" },
   });
 });
 

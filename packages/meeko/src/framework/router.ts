@@ -41,6 +41,23 @@ export interface RouteRecord {
    * @since 1.5.0
    */
   readonly layout?: NamedLayoutRecord;
+  /**
+   * Archivos de los middleware con nombre de la ruta (`defineRouteMiddleware(fn, { global: false })`),
+   * en el orden en que se ejecutan después de los globales: los de sus `+group.ts`, de fuera hacia
+   * dentro, y los de la página, sin repetir. Sin él, la ruta sólo ejecuta los globales.
+   * @since 1.6.0
+   */
+  readonly middleware?: readonly string[];
+  /**
+   * Archivos de todos los middleware de ruta de servidor de la ruta (`app/middleware/*.server.ts`,
+   * con `defineServerRouteMiddleware`), en el orden en que se ejecutan en el servidor: los globales y
+   * después los con nombre, con la misma herencia que {@link RouteRecord.middleware}. A diferencia de
+   * `middleware`, es la cadena completa, para que un host sin cargador falle en lugar de saltarse los
+   * globales. Las rutas `render: "client"` y `"prerender"` no lo llevan, y el manifiesto del
+   * navegador tampoco.
+   * @since 1.6.0
+   */
+  readonly serverMiddleware?: readonly string[];
 }
 
 /**

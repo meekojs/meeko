@@ -2,6 +2,7 @@ import type { StateStore } from "./state.js";
 import { normalizeHeadInput } from "./head.js";
 import type { HeadInput } from "./head.js";
 import type { LayoutProps, PageLayoutOptions } from "./layout.js";
+import type { ClientRouteMiddlewareName, RouteMiddlewareName } from "./middleware.js";
 
 /**
  * Subconjunto de Standard Schema v1 que se puede usar en el navegador, como el que implementan los
@@ -255,6 +256,14 @@ export interface PageDefinition<P extends PageSchema | undefined, S extends Page
    * @since 1.5.0
    */
   readonly layoutProps?: unknown;
+  /**
+   * Middleware con nombre de `app/middleware` que la página añade, después de los globales y de los
+   * de sus `+group.ts`, o `false` para quitar los heredados. Debe ser un array literal de nombres,
+   * porque `meeko build` lo lee sin ejecutar el archivo; su tipo es la unión de los middleware con
+   * nombre de la aplicación.
+   * @since 1.6.0
+   */
+  readonly middleware?: readonly RouteMiddlewareName[] | false;
 }
 
 /**
@@ -307,6 +316,12 @@ export interface ClientPageDefinition<P extends PageSchema | undefined, S extend
    * @since 1.5.0
    */
   readonly layoutProps?: unknown;
+  /**
+   * Middleware con nombre de la página, como en {@link PageDefinition.middleware}, sin los de
+   * servidor (`*.server.ts`): una página `render: "client"` no pide sus datos al servidor al navegar.
+   * @since 1.6.0
+   */
+  readonly middleware?: readonly ClientRouteMiddlewareName[] | false;
 }
 
 /** `layout` and `layoutProps` of server route options, typed against the chosen layout. */

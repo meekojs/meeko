@@ -3,14 +3,16 @@ import { apiGroups, groupHref, referenceHref } from "./api-groups.js";
 
 /** A page of the site and the Markdown file of the repository it renders. */
 export interface CatalogEntry {
-  /** Slug under `/docs/`; absent for the home page. */
-  readonly slug?: string;
+  /** Slug under `/docs/`. */
+  readonly slug: string;
   readonly href: string;
   /** Path of the Markdown file, as `readRepositoryFile` takes it: `README.md` and `CHANGELOG.md` are the package's. */
   readonly source: string;
   /** Short label of the sidebar; the page title is the document's own heading. */
   readonly label: string;
   readonly section: string;
+  /** Rewrites the Markdown before rendering, such as the README's title and logo for the site. */
+  readonly transform?: (text: string) => string;
 }
 
 /**
@@ -18,13 +20,23 @@ export interface CatalogEntry {
  * to it, and to any other file of the repository, go to GitHub.
  */
 export const catalog: readonly CatalogEntry[] = [
-  { href: "/", source: "README.md", label: "Inicio rápido", section: "Empezar" },
+  // The package README, whose title and centered logo (an image from GitHub, which the CSP blocks)
+  // become the page's own heading.
+  {
+    slug: "inicio-rapido",
+    href: "/docs/inicio-rapido",
+    source: "README.md",
+    label: "Inicio rápido",
+    section: "Empezar",
+    transform: (text) => text.replace(/^# Meeko\n+<p align="center">[\s\S]*?<\/p>\n+/, "# Inicio rápido\n\n"),
+  },
   { slug: "framework", href: "/docs/framework", source: "docs/framework.md", label: "Framework full-stack", section: "Guías" },
   { slug: "api", href: "/docs/api", source: "docs/api.md", label: "Componentes y API", section: "Guías" },
   { slug: "editors", href: "/docs/editors", source: "docs/editors.md", label: "Editores", section: "Herramientas" },
   { slug: "devtools", href: "/docs/devtools", source: "docs/devtools.md", label: "DevTools", section: "Herramientas" },
   { slug: "stability", href: "/docs/stability", source: "docs/stability.md", label: "Estabilidad 1.x", section: "Referencia" },
   { slug: "architecture", href: "/docs/architecture", source: "docs/architecture.md", label: "Arquitectura", section: "Referencia" },
+  { slug: "migration-1.6", href: "/docs/migration-1.6", source: "docs/migration-1.6.md", label: "Actualizar a 1.6", section: "Referencia" },
   { slug: "migration-1.5", href: "/docs/migration-1.5", source: "docs/migration-1.5.md", label: "Actualizar a 1.5", section: "Referencia" },
   { slug: "migration-1.4", href: "/docs/migration-1.4", source: "docs/migration-1.4.md", label: "Actualizar a 1.4", section: "Referencia" },
   { slug: "migration-1.3", href: "/docs/migration-1.3", source: "docs/migration-1.3.md", label: "Actualizar a 1.3", section: "Referencia" },
@@ -37,10 +49,10 @@ export const catalog: readonly CatalogEntry[] = [
 ];
 
 /** Slugs of the `/docs/[slug]` pages, for `prerenderEntries`. */
-export const docSlugs: readonly string[] = catalog.flatMap((entry) => entry.slug === undefined ? [] : [entry.slug]);
+export const docSlugs: readonly string[] = catalog.map((entry) => entry.slug);
 
-/** The entry of a slug, or of the home page without one. */
-export function catalogEntry(slug?: string): CatalogEntry | undefined {
+/** The entry of a slug. */
+export function catalogEntry(slug: string): CatalogEntry | undefined {
   return catalog.find((entry) => entry.slug === slug);
 }
 

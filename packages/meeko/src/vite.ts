@@ -10,7 +10,7 @@ import { sourceMapForCompiled } from "./compiler/sourcemap.js";
 import { autoImportDirectories, autoImportedValues, checkComponentBoundary, discoverAutoImports, transformAutoImports } from "./autoimports.js";
 import { transformTypeScriptAutoImports, typeScriptAutoImportMap } from "./autoimports-ts.js";
 import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./framework/config.js";
-import { clientPluginsSource, clientRoutesSource, clientSidecarsSource, readBuildAppData, serverAppSource } from "./framework/app-manifest.js";
+import { clientMiddlewareSource, clientPluginsSource, clientRoutesSource, clientSidecarsSource, readBuildAppData, serverAppSource } from "./framework/app-manifest.js";
 import { assertRouteBlockPlacement, isPageFile, routeBlockFile, routeBlockId, routeBlockSource, withoutRouteBlock } from "./framework/route-block.js";
 import { extractRouteRender } from "./framework/routes-discovery.js";
 import { builtinOptimizeInclude, devScanIgnored, isDevWatchIgnored, isDiscoverySource } from "./framework/dev-watch.js";
@@ -31,7 +31,8 @@ const clientRoutesModule = "virtual:meeko-manifest/client";
 const clientSidecarsModule = "virtual:meeko-client-routes";
 const serverAppModule = "virtual:meeko-server-app";
 const clientPluginsModule = "virtual:meeko-plugins/client";
-const virtualModules = new Set([clientPagesModule, clientRoutesModule, clientSidecarsModule, serverAppModule, clientPluginsModule]);
+const clientMiddlewareModule = "virtual:meeko-middleware/client";
+const virtualModules = new Set([clientPagesModule, clientRoutesModule, clientSidecarsModule, serverAppModule, clientPluginsModule, clientMiddlewareModule]);
 /** A module that imports `defineMeekoModule` holds build code: the browser must never load it. */
 const moduleDefinitionImport = /\bimport\s*\{[^}]*\bdefineMeekoModule\b[^}]*\}\s*from\s*["']@meekojs\/meeko\/framework["']/;
 /** This package (its `src/` and `dist/`), whose documentation shows module imports in comments. */
@@ -234,6 +235,10 @@ export function meeko(): Plugin {
       if (virtual === clientPluginsModule) {
         if (options?.ssr || ssrBuild) throw new Error(`${clientPluginsModule} belongs to the client bundle`);
         return clientPluginsSource(root);
+      }
+      if (virtual === clientMiddlewareModule) {
+        if (options?.ssr || ssrBuild) throw new Error(`${clientMiddlewareModule} belongs to the client bundle`);
+        return clientMiddlewareSource(root);
       }
       if (virtual === clientPagesModule) {
         const routes = await discoverConfiguredRoutes(root);
