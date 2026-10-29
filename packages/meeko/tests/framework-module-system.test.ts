@@ -61,14 +61,14 @@ test("version ranges follow npm comparators", () => {
   assert.equal(satisfiesVersion("3.0.0", "1.x || 2.x"), false);
   assert.equal(satisfiesVersion("1.2.0", ">1.2"), false);
   assert.equal(satisfiesVersion("1.2.0", "*"), true);
-  assert.throws(() => satisfiesVersion("1.2.0", "1.0 - 2.0"), /Unsupported version range/);
+  assert.throws(() => satisfiesVersion("1.2.0", "1.0 - 2.0"), /Comparador de rango de versiones no admitido/);
 });
 
 test("module options merge defaults, config[configKey] and inline options in order", () => {
   assert.deepEqual(mergeModuleOptions({ a: 1, nested: { x: 1, y: 1 }, list: [1] }, { nested: { y: 2 }, list: [2] }, { a: 3, nested: { z: 3 } }), {
     a: 3, nested: { x: 1, y: 2, z: 3 }, list: [2],
   });
-  assert.throws(() => mergeModuleOptions([1]), /plain objects/);
+  assert.throws(() => mergeModuleOptions([1]), /objetos planos/);
   assert.deepEqual(mergeHeadInput({ title: "A", meta: [{ name: "a", content: "1" }], htmlAttrs: { lang: "es" } }, { title: "B", meta: [{ name: "b", content: "2" }], htmlAttrs: { dir: "ltr" } }), {
     title: "B", meta: [{ name: "a", content: "1" }, { name: "b", content: "2" }], htmlAttrs: { lang: "es", dir: "ltr" },
   });
@@ -184,17 +184,17 @@ export default defineMeekoModule({ meta: { name: "dup" }, setup() {} });
 `);
   }
   const cases: Array<[string, RegExp]> = [
-    [`modules: ["./modules/future"]`, /requires Meeko >=9; this project uses/],
-    [`modules: ["./modules/plain"]`, /must default-export defineMeekoModule/],
-    [`modules: ["./modules/broken"]`, /broken failed during setup: .*plugin .*missing\.ts does not exist/],
-    [`modules: ["./modules/dup-a", "./modules/dup-b"]`, /Meeko module dup is listed more than once/],
-    [`modules: [["./legacy-folder", { a: 1 }]]`, /layer folder, which takes no options; move it to layers/],
-    [`modules: [42]`, /modules must be an array/],
-    [`modules: ["./modules/acme-theme"]`, /Meeko module @acme\/acme-theme uses meta\.configKey "theme", which is an option of Meeko itself since 1\.4: give the module another configKey .*migration-1\.4/],
-    [`modules: ["./modules/acme-site"]`, /meta\.configKey "site", which is an option of Meeko itself since 1\.3/],
-    [`modules: ["./modules/acme-layers"]`, /meta\.configKey "layers", which is an option of Meeko itself: /],
-    [`modules: ["./modules/acme-theme"], theme: { initial: "dark", storageKey: "theme" }`, /theme: unknown field initial\. Since 1\.4, theme is Meeko's own .*meta\.configKey "theme".*migration-1\.4/],
-    [`modules: ["./nowhere"]`, /not found|does not exist/],
+    [`modules: ["./modules/future"]`, /necesita Meeko >=9; este proyecto usa/],
+    [`modules: ["./modules/plain"]`, /debe exportar por defecto defineMeekoModule/],
+    [`modules: ["./modules/broken"]`, /broken falló en setup: .*plugin .*missing\.ts no existe/],
+    [`modules: ["./modules/dup-a", "./modules/dup-b"]`, /El módulo de Meeko dup aparece más de una vez/],
+    [`modules: [["./legacy-folder", { a: 1 }]]`, /carpeta de layer, que no admite opciones; muévala a layers/],
+    [`modules: [42]`, /modules debe ser un array/],
+    [`modules: ["./modules/acme-theme"]`, /El módulo de Meeko @acme\/acme-theme usa meta\.configKey "theme", que es una opción del propio Meeko desde 1\.4: dé al módulo otra configKey .*migration-1.4/],
+    [`modules: ["./modules/acme-site"]`, /meta\.configKey "site", que es una opción del propio Meeko desde 1\.3/],
+    [`modules: ["./modules/acme-layers"]`, /meta\.configKey "layers", que es una opción del propio Meeko: /],
+    [`modules: ["./modules/acme-theme"], theme: { initial: "dark", storageKey: "theme" }`, /theme: campo desconocido initial\. Desde 1\.4, theme es la opción del tema claro\/oscuro de Meeko.*meta\.configKey "theme".*migration-1\.4/],
+    [`modules: ["./nowhere"]`, /No se encuentra|no existe/],
   ];
   for (const [modules, error] of cases) {
     await put(root, "meeko.config.mjs", `export default { ${modules} };\n`);

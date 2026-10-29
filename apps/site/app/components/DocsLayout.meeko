@@ -19,6 +19,7 @@
 	const menuOpen = signal(false)
 	const activeHeading = signal('')
 	const toggle = useElementRef('toggle')
+	const sidebar = useElementRef('sidebar')
 	/** Label of the current page in the sidebar, for the small-screen bar. */
 	const currentLabel = computed(() => props.nav.flatMap((section) => section.links).find((link) => link.href === props.current)?.label ?? 'Documentación')
 
@@ -48,6 +49,16 @@
 			toggle.value?.focus()
 		}
 		document.addEventListener('keydown', onKeydown)
+		// The sidebar of the reference is long: the current page is brought into its view.
+		effect(() => {
+			void props.current
+			requestAnimationFrame(() => {
+				const nav = sidebar.value
+				const link = nav?.querySelector<HTMLElement>('a[aria-current="page"]')
+				if (!nav || !link) return
+				if (link.offsetTop < nav.scrollTop || link.offsetTop + link.offsetHeight > nav.scrollTop + nav.clientHeight) nav.scrollTop = link.offsetTop - nav.clientHeight / 3
+			})
+		})
 		let headings: HTMLElement[] = []
 		let frame = 0
 		const update = (): void => {
@@ -114,6 +125,7 @@
 			on:click="closeMenu"
 		></div>
 		<nav
+			ref:sidebar
 			id="docs-nav"
 			class="sidebar"
 			aria-label="Documentación"
@@ -121,14 +133,24 @@
 			on:click="onNavClick"
 		>
 			<details
-				class="group"
+				bind:class="section.icon ? 'group has-icon' : 'group'"
 				open
 				each:of="props.nav"
 				each:as="section"
 				each:key="section.title"
 			>
 				<summary>
-					{section.title}
+					<span class="group-title">
+						<svg
+							class="group-icon"
+							if:when="section.icon"
+							viewBox="0 0 16 16"
+							aria-hidden="true"
+						>
+							<path bind:d="section.icon" />
+						</svg>
+						{section.title}
+					</span>
 					<svg
 						viewBox="0 0 16 16"
 						aria-hidden="true"
@@ -140,10 +162,11 @@
 					<li
 						each:of="section.links"
 						each:as="link"
-						each:key="link.href"
+						each:key="link.label + link.href"
 					>
 						<a
 							bind:href="link.href"
+							bind:class="link.code ? 'symbol' : undefined"
 							bind:aria-current="link.href === props.current ? 'page' : undefined"
 						>
 							{link.label}
@@ -259,8 +282,8 @@
 		grid-template-columns: 15rem minmax(0, 1fr) 13.5rem;
 		gap: 3rem;
 		margin: 0 auto;
-		padding: 0 1.5rem;
-		max-width: 86rem;
+		padding: 0 var(--gutter);
+		max-width: var(--container);
 	}
 	.docs-bar,
 	.scrim {
@@ -331,12 +354,37 @@
 	.group summary:hover {
 		background: var(--surface);
 	}
-	.group summary svg {
+	.group-title {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		min-width: 0;
+	}
+	.group summary .group-icon {
+		transform: none;
+		color: var(--ink-soft);
+	}
+	.group.has-icon ul {
+		margin-left: 1.05rem;
+		border-left: 1px solid var(--line);
+		padding-left: 0.35rem;
+	}
+	.sidebar a.symbol {
+		overflow: hidden;
+		font: 400 0.8rem/1.55 var(--font-mono);
+		letter-spacing: 0;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.sidebar a.symbol[aria-current='page'] {
+		font-weight: 500;
+	}
+	.group summary > svg {
 		transform: rotate(-90deg);
 		transition: transform 0.2s var(--ease-out);
 		color: var(--muted);
 	}
-	.group[open] summary svg {
+	.group[open] summary > svg {
 		transform: none;
 	}
 	.sidebar ul,
@@ -528,7 +576,6 @@
 	@media (max-width: 860px) {
 		.docs {
 			display: block;
-			padding: 0 1rem;
 		}
 		.docs-bar {
 			display: flex;
@@ -541,7 +588,7 @@
 			margin: 0 -1rem;
 			border-bottom: 1px solid var(--line);
 			background: color-mix(in oklab, var(--bg) 78%, transparent);
-			padding: 0 1rem;
+			padding: 0 var(--gutter);
 			height: 2.75rem;
 		}
 		.menu-toggle {
@@ -619,7 +666,7 @@
 	@media (prefers-reduced-motion: reduce) {
 		.sidebar,
 		.scrim,
-		.group summary svg,
+		.group summary > svg,
 		.toc-mobile summary svg {
 			transition: none;
 		}

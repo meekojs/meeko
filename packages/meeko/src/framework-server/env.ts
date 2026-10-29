@@ -96,13 +96,31 @@ export function setSocketAddress(request: Request, address: string | undefined):
   return request;
 }
 
+/** The environment whose `MEEKO_TRUST_PROXY` applies to a request, recorded by `ServerApp.fetch`. */
+const requestEnvironments = new WeakMap<Request, { readonly env: unknown }>();
+
+/** Records the environment (`platform.env`) of the application that serves `request`. */
+export function setRequestEnvironment(request: Request, env: unknown): Request {
+  requestEnvironments.set(request, { env });
+  return request;
+}
+
+/** The environment recorded for `request`, if a `ServerApp` serves it. */
+export function requestEnvironmentOf(request: Request): { readonly env: unknown } | undefined {
+  return requestEnvironments.get(request);
+}
+
 /**
  * Carries the connection address of `from` over to a copy of the request, such as a rebased one or
- * the one a server middleware passes to `next()`. An address already recorded on `to` is kept.
+ * the one a server middleware passes to `next()`, with the environment of its application. What is
+ * already recorded on `to` is kept.
  */
 export function copySocketAddress(from: Request, to: Request): Request {
+  if (from === to) return to;
   const address = socketAddresses.get(from);
-  if (address !== undefined && from !== to && !socketAddresses.has(to)) socketAddresses.set(to, address);
+  if (address !== undefined && !socketAddresses.has(to)) socketAddresses.set(to, address);
+  const environment = requestEnvironments.get(from);
+  if (environment !== undefined && !requestEnvironments.has(to)) requestEnvironments.set(to, environment);
   return to;
 }
 

@@ -59,10 +59,86 @@ export function escapeHtml(text: string): string {
   return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 
-/** A highlighted `<pre>` under the header of every code block: its language and a copy button. */
-export function codeBlockHtml(label: string, pre: TrustedHtml): TrustedHtml {
+/**
+ * The verdict of a code block of the reference: ```` ```ts good ```` is the correct way and
+ * ```` ```ts bad ```` the mistake it corrects (see docs/reference/README.md).
+ */
+export type CodeVerdict = "good" | "bad";
+
+/** Label and stroke icon of each verdict, in the code block header. */
+const verdicts: Readonly<Record<CodeVerdict, { readonly label: string; readonly icon: string }>> = {
+  good: { label: "Correcto", icon: '<path d="m3.5 8.5 3 3 6-7" />' },
+  bad: { label: "Incorrecto", icon: '<path d="m4.5 4.5 7 7M11.5 4.5l-7 7" />' },
+};
+
+/**
+ * A highlighted `<pre>` under the header of every code block: its language and a copy button and,
+ * in the reference, whether it is the correct or the incorrect way.
+ */
+export function codeBlockHtml(label: string, pre: TrustedHtml, verdict?: CodeVerdict): TrustedHtml {
   const name = escapeHtml(label);
-  return trustHtml(`<div class="code-block" data-lang="${name}"><div class="code-head" data-pagefind-ignore><span class="code-lang">${name}</span><button type="button" class="code-copy" data-copy>Copiar</button></div>${pre}</div>\n`);
+  const mark = verdict
+    ? `<span class="code-verdict"><svg viewBox="0 0 16 16" aria-hidden="true">${verdicts[verdict].icon}</svg>${verdicts[verdict].label}</span>`
+    : "";
+  const attribute = verdict ? ` data-verdict="${verdict}"` : "";
+  return trustHtml(`<div class="code-block" data-lang="${name}"${attribute}><div class="code-head" data-pagefind-ignore>${mark}<span class="code-lang">${name}</span><button type="button" class="code-copy" data-copy>Copiar</button></div>${pre}</div>\n`);
+}
+
+/** The verdict word of a fence's info string, after the language: ```` ```ts bad ````. */
+function fenceVerdict(info: string): CodeVerdict | undefined {
+  const words = info.trim().split(/\s+/).slice(1);
+  return words.includes("bad") ? "bad" : words.includes("good") ? "good" : undefined;
+}
+
+/** Callouts in the GitHub syntax (`> [!NOTE]`) and their label. */
+const callouts: Readonly<Record<string, { readonly label: string; readonly icon: string }>> = {
+  NOTE: { label: "Nota", icon: '<circle cx="8" cy="8" r="6" /><path d="M8 7.25v3.5M8 5.1v.01" />' },
+  TIP: { label: "Consejo", icon: '<path d="M6 12.5h4M6.6 14.5h2.8M8 1.75a4.25 4.25 0 0 0-2.5 7.7c.4.3.6.7.6 1.15v.4h3.8v-.4c0-.45.2-.85.6-1.15A4.25 4.25 0 0 0 8 1.75Z" />' },
+  IMPORTANT: { label: "Importante", icon: '<path d="M2.5 3.5h11v7.5H8l-3 2.5V11H2.5Z" /><path d="M8 5.5v2.5M8 9.6v.01" />' },
+  WARNING: { label: "Advertencia", icon: '<path d="M8 2.25 14.25 13H1.75Z" /><path d="M8 6.5v2.75M8 11.1v.01" />' },
+  CAUTION: { label: "Cuidado", icon: '<path d="M5.4 1.75h5.2l3.65 3.65v5.2l-3.65 3.65H5.4l-3.65-3.65V5.4Z" /><path d="M8 5v3.5M8 10.85v.01" />' },
+};
+
+/**
+ * Turns each blockquote that starts with `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or
+ * `[!CAUTION]` into a callout: a `<div class="callout">` with its label, as GitHub shows them.
+ */
+function calloutRule(md: MarkdownIt): void {
+  md.core.ruler.push("meeko_callouts", (state) => {
+    const tokens = state.tokens;
+    for (let index = 0; index < tokens.length; index++) {
+      const open = tokens[index]!;
+      const inline = tokens[index + 2];
+      if (open.type !== "blockquote_open" || tokens[index + 1]?.type !== "paragraph_open" || inline?.type !== "inline") continue;
+      const marker = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*/.exec(inline.content);
+      if (!marker) continue;
+      const kind = marker[1]!;
+      const callout = callouts[kind]!;
+      // The marker is the start of the first text token, maybe followed by a line break.
+      inline.content = inline.content.slice(marker[0].length).replace(/^\n/, "");
+      const children = inline.children ?? [];
+      const first = children[0];
+      if (first?.type === "text") first.content = first.content.replace(/^\[!\w+\][ \t]*/, "");
+      while (children.length && (children[0]!.type === "softbreak" || (children[0]!.type === "text" && children[0]!.content === ""))) children.shift();
+      let depth = 0;
+      for (let close = index; close < tokens.length; close++) {
+        const token = tokens[close]!;
+        if (token.type === "blockquote_open") depth++;
+        else if (token.type === "blockquote_close" && --depth === 0) {
+          token.tag = "div";
+          break;
+        }
+      }
+      open.tag = "div";
+      open.attrSet("class", `callout callout-${kind.toLowerCase()}`);
+      open.attrSet("role", "note");
+      const title = new state.Token("html_block", "", 0);
+      title.content = `<p class="callout-title"><svg viewBox="0 0 16 16" aria-hidden="true">${callout.icon}</svg>${callout.label}</p>\n`;
+      tokens.splice(index + 1, 0, title);
+      // An empty first paragraph (the marker alone on its line) is dropped.
+      if (!inline.content.trim() && !children.length) tokens.splice(index + 2, 3);
+    }
+  });
 }
 
 /**
@@ -84,8 +160,9 @@ function markdown(html = true): Promise<MarkdownIt> {
       const token = tokens[index]!;
       const code = token.content.replace(/\n$/, "");
       const { lang, label } = blockLanguage(token.info, code);
-      return codeBlockHtml(label, highlight(code, lang));
+      return codeBlockHtml(label, highlight(code, lang), fenceVerdict(token.info));
     };
+    calloutRule(md);
     md.renderer.rules.table_open = () => '<div class="table-wrap"><table>\n';
     md.renderer.rules.table_close = () => "</table></div>\n";
     md.renderer.rules.heading_close = (tokens, index, options, _env, self) => {
@@ -129,8 +206,15 @@ function linkCode(token: Token, codeLinks: NonNullable<RenderOptions["codeLinks"
 
 /** Renders a document of the repository by its path from the root, such as `docs/api.md`. */
 export async function renderSource(source: string, transform: (text: string) => string = (text) => text, options: RenderOptions = {}): Promise<RenderedDoc> {
+  return renderMarkdown(transform(readRepositoryFile(source)), source, options);
+}
+
+/**
+ * Renders Markdown of the repository that has already been read, such as the body of a page of
+ * the reference without its frontmatter; `source` is its path, for relative links and editing.
+ */
+export async function renderMarkdown(text: string, source: string, options: RenderOptions = {}): Promise<RenderedDoc> {
   const md = await markdown();
-  const text = transform(readRepositoryFile(source));
   const tokens = md.parse(text, {});
   const slugger = new GithubSlugger();
   const toc: TocEntry[] = [];

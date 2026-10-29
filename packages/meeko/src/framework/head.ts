@@ -159,11 +159,22 @@ export interface HeadInput {
   script?: HeadScript[];
   /** Etiquetas `<style>`. */
   style?: HeadStyle[];
-  /** Atributos de `<html>`, como `lang`, `dir`, `class` o `data-*`; `undefined` no aporta nada. */
-  htmlAttrs?: Record<string, string | undefined>;
-  /** Atributos de `<body>`; `undefined` no aporta nada. */
-  bodyAttrs?: Record<string, string | undefined>;
+  /**
+   * Atributos de `<html>`, como `lang`, `dir`, `class` o `data-*`; `undefined` no aporta nada. Un
+   * manejador `on*` lanza en ejecución; desde `1.7`, los de los eventos del DOM (`onclick`,
+   * `onload`…) son además un error de tipos.
+   */
+  htmlAttrs?: Record<string, string | undefined> & HeadEventAttributes;
+  /** Atributos de `<body>`; `undefined` no aporta nada. Como en `htmlAttrs`, sin manejadores `on*`. */
+  bodyAttrs?: Record<string, string | undefined> & HeadEventAttributes;
 }
+
+/**
+ * The DOM event handler attributes (`onclick`, `onload`…), which `htmlAttrs` and `bodyAttrs` reject
+ * at run time. Named keys keep a `Record<string, string>` assignable; any other `on*` key still
+ * fails in `normalizeHeadInput`.
+ */
+type HeadEventAttributes = { readonly [K in `on${keyof GlobalEventHandlersEventMap | keyof WindowEventHandlersEventMap}`]?: never };
 
 /**
  * `head` de {@link DocumentConfig} y de `meeko.addHead` en los módulos: lo mismo que

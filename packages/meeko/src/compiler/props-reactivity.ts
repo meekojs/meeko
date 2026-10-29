@@ -12,7 +12,7 @@ export interface PropsReadOnce {
  * callback. With reactive props the child stays mounted when the parent changes a prop, so such a
  * read keeps the first value. Reads inside other functions (handlers, `computed`, `effect`) run
  * again and are fine, `untrack(() => props.x)` among them; so are calls of a function prop and
- * `signal(props.x)`, an explicit initial value.
+ * `signal(props.x)` or `signal(props.x ?? 0)`, an explicit initial value.
  */
 export function propsReadsOnce(file: ts.SourceFile, propsName: string): PropsReadOnce[] {
   const found: PropsReadOnce[] = [];
@@ -37,6 +37,15 @@ export function propsReadsOnce(file: ts.SourceFile, propsName: string): PropsRea
   return found;
 }
 
+/** `node` is part of the first argument of a `signal(...)` call, outside any nested function. */
+function signalInitialValue(node: ts.Node): boolean {
+  let child = node;
+  for (let parent = node.parent; parent && !ts.isFunctionLike(parent) && !ts.isStatement(parent); child = parent, parent = parent.parent) {
+    if (ts.isCallExpression(parent) && ts.isIdentifier(parent.expression) && parent.expression.text === "signal" && parent.arguments[0] === child) return true;
+  }
+  return false;
+}
+
 function readOnceMessage(node: ts.Identifier, propsName: string, scope: "setup" | "mounted", file: ts.SourceFile): string | undefined {
   const parent = node.parent;
   const fix = scope === "mounted"
@@ -54,8 +63,8 @@ function readOnceMessage(node: ts.Identifier, propsName: string, scope: "setup" 
   const outer = access.parent;
   // Calling a function prop (an event callback) is not a copy of its value.
   if (ts.isCallExpression(outer) && outer.expression === access) return undefined;
-  // signal(props.x) states that the prop is only the initial value.
-  if (ts.isCallExpression(outer) && ts.isIdentifier(outer.expression) && outer.expression.text === "signal" && outer.arguments[0] === access) return undefined;
+  // signal(props.x), or any expression of it (`signal(props.x ?? 0)`), states that the prop is only the initial value.
+  if (signalInitialValue(access)) return undefined;
   const text = access.getText(file);
   const initial = scope === "setup" ? `. Si sólo quieres el valor inicial, usa signal(${text}) o untrack(() => ${text})` : "";
   return `${text} se lee una sola vez porque ${when}: no se actualizará cuando el padre cambie la prop; ${fix}${initial}`;

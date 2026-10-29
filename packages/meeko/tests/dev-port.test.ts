@@ -62,3 +62,36 @@ test("a port in use names the port and how to fix it", () => {
   assert.equal(error.cause, cause);
   assert.equal(error.message, "El puerto 4173 de 127.0.0.1 ya está en uso; usa MEEKO_PORT=<otro puerto> o cierra el otro meeko dev");
 });
+
+test("a second meeko dev of the same project warns while the first runs, and not after it stopped", async (context) => {
+  const { claimDevelopmentProject, developmentLockFile } = await import("../src/framework/dev-lock.ts");
+  const { tempProject } = await import("./helpers/temp-project.ts");
+  const { mkdir: makeDirectory, readFile: read, writeFile: write } = await import("node:fs/promises");
+  const { dirname: parent, join: joinPath } = await import("node:path");
+  const { spawnSync } = await import("node:child_process");
+  const { pathToFileURL } = await import("node:url");
+  const root = await tempProject(context, "dev-lock");
+  const lock = joinPath(root, developmentLockFile);
+  const warnings: string[] = [];
+  claimDevelopmentProject(root, (message) => warnings.push(message));
+  assert.equal(warnings.length, 0, "the first dev of the project");
+  assert.equal(JSON.parse(await read(lock, "utf8")).pid, process.pid);
+  claimDevelopmentProject(root, (message) => warnings.push(message));
+  assert.equal(warnings.length, 0, "this same process again");
+  // Another process that is running: the parent of this test.
+  await makeDirectory(parent(lock), { recursive: true });
+  await write(lock, JSON.stringify({ pid: process.ppid, startedAt: new Date().toISOString() }));
+  claimDevelopmentProject(root, (message) => warnings.push(message));
+  assert.equal(warnings.length, 1);
+  assert.ok(warnings[0]!.startsWith(`[meeko] Otro meeko dev (PID ${process.ppid}) ya sirve este proyecto`), warnings[0]);
+  assert.equal(JSON.parse(await read(lock, "utf8")).pid, process.ppid, "the first dev keeps the record");
+  // A second dev that leaves does not erase the first one's record.
+  const second = spawnSync(process.execPath, ["--import", "tsx", "-e", `import(${JSON.stringify(pathToFileURL(joinPath(process.cwd(), "src/framework/dev-lock.ts")).href)}).then(({ claimDevelopmentProject }) => claimDevelopmentProject(${JSON.stringify(root)}, () => {}))`], { encoding: "utf8" });
+  assert.equal(second.status, 0, second.stderr);
+  assert.equal(JSON.parse(await read(lock, "utf8")).pid, process.ppid, "the second dev leaving does not erase it");
+  // A process that already exited, such as a dev killed without its cleanup.
+  const exited = spawnSync(process.execPath, ["-e", "console.log(process.pid)"], { encoding: "utf8" });
+  await write(lock, JSON.stringify({ pid: Number(exited.stdout.trim()), startedAt: new Date().toISOString() }));
+  claimDevelopmentProject(root, (message) => warnings.push(message));
+  assert.equal(warnings.length, 1, "a stale record does not warn");
+});

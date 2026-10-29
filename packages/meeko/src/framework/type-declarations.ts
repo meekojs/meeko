@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { generateTypeScriptAutoImports } from "../autoimports-ts.js";
@@ -9,6 +10,7 @@ import { generateServerContracts } from "./contracts-generate.js";
 import { generateRoutes } from "./generate.js";
 import { generatePageContracts } from "./page-contracts-generate.js";
 import { generateRouteBlockTypes, routeBlockTypesDirectory } from "./route-block-types.js";
+import { generateServicesTypes, servicesDeclaration } from "./services-types.js";
 
 export const projectNames = ["app", "server", "shared"] as const;
 
@@ -29,6 +31,8 @@ const generatedIncludes: Record<(typeof projectNames)[number], string[]> = {
     "generated/entry-server.ts", "generated/clients.server.ts", "generated/socket-contracts.ts",
     "generated/page-contracts.server.ts", "types/virtual-pages.d.ts", "types/routes.d.ts",
     "types/**/*.d.meeko.ts", "types/autoimports/server.d.ts", `${routeBlockTypesDirectory}/**/*.route.ts`,
+    // The type of RequestContext.services, from server/runtime.ts.
+    servicesDeclaration,
   ],
   shared: ["types/autoimports/shared.d.ts"],
 };
@@ -80,13 +84,21 @@ export async function generateFrameworkTsconfigs(projectRoot: string): Promise<s
  * Generates declarations without loading a Vite server into the editor host. `options` reach the
  * component declarations: the editor's open documents and its tolerance to a component being written.
  */
-export async function prepareFrameworkTypeDeclarations(projectRoot: string, options: AppTypesOptions = {}): Promise<void> {
+export async function prepareFrameworkTypeDeclarations(projectRoot: string, options: AppTypesOptions = {}): Promise<string[]> {
   const root = resolve(projectRoot);
-  await generateRoutes(root);
-  await generateServerContracts(root);
-  await generateAppTypes(root, options);
+  const routes = await generateRoutes(root);
+  const server = await generateServerContracts(root);
+  const components = await generateAppTypes(root, options);
   await generateRouteBlockTypes(root);
-  await generatePageContracts(root);
-  await generateTypeScriptAutoImports(root);
-  await generateFrameworkTsconfigs(root);
+  const pageContracts = await generatePageContracts(root);
+  const services = await generateServicesTypes(root);
+  const imports = await generateTypeScriptAutoImports(root);
+  const tsconfigs = await generateFrameworkTsconfigs(root);
+  // What `meeko routes` lists: the declarations and manifests a project reads, not the copies.
+  return [routes.types, routes.manifest, server.types, server.manifest, ...components, pageContracts, services, imports.client, imports.server, imports.shared, ...tsconfigs];
+}
+
+/** Whether the project has the `.meeko/tsconfig.*.json` that Vite resolves from its `tsconfig.json`. */
+export function hasFrameworkTsconfigs(projectRoot: string): boolean {
+  return projectNames.every((name) => existsSync(join(resolve(projectRoot), ".meeko", `tsconfig.${name}.json`)));
 }

@@ -10,7 +10,7 @@
 	const home = href('/')
 	const guide = href('/docs/[slug]', { params: { slug: 'framework' } })
 	const api = href('/docs/[slug]', { params: { slug: 'api' } })
-	const reference = '/docs/reference'
+	const reference = href('/docs/reference')
 	const changes = href('/docs/[slug]', { params: { slug: 'changelog' } })
 	const stability = href('/docs/[slug]', { params: { slug: 'stability' } })
 	const devtools = href('/docs/[slug]', { params: { slug: 'devtools' } })
@@ -49,7 +49,7 @@
 				aria-label="Principal"
 			>
 				<a bind:href="guide">Guía</a>
-				<a bind:href="api">API</a>
+				<a bind:href="reference">API</a>
 				<a bind:href="changes">Cambios</a>
 			</nav>
 			<div class="tools">
@@ -90,8 +90,7 @@
 						on:click="closeMenu"
 					>
 						<a bind:href="guide">Guía</a>
-						<a bind:href="api">API</a>
-						<a bind:href="reference">Referencia de la API</a>
+						<a bind:href="reference">API</a>
 						<a bind:href="changes">Cambios</a>
 						<a
 							href="https://github.com/meekojs/meeko"
@@ -201,8 +200,8 @@
 		align-items: center;
 		gap: 1.75rem;
 		margin: 0 auto;
-		padding: 0 1.5rem;
-		max-width: 80rem;
+		padding: 0 var(--gutter);
+		max-width: var(--container);
 		height: 100%;
 	}
 	.brand {
@@ -338,8 +337,8 @@
 		justify-content: space-between;
 		gap: 2.5rem 4rem;
 		margin: 0 auto;
-		padding: 3.5rem 1.5rem 4rem;
-		max-width: 80rem;
+		padding: 3.5rem var(--gutter) 4rem;
+		max-width: var(--container);
 		color: var(--muted);
 		font-size: 0.875rem;
 	}
@@ -382,7 +381,6 @@
 	@media (max-width: 860px) {
 		.bar {
 			gap: 0.75rem;
-			padding: 0 1rem;
 		}
 		.primary,
 		.github {

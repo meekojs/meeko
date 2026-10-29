@@ -20,6 +20,9 @@ export interface ApiGroup {
 /** URL of the index of the reference. */
 export const referenceHref = '/docs/reference'
 
+/** URL of the index of every export, by module: the exhaustive reference generated from the sources. */
+export const exportsHref = '/docs/reference/exports'
+
 const packageName = '@meekojs/meeko'
 
 /**
@@ -40,6 +43,7 @@ const known: Readonly<Record<string, { readonly label: string; readonly descript
 		description: 'El servidor de la aplicación: runtime, middleware, contexto de la petición, sesiones y sus almacenes, endpoints de API y RPC, canales Socket, OpenAPI y llamadas locales.',
 	},
 	'./node': { label: 'Node.js', description: 'Adaptador de Node.js: listener y servidor HTTP, lectura de assets y WebSocket.' },
+	'./password': { label: 'Contraseñas', description: 'Hash y verificación de contraseñas con scrypt, sin dependencias.' },
 	'./bun': { label: 'Bun', description: 'Adaptador de Bun: servidor con WebSocket y lectura de assets.' },
 	'./deno': { label: 'Deno', description: 'Adaptador de Deno: servidor y lectura de assets.' },
 	'./cloudflare': {
@@ -52,6 +56,7 @@ const known: Readonly<Record<string, { readonly label: string; readonly descript
 	},
 	'./vite': { label: 'Vite', description: 'El plugin de Vite: compila los imports `.meeko` en cliente y SSR y añade HMR y CSS en desarrollo.' },
 	'./prettier': { label: 'Prettier', description: 'El plugin de Prettier para `.meeko`: script, `<script server>`, plantilla y estilo.' },
+	'./postcss': { label: 'PostCSS', description: 'El plugin de PostCSS de las utilidades de CSS: `@utilities` y `defineUtilities`.' },
 	'./devtools-ui': { label: 'DevTools', description: 'El panel de DevTools que se monta dentro de la página.' },
 }
 
@@ -102,7 +107,7 @@ export function apiGroups(): readonly ApiGroup[] {
 	return groups
 }
 
-/** URL of a group in the index. */
+/** URL of a group in the index of every export. */
 export function groupHref(group: ApiGroup): string {
-	return `${referenceHref}#${group.id}`
+	return `${exportsHref}#${group.id}`
 }

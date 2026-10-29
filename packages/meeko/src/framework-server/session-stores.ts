@@ -259,8 +259,68 @@ export interface SqlSessionDriver {
   replace(previousId: string, row: SqlSessionRow, now: number): Promise<boolean>;
   /** Borra en una operación atómica la fila activa de la familia, también desde un handle anterior. */
   revokeFamily(familyId: string): Promise<void>;
+  /**
+   * Cuenta una petición en la ventana fija de `key` con una sola sentencia atómica y devuelve la
+   * fila resultante (desde `1.7`). Opcional: con él, {@link SqlSessionStore} implementa
+   * `SessionStore.rateLimit` y los límites de `rateLimit` se comparten entre instancias; sin él,
+   * se cuentan en la memoria de cada instancia, con un aviso en producción.
+   *
+   * `key` son los 32 bytes del SHA-256 de la clave del contador, que Meeko ya calcula como un
+   * resumen de la ruta y el sujeto: nunca llega una IP en claro y la columna tiene ancho fijo
+   * (`bytea` en PostgreSQL, `BLOB` en SQLite). Si no existe una fila para `key`, o su ventana
+   * terminó (`window_ends_at <= now`), la sentencia escribe `count = 1` y
+   * `window_ends_at = now + windowMs`; si no, suma uno y conserva el final de la ventana. Debe ser
+   * atómica frente a peticiones concurrentes, como `INSERT … ON CONFLICT DO UPDATE … RETURNING`.
+   * Si falla, la petición limitada se rechaza.
+   *
+   * @param key SHA-256 de la clave del contador.
+   * @param windowMs Duración de la ventana, un entero positivo de milisegundos.
+   * @param now Instante de la petición, en milisegundos desde la época.
+   * @returns La fila tras contar la petición.
+   * @since 1.7.0
+   * @example
+   * ```ts
+   * import type { SqlSessionDriver } from "@meekojs/meeko/server";
+   *
+   * const rateLimit: SqlSessionDriver["rateLimit"] = async (key, windowMs, now) => {
+   *   const { rows } = await pool.query<{ count: number; window_ends_at: string }>(
+   *     `INSERT INTO meeko_rate_limits AS r (key, window_ends_at, count) VALUES ($1, $2::bigint + $3::bigint, 1)
+   *      ON CONFLICT (key) DO UPDATE SET
+   *        count = CASE WHEN r.window_ends_at <= $2 THEN 1 ELSE r.count + 1 END,
+   *        window_ends_at = CASE WHEN r.window_ends_at <= $2 THEN EXCLUDED.window_ends_at ELSE r.window_ends_at END
+   *      RETURNING count, window_ends_at`,
+   *     [Buffer.from(key), now, windowMs],
+   *   );
+   *   return { count: rows[0]!.count, windowEndsAt: Number(rows[0]!.window_ends_at) };
+   * };
+   * ```
+   * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#rate-limit-en-sql
+   */
+  rateLimit?(key: Uint8Array, windowMs: number, now: number): Promise<SqlRateLimitRow>;
   /** Cierra la conexión; sólo se usa con `closeDriver`. */
   close?(): Promise<void>;
+}
+
+/**
+ * Fila de un contador de `rateLimit` que devuelve `SqlSessionDriver.rateLimit` (desde `1.7`): el
+ * total de la ventana, incluida la petición actual, y el instante en que termina.
+ *
+ * @since 1.7.0
+ * @example
+ * ```ts
+ * import type { SqlRateLimitRow } from "@meekojs/meeko/server";
+ *
+ * const fromDatabase = (row: { count: number; window_ends_at: string }): SqlRateLimitRow => ({
+ *   count: row.count,
+ *   windowEndsAt: Number(row.window_ends_at), // node-postgres devuelve bigint como texto
+ * });
+ * ```
+ */
+export interface SqlRateLimitRow {
+  /** Peticiones contadas en la ventana, incluida esta; un entero positivo. */
+  count: number;
+  /** Final de la ventana, en milisegundos desde la época. */
+  windowEndsAt: number;
 }
 
 /**
@@ -281,6 +341,8 @@ export interface SqlSessionStoreOptions {
 /**
  * Store de sesiones SQL genérico y persistente: la aplicación aporta las sentencias mediante su
  * driver. Las filas caducadas se borran al leerlas. No notifica revocaciones a otras instancias.
+ * Desde `1.7`, si el driver implementa `rateLimit`, los contadores de `rateLimit` viven en la base
+ * de datos y los comparten todas las instancias.
  * La duración propia de cada sesión (`SessionRecord.ttlMs`) se deduce de `expiresAt - createdAt`,
  * sin columna adicional.
  *
@@ -298,12 +360,35 @@ export interface SqlSessionStoreOptions {
 export class SqlSessionStore<T = unknown> implements SessionStore<T> {
   readonly persistent = true;
   /**
-   * @param driver Driver con `replace` y `revokeFamily` atómicos.
+   * Cuenta una petición en la ventana fija `key` con `SqlSessionDriver.rateLimit` (desde `1.7`).
+   * Sólo existe si el driver lo implementa; sin él, `rateLimit` cuenta en la memoria de cada
+   * instancia y Meeko lo avisa una vez en producción.
+   */
+  readonly rateLimit?: (key: string, windowMs: number) => Promise<RateLimitHit>;
+  /**
+   * @param driver Driver con `replace` y `revokeFamily` atómicos, y `rateLimit` opcional.
    * @param options Propiedad de la conexión.
-   * @throws {TypeError} Si el driver no implementa `replace` o `revokeFamily`.
+   * @throws {TypeError} Si el driver no implementa `replace` o `revokeFamily`, o si su `rateLimit`
+   * no es una función.
    */
   constructor(private readonly driver: SqlSessionDriver, private readonly options: SqlSessionStoreOptions = {}) {
     if (typeof driver.replace !== "function" || typeof driver.revokeFamily !== "function") throw new TypeError("SQL session driver requires atomic replace and family revocation");
+    if (driver.rateLimit !== undefined) {
+      if (typeof driver.rateLimit !== "function") throw new TypeError("SQL session driver rateLimit must be a function");
+      this.rateLimit = (key, windowMs) => this.countRateLimit(key, windowMs);
+    }
+  }
+  private async countRateLimit(key: string, windowMs: number): Promise<RateLimitHit> {
+    if (!Number.isSafeInteger(windowMs) || windowMs <= 0) throw new RangeError("Rate limit window must be a positive integer of milliseconds");
+    // A fixed-width digest of the key: neither addresses nor app keys reach the table in clear.
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key)));
+    const now = Date.now();
+    const row = await this.driver.rateLimit!(digest, windowMs, now) as Partial<Record<keyof SqlRateLimitRow, unknown>> | undefined;
+    // SQL clients may return bigint columns as strings or BigInt.
+    const count = Number(row?.count);
+    const windowEndsAt = Number(row?.windowEndsAt);
+    if (!Number.isSafeInteger(count) || count < 1 || !Number.isSafeInteger(windowEndsAt) || windowEndsAt <= 0) throw new TypeError("SqlSessionDriver.rateLimit must resolve { count, windowEndsAt }");
+    return { count, resetInMs: Math.max(0, windowEndsAt - now) };
   }
   async get(id: string): Promise<SessionRecord<T> | undefined> {
     const row = await this.driver.read(id);

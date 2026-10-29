@@ -12,7 +12,8 @@
     "check": "meeko check .",
     "build": "node scripts/assets.mjs && meeko build . && node scripts/postbuild.mjs",
     "build:static": "pnpm run build",
-    "preview": "pnpm run build && meeko preview ."
+    "preview": "pnpm run build && meeko preview .",
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@meekojs/meeko": "workspace:*",

@@ -6,7 +6,7 @@ import { createServer } from "node:http";
 import type { Server } from "node:http";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { InlineConfig, ViteDevServer } from "vite";
+import type { InlineConfig, Plugin, ViteDevServer } from "vite";
 import { escapeHtml } from "../server.js";
 import { attachNodeWebSocketServer, toNodeListener } from "../node.js";
 import type { ServerApp, ServerAppOptions } from "../framework-server/app.js";
@@ -22,14 +22,14 @@ import { resolvedDocument, resolveSiteOrigin, setModuleDevelopmentMode } from ".
 import type { PrerenderIndex } from "./prerender.js";
 import { discoverErrorPage } from "./routes-discovery.js";
 import { discoverRouteMiddleware } from "./route-middleware-discovery.js";
-import { robotsTxt, siteFilesOptions, sitemapPathnames, sitemapXml } from "./site-files.js";
+import { robotsTxt, siteFilesOptions, sitemapEntryRoutes, sitemapUrls, sitemapXml } from "./site-files.js";
 import { assertStaticApp, previewStatic, writeStaticOutput } from "./static-adapter.js";
 import type { ResolvedModules } from "./module-loader.js";
 import { createDevAppReloader, isDiscoverySource, isRouteOptionsSource, routeOptionsKey } from "./dev-watch.js";
 import { supervisedHmrPortEnv, supervisedPortEnv } from "./dev-link.js";
 import { devHmrHost, devPortInUse, resolveDevPorts } from "./dev-port.js";
 import type { MeekoAdapterName } from "./config-type.js";
-import { prerenderWithNodeBuild } from "./prerender.js";
+import { prerenderForBuild } from "./prerender.js";
 import { bunEntrySource, cloudflareEntrySource, denoEntrySource } from "./adapter-templates.js";
 import { cloudflareAssetsDirectory, cloudflarePrerenderDirectory, resolveWrangler, wranglerConfig, wranglerSource } from "./cloudflare-build.js";
 import { editorBridgeHost, startEditorBridge } from "./editor-bridge.js";
@@ -38,6 +38,7 @@ import type { DevServerLogs } from "./dev-server-logs.js";
 import type { EditorBridge } from "./editor-bridge.js";
 import { clientEntrySource, nodeEntrySource, serverEntrySource, staticClientEntrySource } from "./project-templates.js";
 import { assertNoLegacySessionFile } from "./runtime-migration.js";
+import { hasFrameworkTsconfigs, prepareFrameworkTypeDeclarations } from "./type-declarations.js";
 import { createGlobalStylesheetSnapshot, devStylesheetLink, globalStylesheetFile, globalStylesheetUrl } from "./styles.js";
 
 export { frameworkClientEntry, frameworkServerEntry } from "./app-manifest.js";
@@ -69,6 +70,27 @@ export function adapterOutput(adapter: MeekoAdapterName): string {
 
 /** Single-file Worker bundle and its generated Wrangler configuration. */
 const cloudflareAdapter = { entry: ".meeko/generated/entry-cloudflare.ts", file: "worker.js", config: "wrangler.jsonc" } as const;
+
+/** The module that replaces Meeko's HTML parser for CSP hashes in a Worker without `contentSecurityPolicy`. */
+const documentHashesStub = "\0meeko:document-hashes";
+
+/**
+ * Leaves the HTML parser of the CSP hashes (parse5) out of a Worker whose configuration has no
+ * `contentSecurityPolicy`: Meeko's page handler only loads it to hash a document for its own CSP, and
+ * a Worker is one module, where a dynamic import is bundled too.
+ */
+const withoutDocumentHashes: Plugin = {
+  name: "meeko:without-document-hashes",
+  enforce: "pre",
+  resolveId(source, importer) {
+    if (source !== "./inline-sources.js" || !importer) return null;
+    return /[\\/]framework[\\/]server\.[jt]s$/.test(importer.split("?")[0]!) ? documentHashesStub : null;
+  },
+  load(id) {
+    if (id !== documentHashesStub) return null;
+    return 'export function documentHashes() { throw new Error("This Worker was built without server.contentSecurityPolicy; rebuild it to hash documents"); }\n';
+  },
+};
 
 /** Entry file of an adapter's build output, relative to the project. */
 export function adapterEntry(adapter: MeekoAdapterName): string {
@@ -203,7 +225,9 @@ export interface BuildProjectResult {
 /**
  * Construye el proyecto como `meeko build`: el cliente, el bundle de servidor del adaptador y sus
  * páginas prerenderizadas, bajo `.meeko/output/<adapter>/`. El adaptador sale de `options`, de
- * `meeko.config.ts` o, por defecto, `node`. Necesita `vite` instalado.
+ * `meeko.config.ts` o, por defecto, `node`. Necesita `vite` instalado. No comprueba tipos; desde
+ * `1.7`, en un proyecto limpio (sin `meeko check` ni `meeko dev` previos) genera antes los tipos y
+ * los `tsconfig.*.json` de `.meeko/`, como `meeko check`.
  *
  * @param projectRoot Carpeta del proyecto.
  * @param options Adaptador que sustituye al de la configuración.
@@ -240,6 +264,9 @@ export async function buildProject(projectRoot: string, options: BuildProjectOpt
   if (adapter === "static") await assertStaticApp(root);
   await modules.callHook("build:before", { adapter, output });
   await prepareProject(root);
+  // `meeko build` checks the project first, which writes them; a clean project called from a
+  // script has none, and Vite fails on the references of its tsconfig.json.
+  if (!hasFrameworkTsconfigs(root)) await prepareFrameworkTypeDeclarations(root);
   // On a static host navigation reads each page's payload file instead of negotiating Accept. That
   // entry has its own file: the shared one in .meeko/generated stays the server-negotiating entry.
   const clientEntry = adapter === "static" ? staticClientEntry : frameworkClientEntry;
@@ -273,11 +300,14 @@ export async function buildProject(projectRoot: string, options: BuildProjectOpt
   }
   const server = config.server?.adapter === "node" ? config.server : undefined;
   const viteManifest = await readViteManifest(root);
+  // One id for the whole build, also when the Node server is built twice (with a sitemap).
+  const buildId = randomUUID();
   const writeData = async (): Promise<void> => {
     const data: BuildAppData = {
       client: clientAssets(viteManifest, clientEntry),
       assets: await assetManifest(clientDirectory, viteManifest),
       node: { host: server?.host ?? "127.0.0.1", port: server?.port ?? 4173 },
+      buildId,
     };
     await mkdir(resolve(root, ".meeko/build"), { recursive: true });
     await writeFile(resolve(root, buildDataFile), JSON.stringify(data, null, 2) + "\n", "utf8");
@@ -298,14 +328,16 @@ export async function buildProject(projectRoot: string, options: BuildProjectOpt
   // a sitemap Node renders them with an intermediate server and builds its own afterwards.
   const nodeTarget = adapter === "node" && !siteFiles.sitemap ? nodeOutput : prerenderServer;
   await buildNodeServer(nodeTarget);
-  await prerenderWithNodeBuild(root, `${nodeTarget}/index.mjs`, prerenderStaging);
+  // The routes whose options name sitemapEntries: only their modules are loaded to evaluate it.
+  const sitemapRoutes = siteFiles.sitemap ? await sitemapEntryRoutes(await discoverConfiguredRoutes(root)) : new Set<string>();
+  const { sitemap: declared } = await prerenderForBuild(root, `${nodeTarget}/index.mjs`, prerenderStaging, { sitemapRoutes });
   if (siteFiles.sitemap && origin) {
     const index = JSON.parse(await readFile(resolve(root, prerenderStaging, "manifest.json"), "utf8")) as PrerenderIndex;
-    const pathnames = await sitemapPathnames({
-      index, prerenderDirectory: resolve(root, prerenderStaging), routes: await discoverConfiguredRoutes(root),
+    const urls = await sitemapUrls({
+      index, prerenderDirectory: resolve(root, prerenderStaging), routes: await discoverConfiguredRoutes(root), declared,
       ...(siteFiles.sitemap.exclude ? { exclude: siteFiles.sitemap.exclude } : {}),
     });
-    await writeFile(join(clientDirectory, "sitemap.xml"), sitemapXml(origin, pathnames), "utf8");
+    await writeFile(join(clientDirectory, "sitemap.xml"), sitemapXml(origin, urls), "utf8");
     await writeData();
     if (adapter === "node") await buildNodeServer(nodeOutput);
   }
@@ -343,7 +375,7 @@ export async function buildProject(projectRoot: string, options: BuildProjectOpt
     const className = (wrangler.durable_objects as { bindings: Array<{ class_name: string }> }).bindings[0]!.class_name;
     await writeFile(resolve(root, cloudflareAdapter.entry), cloudflareEntrySource(className), "utf8");
     await build({
-      root, configFile: false, plugins: [meeko()], logLevel: "warn",
+      root, configFile: false, plugins: [meeko(), ...cloudflare?.contentSecurityPolicy ? [] : [withoutDocumentHashes]], logLevel: "warn",
       // One self-contained module for workerd; only runtime modules stay external.
       ssr: {
         target: "webworker",

@@ -235,7 +235,7 @@ export async function checkApp(projectRoot: string): Promise<CompileDiagnostic[]
       diagnostics.push(error.diagnostic);
       continue;
     }
-    diagnostics.push(...await checkSource(source, file));
+    diagnostics.push(...await checkSource(source, file, { withinProject: true }));
   }
   diagnostics.push(...await strayGroupFiles(sourceRoots));
   // `#server/` in app/ or shared/ and `@/` in shared/: TypeScript alone would only say the module does not exist.

@@ -131,9 +131,9 @@ test("imports folders only accept relative paths inside their own source folder"
     });
     try {
       const index = option === "appDirs" ? 1 : 0;
-      const message = `imports.${option}[${index}] must be a relative path inside ${inside}: ${path}`;
+      const message = `imports.${option}[${index}] debe ser una ruta relativa dentro de ${inside}: ${path}`;
       await assert.rejects(loadMeekoConfig(root), (error: Error) => error instanceof TypeError && error.message.endsWith(`meeko.config.ts: ${message}`));
-      await assert.rejects(discoverAutoImports(root), /must be a relative path inside/);
+      await assert.rejects(discoverAutoImports(root), /debe ser una ruta relativa dentro de/);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -142,7 +142,7 @@ test("imports folders only accept relative paths inside their own source folder"
     "meeko.config.ts": 'export default {\n  imports: { appDirs: ["app/ok", "shared/wrong"], sharedDirs: "shared/x" },\n};\n',
   });
   try {
-    await assert.rejects(loadMeekoConfig(root), /imports\.sharedDirs must be an array of nonempty paths/);
+    await assert.rejects(loadMeekoConfig(root), /imports\.sharedDirs debe ser un array de rutas no vacías/);
     const text = 'export default {\n  imports: { appDirs: ["app/ok", "shared/wrong"] },\n};\n';
     await writeFile(join(root, "meeko.config.ts"), text);
     // The editor marks the entry itself, as MEEK_CONFIG.
@@ -151,7 +151,7 @@ test("imports folders only accept relative paths inside their own source folder"
     const [start, end] = configErrorRange(text, join(root, "meeko.config.ts"), detail);
     assert.equal(text.slice(start, end), '"shared/wrong"');
     await writeFile(join(root, "meeko.config.ts"), "export default { imports: [] };\n");
-    await assert.rejects(loadMeekoConfig(root), /imports must be an object/);
+    await assert.rejects(loadMeekoConfig(root), /imports debe ser un objeto/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -164,7 +164,7 @@ test("the static config reader returns appDirs and sharedDirs for the editor", a
   try {
     assert.deepEqual(readMeekoConfigSync(root).imports, { appDirs: ["app/services"], sharedDirs: ["shared/validators"] });
     await writeFile(join(root, "meeko.config.ts"), "const dirs = [\"app/services\"];\nexport default { imports: { appDirs: dirs } };\n");
-    assert.throws(() => readMeekoConfigSync(root), /appDirs must be a static string array/);
+    assert.throws(() => readMeekoConfigSync(root), /appDirs debe ser un array estático de cadenas/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

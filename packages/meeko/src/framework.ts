@@ -9,7 +9,7 @@ import type { MeekoSelectProps as SelectProps } from "./builtins/select.js";
 
 export { createNavigator, createRouteManifest, matchRoute } from "./framework/router.js";
 export { defineMeekoConfig } from "./framework/config-type.js";
-export type { MeekoConfig, RobotsConfig, SitemapConfig, StaticHeaderFile } from "./framework/config-type.js";
+export type { MeekoConfig, RobotsConfig, ServerHeaders, ServerResponseConfig, SitemapConfig, SitemapEntriesContext, SitemapEntry, StaticHeaderFile } from "./framework/config-type.js";
 export { defineMeekoModule } from "./framework/module.js";
 export type { MeekoHookable, MeekoHooks, MeekoModule, MeekoModuleContext, MeekoModuleDefinition, MeekoModuleEntry, MeekoModuleMeta, ModuleAutoImport, ModulePlugin, ModuleServerHandler } from "./framework/module.js";
 export { definePlugin } from "./framework/plugin.js";
@@ -22,7 +22,7 @@ export type { ClientApp, ClientAppOptions, ClientComponent, ClientRoute } from "
 export { useNavigation, useRoute } from "./framework/navigation.js";
 export type { NavigationState, RouteState } from "./framework/navigation.js";
 export { definePage, PageInputError } from "./framework/page.js";
-export type { ClientPageDefinition, ClientPageLoadContext, PageDefinition, PageHead, PageLoadContext, PageRender, PageSchema } from "./framework/page.js";
+export type { ClientPageDefinition, ClientPageLoadContext, PageCache, PageCacheContext, PageDefinition, PageHead, PageLoadContext, PageMemoryCache, PageRender, PageSchema } from "./framework/page.js";
 export { notFound, redirect, usePage } from "./framework/page-body.js";
 export type { JsonShape, PageBodyHead, PageRequest, PageRequestOf, SerializableExport, ServerData } from "./framework/page-body.js";
 export { StateStore, useState } from "./framework/state.js";

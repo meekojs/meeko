@@ -4,7 +4,7 @@ import ts from "@typescript/typescript6";
 import { applyAutoImports, autoImportedValues, discoverAutoImportsSync } from "../autoimports.js";
 import type { AutoImport } from "../autoimports.js";
 import { awaitForReferences, shadowedBuiltinTags } from "../compiler.js";
-import { projectDeclarationFiles } from "../compiler/project-declarations.js";
+import { generatedServicesDeclaration, projectDeclarationFiles } from "../compiler/project-declarations.js";
 import { projectRoot } from "../compiler/project-root.js";
 import { GenericError, parseGeneric, sectionAttribute } from "../compiler/generic.js";
 import type { GenericParameters } from "../compiler/generic.js";
@@ -1388,7 +1388,7 @@ export function createEditorModel(source: string, filename: string, options: Edi
   if (component.server) virtual.set(component.server.virtualFilename, component.server.code);
   const compilerOptions = options.compilerOptions ?? resolveProjectCompilerOptions(projectRoot(filename)).options;
   // Augmentations such as MeekoSession reach the component only as program roots.
-  const declarations = projectDeclarationFiles(projectRoot(filename));
+  const declarations = [...projectDeclarationFiles(projectRoot(filename)), ...generatedServicesDeclaration(projectRoot(filename))];
   const host: ts.LanguageServiceHost = {
     getCompilationSettings: () => compilerOptions,
     getScriptFileNames: () => [...virtual.keys(), ...declarations],

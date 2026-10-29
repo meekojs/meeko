@@ -85,6 +85,11 @@ test("the compiler rejects the combinations top-level code cannot honour", () =>
     ["MEEK072", 'export const head = { title: "a" };\nexport const route = definePage({ head: () => ({}) });', "head: () => ({})"],
     ["MEEK073", 'export const user = 1;\nexport const route = definePage({ prerenderEntries: async () => [usePage().params] });', "usePage().params"],
     ["MEEK073", 'export const route = definePage({ load: () => notFound() });', "notFound()"],
+    // 1.7: Meeko calls these functions to compute the head, after the top-level code has run.
+    ["MEEK073", 'export const user = 1;\nexport const head = () => ({ title: usePage().url.pathname });', "usePage().url"],
+    ["MEEK073", 'export const user = 1;\nexport const head = (() => { if (!user) notFound(); return {}; }) satisfies object;', "notFound(); return"],
+    ["MEEK073", 'useHead(() => ({ title: usePage().url.pathname }));\nexport const user = 1;', "usePage().url"],
+    ["MEEK073", 'import { useSeoMeta as seo } from "@meekojs/meeko/framework";\nseo(function () { return { description: usePage().url.href }; });', "usePage().url"],
     ["MEEK074", 'export const user = 1;\nexport const route = definePage({ render: "client" });', 'render: "client"'],
     ["MEEK076", "const shared = { id: 1 };\nexport const user = shared;\nexport const route = definePage({ prerenderEntries: [shared] });", "shared] });"],
   ];
@@ -93,6 +98,13 @@ test("the compiler rejects the combinations top-level code cannot honour", () =>
     assert.equal(result.code, code, server);
     assert.ok(result.text.startsWith(at.slice(0, 24)), `${code}: ${result.text}`);
   }
+  // A helper that the top-level code calls runs while the page does: it may use the request APIs,
+  // as may a head computed from values that the top-level code read.
+  for (const server of [
+    'function read() { return usePage().url.pathname; }\nexport const path = read();',
+    'async function guard() { await Promise.resolve(); if (Date.now() < 0) redirect("/"); }\nawait guard();\nexport const ok = true;',
+    'const { url } = usePage();\nexport const head = () => ({ title: url.pathname });\nuseHead(() => ({ title: url.pathname }));',
+  ]) assert.equal(analyze(page(server)).body, true, server);
   // The client script cannot import the request APIs, nor redeclare an export.
   assert.deepEqual(failure(page("export const user = 1;", 'import { usePage } from "@meekojs/meeko/framework";')).code, "MEEK073");
   assert.deepEqual(failure(page("const x = 2;", 'import { redirect } from "@meekojs/meeko/framework";'), "/project/app/components/Card.meeko").code, "MEEK073");

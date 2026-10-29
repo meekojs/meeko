@@ -3,9 +3,9 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 import test from "node:test";
 import {
-  createServerApp, defineApiRoute, defineRpc, defineServerMiddleware, MemorySessionStore, RedisSessionStore, SessionManager, SqlSessionStore,
+  clientAddress, createServerApp, defineApiRoute, defineRpc, defineServerMiddleware, MemorySessionStore, RedisSessionStore, SessionManager, SqlSessionStore,
 } from "../src/framework-server.ts";
-import type { AppManifest, Schema, ServerApp, ServerAppOptions, SqlSessionDriver } from "../src/framework-server.ts";
+import type { AppManifest, Schema, ServerApp, ServerAppOptions, SqlRateLimitRow, SqlSessionDriver } from "../src/framework-server.ts";
 import { addressBucket, clientAddressOf, normalizeAddress, resetEnvWarnings, setSocketAddress, trustProxyOf } from "../src/framework-server/env.ts";
 import { createBunServer } from "../src/bun.ts";
 import { serveNode, toNodeListener } from "../src/node.ts";
@@ -156,6 +156,55 @@ test("client addresses: hop counts, true, normalization and IPv6 /64 buckets", (
   assert.throws(() => trustProxyOf({ MEEKO_TRUST_PROXY: "-1" }), /MEEKO_TRUST_PROXY/);
 });
 
+test("clientAddress applies MEEKO_TRUST_PROXY: hop counts, and spoofed headers when no proxy is trusted", () => {
+  const request = (xff?: string, socket?: string) => setSocketAddress(new Request("https://x.test/", { headers: xff ? { "x-forwarded-for": xff } : {} }), socket);
+  // Not served by a ServerApp and no env: only the connection, whatever the client sends.
+  assert.equal(clientAddress(request("6.6.6.6", "10.0.0.1")), "10.0.0.1");
+  assert.equal(clientAddress(request("6.6.6.6")), undefined, "a spoofed header never becomes the address");
+  assert.equal(clientAddress(request("6.6.6.6", "10.0.0.1"), {}), "10.0.0.1");
+  assert.equal(clientAddress(request("6.6.6.6", "10.0.0.1"), { MEEKO_TRUST_PROXY: "0" }), "10.0.0.1");
+  // n trusted proxies: the nth entry from the right; what the client wrote to its left is ignored.
+  assert.equal(clientAddress(request("6.6.6.6, 203.0.113.9", "10.0.0.1"), { MEEKO_TRUST_PROXY: "1" }), "203.0.113.9");
+  assert.equal(clientAddress(request("6.6.6.6, 203.0.113.9, 10.0.0.5", "10.0.0.1"), { MEEKO_TRUST_PROXY: "2" }), "203.0.113.9");
+  assert.equal(clientAddress(request("203.0.113.9, 10.0.0.5", "10.0.0.1"), { MEEKO_TRUST_PROXY: "5" }), "203.0.113.9", "fewer entries than hops: the leftmost");
+  assert.equal(clientAddress(request("203.0.113.9, 10.0.0.5", "10.0.0.1"), { MEEKO_TRUST_PROXY: "true" }), "203.0.113.9");
+  assert.equal(clientAddress(request("[2001:DB8::1]:443", "10.0.0.1"), { MEEKO_TRUST_PROXY: "1" }), "2001:db8::1");
+  assert.equal(clientAddress(request("::ffff:192.0.2.1", "10.0.0.1"), { MEEKO_TRUST_PROXY: "1" }), "192.0.2.1");
+  assert.throws(() => clientAddress(request("6.6.6.6", "10.0.0.1"), { MEEKO_TRUST_PROXY: "yes" }), /MEEKO_TRUST_PROXY/);
+});
+
+test("clientAddress in server middleware uses the application's MEEKO_TRUST_PROXY, like context.clientAddress", async () => {
+  const table = routes([]);
+  table["/outer"] = { default: defineServerMiddleware(async (request, next) => {
+    const outer = clientAddress(request);
+    // A replaced request keeps both its connection and its application's environment.
+    const response = await next(new Request(request, { headers: new Headers(request.headers) }));
+    return Response.json({ outer, ...await response.json() as object });
+  }) };
+  table["/inner"] = { default: defineServerMiddleware(async (request, next) => {
+    const inner = clientAddress(request);
+    const response = await next();
+    return Response.json({ inner, ...await response.json() as object });
+  }) };
+  const serve = (env: Record<string, string>) => createServerApp({
+    manifest: { ...manifest, serverMiddleware: ["/outer", "/inner"] }, production: false, load: async (key) => table[key],
+    platform: { name: "node", env, waitUntil() {} },
+  });
+  const trusted = await serve({ MEEKO_TRUST_PROXY: "2" });
+  try {
+    const response = await trusted.fetch(get("/api/whoami", "10.0.0.2", { "x-forwarded-for": "6.6.6.6, 203.0.113.9, 10.0.0.5" }));
+    assert.deepEqual(await response.json(), { outer: "203.0.113.9", inner: "203.0.113.9", address: "203.0.113.9" });
+    // The platform an adapter passes to fetch() is the one that applies, as for context.clientAddress.
+    const perRequest = await trusted.fetch(get("/api/whoami", "10.0.0.2", { "x-forwarded-for": "6.6.6.6, 203.0.113.9" }), { name: "node", env: {}, waitUntil() {} });
+    assert.deepEqual(await perRequest.json(), { outer: "10.0.0.2", inner: "10.0.0.2", address: "10.0.0.2" });
+  } finally { await trusted.close(); }
+  const untrusted = await serve({});
+  try {
+    const response = await untrusted.fetch(get("/api/whoami", "10.0.0.2", { "x-forwarded-for": "6.6.6.6" }));
+    assert.deepEqual(await response.json(), { outer: "10.0.0.2", inner: "10.0.0.2", address: "10.0.0.2" }, "a spoofed header is ignored");
+  } finally { await untrusted.close(); }
+});
+
 test("X-Forwarded-For entries with a port, as Azure Application Gateway writes them, name the client", () => {
   const request = (xff: string) => setSocketAddress(new Request("https://x.test/", { headers: { "x-forwarded-for": xff } }), "10.0.0.1");
   const trust = { MEEKO_TRUST_PROXY: "1" };
@@ -281,7 +330,107 @@ test("a store without rateLimit counts in memory and warns once in production", 
       assert.equal((await server.fetch(get("/api/users/9", "198.51.100.200"))).status, 429);
     } finally { await server.close(); }
   } finally { console.warn = original; }
-  assert.deepEqual(warnings, ["[meeko] El store de sesiones no implementa rateLimit: los límites de rateLimit se cuentan en la memoria de cada instancia."]);
+  assert.deepEqual(warnings, ["[meeko] El store de sesiones no implementa rateLimit: los límites de rateLimit se cuentan en la memoria de cada instancia. Con SqlSessionStore, implemente SqlSessionDriver.rateLimit para compartirlos."]);
+  assert.equal(new SqlSessionStore(driver).rateLimit, undefined, "without a driver rateLimit the store has none");
+});
+
+/**
+ * A SQL driver whose counters live in a Map shared like a table. `rateLimit` mimics
+ * `INSERT … ON CONFLICT DO UPDATE … RETURNING`: after the round trip, it reads and writes the row in
+ * one synchronous step, so concurrent hits never see the same count.
+ */
+function sqlDriver(table = new Map<string, SqlRateLimitRow>()) {
+  const sessions = new Map<string, unknown>();
+  const hits: { key: Uint8Array; windowMs: number; now: number }[] = [];
+  const driver: SqlSessionDriver = {
+    read: async (id) => sessions.get(id) as never, write: async (row) => { sessions.set(row.id, row); }, remove: async (id) => { sessions.delete(id); },
+    replace: async () => true, revokeFamily: async () => {},
+    async rateLimit(key, windowMs, now) {
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      hits.push({ key, windowMs, now });
+      const id = Buffer.from(key).toString("hex");
+      const row = table.get(id);
+      const next = !row || row.windowEndsAt <= now ? { count: 1, windowEndsAt: now + windowMs } : { count: row.count + 1, windowEndsAt: row.windowEndsAt };
+      table.set(id, next);
+      return { ...next };
+    },
+  };
+  return { driver, table, hits };
+}
+
+test("SqlSessionStore delegates rateLimit to its driver: one counter for every instance, 429 with Retry-After and no warning", async () => {
+  resetEnvWarnings();
+  const warnings: string[] = [];
+  const original = console.warn;
+  console.warn = (message: unknown) => { warnings.push(String(message)); };
+  const table = new Map<string, SqlRateLimitRow>();
+  const first = sqlDriver(table);
+  const second = sqlDriver(table);
+  const calls: string[] = [];
+  try {
+    const one = await app({ calls, runtime: () => ({ sessions: new SessionManager({ store: new SqlSessionStore(first.driver), production: true }) }) });
+    const two = await app({ calls, runtime: () => ({ sessions: new SessionManager({ store: new SqlSessionStore(second.driver), production: true }) }) });
+    try {
+      assert.equal((await one.fetch(post("/api/login", { text: "a" }, "203.0.113.7"))).status, 200);
+      assert.equal((await two.fetch(post("/api/login", { text: "b" }, "203.0.113.7"))).status, 200);
+      const limited = await one.fetch(post("/api/login", { wrong: true }, "203.0.113.7"));
+      assert.equal(limited.status, 429, "the counter lives in the database, not in each instance");
+      const retryAfter = Number(limited.headers.get("retry-after"));
+      assert.ok(retryAfter >= 59 && retryAfter <= 60, String(retryAfter));
+      assert.equal((await limited.json() as { code: string }).code, "RATE_LIMITED");
+      assert.deepEqual(calls, ["login", "login"]);
+      assert.equal((await two.fetch(post("/api/login", { text: "c" }, "198.51.100.1"))).status, 200, "another client, another row");
+    } finally {
+      await one.close();
+      await two.close();
+    }
+  } finally { console.warn = original; }
+  assert.deepEqual(warnings, []);
+  const hits = [...first.hits, ...second.hits];
+  assert.equal(hits.length, 4);
+  assert.ok(hits.every(({ key, windowMs }) => key instanceof Uint8Array && key.length === 32 && windowMs === 60_000), "a SHA-256 digest and the route's window");
+  assert.equal(table.size, 2);
+  assert.ok(![...table.keys()].some((key) => Buffer.from(key, "hex").toString("latin1").includes("203.0.113.7")), "no address in clear");
+});
+
+test("SqlSessionStore.rateLimit keeps fixed windows, restarts ended ones and counts concurrent hits atomically", async () => {
+  const { driver } = sqlDriver();
+  const store = new SqlSessionStore(driver);
+  const realNow = Date.now;
+  let now = 1_700_000_000_000;
+  Date.now = () => now;
+  try {
+    assert.deepEqual(await store.rateLimit!("k", 1000), { count: 1, resetInMs: 1000 });
+    now += 400;
+    assert.deepEqual(await store.rateLimit!("k", 1000), { count: 2, resetInMs: 600 }, "the window does not slide");
+    now += 600;
+    assert.deepEqual(await store.rateLimit!("k", 1000), { count: 1, resetInMs: 1000 }, "an ended window restarts at 1");
+    assert.deepEqual(await store.rateLimit!("other", 1000), { count: 1, resetInMs: 1000 });
+    const counts = (await Promise.all(Array.from({ length: 20 }, () => store.rateLimit!("burst", 60_000)))).map((hit) => hit.count);
+    assert.deepEqual(counts.sort((a, b) => a - b), Array.from({ length: 20 }, (_, index) => index + 1));
+  } finally { Date.now = realNow; }
+  await assert.rejects(store.rateLimit!("k", 0), RangeError);
+});
+
+test("SqlSessionStore validates the driver's rateLimit and accepts bigint columns as text", async () => {
+  const base = sqlDriver().driver;
+  assert.throws(() => new SqlSessionStore({ ...base, rateLimit: "yes" as never }), /rateLimit must be a function/);
+  const now = Date.now();
+  const textual = new SqlSessionStore({ ...base, rateLimit: async () => ({ count: "3", windowEndsAt: String(now + 5000) }) as never });
+  const hit = await textual.rateLimit!("k", 5000);
+  assert.equal(hit.count, 3);
+  assert.ok(hit.resetInMs > 4000 && hit.resetInMs <= 5000, String(hit.resetInMs));
+  for (const result of [undefined, {}, { count: 0, windowEndsAt: now }, { count: 1, windowEndsAt: Number.NaN }, { count: 1, windowEndsAt: null }]) {
+    const store = new SqlSessionStore({ ...base, rateLimit: async () => result as never });
+    await assert.rejects(store.rateLimit!("k", 1000), /SqlSessionDriver.rateLimit must resolve/);
+  }
+  const failing = new SqlSessionStore({ ...base, rateLimit: async () => { throw new Error("database down"); } });
+  const reported: unknown[] = [];
+  const server = await app({ runtime: () => ({ sessions: new SessionManager({ store: failing, production: true }), onError: (error) => { reported.push(error); } }) });
+  try {
+    assert.equal((await server.fetch(post("/api/login", { text: "a" }, "203.0.113.7"))).status, 500, "fail closed");
+    assert.equal(reported.length, 1);
+  } finally { await server.close(); }
 });
 
 test("MemorySessionStore implements SessionStore.rateLimit with fixed windows", async () => {

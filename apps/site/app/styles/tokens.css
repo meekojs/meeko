@@ -62,6 +62,9 @@
 	--radius: 10px;
 	--radius-l: 14px;
 	--header-height: 56px;
+	/* One container for every page: the header, the footer, the home, the docs and the error page share it. */
+	--container: 80rem;
+	--gutter: clamp(1rem, 4vw, 1.5rem);
 	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 

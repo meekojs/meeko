@@ -37,3 +37,13 @@ export function projectDeclarationFiles(root: string): readonly string[] {
   cache.set(root, { at: now, files });
   return files;
 }
+
+/**
+ * `.meeko/types/services.d.ts` when `meeko check`, `meeko dev` or the editor generated it: the type
+ * of `RequestContext.services` from `server/runtime.ts`. The editor's component programs add it as
+ * a root, like the project's own declarations, so `<script server>` reads typed services.
+ */
+export function generatedServicesDeclaration(root: string): readonly string[] {
+  const file = join(root, ".meeko", "types", "services.d.ts");
+  return existsSync(file) ? [file] : [];
+}

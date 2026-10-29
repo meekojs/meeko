@@ -24,7 +24,7 @@ test("CLI init creates an SSR project and refuses to overwrite it", async () => 
     assert.match(await readFile(join(target, "src/entry-client.ts"), "utf8"), /hydrate\(root/);
     const second = spawnSync(process.execPath, [cli, "init", target], { encoding: "utf8" });
     assert.equal(second.status, 1);
-    assert.match(second.stderr, /Destination is not empty/);
+    assert.match(second.stderr, /El destino no está vacío/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -74,7 +74,7 @@ test("CLI init no transforma un proyecto que ya contiene código", async () => {
     await writeFile(join(root, "src", "index.ts"), "export const existing = true;\n");
     const result = spawnSync(process.execPath, [resolve("dist/cli.js"), "init", "."], { cwd: root, encoding: "utf8" });
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /Destination is not empty/);
+    assert.match(result.stderr, /El destino no está vacío/);
     assert.equal(await readFile(join(root, "package.json"), "utf8"), manifest);
     assert.equal(await readFile(join(root, "src", "index.ts"), "utf8"), "export const existing = true;\n");
   } finally {

@@ -11,6 +11,7 @@ import { discoverAppManifest } from "./app-manifest.js";
 import type { MeekoServerConfig } from "./config-type.js";
 import { contentTypes } from "./content-types.js";
 import { discoverRouteMiddleware } from "./route-middleware-discovery.js";
+import { documentShell } from "./inline-sources.js";
 import { importNodeOutput } from "./prerender.js";
 import type { PrerenderIndex } from "./prerender.js";
 import { inlineScriptHashes, inlineStyleHashes } from "./script-hashes.js";
@@ -99,9 +100,12 @@ async function staticHeaders(output: string, config: StaticConfig | undefined): 
     const problems: string[] = [];
     for (const file of await htmlFiles(output)) {
       const html = await readFile(file, "utf8");
+      // The page and its teleports may carry user content: only what Meeko writes around them is
+      // hashed. JavaScript no hash can allow is still reported from the whole document.
+      const shell = documentShell(html);
       const report = inlineScriptHashes(html);
-      for (const hash of report.hashes) hashes.add(hash);
-      for (const hash of inlineStyleHashes(html)) styleHashes.add(hash);
+      for (const hash of inlineScriptHashes(shell).hashes) hashes.add(hash);
+      for (const hash of inlineStyleHashes(shell)) styleHashes.add(hash);
       for (const item of report.unhashable) problems.push(`${relative(output, file).replaceAll("\\", "/")}: ${item}`);
     }
     if (problems.length) {

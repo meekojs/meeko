@@ -38,9 +38,9 @@ describe("language server: meeko.config.* failures", () => {
     // `export default config`, `satisfies` and an element of an array.
     const declared = `const config = {\n  document: { head: { meta: [{ name: "a", content: "x" }, { name: "b" }] } },\n} satisfies object;\nexport default config;\n`;
     assert.equal(marked(declared, "document.head.meta[1]: content is required"), `{ name: "b" }`);
-    assert.equal(marked(declared, "document: unknown field other"), "document");
+    assert.equal(marked(declared, "document: campo desconocido other"), "document");
     // Nothing named: the `export default` line.
-    assert.equal(marked(userConfig, "must export a Meeko configuration object"), "export default defineMeekoConfig({");
+    assert.equal(marked(userConfig, "debe exportar por defecto un objeto de configuración de Meeko"), "export default defineMeekoConfig({");
     assert.equal(marked("// empty\n", "anything"), "// empty");
   });
 

@@ -14,6 +14,7 @@ pnpm run dev                         # http://127.0.0.1:4173
 pnpm run check                       # meeko check
 pnpm run build                       # sitio estático en .meeko/output/static y dist-static/
 pnpm run preview                     # build y meeko preview (sirve la salida como un hosting estático)
+pnpm run test                        # comprueba las páginas escritas de la referencia
 pnpm run build:static                # lo mismo que build; lo usan la raíz y el despliegue
 ```
 
@@ -39,11 +40,22 @@ pnpm run build:static                # lo mismo que build; lo usan la raíz y el
 - Una copia de trabajo anterior puede conservar `public/sitemap.xml`, `public/robots.txt` y
   `public/pagefind/`, que generaba el `postbuild.mjs` anterior: bórrelos. Los dos primeros chocan con
   los que genera Meeko y el build lo indica.
-- La referencia de la API (`/docs/reference` y `/docs/reference/<símbolo>`) se genera en el build:
-  `server/content/api.ts` lee con TypeScript cada export de las subrutas públicas de
+- La referencia de la API tiene dos capas. `/docs/reference` es el índice de la taxonomía de
+  `docs/reference/taxonomy.json` (componentes, macros, composables, reactividad, utilidades, sintaxis,
+  servidor, adaptadores, comandos, configuración y avanzado), que también forma el aside de cada
+  página. Un símbolo con página escrita (`docs/reference/<grupo>/<slug>.md`) la muestra fusionada con
+  lo que genera el código: `server/content/reference.ts` inserta la sección «Tipo» con las firmas y
+  declaraciones exactas, la importación, el autoimport, la versión y «Relacionado». Un símbolo
+  pendiente enlaza su página generada. `/docs/reference/exports` es la referencia exhaustiva por
+  módulo: `server/content/api.ts` lee con TypeScript cada export de las subrutas públicas de
   `packages/meeko/package.json` y su JSDoc, así que un export nuevo tiene su página sin tocar el
   sitio. La sintaxis de `.meeko` que no es un export (bloques, macros, etiquetas y directivas) está
-  en `server/content/api-builtins.ts`, completada con la documentación del servidor de lenguaje.
+  en `server/content/api-builtins.ts`. Cómo escribir una página: `docs/reference/README.md`.
+- `pnpm run test` comprueba la referencia escrita contra el paquete y la taxonomía
+  (`tests/reference.test.mjs`): símbolos que existen, secciones obligatorias, pendientes y ejemplos
+  `ts` que compilan.
+- `postbuild.mjs` también escribe `/llms.txt` (índice con un enlace y una línea por guía y símbolo) y
+  `/llms-full.txt` (guías y referencia en Markdown), cargando los módulos de contenido con Vite.
 - Desde la raíz, `pnpm run site:build` y `pnpm run site:build:static` compilan primero el paquete y
   después el sitio. Un despliegue desde el repositorio ejecuta `pnpm install --frozen-lockfile` y
   `pnpm run site:build:static` en la raíz y publica `apps/site/dist-static/`.

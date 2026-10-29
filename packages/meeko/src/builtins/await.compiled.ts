@@ -17,7 +17,7 @@ interface Props {
 export type ComponentProps = Props;
 function __setup(__props: Props, __meeko_refs: __meeko.ElementRefs) {
 type __MeekoRefs = { "box": __meeko.ElementOf<"div", false> };
-const props: Props = __props;
+const props = __props as Readonly<Props>;
 const snippets: __meeko.SnippetMap<__MeekoSnippets> = __meeko.useSnippets<__MeekoSnippets>(__props);
 const box = __meeko.elementRef<__MeekoRefs["box"]>("box", __meeko_refs, 0);
 const zone = useAwaitZone(props, box);

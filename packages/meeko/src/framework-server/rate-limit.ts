@@ -86,7 +86,7 @@ export class MemoryRateCounter {
   clear(): void { this.windows.clear(); }
 }
 
-/** Shared by session managers whose store cannot count, such as `SqlSessionStore`. */
+/** Shared by session managers whose store cannot count, such as `SqlSessionStore` without a driver `rateLimit`. */
 const fallbackCounter = new MemoryRateCounter();
 
 /** Counts one hit for a manager or store that may lack `rateLimit`; the store's own errors propagate. */
@@ -98,7 +98,7 @@ export async function countRateLimit(source: { rateLimit?(key: string, windowMs:
     }
     return hit;
   }
-  if (production) warnOnce("rate-limit:memory", "[meeko] El store de sesiones no implementa rateLimit: los límites de rateLimit se cuentan en la memoria de cada instancia.");
+  if (production) warnOnce("rate-limit:memory", "[meeko] El store de sesiones no implementa rateLimit: los límites de rateLimit se cuentan en la memoria de cada instancia. Con SqlSessionStore, implemente SqlSessionDriver.rateLimit para compartirlos.");
   return fallbackCounter.hit(key, windowMs);
 }
 

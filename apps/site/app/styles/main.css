@@ -371,6 +371,106 @@ kbd {
 .code-copy[data-state='error'] {
 	color: var(--danger);
 }
+/*
+ * The verdict of a block in the reference: "Correcto" and "Incorrecto" in the header, with a
+ * faint wash of their state color over the header only; the code keeps the code ground.
+ */
+.code-verdict {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	margin-right: auto;
+	font: 560 0.75rem/1.5 var(--font-ui);
+	letter-spacing: 0;
+}
+.code-verdict svg {
+	flex: none;
+	fill: none;
+	stroke: currentColor;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1.8;
+	width: 13px;
+	height: 13px;
+}
+.code-block[data-verdict] .code-lang {
+	margin-right: 0.25rem;
+}
+.code-block[data-verdict='good'] {
+	border-color: color-mix(in oklab, var(--success) 30%, var(--code-line));
+}
+.code-block[data-verdict='good'] .code-head {
+	background: color-mix(in oklab, var(--success) 7%, transparent);
+	color: var(--success);
+}
+.code-block[data-verdict='bad'] {
+	border-color: color-mix(in oklab, var(--danger) 32%, var(--code-line));
+}
+.code-block[data-verdict='bad'] .code-head {
+	background: color-mix(in oklab, var(--danger) 7%, transparent);
+	color: var(--danger);
+}
+.code-block[data-verdict] .code-head .code-lang,
+.code-block[data-verdict] .code-head .code-copy {
+	color: var(--muted);
+}
+.code-block[data-verdict] .code-head .code-copy:hover {
+	color: var(--ink);
+}
+
+/* Callouts (`> [!NOTE]`): a hairline box on the first surface, with its label and icon. */
+.callout {
+	margin: 0 0 1.5rem;
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	background: var(--surface);
+	padding: 0.8rem 1.05rem;
+	color: var(--ink-soft);
+	font-size: 0.95rem;
+}
+.callout > :last-child {
+	margin-bottom: 0;
+}
+.callout p {
+	margin: 0 0 0.6rem;
+}
+.callout-title {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	margin: 0 0 0.35rem;
+	color: var(--ink);
+	font-weight: 560;
+	font-size: 0.86rem;
+}
+.callout-title svg {
+	flex: none;
+	fill: none;
+	stroke: currentColor;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1.4;
+	width: 15px;
+	height: 15px;
+}
+.callout-note .callout-title,
+.callout-tip .callout-title,
+.callout-important .callout-title {
+	color: var(--accent-ink);
+}
+.callout-warning,
+.callout-caution {
+	border-color: color-mix(in oklab, var(--danger) 34%, var(--line));
+	background: color-mix(in oklab, var(--danger) 5%, var(--surface));
+}
+.callout-warning .callout-title,
+.callout-caution .callout-title {
+	color: var(--danger);
+}
+.callout .code-block {
+	margin: 0.6rem 0 0.4rem;
+}
+
 .shiki {
 	margin: 0;
 	background: transparent !important;

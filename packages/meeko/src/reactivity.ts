@@ -578,8 +578,9 @@ export function signalReadSites(value: Signal<unknown>, owner: object | undefine
 }
 
 /**
- * Deriva un valor de otras señales y lo recalcula cuando cambian. Es de sólo lectura y no forma
- * parte del estado transferido: se vuelve a calcular al hidratar y en HMR.
+ * Deriva un valor de otras señales y lo recalcula cuando cambian. Es de sólo lectura (desde `1.7`,
+ * asignar `value` lanza un `TypeError`, como en las props) y no forma parte del estado transferido:
+ * se vuelve a calcular al hidratar y en HMR.
  *
  * @param fn Función pura que lee señales.
  * @returns Una señal de sólo lectura con el valor derivado.
@@ -595,10 +596,18 @@ export function signalReadSites(value: Signal<unknown>, owner: object | undefine
  */
 export function computed<T>(fn: () => T): ReadonlySignal<T> {
   const result = signal<T>(undefined as T);
+  const descriptor = Object.getOwnPropertyDescriptor(result, "value")!;
+  const get = descriptor.get!;
+  const write = descriptor.set!;
+  // Since 1.7 a write throws, like one to the props: it used to last until the next recomputation.
+  Object.defineProperty(result, "value", {
+    get, enumerable: true, configurable: true,
+    set() { throw new TypeError("Meeko computed values are read-only: change the signals it reads, or use a signal"); },
+  });
   derivedSignals.add(result);
   // A derived value has no side effects: it keeps working in a dry render.
   observe(() => {
-    result.value = fn();
+    write.call(result, fn());
   });
   return result;
 }

@@ -337,6 +337,13 @@ Herramientas exactas, sin adorno: píldoras para acciones, cuadros de 32px para 
 ### Command Chip
 Píldora copiable con el comando de inicio: superficie 1, borde `line-strong`, comando en mono, indicador de estado en una subpíldora `surface-3` que pasa a `success` o `danger`. En hover, borde `accent-line` y superficie 2.
 
+### Reference Blocks
+Las páginas de la referencia de la API usan dos piezas propias sobre el bloque de código y la prosa:
+- **Correcto / Incorrecto:** el bloque de código con su veredicto en la cabecera, a la izquierda, con un icono de trazo (✓ trazado, ✕ trazado). La cabecera lleva un lavado del 7 % de `success` o `danger` y el borde se mezcla con ese color al 30 %; el código conserva `code-bg`. Es la única excepción a «Estado sólo para copiar»: el veredicto es un estado, no decoración, y un error sigue siendo ámbar, nunca rosa.
+- **Avisos** (`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`): caja de `surface` con filete `line` y radio 10px, título a 0.86rem/560 con icono de 15px. Nota, consejo e importante titulan en `accent-ink`; advertencia y cuidado en `danger`, con el borde mezclado al 34 % y la superficie al 5 %. Sin borde lateral grueso.
+- **Iconos de grupo:** cada grupo de la taxonomía (componentes, macros, composables…) tiene un icono de trazo de 16px a 1.4px, en el aside, en las tarjetas del índice y en la miga de pan.
+- **Índice de la referencia:** tarjetas finas por grupo (`surface`, filete, radio 10px, hover a `surface-2`) en tres columnas que bajan a dos bajo 1080px y a una bajo 520px; debajo, cada grupo con sus símbolos en dos columnas separadas por filetes.
+
 ### Chips
 - **Insignias:** píldora con borde `line` sobre `surface`; la insignia de tipo usa `accent-soft` con texto `accent-ink`.
 - **Filtros:** píldora sobre `bg` con borde `line`; activa con borde `accent`, fondo `accent-soft` y texto `accent-ink`.
@@ -357,7 +364,7 @@ Fondo `code-bg`, borde `code-line`, radio 10px, cabecera con el lenguaje en mono
 
 ### Navigation
 - **Barra superior:** marca con la gatita, enlaces en `muted` a 0.875rem/500 que pasan a `ink`; buscador, tema, GitHub y la píldora «Empezar» a la derecha. Bajo 860px los enlaces se recogen en un menú desplegable.
-- **Barra lateral:** grupos plegables, enlaces en `muted`; la página actual sobre `surface-2` en `ink` y peso 500.
+- **Barra lateral:** grupos plegables, enlaces en `muted`; la página actual sobre `surface-2` en `ink` y peso 500. En la referencia, cada grupo lleva su icono y sus símbolos en mono a 0.8rem, sangrados tras un filete `line`; la página actual se desplaza a la vista al cargar.
 - **En esta página:** lista con filete izquierdo `line`; la sección actual cambia el filete a `accent`.
 
 ### Product Window (signature)

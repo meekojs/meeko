@@ -1,0 +1,271 @@
+<script lang="ts">
+	import type { ReferencePage } from '../../shared/types/reference.js'
+
+	interface Props {
+		/** A written page of the reference, merged with its generated types (server/content/reference.ts). */
+		page: ReferencePage
+		/** `title:` meta of Pagefind, for the search result. */
+		searchTitle: string
+	}
+
+	const props = defineProps<Props>()
+</script>
+
+<template>
+	<article
+		class="prose reference-page"
+		data-pagefind-body
+		bind:data-pagefind-meta="props.searchTitle"
+		on:click="copyCodeBlock"
+	>
+		<nav
+			class="crumbs"
+			aria-label="Ruta"
+			data-pagefind-ignore
+		>
+			<a href="/docs/reference">Referencia de la API</a>
+			<svg
+				class="chevron"
+				viewBox="0 0 16 16"
+				aria-hidden="true"
+			>
+				<path d="m6.5 4.5 3.5 3.5-3.5 3.5" />
+			</svg>
+			<a
+				class="crumb-group"
+				bind:href="props.page.group.href"
+			>
+				<svg
+					viewBox="0 0 16 16"
+					aria-hidden="true"
+				>
+					<path bind:d="props.page.group.icon" />
+				</svg>
+				{props.page.group.title}
+			</a>
+		</nav>
+		<h1 class="title">
+			<code>{props.page.title}</code>
+		</h1>
+		<p class="lead">{props.page.description}</p>
+		<div
+			class="meta"
+			data-pagefind-ignore
+		>
+			<span class="badge kind">{props.page.kindLabel}</span>
+			<span
+				class="badge"
+				if:when="props.page.since"
+			>
+				Desde {props.page.since}
+			</span>
+			<span
+				class="badge"
+				if:when="props.page.autoImport"
+			>
+				Sin import
+			</span>
+			<code
+				class="specifier"
+				if:when="props.page.specifier"
+			>
+				{props.page.specifier}
+			</code>
+			<a
+				class="source"
+				if:when="props.page.sourceUrl"
+				bind:href="props.page.sourceUrl"
+				rel="noopener"
+			>
+				<svg
+					viewBox="0 0 16 16"
+					aria-hidden="true"
+				>
+					<path d="m5.5 5-3 3 3 3M10.5 5l3 3-3 3M9 3.5l-2 9" />
+				</svg>
+				Código fuente
+			</a>
+		</div>
+		<p
+			class="autoimport"
+			if:when="props.page.autoImport"
+			html="props.page.autoImport"
+		></p>
+		<div
+			class="import"
+			if:when="props.page.importCode"
+			html="props.page.importCode"
+		></div>
+		<div
+			class="body"
+			html="props.page.body"
+		></div>
+	</article>
+</template>
+
+<style scoped>
+	.reference-page {
+		max-width: 50rem;
+	}
+	.crumbs {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.35rem;
+		margin: 0 0 1rem;
+		color: var(--muted);
+		font-size: 0.86rem;
+	}
+	.crumbs a {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		color: var(--muted);
+		text-decoration: none;
+	}
+	.crumbs a:hover {
+		color: var(--ink);
+	}
+	.crumbs .crumb-group {
+		color: var(--ink-soft);
+	}
+	svg {
+		flex: none;
+		fill: none;
+		stroke: currentColor;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-width: 1.4;
+		width: 15px;
+		height: 15px;
+	}
+	.chevron {
+		width: 13px;
+		height: 13px;
+		color: var(--muted);
+	}
+	.title {
+		margin-bottom: 0.6rem;
+		overflow-wrap: anywhere;
+	}
+	.title code {
+		border: 0;
+		background: none;
+		padding: 0;
+		color: var(--ink);
+		font-weight: 560;
+		font-size: 0.84em;
+		letter-spacing: -0.02em;
+	}
+	.lead {
+		margin: 0 0 1.1rem;
+		max-width: 44rem;
+		color: var(--ink-soft);
+		font-size: 1.08rem;
+		line-height: 1.55;
+	}
+	.meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.45rem 0.5rem;
+		margin: 0 0 1.25rem;
+		border-bottom: 1px solid var(--line);
+		padding-bottom: 1.25rem;
+	}
+	.badge {
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		background: var(--surface);
+		padding: 0.08rem 0.6rem;
+		color: var(--ink-soft);
+		font: 500 0.78rem/1.6 var(--font-ui);
+	}
+	.badge.kind {
+		border-color: transparent;
+		background: var(--accent-soft);
+		color: var(--accent-ink);
+	}
+	.meta .specifier {
+		border-radius: 0;
+		background: none;
+		padding: 0 0.15rem;
+		color: var(--muted);
+		font-size: 0.8rem;
+	}
+	.source {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		margin-left: auto;
+		color: var(--muted);
+		font-size: 0.84rem;
+		text-decoration: none;
+	}
+	.source:hover {
+		color: var(--ink);
+	}
+	.autoimport {
+		margin: 0 0 0.6rem;
+		color: var(--muted);
+		font-size: 0.92rem;
+	}
+	.import :global(.code-block) {
+		margin-bottom: 1.75rem;
+	}
+	/* Prose keeps its measure; tables and code take the width of the page. */
+	.body > :global(p),
+	.body > :global(ul),
+	.body > :global(ol),
+	.body > :global(h2),
+	.body > :global(h3) {
+		max-width: 42rem;
+	}
+	.body :global(.type-block + .type-block) {
+		margin-top: 0.25rem;
+	}
+	.body :global(.type-of) {
+		margin: 0 0 0.4rem;
+		font-size: 0.86rem;
+	}
+	.body :global(.type-of code) {
+		background: none;
+		padding: 0;
+	}
+	.body :global(.related-list) {
+		display: grid;
+		gap: 0;
+		margin: 0;
+		border-top: 1px solid var(--line);
+		padding: 0;
+		list-style: none;
+	}
+	.body :global(.related-list li) {
+		display: grid;
+		grid-template-columns: minmax(10rem, 15rem) minmax(0, 1fr);
+		align-items: baseline;
+		gap: 0.2rem 1.25rem;
+		margin: 0;
+		border-bottom: 1px solid var(--line);
+		padding: 0.6rem 0;
+	}
+	.body :global(.related-list a) {
+		text-decoration: none;
+	}
+	.body :global(.related-list a:hover) {
+		text-decoration: underline;
+	}
+	.body :global(.related-note) {
+		color: var(--muted);
+		font-size: 0.9rem;
+		line-height: 1.5;
+	}
+	@media (max-width: 640px) {
+		.source {
+			margin-left: 0;
+		}
+		.body :global(.related-list li) {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+</style>

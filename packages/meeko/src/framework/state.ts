@@ -1,4 +1,4 @@
-import { createContext, createRoot, finishWithCleanup, inject, provide, signal } from "../reactivity.js";
+import { createContext, createRoot, findContext, finishWithCleanup, inject, provide, signal } from "../reactivity.js";
 import type { Signal } from "../reactivity.js";
 import { serializeJson } from "../server.js";
 
@@ -196,6 +196,11 @@ export class StateStore {
  */
 export function useState<T>(key: string, factory: () => T): Signal<T> {
   return inject(stateKey).get(key, factory);
+}
+
+/** Like `useState`, but `undefined` outside a Meeko application instead of failing. */
+export function findState<T>(key: string, factory: () => T): Signal<T> | undefined {
+  return findContext(stateKey)?.get(key, factory);
 }
 
 /** Runs synchronous SSR rendering with a state provider and releases its root. */

@@ -748,8 +748,8 @@
 
 	.hero {
 		margin: 0 auto;
-		padding: clamp(3rem, 8vh, 5.5rem) 1.5rem 0;
-		max-width: 80rem;
+		padding: clamp(3rem, 8vh, 5.5rem) var(--gutter) 0;
+		max-width: var(--container);
 	}
 	.hero-copy {
 		max-width: 62rem;
@@ -890,8 +890,8 @@
 	}
 	.chapter-inner {
 		margin: 0 auto;
-		padding: clamp(4.5rem, 10vw, 7.5rem) 1.5rem clamp(3.5rem, 7vw, 5.5rem);
-		max-width: 80rem;
+		padding: clamp(4.5rem, 10vw, 7.5rem) var(--gutter) clamp(3.5rem, 7vw, 5.5rem);
+		max-width: var(--container);
 	}
 	.chapter-flow {
 		border-top: 0;
@@ -1272,17 +1272,9 @@
 		}
 	}
 	@media (max-width: 640px) {
-		.hero {
-			padding-right: 1rem;
-			padding-left: 1rem;
-		}
-		.chapter-inner {
-			padding-right: 1rem;
-			padding-left: 1rem;
-		}
 		.hero-demo {
-			margin-right: -1rem;
-			margin-left: -1rem;
+			margin-right: calc(-1 * var(--gutter));
+			margin-left: calc(-1 * var(--gutter));
 		}
 		.command {
 			gap: 0.5rem;

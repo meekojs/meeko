@@ -148,7 +148,7 @@ function compare(left: Version, right: Version): number {
 
 function comparatorMatches(version: Version, comparator: string): boolean {
   const match = /^(>=|<=|>|<|=|\^|~)?v?(\d+|x|X|\*)(?:\.(\d+|x|X|\*))?(?:\.(\d+|x|X|\*))?(?:-[0-9A-Za-z.-]+)?$/.exec(comparator);
-  if (!match) throw new Error(`Unsupported version range comparator: ${comparator}`);
+  if (!match) throw new Error(`Comparador de rango de versiones no admitido: ${comparator}`);
   const [, operator = "", ...raw] = match;
   const parts = raw.map((part) => part === undefined || /^[xX*]$/.test(part) ? undefined : Number(part));
   const [major, minor, patch] = parts;
@@ -176,7 +176,7 @@ function comparatorMatches(version: Version, comparator: string): boolean {
 /** Whether `version` satisfies an npm range: comparators joined by spaces, sets joined by `||`. */
 export function satisfiesVersion(version: string, range: string): boolean {
   const parsed = /^v?(\d+)\.(\d+)\.(\d+)/.exec(version.trim());
-  if (!parsed) throw new Error(`Invalid version: ${version}`);
+  if (!parsed) throw new Error(`Versión no válida: ${version}`);
   const current: Version = [Number(parsed[1]), Number(parsed[2]), Number(parsed[3])];
   // Every comparator is evaluated, so an unsupported one fails even when another decides the result.
   const sets = range.split("||").map((set) => set.trim().replace(/(>=|<=|>|<|=|\^|~)\s+/g, "$1").split(/\s+/).filter(Boolean)
@@ -262,7 +262,7 @@ export function mergeModuleOptions(...layers: readonly unknown[]): Record<string
   const result: Record<string, unknown> = {};
   for (const layer of layers) {
     if (layer === undefined) continue;
-    if (!isPlainObject(layer)) throw new TypeError("Meeko module options must be plain objects");
+    if (!isPlainObject(layer)) throw new TypeError("Las opciones de un módulo de Meeko deben ser objetos planos");
     for (const [key, value] of Object.entries(layer)) {
       if (value === undefined) continue;
       const previous = result[key];
@@ -289,17 +289,17 @@ export function mergeHeadInput(first: HeadInput | undefined, second: HeadInput |
 
 function toPath(root: string, value: string | URL, what: string, module: string): string {
   if (value instanceof URL) {
-    if (value.protocol !== "file:") throw new TypeError(`Meeko module ${module}: ${what} must be a file URL or a path`);
+    if (value.protocol !== "file:") throw new TypeError(`Módulo de Meeko ${module}: ${what} debe ser una URL file: o una ruta`);
     return fileURLToPath(value);
   }
-  if (typeof value !== "string" || !value) throw new TypeError(`Meeko module ${module}: ${what} must be a nonempty path`);
+  if (typeof value !== "string" || !value) throw new TypeError(`Módulo de Meeko ${module}: ${what} debe ser una ruta no vacía`);
   if (value.startsWith("file:")) return fileURLToPath(value);
   return resolve(root, value);
 }
 
 export function pluginMode(file: string, mode: ModulePlugin["mode"]): "client" | "server" | "universal" {
   if (mode !== undefined) {
-    if (mode !== "client" && mode !== "server" && mode !== "universal") throw new TypeError(`Invalid plugin mode ${String(mode)}: use "client", "server" or "universal"`);
+    if (mode !== "client" && mode !== "server" && mode !== "universal") throw new TypeError(`Modo de plugin no válido ${String(mode)}: use "client", "server" o "universal"`);
     return mode;
   }
   if (/\.client\.[cm]?[jt]s$/.test(file)) return "client";
@@ -315,7 +315,7 @@ function normalizePublicPath(path: string, module: string): string {
   const normalized = path.replaceAll("\\", "/").replace(/^\/+/, "");
   const parts = normalized.split("/");
   if (!normalized || parts.some((part) => !part || part === "." || part === "..")) {
-    throw new TypeError(`Meeko module ${module}: invalid public file path ${path}`);
+    throw new TypeError(`Módulo de Meeko ${module}: ruta de archivo público no válida ${path}`);
   }
   return parts.join("/");
 }
@@ -325,23 +325,27 @@ type ModuleEntry = NonNullable<MeekoConfig["modules"]>[number];
 async function loadModule(root: string, entry: ModuleEntry): Promise<{ module: MeekoModule<object>; inline: unknown; file?: string } | undefined> {
   const [reference, inline] = Array.isArray(entry) ? entry as readonly [unknown, unknown] : [entry, undefined];
   if (isMeekoModule(reference)) return { module: reference, inline };
-  if (typeof reference !== "string") throw new TypeError("Each entry of modules must be a module created with defineMeekoModule, a package name or path, or [module, options]");
+  if (typeof reference !== "string") throw new TypeError("Cada entrada de modules debe ser un módulo creado con defineMeekoModule, un nombre de paquete o una ruta, o [módulo, opciones]");
   const target = classifyModuleEntry(root, reference);
   if (target.kind === "layer") {
     // A layer folder in `modules` stays a layer during 1.x; `[folder, options]` has no module to receive the options.
-    if (inline !== undefined) throw new TypeError(`modules entry ${reference} is a layer folder, which takes no options; move it to layers`);
+    if (inline !== undefined) throw new TypeError(`La entrada ${reference} de modules es una carpeta de layer, que no admite opciones; muévala a layers`);
     return undefined;
   }
-  if (target.kind === "missing") throw new Error(`Meeko module ${reference} not found: ${target.path}`);
+  if (target.kind === "missing") throw new Error(`No se encuentra el módulo de Meeko ${reference}: ${target.path}`);
   let loaded: unknown;
   try { loaded = (await import(pathToFileURL(target.file).href) as { default?: unknown }).default; }
-  catch (error) { throw new Error(`Cannot load Meeko module ${reference}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
-  if (!isMeekoModule(loaded)) throw new TypeError(`${target.file} must default-export defineMeekoModule(...)`);
+  catch (error) { throw new Error(`No se puede cargar el módulo de Meeko ${reference}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
+  if (!isMeekoModule(loaded)) throw new TypeError(`${target.file} debe exportar por defecto defineMeekoModule(...)`);
   return { module: loaded, inline, file: target.file };
 }
 
 async function runModules(root: string, config: MeekoConfig, dev: boolean): Promise<ResolvedModules> {
-  if (!config.modules?.length) return emptyModules;
+  if (!config.modules?.length) {
+    warnUnknownConfigKeys(root, config, []);
+    return emptyModules;
+  }
+  const configKeys: string[] = [];
   const names: string[] = [];
   const entryFiles: string[] = [];
   const layers: string[] = [];
@@ -364,30 +368,31 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
     if (!loaded) continue;
     const { module, inline, file } = loaded;
     const name = module.meta.name;
-    if (names.includes(name)) throw new Error(`Meeko module ${name} is listed more than once`);
+    if (names.includes(name)) throw new Error(`El módulo de Meeko ${name} aparece más de una vez`);
     names.push(name);
     if (file) { entryFiles.push(file); ownedDirectories.add(dirname(file)); }
     const range = module.meta.compatibility?.meeko;
     if (range !== undefined && !satisfiesVersion(version, range)) {
-      throw new Error(`Meeko module ${name} requires Meeko ${range}; this project uses ${version}`);
+      throw new Error(`El módulo de Meeko ${name} necesita Meeko ${range}; este proyecto usa ${version}`);
     }
     const configKey = module.meta.configKey;
     if (configKey !== undefined && ownConfigKeys.includes(configKey)) {
       const since = ownConfigKeySince[configKey];
-      throw new Error(`Meeko module ${name} uses meta.configKey ${JSON.stringify(configKey)}, which is an option of Meeko itself${since ? ` since ${since}` : ""}: give the module another configKey and move its options in meeko.config.* to that key (see docs/migration-1.4.md)`);
+      throw new Error(`El módulo de Meeko ${name} usa meta.configKey ${JSON.stringify(configKey)}, que es una opción del propio Meeko${since ? ` desde ${since}` : ""}: dé al módulo otra configKey y mueva sus opciones de meeko.config.* a esa clave (véase docs/migration-1.4.md)`);
     }
+    if (configKey !== undefined) configKeys.push(configKey);
     const configured = configKey === undefined ? undefined : (config as Record<string, unknown>)[configKey];
     const options = mergeModuleOptions(module.defaults, configured, inline);
     const path = (value: string | URL, what: string): string => toPath(root, value, what, name);
     const existingFile = (value: string | URL, what: string): string => {
       const file = path(value, what);
-      if (!isFile(file)) throw new Error(`Meeko module ${name}: ${what} ${file} does not exist`);
+      if (!isFile(file)) throw new Error(`Módulo de Meeko ${name}: ${what} ${file} no existe`);
       ownedDirectories.add(dirname(file));
       return file;
     };
     const existingDirectory = (value: string | URL, what: string): string => {
       const directory = path(value, what);
-      if (!isDirectory(directory)) throw new Error(`Meeko module ${name}: ${what} ${directory} is not a directory`);
+      if (!isDirectory(directory)) throw new Error(`Módulo de Meeko ${name}: ${what} ${directory} no es un directorio`);
       ownedDirectories.add(directory);
       return directory;
     };
@@ -397,7 +402,7 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
       config,
       hooks: Object.freeze({
         hook<Name extends keyof MeekoHooks>(hookName: Name, handler: MeekoHooks[Name]): () => void {
-          if (typeof handler !== "function") throw new TypeError(`Meeko module ${name}: hook ${hookName} requires a function`);
+          if (typeof handler !== "function") throw new TypeError(`Módulo de Meeko ${name}: el hook ${hookName} necesita una función`);
           const list = hooks.get(hookName) ?? [];
           hooks.set(hookName, list);
           const registered = handler as (...args: never[]) => unknown;
@@ -408,26 +413,26 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
       addLayer(dir: string | URL) { layers.push(existingDirectory(dir, "layer")); },
       addComponentsDir(dir: string | URL, componentOptions?: { readonly prefix?: string }) {
         const prefix = componentOptions?.prefix === undefined ? "" : pascalCase(componentOptions.prefix);
-        if (componentOptions?.prefix !== undefined && !/^[A-Z][A-Za-z0-9]*$/.test(prefix)) throw new TypeError(`Meeko module ${name}: invalid component prefix ${componentOptions.prefix}`);
+        if (componentOptions?.prefix !== undefined && !/^[A-Z][A-Za-z0-9]*$/.test(prefix)) throw new TypeError(`Módulo de Meeko ${name}: prefijo de componentes no válido ${componentOptions.prefix}`);
         componentsDirs.push({ dir: existingDirectory(dir, "components directory"), prefix });
       },
       addLayout(layoutName: string, file: string | URL) {
         if (typeof layoutName !== "string" || !/^[A-Za-z0-9][\w-]*(?:\/[A-Za-z0-9][\w-]*)*$/.test(layoutName)) {
-          throw new TypeError(`Meeko module ${name}: invalid layout name ${String(layoutName)}; use letters, digits, - and _, with / between folders`);
+          throw new TypeError(`Módulo de Meeko ${name}: nombre de layout no válido ${String(layoutName)}; use letras, dígitos, - y _, con / entre carpetas`);
         }
         const layoutFile = existingFile(file, `layout ${layoutName}`);
-        if (!layoutFile.endsWith(".meeko")) throw new TypeError(`Meeko module ${name}: layout ${layoutName} must be a .meeko file`);
+        if (!layoutFile.endsWith(".meeko")) throw new TypeError(`Módulo de Meeko ${name}: el layout ${layoutName} debe ser un archivo .meeko`);
         const previous = layouts.find((entry) => entry.name === layoutName);
-        if (previous) throw new Error(`Meeko module ${name}: layout ${layoutName} is already added by ${previous.module}`);
+        if (previous) throw new Error(`Módulo de Meeko ${name}: el layout ${layoutName} ya lo añade ${previous.module}`);
         layouts.push({ name: layoutName, file: layoutFile, module: name });
       },
       addAutoImports(entries: ModuleAutoImport | readonly ModuleAutoImport[]) {
         for (const item of (Array.isArray(entries) ? entries : [entries]) as readonly ModuleAutoImport[]) {
-          if (!item || typeof item.name !== "string" || !/^[A-Za-z_$][\w$]*$/.test(item.name)) throw new TypeError(`Meeko module ${name}: invalid autoimport name ${String(item?.name)}`);
+          if (!item || typeof item.name !== "string" || !/^[A-Za-z_$][\w$]*$/.test(item.name)) throw new TypeError(`Módulo de Meeko ${name}: nombre de autoimport no válido ${String(item?.name)}`);
           const as = item.as ?? item.name;
-          if (!/^[A-Za-z_$][\w$]*$/.test(as)) throw new TypeError(`Meeko module ${name}: invalid autoimport alias ${as}`);
+          if (!/^[A-Za-z_$][\w$]*$/.test(as)) throw new TypeError(`Módulo de Meeko ${name}: alias de autoimport no válido ${as}`);
           const scope = item.scope ?? "app";
-          if (!["app", "client", "server", "shared"].includes(scope)) throw new TypeError(`Meeko module ${name}: invalid autoimport scope ${scope}`);
+          if (!["app", "client", "server", "shared"].includes(scope)) throw new TypeError(`Módulo de Meeko ${name}: ámbito de autoimport no válido ${scope}`);
           const from = item.from instanceof URL || item.from.startsWith("file:") || item.from.startsWith(".") || isAbsolute(item.from)
             ? existingFile(item.from, `autoimport ${as}`) : item.from;
           autoImports.push({ name: item.name, as, from, specifier: from === item.from && !isAbsolute(from), type: item.type === true, scope });
@@ -435,7 +440,7 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
       },
       addAutoImportsDir(dir: string | URL, dirOptions: { readonly scope: "app" | "server" | "shared" }) {
         const scope = dirOptions?.scope;
-        if (scope !== "app" && scope !== "server" && scope !== "shared") throw new TypeError(`Meeko module ${name}: addAutoImportsDir requires scope "app", "server" or "shared"`);
+        if (scope !== "app" && scope !== "server" && scope !== "shared") throw new TypeError(`Módulo de Meeko ${name}: addAutoImportsDir necesita scope "app", "server" o "shared"`);
         autoImportsDirs.push({ dir: existingDirectory(dir, "autoimports directory"), scope });
       },
       addPlugin(plugin: ModulePlugin | string | URL) {
@@ -445,18 +450,18 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
       },
       addServerMiddleware(middleware: string | URL) { serverMiddleware.push(existingFile(middleware, "server middleware")); },
       addServerHandler(handler) {
-        if (typeof handler?.route !== "string" || !handler.route.startsWith("/")) throw new TypeError(`Meeko module ${name}: server handler route must start with /`);
-        if (serverHandlers.some((existing) => existing.route === handler.route)) throw new Error(`Meeko module ${name}: duplicate server handler for ${handler.route}`);
+        if (typeof handler?.route !== "string" || !handler.route.startsWith("/")) throw new TypeError(`Módulo de Meeko ${name}: la ruta del handler de servidor debe empezar por /`);
+        if (serverHandlers.some((existing) => existing.route === handler.route)) throw new Error(`Módulo de Meeko ${name}: handler de servidor repetido para ${handler.route}`);
         serverHandlers.push({ route: handler.route, file: existingFile(handler.handler, `server handler ${handler.route}`) });
       },
       addPublicFile(publicPath: string, contents: PublicFileContents) {
         const key = normalizePublicPath(publicPath, name);
-        if (publicFiles.has(key)) throw new Error(`Meeko module ${name}: public file ${key} is already added`);
-        if (typeof contents !== "string" && typeof contents !== "function" && !(contents instanceof Uint8Array)) throw new TypeError(`Meeko module ${name}: public file ${key} needs a string, bytes or a function`);
+        if (publicFiles.has(key)) throw new Error(`Módulo de Meeko ${name}: el archivo público ${key} ya está añadido`);
+        if (typeof contents !== "string" && typeof contents !== "function" && !(contents instanceof Uint8Array)) throw new TypeError(`Módulo de Meeko ${name}: el archivo público ${key} necesita una cadena, bytes o una función`);
         publicFiles.set(key, contents);
       },
       addHead(input: DocumentHead) {
-        if (!input || typeof input !== "object") throw new TypeError(`Meeko module ${name}: addHead requires a head object`);
+        if (!input || typeof input !== "object") throw new TypeError(`Módulo de Meeko ${name}: addHead necesita un objeto de head`);
         // It joins `document`, which the build bakes as JSON: fail here, naming the module.
         head = mergeHeadInput(head, normalizeHeadInput(input, `Meeko module ${name}: addHead`, { serializable: true }));
       },
@@ -464,13 +469,13 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
         for (const item of (Array.isArray(plugin) ? plugin : [plugin]) as readonly object[]) vitePlugins.push(item);
       },
       extendViteConfig(extend) {
-        if (typeof extend !== "function") throw new TypeError(`Meeko module ${name}: extendViteConfig requires a function`);
+        if (typeof extend !== "function") throw new TypeError(`Módulo de Meeko ${name}: extendViteConfig necesita una función`);
         viteExtenders.push(extend);
       },
       warn(message: string) { process.stderr.write(`[meeko] ${name}: ${message}\n`); },
     } satisfies MeekoModuleContext);
     try { await module.setup(options as never, context); }
-    catch (error) { throw new Error(`Meeko module ${name} failed during setup: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
+    catch (error) { throw new Error(`El módulo de Meeko ${name} falló en setup: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
   }
   const resolved: ResolvedModules = {
     names, entryFiles, layers, componentsDirs, layouts, autoImports, autoImportsDirs, plugins, serverMiddleware, serverHandlers,
@@ -480,7 +485,60 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
     },
   };
   await resolved.callHook("ready");
+  warnUnknownConfigKeys(root, config, configKeys);
   return resolved;
+}
+
+/** Configurations whose unknown keys were already reported. */
+const reportedConfigs = new WeakSet<object>();
+
+/** Edit distance of two keys, for the suggestion of an unknown one. */
+function editDistance(left: string, right: string): number {
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= left.length; row++) {
+    const current = [row];
+    for (let column = 1; column <= right.length; column++) {
+      current[column] = Math.min(previous[column]! + 1, current[column - 1]! + 1, previous[column - 1]! + (left[row - 1] === right[column - 1] ? 0 : 1));
+    }
+    previous = current;
+  }
+  return previous[right.length]!;
+}
+
+/**
+ * The keys of an executed configuration that neither Meeko nor a module (`meta.configKey`) reads,
+ * each with the closest known key when it looks like a typo (`sitmap` for `sitemap`).
+ */
+export function unknownConfigKeys(config: MeekoConfig, moduleKeys: readonly string[]): Array<{ readonly key: string; readonly suggestion?: string }> {
+  const known = [...ownConfigKeys, ...moduleKeys];
+  const result: Array<{ key: string; suggestion?: string }> = [];
+  for (const key of Object.keys(config)) {
+    if (known.includes(key)) continue;
+    let suggestion: string | undefined;
+    let best = (key.length <= 3 ? 1 : Math.max(2, Math.floor(key.length / 3))) + 1;
+    for (const candidate of known) {
+      const distance = candidate.toLowerCase() === key.toLowerCase() ? 0 : editDistance(key, candidate);
+      if (distance < best) { best = distance; suggestion = candidate; }
+    }
+    result.push(suggestion === undefined ? { key } : { key, suggestion });
+  }
+  return result;
+}
+
+/**
+ * Warns, once per configuration, of the keys that nothing reads: a typo such as `sitmap: true`
+ * would otherwise be ignored in silence. It is a warning and not an error during 1.x, because such
+ * a configuration loaded until 1.6.
+ */
+export function warnUnknownConfigKeys(projectRoot: string, config: MeekoConfig, moduleKeys: readonly string[], write: (text: string) => void = (text) => process.stderr.write(text)): void {
+  if (reportedConfigs.has(config)) return;
+  reportedConfigs.add(config);
+  const file = basename(["meeko.config.ts", "meeko.config.mts", "meeko.config.js", "meeko.config.mjs"].map((name) => join(resolve(projectRoot), name)).find(isFile) ?? "meeko.config.ts");
+  for (const { key, suggestion } of unknownConfigKeys(config, moduleKeys)) {
+    write(`[meeko] Aviso: ${file} tiene la clave desconocida ${JSON.stringify(key)}, que Meeko ignora. ${suggestion === undefined
+      ? "Si son las opciones de un módulo, añádalo a modules: su meta.configKey la declara."
+      : `¿Quisiste decir ${JSON.stringify(suggestion)}?`}\n`);
+  }
 }
 
 let developmentMode = false;
@@ -548,8 +606,8 @@ export function resolveSiteOrigin(config: MeekoConfig, env: Readonly<Record<stri
 function publicOriginOf(value: string): string {
   let url: URL;
   try { url = new URL(value); }
-  catch { throw new TypeError(`MEEKO_PUBLIC_ORIGIN must be an absolute URL such as "https://example.com"`); }
-  if (url.protocol !== "http:" && url.protocol !== "https:") throw new TypeError("MEEKO_PUBLIC_ORIGIN must use http: or https:");
+  catch { throw new TypeError(`MEEKO_PUBLIC_ORIGIN debe ser una URL absoluta, como "https://example.com"`); }
+  if (url.protocol !== "http:" && url.protocol !== "https:") throw new TypeError("MEEKO_PUBLIC_ORIGIN debe usar http: o https:");
   return url.origin;
 }
 

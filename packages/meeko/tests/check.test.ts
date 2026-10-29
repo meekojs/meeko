@@ -11,7 +11,7 @@ const execFileAsync = promisify(execFile);
 const exampleDirectory = resolve("examples/counter");
 
 test("types rechaza entradas que podrían sobrescribir el archivo fuente", async () => {
-  await assert.rejects(generateTypes("", "Component.ts"), /requires a \.meeko input file/);
+  await assert.rejects(generateTypes("", "Component.ts"), /necesita un componente \.meeko/);
 });
 
 test("checkSource sitúa errores de tipos de script y plantilla en .meeko", async () => {

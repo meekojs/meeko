@@ -299,6 +299,8 @@ interface TemplateContext {
   shadowedTags: ReadonlySet<string>;
   /** Offset of the first tag of each replaced built-in, for its MEEK106 warning. */
   shadowedUses: Map<string, number>;
+  /** Offset of each `each:*` or `if:*` attribute that no directive reads, for its MEEK119 warning. */
+  strayDirectives: Map<number, { readonly name: string; readonly directive: "if:when" | "each:of" }>;
   /** `theme` of the project, when the caller knows it; see {@link CompileOptions.theme}. */
   theme: boolean | undefined;
   /**
@@ -781,6 +783,12 @@ function renderNode(node: TemplateNode, bindings: TemplateBindings, context: Tem
   if (condition || list) {
     const inner = emptyBindings();
     const excluded = new Set(condition ? ["if:when"] : ["each:of", "each:as", "each:key", "each:index"]);
+    // MEEK119: `each:by`, `if:else`… read by no directive stay a literal attribute; a warning, since 1.7.
+    for (const attribute of attrsList) {
+      if (!excluded.has(attribute.name) && /^(?:each|if):/.test(attribute.name)) {
+        context.strayDirectives.set(attribute.start, { name: attribute.name, directive: condition ? "if:when" : "each:of" });
+      }
+    }
     const clone: TemplateNode = { ...node, attrs: attrsList.filter((attribute) => !excluded.has(attribute.name)) };
     const itemName = attrsList.find((attribute) => attribute.name === "each:as")?.value;
     const key = attrsList.find((attribute) => attribute.name === "each:key")?.value;
@@ -2011,7 +2019,9 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
             if (!(error instanceof PropsDefaultsError)) throw error;
             throw compileError(source, filename, error.code, error.message, section.contentStart + error.node.getStart(file));
           }
-          setup.push(`const ${name}: ${defaults ? `__MeekoResolvedProps${typeArgs}` : markSource(propsType, propsTypeOffset)} = __props;`);
+          // Readonly: the props view throws on any write, so an assignment is a type error (TS2540).
+          // An assertion, so that `unknown` props reach their own check (MEEK_PAGE_PROPS…).
+          setup.push(`const ${name} = __props as Readonly<${defaults ? `__MeekoResolvedProps${typeArgs}` : markSource(propsType, propsTypeOffset)}>;`);
         } else {
           setup.push(setupStatement(statement));
         }
@@ -2465,7 +2475,7 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
   const bindingsForTemplate = emptyBindings();
   const projectComponents = [...options.projectComponents ?? []];
   const knownComponents = new Set([...importedComponents(script.content), ...projectComponents.filter((name) => /^[A-Z]/.test(name))]);
-  const context: TemplateContext = { source, filename, templateOffset: template.contentStart, scopeAttribute, scopeTargets: targets, nextText: 0, nextRegion: 0, nextRef: 0, nextHtml: 0, nextElement: 0, listDepth: 0, refs: new Map(), usedRefs: new Set(), nextSnippet: 0, snippetDepth: 0, selectModel: undefined, narrow: options.typeCheck === true, guards: [], shadowedTags: shadowedBuiltinTags(script.content, projectComponents), shadowedUses: new Map(), theme: options.theme, knownComponents, builtinModules: new Set() };
+  const context: TemplateContext = { source, filename, templateOffset: template.contentStart, scopeAttribute, scopeTargets: targets, nextText: 0, nextRegion: 0, nextRef: 0, nextHtml: 0, nextElement: 0, listDepth: 0, refs: new Map(), usedRefs: new Set(), nextSnippet: 0, snippetDepth: 0, selectModel: undefined, narrow: options.typeCheck === true, guards: [], shadowedTags: shadowedBuiltinTags(script.content, projectComponents), shadowedUses: new Map(), strayDirectives: new Map(), theme: options.theme, knownComponents, builtinModules: new Set() };
   const html = renderNode(parsed, bindingsForTemplate, context);
   const hot = options.hot === true;
   const scriptParts = compileScript(script, source, filename, hot, context.refs, generic);
@@ -2641,6 +2651,11 @@ function __meeko_resolveProps${G}(input: ComponentProps${A}): ${setupPropsType} 
   const warnings = [...scriptParts.warnings, ...[...context.shadowedUses].map(([tag, offset]): CompileDiagnostic => ({
     code: "MEEK106", filename, location: locate(source, offset), severity: "warning",
     message: `<${tag}> es el componente ${tag} del proyecto, no la etiqueta propia de Meeko (${builtinDescriptions[tag]}); renombra el componente para usar la de Meeko`,
+  })), ...[...context.strayDirectives].map(([offset, { name, directive }]): CompileDiagnostic => ({
+    code: "MEEK119", filename, location: locate(source, offset), severity: "warning",
+    message: directive === "each:of"
+      ? `${name} no es una directiva de each:of (each:as, each:key, each:index) y se escribe como atributo HTML literal; quítalo o corrige su nombre`
+      : `${name} no es una directiva de if:when y se escribe como atributo HTML literal; quítalo o corrige su nombre`,
   })), ...layoutShiftHints(source, filename, script.content, script.contentStart, parsed)];
   return { code, css, mappings, ...(warnings.length ? { warnings } : {}) };
 }

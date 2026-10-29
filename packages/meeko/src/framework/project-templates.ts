@@ -86,7 +86,7 @@ export { load, manifest };
 
 const output = dirname(fileURLToPath(import.meta.url));
 
-interface PrerenderIndex { readonly pages?: Record<string, { file: string; headOffset: number; etag: string; payload?: string }> }
+interface PrerenderIndex { readonly pages?: Record<string, { file: string; headOffset: number; etag: string; payload?: string; scriptHashes?: string[]; styleHashes?: string[] }> }
 
 async function prerenderSource(): Promise<PrerenderSource | undefined> {
   let index: PrerenderIndex;
@@ -107,7 +107,7 @@ async function prerenderSource(): Promise<PrerenderSource | undefined> {
       const page = (async () => {
         const html = await read(entry.file);
         const payload = entry.payload ? await read(entry.payload) : undefined;
-        return { html, headOffset: entry.headOffset, etag: entry.etag, ...(payload === undefined ? {} : { payload }) };
+        return { html, headOffset: entry.headOffset, etag: entry.etag, ...(payload === undefined ? {} : { payload }), ...(entry.scriptHashes ? { scriptHashes: entry.scriptHashes } : {}), ...(entry.styleHashes ? { styleHashes: entry.styleHashes } : {}) };
       })();
       cache.set(pathname, page);
       // A failed read is retried by the next request instead of being cached.

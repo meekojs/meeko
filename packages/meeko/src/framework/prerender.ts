@@ -11,7 +11,10 @@ import type { RouteRecord } from "./router.js";
 import { DOCUMENT_HEAD_PREFIX } from "./server.js";
 import { loadConfiguredModules } from "./config.js";
 import type { PageRoute } from "./server.js";
+import { documentShell } from "./inline-sources.js";
 import { inlineScriptHashes, inlineStyleHashes } from "./script-hashes.js";
+import { collectSitemapEntries } from "./site-files.js";
+import type { DeclaredSitemapUrl } from "./site-files.js";
 
 /**
  * Opciones de {@link prerenderRoutes}.
@@ -75,7 +78,10 @@ export interface PrerenderIndex {
    * `'sha256-…'` de los scripts en línea que ejecuta la página (véase `inlineScriptHashes`), para
    * construir su `Content-Security-Policy` con `contentSecurityPolicy`. Un índice escrito por una
    * versión anterior no tiene `scriptHashes`. Desde `1.4`, `styleHashes` hace lo mismo con los
-   * `<style>` en línea (véase `inlineStyleHashes`), como el del tema de `<MeekoThemeToggle>`.
+   * `<style>` en línea (véase `inlineStyleHashes`), como el del tema de `<MeekoThemeToggle>`. Desde
+   * `1.7`, sólo cuentan los que escribe Meeko alrededor de la página (la cabecera, el payload, la
+   * entrada y `bodyEnd`): un `<script>` o un `<style>` dentro de `#app` o de un teleport, que puede
+   * venir de contenido de usuario, no se autoriza.
    */
   readonly pages: Readonly<Record<string, {
     readonly file: string;
@@ -234,10 +240,13 @@ export async function prerenderRoutes(options: PrerenderOptions): Promise<string
       payload = [...parts, "index.meeko.json"].join("/");
       await writeFile(resolve(outputRoot, ...parts, "index.meeko.json"), navigationPayload, "utf8");
     }
+    // Only what Meeko writes around the page is hashed: the page and its teleports may carry user
+    // content, and a hash of an injected <script> or <style> would allow it.
+    const shell = documentShell(html);
     pages[pathname] = {
       file, headOffset: headOffset(pathname, html), etag: contentTag(html), ...(payload ? { payload } : {}),
-      scriptHashes: inlineScriptHashes(html).hashes,
-      styleHashes: inlineStyleHashes(html),
+      scriptHashes: inlineScriptHashes(shell).hashes,
+      styleHashes: inlineStyleHashes(shell),
     };
   }
   const index: PrerenderIndex = { version: 1, pages };
@@ -254,11 +263,11 @@ interface NodeOutputModule {
 export async function importNodeOutput(projectRoot: string, server = ".meeko/output/node/index.mjs"): Promise<NodeOutputModule> {
   const entry = resolve(projectRoot, server);
   try { await access(entry); }
-  catch { throw new Error(`Missing production build at ${entry}; run meeko build`); }
+  catch { throw new Error(`No hay build de producción en ${entry}; ejecuta meeko build`); }
   // A query keeps repeated builds in one process from reusing a cached entry.
   const output = await import(`${pathToFileURL(entry).href}?build=${Date.now()}`) as Partial<NodeOutputModule>;
   if (typeof output.createNodeApp !== "function" || typeof output.load !== "function") {
-    throw new Error(`${entry} is not a Meeko Node build; run meeko build`);
+    throw new Error(`${entry} no es un build de Node de Meeko; ejecuta meeko build`);
   }
   return output as NodeOutputModule;
 }
@@ -286,23 +295,37 @@ export async function prerenderProject(projectRoot: string): Promise<string[]> {
 
 /** Renders prerendered routes with a built Node server into an adapter's output directory. */
 export async function prerenderWithNodeBuild(projectRoot: string, server: string, prerenderOutput: string): Promise<string[]> {
+  return (await prerenderForBuild(projectRoot, server, prerenderOutput)).files;
+}
+
+/**
+ * {@link prerenderWithNodeBuild}, and with `sitemapRoutes` (the IDs of the routes that declare
+ * `sitemapEntries`) the URLs of their entries, evaluated by the same build and runtime, with
+ * `prerendering`, after the pages are written.
+ */
+export async function prerenderForBuild(projectRoot: string, server: string, prerenderOutput: string, options: { readonly sitemapRoutes?: ReadonlySet<string> } = {}): Promise<{ files: string[]; sitemap: DeclaredSitemapUrl[] }> {
   const root = resolve(projectRoot);
   const { modules } = await loadConfiguredModules(root);
   const output = await importNodeOutput(root, server);
   const app = await output.createNodeApp({ prerendering: true }) as InternalServerApp;
   const outputRoot = resolve(root, prerenderOutput);
+  const loadRoute = async (key: string): Promise<PageRoute> => {
+    const module = await output.load(key) as Record<string, unknown>;
+    return (module.route ?? module.default ?? module) as PageRoute;
+  };
   try {
     await rm(outputRoot, { recursive: true, force: true });
-    return await prerenderRoutes({
+    const files = await prerenderRoutes({
       extendUrls: (urls) => modules.callHook("prerender:routes", { urls }),
       routes: app.manifest.routes,
       handler: (request) => app[renderPage](request),
-      loadRoute: async (key) => {
-        const module = await output.load(key) as Record<string, unknown>;
-        return (module.route ?? module.default ?? module) as PageRoute;
-      },
+      loadRoute,
       outputRoot,
     });
+    const sitemap = options.sitemapRoutes?.size
+      ? await collectSitemapEntries({ routes: app.manifest.routes, declared: options.sitemapRoutes, loadRoute, context: { env: process.env, prerendering: true } })
+      : [];
+    return { files, sitemap };
   } finally {
     await app.close();
   }

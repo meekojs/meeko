@@ -181,29 +181,52 @@ export function extractRouteRender(file: string, source: string): PageRender | u
  * be a literal in the exported `definePage({...})` call or object literal.
  */
 export function extractRouteOptions(file: string, source: string): StaticRouteOptions {
+  return readRouteOptions(file, source).options;
+}
+
+function hasExportModifier(node: ts.FunctionDeclaration): boolean {
+  return node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) ?? false;
+}
+
+/** Whether a route ID has a dynamic segment (`[id]`, `[...rest]`). */
+function dynamicRoute(id: string): boolean {
+  return /\[(?:\.\.\.)?[A-Za-z_$][\w$]*\]/.test(id);
+}
+
+/**
+ * The options of {@link extractRouteOptions} and whether they declare `prerenderEntries`:
+ * `undefined` when a spread, a computed key or a reexport may carry it.
+ */
+function readRouteOptions(file: string, source: string): { readonly options: StaticRouteOptions; readonly prerenderEntries: boolean | undefined } {
   const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   let routeExport: ts.Expression | undefined;
   let defaultExport: ts.Expression | undefined;
   let namedRender: ts.Expression | undefined;
   let opaque = false;
+  // Without route or default, the module itself is the options (`module.route ?? module.default ?? module`).
+  let namedEntries: boolean | undefined = false;
   for (const statement of sourceFile.statements) {
     if (ts.isExportAssignment(statement) && !statement.isExportEquals) defaultExport = statement.expression;
     else if (ts.isVariableStatement(statement) && statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
       for (const declaration of statement.declarationList.declarations) {
-        if (!ts.isIdentifier(declaration.name)) continue;
+        if (!ts.isIdentifier(declaration.name)) { namedEntries = undefined; continue; }
         if (declaration.name.text === "route") routeExport = declaration.initializer;
         if (declaration.name.text === "render" && declaration.initializer) namedRender = declaration.initializer;
+        if (declaration.name.text === "prerenderEntries" && namedEntries === false) namedEntries = true;
       }
+    } else if (ts.isFunctionDeclaration(statement) && statement.name?.text === "prerenderEntries" && hasExportModifier(statement)) {
+      if (namedEntries === false) namedEntries = true;
     } else if (ts.isExportDeclaration(statement)) {
       const names = statement.exportClause && ts.isNamedExports(statement.exportClause)
         ? statement.exportClause.elements.map((element) => element.name.text) : undefined;
       if (!names || names.some((name) => name === "route" || name === "default" || name === "render")) opaque = true;
+      if (!names || names.includes("prerenderEntries")) namedEntries = undefined;
     }
   }
   const definition = routeExport ?? defaultExport;
   if (!definition) {
     if (opaque) throw new Error(`${file}: las opciones de ruta reexportadas no se pueden leer durante el build; exporta definePage({ ... }) desde este archivo`);
-    return namedRender ? { render: literalRender(file, namedRender) } : {};
+    return { options: namedRender ? { render: literalRender(file, namedRender) } : {}, prerenderEntries: namedEntries };
   }
   // Options may live in a module-level `const` of the same file.
   const constants = new Map<string, ts.Expression>();
@@ -229,17 +252,22 @@ export function extractRouteOptions(file: string, source: string): StaticRouteOp
   let spread = false;
   let computed = false;
   let prerenderEntries = false;
+  // A spread or a computed key may carry prerenderEntries, which the build then reads at run time.
+  let entriesUnknown = false;
+  let sitemapEntries = false;
   // A spread after the last explicit middleware that may carry one: the build would not see it.
   let middlewareSpread: ts.SpreadAssignment | undefined;
   for (const property of object.properties) {
     if (ts.isSpreadAssignment(property)) {
       spread = true;
       if (spreadMayDeclare(property.expression, "middleware", constants)) middlewareSpread = property;
+      if (spreadMayDeclare(property.expression, "prerenderEntries", constants)) entriesUnknown = true;
       continue;
     }
-    if (property.name && ts.isComputedPropertyName(property.name)) { computed = true; continue; }
+    if (property.name && ts.isComputedPropertyName(property.name)) { computed = true; entriesUnknown = true; continue; }
     const name = property.name ? propertyName(property.name) : undefined;
     if (name === "prerenderEntries") prerenderEntries = true;
+    if (name === "sitemapEntries") sitemapEntries = true;
     if (name === "layout") {
       if (!ts.isPropertyAssignment(property)) {
         throw new Error(`${file}: layout debe ser un literal de texto (el nombre de un layout de app/layouts) o false para que Meeko pueda leerlo durante el build`);
@@ -270,7 +298,13 @@ export function extractRouteOptions(file: string, source: string): StaticRouteOp
   if (render === "client" && prerenderEntries) {
     throw new Error(`${file}: una página render: "client" no se puede prerenderizar; quita prerenderEntries o usa render: "prerender"`);
   }
-  return { ...(render ? { render } : {}), ...(layout === undefined ? {} : { layout }), ...(middleware === undefined ? {} : { middleware }) };
+  if (render === "client" && sitemapEntries) {
+    throw new Error(`${file}: una página render: "client" no declara sitemapEntries, porque sus opciones llegan al navegador; quítalo o usa otro modo de render`);
+  }
+  return {
+    options: { ...(render ? { render } : {}), ...(layout === undefined ? {} : { layout }), ...(middleware === undefined ? {} : { middleware }) },
+    prerenderEntries: prerenderEntries || (entriesUnknown ? undefined : false),
+  };
 }
 
 /**
@@ -614,8 +648,14 @@ export async function discoverRoutes(projectRoot: string, options: DiscoverRoute
     const sidecar = block !== undefined ? routeBlockId(file) : files.has(sidecarFile) ? sidecarFile : undefined;
     const hasSidecar = sidecar !== undefined;
     const optionsFile = block !== undefined ? file : sidecar;
-    const routeOptions = block !== undefined ? extractRouteOptions(file, block)
-      : hasSidecar ? extractRouteOptions(sidecar, await readFile(sidecar, "utf8")) : {};
+    const read = block !== undefined ? readRouteOptions(file, block)
+      : hasSidecar ? readRouteOptions(sidecar, await readFile(sidecar, "utf8")) : undefined;
+    const routeOptions: StaticRouteOptions = read?.options ?? {};
+    const id = routeId(relative(pagesRoot, file));
+    // The build stops on it (prerenderRoutes); since 1.7, meeko check and meeko dev stop here too.
+    if (routeOptions.render === "prerender" && read?.prerenderEntries === false && dynamicRoute(id)) {
+      throw new Error(`${optionsFile ?? file}: Dynamic prerender route ${id} requires prerenderEntries`);
+    }
     // The layout cascades from the outermost +group.ts to the page. Props inherited for one layout
     // do not reach another: choosing a different layout starts with its own props.
     let layoutName: string | false = "default";
@@ -674,7 +714,7 @@ export async function discoverRoutes(projectRoot: string, options: DiscoverRoute
       ...plusLayouts,
     ];
     routes.push({
-      id: routeId(relative(pagesRoot, file)),
+      id,
       file,
       layouts,
       ...(error ? { error } : {}),

@@ -1,30 +1,33 @@
 <script server lang="ts">
 	import { definePage } from '@meekojs/meeko/framework'
-	import { apiIndex, apiKinds } from '../../../../server/content/api.js'
-	import { navigation } from '../../../../server/content/catalog.js'
+	import { apiGroups, exportsHref, groupHref, referenceHref } from '../../../../server/content/api-groups.js'
+	import { referenceIndex, referenceNavigation } from '../../../../server/content/reference.js'
+	import { groupIcons, taxonomyPath } from '../../../../server/content/reference-taxonomy.js'
 	import { githubUrl } from '../../../../server/content/repository.js'
 
-	// The index is generated in `meeko build` from the sources of the package; see server/content/api.ts.
+	// The index of the reference: the groups of docs/reference/taxonomy.json, each with its symbols
+	// (server/content/reference.ts). Every export by module is at /docs/reference/exports.
 	export const route = definePage({ render: 'prerender' })
 
-	export const groups = await apiIndex()
-	const items = groups.flatMap((group) => group.sections.flatMap((section) => section.items))
-	export const total = items.length
-	export const kinds = apiKinds()
-		.map((entry) => ({ ...entry, count: items.filter((item) => item.kind === entry.kind).length }))
-		.filter((entry) => entry.count > 0)
-	export const nav = navigation()
-	export const toc = groups.map((group) => ({ id: group.id, text: group.specifier ?? group.title, level: 2 }))
-	const first = groups[0]?.sections[0]?.items[0]
+	export const groups = await referenceIndex()
+	export const total = groups.reduce((sum, group) => sum + group.entries.length, 0)
+	// The anchors of the earlier index (`/docs/reference#framework`) stay, on the modules at the end.
+	export const modules = apiGroups().map((group) => ({ id: group.id, label: group.specifier ?? group.title, href: groupHref(group), code: group.specifier !== null }))
+	export const exportsIcon = groupIcons.exports!
+	export const exportsLink = exportsHref
+	export const nav = await referenceNavigation()
+	export const current = referenceHref
+	export const toc = [...groups.map((group) => ({ id: group.anchor, text: group.title, level: 2 })), { id: 'todos-los-exports', text: 'Todos los exports', level: 2 }]
+	const first = groups[0]?.entries[0]
 	export const pages = {
 		previous: { href: '/docs/api', label: 'Componentes y API' },
 		next: first ? { href: first.href, label: first.name } : null,
 	}
-	export const source = 'apps/site/server/content/api-groups.ts'
+	export const source = taxonomyPath
 	export const editUrl = githubUrl(source, 'edit')
 	export const head = {
 		title: 'Referencia de la API · Meeko',
-		description: 'Una página por cada export público de @meekojs/meeko y por cada macro, etiqueta y directiva de los componentes .meeko, generada desde el código fuente.',
+		description: 'Cada componente, macro, composable, función de reactividad, utilidad, directiva, API de servidor, adaptador, comando y opción de configuración de Meeko, con su tipo exacto, ejemplos y errores comunes.',
 	}
 </script>
 
@@ -33,302 +36,265 @@
 		params: Record<string, string>
 		search: Record<string, string | string[]>
 	}
-
-	const query = signal('')
-	const kind = signal('all')
-
-	/** The groups with the symbols whose name contains the query and whose kind is chosen. */
-	const visible = computed(() => {
-		const text = query.value.trim().toLowerCase()
-		const chosen = kind.value
-		return groups
-			.map((group) => ({
-				...group,
-				sections: group.sections
-					.filter((section) => chosen === 'all' || section.kind === chosen)
-					.map((section) => ({ ...section, items: section.items.filter((item) => !text || item.name.toLowerCase().includes(text)) }))
-					.filter((section) => section.items.length > 0),
-			}))
-			.filter((group) => group.sections.length > 0)
-	})
-	const count = computed(() => visible.value.reduce((sum, group) => sum + group.sections.reduce((inner, section) => inner + section.items.length, 0), 0))
-
-	function choose(value: string): void {
-		kind.value = kind.value === value ? 'all' : value
-	}
 </script>
 
 <template>
 	<DocsLayout
 		bind:nav="nav"
-		current="/docs/reference"
+		bind:current="current"
 		bind:toc="toc"
 		bind:pager="pages"
 		bind:editUrl="editUrl"
 		bind:source="source"
 	>
-		<article class="prose reference">
+		<article class="prose reference-index">
 			<h1>Referencia de la API</h1>
-			<p class="lead">{total} páginas: una por cada export público del paquete y una por cada bloque, macro, etiqueta y directiva que reconoce el compilador de componentes. Salen del código fuente y de su JSDoc, la misma documentación que muestra el editor.</p>
-			<p>
-				Las guías
-				<a href="/docs/api">Componentes y API</a>
-				y
-				<a href="/docs/framework">Framework full-stack</a>
-				explican los conceptos con ejemplos completos.
+			<p class="lead">
+				{total} símbolos de Meeko agrupados por lo que son. Cada página explica uno con su tipo exacto, generado desde el código fuente, sus parámetros, ejemplos reales y los errores que da usarlo mal.
 			</p>
-			<div
-				class="filters"
-				role="search"
-				data-pagefind-ignore
+			<ul
+				class="cards"
+				aria-label="Grupos de la referencia"
 			>
-				<label
-					class="field"
-					for="api-filter"
+				<li
+					each:of="groups"
+					each:as="group"
+					each:key="group.anchor"
 				>
-					<svg
-						viewBox="0 0 24 24"
-						aria-hidden="true"
+					<a
+						class="card"
+						bind:href="'#' + group.anchor"
 					>
-						<path d="M4 6h16M7 12h10M10 18h4" />
-					</svg>
-					<span class="sr-only">Filtrar por nombre</span>
-					<input
-						id="api-filter"
-						type="search"
-						model="query"
-						placeholder="Filtrar por nombre: signal, definePage, SessionManager…"
-						autocomplete="off"
-						spellcheck="false"
-					/>
-				</label>
-				<div
-					class="kinds"
-					role="group"
-					aria-label="Filtrar por tipo"
-				>
-					<button
-						type="button"
-						bind:aria-pressed="String(kind.value === 'all')"
-						on:click="() => choose('all')"
+						<span class="card-head">
+							<svg
+								viewBox="0 0 16 16"
+								aria-hidden="true"
+							>
+								<path bind:d="group.icon" />
+							</svg>
+							<span class="card-title">{group.title}</span>
+							<span class="tally">{group.entries.length}</span>
+						</span>
+						<span
+							class="card-text"
+							html="group.description"
+						></span>
+					</a>
+				</li>
+				<li>
+					<a
+						class="card"
+						bind:href="exportsLink"
 					>
-						Todo
-					</button>
-					<button
-						type="button"
-						each:of="kinds"
-						each:as="entry"
-						each:key="entry.kind"
-						bind:aria-pressed="String(kind.value === entry.kind)"
-						on:click="() => choose(entry.kind)"
-					>
-						{entry.label}
-						<span class="tally">{entry.count}</span>
-					</button>
-				</div>
-				<p
-					class="count"
-					aria-live="polite"
-				>
-					{count.value === total ? total + ' símbolos' : count.value + ' de ' + total + ' símbolos'}
-				</p>
-			</div>
-			<p
-				class="empty"
-				if:when="count.value === 0"
-			>
-				Ningún símbolo coincide con «{query.value.trim()}». La
-				<kbd>/</kbd>
-				abre la búsqueda en toda la documentación.
-			</p>
+						<span class="card-head">
+							<svg
+								viewBox="0 0 16 16"
+								aria-hidden="true"
+							>
+								<path bind:d="exportsIcon" />
+							</svg>
+							<span class="card-title">Todos los exports</span>
+						</span>
+						<span class="card-text">Cada export de cada módulo del paquete, con su página generada desde el JSDoc.</span>
+					</a>
+				</li>
+			</ul>
+
 			<section
 				class="group"
-				each:of="visible.value"
+				each:of="groups"
 				each:as="group"
-				each:key="group.id"
+				each:key="group.anchor"
 			>
-				<h2 bind:id="group.id">
-					<code if:when="group.specifier">{group.specifier}</code>
-					<span if:when="!group.specifier">{group.title}</span>
+				<h2 bind:id="group.anchor">
+					<svg
+						viewBox="0 0 16 16"
+						aria-hidden="true"
+					>
+						<path bind:d="group.icon" />
+					</svg>
+					{group.title}
+					<a
+						class="heading-anchor"
+						bind:href="'#' + group.anchor"
+						aria-label="Enlace a esta sección"
+						data-pagefind-ignore
+					>
+						#
+					</a>
 				</h2>
 				<p
 					class="group-description"
 					html="group.description"
 				></p>
-				<div
-					class="kind"
-					each:of="group.sections"
-					each:as="section"
-					each:key="section.kind"
-				>
-					<h3>{section.title}</h3>
-					<ul class="entries">
-						<li
-							each:of="section.items"
-							each:as="item"
-							each:key="item.href"
+				<ul class="entries">
+					<li
+						each:of="group.entries"
+						each:as="entry"
+						each:key="entry.name"
+					>
+						<a
+							class="name"
+							bind:href="entry.href"
 						>
-							<a
-								class="name"
-								bind:href="item.href"
-							>
-								<code>{item.name}</code>
-							</a>
-							<span
-								class="deprecated"
-								if:when="item.deprecated"
-							>
-								obsoleto
-							</span>
-							<span
-								class="summary"
-								html="item.summary"
-							></span>
-						</li>
-					</ul>
-				</div>
+							<code>{entry.name}</code>
+						</a>
+						<span
+							class="summary"
+							html="entry.description"
+						></span>
+					</li>
+				</ul>
+			</section>
+
+			<section class="group">
+				<h2 id="todos-los-exports">
+					<svg
+						viewBox="0 0 16 16"
+						aria-hidden="true"
+					>
+						<path bind:d="exportsIcon" />
+					</svg>
+					Todos los exports
+					<a
+						class="heading-anchor"
+						href="#todos-los-exports"
+						aria-label="Enlace a esta sección"
+						data-pagefind-ignore
+					>
+						#
+					</a>
+				</h2>
+				<p class="group-description">
+					Los tipos, las interfaces y las piezas de bajo nivel que no tienen su propia entrada arriba siguen documentados, uno por página, en el
+					<a bind:href="exportsLink">índice por módulo</a>
+					.
+				</p>
+				<ul class="modules">
+					<li
+						each:of="modules"
+						each:as="module"
+						each:key="module.id"
+						bind:id="module.id"
+					>
+						<a bind:href="module.href">
+							<code if:when="module.code">{module.label}</code>
+							<span if:when="!module.code">{module.label}</span>
+						</a>
+					</li>
+				</ul>
 			</section>
 		</article>
 	</DocsLayout>
 </template>
 
 <style scoped>
-	.reference {
-		max-width: 56rem;
+	.reference-index {
+		max-width: 60rem;
 	}
 	.lead {
+		max-width: 46rem;
 		color: var(--ink-soft);
 		font-size: 1.05rem;
-	}
-	.filters {
-		display: grid;
-		gap: 0.75rem;
-		margin: 1.75rem 0 0.5rem;
-	}
-	.field {
-		display: flex;
-		align-items: center;
-		gap: 0.6rem;
-		transition: border-color 0.15s;
-		border: 1px solid var(--line);
-		border-radius: var(--radius);
-		background: var(--surface);
-		padding: 0 0.9rem;
-		height: 42px;
-		color: var(--muted);
-	}
-	.field:focus-within {
-		border-color: var(--accent);
-	}
-	.field input {
-		flex: 1;
-		outline: 0;
-		border: 0;
-		background: transparent;
-		min-width: 0;
-		color: var(--ink);
-		font: inherit;
-		font-size: 1rem;
-	}
-	.field input::placeholder {
-		color: var(--muted);
 	}
 	svg {
 		flex: none;
 		fill: none;
 		stroke: currentColor;
 		stroke-linecap: round;
-		stroke-width: 2;
-		width: 18px;
-		height: 18px;
+		stroke-linejoin: round;
+		stroke-width: 1.4;
+		width: 16px;
+		height: 16px;
 	}
-	.kinds {
+	.cards {
+		display: grid;
+		max-width: none;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.6rem;
+		margin: 2rem 0 1rem;
+		padding: 0;
+		list-style: none;
+	}
+	.cards li {
 		display: flex;
-		flex-wrap: wrap;
-		gap: 0.4rem;
+		margin: 0;
+		padding: 0;
 	}
-	.kinds button {
-		display: inline-flex;
-		align-items: center;
+	.card {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
 		gap: 0.4rem;
 		transition:
 			border-color 0.15s,
 			background-color 0.15s;
-		cursor: pointer;
 		border: 1px solid var(--line);
-		border-radius: 999px;
-		background: var(--bg);
-		padding: 0.28rem 0.75rem;
-		color: var(--ink-soft);
-		font: 500 0.84rem/1.4 var(--font-ui);
-	}
-	.kinds button:hover {
-		border-color: var(--accent);
+		border-radius: var(--radius);
+		background: var(--surface);
+		padding: 0.85rem 0.95rem 0.95rem;
 		color: var(--ink);
+		text-decoration: none;
 	}
-	.kinds button[aria-pressed='true'] {
-		border-color: var(--accent);
-		background: var(--accent-soft);
-		color: var(--accent-ink);
+	.card:hover {
+		border-color: var(--line-strong);
+		background: var(--surface-2);
+	}
+	.card-head {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		color: var(--ink-soft);
+	}
+	.card-title {
+		flex: 1;
+		color: var(--ink);
+		font-weight: 560;
+		font-size: 0.95rem;
 	}
 	.tally {
 		color: var(--muted);
 		font: 500 0.75rem var(--font-mono);
 		font-variant-numeric: tabular-nums;
 	}
-	.kinds button[aria-pressed='true'] .tally {
-		color: inherit;
-	}
-	.count {
-		margin: 0;
+	.card-text {
 		color: var(--muted);
-		font-size: 0.88rem;
-		font-variant-numeric: tabular-nums;
+		font-size: 0.86rem;
+		line-height: 1.5;
 	}
-	.empty {
-		border: 1px dashed var(--line);
-		border-radius: var(--radius);
-		padding: 1rem 1.2rem;
+	.card-text :global(code) {
+		font-size: 0.86em;
+	}
+	.group h2 {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+	}
+	.group h2 svg {
+		width: 20px;
+		height: 20px;
 		color: var(--ink-soft);
-	}
-	.empty kbd {
-		border: 1px solid var(--line);
-		border-bottom-width: 2px;
-		border-radius: 5px;
-		background: var(--surface);
-		padding: 0.05rem 0.4rem;
-		font: 500 0.8rem var(--font-mono);
-	}
-	.group h2 code {
-		border: 0;
-		background: none;
-		padding: 0;
-		font-size: 0.82em;
-		letter-spacing: 0;
 	}
 	.group-description {
 		max-width: 46rem;
 		color: var(--ink-soft);
 	}
-	.kind h3 {
-		margin: 1.6rem 0 0.4rem;
-		color: var(--ink);
-		font: 500 0.85rem/1.4 var(--font-ui);
-	}
 	.entries {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		column-gap: 2rem;
 		margin: 0;
 		border-top: 1px solid var(--line);
 		padding: 0;
 		list-style: none;
 	}
 	.entries li {
-		display: grid;
-		grid-template-columns: minmax(11rem, 17rem) minmax(0, 1fr);
-		align-items: baseline;
-		gap: 0.25rem 1.25rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
 		margin: 0;
 		border-bottom: 1px solid var(--line);
-		padding: 0.55rem 0;
+		padding: 0.6rem 0;
 	}
 	.name {
 		text-decoration: none;
@@ -339,39 +305,71 @@
 		background: none;
 		padding: 0;
 		color: var(--accent-ink);
-		font-weight: 600;
-		font-size: 0.9rem;
+		font-weight: 500;
+		font-size: 0.88rem;
 	}
 	.name:hover code {
 		text-decoration: underline;
 		text-underline-offset: 0.18em;
 	}
-	.deprecated {
-		grid-column: 1;
-		justify-self: start;
-		border: 1px solid var(--line-strong);
-		border-radius: 999px;
-		padding: 0 0.45rem;
-		color: var(--ink-soft);
-		font: 500 0.7rem/1.5 var(--font-ui);
-	}
 	.summary {
-		grid-row: 1;
-		grid-column: 2;
-		color: var(--ink-soft);
-		font-size: 0.92rem;
+		color: var(--muted);
+		font-size: 0.88rem;
 		line-height: 1.5;
 	}
 	.summary :global(code) {
 		font-size: 0.84em;
 	}
-	@media (max-width: 640px) {
-		.entries li {
+	.modules {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.45rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		scroll-margin-top: calc(var(--header-height) + 1.25rem);
+	}
+	.modules li {
+		margin: 0;
+		padding: 0;
+		scroll-margin-top: calc(var(--header-height) + 1.25rem);
+	}
+	.modules a {
+		display: inline-block;
+		transition: border-color 0.15s;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-s);
+		background: var(--surface);
+		padding: 0.25rem 0.6rem;
+		color: var(--ink-soft);
+		font-size: 0.86rem;
+		text-decoration: none;
+	}
+	.modules a:hover {
+		border-color: var(--accent-line);
+	}
+	.modules code {
+		background: none;
+		padding: 0;
+		color: var(--accent-ink);
+	}
+	.modules li:target a {
+		border-color: var(--accent);
+		background: var(--accent-soft);
+	}
+	@media (max-width: 1080px) {
+		.cards {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+	@media (max-width: 760px) {
+		.entries {
 			grid-template-columns: minmax(0, 1fr);
 		}
-		.summary {
-			grid-row: auto;
-			grid-column: 1;
+	}
+	@media (max-width: 520px) {
+		.cards {
+			grid-template-columns: minmax(0, 1fr);
 		}
 	}
 </style>

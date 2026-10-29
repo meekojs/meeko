@@ -8,7 +8,8 @@ import { fetchApp, positiveInteger, publicOriginOf, rebaseRequest } from "./fram
 import { createDetachedPlatform } from "./framework-server/platform.js";
 import type { ServerPlatform } from "./framework-server/platform.js";
 import { watchIsolateErrors } from "./framework-server/process-errors.js";
-import type { SqlSessionDriver, SqlSessionRow } from "./framework-server/session-stores.js";
+import { encodeBase64Url } from "./framework-server/base64url.js";
+import type { SqlRateLimitRow, SqlSessionDriver, SqlSessionRow } from "./framework-server/session-stores.js";
 import type { SocketMessage, SocketPeer, SocketPubSub, Unsubscribe } from "./framework-server/socket.js";
 import { createSocketUpgradeHandler, openSocketSession, socketPathnamePrefix } from "./framework-server/upgrade.js";
 import type { OpenedSocketSession, SocketUpgradeClose, SocketUpgradeHandler } from "./framework-server/upgrade.js";
@@ -960,7 +961,7 @@ export interface CloudflarePrerenderSourceOptions {
   readonly directory?: string;
 }
 
-interface PrerenderIndex { readonly pages?: Record<string, { file: string; headOffset: number; etag: string; payload?: string }> }
+interface PrerenderIndex { readonly pages?: Record<string, { file: string; headOffset: number; etag: string; payload?: string; scriptHashes?: string[]; styleHashes?: string[] }> }
 
 /**
  * Páginas prerenderizadas guardadas con los assets y leídas mediante el binding. El índice y cada
@@ -1006,7 +1007,7 @@ export function createCloudflarePrerenderSource(options: CloudflarePrerenderSour
         const loading = (async () => {
           const html = (await read(entry.file, false))!;
           const payload = entry.payload ? await read(entry.payload, false) : undefined;
-          return { html, headOffset: entry.headOffset, etag: entry.etag, ...(payload === undefined ? {} : { payload }) };
+          return { html, headOffset: entry.headOffset, etag: entry.etag, ...(payload === undefined ? {} : { payload }), ...(entry.scriptHashes ? { scriptHashes: entry.scriptHashes } : {}), ...(entry.styleHashes ? { styleHashes: entry.styleHashes } : {}) };
         })();
         page = loading;
         cache.set(pathname, loading);
@@ -1066,6 +1067,12 @@ export interface D1DatabaseLike {
 export interface D1SessionDriverOptions {
   /** Tabla creada con `D1SessionDriver.schema(table)`. Por defecto, `meeko_sessions`. */
   readonly table?: string;
+  /**
+   * Tabla de los contadores de `rateLimit`, creada con `D1SessionDriver.rateLimitSchema(table)`
+   * (desde `1.7`). Con ella, el driver implementa `rateLimit` y los límites se comparten entre
+   * aislados; sin ella, se cuentan en la memoria de cada aislado, como hasta `1.6`.
+   */
+  readonly rateLimitTable?: string;
 }
 
 interface D1SessionRow {
@@ -1077,8 +1084,8 @@ interface D1SessionRow {
   expires_at: number;
 }
 
-function tableName(value: string | undefined): string {
-  const table = value ?? "meeko_sessions";
+function tableName(value: string | undefined, fallback = "meeko_sessions"): string {
+  const table = value ?? fallback;
   if (!/^[A-Za-z_][A-Za-z0-9_]{0,62}$/.test(table)) throw new TypeError(`Invalid D1 session table name: ${table}`);
   return table;
 }
@@ -1106,6 +1113,13 @@ function tableName(value: string | undefined): string {
  */
 export class D1SessionDriver implements SqlSessionDriver {
   private readonly table: string;
+  private readonly rateLimitTable: string | undefined;
+  /**
+   * Cuenta una petición en la ventana fija de `key` con una sola sentencia
+   * `INSERT … ON CONFLICT DO UPDATE … RETURNING` (desde `1.7`). Sólo existe con la opción
+   * `rateLimitTable`.
+   */
+  readonly rateLimit?: (key: Uint8Array, windowMs: number, now: number) => Promise<SqlRateLimitRow>;
 
   /**
    * Esquema de referencia de la tabla; aplíquelo con una migración de D1 antes de desplegar.
@@ -1126,6 +1140,34 @@ CREATE INDEX IF NOT EXISTS "${name}_expires_at" ON "${name}" (expires_at);
   }
 
   /**
+   * Esquema de referencia de la tabla de contadores de `rateLimit` (desde `1.7`); aplíquelo con una
+   * migración de D1 y pase el mismo nombre en la opción `rateLimitTable`. Por defecto,
+   * `meeko_rate_limits`. La clave es el SHA-256 de la clave del contador en base64url.
+   *
+   * @param table Nombre de la tabla.
+   * @returns Las sentencias `CREATE TABLE` y `CREATE INDEX`.
+   * @throws {TypeError} Si el nombre de la tabla no es válido.
+   * @since 1.7.0
+   * @example
+   * ```ts
+   * import { D1SessionDriver } from "@meekojs/meeko/cloudflare";
+   *
+   * console.log(D1SessionDriver.rateLimitSchema()); // cópielo en una migración de D1
+   * const driver = new D1SessionDriver(env.DB, { rateLimitTable: "meeko_rate_limits" });
+   * ```
+   */
+  static rateLimitSchema(table?: string): string {
+    const name = tableName(table, "meeko_rate_limits");
+    return `CREATE TABLE IF NOT EXISTS "${name}" (
+  key TEXT PRIMARY KEY NOT NULL,
+  window_ends_at INTEGER NOT NULL,
+  count INTEGER NOT NULL
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS "${name}_window_ends_at" ON "${name}" (window_ends_at);
+`;
+  }
+
+  /**
    * @param db Binding de la base de datos D1.
    * @param options Tabla de las sesiones.
    * @throws {TypeError} Si `db` no es un binding de D1 o la tabla no es válida.
@@ -1133,6 +1175,22 @@ CREATE INDEX IF NOT EXISTS "${name}_expires_at" ON "${name}" (expires_at);
   constructor(private readonly db: D1DatabaseLike, options: D1SessionDriverOptions = {}) {
     if (!db || typeof db.prepare !== "function") throw new TypeError("D1SessionDriver requires a D1 database binding");
     this.table = tableName(options.table);
+    this.rateLimitTable = options.rateLimitTable === undefined ? undefined : tableName(options.rateLimitTable);
+    if (this.rateLimitTable !== undefined) {
+      const table = this.rateLimitTable;
+      // One statement: a new or ended window restarts at 1; otherwise the count grows and the end stays.
+      const sql = `INSERT INTO "${table}" (key, window_ends_at, count) VALUES (?, ?, 1) ` +
+        `ON CONFLICT(key) DO UPDATE SET ` +
+        `count = CASE WHEN "${table}".window_ends_at <= ? THEN 1 ELSE "${table}".count + 1 END, ` +
+        `window_ends_at = CASE WHEN "${table}".window_ends_at <= ? THEN excluded.window_ends_at ELSE "${table}".window_ends_at END ` +
+        `RETURNING count, window_ends_at`;
+      this.rateLimit = async (key, windowMs, now) => {
+        // TEXT rather than BLOB: base64url binds the same way in D1, Miniflare and local SQLite.
+        const row = await this.db.prepare(sql).bind(encodeBase64Url(key), now + windowMs, now, now).first<{ count: number; window_ends_at: number }>();
+        if (!row) throw new Error("D1 rate limit returned no row");
+        return { count: Number(row.count), windowEndsAt: Number(row.window_ends_at) };
+      };
+    }
   }
 
   async read(id: string): Promise<SqlSessionRow | undefined> {
@@ -1169,9 +1227,15 @@ CREATE INDEX IF NOT EXISTS "${name}_expires_at" ON "${name}" (expires_at);
     await this.db.prepare(`DELETE FROM "${this.table}" WHERE family_id = ?`).bind(familyId).run();
   }
 
-  /** Borra las filas caducadas, por ejemplo desde un Cron Trigger; devuelve cuántas borró. */
+  /**
+   * Borra las filas caducadas, por ejemplo desde un Cron Trigger, y desde `1.7` también los
+   * contadores de `rateLimit` cuya ventana terminó si hay `rateLimitTable`; devuelve cuántas filas
+   * borró en total.
+   */
   async deleteExpired(now: number = Date.now()): Promise<number> {
     const result = await this.db.prepare(`DELETE FROM "${this.table}" WHERE expires_at <= ?`).bind(now).run();
-    return result.meta.changes;
+    if (this.rateLimitTable === undefined) return result.meta.changes;
+    const counters = await this.db.prepare(`DELETE FROM "${this.rateLimitTable}" WHERE window_ends_at <= ?`).bind(now).run();
+    return result.meta.changes + counters.meta.changes;
   }
 }

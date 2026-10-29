@@ -5,7 +5,9 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { build } from "esbuild";
 
-const tooling = /(?:^|\/)node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?(?:typescript|@typescript\/typescript6|parse5|postcss|ws)\//;
+// parse5 is not tooling since 1.7: the server reads a document's inline scripts and styles with it, as
+// the browser does, to hash them for Meeko's CSP (framework/inline-sources.ts). It is portable.
+const tooling = /(?:^|\/)node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?(?:typescript|@typescript\/typescript6|postcss|ws)\//;
 
 async function entry(subpath: string): Promise<string> {
   const manifest = JSON.parse(await readFile(resolve("package.json"), "utf8")) as { exports: Record<string, { default: string }> };
@@ -77,7 +79,7 @@ test("server, node, bun, deno, cloudflare and build subpaths expose exactly thei
   const server = await import(pathToFileURL(await entry("./server")).href);
   assert.deepEqual(Object.keys(server).sort(), [
     "ApiError", "LocalSocketPubSub", "MemorySessionStore", "RedisSessionStore", "RedisSocketPubSub", "SessionHandle", "SessionManager",
-    "SessionRevokedError", "SessionSecurityError", "SqlSessionStore", "composeServerMiddleware", "contentSecurityPolicy", "createFrameworkHandler", "createLocalCalls",
+    "SessionRevokedError", "SessionSecurityError", "SqlSessionStore", "clientAddress", "composeServerMiddleware", "contentSecurityPolicy", "createFrameworkHandler", "createLocalCalls",
     "createLocalServerFetch", "createRequestContext", "createServerApp", "createServerClientOptions", "createServerDispatcher", "createServerSocketRegistry",
     "createSocketHub", "createSocketUpgradeHandler", "defineApiRoute", "defineRpc", "defineServerMiddleware", "defineServerRuntime", "defineSocketChannel",
     "dispatchApiRoute", "dispatchRpc", "errorResponse", "executeApiRoute", "executeRpc", "generateOpenApi", "handleProcessErrors",

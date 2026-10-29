@@ -143,6 +143,78 @@ export type ServerRuntimeDefinition<Env = Readonly<Record<string, string | undef
   (context: ServerRuntimeContext<Env>) => ServerRuntime<Services, Env> | Promise<ServerRuntime<Services, Env>>;
 
 /**
+ * Tipo de los servicios que devuelve una definición de runtime: el `services` del objeto que crea la
+ * fábrica o, si `services` es una función por petición, lo que ésta devuelve (sin la promesa). Sin
+ * `services`, `unknown`. Meeko lo usa para inferir {@link AppServices} de `server/runtime.ts`.
+ *
+ * @typeParam Definition Tipo de la fábrica, como `typeof runtime` de `server/runtime.ts`.
+ * @since 1.7.0
+ * @example
+ * ```ts
+ * import type { ServerRuntimeServices } from "@meekojs/meeko/server";
+ * import type runtime from "../runtime.js";
+ *
+ * type Services = ServerRuntimeServices<typeof runtime>;
+ * export function ready(services: Services): boolean {
+ *   return services.db.connected;
+ * }
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#tipos-de-los-servicios
+ */
+export type ServerRuntimeServices<Definition> = Definition extends (...args: never[]) => infer Result
+  ? Awaited<Result> extends { readonly services?: infer Services } ? ServicesValue<Exclude<Services, undefined>> : unknown
+  : unknown;
+
+/** The services a `services` option gives: a per-request factory resolves to what it returns. */
+type ServicesValue<Services> = Services extends (...args: never[]) => infer Value ? Awaited<Value> : Services;
+
+/**
+ * Registro de los servicios de la aplicación. Está vacío: `meeko check`, `meeko dev` y el editor lo
+ * amplían en `.meeko/types/services.d.ts` con `services`, el tipo que infieren del export por
+ * defecto de `server/runtime.ts` (véase {@link ServerRuntimeServices}). Un host propio sin esas
+ * declaraciones puede ampliarlo a mano. No valida en ejecución.
+ *
+ * @since 1.7.0
+ * @example
+ * ```ts
+ * // server/types/services.d.ts, sólo en un host propio: Meeko genera esta declaración.
+ * import type {} from "@meekojs/meeko/server";
+ * import type { Database } from "../utils/database.js";
+ * declare module "@meekojs/meeko/server" {
+ *   interface GeneratedServices { readonly services: { readonly db: Database } }
+ * }
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#tipos-de-los-servicios
+ */
+// Empty on purpose: the generated declarations add `services` through module augmentation.
+export interface GeneratedServices {}
+
+/**
+ * Servicios de la aplicación: los de {@link GeneratedServices} (inferidos de `server/runtime.ts`) o
+ * `unknown` sin ellos. Es el tipo de `RequestContext.services` cuando no se indica otro, así que
+ * `context.services` queda tipado sin conversiones en páginas, `usePage()`, API, RPC, Socket y el
+ * middleware de ruta de servidor.
+ *
+ * @since 1.7.0
+ * @example
+ * ```ts
+ * import type { AppServices } from "@meekojs/meeko/server";
+ *
+ * export async function countUsers(services: AppServices): Promise<number> {
+ *   return services.db.users.count();
+ * }
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#tipos-de-los-servicios
+ */
+export type AppServices = GeneratedServices extends { readonly services: infer Services } ? Services : unknown;
+
+/**
+ * `services` of a request context: the written type, or {@link AppServices} for `unknown`, the
+ * default of every `services` type parameter. `any` stays `any`.
+ */
+export type ContextServices<TServices> = 0 extends 1 & TServices ? TServices : unknown extends TServices ? AppServices : TServices;
+
+/**
  * Declara en `server/runtime.ts` las sesiones, los servicios y la política de Socket de la
  * aplicación. Meeko llama a la fábrica una vez por proceso con `{ env, production, platform,
  * prerendering }`; con `prerendering` no se sirve tráfico y basta un store en memoria.

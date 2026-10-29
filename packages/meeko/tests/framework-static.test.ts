@@ -120,20 +120,20 @@ test("meeko.config.ts validates site, sitemap, robots, document.seo and the stat
   assert.equal(resolveSiteOrigin({}, {}), undefined);
   // MEEKO_PUBLIC_ORIGIN keeps only its origin, as the server reads it since 1.2; `site` stays strict.
   assert.equal(resolveSiteOrigin({}, { MEEKO_PUBLIC_ORIGIN: "https://user:secret@env.example/app?x=1#y" }), "https://env.example");
-  assert.throws(() => resolveSiteOrigin({}, { MEEKO_PUBLIC_ORIGIN: "ftp://env.example" }), /MEEKO_PUBLIC_ORIGIN must use http: or https:/);
+  assert.throws(() => resolveSiteOrigin({}, { MEEKO_PUBLIC_ORIGIN: "ftp://env.example" }), /MEEKO_PUBLIC_ORIGIN debe usar http: o https:/);
   assert.throws(() => resolveSiteOrigin({ site: "https://example.com/app" }, {}), /site must be an origin without path/);
   await assert.rejects(config('{ site: "https://example.com/docs" }'), /site must be an origin without path/);
   await assert.rejects(config('{ site: "ftp://example.com" }'), /site must use http: or https:/);
-  await assert.rejects(config('{ sitemap: { exclude: ["admin"] } }'), /sitemap\.exclude must be an array of nonempty strings that start with \//);
-  await assert.rejects(config('{ sitemap: { include: [] } }'), /sitemap: unknown field include/);
-  await assert.rejects(config('{ robots: "yes" }'), /robots must be a boolean or an object/);
+  await assert.rejects(config('{ sitemap: { exclude: ["admin"] } }'), /sitemap\.exclude debe ser un array de cadenas no vacías que empiecen por \//);
+  await assert.rejects(config('{ sitemap: { include: [] } }'), /sitemap: campo desconocido include/);
+  await assert.rejects(config('{ robots: "yes" }'), /robots debe ser un booleano o un objeto/);
   await assert.rejects(config('{ document: { seo: { canonical: "yes" } } }'), /document\.seo: canonical must be a boolean/);
-  await assert.rejects(config('{ server: { adapter: "static", port: 3000 } }'), /server \(static\): unknown field port/);
-  await assert.rejects(config('{ server: { adapter: "static", headerFiles: ["apache"] } }'), /headerFiles must be an array of "_headers" and "nginx"/);
+  await assert.rejects(config('{ server: { adapter: "static", port: 3000 } }'), /server \(static\): campo desconocido port/);
+  await assert.rejects(config('{ server: { adapter: "static", headerFiles: ["apache"] } }'), /headerFiles debe ser un array con "_headers" y "nginx"/);
   await assert.rejects(config('{ server: { adapter: "static", contentSecurityPolicy: { "script-src": ["a;b"] } } }'), /server\.contentSecurityPolicy: invalid source/);
   await assert.rejects(config('{ server: { adapter: "static", headers: { "Content-Security-Policy": "x" } } }'), /use server\.contentSecurityPolicy/);
-  await assert.rejects(config('{ server: { adapter: "static", headers: { "X-A": "a\\nb" } } }'), /without line breaks/);
-  await assert.rejects(config('{ server: { adapter: "edge" } }'), /"bun" or "static"/);
+  await assert.rejects(config('{ server: { adapter: "static", headers: { "X-A": "a\\nb" } } }'), /sin saltos de línea/);
+  await assert.rejects(config('{ server: { adapter: "edge" } }'), /"bun" o "static"/);
 });
 
 test("the document reads MEEKO_PUBLIC_ORIGIN only when document.seo writes an absolute URL, and keeps its origin", () => {

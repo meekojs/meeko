@@ -23,6 +23,7 @@ A partir de 1.0, Meeko sigue SemVer. La [política de estabilidad](https://githu
 - [Actualizar de 1.3 a 1.4](https://github.com/meekojs/meeko/blob/main/docs/migration-1.4.md)
 - [Actualizar de 1.4 a 1.5](https://github.com/meekojs/meeko/blob/main/docs/migration-1.5.md)
 - [Actualizar de 1.5 a 1.6](https://github.com/meekojs/meeko/blob/main/docs/migration-1.6.md)
+- [Actualizar de 1.6 a 1.7](https://github.com/meekojs/meeko/blob/main/docs/migration-1.7.md)
 - [Editores y servidor de lenguaje](https://github.com/meekojs/meeko/blob/main/docs/editors.md)
 - [Plan de desarrollo](https://github.com/meekojs/meeko/blob/main/docs/roadmap.md)
 - [Comparativa reproducible con Vue](https://github.com/meekojs/meeko/blob/main/docs/benchmarks.md)

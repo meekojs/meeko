@@ -6,9 +6,13 @@
 import { componentErrorReporter } from "../component-errors.js";
 import { useId } from "../ids.js";
 import { setupPhase } from "../lifecycle.js";
-import { batch, computed, effect, signal, untrack } from "../reactivity.js";
+import { batch, computed, effect, findContext, signal, untrack } from "../reactivity.js";
 import type { ReadonlySignal, Signal } from "../reactivity.js";
+import { ClientError } from "./clients.js";
 import type { ValidationIssue } from "./clients.js";
+import { actionPathname, formFlashKey, formStateKey, parseFormFlash } from "./form-flash.js";
+import type { FormFlash } from "./form-flash.js";
+import { findState } from "./state.js";
 
 type SchemaResult<O> = { value: O; issues?: undefined } | { issues: readonly unknown[] };
 
@@ -118,6 +122,13 @@ export interface Form<Values, Result> {
    * @since 1.5.0
    */
   readonly field: <K extends keyof Values & string>(name: K) => FormField<Values[K]>;
+  /**
+   * Token CSRF de la sesión para el campo oculto `_csrf` de un formulario nativo, o `undefined`
+   * sin sesión: en SSR, el de la petición; en el navegador, el de la meta `meeko-csrf-token`. Un
+   * envío con JavaScript no lo necesita, porque lo envía en la cabecera.
+   * @since 1.7.0
+   */
+  readonly csrfToken: string | undefined;
 }
 
 /**
@@ -254,6 +265,15 @@ interface FormOptions<Values, Output, Result> {
    * @since 1.5.0
    */
   readonly focusInvalid?: boolean;
+  /**
+   * Ruta del endpoint de API con `form` al que el `<form method="post">` se envía sin JavaScript,
+   * como `"/api/feedback"`. Cuando el navegador vuelve de ese envío, el SSR pinta su resultado:
+   * `errors`, `error` y `failure` de un error, o `submitted` de un envío correcto, y los valores de
+   * los campos que el endpoint lista en `form.echo` (por defecto ninguno: los demás campos parten
+   * de `initial`). La hidratación los conserva.
+   * @since 1.7.0
+   */
+  readonly action?: string;
 }
 
 /**
@@ -327,8 +347,11 @@ export function useForm<S extends FormSchema<object, unknown>, Result = unknown>
 export function useForm(options: FormOptions<Record<string, unknown>, unknown, unknown> & { readonly schema?: FormSchema | undefined }): Form<Record<string, unknown>, unknown> {
   const { schema, initial } = options;
   const keys = Object.keys(initial);
+  // The outcome of a native submission of this form, when the browser came back from one.
+  const native = nativeForm(options.action);
+  const flash = native.flash;
   const fields: Record<string, Signal<unknown>> = Object.create(null);
-  for (const key of keys) fields[key] = signal(initial[key]);
+  for (const key of keys) fields[key] = signal(flash?.values && Object.hasOwn(flash.values, key) ? flash.values[key] : initial[key]);
   // The values that `reset()` restores: `initial`, or the last `commit`.
   let origin: Record<string, unknown> = { ...initial };
   const baseline = signal<Record<string, unknown>>({ ...initial });
@@ -620,8 +643,51 @@ export function useForm(options: FormOptions<Record<string, unknown>, unknown, u
     });
   };
 
-  const form = { fields, errors, error, failure, pending, submitted, dirty, submit, reset, trySubmit, commit, field } as unknown as Form<Record<string, unknown>, unknown>;
+  const form = { fields, errors, error, failure, pending, submitted, dirty, submit, reset, trySubmit, commit, field, csrfToken: native.csrfToken } as unknown as Form<Record<string, unknown>, unknown>;
+  if (flash) {
+    if (flash.ok) {
+      submitted.value = true;
+    } else {
+      const cause = new ClientError(flash.code ?? "INTERNAL_ERROR", flash.status ?? 500, flash.requestId, flash.issues);
+      // The same reading as a failed submission with JavaScript, without reporting it again.
+      if (flash.issues?.length) {
+        const sorted = sortIssues(flash.issues);
+        for (const path of Object.keys(sorted.byPath)) serverPaths.add(path);
+        batch(() => { errors.value = Object.freeze(sorted.byPath); error.value = sorted.form; failure.value = cause; });
+      } else {
+        let message: string;
+        try { message = options.errorMessage ? options.errorMessage(cause) : messageOf(cause); }
+        catch (messageError) { report(messageError); message = messageOf(cause); }
+        batch(() => { error.value = message; failure.value = cause; });
+      }
+    }
+  }
   return form;
+}
+
+/**
+ * The flash of a native submission of `action` and the session's CSRF token. In SSR they come from
+ * the server's form plugin, and the flash goes into the page state; in the browser, from that state
+ * (read once) and the `meeko-csrf-token` meta.
+ */
+function nativeForm(action: string | undefined): { readonly flash: FormFlash | undefined; readonly csrfToken: string | undefined } {
+  const source = findContext(formFlashKey);
+  if (source) {
+    const path = action === undefined ? undefined : actionPathname(action);
+    const flash = path !== undefined && source.flash?.action === path ? source.flash : undefined;
+    if (flash) findState(formStateKey(flash.action), () => flash);
+    return { flash, csrfToken: source.csrfToken };
+  }
+  const document = (globalThis as { document?: Document }).document;
+  // A server render without the plugin (a host's own handler) has neither.
+  if (!document && setupPhase() === "render") return { flash: undefined, csrfToken: undefined };
+  const csrfToken = document?.querySelector?.('meta[name="meeko-csrf-token"]')?.getAttribute("content") || undefined;
+  if (action === undefined) return { flash: undefined, csrfToken };
+  const state = findState<unknown>(formStateKey(actionPathname(action)), () => null);
+  const flash = parseFormFlash(untrack(() => state?.value));
+  // Once shown, a later mount of the form (another navigation to the page) starts from `initial`.
+  if (flash && state && setupPhase() === "mount") state.value = null;
+  return { flash, csrfToken };
 }
 
 const skipped: FormSubmission<never> = Object.freeze({ ok: false, reason: "skipped" });

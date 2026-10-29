@@ -12,12 +12,16 @@ export interface TocEntry {
 export interface NavLink {
   readonly href: string;
   readonly label: string;
+  /** The label is the name of a symbol (`useForm`, `<MeekoLink>`), shown as code. */
+  readonly code?: boolean;
 }
 
 /** A group of the sidebar. */
 export interface NavSection {
   readonly title: string;
   readonly links: readonly NavLink[];
+  /** `d` of the 16 px stroke icon of a group of the API reference, drawn before its title. */
+  readonly icon?: string;
 }
 
 /** A rendered Markdown document of the repository. */

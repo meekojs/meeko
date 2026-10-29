@@ -5,6 +5,7 @@ import {
   LocalSocketPubSub, MemorySessionStore, SessionManager,
 } from "../src/framework-server.ts";
 import type { AppManifest, Schema, SocketMessage, SocketPeer, SocketPubSub } from "../src/framework-server.ts";
+import { resetEnvWarnings } from "../src/framework-server/env.ts";
 
 function object<T>(check: (value: Record<string, unknown>) => boolean): Schema<T> {
   return { "~standard": { version: 1, validate(value) {
@@ -158,4 +159,34 @@ test("Socket handlers broadcast to other rooms through their own hub", async () 
   const strictConnection = await strict.accept("kitchen", request, peer().socket, "store-1");
   await assert.rejects(strictConnection.receive(JSON.stringify({ event: "relay", payload: { room: "store-2", orderId: "E5" } })),
     (error: unknown) => error instanceof ApiError && error.code === "INVALID_SOCKET_PAYLOAD");
+});
+
+test("production with the default in-memory broker warns once; a declared broker or development does not", async () => {
+  resetEnvWarnings();
+  const manifest: AppManifest = {
+    version: 1,
+    routes: [],
+    server: { api: [], rpc: [], socket: [{ kind: "socket", file: "/server/socket/kitchen.ts", name: "kitchen", pathname: "/_meeko/socket/kitchen" }] },
+    routeMiddleware: [],
+    serverMiddleware: [],
+    client: { entry: "/assets/entry.js", css: [], preload: [] },
+  };
+  const table: Record<string, unknown> = { "/server/socket/kitchen.ts": { default: defineSocketChannel({ clientToServer: { relay }, serverToClient: { kitchenChanged } }) } };
+  const build = async (production: boolean, pubsub?: SocketPubSub) => createServerApp({
+    manifest, production, load: async (key) => table[key],
+    runtime: defineServerRuntime(() => ({
+      sessions: new SessionManager({ store: new MemorySessionStore(), secure: false }),
+      ...(pubsub ? { socket: { pubsub } } : {}),
+    })),
+  });
+  const warnings: string[] = [];
+  const original = console.warn;
+  console.warn = (message: unknown) => { warnings.push(String(message)); };
+  try {
+    for (const app of [await build(false), await build(true, new LocalSocketPubSub())]) await app.close();
+    assert.deepEqual(warnings, [], "development and an explicit broker stay quiet");
+    for (const app of [await build(true), await build(true)]) await app.close();
+  } finally { console.warn = original; }
+  assert.equal(warnings.length, 1, "once per process");
+  assert.match(warnings[0]!, /LocalSocketPubSub.*varias réplicas.*RedisSocketPubSub/s);
 });

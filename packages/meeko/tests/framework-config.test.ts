@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { discoverConfiguredRoutes, loadMeekoConfig, readMeekoConfigSync, resolveConfigSources } from "../src/framework/config.ts";
 import { generateRoutes } from "../src/framework/generate.ts";
+import { resolveMeekoModules } from "../src/framework/module-loader.ts";
 
 async function put(root: string, name: string, value: string): Promise<void> {
   const file = join(root, name);
@@ -44,7 +45,7 @@ test("config rejects colliding routes and source names with file paths", async (
     await assert.rejects(discoverConfiguredRoutes(root), /Route collision:.*chat\.meeko/);
     await put(root, "meeko.config.mjs", `export default { extends: ["./layers/base"], modules: ["./modules/base"] };`);
     await put(root, "modules/base/app/pages/other.meeko", "<template>Other</template>");
-    await assert.rejects(discoverConfiguredRoutes(root), /duplicate Meeko source name base/);
+    await assert.rejects(discoverConfiguredRoutes(root), /no válido o repetido base/);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
@@ -57,7 +58,7 @@ test("configured layers cannot escape the project through a directory link", asy
     await symlink(external, join(root, "layers", "external"), "junction");
     await assert.rejects(
       resolveConfigSources(root, { extends: ["./layers/external"] }),
-      /escapes project root/,
+      /sale de la raíz del proyecto/,
     );
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -87,10 +88,42 @@ test("loadMeekoConfig validates the dev options", async () => {
     const file = join(root, "meeko.config.mjs");
     await writeFile(file, `export default { dev: { serverLogs: false } };\n`);
     assert.equal((await loadMeekoConfig(root)).dev?.serverLogs, false);
-    for (const [dev, error] of [["[]", /dev must be an object/], ['{ serverLogs: "no" }', /dev\.serverLogs must be a boolean/]] as const) {
+    for (const [dev, error] of [["[]", /dev debe ser un objeto/], ['{ serverLogs: "no" }', /dev\.serverLogs debe ser un booleano/]] as const) {
       await writeFile(file, `export default { dev: ${dev} };\n`);
       await assert.rejects(loadMeekoConfig(root), error);
     }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+/** Runs `run` and returns what it wrote to stderr. */
+async function stderrOf(run: () => Promise<unknown>): Promise<string> {
+  const original = process.stderr.write;
+  let written = "";
+  process.stderr.write = ((chunk: string | Uint8Array) => { written += String(chunk); return true; }) as typeof process.stderr.write;
+  try { await run(); } finally { process.stderr.write = original; }
+  return written;
+}
+
+test("an unknown key of meeko.config warns once with the closest key, and module keys are known", async () => {
+  const root = await mkdtemp(join(tmpdir(), "meeko-config-unknown-"));
+  try {
+    await put(root, "meeko.config.mjs", `export default { sitmap: true, site: "https://example.com", extra: 1 };\n`);
+    const warned = await stderrOf(async () => {
+      const config = await loadMeekoConfig(root);
+      assert.equal((config as Record<string, unknown>).sitmap, true, "still loads: a warning, not an error");
+      await resolveMeekoModules(root, config);
+    });
+    assert.equal(warned, [
+      `[meeko] Aviso: meeko.config.mjs tiene la clave desconocida "sitmap", que Meeko ignora. ¿Quisiste decir "sitemap"?\n`,
+      `[meeko] Aviso: meeko.config.mjs tiene la clave desconocida "extra", que Meeko ignora. Si son las opciones de un módulo, añádalo a modules: su meta.configKey la declara.\n`,
+    ].join(""));
+    // A module's configKey is a key of the configuration; a typo of it is not.
+    await put(root, "modules/hello/index.mjs", `export default { [Symbol.for("meeko.module")]: true, meta: { name: "hello", configKey: "hello" }, setup() {} };\n`);
+    await put(root, "meeko.config.mjs", `export default { modules: ["./modules/hello"], hello: { greeting: "Hola" }, helo: {}, alias: { "lib/": "app/lib/" } };\n`);
+    const modules = await stderrOf(async () => resolveMeekoModules(root, await loadMeekoConfig(root)));
+    assert.equal(modules, `[meeko] Aviso: meeko.config.mjs tiene la clave desconocida "helo", que Meeko ignora. ¿Quisiste decir "hello"?\n`);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

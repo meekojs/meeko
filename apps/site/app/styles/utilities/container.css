@@ -1,5 +1,5 @@
 .container {
 	margin-inline: auto;
-	padding-inline: 1rem;
-	max-width: 100%;
+	padding-inline: var(--gutter);
+	max-width: var(--container);
 }

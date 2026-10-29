@@ -1,6 +1,7 @@
 import type { GeneratedRouteMiddleware } from "../framework.js";
 import type { RequestContext } from "../framework-server/context.js";
 import type { ServerPlatform } from "../framework-server/platform.js";
+import type { ContextServices } from "../framework-server/runtime.js";
 import type { RouteMatch, RouteRecord } from "./router.js";
 
 /**
@@ -198,8 +199,8 @@ export interface ServerRouteMiddlewareContext<TServices = unknown, TEnv = unknow
   readonly context: RequestContext<TServices, TEnv>;
   /** Sesión de la petición, como `context.session`. */
   readonly session: RequestContext<TServices, TEnv>["session"];
-  /** Servicios de `server/runtime.ts`, como `context.services`. */
-  readonly services: TServices;
+  /** Servicios de `server/runtime.ts`, como `context.services`; desde `1.7`, `AppServices` sin `TServices`. */
+  readonly services: ContextServices<TServices>;
   /** Runtime que atiende la petición, como `context.platform`. */
   readonly platform: ServerPlatform<TEnv>;
   /** ID de la petición, como `context.requestId`. */

@@ -2,7 +2,30 @@ import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 
 /** Entradas que puede dejar un gestor de paquetes antes de generar el proyecto. */
+/** What `meeko init` and `meeko init-framework` accept in the destination: a package being started. */
 const packageScaffoldEntries = new Set(["package.json", "package-lock.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "yarn.lock", "bun.lock", "bun.lockb", "node_modules", ".npmrc", ".git"]);
+
+/**
+ * Entries of the destination of `meeko init` and `meeko init-framework`, after checking that it can
+ * receive a project: it does not exist, is empty, holds only a `.git` (a fresh `git init`) or holds
+ * a `package.json` with only lockfiles, `node_modules`, `.npmrc` and `.git` around it.
+ */
+export async function scaffoldDestinationEntries(target: string): Promise<string[]> {
+  let entries: string[] = [];
+  try {
+    if (!(await stat(target)).isDirectory()) throw new Error(`El destino no es un directorio: ${target}`);
+    entries = await readdir(target);
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+  }
+  const unexpected = entries.filter((entry) => !packageScaffoldEntries.has(entry));
+  // Lockfiles or node_modules without their package.json belong to something else.
+  const orphaned = !entries.includes("package.json") && entries.some((entry) => entry !== ".git");
+  if (unexpected.length > 0 || orphaned) {
+    throw new Error(`El destino no está vacío: ${target}${unexpected.length > 0 ? ` (${unexpected.join(", ")})` : " (sin package.json)"}`);
+  }
+  return entries;
+}
 
 /** Comprueba que un valor JSON sea un objeto de configuración. */
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -177,27 +200,17 @@ export async function initProject(directory: string): Promise<string> {
   const name = basename(target).toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[._-]+|[._-]+$/g, "") || "meeko-app";
   const packageMetadata: unknown = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   if (typeof packageMetadata !== "object" || packageMetadata === null || !("version" in packageMetadata) || typeof packageMetadata.version !== "string") {
-    throw new Error("Meeko package version is unavailable");
+    throw new Error("No se puede leer la versión del paquete de Meeko");
   }
-  let existingEntries: string[] = [];
-  try {
-    if (!(await stat(target)).isDirectory()) throw new Error(`Destination is not a directory: ${target}`);
-    existingEntries = await readdir(target);
-  } catch (error) {
-    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
-  }
-  const unexpected = existingEntries.filter((entry) => !packageScaffoldEntries.has(entry));
-  if (unexpected.length > 0 || (existingEntries.length > 0 && !existingEntries.includes("package.json"))) {
-    throw new Error(`Destination is not empty: ${target}${unexpected.length > 0 ? ` (${unexpected.join(", ")})` : ""}`);
-  }
+  const existingEntries = await scaffoldDestinationEntries(target);
   const existing: unknown = existingEntries.includes("package.json") ? JSON.parse(await readFile(join(target, "package.json"), "utf8")) : {};
-  if (!isRecord(existing)) throw new Error(`Invalid package.json in ${target}`);
+  if (!isRecord(existing)) throw new Error(`package.json no válido en ${target}`);
   const existingScripts = existing.scripts ?? {};
   const existingDependencies = existing.dependencies ?? {};
   const existingDevDependencies = existing.devDependencies ?? {};
   const existingEngines = existing.engines ?? {};
   if (!isRecord(existingScripts) || !isRecord(existingDependencies) || !isRecord(existingDevDependencies) || !isRecord(existingEngines)) {
-    throw new Error(`Invalid package.json in ${target}`);
+    throw new Error(`package.json no válido en ${target}`);
   }
   const scripts = {
     dev: "node server.mjs",
@@ -207,10 +220,10 @@ export async function initProject(directory: string): Promise<string> {
   };
   const devDependencies = { "@types/node": "^24.0.0", typescript: "^7.0.2", vite: "^8.3.5" };
   for (const command of Object.keys(scripts)) {
-    if (command in existingScripts) throw new Error(`Destination already defines the ${command} script: ${target}`);
+    if (command in existingScripts) throw new Error(`El destino ya define el script ${command}: ${target}`);
   }
   if (Object.keys(existingDependencies).some((dependency) => dependency !== "@meekojs/meeko") || Object.keys(existingDevDependencies).some((dependency) => !(dependency in devDependencies))) {
-    throw new Error(`Destination contains other dependencies: ${target}`);
+    throw new Error(`El destino tiene otras dependencias: ${target}`);
   }
   const packageFile = JSON.stringify({
     ...existing,

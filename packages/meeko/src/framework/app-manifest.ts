@@ -24,6 +24,8 @@ export interface BuildAppData {
   readonly client: ClientAssets;
   readonly assets: AssetManifest;
   readonly node: { readonly host: string; readonly port: number };
+  /** Unique per `meeko build`; part of the ETag of cached pages. Missing in a build before 1.7. */
+  readonly buildId?: string;
 }
 
 /** Converts an absolute source file into the project-relative key used by bundles. */
@@ -161,11 +163,15 @@ export async function discoverAppManifest(projectRoot: string, client: ClientAss
   const serverHandlers = projectModules.serverHandlers.map(({ route, file }) => ({ route, file: importSpecifier(root, file) }));
   const errorPage = await portableErrorPage(root);
   const document = resolvedDocument(config, projectModules);
+  // The response headers of the adapters with a server; the static adapter writes its own files.
+  const response = config.server && config.server.adapter !== "static" ? config.server : undefined;
   const manifest: AppManifest = {
     version: 1,
     routes,
     ...(errorPage ? { errorPage } : {}),
     ...(document ? { document } : {}),
+    ...(response?.contentSecurityPolicy ? { contentSecurityPolicy: response.contentSecurityPolicy } : {}),
+    ...(response?.headers ? { headers: response.headers } : {}),
     server: {
       api: server.api.map((endpoint) => ({ ...endpoint, file: moduleKey(root, endpoint.file) })),
       rpc: server.rpc.map((endpoint) => ({ ...endpoint, file: moduleKey(root, endpoint.file) })),
@@ -216,7 +222,9 @@ export function projectHasRedis(root: string): boolean {
  */
 export async function serverAppSource(projectRoot: string, build: BuildAppData | undefined, options: { readonly redis?: boolean } = {}): Promise<string> {
   const client: ClientAssets = build?.client ?? { entry: `/${frameworkClientEntry}`, css: [], preload: [] };
-  const { manifest, modules, runtime } = await discoverAppManifest(projectRoot, client, build?.assets);
+  const discovered = await discoverAppManifest(projectRoot, client, build?.assets);
+  const { modules, runtime } = discovered;
+  const manifest: AppManifest = build?.buildId ? { ...discovered.manifest, buildId: build.buildId } : discovered.manifest;
   const entries = modules.map((key) => `  ${JSON.stringify(key)}: () => import(${JSON.stringify(key)})`).join(",\n");
   const root = resolve(projectRoot);
   const plugins = pluginRegistrations(root, (await discoverAppPlugins(root)).filter((plugin) => plugin.mode !== "client"));

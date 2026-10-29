@@ -182,7 +182,7 @@ export default defineMeekoModule({ meta: { name: "other" }, setup(_options, meek
 `);
   await put(root, "modules/other/docs.meeko", layout);
   await put(root, "meeko.config.mjs", 'export default { layers: ["./layers/base"], modules: ["./modules/docs", "./modules/other"] };\n');
-  await assert.rejects(discoverConfiguredRoutes(root), /Meeko module other: layout docs is already added by docs/);
+  await assert.rejects(discoverConfiguredRoutes(root), /Módulo de Meeko other: el layout docs ya lo añade docs/);
 });
 
 test("meeko dev rebuilds when an edit changes the options that discovery reads", () => {

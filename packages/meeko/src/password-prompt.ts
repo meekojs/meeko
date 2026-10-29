@@ -88,6 +88,8 @@ async function readPiped(input: PasswordInput): Promise<string> {
   }
   const password = text.replace(/\r?\n$/, "");
   if (/[\r\n]/.test(password)) throw new Error("La entrada debe tener una sola línea con la contraseña");
+  // The CLI's own message, before the English one of hashPassword.
+  if (!password) throw new Error("La contraseña está vacía");
   return password;
 }
 
@@ -96,10 +98,18 @@ async function readPiped(input: PasswordInput): Promise<string> {
  * (`echo "$PASSWORD" | meeko auth hash`).
  */
 export async function promptPassword(input: PasswordInput, output: PromptOutput): Promise<string> {
-  if (!input.isTTY) return readPiped(input);
+  if (!input.isTTY) return withinLimit(await readPiped(input));
   const password = await readHidden(input, output, "Contraseña: ");
   if (!password) throw new Error("La contraseña está vacía");
   const confirmation = await readHidden(input, output, "Repite la contraseña: ");
   if (password !== confirmation) throw new Error("Las contraseñas no coinciden");
+  return withinLimit(password);
+}
+
+/** The limit of `hashPassword` in UTF-8 bytes, checked here so the CLI says it in Spanish. */
+const maxPasswordBytes = 4096;
+
+function withinLimit(password: string): string {
+  if (Buffer.byteLength(password, "utf8") > maxPasswordBytes) throw new Error(`La contraseña supera ${maxPasswordBytes} bytes`);
   return password;
 }

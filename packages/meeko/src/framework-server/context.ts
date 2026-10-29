@@ -1,9 +1,10 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { SessionData, SessionHandle } from "./sessions.js";
-import { clientAddressOf } from "./env.js";
+import { clientAddressOf, requestEnvironmentOf } from "./env.js";
 import { defaultPlatform } from "./platform.js";
 import type { ServerPlatform } from "./platform.js";
 import { takeScopedRequestId } from "./process-errors.js";
+import type { ContextServices } from "./runtime.js";
 
 /**
  * Contexto de una petición HTTP: sesión, servicios, plataforma y estado propios de esa petición,
@@ -26,15 +27,20 @@ import { takeScopedRequestId } from "./process-errors.js";
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#revocación-durante-una-petición
  */
-export interface RequestContext<TServices = unknown, TEnv = unknown> {
+export interface RequestContext<out TServices = unknown, TEnv = unknown> {
+  // `out`: a context compares by its services type, so one with any services still goes where a
+  // `RequestContext` (services `unknown`, read as AppServices) is expected, as before 1.7.
   /** Petición HTTP original. */
   readonly request: Request;
   /** ID de la petición, que también va en `x-request-id` y llega a `onError`. */
   readonly requestId: string;
   /** Se aborta si el cliente se desconecta o, con `SessionRevokedError`, si se revoca la sesión. */
   readonly signal: AbortSignal;
-  /** Servicios de `server/runtime.ts`. */
-  readonly services: TServices;
+  /**
+   * Servicios de `server/runtime.ts`. Sin `TServices` (o con `unknown`), desde `1.7` su tipo es
+   * `AppServices`, el que Meeko infiere de `server/runtime.ts`.
+   */
+  readonly services: ContextServices<TServices>;
   /**
    * Sesión de la petición: leer, crear, rotar, revocar y verificar. Sus datos tienen el tipo de
    * `MeekoSession` cuando la aplicación lo declara (desde `1.2`), o `unknown`.
@@ -55,9 +61,48 @@ export interface RequestContext<TServices = unknown, TEnv = unknown> {
    * IP del cliente (desde `1.2`): la de la conexión que entrega el adaptador o, con
    * `MEEKO_TRUST_PROXY`, la que añadió a `X-Forwarded-For` el proxy de confianza más externo.
    * `undefined` si no se conoce. Sin `MEEKO_TRUST_PROXY`, `X-Forwarded-For` nunca se lee, porque
-   * cualquier cliente puede enviarlo. La usa `rateLimit` y sirve para registros y auditoría.
+   * cualquier cliente puede enviarlo. La usa `rateLimit` y sirve para registros y auditoría. Fuera
+   * de un contexto, como en un middleware de servidor, la misma IP la da {@link clientAddress}.
    */
   readonly clientAddress?: string | undefined;
+}
+
+/**
+ * IP del cliente de una petición (desde `1.7`), con la misma política que `context.clientAddress`
+ * y `rateLimit`: la de la conexión que entrega el adaptador (el socket en Node, Bun y Deno;
+ * `CF-Connecting-IP` en Workers) o, con `MEEKO_TRUST_PROXY`, la entrada de `X-Forwarded-For` que
+ * añadió el proxy de confianza más externo (la `n`-ésima desde la derecha), sin su puerto. Sin
+ * `MEEKO_TRUST_PROXY`, `X-Forwarded-For` nunca se lee, porque cualquier cliente puede enviarlo.
+ * Sirve donde no hay `RequestContext`, como en `defineServerMiddleware` o en el handler de
+ * `addServerHandler` de un módulo; en el resto, use `context.clientAddress`.
+ *
+ * Sin `env`, aplica el `MEEKO_TRUST_PROXY` del entorno (`platform.env`) de la aplicación que atiende
+ * la petición, también en la petición nueva que un middleware pasa a `next()`. Una petición que no
+ * atiende un `ServerApp` sólo usa la IP de la conexión, salvo que reciba `env`.
+ *
+ * @param request Petición que recibe el middleware o el handler.
+ * @param env Entorno del que leer `MEEKO_TRUST_PROXY`, como `process.env`; por defecto, el de la
+ * aplicación que atiende la petición.
+ * @returns La IP normalizada (IPv6 en minúsculas, IPv4 mapeada como IPv4), o `undefined` si no se
+ * conoce.
+ * @throws {TypeError} Si `MEEKO_TRUST_PROXY` no es válida.
+ * @since 1.7.0
+ * @example
+ * ```ts
+ * // server/middleware/10-visitor.ts
+ * import { clientAddress, defineServerMiddleware } from "@meekojs/meeko/server";
+ *
+ * export default defineServerMiddleware((request, next) => {
+ *   // Tras Traefik con MEEKO_TRUST_PROXY=1, la IP del cliente y no la del proxy.
+ *   const ip = clientAddress(request) ?? "desconocida";
+ *   console.log(`${request.method} ${new URL(request.url).pathname} desde ${ip}`);
+ *   return next();
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#ip-del-cliente-tras-un-proxy
+ */
+export function clientAddress(request: Request, env?: unknown): string | undefined {
+  return clientAddressOf(request, env === undefined ? requestEnvironmentOf(request)?.env : env);
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -151,7 +196,8 @@ export function createRequestContext<TServices, TEnv = unknown>(request: Request
   let address: { readonly value: string | undefined } | undefined;
   return {
     // The first context of a ServerApp request takes the ID its process failures carry.
-    request, requestId: takeScopedRequestId() ?? crypto.randomUUID(), services, session, state: new Map(),
+    // `services` is the written type unless it is `unknown`, which ContextServices resolves.
+    request, requestId: takeScopedRequestId() ?? crypto.randomUUID(), services: services as ContextServices<TServices>, session, state: new Map(),
     get signal() { return signal ??= revocation ? combinedSignal(request.signal, revocation) : request.signal; },
     platform: resolvedPlatform,
     idempotencyKey: idempotencyKeyOf(request),

@@ -115,11 +115,11 @@ test("the default aliases resolve in each source root, alias adds or turns them 
   assert.deepEqual(readMeekoConfigSync(root).alias, { "lib/": "app/lib/", "secret/": "server/secret/", "#server/": false, "~/": "src/" });
 
   for (const [alias, message] of [
-    ['"app/lib/"', /alias must be an object of path prefixes/],
-    ['{ "lib": "app/lib/" }', /alias "lib" must be a prefix that ends in \//],
-    ['{ "./x/": "app/" }', /alias "\.\/x\/" must be a prefix that ends in \//],
-    ['{ "lib/": 1 }', /alias "lib\/" must name a folder of the project/],
-    ['{ "lib/": "../outside/" }', /alias "lib\/" must be a relative path inside the project/],
+    ['"app/lib/"', /alias debe ser un objeto de prefijos de ruta/],
+    ['{ "lib": "app/lib/" }', /alias "lib" debe ser un prefijo que termine en \//],
+    ['{ "./x/": "app/" }', /alias "\.\/x\/" debe ser un prefijo que termine en \//],
+    ['{ "lib/": 1 }', /alias "lib\/" debe nombrar una carpeta del proyecto/],
+    ['{ "lib/": "../outside/" }', /alias "lib\/" debe ser una ruta relativa dentro del proyecto/],
   ] as const) {
     await writeFile(join(root, "meeko.config.mjs"), `export default { alias: ${alias} };\n`);
     await assert.rejects(loadMeekoConfig(root), (error: Error) => error instanceof TypeError && message.test(error.message) && error.message.includes("meeko.config.mjs: alias"));

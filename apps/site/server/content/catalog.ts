@@ -1,5 +1,6 @@
 import type { NavLink, NavSection, Pager } from "../../shared/types/docs.js";
-import { apiGroups, groupHref, referenceHref } from "./api-groups.js";
+import { exportsHref, referenceHref } from "./api-groups.js";
+import { taxonomy } from "./reference-taxonomy.js";
 
 /** A page of the site and the Markdown file of the repository it renders. */
 export interface CatalogEntry {
@@ -37,6 +38,7 @@ export const catalog: readonly CatalogEntry[] = [
   { slug: "stability", href: "/docs/stability", source: "docs/stability.md", label: "Estabilidad 1.x", section: "Referencia" },
   { slug: "architecture", href: "/docs/architecture", source: "docs/architecture.md", label: "Arquitectura", section: "Referencia" },
   { slug: "migration-1.6", href: "/docs/migration-1.6", source: "docs/migration-1.6.md", label: "Actualizar a 1.6", section: "Referencia" },
+  { slug: "migration-1.7", href: "/docs/migration-1.7", source: "docs/migration-1.7.md", label: "Actualizar a 1.7", section: "Referencia" },
   { slug: "migration-1.5", href: "/docs/migration-1.5", source: "docs/migration-1.5.md", label: "Actualizar a 1.5", section: "Referencia" },
   { slug: "migration-1.4", href: "/docs/migration-1.4", source: "docs/migration-1.4.md", label: "Actualizar a 1.4", section: "Referencia" },
   { slug: "migration-1.3", href: "/docs/migration-1.3", source: "docs/migration-1.3.md", label: "Actualizar a 1.3", section: "Referencia" },
@@ -69,9 +71,14 @@ export function navigation(): NavSection[] {
     if (!section) sections.push(section = { title: entry.section, links: [] });
     section.links.push({ href: entry.href, label: entry.label });
   }
+  // The groups of the taxonomy, each at its place in the index; the reference has its own sidebar.
   const reference = {
     title: "Referencia de la API",
-    links: [{ href: referenceHref, label: "Índice de la API" }, ...apiGroups().map((group) => ({ href: groupHref(group), label: group.label }))],
+    links: [
+      { href: referenceHref, label: "Índice de la API" },
+      ...taxonomy().map((group) => ({ href: `${referenceHref}#${group.anchor}`, label: group.title })),
+      { href: exportsHref, label: "Todos los exports" },
+    ],
   };
   const guides = sections.findIndex((section) => section.title === "Guías");
   sections.splice(guides < 0 ? sections.length : guides + 1, 0, reference);

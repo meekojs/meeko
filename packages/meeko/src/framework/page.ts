@@ -1,3 +1,4 @@
+import type { SitemapEntriesContext, SitemapEntry } from "./config-type.js";
 import type { StateStore } from "./state.js";
 import { normalizeHeadInput } from "./head.js";
 import type { HeadInput } from "./head.js";
@@ -178,6 +179,137 @@ export const PAYLOAD_VERSION = 2;
 export const ERROR_PAGE_TITLE = "Error";
 
 /**
+ * Contexto que recibe `cache.etag` de una página, antes del loader y del render: la petición, ya
+ * validada por los schemas de la ruta, sin estado ni datos.
+ *
+ * @typeParam P Schema de `params`, o `undefined`.
+ * @typeParam S Schema de `search`, o `undefined`.
+ * @typeParam C Tipo del contexto de la petición.
+ * @since 1.7.0
+ * @example
+ * ```ts
+ * import type { PageCacheContext } from "@meekojs/meeko/framework";
+ *
+ * const etag = ({ params }: PageCacheContext<undefined, undefined>) => docs.versionOf(params.slug);
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#caché-de-páginas-ssr
+ */
+export interface PageCacheContext<P extends PageSchema | undefined, S extends PageSchema | undefined, C = unknown> {
+  /** URL de la petición. */
+  readonly url: URL;
+  /** Parámetros de la ruta, validados. */
+  readonly params: Params<P>;
+  /** Parámetros de búsqueda, validados. */
+  readonly search: Search<S>;
+  /** Petición HTTP de la página. */
+  readonly request: Request;
+  /** Se aborta si el cliente se desconecta. */
+  readonly signal: AbortSignal;
+  /** Contexto de la petición (`RequestContext` en `createServerApp`): servicios y plataforma. */
+  readonly context?: C;
+}
+
+/**
+ * Límites de la caché en memoria de una página (`cache.memory`), por ruta y por proceso.
+ *
+ * @since 1.7.0
+ * @example
+ * ```ts
+ * import type { PageMemoryCache } from "@meekojs/meeko/framework";
+ *
+ * const memory: PageMemoryCache = { maxEntries: 200, maxBytes: 8 * 1024 * 1024 };
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#caché-de-páginas-ssr
+ */
+export interface PageMemoryCache {
+  /** Respuestas guardadas como máximo; al superarlo sale la menos usada. Por defecto, `1000`. */
+  readonly maxEntries?: number;
+  /** Bytes (UTF-8) de los cuerpos guardados como máximo. Por defecto, 32 MiB. */
+  readonly maxBytes?: number;
+}
+
+/**
+ * Caché HTTP de una página que se renderiza en el servidor (`definePage({ cache })`). Sólo se
+ * aplica en producción, a peticiones `GET` y `HEAD` sin sesión: una petición con la cookie de
+ * sesión, o una respuesta que pone una cookie, sale como siempre, con `no-store`.
+ *
+ * @typeParam P Schema de `params`, o `undefined`.
+ * @typeParam S Schema de `search`, o `undefined`.
+ * @typeParam C Tipo del contexto de la petición.
+ * @since 1.7.0
+ * @example
+ * ```ts
+ * import { definePage } from "@meekojs/meeko/framework";
+ *
+ * export const route = definePage({
+ *   cache: { etag: ({ params }) => docs.versionOf(params.slug), maxAge: 60, memory: true },
+ *   load: ({ params }) => docs.get(params.slug),
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#caché-de-páginas-ssr
+ */
+export interface PageCache<P extends PageSchema | undefined = undefined, S extends PageSchema | undefined = undefined, C = unknown> {
+  /**
+   * Versión del contenido de la página, que se calcula antes del loader y del render y debe ser
+   * barata (una fecha de modificación, un contador). Meeko la combina con el tema, el build y el
+   * tipo de respuesta (documento o payload) en un `ETag` débil; si coincide con `If-None-Match`,
+   * responde `304` sin ejecutar el loader ni el render. Debe cambiar con todo lo que cambia el HTML
+   * salvo el tema. `undefined` deja esta respuesta sin `ETag`.
+   */
+  readonly etag?: (args: PageCacheContext<P, S, C>) => string | number | undefined | Promise<string | number | undefined>;
+  /** Segundos que el navegador o una CDN pueden servir la copia sin preguntar (`max-age`). Por defecto, `0`. */
+  readonly maxAge?: number;
+  /** Segundos que pueden servir una copia caducada mientras la revalidan (`stale-while-revalidate`). */
+  readonly staleWhileRevalidate?: number;
+  /**
+   * Guarda en la memoria del proceso el HTML y el payload renderizados, por URL, tema y `ETag`, y
+   * los sirve sin loader ni render mientras `etag` devuelva lo mismo. Necesita `etag`. No se aplica
+   * a `render: "stream"`, que sólo usa el `ETag`.
+   */
+  readonly memory?: boolean | PageMemoryCache;
+}
+
+/** `cache` of a page, validated, with its defaults. */
+export interface ResolvedPageCache {
+  readonly etag?: (args: PageCacheContext<PageSchema | undefined, PageSchema | undefined, unknown>) => unknown;
+  readonly maxAge: number;
+  readonly staleWhileRevalidate?: number;
+  readonly memory?: { readonly maxEntries: number; readonly maxBytes: number };
+}
+
+const seconds = (value: unknown): boolean => Number.isSafeInteger(value) && (value as number) >= 0;
+const positive = (value: unknown): boolean => Number.isSafeInteger(value) && (value as number) > 0;
+
+/** Validates `cache` of route options, naming `label` in the errors; `undefined` without one. */
+export function resolvePageCache(value: unknown, label: string): ResolvedPageCache | undefined {
+  if (value === undefined) return undefined;
+  if (!record(value)) throw new TypeError(`${label}: cache must be an object like { etag, maxAge, memory }`);
+  for (const key of Object.keys(value)) {
+    if (!["etag", "maxAge", "staleWhileRevalidate", "memory"].includes(key)) throw new TypeError(`${label}: cache has an unknown field ${key}`);
+  }
+  if (value.etag !== undefined && typeof value.etag !== "function") throw new TypeError(`${label}: cache.etag must be a function`);
+  if (value.maxAge !== undefined && !seconds(value.maxAge)) throw new TypeError(`${label}: cache.maxAge must be a whole number of seconds`);
+  if (value.staleWhileRevalidate !== undefined && !seconds(value.staleWhileRevalidate)) throw new TypeError(`${label}: cache.staleWhileRevalidate must be a whole number of seconds`);
+  let memory: ResolvedPageCache["memory"];
+  if (value.memory !== undefined && value.memory !== false) {
+    const limits = value.memory === true ? {} : value.memory;
+    if (!record(limits)) throw new TypeError(`${label}: cache.memory must be a boolean or { maxEntries, maxBytes }`);
+    for (const key of Object.keys(limits)) if (key !== "maxEntries" && key !== "maxBytes") throw new TypeError(`${label}: cache.memory has an unknown field ${key}`);
+    if (limits.maxEntries !== undefined && !positive(limits.maxEntries)) throw new TypeError(`${label}: cache.memory.maxEntries must be a positive integer`);
+    if (limits.maxBytes !== undefined && !positive(limits.maxBytes)) throw new TypeError(`${label}: cache.memory.maxBytes must be a positive integer`);
+    // Without an ETag nothing would tell a stored page from a changed one.
+    if (value.etag === undefined) throw new TypeError(`${label}: cache.memory needs cache.etag, which tells when a stored page changed`);
+    memory = { maxEntries: (limits.maxEntries as number | undefined) ?? 1000, maxBytes: (limits.maxBytes as number | undefined) ?? 32 * 1024 * 1024 };
+  }
+  return {
+    ...(value.etag ? { etag: value.etag as NonNullable<ResolvedPageCache["etag"]> } : {}),
+    maxAge: (value.maxAge as number | undefined) ?? 0,
+    ...(value.staleWhileRevalidate === undefined ? {} : { staleWhileRevalidate: value.staleWhileRevalidate as number }),
+    ...(memory ? { memory } : {}),
+  };
+}
+
+/**
  * Opciones de ruta de una página que se renderiza en el servidor (`"ssr"`, el modo por defecto,
  * `"stream"` o `"prerender"`). Se declaran con {@link definePage} en `<script server>` o en un
  * sidecar `*.route.ts`, que nunca llegan al navegador.
@@ -228,6 +360,16 @@ export interface PageDefinition<P extends PageSchema | undefined, S extends Page
    */
   readonly prerenderEntries?: readonly Readonly<Record<string, string>>[] | (() => Promise<readonly Readonly<Record<string, string>>[]>);
   /**
+   * URL de la ruta que `meeko build` añade a `sitemap.xml` (con `sitemap` en `meeko.config.ts`): una
+   * lista de {@link SitemapEntry} o una función, síncrona o asíncrona, que la devuelve y recibe
+   * {@link SitemapEntriesContext}. Sirve sobre todo para las rutas dinámicas con `"ssr"` o
+   * `"stream"`, que el build no conoce. En una ruta `"prerender"` sólo añade `lastmod`, `changefreq`
+   * y `priority` a sus páginas prerenderizadas: una entrada sin página detiene el build. `exclude` y
+   * `noindex` siguen ganando.
+   * @since 1.7.0
+   */
+  readonly sitemapEntries?: readonly SitemapEntry[] | ((context: SitemapEntriesContext) => readonly SitemapEntry[] | Promise<readonly SitemapEntry[]>);
+  /**
    * Loader del servidor: se ejecuta en cada petición de la página (en SSR y en la petición de datos
    * de una navegación), o una vez por URL durante `meeko build` con `"prerender"`. Lo que devuelve
    * llega a la página como `props.data`, que pasa a ser obligatorio. Puede devolver un `Response`
@@ -264,6 +406,14 @@ export interface PageDefinition<P extends PageSchema | undefined, S extends Page
    * @since 1.6.0
    */
   readonly middleware?: readonly RouteMiddlewareName[] | false;
+  /**
+   * Caché HTTP de la página: `ETag` (con `304` sin loader ni render), `max-age`,
+   * `stale-while-revalidate` y, con `memory`, una caché en memoria del HTML renderizado. Sólo en
+   * producción y para peticiones sin sesión (véase {@link PageCache}). Se lee al ejecutar la ruta,
+   * como `load`.
+   * @since 1.7.0
+   */
+  readonly cache?: PageCache<P, S, C>;
 }
 
 /**
@@ -299,6 +449,12 @@ export interface ClientPageDefinition<P extends PageSchema | undefined, S extend
   /** Una página `"client"` no se puede prerenderizar: declararlo es un error de tipos y detiene `meeko build`. */
   readonly prerenderEntries?: never;
   /**
+   * Una página `"client"` no declara URL del sitemap: sus opciones llegan al navegador. Declararlo es
+   * un error de tipos y detiene `meeko build`; una ruta sin parámetros ya está en el sitemap.
+   * @since 1.7.0
+   */
+  readonly sitemapEntries?: never;
+  /**
    * Loader del navegador, con {@link ClientPageLoadContext} (sin `request` ni `context`): pide los
    * datos a la API o al RPC. Lo que devuelve llega a la página como `props.data`.
    */
@@ -322,6 +478,12 @@ export interface ClientPageDefinition<P extends PageSchema | undefined, S extend
    * @since 1.6.0
    */
   readonly middleware?: readonly ClientRouteMiddlewareName[] | false;
+  /**
+   * Una página `"client"` no tiene caché de servidor: su HTML sólo lleva los layouts, y sus datos
+   * llegan por API o RPC. Declararla es un error de tipos y falla al cargar la ruta.
+   * @since 1.7.0
+   */
+  readonly cache?: never;
 }
 
 /** `layout` and `layoutProps` of server route options, typed against the chosen layout. */
@@ -333,7 +495,7 @@ type AnyPageDefinition<P extends PageSchema | undefined, S extends PageSchema | 
   | (PageDefinition<P, S, D, C> & ServerLayout<P, S, D, C>)
   | (ClientPageDefinition<P, S, D> & ClientLayout<P, S, D>);
 /** What `definePage` reads from the options as written: any of them, so options with only `layout` are options too. */
-interface WrittenOptions { readonly render?: PageRender; readonly load?: unknown; readonly layout?: unknown; readonly layoutProps?: unknown }
+interface WrittenOptions { readonly render?: PageRender; readonly load?: unknown; readonly layout?: unknown; readonly layoutProps?: unknown; readonly cache?: unknown }
 /**
  * `T` absorbs the keys it is written with, so a key that the chosen layout does not declare would
  * pass: it must be `never`.
@@ -484,12 +646,18 @@ export function definePage(definition: unknown): unknown {
     && "prerenderEntries" in definition && definition.prerenderEntries !== undefined) {
     throw new TypeError('render: "client" cannot be prerendered; remove prerenderEntries or use render: "prerender"');
   }
+  if (record(definition) && definition.cache !== undefined) {
+    if (definition.render === "client") throw new TypeError('render: "client" has no server cache; remove cache or render the page on the server');
+    // A wrong cache fails where the page is defined, not on its first cached request.
+    resolvePageCache(definition.cache, "definePage");
+  }
   return definition;
 }
 
 /**
  * Error de validación de `params` o `search` de una página contra sus schemas. El servidor responde
- * `400` con el código, y en el navegador se muestra la página de error con ese estado.
+ * `400` con el código, y en el navegador se muestra la página de error con ese estado. Desde `1.7`,
+ * su `name` es `"PageInputError"`, como el de `ClientError` y `ApiError`.
  *
  * @example
  * ```ts
@@ -504,6 +672,8 @@ export class PageInputError extends Error {
   /** @param code `INVALID_PARAMS` o `INVALID_SEARCH`, según la entrada que falló. */
   constructor(public readonly code: "INVALID_PARAMS" | "INVALID_SEARCH") {
     super(code);
+    // Since 1.7, like `ClientError` and `ApiError`: logs and `error.name` say which error it is.
+    this.name = "PageInputError";
   }
 }
 

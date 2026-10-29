@@ -85,7 +85,8 @@ export async function checkFrameworkPageContracts(projectRoot: string, options: 
       rootDirs: ["..", "./types"],
       ...(Object.keys(paths).length ? { paths } : {}),
     },
-    include: ["generated/page-contracts.server.ts", "types/**/*.d.meeko.ts", "types/routes.d.ts"],
+    // services.d.ts: the data a loader reads from context.services keeps its type.
+    include: ["generated/page-contracts.server.ts", "types/**/*.d.meeko.ts", "types/routes.d.ts", "types/services.d.ts"],
   }, null, 2)}\n`;
   try { if (await readFile(config, "utf8") !== configSource) await writeFile(config, configSource); }
   catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") await writeFile(config, configSource); else throw error; }

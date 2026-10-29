@@ -37,8 +37,11 @@ interface GeneratedEntry {
   source: string;
   code: string;
   mappings: SourceMapping[];
-  /** TypeScript copy of the page's `<script server>`, which types the exports the page reads. */
-  server?: { readonly file: string; readonly code: string };
+  /**
+   * TypeScript copy of the page's `<script server>`, which types the exports the page reads. Its
+   * line `n + lines` is line `n` of the `.meeko` file: the autoimports add `lines` lines before it.
+   */
+  server?: { readonly file: string; readonly code: string; readonly lines: number };
   /** Compiler warnings of this component. */
   warnings: readonly CompileDiagnostic[];
 }
@@ -52,6 +55,15 @@ export interface CheckSourceOptions {
    * ejecutarla si se da `autoImports`.
    */
   readonly aliases?: (projectRoot: string) => ProjectAliases | Promise<ProjectAliases>;
+  /**
+   * El componente se comprueba como parte de su proyecto: `meeko check` del directorio, que ya
+   * prepara `.meeko/types`, comprueba dónde va cada `<script server>` y `generic` (`MEEK044`,
+   * `MEEK100`) y pasa TypeScript por el proyecto `server`, o el editor, que hace lo mismo por su
+   * cuenta. Sin él, como `meeko check componente.meeko`, el componente de un proyecto con `app/`
+   * se comprueba solo: aplica esas reglas, da los errores de tipos de su `<script server>` y, si
+   * el proyecto ya tiene `.meeko/types`, los regenera antes.
+   */
+  readonly withinProject?: boolean;
 }
 
 /** The path aliases of a project, as `options` gives them or as `meeko check` (or the static reader) reads them. */
@@ -98,8 +110,12 @@ async function compileGraph(source: string, filename: string, options: CheckSour
     byOriginal.set(original, entry);
     byGenerated.set(entry.generated, entry);
     const serverSpecifier = `./${basename(original)}.server.js`;
-    if (entry.code.includes(`from ${JSON.stringify(serverSpecifier)}`)) {
-      entry.server = { file: entry.generated.replace(/\.ts$/, ".server.ts"), code: serverCopy(content, original, entry.generated.replace(/\.ts$/, ".server.ts"), registry ?? await discoverAutoImports(rootDirectory)) };
+    // Checked alone, a page also gets the copy of a block with only route options, so TypeScript
+    // checks them (`layoutProps` against its layout, for example) as the server project does.
+    const routeOptions = !options.withinProject && original === filename && /<script\b[^>]*\bserver\b/.test(content);
+    if (entry.code.includes(`from ${JSON.stringify(serverSpecifier)}`) || routeOptions) {
+      const file = entry.generated.replace(/\.ts$/, ".server.ts");
+      entry.server = { file, ...serverCopy(content, original, file, registry ?? await discoverAutoImports(rootDirectory)) };
     }
     const edits: Array<{ start: number; end: number; text: string }> = [];
     for (const specifier of moduleSpecifiers(entry.code, entry.generated)) {
@@ -148,16 +164,50 @@ async function compileGraph(source: string, filename: string, options: CheckSour
  * server autoimports and relative imports resolved from the page's folder. Its
  * own diagnostics belong to the server TypeScript project, not to this check.
  */
-function serverCopy(source: string, original: string, file: string, registry: readonly AutoImport[]): string {
+function serverCopy(source: string, original: string, file: string, registry: readonly AutoImport[]): { code: string; lines: number } {
   const block = routeBlockTypeSource(source, original, pageRouteId(original)) ?? "export {};\n";
   let code = block;
   try { code = applyAutoImports(block, original, registry, "server"); }
   catch { /* An unresolved autoimport is reported by the server project. */ }
-  return replaceModuleSpecifiers(code, file, ({ value }) => {
-    if (!value.startsWith(".")) return value;
-    const target = relative(dirname(file), resolve(dirname(original), value)).replaceAll("\\", "/");
-    return target.startsWith(".") ? target : `./${target}`;
-  });
+  // The block keeps the lines of the `.meeko` file; the autoimports go before it.
+  const lines = code.slice(0, code.length - block.length).split("\n").length - 1;
+  return {
+    code: replaceModuleSpecifiers(code, file, ({ value }) => {
+      if (!value.startsWith(".")) return value;
+      const target = relative(dirname(file), resolve(dirname(original), value)).replaceAll("\\", "/");
+      return target.startsWith(".") ? target : `./${target}`;
+    }),
+    lines,
+  };
+}
+
+/**
+ * What `meeko check componente.meeko` adds to the compiler and TypeScript for a component of a
+ * framework project (one with `app/`): `MEEK044`/`MEEK100` for `<script server>` and `generic` and,
+ * once the project has `.meeko/types`, fresh declarations, so a layout or a page created since the
+ * last `meeko check .` is known.
+ * Returns the placement error, if any.
+ */
+async function prepareStandaloneCheck(source: string, filename: string): Promise<CompileDiagnostic | undefined> {
+  const root = projectRoot(filename);
+  if (!existsSync(join(root, "app"))) return undefined;
+  // Loaded on demand: the project generators import this module.
+  const [{ prepareFrameworkTypeDeclarations }, { resolveConfigSources }, { assertRouteBlockPlacement }] = await Promise.all([
+    import("./framework/type-declarations.js"), import("./framework/config.js"), import("./framework/route-block.js"),
+  ]);
+  try { assertRouteBlockPlacement(source, filename, (await resolveConfigSources(root)).map((entry) => entry.root)); }
+  catch (error) {
+    if (error instanceof MeekoCompileError) return error.diagnostic;
+    throw error;
+  }
+  // Only a project that `meeko check .`, `meeko dev` or the editor already prepared: the check of a
+  // component reads those declarations, so they are brought up to date; without them it reads none.
+  if (!existsSync(join(root, "app", "pages")) || !existsSync(join(root, ".meeko", "types", "routes.d.ts"))) return undefined;
+  // Another component that does not compile keeps its previous declaration, and a project that
+  // cannot be prepared keeps its previous `.meeko/types`: `meeko check .` reports both.
+  try { await prepareFrameworkTypeDeclarations(root, { onError: () => undefined }); }
+  catch { /* Checked against the declarations already there. */ }
+  return undefined;
 }
 
 /** Resolution options of the project tsconfig that `meeko check` shares with the language server. */
@@ -276,6 +326,10 @@ function unexposedRefDiagnostic(entry: GeneratedEntry, generated: number, offset
 /** Comprueba un componente con TypeScript 7 y devuelve errores ubicados en el .meeko original. */
 export async function checkSource(source: string, filename: string, options: CheckSourceOptions = {}): Promise<CompileDiagnostic[]> {
   const absolute = resolve(filename);
+  if (!options.withinProject) {
+    const placement = await prepareStandaloneCheck(source, absolute);
+    if (placement) return [placement];
+  }
   let graph: Awaited<ReturnType<typeof compileGraph>>;
   try {
     graph = await compileGraph(source, absolute, options);
@@ -295,7 +349,7 @@ export async function checkSource(source: string, filename: string, options: Che
     // command-line flags below still override every type-checking option.
     const rootDirectory = projectRoot(absolute);
     const projectResolution = await projectResolutionOptions(rootDirectory, await projectAliasesFor(rootDirectory, options));
-    const files = [graph.root.generated, ...generatedDeclarations(rootDirectory, absolute), ...projectDeclarationFiles(rootDirectory)];
+    const files = [graph.root.generated, ...graph.root.server && !options.withinProject ? [graph.root.server.file] : [], ...generatedDeclarations(rootDirectory, absolute), ...projectDeclarationFiles(rootDirectory)];
     // The generated declarations name components by their `.meeko` path (the props of each named
     // layout in routes.d.ts), which the declaration tree resolves as in the framework tsconfigs.
     const declarationTree = join(rootDirectory, ".meeko", "types");
@@ -321,11 +375,22 @@ export async function checkSource(source: string, filename: string, options: Che
     await rm(graph.tempDirectory, { recursive: true, force: true });
   }
 
-  const serverCopies = new Set([...graph.entries.values()].flatMap((entry) => entry.server ? [entry.server.file] : []));
+  const serverCopies = new Map([...graph.entries.values()].flatMap((entry) => entry.server ? [[entry.server.file, entry] as const] : []));
   const parsed = parseTypeScriptOutput(output);
   if (parsed.length === 0 && output.trim()) throw new Error(`Falló la comprobación con TypeScript 7: ${output.trim()}`);
-  // The server TypeScript project reports errors inside `<script server>` on the page itself.
-  const typed = parsed.filter((diagnostic) => !serverCopies.has(resolve(dirname(absolute), diagnostic.file)));
+  // Within the project, the server TypeScript project reports errors inside `<script server>` on the
+  // page itself. A component checked alone reports those of its own block here.
+  const serverDiagnostics: CompileDiagnostic[] = [];
+  const typed = parsed.filter((diagnostic) => {
+    const page = serverCopies.get(resolve(dirname(absolute), diagnostic.file));
+    if (!page) return true;
+    if (!options.withinProject && page === graph.root) {
+      const line = Math.max(1, diagnostic.line - page.server!.lines);
+      const offset = Math.min(page.source.length, generatedOffset(page.source, line, diagnostic.column));
+      serverDiagnostics.push({ code: diagnostic.code, message: diagnostic.message, filename: page.original, location: locate(page.source, offset) });
+    }
+    return false;
+  });
   // Original span of each error whose position comes from a rewritten expression (approximate).
   const approximate = new Map<CompileDiagnostic, readonly [number, number]>();
   const mapped = await Promise.all(typed.map(async (diagnostic): Promise<CompileDiagnostic> => {
@@ -379,7 +444,7 @@ export async function checkSource(source: string, filename: string, options: Che
     left.filename === right.filename && left.code === right.code && left.message === right.message;
   const seen = new Set<string>();
   // Warnings of the checked component only; each imported component reports its own when checked.
-  return [...mapped, ...graph.root.warnings].filter((item) => {
+  return [...mapped, ...serverDiagnostics, ...graph.root.warnings].filter((item) => {
     if (item.severity === "warning" && item.filename !== graph.root.original) return false;
     const span = approximate.get(item);
     if (span && mapped.some((other) => other !== item && !approximate.has(other) && sameError(other, item)

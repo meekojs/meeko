@@ -120,6 +120,8 @@ export default defineMeekoConfig({
     adapter: "cloudflare",
     name: "meeko-conformance",
     wrangler: { d1_databases: [{ binding: "DB", database_name: "meeko-conformance", database_id: "00000000-0000-4000-8000-000000000000" }] },
+    contentSecurityPolicy: { "default-src": ["'self'"], "script-src": ["'self'"], "style-src": ["'self'", "'unsafe-inline'"], "object-src": ["'none'"] },
+    headers: { "X-Content-Type-Options": "nosniff", "/api/*": { "X-Robots-Tag": "none" } },
   },
 });
 `;

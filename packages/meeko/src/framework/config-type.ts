@@ -20,6 +20,64 @@ import type { ThemeConfig } from "./theme.js";
 export type StaticHeaderFile = "_headers" | "nginx";
 
 /**
+ * Cabeceras de las respuestas de un adaptador con servidor (`server.headers`). Una clave con nombre
+ * de cabecera se aplica a todas las respuestas; una clave que empieza por `/` es un patrón de ruta
+ * (`pathname`, sin query) cuyas cabeceras se aplican sólo a las URL que coinciden, después de las
+ * globales y en el orden escrito. En el patrón, `*` sustituye a cualquier secuencia de caracteres,
+ * `/` incluida: `"/docs/*"` coincide con `/docs/api`, pero no con `/docs`. Una cabecera que la
+ * respuesta ya trae (de un handler, un middleware o Meeko) no se sustituye.
+ *
+ * @since 1.7.0
+ * @example
+ * ```ts
+ * import type { ServerHeaders } from "@meekojs/meeko/framework";
+ *
+ * const headers: ServerHeaders = {
+ *   "X-Content-Type-Options": "nosniff",
+ *   "Referrer-Policy": "strict-origin-when-cross-origin",
+ *   "/admin/*": { "X-Robots-Tag": "noindex" },
+ * };
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#csp-y-cabeceras-en-los-adaptadores-con-servidor
+ */
+export type ServerHeaders = Readonly<Record<string, string | Readonly<Record<string, string>>>>;
+
+/**
+ * Cabeceras de respuesta de los adaptadores con servidor (`node`, `bun`, `deno` y `cloudflare`).
+ * Se fijan en el build y se aplican en producción (`meeko start` y las salidas de cada
+ * adaptador), no en `meeko dev`.
+ *
+ * @since 1.7.0
+ * @example
+ * ```ts
+ * import type { ServerResponseConfig } from "@meekojs/meeko/framework";
+ *
+ * const response: ServerResponseConfig = {
+ *   contentSecurityPolicy: { "default-src": ["'self'"], "object-src": ["'none'"], "base-uri": ["'none'"] },
+ *   headers: { "X-Content-Type-Options": "nosniff" },
+ * };
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#csp-y-cabeceras-en-los-adaptadores-con-servidor
+ */
+export interface ServerResponseConfig {
+  /**
+   * Política `Content-Security-Policy`, por directiva. Meeko le añade, según la respuesta: los
+   * hashes del build en una página prerenderizada; un nonce por petición en una página SSR; los
+   * hashes de su HTML en una página SSR con `cache`, y `default-src 'none'; frame-ancestors 'none'`
+   * sustituye a la política en el JSON de API, RPC y navegación. Nunca añade un nonce ni un hash a
+   * una directiva con `'unsafe-inline'`.
+   * @since 1.7.0
+   */
+  readonly contentSecurityPolicy?: ContentSecurityPolicy;
+  /**
+   * Otras cabeceras, globales o por patrón de ruta (véase {@link ServerHeaders}).
+   * `Content-Security-Policy` no se admite aquí: use `contentSecurityPolicy`.
+   * @since 1.7.0
+   */
+  readonly headers?: ServerHeaders;
+}
+
+/**
  * Destino de ejecución de `meeko build`, una unión discriminada por `adapter`. Cada adaptador
  * escribe en `.meeko/output/<adapter>/`; `--adapter` de la CLI tiene prioridad.
  *
@@ -34,15 +92,15 @@ export type StaticHeaderFile = "_headers" | "nginx";
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#build-despliegue-y-verificación
  */
 export type MeekoServerConfig =
-  | {
+  | ({
     /** Servidor Node en `.meeko/output/node/`, el que sirve `meeko start`. */
     readonly adapter: "node";
     /** Interfaz en la que escucha `meeko start`. Por defecto, `127.0.0.1`; `HOST` la sustituye. */
     readonly host?: string;
     /** Puerto de `meeko start`. Por defecto, `4173`; `PORT` lo sustituye. */
     readonly port?: number;
-  }
-  | {
+  } & ServerResponseConfig)
+  | ({
     /** Worker de Cloudflare con su `wrangler.jsonc`, en `.meeko/output/cloudflare/`. */
     readonly adapter: "cloudflare";
     /** Nombre del Worker en el `wrangler.jsonc` generado. Por defecto, el nombre del paquete. */
@@ -59,15 +117,15 @@ export type MeekoServerConfig =
      * `find_additional_modules` pertenecen a Meeko.
      */
     readonly wrangler?: Readonly<Record<string, unknown>>;
-  }
-  | {
+  } & ServerResponseConfig)
+  | ({
     /** Servidor Deno en `.meeko/output/deno/`. */
     readonly adapter: "deno";
-  }
-  | {
+  } & ServerResponseConfig)
+  | ({
     /** Servidor Bun en `.meeko/output/bun/`. */
     readonly adapter: "bun";
-  }
+  } & ServerResponseConfig)
   | {
     /**
      * Sitio estático en `.meeko/output/static/`, sin servidor: los assets, `public/`, cada página
@@ -130,6 +188,53 @@ export interface SitemapConfig {
    * incluida: `"/admin/*"` excluye todo lo que hay bajo `/admin/`, pero no `/admin`.
    */
   readonly exclude?: readonly string[];
+}
+
+/**
+ * Una URL de una ruta en `sitemap.xml`, que declara `sitemapEntries` en `definePage`: los
+ * parámetros de la ruta y, de forma opcional, los campos del protocolo sitemaps.org 0.9.
+ *
+ * @since 1.7.0
+ * @example
+ * ```ts
+ * import type { SitemapEntry } from "@meekojs/meeko/framework";
+ *
+ * const entry: SitemapEntry = { params: { slug: "instalacion" }, lastmod: "2026-10-01", changefreq: "monthly", priority: 0.8 };
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#rutas-dinámicas-en-el-sitemap-sitemapentries
+ */
+export interface SitemapEntry {
+  /** Parámetros de la ruta (los segmentos `[slug]`), como en `prerenderEntries`. Una ruta sin parámetros no los necesita. */
+  readonly params?: Readonly<Record<string, string>>;
+  /** Fecha de la última modificación (`<lastmod>`): un `Date` o un texto W3C Datetime, como `"2026-10-01"`. */
+  readonly lastmod?: Date | string;
+  /** Frecuencia de cambio orientativa (`<changefreq>`). */
+  readonly changefreq?: "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never";
+  /** Prioridad relativa dentro del sitio (`<priority>`), de `0` a `1`. */
+  readonly priority?: number;
+}
+
+/**
+ * Lo que recibe la función `sitemapEntries` de `definePage`. Se ejecuta durante
+ * `meeko build`, en el servidor de Node que prerenderiza las páginas, sin petición ni sesión.
+ *
+ * @since 1.7.0
+ * @example
+ * ```ts
+ * import type { SitemapEntriesContext, SitemapEntry } from "@meekojs/meeko/framework";
+ *
+ * async function entries({ env }: SitemapEntriesContext): Promise<SitemapEntry[]> {
+ *   const slugs = env.DOCS_DRAFTS === "1" ? ["borrador"] : [];
+ *   return slugs.map((slug) => ({ params: { slug } }));
+ * }
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#rutas-dinámicas-en-el-sitemap-sitemapentries
+ */
+export interface SitemapEntriesContext {
+  /** Variables de entorno del proceso de `meeko build` (`process.env`). */
+  readonly env: Readonly<Record<string, string | undefined>>;
+  /** Siempre `true`: el runtime de `server/runtime.ts` se creó con `prerendering`, sin tráfico de clientes. */
+  readonly prerendering: true;
 }
 
 /**
@@ -281,7 +386,8 @@ export interface MeekoConfig {
   /**
    * Escribe `sitemap.xml` con las páginas prerenderizadas y las rutas sin parámetros, salvo las
    * excluidas y las prerenderizadas con `<meta name="robots">` `noindex`. Necesita `site` o
-   * `MEEKO_PUBLIC_ORIGIN`.
+   * `MEEKO_PUBLIC_ORIGIN`. Desde `1.7`, también las URL de `sitemapEntries` de `definePage`, como
+   * las de las rutas dinámicas con SSR.
    * @since 1.3.0
    */
   readonly sitemap?: boolean | SitemapConfig;

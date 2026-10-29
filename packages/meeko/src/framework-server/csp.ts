@@ -1,3 +1,5 @@
+import { encodeBase64Url } from "./base64url.js";
+
 /**
  * Política `Content-Security-Policy` por directiva: cada clave es el nombre de una directiva
  * (`"script-src"`) y su valor, la lista de fuentes tal como se escriben en la cabecera
@@ -34,7 +36,9 @@ const hashSource = /^'sha(?:256|384|512)-[A-Za-z0-9+/]+={0,2}'$/;
  * que los hashes no restrinjan más que la política. Sin `script-src` ni `default-src`, los
  * scripts ya están permitidos y los hashes no se añaden.
  *
- * Con hashes en `script-src`, el navegador ignora `'unsafe-inline'` de esa directiva.
+ * Con hashes en `script-src`, el navegador ignora `'unsafe-inline'` de esa directiva. Desde `1.7`,
+ * si la política tiene `script-src-elem`, los hashes van a esa directiva, que es la que rige los
+ * elementos `<script>`.
  *
  * Desde `1.4`, `styleHashes` (como `PrerenderIndex.pages[ruta].styleHashes`) permite igual los
  * `<style>` en línea, como el del tema de `<MeekoThemeToggle>` y los de los componentes: van a
@@ -78,10 +82,12 @@ export function contentSecurityPolicy(policy: ContentSecurityPolicy, scriptHashe
     directives.set(name, [...sources]);
   }
   if (scriptHashes.length) {
-    const base = directives.get("script-src") ?? directives.get("default-src");
+    // `<script>` elements follow script-src-elem when the policy has it, else script-src, else default-src.
+    const name = directives.has("script-src-elem") ? "script-src-elem" : "script-src";
+    const base = directives.get(name) ?? directives.get("default-src");
     if (base) {
       // The hashes allow inline scripts; a directive copied from default-src keeps what it allowed.
-      directives.set("script-src", [...new Set([...base, ...scriptHashes])]);
+      directives.set(name, [...new Set([...base, ...scriptHashes])]);
     }
   }
   if (styleHashes.length) {
@@ -94,4 +100,48 @@ export function contentSecurityPolicy(policy: ContentSecurityPolicy, scriptHashe
     }
   }
   return [...directives].map(([name, sources]) => [name, ...sources].join(" ")).join("; ");
+}
+
+/** `'nonce-<base64>'`; base64url characters are valid too. */
+const nonceSource = /^'nonce-[A-Za-z0-9+/_-]+={0,2}'$/;
+
+/**
+ * The policy of JSON responses (API, RPC and navigation payloads), which run no script and embed
+ * nothing: no source of any kind, and no framing.
+ */
+export const JSON_CONTENT_SECURITY_POLICY = "default-src 'none'; frame-ancestors 'none'";
+
+/**
+ * The header of a server-rendered document with its nonce or the hashes of its inline scripts and
+ * styles. Unlike {@link contentSecurityPolicy}, no source is added to a directive that allows
+ * `'unsafe-inline'`, for scripts as for styles: a nonce or a hash makes the browser ignore
+ * `'unsafe-inline'`, which the policy keeps for what neither can allow (`style="…"` attributes,
+ * `on*` handlers). A directive with `'strict-dynamic'` is the exception: there the browser already
+ * ignores `'unsafe-inline'` (it stays only for older browsers) and the host sources, so only a
+ * nonce or a hash lets Meeko's scripts run. The policy was validated when the configuration was
+ * loaded.
+ */
+export function documentContentSecurityPolicy(policy: ContentSecurityPolicy, scriptSources: readonly string[], styleSources: readonly string[]): string {
+  for (const source of [...scriptSources, ...styleSources]) {
+    if (!hashSource.test(source) && !nonceSource.test(source)) throw new TypeError(`contentSecurityPolicy: invalid source ${JSON.stringify(source)}`);
+  }
+  const directives = new Map<string, string[]>(Object.entries(policy).map(([name, sources]) => [name, [...sources]]));
+  const has = (sources: readonly string[], keyword: string): boolean => sources.some((source) => source.toLowerCase() === keyword);
+  const extend = (name: string, base: readonly string[] | undefined, sources: readonly string[]): void => {
+    if (!sources.length || !base) return;
+    if (has(base, "'unsafe-inline'") && !has(base, "'strict-dynamic'")) return;
+    directives.set(name, [...new Set([...base, ...sources])]);
+  };
+  // `<script>` elements follow script-src-elem when the policy has it, else script-src, else default-src.
+  const script = directives.has("script-src-elem") ? "script-src-elem" : "script-src";
+  extend(script, directives.get(script) ?? directives.get("default-src"), scriptSources);
+  // `<style>` elements follow style-src-elem when the policy has it, else style-src, else default-src.
+  const style = directives.has("style-src-elem") ? "style-src-elem" : "style-src";
+  extend(style, directives.get(style) ?? directives.get("default-src"), styleSources);
+  return [...directives].map(([name, sources]) => [name, ...sources].join(" ")).join("; ");
+}
+
+/** A fresh CSP nonce for one response: 128 random bits in base64url. */
+export function createCspNonce(): string {
+  return encodeBase64Url(crypto.getRandomValues(new Uint8Array(16)));
 }

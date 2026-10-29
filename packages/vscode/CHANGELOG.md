@@ -1,5 +1,14 @@
 # Cambios de Meeko Language
 
+## [1.7.0] - 2026-10-29
+
+- `context.services` tipado de Meeko 1.7: el editor incluye `.meeko/types/services.d.ts` en los programas de las páginas y del código de servidor, así que `usePage().context.services.db`, los handlers de API, RPC y Socket y el middleware de ruta de servidor completan y comprueban los servicios que devuelve `server/runtime.ts`, sin `as unknown as`.
+- Nuevos autoimports de Meeko 1.7: `useNavigation`, `createRoot` y, en el código de servidor, `defer` ya no se marcan con `TS2304`/`TS2552` sin un import, y un `export const x = defer(...)` llega a la plantilla con su tipo exacto.
+- El aviso `MEEK119` marca un atributo `each:*` o `if:*` que ninguna directiva del nodo lee (`each:by` junto a `each:of`, `if:else` junto a `if:when`), que se escribía en silencio como atributo HTML.
+- Un componente abierto en el editor se comprueba con las reglas del proyecto: `MEEK044` (un `<script server>` fuera de una página), `MEEK100` (`generic` en una página o un layout) y los errores de tipos de su `<script server>` y de sus opciones de ruta, como `meeko check .`.
+- Más errores de Meeko 1.7 en el editor: `props.x = …` es `TS2540` (las props son de sólo lectura en los tipos), un manejador `on*` en `htmlAttrs` o `bodyAttrs` de `useHead` es un error de tipos, `usePage()`, `redirect()` y `notFound()` dentro de la función de `head` o de `useHead` son `MEEK073`, y `export default definePage(...)` ya no falla la comprobación de contratos.
+- Un `meeko.config.ts` que no carga se marca con el mensaje en español de Meeko 1.7, `No se puede cargar la configuración: …`.
+
 ## [1.6.0] - 2026-10-28
 
 - Middleware de ruta con nombre de Meeko 1.6: en `definePage` y en `defineGroup`, el editor completa los nombres de `middleware: [...]` con los middleware con nombre de la aplicación; el hover de un nombre muestra su archivo de `app/middleware` y sus páginas (o avisa de que es global o no existe), y Ctrl+clic lo abre. Un middleware de ruta de servidor (`app/middleware/*.server.ts`) aparece en el completado como uno más y su hover indica que es «sólo servidor».

@@ -86,12 +86,25 @@ test("channel registry is lazy during SSR and component sockets close with their
   }
 });
 
-test("the deprecated framework useSocket is the same function as useSocketClient and keeps working", () => {
+/** In SSR the client never connects nor throws: it stays `"connecting"`, `on` is a no-op and `emit` rejects. */
+async function ssrClientIsInert(contract: { clientToServer: { message: typeof stringSchema }; serverToClient: { message: typeof stringSchema } }): Promise<void> {
+  let opened = 0;
+  const client = useSocketClient("ws://example.test/chat", contract, { webSocketFactory: () => { opened++; throw new Error("no socket in SSR"); } });
+  assert.equal(client.state.value, "connecting");
+  assert.equal(typeof client.on("message", () => {}), "function");
+  await assert.rejects(client.emit("message", "hola"), /Socket is disconnected/);
+  client.close();
+  assert.equal(opened, 0, "SSR never opens a connection");
+}
+
+test("the deprecated framework useSocket is the same function as useSocketClient and keeps working", async () => {
   assert.equal(framework.useSocketClient, useSocketClient);
   assert.equal(framework.useSocket, framework.useSocketClient);
   assert.equal(framework.createSocketClient, createSocketClient);
   const contract = { clientToServer: { message: stringSchema }, serverToClient: { message: stringSchema } };
-  assert.throws(() => framework.useSocket("ws://example.test/chat", contract), /only available in the browser/);
+  assert.equal(typeof window, "undefined");
+  assert.equal(framework.useSocket, useSocketClient);
+  await ssrClientIsInert(contract);
   const previous = Object.getOwnPropertyDescriptor(globalThis, "window");
   Object.defineProperty(globalThis, "window", { configurable: true, value: { location: { href: "https://example.test/" } } });
   const peers: FakeSocket[] = [];

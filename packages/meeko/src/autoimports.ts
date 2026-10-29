@@ -101,9 +101,15 @@ const frameworkTypes: readonly string[] = ["RouteId", "LayoutProps"];
 function builtins(root: string): AutoImport[] {
   const entries: AutoImport[] = [
     ...["signal", "computed", "effect", "batch", "untrack", "onCleanup", "onMounted", "provide", "inject", "createContext", "provideErrorHandler", "useId"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko", specifier: "@meekojs/meeko", scope: "shared", typeOnly: false, component: false })),
+    // Since 1.7: `createRoot`, which its siblings of `@meekojs/meeko` already were.
+    { name: "createRoot", imported: "createRoot", file: "@meekojs/meeko", specifier: "@meekojs/meeko", scope: "shared", typeOnly: false, component: false },
+    // Since 1.7: `useNavigation`, like `useRoute`; on the server it is a fixed state with `pending` false.
+    { name: "useNavigation", imported: "useNavigation", file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "shared", typeOnly: false, component: false },
     ...["useState", "href", "useRoute", "useForm", "useStorage", "useHead", "useSeoMeta", "useTheme", "useLayout", "definePage", "defineGroup", "defineRouteMiddleware", "definePlugin"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "shared", typeOnly: false, component: false })),
     // The definitions of server/ (contract discovery reads the call by name, not by its import).
     ...["defineApiRoute", "defineRpc", "defineServerMiddleware", "defineSocketChannel", "defineServerRuntime"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/server", specifier: "@meekojs/meeko/server", scope: "server", typeOnly: false, component: false })),
+    // Since 1.7, for `<script server>` (also inside the route options), `*.route.ts` sidecars and server/.
+    { name: "defer", imported: "defer", file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "server", typeOnly: false, component: false },
     // Since 1.6, for app/middleware/*.server.ts: route middleware that only runs on the server.
     { name: "defineServerRouteMiddleware", imported: "defineServerRouteMiddleware", file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "server", typeOnly: false, component: false },
     { name: "ApiError", imported: "ApiError", file: "@meekojs/meeko/server", specifier: "@meekojs/meeko/server", scope: "server", typeOnly: false, component: false, alsoType: true },
@@ -131,7 +137,7 @@ function builtins(root: string): AutoImport[] {
  * the project's own export wins, instead of making the name ambiguous. `useApiMutation` comes from
  * the generated clients; the others, from `@meekojs/meeko/framework`.
  */
-const yieldingBuiltins: ReadonlySet<string> = new Set(["useRoute", "useForm", "useStorage", "useApiMutation", "useHead", "useSeoMeta", "useTheme", "useId", "useLayout", "defineGroup", "defineServerRouteMiddleware", "ClientError", "isClientError", ...frameworkTypes]);
+const yieldingBuiltins: ReadonlySet<string> = new Set(["useRoute", "useForm", "useStorage", "useApiMutation", "useHead", "useSeoMeta", "useTheme", "useId", "useLayout", "defineGroup", "defineServerRouteMiddleware", "createRoot", "useNavigation", "defer", "ClientError", "isClientError", ...frameworkTypes]);
 
 /** `api`, `rpc`, `socket`… of `.meeko/generated/clients.client.ts` or `clients.server.ts`. */
 export function isGeneratedClient(file: string): boolean {

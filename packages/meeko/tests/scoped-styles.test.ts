@@ -318,7 +318,7 @@ test("meeko.config valida css.scopeAttribute", async () => {
     assert.deepEqual((await loadMeekoConfig(root)).css, undefined);
     await writeFile(join(root, "meeko.config.mjs"), `export default { css: { scopeAttribute: "matched" } };`);
     assert.equal((await loadMeekoConfig(root)).css?.scopeAttribute, "matched");
-    for (const [css, message] of [[`{ scopeAttribute: "some" }`, /css\.scopeAttribute must be "all" or "matched"/], [`"matched"`, /css must be an object/]] as const) {
+    for (const [css, message] of [[`{ scopeAttribute: "some" }`, /css\.scopeAttribute debe ser "all" o "matched"/], [`"matched"`, /css debe ser un objeto/]] as const) {
       await writeFile(join(root, "meeko.config.mjs"), `export default { css: ${css} };`);
       await assert.rejects(loadMeekoConfig(root), message);
     }

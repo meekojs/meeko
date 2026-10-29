@@ -170,3 +170,16 @@ export default defineApiRoute({ contentType: "response", async handler({ context
   assert.equal(personal.headers.get("x-output-middleware"), "active");
   assert.ok((await personal.text()).includes(`<meta name="meeko-csrf-token" content="${csrf}">`));
 });
+
+test("buildProject builds a clean project: it writes the .meeko tsconfigs that meeko check and meeko dev would", async (context) => {
+  const root = await tempProject(context, "build-clean");
+  await initFrameworkProject(root);
+  await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
+  await symlink(repositoryRoot, join(root, "node_modules", "@meekojs", "meeko"), "junction");
+  await symlink(join(repositoryRoot, "node_modules", "vite"), join(root, "node_modules", "vite"), "junction");
+  await assert.rejects(readdir(join(root, ".meeko")), { code: "ENOENT" }, "nothing prepared the project");
+  const result = await buildProject(root, { adapter: "node" });
+  assert.equal(result.output, join(root, ".meeko", "output", "node"));
+  for (const name of ["app", "server", "shared"]) await readFile(join(root, ".meeko", `tsconfig.${name}.json`), "utf8");
+  await readFile(join(result.output, "prerender", "index.html"), "utf8");
+});

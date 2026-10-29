@@ -215,54 +215,54 @@ function fail(label: string, message: string): never {
  */
 export function resolveThemeConfig(value: unknown, label = "theme"): ResolvedThemeConfig | undefined {
   if (value === undefined || value === false) return undefined;
-  if (value !== true && (typeof value !== "object" || value === null || Array.isArray(value))) fail(label, "must be true, false or an object");
+  if (value !== true && (typeof value !== "object" || value === null || Array.isArray(value))) fail(label, "debe ser true, false o un objeto");
   const options = (value === true ? {} : value) as Record<string, unknown>;
   const known = ["themes", "default", "system", "darkThemes", "attribute", "colorScheme", "cookie", "storageKey", "clientHints"];
-  for (const name of Object.keys(options)) if (!known.includes(name)) fail(label, `unknown field ${name}`);
+  for (const name of Object.keys(options)) if (!known.includes(name)) fail(label, `campo desconocido ${name}`);
   const names = (raw: unknown, field: string): string[] => {
-    if (!Array.isArray(raw) || raw.some((entry) => typeof entry !== "string")) fail(label, `${field} must be an array of theme names`);
+    if (!Array.isArray(raw) || raw.some((entry) => typeof entry !== "string")) fail(label, `${field} debe ser un array de nombres de tema`);
     for (const entry of raw as string[]) {
-      if (!themeName.test(entry) || entry === "system") fail(label, `${field} has an invalid theme name ${JSON.stringify(entry)}: use letters, digits, - or _, and not "system"`);
+      if (!themeName.test(entry) || entry === "system") fail(label, `${field} tiene un nombre de tema no válido ${JSON.stringify(entry)}: use letras, dígitos, - o _, y no "system"`);
     }
     return [...raw as string[]];
   };
   const themes = options.themes === undefined ? [...defaults.themes] : names(options.themes, "themes");
-  if (!themes.length) fail(label, "themes must name at least one theme");
-  if (new Set(themes).size !== themes.length) fail(label, "themes has repeated names");
+  if (!themes.length) fail(label, "themes debe nombrar al menos un tema");
+  if (new Set(themes).size !== themes.length) fail(label, "themes tiene nombres repetidos");
   const member = (entry: unknown, field: string): string => {
-    if (typeof entry !== "string" || !themes.includes(entry)) fail(label, `${field} must be one of themes (${themes.join(", ")})`);
+    if (typeof entry !== "string" || !themes.includes(entry)) fail(label, `${field} debe ser uno de los temas de themes (${themes.join(", ")})`);
     return entry;
   };
   let system: ResolvedThemeConfig["system"];
   if (options.system === false) system = false;
   else if (options.system === undefined || options.system === true) {
     if (!themes.includes("light") || !themes.includes("dark")) {
-      fail(label, 'system needs the themes "light" and "dark"; map other names with system: { light, dark } or turn it off with system: false');
+      fail(label, 'system necesita los temas "light" y "dark"; asigne otros nombres con system: { light, dark } o desactívelo con system: false');
     }
     system = { light: "light", dark: "dark" };
   } else if (typeof options.system === "object" && options.system !== null && !Array.isArray(options.system)) {
     const pair = options.system as Record<string, unknown>;
-    for (const name of Object.keys(pair)) if (name !== "light" && name !== "dark") fail(label, `unknown field system.${name}`);
+    for (const name of Object.keys(pair)) if (name !== "light" && name !== "dark") fail(label, `campo desconocido system.${name}`);
     system = { light: member(pair.light, "system.light"), dark: member(pair.dark, "system.dark") };
-  } else fail(label, "system must be a boolean or { light, dark }");
+  } else fail(label, "system debe ser un booleano o { light, dark }");
   const fallback = system ? "system" : themes[0]!;
   const choice = options.default === undefined ? fallback
-    : options.default === "system" ? (system ? "system" : fail(label, 'default cannot be "system" with system: false'))
+    : options.default === "system" ? (system ? "system" : fail(label, 'default no puede ser "system" con system: false'))
       : member(options.default, "default");
   const darkThemes = options.darkThemes === undefined
     ? system ? [system.dark] : themes.filter((entry) => entry === "dark")
     : names(options.darkThemes, "darkThemes").map((entry) => member(entry, "darkThemes"));
   const attribute = options.attribute ?? defaults.attribute;
   if (attribute !== "class" && (typeof attribute !== "string" || !dataAttribute.test(attribute))) {
-    fail(label, 'attribute must be "class" or a lowercase data-* attribute such as "data-theme"');
+    fail(label, 'attribute debe ser "class" o un atributo data-* en minúsculas, como "data-theme"');
   }
-  if (attribute === THEME_CHOICE_ATTRIBUTE) fail(label, `attribute cannot be ${THEME_CHOICE_ATTRIBUTE}: Meeko writes the choice there`);
+  if (attribute === THEME_CHOICE_ATTRIBUTE) fail(label, `attribute no puede ser ${THEME_CHOICE_ATTRIBUTE}: Meeko escribe ahí la elección`);
   const cookie = options.cookie ?? defaults.cookie;
-  if (typeof cookie !== "string" || !cookieName.test(cookie)) fail(label, "cookie must be a cookie name (letters, digits and !#$%&'*+.^_`|~-)");
+  if (typeof cookie !== "string" || !cookieName.test(cookie)) fail(label, "cookie debe ser un nombre de cookie (letras, dígitos y !#$%&'*+.^_`|~-)");
   const storageKey = options.storageKey ?? cookie;
-  if (storageKey !== false && (typeof storageKey !== "string" || !storageKey)) fail(label, "storageKey must be a nonempty string or false");
+  if (storageKey !== false && (typeof storageKey !== "string" || !storageKey)) fail(label, "storageKey debe ser una cadena no vacía o false");
   for (const field of ["colorScheme", "clientHints"] as const) {
-    if (options[field] !== undefined && typeof options[field] !== "boolean") fail(label, `${field} must be a boolean`);
+    if (options[field] !== undefined && typeof options[field] !== "boolean") fail(label, `${field} debe ser un booleano`);
   }
   return {
     themes, default: choice, system, darkThemes,

@@ -379,9 +379,9 @@ function contextualSocketObserver(): ((error: unknown) => void) | undefined {
 }
 
 /**
- * The client of a component script that only renders HTML in the browser: the render before a
- * mount, or a dry pass that loads data. It never connects and stays `"connecting"`, like the
- * client of the mount that follows starts.
+ * The client of a script that only renders HTML: SSR, the render before a mount in the browser,
+ * or a dry pass that loads data. It never connects and stays `"connecting"`, like the client of
+ * the mount that follows starts.
  */
 function renderOnlyClient<C extends SocketContract>(): SocketClient<C> {
   const state = signal<SocketClientState>("connecting");
@@ -395,31 +395,32 @@ function renderOnlyClient<C extends SocketContract>(): SocketClient<C> {
 
 /**
  * Crea un cliente Socket ligado a la raíz del componente actual, que se cierra al desmontarlo.
- * Nunca abre conexión en SSR ni en un render que sólo produce HTML. Es la forma de bajo nivel, con
- * URL y contrato explícitos; el autoimport `useSocket(canal, opciones)` de las aplicaciones es
- * otra función, generada con {@link useSocketChannel}. Con `await` en el nivel superior del
- * script, el resto del setup continúa en el navegador cuando el socket está abierto. Fuera de un
- * componente, use {@link createSocketClient}.
+ * Nunca abre conexión en SSR ni en un render que sólo produce HTML: ahí devuelve un cliente inerte
+ * que se queda en `"connecting"`, cuyo `on` no registra nada y cuyo `emit` rechaza (hasta `1.6`,
+ * en SSR lanzaba «only available in the browser»). Es la forma de bajo nivel, con URL y contrato
+ * explícitos; el autoimport `useSocket(canal, opciones)` de las aplicaciones es otra función,
+ * generada con {@link useSocketChannel}. Con `await` en el nivel superior del script, el resto del
+ * setup continúa en el navegador cuando el socket está abierto. Fuera de un componente, use
+ * {@link createSocketClient}.
  *
  * @param url URL `ws:` o `wss:` del canal.
  * @param contract Contrato del canal.
  * @param options Opciones del cliente; sin `onError`, usa el observador de errores más cercano.
- * @returns El cliente tipado.
- * @throws {Error} En SSR («only available in the browser»).
+ * @returns El cliente tipado; en SSR, uno inerte.
  * @since 1.1.0
  * @example
  * ```ts
  * import { useSocketClient } from "@meekojs/meeko/framework";
  *
- * // Dentro del <script> de un componente, sólo en el navegador.
- * const chat = typeof window === "undefined" ? undefined : useSocketClient("wss://example.com/_meeko/socket/chat?room=general", chatContract);
- * chat?.on("message", (message) => console.log(message.text));
+ * // Dentro del <script> de un componente: en SSR el cliente no conecta y el HTML sale con el estado inicial.
+ * const chat = useSocketClient("wss://example.com/_meeko/socket/chat?room=general", chatContract);
+ * chat.on("message", (message) => console.log(message.text));
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#websocket
  */
 export function useSocketClient<C extends SocketContract>(url: string, contract: C, options: SocketClientOptions = {}): SocketClient<C> {
-  if (typeof window === "undefined") throw new Error("useSocketClient() is only available in the browser");
-  if (setupPhase() === "render") return renderOnlyClient<C>();
+  // SSR renders the HTML with the initial state; the browser's mount opens the connection.
+  if (typeof window === "undefined" || setupPhase() === "render") return renderOnlyClient<C>();
   const onError = options.onError ?? contextualSocketObserver();
   const client = createSocketClient(url, contract, onError ? { ...options, onError } : options);
   try { onCleanup(() => client.close()); }
@@ -531,9 +532,8 @@ export function createSocketRegistry<C extends Record<string, SocketContract>>(c
  * @param contracts Contratos públicos por nombre de canal.
  * @param name Canal que se abre.
  * @param options Sala, URL base y opciones del cliente.
- * @returns El cliente tipado del canal.
+ * @returns El cliente tipado del canal; en SSR, uno inerte que no conecta.
  * @throws {TypeError} Si el canal no existe.
- * @throws {Error} En SSR.
  * @example
  * ```ts
  * import { useSocketChannel } from "@meekojs/meeko/framework";

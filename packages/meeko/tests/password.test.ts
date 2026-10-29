@@ -76,7 +76,7 @@ test("meeko auth hash reads a piped password and prints only the hash line", asy
   const empty = spawnSync(process.execPath, [resolve("dist/cli.js"), "auth", "hash"], { input: "\n", encoding: "utf8", windowsHide: true });
   assert.equal(empty.status, 1);
   assert.equal(empty.stdout, "");
-  assert.match(empty.stderr, /The password is empty/);
+  assert.equal(empty.stderr, "La contraseña está vacía\n");
   const lines = spawnSync(process.execPath, [resolve("dist/cli.js"), "auth", "hash"], { input: "one\ntwo\n", encoding: "utf8", windowsHide: true });
   assert.equal(lines.status, 1);
   assert.match(lines.stderr, /una sola línea/);
@@ -123,4 +123,9 @@ test("the terminal prompt reads twice in raw mode without echo, with Backspace, 
   await assert.rejects(promptPassword(new FakeTerminal(["one\r", "two\r"]), output), /Las contraseñas no coinciden/);
   await assert.rejects(promptPassword(new FakeTerminal(["\u0003"]), output), (error) => error instanceof PromptCancelled);
   await assert.rejects(promptPassword(new FakeTerminal(["\r"]), output), /La contraseña está vacía/);
+  // An empty pipe gets the same message, not the English one of hashPassword.
+  const pipe = (text: string) => ({ isTTY: false, async *[Symbol.asyncIterator]() { yield text; } });
+  await assert.rejects(promptPassword(pipe("\n") as never, output), { message: "La contraseña está vacía" });
+  assert.equal(await promptPassword(pipe("secret\n") as never, output), "secret");
+  await assert.rejects(promptPassword(pipe(`${"ñ".repeat(2049)}\n`) as never, output), { message: "La contraseña supera 4096 bytes" });
 });

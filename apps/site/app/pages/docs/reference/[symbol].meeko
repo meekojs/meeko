@@ -1,28 +1,37 @@
 <script server lang="ts">
 	import { definePage } from '@meekojs/meeko/framework'
-	import { apiPage, apiPager, apiSlugs } from '../../../../server/content/api.js'
+	import { apiHref, apiPage, apiPager, apiSlugs } from '../../../../server/content/api.js'
 	import { referenceHref } from '../../../../server/content/api-groups.js'
-	import { navigation } from '../../../../server/content/catalog.js'
+	import { referenceEntryAt, referenceNavigation, referenceOnlySlugs, referencePage, referencePager } from '../../../../server/content/reference.js'
 
 	// One page per export and per piece of `.meeko` syntax, generated in `meeko build` from the
-	// sources of the package: a new export gets its page without changes here.
+	// sources of the package, and one per written page of docs/reference (reference.ts), which
+	// takes the URL of the generated page of its symbol and merges its types into the prose.
 	export const route = definePage({
 		render: 'prerender',
-		prerenderEntries: async () => (await apiSlugs()).map((symbol) => ({ symbol })),
+		prerenderEntries: async () => [...(await apiSlugs()), ...(await referenceOnlySlugs())].map((symbol) => ({ symbol })),
 	})
 
 	const { params } = usePage()
-	const found = await apiPage(params.symbol)
-	if (!found) notFound()
-	export const page = found
-	export const nav = navigation()
-	export const pages = await apiPager(found.slug)
+	const href = apiHref(params.symbol)
+	export const written = (await referencePage(params.symbol)) ?? null
+	export const page = written ? null : ((await apiPage(params.symbol)) ?? null)
+	if (!written && !page) notFound()
+	export const nav = await referenceNavigation()
+	// A symbol of the taxonomy is marked in its group; any other export, in its module.
+	const entry = await referenceEntryAt(href)
+	export const current = entry ? entry.href : (page?.group.href ?? referenceHref)
+	export const pages = (await referencePager(href)) ?? (await apiPager(params.symbol))
+	export const toc = written?.toc ?? page?.toc ?? []
+	export const editUrl = written?.editUrl ?? page?.editUrl ?? ''
+	export const editPath = written?.editPath ?? page?.editPath ?? ''
 	export const index = referenceHref
+	const title = written?.title ?? page?.name ?? params.symbol
 	/** Title of the search result: the name and where it comes from. */
-	export const searchTitle = `title:${found.name} · ${found.specifier ?? 'sintaxis de .meeko'}`
+	export const searchTitle = `title:${title} · ${written ? written.kindLabel : (page?.specifier ?? 'sintaxis de .meeko')}`
 	export const head = {
-		title: `${found.name} · Referencia de la API · Meeko`,
-		description: found.summary || `${found.name}, ${found.kindLabel} de ${found.specifier ?? 'los componentes .meeko'}.`,
+		title: `${title} · Referencia de la API · Meeko`,
+		description: written?.description ?? (page ? page.summary || `${page.name}, ${page.kindLabel} de ${page.specifier ?? 'los componentes .meeko'}.` : ''),
 	}
 </script>
 
@@ -36,13 +45,19 @@
 <template>
 	<DocsLayout
 		bind:nav="nav"
-		bind:current="page.group.href"
-		bind:toc="page.toc"
+		bind:current="current"
+		bind:toc="toc"
 		bind:pager="pages"
-		bind:editUrl="page.editUrl"
-		bind:source="page.editPath"
+		bind:editUrl="editUrl"
+		bind:source="editPath"
 	>
+		<ReferenceArticle
+			if:when="written"
+			bind:page="written"
+			bind:searchTitle="searchTitle"
+		/>
 		<article
+			if:when="page"
 			class="prose symbol"
 			data-pagefind-body
 			bind:data-pagefind-meta="searchTitle"

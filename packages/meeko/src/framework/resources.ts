@@ -101,10 +101,14 @@ export interface LoadedResource<T> {
  * // Por defecto, data conserva la página anterior mientras llega la siguiente.
  * const page = signal("1");
  * const list = useApi("/api/users", { query: { page } });
+ * // Desde 1.7: una petición cuando se deja de escribir, y ninguna con menos de dos letras.
+ * const q = signal("");
+ * const hits = useRpcQuery("docs.search", () => ({ q: q.value }), { debounceMs: 200, enabled: () => q.value.length >= 2 });
  * </script>
  * <template><p if:when="list.refreshing.value">Actualizando…</p></template>
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#datos-anteriores-durante-una-recarga-keepprevious
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#búsqueda-mientras-se-escribe-debouncems-y-enabled
  */
 export interface DataResourceOptions {
   /**
@@ -115,6 +119,25 @@ export interface DataResourceOptions {
    * `await`, cuyo `data` nunca es `null`, también.
    */
   readonly keepPrevious?: boolean;
+  /**
+   * Milisegundos que la entrada debe quedarse quieta antes de pedir los datos (desde `1.7`), como en
+   * una búsqueda mientras se escribe: una ráfaga de cambios hace una sola petición, con la última
+   * entrada. Cada cambio cancela la petición en curso. Durante la espera `pending` vale `true` y
+   * `data` conserva el resultado anterior, salvo con `keepPrevious: false`. No retrasa la primera
+   * carga, `refresh()` ni el SSR, que pide los datos de un `await` enseguida para hidratar.
+   * @since 1.7.0
+   */
+  readonly debounceMs?: number;
+  /**
+   * Si se piden los datos (desde `1.7`): un booleano, una señal o una función que lee señales, como
+   * `() => query.value.length >= 2`. Mientras vale `false` no hay petición (tampoco con
+   * `refresh()`), la que estaba en curso se cancela, `pending` vale `false` y `data` conserva el
+   * último resultado, o `null` si no lo hubo. Al volver a `true` se piden los datos de la entrada
+   * actual, salvo que `data` ya sea de esa entrada. Un recurso con `await` no puede empezar
+   * desactivado.
+   * @since 1.7.0
+   */
+  readonly enabled?: boolean | ReadonlySignal<boolean> | (() => boolean);
 }
 
 /**
@@ -262,7 +285,7 @@ type QueryOf<Queries, Path extends keyof Queries> = Extract<Queries[Path], AnyAp
  * Firma de `useApi(ruta, opciones?, recarga?)`: lee un endpoint GET por su ruta y devuelve un
  * {@link DataResource}. Sólo se llama en el nivel superior del `<script>` (`MEEK054`); con `await`,
  * la página no se renderiza hasta tener los datos. Desde `1.5`, el tercer argumento son las
- * {@link DataResourceOptions} (`keepPrevious`).
+ * {@link DataResourceOptions} (`keepPrevious` y, desde `1.7`, `debounceMs` y `enabled`).
  *
  * @typeParam Queries Operaciones GET por ruta, normalmente un {@link ApiQueryContract}.
  * @since 1.1.0
@@ -282,7 +305,7 @@ export type UseApi<Queries> =
  * Firma de `useRpcQuery(procedimiento, input?, recarga?)`: lee datos mediante un procedimiento RPC y
  * devuelve un {@link DataResource}. `input` puede contener señales o ser una función que las lee; un
  * cambio vuelve a pedir los datos. Sólo en el nivel superior del `<script>` (`MEEK054`). Desde `1.5`,
- * el tercer argumento son las {@link DataResourceOptions} (`keepPrevious`).
+ * el tercer argumento son las {@link DataResourceOptions} (`keepPrevious` y, desde `1.7`, `debounceMs` y `enabled`).
  *
  * @typeParam Contract Contrato `RpcContract` generado, indexado por ID de procedimiento.
  * @since 1.1.0
@@ -548,15 +571,31 @@ interface ResourceSource {
   readonly fetch: (input: unknown, signal: AbortSignal | undefined) => Promise<unknown>;
 }
 
+/** `enabled` as a function that reads its signals; `true` when left out. */
+function enabledReader(value: unknown, label: string): () => boolean {
+  if (value === undefined) return () => true;
+  if (typeof value === "boolean") return () => value;
+  if (isSignal(value)) return () => Boolean(value.value);
+  if (typeof value === "function") return () => Boolean((value as () => unknown)());
+  throw new TypeError(`${label}: enabled must be a boolean, a signal or a function that returns one`);
+}
+
 function createResource<T>(source: ResourceSource, options: DataResourceOptions | undefined): DataResource<T> {
   const phase = requireSetup(source.label);
   if (options !== undefined && (typeof options !== "object" || options === null)) {
     throw new TypeError(`${source.label}: the last argument must be an object such as { keepPrevious: false }`);
   }
   const keepPrevious = options?.keepPrevious !== false;
+  const debounceMs = options?.debounceMs ?? 0;
+  if (typeof debounceMs !== "number" || !Number.isFinite(debounceMs) || debounceMs < 0) {
+    throw new TypeError(`${source.label}: debounceMs must be a number of milliseconds, 0 or more`);
+  }
+  const isEnabled = enabledReader(options?.enabled, source.label);
+  let enabled = untrack(isEnabled);
   const data = signal<T | null>(null);
   const error = signal<Error | null>(null);
-  const pending = signal(true);
+  // A disabled resource is not loading anything.
+  const pending = signal(enabled);
   const refreshing = signal(false);
   /** Whether `data` holds the result of a load: `null` may be a real output. */
   const loadedOnce = signal(false);
@@ -571,7 +610,18 @@ function createResource<T>(source: ResourceSource, options: DataResourceOptions 
   let controller: AbortController | undefined;
   let inflight: Promise<void> | undefined;
   let generation = 0;
+  /** Request key of the input whose result `data` holds. */
+  let dataKey: string | undefined;
+  /** The wait of `debounceMs` before the next request. */
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  /** Stops the wait and the request in flight; a result that still arrives is ignored. */
+  const cancel = (): void => {
+    if (timer !== undefined) { clearTimeout(timer); timer = undefined; }
+    if (controller) { controller.abort(); controller = undefined; generation++; inflight = undefined; }
+  };
+  const disabled = (): Error => new Error(`${source.label} is disabled (enabled is false): an awaited resource needs its data. Leave out await, or enable it`);
   const load = (): Promise<void> => {
+    if (timer !== undefined) { clearTimeout(timer); timer = undefined; }
     started = true;
     controller?.abort();
     const current = new AbortController();
@@ -585,6 +635,7 @@ function createResource<T>(source: ResourceSource, options: DataResourceOptions 
     const run = source.fetch(input, current.signal).then((value) => {
       if (id !== generation || released) return;
       batch(() => { data.value = value as T; error.value = null; pending.value = false; refreshing.value = false; loadedOnce.value = true; });
+      dataKey = requestKey;
       cache?.set(requestKey, value);
     }, (failure: unknown) => {
       if (id !== generation || released || current.signal.aborted) return;
@@ -595,12 +646,16 @@ function createResource<T>(source: ResourceSource, options: DataResourceOptions 
   };
   const loaded = (value: unknown): LoadedResource<T> => {
     batch(() => { data.value = value as T; error.value = null; pending.value = false; refreshing.value = false; loadedOnce.value = true; });
+    dataKey = key;
     return view;
   };
+  /** A disabled resource requests nothing, also on `refresh()`. */
+  const refresh = (): Promise<void> => enabled ? load() : Promise.resolve();
   const internals: ResourceInternals = { key: keySignal, loaded: loadedOnce };
-  const view: LoadedResource<T> = Object.assign({ data: data as ReadonlySignal<T>, error, pending, refreshing, refresh: () => load() }, { [resourceInternals]: internals });
+  const view: LoadedResource<T> = Object.assign({ data: data as ReadonlySignal<T>, error, pending, refreshing, refresh }, { [resourceInternals]: internals });
   const settle = (): Promise<LoadedResource<T>> => {
     awaited = true;
+    if (!enabled) return Promise.reject(disabled());
     const ready = untrack(() => !pending.value && error.value === null);
     const run = inflight ?? (ready ? Promise.resolve() : load());
     return run.then(() => {
@@ -611,6 +666,7 @@ function createResource<T>(source: ResourceSource, options: DataResourceOptions 
   };
   const readNow = (): LoadedResource<T> => {
     awaited = true;
+    if (!enabled) throw disabled();
     const describe = `${source.label} (${key})`;
     if (activeScope) {
       const scope = activeScope;
@@ -631,31 +687,57 @@ function createResource<T>(source: ResourceSource, options: DataResourceOptions 
     // A component that mounts later waits for its data; a plain renderToString throws SuspendedRenderError.
     return suspendLate(describe);
   };
+  /** A change of the input: the request now, or once the input stays still for `debounceMs`. */
+  const schedule = (): void => {
+    if (debounceMs === 0) { void load(); return; }
+    cancel();
+    batch(() => {
+      pending.value = true;
+      refreshing.value = untrack(() => loadedOnce.value);
+    });
+    timer = setTimeout(() => {
+      timer = undefined;
+      if (!released && enabled) void load();
+    }, debounceMs);
+  };
   if (phase === "mount") {
-    onCleanup(() => { released = true; controller?.abort(); });
+    onCleanup(() => { released = true; cancel(); });
     let first = true;
     effect(() => {
       const next = source.read();
       const nextKey = source.key(next);
+      const nextEnabled = isEnabled();
       if (first) { first = false; return; }
-      if (nextKey === key) return;
+      const keyChanged = nextKey !== key;
+      if (!keyChanged && nextEnabled === enabled) return;
+      const reenabled = nextEnabled && !enabled;
       input = next;
       key = nextKey;
+      enabled = nextEnabled;
       untrack(() => {
         // `keepPrevious: false`: the data of another input is not shown while the new one loads.
-        batch(() => {
-          keySignal.value = nextKey;
-          if (!keepPrevious && !awaited) { data.value = null; error.value = null; loadedOnce.value = false; }
-        });
-        void load();
+        if (keyChanged) {
+          batch(() => {
+            keySignal.value = nextKey;
+            if (!keepPrevious && !awaited) { data.value = null; error.value = null; loadedOnce.value = false; dataKey = undefined; }
+          });
+        }
+        if (!enabled) {
+          cancel();
+          batch(() => { pending.value = false; refreshing.value = false; });
+          return;
+        }
+        // Enabled again with the input whose data is already shown: nothing to load.
+        if (reenabled && dataKey === key && error.value === null) return;
+        schedule();
       });
     });
     // Without await, the browser loads the data once the component is mounted.
-    whenMounted(() => { if (!awaited && !started) void load(); });
+    whenMounted(() => { if (!awaited && !started && enabled) void load(); });
   }
   const resource = {
     data, error, pending, refreshing,
-    refresh: () => load(),
+    refresh,
     [resourceInternals]: internals,
     then<R1 = LoadedResource<T>, R2 = never>(onfulfilled?: ((value: LoadedResource<T>) => R1 | PromiseLike<R1>) | null, onrejected?: ((reason: unknown) => R2 | PromiseLike<R2>) | null): PromiseLike<R1 | R2> {
       return settle().then(onfulfilled, onrejected);

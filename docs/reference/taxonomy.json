@@ -1,0 +1,1183 @@
+{
+  "$comment": "Taxonomía de la referencia de la API: grupos del aside y símbolos en orden de lectura. Véase docs/reference/README.md.",
+  "groups": [
+    {
+      "id": "components",
+      "title": "Componentes",
+      "label": "componente",
+      "icon": "components",
+      "description": "Las etiquetas propias de Meeko: se usan en la plantilla sin importarlas y el compilador comprueba sus atributos.",
+      "entries": [
+        {
+          "name": "<MeekoLink>",
+          "symbols": [
+            "syntax:meekolink"
+          ]
+        },
+        {
+          "name": "<MeekoOutlet>",
+          "symbols": [
+            "syntax:meekooutlet"
+          ]
+        },
+        {
+          "name": "<MeekoAwait>",
+          "symbols": [
+            "syntax:meekoawait"
+          ]
+        },
+        {
+          "name": "<MeekoTeleport>",
+          "symbols": [
+            "syntax:meekoteleport"
+          ]
+        },
+        {
+          "name": "<MeekoPopover>",
+          "symbols": [
+            "syntax:meekopopover"
+          ]
+        },
+        {
+          "name": "<MeekoSelect>",
+          "symbols": [
+            "syntax:meekoselect"
+          ]
+        },
+        {
+          "name": "<MeekoThemeToggle>",
+          "symbols": [
+            "syntax:meekothemetoggle"
+          ]
+        },
+        {
+          "name": "<component is>",
+          "symbols": [
+            "syntax:component-tag"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "macros",
+      "title": "Macros",
+      "label": "macro",
+      "icon": "macros",
+      "description": "Las macros que el compilador lee en el script del componente y las funciones `define*` que declaran páginas, middleware, plugins, módulos, la configuración y el servidor.",
+      "entries": [
+        {
+          "name": "defineProps",
+          "symbols": [
+            "syntax:defineprops"
+          ]
+        },
+        {
+          "name": "defineEmits",
+          "symbols": [
+            "syntax:defineemits"
+          ]
+        },
+        {
+          "name": "defineModel",
+          "symbols": [
+            "syntax:definemodel"
+          ]
+        },
+        {
+          "name": "defineSnippets",
+          "symbols": [
+            "syntax:definesnippets"
+          ]
+        },
+        {
+          "name": "defineExpose",
+          "symbols": [
+            "syntax:defineexpose"
+          ]
+        },
+        {
+          "name": "useElementRef",
+          "symbols": [
+            "syntax:useelementref"
+          ]
+        },
+        {
+          "name": "definePage",
+          "symbols": [
+            "@meekojs/meeko/framework#definePage"
+          ]
+        },
+        {
+          "name": "defineGroup",
+          "symbols": [
+            "@meekojs/meeko/framework#defineGroup"
+          ]
+        },
+        {
+          "name": "defineRouteMiddleware",
+          "symbols": [
+            "@meekojs/meeko/framework#defineRouteMiddleware"
+          ]
+        },
+        {
+          "name": "defineServerRouteMiddleware",
+          "symbols": [
+            "@meekojs/meeko/framework#defineServerRouteMiddleware"
+          ]
+        },
+        {
+          "name": "definePlugin",
+          "symbols": [
+            "@meekojs/meeko/framework#definePlugin"
+          ]
+        },
+        {
+          "name": "defineMeekoConfig",
+          "symbols": [
+            "@meekojs/meeko/framework#defineMeekoConfig"
+          ]
+        },
+        {
+          "name": "defineMeekoModule",
+          "symbols": [
+            "@meekojs/meeko/framework#defineMeekoModule"
+          ]
+        },
+        {
+          "name": "defineApiRoute",
+          "symbols": [
+            "@meekojs/meeko/server#defineApiRoute"
+          ]
+        },
+        {
+          "name": "defineRpc",
+          "symbols": [
+            "@meekojs/meeko/server#defineRpc"
+          ]
+        },
+        {
+          "name": "defineServerMiddleware",
+          "symbols": [
+            "@meekojs/meeko/server#defineServerMiddleware"
+          ]
+        },
+        {
+          "name": "defineSocketChannel",
+          "symbols": [
+            "@meekojs/meeko/server#defineSocketChannel"
+          ]
+        },
+        {
+          "name": "defineServerRuntime",
+          "symbols": [
+            "@meekojs/meeko/server#defineServerRuntime"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "composables",
+      "title": "Composables",
+      "label": "composable",
+      "icon": "composables",
+      "description": "Funciones `use*` que el script de un componente llama en su nivel superior: la ruta, la página, formularios, el head, el tema, el estado y los datos del servidor.",
+      "entries": [
+        {
+          "name": "useRoute",
+          "symbols": [
+            "@meekojs/meeko/framework#useRoute"
+          ]
+        },
+        {
+          "name": "usePage",
+          "symbols": [
+            "@meekojs/meeko/framework#usePage"
+          ]
+        },
+        {
+          "name": "useNavigation",
+          "symbols": [
+            "@meekojs/meeko/framework#useNavigation"
+          ]
+        },
+        {
+          "name": "useForm",
+          "symbols": [
+            "@meekojs/meeko/framework#useForm"
+          ]
+        },
+        {
+          "name": "useId",
+          "symbols": [
+            "@meekojs/meeko#useId"
+          ]
+        },
+        {
+          "name": "useHead",
+          "symbols": [
+            "@meekojs/meeko/framework#useHead"
+          ]
+        },
+        {
+          "name": "useSeoMeta",
+          "symbols": [
+            "@meekojs/meeko/framework#useSeoMeta"
+          ]
+        },
+        {
+          "name": "useTheme",
+          "symbols": [
+            "@meekojs/meeko/framework#useTheme"
+          ]
+        },
+        {
+          "name": "useLayout",
+          "symbols": [
+            "@meekojs/meeko/framework#useLayout"
+          ]
+        },
+        {
+          "name": "useState",
+          "symbols": [
+            "@meekojs/meeko/framework#useState"
+          ]
+        },
+        {
+          "name": "useStorage",
+          "symbols": [
+            "@meekojs/meeko/framework#useStorage"
+          ]
+        },
+        {
+          "name": "useApi",
+          "symbols": [
+            "autoimport:useApi"
+          ],
+          "slug": "use-api",
+          "fallback": "/docs/framework#datos-en-componentes-useapi-userpcquery-y-userpcmutation",
+          "description": "Lee un endpoint de API desde un componente, con SSR, hidratación y tipos del contrato."
+        },
+        {
+          "name": "useApiMutation",
+          "symbols": [
+            "autoimport:useApiMutation"
+          ],
+          "slug": "use-api-mutation",
+          "fallback": "/docs/framework#mutaciones",
+          "description": "Envía una mutación a un endpoint de API con su estado de envío y sus errores."
+        },
+        {
+          "name": "useRpcQuery",
+          "symbols": [
+            "autoimport:useRpcQuery"
+          ],
+          "slug": "use-rpc-query",
+          "fallback": "/docs/framework#datos-en-componentes-useapi-userpcquery-y-userpcmutation",
+          "description": "Lee un procedimiento RPC desde un componente, con SSR e hidratación."
+        },
+        {
+          "name": "useRpcMutation",
+          "symbols": [
+            "autoimport:useRpcMutation"
+          ],
+          "slug": "use-rpc-mutation",
+          "fallback": "/docs/framework#mutaciones",
+          "description": "Llama a un procedimiento RPC que cambia datos, con su estado de envío y sus errores."
+        },
+        {
+          "name": "useSocket",
+          "symbols": [
+            "autoimport:useSocket"
+          ],
+          "slug": "use-socket",
+          "fallback": "/docs/framework#websocket",
+          "description": "Conecta un componente a un canal Socket del servidor con sus eventos tipados."
+        },
+        {
+          "name": "useSocketChannel",
+          "symbols": [
+            "@meekojs/meeko/framework#useSocketChannel"
+          ]
+        },
+        {
+          "name": "useRequestState",
+          "symbols": [
+            "@meekojs/meeko/server#useRequestState"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reactivity",
+      "title": "Reactividad",
+      "label": "reactividad",
+      "icon": "reactivity",
+      "description": "Señales, valores derivados, efectos, ciclo de vida, contexto y observadores de errores: el núcleo sin DOM virtual.",
+      "entries": [
+        {
+          "name": "signal",
+          "symbols": [
+            "@meekojs/meeko#signal"
+          ]
+        },
+        {
+          "name": "computed",
+          "symbols": [
+            "@meekojs/meeko#computed"
+          ]
+        },
+        {
+          "name": "effect",
+          "symbols": [
+            "@meekojs/meeko#effect"
+          ]
+        },
+        {
+          "name": "batch",
+          "symbols": [
+            "@meekojs/meeko#batch"
+          ]
+        },
+        {
+          "name": "untrack",
+          "symbols": [
+            "@meekojs/meeko#untrack"
+          ]
+        },
+        {
+          "name": "onMounted",
+          "symbols": [
+            "@meekojs/meeko#onMounted"
+          ]
+        },
+        {
+          "name": "onCleanup",
+          "symbols": [
+            "@meekojs/meeko#onCleanup"
+          ]
+        },
+        {
+          "name": "createContext",
+          "symbols": [
+            "@meekojs/meeko#createContext"
+          ]
+        },
+        {
+          "name": "provide",
+          "symbols": [
+            "@meekojs/meeko#provide"
+          ]
+        },
+        {
+          "name": "inject",
+          "symbols": [
+            "@meekojs/meeko#inject"
+          ]
+        },
+        {
+          "name": "createRoot",
+          "symbols": [
+            "@meekojs/meeko#createRoot"
+          ]
+        },
+        {
+          "name": "provideErrorHandler",
+          "symbols": [
+            "@meekojs/meeko#provideErrorHandler"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "utils",
+      "title": "Utilidades",
+      "label": "utilidad",
+      "icon": "utils",
+      "description": "Rutas tipadas, redirecciones, errores de API, clientes generados, serialización, HTML de confianza y contraseñas.",
+      "entries": [
+        {
+          "name": "href",
+          "symbols": [
+            "@meekojs/meeko/framework#href"
+          ]
+        },
+        {
+          "name": "redirect",
+          "symbols": [
+            "@meekojs/meeko/framework#redirect"
+          ]
+        },
+        {
+          "name": "notFound",
+          "symbols": [
+            "@meekojs/meeko/framework#notFound"
+          ]
+        },
+        {
+          "name": "defer",
+          "symbols": [
+            "@meekojs/meeko/framework#defer"
+          ]
+        },
+        {
+          "name": "api",
+          "symbols": [
+            "autoimport:api"
+          ],
+          "slug": "client-api",
+          "fallback": "/docs/framework#api-y-rpc",
+          "description": "Cliente generado de los endpoints de `server/api`, tipado por sus contratos."
+        },
+        {
+          "name": "rpc",
+          "symbols": [
+            "autoimport:rpc"
+          ],
+          "slug": "client-rpc",
+          "fallback": "/docs/framework#api-y-rpc",
+          "description": "Cliente generado de los procedimientos de `server/rpc`, tipado por sus contratos."
+        },
+        {
+          "name": "socket",
+          "symbols": [
+            "autoimport:socket"
+          ],
+          "slug": "client-socket",
+          "fallback": "/docs/framework#websocket",
+          "description": "Cliente generado de los canales de `server/socket`."
+        },
+        {
+          "name": "ApiError",
+          "symbols": [
+            "@meekojs/meeko/server#ApiError"
+          ]
+        },
+        {
+          "name": "ClientError",
+          "symbols": [
+            "@meekojs/meeko/framework#ClientError"
+          ]
+        },
+        {
+          "name": "isClientError",
+          "symbols": [
+            "@meekojs/meeko/framework#isClientError"
+          ]
+        },
+        {
+          "name": "PageInputError",
+          "symbols": [
+            "@meekojs/meeko/framework#PageInputError"
+          ]
+        },
+        {
+          "name": "serializeJson",
+          "symbols": [
+            "@meekojs/meeko#serializeJson"
+          ]
+        },
+        {
+          "name": "trustHtml",
+          "symbols": [
+            "@meekojs/meeko#trustHtml",
+            "@meekojs/meeko#TrustedHtml"
+          ]
+        },
+        {
+          "name": "hashPassword",
+          "symbols": [
+            "@meekojs/meeko/password#hashPassword"
+          ]
+        },
+        {
+          "name": "verifyPassword",
+          "symbols": [
+            "@meekojs/meeko/password#verifyPassword"
+          ]
+        },
+        {
+          "name": "needsRehash",
+          "symbols": [
+            "@meekojs/meeko/password#needsRehash"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "syntax",
+      "title": "Sintaxis .meeko",
+      "label": "sintaxis",
+      "icon": "syntax",
+      "description": "Lo que el compilador reconoce en un archivo `.meeko`: interpolación, directivas, snippets y los bloques del componente.",
+      "entries": [
+        {
+          "name": "{expresión}",
+          "symbols": [
+            "syntax:interpolation"
+          ]
+        },
+        {
+          "name": "if:when",
+          "symbols": [
+            "syntax:if-when"
+          ]
+        },
+        {
+          "name": "each:of",
+          "symbols": [
+            "syntax:each"
+          ]
+        },
+        {
+          "name": "on:evento",
+          "symbols": [
+            "syntax:on"
+          ]
+        },
+        {
+          "name": "bind:nombre",
+          "symbols": [
+            "syntax:bind"
+          ]
+        },
+        {
+          "name": "model",
+          "symbols": [
+            "syntax:model"
+          ]
+        },
+        {
+          "name": "html",
+          "symbols": [
+            "syntax:html"
+          ]
+        },
+        {
+          "name": "ref:nombre",
+          "symbols": [
+            "syntax:ref"
+          ]
+        },
+        {
+          "name": "<snippet>",
+          "symbols": [
+            "syntax:snippet-tag"
+          ]
+        },
+        {
+          "name": "<render>",
+          "symbols": [
+            "syntax:render-tag"
+          ]
+        },
+        {
+          "name": "<script server>",
+          "symbols": [
+            "syntax:script-server"
+          ]
+        },
+        {
+          "name": "generic",
+          "symbols": [
+            "syntax:generic"
+          ]
+        },
+        {
+          "name": "<style>",
+          "symbols": [
+            "syntax:style"
+          ]
+        },
+        {
+          "name": "<style scoped>",
+          "symbols": [
+            "syntax:style-scoped"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "server",
+      "title": "Servidor",
+      "label": "servidor",
+      "icon": "server",
+      "description": "Sesiones y sus almacenes, cabeceras de seguridad, OpenAPI, llamadas locales, Socket entre instancias y errores del proceso.",
+      "entries": [
+        {
+          "name": "SessionManager",
+          "symbols": [
+            "@meekojs/meeko/server#SessionManager"
+          ]
+        },
+        {
+          "name": "SessionHandle",
+          "symbols": [
+            "@meekojs/meeko/server#SessionHandle"
+          ]
+        },
+        {
+          "name": "MemorySessionStore",
+          "symbols": [
+            "@meekojs/meeko/server#MemorySessionStore"
+          ]
+        },
+        {
+          "name": "RedisSessionStore",
+          "symbols": [
+            "@meekojs/meeko/server#RedisSessionStore"
+          ]
+        },
+        {
+          "name": "SqlSessionStore",
+          "symbols": [
+            "@meekojs/meeko/server#SqlSessionStore"
+          ]
+        },
+        {
+          "name": "SessionRevokedError",
+          "symbols": [
+            "@meekojs/meeko/server#SessionRevokedError"
+          ]
+        },
+        {
+          "name": "SessionSecurityError",
+          "symbols": [
+            "@meekojs/meeko/server#SessionSecurityError"
+          ]
+        },
+        {
+          "name": "contentSecurityPolicy",
+          "symbols": [
+            "@meekojs/meeko/server#contentSecurityPolicy"
+          ]
+        },
+        {
+          "name": "generateOpenApi",
+          "symbols": [
+            "@meekojs/meeko/server#generateOpenApi"
+          ]
+        },
+        {
+          "name": "createLocalCalls",
+          "symbols": [
+            "@meekojs/meeko/server#createLocalCalls"
+          ]
+        },
+        {
+          "name": "createLocalServerFetch",
+          "symbols": [
+            "@meekojs/meeko/server#createLocalServerFetch"
+          ]
+        },
+        {
+          "name": "LocalSocketPubSub",
+          "symbols": [
+            "@meekojs/meeko/server#LocalSocketPubSub"
+          ]
+        },
+        {
+          "name": "RedisSocketPubSub",
+          "symbols": [
+            "@meekojs/meeko/server#RedisSocketPubSub"
+          ]
+        },
+        {
+          "name": "composeServerMiddleware",
+          "symbols": [
+            "@meekojs/meeko/server#composeServerMiddleware"
+          ]
+        },
+        {
+          "name": "handleProcessErrors",
+          "symbols": [
+            "@meekojs/meeko/server#handleProcessErrors"
+          ]
+        },
+        {
+          "name": "errorResponse",
+          "symbols": [
+            "@meekojs/meeko/server#errorResponse"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "adapters",
+      "title": "Adaptadores",
+      "label": "adaptador",
+      "icon": "adapters",
+      "description": "Cómo se ejecuta la aplicación construida en Node, Bun, Deno y Cloudflare Workers.",
+      "entries": [
+        {
+          "name": "serveNode",
+          "symbols": [
+            "@meekojs/meeko/node#serveNode"
+          ]
+        },
+        {
+          "name": "toNodeListener",
+          "symbols": [
+            "@meekojs/meeko/node#toNodeListener"
+          ]
+        },
+        {
+          "name": "attachNodeWebSocketServer",
+          "symbols": [
+            "@meekojs/meeko/node#attachNodeWebSocketServer"
+          ]
+        },
+        {
+          "name": "createNodeAssetReader",
+          "symbols": [
+            "@meekojs/meeko/node#createNodeAssetReader"
+          ]
+        },
+        {
+          "name": "createNodeSocketUpgradeHandler",
+          "symbols": [
+            "@meekojs/meeko/node#createNodeSocketUpgradeHandler"
+          ]
+        },
+        {
+          "name": "createBunServer",
+          "symbols": [
+            "@meekojs/meeko/bun#createBunServer"
+          ]
+        },
+        {
+          "name": "createBunAssetReader",
+          "symbols": [
+            "@meekojs/meeko/bun#createBunAssetReader"
+          ]
+        },
+        {
+          "name": "serveDeno",
+          "symbols": [
+            "@meekojs/meeko/deno#serveDeno"
+          ]
+        },
+        {
+          "name": "createDenoAssetReader",
+          "symbols": [
+            "@meekojs/meeko/deno#createDenoAssetReader"
+          ]
+        },
+        {
+          "name": "createWorker",
+          "symbols": [
+            "@meekojs/meeko/cloudflare#createWorker"
+          ]
+        },
+        {
+          "name": "createSocketRoomClass",
+          "symbols": [
+            "@meekojs/meeko/cloudflare#createSocketRoomClass"
+          ]
+        },
+        {
+          "name": "socketRoomName",
+          "symbols": [
+            "@meekojs/meeko/cloudflare#socketRoomName"
+          ]
+        },
+        {
+          "name": "DurableObjectSocketPubSub",
+          "symbols": [
+            "@meekojs/meeko/cloudflare#DurableObjectSocketPubSub"
+          ]
+        },
+        {
+          "name": "D1SessionDriver",
+          "symbols": [
+            "@meekojs/meeko/cloudflare#D1SessionDriver"
+          ]
+        },
+        {
+          "name": "createCloudflareAssetReader",
+          "symbols": [
+            "@meekojs/meeko/cloudflare#createCloudflareAssetReader"
+          ]
+        },
+        {
+          "name": "createCloudflarePrerenderSource",
+          "symbols": [
+            "@meekojs/meeko/cloudflare#createCloudflarePrerenderSource"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "commands",
+      "title": "Comandos",
+      "label": "comando",
+      "icon": "commands",
+      "description": "La CLI `meeko`: desarrollo, comprobación, build, servidor de producción, proyectos nuevos y herramientas.",
+      "entries": [
+        {
+          "name": "meeko dev",
+          "symbols": [
+            "cli:dev"
+          ],
+          "slug": "meeko-dev",
+          "fallback": "/docs/inicio-rapido#crear-una-aplicación-full-stack",
+          "description": "Servidor de desarrollo: prepara los tipos y arranca la aplicación con Vite y HMR."
+        },
+        {
+          "name": "meeko build",
+          "symbols": [
+            "cli:build"
+          ],
+          "slug": "meeko-build",
+          "fallback": "/docs/framework#build-despliegue-y-verificación",
+          "description": "Comprueba el proyecto y genera la salida de producción de su adaptador."
+        },
+        {
+          "name": "meeko start",
+          "symbols": [
+            "cli:start"
+          ],
+          "slug": "meeko-start",
+          "fallback": "/docs/framework#build-despliegue-y-verificación",
+          "description": "Arranca el servidor de producción del build."
+        },
+        {
+          "name": "meeko preview",
+          "symbols": [
+            "cli:preview"
+          ],
+          "slug": "meeko-preview",
+          "fallback": "/docs/framework#build-despliegue-y-verificación",
+          "description": "Ejecuta la salida del build en su runtime: Node, Bun, Deno o `wrangler dev`."
+        },
+        {
+          "name": "meeko check",
+          "symbols": [
+            "cli:check"
+          ],
+          "slug": "meeko-check",
+          "fallback": "/docs/inicio-rapido#desarrollo",
+          "description": "Comprueba un proyecto o un componente `.meeko` con TypeScript y los diagnósticos de Meeko."
+        },
+        {
+          "name": "meeko clean",
+          "symbols": [
+            "cli:clean"
+          ],
+          "slug": "meeko-clean",
+          "fallback": "/docs/framework#limpiar-el-proyecto",
+          "description": "Borra lo que genera Meeko: `.meeko/` y la caché de Vite; con `--all`, también `node_modules`."
+        },
+        {
+          "name": "meeko init",
+          "symbols": [
+            "cli:init"
+          ],
+          "slug": "meeko-init",
+          "fallback": "/docs/inicio-rapido#crear-una-aplicación-ssr",
+          "description": "Crea un proyecto SSR independiente con un componente `.meeko`."
+        },
+        {
+          "name": "meeko init-framework",
+          "symbols": [
+            "cli:init-framework"
+          ],
+          "slug": "meeko-init-framework",
+          "fallback": "/docs/inicio-rapido#crear-una-aplicación-full-stack",
+          "description": "Crea una aplicación full-stack con páginas, layouts, servidor y tipos."
+        },
+        {
+          "name": "meeko auth hash",
+          "symbols": [
+            "cli:auth hash"
+          ],
+          "slug": "meeko-auth-hash",
+          "fallback": "/docs/framework#contraseñas",
+          "description": "Pide una contraseña sin mostrarla, o la lee de stdin, e imprime su hash."
+        },
+        {
+          "name": "meeko routes",
+          "symbols": [
+            "cli:routes"
+          ],
+          "slug": "meeko-routes",
+          "fallback": "/docs/framework#configuración",
+          "description": "Descubre rutas, contratos y autoimports y escribe los manifiestos y tipos de `.meeko/`."
+        },
+        {
+          "name": "meeko prerender",
+          "symbols": [
+            "cli:prerender"
+          ],
+          "slug": "meeko-prerender",
+          "fallback": "/docs/framework#modos-de-render",
+          "description": "Prerenderiza las rutas `render: \"prerender\"` sobre un build existente."
+        },
+        {
+          "name": "meeko compile",
+          "symbols": [
+            "cli:compile"
+          ],
+          "slug": "meeko-compile",
+          "fallback": "/docs/inicio-rapido#desarrollo",
+          "description": "Compila un componente `.meeko` a un módulo TypeScript."
+        },
+        {
+          "name": "meeko types",
+          "symbols": [
+            "cli:types"
+          ],
+          "slug": "meeko-types",
+          "fallback": "/docs/inicio-rapido#desarrollo",
+          "description": "Genera las declaraciones de tipos de un componente `.meeko`."
+        },
+        {
+          "name": "meeko check-app",
+          "symbols": [
+            "cli:check-app"
+          ],
+          "slug": "meeko-check-app",
+          "fallback": "/docs/inicio-rapido#desarrollo",
+          "description": "Comprueba todos los componentes de la aplicación."
+        },
+        {
+          "name": "meeko lsp",
+          "symbols": [
+            "cli:lsp"
+          ],
+          "slug": "meeko-lsp",
+          "fallback": "/docs/editors",
+          "description": "Servidor de lenguaje de `.meeko` por stdio, el que usan los editores."
+        }
+      ]
+    },
+    {
+      "id": "config",
+      "title": "Configuración",
+      "label": "configuración",
+      "icon": "config",
+      "description": "Las claves de `meeko.config.ts`, que se declara con `defineMeekoConfig`.",
+      "entries": [
+        {
+          "name": "layers",
+          "symbols": [
+            "config:layers"
+          ],
+          "slug": "config-layers"
+        },
+        {
+          "name": "extends",
+          "symbols": [
+            "config:extends"
+          ],
+          "slug": "config-extends"
+        },
+        {
+          "name": "modules",
+          "symbols": [
+            "config:modules"
+          ],
+          "slug": "config-modules"
+        },
+        {
+          "name": "imports",
+          "symbols": [
+            "config:imports"
+          ],
+          "slug": "config-imports"
+        },
+        {
+          "name": "alias",
+          "symbols": [
+            "config:alias"
+          ],
+          "slug": "config-alias"
+        },
+        {
+          "name": "server",
+          "symbols": [
+            "config:server"
+          ],
+          "slug": "config-server"
+        },
+        {
+          "name": "css",
+          "symbols": [
+            "config:css"
+          ],
+          "slug": "config-css"
+        },
+        {
+          "name": "document",
+          "symbols": [
+            "config:document"
+          ],
+          "slug": "config-document"
+        },
+        {
+          "name": "dev",
+          "symbols": [
+            "config:dev"
+          ],
+          "slug": "config-dev"
+        },
+        {
+          "name": "site",
+          "symbols": [
+            "config:site"
+          ],
+          "slug": "config-site"
+        },
+        {
+          "name": "sitemap",
+          "symbols": [
+            "config:sitemap"
+          ],
+          "slug": "config-sitemap"
+        },
+        {
+          "name": "robots",
+          "symbols": [
+            "config:robots"
+          ],
+          "slug": "config-robots"
+        },
+        {
+          "name": "theme",
+          "symbols": [
+            "config:theme"
+          ],
+          "slug": "config-theme"
+        }
+      ]
+    },
+    {
+      "id": "advanced",
+      "title": "Avanzado",
+      "label": "API avanzada",
+      "icon": "advanced",
+      "description": "Las piezas que hay debajo del framework, para hosts propios, herramientas y builds a medida.",
+      "entries": [
+        {
+          "name": "createServerApp",
+          "symbols": [
+            "@meekojs/meeko/server#createServerApp"
+          ]
+        },
+        {
+          "name": "createFrameworkHandler",
+          "symbols": [
+            "@meekojs/meeko/server#createFrameworkHandler"
+          ]
+        },
+        {
+          "name": "createServerDispatcher",
+          "symbols": [
+            "@meekojs/meeko/server#createServerDispatcher"
+          ]
+        },
+        {
+          "name": "createRequestContext",
+          "symbols": [
+            "@meekojs/meeko/server#createRequestContext"
+          ]
+        },
+        {
+          "name": "createSocketHub",
+          "symbols": [
+            "@meekojs/meeko/server#createSocketHub"
+          ]
+        },
+        {
+          "name": "createSocketUpgradeHandler",
+          "symbols": [
+            "@meekojs/meeko/server#createSocketUpgradeHandler"
+          ]
+        },
+        {
+          "name": "mountClientApp",
+          "symbols": [
+            "@meekojs/meeko/framework#mountClientApp"
+          ]
+        },
+        {
+          "name": "createNavigator",
+          "symbols": [
+            "@meekojs/meeko/framework#createNavigator"
+          ]
+        },
+        {
+          "name": "createApiClient",
+          "symbols": [
+            "@meekojs/meeko/framework#createApiClient"
+          ]
+        },
+        {
+          "name": "createRpcClient",
+          "symbols": [
+            "@meekojs/meeko/framework#createRpcClient"
+          ]
+        },
+        {
+          "name": "createSocketClient",
+          "symbols": [
+            "@meekojs/meeko/framework#createSocketClient"
+          ]
+        },
+        {
+          "name": "useSocketClient",
+          "symbols": [
+            "@meekojs/meeko/framework#useSocketClient"
+          ]
+        },
+        {
+          "name": "StateStore",
+          "symbols": [
+            "@meekojs/meeko/framework#StateStore"
+          ]
+        },
+        {
+          "name": "matchRoute",
+          "symbols": [
+            "@meekojs/meeko/framework#matchRoute"
+          ]
+        },
+        {
+          "name": "buildProject",
+          "symbols": [
+            "@meekojs/meeko/build#buildProject"
+          ]
+        },
+        {
+          "name": "prerenderRoutes",
+          "symbols": [
+            "@meekojs/meeko/build#prerenderRoutes"
+          ]
+        },
+        {
+          "name": "loadMeekoConfig",
+          "symbols": [
+            "@meekojs/meeko/build#loadMeekoConfig"
+          ]
+        },
+        {
+          "name": "meeko (Vite)",
+          "symbols": [
+            "@meekojs/meeko/vite#meeko"
+          ]
+        },
+        {
+          "name": "meekoUtilities",
+          "symbols": [
+            "@meekojs/meeko/postcss#meekoUtilities"
+          ]
+        },
+        {
+          "name": "mountDevtoolsPanel",
+          "symbols": [
+            "@meekojs/meeko/devtools-ui#mountDevtoolsPanel"
+          ]
+        }
+      ]
+    }
+  ]
+}

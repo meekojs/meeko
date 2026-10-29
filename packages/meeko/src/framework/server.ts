@@ -6,7 +6,11 @@ import type { ServerFetch } from "../framework-server/context.js";
 import { ApiError, errorResponse, normalizeServerError, observeServerError } from "../framework-server/contracts.js";
 import { lockSessionCookie } from "../framework-server/sessions.js";
 import { etagMatches } from "../framework-server/assets.js";
-import { ERROR_PAGE_TITLE, PAYLOAD_VERSION, PageInputError, pageSearchObject, payloadHead, validatePageInputs } from "./page.js";
+import { encodeBase64Url } from "../framework-server/base64url.js";
+import { createCspNonce, documentContentSecurityPolicy } from "../framework-server/csp.js";
+import type { ContentSecurityPolicy } from "../framework-server/csp.js";
+import { ERROR_PAGE_TITLE, PAYLOAD_VERSION, PageInputError, pageSearchObject, payloadHead, resolvePageCache, validatePageInputs } from "./page.js";
+import type { PageCache, ResolvedPageCache } from "./page.js";
 import { hasRouteMiddleware, routeMiddlewareChain, runRouteMiddleware, runServerRouteMiddleware, serverRouteMiddlewareChain } from "./middleware.js";
 import type { RouteMiddleware, ServerRouteMiddleware, ServerRouteMiddlewareContext } from "./middleware.js";
 import type { PageHead, PageRender, PageSchema } from "./page.js";
@@ -35,6 +39,7 @@ import type { PluginRegistration, PluginState } from "./plugin.js";
 import { addThemeHeaders, provideServerTheme, requestTheme, resolveThemeConfig, THEME_ENDPOINT, withThemeAttributes } from "./theme.js";
 import { themeEndpoint } from "./theme-endpoint.js";
 import type { ResolvedThemeConfig, ServerTheme } from "./theme.js";
+import { formFlashCookies } from "./form-flash.js";
 
 /** Route manifest of the application handling the current request, for `href(id)`. */
 const requestManifest = new AsyncLocalStorage<readonly RouteRecord[]>();
@@ -116,6 +121,12 @@ export interface PageRoute {
    * @since 1.6.0
    */
   middleware?: unknown;
+  /**
+   * Caché HTTP de la página (`ETag`, `304`, `max-age` y caché en memoria), que el servidor lee al
+   * ejecutar la ruta. Sólo se aplica en producción y a peticiones sin sesión.
+   * @since 1.7.0
+   */
+  cache?: PageCache<undefined, undefined, RequestContext>;
 }
 
 /**
@@ -263,8 +274,8 @@ export interface DocumentOptions {
   readonly config?: DocumentConfig;
 }
 
-function documentParts(options: DocumentOptions | undefined, request: Request): { head: string; bodyEnd: string; nonce: string | undefined; nonceAttribute: string } {
-  const nonce = options?.nonce?.(request);
+/** The host's markup of one document, with the nonce of its response (none in a document read by hashes). */
+function documentParts(options: DocumentOptions | undefined, request: Request, nonce: string | undefined): { head: string; bodyEnd: string; nonce: string | undefined; nonceAttribute: string } {
   const markup = (value: DocumentMarkup | undefined): string => typeof value === "function" ? value({ request, nonce }) : value ?? "";
   return { head: markup(options?.head), bodyEnd: markup(options?.bodyEnd), nonce, nonceAttribute: nonce ? ` nonce="${escapeHtml(nonce)}"` : "" };
 }
@@ -332,6 +343,17 @@ export interface PrerenderedPage {
   readonly etag: string;
   /** Payload de navegación que reciben las navegaciones de cliente a la misma URL. */
   readonly payload?: string;
+  /**
+   * Fuentes CSP `'sha256-…'` de sus scripts en línea, como `scriptHashes` del índice de prerender.
+   * Con `server.contentSecurityPolicy`, la página se sirve con ellas; si faltan, se calculan del HTML.
+   * @since 1.7.0
+   */
+  readonly scriptHashes?: readonly string[];
+  /**
+   * Fuentes CSP `'sha256-…'` de sus `<style>` en línea, como `styleHashes` del índice de prerender.
+   * @since 1.7.0
+   */
+  readonly styleHashes?: readonly string[];
 }
 
 /**
@@ -369,12 +391,22 @@ export interface PageHandlerOptions extends FrameworkHandlerOptions<unknown> {
    * (development); otherwise its content renders in its place with a warning.
    */
   readonly production?: boolean;
+  /**
+   * Meeko's own CSP (`server.contentSecurityPolicy`): every document gets the header, with a nonce
+   * per response or the hashes of the document; prerendered pages are served from their file.
+   */
+  readonly contentSecurityPolicy?: ContentSecurityPolicy;
+  /** Part of the ETag of a cached page: a new deploy invalidates the browser's copies. */
+  readonly buildId?: string;
+  /** A request with this cookie belongs to a session, even an expired one, and is never cached. */
+  readonly sessionCookieName?: string;
 }
 
 /** A typed sidecar may narrow callback arguments after its schemas validate them. */
-type TypedPageRoute = Omit<PageRoute, "load" | "head"> & {
+type TypedPageRoute = Omit<PageRoute, "load" | "head" | "cache"> & {
   load?: (context: never) => Promise<unknown> | unknown;
   head?: (context: never) => PageHead;
+  cache?: { readonly etag?: (context: never) => unknown; readonly maxAge?: number; readonly staleWhileRevalidate?: number; readonly memory?: unknown };
 };
 
 function wantsPayload(request: Request): boolean {
@@ -691,6 +723,102 @@ const emptyOutlet: PageModule = {
   renderToString: () => "",
 };
 
+/** What makes the HTML of one URL differ besides its page: the theme the server renders. */
+function themeVariant(theme: ServerTheme | undefined): string {
+  return theme ? [theme.choice, theme.known ? "known" : "default", theme.resolved ?? ""].join("\u0001") : "";
+}
+
+/** A weak ETag from the parts that make a cached response differ, without exposing them. */
+async function weakEtag(parts: readonly string[]): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(parts.join("\u0000")));
+  return `W/"${encodeBase64Url(new Uint8Array(digest).subarray(0, 18))}"`;
+}
+
+/** `Cache-Control` of a cacheable page response. */
+function pageCacheControl(cache: ResolvedPageCache): string {
+  return [
+    "public", `max-age=${cache.maxAge}`,
+    ...cache.maxAge === 0 ? ["must-revalidate"] : [],
+    ...cache.staleWhileRevalidate ? [`stale-while-revalidate=${cache.staleWhileRevalidate}`] : [],
+  ].join(", ");
+}
+
+/** A response kept by `cache.memory`: its validator, body and headers. */
+interface StoredPage {
+  readonly etag: string;
+  readonly body: Uint8Array;
+  readonly headers: readonly (readonly [string, string])[];
+}
+
+/**
+ * The in-process LRU of one route's `cache.memory`. A slot is a URL, a theme and a kind of
+ * response; it holds one ETag, so a changed ETag replaces (invalidates) what the slot had.
+ */
+class PageMemory {
+  private readonly entries = new Map<string, StoredPage>();
+  private bytes = 0;
+  constructor(private readonly maxEntries: number, private readonly maxBytes: number) {}
+  /** The stored response of `slot` when it still has `etag`; a stale one is dropped. */
+  get(slot: string, etag: string): StoredPage | undefined {
+    const entry = this.entries.get(slot);
+    if (!entry) return undefined;
+    this.delete(slot);
+    if (entry.etag !== etag) return undefined;
+    // Most recently used last.
+    this.entries.set(slot, entry);
+    this.bytes += entry.body.byteLength;
+    return entry;
+  }
+  set(slot: string, entry: StoredPage): void {
+    this.delete(slot);
+    if (entry.body.byteLength > this.maxBytes) return;
+    this.entries.set(slot, entry);
+    this.bytes += entry.body.byteLength;
+    for (const oldest of this.entries.keys()) {
+      if (this.entries.size <= this.maxEntries && this.bytes <= this.maxBytes) break;
+      this.delete(oldest);
+    }
+  }
+  private delete(slot: string): void {
+    const entry = this.entries.get(slot);
+    if (!entry) return;
+    this.entries.delete(slot);
+    this.bytes -= entry.body.byteLength;
+  }
+}
+
+/** Development warnings already printed, once per message. */
+const cacheWarnings = new Set<string>();
+
+function warnCache(message: string): void {
+  if (cacheWarnings.has(message)) return;
+  cacheWarnings.add(message);
+  console.warn(message);
+}
+
+/**
+ * The one-time cookie of a form submitted without JavaScript: the 303 that ends the submission
+ * sets it, and the GET that follows renders the result once and clears it.
+ */
+const FORM_FLASH_COOKIES: readonly string[] = [formFlashCookies.secure, formFlashCookies.plain];
+
+/**
+ * Whether a request carries the result of a form submission: its page must render for this
+ * request alone, so it skips the prerendered file, the 304 and `cache.memory`, and is never stored.
+ */
+export function hasFormFlash(request: Request): boolean {
+  const header = request.headers.get("cookie");
+  return FORM_FLASH_COOKIES.some((name) => cookieNamed(header, name));
+}
+
+/** Whether a `Cookie` header has a cookie called `name`, whatever its value. */
+function cookieNamed(header: string | null, name: string): boolean {
+  return (header ?? "").split(";").some((cookie) => {
+    const separator = cookie.indexOf("=");
+    return separator > 0 && cookie.slice(0, separator).trim() === name;
+  });
+}
+
 function prerenderedResponse(page: PrerenderedPage, request: Request, context: RequestContext | undefined): Response {
   const session = context?.session;
   const head = request.method === "HEAD";
@@ -741,6 +869,26 @@ export function createFrameworkHandler(options: FrameworkHandlerOptions<unknown>
 }
 
 /**
+ * The hashes of the inline code Meeko writes in a document. The HTML parser loads on the first use,
+ * which only Meeko's own CSP needs: without `contentSecurityPolicy` it never loads (and the
+ * Cloudflare build leaves it out of the Worker).
+ */
+async function documentHashes(html: string): Promise<{ readonly scripts: readonly string[]; readonly styles: readonly string[] }> {
+  return (await import("./inline-sources.js")).documentHashes(html);
+}
+
+/**
+ * The query of a `cache.memory` copy: with a `search` schema, its validated value, so a parameter
+ * the route does not declare (`?utm_source=…`, a random cache buster) shares the copy instead of
+ * filling the LRU; without one, the raw query, which the page receives as it came.
+ */
+function memorySearch(sidecar: PageRoute | undefined, url: URL, search: Readonly<Record<string, unknown>>): string {
+  if (!sidecar?.search) return url.search;
+  try { return `?${JSON.stringify(search)}`; }
+  catch { return url.search; }
+}
+
+/**
  * Runs server route middleware with the context of `usePage()`, inside the page scope so that
  * `redirect()` and `notFound()` stop the route as they do in `<script server>`.
  */
@@ -770,6 +918,38 @@ function runServerMiddleware(
 }
 
 export function createPageHandler(options: PageHandlerOptions): (request: Request) => Promise<Response> {
+  const policy = options.contentSecurityPolicy;
+  // A host without a build id still invalidates the browser's copies when the process restarts.
+  const buildId = options.buildId ?? `${options.clientEntry ?? ""}\u0000${crypto.randomUUID()}`;
+  /**
+   * The CSP of each prerendered page, from the hashes of its index or, without them, of the part of
+   * its HTML that Meeko writes (never of the page and its teleports).
+   */
+  const prerenderPolicies = new WeakMap<PrerenderedPage, Promise<string>>();
+  const prerenderPolicy = (page: PrerenderedPage): Promise<string> => {
+    let header = prerenderPolicies.get(page);
+    if (!header) {
+      header = page.scriptHashes && page.styleHashes
+        ? Promise.resolve(documentContentSecurityPolicy(policy!, page.scriptHashes, page.styleHashes))
+        : documentHashes(page.html).then((hashes) => documentContentSecurityPolicy(policy!, hashes.scripts, hashes.styles));
+      prerenderPolicies.set(page, header);
+    }
+    return header;
+  };
+  /** `cache` of each route options object, validated once. */
+  const pageCaches = new WeakMap<object, ResolvedPageCache | undefined>();
+  const pageCacheOf = (sidecar: PageRoute | undefined, routeId: string): ResolvedPageCache | undefined => {
+    if (!sidecar || sidecar.cache === undefined) return undefined;
+    if (!pageCaches.has(sidecar)) pageCaches.set(sidecar, resolvePageCache(sidecar.cache, `Route ${routeId}`));
+    return pageCaches.get(sidecar);
+  };
+  /** The `cache.memory` LRU of each route. */
+  const memories = new Map<string, PageMemory>();
+  const memoryOf = (routeId: string, limits: NonNullable<ResolvedPageCache["memory"]>): PageMemory => {
+    let memory = memories.get(routeId);
+    if (!memory) memories.set(routeId, memory = new PageMemory(limits.maxEntries, limits.maxBytes));
+    return memory;
+  };
   const handle = async (request: Request): Promise<Response> => {
     const fallbackRequestId = crypto.randomUUID();
     // `<MeekoThemeToggle>` without JavaScript posts its form here, with `theme` in the configuration.
@@ -806,10 +986,25 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     };
     // The theme of this request: the cookie and, in "system" mode, the client hint.
     const theme = themeOf(options.document, request);
-    /** `document` marks an HTML document rendered for this request, which depends on the theme. */
-    const finish = (response: Response, document = false): Response => {
+    let nonce: { readonly value: string | undefined } | undefined;
+    /** The nonce of this response's documents: the host's or, with Meeko's CSP, a fresh one. */
+    const requestNonce = (): string | undefined => {
+      nonce ??= { value: options.document?.nonce?.(request) ?? (policy ? createCspNonce() : undefined) };
+      return nonce.value;
+    };
+    /** Meeko's CSP of a document that carries the nonce of this response. */
+    const noncePolicy = (): string | undefined => {
+      const value = requestNonce();
+      return policy && value !== undefined ? documentContentSecurityPolicy(policy, [`'nonce-${value}'`], [`'nonce-${value}'`]) : undefined;
+    };
+    /**
+     * `document` marks an HTML document rendered for this request, which depends on the theme, and
+     * `csp` is Meeko's policy of that body.
+     */
+    const finish = (response: Response, document = false, csp?: string): Response => {
       const headers = new Headers(response.headers);
       if (document && theme) addThemeHeaders(headers, theme);
+      if (csp !== undefined && response.status !== 304) headers.set("content-security-policy", csp);
       headers.set("x-request-id", requestContext?.requestId ?? fallbackRequestId);
       if (requestContext) {
         headers.set("x-meeko-csrf-token", requestContext.session.current?.csrfToken ?? "");
@@ -855,7 +1050,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
             status: 404, headers: { "content-type": "application/meeko+json; charset=utf-8", "cache-control": "no-store" },
           }));
         }
-        const host = documentParts(options.document, request);
+        const host = documentParts(options.document, request, requestNonce());
         const styleTags = [...new Set(styles)].map((css) => `<style${host.nonceAttribute}>${css.replaceAll("<", "\\3C ")}</style>`).join("");
         const script = options.clientEntry ? `<script type="module"${host.nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
         const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
@@ -866,7 +1061,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
         const document = `${head.prefix}${csrfMeta}${styleTags}${head.head}${host.head}</head>${head.bodyOpen}<div id="app">${placed.app}</div>${placed.body}<script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
         return finish(new Response(headRequest ? null : document, {
           status: 404, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
-        }), true);
+        }), true, noncePolicy());
       };
       return requestContext ? await withRequestContext(requestContext, options.serverFetch, renderNotFound) : await renderNotFound();
     }
@@ -881,9 +1076,13 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       const serverResponse = await runServerMiddleware(serverMiddleware, url, match, request, requestContext);
       if (serverResponse) return finish(serverResponse);
     }
-    if (options.prerendered && match.route.render === "prerender" && url.search === "" && !options.document?.nonce) {
+    // A host nonce changes in every response, so the stored HTML cannot carry it; Meeko's own CSP
+    // allows the stored HTML by the hashes of its scripts and styles instead.
+    // The result of a form submission renders for this request alone, also on a prerendered page.
+    const formFlash = hasFormFlash(request);
+    if (options.prerendered && match.route.render === "prerender" && url.search === "" && (policy || !options.document?.nonce) && !formFlash) {
       const page = await options.prerendered.get(url.pathname);
-      if (page && !wantsPayload(request)) return finish(prerenderedResponse(page, request, requestContext));
+      if (page && !wantsPayload(request)) return finish(prerenderedResponse(page, request, requestContext), false, policy ? await prerenderPolicy(page) : undefined);
       if (page?.payload !== undefined) return finish(new Response(request.method === "HEAD" ? null : page.payload, {
         status: 200, headers: { "content-type": "application/meeko+json; charset=utf-8", "cache-control": "no-store" },
       }));
@@ -905,6 +1104,58 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     // Client disconnect, session revocation, a cancelled stream or a HEAD
     // response: the loader and its deferred work stop being awaited.
     const driverSignal = AbortSignal.any([requestContext?.signal ?? request.signal, deferredWork.signal]);
+    // Page cache: production only (development serves what it just compiled), never a session's
+    // response (its HTML carries the CSRF token), and never with a host nonce that Meeko's CSP does
+    // not replace by hashes. Every middleware above already ran: a guard is never skipped.
+    const cache = clientPage ? undefined : pageCacheOf(sidecar, match.route.id);
+    const session = requestContext?.session;
+    const sessionRequest = Boolean(session?.current || session?.cookieHeader
+      || (options.sessionCookieName && cookieNamed(request.headers.get("cookie"), options.sessionCookieName)));
+    // A form result is one response's: no 304, no stored copy read or written (Vary: Cookie covers shared caches).
+    // A request with Authorization may be answered for its credentials: it is never cached either.
+    const caching = cache !== undefined && (options.production ?? true) && !sessionRequest && !formFlash
+      && !request.headers.has("authorization") && (policy !== undefined || !options.document?.nonce);
+    const payloadRequest = wantsPayload(request);
+    /** One URL, theme and kind of response: what `cache.memory` keeps one copy of. */
+    const variant = themeVariant(theme);
+    let etag: string | undefined;
+    if (caching && cache.etag) {
+      const version = await cache.etag({
+        url, request, params: validated.params, search: validated.search, signal: driverSignal,
+        ...(requestContext ? { context: requestContext } : {}),
+      });
+      if (version !== undefined && version !== null) {
+        if (typeof version !== "string" && typeof version !== "number") throw new TypeError(`Route ${match.route.id}: cache.etag must return a string, a number or undefined`);
+        etag = await weakEtag([String(version), buildId, variant, payloadRequest ? "payload" : "document", renderMode, String(PAYLOAD_VERSION)]);
+      }
+    }
+    const cacheHeaders: Record<string, string> = caching ? { "cache-control": pageCacheControl(cache), vary: "Accept, Cookie", ...(etag ? { etag } : {}) } : {};
+    if (etag && etagMatches(request.headers.get("if-none-match"), etag)) {
+      // The loader and the render never run; the browser keeps its copy, policy included.
+      return finish(new Response(null, { status: 304, headers: cacheHeaders }), true);
+    }
+    const memory = caching && etag && cache.memory && renderMode !== "stream" ? memoryOf(match.route.id, cache.memory) : undefined;
+    const slot = `${payloadRequest ? "payload" : "document"}\n${url.pathname}${memorySearch(sidecar, url, validated.search)}\n${variant}`;
+    const stored = memory && etag ? memory.get(slot, etag) : undefined;
+    if (stored) {
+      const headers = new Headers(stored.headers as [string, string][]);
+      return finish(new Response(request.method === "HEAD" ? null : stored.body.slice(), { status: 200, headers }), true);
+    }
+    /**
+     * The headers of the rendered response, and its copy in `cache.memory`. A response that sets
+     * a cookie (a loader that creates a session) is not cached after all.
+     */
+    const cacheResult = (body: string, headers: Record<string, string>): Record<string, string> => {
+      if (cache && !sessionRequest && (session?.current || session?.cookieHeader)) {
+        // Development has no page cache, but tells that production will not cache this page either.
+        if (!(options.production ?? true)) warnCache(`[meeko] Route ${match.route.id} declares cache, but this response sets a cookie or starts a session, so it is sent with no-store and never cached.`);
+        return headers;
+      }
+      if (!caching) return headers;
+      const cached = { ...headers, ...cacheHeaders };
+      if (memory && etag) memory.set(slot, { etag, body: new TextEncoder().encode(body), headers: Object.entries(cached) });
+      return cached;
+    };
     const context: PageRequestContext = {
       request, params: validated.params, search: validated.search, searchParams: url.searchParams, signal: driverSignal, state: stateStore,
       ...(requestContext ? { context: requestContext } : {}),
@@ -997,7 +1248,15 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       await requestContext.session[lockSessionCookie]?.();
       await requestContext.session.verify();
     }
-    const host = documentParts(options.document, request);
+    // A cacheable document is the same for every visitor and every revalidation, so it carries no
+    // nonce: Meeko's CSP allows its inline scripts and styles by their hashes.
+    const host = documentParts(options.document, request, caching ? undefined : requestNonce());
+    const documentPolicy = async (html: string): Promise<string | undefined> => {
+      if (!policy) return undefined;
+      if (!caching) return noncePolicy();
+      const hashes = await documentHashes(html);
+      return documentContentSecurityPolicy(policy, hashes.scripts, hashes.styles);
+    };
     const nonceAttribute = host.nonceAttribute;
     const documentHead = (): HeadDocument => headDocument(options.document, host.nonce, collected, routeHeadInput(head), url.pathname, theme);
     const styleTags = [...new Set(styles)].map((css) => `<style${nonceAttribute}>${css.replaceAll("<", "\\3C ")}</style>`).join("");
@@ -1026,31 +1285,50 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
           deferredWork.abort(reason);
         });
       };
+      // A stream keeps only the ETag: its body goes out while the deferred values settle, so it
+      // is never stored, and a proxy must still pass it through as written.
+      const streamCache = (headers: Record<string, string>): Record<string, string> => {
+        const cached = cacheResult("", headers);
+        return cached === headers ? headers : { ...cached, "cache-control": `${cached["cache-control"]}, no-transform` };
+      };
       if (wantsPayload(request)) {
         return finish(new Response(body(`${payload}\n`, (text) => `${text}\n`, ""), {
-          status: 200, headers: { "content-type": "application/meeko+ndjson; charset=utf-8", ...streamHeaders },
-        }));
+          status: 200, headers: streamCache({ "content-type": "application/meeko+ndjson; charset=utf-8", ...streamHeaders }),
+        }), caching);
       }
       const script = options.clientEntry ? `<script type="module" async${nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
       const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
       const parts = documentHead();
-      const opening = `${parts.prefix}${csrfMeta}${styleTags}${parts.head}${host.head}</head>${parts.bodyOpen}<div id="app">${placed.app}</div>${placed.body}<script id="meeko-payload" type="application/json">${payload}</script>${script}`;
-      return finish(new Response(body(opening, (text, id) => `<script type="application/json" data-meeko-deferred="${id}">${text}</script>`, `${host.bodyEnd}</body></html>`), {
-        status: 200, headers: { "content-type": "text/html; charset=utf-8", ...streamHeaders },
-      }), true);
+      const shellStart = `${parts.prefix}${csrfMeta}${styleTags}${parts.head}${host.head}</head>${parts.bodyOpen}<div id="app">`;
+      const shellEnd = `<script id="meeko-payload" type="application/json">${payload}</script>${script}`;
+      const opening = `${shellStart}${placed.app}</div>${placed.body}${shellEnd}`;
+      const closing = `${host.bodyEnd}</body></html>`;
+      // The deferred chunks are JSON data blocks, which script-src does not check. The page and its
+      // teleports may carry user content: only what Meeko writes around them is hashed.
+      const csp = await documentPolicy(`${shellStart}</div>${shellEnd}${closing}`);
+      return finish(new Response(body(opening, (text, id) => `<script type="application/json" data-meeko-deferred="${id}">${text}</script>`, closing), {
+        status: 200, headers: streamCache({ "content-type": "text/html; charset=utf-8", ...streamHeaders }),
+      }), true, csp);
     }
     if (wantsPayload(request)) {
       return finish(new Response(headRequest ? null : payload, {
-        status: 200, headers: { "content-type": "application/meeko+json; charset=utf-8", "cache-control": "no-store" },
-      }));
+        status: 200, headers: cacheResult(payload, { "content-type": "application/meeko+json; charset=utf-8", "cache-control": "no-store" }),
+      }), caching);
     }
     const script = options.clientEntry ? `<script type="module"${nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
     const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
     const parts = documentHead();
-    const document = `${parts.prefix}${csrfMeta}${styleTags}${parts.head}${host.head}</head>${parts.bodyOpen}<div id="app">${placed.app}</div>${placed.body}<script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
+    const shellStart = `${parts.prefix}${csrfMeta}${styleTags}${parts.head}${host.head}</head>${parts.bodyOpen}<div id="app">`;
+    const shellEnd = `<script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
+    const document = `${shellStart}${placed.app}</div>${placed.body}${shellEnd}`;
+    // The page and its teleports may carry user content: only what Meeko writes around them is hashed.
+    const csp = await documentPolicy(`${shellStart}</div>${shellEnd}`);
+    const headers: Record<string, string> = { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" };
+    // The stored copy keeps its policy: the hashes are those of its own HTML.
+    if (csp !== undefined && caching) headers["content-security-policy"] = csp;
     return finish(new Response(headRequest ? null : document, {
-      status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
-    }), true);
+      status: 200, headers: cacheResult(document, headers),
+    }), true, csp);
     };
     return requestContext ? await withRequestContext(requestContext, options.serverFetch, render) : await render();
     } catch (error) {
@@ -1079,14 +1357,14 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
             }, pageStore.sealed ? new StateStore() : pageStore, route!,
             // Plugins that failed (perhaps the failure shown here) leave the error page without their values.
             await startPlugins().catch(() => emptyPluginState), request.signal, theme, options.document?.config?.idPrefix);
-            const host = documentParts(options.document, request);
+            const host = documentParts(options.document, request, requestNonce());
             const head = headDocument(options.document, host.nonce, collected, routeHeadInput({}, ERROR_PAGE_TITLE), undefined, theme);
             // The error page is not hydrated, so a missing target only keeps its teleport in place.
             const placed = documentBody(errorRendered.html, teleports, true);
             const document = `${head.prefix}${head.head}${host.head}</head>${head.bodyOpen}<div id="app">${placed.app}</div>${placed.body}${host.bodyEnd}</body></html>`;
             return finish(new Response(request.method === "HEAD" ? null : document, {
               status: known.status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
-            }), true);
+            }), true, noncePolicy());
           };
           return requestContext
             ? await withRequestContext(requestContext, options.serverFetch, renderError)

@@ -48,11 +48,44 @@ test("framework starter creates routable SSR/client sources and refuses overwrit
     for (const file of ["server/runtime.ts", "server/session.ts", "app/entry-client.ts", "server/entry.ts", "server.mjs", "vite.config.ts", "vite.server.config.ts", "tsconfig.app.json", "tsconfig.server.json", "tsconfig.shared.json"]) {
       await assert.rejects(readFile(join(target, file), "utf8"), /ENOENT/);
     }
-    await assert.rejects(initFrameworkProject(target), /Destination is not empty/);
+    await assert.rejects(initFrameworkProject(target), /El destino no está vacío/);
     const cliTarget = join(root, "cli-app");
     const cli = spawnSync(process.execPath, [resolve("dist/cli.js"), "init-framework", cliTarget], { encoding: "utf8" });
     assert.equal(cli.status, 0, cli.stderr);
     assert.equal((JSON.parse(await readFile(join(cliTarget, "package.json"), "utf8")) as { scripts: Record<string, string> }).scripts.dev, "meeko dev .");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("init and init-framework accept the same destinations: only .git, or a package.json with bun.lock", async () => {
+  const { initProject } = await import("../src/init.ts");
+  const { initFrameworkProject: initFramework } = await import("../src/framework/init.ts");
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  const root = await mkdtemp(join(tmpdir(), "meeko-init-destinations-"));
+  try {
+    for (const [name, create] of [["init", initProject], ["init-framework", initFramework]] as const) {
+      // A fresh `git init`.
+      const repository = join(root, `${name}-git`);
+      await mkdir(join(repository, ".git"), { recursive: true });
+      assert.equal(await create(repository), repository, name);
+      await readFile(join(repository, "package.json"), "utf8");
+      // A package started with Bun.
+      const bun = join(root, `${name}-bun`);
+      await mkdir(bun, { recursive: true });
+      await writeFile(join(bun, "package.json"), "{}\n");
+      await writeFile(join(bun, "bun.lock"), "{}\n");
+      assert.equal(await create(bun), bun, name);
+      // A lockfile without its package.json belongs to something else.
+      const orphan = join(root, `${name}-orphan`);
+      await mkdir(orphan, { recursive: true });
+      await writeFile(join(orphan, "bun.lock"), "{}\n");
+      await assert.rejects(create(orphan), { message: `El destino no está vacío: ${orphan} (sin package.json)` }, name);
+      const busy = join(root, `${name}-busy`);
+      await mkdir(busy, { recursive: true });
+      await writeFile(join(busy, "notes.txt"), "x\n");
+      await assert.rejects(create(busy), { message: `El destino no está vacío: ${busy} (notes.txt)` }, name);
+    }
   } finally {
     await rm(root, { recursive: true, force: true });
   }

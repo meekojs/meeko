@@ -163,9 +163,9 @@ function projectConfigFile(root: string): string | undefined {
 /**
  * A failure of `meeko.config.*` while a component is checked: `loadMeekoConfig` prefixes its
  * validation errors with the file (`<file>: document.head: …`) and wraps import errors in
- * `Cannot load <file>: …`.
+ * `No se puede cargar <file>: …`.
  */
-const configFailure = /^(Cannot load )?(.*?[\\/]meeko\.config\.(?:ts|mts|js|mjs))(?::[ \t]+|[ \t]+)([\s\S]*)$/;
+const configFailure = /^(No se puede cargar )?(.*?[\\/]meeko\.config\.(?:ts|mts|js|mjs))(?::[ \t]+|[ \t]+)([\s\S]*)$/;
 
 function unwrapExpression(node: ts.Expression): ts.Expression {
   let current = node;
@@ -240,7 +240,7 @@ function configDiagnostic(message: string, locate: (filename: string) => Located
   const loadFailure = failure[1] !== undefined;
   const detail = failure[3]!.trim();
   const [start, end] = configErrorRange(target.document.getText(), filename, loadFailure ? "" : detail);
-  const text = loadFailure ? `Cannot load the configuration: ${detail}` : detail;
+  const text = loadFailure ? `No se puede cargar la configuración: ${detail}` : detail;
   return {
     filename, uri: target.uri, message: text,
     diagnostic: { range: toRange(target.document, start, end), message: text, code: "MEEK_CONFIG", source: "Meeko", severity: DiagnosticSeverity.Error },
@@ -272,7 +272,8 @@ export async function componentDiagnostics(
   const blockDiagnostics = current ? [...serverBlockDiagnostics(project, current, document), ...deprecatedDiagnostics(project, current, document)] : [];
   let found: CompileDiagnostic[];
   try {
-    found = await checkSource(source, filename, trusted ? {} : {
+    found = await checkSource(source, filename, trusted ? { withinProject: true } : {
+      withinProject: true,
       autoImports: (root) => pathKey(root) === pathKey(project.root) ? project.autoImports() : staticAutoImports(root),
     });
   } catch (error) {

@@ -290,6 +290,13 @@ function exportedDefinition(module: unknown): unknown {
   throw new ApiError("INVALID_HANDLER", 500);
 }
 
+/** `405 METHOD_NOT_ALLOWED` with the methods the path accepts in `Allow`. */
+function methodNotAllowed(requestId: string, allowed: readonly string[]): Response {
+  const response = errorResponse(new ApiError("METHOD_NOT_ALLOWED", 405), requestId);
+  response.headers.set("allow", [...new Set(allowed)].join(", "));
+  return response;
+}
+
 /** Dispatches API and RPC through the same request context and security pipeline. */
 export function createContextDispatcher<S>(options: Pick<ServerDispatcherOptions<S>, "manifest" | "sessions" | "load" | "onError">): (context: RequestContext<S>) => Promise<Response> {
   if (typeof options.load !== "function") throw new TypeError("Server dispatch requires a module loader");
@@ -302,7 +309,7 @@ export function createContextDispatcher<S>(options: Pick<ServerDispatcherOptions
       if (pathname.startsWith("/_meeko/rpc/")) {
         const endpoint = options.manifest.rpc.find((record) => record.pathname === pathname);
         if (!endpoint) throw new ApiError("NOT_FOUND", 404);
-        if (request.method !== "POST") throw new ApiError("METHOD_NOT_ALLOWED", 405);
+        if (request.method !== "POST") return methodNotAllowed(context.requestId, ["POST"]);
         const definition = exportedDefinition(await load(endpoint.file)) as RpcDefinition<Schema, Schema, S>;
         setRateLimitRoute(context, `rpc ${endpoint.id}`);
         return dispatchRpc(definition, context, options.sessions, options.onError);
@@ -316,11 +323,7 @@ export function createContextDispatcher<S>(options: Pick<ServerDispatcherOptions
         setRateLimitRoute(context, `api ${endpoint.method} ${endpoint.pathname}`);
         return dispatchApiRoute(definition, context, options.sessions, params, options.onError);
       }
-      if (allowed.length) {
-        const response = errorResponse(new ApiError("METHOD_NOT_ALLOWED", 405), context.requestId);
-        response.headers.set("allow", [...new Set(allowed)].join(", "));
-        return response;
-      }
+      if (allowed.length) return methodNotAllowed(context.requestId, allowed);
       throw new ApiError("NOT_FOUND", 404);
     } catch (error) { reportServerError(error, context.requestId, options.onError); return errorResponse(error, context.requestId); }
   };

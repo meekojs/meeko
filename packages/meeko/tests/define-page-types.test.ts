@@ -53,6 +53,16 @@ expect<Equals<Data<typeof method>, { method: boolean }>>();
 const options = { load: () => ({ fromOptions: true }) };
 export const fromOptions = definePage(options);
 expect<Equals<Data<typeof fromOptions>, { fromOptions: boolean }>>();
+// cache.etag reads the validated params of the page before its loader, without changing its data.
+export const cached = definePage({
+  params: slug,
+  cache: { etag: ({ params, url }) => params.slug + url.search, maxAge: 60, memory: { maxEntries: 10 } },
+  load: ({ params }) => ({ slug: params.slug }),
+});
+expect<Equals<Data<typeof cached>, { slug: string }>>();
+export const cachedOnly = definePage({ cache: { maxAge: 60 } });
+// @ts-expect-error A client page has no server cache.
+definePage({ render: "client", cache: { maxAge: 60 } });
 // Without load there are no data, and the result is the plain definition of its mode.
 export const ssr = definePage({ render: "ssr" });
 expect<Equals<typeof ssr, PageDefinition<undefined, undefined, unknown, unknown>>>();
@@ -85,6 +95,13 @@ definePage({ render: "client", load: ({ request }) => request.url });
 definePage({ load: ({ url }) => url });
 // @ts-expect-error A client page cannot be prerendered.
 definePage({ render: "client", prerenderEntries: [{ slug: "a" }], load: () => 1 });
+// Since 1.7 a server page lists its sitemap URLs, with the build context.
+export const listed = definePage({ params: slug, sitemapEntries: async ({ env, prerendering }) => [{ params: { slug: env.SLUG ?? "a" }, lastmod: new Date(), changefreq: "weekly", priority: prerendering ? 0.5 : 1 }], load: ({ params }) => params.slug });
+export const listedStatic = definePage({ render: "prerender", sitemapEntries: [{ lastmod: "2026-10-01" }] });
+// @ts-expect-error Not a changefreq of the sitemaps.org protocol.
+definePage({ sitemapEntries: [{ changefreq: "often" }] });
+// @ts-expect-error The options of a client page reach the browser: it declares no sitemap URLs.
+definePage({ render: "client", sitemapEntries: [{}] });
 // @ts-expect-error Not a render mode.
 definePage({ render: "static" });
 export { clientMode, explicitClientMode };

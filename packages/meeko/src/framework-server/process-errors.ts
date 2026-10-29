@@ -276,7 +276,10 @@ function installProcessErrorHandlers(settings: InstallSettings): () => void {
  * eventos de `process` en Node y Bun, los de `globalThis` en Deno y `unhandledrejection` en
  * Workers. Si la aplicación registró sus propios listeners de `process`, Meeko sólo informa y deja
  * que ellos decidan. `serveNode` y `serveDeno` la aplican con `handleSignals`, y la usan las
- * salidas de `meeko build` y `meeko dev`.
+ * salidas de `meeko build` y `meeko dev`. Desde `1.7` se instala una sola vez por aplicación: otra
+ * llamada con la misma `app` (por ejemplo, junto a `serveNode` con `handleSignals`) no añade
+ * listeners ni otro cierre, conserva las opciones de la primera y devuelve otra función de
+ * retirada; los listeners se retiran cuando se han llamado todas.
  *
  * @param app Aplicación de `createServerApp`.
  * @param options Cierre del host, observador y plazo del cierre.
@@ -298,8 +301,19 @@ export function handleProcessErrors(app: ServerApp, options: ProcessErrorOptions
   if (!Number.isFinite(shutdownTimeout) || shutdownTimeout < 0 || shutdownTimeout > 2_147_483_647) {
     throw new RangeError(`Invalid shutdownTimeout: ${shutdownTimeout}`);
   }
+  // One installation per application: a second call (a host's own next to `serveNode` with
+  // `handleSignals`) would report each failure twice and start two competing shutdowns.
+  const existing = installations.get(app);
+  if (existing) {
+    // The listeners of the first call stay: options that differ from them are ignored, and said so.
+    const first = existing.options;
+    if (first.onError !== options.onError || first.close !== options.close || first.shutdownTimeout !== shutdownTimeout) {
+      console.warn("[meeko] handleProcessErrors ya estaba instalado para esta aplicación con otras opciones (onError, close o shutdownTimeout); se mantienen las de la primera llamada. Instálelo una sola vez, por ejemplo sólo con serveNode({ handleSignals }) o sólo con su propia llamada.");
+    }
+    return existing.retain();
+  }
   const observer = options.onError ?? processErrorObserver(app);
-  return installProcessErrorHandlers({
+  const release = installProcessErrorHandlers({
     host: detectHost(),
     policy: applications.get(app)?.policy,
     report: (error, requestId, info) => observeServerError(error, requestId, observer, info),
@@ -309,7 +323,35 @@ export function handleProcessErrors(app: ServerApp, options: ProcessErrorOptions
     }),
     shutdownTimeout,
   });
+  let holders = 0;
+  const installation: Installation = {
+    options: { onError: options.onError, close: options.close, shutdownTimeout },
+    retain() {
+      holders++;
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        if (--holders > 0) return;
+        installations.delete(app);
+        release();
+      };
+    },
+  };
+  installations.set(app, installation);
+  return installation.retain();
 }
+
+/** The process listeners of an application, shared by every call that installed them. */
+interface Installation {
+  /** The options of the call that installed the listeners, to tell a later call that differs. */
+  readonly options: { readonly onError: ProcessErrorOptions["onError"]; readonly close: ProcessErrorOptions["close"]; readonly shutdownTimeout: number };
+  /** Another holder of the listeners; its release removes them once no holder is left. */
+  retain(): () => void;
+}
+
+/** Installations by application, one registry per process like the policies. */
+const installations: WeakMap<object, Installation> = (globalThis as { [key: symbol]: WeakMap<object, Installation> | undefined })[Symbol.for("meeko.process-error-installations")] ??= new WeakMap();
 
 /** Isolates whose process failures already reach an application. */
 const watchedIsolates = new WeakSet<object>();

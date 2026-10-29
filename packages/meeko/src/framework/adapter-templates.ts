@@ -1,5 +1,5 @@
 /** Reads the prerender index next to a bundled entry through the runtime's `readText(file)`. */
-const prerenderSource = `interface PrerenderIndex { readonly pages?: Record<string, { file: string; headOffset: number; etag: string; payload?: string }> }
+const prerenderSource = `interface PrerenderIndex { readonly pages?: Record<string, { file: string; headOffset: number; etag: string; payload?: string; scriptHashes?: string[]; styleHashes?: string[] }> }
 
 function missingFile(error: unknown): boolean {
   const failure = error as { code?: unknown; name?: unknown } | undefined;
@@ -28,7 +28,7 @@ async function prerenderSource(): Promise<PrerenderSource | undefined> {
         page = (async () => {
           const html = await read(entry.file);
           const payload = entry.payload ? await read(entry.payload) : undefined;
-          return { html, headOffset: entry.headOffset, etag: entry.etag, ...(payload === undefined ? {} : { payload }) };
+          return { html, headOffset: entry.headOffset, etag: entry.etag, ...(payload === undefined ? {} : { payload }), ...(entry.scriptHashes ? { scriptHashes: entry.scriptHashes } : {}), ...(entry.styleHashes ? { styleHashes: entry.styleHashes } : {}) };
         })();
         cache.set(pathname, page);
       }

@@ -1211,3 +1211,174 @@ export async function apiCodeLinks(): Promise<(code: string) => string | undefin
 		return api.bySlug.get(target.slug)?.deprecated === null ? apiHref(target.slug) : undefined
 	}
 }
+
+// ---------------------------------------------------------------------------------------------
+// Symbols by id, for the written pages of the reference (reference.ts)
+
+/**
+ * What the written page of a symbol takes from its generated documentation. Every HTML field is
+ * trusted: it comes from the package's sources.
+ */
+export interface ApiSymbolInfo {
+	readonly name: string
+	readonly slug: string
+	readonly href: string
+	readonly kind: ApiKind
+	/** Singular label of the kind, such as "función". */
+	readonly kindLabel: string
+	/** `@meekojs/meeko/framework`, or `null` for the syntax of `.meeko`. */
+	readonly specifier: string | null
+	readonly since: string | null
+	readonly deprecated: boolean
+	/** Where it is available without an import, as inline HTML, or `null`. */
+	readonly autoImport: TrustedHtml | null
+	/** Highlighted code block with the import, or `null` where there is nothing to import. */
+	readonly importCode: TrustedHtml | null
+	readonly sourceUrl: string | null
+	readonly sourceLabel: string | null
+	/** Plain text of the first sentence of its JSDoc. */
+	readonly summary: string
+}
+
+/** A highlighted declaration of the "Tipo" section of a written page, with the page it comes from. */
+export interface ApiTypeBlock {
+	readonly name: string
+	readonly href: string
+	/** A code block (`codeBlockHtml`) with the names of other pages as links. */
+	readonly code: TrustedHtml
+	/** The same code as text, and its Markdown language (`ts`, `html`), for `/llms-full.txt`. */
+	readonly source: string
+	readonly lang: string
+}
+
+/**
+ * The symbol of an id of the reference: `@meekojs/meeko/framework#useForm` for an export of a
+ * subpath, or `syntax:meekolink` for the syntax of `.meeko` by the slug of its page in
+ * api-builtins.ts.
+ */
+function symbolOf(api: ApiModel, id: string): SymbolModel | undefined {
+	if (id.startsWith('syntax:')) {
+		const model = api.bySlug.get(id.slice('syntax:'.length))
+		return model && model.group.specifier === null ? model : undefined
+	}
+	const hash = id.lastIndexOf('#')
+	if (hash < 1) return undefined
+	const specifier = id.slice(0, hash)
+	const name = id.slice(hash + 1)
+	return api.symbols.find((symbol) => symbol.group.specifier === specifier && symbol.name === name)
+}
+
+/** The generated page of an id of the reference, or `undefined` if the package has no such symbol. */
+export async function apiSymbolInfo(id: string): Promise<ApiSymbolInfo | undefined> {
+	const api = await buildModel()
+	const model = symbolOf(api, id)
+	if (!model) return undefined
+	return {
+		name: model.name,
+		slug: model.slug,
+		href: apiHref(model.slug),
+		kind: model.kind,
+		kindLabel: kindLabels[model.kind][0],
+		specifier: model.group.specifier,
+		since: model.since,
+		deprecated: model.deprecated !== null,
+		autoImport: model.autoImport ? await renderInline(model.autoImport) : null,
+		importCode: model.importLine ? codeBlockHtml('ts', await highlightCode(model.importLine, 'typescript', new Map())) : null,
+		sourceUrl: model.source ? `${githubUrl(model.source.path)}${model.source.line ? `#L${model.source.line}` : ''}` : null,
+		sourceLabel: model.source ? `${model.source.path.replace(`${packageFolder}/`, '')}${model.source.line ? `:${model.source.line}` : ''}` : null,
+		summary: plainText(firstSentence(model.description)),
+	}
+}
+
+/** Links on the PascalCase names that `model` references, to their pages other than `except`. */
+function referenceLinks(api: ApiModel, model: SymbolModel, except: ReadonlySet<string>): Map<string, string> {
+	const links = new Map<string, string>()
+	for (const name of model.references) {
+		const resolved = api.resolve(name, model.group)
+		if (resolved && !except.has(resolved.slug) && /^[A-Z]/.test(name)) links.set(name, apiHref(resolved.slug))
+	}
+	return links
+}
+
+/**
+ * A declaration printed by the checker on one long line (`function f<…>(options: …): …`) broken
+ * at 90 columns with Prettier, so that the "Tipo" section reads without scrolling. The code is
+ * unchanged if Prettier cannot parse it.
+ */
+async function formatDeclaration(code: string): Promise<string> {
+	if (!code.split('\n').some((line) => line.length > 90)) return code
+	try {
+		const prettier = await import('prettier')
+		const formatted = await prettier.format(`declare ${code}`, { parser: 'typescript', printWidth: 90, tabWidth: 2 })
+		return formatted.replace(/^declare /, '').replace(/;?\n$/, '')
+	} catch {
+		return code
+	}
+}
+
+/**
+ * The exact types of a written page, generated from the sources so that they never drift from
+ * the package: the signatures of a function (all of its overloads, or the first with
+ * `firstOnly`), the declaration of a type or class, or the syntax of a tag, macro or directive.
+ * `own` is the slug of the page that shows them, which its names do not link to.
+ */
+export async function apiTypeBlocks(ids: readonly string[], own: string, options: { readonly firstOnly?: readonly string[] } = {}): Promise<ApiTypeBlock[]> {
+	const api = await buildModel()
+	const blocks: ApiTypeBlock[] = []
+	for (const id of ids) {
+		const model = symbolOf(api, id)
+		if (!model) throw new Error(`API reference: ${id} is not a symbol of the package`)
+		const links = referenceLinks(api, model, new Set([own, model.slug]))
+		const signatures = options.firstOnly?.includes(id) ? model.signatures.slice(0, 1) : model.signatures
+		for (const signature of signatures) {
+			const label = signature.lang === 'typescript' ? 'ts' : 'meeko'
+			const source = signature.lang === 'typescript' ? await formatDeclaration(signature.code) : signature.code
+			const code = codeBlockHtml(label, await highlightCode(source, signature.lang, links))
+			blocks.push({ name: model.name, href: apiHref(model.slug), code, source, lang: label === 'ts' ? 'ts' : 'html' })
+		}
+	}
+	return blocks
+}
+
+/** The keys of `meeko.config.ts`: the members of `MeekoConfig` with their declaration. */
+export async function apiConfigKeys(): Promise<Array<{ name: string; line: string; description: string; href: string }>> {
+	const api = await buildModel()
+	const config = symbolOf(api, '@meekojs/meeko/framework#MeekoConfig')
+	if (!config) throw new Error('API reference: @meekojs/meeko/framework no longer exports MeekoConfig; update apps/site/server/content/api.ts')
+	return config.members.map((member) => ({ name: member.name, line: member.lines.join('\n'), description: member.description, href: `${apiHref(config.slug)}#${memberId(member.name)}` }))
+}
+
+/** The declaration of a key of `meeko.config.ts`, highlighted as a member of `MeekoConfig`. */
+export async function apiConfigBlock(key: string, own: string): Promise<ApiTypeBlock | undefined> {
+	const api = await buildModel()
+	const config = symbolOf(api, '@meekojs/meeko/framework#MeekoConfig')
+	const member = config?.members.find((candidate) => candidate.name === key)
+	if (!config || !member) return undefined
+	const links = referenceLinks(api, config, new Set([own]))
+	const source = member.lines.join('\n')
+	return { name: `MeekoConfig.${key}`, href: `${apiHref(config.slug)}#${memberId(key)}`, code: codeBlockHtml('ts', await highlightCode(source, 'typescript', links, 'interface')), source, lang: 'ts' }
+}
+
+/**
+ * The generated documentation of a symbol as plain Markdown, for `/llms-full.txt`: its
+ * description, import, signatures, parameters, return value and examples, the text of its page.
+ */
+export async function apiSymbolMarkdown(id: string): Promise<string | undefined> {
+	const api = await buildModel()
+	const model = symbolOf(api, id)
+	if (!model) return undefined
+	const fence = (code: string, lang: string): string => ['```' + (lang === 'typescript' ? 'ts' : 'html'), code, '```'].join('\n')
+	const oneLine = (text: string): string => text.replace(/\s*\n\s*/g, ' ')
+	const parts = [model.description]
+	if (model.importLine) parts.push(fence(model.importLine, 'typescript'))
+	if (model.signatures.length) parts.push(`### ${model.signatureTitle}`, ...model.signatures.map((signature) => fence(signature.code, signature.lang)))
+	if (model.parameters.length) parts.push('### Parámetros', model.parameters.map((parameter) => `- \`${parameter.name}${parameter.optional ? '?' : ''}: ${oneLine(parameter.type)}\`${parameter.description ? `: ${oneLine(parameter.description)}` : ''}`).join('\n'))
+	if (model.returns) parts.push('### Devuelve', `\`${oneLine(model.returns.type)}\`${model.returns.description ? `: ${oneLine(model.returns.description)}` : ''}`)
+	if (model.examples.length) parts.push(model.examples.length > 1 ? '### Ejemplos' : '### Ejemplo', ...model.examples)
+	return parts.filter(Boolean).join('\n\n')
+}
+
+/** The slug of every generated page, to keep the written pages from taking one by mistake. */
+export async function apiSlugSet(): Promise<ReadonlySet<string>> {
+	return new Set((await buildModel()).bySlug.keys())
+}

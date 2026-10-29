@@ -211,7 +211,7 @@ test("the style of <head> hides every icon but the one of data-theme-choice, als
   assert.doesNotMatch(style, /<\//);
   // Without system, the default theme also stands for a document without the attribute.
   assert.match(themeStyle(resolved({ themes: ["paper", "ink"], system: false })), /^:root:is\(\[data-theme-choice="paper"\],:not\(\[data-theme-choice\]\)\)/);
-  assert.throws(() => resolveThemeConfig({ attribute: "data-theme-choice" }), /attribute cannot be data-theme-choice/);
+  assert.throws(() => resolveThemeConfig({ attribute: "data-theme-choice" }), /attribute no puede ser data-theme-choice/);
 });
 
 test("contentSecurityPolicy allows inline styles by their hashes, but never overrides 'unsafe-inline'", () => {

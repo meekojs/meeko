@@ -132,6 +132,57 @@ test("meeko check rejects <script server> in components and checks the block in 
   }
 });
 
+test("export default definePage(...) in <script server> or a sidecar passes meeko check, and its loader is checked against the page", async () => {
+  const dataPage = (data: string) => `<script lang="ts">\nexport interface Props { params: Record<string, string>; data: ${data} }\nconst props = defineProps<Props>();\n</script>\n<template><p>{JSON.stringify(props.data)}</p></template>\n`;
+  const root = await project({
+    "app/pages/index.meeko": page(
+      'export default definePage({ render: "prerender", load: () => ({ name: "Ada" }) });',
+      "export interface Props { params: Record<string, string>; data: { name: string } }\nconst props = defineProps<Props>();",
+    ),
+    "app/pages/about.meeko": dataPage("{ title: string }"),
+    "app/pages/about.route.ts": 'export default definePage({ load: () => ({ title: "Meeko" }) });\n',
+  });
+  try {
+    // The runtime and the build read `route ?? default`; the check reads the same options.
+    const routes = await discoverRoutes(root);
+    assert.equal(routes.find((route) => route.id === "/")?.render, "prerender");
+    await checkFrameworkProject(root);
+    await writeFile(join(root, "app", "pages", "index.meeko"), page(
+      'export default definePage({ load: () => ({ name: 42 }) });',
+      "export interface Props { params: Record<string, string>; data: { name: string } }\nconst props = defineProps<Props>();",
+    ));
+    await assert.rejects(checkFrameworkProject(root), /Las props de la página app\/pages\/index\.meeko no coinciden con el loader app\/pages\/index\.meeko <script server>/);
+    await writeFile(join(root, "app", "pages", "index.meeko"), page('export default definePage({ load: () => ({ name: "Ada" }) });', "export interface Props { params: Record<string, string>; data: { name: string } }\nconst props = defineProps<Props>();"));
+    await writeFile(join(root, "app", "pages", "about.route.ts"), "export default definePage({ load: () => ({ title: 1 }) });\n");
+    await assert.rejects(checkFrameworkProject(root), /no coinciden con el loader app\/pages\/about\.route\.ts/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("route discovery, and so meeko check and meeko dev, reject a dynamic prerendered route without prerenderEntries", async () => {
+  const root = await project({
+    "app/pages/posts/[id].meeko": page('export const route = definePage({ render: "prerender" });'),
+    "app/pages/docs/[...slug].meeko": "<template><p>Doc</p></template>\n",
+    "app/pages/docs/[...slug].route.ts": 'export default definePage({ render: "prerender", prerenderEntries: [{ slug: ["a"] }] });\n',
+  });
+  const missing = /posts[\\/]\[id\]\.meeko: Dynamic prerender route \/posts\/\[id\] requires prerenderEntries/;
+  try {
+    await assert.rejects(discoverRoutes(root), missing);
+    await assert.rejects(checkFrameworkProject(root), missing);
+    // The same message from a sidecar.
+    await writeFile(join(root, "app", "pages", "docs", "[...slug].route.ts"), 'export const render = "prerender";\n');
+    await writeFile(join(root, "app", "pages", "posts", "[id].meeko"), page('export const route = definePage({ render: "prerender", prerenderEntries: async () => [{ id: "1" }] });'));
+    await assert.rejects(discoverRoutes(root), /\[\.\.\.slug\]\.route\.ts: Dynamic prerender route \/docs\/\[\.\.\.slug\] requires prerenderEntries/);
+    // A spread that may carry them is left to the build, which reads them at run time.
+    await writeFile(join(root, "app", "pages", "docs", "[...slug].route.ts"), 'import { shared } from "./shared.js";\nexport const route = definePage({ ...shared, render: "prerender", middleware: [] });\n');
+    const routes = await discoverRoutes(root);
+    assert.deepEqual(routes.filter((route) => route.render === "prerender").map((route) => route.id).sort(), ["/docs/[...slug]", "/posts/[id]"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("the Vite plugin serves a server block only to SSR unless its route renders in the browser", async () => {
   const root = await project({
     "app/pages/index.meeko": page('export const route = definePage({ load: () => "private" });'),

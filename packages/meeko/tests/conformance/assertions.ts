@@ -140,7 +140,13 @@ export function conformanceSuite(adapter: ConformanceAdapter, extra?: (suite: Co
       assert.match(html, /About conformance/);
       // Text bindings carry hydration markers around the value.
       assert.match(html, new RegExp(`<p id="platform">(?:<!--meeko:text:\\d+-->)?${platform}(?:<!--/meeko:text:\\d+-->)?</p>`));
-      assert.match(html, /<script type="module" src="\/assets\/[^"]+\.js"><\/script>/);
+      // server.contentSecurityPolicy: a fresh nonce per SSR response in script-src, and none next to 'unsafe-inline'.
+      const csp = response.headers.get("content-security-policy") ?? "";
+      const nonce = /script-src 'self' 'nonce-([A-Za-z0-9_-]+)'/.exec(csp)?.[1];
+      assert.ok(nonce, csp);
+      assert.match(csp, /style-src 'self' 'unsafe-inline'(;|$)/);
+      assert.match(html, new RegExp(`<script type="module" nonce="${nonce}" src="/assets/[^"]+\\.js"></script>`));
+      assert.equal(response.headers.get("x-content-type-options"), "nosniff");
     });
 
     it("runs server middleware in file order on the way in and reverse order on the way out", async () => {
@@ -160,6 +166,10 @@ export function conformanceSuite(adapter: ConformanceAdapter, extra?: (suite: Co
       const rpc = await fetch(`${origin}/_meeko/rpc/math/add`, { method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ a: 2, b: 3 }) });
       assert.equal(rpc.status, 200);
       assert.deepEqual(await rpc.json(), { total: 5 });
+      // JSON runs nothing: the strictest policy, whatever server.contentSecurityPolicy says.
+      assert.equal(echo.headers.get("content-security-policy"), "default-src 'none'; frame-ancestors 'none'");
+      assert.equal(rpc.headers.get("content-security-policy"), "default-src 'none'; frame-ancestors 'none'");
+      assert.equal(echo.headers.get("x-robots-tag"), "none", "server.headers path patterns apply");
     });
 
     it("requires Origin and CSRF token for authenticated mutations", async () => {
@@ -201,7 +211,7 @@ export function conformanceSuite(adapter: ConformanceAdapter, extra?: (suite: Co
       assert.match(html, /<div class="site-root">.*<div class="app-shell"[^>]*>.*<section id="app-error">/s);
       assert.match(html, /Error (?:<!--meeko:text:\d+-->)?404/);
       assert.match(html, /<script id="meeko-payload" type="application\/json">\{[^<]*"error":true/);
-      assert.match(html, /<script type="module" src="\/assets\/[^"]+\.js"><\/script>/);
+      assert.match(html, /<script type="module" nonce="[^"]+" src="\/assets\/[^"]+\.js"><\/script>/);
       const navigation = await fetch(`${origin}/missing-page`, { headers: { accept: "application/meeko+json" } });
       assert.equal(navigation.status, 404);
       assert.deepEqual(((await navigation.json()) as { props: unknown }).props, { status: 404, message: "NOT_FOUND" });
@@ -231,7 +241,7 @@ export function conformanceSuite(adapter: ConformanceAdapter, extra?: (suite: Co
       assert.equal(cached.status, 304);
       assert.equal(await cached.text(), "");
       const html = await (await fetch(`${origin}/about`)).text();
-      const entry = html.match(/<script type="module" src="(\/assets\/[^"]+\.js)"><\/script>/)?.[1];
+      const entry = html.match(/<script type="module" nonce="[^"]+" src="(\/assets\/[^"]+\.js)"><\/script>/)?.[1];
       assert.ok(entry);
       const script = await fetch(`${origin}${entry}`);
       assert.equal(script.status, 200);
@@ -277,6 +287,11 @@ export function conformanceSuite(adapter: ConformanceAdapter, extra?: (suite: Co
       const html = await anonymous.text();
       assert.match(html, /Welcome to Meeko/);
       assert.doesNotMatch(html, /meeko-csrf-token/);
+      // The stored file, with the hashes of its index instead of a nonce.
+      assert.doesNotMatch(html, /nonce=/);
+      const csp = anonymous.headers.get("content-security-policy") ?? "";
+      assert.match(csp, /^default-src 'self'; script-src 'self'/);
+      assert.doesNotMatch(csp, /nonce-/);
       assert.equal((await fetch(origin, { headers: { "if-none-match": etag } })).status, 304);
       const personal = await fetch(origin, { headers: { cookie } });
       assert.equal(personal.headers.get("cache-control"), "private, no-store");
@@ -394,7 +409,7 @@ export function conformanceSuite(adapter: ConformanceAdapter, extra?: (suite: Co
       assert.ok(firstByte !== undefined && firstByte < delay, `time to first byte ${firstByte} ms is not below the ${delay} ms deferred delay`);
       assert.ok(payloadAt !== undefined && payloadAt < delay, `the payload arrived after ${payloadAt} ms`);
       assert.ok(total >= delay - 50, `the response ended after ${total} ms, before the deferred value`);
-      assert.match(html, /<script type="module" async src="\/assets\/[^"]+\.js"><\/script>/);
+      assert.match(html, /<script type="module" async nonce="[^"]+" src="\/assets\/[^"]+\.js"><\/script>/);
       assert.match(html, /<script type="application\/json" data-meeko-deferred="0">\{"deferred":0,"value":\{"text":"Deferred done"\}\}<\/script>/);
       assert.ok(html.endsWith("</body></html>"));
     });

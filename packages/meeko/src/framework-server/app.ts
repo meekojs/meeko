@@ -16,16 +16,20 @@ import { createContextDispatcher, createLocalServerFetch, loadSocketChannels } f
 import type { ServerManifest } from "./discovery.js";
 import { composeServerMiddleware } from "./middleware.js";
 import type { ServerMiddleware } from "./middleware.js";
+import { consumeFormFlash, formFlashPlugin, readFormFlash } from "./forms.js";
 import { createDetachedPlatform } from "./platform.js";
 import type { ServerPlatform } from "./platform.js";
 import type { ServerRuntime, ServerRuntimeDefinition } from "./runtime.js";
 import type { SessionManager } from "./sessions.js";
-import { copySocketAddress, trustProxyOf } from "./env.js";
+import { copySocketAddress, setRequestEnvironment, trustProxyOf, warnOnce } from "./env.js";
 import { createSessionDefaults, warnIgnoredSessionEnv } from "./zero-config.js";
 import type { SessionDefaults } from "./zero-config.js";
 import { createSocketHub, withSocketHub } from "./socket.js";
 import type { SocketHub, SocketPubSub } from "./socket.js";
 import type { PluginRegistration } from "../framework/plugin.js";
+import type { ServerHeaders } from "../framework/config-type.js";
+import { contentSecurityPolicy, JSON_CONTENT_SECURITY_POLICY } from "./csp.js";
+import type { ContentSecurityPolicy } from "./csp.js";
 
 /**
  * Archivos del build cliente que enlaza cada documento renderizado en el servidor.
@@ -103,6 +107,27 @@ export interface AppManifest {
    * @since 1.2.0
    */
   readonly document?: DocumentConfig | undefined;
+  /**
+   * `server.contentSecurityPolicy` de `meeko.config.ts` en los adaptadores con servidor, fijado en
+   * el build. En producción, la aplicación pone la cabecera en cada respuesta: con los hashes del
+   * build, un nonce por petición o los hashes del HTML según la página, y
+   * `default-src 'none'; frame-ancestors 'none'` en el JSON de API, RPC y navegación.
+   * @since 1.7.0
+   */
+  readonly contentSecurityPolicy?: ContentSecurityPolicy | undefined;
+  /**
+   * `server.headers` de `meeko.config.ts` en los adaptadores con servidor, fijado en el build: las
+   * cabeceras globales y por patrón de ruta que la aplicación añade a las respuestas que no las traen.
+   * @since 1.7.0
+   */
+  readonly headers?: ServerHeaders | undefined;
+  /**
+   * Identificador del build, distinto en cada `meeko build`. Entra en el `ETag` de las páginas con
+   * `cache`, así que un despliegue nuevo invalida las copias del navegador. Sin él, cada proceso
+   * usa uno aleatorio.
+   * @since 1.7.0
+   */
+  readonly buildId?: string | undefined;
 }
 
 /**
@@ -328,6 +353,58 @@ async function createRuntime<Env>(options: ServerAppOptions<Env>, platform: Serv
   };
 }
 
+/** A `server.headers` path pattern as a regular expression: `*` is any sequence, `/` included. */
+function headerPattern(pattern: string): RegExp {
+  return new RegExp(`^${pattern.split("*").map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*")}$`);
+}
+
+/** Whether a response body is JSON: API, RPC, errors and the navigation payloads. */
+function jsonResponse(pathname: string, response: Response): boolean {
+  if (pathname.startsWith("/api/") || pathname.startsWith("/_meeko/rpc/")) return true;
+  const type = response.headers.get("content-type")?.toLowerCase() ?? "";
+  return type.startsWith("application/json") || type.startsWith("application/meeko+") || /^application\/[^;]*\+json/.test(type);
+}
+
+/**
+ * The last step of every response of the application: the headers of `server.headers` that it
+ * does not carry, the CSP when the page handler did not set one (`default-src 'none'` for JSON,
+ * the configured policy for the rest), and no shared cache for a response that sets a cookie.
+ */
+function responseHeaders(policy: ContentSecurityPolicy | undefined, configured: ServerHeaders | undefined): (pathname: string, response: Response) => Response {
+  const global: [string, string][] = [];
+  const patterns: { readonly test: RegExp; readonly headers: readonly [string, string][] }[] = [];
+  for (const [name, value] of Object.entries(configured ?? {})) {
+    if (typeof value === "string") global.push([name, value]);
+    else patterns.push({ test: headerPattern(name), headers: Object.entries(value) });
+  }
+  const basePolicy = policy ? contentSecurityPolicy(policy) : undefined;
+  return (pathname, response) => {
+    // An upgrade (101) or another informational answer cannot be rebuilt.
+    if (response.status < 200) return response;
+    // Later entries win: the global headers first, then each pattern in written order.
+    const extra = new Map<string, string>(global.map(([name, value]) => [name.toLowerCase(), value]));
+    for (const pattern of patterns) if (pattern.test.test(pathname)) for (const [name, value] of pattern.headers) extra.set(name.toLowerCase(), value);
+    // A 304 updates the stored response's headers: a policy without the hashes of that document would replace its own.
+    const csp = basePolicy && response.status !== 304 && !response.headers.has("content-security-policy")
+      ? jsonResponse(pathname, response) ? JSON_CONTENT_SECURITY_POLICY : basePolicy
+      : undefined;
+    // `public` and `s-maxage` both let a shared cache store the response, also when `headers` adds them.
+    const cacheControl = response.headers.get("cache-control") ?? extra.get("cache-control") ?? "";
+    const sharedCookie = response.headers.has("set-cookie") && /(?:^|,)\s*(?:public\b|s-maxage\s*=)/i.test(cacheControl);
+    const missing = [...extra].filter(([name]) => !response.headers.has(name));
+    if (!missing.length && !csp && !sharedCookie) return response;
+    const headers = new Headers(response.headers);
+    for (const [name, value] of missing) headers.set(name, value);
+    if (csp) headers.set("content-security-policy", csp);
+    // A shared cache would store the cookie with the page and hand it to everyone.
+    if (sharedCookie) {
+      headers.set("cache-control", "private, no-store");
+      headers.delete("etag");
+    }
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  };
+}
+
 async function loadDefault<T>(load: AppModuleLoader, key: string, label: string): Promise<T> {
   const module = await load(key) as { default?: unknown } | undefined;
   if (typeof module?.default !== "function") throw new Error(`${key}: ${label} requires a default function export`);
@@ -471,9 +548,23 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
       document,
       // A `<MeekoTeleport>` without its target fails the render in development.
       production: options.production,
-      ...(options.plugins?.length ? { plugins: options.plugins } : {}),
+      // The built-in plugin first: it publishes the outcome of a native form for `useForm`.
+      plugins: [formFlashPlugin, ...(options.plugins ?? [])],
+      // The ETag of a cached page changes with every deploy; without a build, with every process.
+      buildId: manifest.buildId ?? crypto.randomUUID(),
+      ...(typeof sessions.cookieName === "string" ? { sessionCookieName: sessions.cookieName } : {}),
     };
-    const pages = createPageHandler(options.prerender ? { ...pageOptions, prerendered: options.prerender } : pageOptions);
+    // The CSP applies in production: the scripts and styles that Vite injects in development have
+    // neither a nonce nor a hash. The build renders its prerendered pages without it, so the stored
+    // HTML never carries the nonce of one response.
+    const policy = options.production ? manifest.contentSecurityPolicy : undefined;
+    const servedPages: PageHandlerOptions = {
+      ...pageOptions,
+      ...(options.prerender ? { prerendered: options.prerender } : {}),
+      ...(policy ? { contentSecurityPolicy: policy } : {}),
+    };
+    const respond = responseHeaders(policy, manifest.headers);
+    const pages = createPageHandler(servedPages);
     const renderOnly = createPageHandler(pageOptions);
     const notFoundOnly = createPageHandler({ ...pageOptions, notFoundOnly: true });
     const serverMiddleware: ServerMiddleware[] = manifest.serverMiddleware.map((key) => async (request, next) =>
@@ -488,6 +579,10 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
         return response;
       }
       if (pathname.startsWith("/api/") || pathname.startsWith("/_meeko/rpc/")) return endpoints(request);
+      // The page a native form returned to renders its outcome and deletes the single-use cookie; a
+      // cookie for another page is left alone. The served handler skips the stored prerender, the
+      // 304 and cache.memory for it (hasFormFlash) and keeps Meeko's CSP, with this response's nonce.
+      if (readFormFlash(request)) return consumeFormFlash(request, await pages(request));
       return pages(request);
     });
     const withPublicOrigin = (request: Request): Request => {
@@ -504,6 +599,11 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
     if (manifest.server.socket?.length) {
       const channels = await loadSocketChannels(manifest.server, load);
       const pubsub = runtime.socket?.pubsub ?? options.defaultSocketPubSub;
+      // Like rateLimit's memory counter: replicas cannot be counted, so production without a
+      // declared broker warns once. An explicit LocalSocketPubSub is the single-instance choice.
+      if (!pubsub && options.production && options.prerendering !== true) {
+        warnOnce("socket:local-pubsub", "[meeko] Los canales de Socket usan LocalSocketPubSub, el broker en memoria de cada instancia: con varias réplicas o procesos, un broadcast sólo llega a los peers de la instancia que lo publica. Declare socket.pubsub en server/runtime.ts con RedisSocketPubSub, o con new LocalSocketPubSub() si sirve una sola instancia.");
+      }
       const hub = createSocketHub({
         channels, sessions, platform: basePlatform,
         services: (request: Request) => servicesFor(request, currentPlatform()),
@@ -549,13 +649,14 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
     const app: InternalServerApp = {
       fetch(request, platform = basePlatform) {
         return run(platform, async () => {
-          const normalized = withPublicOrigin(request);
+          // clientAddress(request) in server middleware applies this platform's MEEKO_TRUST_PROXY.
+          const normalized = setRequestEnvironment(withPublicOrigin(request), platform.env);
           if (options.assets) {
             const asset = await options.assets.get(new URL(normalized.url).pathname, normalized);
             if (asset) return asset;
           }
           return decorated(normalized);
-        });
+        }).then((response) => respond(new URL(request.url).pathname, response));
       },
       [renderPage]: (request) => renderForBuild(renderOnly, request, 200),
       [renderNotFound]: (request) => renderForBuild(notFoundOnly, request, 404),

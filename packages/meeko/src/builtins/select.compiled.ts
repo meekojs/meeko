@@ -13,7 +13,7 @@ export type ComponentProps<T, Multiple extends boolean = false> = __MeekoDeclare
 function __setup<T, Multiple extends boolean = false>(__props: ComponentProps<T, Multiple>, __meeko_refs: __meeko.ElementRefs) {
 type __MeekoRefs = { "root": __meeko.ElementOf<"div", false> };
 const __meeko_borrowed = new Set<unknown>();
-const props: MeekoSelectProps<T, Multiple> = __props;
+const props = __props as Readonly<MeekoSelectProps<T, Multiple>>;
 const snippets: __meeko.SnippetMap<__MeekoSnippets<T, Multiple>> = __meeko.useSnippets<__MeekoSnippets<T, Multiple>>(__props);
 const emit: __meeko.Emit<__MeekoEmits<T, Multiple>> = __meeko.createEmit<__MeekoEmits<T, Multiple>, __meeko.NoEmitConflict<__MeekoDeclaredProps<T, Multiple>, __MeekoEmits<T, Multiple>>>(__props);
 const model: __meeko.Signal<__MeekoModels<T, Multiple>["default"]> = __meeko.useModel<__MeekoModels<T, Multiple>["default"]>(__props, "default", __meeko_borrowed, { default: null as unknown as SelectModel<T, Multiple> });

@@ -1,7 +1,6 @@
-import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
-
-const allowedEntries = new Set(["package.json", "package-lock.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "yarn.lock", "node_modules", ".npmrc", ".git"]);
+import { scaffoldDestinationEntries } from "../init.js";
 
 const files: Readonly<Record<string, string>> = {
   ".gitignore": "node_modules/\n.meeko/\n.env\n",
@@ -118,23 +117,14 @@ export async function initFrameworkProject(directory: string): Promise<string> {
   const target = resolve(directory);
   const name = basename(target).toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[._-]+|[._-]+$/g, "") || "meeko-app";
   const metadata: unknown = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"));
-  if (!record(metadata) || typeof metadata.version !== "string") throw new Error("Meeko package version is unavailable");
-  let entries: string[] = [];
-  try {
-    if (!(await stat(target)).isDirectory()) throw new Error(`Destination is not a directory: ${target}`);
-    entries = await readdir(target);
-  } catch (error) {
-    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
-  }
-  const unexpected = entries.filter((entry) => !allowedEntries.has(entry));
-  if (unexpected.length || (entries.length && !entries.includes("package.json"))) {
-    throw new Error(`Destination is not empty: ${target}`);
-  }
+  if (!record(metadata) || typeof metadata.version !== "string") throw new Error("No se puede leer la versión del paquete de Meeko");
+  // The same destinations as `meeko init`.
+  const entries = await scaffoldDestinationEntries(target);
   const existing: unknown = entries.includes("package.json") ? JSON.parse(await readFile(join(target, "package.json"), "utf8")) : {};
   if (!record(existing) || (existing.scripts !== undefined && !record(existing.scripts))
     || (existing.dependencies !== undefined && !record(existing.dependencies))
     || (existing.devDependencies !== undefined && !record(existing.devDependencies))) {
-    throw new Error(`Invalid package.json in ${target}`);
+    throw new Error(`package.json no válido en ${target}`);
   }
   const scripts = {
     dev: "meeko dev .",
@@ -144,7 +134,7 @@ export async function initFrameworkProject(directory: string): Promise<string> {
   };
   const oldScripts = existing.scripts as Record<string, unknown> | undefined;
   for (const command of Object.keys(scripts)) if (oldScripts && command in oldScripts) {
-    throw new Error(`Destination already defines the ${command} script: ${target}`);
+    throw new Error(`El destino ya define el script ${command}: ${target}`);
   }
   const manifest = {
     ...existing,

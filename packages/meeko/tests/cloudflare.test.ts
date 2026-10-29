@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -15,7 +15,9 @@ import {
   createServerApp, defineServerRuntime, defineSocketChannel, LocalSocketPubSub, MemorySessionStore, SessionManager, SqlSessionStore,
 } from "../src/framework-server.ts";
 import type { AppManifest, Schema, ServerApp, SocketMessage, SocketPubSub } from "../src/framework-server.ts";
-import { assertBuildAdapter } from "../src/framework/project.ts";
+import { assertBuildAdapter, buildProject } from "../src/framework/project.ts";
+import { initFrameworkProject } from "../src/framework/init.ts";
+import { linkRepositoryPackages, tempProject } from "./helpers/temp-project.ts";
 import { cloudflareCompatibilityDate, wranglerConfig } from "../src/framework/cloudflare-build.ts";
 
 /** D1's prepared statement surface over node:sqlite, enough for the session driver. */
@@ -85,7 +87,32 @@ test("D1 sessions keep their own TTL across rotation without a schema change", a
 
 test("D1SessionDriver rejects table names that are not plain identifiers", () => {
   assert.throws(() => new D1SessionDriver(sqliteD1(), { table: "x; DROP TABLE y" }), /table/);
+  assert.throws(() => new D1SessionDriver(sqliteD1(), { rateLimitTable: "x; DROP TABLE y" }), /table/);
   assert.match(D1SessionDriver.schema(), /family_id TEXT NOT NULL UNIQUE/);
+  assert.match(D1SessionDriver.rateLimitSchema(), /CREATE TABLE IF NOT EXISTS "meeko_rate_limits"/);
+});
+
+test("D1SessionDriver counts rateLimit windows in D1 only with rateLimitTable", async () => {
+  const db = sqliteD1();
+  db.sqlite.exec(D1SessionDriver.schema());
+  // Without the option nothing changes: the store has no rateLimit and Meeko counts in memory.
+  assert.equal(new D1SessionDriver(db).rateLimit, undefined);
+  assert.equal(new SqlSessionStore(new D1SessionDriver(db)).rateLimit, undefined);
+  db.sqlite.exec(D1SessionDriver.rateLimitSchema("app_limits"));
+  const driver = new D1SessionDriver(db, { rateLimitTable: "app_limits" });
+  const key = new Uint8Array(32).fill(7);
+  assert.deepEqual(await driver.rateLimit!(key, 1000, 10_000), { count: 1, windowEndsAt: 11_000 });
+  assert.deepEqual(await driver.rateLimit!(key, 1000, 10_999), { count: 2, windowEndsAt: 11_000 });
+  assert.deepEqual(await driver.rateLimit!(key, 1000, 11_000), { count: 1, windowEndsAt: 12_000 }, "an ended window restarts");
+  assert.deepEqual(await driver.rateLimit!(new Uint8Array(32), 1000, 11_000), { count: 1, windowEndsAt: 12_000 }, "another key, another counter");
+  const rows = db.sqlite.prepare("SELECT key FROM app_limits ORDER BY key").all() as { key: string }[];
+  assert.ok(rows.every((row) => /^[A-Za-z0-9_-]{43}$/.test(row.key)), "the digest in base64url");
+  // Two isolates share the table, and deleteExpired prunes ended windows with the sessions.
+  const store = new SqlSessionStore(new D1SessionDriver(db, { rateLimitTable: "app_limits" }));
+  assert.equal((await store.rateLimit!("route", 60_000)).count, 1);
+  assert.equal((await new SqlSessionStore(new D1SessionDriver(db, { rateLimitTable: "app_limits" })).rateLimit!("route", 60_000)).count, 2);
+  assert.equal(await driver.deleteExpired(12_000), 2);
+  assert.equal((db.sqlite.prepare("SELECT count(*) AS total FROM app_limits").get() as { total: number }).total, 1);
 });
 
 test("createCloudflareAssetReader serves only manifest files through the ASSETS binding", async () => {
@@ -259,6 +286,18 @@ test("the default Socket broker is replaced by the runtime's own broker", async 
 
 test("the cloudflare adapter can be built", () => {
   assert.equal(assertBuildAdapter("cloudflare"), "cloudflare");
+});
+
+test("a Worker without server.contentSecurityPolicy leaves out the HTML parser of the CSP hashes", { timeout: 300_000 }, async (context) => {
+  const root = await tempProject(context, "worker-without-csp");
+  await initFrameworkProject(root);
+  await linkRepositoryPackages(root);
+  await writeFile(join(root, "meeko.config.ts"), 'export default { server: { adapter: "cloudflare" } };\n');
+  const result = await buildProject(root, { adapter: "cloudflare" });
+  const worker = await readFile(join(result.output, "worker.js"), "utf8");
+  // parse5's error codes travel with its tokenizer; the stub takes its place.
+  assert.doesNotMatch(worker, /eof-in-tag/);
+  assert.match(worker, /built without server\.contentSecurityPolicy/);
 });
 
 test("wranglerConfig owns the Worker bundle and assets and combines the application's fields", async () => {

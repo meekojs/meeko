@@ -209,3 +209,41 @@ test("an application's own uncaughtException listener decides: Meeko only report
   assert.equal(await (await fetch(`${running.origin}/api/ok`)).text(), "ok");
   assert.doesNotMatch(running.logs(), /RUNTIME CLOSED/);
 });
+
+test("handleProcessErrors installs once per application: a second call adds no listener and no second report", async () => {
+  const { handleProcessErrors } = await import("../src/framework-server/process-errors.ts");
+  const app = { close: async () => {} } as unknown as Parameters<typeof handleProcessErrors>[0];
+  const reported: unknown[] = [];
+  const existing = new Set(process.listeners("unhandledRejection"));
+  const before = existing.size;
+  const onError = (error: unknown): void => { reported.push(error); };
+  const warnings: string[] = [];
+  const warn = console.warn;
+  console.warn = (message: string) => { warnings.push(message); };
+  let first!: () => void;
+  let second!: () => void;
+  try {
+    first = handleProcessErrors(app, { onError });
+    // The same options are a plain second holder; different ones are ignored, with a warning.
+    handleProcessErrors(app, { onError })();
+    assert.deepEqual(warnings, []);
+    second = handleProcessErrors(app, { onError: (error) => { reported.push(["second", error]); } });
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0]!, /handleProcessErrors ya estaba instalado .* se mantienen las de la primera llamada/);
+  } finally { console.warn = warn; }
+  try {
+    const added = process.listeners("unhandledRejection").filter((listener) => !existing.has(listener));
+    assert.equal(added.length, 1, "one listener for both calls");
+    // Called directly: the test runner's own listener would fail the test on a real event.
+    const failure = new Error("floating");
+    (added[0] as (reason: unknown, promise: Promise<unknown>) => void)(failure, Promise.resolve());
+    assert.deepEqual(reported, [failure], "reported once, by the first installation");
+    first();
+    first();
+    assert.equal(process.listeners("unhandledRejection").length, before + 1, "the other call still holds the listeners");
+  } finally { second(); }
+  assert.equal(process.listeners("unhandledRejection").length, before, "released with the last holder");
+  const again = handleProcessErrors(app, { onError: () => {} });
+  assert.equal(process.listeners("unhandledRejection").length, before + 1, "a new installation after the release");
+  again();
+});

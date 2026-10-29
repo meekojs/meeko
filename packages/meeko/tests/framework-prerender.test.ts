@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -147,6 +148,29 @@ test("prerender stores the HTML and navigation payload of one loader run and fai
 
     rejectDeferred = true;
     await assert.rejects(prerenderRoutes({ routes, handler, loadRoute: async () => sidecar(), outputRoot: join(root, "failed") }), /Prerender \/ returned HTTP 500/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("the prerender index hashes only what Meeko writes, never a <script> or <style> injected in the page", async () => {
+  const root = await mkdtemp(join(tmpdir(), "meeko-prerender-hashes-"));
+  const routes = createRouteManifest([{ id: "/", file: "index.meeko", layouts: [], render: "prerender" }]);
+  const sha256 = (text: string): string => `'sha256-${createHash("sha256").update(text, "utf8").digest("base64")}'`;
+  const page = {
+    css: ".home{color:red}",
+    renderWithState: () => ({ html: "<main><script>alert(1)</script><style>body{display:none}</style></main>", state: {} }),
+  };
+  try {
+    const handler = createFrameworkHandler({
+      routes, loadPage: async () => page, loadRoute: async () => ({ render: "prerender" }), onError: () => {},
+      document: { head: "<script>window.head = 1</script>", bodyEnd: "<script>window.end = 1</script>" },
+    });
+    await prerenderRoutes({ routes, handler, loadRoute: async () => ({ render: "prerender" }), outputRoot: root });
+    assert.match(await readFile(join(root, "index.html"), "utf8"), /<main><script>alert\(1\)<\/script>/);
+    const index = JSON.parse(await readFile(join(root, "manifest.json"), "utf8")) as { pages: Record<string, { scriptHashes: string[]; styleHashes: string[] }> };
+    assert.deepEqual(index.pages["/"]!.scriptHashes, [sha256("window.end = 1"), sha256("window.head = 1")].sort());
+    assert.deepEqual(index.pages["/"]!.styleHashes, [sha256(".home{color:red}")]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

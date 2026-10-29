@@ -118,20 +118,20 @@ test("theme options are decided once and invalid ones fail with the field", () =
   assert.equal(resolveThemeConfig({ themes: ["paper", "ink"], system: false })!.default, "paper");
   assert.deepEqual(resolveThemeConfig({ themes: ["light", "dark", "dim"], darkThemes: ["dark", "dim"] })!.darkThemes, ["dark", "dim"]);
   const invalid: Array<[unknown, RegExp]> = [
-    ["dark", /must be true, false or an object/],
-    [{ themes: [] }, /at least one theme/],
-    [{ themes: ["light", "light"] }, /repeated/],
-    [{ themes: ["system"] }, /invalid theme name "system"/],
-    [{ themes: ['"><script>'] }, /invalid theme name/],
-    [{ themes: ["paper", "ink"] }, /system needs the themes "light" and "dark"/],
-    [{ default: "purple" }, /default must be one of themes/],
-    [{ system: false, default: "system" }, /default cannot be "system"/],
-    [{ darkThemes: ["purple"] }, /darkThemes must be one of themes/],
-    [{ attribute: "theme" }, /attribute must be "class" or a lowercase data-\* attribute/],
-    [{ cookie: "my theme" }, /cookie must be a cookie name/],
-    [{ storageKey: "" }, /storageKey must be a nonempty string or false/],
-    [{ clientHints: "yes" }, /clientHints must be a boolean/],
-    [{ colours: true }, /unknown field colours/],
+    ["dark", /debe ser true, false o un objeto/],
+    [{ themes: [] }, /al menos un tema/],
+    [{ themes: ["light", "light"] }, /nombres repetidos/],
+    [{ themes: ["system"] }, /nombre de tema no válido "system"/],
+    [{ themes: ['"><script>'] }, /nombre de tema no válido/],
+    [{ themes: ["paper", "ink"] }, /system necesita los temas "light" y "dark"/],
+    [{ default: "purple" }, /default debe ser uno de los temas de themes/],
+    [{ system: false, default: "system" }, /default no puede ser "system"/],
+    [{ darkThemes: ["purple"] }, /darkThemes debe ser uno de los temas de themes/],
+    [{ attribute: "theme" }, /attribute debe ser "class" o un atributo data-\* en minúsculas/],
+    [{ cookie: "my theme" }, /cookie debe ser un nombre de cookie/],
+    [{ storageKey: "" }, /storageKey debe ser una cadena no vacía o false/],
+    [{ clientHints: "yes" }, /clientHints debe ser un booleano/],
+    [{ colours: true }, /campo desconocido colours/],
   ];
   for (const [value, message] of invalid) assert.throws(() => resolveThemeConfig(value), message, JSON.stringify(value));
 });
@@ -476,9 +476,9 @@ test("theme is validated in meeko.config.ts and baked into the server and client
     assert.deepEqual(manifest.document?.theme, resolveThemeConfig({ themes: ["light", "dark", "sepia"] }));
     assert.match(await clientRoutesSource(root), /export const documentConfig = \{"theme":\{"themes":\["light","dark","sepia"\]/);
     await writeFile(join(root, "meeko.config.mjs"), 'export default { theme: { default: "sepia" } };\n');
-    await assert.rejects(loadMeekoConfig(root), /theme: default must be one of themes \(light, dark\)/);
+    await assert.rejects(loadMeekoConfig(root), /theme: default debe ser uno de los temas de themes \(light, dark\)/);
     await writeFile(join(root, "meeko.config.mjs"), 'export default { document: { theme: {} } };\n');
-    await assert.rejects(loadMeekoConfig(root), /document\.theme is not an option of meeko\.config\.ts; use theme at the top level/);
+    await assert.rejects(loadMeekoConfig(root), /document\.theme no es una opción de meeko\.config\.ts; use theme en el nivel superior/);
   } finally {
     await project.remove();
   }

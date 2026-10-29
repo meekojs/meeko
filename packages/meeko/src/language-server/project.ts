@@ -3,7 +3,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import ts from "@typescript/typescript6";
 import { discoverAutoImports, discoverAutoImportsSync } from "../autoimports.js";
 import type { AutoImport } from "../autoimports.js";
-import { projectDeclarationFiles } from "../compiler/project-declarations.js";
+import { generatedServicesDeclaration, projectDeclarationFiles } from "../compiler/project-declarations.js";
 import { projectRoot } from "../compiler/project-root.js";
 import { readMeekoConfigSync, readThemeOptionSync, resolveConfigSources } from "../framework/config.js";
 import { generatedThemeLines } from "../framework/generate.js";
@@ -213,6 +213,8 @@ export class MeekoProject {
         ...this.compiler.fileNames,
         // Augmentations such as MeekoSession reach components only as program roots.
         ...this.roots.flatMap((root) => projectDeclarationFiles(root)),
+        // The type of RequestContext.services, from server/runtime.ts.
+        ...generatedServicesDeclaration(this.root),
         ...this.theme ? [this.theme.file] : [],
         ...[...this.entries.values()].flatMap((entry) => entry.component
           ? [entry.virtualFilename, ...(entry.component.server ? [entry.component.server.virtualFilename] : [])]

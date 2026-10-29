@@ -142,6 +142,33 @@ function typeOnlyStatement(statement: ts.Statement): boolean {
       && statement.exportClause.elements.every((element) => element.isTypeOnly)));
 }
 
+/** The expression inside parentheses, `as`, `satisfies`, `<T>` and `!`. */
+function unwrapExpression(expression: ts.Expression): ts.Expression {
+  let current = expression;
+  while (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isSatisfiesExpression(current)
+    || ts.isNonNullExpression(current) || ts.isTypeAssertionExpression(current)) current = current.expression;
+  return current;
+}
+
+/**
+ * The function around `node` that Meeko calls after the top-level code has run, to compute the
+ * head: `export const head = () => ...` (`headFunction`) or the one passed to `useHead` or
+ * `useSeoMeta`. Undefined when `node` is in no such function.
+ */
+function laterHeadFunction(node: ts.Node, headFunction: ts.Expression | undefined, headApis: ReadonlySet<string>): string | undefined {
+  for (let current: ts.Node = node; !ts.isSourceFile(current); current = current.parent) {
+    if (!ts.isArrowFunction(current) && !ts.isFunctionExpression(current)) continue;
+    if (current === headFunction) return "export const head = () => ...";
+    let argument: ts.Node = current;
+    while (ts.isParenthesizedExpression(argument.parent) || ts.isAsExpression(argument.parent) || ts.isSatisfiesExpression(argument.parent)) argument = argument.parent;
+    const call = argument.parent;
+    if (ts.isCallExpression(call) && call.arguments.some((entry) => entry === argument) && ts.isIdentifier(call.expression) && headApis.has(call.expression.text)) {
+      return `${call.expression.text}(() => ...)`;
+    }
+  }
+  return undefined;
+}
+
 /** The options object of `definePage({ ... })`, `{ ... } satisfies X` and similar wrappers. */
 function optionsObject(expression: ts.Expression): ts.ObjectLiteralExpression | undefined {
   let current = expression;
@@ -232,6 +259,8 @@ export function analyzeServerScript(source: string, filename: string, section: S
   const statements: ServerStatement[] = [];
   const exports: ServerBinding[] = [];
   let head: ServerBinding | undefined;
+  /** `export const head = () => ...`: Meeko calls it after the top-level code, to compute the head. */
+  let headFunction: ts.Expression | undefined;
   let route: { statement: ts.VariableStatement; declaration: ts.VariableDeclaration } | undefined;
   let unsupportedExport: ts.Statement | undefined;
   let body = false;
@@ -267,8 +296,10 @@ export function analyzeServerScript(source: string, filename: string, section: S
         for (const identifier of identifiers) {
           bodyNames.add(identifier.text);
           const binding = { name: identifier.text, start: at(identifier), end: base + identifier.getEnd() };
-          if (identifier.text === "head") head = binding;
-          else exports.push(binding);
+          if (identifier.text === "head") {
+            head = binding;
+            if (declaration.initializer && declaration.name === identifier) headFunction = unwrapExpression(declaration.initializer);
+          } else exports.push(binding);
         }
       }
       continue;
@@ -316,6 +347,15 @@ export function analyzeServerScript(source: string, filename: string, section: S
   if (misplaced) {
     const api = apis.get(misplaced.identifier.text)!;
     fail("MEEK073", `${api}() no puede ejecutarse dentro de las opciones de ruta; llámala en el código de nivel superior de <script server>`, misplaced.identifier);
+  }
+  // A helper that the top-level code calls runs while the page does, so it may use the request
+  // APIs. A function that Meeko calls later, to compute the head, has no page running (1.7).
+  for (const reference of references) {
+    if (!reference.nested) continue;
+    const where = laterHeadFunction(reference.identifier, headFunction, headApis);
+    if (!where) continue;
+    const api = apis.get(reference.identifier.text)!;
+    fail("MEEK073", `${api}() no funciona dentro de ${where}: Meeko llama a esa función al calcular el head, cuando el código de nivel superior de <script server> ya terminó. Llama a ${api}() en el nivel superior y usa su valor dentro de la función`, reference.identifier);
   }
   let routeInfo: ServerScript["route"];
   if (route) {

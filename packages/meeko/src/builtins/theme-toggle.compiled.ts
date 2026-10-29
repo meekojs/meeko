@@ -20,7 +20,7 @@ interface Props {
 }
 export type ComponentProps = Props;
 function __setup(__props: Props) {
-const props: Props = __props;
+const props = __props as Readonly<Props>;
 const snippets: __meeko.SnippetMap<__MeekoSnippets> = __meeko.useSnippets<__MeekoSnippets>(__props);
 const toggle = useThemeToggle();
 const route = useRoute();

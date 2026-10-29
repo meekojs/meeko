@@ -1,5 +1,7 @@
 import { serializeJson } from "../server.js";
 import type { RequestContext } from "./context.js";
+import { echoValues, formEncoding, formFlashCookie, formObject, formReturnPath, issueRoot, planFormConversion, sameOriginPath, seeOther } from "./forms.js";
+import type { FormFieldValue, ParsedForm } from "./forms.js";
 import { countRateLimit, rateLimitKey, rateLimitSettings, rateLimitSubject, retryAfterSeconds } from "./rate-limit.js";
 import type { RateLimitOptions } from "./rate-limit.js";
 import { isAllowedOrigin, SessionSecurityError, settleSessionOrigin, type SessionManager } from "./sessions.js";
@@ -311,6 +313,59 @@ const successStatuses: ReadonlySet<unknown> = new Set<ApiSuccessStatus>([200, 20
 
 /** What a JSON handler returns: nothing with `204`, the response schema's value otherwise. */
 type ApiHandlerResult<R, T> = [T] extends [204] ? void | undefined : R extends Schema ? Output<R> : Response;
+/** What `form.redirect` receives: the validated response, `undefined` with `204`, or the handler's `Response`. */
+type ApiFormResult<R, T> = [T] extends [204] ? undefined : R extends Schema ? Output<R> : Response;
+
+/**
+ * Opciones de un endpoint que acepta formularios HTML nativos con `form` (desde `1.7`): un
+ * `<form method="post">` que funciona sin JavaScript, enviado como
+ * `application/x-www-form-urlencoded` o `multipart/form-data`.
+ *
+ * @typeParam Result Lo que recibe `redirect`: la respuesta validada con `response`, `undefined` con
+ * `status: 204` o el `Response` del handler con `contentType: "response"`.
+ * @typeParam S Tipo de los servicios.
+ * @since 1.7.0
+ * @example
+ * ```ts
+ * // server/api/feedback.post.ts
+ * import { defineApiRoute } from "@meekojs/meeko/server";
+ * import { feedbackInput, feedbackSaved } from "../../shared/schemas/feedback.js";
+ * import { saveFeedback } from "../utils/feedback.js";
+ *
+ * export default defineApiRoute({
+ *   body: feedbackInput,
+ *   response: feedbackSaved,
+ *   // Tras un error, el comentario vuelve a la página; ningún otro valor.
+ *   form: { redirect: (saved) => `/gracias?id=${saved.id}`, echo: ["comment"] },
+ *   handler: ({ body }) => saveFeedback(body),
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#formularios-sin-javascript-form
+ */
+export interface ApiFormOptions<Result = unknown, S = unknown> {
+  /**
+   * Ruta de esta aplicación a la que vuelve un envío correcto con `303 See Other`, como
+   * `/gracias`. Sin ella, la del campo `return` del formulario, la de `Referer` o `/`. Una ruta de
+   * otro origen, con `//`, `\` o un esquema se sustituye por `/`.
+   */
+  readonly redirect?: (result: Result, context: RequestContext<S>) => string | Promise<string>;
+  /** Tamaño máximo del cuerpo en bytes; por defecto 1 MiB, como el JSON. Por encima, `BODY_TOO_LARGE`. */
+  readonly maxBytes?: number;
+  /**
+   * Con `true`, un `multipart/form-data` puede traer archivos, que llegan al schema de `body` como
+   * `File`. Sin él, un archivo responde `FILES_NOT_ALLOWED` (`400`).
+   */
+  readonly files?: boolean;
+  /**
+   * Campos cuyo valor enviado vuelve a la página tras un envío con errores, para que el SSR los
+   * pinte de nuevo, como `["name", "email"]`. Por defecto ninguno: sólo vuelven el código y los
+   * `issues`, y los campos muestran `initial`. Los valores viajan en una cookie de un solo uso y en
+   * el HTML de la página, así que no incluyas contraseñas, números de tarjeta ni otros datos
+   * sensibles; aun así, los nombres que parecen credenciales (`password`, `token`, `secret`, `cvc`…)
+   * nunca se devuelven. Sólo vuelven texto, números y booleanos, nunca archivos.
+   */
+  readonly echo?: readonly string[];
+}
 
 /**
  * Contrato de un endpoint de `server/api/<ruta>.<método>.ts`: schemas de entrada y respuesta,
@@ -335,7 +390,7 @@ export interface ApiRouteDefinition<P extends Schema | undefined, Q extends Sche
   params?: P;
   /** Query string; sus campos aceptan cadenas o listas de cadenas. */
   query?: Q;
-  /** Cuerpo JSON (`application/json`, hasta 1 MiB). */
+  /** Cuerpo JSON (`application/json`, hasta 1 MiB) y, con `form` (desde `1.7`), el de un formulario nativo. */
   body?: B;
   /** Schema de la respuesta; obligatorio salvo con `contentType: "response"` o `status: 204`. */
   response?: R;
@@ -370,6 +425,14 @@ export interface ApiRouteDefinition<P extends Schema | undefined, Q extends Sche
   rateLimit?: RateLimitOptions<S>;
   /** `"response"` deja que el handler devuelva su propio `Response`. */
   contentType?: "json" | "response";
+  /**
+   * Acepta también formularios HTML nativos (desde `1.7`): `application/x-www-form-urlencoded` y
+   * `multipart/form-data`, validados con el mismo schema de `body`. Un envío correcto responde
+   * `303 See Other` a `redirect`, al campo `return` o a la página de `Referer`; un error vuelve a
+   * esa página con `303` y su estado, que `useForm({ action })` pinta en el SSR. Exige siempre un
+   * `Origin` permitido. Sin `form`, esos tipos responden `415 UNSUPPORTED_MEDIA_TYPE`.
+   */
+  form?: true | ApiFormOptions<ApiFormResult<R, T>, S>;
   /** Devolver `false` responde `403 FORBIDDEN`. */
   authorize?: (context: RequestContext<S>) => boolean | Promise<boolean>;
   /**
@@ -553,10 +616,12 @@ async function validate<S extends Schema>(schema: S, value: unknown, label: stri
   return (result as { value: Output<S> }).value;
 }
 
-async function readJson(request: Request, maxBytes = 1024 * 1024): Promise<unknown> {
-  if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) throw new ApiError("UNSUPPORTED_MEDIA_TYPE", 415);
+const defaultMaxBodyBytes = 1024 * 1024;
+
+/** The body as bytes, or `undefined` without one; more than `maxBytes` is `413 BODY_TOO_LARGE`. */
+async function readBounded(request: Request, maxBytes: number): Promise<Uint8Array<ArrayBuffer> | undefined> {
   const reader = request.body?.getReader();
-  if (!reader) throw new ApiError("INVALID_JSON", 400);
+  if (!reader) return undefined;
   let length = 0;
   const chunks: Uint8Array[] = [];
   try {
@@ -571,8 +636,58 @@ async function readJson(request: Request, maxBytes = 1024 * 1024): Promise<unkno
   const bytes = new Uint8Array(length);
   let position = 0;
   for (const chunk of chunks) { bytes.set(chunk, position); position += chunk.byteLength; }
+  return bytes;
+}
+
+async function readJson(request: Request, maxBytes = defaultMaxBodyBytes): Promise<unknown> {
+  if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) throw new ApiError("UNSUPPORTED_MEDIA_TYPE", 415);
+  const bytes = await readBounded(request, maxBytes);
+  if (!bytes) throw new ApiError("INVALID_JSON", 400);
   try { return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as unknown; }
   catch { throw new ApiError("INVALID_JSON", 400); }
+}
+
+/** The fields of a native form, with `_csrf` and `return` apart. */
+async function readForm(request: Request, encoding: "urlencoded" | "multipart", maxBytes: number, files: boolean): Promise<ParsedForm> {
+  // A declared length over the limit is refused before reading anything.
+  const declared = Number(request.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declared) && declared > maxBytes) throw new ApiError("BODY_TOO_LARGE", 413);
+  const bytes = await readBounded(request, maxBytes) ?? new Uint8Array();
+  let entries: Iterable<[string, FormDataEntryValue]>;
+  if (encoding === "urlencoded") {
+    entries = new URLSearchParams(new TextDecoder().decode(bytes));
+  } else {
+    try { entries = await new Response(bytes, { headers: { "content-type": request.headers.get("content-type")! } }).formData() as unknown as Iterable<[string, FormDataEntryValue]>; }
+    catch { throw new ApiError("INVALID_FORM", 400); }
+  }
+  return formObject(entries, files);
+}
+
+/**
+ * Validates a form with the route's `body` schema: first its text; if the schema rejects some
+ * fields, once more with the typed reading of those fields (`convertFormValue`). A field whose
+ * conversion still fails keeps the messages of its text.
+ */
+async function validateForm(schema: Schema, fields: Record<string, FormFieldValue>): Promise<{ value: unknown } | { issues: ApiErrorIssue[]; echo: Record<string, unknown> }> {
+  const pending = schema["~standard"].validate(fields);
+  // An asynchronous schema may have side effects (a lookup, a uniqueness check): it runs once, so
+  // its form fields get no second attempt with the typed reading of their text.
+  const asynchronous = typeof (pending as Partial<PromiseLike<unknown>>).then === "function";
+  const first = await pending;
+  if (!("issues" in first && first.issues)) return { value: (first as { value: unknown }).value };
+  const firstIssues = publicIssues(first.issues);
+  const plan = asynchronous ? undefined : planFormConversion(fields, first.issues.map((issue) => issueRoot(issuePath((issue as { path?: unknown } | null)?.path))));
+  if (!plan) return { issues: firstIssues, echo: fields };
+  const second = await schema["~standard"].validate(plan.value);
+  if (!("issues" in second && second.issues)) return { value: (second as { value: unknown }).value };
+  const failing = new Set(second.issues.map((issue) => issueRoot(issuePath((issue as { path?: unknown } | null)?.path))));
+  const issues = [
+    ...publicIssues(second.issues).filter((issue) => !plan.converted.has(issueRoot(issue.path))),
+    ...firstIssues.filter((issue) => plan.converted.has(issueRoot(issue.path)) && failing.has(issueRoot(issue.path))),
+  ].slice(0, maxPublicIssues);
+  const echo: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(fields)) echo[key] = plan.converted.has(key) && !failing.has(key) ? plan.value[key] : value;
+  return { issues, echo };
 }
 
 function queryObject(url: URL): Record<string, string | string[]> {
@@ -619,7 +734,15 @@ async function enforceRateLimit<S>(options: RateLimitOptions<S>, context: Reques
   if (hit.count > settings.limit) throw new RateLimitedError(retryAfterSeconds(hit.resetInMs));
 }
 
-async function guard<S>(definition: Guarded<S>, context: RequestContext<S>, sessions: SessionManager, mutating?: boolean): Promise<void> {
+/** The request with the CSRF token of a native form's `_csrf` field in `x-meeko-csrf`, for the session check. */
+function withCsrfHeader(request: Request, token: string | undefined): Request {
+  if (!token || request.headers.has("x-meeko-csrf")) return request;
+  const headers = new Headers(request.headers);
+  headers.set("x-meeko-csrf", token);
+  return new Request(request.url, { method: request.method, headers });
+}
+
+async function guard<S>(definition: Guarded<S>, context: RequestContext<S>, sessions: SessionManager, mutating?: boolean, formCsrf?: string, rateLimited = false): Promise<void> {
   const request = context.request;
   // Anonymous mutations such as a sign-in opt in to the session's allowed-origin rule. SSR
   // clients send the request's own origin, so local dispatch passes.
@@ -629,11 +752,20 @@ async function guard<S>(definition: Guarded<S>, context: RequestContext<S>, sess
   }
   // An explicit, documented opt-out: session.create() then skips its login CSRF check.
   if (definition.origin === "none") context.session[settleSessionOrigin]?.("exempt");
-  sessions.assertMutationAllowed(request, context.session, mutating);
-  // Before auth and authorize: a flood of anonymous requests is limited too.
-  if (definition.rateLimit) await enforceRateLimit(definition.rateLimit, context, sessions);
+  sessions.assertMutationAllowed(withCsrfHeader(request, formCsrf), context.session, mutating);
+  // Before auth and authorize: a flood of anonymous requests is limited too. A native form counted
+  // it already, before reading its body.
+  if (definition.rateLimit && !rateLimited) await enforceRateLimit(definition.rateLimit, context, sessions);
   if (definition.auth === "required" && !context.session.current) throw new ApiError("UNAUTHENTICATED", 401);
   if (definition.authorize && !(await definition.authorize(context))) throw new ApiError("FORBIDDEN", 403);
+}
+
+/** A misdeclared status is a server fault, reported before any input is read. */
+function checkedStatus(definition: { readonly status?: unknown; readonly contentType?: unknown; readonly response?: unknown }): ApiSuccessStatus {
+  const status = (definition.status ?? 200) as ApiSuccessStatus;
+  if (!successStatuses.has(status) || (definition.status !== undefined && definition.contentType === "response")
+    || (status === 204 && definition.response)) throw new ApiError("INVALID_RESPONSE_STATUS", 500);
+  return status;
 }
 
 /**
@@ -661,10 +793,7 @@ async function guard<S>(definition: Guarded<S>, context: RequestContext<S>, sess
  * ```
  */
 export async function executeApiRoute<P extends Schema | undefined, Q extends Schema | undefined, B extends Schema | undefined, R extends Schema | undefined, S, L = undefined, T extends ApiSuccessStatus = ApiSuccessStatus>(definition: ApiRouteDefinition<P, Q, B, R, S, L, T>, context: RequestContext<S>, sessions: SessionManager, rawParams: unknown = {}): Promise<Response> {
-  // A misdeclared status is a server fault, reported before any input is read.
-  const status = definition.status ?? 200;
-  if (!successStatuses.has(status) || (definition.status !== undefined && definition.contentType === "response")
-    || (status === 204 && definition.response)) throw new ApiError("INVALID_RESPONSE_STATUS", 500);
+  const status = checkedStatus(definition);
   await guard(definition, context, sessions);
   const params = definition.params ? await validate(definition.params, rawParams, "params") : undefined;
   const query = definition.query ? await validate(definition.query, queryObject(new URL(context.request.url)), "query") : undefined;
@@ -756,7 +885,9 @@ function finish(response: Response, context: RequestContext): Response {
 /**
  * Atiende una petición de API para un host propio: ejecuta el endpoint, normaliza los errores en
  * `{ code, status, requestId }`, informa los fallos 5xx a `onError` y añade `x-request-id`, la
- * cookie de sesión y el token CSRF. Nunca rechaza.
+ * cookie de sesión y el token CSRF. Nunca rechaza. Desde `1.7`, si el endpoint declara `form` y
+ * la petición es un formulario nativo, responde `303 See Other` con el resultado en una cookie de
+ * un solo uso (salvo `403` por Origin o CSRF); `executeApiRoute` sigue aceptando sólo JSON.
  *
  * @param definition Endpoint declarado con `defineApiRoute`.
  * @param context Contexto de la petición.
@@ -773,14 +904,85 @@ function finish(response: Response, context: RequestContext): Response {
  * ```
  */
 export async function dispatchApiRoute<P extends Schema | undefined, Q extends Schema | undefined, B extends Schema | undefined, R extends Schema | undefined, S, L = undefined, T extends ApiSuccessStatus = ApiSuccessStatus>(definition: ApiRouteDefinition<P, Q, B, R, S, L, T>, context: RequestContext<S>, sessions: SessionManager, params: unknown = {}, onError?: ServerErrorObserver): Promise<Response> {
+  const encoding = definition.form ? formEncoding(context.request) : undefined;
+  if (encoding) return dispatchApiForm(definition, encoding, context, sessions, params, onError);
   try { return finish(await executeApiRoute(definition, context, sessions, params), context); }
   catch (error) { reportServerError(error, context.requestId, onError); return finish(errorResponse(error, context.requestId), context); }
 }
 
 /**
- * Atiende una petición RPC para un host propio: exige `POST` con JSON, ejecuta el procedimiento,
- * normaliza los errores, informa los fallos 5xx a `onError` y añade `x-request-id`, la cookie de
- * sesión y el token CSRF. Nunca rechaza.
+ * A native form against an API route with `form`: the same guards, schemas and handler as JSON,
+ * but the answer is a `303 See Other` with a single-use cookie for the page it returns to. Only a
+ * foreign Origin or a failed CSRF check answers `403` directly: that request is not this site's.
+ */
+async function dispatchApiForm<P extends Schema | undefined, Q extends Schema | undefined, B extends Schema | undefined, R extends Schema | undefined, S, L, T extends ApiSuccessStatus>(definition: ApiRouteDefinition<P, Q, B, R, S, L, T>, encoding: "urlencoded" | "multipart", context: RequestContext<S>, sessions: SessionManager, rawParams: unknown, onError?: ServerErrorObserver): Promise<Response> {
+  const request = context.request;
+  const url = new URL(request.url);
+  const options: ApiFormOptions<unknown, S> = definition.form === true || !definition.form ? {} : definition.form as ApiFormOptions<unknown, S>;
+  let parsed: ParsedForm | undefined;
+  let echo: Record<string, unknown> | undefined;
+  const echoNames: readonly string[] = Array.isArray(options.echo) ? options.echo.filter((name): name is string => typeof name === "string") : [];
+  try {
+    const status = checkedStatus(definition);
+    // A form needs no preflight, so any site can send one: every native submission needs this
+    // site's Origin, which browsers send with each POST, before its body is read.
+    if (!isAllowedOrigin(request, sessions.allowedOrigins ?? [])) throw new ApiError("INVALID_ORIGIN", 403);
+    const maxBytes = options.maxBytes ?? defaultMaxBodyBytes;
+    if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) throw new ApiError("INVALID_FORM_OPTIONS", 500);
+    if (options.echo !== undefined && !(Array.isArray(options.echo) && options.echo.every((name) => typeof name === "string"))) throw new ApiError("INVALID_FORM_OPTIONS", 500);
+    // A flood of submissions is limited before any body is read; the CSRF token is in the body.
+    if (definition.rateLimit) await enforceRateLimit(definition.rateLimit, context, sessions);
+    parsed = await readForm(request, encoding, maxBytes, options.files === true);
+    echo = parsed.fields;
+    // Read after `return`, so the error goes back to the page of the form.
+    if (parsed.rejectedFile) throw new ApiError("FILES_NOT_ALLOWED", 400);
+    await guard(definition, context, sessions, undefined, parsed.csrf, true);
+    const params = definition.params ? await validate(definition.params, rawParams, "params") : undefined;
+    const query = definition.query ? await validate(definition.query, queryObject(url), "query") : undefined;
+    let body: unknown;
+    if (definition.body) {
+      const checked = await validateForm(definition.body, parsed.fields);
+      if ("issues" in checked) { echo = checked.echo; throw new InvalidInputError("INVALID_BODY", checked.issues); }
+      body = checked.value;
+    }
+    const locals = definition.locals ? await definition.locals(context) : undefined;
+    const result: unknown = await definition.handler({ params: params as OptionalOutput<P>, query: query as OptionalOutput<Q>, body: body as OptionalOutput<B>, context, locals: locals as L });
+    let output: unknown;
+    if (definition.contentType === "response") {
+      if (!(result instanceof Response)) throw new ApiError("INVALID_RESPONSE", 500);
+      // Without `redirect`, the handler's own response is the answer.
+      if (!options.redirect) return finish(result, context);
+      output = result;
+    } else if (status === 204) {
+      if (result !== undefined) throw new ApiError("INVALID_RESPONSE", 500);
+    } else {
+      if (!definition.response) throw new ApiError("MISSING_RESPONSE_SCHEMA", 500);
+      output = await validate(definition.response, result, "response");
+    }
+    const location = options.redirect
+      ? sameOriginPath(await options.redirect(output, context), url.origin)
+      : formReturnPath(parsed.returnTo, request);
+    return finish(seeOther(location, formFlashCookie(request, { action: url.pathname, ok: true }, location)), context);
+  } catch (error) {
+    reportServerError(error, context.requestId, onError);
+    const known = normalizeServerError(error);
+    if (known.code === "INVALID_ORIGIN" || known.code === "INVALID_CSRF") return finish(errorResponse(error, context.requestId), context);
+    const location = formReturnPath(parsed?.returnTo, request);
+    const issues = sentIssues(known);
+    const flash = {
+      action: url.pathname, ok: false, code: known.code, status: known.status, requestId: context.requestId,
+      ...(issues ? { issues } : {}),
+      // Only the fields the route lists in `form.echo` travel back; by default, none.
+      ...(echo && echoNames.length ? { values: echoValues(echo, echoNames) } : {}),
+    };
+    return finish(seeOther(location, formFlashCookie(request, flash, location)), context);
+  }
+}
+
+/**
+ * Atiende una petición RPC para un host propio: exige `POST` con JSON (otro método responde `405`
+ * con `Allow: POST`), ejecuta el procedimiento, normaliza los errores, informa los fallos 5xx a
+ * `onError` y añade `x-request-id`, la cookie de sesión y el token CSRF. Nunca rechaza.
  *
  * @param definition Procedimiento declarado con `defineRpc`.
  * @param context Contexto de la petición.
@@ -797,7 +999,11 @@ export async function dispatchApiRoute<P extends Schema | undefined, Q extends S
  */
 export async function dispatchRpc<I extends Schema, O extends Schema, S, L = undefined>(definition: RpcDefinition<I, O, S, L>, context: RequestContext<S>, sessions: SessionManager, onError?: ServerErrorObserver): Promise<Response> {
   try {
-    if (context.request.method !== "POST") throw new ApiError("METHOD_NOT_ALLOWED", 405);
+    if (context.request.method !== "POST") {
+      const response = errorResponse(new ApiError("METHOD_NOT_ALLOWED", 405), context.requestId);
+      response.headers.set("allow", "POST");
+      return finish(response, context);
+    }
     const output = await executeRpc(definition, await readJson(context.request), context, sessions);
     return finish(new Response(serializeJson(output), { headers: { "content-type": "application/json; charset=utf-8" } }), context);
   } catch (error) { reportServerError(error, context.requestId, onError); return finish(errorResponse(error, context.requestId), context); }

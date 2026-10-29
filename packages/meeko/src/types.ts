@@ -24,7 +24,7 @@ export interface GenerateTypesOptions {
 
 /** Genera declaraciones TypeScript para un componente y sus imports .meeko relativos. */
 export async function generateTypes(source: string, filename: string, options: GenerateTypesOptions = {}): Promise<string[]> {
-  if (!filename.endsWith(".meeko")) throw new TypeError("Type generation requires a .meeko input file");
+  if (!filename.endsWith(".meeko")) throw new TypeError(`meeko types necesita un componente .meeko: ${filename}`);
   const root = projectRoot(filename);
   const aliases = await resolveProjectAliases(root);
   const declarations = new Map<string, string>();
