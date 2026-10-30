@@ -6,7 +6,7 @@ import {
   clientAddress, createServerApp, defineApiRoute, defineRpc, defineServerMiddleware, MemorySessionStore, RedisSessionStore, SessionManager, SqlSessionStore,
 } from "../src/framework-server.ts";
 import type { AppManifest, Schema, ServerApp, ServerAppOptions, SqlRateLimitRow, SqlSessionDriver } from "../src/framework-server.ts";
-import { addressBucket, clientAddressOf, normalizeAddress, resetEnvWarnings, setSocketAddress, trustProxyOf } from "../src/framework-server/env.ts";
+import { addressBucket, clientAddressOf, normalizeAddress, resetEnvWarnings, setSocketAddress, trustProxyOf } from "../src/server/runtime/env.ts";
 import { createBunServer } from "../src/bun.ts";
 import { serveNode, toNodeListener } from "../src/node.ts";
 import { FakeRedis, FakeRedisServer } from "./helpers/fake-redis.ts";

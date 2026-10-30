@@ -6,10 +6,10 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { Window as HappyWindow } from "happy-dom";
 import { compile } from "../src/compiler.ts";
-import { mountClientApp } from "../src/framework/client.ts";
-import type { ClientComponent } from "../src/framework/client.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import { createFrameworkHandler } from "../src/framework/server.ts";
+import { mountClientApp } from "../src/app/runtime/client.ts";
+import type { ClientComponent } from "../src/app/runtime/client.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 
 const page = (name: string): string => `<script lang="ts">
 import { onMounted } from "@meekojs/meeko";

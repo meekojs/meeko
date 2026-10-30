@@ -9,7 +9,7 @@ export const tagCompletionRequest = "meeko/tagComplete";
  * tras la pulsación, pide al servidor la etiqueta de cierre y la inserta si el cursor no se movió.
  * Se desactiva con `meeko.autoClosingTags`.
  */
-export function registerAutoClosingTags(client: () => LanguageClient | undefined): vscode.Disposable {
+export function registerAutoClosingTags(client: (uri: vscode.Uri) => LanguageClient | undefined): vscode.Disposable {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const listener = vscode.workspace.onDidChangeTextDocument((event) => {
     const { document } = event;
@@ -25,7 +25,7 @@ export function registerAutoClosingTags(client: () => LanguageClient | undefined
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
       timer = undefined;
-      const current = client();
+      const current = client(document.uri);
       if (!current) return;
       void current.sendRequest<string | null>(tagCompletionRequest, {
         textDocument: { uri: document.uri.toString() },

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createServerApp, defineApiRoute, defineRpc, MemorySessionStore, SessionHandle, SessionManager, SessionSecurityError } from "../src/framework-server.ts";
 import type { AppManifest, Schema, ServerApp } from "../src/framework-server.ts";
-import { resetEnvWarnings } from "../src/framework-server/env.ts";
+import { resetEnvWarnings } from "../src/server/runtime/env.ts";
 
 const emptySchema: Schema<Record<string, never>> = { "~standard": { version: 1, validate: (value) => ({ value: value as Record<string, never> }) } };
 const okSchema: Schema<{ ok: true }> = { "~standard": { version: 1, validate: (value) => ({ value: value as { ok: true } }) } };

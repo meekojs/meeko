@@ -4,9 +4,9 @@ import { ApiError, createServerApp, defineApiRoute, defineServerRuntime, MemoryS
 import type { AppManifest, Schema, ServerApp } from "../src/framework-server.ts";
 import { useForm } from "../src/framework.ts";
 import type { Form } from "../src/framework.ts";
-import { parseFormFlash } from "../src/framework/form-flash.ts";
-import { hydrateWithStateStore, StateStore } from "../src/framework/state.ts";
-import { collectMounted } from "../src/lifecycle.ts";
+import { parseFormFlash } from "../src/shared/form-flash.ts";
+import { hydrateWithStateStore, StateStore } from "../src/app/runtime/state.ts";
+import { collectMounted } from "../src/app/runtime/lifecycle.ts";
 
 type Issue = { readonly message: string; readonly path?: readonly { readonly key: PropertyKey }[] };
 type Feedback = { page: string; rating: number; helpful: boolean; comment: string; tags: string[] };

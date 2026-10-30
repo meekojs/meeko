@@ -10,6 +10,7 @@ types:
   - "@meekojs/meeko/framework#MeekoAwaitSnippets"
   - "@meekojs/meeko/framework#AwaitResource"
 related:
+  - docs/como-elegir.md
   - "autoimport:useApi"
   - "autoimport:useRpcQuery"
   - "@meekojs/meeko/framework#DataResource"

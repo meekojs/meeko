@@ -434,7 +434,8 @@ function go(): void { emit("save", 1); emit("nope"); emit("save", "x"); }
     const diagnostics = model.service.getSemanticDiagnostics(model.virtualFilename);
     assert.deepEqual(diagnostics.map((item) => [item.code, model.toSource(item.start ?? -1)]), [[2345, child.indexOf('"nope"')], [2345, child.indexOf('"x"')]]);
     assert.match(model.code, /type __MeekoEmits = \{ save: \[id: number\]; close: \[\] \};/);
-    assert.match(model.code, /export type ComponentProps = \(__MeekoDeclaredProps\) & __MeekoEmitPropsOf<__MeekoEmits>;/);
+    assert.match(model.code, /type __MeekoComponentProps = \(__MeekoDeclaredProps\) & __MeekoEmitPropsOf<__MeekoEmits>;/);
+    assert.match(model.code, /export type \{ __MeekoComponentProps as ComponentProps \};/);
   } finally { model.dispose(); }
 
   const parent = `<script lang="ts">

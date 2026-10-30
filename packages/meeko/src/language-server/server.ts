@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "@typescript/typescript6";
@@ -9,7 +11,7 @@ import {
 } from "vscode-languageserver/node";
 import type { Connection, Diagnostic, InitializeResult, Position, Range, SemanticTokens, TextDocumentIdentifier } from "vscode-languageserver/node";
 import { projectRoot } from "../compiler/project-root.js";
-import { MeekoCompileError } from "../compiler/sfc.js";
+import { MeekoCompileError } from "../compiler/parser/sfc.js";
 import { checkFrameworkPageContracts } from "../framework/page-contracts-check.js";
 import { componentDiagnostics, contractRange, frameworkContractRoot, projectCheckRoot, tokenEnd } from "./diagnostics.js";
 import {
@@ -19,13 +21,12 @@ import {
 import type { CompletionData, FeatureContext, LocatedDocument, MeekoFormatSettings } from "./features.js";
 import { classCompletion, classDefinition, classHover, ClassIndex, classView, isClassCompletionData, resolveClassCompletion, withItemDefaults } from "./classes.js";
 import {
-  colorPresentations, cssCompletion, cssHover, documentColors, htmlCompletion, htmlHover, linkedEditingRanges, styleDiagnostics, tagCompletion,
+  colorPresentations, cssCompletion, cssHover, documentColors, htmlCompletion, htmlHover, linkedEditingRanges, specialTemplateHover, styleDiagnostics, tagCompletion,
 } from "./embedded.js";
 import { codeLenses } from "./lenses.js";
 import { createComponentActions, listItemActions, propsReadActions } from "./quick-fixes.js";
 import { documentLinks, inlayHints, linkRouteCompletion, workspaceSymbols } from "./nav.js";
-import { MeekoWorkspace, pathKey } from "./project.js";
-import type { MeekoProject } from "./project.js";
+import { MeekoProject, MeekoWorkspace, pathKey } from "./project.js";
 import { teleportCompletion, teleportHover } from "./teleport.js";
 import { executionZones } from "./zones.js";
 import type { ExecutionZoneKind, ExecutionZoneReason } from "./zones.js";
@@ -131,6 +132,26 @@ function relevantChange(path: string): boolean {
 export function startLanguageServer(connection: Connection): void {
   const documents = new TextDocuments(TextDocument);
   let workspace = new MeekoWorkspace({ trusted: true });
+  /** Each virtual URI gets an isolated project; its synthetic path never targets the provider. */
+  const virtualProjects = new Map<string, { filename: string; project: MeekoProject }>();
+  const virtualDocument = (uri: string): { filename: string; project: MeekoProject } | undefined => {
+    if (uri.startsWith("file:")) return undefined;
+    let path: string;
+    try { path = new URL(uri).pathname; }
+    catch { return undefined; }
+    if (!path.toLowerCase().endsWith(".meeko")) return undefined;
+    let entry = virtualProjects.get(uri);
+    if (!entry) {
+      const id = createHash("sha256").update(uri).digest("hex");
+      const root = join(tmpdir(), "meeko-virtual-documents", id);
+      const filename = join(root, "component.meeko");
+      entry = { filename, project: new MeekoProject(root, { trusted: false, log }) };
+      virtualProjects.set(uri, entry);
+    }
+    return entry;
+  };
+  const documentPath = (uri: string): string | undefined => uriToPath(uri) ?? virtualProjects.get(uri)?.filename;
+  const documentProject = (uri: string, filename: string): MeekoProject => virtualProjects.get(uri)?.project ?? workspace.projectFor(filename);
   let contracts = true;
   let delay = 300;
   let semanticRefresh = false;
@@ -179,9 +200,9 @@ export function startLanguageServer(connection: Connection): void {
   /** An open component with its project ready, for the features that read classes. */
   const componentOf = async (uri: string): Promise<{ document: TextDocument; filename: string; project: MeekoProject } | undefined> => {
     const document = documents.get(uri);
-    const filename = uriToPath(uri);
+    const filename = documentPath(uri);
     if (!document || !filename?.endsWith(".meeko")) return undefined;
-    const project = workspace.projectFor(filename);
+    const project = documentProject(uri, filename);
     await project.ready();
     return { document, filename, project };
   };
@@ -189,7 +210,7 @@ export function startLanguageServer(connection: Connection): void {
   const openDocument = (filename: string): TextDocument | undefined => {
     const key = pathKey(filename);
     return documents.all().find((document) => {
-      const path = uriToPath(document.uri);
+      const path = documentPath(document.uri);
       return path !== undefined && pathKey(path) === key;
     });
   };
@@ -233,9 +254,9 @@ export function startLanguageServer(connection: Connection): void {
   /** Runs a feature on an open component; `app` waits for the application index (routes, API, RPC). */
   async function withContext<T>(uri: string, run: (context: FeatureContext) => T | undefined, app = false): Promise<T | null> {
     const document = documents.get(uri);
-    const filename = uriToPath(uri);
+    const filename = documentPath(uri);
     if (!document || !filename?.endsWith(".meeko")) return null;
-    const project = workspace.projectFor(filename);
+    const project = documentProject(uri, filename);
     await project.ready();
     const component = project.setDocument(filename, document.getText());
     if (!component) return null;
@@ -248,13 +269,13 @@ export function startLanguageServer(connection: Connection): void {
   }
 
   const scheduleCheck = (document: TextDocument): void => {
-    const filename = uriToPath(document.uri);
+    const filename = documentPath(document.uri);
     if (stopped || !filename?.endsWith(".meeko")) return;
     clearTimeout(timers.get(document.uri));
     const version = document.version;
     timers.set(document.uri, setTimeout(() => {
       timers.delete(document.uri);
-      const project = workspace.projectFor(filename);
+      const project = documentProject(document.uri, filename);
       project.setDocument(filename, document.getText());
       componentDiagnostics(project, document, filename, locate, reportConfig).then((found) => {
         if (documents.get(document.uri)?.version !== version) return;
@@ -405,8 +426,9 @@ export function startLanguageServer(connection: Connection): void {
 
   documents.onDidOpen(({ document }) => {
     openVersions.set(document.uri, document.version);
-    const filename = uriToPath(document.uri);
-    if (filename?.endsWith(".meeko")) workspace.projectFor(filename).setDocument(filename, document.getText());
+    const entry = virtualDocument(document.uri);
+    const filename = entry?.filename ?? uriToPath(document.uri);
+    if (filename?.endsWith(".meeko")) (entry?.project ?? workspace.projectFor(filename)).setDocument(filename, document.getText());
     const root = contractRootOf(document);
     if (root) scheduleContractCheck(root, document);
   });
@@ -430,10 +452,14 @@ export function startLanguageServer(connection: Connection): void {
     const edited = openVersions.get(document.uri) !== document.version;
     openVersions.delete(document.uri);
     semanticCache.delete(document.uri);
-    const filename = uriToPath(document.uri);
-    if (filename?.endsWith(".meeko")) workspace.projectFor(filename).closeDocument(filename);
+    const virtual = virtualProjects.get(document.uri);
+    const filename = virtual?.filename ?? uriToPath(document.uri);
+    if (virtual) {
+      virtual.project.dispose();
+      virtualProjects.delete(document.uri);
+    } else if (filename?.endsWith(".meeko")) workspace.projectFor(filename).closeDocument(filename);
     // Closed without saving: the project check counted its unsaved text, now the saved one counts.
-    const root = edited && filename ? projectCheckRoot(filename) : undefined;
+    const root = !virtual && edited && filename ? projectCheckRoot(filename) : undefined;
     if (root) scheduleContractCheck(root);
     ownDiagnostics.delete(document.uri);
     publish(document.uri);
@@ -492,10 +518,17 @@ export function startLanguageServer(connection: Connection): void {
   connection.onCompletion(async ({ textDocument, position, context: request }) => {
     // `<A` in the template: the component is usually unparsable while the tag is being typed.
     const document = documents.get(textDocument.uri);
-    const filename = uriToPath(textDocument.uri);
+    const filename = documentPath(textDocument.uri);
     if (document && filename?.endsWith(".meeko")) {
-      const project = workspace.projectFor(filename);
+      const project = documentProject(textDocument.uri, filename);
       await project.ready();
+      // An unfinished lowercase Meeko tag has no virtual TypeScript node yet.
+      // Offer its HTML completion before TypeScript's fallback captures the cursor.
+      const partialTag = /<([a-z]+)$/.exec(document.getText().slice(0, document.offsetAt(position)))?.[1];
+      if (partialTag && ["render", "snippet"].some((tag) => tag.startsWith(partialTag))) {
+        const special = htmlCompletion(document, position);
+        if (special) return special;
+      }
       const tags = componentNameCompletion(project, document, filename, position);
       if (tags) return tags;
       // `each:`, `if:when`, `bind:`… in a tag, also a component tag; the tag may not parse yet.
@@ -531,6 +564,8 @@ export function startLanguageServer(connection: Connection): void {
     if (classes) return classes;
     const teleport = open && teleportHover(open.document, position, shadowedTagsOf(open.project, open.document.getText()));
     if (teleport) return teleport;
+    const special = open && specialTemplateHover(open.document, position);
+    if (special) return special;
     const typed = await withContext(textDocument.uri, (context) => hover(context, position), true);
     const document = documents.get(textDocument.uri);
     if (typed || !document) return typed;
@@ -627,6 +662,8 @@ export function startLanguageServer(connection: Connection): void {
     contractTimers.clear();
     await Promise.allSettled([...contractRuns.values()]);
     workspace.dispose();
+    for (const entry of virtualProjects.values()) entry.project.dispose();
+    virtualProjects.clear();
   });
 
   documents.listen(connection);

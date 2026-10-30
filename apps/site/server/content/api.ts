@@ -1,4 +1,5 @@
-import { relative } from 'node:path'
+import { posix, relative } from 'node:path'
+import { existsSync } from 'node:fs'
 import type TS from '@typescript/typescript6'
 import type { ApiIndexGroup, ApiIndexItem, ApiKind, ApiLink, ApiMember, ApiPage, ApiParameter } from '../../shared/types/api.js'
 import type { NavLink, Pager, TocEntry } from '../../shared/types/docs.js'
@@ -691,6 +692,8 @@ function parseDocLines(text: string): { description: string; since: string | nul
 interface SourceDocs {
 	/** JSDoc of each compiler macro, as the editor shows it. */
 	readonly macros: ReadonlyMap<string, ReturnType<typeof parseDocLines>>
+	/** Source module of each compiler macro. */
+	readonly macroSources: ReadonlyMap<string, string>
 	/** Documentation of the `html` directive. */
 	readonly html: ReturnType<typeof parseDocLines>
 	/** One-line detail of each directive, attribute and built-in tag that the editor completes. */
@@ -706,20 +709,35 @@ function readSourceDocs(ts: Ts): SourceDocs {
 	const model = parse(modelPath)
 	const modelConstants = constants(ts, model)
 	const values = new Map<string, string>()
-	const apiDocs = modelConstants.get('apiDocs')
-	if (apiDocs) values.set('apiDocs', stringValue(ts, apiDocs, values, modelPath))
+	const compilerDocsPath = `${packageFolder}/src/app/definitions/compiler-docs.ts`
+	const apiDocs = constants(ts, parse(compilerDocsPath)).get('apiDocs')
+	if (apiDocs) values.set('apiDocs', stringValue(ts, apiDocs, values, compilerDocsPath))
+	const macroSources = new Map<string, string>()
+	for (const statement of model.statements) {
+		if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier) || !statement.moduleSpecifier.text.startsWith('../app/definitions/')) continue
+		for (const specifier of statement.importClause?.namedBindings && ts.isNamedImports(statement.importClause.namedBindings) ? statement.importClause.namedBindings.elements : []) {
+			macroSources.set(specifier.name.text, posix.normalize(`${posix.dirname(modelPath)}/${statement.moduleSpecifier.text.replace(/\.js$/, '.ts')}`))
+		}
+	}
 	const macros = new Map<string, ReturnType<typeof parseDocLines>>()
+	const macroFiles = new Map<string, string>()
 	const macroObject = modelConstants.get('macroDocs')
 	const macroLiteral = macroObject && unwrap(ts, macroObject)
 	if (!macroLiteral || !ts.isObjectLiteralExpression(macroLiteral)) throw new Error(`${modelPath}: macroDocs not found; update apps/site/server/content/api.ts`)
 	for (const property of macroLiteral.properties) {
-		if (!ts.isPropertyAssignment(property) || !ts.isCallExpression(property.initializer)) continue
-		const lines = property.initializer.arguments.map((argument) => stringValue(ts, argument, values, modelPath))
+		if (!ts.isPropertyAssignment(property) || !ts.isIdentifier(property.initializer)) continue
+		const sourcePath = macroSources.get(property.initializer.text)
+		if (!sourcePath) throw new Error(`${modelPath}: source of ${property.initializer.text} not found; update apps/site/server/content/api.ts`)
+		const docs = constants(ts, parse(sourcePath)).get(property.initializer.text)
+		const call = docs && unwrap(ts, docs)
+		if (!call || !ts.isCallExpression(call) || !ts.isIdentifier(call.expression) || call.expression.text !== 'jsdoc') throw new Error(`${sourcePath}: ${property.initializer.text} not found; update apps/site/server/content/api.ts`)
+		const lines = call.arguments.map((argument) => stringValue(ts, argument, values, sourcePath))
 		macros.set(property.name.getText(), parseDocLines(lines.join('\n')))
+		macroFiles.set(property.name.getText(), sourcePath)
 	}
 	const htmlDocs = modelConstants.get('htmlDirectiveDocs')
 	const htmlCall = htmlDocs && unwrap(ts, htmlDocs)
-	const htmlArray = htmlCall && ts.isCallExpression(htmlCall) && ts.isPropertyAccessExpression(htmlCall.expression) ? unwrap(ts, htmlCall.expression.expression) : undefined
+	const htmlArray = htmlCall && ts.isCallExpression(htmlCall) && ts.isPropertyAccessExpression(htmlCall.expression) && htmlCall.expression.name.text === 'join' ? unwrap(ts, htmlCall.expression.expression) : undefined
 	if (!htmlArray || !ts.isArrayLiteralExpression(htmlArray)) throw new Error(`${modelPath}: htmlDirectiveDocs not found; update apps/site/server/content/api.ts`)
 	const html = parseDocLines(htmlArray.elements.map((element) => stringValue(ts, element, values, modelPath)).join('\n'))
 
@@ -740,9 +758,9 @@ function readSourceDocs(ts: Ts): SourceDocs {
 	}
 	visitDetails(parse(featuresPath))
 
-	// The builtins of autoimports.ts: `[...names].map((name) => ({ …, specifier, scope }))` and literal entries.
+	// The builtins of autoimports/registry.ts: `[...names].map((name) => ({ …, specifier, scope }))` and literal entries.
 	const autoImports = new Map<string, string>()
-	const autoImportsPath = `${packageFolder}/src/autoimports.ts`
+	const autoImportsPath = `${packageFolder}/src/autoimports/registry.ts`
 	const property = (object: TS.ObjectLiteralExpression, key: string): TS.Expression | undefined => object.properties.find((candidate): candidate is TS.PropertyAssignment => ts.isPropertyAssignment(candidate) && candidate.name.getText() === key)?.initializer
 	const literal = (node: TS.Expression | undefined): string | undefined => (node && ts.isStringLiteral(node) ? node.text : undefined)
 	const visitImports = (node: TS.Node): void => {
@@ -765,13 +783,13 @@ function readSourceDocs(ts: Ts): SourceDocs {
 	}
 	visitImports(parse(autoImportsPath))
 	if (!autoImports.size) throw new Error(`${autoImportsPath}: no builtin autoimports found; update apps/site/server/content/api.ts`)
-	const serverScriptPath = `${packageFolder}/src/compiler/server-script.ts`
+	const serverScriptPath = `${packageFolder}/src/compiler/transforms/server-script.ts`
 	const requestApis = constants(ts, parse(serverScriptPath)).get('pageRequestApis')
 	const requestList = requestApis && unwrap(ts, requestApis)
 	if (requestList && ts.isArrayLiteralExpression(requestList)) {
 		for (const element of requestList.elements) if (ts.isStringLiteral(element)) autoImports.set(`@meekojs/meeko/framework#${element.text}`, 'page')
 	}
-	return { macros, html, details, autoImports }
+	return { macros, macroSources: macroFiles, html, details, autoImports }
 }
 
 const autoImportLabels: Readonly<Record<string, string>> = {
@@ -965,10 +983,11 @@ function builtinModel(entry: BuiltinEntry, target: Target, docs: SourceDocs): Sy
 	// A directive without attributes shows the one-line detail of the editor in its description.
 	const detail = docs.details.get(entry.name) ?? docs.details.get(entry.name.replace(/(?<=:).*$/, ''))
 	if (detail && !model.members.length && entry.kind === 'directive') model.description = `${sentence(detail)}\n\n${model.description}`
-	const file = readRepositoryFile(entry.source.file)
+	const sourcePath = entry.kind === 'macro' && !existsSync(`${repositoryRoot()}/${entry.source.file}`) ? docs.macroSources.get(entry.name) ?? entry.source.file : entry.source.file
+	const file = readRepositoryFile(sourcePath)
 	const at = file.indexOf(entry.source.match)
-	model.source = { path: entry.source.file, line: at < 0 ? null : file.slice(0, at).split('\n').length }
-	model.editPath = entry.kind === 'macro' ? `${packageFolder}/src/language-server/model.ts` : 'apps/site/server/content/api-builtins.ts'
+	model.source = { path: sourcePath, line: at < 0 ? null : file.slice(0, at).split('\n').length }
+	model.editPath = entry.kind === 'macro' ? docs.macroSources.get(entry.name) ?? `${packageFolder}/src/language-server/model.ts` : 'apps/site/server/content/api-builtins.ts'
 	return model
 }
 

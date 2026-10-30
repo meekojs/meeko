@@ -124,7 +124,7 @@ test("an asynchronous revalidation applies only its latest run and covers every 
   assert.deepEqual(form.errors.value, {});
 });
 
-test("commit moves the reference of dirty and reset without clearing submitted", async () => {
+test("commit moves the dirty reference without changing declared reset defaults", async () => {
   const form = useForm({ initial: { name: "Ada", bio: "" }, submit: (values) => ({ ...values, name: values.name.trim() }) });
   form.fields.name.value = "  Grace ";
   assert.equal(form.dirty.value, true);
@@ -135,7 +135,7 @@ test("commit moves the reference of dirty and reset without clearing submitted",
   form.fields.bio.value = "Hola";
   assert.equal(form.dirty.value, true);
   form.reset();
-  assert.deepEqual([form.fields.name.value, form.fields.bio.value, form.dirty.value], ["Grace", "", false], "reset returns to the committed values");
+  assert.deepEqual([form.fields.name.value, form.fields.bio.value, form.dirty.value], ["Ada", "", false], "reset returns to initial after commit");
   assert.equal(form.submitted.value, false, "reset still clears submitted");
 
   // Without values, commit takes the current fields.
@@ -143,7 +143,7 @@ test("commit moves the reference of dirty and reset without clearing submitted",
   form.commit();
   assert.equal(form.dirty.value, false);
   form.reset({ name: "Ada" });
-  assert.deepEqual([form.fields.name.value, form.fields.bio.value], ["Ada", "Nueva"], "reset(values) merges over the committed values");
+  assert.deepEqual([form.fields.name.value, form.fields.bio.value], ["Ada", ""], "reset(values) merges over initial");
 });
 
 test("onSuccess runs after a successful submission with the result and the form", async () => {

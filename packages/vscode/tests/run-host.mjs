@@ -13,5 +13,5 @@ await runTests({
   ...(executable ? { vscodeExecutablePath: executable } : { version: "stable", cachePath: join(data, "..", "vscode-download") }),
   extensionDevelopmentPath: extension,
   extensionTestsPath: join(import.meta.dirname, "host-index.cjs"),
-  launchArgs: [consumer, "--skip-welcome", "--disable-extensions", "--disable-workspace-trust", "--user-data-dir", data],
+  launchArgs: [process.env.MEEKO_HOST_WORKSPACE ?? consumer, "--skip-welcome", "--disable-extensions", "--disable-workspace-trust", "--user-data-dir", data],
 });

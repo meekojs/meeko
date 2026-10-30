@@ -7,9 +7,9 @@ import { contentSecurityPolicy, createServerApp, defineApiRoute, defineServerRun
 import type { AppManifest, PrerenderedPage, ServerApp, ServerAppOptions } from "../src/framework-server.ts";
 import { discoverAppManifest } from "../src/framework/app-manifest.ts";
 import { loadMeekoConfig } from "../src/framework/config.ts";
-import { DOCUMENT_HEAD_PREFIX } from "../src/framework/server.ts";
+import { DOCUMENT_HEAD_PREFIX } from "../src/server/runtime/framework-render.ts";
 import { inlineScriptHashes, inlineStyleHashes } from "../src/framework/script-hashes.ts";
-import { resolveThemeConfig, themeScript } from "../src/framework/theme.ts";
+import { resolveThemeConfig, themeScript } from "../src/shared/theme.ts";
 import { createTempProject } from "./helpers/temp-project.ts";
 
 const sha256 = (text: string): string => `'sha256-${createHash("sha256").update(text, "utf8").digest("base64")}'`;

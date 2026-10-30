@@ -57,6 +57,24 @@ test("on: on an element offers its DOM events with their description", () => {
   assert.match(JSON.stringify(click.documentation), /pointing device/);
 });
 
+test("bind: completes HTML attributes after the prefix and skips attributes already bound", () => {
+  const text = `<script lang="ts"></script>\n<template><input bind:id="id" bind:aria-h></template>`;
+  const document = TextDocument.create("file:///Probe.meeko", "meeko", 1, text);
+  const items = directiveNameCompletion(document, document.positionAt(text.indexOf("bind:aria-h") + "bind:aria-h".length))!;
+  const hidden = items.find((item) => item.label === "bind:aria-hidden")!;
+  assert.ok(hidden, JSON.stringify(items.map((item) => item.label)));
+  assert.ok(hidden.textEdit && "range" in hidden.textEdit);
+  assert.equal(document.getText(hidden.textEdit.range), "bind:aria-h");
+  assert.equal(hidden.textEdit.newText, 'bind:aria-hidden="$1"');
+  assert.ok(hidden.documentation);
+  assert.ok(!items.some((item) => item.label === "bind:id"));
+  const initial = labels(`<input bind:|>`)!;
+  assert.ok(initial.includes("bind:checked") && initial.includes("bind:aria-hidden"));
+  assert.ok(!initial.includes("bind:"));
+  assert.ok(labels(`<MeekoLink bind:|>`)!.includes("bind:to"));
+  assert.ok(labels(`<component is="'input'" bind:|>`)!.includes("bind:checked"));
+});
+
 test("values, text, closing tags and names after a prefix are left to the other completions", () => {
   assert.equal(labels(`<p bind:title="va|">`), undefined);
   assert.equal(labels(`<p>texto |</p>`), undefined);

@@ -2,12 +2,12 @@ import { readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import type { MeekoConfig } from "./config-type.js";
-import { meekoEnv } from "../framework-server/env.js";
-import { normalizeHeadInput, resolveDocumentConfig, siteOrigin } from "./head.js";
-import type { DocumentConfig, DocumentHead, HeadInput } from "./head.js";
-import { isMeekoModule } from "./module.js";
-import type { MeekoHooks, MeekoModule, MeekoModuleContext, ModuleAutoImport, ModulePlugin } from "./module.js";
+import type { MeekoConfig } from "../modules/define-meeko-config.js";
+import { meekoEnv } from "../server/runtime/env.js";
+import { normalizeHeadInput, resolveDocumentConfig, siteOrigin } from "../shared/head.js";
+import type { DocumentConfig, DocumentHead, HeadInput } from "../shared/head.js";
+import { isMeekoModule } from "../modules/define-meeko-module.js";
+import type { MeekoHooks, MeekoModule, MeekoModuleContext, ModuleAutoImport, ModulePlugin } from "../modules/define-meeko-module.js";
 
 /**
  * Build-time half of the module system: it runs `defineMeekoModule` setups in Node and records
@@ -195,6 +195,7 @@ export interface ResolvedModuleAutoImport {
   readonly specifier: boolean;
   readonly type: boolean;
   readonly scope: "app" | "client" | "server" | "shared";
+  readonly componentOnly: boolean;
 }
 
 /** A module-added app plugin. */
@@ -244,7 +245,7 @@ const emptyModules: ResolvedModules = Object.freeze({
  * Meeko's type. `satisfies` keeps the list in step with the interface.
  */
 const ownConfigKeys = Object.keys({
-  layers: true, extends: true, modules: true, imports: true, server: true, css: true, document: true,
+  layers: true, extends: true, modules: true, imports: true, components: true, server: true, css: true, document: true,
   dev: true, site: true, sitemap: true, robots: true, theme: true, alias: true,
 } satisfies Record<keyof MeekoConfig, true>);
 
@@ -433,9 +434,10 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
           if (!/^[A-Za-z_$][\w$]*$/.test(as)) throw new TypeError(`Módulo de Meeko ${name}: alias de autoimport no válido ${as}`);
           const scope = item.scope ?? "app";
           if (!["app", "client", "server", "shared"].includes(scope)) throw new TypeError(`Módulo de Meeko ${name}: ámbito de autoimport no válido ${scope}`);
+          if (item.componentOnly && scope !== "app") throw new TypeError(`Módulo de Meeko ${name}: componentOnly requiere scope "app"`);
           const from = item.from instanceof URL || item.from.startsWith("file:") || item.from.startsWith(".") || isAbsolute(item.from)
             ? existingFile(item.from, `autoimport ${as}`) : item.from;
-          autoImports.push({ name: item.name, as, from, specifier: from === item.from && !isAbsolute(from), type: item.type === true, scope });
+          autoImports.push({ name: item.name, as, from, specifier: from === item.from && !isAbsolute(from), type: item.type === true, scope, componentOnly: item.componentOnly === true });
         }
       },
       addAutoImportsDir(dir: string | URL, dirOptions: { readonly scope: "app" | "server" | "shared" }) {

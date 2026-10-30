@@ -151,7 +151,8 @@ test("CLI types genera declaraciones de imports .meeko para un consumidor TS7", 
   assert.match(stdout, /Child\.d\.meeko\.ts/);
   assert.match(stdout, /Grandchild\.d\.meeko\.ts/);
   const declaration = await readFile(resolve(".meeko/types/examples/nested/Child.d.meeko.ts"), "utf8");
-  assert.match(declaration, /export type ComponentProps = \{\s*label: string;/);
+  assert.match(declaration, /type __MeekoComponentProps = \{\s*label: string;/);
+  assert.match(declaration, /export type \{ __MeekoComponentProps as ComponentProps \};/);
   await execFileAsync(process.execPath, [resolve("node_modules/typescript/bin/tsc"), "-p", resolve("examples/nested/tsconfig.json"), "--noEmit"]);
 });
 

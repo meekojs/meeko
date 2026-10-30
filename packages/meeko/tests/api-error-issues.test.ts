@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ApiError, createRequestContext, defineApiRoute, defineRpc, dispatchApiRoute, dispatchRpc, errorResponse, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
 import type { ApiErrorIssue, Schema } from "../src/framework-server.ts";
-import { normalizeServerError } from "../src/framework-server/contracts.ts";
+import { normalizeServerError } from "../src/server/errors.ts";
 import { ClientError, createRpcClient, useForm } from "../src/framework.ts";
 import type { RpcOperation } from "../src/framework.ts";
 

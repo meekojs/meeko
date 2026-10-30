@@ -15,6 +15,8 @@ A partir de 1.0, Meeko sigue SemVer. La [política de estabilidad](https://githu
 - [Arquitectura y contratos](https://github.com/meekojs/meeko/blob/main/docs/architecture.md)
 - [API del motor de componentes](https://github.com/meekojs/meeko/blob/main/docs/api.md)
 - [Aplicaciones full-stack con Meeko](https://github.com/meekojs/meeko/blob/main/docs/framework.md)
+- [Registro tipado y carga diferida de componentes](https://github.com/meekojs/meeko/blob/main/docs/reference/components/componentregistry.md)
+- [Módulo i18n](https://github.com/meekojs/meeko/blob/main/docs/i18n.md)
 - [Política de estabilidad 1.x](https://github.com/meekojs/meeko/blob/main/docs/stability.md)
 - [Migrar de 0.1.0 a 1.0](https://github.com/meekojs/meeko/blob/main/docs/migration-1.0.md)
 - [Actualizar de 1.0 a 1.1](https://github.com/meekojs/meeko/blob/main/docs/migration-1.1.md)
@@ -113,12 +115,12 @@ El paquete vive en `packages/meeko` del [repositorio](https://github.com/meekojs
 
 | Ruta | Responsabilidad |
 | --- | --- |
-| `src/reactivity.ts` | `signal`, `computed`, `effect`, `batch` y liberación de efectos por instancia. |
-| `src/compiler/sfc.ts` | Analiza secciones `.meeko` y conserva posiciones para diagnósticos. |
+| `src/core/reactivity.ts` | `signal`, `computed`, `effect`, `batch` y liberación de efectos por instancia. |
+| `src/compiler/parser/sfc.ts` | Analiza secciones `.meeko` y conserva posiciones para diagnósticos. |
 | `src/compiler.ts` | Genera un módulo TypeScript con SSR, hidratación y mapeos al archivo fuente. |
 | `src/check.ts` | Comprueba tipos con TypeScript 7 y ubica diagnósticos en `.meeko`. |
 | `src/types.ts` | Genera declaraciones para imports `.meeko` en proyectos TypeScript. |
-| `src/server.ts` | Escapado de contenido dinámico para HTML y `serializeJson`. |
+| `src/core/server.ts`, `src/core/html-content.ts` | Escapado y normalización de contenido dinámico para HTML y `serializeJson`. |
 | `src/dom.ts`, `src/hmr.ts` | Runtime de hidratación, regiones, listas y HMR. |
 | `src/internal.ts` | Entrada `@meekojs/meeko/internal` que importa el código generado. |
 | `src/cli.ts` | CLI `meeko`: comandos de proyecto (`dev`, `check`, `build --adapter`, `start`, `preview`), de componente (`compile`, `types`), de generación (`routes`, `prerender`), limpieza (`clean`), starters (`init`, `init-framework`), servidor de lenguaje (`lsp`), `--help` y `--version`. |
@@ -128,7 +130,7 @@ El paquete vive en `packages/meeko` del [repositorio](https://github.com/meekojs
 | `src/build.ts` | Herramientas de build para Node (`@meekojs/meeko/build`). |
 | `src/language-server` | Servidor de lenguaje (`meeko lsp --stdio`, bin `meeko-language-server`) para VS Code y cualquier editor LSP. |
 | `src/vite.ts` | Plugin de Vite para transformar `.meeko` en cliente y SSR. |
-| `src/devtools.ts`, `src/devtools-protocol.ts` | Instrumentación de desarrollo y tipos del protocolo DevTools 1. |
+| `src/devtools.ts`, `src/core/devtools-protocol.ts` | Instrumentación de desarrollo y tipos del protocolo DevTools 1. |
 | `src/devtools-ui` | Panel de inspección dentro de la página. |
 | `examples/counter` | Componente de referencia tipado. |
 | `examples/attributes`, `examples/regions`, `examples/primitives` | Atributos dinámicos, condiciones y listas anidadas, y listas de valores primitivos. |

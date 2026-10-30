@@ -16,7 +16,7 @@ import {
 } from "../src/framework-server.ts";
 import type { AppManifest, PrerenderedPage, Schema, ServerApp, ServerAppOptions, ServerPlatform, SocketHub } from "../src/framework-server.ts";
 import { prerenderRoutes } from "../src/framework/prerender.ts";
-import { DOCUMENT_HEAD_PREFIX } from "../src/framework/server.ts";
+import { DOCUMENT_HEAD_PREFIX } from "../src/server/runtime/framework-render.ts";
 import { createNodeAssetReader, serveNode, toNodeListener } from "../src/node.ts";
 
 const idSchema: Schema<{ id: string }> = { "~standard": { version: 1, validate(value) {

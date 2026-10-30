@@ -3,11 +3,12 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { applyAutoImports, discoverAutoImports } from "../src/autoimports.ts";
+import { discoverAutoImports } from "../src/autoimports/registry.ts";
+import { applyAutoImports } from "../src/autoimports/transform.ts";
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
-import { PageInputError } from "../src/framework/page.ts";
-import { computed, createRoot, signal } from "../src/reactivity.ts";
+import { PageInputError } from "../src/app/definitions/define-page.ts";
+import { computed, createRoot, signal } from "../src/core/reactivity.ts";
 
 // Gaps that the authors of the 1.7 reference found while documenting each symbol.
 

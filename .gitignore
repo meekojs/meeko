@@ -2,6 +2,7 @@
 .meeko/
 .pnpm-store/
 .serena/
+.env
 *.bundle.js
 *.d.meeko.ts
 *.generated.ts

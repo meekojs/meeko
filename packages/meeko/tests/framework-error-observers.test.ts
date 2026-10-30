@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { defer } from "../src/framework/deferred.ts";
-import { definePlugin } from "../src/framework/plugin.ts";
-import type { PluginErrorInfo } from "../src/framework/plugin.ts";
+import { defer } from "../src/app/runtime/deferred.ts";
+import { definePlugin } from "../src/app/definitions/define-plugin.ts";
+import type { PluginErrorInfo } from "../src/app/definitions/define-plugin.ts";
 import { createServerApp, defineServerRuntime } from "../src/framework-server.ts";
 import type { AppManifest, ServerApp } from "../src/framework-server.ts";
 

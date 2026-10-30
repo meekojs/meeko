@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { MemorySessionStore, SessionManager } from "../src/framework-server/sessions.ts";
-import { RedisSessionStore, SqlSessionStore } from "../src/framework-server/session-stores.ts";
-import type { RedisSessionClient, SqlSessionDriver, SqlSessionRow } from "../src/framework-server/session-stores.ts";
-import { createServerDispatcher } from "../src/framework-server/discovery.ts";
+import { MemorySessionStore, SessionManager } from "../src/server/runtime/sessions.ts";
+import { RedisSessionStore, SqlSessionStore } from "../src/server/runtime/session-stores.ts";
+import type { RedisSessionClient, SqlSessionDriver, SqlSessionRow } from "../src/server/runtime/session-stores.ts";
+import { createServerDispatcher } from "../src/server/runtime/discovery.ts";
 
 class TestRedis implements RedisSessionClient {
   readonly records = new Map<string, { value: string; expiresAt: number }>();

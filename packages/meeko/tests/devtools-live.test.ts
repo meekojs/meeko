@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Window } from "happy-dom";
 import { compile } from "../src/compiler.ts";
-import type { LiveBrowserResult, LiveBrowserUpdate, LiveServerMessage } from "../src/devtools-bridge-protocol.ts";
-import { connectLiveBridge, disconnectLiveBridge, liveThrottleMs, liveValueLimit } from "../src/devtools-live.ts";
-import type { LiveHotContext } from "../src/devtools-live.ts";
-import { registerDevtoolsInstance } from "../src/devtools.ts";
-import type { DevtoolsHook } from "../src/devtools.ts";
-import { borrowedKey } from "../src/models.ts";
-import { signal } from "../src/reactivity.ts";
+import type { LiveBrowserResult, LiveBrowserUpdate, LiveServerMessage } from "../src/shared/devtools-bridge-protocol.ts";
+import { connectLiveBridge, disconnectLiveBridge, liveThrottleMs, liveValueLimit } from "../src/app/runtime/devtools-live.ts";
+import type { LiveHotContext } from "../src/app/runtime/devtools-live.ts";
+import { registerDevtoolsInstance } from "../src/app/runtime/devtools.ts";
+import type { DevtoolsHook } from "../src/app/runtime/devtools.ts";
+import { borrowedKey } from "../src/app/runtime/models.ts";
+import { signal } from "../src/core/reactivity.ts";
 
 /** `import.meta.hot` falso: guarda lo enviado y entrega mensajes del servidor a sus oyentes. */
 function fakeHot(sent: Array<{ event: string; data: unknown }> = []): LiveHotContext & { sent: Array<{ event: string; data: unknown }>; deliver(message: LiveServerMessage): void } {

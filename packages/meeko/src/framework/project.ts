@@ -8,15 +8,15 @@ import { networkInterfaces } from "node:os";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { InlineConfig, Plugin, ViteDevServer } from "vite";
-import { escapeHtml } from "../server.js";
+import { escapeHtml } from "../core/server.js";
 import { attachNodeWebSocketServer, toNodeListener } from "../node.js";
-import type { ServerApp, ServerAppOptions } from "../framework-server/app.js";
-import type { AssetManifest, AssetRecord } from "../framework-server/assets.js";
-import { reportServerError } from "../framework-server/contracts.js";
-import { handleProcessErrors, processErrorObserver } from "../framework-server/process-errors.js";
-import { meekoEnv } from "../framework-server/env.js";
-import { visibleHost } from "../framework-server/fetch-host.js";
-import { listeningMessage } from "../framework-server/listen-address.js";
+import type { ServerApp, ServerAppOptions } from "../server/runtime/app.js";
+import type { AssetManifest, AssetRecord } from "../server/runtime/assets.js";
+import { reportServerError } from "../server/errors.js";
+import { handleProcessErrors, processErrorObserver } from "../server/runtime/process-errors.js";
+import { meekoEnv } from "../server/runtime/env.js";
+import { visibleHost } from "../server/runtime/fetch-host.js";
+import { listeningMessage } from "../server/runtime/listen-address.js";
 import { buildDataFile, frameworkClientEntry, frameworkNodeEntry, frameworkServerEntry } from "./app-manifest.js";
 import type { BuildAppData } from "./app-manifest.js";
 import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./config.js";
@@ -31,7 +31,7 @@ import type { ResolvedModules } from "./module-loader.js";
 import { createDevAppReloader, isDiscoverySource, isRouteOptionsSource, routeOptionsKey } from "./dev-watch.js";
 import { supervisedHmrPortEnv, supervisedPortEnv } from "./dev-link.js";
 import { devHmrHost, devPortInUse, resolveDevPorts } from "./dev-port.js";
-import type { MeekoAdapterName } from "./config-type.js";
+import type { MeekoAdapterName } from "../modules/define-meeko-config.js";
 import { prerenderForBuild } from "./prerender.js";
 import { bunEntrySource, cloudflareEntrySource, denoEntrySource } from "./adapter-templates.js";
 import { cloudflareAssetsDirectory, cloudflarePrerenderDirectory, resolveWrangler, wranglerConfig, wranglerSource } from "./cloudflare-build.js";
@@ -88,7 +88,7 @@ const withoutDocumentHashes: Plugin = {
   enforce: "pre",
   resolveId(source, importer) {
     if (source !== "./inline-sources.js" || !importer) return null;
-    return /[\\/]framework[\\/]server\.[jt]s$/.test(importer.split("?")[0]!) ? documentHashesStub : null;
+    return /[\\/]server[\\/]runtime[\\/]framework-render\.[jt]s$/.test(importer.split("?")[0]!) ? documentHashesStub : null;
   },
   load(id) {
     if (id !== documentHashesStub) return null;

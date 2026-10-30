@@ -4,15 +4,16 @@ import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { Window as HappyWindow } from "happy-dom";
-import { applyAutoImports, discoverAutoImports } from "../src/autoimports.ts";
+import { discoverAutoImports } from "../src/autoimports/registry.ts";
+import { applyAutoImports } from "../src/autoimports/transform.ts";
 import { compile } from "../src/compiler.ts";
 import { ClientError, useForm } from "../src/framework.ts";
 import type { Form } from "../src/framework.ts";
 import { checkApp } from "../src/framework/check-app.ts";
-import type { ClientComponent } from "../src/framework/client.ts";
+import type { ClientComponent } from "../src/app/runtime/client.ts";
 import { prepareFrameworkTypeDeclarations } from "../src/framework/type-declarations.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import type { RouteRecord } from "../src/framework/router.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import type { RouteRecord } from "../src/app/runtime/router.ts";
 import { createRoot, provideErrorHandler } from "../src/index.ts";
 import type { Signal } from "../src/index.ts";
 import { createTempProject } from "./helpers/temp-project.ts";
@@ -96,6 +97,11 @@ test("useForm types its fields from the schema input and the submitted values fr
     form.reset({ name: "Bebidas" });
     // @ts-expect-error reset follows the field types
     form.reset({ price: 1 });
+    form.load({ name: "Bebidas" });
+    // @ts-expect-error load follows the field types
+    form.load({ price: 1 });
+    // @ts-expect-error load cannot add a field
+    form.load({ unknown: "x" });
     void [name, price, message, formMessage, failure, flags, submitted];
 
     // @ts-expect-error initial needs every field of the schema input
@@ -162,6 +168,35 @@ test("useForm validates on submit, maps the issues to fields and sends the schem
   assert.equal(form.dirty.value, true);
   form.fields.price.value = "";
   assert.equal(form.dirty.value, false, "dirty compares with the values of the last reset");
+});
+
+test("load fills an edit form, becomes the dirty reference, and reset returns to initial", async () => {
+  const initial = { name: "", tags: ["new"], settings: { public: false } };
+  const form = useForm({ initial, submit: (values) => values });
+  form.load({ name: "Ada", tags: ["editor"] });
+  assert.deepEqual([form.fields.name.value, form.fields.tags.value, form.dirty.value], ["Ada", ["editor"], false]);
+  form.fields.name.value = "Grace";
+  assert.equal(form.dirty.value, true);
+  form.reset();
+  assert.deepEqual([form.fields.name.value, form.fields.tags.value, form.dirty.value], ["", ["new"], false]);
+  form.fields.tags.value.push("changed");
+  form.fields.settings.value.public = true;
+  form.reset();
+  assert.deepEqual([form.fields.tags.value, form.fields.settings.value], [["new"], { public: false }], "nested defaults are restored");
+  assert.deepEqual(initial, { name: "", tags: ["new"], settings: { public: false } });
+  let prevented = 0;
+  form.reset({ preventDefault: () => { prevented++; } } as Event);
+  assert.equal(prevented, 1);
+});
+
+test("load discards an in-flight submission result", async () => {
+  const gate = deferred<string>();
+  const form = useForm({ initial: { name: "" }, submit: () => gate.promise });
+  const pending = form.trySubmit();
+  form.load({ name: "Ada" });
+  gate.resolve("old result");
+  assert.deepEqual(await pending, { ok: false, reason: "skipped" });
+  assert.deepEqual([form.fields.name.value, form.submitted.value, form.dirty.value], ["Ada", false, false]);
 });
 
 test("useForm maps the issues of a server 400 to fields and the rest to the form message", async () => {
@@ -284,8 +319,8 @@ test("useForm marks pending during an asynchronous validation and drops results 
 const fileUrl = (path: string): string => pathToFileURL(resolve(path)).href;
 
 const runtime = async () => ({
-  ...await import(fileUrl("src/framework/server.ts")) as typeof import("../src/framework/server.ts"),
-  ...await import(fileUrl("src/framework/client.ts")) as typeof import("../src/framework/client.ts"),
+  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof import("../src/server/runtime/framework-render.ts"),
+  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof import("../src/app/runtime/client.ts"),
 });
 
 const globals = globalThis as unknown as { meekoFormFetch?: typeof fetch };
@@ -482,7 +517,7 @@ test("meeko check types useForm fields with model, model:value and on:submit", {
   await writeFile(join(root, "PriceField.meeko"), priceField);
   const head = `<script lang="ts">\nimport { useForm } from "@meekojs/meeko/framework";\nimport * as PriceField from "./PriceField.meeko";\nconst form = useForm({ initial: { name: "", price: "", count: 0 }, submit: (values) => values.name });\n</script>\n`;
   const cases = [
-    { name: "Typed", template: `<template><form on:submit="form.submit"><input model="form.fields.name"><PriceField model:value="form.fields.price" bind:error="form.errors.value.price" /><p>{form.errors.value.name ?? ""}{form.error.value ?? ""}</p></form></template>`, codes: [] as string[] },
+    { name: "Typed", template: `<template><form on:submit="form.submit" on:reset="form.reset"><input model="form.fields.name"><PriceField model:value="form.fields.price" bind:error="form.errors.value.price" /><p>{form.errors.value.name ?? ""}{form.error.value ?? ""}</p></form></template>`, codes: [] as string[] },
     { name: "UnknownField", template: `<template><input model="form.fields.nope"></template>`, codes: ["TS2339"] },
     { name: "NumberField", template: `<template><input model="form.fields.count"></template>`, codes: ["TS2322"] },
     { name: "ReadOnly", template: `<template><input model="form.pending"></template>`, codes: ["TS2322"] },

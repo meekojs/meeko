@@ -213,7 +213,7 @@ test("an application's own uncaughtException listener decides: Meeko only report
 });
 
 test("handleProcessErrors installs once per application: a second call adds no listener and no second report", async () => {
-  const { handleProcessErrors } = await import("../src/framework-server/process-errors.ts");
+  const { handleProcessErrors } = await import("../src/server/runtime/process-errors.ts");
   const app = { close: async () => {} } as unknown as Parameters<typeof handleProcessErrors>[0];
   const reported: unknown[] = [];
   const existing = new Set(process.listeners("unhandledRejection"));

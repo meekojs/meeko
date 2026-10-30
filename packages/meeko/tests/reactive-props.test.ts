@@ -5,13 +5,13 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { Window } from "happy-dom";
 import { compile } from "../src/compiler.ts";
-import type { DevtoolsHook } from "../src/devtools.ts";
+import type { DevtoolsHook } from "../src/app/runtime/devtools.ts";
 
 /** The runtime as the compiled components import it, by file URL: one instance of every module. */
 const runtimeUrl = (path: string): string => pathToFileURL(resolve(path)).href;
-const { enableHotModule, replaceHotModule } = await import(runtimeUrl("src/hmr.js")) as typeof import("../src/hmr.ts");
-const { isReactiveProps, reactiveProps, resolveProps } = await import(runtimeUrl("src/props.js")) as typeof import("../src/props.ts");
-const { effect, signal } = await import(runtimeUrl("src/reactivity.js")) as typeof import("../src/reactivity.ts");
+const { enableHotModule, replaceHotModule } = await import(runtimeUrl("src/app/runtime/hmr.js")) as typeof import("../src/app/runtime/hmr.ts");
+const { isReactiveProps, reactiveProps, resolveProps } = await import(runtimeUrl("src/app/runtime/props.js")) as typeof import("../src/app/runtime/props.ts");
+const { effect, signal } = await import(runtimeUrl("src/core/reactivity.js")) as typeof import("../src/core/reactivity.ts");
 
 interface Module {
   renderToString(props: object): string;
@@ -297,8 +297,9 @@ test("the props view is read-only, tracks names and values, and applies defaults
 });
 
 test("the snippets of a props view follow a snippet that appears or disappears, and keep their identity", async () => {
-  const { withChannels } = await import(runtimeUrl("src/channels.js")) as typeof import("../src/channels.ts");
-  const { snippet, useSnippets } = await import(runtimeUrl("src/snippets.js")) as typeof import("../src/snippets.ts");
+  const { withChannels } = await import(runtimeUrl("src/app/runtime/channels.js")) as typeof import("../src/app/runtime/channels.ts");
+  const { snippet } = await import(runtimeUrl("src/app/runtime/snippets.js")) as typeof import("../src/app/runtime/snippets.ts");
+  const { useSnippets } = await import(runtimeUrl("src/app/composables/useSnippets.js")) as typeof import("../src/app/composables/useSnippets.ts");
   const tag = (footer: boolean): Record<string, unknown> => withChannels({ label: "a" }, undefined, { default: snippet(() => "d"), footer: footer ? snippet(() => "f") : undefined });
   const source = reactiveProps(tag(false));
   // Through the defaults view too, as a compiled child with defineProps defaults reads them.

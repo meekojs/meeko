@@ -1,10 +1,9 @@
 import * as vscode from "vscode";
-import { LanguageClient, TransportKind } from "vscode-languageclient/node";
-import type { LanguageClientOptions, ServerOptions } from "vscode-languageclient/node";
-import { resolveLanguageServer } from "./server-resolution.js";
+import type { LanguageClient } from "vscode-languageclient/node";
 import type { ResolvedLanguageServer } from "./server-resolution.js";
 import { ExecutionZoneDecorations, executionZonesRequest } from "./zones.js";
 import type { ExecutionZoneItem } from "./zones.js";
+import { LanguageServers } from "./language-servers.js";
 import { registerLiveValues } from "./live/controller.js";
 import { registerAutoClosingTags } from "./auto-close.js";
 import { registerScaffoldCommands } from "./commands.js";
@@ -13,14 +12,16 @@ import type { MeekoLiveApi } from "./live/controller.js";
 /** API que devuelve la activación; las pruebas la usan para saber qué servidor se eligió. */
 export interface MeekoExtensionApi {
   readonly server: ResolvedLanguageServer | undefined;
+  /** Server selected for a file in a multi-root workspace. */
+  serverFor(uri: vscode.Uri): ResolvedLanguageServer | undefined;
   /** Zonas de ejecución decoradas en un documento, o `undefined` si aún no se pidieron. */
   executionZones(uri: vscode.Uri): readonly ExecutionZoneItem[] | undefined;
   /** Valores en vivo de `meeko dev`. */
   readonly live: MeekoLiveApi;
 }
 
-let client: LanguageClient | undefined;
 let zones: ExecutionZoneDecorations | undefined;
+let servers: LanguageServers | undefined;
 
 /** VS Code's command behind the reference lenses of the server. */
 const showReferences = "editor.action.showReferences";
@@ -45,62 +46,28 @@ function referenceLens(lens: vscode.CodeLens, current: LanguageClient): vscode.C
 export async function activate(context: vscode.ExtensionContext): Promise<MeekoExtensionApi> {
   const output = vscode.window.createOutputChannel("Meeko", { log: true });
   context.subscriptions.push(output);
-  const api: { server: ResolvedLanguageServer | undefined; executionZones: MeekoExtensionApi["executionZones"]; live: MeekoLiveApi } = {
-    server: undefined,
+  const api: MeekoExtensionApi = {
+    get server() { return servers?.first; },
+    serverFor: (uri) => servers?.resolutionFor(uri),
     executionZones: (uri) => zones?.applied.get(uri.toString()),
     live: registerLiveValues(context, output),
   };
-
-  const start = async (): Promise<void> => {
-    const trusted = vscode.workspace.isTrusted;
-    const server = resolveLanguageServer({
-      folders: (vscode.workspace.workspaceFolders ?? []).filter((folder) => folder.uri.scheme === "file").map((folder) => folder.uri.fsPath),
-      bundled: context.asAbsolutePath("dist/server.js"),
-      preferWorkspace: trusted && vscode.workspace.getConfiguration("meeko").get<boolean>("languageServer.preferWorkspace", true),
-    });
-    api.server = server;
-    output.info(`Servidor de lenguaje de Meeko: ${server.source} ${server.module}${server.version ? ` (${server.version})` : ""}${server.reason ? `; ${server.reason}` : ""}`);
-    const serverOptions: ServerOptions = {
-      run: { module: server.module, transport: TransportKind.ipc },
-      debug: { module: server.module, transport: TransportKind.ipc, options: { execArgv: ["--nolazy", "--inspect=6009"] } },
-    };
-    const clientOptions: LanguageClientOptions = {
-      documentSelector: [{ language: "meeko", scheme: "file" }],
-      initializationOptions: { trusted },
-      outputChannel: output,
-      middleware: {
-        provideCodeLenses: async (document, token, next) => {
-          const lenses = await next(document, token);
-          const current = client;
-          return current ? lenses?.map((lens) => referenceLens(lens, current)) : lenses;
-        },
-      },
-    };
-    const started = new LanguageClient("meeko", "Meeko", serverOptions, clientOptions);
-    client = started;
-    await started.start();
-    // An older workspace server has no zones; it answers the request with an error, shown as no zones.
-    zones = new ExecutionZoneDecorations(context.extensionUri, (uri) => started.sendRequest<{ zones: ExecutionZoneItem[] } | null>(executionZonesRequest, { textDocument: { uri } }));
-  };
-
-  const stop = async (): Promise<void> => {
-    zones?.dispose();
-    zones = undefined;
-    await client?.stop();
-  };
-
-  await start();
-  context.subscriptions.push(registerAutoClosingTags(() => client));
+  servers = new LanguageServers(context, output, (lenses, current) => lenses.map((lens) => referenceLens(lens, current)), () => zones?.refreshVisible());
+  await servers.refresh();
+  // An older workspace server has no zones; it answers the request with an error, shown as no zones.
+  zones = new ExecutionZoneDecorations(context.extensionUri, (uri) => {
+    const current = servers?.clientFor(vscode.Uri.parse(uri));
+    return current ? current.sendRequest<{ zones: ExecutionZoneItem[] } | null>(executionZonesRequest, { textDocument: { uri } }) : Promise.resolve(null);
+  });
+  context.subscriptions.push(registerAutoClosingTags((uri) => servers?.clientFor(uri)));
   context.subscriptions.push(registerScaffoldCommands());
   context.subscriptions.push({ dispose: () => { zones?.dispose(); zones = undefined; } });
-  context.subscriptions.push(vscode.workspace.onDidGrantWorkspaceTrust(async () => {
-    await stop();
-    await start();
-  }));
-  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (event) => {
+  const refresh = (): void => { void servers?.refresh().catch((error: unknown) => output.error(`No se pudo reiniciar Meeko: ${String(error)}`)); };
+  context.subscriptions.push(vscode.workspace.onDidGrantWorkspaceTrust(refresh));
+  context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(refresh));
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
     if (!event.affectsConfiguration("meeko.languageServer")) return;
-    await stop();
-    await start();
+    refresh();
   }));
   return api;
 }
@@ -109,6 +76,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<MeekoE
 export async function deactivate(): Promise<void> {
   zones?.dispose();
   zones = undefined;
-  await client?.stop();
-  client = undefined;
+  await servers?.dispose();
+  servers = undefined;
 }

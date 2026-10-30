@@ -3,10 +3,10 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import { createServerApp, defineServerRuntime, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
 import type { AppManifest, ServerApp } from "../src/framework-server.ts";
-import { definePage } from "../src/framework/page.ts";
-import { formFlashCookies } from "../src/framework/form-flash.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import { resolveThemeConfig, themeScript, themeStyle } from "../src/framework/theme.ts";
+import { definePage } from "../src/app/definitions/define-page.ts";
+import { formFlashCookies } from "../src/shared/form-flash.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { resolveThemeConfig, themeScript, themeStyle } from "../src/shared/theme.ts";
 
 const sha256 = (text: string): string => `'sha256-${createHash("sha256").update(text, "utf8").digest("base64")}'`;
 const theme = resolveThemeConfig(true)!;

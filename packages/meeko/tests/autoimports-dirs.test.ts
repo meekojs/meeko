@@ -3,9 +3,10 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { applyAutoImports, autoImportDirectories, discoverAutoImports, discoverAutoImportsSync } from "../src/autoimports.ts";
-import type { AutoImport } from "../src/autoimports.ts";
-import { generateAutoImportTypes } from "../src/autoimports-ts.ts";
+import { autoImportDirectories, discoverAutoImports, discoverAutoImportsSync } from "../src/autoimports/registry.ts";
+import { applyAutoImports } from "../src/autoimports/transform.ts";
+import type { AutoImport } from "../src/autoimports/registry.ts";
+import { generateAutoImportTypes } from "../src/autoimports/typescript.ts";
 import { loadMeekoConfig, readMeekoConfigSync } from "../src/framework/config.ts";
 import { configErrorRange } from "../src/language-server/diagnostics.ts";
 import { meeko } from "../src/vite.ts";
@@ -181,10 +182,14 @@ test("meeko dev reloads when a file of an imports folder changes, is added or is
     const sent: unknown[] = [];
     let invalidated = 0;
     const listeners = new Map<string, (file: string) => void>();
+    const watched: string[] = [];
     const server = {
       moduleGraph: { invalidateAll: () => { invalidated++; } },
       ws: { send: (message: unknown) => { sent.push(message); } },
-      watcher: { on: (event: string, listener: (file: string) => void) => { listeners.set(event, listener); } },
+      watcher: {
+        on: (event: string, listener: (file: string) => void) => { listeners.set(event, listener); },
+        add: (directories: string[]) => { watched.push(...directories); },
+      },
       config: { logger: { error: (message: string) => { throw new Error(message); } } },
     };
     const hotUpdate = plugin.handleHotUpdate as unknown as (context: { file: string; server: typeof server }) => Promise<unknown>;
@@ -193,7 +198,9 @@ test("meeko dev reloads when a file of an imports folder changes, is added or is
     }
     assert.equal(await hotUpdate({ file: join(root, "app", "other", "price.ts"), server }), undefined);
     assert.equal(invalidated, 3);
-    (plugin.configureServer as (server: unknown) => void)(server);
+    await (plugin.configureServer as (server: unknown) => Promise<void>)(server);
+    assert.ok(watched.includes(join(root, "app", "services")));
+    assert.ok(watched.includes(join(root, "shared", "validators")));
     listeners.get("add")!(join(root, "app", "services", "fresh.ts"));
     listeners.get("unlink")!(join(root, "shared", "validators", "gone.ts"));
     const deadline = Date.now() + 10_000;

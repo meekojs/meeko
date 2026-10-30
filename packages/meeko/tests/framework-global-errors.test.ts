@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Window as HappyWindow } from "happy-dom";
-import { provideErrorHandler } from "../src/component-errors.ts";
-import type { ErrorSource } from "../src/component-errors.ts";
-import { mountClientApp } from "../src/framework/client.ts";
-import type { ClientApp, ClientAppOptions, ClientComponent } from "../src/framework/client.ts";
-import { ClientError, isClientError } from "../src/framework/clients.ts";
-import { definePlugin } from "../src/framework/plugin.ts";
-import type { PluginErrorInfo } from "../src/framework/plugin.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import { createFrameworkHandler } from "../src/framework/server.ts";
+import { provideErrorHandler } from "../src/app/runtime/component-errors.ts";
+import type { ErrorSource } from "../src/app/runtime/component-errors.ts";
+import { mountClientApp } from "../src/app/runtime/client.ts";
+import type { ClientApp, ClientAppOptions, ClientComponent } from "../src/app/runtime/client.ts";
+import { ClientError, isClientError } from "../src/shared/clients.ts";
+import { definePlugin } from "../src/app/definitions/define-plugin.ts";
+import type { PluginErrorInfo } from "../src/app/definitions/define-plugin.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 
 const page = (id: string, fail = false): ClientComponent => ({
   renderWithState: () => {

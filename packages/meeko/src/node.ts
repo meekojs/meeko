@@ -5,20 +5,21 @@ import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { TLSSocket } from "node:tls";
-import { ApiError, errorResponse, observeServerError } from "./framework-server/contracts.js";
-import { setSocketAddress, trustProxyOf } from "./framework-server/env.js";
-import { assetResponse, etagMatches, findAsset } from "./framework-server/assets.js";
-import type { AssetManifest, AssetReader } from "./framework-server/assets.js";
-import type { ServerApp } from "./framework-server/app.js";
-import type { ServerPlatform } from "./framework-server/platform.js";
-import { attachNodeWebSocketServer } from "./framework-server/node-websocket.js";
-import type { NodeWebSocketServer } from "./framework-server/node-websocket.js";
-import { handleProcessErrors } from "./framework-server/process-errors.js";
+import { ApiError, observeServerError } from "./server/errors.js";
+import { errorResponse } from "./server/contract-runtime.js";
+import { setSocketAddress, trustProxyOf } from "./server/runtime/env.js";
+import { assetResponse, etagMatches, findAsset } from "./server/runtime/assets.js";
+import type { AssetManifest, AssetReader } from "./server/runtime/assets.js";
+import type { ServerApp } from "./server/runtime/app.js";
+import type { ServerPlatform } from "./server/runtime/platform.js";
+import { attachNodeWebSocketServer } from "./server/runtime/node-websocket.js";
+import type { NodeWebSocketServer } from "./server/runtime/node-websocket.js";
+import { handleProcessErrors } from "./server/runtime/process-errors.js";
 
-export { attachNodeWebSocketServer } from "./framework-server/node-websocket.js";
-export type { NodeWebSocketOptions, NodeWebSocketServer } from "./framework-server/node-websocket.js";
-export { createNodeSocketUpgradeHandler } from "./framework-server/node-upgrade.js";
-export type { NodeAcceptedSocket, NodeSocketUpgradeOptions } from "./framework-server/node-upgrade.js";
+export { attachNodeWebSocketServer } from "./server/runtime/node-websocket.js";
+export type { NodeWebSocketOptions, NodeWebSocketServer } from "./server/runtime/node-websocket.js";
+export { createNodeSocketUpgradeHandler } from "./server/runtime/node-upgrade.js";
+export type { NodeAcceptedSocket, NodeSocketUpgradeOptions } from "./server/runtime/node-upgrade.js";
 
 /**
  * Opciones de {@link toNodeListener}.

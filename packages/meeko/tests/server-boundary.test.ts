@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { build } from "esbuild";
 
 // parse5 is not tooling since 1.7: the server reads a document's inline scripts and styles with it, as
-// the browser does, to hash them for Meeko's CSP (framework/inline-sources.ts). It is portable.
+// the browser does, to hash them for Meeko's CSP (server/runtime/inline-sources.ts). It is portable.
 const tooling = /(?:^|\/)node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?(?:typescript|@typescript\/typescript6|postcss|ws)\//;
 
 async function entry(subpath: string): Promise<string> {

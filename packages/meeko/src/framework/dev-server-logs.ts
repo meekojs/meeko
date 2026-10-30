@@ -5,7 +5,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { readFile } from "node:fs/promises";
 import { inspect, types } from "node:util";
 import type { Plugin } from "vite";
-import { normalizeAddress, socketAddressOf } from "../framework-server/env.js";
+import { normalizeAddress, socketAddressOf } from "../server/runtime/env.js";
 
 /** `console` methods whose calls are forwarded. */
 export const serverLogLevels = ["log", "info", "warn", "error", "debug"] as const;

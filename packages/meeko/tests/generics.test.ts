@@ -9,8 +9,8 @@ import { Window } from "happy-dom";
 import * as prettier from "prettier";
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
-import { MeekoCompileError } from "../src/compiler/sfc.ts";
-import { assertRouteBlockPlacement } from "../src/framework/route-block.ts";
+import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
+import { assertRouteBlockPlacement } from "../src/compiler/transforms/route-block.ts";
 import plugin from "../src/prettier.ts";
 import { generateTypes } from "../src/types.ts";
 
@@ -105,20 +105,21 @@ function assertCompileError(source: string, code: string, offset: number): void 
 test("generic gives the compiled module generic types and functions", () => {
   const { code } = compile(dataTable, "DataTable.meeko");
   const parameters = "T extends { id: string }";
-  assert.ok(code.includes(`export type ComponentProps<${parameters}> = __MeekoDeclaredProps<T> & __MeekoEmitProps<T>;`), code);
+  assert.ok(code.includes(`type __MeekoComponentProps<${parameters}> = __MeekoDeclaredProps<T> & __MeekoEmitProps<T>;`), code);
+  assert.ok(code.includes("export type { __MeekoComponentProps as ComponentProps };"));
   assert.ok(code.includes(`type __MeekoEmits<${parameters}> = __meeko.Emits<{ select: [row: T] }>;`));
   assert.ok(code.includes(`export type ComponentModels<${parameters}> = { "current": __meeko.Signal<__MeekoModels<T>["current"]> };`));
   assert.ok(code.includes(`export type ComponentSnippets<${parameters}> = __meeko.SnippetMap<__MeekoSnippets<T>>;`));
   assert.ok(code.includes(`export type ComponentExposed<${parameters}> = ReturnType<typeof __setup<T>>[typeof __meeko.exposedKey];`));
-  assert.ok(code.includes(`function __setup<${parameters}>(__props: ComponentProps<T>)`));
-  assert.ok(code.includes(`export function renderWithState<${parameters}>(__inputProps: ComponentProps<T>)`));
-  assert.ok(code.includes(`export function renderToString<${parameters}>(__inputProps: ComponentProps<T>, __state?: __meeko.HotState): string`));
-  assert.ok(code.includes(`export function hydrate<${parameters}>(root: Element, __inputProps: ComponentProps<T>, __state?: __meeko.HotState): () => void`));
-  assert.ok(code.includes(`export function hydrateScope<${parameters}>(__scope: __meeko.DomScope, __inputProps: ComponentProps<T>, __state?: __meeko.HotState): __meeko.ComponentRelease<ComponentExposed<T>>`));
+  assert.ok(code.includes(`function __setup<${parameters}>(__props: __MeekoComponentProps<T>)`));
+  assert.ok(code.includes(`export function renderWithState<${parameters}>(__inputProps: __MeekoComponentProps<T>)`));
+  assert.ok(code.includes(`export function renderToString<${parameters}>(__inputProps: __MeekoComponentProps<T>, __state?: __meeko.HotState): string`));
+  assert.ok(code.includes(`export function hydrate<${parameters}>(root: Element, __inputProps: __MeekoComponentProps<T>, __state?: __meeko.HotState): () => void`));
+  assert.ok(code.includes(`export function hydrateScope<${parameters}>(__scope: __meeko.DomScope, __inputProps: __MeekoComponentProps<T>, __state?: __meeko.HotState): __meeko.ComponentRelease<ComponentExposed<T>>`));
   assert.ok(code.includes("return hydrateScope<T>(__scope, __inputProps, __state);"));
   assert.ok(code.includes("() => __setup<T>(__inputProps)"));
   // The tag check that a parent calls: T comes from the props, the rest only uses it.
-  assert.ok(code.includes(`export declare const __meekoTag: <${parameters}>(props: __MeekoTagProps<ComponentProps<T>> & __meeko.ExtraProps, events: NoInfer<__meeko.EventNames<ComponentProps<T>>>, models: NoInfer<ComponentModels<T>>, snippets: NoInfer<ComponentSnippets<T>>) => __meeko.TagInput<ComponentExposed<T>>;`));
+  assert.ok(code.includes(`export declare const __meekoTag: <${parameters}>(props: __MeekoTagProps<__MeekoComponentProps<T>> & __meeko.ExtraProps, events: NoInfer<__meeko.EventNames<__MeekoComponentProps<T>>>, models: NoInfer<ComponentModels<T>>, snippets: NoInfer<ComponentSnippets<T>>) => __meeko.TagInput<ComponentExposed<T>>;`));
   assert.ok(code.includes(`declare function __meeko_channels<${parameters}>(): { readonly models: ComponentModels<T>; readonly snippets: ComponentSnippets<T> };`));
   // Inside the setup, the macros use the parameters of __setup.
   assert.match(code, /const current: __meeko\.Signal<__MeekoModels<T>\["current"\]> = __meeko\.useModel<__MeekoModels<T>\["current"\]>/);
@@ -127,14 +128,14 @@ test("generic gives the compiled module generic types and functions", () => {
   // Defaults keep their helpers' own parameters apart from the component's.
   const defaults = compile(`<script lang="ts" generic="T, K extends string = 'id'">\nconst props = defineProps<{ value: T; key?: K; label?: string }>({ label: "x" });\n</script><template><p>{props.label}{String(props.value)}</p></template>`, "Defaults.meeko").code;
   assert.ok(defaults.includes("type __MeekoResolvedPropsOf<__P, T, K extends string = 'id'> = __P extends unknown ? Omit<__P, __MeekoDefaultKeys<T, K>> & __MeekoDefaultValues<T, K> : never;"), defaults);
-  assert.ok(defaults.includes("export type ComponentProps<T, K extends string = 'id'> = __MeekoInputPropsOf<__MeekoDeclaredProps<T, K>, T, K>;"));
+  assert.ok(defaults.includes("type __MeekoComponentProps<T, K extends string = 'id'> = __MeekoInputPropsOf<__MeekoDeclaredProps<T, K>, T, K>;"));
   assert.ok(defaults.includes("return __meeko.resolveProps(input, __meeko_defaultProps<T, K>()) as __MeekoResolvedProps<T, K>;"), defaults);
 
   // Without generic the module is the non-generic one, plus its tag check.
   const plain = compile(`<script lang="ts">const props = defineProps<{ id: number }>();</script><template><p>{props.id}</p></template>`, "Plain.meeko").code;
-  assert.match(plain, /export type ComponentProps = \{ id: number \};/);
-  assert.match(plain, /export function renderToString\(__inputProps: ComponentProps, __state\?: __meeko\.HotState\): string/);
-  assert.match(plain, /export declare const __meekoTag: \(props: __MeekoTagProps<ComponentProps> & __meeko\.ExtraProps, events: NoInfer<__meeko\.EventNames<ComponentProps>>, models: __meeko\.NoModels, snippets: __meeko\.NoSnippets\) => __meeko\.TagInput<ComponentExposed>;/);
+  assert.match(plain, /type __MeekoComponentProps = \{ id: number \};/);
+  assert.match(plain, /export function renderToString\(__inputProps: __MeekoComponentProps, __state\?: __meeko\.HotState\): string/);
+  assert.match(plain, /export declare const __meekoTag: \(props: __MeekoTagProps<__MeekoComponentProps> & __meeko\.ExtraProps, events: NoInfer<__meeko\.EventNames<__MeekoComponentProps>>, models: __meeko\.NoModels, snippets: __meeko\.NoSnippets\) => __meeko\.TagInput<ComponentExposed>;/);
   assert.match(plain, /export declare const __meekoChannels: \{ readonly models: ComponentModels; readonly snippets: ComponentSnippets \};/);
 });
 
@@ -311,9 +312,10 @@ test(".d.meeko.ts keeps the type parameters for TypeScript consumers", { timeout
   try {
     await generateTypes(users, join(root, "Users.meeko"));
     const declaration = await readFile(join(root, ".meeko", "types", "DataTable.d.meeko.ts"), "utf8");
-    assert.match(declaration, /export type ComponentProps<T extends \{\s*id: string;?\s*\}> = /);
-    assert.match(declaration, /export declare function renderToString<T extends \{\s*id: string;?\s*\}>\(__inputProps: ComponentProps<T>/);
-    assert.match(declaration, /export declare function hydrateScope<T extends \{\s*id: string;?\s*\}>\(__scope: __meeko\.DomScope, __inputProps: ComponentProps<T>.*\): __meeko\.ComponentRelease<ComponentExposed<T>>;/);
+    assert.match(declaration, /type __MeekoComponentProps<T extends \{\s*id: string;?\s*\}> = /);
+    assert.match(declaration, /export type \{ __MeekoComponentProps as ComponentProps \};/);
+    assert.match(declaration, /export declare function renderToString<T extends \{\s*id: string;?\s*\}>\(__inputProps: __MeekoComponentProps<T>/);
+    assert.match(declaration, /export declare function hydrateScope<T extends \{\s*id: string;?\s*\}>\(__scope: __meeko\.DomScope, __inputProps: __MeekoComponentProps<T>.*\): __meeko\.ComponentRelease<ComponentExposed<T>>;/);
     assert.match(declaration, /export declare const __meekoTag: <T extends \{/);
     assert.match(declaration, /declare function __meeko_channels<T extends \{/);
     await writeFile(join(root, "consumer.ts"), `import type { ComponentExposed, ComponentProps } from "./DataTable.meeko";

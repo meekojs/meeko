@@ -6,8 +6,8 @@ import { isIP } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import type {
   EditorBridgeDescriptor, EditorBridgeEvent, EditorCommandResult, EditorLiveAlias, EditorLiveSignal, LiveBrowserResult, LiveServerBody, LiveServerMessage,
-} from "../devtools-bridge-protocol.js";
-import type { DevtoolsValue } from "../devtools-protocol.js";
+} from "../shared/devtools-bridge-protocol.js";
+import type { DevtoolsValue } from "../core/devtools-protocol.js";
 
 /** Directorio, relativo a la raíz del proyecto, donde cada `meeko dev` en marcha publica su descriptor. */
 export const editorBridgeDirectory = ".meeko/dev";

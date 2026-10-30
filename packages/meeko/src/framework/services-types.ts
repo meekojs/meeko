@@ -1,6 +1,7 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, extname, join, relative, resolve } from "node:path";
-import { applyAutoImports, discoverAutoImports } from "../autoimports.js";
+import { discoverAutoImports } from "../autoimports/registry.js";
+import { applyAutoImports } from "../autoimports/transform.js";
 import { replaceModuleSpecifiers } from "../compiler/import-graph.js";
 import { findRuntimeFile } from "./app-manifest.js";
 

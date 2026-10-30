@@ -1,3 +1,4 @@
+import { locationOf, sourceRange, toRange } from "./locations.js";
 import { isBuiltin } from "node:module";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import ts from "@typescript/typescript6";
@@ -12,14 +13,14 @@ import type {
   ParameterInformation, Position, Range, SemanticTokens, SemanticTokensLegend, SignatureHelp, SignatureInformation,
   TextEdit, WorkspaceEdit,
 } from "vscode-languageserver/node";
-import { autoImportedValues } from "../autoimports.js";
-import type { AutoImport } from "../autoimports.js";
+import { autoImportedValues } from "../autoimports/transform.js";
+import type { AutoImport } from "../autoimports/registry.js";
 import { shadowedBuiltinTags } from "../compiler.js";
-import { serverOnlyCompletion } from "../compiler/client-boundary.js";
-import { parseSfc } from "../compiler/sfc.js";
-import type { SfcSection } from "../compiler/sfc.js";
+import { serverOnlyCompletion } from "../compiler/transforms/client-boundary.js";
+import { parseSfc } from "../compiler/parser/sfc.js";
+import type { SfcSection } from "../compiler/parser/sfc.js";
 import { eachKeyActions, sidecarActions } from "./actions.js";
-import { domEventCompletion, dynamicTagAttributeCompletion, dynamicTagHover, dynamicTags, htmlAttributeCompletion, tagAt } from "./embedded.js";
+import { bindAttributeCompletion, domEventCompletion, dynamicTagAttributeCompletion, dynamicTagHover, dynamicTags, htmlAttributeCompletion, specialTemplateDocumentation, tagAt } from "./embedded.js";
 import { builtinTag, builtinTags } from "./builtin-tags.js";
 import { builtinTagDefinition, builtinTagHover } from "./builtins.js";
 import { componentSummaryMarkdown, documentationMarkdown, memberDocumentation, tagSummary } from "./components.js";
@@ -87,20 +88,6 @@ const userPreferences: ts.UserPreferences = {
 const typescriptTriggers = [".", '"', "'", "`", "/", "@", "<", "#", " "] as const;
 const renamePreferences: ts.UserPreferences = { ...userPreferences, providePrefixAndSuffixTextForRename: false };
 
-/** Rango fuente de un tramo generado; ambos extremos deben pertenecer a un mismo tramo mapeado. */
-export function sourceRange(component: VirtualComponent, start: number, length: number): [number, number] | undefined {
-  for (const span of component.spans) {
-    if (start >= span.generatedStart && start + length <= span.generatedEnd) {
-      return [span.sourceStart + start - span.generatedStart, span.sourceStart + start + length - span.generatedStart];
-    }
-  }
-  return undefined;
-}
-
-export function toRange(document: TextDocument, start: number, end: number): Range {
-  return { start: document.positionAt(start), end: document.positionAt(end) };
-}
-
 function generatedOffset(context: FeatureContext, position: Position): number | undefined {
   return context.component.toGenerated(context.document.offsetAt(position));
 }
@@ -121,18 +108,6 @@ export function contextAt(context: FeatureContext, offset: number): FeatureConte
 
 function contextAtPosition(context: FeatureContext, position: Position): FeatureContext {
   return contextAt(context, context.document.offsetAt(position));
-}
-
-/** Ubicación LSP de un tramo de TypeScript, ya sea de un componente virtual o de un archivo real. */
-export function locationOf(context: FeatureContext, fileName: string, span: ts.TextSpan): Location | undefined {
-  const virtual = context.project.virtualEntry(fileName);
-  if (virtual) {
-    const range = sourceRange(virtual, span.start, span.length);
-    const target = range && context.locate(virtual.filename);
-    return range && target ? { uri: target.uri, range: toRange(target.document, range[0], range[1]) } : undefined;
-  }
-  const target = context.locate(fileName);
-  return target ? { uri: target.uri, range: toRange(target.document, span.start, span.start + span.length) } : undefined;
 }
 
 function dedupeLocations(locations: readonly Location[]): Location[] {
@@ -559,6 +534,23 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
   if (!context || context.value) return undefined;
   const word = /[\w:.-]*$/.exec(source.slice(context.tagStart, offset))![0];
   if (!/\s/.test(source[offset - word.length - 1] ?? "")) return undefined;
+  if (context.tag === "render") {
+    const written = new Set([...source.slice(context.tagStart, context.tagEnd).matchAll(/\s([^\s=/>"']+)/g)].map((match) => match[1]!));
+    written.delete(word);
+    return [
+      { name: "snippet", detail: "Snippet que se va a renderizar", insert: 'snippet="$1"' },
+      { name: "args", detail: "Argumentos del snippet, separados por comas", insert: 'args="$1"' },
+      { name: "if:when", detail: "Renderiza sólo si la expresión es verdadera", insert: 'if:when="$1"' },
+    ].filter((attribute) => !written.has(attribute.name)).map((attribute, index): CompletionItem => ({
+      label: attribute.name,
+      kind: CompletionItemKind.Property,
+      detail: attribute.detail,
+      documentation: { kind: MarkupKind.Markdown, value: specialTemplateDocumentation("render", attribute.name)! },
+      sortText: `0${index}`,
+      insertTextFormat: InsertTextFormat.Snippet,
+      textEdit: { range: { start: document.positionAt(offset - word.length), end: position }, newText: attribute.insert },
+    }));
+  }
   // `<snippet>` only admits name, params and if:when (MEEK061).
   if (context.tag === "snippet") {
     const written = new Set([...source.slice(context.tagStart, context.tagEnd).matchAll(/\s([^\s=/>"']+)/g)].map((match) => match[1]!));
@@ -568,6 +560,7 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
       label: attribute.name,
       kind: attribute.name === "if:when" ? CompletionItemKind.Keyword : CompletionItemKind.Property,
       detail: attribute.detail,
+      documentation: { kind: MarkupKind.Markdown, value: specialTemplateDocumentation("snippet", attribute.name)! },
       sortText: `0${String(index).padStart(2, "0")}`,
       insertTextFormat: InsertTextFormat.Snippet,
       textEdit: { range, newText: attribute.insert },
@@ -598,8 +591,25 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
   if (builtin && !builtin.element && !builtin.component) return /^(?:on|model|bind|ref):./.test(word) ? undefined : ownProps;
   // DOM events of an element after `on:`; a component's come from its props.
   if (/^on:/.test(word)) return component ? undefined : domEventCompletion(document, position, context, word, builtin?.element);
-  // `model:va`, `bind:ti`: the name after the prefix has its own completion.
-  if (/^(?:model|bind|ref):./.test(word) && !(builtin && /^bind:/.test(word))) return undefined;
+  if (/^bind:/.test(word) && !component) {
+    const builtinProps = builtin?.props.flatMap((prop, index): CompletionItem[] => prop.attributes
+      .filter((attribute) => attribute.startsWith("bind:") && !present.has(attribute))
+      .map((attribute) => ({
+        label: attribute,
+        kind: CompletionItemKind.Property,
+        detail: prop.detail,
+        documentation: { kind: MarkupKind.Markdown, value: prop.documentation },
+        sortText: `0${String(index).padStart(2, "0")}`,
+        insertTextFormat: InsertTextFormat.Snippet,
+        textEdit: { range: { start, end: position }, newText: prop.insert.startsWith("bind:") ? prop.insert : `${attribute}=\"$1\"` },
+      }))) ?? [];
+    const rejected = new Set(builtin?.rejected ?? []);
+    const html = bindAttributeCompletion(document, position, word, tags ?? [builtin?.element ?? context.tag], present)
+      .filter((item) => !rejected.has(item.label.slice(5)) && !builtinProps.some((prop) => prop.label === item.label));
+    return [...builtinProps, ...html];
+  }
+  // `model:va`, `ref:ti`: the name after the prefix has its own completion.
+  if (/^(?:model|ref):./.test(word) || (component && /^bind:./.test(word))) return undefined;
   const directives = templateDirectives
     .filter((directive) => directive.on === "all" || directive.on === (component ? "component" : "element"))
     .filter((directive) => !directive.elements || directive.elements.includes((builtin?.element ?? context.tag).toLowerCase()))
@@ -660,7 +670,8 @@ export function completionList(base: FeatureContext, position: Position, trigger
   const publicImports = new Map<ts.CompletionEntry, string>();
   const offered = new Set<string>();
   // A type the project autoimports (`MeekoLinkProps`) needs no import: its own item stands for it.
-  const autoTypes = new Set(context.project.autoImports().filter(autoImportedType).map((entry) => entry.name));
+  const serverBlock = context.component !== base.component;
+  const autoTypes = new Set(context.project.autoImports().filter((entry) => autoImportedType(entry) && !(serverBlock && entry.browserCode)).map((entry) => entry.name));
   const program = context.project.service.getProgram();
   const file = program?.getSourceFile(context.component.virtualFilename);
   const generated = file ? generatedExports(context.component, file) : new Set<string>();
@@ -669,6 +680,7 @@ export function completionList(base: FeatureContext, position: Position, trigger
     if (entry.source === undefined && !entry.hasAction && generated.has(entry.name)) return false;
     const meeko = meekoAutoImport(context.project, entry);
     if (meeko && "hidden" in meeko) return false;
+    if (serverBlock && entry.hasAction && context.project.autoImports().some((item) => item.name === entry.name && item.browserCode)) return false;
     if (meeko) publicImports.set(entry, meeko.specifier);
     const module = meeko?.specifier ?? entry.data?.moduleSpecifier;
     if (!entry.hasAction || module === undefined) return true;
@@ -1241,8 +1253,8 @@ export async function formatting(
   const { component, document } = context;
   const source = document.getText();
   const describe = (error: unknown): string => error instanceof Error ? error.message : String(error);
-  let editor: typeof import("../prettier/editor.js") | undefined;
-  try { editor = await import("../prettier/editor.js"); }
+  let editor: typeof import("../formatters/prettier/editor.js") | undefined;
+  try { editor = await import("../formatters/prettier/editor.js"); }
   catch (error) { environment.log?.(`Prettier no está disponible; se usa el formateador incluido: ${describe(error)}`); }
   if (editor) {
     try {

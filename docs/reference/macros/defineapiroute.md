@@ -9,6 +9,7 @@ types:
   - "@meekojs/meeko/server#ApiRouteDefinition"
   - "@meekojs/meeko/server#ApiFormOptions"
 related:
+  - docs/como-elegir.md
   - "@meekojs/meeko/server#defineRpc"
   - "@meekojs/meeko/server#ApiError"
   - "autoimport:api"

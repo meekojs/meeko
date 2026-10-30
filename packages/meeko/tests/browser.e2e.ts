@@ -223,7 +223,7 @@ test("una página render: stream es interactiva antes del diferido y respeta una
 
 test("Chrome real envía las excepciones y los rechazos globales a onError sin duplicados y deja de hacerlo al desmontar", { timeout: 120_000 }, async () => {
   const { build } = await import("esbuild");
-  const { createFrameworkHandler } = await import("../src/framework/server.ts");
+  const { createFrameworkHandler } = await import("../src/server/runtime/framework-render.ts");
   const { page: fixturePage, routes } = await import("./fixtures/global-errors/page.ts");
   const bundle = await build({
     entryPoints: [resolve("tests/fixtures/global-errors/client.ts")],

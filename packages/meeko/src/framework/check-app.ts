@@ -2,12 +2,13 @@ import { access, mkdir, readFile, readdir, realpath, unlink, writeFile } from "n
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
 import { checkSource } from "../check.js";
-import { MeekoCompileError } from "../compiler/sfc.js";
-import type { CompileDiagnostic } from "../compiler/sfc.js";
+import { MeekoCompileError } from "../compiler/parser/sfc.js";
+import type { CompileDiagnostic } from "../compiler/parser/sfc.js";
 import { componentTypeDeclarationMarker, componentTypesPath, generateTypes } from "../types.js";
+import { discoverComponents } from "../autoimports/registry.js";
 import { checkAliasScopes, resolveProjectAliases } from "./aliases.js";
 import { loadConfiguredModules, resolveConfigSources } from "./config.js";
-import { assertRouteBlockPlacement } from "./route-block.js";
+import { assertRouteBlockPlacement } from "../compiler/transforms/route-block.js";
 
 const componentTypesManifest = "component-types.json";
 const componentTypeSuffix = ".d.meeko.ts";
@@ -162,6 +163,12 @@ async function appMeekoFiles(projectRoot: string): Promise<string[]> {
       catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
     }
   }
+  // The component catalog owns configured directories, including nested directories and layers.
+  // Generate declarations only for sources owned by this project; installed modules must ship
+  // their own adjacent declarations instead of being written to by the consuming project.
+  for (const { file } of await discoverComponents(root)) {
+    if (inside(root, file) && !relative(root, file).split(sep).includes("node_modules")) files.push(file);
+  }
   // Components of a module inside the project (not an installed package) are project sources too.
   for (const { dir } of modules.componentsDirs) {
     if (inside(root, dir) && !relative(root, dir).split(sep).includes("node_modules")) await walk(dir);
@@ -255,26 +262,42 @@ export interface AppTypesOptions {
   readonly onError?: (filename: string, error: unknown) => void;
 }
 
+async function generateAppType(root: string, file: string, options: AppTypesOptions): Promise<string[]> {
+  const source = options.read?.(file) ?? await readFile(file, "utf8");
+  try {
+    return await generateTypes(source, file, options);
+  } catch (error) {
+    if (!options.onError) throw error;
+    // Preserve the last usable declaration while a component is being edited.
+    if (source.trim()) options.onError(file, error);
+    const previous = componentTypesPath(root, file);
+    try { await access(previous); return [previous]; }
+    catch { return []; }
+  }
+}
+
+/** Updates a saved component and its imported .meeko declarations without scanning the app. */
+export async function generateAppTypeForFile(projectRoot: string, filename: string, options: AppTypesOptions = {}): Promise<string[]> {
+  const root = resolve(projectRoot);
+  const file = resolve(filename);
+  if (!file.endsWith(".meeko") || !inside(root, file) || relative(root, file).split(sep).includes("node_modules")) return [];
+  const manifest = resolve(root, ".meeko", "manifests", componentTypesManifest);
+  const recorded = await readTypeOwnership(manifest);
+  // A missing manifest means there is no complete ownership snapshot to merge with.
+  if (!recorded) return generateAppTypes(root, options);
+  const outputs = await generateAppType(root, file, options);
+  const existing = recorded.map((path) => resolve(root, ".meeko", "types", path));
+  const merged = [...new Set([...existing, ...outputs])];
+  if (merged.length !== existing.length) await reconcileOwnedTypes(root, merged);
+  return outputs;
+}
+
 /** Mirrors app component declarations into the project's virtual type tree. */
 export async function generateAppTypes(projectRoot: string, options: AppTypesOptions = {}): Promise<string[]> {
   const root = resolve(projectRoot);
   const outputs = new Set<string>();
   for (const file of await appMeekoFiles(root)) {
-    const source = options.read?.(file) ?? await readFile(file, "utf8");
-    if (!options.onError) {
-      for (const output of await generateTypes(source, file, options)) outputs.add(output);
-      continue;
-    }
-    // A component being written (new and still empty, or with a syntax error) keeps its last
-    // declaration, so the rest of the project is still checked; an empty file is not reported.
-    try {
-      for (const output of await generateTypes(source, file, options)) outputs.add(output);
-    } catch (error) {
-      if (source.trim()) options.onError(file, error);
-      const previous = componentTypesPath(root, file);
-      try { await access(previous); outputs.add(previous); }
-      catch { /* Never generated: nothing to keep. */ }
-    }
+    for (const output of await generateAppType(root, file, options)) outputs.add(output);
   }
   const generated = [...outputs].sort();
   await reconcileOwnedTypes(root, generated);

@@ -4,6 +4,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if (-not ('System.IO.Compression.ZipFile' -as [type])) {
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+}
 
 if (!$Target) {
   $hostOs = if ($IsWindows) { 'win32' } elseif ($IsLinux) { 'linux' } elseif ($IsMacOS) { 'darwin' } else { throw 'Sistema operativo no admitido para el VSIX.' }
@@ -59,7 +62,7 @@ try {
       throw "El paquete aislado contiene binarios nativos inesperados: $($installedNativePackages -join ', ')."
     }
     New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
-    & pnpm dlx '@vscode/vsce@4.0.0' package --target $Target --allow-missing-repository --out $outputFile
+    & npm exec --yes --package=@vscode/vsce@4.0.0 -- vsce package --target $Target --allow-missing-repository --out $outputFile
     if ($LASTEXITCODE -ne 0) { throw 'Falló la creación del VSIX.' }
     $binaryEntry = "extension/node_modules/@typescript/$nativePackage/lib/$nativeExecutable"
     if ($targetOs -ne 'win32') {

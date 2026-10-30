@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ApiError, createLocalServerFetch, createRequestContext, createServerClientOptions, defineApiRoute, defineRpc, dispatchApiRoute, dispatchRpc, MemorySessionStore, SessionManager, useRequestState } from "../src/framework-server.ts";
 import type { Schema, ServerManifest } from "../src/framework-server.ts";
-import { withRequestContext } from "../src/framework-server/context.ts";
-import { createApiClient, createRpcClient } from "../src/framework/clients.ts";
-import type { ApiOperation, RpcOperation } from "../src/framework/clients.ts";
+import { withRequestContext } from "../src/server/runtime/request-context.ts";
+import { createApiClient, createRpcClient } from "../src/shared/clients.ts";
+import type { ApiOperation, RpcOperation } from "../src/shared/clients.ts";
 
 function schema<T>(accept: (input: unknown) => input is T): Schema<T> {
   return { "~standard": { version: 1, validate(value) { return accept(value) ? { value } : { issues: [{}] }; } } };

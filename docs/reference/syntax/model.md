@@ -6,6 +6,7 @@ description: Enlaza en los dos sentidos un control de formulario, o el modelo de
 symbols:
   - "syntax:model"
 related:
+  - docs/como-elegir.md
   - "syntax:definemodel"
   - "syntax:bind"
   - "syntax:on"

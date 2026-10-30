@@ -6,9 +6,9 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { Window as HappyWindow } from "happy-dom";
 import { compile } from "../src/compiler.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import type { RouteRecord } from "../src/framework/router.ts";
-import type { ClientComponent } from "../src/framework/client.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import type { RouteRecord } from "../src/app/runtime/router.ts";
+import type { ClientComponent } from "../src/app/runtime/client.ts";
 
 const runtimeUrl = (path: string): string => JSON.stringify(pathToFileURL(resolve(path)).href);
 const globals = globalThis as { meekoSelected?: string };
@@ -91,8 +91,8 @@ test("a framework page with an undefined signal answers 200 and hydrates", { tim
   const { module, cleanup } = await load({ "Picker.meeko": picker, "Page.meeko": page }, "Page.meeko");
   try {
     const { createFrameworkHandler, mountClientApp } = {
-      ...await import(pathToFileURL(resolve("src/framework/server.ts")).href) as typeof import("../src/framework/server.ts"),
-      ...await import(pathToFileURL(resolve("src/framework/client.ts")).href) as typeof import("../src/framework/client.ts"),
+      ...await import(pathToFileURL(resolve("src/server/runtime/framework-render.ts")).href) as typeof import("../src/server/runtime/framework-render.ts"),
+      ...await import(pathToFileURL(resolve("src/app/runtime/client.ts")).href) as typeof import("../src/app/runtime/client.ts"),
     };
     const routes: readonly RouteRecord[] = createRouteManifest([{ id: "/", file: "Page.meeko", layouts: [] }]);
     const response = await createFrameworkHandler({ routes, loadPage: async () => module })(new Request("https://example.test/", { headers: { accept: "text/html" } }));

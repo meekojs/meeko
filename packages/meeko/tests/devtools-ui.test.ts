@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Window as HappyWindow } from "happy-dom";
 import { mountDevtoolsPanel } from "../src/devtools-ui/index.ts";
-import type { DevtoolsHook, DevtoolsSnapshot } from "../src/devtools.ts";
+import type { DevtoolsHook, DevtoolsSnapshot } from "../src/app/runtime/devtools.ts";
 
 test("panel DevTools muestra ausencia del hook y se conecta cuando queda disponible", () => {
   const browser = new HappyWindow();

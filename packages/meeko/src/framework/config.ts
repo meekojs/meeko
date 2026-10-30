@@ -6,17 +6,17 @@ import { pathToFileURL } from "node:url";
 import ts from "@typescript/typescript6";
 import { composeFrameworkRoutes } from "./modules.js";
 import { discoverLayouts } from "./routes-discovery.js";
-import { contentSecurityPolicy } from "../framework-server/csp.js";
-import type { ContentSecurityPolicy } from "../framework-server/csp.js";
-import { normalizeDocumentConfig, siteOrigin } from "./head.js";
-import { resolveThemeConfig } from "./theme.js";
-import type { RouteRecord } from "./router.js";
-import type { MeekoConfig } from "./config-type.js";
-import { isMeekoModule } from "./module.js";
+import { contentSecurityPolicy } from "../server/runtime/csp.js";
+import type { ContentSecurityPolicy } from "../server/runtime/csp.js";
+import { normalizeDocumentConfig, siteOrigin } from "../shared/head.js";
+import { resolveThemeConfig } from "../shared/theme.js";
+import type { RouteRecord } from "../app/runtime/router.js";
+import type { MeekoConfig } from "../modules/define-meeko-config.js";
+import { isMeekoModule } from "../modules/define-meeko-module.js";
 import { classifyModuleEntry, resolveMeekoModules, resolvedDocument, warnUnknownConfigKeys } from "./module-loader.js";
 import type { ResolvedModules } from "./module-loader.js";
 
-export type { MeekoConfig } from "./config-type.js";
+export type { MeekoConfig } from "../modules/define-meeko-config.js";
 
 /**
  * Una fuente de páginas y autoimports del proyecto: la aplicación, un layer de `layers` (o
@@ -61,6 +61,31 @@ export function normalizeImportDirectory(option: ImportDirectoryOption, raw: str
   const parts = directory.split("/");
   if (parts[0] !== importDirectoryRoots[option] || parts.length < 2 || parts.some((part) => !part || part === "." || part === "..")) return undefined;
   return directory;
+}
+
+/** Normalize a configured component directory without allowing it to escape a source root. */
+export function normalizeComponentDirectory(raw: string): string | undefined {
+  if (typeof raw !== "string" || !raw || isAbsolute(raw) || /^[A-Za-z]:/.test(raw) || raw.startsWith("\\\\") || raw.startsWith("//")) return undefined;
+  const directory = raw.replaceAll("\\", "/").replace(/\/+$/, "");
+  const parts = directory.split("/");
+  return parts.some((part) => !part || part === "." || part === ".." || part.includes(":")) ? undefined : directory;
+}
+
+/** Validate component directories from both executed and statically read configuration. */
+export function componentDirectories(config: MeekoConfig["components"]): readonly { path: string; prefix: string }[] {
+  if (config !== undefined && (!isPlainObject(config) || (config.dirs !== undefined && !Array.isArray(config.dirs)))) {
+    throw new TypeError("components.dirs debe ser un array de directorios");
+  }
+  return [{ path: "app/components", prefix: "" }, ...(config?.dirs ?? []).map((entry, index) => {
+    if (!isPlainObject(entry) || typeof entry.path !== "string" || normalizeComponentDirectory(entry.path) === undefined) {
+      throw new TypeError(`components.dirs[${index}].path debe ser una ruta relativa segura`);
+    }
+    const prefix = entry.prefix ?? "";
+    if (typeof prefix !== "string" || (prefix !== "" && !/^[A-Z][A-Za-z0-9]*$/.test(prefix))) {
+      throw new TypeError(`components.dirs[${index}].prefix debe ser un nombre PascalCase o una cadena vacía`);
+    }
+    return { path: normalizeComponentDirectory(entry.path)!, prefix };
+  })];
 }
 
 function inside(root: string, target: string): boolean {
@@ -112,6 +137,7 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
   catch (error) { throw new Error(`No se puede cargar ${file}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
   if (!loaded || typeof loaded !== "object" || Array.isArray(loaded)) throw new TypeError(`${file} debe exportar por defecto un objeto de configuración de Meeko`);
   const config = loaded as MeekoConfig;
+  componentDirectories(config.components);
   const imports = config.imports as unknown;
   if (imports !== undefined && !isPlainObject(imports)) throw new TypeError(`${file}: imports debe ser un objeto`);
   for (const [key, entries] of [
@@ -369,6 +395,25 @@ export function readMeekoConfigSync(projectRoot: string): MeekoConfig {
     return value.elements.map((entry) => (entry as ts.StringLiteral).text);
   };
   const imports = property(config, "imports");
+  const components = property(config, "components");
+  let componentDirs: MeekoConfig["components"];
+  if (components !== undefined) {
+    if (!ts.isObjectLiteralExpression(components)) throw new TypeError(`${file}: components debe ser un objeto literal para que el editor lo lea`);
+    const dirs = property(components, "dirs");
+    if (dirs !== undefined) {
+      if (!ts.isArrayLiteralExpression(dirs)) throw new TypeError(`${file}: components.dirs debe ser un array literal para que el editor lo lea`);
+      componentDirs = { dirs: dirs.elements.map((element, index) => {
+        if (!ts.isObjectLiteralExpression(element)) throw new TypeError(`${file}: components.dirs[${index}] debe ser un objeto literal`);
+        const path = property(element, "path");
+        const prefix = property(element, "prefix");
+        if (!path || !ts.isStringLiteralLike(path) || (prefix && !ts.isStringLiteralLike(prefix))) {
+          throw new TypeError(`${file}: components.dirs[${index}] requiere path y prefix literales`);
+        }
+        return { path: path.text, ...(prefix ? { prefix: prefix.text } : {}) };
+      }) };
+      componentDirectories(componentDirs);
+    } else componentDirs = {};
+  }
   const importDirs: { -readonly [Option in ImportDirectoryOption]?: readonly string[] } = {};
   for (const option of importDirectoryOptions) {
     const entries = imports && ts.isObjectLiteralExpression(imports) ? strings(imports, option) : undefined;
@@ -389,6 +434,7 @@ export function readMeekoConfigSync(projectRoot: string): MeekoConfig {
     ...(extensions ? { extends: extensions } : {}),
     ...(modules ? { modules } : {}),
     ...(Object.keys(importDirs).length ? { imports: importDirs } : {}),
+    ...(componentDirs ? { components: componentDirs } : {}),
   };
 }
 

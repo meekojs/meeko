@@ -1,38 +1,29 @@
 <script server lang="ts">
 	import { definePage } from '@meekojs/meeko/framework'
-	import { apiHref, apiPage, apiPager, apiSlugs } from '../../../../server/content/api.js'
-	import { referenceHref } from '../../../../server/content/api-groups.js'
-	import { referenceEntryAt, referenceNavigation, referenceOnlySlugs, referencePage, referencePager } from '../../../../server/content/reference.js'
+	import type { ApiPage } from '../../../../shared/types/api.js'
+	import type { NavSection, Pager, TocEntry } from '../../../../shared/types/docs.js'
+	import type { ReferencePage } from '../../../../shared/types/reference.js'
+	import { readPage } from '../../../../server/content/db.js'
 
-	// One page per export and per piece of `.meeko` syntax, generated in `meeko build` from the
-	// sources of the package, and one per written page of docs/reference (reference.ts), which
-	// takes the URL of the generated page of its symbol and merges its types into the prose.
-	export const route = definePage({
-		render: 'prerender',
-		prerenderEntries: async () => [...(await apiSlugs()), ...(await referenceOnlySlugs())].map((symbol) => ({ symbol })),
-	})
+	export const route = definePage({ render: 'ssr' })
 
 	const { params } = usePage()
-	const href = apiHref(params.symbol)
-	export const written = (await referencePage(params.symbol)) ?? null
-	export const page = written ? null : ((await apiPage(params.symbol)) ?? null)
-	if (!written && !page) notFound()
-	export const nav = await referenceNavigation()
-	// A symbol of the taxonomy is marked in its group; any other export, in its module.
-	const entry = await referenceEntryAt(href)
-	export const current = entry ? entry.href : (page?.group.href ?? referenceHref)
-	export const pages = (await referencePager(href)) ?? (await apiPager(params.symbol))
-	export const toc = written?.toc ?? page?.toc ?? []
-	export const editUrl = written?.editUrl ?? page?.editUrl ?? ''
-	export const editPath = written?.editPath ?? page?.editPath ?? ''
-	export const index = referenceHref
-	const title = written?.title ?? page?.name ?? params.symbol
-	/** Title of the search result: the name and where it comes from. */
-	export const searchTitle = `title:${title} · ${written ? written.kindLabel : (page?.specifier ?? 'sintaxis de .meeko')}`
-	export const head = {
-		title: `${title} · Referencia de la API · Meeko`,
-		description: written?.description ?? (page ? page.summary || `${page.name}, ${page.kindLabel} de ${page.specifier ?? 'los componentes .meeko'}.` : ''),
+	type SymbolPage = {
+		readonly written: ReferencePage | null
+		readonly page: ApiPage | null
+		readonly nav: readonly NavSection[]
+		readonly current: string
+		readonly pages: Pager
+		readonly toc: readonly TocEntry[]
+		readonly editUrl: string
+		readonly editPath: string
+		readonly index: string
+		readonly searchTitle: string
+		readonly head: { readonly title: string; readonly description: string }
 	}
+	const snapshot = await readPage<SymbolPage>(`/docs/reference/${params.symbol}`)
+	if (!snapshot) notFound()
+	export const { written, page, nav, current, pages, toc, editUrl, editPath, index, searchTitle, head } = snapshot
 </script>
 
 <script lang="ts">

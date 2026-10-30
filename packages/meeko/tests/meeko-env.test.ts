@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { meekoEnv, parseDuration, resetEnvWarnings } from "../src/framework-server/env.ts";
+import { meekoEnv, parseDuration, resetEnvWarnings } from "../src/server/runtime/env.ts";
 import { meekoEnv as internalMeekoEnv } from "../src/internal.ts";
 
 function captureWarnings(run: () => void): string[] {

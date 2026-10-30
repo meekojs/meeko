@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import ts from "@typescript/typescript6";
-import { parseSfc } from "../compiler/sfc.js";
+import { parseSfc } from "../compiler/parser/sfc.js";
 import { frameworkTsconfigPaths, resolveProjectAliases } from "./aliases.js";
 import type { AppTypesOptions } from "./check-app.js";
 import { prepareFrameworkTypeDeclarations } from "./type-declarations.js";

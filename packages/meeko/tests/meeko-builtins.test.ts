@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import { compileWithAutoImports } from "../src/autoimports.ts";
-import type { AutoImport } from "../src/autoimports.ts";
+import { compileWithAutoImports } from "../src/autoimports/transform.ts";
+import type { AutoImport } from "../src/autoimports/registry.ts";
 import { compile, shadowedBuiltinTags } from "../src/compiler.ts";
-import { MeekoCompileError } from "../src/compiler/sfc.ts";
+import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
 import { directiveNameCompletion } from "../src/language-server/features.ts";
 import { linkRouteCompletion } from "../src/language-server/nav.ts";
-import { linkCurrent, routeCurrent } from "../src/link.ts";
-import { fixedRoute } from "../src/framework/navigation.ts";
-import { activateRouteManifest, createRouteManifest } from "../src/framework/router.ts";
-import type { RouteRecord } from "../src/framework/router.ts";
+import { linkCurrent, routeCurrent } from "../src/shared/link.ts";
+import { fixedRoute } from "../src/app/runtime/navigation.ts";
+import { activateRouteManifest, createRouteManifest } from "../src/app/runtime/router.ts";
+import type { RouteRecord } from "../src/app/runtime/router.ts";
 
 const layout = "/project/app/layouts/default.meeko";
 

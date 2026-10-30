@@ -34,7 +34,7 @@ test("the editor model accepts defineExpose, autoimports onMounted and lists wit
     const text = ts.displayPartsToString(info?.displayParts);
     assert.match(text, /bump: \(\) => number/);
     assert.match(text, /count: Signal<number>/);
-    assert.match(model.code, /hydrateScope\(scope: object, props: ComponentProps, state\?: Record<string, unknown>\): \{ \(\): void; readonly exposed\?: ComponentExposed \}/);
+    assert.match(model.code, /hydrateScope\(scope: object, props: __MeekoComponentProps, state\?: Record<string, unknown>\): \{ \(\): void; readonly exposed\?: ComponentExposed \}/);
 
     // The script keeps its positions: hover on the defineExpose argument maps back.
     const use = source.indexOf("bump, count })");

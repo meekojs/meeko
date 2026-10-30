@@ -55,6 +55,12 @@
           "symbols": [
             "syntax:component-tag"
           ]
+        },
+        {
+          "name": "ComponentRegistry",
+          "symbols": [
+            "@meekojs/meeko#ComponentRegistry"
+          ]
         }
       ]
     },

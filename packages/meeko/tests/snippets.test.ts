@@ -7,7 +7,7 @@ import { Window } from "happy-dom";
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
 import { originalOffset } from "../src/compiler/mapping.ts";
-import { MeekoCompileError, parseSfc } from "../src/compiler/sfc.ts";
+import { MeekoCompileError, parseSfc } from "../src/compiler/parser/sfc.ts";
 import { generateTypes } from "../src/types.ts";
 
 interface RuntimeModule {

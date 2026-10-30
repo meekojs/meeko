@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { bunEntrySource, denoEntrySource } from "../src/framework/adapter-templates.ts";
 import { nodeEntrySource } from "../src/framework/project-templates.ts";
-import { displayHost, listeningMessage, serverUrls } from "../src/framework-server/listen-address.ts";
-import type { NetworkInterfaces } from "../src/framework-server/listen-address.ts";
+import { displayHost, listeningMessage, serverUrls } from "../src/server/runtime/listen-address.ts";
+import type { NetworkInterfaces } from "../src/server/runtime/listen-address.ts";
 import { listeningMessage as internalListeningMessage } from "../src/internal.ts";
 
 /** A machine with loopback, a LAN address, a Docker bridge and IPv6, as `os.networkInterfaces()` reports it. */

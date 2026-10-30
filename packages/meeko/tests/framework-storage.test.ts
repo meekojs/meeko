@@ -5,21 +5,22 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { Window as HappyWindow } from "happy-dom";
 import { compile } from "../src/compiler.ts";
-import { applyAutoImports, discoverAutoImports } from "../src/autoimports.ts";
-import type { ClientComponent } from "../src/framework/client.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import type { RouteRecord } from "../src/framework/router.ts";
+import { discoverAutoImports } from "../src/autoimports/registry.ts";
+import { applyAutoImports } from "../src/autoimports/transform.ts";
+import type { ClientComponent } from "../src/app/runtime/client.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import type { RouteRecord } from "../src/app/runtime/router.ts";
 import { createTempProject } from "./helpers/temp-project.ts";
 
 const fileUrl = (path: string): string => pathToFileURL(resolve(path)).href;
 
 /** The runtime as the compiled pages import it, by file URL: one instance for pages, server and browser. */
 const runtime = async () => ({
-  ...await import(fileUrl("src/framework/server.ts")) as typeof import("../src/framework/server.ts"),
-  ...await import(fileUrl("src/framework/client.ts")) as typeof import("../src/framework/client.ts"),
-  ...await import(fileUrl("src/framework/storage.ts")) as typeof import("../src/framework/storage.ts"),
-  ...await import(fileUrl("src/reactivity.ts")) as typeof import("../src/reactivity.ts"),
-  ...await import(fileUrl("src/lifecycle.ts")) as typeof import("../src/lifecycle.ts"),
+  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof import("../src/server/runtime/framework-render.ts"),
+  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof import("../src/app/runtime/client.ts"),
+  ...await import(fileUrl("src/app/composables/useStorage.ts")) as typeof import("../src/app/composables/useStorage.ts"),
+  ...await import(fileUrl("src/core/reactivity.ts")) as typeof import("../src/core/reactivity.ts"),
+  ...await import(fileUrl("src/app/runtime/lifecycle.ts")) as typeof import("../src/app/runtime/lifecycle.ts"),
 });
 
 const log = (): string[] => (globalThis as unknown as { storageLog: string[] }).storageLog;

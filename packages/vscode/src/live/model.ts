@@ -1,6 +1,6 @@
-import type { DevelopmentServerRecord, EditorLiveAlias, EditorLiveSignal } from "../../../meeko/src/devtools-bridge-protocol.js";
+import type { DevelopmentServerRecord, EditorLiveAlias, EditorLiveSignal } from "../../../meeko/src/shared/devtools-bridge-protocol.js";
 
-export type { EditorBridgeDescriptor, EditorBridgeEvent, EditorCommandResult, EditorLiveAlias, EditorLiveSignal } from "../../../meeko/src/devtools-bridge-protocol.js";
+export type { EditorBridgeDescriptor, EditorBridgeEvent, EditorCommandResult, EditorLiveAlias, EditorLiveSignal } from "../../../meeko/src/shared/devtools-bridge-protocol.js";
 
 /** Descriptores del puente: cada `meeko dev` en marcha escribe el suyo, con su puerto en el nombre. */
 export const bridgeDescriptorGlob = "**/.meeko/dev/editor-bridge-*.json";
@@ -254,18 +254,28 @@ export function loopbackBridgeUrl(url: unknown): URL | undefined {
   return loopback ? parsed : undefined;
 }
 
-/** Lector incremental de `text/event-stream`. */
+/** Límite por evento SSE, incluida la instantánea de señales. */
+export const maxSseFrameBytes = 4 * 1024 * 1024;
+
+/** Lector incremental de `text/event-stream`; rechaza eventos demasiado grandes. */
 export class SseParser {
   private buffer = "";
+  private rejected = false;
 
-  constructor(private readonly onEvent: (event: string, data: string) => void) {}
+  constructor(private readonly onEvent: (event: string, data: string) => void, private readonly maxBytes = maxSseFrameBytes) {}
 
-  push(chunk: string): void {
-    this.buffer += chunk.replace(/\r\n?/g, "\n");
+  /** `false` indica un evento excesivo; se descarta el búfer y no se aceptan más datos. */
+  push(chunk: string): boolean {
+    if (this.rejected) return false;
+    const incoming = chunk.replace(/\r\n?/g, "\n");
+    // Process complete frames before retaining the incomplete tail. A large chunk can
+    // contain many valid small events without counting them as a single frame.
+    this.buffer += incoming;
     let end: number;
     while ((end = this.buffer.indexOf("\n\n")) >= 0) {
       const frame = this.buffer.slice(0, end);
       this.buffer = this.buffer.slice(end + 2);
+      if (Buffer.byteLength(frame, "utf8") > this.maxBytes) return this.reject();
       let event = "message";
       const data: string[] = [];
       for (const line of frame.split("\n")) {
@@ -278,5 +288,13 @@ export class SseParser {
       }
       if (data.length) this.onEvent(event, data.join("\n"));
     }
+    if (Buffer.byteLength(this.buffer, "utf8") > this.maxBytes) return this.reject();
+    return true;
+  }
+
+  private reject(): false {
+    this.buffer = "";
+    this.rejected = true;
+    return false;
   }
 }

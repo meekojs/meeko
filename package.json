@@ -32,7 +32,7 @@
     "vscode:package": "pnpm -F meeko-language run package:vsix",
     "site:dev": "pnpm -F meeko-site run dev",
     "site:build": "pnpm -F @meekojs/meeko run build && pnpm -F meeko-site run build",
-    "site:build:static": "pnpm -F @meekojs/meeko run build && pnpm -F meeko-site run build:static"
+    "site:docs:sync": "pnpm -F meeko-site run docs:sync"
   },
   "engines": {
     "node": ">=24"

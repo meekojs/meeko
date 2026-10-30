@@ -3,9 +3,10 @@
  * their content, their documentation and where they are valid. One entry per tag; the virtual code,
  * the hover, "go to definition" and the completion read this table, so a new built-in tag only adds
  * an entry here, its props type in `@meekojs/meeko/framework` and that type's name in
- * `builtinTagTypes` of `autoimports.ts`, which autoimports it.
+ * `builtinTagTypes` of `autoimports/registry.ts`, which autoimports it.
  */
 import { readThemeEnabledSync } from "../framework/config.js";
+import { builtinComponentModules } from "../compiler.js";
 
 /** A prop of a built-in tag, as the template writes it. */
 export interface BuiltinTagProp {
@@ -214,7 +215,7 @@ export const builtinTags: readonly BuiltinTag[] = [
     snippets: ["light", "dark", "system"].map((name) => ({ name, parameters: "", optional: true, documentation: `Icono de la elección \`${name}\`; sin él se pinta su nombre.` })),
     snippetsType: "ThemeToggleSnippets",
     component: true,
-    module: "@meekojs/meeko/builtins/theme-toggle",
+    module: builtinComponentModules.MeekoThemeToggle!.specifier,
     summary: "Selector de tema claro/oscuro de `theme` en `meeko.config.ts`, un componente que Meeko compila y distribuye: un `<form method=\"post\" action=\"/_meeko/theme\">` "
       + "que funciona sin JavaScript. Pinta un icono por elección, el snippet con su nombre, y la regla que Meeko añade a `<head>` muestra el de `data-theme-choice` de `<html>`, "
       + "así que nunca salta. `mode=\"cycle\"` es un botón que pasa al tema siguiente y `mode=\"select\"`, un grupo de radios. Sin `theme` es el error `MEEK111`.",
@@ -260,7 +261,7 @@ export const builtinTags: readonly BuiltinTag[] = [
       { name: "error", parameters: "error: Error, retry: () => void", optional: true, documentation: "Un fallo sin datos: `error` y `retry`, que vuelve a pedirlos. Sin él, un aviso con `role=\"alert\"` y un botón." },
     ],
     component: true,
-    module: "@meekojs/meeko/builtins/await",
+    module: builtinComponentModules.MeekoAwait!.specifier,
     summary: "Zona de unos datos que llegan después del primer pintado (`useApi` o `useRpcQuery` sin `await`), un componente que Meeko compila y distribuye: "
       + "pinta `pending` en la primera carga, `error` (con `retry`) si falla y su contenido cuando hay datos, que conserva durante las recargas. "
       + "Con `reserve`, mientras espera ocupa la altura que tuvo con datos, así que la card no salta. Marca `aria-busy` mientras carga.",
@@ -314,7 +315,7 @@ export const builtinTags: readonly BuiltinTag[] = [
       { name: "anchor", parameters: "trigger: PopoverTrigger", optional: true, documentation: "Un disparador propio en lugar del botón; aplique los atributos de `trigger` (`id`, `aria-expanded`…)." },
     ],
     component: true,
-    module: "@meekojs/meeko/builtins/popover",
+    module: builtinComponentModules.MeekoPopover!.specifier,
     summary: "Popover anclado sobre la API nativa `popover` y *CSS anchor positioning* (con un cálculo en JavaScript donde no existe): el contenido está en la capa superior, "
       + "oculto desde el HTML del servidor. Pinta un `<button>` con `popovertarget`, `aria-expanded`, `aria-controls` y `aria-haspopup`; `model` es la señal de apertura y `on:toggle` emite `{ open }`. "
       + "`Esc` cierra y devuelve el foco; con `role=\"menu\"`, flechas, `Inicio`/`Fin` y búsqueda por letras.",
@@ -358,7 +359,7 @@ export const builtinTags: readonly BuiltinTag[] = [
       { name: "loading", parameters: "", optional: true, documentation: "Lo que se muestra mientras una búsqueda asíncrona carga." },
     ],
     component: true,
-    module: "@meekojs/meeko/builtins/select",
+    module: builtinComponentModules.MeekoSelect!.specifier,
     summary: "Select accesible sobre `<MeekoPopover>`: un `role=\"combobox\"` con `aria-activedescendant` (el foco se queda en el disparador o el `<input>` de `searchable`) y un `role=\"listbox\"`. "
       + "`model` es el valor (un array con `multiple`), tipado por `options`; `by` compara objetos, `groupBy` agrupa, `max` limita y `name` envía `<input type=\"hidden\">`. "
       + "Sin estilos visuales: `data-active`, `data-selected` y `data-disabled` en las opciones y `data-open` en la raíz.",

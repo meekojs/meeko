@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import test from "node:test";
-import { isTagName } from "../src/dynamic-tag.ts";
-import { elementAccepts, elementAttributeNames, globalAttributeNames, tagsAccepting } from "../src/html-attributes.ts";
+import { isTagName } from "../src/app/runtime/dynamic-tag.ts";
+import { elementAccepts, elementAttributeNames, globalAttributeNames, tagsAccepting } from "../src/shared/html-attributes.ts";
 
 interface HtmlData {
   readonly tags: ReadonlyArray<{ readonly name: string; readonly attributes: ReadonlyArray<{ readonly name: string }> }>;

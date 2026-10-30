@@ -12,18 +12,17 @@ const permissions = [
 export default defineMeekoConfig({
   // Canonical URLs, og:url, sitemap.xml and robots.txt use this origin.
   site: "https://meeko.diegootayza.com",
-  sitemap: true,
-  robots: true,
+  // Both documents are served from the active documentation snapshot.
+  sitemap: false,
+  robots: false,
   // Light, dark or the system's, in the cookie and localStorage "meeko-theme" (the key the site
   // used before, so earlier choices still apply). Dark until the visitor chooses. Every page is
   // prerendered, so Meeko's inline script in <head> applies the stored theme before the first
   // paint, and the ThemeToggle of the layout (useTheme) follows it.
   theme: { default: "dark" },
-  // Every page is prerendered: the build is a folder of files for nginx (deploy/nginx.conf).
+  // Documentation is rendered from PostgreSQL on each request.
   server: {
-    adapter: "static",
-    // _meeko/headers.conf, which deploy/nginx.conf includes in every location.
-    headerFiles: ["nginx"],
+    adapter: "node",
     // No inline script runs without its SHA-256, which the build adds to script-src on every
     // build (the theme script of `theme`, for example): changing a script needs no manual step.
     //

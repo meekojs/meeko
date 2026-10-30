@@ -1,25 +1,33 @@
+import { definePropsDocs } from "../app/definitions/define-props.js";
+import { defineEmitsDocs } from "../app/definitions/define-emits.js";
+import { defineExposeDocs } from "../app/definitions/define-expose.js";
+import { defineModelDocs } from "../app/definitions/define-model.js";
+import { defineSnippetsDocs } from "../app/definitions/define-snippets.js";
+import { useElementRefDocs, useElementRefEditorDeclaration, useElementRefUnexposedEditorType } from "../app/definitions/use-element-ref.js";
 import { basename, dirname, join, resolve } from "node:path";
+import { apiDocs, jsdoc } from "../app/definitions/compiler-docs.js";
 import { existsSync, statSync } from "node:fs";
 import ts from "@typescript/typescript6";
-import { applyAutoImports, autoImportedValues, discoverAutoImportsSync } from "../autoimports.js";
-import type { AutoImport } from "../autoimports.js";
+import { discoverAutoImportsSync } from "../autoimports/registry.js";
+import { applyAutoImports, autoImportedValues } from "../autoimports/transform.js";
+import type { AutoImport } from "../autoimports/registry.js";
 import { awaitForReferences, shadowedBuiltinTags } from "../compiler.js";
 import { generatedServicesDeclaration, projectDeclarationFiles } from "../compiler/project-declarations.js";
 import { projectRoot } from "../compiler/project-root.js";
 import { GenericError, parseGeneric, sectionAttribute } from "../compiler/generic.js";
 import type { GenericParameters } from "../compiler/generic.js";
-import { analyzePropsDefaults, PropsDefaultsError } from "../compiler/props.js";
+import { analyzePropsDefaults, PropsDefaultsError } from "../app/definitions/define-props.js";
 import { freeIdentifiers } from "../compiler/composables.js";
-import { templateEventDeclaration, templateEventType } from "../compiler/events.js";
-import { isCandidates } from "../compiler/dynamic-tag.js";
-import { scanInterpolations } from "../compiler/interpolation.js";
-import { MeekoCompileError, parseSfc } from "../compiler/sfc.js";
-import { analyzeServerScript } from "../compiler/server-script.js";
-import type { ServerScript } from "../compiler/server-script.js";
-import { pageRouteId, serverScriptTypes } from "../framework/server-script.js";
-import type { SfcSection } from "../compiler/sfc.js";
-import { attributeValueStart, decodeTemplateText, isCustomElementTag, parseTemplate } from "../compiler/template.js";
-import type { TemplateNode } from "../compiler/template.js";
+import { templateEventDeclaration, templateEventType } from "../compiler/transforms/events.js";
+import { isCandidates } from "../compiler/transforms/dynamic-tag.js";
+import { scanInterpolations } from "../compiler/parser/interpolation.js";
+import { MeekoCompileError, parseSfc } from "../compiler/parser/sfc.js";
+import { analyzeServerScript } from "../compiler/transforms/server-script.js";
+import type { ServerScript } from "../compiler/transforms/server-script.js";
+import { pageRouteId, serverScriptTypes } from "../compiler/codegen/server-script.js";
+import type { SfcSection } from "../compiler/parser/sfc.js";
+import { attributeValueStart, decodeTemplateText, isCustomElementTag, parseTemplate } from "../compiler/parser/template.js";
+import type { TemplateNode } from "../compiler/parser/template.js";
 import { extractRouteRender } from "../framework/routes-discovery.js";
 import { builtinTag, builtinTagProp } from "./builtin-tags.js";
 import { aliasCandidates, aliasTsconfigPaths } from "../compiler/aliases.js";
@@ -231,13 +239,6 @@ function serverScriptOf(source: string, filename: string, section: SfcSection): 
   catch (error) { if (error instanceof MeekoCompileError) return undefined; throw error; }
 }
 
-/** Une las líneas de un JSDoc de macro. */
-function jsdoc(...lines: string[]): string {
-  return ["/**", ...lines.map((line) => line ? ` * ${line}` : " *"), " */"].join("\n");
-}
-
-const apiDocs = "https://github.com/meekojs/meeko/blob/main/docs/api.md";
-
 /**
  * JSDoc of `<MeekoThemeToggle>`. The virtual document declares it as the compiled component that
  * Meeko ships, so its props, its snippets and its hover come from that module, as for any tag.
@@ -295,162 +296,14 @@ const awaitDocs = jsdoc(
   "@see https://github.com/meekojs/meeko/blob/main/docs/framework.md#meekoawait",
 );
 
-/**
- * JSDoc de las macros de compilación. El documento virtual los antepone a sus declaraciones para
- * que el hover, el completado y la ayuda de firma del editor muestren la documentación.
- */
+/** JSDoc of the component compile-time macros, each owned by its own module. */
 const macroDocs = {
-  defineProps: jsdoc(
-    "Macro de compilación: declara las props del componente con el tipo `T` y devuelve el objeto de props.",
-    "No se importa ni existe en tiempo de ejecución.",
-    "",
-    "El argumento opcional es un objeto literal de valores por defecto: esas props pasan a ser opcionales",
-    "para el padre y, dentro del componente, nunca son `undefined`. Debe aparecer una sola vez, en su",
-    "propia declaración (`MEEK016`), y con argumento de tipo (`MEEK017`).",
-    "",
-    "@example",
-    "```html",
-    "<script lang=\"ts\">",
-    "interface Props { title: string; count?: number }",
-    "const props = defineProps<Props>({ count: 0 });",
-    "</script>",
-    "<template><h2>{props.title} ({props.count})</h2></template>",
-    "```",
-    `@see ${apiDocs}#valores-por-defecto-en-defineprops`,
-  ),
-  defineEmits: jsdoc(
-    "Macro de compilación: declara los eventos del componente. Cada clave de `T` es un evento y su valor,",
-    "la tupla de argumentos. Devuelve `emit(evento, ...args)`, que llama a la prop de callback opcional",
-    "`onEvento` que el padre pasa con `on:evento`; sin listener no hace nada.",
-    "",
-    "Una sola vez, en su propia declaración `const` de nivel superior (`MEEK045`), con argumento de tipo",
-    "(`MEEK046`) y sin argumentos en tiempo de ejecución (`MEEK047`).",
-    "",
-    "@since 1.1.0",
-    "@example",
-    "```html",
-    "<!-- TodoItem.meeko -->",
-    "<script lang=\"ts\">",
-    "const props = defineProps<{ id: number }>();",
-    "const emit = defineEmits<{ save: [id: number]; close: [] }>();",
-    "</script>",
-    "<template><button on:click=\"() => emit('save', props.id)\">Guardar</button></template>",
-    "",
-    "<!-- En el padre -->",
-    "<TodoItem bind:id=\"todo.id\" on:save=\"(id) => save(id)\" />",
-    "```",
-    `@see ${apiDocs}#eventos-de-componente-defineemits-y-on`,
-  ),
-  defineExpose: jsdoc(
-    "Macro de compilación: publica `exposed` para el padre que nombra este componente con `ref:` y lo",
-    "lee con `useElementRef`. Devuelve el mismo valor. Sin `defineExpose`, el componente expone `null`.",
-    "",
-    "Es una sentencia de nivel superior que aparece una sola vez (`MEEK050`), con un argumento y como",
-    "mucho un argumento de tipo (`MEEK051`). El valor expuesto no viaja en el estado SSR.",
-    "",
-    "@since 1.1.0",
-    "@example",
-    "```html",
-    "<!-- SearchBox.meeko -->",
-    "<script lang=\"ts\">",
-    "const query = signal(\"\");",
-    "function clear(): void {",
-    "  query.value = \"\";",
-    "}",
-    "defineExpose({ query, clear });",
-    "</script>",
-    "<template><input bind:value=\"query.value\" on:input=\"(event) => query.value = event.currentTarget.value\"></template>",
-    "```",
-    `@see ${apiDocs}#exponer-valores-defineexpose`,
-  ),
-  defineModel: jsdoc(
-    "Macro de compilación: declara un modelo, una señal escribible que el padre comparte con",
-    "`model=\"señal\"` (el modelo sin nombre) o `model:nombre=\"señal\"`. El hijo lee y escribe la señal del",
-    "padre; si el padre no pasa ninguna, usa una señal local creada con `default`. Un modelo sin",
-    "`default` es obligatorio para el padre. El modelo sin nombre recibe las opciones solas:",
-    "`defineModel<string>({ default: \"\" })` lo hace opcional.",
-    "",
-    "Va en su propia declaración `const` de nivel superior y cada nombre se declara una sola vez (`MEEK063`).",
-    "",
-    "@since 1.1.0",
-    "@example",
-    "```html",
-    "<!-- Toggle.meeko -->",
-    "<script lang=\"ts\">",
-    "const open = defineModel<boolean>(\"open\", { default: false });",
-    "</script>",
-    "<template><button on:click=\"() => open.value = !open.value\">{open.value ? \"Cerrar\" : \"Abrir\"}</button></template>",
-    "",
-    "<!-- En el padre, con const visible = signal(true) -->",
-    "<Toggle model:open=\"visible\" />",
-    "```",
-  ),
-  defineSnippets: jsdoc(
-    "Macro de compilación: declara los snippets del componente, contenido de plantilla que el padre",
-    "escribe entre las etiquetas del hijo. Cada clave de `T` es un snippet y su valor, la tupla de",
-    "parámetros que el hijo le pasa; una clave opcional (`title?: []`) hace opcional el snippet.",
-    "",
-    "El contenido suelto entre las etiquetas es el snippet `default`; los demás se escriben con",
-    "`<snippet name=\"...\" params=\"...\">`. El hijo los coloca con `<render snippet=\"...\" args=\"...\" />`.",
-    "El contenido pertenece al padre: lee su ámbito y sus señales. Una sola vez, en su propia",
-    "declaración `const` de nivel superior (`MEEK059`).",
-    "",
-    "Desde `1.4`, el valor de una clave también puede ser un `Snippet<Args>`, que cuenta como",
-    "`Args`: así se reutilizan los snippets de otro componente con `Omit`, `Pick` o `&`, por",
-    "ejemplo `defineSnippets<Omit<AppCardSnippets, \"footer\"> & { actions?: [close: () => void] }>()`.",
-    "",
-    "@since 1.1.0",
-    "@example",
-    "```html",
-    "<!-- Card.meeko -->",
-    "<script lang=\"ts\">",
-    "const snippets = defineSnippets<{ default: []; title?: []; actions?: [close: () => void] }>();",
-    "const open = signal(true);",
-    "</script>",
-    "<template>",
-    "  <article if:when=\"open.value\">",
-    "    <header if:when=\"snippets.title\"><render snippet=\"snippets.title\" /></header>",
-    "    <render snippet=\"snippets.default\" />",
-    "    <render snippet=\"snippets.actions\" args=\"() => open.value = false\" />",
-    "  </article>",
-    "</template>",
-    "",
-    "<!-- En el padre -->",
-    "<Card>",
-    "  <snippet name=\"title\">Aviso</snippet>",
-    "  Texto del cuerpo",
-    "  <snippet name=\"actions\" params=\"close\"><button on:click=\"close\">Cerrar</button></snippet>",
-    "</Card>",
-    "```",
-  ),
-  useElementRef: jsdoc(
-    "Macro de compilación: lee el elemento o el componente que la plantilla nombra con `ref:nombre`.",
-    "Su tipo sale de la etiqueta (`HTMLElementTagNameMap` o `SVGElementTagNameMap`) o del `defineExpose`",
-    "del componente.",
-    "",
-    "- Sin `await`, devuelve una señal de sólo lectura que vale `null` en SSR y mientras el destino no existe.",
-    "- Con `await`, devuelve el destino, nunca `null`, y el resto del setup continúa sólo en el navegador.",
-    "- Dentro de `each:of`, devuelve una señal con la lista de filas, que no admite `await`.",
-    "",
-    "Sólo en el nivel superior del script (`MEEK054`). El argumento es un literal con el nombre de una",
-    "`ref:` de la plantilla (`MEEK056`).",
-    "",
-    "@since 1.1.0",
-    "@example",
-    "```html",
-    "<script lang=\"ts\">",
-    "const title = useElementRef(\"title\");",
-    "onMounted(() => {",
-    "  title.value?.scrollIntoView();",
-    "});",
-    "const field = await useElementRef(\"field\");",
-    "// Desde aquí, sólo en el navegador y con el campo ya montado.",
-    "field.focus();",
-    "</script>",
-    "<template><h2 ref:title>Buscar</h2><input ref:field /></template>",
-    "```",
-    `@see ${apiDocs}#referencias-a-elementos-ref-y-useelementref`,
-  ),
+  defineProps: definePropsDocs,
+  defineEmits: defineEmitsDocs,
+  defineExpose: defineExposeDocs,
+  defineModel: defineModelDocs,
+  defineSnippets: defineSnippetsDocs,
+  useElementRef: useElementRefDocs,
 } as const;
 
 /**
@@ -1144,9 +997,9 @@ export function createVirtualComponent(source: string, filename: string, options
   code += `type __MeekoRefs = { ${[...refs].map(([name, ref]) => `${JSON.stringify(name)}: ${ref.type}`).join("; ")} };\n`;
   code += `type __MeekoListRefs = ${[...refs].filter(([, ref]) => ref.list).map(([name]) => JSON.stringify(name)).join(" | ") || "never"};\n`;
   // A component without defineExpose has nothing to await: its `then` is not a promise's (MEEK080).
-  code += "type __MeekoUnexposedRef = { readonly value: null; then(meek080: \"MEEK080: esta ref nombra un componente sin defineExpose, así que no expone nada que esperar; añade defineExpose al componente o lee .value\"): never };\n";
+  code += `${useElementRefUnexposedEditorType}\n`;
   code += `${macroDocs.useElementRef}\n`;
-  code += "declare function useElementRef<K extends keyof __MeekoRefs>(name: K): K extends __MeekoListRefs ? { readonly value: readonly __MeekoRefs[K][] } : [__MeekoRefs[K]] extends [null] ? __MeekoUnexposedRef : { readonly value: __MeekoRefs[K] | null } & PromiseLike<__MeekoRefs[K]>;\n";
+  code += `${useElementRefEditorDeclaration}\n`;
   // The module shape of the compiled component, so another component that imports this one
   // in the shared editor project sees its props, including the `onEvent` callbacks.
   const declaredProps = propsTypeText ?? "Record<string, never>";
@@ -1161,10 +1014,10 @@ export function createVirtualComponent(source: string, filename: string, options
   // Named so the editor can list the events of this component on a parent's tag.
   if (emitsTypeText) code += `type __MeekoEmits${G} = ${emitsTypeText};\n`;
   code += "type __MeekoEmitPropsOf<T> = { [K in keyof T & string as `on${Capitalize<K>}`]?: ((...args: T[K] extends readonly unknown[] ? T[K] : never) => void) | undefined };\n";
-  code += `export type ComponentProps${G} = (${inputProps})${emitsTypeText ? ` & __MeekoEmitPropsOf<__MeekoEmits${A}>` : ""};\n`;
+  code += `type __MeekoComponentProps${G} = (${inputProps})${emitsTypeText ? ` & __MeekoEmitPropsOf<__MeekoEmits${A}>` : ""};\nexport type { __MeekoComponentProps as ComponentProps };\n`;
   // Structural, without importing the package: it satisfies `Component<ComponentProps>`.
-  code += `export declare function renderToString${G}(props: ComponentProps${A}, state?: Record<string, unknown>): string;\n`;
-  code += `export declare function renderWithState${G}(props: ComponentProps${A}): { html: string; state: Record<string, unknown> };\n`;
+  code += `export declare function renderToString${G}(props: __MeekoComponentProps${A}, state?: Record<string, unknown>): string;\n`;
+  code += `export declare function renderWithState${G}(props: __MeekoComponentProps${A}): { html: string; state: Record<string, unknown> };\n`;
   if (generic && exposeCall) {
     // The script above sees each parameter as its constraint; a typed copy inside a generic
     // function gives the exposed value of each instantiation. It is never called.
@@ -1188,9 +1041,9 @@ export function createVirtualComponent(source: string, filename: string, options
   // The check of a parent's tag, like the compiled component's: the parameters come from the props
   // alone. Its result lets the editor show the child with them resolved.
   const typeArguments = generic ? generic.names.map((name) => `${name}: ${name}`).join("; ") : "";
-  code += `export declare const __meekoTag: ${G}(props: __MeekoTagProps<ComponentProps${A}> & __MeekoExtraProps, events: NoInfer<__MeekoEventNames<ComponentProps${A}>>, models: NoInfer<__MeekoTagModels<ComponentModels${A}>>, snippets: NoInfer<__MeekoTagSnippets<ComponentSnippets${A}>>) => { readonly typeArguments: { ${typeArguments} }; readonly props: ComponentProps${A}; readonly events: ${emitsTypeText ? `__MeekoEmits${A}` : "{}"}; readonly models: ComponentModels${A}; readonly snippets: ComponentSnippets${A}; readonly exposed: ComponentExposed${A} };\n`;
-  code += `export declare function hydrateScope${G}(scope: object, props: ComponentProps${A}, state?: Record<string, unknown>): { (): void; readonly exposed?: ComponentExposed${A} };\n`;
-  code += `export declare function hydrate${G}(root: object, props: ComponentProps${A}, state?: Record<string, unknown>): () => void;\n`;
+  code += `export declare const __meekoTag: ${G}(props: __MeekoTagProps<__MeekoComponentProps${A}> & __MeekoExtraProps, events: NoInfer<__MeekoEventNames<__MeekoComponentProps${A}>>, models: NoInfer<__MeekoTagModels<ComponentModels${A}>>, snippets: NoInfer<__MeekoTagSnippets<ComponentSnippets${A}>>) => { readonly typeArguments: { ${typeArguments} }; readonly props: __MeekoComponentProps${A}; readonly events: ${emitsTypeText ? `__MeekoEmits${A}` : "{}"}; readonly models: ComponentModels${A}; readonly snippets: ComponentSnippets${A}; readonly exposed: ComponentExposed${A} };\n`;
+  code += `export declare function hydrateScope${G}(scope: object, props: __MeekoComponentProps${A}, state?: Record<string, unknown>): { (): void; readonly exposed?: ComponentExposed${A} };\n`;
+  code += `export declare function hydrate${G}(root: object, props: __MeekoComponentProps${A}, state?: Record<string, unknown>): () => void;\n`;
   code += "export declare const css: string;\n";
   // Every component is an ES module, like the compiler output; this keeps the
   // declarations of components that share a TypeScript project isolated.

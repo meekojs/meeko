@@ -4,7 +4,7 @@
   "displayName": "Meeko Language",
   "description": "Syntax highlighting and the Meeko language server for .meeko components",
   "icon": "./icons/meeko-logo.png",
-  "version": "1.7.1",
+  "version": "1.7.6",
   "license": "MIT",
   "private": true,
   "repository": { "type": "git", "url": "https://github.com/meekojs/meeko" },
@@ -13,9 +13,10 @@
   "keywords": ["meeko", "typescript", "components", "syntax", "diagnostics", "lsp"],
   "type": "module",
   "main": "./dist/extension.js",
-  "engines": { "vscode": "^1.140.0" },
+  "engines": { "vscode": "^1.144.0" },
   "categories": ["Programming Languages"],
   "capabilities": {
+    "virtualWorkspaces": {"supported":"limited","description":"En documentos virtuales, Meeko analiza el archivo abierto y ofrece completado, hover, diagnósticos y símbolos. Las funciones que requieren archivos del proyecto en disco, como navegación y referencias entre archivos, no están disponibles."},
     "untrustedWorkspaces": {
       "supported": "limited",
       "description": "En modo restringido, Meeko usa su servidor de lenguaje incluido, lee la configuración del proyecto de forma estática, omite la comprobación de los contratos de páginas del proyecto y no se conecta a meeko dev para mostrar valores en vivo.",
@@ -28,6 +29,8 @@
     "test": "tsx --test tests/*.test.ts",
     "test:host": "node tests/run-host.mjs",
     "test:host:isolated": "pwsh -NoProfile -File tests/prepare-host.ps1",
+    "test:host:virtual": "node tests/run-host-virtual.mjs",
+    "test:host:untrusted": "node tests/run-host-untrusted.mjs",
     "package:vsix": "pwsh -NoProfile -File package-vsix.ps1"
   },
   "dependencies": {
@@ -42,6 +45,7 @@
         "meeko.languageServer.preferWorkspace": {
           "type": "boolean",
           "default": true,
+          "scope": "resource",
           "description": "Usa el servidor de lenguaje del paquete @meekojs/meeko del workspace, para que el editor coincida con el compilador del proyecto. Se usa el servidor incluido si ese paquete no está, si este ajuste está desactivado o si el workspace no es de confianza."
         },
         "meeko.format.indentSections": {
@@ -76,7 +80,7 @@
           "type": "string",
           "enum": ["off", "messages", "verbose"],
           "default": "off",
-          "description": "Registra la comunicación entre VS Code y el servidor de lenguaje de Meeko."
+          "description": "Activa el trace LSP de todos los servidores de Meeko. Para ver los mensajes, cambia el nivel del canal Meeko a Trace."
         }
       }
     },
@@ -93,7 +97,7 @@
       ]
     },
     "configurationDefaults": {
-      "[meeko]": { "editor.semanticHighlighting.enabled": true, "editor.linkedEditing": true }
+      "[meeko]": { "editor.semanticHighlighting.enabled": true, "editor.linkedEditing": true, "editor.bracketPairColorization.enabled": false }
     },
     "semanticTokenModifiers": [
       { "id": "signal", "description": "Una señal de Meeko (signal, useState, defineModel, useElementRef) y sus usos." },
@@ -165,7 +169,7 @@
   },
   "devDependencies": {
     "@types/node": "24.0.0",
-    "@types/vscode": "1.140.0",
+    "@types/vscode": "1.144.0",
     "@vscode/test-electron": "3.1.0",
     "esbuild": "0.28.2",
     "tsx": "^4.20.0",

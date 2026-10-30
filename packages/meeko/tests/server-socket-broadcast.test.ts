@@ -5,7 +5,7 @@ import {
   LocalSocketPubSub, MemorySessionStore, SessionManager,
 } from "../src/framework-server.ts";
 import type { AppManifest, Schema, SocketMessage, SocketPeer, SocketPubSub } from "../src/framework-server.ts";
-import { resetEnvWarnings } from "../src/framework-server/env.ts";
+import { resetEnvWarnings } from "../src/server/runtime/env.ts";
 
 function object<T>(check: (value: Record<string, unknown>) => boolean): Schema<T> {
   return { "~standard": { version: 1, validate(value) {

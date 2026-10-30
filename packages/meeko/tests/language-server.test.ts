@@ -1247,7 +1247,7 @@ describe("Meeko language server built-in tags, component hover and completion", 
           const inPackage = file && (file.startsWith(`${repository}/`) || file.includes("/node_modules/@meekojs/meeko/"));
           if (inPackage) assert.match(item.labelDetails?.description ?? "", /^@meekojs\/meeko(?:\/[a-z-]+)?$/, `${item.label} from ${file}`);
         }
-        // Declared in dist/framework/config-type.d.ts and not exported by any entry: only its path
+        // Declared in dist/modules/define-meeko-config.d.ts and not exported by any entry: only its path
         // reaches it, so it is not offered.
         assert.ok(!labels.includes("MeekoAdapterName"), JSON.stringify(labels));
         const module = items.find((item) => item.label === "MeekoModule");

@@ -3,7 +3,7 @@ import test from "node:test";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { classCompletion, classDefinition } from "../src/language-server/classes.ts";
 import {
-  cssCompletion, cssHover, documentColors, hoverText, htmlCompletion, htmlHover, linkedEditingRanges, styleClasses, styleDiagnostics, tagCompletion,
+  cssCompletion, cssHover, documentColors, hoverText, htmlCompletion, htmlHover, linkedEditingRanges, specialTemplateHover, styleClasses, styleDiagnostics, tagCompletion,
 } from "../src/language-server/embedded.ts";
 
 /** A component and the position of `|` in it. */
@@ -54,6 +54,28 @@ test("HTML tags and attributes have their MDN hover", () => {
   assert.match(hoverText(htmlHover(tag.document, tag.position)), /button/i);
   const attribute = at(component(`<button ty|pe="button"></button>`));
   assert.match(hoverText(htmlHover(attribute.document, attribute.position)), /type/i);
+});
+
+test("render and snippet tags and attributes explain their template syntax", () => {
+  const cases: [string, RegExp][] = [
+    ['<ren|der snippet="snippets.title" args="item" />', /Pinta un snippet/],
+    ['<render snip|pet="snippets.title" />', /Snippet<Args>/],
+    ['<render snippet="snippets.title" ar|gs="item" />', /separadas por comas/],
+    ['<render snippet="snippets.title" if:wh|en="ready" />', /expresión es verdadera/],
+    ['<Card><snip|pet name="title">Title</snippet></Card>', /Llena un snippet/],
+    ['<Card><snippet na|me="title">Title</snippet></Card>', /defineSnippets/],
+    ['<Card><snippet name="title" par|ams="item">Title</snippet></Card>', /argumentos/],
+    ['<Card><snippet if:wh|en="ready" name="title">Title</snippet></Card>', /opcional/],
+    ['<Card><snippet name="title">Title</snip|pet></Card>', /Llena un snippet/],
+  ];
+  for (const [template, expected] of cases) {
+    const { document, position } = at(component(template));
+    assert.match(hoverText(specialTemplateHover(document, position)), expected, template);
+  }
+  const value = at(component('<Card><snippet name="ti|tle">Title</snippet></Card>'));
+  assert.equal(specialTemplateHover(value.document, value.position), undefined);
+  const script = at('<script lang="ts">const snippet = |1;</script><template></template>');
+  assert.equal(specialTemplateHover(script.document, script.position), undefined);
 });
 
 test("opening and closing tags are edited together and > completes the closing tag", () => {

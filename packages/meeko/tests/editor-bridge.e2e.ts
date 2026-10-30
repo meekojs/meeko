@@ -7,7 +7,7 @@ import { createServer } from "node:net";
 import { join } from "node:path";
 import test from "node:test";
 import { chromium } from "playwright-core";
-import type { EditorBridgeDescriptor } from "../src/devtools-bridge-protocol.ts";
+import type { EditorBridgeDescriptor } from "../src/shared/devtools-bridge-protocol.ts";
 import { editorBridgeFile } from "../src/framework/editor-bridge.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
 import { BridgeConnection } from "../../vscode/src/live/client.ts";

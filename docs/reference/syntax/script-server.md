@@ -6,6 +6,7 @@ description: El código de servidor de una página, dentro de su .meeko, con sus
 symbols:
   - "syntax:script-server"
 related:
+  - docs/como-elegir.md
   - "@meekojs/meeko/framework#definePage"
   - "@meekojs/meeko/framework#usePage"
   - "@meekojs/meeko/framework#redirect"

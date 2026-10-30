@@ -1,7 +1,7 @@
 import ts from "@typescript/typescript6";
 import { analyzeComposables } from "../compiler/composables.js";
-import { parseSfc } from "../compiler/sfc.js";
-import type { SfcDocument } from "../compiler/sfc.js";
+import { parseSfc } from "../compiler/parser/sfc.js";
+import type { SfcDocument } from "../compiler/parser/sfc.js";
 import type { VirtualComponent } from "./model.js";
 
 /** Family of a reactive declaration of the script, as the editor colors and summarizes it. */

@@ -1,13 +1,13 @@
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import ts from "@typescript/typescript6";
-import { discoverAutoImports, discoverAutoImportsSync } from "../autoimports.js";
-import type { AutoImport } from "../autoimports.js";
+import { discoverAutoImports, discoverAutoImportsSync } from "../autoimports/registry.js";
+import type { AutoImport } from "../autoimports/registry.js";
 import { generatedServicesDeclaration, projectDeclarationFiles } from "../compiler/project-declarations.js";
 import { projectRoot } from "../compiler/project-root.js";
 import { readMeekoConfigSync, readThemeOptionSync, resolveConfigSources } from "../framework/config.js";
 import { generatedThemeLines } from "../framework/generate.js";
-import { resolveThemeConfig } from "../framework/theme.js";
+import { resolveThemeConfig } from "../shared/theme.js";
 import { resolveProjectAliases, resolveProjectAliasesSync } from "../framework/aliases.js";
 import type { ProjectAliases } from "../framework/aliases.js";
 import { emptyAppIndex, loadAppIndex } from "./app-index.js";
@@ -86,8 +86,8 @@ function entryModule(entry: ts.CompletionEntry): { file?: string; specifier?: st
  * import from a public entry, or another module), `hidden` if no public entry exports it (a file of
  * its `dist/` or `src/`, its `internal` entry), or the public entry to import it from. A package
  * linked with `link:` resolves outside node_modules, so TypeScript may write a path into it
- * (`../../Clients/meeko/packages/meeko/dist/framework/middleware.js`) even for a public export.
- * TypeScript names the module that declares the export (`dist/framework/module.d.ts`), also for
+ * (`../../Clients/meeko/packages/meeko/dist/app/middleware/runtime.js`) even for a public export.
+ * TypeScript names the module that declares the export (`dist/modules/define-meeko-module.d.ts`), also for
  * `MeekoModule` from `@meekojs/meeko/framework`: the module specifier and the public exports decide.
  */
 export function meekoAutoImport(project: MeekoProject, entry: ts.CompletionEntry): { readonly hidden: true } | { readonly specifier: string } | undefined {
@@ -213,6 +213,9 @@ export class MeekoProject {
         ...this.compiler.fileNames,
         // Augmentations such as MeekoSession reach components only as program roots.
         ...this.roots.flatMap((root) => projectDeclarationFiles(root)),
+        // Project-specific names and module contracts, also when tsconfig.json excludes .meeko/.
+        ...(existsSync(join(this.root, ".meeko", "types", "components.d.ts"))
+          ? [join(this.root, ".meeko", "types", "components.d.ts")] : []),
         // The type of RequestContext.services, from server/runtime.ts.
         ...generatedServicesDeclaration(this.root),
         ...this.theme ? [this.theme.file] : [],

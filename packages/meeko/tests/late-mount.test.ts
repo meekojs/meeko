@@ -5,17 +5,17 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { Window as HappyWindow } from "happy-dom";
 import { compile } from "../src/compiler.ts";
-import type { ClientComponent } from "../src/framework/client.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import type { RouteRecord } from "../src/framework/router.ts";
+import type { ClientComponent } from "../src/app/runtime/client.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import type { RouteRecord } from "../src/app/runtime/router.ts";
 
 const fileUrl = (path: string): string => pathToFileURL(resolve(path)).href;
 
 /** The runtime as the compiled components import it, by file URL: one instance of every module. */
 const runtime = async () => ({
-  ...await import(fileUrl("src/framework/server.ts")) as typeof import("../src/framework/server.ts"),
-  ...await import(fileUrl("src/framework/client.ts")) as typeof import("../src/framework/client.ts"),
-  ...await import(fileUrl("src/suspense.ts")) as typeof import("../src/suspense.ts"),
+  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof import("../src/server/runtime/framework-render.ts"),
+  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof import("../src/app/runtime/client.ts"),
+  ...await import(fileUrl("src/app/runtime/suspense.ts")) as typeof import("../src/app/runtime/suspense.ts"),
 });
 
 interface TestComponent extends ClientComponent {

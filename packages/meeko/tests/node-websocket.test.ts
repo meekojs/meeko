@@ -6,7 +6,7 @@ import WebSocket from "ws";
 import { attachNodeWebSocketServer } from "../src/node.ts";
 import { createSocketHub, defineSocketChannel, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
 import type { Schema } from "../src/framework-server.ts";
-import type { SocketHub } from "../src/framework-server/socket.ts";
+import type { SocketHub } from "../src/server/socket/runtime.ts";
 
 const textSchema: Schema<{ text: string }> = {
   "~standard": {

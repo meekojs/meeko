@@ -25,6 +25,24 @@ exports.run = async function run() {
   assert.ok(existsSync(path.join(extension.extensionPath, "dist", "server.js")), "El servidor incluido debe estar empaquetado");
   assert.equal(api?.server?.source, "workspace", `Con confianza se usa el servidor de @meekojs/meeko del proyecto: ${JSON.stringify(api?.server)}`);
   assert.match(api.server.module, /node_modules[\\/]@meekojs[\\/]meeko[\\/]dist[\\/]language-server[\\/]main\.js$/);
+  const secondaryUri = vscode.Uri.file(path.join(process.env.MEEKO_HOST_SECONDARY, "Secondary.meeko"));
+  assert.equal(api.serverFor(uri)?.source, "workspace");
+  assert.equal(api.serverFor(secondaryUri)?.source, "bundled", "Cada carpeta elige su propio servidor");
+  const secondaryDocument = await vscode.workspace.openTextDocument(secondaryUri);
+  const secondaryHover = await vscode.commands.executeCommand("vscode.executeHoverProvider", secondaryUri, secondaryDocument.positionAt(secondaryDocument.getText().indexOf("count") + 2));
+  assert.ok(secondaryHover?.length, "El servidor incluido atiende la segunda carpeta");
+  const serverSetting = vscode.workspace.getConfiguration("meeko", uri);
+  const waitForSource = async (source) => {
+    for (let attempt = 0; attempt < 60; attempt++) {
+      if (api.serverFor(uri)?.source === source) return;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    throw new Error(`Servidor esperado ${source}; recibido ${JSON.stringify(api.serverFor(uri))}`);
+  };
+  await serverSetting.update("languageServer.preferWorkspace", false, vscode.ConfigurationTarget.WorkspaceFolder);
+  await waitForSource("bundled");
+  await serverSetting.update("languageServer.preferWorkspace", undefined, vscode.ConfigurationTarget.WorkspaceFolder);
+  await waitForSource("workspace");
 
   const diagnostics = await waitForDiagnostics(uri, "TS2322");
   assert.ok(diagnostics.some((item) => item.source === "Meeko"));

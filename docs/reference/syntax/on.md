@@ -6,6 +6,7 @@ description: Escucha un evento del DOM en un elemento, o un evento de defineEmit
 symbols:
   - "syntax:on"
 related:
+  - docs/como-elegir.md
   - "syntax:defineemits"
   - "syntax:bind"
   - "syntax:model"

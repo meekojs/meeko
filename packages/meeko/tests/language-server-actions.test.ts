@@ -3,7 +3,7 @@ import { after, before, describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import type { CodeAction, DeleteFile, Range, TextDocumentEdit, TextEdit } from "vscode-languageserver/node";
-import { parseSfc } from "../src/compiler/sfc.ts";
+import { parseSfc } from "../src/compiler/parser/sfc.ts";
 import { codeActions } from "../src/language-server/features.ts";
 import { languageProject } from "./language-server-workspace.ts";
 import type { LanguageProject, OpenedComponent } from "./language-server-workspace.ts";

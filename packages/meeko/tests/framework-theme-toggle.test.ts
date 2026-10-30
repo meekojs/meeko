@@ -9,23 +9,24 @@ import { Window as HappyWindow } from "happy-dom";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import type { CompletionItem, MarkupContent } from "vscode-languageserver/node";
 import { builtinOutputs } from "../scripts/builtin-components.ts";
-import { compileWithAutoImports } from "../src/autoimports.ts";
-import type { AutoImport } from "../src/autoimports.ts";
+import { compileWithAutoImports } from "../src/autoimports/transform.ts";
+import type { AutoImport } from "../src/autoimports/registry.ts";
 import { compile } from "../src/compiler.ts";
-import { MeekoCompileError } from "../src/compiler/sfc.ts";
+import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
 import { checkApp } from "../src/framework/check-app.ts";
 import { readThemeEnabledSync, readThemeOptionSync } from "../src/framework/config.ts";
 import { buildProject } from "../src/framework/project.ts";
 import { inlineScriptHashes, inlineStyleHashes } from "../src/framework/script-hashes.ts";
 import { prepareFrameworkTypeDeclarations } from "../src/framework/type-declarations.ts";
-import type { ClientComponent } from "../src/framework/client.ts";
-import type { DocumentConfig } from "../src/framework/head.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import type { ErrorPageRecord, RouteRecord } from "../src/framework/router.ts";
-import { themeEndpoint, themeReturnPath } from "../src/framework/theme-endpoint.ts";
-import { resolveThemeConfig, THEME_ENDPOINT, themeStyle, themeToggleGroupLabel, themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from "../src/framework/theme.ts";
-import type { ResolvedThemeConfig, ThemeToggleContext, ThemeToggleOptions } from "../src/framework/theme.ts";
-import { contentSecurityPolicy } from "../src/framework-server/csp.ts";
+import type { ClientComponent } from "../src/app/runtime/client.ts";
+import type { DocumentConfig } from "../src/shared/head.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import type { ErrorPageRecord, RouteRecord } from "../src/app/runtime/router.ts";
+import { themeEndpoint, themeReturnPath } from "../src/server/runtime/theme-endpoint.ts";
+import { resolveThemeConfig, THEME_ENDPOINT, themeStyle } from "../src/shared/theme.ts";
+import { themeToggleGroupLabel, themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from "../src/shared/theme-toggle.ts";
+import type { ResolvedThemeConfig, ThemeToggleContext, ThemeToggleOptions } from "../src/shared/theme.ts";
+import { contentSecurityPolicy } from "../src/server/runtime/csp.ts";
 import { completion, componentNameCompletion, definition, directiveNameCompletion, hover } from "../src/language-server/features.ts";
 import { staticAppConfig, writeStaticApp } from "./helpers/static-app.ts";
 import { createTempProject, tempProject } from "./helpers/temp-project.ts";
@@ -51,7 +52,7 @@ test("the compiled <MeekoThemeToggle> that the package ships is up to date with 
     assert.equal(await readFile(output, "utf8"), code, `${output} is stale: run pnpm run builtins`);
   }
   // The form posts to the endpoint of the server.
-  assert.match(await readFile("src/builtins/MeekoThemeToggle.meeko", "utf8"), new RegExp(`action="${THEME_ENDPOINT}"`));
+  assert.match(await readFile("src/app/components/MeekoThemeToggle/MeekoThemeToggle.meeko", "utf8"), new RegExp(`action="${THEME_ENDPOINT}"`));
 });
 
 test("<MeekoThemeToggle> is the component that Meeko ships, with its props and snippets, and MEEK111 without theme", async () => {
@@ -273,8 +274,8 @@ test("POST /_meeko/theme validates the theme and the Origin, writes the cookie a
 
 /** The runtime as the compiled components import it, by file URL: one instance for pages, server and browser. */
 const runtime = async () => ({
-  ...await import(fileUrl("src/framework/server.ts")) as typeof import("../src/framework/server.ts"),
-  ...await import(fileUrl("src/framework/client.ts")) as typeof import("../src/framework/client.ts"),
+  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof import("../src/server/runtime/framework-render.ts"),
+  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof import("../src/app/runtime/client.ts"),
 });
 
 const sources: Record<string, string> = {

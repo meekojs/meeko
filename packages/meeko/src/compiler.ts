@@ -4,36 +4,40 @@ import ts from "@typescript/typescript6";
 import postcss from "postcss";
 import selectorParser from "postcss-selector-parser";
 import { extractSourceMappings, markSource } from "./compiler/mapping.js";
+import { emitComponentChannels } from "./compiler/codegen/channels.js";
+import { emitComponentProps } from "./compiler/codegen/props.js";
+import { emitComponentRelease } from "./compiler/codegen/release.js";
 import type { SourceMapping } from "./compiler/mapping.js";
 import { instrumentNode, instrumentTemplateExpression, trackedRead } from "./compiler/devtools.js";
-import { analyzeEmits, EmitsError } from "./compiler/emits.js";
-import type { EmitsDeclaration } from "./compiler/emits.js";
-import { analyzeExpose, ExposeError } from "./compiler/expose.js";
+import { analyzeEmits, EmitsError } from "./app/definitions/define-emits.js";
+import type { EmitsDeclaration } from "./app/definitions/define-emits.js";
+import { analyzeExpose, ExposeError } from "./app/definitions/define-expose.js";
+import { ElementRefError, resolveElementRef, validateElementRefBinding } from "./app/definitions/use-element-ref.js";
 import { GenericError, genericReference, parseGeneric, sectionAttribute } from "./compiler/generic.js";
 import type { GenericParameters } from "./compiler/generic.js";
 import { analyzeComposables, ComposableError, conditionalComposable, freeIdentifiers, isExecutableStatement, nodeDepth } from "./compiler/composables.js";
 import type { ScriptComposables, StatementEdit } from "./compiler/composables.js";
-import type { ExposeDeclaration } from "./compiler/expose.js";
-import { analyzeModels, ModelError } from "./compiler/models.js";
-import type { ModelDeclaration } from "./compiler/models.js";
-import { analyzeSnippets, SnippetsError } from "./compiler/snippets.js";
-import type { SnippetsDeclaration } from "./compiler/snippets.js";
-import { emitPropName } from "./emits.js";
-import { analyzePropsDefaults, PropsDefaultsError } from "./compiler/props.js";
-import { compileError, locate, parseSfc } from "./compiler/sfc.js";
-import { analyzeServerScript, bindingIdentifiers, checkClientScript } from "./compiler/server-script.js";
-import type { CompileDiagnostic, SfcSection } from "./compiler/sfc.js";
-import { scanInterpolations } from "./compiler/interpolation.js";
-import { attributeValueStart, decodeTemplateText, isCustomElementTag, parseTemplate } from "./compiler/template.js";
-import { templateEventType } from "./compiler/events.js";
-import { layoutShiftHints } from "./compiler/layout-shift.js";
-import { propsReadsOnce } from "./compiler/props-reactivity.js";
-import { scopeTargets } from "./compiler/scope-targets.js";
-import type { ScopeCandidate, ScopeTargets } from "./compiler/scope-targets.js";
-import type { TemplateNode } from "./compiler/template.js";
-import { importedComponents, isCandidates } from "./compiler/dynamic-tag.js";
-import { isTagName, isVoidTag } from "./dynamic-tag.js";
-import { elementAttributeNames, tagsAccepting } from "./html-attributes.js";
+import type { ExposeDeclaration } from "./app/definitions/define-expose.js";
+import { analyzeModels, ModelError } from "./app/definitions/define-model.js";
+import type { ModelDeclaration } from "./app/definitions/define-model.js";
+import { analyzeSnippets, SnippetsError } from "./app/definitions/define-snippets.js";
+import type { SnippetsDeclaration } from "./app/definitions/define-snippets.js";
+import { emitPropName } from "./app/runtime/emits.js";
+import { analyzePropsDeclaration, definePropsCall, definePropsInitializer, nonstandardLocalPropsInterface, PropsDefaultsError } from "./app/definitions/define-props.js";
+import { compileError, locate, parseSfc } from "./compiler/parser/sfc.js";
+import { analyzeServerScript, bindingIdentifiers, checkClientScript } from "./compiler/transforms/server-script.js";
+import type { CompileDiagnostic, SfcSection } from "./compiler/parser/sfc.js";
+import { scanInterpolations } from "./compiler/parser/interpolation.js";
+import { attributeValueStart, decodeTemplateText, isCustomElementTag, parseTemplate } from "./compiler/parser/template.js";
+import { templateEventType } from "./compiler/transforms/events.js";
+import { layoutShiftHints } from "./compiler/transforms/layout-shift.js";
+import { propsReadsOnce } from "./compiler/transforms/props-reactivity.js";
+import { scopeTargets } from "./compiler/transforms/scope-targets.js";
+import type { ScopeCandidate, ScopeTargets } from "./compiler/transforms/scope-targets.js";
+import type { TemplateNode } from "./compiler/parser/template.js";
+import { importedComponents, isCandidates } from "./compiler/transforms/dynamic-tag.js";
+import { isTagName, isVoidTag } from "./app/runtime/dynamic-tag.js";
+import { elementAttributeNames, tagsAccepting } from "./shared/html-attributes.js";
 
 interface DynamicText {
   id: number;
@@ -368,6 +372,8 @@ const teleportTag = "MeekoTeleport";
 
 /** A built-in component that ships as a module of its own, `@meekojs/meeko/builtins/<name>`. */
 export interface BuiltinComponentModule {
+  /** Canonical component source; the build emits the public module from this file. */
+  readonly source: string;
   /** Specifier of its compiled module, which only the components that use the tag import. */
   readonly specifier: string;
   /** Name of the namespace import in the generated module. */
@@ -378,14 +384,14 @@ export interface BuiltinComponentModule {
  * Meeko's own components that live in a module of their own (`<MeekoThemeToggle>` since 1.4,
  * `<MeekoAwait>`, `<MeekoPopover>` and `<MeekoSelect>` since 1.5): a compiled component imports
  * that module only when its template uses the tag, so an application that never writes them does
- * not carry their code. A new built-in component adds an entry here and its `.meeko` source to
- * `scripts/builtin-components.ts`.
+ * not carry their code. Sources live under `app/components`; generated modules keep the public
+ * `builtins` paths.
  */
 export const builtinComponentModules: Readonly<Record<string, BuiltinComponentModule>> = {
-  MeekoThemeToggle: { specifier: "@meekojs/meeko/builtins/theme-toggle", alias: "__meeko_MeekoThemeToggle" },
-  MeekoAwait: { specifier: "@meekojs/meeko/builtins/await", alias: "__meeko_MeekoAwait" },
-  MeekoPopover: { specifier: "@meekojs/meeko/builtins/popover", alias: "__meeko_MeekoPopover" },
-  MeekoSelect: { specifier: "@meekojs/meeko/builtins/select", alias: "__meeko_MeekoSelect" },
+  MeekoThemeToggle: { source: "src/app/components/MeekoThemeToggle/MeekoThemeToggle.meeko", specifier: "@meekojs/meeko/builtins/theme-toggle", alias: "__meeko_MeekoThemeToggle" },
+  MeekoAwait: { source: "src/app/components/MeekoAwait/MeekoAwait.meeko", specifier: "@meekojs/meeko/builtins/await", alias: "__meeko_MeekoAwait" },
+  MeekoPopover: { source: "src/app/components/MeekoPopover/MeekoPopover.meeko", specifier: "@meekojs/meeko/builtins/popover", alias: "__meeko_MeekoPopover" },
+  MeekoSelect: { source: "src/app/components/MeekoSelect/MeekoSelect.meeko", specifier: "@meekojs/meeko/builtins/select", alias: "__meeko_MeekoSelect" },
 };
 
 /**
@@ -1790,7 +1796,7 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
   try {
     composables = analyzeComposables(file);
   } catch (error) {
-    if (!(error instanceof ComposableError)) throw error;
+    if (!(error instanceof ComposableError) && !(error instanceof ElementRefError)) throw error;
     throw compileError(source, filename, error.code, error.message, section.contentStart + error.node.getStart(file));
   }
   const split = composables.split ?? file.statements.length;
@@ -1810,14 +1816,12 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
   };
   const usedRefs = new Set<string>();
   for (const call of composables.elementRefs) {
-    const ref = refs.get(call.name);
-    const at = section.contentStart + call.nameNode.getStart(file);
-    if (!ref) {
-      const known = [...refs.keys()].map((name) => `"${name}"`).join(", ");
-      throw compileError(source, filename, "MEEK056", `La plantilla no tiene ref:${call.name}${known ? `; sus refs son ${known}` : "; añade ref:" + call.name + " a un elemento o a un componente"}`, at);
-    }
-    if (ref.list && call.awaited) {
-      throw compileError(source, filename, "MEEK056", `ref:${call.name} está dentro de each:of y nombra una lista; lee useElementRef("${call.name}").value en lugar de esperarla con await`, at);
+    let ref: RefBinding;
+    try {
+      ref = resolveElementRef(call, refs);
+    } catch (error) {
+      if (!(error instanceof ElementRefError)) throw error;
+      throw compileError(source, filename, error.code, error.message, section.contentStart + error.node.getStart(file));
     }
     usedRefs.add(call.name);
     const depth = nodeDepth(call.call, statementOf(call.call)) * 2 + 1;
@@ -1896,14 +1900,18 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
     if (callee === "defineProps") {
       throw compileError(source, filename, "MEEK015", "defineProps no admite desestructuración: asígnalo a un nombre simple, como const props = defineProps<{ title: string }>(), y lee props.title", section.contentStart + declaration.name.getStart(file));
     }
-    if (callee === "useElementRef") {
-      throw compileError(source, filename, "MEEK015", "useElementRef no admite desestructuración: asigna la ref a un nombre simple, como const input = useElementRef(\"input\"), y lee input.value cuando la necesites", section.contentStart + declaration.name.getStart(file));
+    try {
+      validateElementRefBinding(callee, declaration.name);
+    } catch (error) {
+      if (!(error instanceof ElementRefError)) throw error;
+      throw compileError(source, filename, error.code, error.message, section.contentStart + error.node.getStart(file));
     }
     bindingIdentifiers(declaration.name, found);
     return found;
   };
   let propsType: string | undefined;
   let propsTypeOffset: number | undefined;
+  let propsInterfaceWarning: CompileDiagnostic | undefined;
   let defaults: { expression: string; offset: number; keys: readonly string[] } | undefined;
   // En desarrollo con `hot`, DevTools registra escrituras `.value` y lecturas de `computed`; producción y SSR sin `hot` no cambian.
   const setupStatement = (statement: ts.Statement): string => {
@@ -2001,15 +2009,21 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
           // The statement needs to know whether defineProps exists, which may come later.
           emitIndex = setup.length;
           setup.push("");
-        } else if (declaration.initializer && ts.isCallExpression(declaration.initializer) && declaration.initializer.expression.getText(file) === "defineProps") {
+        } else if (definePropsInitializer(declaration)) {
           if (propsType) throw compileError(source, filename, "MEEK016", "defineProps debe aparecer una sola vez, en su propia declaración", section.contentStart + declaration.getStart(file));
-          const typeArgument = declaration.initializer.typeArguments?.[0];
+          const call = definePropsInitializer(declaration)!;
+          const typeArgument = call.typeArguments?.[0];
           propsType = typeArgument?.getText(file);
           if (!propsType) throw compileError(source, filename, "MEEK017", "defineProps necesita un argumento de tipo", section.contentStart + declaration.getStart(file));
           propsTypeOffset = section.contentStart + typeArgument!.getStart(file);
+          const nonstandard = nonstandardLocalPropsInterface(call, file);
+          if (nonstandard) propsInterfaceWarning = {
+            code: "MEEK120", filename, location: locate(source, section.contentStart + nonstandard.getStart(file)), severity: "warning",
+            message: `La interfaz local de defineProps se llama ${nonstandard.text}; usa interface Props para mantener una convención consistente entre componentes`,
+          };
           propsName = name;
           try {
-            const analyzed = analyzePropsDefaults(declaration.initializer);
+            const analyzed = analyzePropsDeclaration(call).defaults;
             if (analyzed) defaults = {
               expression: analyzed.argument.getText(file),
               offset: section.contentStart + analyzed.argument.getStart(file),
@@ -2067,11 +2081,12 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
   if (borrows) setup.unshift("const __meeko_borrowed = new Set<unknown>();");
   // MEEK101: with reactive props the child stays mounted, so a read that runs once keeps the first
   // value. A component with a top-level data await is still mounted again, so its reads stay fresh.
-  const warnings = propsName && !dataAwait
+  const warnings: CompileDiagnostic[] = propsName && !dataAwait
     ? propsReadsOnce(file, propsName).map((read): CompileDiagnostic => ({
       code: "MEEK101", message: read.message, filename, location: locate(source, section.contentStart + read.start), severity: "warning",
     }))
     : [];
+  if (propsInterfaceWarning) warnings.push(propsInterfaceWarning);
   return { borrows, imports, types, setup, names, declarations, propsType: propsType ?? "Record<string, never>", propsTypeOffset, ...(defaults ? { defaults } : {}), ...(emits ? { emits } : {}), exposed: exposeDeclaration !== undefined, usedRefs, continuationNames, models, ...(snippets ? { snippets } : {}), dataAwait, ...(propsName ? { propsName } : {}), warnings };
 }
 
@@ -2115,12 +2130,6 @@ function taggedRefs(bindings: TemplateBindings, narrow: boolean): Map<RefBinding
   return found;
 }
 
-/** A `defineProps(...)` call anywhere inside `node`, which only a top-level declaration accepts. */
-function definePropsCall(node: ts.Node): ts.CallExpression | undefined {
-  if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "defineProps") return node;
-  return ts.forEachChild(node, definePropsCall);
-}
-
 /** A top-level value export: the script of a component only exports types. */
 function exportsValue(statement: ts.Statement): boolean {
   if (ts.isExportDeclaration(statement) || ts.isExportAssignment(statement)) return true;
@@ -2150,7 +2159,7 @@ function macroCall(statement: ts.Statement, file: ts.SourceFile, emits: EmitsDec
     if (declaration === emits?.declaration) return "defineEmits";
     if (models.some((model) => model.declaration === declaration)) return "defineModel";
     if (declaration === snippets?.declaration) return "defineSnippets";
-    if (declaration.initializer && ts.isCallExpression(declaration.initializer) && declaration.initializer.expression.getText(file) === "defineProps") return "defineProps";
+    if (definePropsInitializer(declaration)) return "defineProps";
   }
   return undefined;
 }
@@ -2563,28 +2572,7 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
   // passes them on (A); without `generic` both are empty and the module is the non-generic one.
   const G = generic ? `<${markSource(generic.declaration, generic.offset)}>` : "";
   const A = generic ? `<${generic.names.join(", ")}>` : "";
-  const exposedType = scriptParts.exposed
-    ? `export type ComponentExposed${G} = ReturnType<typeof __setup${A}>[typeof __meeko.exposedKey];\n`
-    : `export type ComponentExposed${G} = null;\n`;
-  // Models and snippets are channels of their own, beside the props; `__meekoChannels` only has a type.
-  const modelsType = scriptParts.models.length
-    ? `type __MeekoModels${G} = { ${scriptParts.models.map((model) => `${quote(model.name)}: ${markSource(model.type, model.typeOffset)}`).join("; ")} };\nexport type ComponentModels${G} = { ${scriptParts.models.map((model) => `${quote(model.name)}${model.optional ? "?" : ""}: __meeko.Signal<__MeekoModels${A}[${quote(model.name)}]>`).join("; ")} };\n`
-    : `export type ComponentModels${G} = null;\n`;
-  const snippetsType = scriptParts.snippets
-    ? `type __MeekoSnippets${G} = __meeko.SnippetTypes<${markSource(scriptParts.snippets.type, scriptParts.snippets.offset)}>;\nexport type ComponentSnippets${G} = __meeko.SnippetMap<__MeekoSnippets${A}>;\n`
-    : `export type ComponentSnippets${G} = null;\n`;
-  // A generic component's channels outside a tag use the constraints of its parameters.
-  const channelsDeclaration = generic
-    ? `declare function __meeko_channels${G}(): { readonly models: ComponentModels${A}; readonly snippets: ComponentSnippets${A} };\nexport declare const __meekoChannels: ReturnType<typeof __meeko_channels>;\n`
-    : "export declare const __meekoChannels: { readonly models: ComponentModels; readonly snippets: ComponentSnippets };\n";
-  // The check of a parent's tag: the type parameters are inferred from the props alone.
-  const tagModels = scriptParts.models.length ? `NoInfer<ComponentModels${A}>` : "__meeko.NoModels";
-  const tagSnippets = scriptParts.snippets ? `NoInfer<ComponentSnippets${A}>` : "__meeko.NoSnippets";
-  // `TagProps` of the package: an optional prop also accepts `undefined`, which Meeko treats as an absent prop.
-  const tagPropsType = "type __MeekoTagProps<P> = P extends unknown ? { [K in keyof P]: {} extends Record<K, unknown> ? P[K] : {} extends Pick<P, K> ? P[K] | undefined : P[K] } : never;\n";
-  const tagDeclaration = `${tagPropsType}export declare const __meekoTag: ${G}(props: __MeekoTagProps<ComponentProps${A}> & __meeko.ExtraProps, events: NoInfer<__meeko.EventNames<ComponentProps${A}>>, models: ${tagModels}, snippets: ${tagSnippets}) => __meeko.TagInput<ComponentExposed${A}>;\n`;
-  const channelsType = `${modelsType}${snippetsType}${channelsDeclaration}${tagDeclaration}`;
-  const exposedValue = scriptParts.exposed ? ", __bindings[__meeko.exposedKey]" : "";
+  const { exposedType, channelsType } = emitComponentChannels(scriptParts, generic);
   // Lets a client navigation skip loading data when no component of the new page awaits it.
   const children = templateChildren(bindingsForTemplate, new Set([...scriptParts.names, ...scriptParts.continuationNames.keys()]), scriptParts.propsName);
   // `__meekoReactiveProps` tells a parent's binding that this module reads its props reactively,
@@ -2598,54 +2586,18 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
   const refsDeclaration = usesRefs ? "const __meeko_refs = __meeko.createRefs();\n" : "";
   const setupCode = (queue: string): string => `const __bindings = ${setupCall(queue)};\n__meeko.restoreSignals(__bindings, __state);\nconst { ${bindings} } = __bindings;`;
   // Declaration of each binding, so DevTools and the editor bridge can place a signal's value in its source.
-  const devtoolsSites = hot
-    ? `{ ${[...scriptParts.declarations].map(([name, offset]) => { const point = locate(source, offset); return `${quote(name)}: { line: ${point.line}, column: ${point.column} }`; }).join(", ")} }`
-    : "";
-  const releaseCode = hot
-    ? `const __cleanup = () => __meeko.finishWithCleanup(__release, __meeko_dispose);\nconst __component = { renderToString, hydrate, hydrateScope, css };\nconst __snapshot = () => __meeko.snapshotSignals(__bindings);\nconst __devtoolsStop = __meeko.registerDevtoolsInstance({ componentId: __hotId, name: ${quote(basename(filename, ".meeko"))}, file: ${quote(filename)}, scope: __scope, props: __inputProps, bindings: __bindings, sites: ${devtoolsSites} });\nconst __dispose = () => __meeko.finishWithCleanup(__cleanup, __devtoolsStop);\nconst __stop = __hotRoot ? __meeko.registerHotInstance(__hotId, __hotRoot, __inputProps, __component, __snapshot, __dispose) : __scope.start ? __meeko.registerHotScope(__hotId, __scope, __inputProps, __component, __snapshot, __dispose) : __dispose;\nreturn __meeko.withStateSnapshot(__stop, __snapshot${exposedValue});`
-    : `return __meeko.withStateSnapshot(() => __meeko.finishWithCleanup(__release, __meeko_dispose), () => __meeko.snapshotSignals(__bindings)${exposedValue});`;
+  const releaseCode = emitComponentRelease(source, filename, scriptParts.declarations, scriptParts.exposed, hot);
   const hotIdExport = hot ? `export const __hotId = ${quote(componentId)};\n` : "";
   const stateParam = ", __state?: __meeko.HotState";
   const scopeHotRootParam = hot ? ", __hotRoot?: Element" : "";
   const scopeForward = hot ? "__scope, __inputProps, __state, root" : "__scope, __inputProps, __state";
-  const propsType = scriptParts.propsTypeOffset === undefined ? scriptParts.propsType : markSource(scriptParts.propsType, scriptParts.propsTypeOffset);
-  const defaults = scriptParts.defaults;
-  const emits = scriptParts.emits;
-  const defaultKeys = defaults?.keys.map(quote).join(" | ") || "never";
-  // defineEmits adds one optional callback prop per event to the declared props.
-  const emitsDeclaration = emits ? `type __MeekoEmits${G} = __meeko.Emits<${markSource(emits.type, emits.offset)}>;\ntype __MeekoEmitProps${G} = __meeko.EmitProps<__MeekoEmits${A}>;\n` : "";
-  const emitProps = emits ? ` & __MeekoEmitProps${A}` : "";
-  const setupPropsType = defaults ? `__MeekoResolvedProps${A}${emitProps}` : emits ? `ComponentProps${A}` : propsType;
-  const plainPropsDeclaration = !emits
-    ? `export type ComponentProps${G} = ${propsType};`
-    : scriptParts.propsTypeOffset === undefined
-      ? `export type ComponentProps${G} = __MeekoEmitProps${A};`
-      : `type __MeekoDeclaredProps${G} = ${propsType};\nexport type ComponentProps${G} = __MeekoDeclaredProps${A} & __MeekoEmitProps${A};`;
-  // Names of the helpers' own parameters, which must not shadow the component's.
-  const P = generic ? "__P" : "T";
-  const K = generic ? "__K" : "K";
-  const ofParameters = generic ? `<${P}, ${markSource(generic.declaration, generic.offset)}>` : `<${P}>`;
-  const ofArguments = (props: string): string => generic ? `<${props}, ${generic.names.join(", ")}>` : `<${props}>`;
-  const propsDeclaration = emitsDeclaration + (defaults ? `type __MeekoDeclaredProps${G} = ${propsType};
-type __MeekoDefaultKeys${G} = Extract<${defaultKeys}, keyof __MeekoDeclaredProps${A}>;
-type __MeekoDefaultPick${G} = Pick<__MeekoDeclaredProps${A}, __MeekoDefaultKeys${A}>;
-type __MeekoDefaultValues${G} = { [${K} in keyof __MeekoDefaultPick${A}]-?: Exclude<__MeekoDefaultPick${A}[${K}], undefined> };
-type __MeekoResolvedPropsOf${ofParameters} = ${P} extends unknown ? Omit<${P}, __MeekoDefaultKeys${A}> & __MeekoDefaultValues${A} : never;
-type __MeekoResolvedProps${G} = __MeekoResolvedPropsOf${ofArguments(`__MeekoDeclaredProps${A}`)};
-type __MeekoInputPropsOf${ofParameters} = ${P} extends unknown ? Omit<${P}, __MeekoDefaultKeys${A}> & { [${K} in keyof __MeekoDefaultPick${A}]?: __MeekoDefaultPick${A}[${K}] | undefined } : never;
-export type ComponentProps${G} = __MeekoInputPropsOf${ofArguments(`__MeekoDeclaredProps${A}`)}${emitProps};
-function __meeko_defaultProps${G}() {
-  return (${markSource(defaults.expression, defaults.offset)} satisfies Partial<__MeekoDeclaredProps${A}> & __MeekoDefaultValues${A} & Record<Exclude<${defaultKeys}, keyof __MeekoDeclaredProps${A}>, never>);
-}
-function __meeko_resolveProps${G}(input: ComponentProps${A}): ${setupPropsType} {
-  return __meeko.resolveProps(input, __meeko_defaultProps${A}()) as ${setupPropsType};
-}` : plainPropsDeclaration);
+  const { setupPropsType, propsDeclaration } = emitComponentProps(scriptParts, generic);
   // Since 1.5 a layout with `<MeekoOutlet />` may declare its own props without `outlet`: Meeko
   // passes it anyway, so it joins the props type (its pages and the contracts see it).
   const outletProps = !generic && scriptParts.propsTypeOffset !== undefined && html.includes(outletReference)
-    ? `${propsDeclaration.replace("export type ComponentProps = ", "type __MeekoPropsBesideOutlet = ")}\nexport type ComponentProps = __MeekoPropsBesideOutlet & { outlet: import("@meekojs/meeko").Component<Record<string, unknown>> };`
+    ? `${propsDeclaration.replace("type __MeekoComponentProps = ", "type __MeekoPropsBesideOutlet = ").replace("export type { __MeekoComponentProps as ComponentProps };", "")}\ntype __MeekoComponentProps = __MeekoPropsBesideOutlet & { outlet: import("@meekojs/meeko").Component<Record<string, unknown>> };\nexport type { __MeekoComponentProps as ComponentProps };`
     : propsDeclaration;
-  const markedCode = `// Generated by Meeko. Edit the .meeko source instead.\nimport * as __meeko from "@meekojs/meeko/internal";\n${scriptParts.imports.join("\n")}\n${scriptParts.types.join("\n")}\n${outletProps}\nfunction __setup${G}(__props: ${setupPropsType}${usesRefs ? ", __meeko_refs: __meeko.ElementRefs" : ""}) {\n${refsType}${scriptParts.setup.join("\n")}\n${refHelpers.join("")}return { ${setupReturn} };\n}\n${exposedType}${channelsType}export const css = ${quote(css)};\n${dataMarks}${hotIdExport}export function renderWithState${G}(__inputProps: ComponentProps${A}): { html: string; state: __meeko.HotState } {\nreturn __meeko.createRoot((__meeko_dispose) => {\nconst __meeko_transfer = true;\n${refsDeclaration}const __bindings = ${setupCall("null")};\nconst { ${bindings} } = __bindings;\nreturn __meeko.finishWithCleanup(() => {\nconst __meeko_html = ${html};\nconst __meeko_state = __meeko.transferState(__bindings, ${quote(stateLabel(filename))});\nreturn { html: __meeko_html, state: __meeko_state };\n}, __meeko_dispose);\n});\n}\nexport function renderToString${G}(__inputProps: ComponentProps${A}${stateParam}): string {\nreturn __meeko.createRoot((__meeko_dispose) => {\nconst __meeko_transfer = false;\n${refsDeclaration}${setupCode("null")}\nreturn __meeko.finishWithCleanup(() => ${html}, __meeko_dispose);\n});\n}\nexport function hydrate${G}(root: Element, __inputProps: ComponentProps${A}${stateParam}): () => void {\nconst __scope: __meeko.DomScope = { root };\nreturn hydrateScope${A}(${scopeForward});\n}\nexport function hydrateScope${G}(__scope: __meeko.DomScope, __inputProps: ComponentProps${A}${stateParam}${scopeHotRootParam}): __meeko.ComponentRelease<ComponentExposed${A}> {\nreturn __meeko.mountBatch(() => __meeko.createRoot((__meeko_dispose) => {\nconst __meeko_transfer = false;\nconst __mounted: Array<() => __meeko.MountedResult> = [];\n${refsDeclaration}${setupCode("__mounted")}\nconst __release = (() => { ${hydrationBody(bindingsForTemplate, context, hot)} })();\n__meeko.runMounted(__mounted);\n${releaseCode}\n}));\n}\n`;
+  const markedCode = `// Generated by Meeko. Edit the .meeko source instead.\nimport * as __meeko from "@meekojs/meeko/internal";\n${scriptParts.imports.join("\n")}\n${scriptParts.types.join("\n")}\n${outletProps}\nfunction __setup${G}(__props: ${setupPropsType}${usesRefs ? ", __meeko_refs: __meeko.ElementRefs" : ""}) {\n${refsType}${scriptParts.setup.join("\n")}\n${refHelpers.join("")}return { ${setupReturn} };\n}\n${exposedType}${channelsType}export const css = ${quote(css)};\n${dataMarks}${hotIdExport}export function renderWithState${G}(__inputProps: __MeekoComponentProps${A}): { html: string; state: __meeko.HotState } {\nreturn __meeko.createRoot((__meeko_dispose) => {\nconst __meeko_transfer = true;\n${refsDeclaration}const __bindings = ${setupCall("null")};\nconst { ${bindings} } = __bindings;\nreturn __meeko.finishWithCleanup(() => {\nconst __meeko_html = ${html};\nconst __meeko_state = __meeko.transferState(__bindings, ${quote(stateLabel(filename))});\nreturn { html: __meeko_html, state: __meeko_state };\n}, __meeko_dispose);\n});\n}\nexport function renderToString${G}(__inputProps: __MeekoComponentProps${A}${stateParam}): string {\nreturn __meeko.createRoot((__meeko_dispose) => {\nconst __meeko_transfer = false;\n${refsDeclaration}${setupCode("null")}\nreturn __meeko.finishWithCleanup(() => ${html}, __meeko_dispose);\n});\n}\nexport function hydrate${G}(root: Element, __inputProps: __MeekoComponentProps${A}${stateParam}): () => void {\nconst __scope: __meeko.DomScope = { root };\nreturn hydrateScope${A}(${scopeForward});\n}\nexport function hydrateScope${G}(__scope: __meeko.DomScope, __inputProps: __MeekoComponentProps${A}${stateParam}${scopeHotRootParam}): __meeko.ComponentRelease<ComponentExposed${A}> {\nreturn __meeko.mountBatch(() => __meeko.createRoot((__meeko_dispose) => {\nconst __meeko_transfer = false;\nconst __mounted: Array<() => __meeko.MountedResult> = [];\n${refsDeclaration}${setupCode("__mounted")}\nconst __release = (() => { ${hydrationBody(bindingsForTemplate, context, hot)} })();\n__meeko.runMounted(__mounted);\n${releaseCode}\n}));\n}\n`;
   const { code, mappings } = extractSourceMappings(markedCode);
   // MEEK106: the project's component keeps a built-in tag's name; renaming it adopts the built-in.
   const warnings = [...scriptParts.warnings, ...[...context.shadowedUses].map(([tag, offset]): CompileDiagnostic => ({

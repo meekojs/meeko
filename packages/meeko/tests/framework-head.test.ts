@@ -6,18 +6,19 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { Window as HappyWindow } from "happy-dom";
 import { compile } from "../src/compiler.ts";
-import { applyAutoImports, discoverAutoImports } from "../src/autoimports.ts";
+import { discoverAutoImports } from "../src/autoimports/registry.ts";
+import { applyAutoImports } from "../src/autoimports/transform.ts";
 import { checkApp } from "../src/framework/check-app.ts";
 import { prepareFrameworkTypeDeclarations } from "../src/framework/type-declarations.ts";
 import { clientRoutesSource, discoverAppManifest } from "../src/framework/app-manifest.ts";
 import { loadMeekoConfig } from "../src/framework/config.ts";
-import { serverScriptModule } from "../src/framework/server-script.ts";
-import type { ClientComponent, ClientRoute } from "../src/framework/client.ts";
-import type { DocumentConfig, DocumentHead, HeadInput } from "../src/framework/head.ts";
-import { defineMeekoConfig } from "../src/framework/config-type.ts";
-import type { MeekoModuleContext } from "../src/framework/module.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import type { ErrorPageRecord, RouteRecord } from "../src/framework/router.ts";
+import { serverScriptModule } from "../src/compiler/codegen/server-script.ts";
+import type { ClientComponent, ClientRoute } from "../src/app/runtime/client.ts";
+import type { DocumentConfig, DocumentHead, HeadInput } from "../src/shared/head.ts";
+import { defineMeekoConfig } from "../src/modules/define-meeko-config.ts";
+import type { MeekoModuleContext } from "../src/modules/define-meeko-module.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import type { ErrorPageRecord, RouteRecord } from "../src/app/runtime/router.ts";
 import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
 import { loadCheckedMeekoConfig } from "../src/framework/check-project.ts";
 
@@ -25,11 +26,14 @@ const fileUrl = (path: string): string => pathToFileURL(resolve(path)).href;
 
 /** The runtime as the compiled components import it, by file URL: one instance for pages, server and browser. */
 const runtime = async () => ({
-  ...await import(fileUrl("src/framework/server.ts")) as typeof import("../src/framework/server.ts"),
-  ...await import(fileUrl("src/framework/client.ts")) as typeof import("../src/framework/client.ts"),
+  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof import("../src/server/runtime/framework-render.ts"),
+  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof import("../src/app/runtime/client.ts"),
   ...await import(fileUrl("src/framework/prerender.ts")) as typeof import("../src/framework/prerender.ts"),
-  ...await import(fileUrl("src/framework/page-body.ts")) as typeof import("../src/framework/page-body.ts"),
-  ...await import(fileUrl("src/framework/head.ts")) as typeof import("../src/framework/head.ts"),
+  ...await import(fileUrl("src/server/runtime/page-body.ts")) as typeof import("../src/server/runtime/page-body.ts"),
+  ...await import(fileUrl("src/shared/head.ts")) as typeof import("../src/shared/head.ts"),
+  ...await import(fileUrl("src/app/composables/use-head.ts")) as typeof import("../src/app/composables/use-head.ts"),
+  ...await import(fileUrl("src/app/runtime/head.ts")) as typeof import("../src/app/runtime/head.ts"),
+  ...await import(fileUrl("src/server/runtime/head.ts")) as typeof import("../src/server/runtime/head.ts"),
 });
 
 const appShell = `<script lang="ts">
@@ -645,7 +649,7 @@ test("useHead and useSeoMeta are framework autoimports that a project composable
     const filename = join(root, "app", "pages", "index.meeko");
     const registry = await discoverAutoImports(root);
     assert.match(applyAutoImports('useHead({ title: "x" });', filename, registry, "client"), /import \{ useHead as useHead \} from "@meekojs\/meeko\/framework"/);
-    assert.match(applyAutoImports('useSeoMeta({ title: "x" });', filename, registry, "server"), /import \{ useSeoMeta as useSeoMeta \} from "@meekojs\/meeko\/framework"/);
+    assert.match(applyAutoImports('useSeoMeta({ title: "x" });', filename, registry, "server", "client"), /import \{ useSeoMeta as useSeoMeta \} from "@meekojs\/meeko\/framework"/);
     await mkdir(join(root, "app", "composables"), { recursive: true });
     await writeFile(join(root, "app", "composables", "head.ts"), "export function useHead() { return 1; }\n");
     const own = await discoverAutoImports(root);

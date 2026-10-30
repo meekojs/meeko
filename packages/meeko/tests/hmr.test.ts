@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Window } from "happy-dom";
-import { enableHotModule, registerHotInstance, registerHotScope, replaceHotModule, replaceHotStyle, restoreSignals, snapshotSignals } from "../src/hmr.ts";
-import type { HotComponent } from "../src/hmr.ts";
-import type { DomScope } from "../src/dom.ts";
-import { computed, createContext, createRoot, inject, provide, signal } from "../src/reactivity.ts";
+import { enableHotModule, registerHotInstance, registerHotScope, replaceHotModule, replaceHotStyle, restoreSignals, snapshotSignals } from "../src/app/runtime/hmr.ts";
+import type { HotComponent } from "../src/app/runtime/hmr.ts";
+import type { DomScope } from "../src/app/runtime/renderer.ts";
+import { computed, createContext, createRoot, inject, provide, signal } from "../src/core/reactivity.ts";
 
 test("HMR conserva señales editables y omite valores derivados", () => {
   const release = createRoot((dispose) => {

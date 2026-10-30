@@ -6,11 +6,11 @@ import { createServer } from "node:net";
 import { join } from "node:path";
 import test from "node:test";
 import { Window as HappyWindow } from "happy-dom";
-import { composeServerMiddleware, defineServerMiddleware } from "../src/framework-server/middleware.ts";
-import { mountClientApp } from "../src/framework/client.ts";
-import { defineRouteMiddleware } from "../src/framework/middleware.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import { createFrameworkHandler } from "../src/framework/server.ts";
+import { composeServerMiddleware, defineServerMiddleware } from "../src/server/middleware/index.ts";
+import { mountClientApp } from "../src/app/runtime/client.ts";
+import { defineRouteMiddleware } from "../src/app/definitions/define-route-middleware.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
 import { repositoryRoot, stopChild, tempProject } from "./helpers/temp-project.ts";
 

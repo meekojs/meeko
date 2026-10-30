@@ -6,8 +6,8 @@ import { CompletionItemKind, DiagnosticSeverity, DiagnosticTag, InsertTextFormat
 import type { CompletionItem, CompletionList, Diagnostic, Hover, MarkupContent, Position, Range } from "vscode-languageserver/node";
 import { builtinTag } from "./builtin-tags.js";
 import { cssClassRules } from "./class-rules.js";
-import { isCandidates } from "../compiler/dynamic-tag.js";
-import { elementAccepts } from "../html-attributes.js";
+import { isCandidates } from "../compiler/transforms/dynamic-tag.js";
+import { elementAccepts } from "../shared/html-attributes.js";
 
 // HTML of the template and CSS of `<style>`, outside the TypeScript model: what the editor offers
 // while writing markup and styles. Every function reads the text, so it works while a tag or a
@@ -18,6 +18,39 @@ const cssService = getCSSLanguageService();
 const htmlData = getDefaultHTMLDataProvider();
 // `@layer` and nesting are standard; an unknown at-rule (a PostCSS plugin's) is not an error here.
 cssService.configure({ validate: true, lint: { unknownAtRules: "ignore" } });
+
+const specialTagDocumentation = {
+  render: [
+    "```html",
+    '<render snippet="snippets.name" args="value, action" />',
+    "```",
+    "Pinta un snippet que recibió este componente. `snippet` es una expresión, normalmente una clave de `defineSnippets`; `args` pasa valores al contenido del padre. Un snippet opcional ausente no pinta nada. No admite contenido dentro de `<render>`.",
+  ].join("\n\n"),
+  snippet: [
+    "```html",
+    '<snippet name="title" params="item, index">…</snippet>',
+    "```",
+    "Llena un snippet declarado por el componente hijo. Debe ser hijo directo de su etiqueta. El contenido pertenece al padre; `params` nombra los argumentos que el hijo envía desde `<render>`.",
+  ].join("\n\n"),
+} as const;
+
+const specialAttributeDocumentation = {
+  render: {
+    snippet: "**`snippet`** · Expresión de tipo `Snippet<Args> | undefined` que se pinta. Normalmente `snippets.name`, declarado con `defineSnippets`. Es obligatorio; si es `undefined`, no pinta contenido.",
+    args: "**`args`** · Expresiones separadas por comas que recibe el snippet, en el orden y con los tipos de la tupla declarada en `defineSnippets`.",
+    "if:when": "**`if:when`** · Pinta este `<render>` sólo cuando la expresión es verdadera.",
+  },
+  snippet: {
+    name: "**`name`** · Nombre del snippet que llena en el componente hijo; debe coincidir con una clave de su `defineSnippets`.",
+    params: "**`params`** · Nombres de los argumentos que el hijo pasa desde `<render args=\"…\">`, separados por comas. Sus tipos se infieren de `defineSnippets`.",
+    "if:when": "**`if:when`** · Pasa el snippet al hijo sólo cuando la expresión es verdadera. El hijo debe haberlo declarado como opcional.",
+  },
+} as const;
+
+export function specialTemplateDocumentation(tag: "render" | "snippet", attribute?: string): string | undefined {
+  return attribute === undefined ? specialTagDocumentation[tag]
+    : (specialAttributeDocumentation[tag] as Record<string, string>)[attribute];
+}
 
 interface Region {
   readonly contentStart: number;
@@ -173,6 +206,16 @@ export function dynamicTagAttributeCompletion(document: TextDocument, position: 
   }));
 }
 
+/** Propone atributos HTML tras `bind:` con los mismos datos y restricciones que los atributos normales. */
+export function bindAttributeCompletion(document: TextDocument, position: Position, word: string, tags: readonly string[], present: ReadonlySet<string>): CompletionItem[] {
+  return dynamicTagAttributeCompletion(document, position, word, tags, new Set()).filter((item) => !present.has(`bind:${item.label}`))
+    .map((item) => ({
+      ...item,
+      label: `bind:${item.label}`,
+      textEdit: { range: { start: document.positionAt(document.offsetAt(position) - word.length), end: position }, newText: `bind:${item.label}=\"$1\"` },
+    }));
+}
+
 /**
  * Hover of the name of `<component is>` with HTML tags: the elements it may render and the rule of
  * its attributes, with the MDN description of each tag.
@@ -251,6 +294,19 @@ export function htmlCompletion(document: TextDocument, position: Position): Comp
   const items = list.items.filter((item) => item.kind !== CompletionItemKind.Snippet && !/^on[a-z]/.test(item.label));
   const snippet = snippetTagCompletion(document, position, parsed);
   if (snippet) items.unshift(snippet);
+  const typed = /<([a-z]*)$/.exec(source.slice(Math.max(0, offset - 64), offset));
+  if (typed && "render".startsWith(typed[1]!)) {
+    const tagStart = offset - typed[0].length;
+    items.unshift({
+      label: "render",
+      kind: CompletionItemKind.Property,
+      detail: "Renderiza un snippet con sus argumentos",
+      documentation: { kind: MarkupKind.Markdown, value: specialTagDocumentation.render },
+      sortText: "0",
+      insertTextFormat: InsertTextFormat.Snippet,
+      textEdit: { range: { start: document.positionAt(tagStart + 1), end: position }, newText: 'render snippet="$1" />' },
+    });
+  }
   return items.length ? { isIncomplete: list.isIncomplete, items } : undefined;
 }
 
@@ -275,7 +331,7 @@ function snippetTagCompletion(document: TextDocument, position: Position, parsed
     label: "snippet",
     kind: CompletionItemKind.Property,
     detail: `Snippet de <${parent}>: <snippet name="…">`,
-    documentation: { kind: "markdown", value: `Llena un snippet del componente: \`<snippet name="nombre" params="a, b">…</snippet>\`, hijo directo de \`<${parent}>\`.` },
+    documentation: { kind: MarkupKind.Markdown, value: specialTagDocumentation.snippet },
     sortText: "0",
     insertTextFormat: InsertTextFormat.Snippet,
     textEdit: { range: { start: document.positionAt(tagStart + 1), end: position }, newText: 'snippet name="$1">$0</snippet>' },
@@ -293,6 +349,45 @@ export function htmlHover(document: TextDocument, position: Position): Hover | u
   if (context?.component) return undefined;
   const html = masked(document, template, "html");
   return htmlService.doHover(html, position, htmlService.parseHTMLDocument(html)) ?? undefined;
+}
+
+/** Hover of Meeko's snippet syntax; leave quoted values to the typed component model. */
+export function specialTemplateHover(document: TextDocument, position: Position): Hover | undefined {
+  const source = document.getText();
+  const offset = document.offsetAt(position);
+  const template = templateRegion(source);
+  if (!inside(template, offset)) return undefined;
+  const tagStart = source.lastIndexOf("<", offset);
+  if (tagStart < template.contentStart) return undefined;
+  const opening = /^<(render|snippet)(?=[\s/>])/.exec(source.slice(tagStart));
+  const closing = /^<\/(render|snippet)\s*>/.exec(source.slice(tagStart));
+  const tag = (opening?.[1] ?? closing?.[1]) as "render" | "snippet" | undefined;
+  if (!tag) return undefined;
+  const nameStart = tagStart + (closing ? 2 : 1);
+  const nameEnd = nameStart + tag.length;
+  const makeHover = (start: number, end: number, markdown: string): Hover => ({
+    contents: { kind: MarkupKind.Markdown, value: markdown },
+    range: { start: document.positionAt(start), end: document.positionAt(end) },
+  });
+  if (offset >= nameStart && offset < nameEnd) return makeHover(nameStart, nameEnd, specialTagDocumentation[tag]);
+  if (!opening) return undefined;
+  const context = tagAt(source, offset);
+  if (!context || context.tag !== tag || context.tagStart !== tagStart || context.value) return undefined;
+  let quote: string | undefined;
+  for (let index = nameEnd; index < context.tagEnd; index++) {
+    const char = source[index]!;
+    if (quote) { if (char === quote) quote = undefined; continue; }
+    if (char === '"' || char === "'") { quote = char; continue; }
+    if (!/\s/.test(char)) continue;
+    const match = /^([A-Za-z_:][\w:-]*)/.exec(source.slice(index + 1));
+    if (!match) continue;
+    const start = index + 1;
+    const end = start + match[1]!.length;
+    const markdown = specialTemplateDocumentation(tag, match[1]!);
+    if (markdown && offset >= start && offset < end) return makeHover(start, end, markdown);
+    index = end - 1;
+  }
+  return undefined;
 }
 
 /** `<div>` and `</div>` edited together, also in the tags of components. */

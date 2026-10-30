@@ -1,4 +1,4 @@
-import type { DevtoolsEvent, DevtoolsHook, DevtoolsInstance, DevtoolsProtocolVersion, DevtoolsReadSite, DevtoolsSnapshot, DevtoolsWriteSite } from "../devtools.js";
+import type { DevtoolsEvent, DevtoolsHook, DevtoolsInstance, DevtoolsProtocolVersion, DevtoolsReadSite, DevtoolsSnapshot, DevtoolsWriteSite } from "../app/runtime/devtools.js";
 
 /** Versión del protocolo que entiende este panel; el tipo obliga a revisarlo si el protocolo cambia. */
 const supportedProtocolVersion: DevtoolsProtocolVersion = 1;

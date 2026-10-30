@@ -5,9 +5,9 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { Window as HappyWindow } from "happy-dom";
 import { compile } from "../src/compiler.ts";
-import type { ClientComponent, ClientRoute } from "../src/framework/client.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import type { RouteRecord } from "../src/framework/router.ts";
+import type { ClientComponent, ClientRoute } from "../src/app/runtime/client.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import type { RouteRecord } from "../src/app/runtime/router.ts";
 
 const fileUrl = (path: string): string => pathToFileURL(resolve(path)).href;
 
@@ -16,9 +16,9 @@ const fileUrl = (path: string): string => pathToFileURL(resolve(path)).href;
  * reactivity, lifecycle and resource modules for the pages, the server and the browser app.
  */
 const runtime = async () => ({
-  ...await import(fileUrl("src/framework/server.ts")) as typeof import("../src/framework/server.ts"),
-  ...await import(fileUrl("src/framework/client.ts")) as typeof import("../src/framework/client.ts"),
-  ...await import(fileUrl("src/suspense.ts")) as typeof import("../src/suspense.ts"),
+  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof import("../src/server/runtime/framework-render.ts"),
+  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof import("../src/app/runtime/client.ts"),
+  ...await import(fileUrl("src/app/runtime/suspense.ts")) as typeof import("../src/app/runtime/suspense.ts"),
 });
 
 /** HTML without the hydration markers of text bindings. */

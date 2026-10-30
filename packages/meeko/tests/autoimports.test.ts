@@ -3,7 +3,8 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { applyAutoImports, compileWithAutoImports, discoverAutoImports } from "../src/autoimports.ts";
+import { discoverAutoImports } from "../src/autoimports/registry.ts";
+import { applyAutoImports, compileWithAutoImports } from "../src/autoimports/transform.ts";
 import { checkSource } from "../src/check.ts";
 
 test("definePage and the server definitions are autoimported where they run", async () => {

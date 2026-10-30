@@ -1,61 +1,39 @@
 # Sitio de documentación de Meeko
 
-El sitio público de Meeko (`https://meeko.diegootayza.com`), hecho con Meeko. Sus páginas salen de los
-Markdown del repositorio (`packages/meeko/README.md`, `packages/meeko/CHANGELOG.md` y `docs/*.md`,
-salvo `docs/releasing.md`): no copie aquí su contenido. `server/content/repository.ts` resuelve las
-rutas del paquete (`README.md`, `CHANGELOG.md`, `package.json`, `examples/…`) bajo `packages/meeko/`.
-Depende del Meeko de este repositorio con `workspace:*`, así que usa su `dist/`.
+El sitio conserva Markdown, taxonomía y JSDoc en este repositorio como fuente. El script `docs:sync` los convierte en un snapshot de PostgreSQL. El servidor público usa únicamente ese snapshot para la portada, guías, referencia, búsqueda, `llms.txt` y sitemap; no lee Markdown del repositorio al atender peticiones.
 
-```powershell
-pnpm install                         # en la raíz del repositorio: instala todo el workspace
-pnpm run build                       # en la raíz: compila packages/meeko/dist/
-cd apps/site
-pnpm run dev                         # http://localhost:4173
-pnpm run check                       # meeko check
-pnpm run build                       # sitio estático en .meeko/output/static y dist-static/
-pnpm run preview                     # build y meeko preview (sirve la salida como un hosting estático)
-pnpm run test                        # comprueba las páginas escritas de la referencia
-pnpm run build:static                # lo mismo que build; lo usan la raíz y el despliegue
+## Desarrollo
+
+Se necesita Node.js 24, pnpm y una base PostgreSQL **dedicada al sitio**. La URL de conexión va en `apps/site/.env`, ignorado por Git:
+
+```dotenv
+DATABASE_URL=postgresql://USUARIO:CLAVE@HOST:5432/BASE_DE_DATOS
 ```
 
-- `meeko.config.ts` usa el adaptador `static` de Meeko: todas las páginas se prerenderizan y
-  `meeko build` escribe el sitio completo en `.meeko/output/static/`, con `<ruta>/index.html` y
-  `<ruta>/index.meeko.json` (el payload que lee la navegación cliente) por página, `404.html` de
-  `app/error.meeko`, `sitemap.xml` y `robots.txt` (`site`, `sitemap` y `robots`), la URL canónica y
-  Open Graph de cada página (`document.seo`) y `_meeko/headers.conf` (`server.headerFiles`).
-- `_meeko/headers.conf` lleva la Content-Security-Policy de `server.contentSecurityPolicy` y las
-  demás cabeceras de seguridad de `server.headers` (`X-Content-Type-Options`, `Referrer-Policy`,
-  `Permissions-Policy`). El build permite cada `<script>` inline de las páginas (como el del tema de
-  `meeko.config.ts`) por su hash SHA-256, calculado en cada build, así que cambiar un script no exige
-  tocar la política; un atributo `on*` o una URL `javascript:` hacen fallar el build.
-  `deploy/nginx.conf` incluye ese archivo desde la raíz web en cada `location` y responde 404 a
-  `/_meeko/`.
-- La tipografía es Inter variable (ejes `opsz` y `wght`, subconjunto latino), autoalojada en
-  `public/fonts/` bajo la SIL Open Font License 1.1 (`public/fonts/Inter-OFL.txt`); sale de
-  `@fontsource-variable/inter` 5.3.0. La CSP sólo admite fuentes de `'self'`: no use un CDN.
-- `scripts/` sólo tiene lo propio del sitio: `assets.mjs` deriva las imágenes de `public/brand/` del
-  logo del repositorio, y `postbuild.mjs` indexa las páginas con Pagefind en `pagefind/` de la salida
-  y la copia a `dist-static/`, la carpeta que sirve `deploy/nginx.conf`.
-- La búsqueda usa el índice de Pagefind del build: en `meeko dev` no existe.
-- Una copia de trabajo anterior puede conservar `public/sitemap.xml`, `public/robots.txt` y
-  `public/pagefind/`, que generaba el `postbuild.mjs` anterior: bórrelos. Los dos primeros chocan con
-  los que genera Meeko y el build lo indica.
-- La referencia de la API tiene dos capas. `/docs/reference` es el índice de la taxonomía de
-  `docs/reference/taxonomy.json` (componentes, macros, composables, reactividad, utilidades, sintaxis,
-  servidor, adaptadores, comandos, configuración y avanzado), que también forma el aside de cada
-  página. Un símbolo con página escrita (`docs/reference/<grupo>/<slug>.md`) la muestra fusionada con
-  lo que genera el código: `server/content/reference.ts` inserta la sección «Tipo» con las firmas y
-  declaraciones exactas, la importación, el autoimport, la versión y «Relacionado». Un símbolo
-  pendiente enlaza su página generada. `/docs/reference/exports` es la referencia exhaustiva por
-  módulo: `server/content/api.ts` lee con TypeScript cada export de las subrutas públicas de
-  `packages/meeko/package.json` y su JSDoc, así que un export nuevo tiene su página sin tocar el
-  sitio. La sintaxis de `.meeko` que no es un export (bloques, macros, etiquetas y directivas) está
-  en `server/content/api-builtins.ts`. Cómo escribir una página: `docs/reference/README.md`.
-- `pnpm run test` comprueba la referencia escrita contra el paquete y la taxonomía
-  (`tests/reference.test.mjs`): símbolos que existen, secciones obligatorias, pendientes y ejemplos
-  `ts` que compilan.
-- `postbuild.mjs` también escribe `/llms.txt` (índice con un enlace y una línea por guía y símbolo) y
-  `/llms-full.txt` (guías y referencia en Markdown), cargando los módulos de contenido con Vite.
-- Desde la raíz, `pnpm run site:build` y `pnpm run site:build:static` compilan primero el paquete y
-  después el sitio. Un despliegue desde el repositorio ejecuta `pnpm install --frozen-lockfile` y
-  `pnpm run site:build:static` en la raíz y publica `apps/site/dist-static/`.
+Desde la raíz del repositorio:
+
+```powershell
+pnpm install
+pnpm run build
+pnpm -F meeko-site run db:migrate
+pnpm -F meeko-site run docs:sync
+pnpm -F meeko-site run check
+pnpm -F meeko-site run test
+pnpm -F meeko-site run dev
+```
+
+`db:migrate` aplica `migrations/001_docs.sql`. `docs:sync` genera todas las páginas a partir de los archivos locales y activa el nuevo snapshot en una transacción; si falla, la versión anterior sigue visible. La base conserva también la versión activa anterior para una posible reversión. Nunca publiques un snapshot parcial ni edites las filas a mano. Después de cambiar Markdown o JSDoc, ejecuta `docs:sync` para publicarlos en el sitio.
+
+## Build y publicación
+
+```powershell
+pnpm run site:build
+pnpm -F meeko-site run docs:sync
+pnpm -F meeko-site run start
+```
+
+El build genera `.meeko/output/node`; `start` sirve las rutas SSR y los assets. El proceso necesita `DATABASE_URL` y una base ya migrada y sincronizada. En producción, configura la URL en el gestor de secretos del servicio, inicia Node detrás del proxy HTTPS y comprueba `/docs`, `/docs/reference`, `/api/docs/search?q=signal` y `/sitemap.xml` antes de dirigir tráfico. El antiguo despliegue de archivos `dist-static/` no sirve esta versión.
+
+El snapshot se construye con `scripts/sync-docs.mjs`: las guías vienen de `docs/*.md` y del README del paquete; la referencia combina `docs/reference/`, `taxonomy.json` y las declaraciones TypeScript/JSDoc públicas. Los tipos y las firmas se generan desde el código del paquete, no se duplican en PostgreSQL como una segunda fuente editable.
+
+La búsqueda consulta el texto del mismo snapshot activo. Los fragmentos que devuelve son texto plano y el cliente los escapa antes de mostrarlos. `/llms.txt`, `/llms-full.txt`, `/sitemap.xml` y `/robots.txt` también salen del servidor Node. `pnpm run test` comprueba que los símbolos, ejemplos y páginas escritas sigan el contrato de la referencia.

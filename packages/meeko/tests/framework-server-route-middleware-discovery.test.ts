@@ -10,7 +10,7 @@ import { routeOptionsKey } from "../src/framework/dev-watch.ts";
 import { generateRoutes } from "../src/framework/generate.ts";
 import { discoverRouteMiddleware, extractRouteMiddlewareOptions } from "../src/framework/route-middleware-discovery.ts";
 import { discoverRoutes } from "../src/framework/routes-discovery.ts";
-import type { RouteRecord } from "../src/framework/router.ts";
+import type { RouteRecord } from "../src/app/runtime/router.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
 import { buildProject } from "../src/framework/project.ts";
 import { assertStaticApp } from "../src/framework/static-adapter.ts";

@@ -5,17 +5,21 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { Window } from "happy-dom";
-import { applyAutoImports, discoverAutoImports, discoverAutoImportsSync } from "../src/autoimports.ts";
-import { generateAutoImportTypes } from "../src/autoimports-ts.ts";
+import { discoverAutoImports, discoverAutoImportsSync } from "../src/autoimports/registry.ts";
+import { applyAutoImports } from "../src/autoimports/transform.ts";
+import { generateAutoImportTypes } from "../src/autoimports/typescript.ts";
 import { generateServerContracts } from "../src/framework/contracts-generate.ts";
-import { createApiClient, createBrowserClientOptions, createRpcClient } from "../src/framework/clients.ts";
-import { createRequestContext, withRequestContext } from "../src/framework-server/context.ts";
-import { createServerClientOptions } from "../src/framework-server/auto-clients.ts";
-import { MemorySessionStore, SessionManager } from "../src/framework-server/sessions.ts";
-import { createLocalServerFetch } from "../src/framework-server/discovery.ts";
-import { defineApiRoute, defineRpc, dispatchApiRoute } from "../src/framework-server/contracts.ts";
+import { createApiClient, createRpcClient } from "../src/shared/clients.ts";
+import { createBrowserClientOptions } from "../src/app/runtime/browser-clients.ts";
+import { createRequestContext, withRequestContext } from "../src/server/runtime/request-context.ts";
+import { createServerClientOptions } from "../src/server/runtime/auto-clients.ts";
+import { MemorySessionStore, SessionManager } from "../src/server/runtime/sessions.ts";
+import { createLocalServerFetch } from "../src/server/runtime/discovery.ts";
+import { defineApiRoute } from "../src/server/api/define-api-route.ts";
+import { defineRpc } from "../src/server/rpc/define-rpc.ts";
+import { dispatchApiRoute } from "../src/server/api/runtime.ts";
 import type { Schema, ServerManifest } from "../src/framework-server.ts";
-import type { ApiOperation } from "../src/framework/clients.ts";
+import type { ApiOperation } from "../src/shared/clients.ts";
 
 const execFileAsync = promisify(execFile);
 

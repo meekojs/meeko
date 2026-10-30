@@ -31,13 +31,14 @@ Con `meeko dev` en marcha y la página abierta en el navegador, la extensión mu
 - **Barra de estado.** Un indicador **Meeko live** muestra si hay conexión con `meeko dev`; al pulsarlo, o con el comando de reconexión (`meeko.live.reconnect`), se vuelve a conectar. Sólo aparece cuando hay un servidor de desarrollo o un `.meeko` activo.
 - **Modelos compartidos.** Una señal que es la misma que otra, como el modelo que un hijo recibe con `defineModel`, se muestra con su señal principal (`open = true (= dialogOpen)`), su hover dice «alias de `dialogOpen`» con su archivo y línea, y editarla edita la principal.
 - **Conexión.** Cada `meeko dev` escribe su descriptor `.meeko/dev/editor-bridge-<puerto>.json`; la extensión se conecta a todos los que encuentra, con el token de cada sesión, así que funcionan varios `meeko dev` a la vez. Sólo acepta direcciones de loopback y se reconecta sola cuando `meeko dev` se reinicia. Al conectarse espera un instante el estado de las pestañas abiertas, de modo que los valores aparecen sin recargar la página.
+- **Varias carpetas.** Al añadir o quitar carpetas del workspace, la extensión descubre los servidores nuevos y cierra las conexiones de las carpetas retiradas.
 - **Confianza.** Sólo funciona en workspaces de confianza.
 
 `meeko dev` no publica valores si se arranca con `MEEKO_EDITOR_BRIDGE=0` o si escucha en una dirección que no es de loopback. Con Meeko 1.7.1 o posterior, mientras ese `meeko dev` sigue en marcha, el indicador muestra **Meeko live: desactivado en meeko dev**, con el motivo y cómo activarlo en el tooltip (por ejemplo, quitar `MEEKO_EDITOR_BRIDGE=0` del `.env` y reiniciar `meeko dev`). El protocolo y sus reglas de seguridad se describen en [docs/devtools.md](https://github.com/meekojs/meeko/blob/main/docs/devtools.md#puente-del-editor).
 
 ## Primeros pasos
 
-1. Instala **Meeko Language** en Visual Studio Code 1.140.0 o posterior.
+1. Instala **Meeko Language** en Visual Studio Code 1.144.0 o posterior.
 2. Abre tu proyecto Meeko y un archivo con extensión `.meeko`.
 3. Usa completado, hover, ir a definición, referencias, renombrado y **Format Document** desde el editor.
 
@@ -49,8 +50,13 @@ Al guardar un módulo TypeScript del mismo proyecto, el servidor vuelve a compro
 
 - Si el workspace es de confianza y el proyecto tiene `@meekojs/meeko` con el bin `meeko-language-server` en `node_modules` (se busca desde cada carpeta del workspace hacia arriba), la extensión arranca **ese** servidor. Así el editor usa la misma versión que el compilador del proyecto.
 - Si no existe, es una versión anterior sin servidor de lenguaje, el ajuste `meeko.languageServer.preferWorkspace` está desactivado o el workspace no es de confianza, usa el **servidor incluido** en la extensión.
+- En un workspace con varias carpetas, cada una elige su propio servidor; al cambiar carpetas, confianza o `meeko.languageServer.preferWorkspace`, la extensión vuelve a seleccionar y arrancar los servidores.
 
 El canal de salida **Meeko** indica al arrancar qué servidor se eligió, su versión y el motivo de la elección, y registra los fallos internos del servidor.
+
+## Workspaces virtuales
+
+En documentos `.meeko` de un proveedor virtual, el servidor incluido analiza el archivo abierto y ofrece completado, hover, símbolos y diagnósticos mientras se edita. Cada documento se analiza de forma aislada: la navegación, las referencias y la comprobación de contratos entre archivos requieren un proyecto en disco y no están disponibles allí. Meeko live también requiere un proyecto local.
 
 ## Modo restringido
 
@@ -65,7 +71,17 @@ En un workspace no confiable la extensión nunca ejecuta código del proyecto: u
 | `meeko.editor.executionZones` | `true` | Muestra las zonas de ejecución: una barra en el margen y un color de línea tenue para el código que se ejecuta sólo en el servidor, en ambos lados o sólo en el navegador. |
 | `meeko.live.enabled` | `true` | Conecta con `meeko dev` para mostrar y editar los valores en vivo de las señales. Sólo en workspaces de confianza y con un servidor de desarrollo en loopback. |
 | `meeko.live.inlineValues` | `true` | Muestra el valor en vivo al final de la línea de cada señal. Con `false`, el valor sigue en el hover. |
-| `meeko.trace.server` | `off` | Registra la comunicación con el servidor (`messages` o `verbose`) en el canal **Meeko**. |
+| `meeko.trace.server` | `off` | Activa el trace de cada servidor (`messages` o `verbose`). Para ver los mensajes, cambia el nivel del canal **Meeko** a **Trace**. |
+
+Si usas Fira Code y has activado `editor.bracketPairColorization.enabled: true` explícitamente, VS Code puede colorear por separado el `>` de `=>` dentro del TypeScript de un `.meeko` y romper la ligadura. La preferencia global prevalece sobre el valor predeterminado de la extensión. Añade esta excepción a tus ajustes de VS Code:
+
+```json
+"[meeko]": {
+  "editor.bracketPairColorization.enabled": false
+}
+```
+
+Esto quita los colores de pares de corchetes sólo en `.meeko`; el emparejamiento y la edición vinculada de etiquetas siguen disponibles.
 
 Cambiar un ajuste `meeko.languageServer.*` reinicia el servidor. Los ajustes `meeko.format.*` se leen en cada formateo y no requieren reinicio.
 

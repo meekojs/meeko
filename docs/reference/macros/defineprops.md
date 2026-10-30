@@ -19,6 +19,8 @@ related:
 
 `defineProps<Props>()` declara las props que recibe el componente y devuelve el objeto `props`. Es una macro de compilación: no se importa ni existe en ejecución; el compilador lee el tipo `Props` y genera `ComponentProps`, que comprueban `meeko check` y el editor en cada etiqueta del padre.
 
+**Convención de nombres:** si declaras la interfaz de props dentro del mismo `<script>`, llámala `Props` y úsala como `defineProps<Props>()`. `meeko check` y el editor emiten el aviso `MEEK120` cuando esa interfaz local tiene otro nombre; el componente sigue compilando. Los tipos inline, alias e interfaces importadas conservan sus nombres. Para consultar las props desde otro archivo, usa `ComponentProps<"NombreDelComponente">`; no hace falta exportar una interfaz global por componente.
+
 Desde `1.2`, `props` es una vista **reactiva** de sólo lectura: cada lectura de `props.x` en la plantilla, en un `computed` o en un `effect` sigue a la prop cuando el padre la cambia, sin volver a montar el hijo. El argumento opcional es un objeto literal con valores por defecto.
 
 ## Uso

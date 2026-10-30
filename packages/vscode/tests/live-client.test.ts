@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { Server } from "node:http";
 import { tmpdir } from "node:os";
@@ -9,6 +9,7 @@ import { test } from "node:test";
 import { editorBridgeFile, startEditorBridge } from "../../meeko/src/framework/editor-bridge.js";
 import type { EditorBridge, EditorBridgeHotChannel, EditorBridgeHotClient } from "../../meeko/src/framework/editor-bridge.js";
 import { BridgeConnection } from "../src/live/client.js";
+import { maxSseFrameBytes } from "../src/live/model.js";
 import type { LiveChange } from "../src/live/client.js";
 
 type Listener = (data: unknown, client: EditorBridgeHotClient) => void;
@@ -132,4 +133,33 @@ test("un descriptor que apunta fuera de loopback no se usa", async (t) => {
   await until(() => logs.length > 0, "No rechazó el descriptor");
   assert.match(logs[0] ?? "", /loopback/);
   assert.equal(connection.isConnected, false);
+});
+
+test("cierra un stream SSE excesivo y espera otro descriptor antes de reconectar", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "meeko-live-oversize-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  let requests = 0;
+  let closed = false;
+  const server = createServer((_request, response) => {
+    requests++;
+    response.writeHead(200, { "content-type": "text/event-stream" });
+    response.on("close", () => { closed = true; });
+    response.write(`data: ${"x".repeat(maxSseFrameBytes)}`);
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(async () => { server.closeAllConnections(); server.close(); await once(server, "close"); });
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const descriptor = join(root, editorBridgeFile(address.port));
+  await mkdir(join(root, ".meeko", "dev"), { recursive: true });
+  await writeFile(descriptor, JSON.stringify({ protocol: 1, url: `http://127.0.0.1:${address.port}/__meeko/editor-bridge`, token: "test", pid: process.pid }));
+  const logs: string[] = [];
+  const connection = new BridgeConnection({ descriptor, onState: () => {}, onChange: () => {}, log: (message) => logs.push(message), retryDelays: [10] });
+  t.after(() => connection.dispose());
+  connection.reload();
+  await until(() => closed && logs.some((message) => message.includes("evento SSE superior")), "No cerró el stream excesivo");
+  assert.equal(connection.isConnected, false);
+  await new Promise((done) => setTimeout(done, 80));
+  assert.equal(requests, 1, "No debe reconectar al mismo stream excesivo");
 });

@@ -1,5 +1,30 @@
 # Cambios de Meeko Language
 
+## [1.7.6] - 2026-10-30
+
+- Los archivos `.meeko` de workspaces virtuales reciben análisis del archivo abierto: completado, hover, símbolos y diagnósticos que se actualizan al editar. La extensión declara soporte limitado porque la navegación y las referencias entre archivos siguen requiriendo un proyecto en disco.
+- `meeko.trace.server` se aplica a cada cliente LSP al arrancar y al cambiar el ajuste, incluso en workspaces con varias carpetas.
+- Meeko live descubre y deja de observar carpetas al cambiar un workspace con varias raíces; cierra las conexiones de carpetas retiradas. Los eventos SSE de más de 4 MiB cierran la conexión para evitar que el búfer crezca sin límite.
+- Los tipos de la API de VS Code se actualizan a 1.144.0; ésa pasa a ser la versión mínima compatible del editor.
+
+## [1.7.5] - 2026-10-29
+
+- Tras `bind:` en un elemento HTML, el editor propone atributos concretos, incluidos `aria-*`, con su descripción. Completar un nombre parcial reemplaza el prefijo completo y omite atributos ya enlazados. También incluye los atributos válidos de elementos dinámicos y etiquetas integradas que representan HTML.
+
+## [1.7.4] - 2026-10-29
+
+- La extensión propone desactivar por defecto la colorización de pares en `.meeko`: VS Code recolorea el `>` de `=>` dentro de TypeScript incrustado y rompe la ligadura de Fira Code, aunque el inspector muestre un único token rojo. Si el usuario ha activado `editor.bracketPairColorization.enabled` globalmente, VS Code prioriza ese ajuste y requiere `"[meeko]": { "editor.bracketPairColorization.enabled": false }` en su perfil.
+
+## [1.7.3] - 2026-10-29
+
+- `<` y `>` siguen reconocidos como par para la edición de etiquetas, pero se excluyen de `colorizedBracketPairs` en la configuración de Meeko. Este ajuste por sí solo no alcanza al TypeScript incrustado en `<script>`; la versión 1.7.4 corrige ese caso.
+
+## [1.7.2] - 2026-10-29
+
+- Cada carpeta de un workspace usa el servidor de lenguaje de su propia instalación de Meeko. La extensión vuelve a seleccionarlos al añadir o quitar carpetas, al cambiar la confianza o al modificar `meeko.languageServer.preferWorkspace`.
+- La selección, el arranque y el cierre de los servidores se gestionan en un módulo propio; las peticiones de cierre automático de etiquetas y zonas de ejecución van al servidor de la carpeta del archivo.
+- Una prueba de regresión comprueba `=>` y las expresiones anidadas con la gramática TypeScript de VS Code instalada, cuando está disponible.
+
 ## [1.7.1] - 2026-10-29
 
 - «Meeko live» explica un `meeko dev` sin puente: si el `meeko dev` del proyecto se arrancó con `MEEKO_EDITOR_BRIDGE=0` (o escucha fuera de loopback), la barra de estado muestra «Meeko live: desactivado en meeko dev», con el motivo y cómo activarlo en el tooltip, en lugar de «desconectado». Lo lee de `.meeko/dev/server.json`, que escribe Meeko 1.7.1 o posterior.

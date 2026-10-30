@@ -8,7 +8,7 @@ import { Window } from "happy-dom";
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
 import type { CompileOptions } from "../src/compiler.ts";
-import { MeekoCompileError } from "../src/compiler/sfc.ts";
+import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
 import { createTempProject, repositoryRoot } from "./helpers/temp-project.ts";
 
 interface Props {

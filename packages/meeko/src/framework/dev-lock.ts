@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import type { DevelopmentServerRecord } from "../devtools-bridge-protocol.js";
+import type { DevelopmentServerRecord } from "../shared/devtools-bridge-protocol.js";
 
 /** The process of `meeko dev` that serves a project, under its `.meeko/dev/`. */
 export const developmentLockFile = join(".meeko", "dev", "server.json");

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { definePage } from "../src/framework/page.ts";
-import type { PageSchema } from "../src/framework/page.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import { createFrameworkHandler } from "../src/framework/server.ts";
+import { definePage } from "../src/app/definitions/define-page.ts";
+import type { PageSchema } from "../src/app/definitions/define-page.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 
 const paramsSchema: PageSchema<unknown, { id: number }> = {
   "~standard": {

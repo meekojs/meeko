@@ -1,34 +1,28 @@
 <script server lang="ts">
 	import { definePage } from '@meekojs/meeko/framework'
-	import { apiGroups, exportsHref, groupHref, referenceHref } from '../../../../server/content/api-groups.js'
-	import { referenceIndex, referenceNavigation } from '../../../../server/content/reference.js'
-	import { groupIcons, taxonomyPath } from '../../../../server/content/reference-taxonomy.js'
-	import { githubUrl } from '../../../../server/content/repository.js'
+	import type { NavSection, Pager, TocEntry } from '../../../../shared/types/docs.js'
+	import type { ReferenceIndexGroup } from '../../../../shared/types/reference.js'
+	import { readPage } from '../../../../server/content/db.js'
 
-	// The index of the reference: the groups of docs/reference/taxonomy.json, each with its symbols
-	// (server/content/reference.ts). Every export by module is at /docs/reference/exports.
-	export const route = definePage({ render: 'prerender' })
+	export const route = definePage({ render: 'ssr' })
 
-	export const groups = await referenceIndex()
-	export const total = groups.reduce((sum, group) => sum + group.entries.length, 0)
-	// The anchors of the earlier index (`/docs/reference#framework`) stay, on the modules at the end.
-	export const modules = apiGroups().map((group) => ({ id: group.id, label: group.specifier ?? group.title, href: groupHref(group), code: group.specifier !== null }))
-	export const exportsIcon = groupIcons.exports!
-	export const exportsLink = exportsHref
-	export const nav = await referenceNavigation()
-	export const current = referenceHref
-	export const toc = [...groups.map((group) => ({ id: group.anchor, text: group.title, level: 2 })), { id: 'todos-los-exports', text: 'Todos los exports', level: 2 }]
-	const first = groups[0]?.entries[0]
-	export const pages = {
-		previous: { href: '/docs/api', label: 'Componentes y API' },
-		next: first ? { href: first.href, label: first.name } : null,
+	type ReferenceIndexPage = {
+		readonly groups: readonly ReferenceIndexGroup[]
+		readonly total: number
+		readonly modules: readonly { readonly id: string; readonly label: string; readonly href: string; readonly code: boolean }[]
+		readonly exportsIcon: string
+		readonly exportsLink: string
+		readonly nav: readonly NavSection[]
+		readonly current: string
+		readonly toc: readonly TocEntry[]
+		readonly pages: Pager
+		readonly source: string
+		readonly editUrl: string
+		readonly head: { readonly title: string; readonly description: string }
 	}
-	export const source = taxonomyPath
-	export const editUrl = githubUrl(source, 'edit')
-	export const head = {
-		title: 'Referencia de la API · Meeko',
-		description: 'Cada componente, macro, composable, función de reactividad, utilidad, directiva, API de servidor, adaptador, comando y opción de configuración de Meeko, con su tipo exacto, ejemplos y errores comunes.',
-	}
+	const snapshot = await readPage<ReferenceIndexPage>('/docs/reference')
+	if (!snapshot) notFound()
+	export const { groups, total, modules, exportsIcon, exportsLink, nav, current, toc, pages, source, editUrl, head } = snapshot
 </script>
 
 <script lang="ts">

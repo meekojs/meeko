@@ -128,7 +128,7 @@ Viajan en el payload: una prop con `undefined` deja la prop en el valor por defe
 
 - **`form.field(name)`** devuelve un `FormField` tipado (la señal, el nombre, los IDs de `useId`, el mensaje, `invalid` y `describedBy`) para un componente de campo propio: `<AppField bind:field="form.field('email')" label="Correo" />`. Un componente de campo que sirve dentro y fuera de un formulario declara `field` opcional y el modelo por defecto con opciones sin nombre, `defineModel<string>({ default: "" })`, para que también sea opcional, y lee `computed(() => props.field?.value ?? model)`. Véase [Componentes de campo: `FormField`](framework.md#componentes-de-campo-formfield).
 - **`form.trySubmit(event)`** envía como `submit`, pero resuelve con un `FormSubmission` (`{ ok: true, result }` o `{ ok: false, reason: "invalid" | "error" | "skipped" }`) y nunca rechaza. `submit` no cambia.
-- **`form.commit(values?)`** toma los valores como nuevos iniciales de `dirty` y de `reset()`, sin borrar `submitted`; la opción `onSuccess(result, form)` se ejecuta tras un envío correcto, por ejemplo para llamar a `commit`.
+- **`form.commit(values?)`** tomaba los valores como nuevos iniciales de `dirty` y de `reset()` en 1.5, sin borrar `submitted`; la opción `onSuccess(result, form)` se ejecuta tras un envío correcto, por ejemplo para llamar a `commit`. En la API actual, `reset()` vuelve siempre al `initial` declarado; `commit` sólo actualiza la referencia de `dirty`.
 - **`focusInvalid: true`** mueve el foco al primer control inválido tras un envío con errores en los campos, del schema o de los `issues` del servidor.
 
 Véase [Formularios: `useForm`](framework.md#formularios-useform).

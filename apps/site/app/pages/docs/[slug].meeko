@@ -1,22 +1,21 @@
 <script server lang="ts">
 	import { definePage } from '@meekojs/meeko/framework'
-	import { catalogEntry, docSlugs, navigation, pager } from '../../../server/content/catalog.js'
-	import { renderSource } from '../../../server/content/markdown.js'
+	import type { NavSection, Pager, RenderedDoc } from '../../../shared/types/docs.js'
+	import { readPage } from '../../../server/content/db.js'
 
-	// Every document is rendered once, in `meeko build`: Markdown to HTML with Shiki highlighting.
-	export const route = definePage({
-		render: 'prerender',
-		prerenderEntries: docSlugs.map((slug) => ({ slug })),
-	})
+	export const route = definePage({ render: 'ssr' })
 
 	const { params } = usePage()
-	const entry = catalogEntry(params.slug)
-	if (!entry) notFound()
-	export const doc = await renderSource(entry.source, entry.transform)
-	export const nav = navigation()
-	export const pages = pager(entry.href)
-	export const current = entry.href
-	export const head = { title: `${doc.title} · Meeko`, description: doc.description }
+	type GuidePage = {
+		readonly doc: RenderedDoc
+		readonly nav: readonly NavSection[]
+		readonly pages: Pager
+		readonly current: string
+		readonly head: { readonly title: string; readonly description: string }
+	}
+	const snapshot = await readPage<GuidePage>(`/docs/${params.slug}`)
+	if (!snapshot) notFound()
+	export const { doc, nav, pages, current, head } = snapshot
 </script>
 
 <script lang="ts">

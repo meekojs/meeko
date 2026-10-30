@@ -3,14 +3,15 @@ import test from "node:test";
 import { Window as HappyWindow } from "happy-dom";
 import { createServerApp, defineApiRoute, defineServerRuntime, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
 import type { AppManifest, ServerApp, ServerPlatform } from "../src/framework-server.ts";
-import { renderPage } from "../src/framework-server/app.ts";
-import type { InternalServerApp } from "../src/framework-server/app.ts";
-import { mountClientApp } from "../src/framework/client.ts";
-import { defineRouteMiddleware, defineServerRouteMiddleware } from "../src/framework/middleware.ts";
-import type { ServerRouteMiddlewareContext } from "../src/framework/middleware.ts";
-import { notFound, redirect } from "../src/framework/page-body.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import { createFrameworkHandler } from "../src/framework/server.ts";
+import { renderPage } from "../src/server/runtime/app.ts";
+import type { InternalServerApp } from "../src/server/runtime/app.ts";
+import { mountClientApp } from "../src/app/runtime/client.ts";
+import { defineRouteMiddleware } from "../src/app/definitions/define-route-middleware.ts";
+import { defineServerRouteMiddleware } from "../src/server/middleware/definitions.ts";
+import type { ServerRouteMiddlewareContext } from "../src/server/middleware/runtime.ts";
+import { notFound, redirect } from "../src/server/runtime/page-body.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 
 const origin = "http://local.test";
 

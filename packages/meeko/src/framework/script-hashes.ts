@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { inlineSources } from "./inline-sources.js";
+import { inlineSources } from "../server/runtime/inline-sources.js";
 
 /**
  * Resultado de {@link inlineScriptHashes}.

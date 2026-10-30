@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createLocalCalls, createRequestContext, createServerDispatcher, defineApiRoute, defineRpc, MemorySessionStore, SessionManager, useRequestState } from "../src/framework-server.ts";
 import type { Schema, ServerManifest } from "../src/framework-server.ts";
-import { setSocketAddress } from "../src/framework-server/env.ts";
+import { setSocketAddress } from "../src/server/runtime/env.ts";
 
 const paramsSchema: Schema<{ id: string }> = { "~standard": { version: 1, validate(value) { return value && typeof value === "object" && typeof (value as { id?: unknown }).id === "string" ? { value: value as { id: string } } : { issues: [{}] }; } } };
 const inputSchema: Schema<{ value: string }> = { "~standard": { version: 1, validate(value) { return value && typeof value === "object" && typeof (value as { value?: unknown }).value === "string" ? { value: value as { value: string } } : { issues: [{}] }; } } };

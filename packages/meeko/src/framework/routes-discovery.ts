@@ -1,11 +1,11 @@
 import { lstat, readFile, readdir, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
-import { routeBlockId, tryRouteBlockSource } from "./route-block.js";
+import { routeBlockId, tryRouteBlockSource } from "../compiler/transforms/route-block.js";
 import { discoverRouteMiddleware, globalMiddlewareNames, isServerRouteMiddleware, routeMiddlewareNamePattern } from "./route-middleware-discovery.js";
-import { createRouteManifest } from "./router.js";
-import type { ErrorPageRecord, RouteRecord } from "./router.js";
-import type { PageRender } from "./page.js";
+import { createRouteManifest } from "../app/runtime/router.js";
+import type { ErrorPageRecord, RouteRecord } from "../app/runtime/router.js";
+import type { PageRender } from "../app/definitions/define-page.js";
 
 async function isFile(path: string, follow = true): Promise<boolean> {
   try { return (await (follow ? stat(path) : lstat(path))).isFile(); }

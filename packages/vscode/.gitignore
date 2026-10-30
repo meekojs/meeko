@@ -1,2 +1,4 @@
-artifacts/
+.code-cli/
 .vscode-test/
+.vsix-temp/
+artifacts/

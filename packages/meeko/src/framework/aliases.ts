@@ -4,9 +4,9 @@ import ts from "@typescript/typescript6";
 import { aliasImporterScope, aliasScopeProblem, aliasTsconfigPaths, matchPathAlias } from "../compiler/aliases.js";
 import type { AliasImporterScope, PathAlias, PathAliasScope } from "../compiler/aliases.js";
 import { moduleSpecifiers } from "../compiler/import-graph.js";
-import type { CompileDiagnostic } from "../compiler/sfc.js";
-import { locate } from "../compiler/sfc.js";
-import type { MeekoConfig } from "./config-type.js";
+import type { CompileDiagnostic } from "../compiler/parser/sfc.js";
+import { locate } from "../compiler/parser/sfc.js";
+import type { MeekoConfig } from "../modules/define-meeko-config.js";
 import { isExecutedConfig, loadMeekoConfig, readMeekoConfigSync, resolveConfigSources } from "./config.js";
 import { legacyLayerEntries, resolveMeekoModules } from "./module-loader.js";
 

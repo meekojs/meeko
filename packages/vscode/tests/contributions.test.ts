@@ -52,6 +52,20 @@ test("tags close and rename together in .meeko files", () => {
   assert.equal(manifest.contributes.configurationDefaults["[meeko]"]?.["editor.linkedEditing"], true);
 });
 
+test("angle brackets stay paired without recoloring TypeScript arrows", () => {
+  const language = JSON.parse(readFileSync(join(root, "language-configuration.json"), "utf8")) as {
+    brackets: string[][];
+    colorizedBracketPairs: string[][];
+  };
+  assert.ok(language.brackets.some(([open, close]) => open === "<" && close === ">"));
+  assert.ok(!language.colorizedBracketPairs.some(([open, close]) => open === "<" || close === ">"));
+  assert.deepEqual(language.colorizedBracketPairs, [["{", "}"], ["(", ")"], ["[", "]"]]);
+});
+
+test("bracket colors are disabled for Meeko's embedded TypeScript by default", () => {
+  assert.equal(manifest.contributes.configurationDefaults["[meeko]"]?.["editor.bracketPairColorization.enabled"], false);
+});
+
 test("execution zones have a setting, theme colors and gutter icons", () => {
   const setting = manifest.contributes.configuration.properties["meeko.editor.executionZones"];
   assert.deepEqual([setting?.type, setting?.default], ["boolean", true]);

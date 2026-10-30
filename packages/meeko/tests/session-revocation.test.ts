@@ -7,7 +7,7 @@ import {
   MemorySessionStore, RedisSessionStore, SessionManager, SessionRevokedError,
 } from "../src/framework-server.ts";
 import type { AppManifest, RedisSessionClient, RedisSubscriberClient, SocketPeer } from "../src/framework-server.ts";
-import { trackedSessionHandles } from "../src/framework-server/sessions.ts";
+import { trackedSessionHandles } from "../src/server/runtime/sessions.ts";
 
 const origin = "https://example.test";
 const withCookie = (sessions: SessionManager<unknown>, id: string, path = "/") =>

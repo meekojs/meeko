@@ -23,7 +23,7 @@ test("engine and framework browser bundles exclude server transports", async () 
 test("package.json exports exactly the public subpaths", async () => {
   const manifest = JSON.parse(await readFile(resolve("package.json"), "utf8")) as { exports: Record<string, unknown> };
   assert.deepEqual(Object.keys(manifest.exports), [
-    ".", "./vite", "./framework", "./server", "./node", "./password", "./bun", "./deno", "./cloudflare",
+    ".", "./vite", "./framework", "./i18n", "./i18n/module", "./server", "./node", "./password", "./bun", "./deno", "./cloudflare",
     "./build", "./prettier", "./postcss", "./internal", "./builtins/*", "./devtools-ui",
   ]);
 });
@@ -118,7 +118,7 @@ test("a component without the framework leaves the theme, the router state and <
     assert.ok(!code.includes(marker), `${marker} reached the bundle`);
   }
   const output = Object.values(result.metafile.outputs)[0]!;
-  for (const module of ["framework/navigation", "framework/state", "framework/storage", "builtins/theme-toggle.compiled", "builtins/await.compiled"]) {
+  for (const module of ["app/runtime/navigation", "app/runtime/state", "framework/storage", "builtins/theme-toggle.compiled", "builtins/await.compiled"]) {
     const input = Object.entries(output.inputs).find(([path]) => path.replaceAll("\\", "/").endsWith(`dist/${module}.js`));
     assert.equal(input?.[1].bytesInOutput ?? 0, 0, `dist/${module}.js reached the bundle`);
   }

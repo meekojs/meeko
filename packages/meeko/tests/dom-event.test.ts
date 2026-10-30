@@ -3,9 +3,9 @@ import test from "node:test";
 import { resolve } from "node:path";
 import { Window as HappyWindow } from "happy-dom";
 import { createServer } from "vite";
-import { bindEvent } from "../src/dom.ts";
-import { provideErrorHandler } from "../src/component-errors.ts";
-import { createRoot } from "../src/reactivity.ts";
+import { bindEvent } from "../src/app/runtime/renderer.ts";
+import { provideErrorHandler } from "../src/app/runtime/component-errors.ts";
+import { createRoot } from "../src/core/reactivity.ts";
 import { meeko } from "../src/vite.ts";
 
 test("component event failures are reported and listeners still release", async () => {

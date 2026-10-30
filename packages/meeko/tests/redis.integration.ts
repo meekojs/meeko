@@ -9,9 +9,9 @@ import {
   createServerApp, createSocketHub, defineApiRoute, defineServerRuntime, defineSocketChannel, MemorySessionStore, RedisSocketPubSub, SessionRevokedError,
 } from "../src/framework-server.ts";
 import type { Schema } from "../src/framework-server.ts";
-import { RedisSessionStore } from "../src/framework-server/session-stores.ts";
-import { SessionManager } from "../src/framework-server/sessions.ts";
-import type { SessionRecord } from "../src/framework-server/sessions.ts";
+import { RedisSessionStore } from "../src/server/runtime/session-stores.ts";
+import { SessionManager } from "../src/server/runtime/sessions.ts";
+import type { SessionRecord } from "../src/server/runtime/sessions.ts";
 
 const url = process.env.MEEKO_REDIS_URL;
 

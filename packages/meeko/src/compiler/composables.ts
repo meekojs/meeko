@@ -1,4 +1,6 @@
 import ts from "@typescript/typescript6";
+import { analyzeElementRefCall } from "../app/definitions/use-element-ref.js";
+import type { ElementRefCall } from "../app/definitions/use-element-ref.js";
 
 /**
  * Composables that the compiler resolves from the top level of a `<script>`. Calling one inside
@@ -25,14 +27,6 @@ export interface AwaitSite {
   readonly call: ts.CallExpression;
   readonly name: string;
   readonly browser: boolean;
-}
-
-/** A `useElementRef("name")` call. */
-export interface ElementRefCall {
-  readonly call: ts.CallExpression;
-  readonly name: string;
-  readonly nameNode: ts.StringLiteralLike;
-  readonly awaited: boolean;
 }
 
 export interface ScriptComposables {
@@ -100,12 +94,7 @@ export function analyzeComposables(file: ts.SourceFile): ScriptComposables {
         throw new ComposableError("MEEK054", `${name}() debe llamarse en el nivel superior de <script>, no dentro de una función, un handler, un effect ni onMounted`, node.expression);
       }
       if (name === "useElementRef") {
-        const argument = node.arguments[0];
-        if (node.arguments.length !== 1 || !argument || !ts.isStringLiteralLike(argument)) {
-          throw new ComposableError("MEEK056", "useElementRef necesita un literal de texto con el nombre de una directiva ref: de la plantilla, como useElementRef(\"input\")", argument ?? node);
-        }
-        const awaited = ts.isAwaitExpression(node.parent) && !nested;
-        elementRefs.push({ call: node, name: argument.text, nameNode: argument, awaited });
+        elementRefs.push(analyzeElementRefCall(node, nested));
       }
     }
     if (ts.isAwaitExpression(node) && !nested) acceptAwait(node, statement);

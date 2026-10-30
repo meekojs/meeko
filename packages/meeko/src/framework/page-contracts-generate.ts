@@ -4,11 +4,11 @@ import ts from "@typescript/typescript6";
 import { configuredModuleLayouts, discoverConfiguredRoutes } from "./config.js";
 import { discoverErrorPage, extractGroupOptions, extractRouteOptions } from "./routes-discovery.js";
 import type { StaticGroupOptions } from "./routes-discovery.js";
-import { routeBlockFile, routeBlockSource } from "./route-block.js";
-import { routeBlockTypeFile } from "./route-block-types.js";
-import { MeekoCompileError } from "../compiler/sfc.js";
-import type { ServerScript } from "../compiler/server-script.js";
-import { readServerScript } from "./server-script.js";
+import { routeBlockFile, routeBlockSource } from "../compiler/transforms/route-block.js";
+import { routeBlockTypeFile } from "../compiler/codegen/route-block-types.js";
+import { MeekoCompileError } from "../compiler/parser/sfc.js";
+import type { ServerScript } from "../compiler/transforms/server-script.js";
+import { readServerScript } from "../compiler/codegen/server-script.js";
 
 function importPath(from: string, target: string): string {
   const path = relative(dirname(from), target).replaceAll("\\", "/");

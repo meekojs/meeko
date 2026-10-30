@@ -6,8 +6,8 @@ import * as prettier from "prettier";
 import { compile } from "../src/compiler.ts";
 import plugin from "../src/prettier.ts";
 import type { MeekoPrettierOptions } from "../src/prettier.ts";
-import { classOrderWarnings } from "../src/prettier/classes.ts";
-import { formatWithPrettier } from "../src/prettier/editor.ts";
+import { classOrderWarnings } from "../src/formatters/prettier/classes.ts";
+import { formatWithPrettier } from "../src/formatters/prettier/editor.ts";
 import { createTempProject, linkRepositoryPackages, type TempProject } from "./helpers/temp-project.ts";
 
 type FormatOptions = prettier.Options & MeekoPrettierOptions;

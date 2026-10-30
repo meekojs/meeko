@@ -74,7 +74,7 @@ export const builtins: readonly BuiltinEntry[] = [
 		examples: [['```html', '<!-- app/pages/users/[id].meeko -->', '<script server lang="ts">', 'import { definePage } from "@meekojs/meeko/framework";', 'import * as v from "valibot";', '', 'export const route = definePage({ params: v.object({ id: v.string() }) });', '', 'const { params, context } = usePage();', 'if (!context.session.current) redirect("/login");', 'const row = await db.users.findById(params.id);', 'if (!row) notFound();', 'export const user = { id: row.id, name: row.name };', 'export const head = { title: `Perfil de ${user.name}` };', '</script>', '', '<script lang="ts">', 'const name = signal(user.name);', '</script>', '', '<template><h1>{user.name}</h1><input model="name"></template>', '```'].join('\n')],
 		see: ['docs/framework.md#código-de-servidor-de-la-página', 'docs/framework.md#reglas-comunes', 'docs/framework.md#dónde-se-usa-cada-api', 'docs/framework.md#modos-de-render'],
 		related: ['definePage', 'usePage', 'redirect', 'notFound', 'useHead'],
-		source: { file: 'packages/meeko/src/compiler/server-script.ts', match: 'export function analyzeServerScript(' },
+		source: { file: 'packages/meeko/src/compiler/transforms/server-script.ts', match: 'export function analyzeServerScript(' },
 		aliases: ['<script server lang="ts">'],
 	},
 	{

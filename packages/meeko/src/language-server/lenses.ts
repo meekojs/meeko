@@ -1,9 +1,9 @@
 import { relative, sep } from "node:path";
 import ts from "@typescript/typescript6";
 import type { CodeLens, Location } from "vscode-languageserver/node";
-import { isPageFile } from "../framework/route-block.js";
+import { isPageFile } from "../compiler/transforms/route-block.js";
 import { extractRouteRender } from "../framework/routes-discovery.js";
-import type { RouteRecord } from "../framework/router.js";
+import type { RouteRecord } from "../app/runtime/router.js";
 import type { FeatureContext } from "./features.js";
 import type { VirtualComponent } from "./model.js";
 import { pathKey } from "./project.js";

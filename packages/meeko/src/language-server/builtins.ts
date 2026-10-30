@@ -4,7 +4,7 @@ import { builtinTag } from "./builtin-tags.js";
 import type { BuiltinTag } from "./builtin-tags.js";
 import { componentMemberDocs, componentSignature, memberDocumentation, typeFormat } from "./components.js";
 import type { ComponentMember, ComponentSummary } from "./components.js";
-import { locationOf } from "./features.js";
+import { locationOf } from "./locations.js";
 import type { FeatureContext } from "./features.js";
 import { positionLink } from "./insights.js";
 import type { ComponentTag } from "./model.js";

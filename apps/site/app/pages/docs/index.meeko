@@ -1,22 +1,15 @@
 <script server lang="ts">
 	import { definePage } from '@meekojs/meeko/framework'
-	import { catalog } from '../../../server/content/catalog.js'
-	import { renderSource } from '../../../server/content/markdown.js'
+	import type { NavLink, RenderedDoc } from '../../../shared/types/docs.js'
+	import { readPage } from '../../../server/content/db.js'
 
-	export const route = definePage({ render: 'prerender' })
+	export const route = definePage({ render: 'ssr' })
 
-	// Each card shows the title and first paragraph of its document.
-	const rendered = await Promise.all(
-		catalog.map(async (entry) => {
-			const doc = await renderSource(entry.source, entry.transform)
-			return { href: entry.href, section: entry.section, title: doc.title, description: doc.description }
-		}),
-	)
-
-	export const sections = [...new Set(rendered.map((item) => item.section))].map((title) => ({
-		title,
-		docs: rendered.filter((item) => item.section === title),
-	}))
+	type DocCard = Pick<NavLink, 'href'> & Pick<RenderedDoc, 'title' | 'description'> & { readonly section: string }
+	type IndexPage = { readonly sections: readonly { readonly title: string; readonly docs: readonly DocCard[] }[] }
+	const snapshot = await readPage<IndexPage>('/docs')
+	if (!snapshot) notFound()
+	export const sections = snapshot.sections
 
 	export const head = {
 		title: 'Documentación · Meeko',

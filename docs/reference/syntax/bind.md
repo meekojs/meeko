@@ -6,6 +6,7 @@ description: Da a un atributo de un elemento, o a una prop de un componente, el 
 symbols:
   - "syntax:bind"
 related:
+  - docs/como-elegir.md
   - "syntax:model"
   - "syntax:on"
   - "syntax:component-tag"

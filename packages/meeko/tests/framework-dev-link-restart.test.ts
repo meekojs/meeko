@@ -6,7 +6,7 @@ import { createServer, type Server } from "node:net";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import test from "node:test";
-import type { EditorBridgeDescriptor } from "../src/devtools-bridge-protocol.ts";
+import type { EditorBridgeDescriptor } from "../src/shared/devtools-bridge-protocol.ts";
 import { editorBridgeFile } from "../src/framework/editor-bridge.ts";
 import { hmrPortFor, isPortFree } from "../src/framework/dev-port.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";

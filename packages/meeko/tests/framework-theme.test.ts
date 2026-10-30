@@ -6,18 +6,19 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { Window as HappyWindow } from "happy-dom";
 import { compile } from "../src/compiler.ts";
-import { applyAutoImports, discoverAutoImports } from "../src/autoimports.ts";
+import { discoverAutoImports } from "../src/autoimports/registry.ts";
+import { applyAutoImports } from "../src/autoimports/transform.ts";
 import { checkApp } from "../src/framework/check-app.ts";
 import { clientRoutesSource, discoverAppManifest } from "../src/framework/app-manifest.ts";
 import { loadMeekoConfig } from "../src/framework/config.ts";
 import { buildProject } from "../src/framework/project.ts";
 import { prepareFrameworkTypeDeclarations } from "../src/framework/type-declarations.ts";
-import type { ClientComponent } from "../src/framework/client.ts";
-import type { DocumentConfig } from "../src/framework/head.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import type { RouteRecord } from "../src/framework/router.ts";
-import { resolveThemeConfig, themeScript } from "../src/framework/theme.ts";
-import type { ResolvedThemeConfig } from "../src/framework/theme.ts";
+import type { ClientComponent } from "../src/app/runtime/client.ts";
+import type { DocumentConfig } from "../src/shared/head.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import type { RouteRecord } from "../src/app/runtime/router.ts";
+import { resolveThemeConfig, themeScript } from "../src/shared/theme.ts";
+import type { ResolvedThemeConfig } from "../src/shared/theme.ts";
 import { staticAppConfig, writeStaticApp } from "./helpers/static-app.ts";
 import { createTempProject, tempProject } from "./helpers/temp-project.ts";
 
@@ -26,8 +27,8 @@ const sha256 = (text: string): string => `'sha256-${createHash("sha256").update(
 
 /** The runtime as the compiled components import it, by file URL: one instance for pages, server and browser. */
 const runtime = async () => ({
-  ...await import(fileUrl("src/framework/server.ts")) as typeof import("../src/framework/server.ts"),
-  ...await import(fileUrl("src/framework/client.ts")) as typeof import("../src/framework/client.ts"),
+  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof import("../src/server/runtime/framework-render.ts"),
+  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof import("../src/app/runtime/client.ts"),
 });
 
 const appShell = `<script lang="ts">
@@ -437,7 +438,7 @@ test("useTheme() rejects an unknown theme, and fails clearly without theme in th
     assert.equal((await server(page("https://example.test/"))).status, 500);
     assert.match(String(failures[0]), /useTheme\(\) needs theme in meeko\.config\.ts/);
     // In the browser, an unknown theme is a TypeError and changes nothing.
-    const { BrowserTheme } = await import(fileUrl("src/framework/theme.ts")) as typeof import("../src/framework/theme.ts");
+    const { BrowserTheme } = await import(fileUrl("src/app/runtime/theme-browser.ts")) as typeof import("../src/app/runtime/theme-browser.ts");
     const browser = new HappyWindow({ url: "https://example.test/" });
     const applied: unknown[] = [];
     const theme = new BrowserTheme(browser as unknown as Window, resolved(), { setTheme: (value) => applied.push(value?.resolved) }, undefined);
@@ -453,7 +454,7 @@ test("useTheme() rejects an unknown theme, and fails clearly without theme in th
       browser.happyDOM.abort();
     }
     // On the server the theme is read-only: it changes in the browser.
-    const { requestTheme } = await import(fileUrl("src/framework/theme.ts")) as typeof import("../src/framework/theme.ts");
+    const { requestTheme } = await import(fileUrl("src/server/runtime/theme.ts")) as typeof import("../src/server/runtime/theme.ts");
     const state = requestTheme(resolved(), page("https://example.test/", { cookie: "meeko-theme=dark" })).state;
     assert.equal(state.theme.value, "dark");
     assert.throws(() => state.set("light"), /changes in the browser/);

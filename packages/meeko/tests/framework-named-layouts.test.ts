@@ -6,19 +6,20 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { Window as HappyWindow } from "happy-dom";
 import { compile } from "../src/compiler.ts";
-import type { ClientComponent, ClientRoute } from "../src/framework/client.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import type { ErrorPageRecord, RouteRecord } from "../src/framework/router.ts";
+import type { ClientComponent, ClientRoute } from "../src/app/runtime/client.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import type { ErrorPageRecord, RouteRecord } from "../src/app/runtime/router.ts";
 import { createTempProject } from "./helpers/temp-project.ts";
 
 const fileUrl = (path: string): string => pathToFileURL(resolve(path)).href;
 
 /** The runtime as the compiled components import it, by file URL: one instance for pages, server and browser. */
 const runtime = async () => ({
-  ...await import(fileUrl("src/framework/server.ts")) as typeof import("../src/framework/server.ts"),
-  ...await import(fileUrl("src/framework/client.ts")) as typeof import("../src/framework/client.ts"),
+  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof import("../src/server/runtime/framework-render.ts"),
+  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof import("../src/app/runtime/client.ts"),
   ...await import(fileUrl("src/framework/prerender.ts")) as typeof import("../src/framework/prerender.ts"),
-  ...await import(fileUrl("src/framework/layout.ts")) as typeof import("../src/framework/layout.ts"),
+  ...await import(fileUrl("src/app/runtime/layout.ts")) as typeof import("../src/app/runtime/layout.ts"),
+  ...await import(fileUrl("src/app/composables/useLayout.ts")) as typeof import("../src/app/composables/useLayout.ts"),
 });
 
 const appShell = `<script lang="ts">

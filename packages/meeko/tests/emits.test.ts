@@ -5,11 +5,11 @@ import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { Window } from "happy-dom";
-import { compileWithAutoImports } from "../src/autoimports.ts";
+import { compileWithAutoImports } from "../src/autoimports/transform.ts";
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
-import { MeekoCompileError } from "../src/compiler/sfc.ts";
-import { createEmit } from "../src/emits.ts";
+import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
+import { createEmit } from "../src/app/runtime/emits.ts";
 import { generateTypes } from "../src/types.ts";
 
 const child = `<script lang="ts">
@@ -84,17 +84,18 @@ function assertCompileError(source: string, code: string, offset: number): void 
 test("defineEmits compiles to optional callback props and a typed emit", () => {
   const { code } = compile(child, "Child.meeko");
   assert.match(code, /type __MeekoEmits = __meeko\.Emits<\{ save: \[id: number\]; close: \[\] \}>;/);
-  assert.match(code, /export type ComponentProps = __MeekoDeclaredProps & __MeekoEmitProps;/);
+  assert.match(code, /type __MeekoComponentProps = __MeekoDeclaredProps & __MeekoEmitProps;/);
+  assert.match(code, /export type \{ __MeekoComponentProps as ComponentProps \};/);
   assert.match(code, /const emit: __meeko\.Emit<__MeekoEmits> = __meeko\.createEmit<__MeekoEmits, __meeko\.NoEmitConflict<__MeekoDeclaredProps, __MeekoEmits>>\(__props\);/);
   assert.doesNotMatch(code, /defineEmits/);
 
   const alone = compile(`<script lang="ts">const emit = defineEmits<{ ready: [] }>();</script><template><button on:click="() => emit('ready')">x</button></template>`, "Alone.meeko").code;
-  assert.match(alone, /export type ComponentProps = __MeekoEmitProps;/);
-  assert.match(alone, /function __setup\(__props: ComponentProps\)/);
+  assert.match(alone, /type __MeekoComponentProps = __MeekoEmitProps;/);
+  assert.match(alone, /function __setup\(__props: __MeekoComponentProps\)/);
   assert.match(alone, /__meeko\.createEmit<__MeekoEmits>\(__props\)/);
 
   const defaults = compile(`<script lang="ts">const props = defineProps<{ id?: number }>({ id: 1 });\nconst emit = defineEmits<{ save: [id: number] }>();</script><template><button on:click="() => emit('save', props.id)">x</button></template>`, "Defaults.meeko").code;
-  assert.match(defaults, /export type ComponentProps = __MeekoInputPropsOf<__MeekoDeclaredProps> & __MeekoEmitProps;/);
+  assert.match(defaults, /type __MeekoComponentProps = __MeekoInputPropsOf<__MeekoDeclaredProps> & __MeekoEmitProps;/);
   assert.match(defaults, /function __setup\(__props: __MeekoResolvedProps & __MeekoEmitProps\)/);
 });
 
@@ -212,7 +213,8 @@ test("meeko check types emit calls, on:event handlers and callback conflicts", {
     const [declaration] = await generateTypes(parent, join(root, "Parent.meeko"));
     const childDeclaration = (await readFile(join(root, ".meeko", "types", "Child.d.meeko.ts"), "utf8"));
     assert.ok(declaration);
-    assert.match(childDeclaration, /export type ComponentProps = __MeekoDeclaredProps & __MeekoEmitProps;/);
+    assert.match(childDeclaration, /type __MeekoComponentProps = __MeekoDeclaredProps & __MeekoEmitProps;/);
+    assert.match(childDeclaration, /export type \{ __MeekoComponentProps as ComponentProps \};/);
     assert.match(childDeclaration, /type __MeekoEmitProps = __meeko\.EmitProps<__MeekoEmits>;/);
   } finally {
     await cleanup();

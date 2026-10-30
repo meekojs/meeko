@@ -25,6 +25,14 @@
       "types": "./dist/framework.d.ts",
       "default": "./dist/framework.js"
     },
+    "./i18n": {
+      "types": "./dist/i18n.d.ts",
+      "default": "./dist/i18n.js"
+    },
+    "./i18n/module": {
+      "types": "./dist/i18n/module.d.ts",
+      "default": "./dist/i18n/module.js"
+    },
     "./server": {
       "types": "./dist/framework-server.d.ts",
       "default": "./dist/framework-server.js"
@@ -79,8 +87,8 @@
     "meeko-language-server": "dist/language-server/main.js"
   },
   "scripts": {
-    "prepack": "tsc -p tsconfig.build.json",
-    "build": "tsc -p tsconfig.build.json",
+    "prepack": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json",
+    "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "builtins": "tsx scripts/builtin-components.ts",
     "test": "node scripts/clean-test-tmp.mjs && pnpm run build && pnpm run example:compile && tsx --test --test-concurrency=1 tests/*.test.ts",

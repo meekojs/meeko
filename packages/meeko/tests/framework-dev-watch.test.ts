@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
-import { appendFile, mkdir, symlink, unlink, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, stat, symlink, unlink, writeFile } from "node:fs/promises";
 import { createServer as createNetServer } from "node:net";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import test from "node:test";
 import { createServer, normalizePath, resolveConfig, type InlineConfig, type Plugin, type ViteDevServer } from "vite";
-import { createDevAppReloader, isDevWatchIgnored, isDiscoverySource } from "../src/framework/dev-watch.ts";
+import { createDevAppReloader, isComponentSource, isDevWatchIgnored, isDiscoverySource } from "../src/framework/dev-watch.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
 import { meeko } from "../src/vite.ts";
 import { createTempProject, repositoryRoot, stopChild, tempProject } from "./helpers/temp-project.ts";
@@ -131,6 +132,169 @@ test("discovery sources cover routes, layouts, middleware and server modules of 
   for (const path of ["app/components/Card.meeko", "server/utils/db.ts", ".meeko/check/x/tsconfig.json", "app/app.meeko.bak", "../outside/app/pages/x.meeko"]) {
     assert.ok(!isDiscoverySource(join(root, path), [root]), path);
   }
+});
+
+test("component source matching includes configured, layered and external module directories only", () => {
+  const root = resolve("project");
+  const layer = resolve("layers", "base", "app", "components");
+  const external = resolve("linked", "ui", "components");
+  const dirs = [join(root, "app", "components"), layer, external];
+  for (const file of [join(root, "app/components/Form/Field.meeko"), join(layer, "Card.meeko"), join(external, "Button.meeko")]) {
+    assert.ok(isComponentSource(file, dirs), file);
+  }
+  for (const file of [join(root, "app/pages/index.meeko"), join(root, "app/components/Card.ts"), join(root, "app/components-old/Card.meeko")]) {
+    assert.ok(!isComponentSource(file, dirs), file);
+  }
+});
+
+test("Vite regenerates the component loader and its types on add, edit and unlink", { timeout: 45_000 }, async (context) => {
+  let server: ViteDevServer | undefined;
+  const root = await tempProject(context, "dev-components", () => server?.close());
+  const component = join(root, "app", "components", "Form", "UserCreate.meeko");
+  const other = join(root, "app", "components", "Other.meeko");
+  await mkdir(join(root, "app", "components", "Form"), { recursive: true });
+  await writeFile(other, '<template><p>other</p></template>\n');
+  await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}\n');
+  await writeFile(join(root, "meeko.config.ts"), 'export default { components: { dirs: [{ path: "app/components/Form", prefix: "Form" }] } };\n');
+  server = await createServer({ root, configFile: false, logLevel: "silent", plugins: [meeko()], server: { middlewareMode: true, hmr: false } });
+  const watcher = server.watcher as typeof server.watcher & { _readyEmitted?: boolean };
+  if (!watcher._readyEmitted) await once(watcher, "ready");
+  const registry = join(root, ".meeko", "generated", "components.ts");
+  const declarations = join(root, ".meeko", "types", "components.d.ts");
+  for (let waited = 0; !Object.keys(watcher.getWatched()).some((path) => resolve(path) === resolve(component, "..")) && waited < 5_000; waited += 25) {
+    await new Promise((done) => setTimeout(done, 25));
+  }
+  assert.ok(Object.keys(watcher.getWatched()).some((path) => resolve(path) === resolve(component, "..")), JSON.stringify(watcher.getWatched()));
+  // Chokidar can list a newly added directory before its native watch has settled on Windows.
+  await new Promise((done) => setTimeout(done, 100));
+  const read = async (file: string): Promise<string> => readFile(file, "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return "";
+    throw error;
+  });
+  const until = async (accept: () => Promise<boolean>): Promise<void> => {
+    const start = Date.now();
+    while (!await accept() && Date.now() - start < 15_000) await new Promise((done) => setTimeout(done, 40));
+    assert.ok(await accept(), `registry: ${await read(registry)}; declarations: ${await read(declarations)}; component: ${await read(join(root, ".meeko", "types", "app", "components", "Form", "UserCreate.d.meeko.ts"))}`);
+  };
+  assert.doesNotMatch(await read(registry), /FormUserCreate/);
+  const added = new Promise<void>((done) => watcher.on("add", (file) => { if (resolve(file) === component) done(); }));
+  await writeFile(component, '<template><p>create</p></template>\n');
+  let addTimeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([added, new Promise<never>((_, fail) => { addTimeout = setTimeout(() => fail(new Error("Configured component add was not watched")), 5_000); })]);
+  } finally { clearTimeout(addTimeout); }
+  await until(async () => (await read(registry)).includes('"FormUserCreate": () => import(')
+    && (await read(declarations)).includes('readonly "FormUserCreate"'));
+  const otherDeclaration = join(root, ".meeko", "types", "app", "components", "Other.d.meeko.ts");
+  const before = await Promise.all([registry, declarations, otherDeclaration].map(async (file) => (await stat(file)).mtimeMs));
+  const changed = new Promise<void>((done) => watcher.on("change", (file) => { if (resolve(file) === component) done(); }));
+  await writeFile(component, '<script lang="ts">\nconst props = defineProps<{ name: string }>();\n</script>\n<template><p>{props.name}</p></template>\n');
+  let editTimeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([changed, new Promise<never>((_, fail) => { editTimeout = setTimeout(() => fail(new Error("Component edit was not watched")), 5_000); })]);
+  } finally { clearTimeout(editTimeout); }
+  await until(async () => (await read(join(root, ".meeko", "types", "app", "components", "Form", "UserCreate.d.meeko.ts"))).includes("name: string"));
+  const after = await Promise.all([registry, declarations, otherDeclaration].map(async (file) => (await stat(file)).mtimeMs));
+  assert.deepEqual(after, before, "editing a registered component must leave the loader, registry types and unrelated declarations untouched");
+  await unlink(component);
+  await until(async () => !(await read(registry)).includes("FormUserCreate") && !(await read(declarations)).includes("FormUserCreate")
+    && !(await read(join(root, ".meeko", "types", "app", "components", "Form", "UserCreate.d.meeko.ts"))));
+});
+
+test("Vite watches component directories added by modules outside the project", { timeout: 45_000 }, async (context) => {
+  let server: ViteDevServer | undefined;
+  const root = await tempProject(context, "dev-external-owner", () => server?.close());
+  const external = await tempProject(context, "dev-external-components");
+  const directory = join(external, "components");
+  const component = join(directory, "Button.meeko");
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}\n');
+  const definition = pathToFileURL(join(repositoryRoot, "src", "modules", "define-meeko-module.ts")).href;
+  await writeFile(join(root, "module.ts"), `import { defineMeekoModule } from ${JSON.stringify(definition)};\nexport default defineMeekoModule({ meta: { name: "external" }, setup(_options, meeko) { meeko.addComponentsDir(${JSON.stringify(directory)}, { prefix: "Ui" }); } });\n`);
+  await writeFile(join(root, "meeko.config.ts"), 'import external from "./module.ts";\nexport default { modules: [external] };\n');
+  server = await createServer({ root, configFile: false, logLevel: "silent", plugins: [meeko()], server: { middlewareMode: true, hmr: false } });
+  const watcher = server.watcher as typeof server.watcher & { _readyEmitted?: boolean };
+  if (!watcher._readyEmitted) await once(watcher, "ready");
+  const registry = join(root, ".meeko", "generated", "components.ts");
+  const until = async (present: boolean): Promise<void> => {
+    const start = Date.now();
+    let source = await readFile(registry, "utf8");
+    while (source.includes('"UiButton": () => import(') !== present && Date.now() - start < 15_000) {
+      await new Promise((done) => setTimeout(done, 40));
+      source = await readFile(registry, "utf8");
+    }
+    assert.equal(source.includes('"UiButton": () => import('), present, source);
+  };
+  for (let waited = 0; !Object.keys(watcher.getWatched()).some((path) => resolve(path) === directory) && waited < 5_000; waited += 25) {
+    await new Promise((done) => setTimeout(done, 25));
+  }
+  assert.ok(Object.keys(watcher.getWatched()).some((path) => resolve(path) === directory), JSON.stringify(watcher.getWatched()));
+  const added = new Promise<void>((done) => watcher.on("add", (file) => { if (resolve(file) === component) done(); }));
+  await writeFile(join(directory, "Button.d.meeko.ts"), 'export type ComponentProps = Record<string, never>;\n');
+  await writeFile(component, '<template><button>external</button></template>\n');
+  let addTimeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([added, new Promise<never>((_, fail) => { addTimeout = setTimeout(() => fail(new Error("External component add was not watched")), 5_000); })]);
+  } finally { clearTimeout(addTimeout); }
+  const discovered = await (await import("../src/autoimports/registry.ts")).discoverComponents(root);
+  assert.ok(discovered.some((entry) => entry.name === "UiButton"), JSON.stringify(discovered));
+  await until(true);
+  const registryTypes = join(root, ".meeko", "types", "components.d.ts");
+  await writeFile(registryTypes, "// stale registry declaration\n");
+  // Chokidar can report the add before its native watch has settled on Windows.
+  await new Promise((done) => setTimeout(done, 150));
+  const changed = new Promise<void>((done) => watcher.on("change", (file) => { if (resolve(file) === component) done(); }));
+  await writeFile(component, '<template><button>external edit</button></template>\n');
+  let editTimeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([changed, new Promise<never>((_, fail) => { editTimeout = setTimeout(() => fail(new Error("External component edit was not watched")), 5_000); })]);
+  } finally { clearTimeout(editTimeout); }
+  const start = Date.now();
+  while (!(await readFile(registryTypes, "utf8")).includes('readonly "UiButton"') && Date.now() - start < 15_000) {
+    await new Promise((done) => setTimeout(done, 40));
+  }
+  assert.match(await readFile(registryTypes, "utf8"), /readonly "UiButton"/, "an external module edit must use a full registry refresh");
+  await unlink(component);
+  await until(false);
+});
+
+test("changing component directories in meeko.config.ts reconciles the registry", { timeout: 30_000 }, async (context) => {
+  let server: ViteDevServer | undefined;
+  const root = await tempProject(context, "dev-component-config", () => server?.close());
+  await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}\n');
+  const config = join(root, "meeko.config.ts");
+  const widgets = join(root, "app", "widgets");
+  await mkdir(widgets, { recursive: true });
+  await writeFile(join(widgets, "Badge.meeko"), "<template><span>badge</span></template>\n");
+  await writeFile(config, "export default {};\n");
+  server = await createServer({ root, configFile: false, logLevel: "silent", plugins: [meeko()], server: { middlewareMode: true, hmr: false } });
+  const watcher = server.watcher as typeof server.watcher & { _readyEmitted?: boolean };
+  if (!watcher._readyEmitted) await once(watcher, "ready");
+  await new Promise((done) => setTimeout(done, 100));
+  const configEvents: string[] = [];
+  watcher.on("change", (file) => { if (resolve(file) === config) configEvents.push(file); });
+  const registry = join(root, ".meeko", "generated", "components.ts");
+  const types = join(root, ".meeko", "types", "components.d.ts");
+  const badgeType = join(root, ".meeko", "types", "app", "widgets", "Badge.d.meeko.ts");
+  assert.doesNotMatch(await readFile(registry, "utf8"), /UiBadge/);
+  await writeFile(config, 'export default { components: { dirs: [{ path: "app/widgets", prefix: "Ui" }] } };\n');
+  const waitFor = async (present: boolean): Promise<void> => {
+    const start = Date.now();
+    while (Date.now() - start < 10_000) {
+      const loader = await readFile(registry, "utf8");
+      const declaration = await readFile(types, "utf8");
+      if (loader.includes("UiBadge") === present && declaration.includes("UiBadge") === present) return;
+      await new Promise((done) => setTimeout(done, 40));
+    }
+    assert.fail(`Config change did not reconcile components; events=${JSON.stringify(configEvents)}; registry=${await readFile(registry, "utf8")}`);
+  };
+  await waitFor(true);
+  assert.match(await readFile(badgeType, "utf8"), /component-declaration/);
+  // Native watchers may coalesce writes to the same file within one Windows timestamp tick.
+  await new Promise((done) => setTimeout(done, 150));
+  await writeFile(config, "export default {};\n");
+  await waitFor(false);
+  await assert.rejects(readFile(badgeType, "utf8"), /ENOENT/);
 });
 
 test("the dev app reloader builds one app per burst of changes and waits for Vite restarts", async () => {

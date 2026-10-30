@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import ts from "@typescript/typescript6";
-import { compileWithAutoImports } from "./autoimports.js";
+import { compileWithAutoImports } from "./autoimports/transform.js";
 import { moduleSpecifiers, replaceModuleSpecifiers } from "./compiler/import-graph.js";
 import { projectRoot } from "./compiler/project-root.js";
 import { aliasCandidates } from "./compiler/aliases.js";
@@ -64,7 +64,10 @@ export async function generateTypes(source: string, filename: string, options: G
       return target.startsWith(".") ? target : `./${target}`;
     });
     await mkdir(dirname(output), { recursive: true });
-    await writeFile(output, rewritten, "utf8");
+    let previous: string | undefined;
+    try { previous = await readFile(output, "utf8"); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    if (previous !== rewritten) await writeFile(output, rewritten, "utf8");
     outputs.push(output);
   }
   return outputs;

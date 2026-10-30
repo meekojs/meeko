@@ -365,7 +365,7 @@ export default defineServerRuntime(({ production }) => {
   assert.ok(subpaths.size > 0);
   const exports = JSON.parse(await readFile(join(repositoryRoot, "package.json"), "utf8")).exports as Record<string, { default: string }>;
   const graph = await packageGraph([...subpaths].map((subpath) => resolve(repositoryRoot, exports[`.${subpath}`]!.default)));
-  assert.ok([...graph].some((file) => /framework[\\/]server\.js$/.test(file)), "the walk reaches the page renderer");
+  assert.ok([...graph].some((file) => /server[\\/]runtime[\\/]framework-render\.js$/.test(file)), "the walk reaches the page renderer");
   assert.ok(![...graph].some((file) => /dev-server-logs/.test(file)), [...graph].filter((file) => /framework[\\/]/.test(file)).join("\n"));
   // The same walk does find it from the entry of `meeko dev`.
   assert.ok([...await packageGraph([resolve(repositoryRoot, exports["./build"]!.default)])].some((file) => /dev-server-logs\.js$/.test(file)));

@@ -3,13 +3,13 @@ import test from "node:test";
 import { Window as HappyWindow } from "happy-dom";
 import { createServerApp } from "../src/framework-server.ts";
 import type { AppManifest } from "../src/framework-server.ts";
-import { renderPage } from "../src/framework-server/app.ts";
-import type { InternalServerApp } from "../src/framework-server/app.ts";
-import { mountClientApp } from "../src/framework/client.ts";
-import { defineRouteMiddleware } from "../src/framework/middleware.ts";
-import type { RouteMiddleware } from "../src/framework/middleware.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import { createFrameworkHandler } from "../src/framework/server.ts";
+import { renderPage } from "../src/server/runtime/app.ts";
+import type { InternalServerApp } from "../src/server/runtime/app.ts";
+import { mountClientApp } from "../src/app/runtime/client.ts";
+import { defineRouteMiddleware } from "../src/app/definitions/define-route-middleware.ts";
+import type { RouteMiddleware } from "../src/app/middleware/runtime.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 
 const page = {
   renderWithState: () => ({ html: "<p>Page</p>", state: {} }),

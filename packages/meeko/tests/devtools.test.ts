@@ -6,12 +6,12 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { Window } from "happy-dom";
 import { compile } from "../src/compiler.ts";
-import { DEVTOOLS_PROTOCOL_VERSION, devtoolsUpdate, devtoolsWrite, registerDevtoolsInstance } from "../src/devtools.ts";
-import type { DevtoolsAssignmentSite, DevtoolsEvent, DevtoolsHook } from "../src/devtools.ts";
-import { bindAttribute, bindText } from "../src/dom.ts";
-import { enableHotModule, registerHotInstance, replaceHotModule } from "../src/hmr.ts";
-import type { HotComponent, HotState } from "../src/hmr.ts";
-import { batch, computed, createRoot, effect, signal } from "../src/reactivity.ts";
+import { DEVTOOLS_PROTOCOL_VERSION, devtoolsUpdate, devtoolsWrite, registerDevtoolsInstance } from "../src/app/runtime/devtools.ts";
+import type { DevtoolsAssignmentSite, DevtoolsEvent, DevtoolsHook } from "../src/app/runtime/devtools.ts";
+import { bindAttribute, bindText } from "../src/app/runtime/renderer.ts";
+import { enableHotModule, registerHotInstance, replaceHotModule } from "../src/app/runtime/hmr.ts";
+import type { HotComponent, HotState } from "../src/app/runtime/hmr.ts";
+import { batch, computed, createRoot, effect, signal } from "../src/core/reactivity.ts";
 
 interface CompiledFixture {
   renderToString(props: Record<string, never>): string;

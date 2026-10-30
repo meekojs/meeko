@@ -4,7 +4,7 @@ import test from "node:test";
 import { Window } from "happy-dom";
 import { createServer } from "vite";
 import { compile } from "../src/compiler.ts";
-import { MeekoCompileError } from "../src/compiler/sfc.ts";
+import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
 import { meeko } from "../src/vite.ts";
 
 interface NestedModule {

@@ -1,35 +1,27 @@
 <script server lang="ts">
 	import { definePage } from '@meekojs/meeko/framework'
-	import { apiIndex, apiKinds } from '../../../../server/content/api.js'
-	import { exportsHref, referenceHref } from '../../../../server/content/api-groups.js'
-	import { referenceNavigation } from '../../../../server/content/reference.js'
-	import { githubUrl } from '../../../../server/content/repository.js'
+	import type { ApiIndexGroup, ApiKind } from '../../../../shared/types/api.js'
+	import type { NavSection, Pager, TocEntry } from '../../../../shared/types/docs.js'
+	import { readPage } from '../../../../server/content/db.js'
 
-	// Every export by module, generated in `meeko build` from the sources of the package (see
-	// server/content/api.ts). The index of /docs/reference groups the main symbols by kind.
-	export const route = definePage({ render: 'prerender' })
+	export const route = definePage({ render: 'ssr' })
 
-	export const groups = await apiIndex()
-	const items = groups.flatMap((group) => group.sections.flatMap((section) => section.items))
-	export const total = items.length
-	export const kinds = apiKinds()
-		.map((entry) => ({ ...entry, count: items.filter((item) => item.kind === entry.kind).length }))
-		.filter((entry) => entry.count > 0)
-	export const nav = await referenceNavigation()
-	export const current = exportsHref
-	export const toc = groups.map((group) => ({ id: group.id, text: group.specifier ?? group.title, level: 2 }))
-	const first = groups[0]?.sections[0]?.items[0]
-	export const pages = {
-		previous: { href: referenceHref, label: 'Referencia de la API' },
-		next: first ? { href: first.href, label: first.name } : null,
+	type ExportsPage = {
+		readonly groups: readonly ApiIndexGroup[]
+		readonly total: number
+		readonly kinds: readonly { readonly kind: ApiKind; readonly label: string; readonly count: number }[]
+		readonly nav: readonly NavSection[]
+		readonly current: string
+		readonly toc: readonly TocEntry[]
+		readonly pages: Pager
+		readonly index: string
+		readonly source: string
+		readonly editUrl: string
+		readonly head: { readonly title: string; readonly description: string }
 	}
-	export const index = referenceHref
-	export const source = 'apps/site/server/content/api-groups.ts'
-	export const editUrl = githubUrl(source, 'edit')
-	export const head = {
-		title: 'Todos los exports · Referencia de la API · Meeko',
-		description: 'Una página por cada export público de @meekojs/meeko y por cada macro, etiqueta y directiva de los componentes .meeko, generada desde el código fuente.',
-	}
+	const snapshot = await readPage<ExportsPage>('/docs/reference/exports')
+	if (!snapshot) notFound()
+	export const { groups, total, kinds, nav, current, toc, pages, index, source, editUrl, head } = snapshot
 </script>
 
 <script lang="ts">

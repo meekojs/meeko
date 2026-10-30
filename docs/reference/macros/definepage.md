@@ -14,6 +14,7 @@ types:
   - "@meekojs/meeko/framework#PageCache"
   - "@meekojs/meeko/framework#SitemapEntry"
 related:
+  - docs/como-elegir.md
   - "syntax:script-server"
   - "@meekojs/meeko/framework#usePage"
   - "@meekojs/meeko/framework#defineGroup"

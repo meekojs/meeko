@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Window } from "happy-dom";
-import { setSocketAddress } from "../src/framework-server/env.ts";
+import { setSocketAddress } from "../src/server/runtime/env.ts";
 import { createDevServerLogs, jsonForHtml, serializeLogArguments, serverLogLimits, serverLogsAttribute, serverLogsClientUrl, serverLogsConsoleUrl, serverLogsEvent } from "../src/framework/dev-server-logs.ts";
 import type { ServerLogBatch } from "../src/framework/dev-server-logs.ts";
 import { printServerLogs, serverLogArguments, startServerLogs } from "../src/framework/dev-server-logs-client.ts";

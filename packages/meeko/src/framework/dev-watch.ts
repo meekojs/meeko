@@ -16,6 +16,15 @@ export function isDiscoverySource(file: string, sourceRoots: readonly string[]):
   });
 }
 
+/** Whether a `.meeko` file belongs to a configured component directory (including external module dirs). */
+export function isComponentSource(file: string, directories: readonly string[]): boolean {
+  if (!file.endsWith(".meeko")) return false;
+  return directories.some((directory) => {
+    const path = relative(directory, file);
+    return path !== "" && path !== ".." && !path.startsWith("../") && !path.startsWith("..\\") && !isAbsolute(path);
+  });
+}
+
 /**
  * Whether `file` holds route options that discovery reads without running them: a page (its
  * `<script server>`), a `*.route.ts` sidecar or a `+group.ts` under `app/pages` of a source root,

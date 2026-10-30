@@ -1,13 +1,13 @@
-import { assetLocation, assetResponse, etagMatches, findAsset } from "./framework-server/assets.js";
-import type { AssetManifest, AssetReader } from "./framework-server/assets.js";
-import type { ServerApp } from "./framework-server/app.js";
-import { setSocketAddress, trustProxyOf } from "./framework-server/env.js";
-import { createTrackedPlatform, fetchApp, positiveInteger, publicOriginOf, rebaseRequest, visibleHost } from "./framework-server/fetch-host.js";
-import type { ServerPlatform } from "./framework-server/platform.js";
-import { handleProcessErrors } from "./framework-server/process-errors.js";
-import type { SocketPeer } from "./framework-server/socket.js";
-import { createSocketUpgradeHandler } from "./framework-server/upgrade.js";
-import type { SocketSession, SocketUpgrade, SocketUpgradeClose, SocketUpgradeHandler } from "./framework-server/upgrade.js";
+import { assetLocation, assetResponse, etagMatches, findAsset } from "./server/runtime/assets.js";
+import type { AssetManifest, AssetReader } from "./server/runtime/assets.js";
+import type { ServerApp } from "./server/runtime/app.js";
+import { setSocketAddress, trustProxyOf } from "./server/runtime/env.js";
+import { createTrackedPlatform, fetchApp, positiveInteger, publicOriginOf, rebaseRequest, visibleHost } from "./server/runtime/fetch-host.js";
+import type { ServerPlatform } from "./server/runtime/platform.js";
+import { handleProcessErrors } from "./server/runtime/process-errors.js";
+import type { SocketPeer } from "./server/socket/runtime.js";
+import { createSocketUpgradeHandler } from "./server/runtime/upgrade.js";
+import type { SocketSession, SocketUpgrade, SocketUpgradeClose, SocketUpgradeHandler } from "./server/runtime/upgrade.js";
 
 // Minimal structural views of the Deno namespace, so this entry type-checks without Deno's types.
 

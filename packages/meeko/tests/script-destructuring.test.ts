@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 import { Window } from "happy-dom";
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
-import { MeekoCompileError } from "../src/compiler/sfc.ts";
+import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
 import { createEditorModel } from "../src/language-server/model.ts";
 
 // A composable whose signals the component destructures, beside a signal of its own.

@@ -143,11 +143,11 @@ export function componentSummary(program: ts.Program, component: VirtualComponen
   const checker = program.getTypeChecker();
   const aliases = new Map<string, ts.TypeAliasDeclaration>();
   for (const statement of file.statements) if (ts.isTypeAliasDeclaration(statement)) aliases.set(statement.name.text, statement);
-  const names = { props: "ComponentProps", events: "__MeekoEmits", models: "ComponentModels", snippets: "ComponentSnippets", exposed: "ComponentExposed" } as const;
-  const props = aliases.get("ComponentProps");
+  const names = { props: "__MeekoComponentProps", events: "__MeekoEmits", models: "ComponentModels", snippets: "ComponentSnippets", exposed: "ComponentExposed" } as const;
+  const props = aliases.get("__MeekoComponentProps") ?? aliases.get("ComponentProps");
   const typeParameters = props?.typeParameters?.map((parameter) => parameter.getText(file));
   return summarize(checker, (name) => {
-    const alias = aliases.get(names[name]);
+    const alias = aliases.get(names[name]) ?? (name === "props" ? aliases.get("ComponentProps") : undefined);
     return alias ? { type: checker.getTypeAtLocation(alias.name), at: alias } : undefined;
   }, typeParameters, true);
 }

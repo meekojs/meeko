@@ -31,6 +31,8 @@ export const catalog: readonly CatalogEntry[] = [
     section: "Empezar",
     transform: (text) => text.replace(/^# Meeko\n+<p align="center">[\s\S]*?<\/p>\n+/, "# Inicio rápido\n\n"),
   },
+  { slug: "primeros-pasos", href: "/docs/primeros-pasos", source: "docs/primeros-pasos.md", label: "Primera aplicación", section: "Empezar" },
+  { slug: "como-elegir", href: "/docs/como-elegir", source: "docs/como-elegir.md", label: "Cómo elegir", section: "Guías" },
   { slug: "framework", href: "/docs/framework", source: "docs/framework.md", label: "Framework full-stack", section: "Guías" },
   { slug: "api", href: "/docs/api", source: "docs/api.md", label: "Componentes y API", section: "Guías" },
   { slug: "editors", href: "/docs/editors", source: "docs/editors.md", label: "Editores", section: "Herramientas" },

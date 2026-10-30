@@ -19,8 +19,8 @@ import { findLinkedMeeko, isSupervisedDevelopment, linkWatchEnabled, runSupervis
 import { checkFrameworkProject, loadCheckedMeekoConfig, prepareFrameworkTypes } from "./framework/check-project.js";
 import { cleanProject, formatCleanResult } from "./framework/clean.js";
 import { loadProjectEnv } from "./framework/env-file.js";
-import { formatDiagnostic, hasErrors } from "./compiler/sfc.js";
-import type { CompileDiagnostic } from "./compiler/sfc.js";
+import { formatDiagnostic, hasErrors } from "./compiler/parser/sfc.js";
+import type { CompileDiagnostic } from "./compiler/parser/sfc.js";
 
 const usage = "Uso: meeko dev [directorio]\n     meeko check [directorio | componente.meeko] [--json]\n     meeko build [directorio] [--adapter <node|cloudflare|deno|bun|static>]\n     meeko start [directorio]\n     meeko preview [directorio] [--adapter <node|cloudflare|bun|deno|static>]\n     meeko clean [directorio] [--all] [--dry-run]\n     meeko auth hash  (pide una contraseña sin mostrarla, o la lee de stdin, e imprime su hash)\n     meeko check-app <directorio>\n     meeko compile <componente.meeko> <salida.ts>\n     meeko types <componente.meeko>\n     meeko routes <directorio>\n     meeko prerender <directorio>\n     meeko init <directorio>\n     meeko init-framework <directorio>\n     meeko lsp --stdio | --node-ipc | --socket=<puerto> | --pipe=<nombre>\n     meeko <comando> --help  (la ayuda de un comando)\n     meeko --help | --version\n\n" +
   "Variables de entorno:\n" +

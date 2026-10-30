@@ -20,7 +20,9 @@ related:
   - docs/framework.md#formularios-sin-javascript-form
 ---
 
-`useForm` reúne lo que repite cada formulario: una señal escribible por campo para `model`, la validación con un [Standard Schema](https://standardschema.dev) (como los de Valibot) al enviar, los `issues` de un `400` del servidor repartidos por campo, un mensaje para el formulario completo, `pending`, `submitted`, `dirty`, `reset` y `commit`. Se llama en el nivel superior del `<script>` de un componente y se autoimporta en las aplicaciones del framework.
+`useForm` reúne lo que repite cada formulario: una señal escribible por campo para `model`, la validación con un [Standard Schema](https://standardschema.dev) (como los de Valibot) al enviar, los `issues` de un `400` del servidor repartidos por campo, un mensaje para el formulario completo, `pending`, `submitted`, `dirty`, `reset`, `load` y `commit`. Se llama en el nivel superior del `<script>` de un componente y se autoimporta en las aplicaciones del framework.
+
+Los tipos `Form`, `FormField` y `FormSubmission` también se autoimportan como tipos en el `<script>` del componente y en `app/`. En código de `server/`, `shared/` o `<script server>` se requiere una importación explícita si sólo se necesita describir un tipo.
 
 El formulario es estado del componente: no viaja en el payload. El servidor lo renderiza con `initial` y el navegador vuelve a crearlo con el mismo `initial` al hidratar.
 
@@ -83,8 +85,9 @@ Un `Form<Values, Result>`. `fields` son señales escribibles; el resto de señal
 | `dirty` | `ReadonlySignal<boolean>` | `true` si algún campo difiere de los valores iniciales. Compara arrays, objetos planos y fechas por contenido. |
 | `submit(event?)` | `Promise<Result \| undefined>` | Envía. Resuelve con lo que devuelve tu `submit`, o con `undefined` si los datos no son válidos, si el envío falla o si ya había uno en curso. Nunca rechaza. |
 | `trySubmit(event?)` | `Promise<FormSubmission<Result>>` | Desde `1.5`. Envía igual, pero resuelve con cómo terminó: `{ ok: true, result }` u `{ ok: false, reason }` con `"invalid"`, `"error"` o `"skipped"`. Nunca rechaza. |
-| `reset(values?)` | `void` | Vuelve a los valores iniciales, o a ellos combinados con `values`, que pasan a ser la referencia de `dirty`. Borra `errors`, `error`, `failure` y `submitted` y descarta el resultado de una validación o un envío en curso. |
-| `commit(values?)` | `void` | Desde `1.5`. Escribe `values` y toma los valores actuales como nuevos valores iniciales: `dirty` vuelve a `false`. No borra `submitted`, `errors`, `error` ni `failure`. |
+| `reset(values?)` | `void` | Vuelve a `initial`, incluso después de `load` o `commit`. Si recibe valores, los combina con `initial` y toma el resultado como referencia de `dirty`. Acepta el evento `reset` nativo. Limpia errores y el estado del último envío. |
+| `load(values)` | `void` | Combina un registro con los valores actuales, toma el resultado como referencia de `dirty` y limpia errores y el estado del último envío. `reset()` aún vuelve a `initial`. |
+| `commit(values?)` | `void` | Desde `1.5`. Escribe `values` y toma los valores actuales como nueva referencia de `dirty`: vuelve a `false`. No borra `submitted`, `errors`, `error` ni `failure`. |
 | `field(name)` | `FormField<Values[K]>` | Desde `1.5`. Las piezas de un campo para un componente propio: su señal, su mensaje, `invalid`, `name` e IDs estables entre SSR e hidratación. Devuelve siempre el mismo objeto para el mismo campo. |
 | `csrfToken` | `string \| undefined` | Desde `1.7`. El token CSRF de la sesión para el campo oculto `_csrf` de un formulario nativo, o `undefined` sin sesión: en SSR, el de la petición; en el navegador, el de la meta `meeko-csrf-token`. Es un texto, no una señal. |
 
@@ -140,6 +143,8 @@ Con el `409`, `form.errors.value.email` es «Ese correo ya tiene una cuenta.», 
 ### Editar un registro y guardar como nueva referencia
 
 `initial` sale de los datos de la página. Tras guardar, `onSuccess` llama a `commit` con lo que devolvió el servidor: `dirty` vuelve a `false` y el «Guardado» de `submitted` se mantiene.
+
+Si el registro llega después de crear el componente, llama `form.load({ name: record.name, bio: record.bio })` cuando termine la carga. `load` marca esos valores como limpios; `form.reset()` vuelve a los valores declarados en `initial`.
 
 ```html
 <!-- app/pages/profile.meeko -->

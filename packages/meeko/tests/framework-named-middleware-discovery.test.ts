@@ -10,7 +10,7 @@ import { generateRoutes } from "../src/framework/generate.ts";
 import { composeFrameworkRoutes } from "../src/framework/modules.ts";
 import { discoverRouteMiddleware, extractRouteMiddlewareOptions } from "../src/framework/route-middleware-discovery.ts";
 import { discoverRoutes, extractGroupOptions, extractRouteOptions } from "../src/framework/routes-discovery.ts";
-import type { RouteRecord } from "../src/framework/router.ts";
+import type { RouteRecord } from "../src/app/runtime/router.ts";
 import { tempProject } from "./helpers/temp-project.ts";
 
 async function put(root: string, path: string, source: string): Promise<void> {

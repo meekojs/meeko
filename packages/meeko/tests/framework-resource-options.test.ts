@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createUseApi, createUseRpcQuery, ResourceScope, withResourceScope } from "../src/framework/resources.ts";
-import type { DataResource } from "../src/framework/resources.ts";
-import { collectMounted, runMounted } from "../src/lifecycle.ts";
+import { createUseApi } from "../src/app/composables/resources/use-api.ts";
+import { createUseRpcQuery } from "../src/app/composables/resources/use-rpc-query.ts";
+import { ResourceScope, withResourceScope } from "../src/app/composables/resources/engine.ts";
+import type { DataResource } from "../src/app/composables/resources/engine.ts";
+import { collectMounted, runMounted } from "../src/app/runtime/lifecycle.ts";
 import { createRoot, signal } from "../src/index.ts";
-import { awaitData, renderWithSuspense } from "../src/suspense.ts";
+import { awaitData, renderWithSuspense } from "../src/app/runtime/suspense.ts";
 
 /** A fake transport: every call waits until the test settles it, and its signal is kept. */
 function transport() {

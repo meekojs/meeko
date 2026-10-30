@@ -1,43 +1,22 @@
 <script server lang="ts">
-	import { trustHtml } from '@meekojs/meeko'
+	import type { TrustedHtml } from '@meekojs/meeko'
 	import { definePage } from '@meekojs/meeko/framework'
-	import type { DemoMark, DemoSource } from '../../shared/types/demo.js'
-	import { createHighlight, createTokenizer } from '../../server/content/highlight.js'
-	import { codeBlockHtml, escapeHtml } from '../../server/content/markdown.js'
-	import { githubUrl, readRepositoryFile } from '../../server/content/repository.js'
+	import type { DemoSource } from '../../shared/types/demo.js'
+	import { readPage } from '../../server/content/db.js'
 
-	export const route = definePage({ render: 'prerender' })
+	export const route = definePage({ render: 'ssr' })
 
-	// The live demo runs the counter example of the package; its source is tokenized here, line by
-	// line, so the page can light the lines that declare and read the signal.
-	const tokenize = await createTokenizer()
-	const exampleFile = 'examples/counter/Counter.meeko'
-	const exampleText = readRepositoryFile(exampleFile).trim()
-	const exampleLines = exampleText.split('\n')
-	const markOf = (text: string): DemoMark | undefined => (/\bsignal\(/.test(text) ? 'count' : /\bcomputed\(/.test(text) ? 'doubled' : /\{count\.value\}/.test(text) ? 'render' : undefined)
-	export const demo: DemoSource = {
-		file: exampleFile,
-		url: githubUrl(exampleFile),
-		lines: tokenize(exampleText, 'meeko').map((tokens, index) => {
-			const html = trustHtml(tokens.map((token) => `<span style="${escapeHtml(token.style)}">${escapeHtml(token.content)}</span>`).join(''))
-			// The page state is JSON: a line without a mark leaves the key out instead of `undefined`.
-			const mark = markOf(exampleLines[index] ?? '')
-			return mark ? { html, mark } : { html }
-		}),
-		countLine: exampleLines.findIndex((line) => markOf(line) === 'count') + 1,
-		doubledLine: exampleLines.findIndex((line) => markOf(line) === 'doubled') + 1,
+	type HomePayload = {
+		readonly demo: DemoSource
+		readonly editorLines: { html: TrustedHtml; number: number; count: boolean }[]
+		readonly command: string
+		readonly quickStart: TrustedHtml
+		readonly version: string
+		readonly head: { title: string; description: string }
 	}
-	// The editor frame shows the declarations and the template of the same file, lines 10 to 17.
-	export const editorLines = demo.lines.slice(9, 17).map((line, index) => ({ html: line.html, number: index + 10, count: line.mark === 'count' }))
-	export const command = 'pnpm exec meeko init-framework mi-app'
-	// The quick start of the README (packages/meeko/README.md, «Crear una aplicación full-stack»).
-	const highlight = await createHighlight()
-	export const quickStart = codeBlockHtml('terminal', highlight([command, 'cd mi-app', 'npm install', 'npm run dev'].join('\n'), 'shellscript'))
-	export const version = (JSON.parse(readRepositoryFile('package.json')) as { version: string }).version
-	export const head = {
-		title: 'Meeko · Componentes .meeko tipados, SSR e hidratación para TypeScript',
-		description: 'Meeko es un motor de componentes para TypeScript y un framework full-stack: archivos .meeko tipados, signals, SSR con hidratación, API y RPC tipados y despliegue en Node, Bun, Deno y Cloudflare.',
-	}
+	const snapshot = await readPage<HomePayload>('/')
+	if (!snapshot) notFound()
+	export const { demo, editorLines, command, quickStart, version, head } = snapshot
 </script>
 
 <script lang="ts">

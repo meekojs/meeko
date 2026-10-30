@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  SseParser, aliasDescription, bridgeDescriptorGlob, bridgeOffFromRecord, devServerRecordGlob, editableValue, fileKey, formatValue, groupSignals, hoverMarkdown, inlineText, isWorkspaceBridgeDescriptor, isWorkspaceDevServerRecord, liveStatus, loopbackBridgeUrl, parseEditedValue, placeGroups, previewValue,
+  SseParser, aliasDescription, bridgeDescriptorGlob, bridgeOffFromRecord, devServerRecordGlob, editableValue, fileKey, formatValue, groupSignals, hoverMarkdown, inlineText, isWorkspaceBridgeDescriptor, isWorkspaceDevServerRecord, liveStatus, loopbackBridgeUrl, maxSseFrameBytes, parseEditedValue, placeGroups, previewValue,
 } from "../src/live/model.js";
 import type { EditorLiveSignal } from "../src/live/model.js";
 
@@ -135,6 +135,20 @@ test("lee eventos SSE partidos en trozos y omite comentarios", () => {
   parser.push("lo\ndata: {\"a\":1}\r\n\r\n");
   parser.push("data: x\ndata: y\n\n");
   assert.deepEqual(events, [["hello", "{\"a\":1}"], ["message", "x\ny"]]);
+});
+
+test("limita cada evento SSE y descarta definitivamente el búfer excesivo", () => {
+  assert.equal(maxSseFrameBytes, 4 * 1024 * 1024);
+  const events: string[] = [];
+  const parser = new SseParser((_event, data) => events.push(data), 10);
+  assert.equal(parser.push("data: a\n\ndata: b\n\n"), true, "varios eventos pequeños pueden llegar juntos");
+  assert.deepEqual(events, ["a", "b"]);
+  assert.equal(parser.push("data: 😀"), true);
+  assert.equal(parser.push("x"), false, "se cuenta UTF-8, no sólo caracteres JavaScript");
+  assert.equal(parser.push("\n\ndata: later\n\n"), false, "no reanuda después del límite");
+  assert.deepEqual(events, ["a", "b"]);
+  const complete = new SseParser(() => assert.fail("No debe entregar el evento excesivo"), 10);
+  assert.equal(complete.push("data: 12345\n\n"), false, "también rechaza eventos completos excesivos");
 });
 
 test("el registro de meeko dev dice si se arrancó sin puente, sólo en proyectos del workspace", () => {

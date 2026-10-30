@@ -2,14 +2,14 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { formatDiagnostic, hasErrors } from "../compiler/sfc.js";
-import type { CompileDiagnostic } from "../compiler/sfc.js";
+import { formatDiagnostic, hasErrors } from "../compiler/parser/sfc.js";
+import type { CompileDiagnostic } from "../compiler/parser/sfc.js";
 import { checkApp } from "./check-app.js";
-import { loadMeekoConfig } from "./config.js";
+import { discoverConfiguredRoutes, loadMeekoConfig } from "./config.js";
 import type { MeekoConfig } from "./config.js";
 import { prepareProject } from "./project.js";
 import { assertNoLegacySessionFile } from "./runtime-migration.js";
-import { mapRouteBlockPaths, routeBlockTypeFiles } from "./route-block-types.js";
+import { mapRouteBlockPaths, routeBlockTypeFiles } from "../compiler/codegen/route-block-types.js";
 import { prepareFrameworkTypeDeclarations, projectNames } from "./type-declarations.js";
 import { tscCommand } from "../typescript-cli.js";
 
@@ -94,6 +94,6 @@ export async function checkFrameworkProject(projectRoot: string): Promise<Compil
   // The error lists the warnings too, so none is lost behind the errors.
   if (hasErrors(sourceDiagnostics)) throw new Error(sourceDiagnostics.map(formatDiagnostic).join("\n"));
   const configs = projectNames.map((name) => join(root, ".meeko", `tsconfig.${name}.json`));
-  await checkTypeScript(configs, await routeBlockTypeFiles(root));
+  await checkTypeScript(configs, await routeBlockTypeFiles(root, await discoverConfiguredRoutes(root)));
   return sourceDiagnostics;
 }

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { renderComponent } from "../src/dom.ts";
-import type { Component } from "../src/dom.ts";
-import type { ClientComponent } from "../src/framework/client.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import { createFrameworkHandler } from "../src/framework/server.ts";
+import { renderComponent } from "../src/app/runtime/renderer.ts";
+import type { Component } from "../src/app/runtime/renderer.ts";
+import type { ClientComponent } from "../src/app/runtime/client.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 
 /** A compiled child component: its CSS is only reachable through the parent that renders it. */
 const child = (name: string, css: string): Component<Record<string, never>> & { css: string } => ({

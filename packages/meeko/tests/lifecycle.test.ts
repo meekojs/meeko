@@ -7,11 +7,11 @@ import { pathToFileURL } from "node:url";
 import { Window } from "happy-dom";
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
-import { MeekoCompileError } from "../src/compiler/sfc.ts";
-import { bindComponent, renderComponent } from "../src/dom.ts";
-import type { ComponentModule, ComponentRelease } from "../src/dom.ts";
-import { onMounted } from "../src/lifecycle.ts";
-import { createRoot } from "../src/reactivity.ts";
+import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
+import { bindComponent, renderComponent } from "../src/app/runtime/renderer.ts";
+import type { ComponentModule, ComponentRelease } from "../src/app/runtime/renderer.ts";
+import { onMounted } from "../src/app/runtime/lifecycle.ts";
+import { createRoot } from "../src/core/reactivity.ts";
 import { generateTypes } from "../src/types.ts";
 
 const child = `<script lang="ts">

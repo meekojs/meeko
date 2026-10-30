@@ -1,19 +1,20 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { assetResponse, etagMatches, findAsset } from "./framework-server/assets.js";
-import type { AssetManifest, AssetReader } from "./framework-server/assets.js";
-import type { ServerApp } from "./framework-server/app.js";
-import { ApiError, errorResponse, observeErrorCallback } from "./framework-server/contracts.js";
-import { setSocketAddress } from "./framework-server/env.js";
-import { fetchApp, positiveInteger, publicOriginOf, rebaseRequest } from "./framework-server/fetch-host.js";
-import { createDetachedPlatform } from "./framework-server/platform.js";
-import type { ServerPlatform } from "./framework-server/platform.js";
-import { watchIsolateErrors } from "./framework-server/process-errors.js";
-import { encodeBase64Url } from "./framework-server/base64url.js";
-import type { SqlRateLimitRow, SqlSessionDriver, SqlSessionRow } from "./framework-server/session-stores.js";
-import type { SocketMessage, SocketPeer, SocketPubSub, Unsubscribe } from "./framework-server/socket.js";
-import { createSocketUpgradeHandler, openSocketSession, socketPathnamePrefix } from "./framework-server/upgrade.js";
-import type { OpenedSocketSession, SocketUpgradeClose, SocketUpgradeHandler } from "./framework-server/upgrade.js";
-import type { PrerenderedPage, PrerenderSource } from "./framework/server.js";
+import { assetResponse, etagMatches, findAsset } from "./server/runtime/assets.js";
+import type { AssetManifest, AssetReader } from "./server/runtime/assets.js";
+import type { ServerApp } from "./server/runtime/app.js";
+import { ApiError, observeErrorCallback } from "./server/errors.js";
+import { errorResponse } from "./server/contract-runtime.js";
+import { setSocketAddress } from "./server/runtime/env.js";
+import { fetchApp, positiveInteger, publicOriginOf, rebaseRequest } from "./server/runtime/fetch-host.js";
+import { createDetachedPlatform } from "./server/runtime/platform.js";
+import type { ServerPlatform } from "./server/runtime/platform.js";
+import { watchIsolateErrors } from "./server/runtime/process-errors.js";
+import { encodeBase64Url } from "./server/runtime/base64url.js";
+import type { SqlRateLimitRow, SqlSessionDriver, SqlSessionRow } from "./server/runtime/session-stores.js";
+import type { SocketMessage, SocketPeer, SocketPubSub, Unsubscribe } from "./server/socket/runtime.js";
+import { createSocketUpgradeHandler, openSocketSession, socketPathnamePrefix } from "./server/runtime/upgrade.js";
+import type { OpenedSocketSession, SocketUpgradeClose, SocketUpgradeHandler } from "./server/runtime/upgrade.js";
+import type { PrerenderedPage, PrerenderSource } from "./server/runtime/framework-render.js";
 
 // Minimal structural views of the Workers runtime, so this entry type-checks
 // and loads without @cloudflare/workers-types or `cloudflare:workers`.

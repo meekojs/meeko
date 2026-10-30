@@ -7,8 +7,8 @@ import { pathToFileURL } from "node:url";
 import { Window } from "happy-dom";
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
-import { MeekoCompileError } from "../src/compiler/sfc.ts";
-import type { ComponentModule, ComponentRelease } from "../src/dom.ts";
+import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
+import type { ComponentModule, ComponentRelease } from "../src/app/runtime/renderer.ts";
 
 interface RuntimeModule extends ComponentModule<Record<string, unknown>> {
   renderToString(props: Record<string, unknown>): string;

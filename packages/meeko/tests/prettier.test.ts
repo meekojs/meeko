@@ -14,7 +14,7 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import { compile } from "../src/compiler.ts";
 import plugin from "../src/prettier.ts";
 import type { MeekoPrettierOptions } from "../src/prettier.ts";
-import { formatWithPrettier } from "../src/prettier/editor.ts";
+import { formatWithPrettier } from "../src/formatters/prettier/editor.ts";
 import { startLanguageServer } from "../src/language-server/server.ts";
 import type { LanguageServerInitializationOptions } from "../src/language-server/server.ts";
 

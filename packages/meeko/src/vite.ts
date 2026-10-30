@@ -7,14 +7,18 @@ import type { Plugin } from "vite";
 import { compile } from "./compiler.js";
 import { moduleSpecifiers } from "./compiler/import-graph.js";
 import { sourceMapForCompiled } from "./compiler/sourcemap.js";
-import { autoImportDirectories, autoImportedValues, checkComponentBoundary, discoverAutoImports, transformAutoImports } from "./autoimports.js";
-import { transformTypeScriptAutoImports, typeScriptAutoImportMap } from "./autoimports-ts.js";
-import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./framework/config.js";
+import { autoImportDirectories, discoverAutoImports, discoverComponents } from "./autoimports/registry.js";
+import { generateComponentRegistry } from "./autoimports/components.js";
+import { generateAppTypeForFile, generateAppTypes } from "./framework/check-app.js";
+import { generateComponentRegistryTypes } from "./framework/type-declarations.js";
+import { autoImportedValues, checkComponentBoundary, transformAutoImports } from "./autoimports/transform.js";
+import { transformTypeScriptAutoImports, typeScriptAutoImportMap } from "./autoimports/typescript.js";
+import { componentDirectories, discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./framework/config.js";
 import { clientMiddlewareSource, clientPluginsSource, clientRoutesSource, clientSidecarsSource, readBuildAppData, serverAppSource } from "./framework/app-manifest.js";
-import { assertRouteBlockPlacement, isPageFile, routeBlockFile, routeBlockId, routeBlockSource, withoutRouteBlock } from "./framework/route-block.js";
+import { assertRouteBlockPlacement, isPageFile, routeBlockFile, routeBlockId, routeBlockSource, withoutRouteBlock } from "./compiler/transforms/route-block.js";
 import { extractRouteRender } from "./framework/routes-discovery.js";
-import { builtinOptimizeInclude, devScanIgnored, isDevWatchIgnored, isDiscoverySource } from "./framework/dev-watch.js";
-import { serverScriptModule } from "./framework/server-script.js";
+import { builtinOptimizeInclude, devScanIgnored, isComponentSource, isDevWatchIgnored, isDiscoverySource } from "./framework/dev-watch.js";
+import { serverScriptModule } from "./compiler/codegen/server-script.js";
 import { editorBridgeDirectory } from "./framework/editor-bridge.js";
 import { aliasImporterScope, aliasScopeProblem, matchPathAlias } from "./compiler/aliases.js";
 import { resolveProjectAliases, resolveProjectAliasesSync } from "./framework/aliases.js";
@@ -131,6 +135,44 @@ export function meeko(): Plugin {
   // order, and older stylesheets would otherwise pile up for as long as `meeko dev` runs.
   const styles = new Map<string, string>();
   const fileStyles = new Map<string, string[]>();
+  let activeComponentDirectories: string[] = [];
+  let registeredComponentFiles = new Set<string>();
+  const projectOwnedComponent = (file: string): boolean => {
+    const path = relative(root, resolve(file));
+    return path !== ".." && !path.startsWith("../") && !path.startsWith("..\\") && !isAbsolute(path)
+      && !path.split(/[\\/]/).includes("node_modules");
+  };
+  // Vite may report an add, unlink and change in the same burst. Never write the generated
+  // loader concurrently: its file must describe one complete discovery before invalidation.
+  let registryUpdate: Promise<unknown> = Promise.resolve();
+  const refreshComponentRegistry = (editedFile?: string): Promise<string | undefined> => {
+    const update = registryUpdate.then(async () => {
+      if (editedFile && projectOwnedComponent(editedFile) && registeredComponentFiles.has(normalizePath(resolve(editedFile)))) {
+        await generateAppTypeForFile(root, editedFile, { onError: (file, error) => console.error(`[meeko] Cannot update types for ${file}:`, error) });
+        return;
+      }
+      const registry = await generateComponentRegistry(root);
+      await generateAppTypes(root, { onError: (file, error) => console.error(`[meeko] Cannot update types for ${file}:`, error) });
+      await generateComponentRegistryTypes(root);
+      registeredComponentFiles = new Set((await discoverComponents(root)).map(({ file }) => normalizePath(resolve(file))));
+      return registry;
+    });
+    registryUpdate = update.catch(() => undefined);
+    return update;
+  };
+  const componentWatchDirectories = async (): Promise<string[]> => {
+    const { config, modules } = await loadConfiguredModules(root);
+    const sources = await resolveConfigSources(root, config);
+    return [...new Set([
+      ...sources.flatMap((source) => componentDirectories(config.components).map((entry) => resolve(source.root, entry.path))),
+      ...modules.componentsDirs.map((entry) => resolve(entry.dir)),
+    ])];
+  };
+  const autoImportWatchDirectories = async (): Promise<string[]> => {
+    const config = await loadMeekoConfig(root);
+    const sources = await resolveConfigSources(root, config);
+    return sources.flatMap((source) => autoImportDirectories(config.imports).map((directory) => resolve(source.root, directory)));
+  };
   const keepStyle = (filename: string, hash: string, css: string): void => {
     styles.set(hash, css);
     const hashes = (fileStyles.get(filename) ?? []).filter((known) => known !== hash);
@@ -145,7 +187,8 @@ export function meeko(): Plugin {
   const watchedSource = async (file: string, tree = false): Promise<boolean> => {
     const normalized = normalizePath(file);
     const normalizedRoot = normalizePath(root);
-    if (!normalized.startsWith(`${normalizedRoot}/`) || normalized.startsWith(`${normalizedRoot}/meeko.config.`)) return false;
+    if (normalized.startsWith(`${normalizedRoot}/meeko.config.`)) return false;
+    if (isComponentSource(file, await componentWatchDirectories())) return true;
     const config = await loadMeekoConfig(root);
     const sources = await resolveConfigSources(root, config);
     for (const source of sources) {
@@ -390,23 +433,66 @@ export function meeko(): Plugin {
         return { optimizeDeps: { entries: ["**/*.html", "!**/__tests__/**", "!**/coverage/**", ...devScanIgnored], ...included } };
       },
     },
-    configureServer(server) {
+    async configureServer(server) {
+      const directories = await componentWatchDirectories();
+      activeComponentDirectories = directories;
+      const configSource = (file: string): boolean => normalizePath(file).startsWith(`${normalizePath(root)}/meeko.config.`);
+      const onConfigChange = async (): Promise<void> => {
+        aliasState = undefined;
+        const updated = await componentWatchDirectories();
+        activeComponentDirectories = updated;
+        server.watcher.add(updated);
+        await refreshComponentRegistry();
+        server.moduleGraph.invalidateAll();
+        server.ws.send({ type: "full-reload" });
+      };
       // A new or removed page, layout or server module changes discovery; Vite's
       // hot update only reports edits of files it already knows.
       const onTreeChange = (file: string): void => {
-        void watchedSource(file, true).then((changed) => {
+        void (async () => {
+          if (configSource(file)) { await onConfigChange(); return; }
+          const component = isComponentSource(file, activeComponentDirectories);
+          const changed = component || await watchedSource(file, true);
           if (!changed) return;
+          if (component) await refreshComponentRegistry();
           server.moduleGraph.invalidateAll();
           server.ws.send({ type: "full-reload" });
-        }, (error: unknown) => server.config.logger.error(String(error)));
+        })().catch((error: unknown) => server.config.logger.error(String(error)));
       };
       server.watcher.on("add", onTreeChange);
       server.watcher.on("unlink", onTreeChange);
+      // An edited component can be absent from Vite's module graph (for example before its
+      // first render), so hot-update alone cannot keep its declarations current.
+      server.watcher.on("change", (file) => {
+        if (configSource(file)) {
+          void onConfigChange().catch((error: unknown) => server.config.logger.error(String(error)));
+          return;
+        }
+        if (isComponentSource(file, activeComponentDirectories)) {
+          void refreshComponentRegistry(file).catch((error: unknown) => server.config.logger.error(String(error)));
+        }
+      });
+      // Explicit watches also cover configured folders created after startup and linked module
+      // directories outside Vite's root. A new autoimport must invalidate consumers already loaded.
+      server.watcher.add([...new Set([
+        ...directories, ...await autoImportWatchDirectories(),
+        ...["ts", "mts", "js", "mjs"].map((extension) => join(root, `meeko.config.${extension}`)),
+      ])]);
+      await refreshComponentRegistry();
     },
     async handleHotUpdate({ file, server }) {
       const normalized = normalizePath(file);
       const configFile = normalized.startsWith(`${normalizePath(root)}/meeko.config.`);
-      if (configFile) aliasState = undefined;
+      if (configFile) {
+        aliasState = undefined;
+        // The watcher also covers config files that Vite has not put in its module graph.
+        return [];
+      }
+      if (isComponentSource(file, activeComponentDirectories)) {
+        await registryUpdate;
+        // Keep the compiler's own component HMR and CSS update path for an edit.
+        return;
+      }
       if (!normalized.startsWith(runtimeDirectory) && !configFile && !await watchedSource(file)) return;
       server.moduleGraph.invalidateAll();
       server.ws.send({ type: "full-reload" });

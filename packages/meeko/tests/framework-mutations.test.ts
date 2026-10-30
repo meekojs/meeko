@@ -5,10 +5,10 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { Window as HappyWindow } from "happy-dom";
 import { compile } from "../src/compiler.ts";
-import type { ClientComponent } from "../src/framework/client.ts";
-import type { ApiClient, ApiOperation, RpcClient, RpcOperation } from "../src/framework/clients.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import type { RouteRecord } from "../src/framework/router.ts";
+import type { ClientComponent } from "../src/app/runtime/client.ts";
+import type { ApiClient, ApiOperation, RpcClient, RpcOperation } from "../src/shared/clients.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import type { RouteRecord } from "../src/app/runtime/router.ts";
 import { createRequestContext, defineRpc, dispatchRpc, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
 import type { Schema } from "../src/framework-server.ts";
 import { createUseApiMutation, createUseRpcMutation } from "../src/framework.ts";
@@ -19,11 +19,11 @@ const fileUrl = (path: string): string => pathToFileURL(resolve(path)).href;
 
 /** The runtime as the compiled pages import it, by file URL: one instance for pages, server and browser. */
 const runtime = async () => ({
-  ...await import(fileUrl("src/framework/server.ts")) as typeof import("../src/framework/server.ts"),
-  ...await import(fileUrl("src/framework/client.ts")) as typeof import("../src/framework/client.ts"),
-  ...await import(fileUrl("src/framework/clients.ts")) as typeof import("../src/framework/clients.ts"),
-  ...await import(fileUrl("src/reactivity.ts")) as typeof import("../src/reactivity.ts"),
-  ...await import(fileUrl("src/lifecycle.ts")) as typeof import("../src/lifecycle.ts"),
+  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof import("../src/server/runtime/framework-render.ts"),
+  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof import("../src/app/runtime/client.ts"),
+  ...await import(fileUrl("src/shared/clients.ts")) as typeof import("../src/shared/clients.ts"),
+  ...await import(fileUrl("src/core/reactivity.ts")) as typeof import("../src/core/reactivity.ts"),
+  ...await import(fileUrl("src/app/runtime/lifecycle.ts")) as typeof import("../src/app/runtime/lifecycle.ts"),
 });
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;

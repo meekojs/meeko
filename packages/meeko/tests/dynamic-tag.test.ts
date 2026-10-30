@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { Window } from "happy-dom";
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
-import { MeekoCompileError } from "../src/compiler/sfc.ts";
+import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
 
 interface RuntimeModule {
   renderToString(props: Record<string, unknown>): string;
@@ -548,7 +548,7 @@ import * as Panel from "./Panel.meeko";
 });
 
 test("bind=\"obj\" compares attribute names without case: data-meeko* stays reserved and the explicit binding wins", async () => {
-  const { spreadEntries } = await import(pathToFileURL(resolve("src/dynamic-tag.ts")).href) as typeof import("../src/dynamic-tag.ts");
+  const { spreadEntries } = await import(pathToFileURL(resolve("src/app/runtime/dynamic-tag.ts")).href) as typeof import("../src/app/runtime/dynamic-tag.ts");
   const spread = (value: Record<string, unknown>, excluded: readonly string[], explicit?: { class?: unknown; style?: unknown }) => spreadEntries("div", value as never, excluded, explicit);
   assert.throws(() => spread({ "Data-Meeko": "0" }, []), (error: unknown) => error instanceof TypeError && /^MEEK113: .*data-meeko\* está reservado/.test(error.message));
   assert.throws(() => spread({ "DATA-MEEKO-ID": "0" }, []), /MEEK113/);

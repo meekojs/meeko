@@ -10,8 +10,10 @@
     "assets": "node scripts/assets.mjs",
     "dev": "node scripts/assets.mjs && meeko dev .",
     "check": "meeko check .",
-    "build": "node scripts/assets.mjs && meeko build . && node scripts/postbuild.mjs",
-    "build:static": "pnpm run build",
+    "build": "node scripts/assets.mjs && meeko build .",
+    "db:migrate": "node scripts/migrate-docs.mjs",
+    "docs:sync": "node scripts/sync-docs.mjs",
+    "start": "meeko start .",
     "preview": "pnpm run build && meeko preview .",
     "test": "node --test tests/*.test.mjs"
   },
@@ -20,11 +22,12 @@
     "@typescript/typescript6": "6.0.2",
     "github-slugger": "2.0.0",
     "markdown-it": "15.0.3",
+    "pg": "8.23.1",
     "shiki": "4.5.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "pagefind": "1.5.2",
+    "@types/pg": "8.23.1",
     "prettier": "3.9.10",
     "prettier-plugin-css-order": "^2.2.0",
     "sharp": "0.35.5",

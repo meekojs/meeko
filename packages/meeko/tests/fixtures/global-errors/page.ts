@@ -1,5 +1,5 @@
-import type { ClientComponent } from "../../../src/framework/client.ts";
-import { createRouteManifest } from "../../../src/framework/router.ts";
+import type { ClientComponent } from "../../../src/app/runtime/client.ts";
+import { createRouteManifest } from "../../../src/app/runtime/router.ts";
 
 /** The page of the real-browser test of global errors: plain DOM buttons that fail outside Meeko. */
 const html = [

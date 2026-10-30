@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MeekoCompileError, locate, parseSfc } from "../src/compiler/sfc.ts";
-import { parseTemplate } from "../src/compiler/template.ts";
+import { MeekoCompileError, locate, parseSfc } from "../src/compiler/parser/sfc.ts";
+import { parseTemplate } from "../src/compiler/parser/template.ts";
 import { compile } from "../src/compiler.ts";
 
 const validSource = `<script lang="ts">\nconst label = "<template>literal</template>";\n</script>\n<template><button>{label}</button></template>\n<style scoped>button { color: red; }</style>`;

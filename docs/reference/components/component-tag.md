@@ -8,6 +8,7 @@ symbols:
 types:
   - "@meekojs/meeko#Component"
 related:
+  - docs/como-elegir.md
   - "syntax:meekooutlet"
   - "syntax:defineprops"
   - "syntax:snippet-tag"

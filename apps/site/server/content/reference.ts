@@ -219,14 +219,14 @@ export function cliCommands(): ReadonlyMap<string, string> {
 let autoImportCache: Promise<ReadonlySet<string>> | undefined
 
 /**
- * The names of the built-in autoimports of `src/autoimports.ts`, generated clients included
+ * The names of the built-in autoimports of `src/autoimports/registry.ts`, generated clients included
  * (`api`, `useApi`, `useRpcQuery`…): the strings of each `[...].map((name) => …)` and
  * `for (const name of [...])`, and each `name: "…"` of a literal entry.
  */
 export function autoImportNames(): Promise<ReadonlySet<string>> {
 	autoImportCache ??= (async () => {
 		const ts = (await import('@typescript/typescript6')).default
-		const path = `${packageFolder}/src/autoimports.ts`
+		const path = `${packageFolder}/src/autoimports/registry.ts`
 		const file = ts.createSourceFile(path, readRepositoryFile(path), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
 		const names = new Set<string>()
 		const strings = (node: TS.Expression): string[] => {

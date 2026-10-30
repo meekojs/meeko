@@ -8,6 +8,7 @@ symbols:
 types:
   - "@meekojs/meeko/server#RpcDefinition"
 related:
+  - docs/como-elegir.md
   - "@meekojs/meeko/server#defineApiRoute"
   - "@meekojs/meeko/server#ApiError"
   - "autoimport:rpc"

@@ -6,10 +6,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { prerenderRoutes } from "../src/framework/prerender.ts";
-import { createRouteManifest } from "../src/framework/router.ts";
-import { defer } from "../src/framework/deferred.ts";
-import { createFrameworkHandler } from "../src/framework/server.ts";
-import type { PageRoute } from "../src/framework/server.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { defer } from "../src/app/runtime/deferred.ts";
+import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
+import type { PageRoute } from "../src/server/runtime/framework-render.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
 import { linkRepositoryPackages, repositoryRoot, tempProject } from "./helpers/temp-project.ts";
 

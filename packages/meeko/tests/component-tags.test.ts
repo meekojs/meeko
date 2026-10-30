@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 import { Window } from "happy-dom";
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
-import { MeekoCompileError, parseSfc } from "../src/compiler/sfc.ts";
+import { MeekoCompileError, parseSfc } from "../src/compiler/parser/sfc.ts";
 
 const script = `<script lang="ts">const AppButton = {} as never;\nconst Table = {} as never;\nconst Input = {} as never;\nconst items = ["a"];\nconst show = true;\nconst x = 1;\nconst Y = 2;</script>\n`;
 

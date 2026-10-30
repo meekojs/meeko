@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
-import { discoverAutoImports } from "../src/autoimports.ts";
-import { generateAutoImportTypes, transformTypeScriptAutoImports, typeScriptAutoImportMap, typeScriptScope } from "../src/autoimports-ts.ts";
+import { discoverAutoImports } from "../src/autoimports/registry.ts";
+import { generateAutoImportTypes, transformTypeScriptAutoImports, typeScriptAutoImportMap, typeScriptScope } from "../src/autoimports/typescript.ts";
 
 test("TS autoimports generate isolated client/server/shared declarations and transform real imports", async () => {
   await mkdir(resolve(".meeko"), { recursive: true });
@@ -58,7 +58,7 @@ test("TS autoimports generate isolated client/server/shared declarations and tra
     assert.match(transformTypeScriptAutoImports("getSecret();", sidecar, root, registry) ?? "", /import \{ getSecret as getSecret \}/);
     assert.equal(typeScriptScope(root, join(root, "app", "pages", "page.shared.ts")), "shared");
     const consumer = join(root, "consumer.ts");
-    await writeFile(consumer, `const count: number = useCount();\nconst label: Label = "ok";\nconst box: Box<{ id: string; extra: number }> = { value: { id: "ok", extra: 1 } };\nconst defaultBox: Box = { value: { id: "ok", kind: "default" } };\n// @ts-expect-error the private re-exported generic constraint must remain intact\nconst invalidBox: Box<number> = { value: 1 };\nvoid count; void label; void box; void defaultBox; void invalidBox;\n`);
+    await writeFile(consumer, `const count: number = useCount();\nconst label: Label = "ok";\nconst box: Box<{ id: string; extra: number }> = { value: { id: "ok", extra: 1 } };\nconst defaultBox: Box = { value: { id: "ok", kind: "default" } };\n// @ts-expect-error the private re-exported generic constraint must remain intact\nconst invalidBox: Box<number> = { value: 1 };\ntype Field = FormField<string>; type FormState = Form<{ name: string }, void>; type Submission = FormSubmission<void>;\nvoid count; void label; void box; void defaultBox; void invalidBox;\n`);
     await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: {
       target: "es2022", module: "nodenext", moduleResolution: "nodenext", strict: true, skipLibCheck: false, noEmit: true,
     }, files: [consumer, output.client] }));

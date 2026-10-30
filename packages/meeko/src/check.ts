@@ -4,19 +4,20 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
-import { applyAutoImports, compileWithAutoImports, discoverAutoImports } from "./autoimports.js";
-import type { AutoImport } from "./autoimports.js";
+import { discoverAutoImports } from "./autoimports/registry.js";
+import { applyAutoImports, compileWithAutoImports } from "./autoimports/transform.js";
+import type { AutoImport } from "./autoimports/registry.js";
 import { aliasCandidates } from "./compiler/aliases.js";
 import { originalOffset } from "./compiler/mapping.js";
 import type { SourceMapping } from "./compiler/mapping.js";
 import { moduleSpecifiers, replaceModuleSpecifiers } from "./compiler/import-graph.js";
 import { projectDeclarationFiles } from "./compiler/project-declarations.js";
 import { projectRoot } from "./compiler/project-root.js";
-import { compileError, MeekoCompileError, locate } from "./compiler/sfc.js";
-import type { CompileDiagnostic } from "./compiler/sfc.js";
-import { UnexposedRefError } from "./element-refs.js";
-import { routeBlockTypeSource } from "./framework/route-block-types.js";
-import { pageRouteId } from "./framework/server-script.js";
+import { compileError, MeekoCompileError, locate } from "./compiler/parser/sfc.js";
+import type { CompileDiagnostic } from "./compiler/parser/sfc.js";
+import { UnexposedRefError } from "./app/runtime/element-refs.js";
+import { routeBlockTypeSource } from "./compiler/codegen/route-block-types.js";
+import { pageRouteId } from "./compiler/codegen/server-script.js";
 import { resolveProjectAliases, resolveProjectAliasesSync } from "./framework/aliases.js";
 import type { ProjectAliases } from "./framework/aliases.js";
 import { tscCommand } from "./typescript-cli.js";
@@ -76,7 +77,7 @@ function componentTarget(rootDirectory: string, filename: string): "client" | "s
  */
 function generatedDeclarations(rootDirectory: string, filename: string): string[] {
   const types = join(rootDirectory, ".meeko", "types");
-  return [join(types, "autoimports", `${componentTarget(rootDirectory, filename)}.d.ts`), join(types, "routes.d.ts")]
+  return [join(types, "autoimports", `${componentTarget(rootDirectory, filename)}.d.ts`), join(types, "routes.d.ts"), join(types, "i18n.d.ts")]
     .filter((file) => existsSync(file));
 }
 
@@ -185,7 +186,7 @@ async function prepareStandaloneCheck(source: string, filename: string): Promise
   if (!existsSync(join(root, "app"))) return undefined;
   // Loaded on demand: the project generators import this module.
   const [{ prepareFrameworkTypeDeclarations }, { resolveConfigSources }, { assertRouteBlockPlacement }] = await Promise.all([
-    import("./framework/type-declarations.js"), import("./framework/config.js"), import("./framework/route-block.js"),
+    import("./framework/type-declarations.js"), import("./framework/config.js"), import("./compiler/transforms/route-block.js"),
   ]);
   try { assertRouteBlockPlacement(source, filename, (await resolveConfigSources(root)).map((entry) => entry.root)); }
   catch (error) {
