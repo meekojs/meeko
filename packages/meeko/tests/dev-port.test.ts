@@ -95,3 +95,21 @@ test("a second meeko dev of the same project warns while the first runs, and not
   claimDevelopmentProject(root, (message) => warnings.push(message));
   assert.equal(warnings.length, 1, "a stale record does not warn");
 });
+
+test("a meeko dev without editor bridge notes it in its own record, and only in its own", async (context) => {
+  const { claimDevelopmentProject, developmentLockFile, recordEditorBridgeOff } = await import("../src/framework/dev-lock.ts");
+  const { tempProject } = await import("./helpers/temp-project.ts");
+  const { readFile: read, writeFile: write } = await import("node:fs/promises");
+  const { join: joinPath } = await import("node:path");
+  const root = await tempProject(context, "dev-lock-bridge");
+  const lock = joinPath(root, developmentLockFile);
+  claimDevelopmentProject(root, () => {});
+  const claimed = JSON.parse(await read(lock, "utf8")) as Record<string, unknown>;
+  recordEditorBridgeOff(root, "MEEKO_EDITOR_BRIDGE=0");
+  assert.deepEqual(JSON.parse(await read(lock, "utf8")), { ...claimed, editorBridge: false, editorBridgeReason: "MEEKO_EDITOR_BRIDGE=0" });
+  // Another dev's record, such as the first one of the project, stays as it is.
+  const other = { pid: process.ppid, startedAt: new Date().toISOString() };
+  await write(lock, JSON.stringify(other));
+  recordEditorBridgeOff(root, "MEEKO_EDITOR_BRIDGE=0");
+  assert.deepEqual(JSON.parse(await read(lock, "utf8")), other);
+});

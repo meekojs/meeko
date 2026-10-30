@@ -124,8 +124,9 @@ export default defineApiRoute({ contentType: "response", async handler({ context
   const origin = await new Promise<string>((done, fail) => {
     const start = Date.now();
     const timer = setInterval(() => {
-      const url = logs.match(/http:\/\/127\.0\.0\.1:\d+/)?.[0];
-      if (url) { clearInterval(timer); done(url); }
+      // It listens on 127.0.0.1 and prints localhost, alone on the first line.
+      const port = /^http:\/\/localhost:(\d+)\n/.exec(logs)?.[1];
+      if (port) { clearInterval(timer); done(`http://127.0.0.1:${port}`); }
       else if (child?.exitCode !== null) { clearInterval(timer); fail(new Error(`Node output exited: ${logs}`)); }
       else if (Date.now() - start > 20_000) { clearInterval(timer); fail(new Error(`Node output did not listen: ${logs}`)); }
     }, 25);

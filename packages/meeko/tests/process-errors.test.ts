@@ -78,7 +78,8 @@ async function startServer(root: string, env: Record<string, string> = {}): Prom
       else if (Date.now() - start > 20_000) { clearInterval(timer); fail(new Error(`${pattern} did not appear: ${logs}`)); }
     }, 20);
   });
-  const origin = (await waitFor(/http:\/\/127\.0\.0\.1:\d+/))[0];
+  // The script prints serveNode's url (127.0.0.1); meeko dev listens there too but prints localhost.
+  const origin = `http://127.0.0.1:${(await waitFor(/http:\/\/(?:localhost|127\.0\.0\.1):(\d+)\n/))[1]}`;
   return { child, origin, logs: () => logs, waitFor };
 }
 
@@ -185,7 +186,8 @@ export default defineApiRoute({ contentType: "response", async handler({ context
       else if (Date.now() - start > 30_000) { clearInterval(timer); fail(new Error(`${pattern} did not appear: ${logs}`)); }
     }, 25);
   });
-  await waitFor(new RegExp(origin.replaceAll(".", "\\.")));
+  // meeko dev listens on 127.0.0.1 and prints localhost.
+  await waitFor(new RegExp(`http://localhost:${port}\\n`));
   const response = await fetch(`${origin}/api/floating`);
   assert.equal(response.status, 200, logs);
   const { requestId } = await response.json() as { requestId: string };

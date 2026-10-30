@@ -149,7 +149,7 @@ async function startDev(root: string): Promise<Running> {
   let output = "";
   child.stdout?.on("data", (chunk: Buffer) => { output += chunk.toString(); });
   child.stderr?.on("data", (chunk: Buffer) => { output += chunk.toString(); });
-  await waitFor(() => output.includes(origin), () => `meeko dev did not listen: ${output}`, child, 30_000);
+  await waitFor(() => output.includes(`http://localhost:${port}\n`), () => `meeko dev did not listen: ${output}`, child, 30_000);
   return { child, origin, hmrPort, output: () => output };
 }
 

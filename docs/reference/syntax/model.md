@@ -43,7 +43,7 @@ const plan = signal<string | null>("free");
 | Control | Propiedad y evento | Tipo de la señal |
 | --- | --- | --- |
 | `<input>` de texto (cualquier `type` salvo los siguientes, o `bind:type`) y `<textarea>` | `value`, en `input` | `Signal<string>` |
-| `<input type="checkbox">` | `checked`, en `change` | `Signal<boolean>` |
+| `<input type="checkbox">` | `checked`, en `change` | `Signal<boolean>` o, desde `1.7.1`, `Signal<boolean \| undefined>`: `undefined` se pinta desmarcado y `change` escribe siempre un booleano |
 | `<input type="radio">` | marcado si la señal vale su `value`; `change` escribe ese valor | `Signal<string \| null \| undefined>` |
 | `<select>` | `value`, en `change` | `Signal<string>` |
 | `<select multiple>` | las opciones seleccionadas, en `change` | `Signal<string[]>` |
@@ -54,7 +54,7 @@ La expresión debe ser una **señal escribible**: no su `.value`, ni un `compute
 
 ## Resultado
 
-- **SSR.** El HTML lleva el valor de la señal: `value` en un `<input>`, `checked` en un checkbox o radio, el contenido de un `<textarea>` y `selected` en cada `<option>`.
+- **SSR.** El HTML lleva el valor de la señal: `value` en un `<input>`, `checked` en un checkbox o radio, el contenido de un `<textarea>` y `selected` en cada `<option>`. Un checkbox cuya señal vale `undefined` sale sin `checked`.
 - **Navegador.** Asignar la señal desde código actualiza la propiedad viva del control; cada edición del usuario escribe la señal.
 - **Antes de hidratar.** Si el usuario escribe antes de que la página se hidrate (o el navegador restaura el valor al volver atrás), lo escrito se conserva y se copia a la señal al terminar la hidratación, antes de los `onMounted`.
 - **Componente.** El hijo recibe la misma señal: leer y escribir en el hijo lee y escribe la del padre.
@@ -190,7 +190,7 @@ Con `const upper = computed(() => name.value.toUpperCase())`, `meeko check` da `
 <input type="checkbox" model="accepted">
 ```
 
-Con `signal(0)` y `signal("no")`, `meeko check` da `TS2322: Type 'Signal<number>' is not assignable to type '{ value: string; }'` y `TS2322: Type 'Signal<string>' is not assignable to type '{ value: boolean; }'`.
+Con `signal(0)` y `signal("no")`, `meeko check` da `TS2322: Type 'Signal<number>' is not assignable to type '{ value: string; }'` y `TS2322: Type 'Signal<string>' is not assignable to type '{ value: boolean | undefined; }'`.
 
 ```html good
 <input type="number" model="ageText">

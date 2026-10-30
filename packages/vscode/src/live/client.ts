@@ -5,7 +5,7 @@ import { SseParser, loopbackBridgeUrl } from "./model.js";
 import type { EditorBridgeDescriptor, EditorBridgeEvent, EditorCommandResult, EditorLiveSignal } from "./model.js";
 
 /** `true` si el proceso existe; un error de permisos también indica que existe. */
-function isAlive(pid: number): boolean {
+export function isAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;

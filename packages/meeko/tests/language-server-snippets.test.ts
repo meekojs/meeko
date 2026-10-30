@@ -177,4 +177,14 @@ const user = signal<{ name: string } | null>(null);
     assert.deepEqual(diagnostics.map((item) => [item.code, child.document.getText(item.range)]).sort(), [["TS2322", "'x'"], ["TS2345", "<render"]], JSON.stringify(diagnostics));
     open("Page.meeko", valid);
   });
+
+  test("a checkbox model accepts a boolean | undefined signal, as the field of v.optional(v.boolean(), false)", () => {
+    const source = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const consent = signal<boolean | undefined>(undefined);
+const accepted = signal(false);
+</script>
+<template><input type="checkbox" model="consent" /><input type="checkbox" model="accepted" /></template>`;
+    assert.deepEqual(virtualErrors(open("Consent.meeko", source)), []);
+  });
 });

@@ -70,7 +70,7 @@ npm install
 npm run dev
 ```
 
-Abre `http://127.0.0.1:4173`. `npm run check` genera los tipos del componente y ejecuta TypeScript 7. `npm run build` compila cliente y servidor; `npm start` sirve la versión compilada con SSR. La CLI no sobrescribe archivos de aplicación existentes.
+Abre `http://localhost:4173`. `npm run check` genera los tipos del componente y ejecuta TypeScript 7. `npm run build` compila cliente y servidor; `npm start` sirve la versión compilada con SSR. La CLI no sobrescribe archivos de aplicación existentes.
 
 Si ya ejecutaste `pnpm add @meekojs/meeko` en una carpeta sin código, puedes inicializarla directamente con `pnpm exec meeko init .`. Se conservan el manifiesto, los lockfiles, el workspace y `node_modules`; la CLI rechaza archivos de aplicación o scripts que entrarían en conflicto. Después ejecuta `pnpm install` y `pnpm run dev`. El proyecto generado fija la versión exacta de `@meekojs/meeko`, porque el código compilado y su runtime deben coincidir.
 
@@ -154,7 +154,7 @@ pnpm run package:smoke
 pnpm run example:serve
 ```
 
-`e2e` usa Chrome instalado localmente; `MEEKO_CHROME_PATH` permite indicar otro ejecutable compatible. Prueba Vite en desarrollo y producción, además de una página SSR con navegación. `pilot:e2e` prueba la aplicación piloto en Chromium, Firefox y WebKit instalados por Playwright, tanto en desarrollo como en producción. `package:smoke` instala el tarball en un proyecto temporal externo y prueba CLI, SSR, tipos, Vite y `meeko init`. La última orden sirve el contador en `http://127.0.0.1:4173`.
+`e2e` usa Chrome instalado localmente; `MEEKO_CHROME_PATH` permite indicar otro ejecutable compatible. Prueba Vite en desarrollo y producción, además de una página SSR con navegación. `pilot:e2e` prueba la aplicación piloto en Chromium, Firefox y WebKit instalados por Playwright, tanto en desarrollo como en producción. `package:smoke` instala el tarball en un proyecto temporal externo y prueba CLI, SSR, tipos, Vite y `meeko init`. La última orden sirve el contador en `http://localhost:4173`.
 
 Las demás órdenes de esta sección se ejecutan dentro de `packages/meeko`.
 

@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { createRequire } from "node:module";
+import { join, resolve } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { formatDiagnostic, hasErrors } from "../compiler/sfc.js";
@@ -12,14 +11,14 @@ import { prepareProject } from "./project.js";
 import { assertNoLegacySessionFile } from "./runtime-migration.js";
 import { mapRouteBlockPaths, routeBlockTypeFiles } from "./route-block-types.js";
 import { prepareFrameworkTypeDeclarations, projectNames } from "./type-declarations.js";
+import { tscCommand } from "../typescript-cli.js";
 
 const execute = promisify(execFile);
-const require = createRequire(import.meta.url);
 
 async function checkTypeScript(configs: readonly string[], routeBlocks: ReadonlyMap<string, string>): Promise<void> {
-  const compiler = join(dirname(require.resolve("typescript/package.json")), "bin", "tsc");
   for (const config of configs) {
-    try { await execute(process.execPath, [compiler, "-p", config, "--noEmit"], { windowsHide: true }); }
+    const tsc = tscCommand(["-p", config, "--noEmit"]);
+    try { await execute(tsc.file, tsc.args, { windowsHide: true }); }
     catch (error) {
       const failure = error as Error & { stdout?: string; stderr?: string };
       // Diagnostics in a `<script server>` copy point at the page, on the same line and column.
@@ -35,13 +34,13 @@ async function checkTypeScript(configs: readonly string[], routeBlocks: Readonly
 async function configTypeErrors(root: string): Promise<string[]> {
   const file = ["meeko.config.ts", "meeko.config.mts"].map((name) => join(root, name)).find((candidate) => existsSync(candidate));
   if (!file) return [];
-  const compiler = join(dirname(require.resolve("typescript/package.json")), "bin", "tsc");
+  const tsc = tscCommand([
+    "--noEmit", "--pretty", "false", "--ignoreConfig", "--strict", "--skipLibCheck", "--allowImportingTsExtensions",
+    "--module", "esnext", "--moduleResolution", "bundler", "--target", "es2022", "--lib", "es2022,dom", file,
+  ]);
   let output: string;
   try {
-    await execute(process.execPath, [
-      compiler, "--noEmit", "--pretty", "false", "--ignoreConfig", "--strict", "--skipLibCheck", "--allowImportingTsExtensions",
-      "--module", "esnext", "--moduleResolution", "bundler", "--target", "es2022", "--lib", "es2022,dom", file,
-    ], { cwd: root, windowsHide: true, maxBuffer: 8 * 1024 * 1024 });
+    await execute(tsc.file, tsc.args, { cwd: root, windowsHide: true, maxBuffer: 8 * 1024 * 1024 });
     return [];
   } catch (error) {
     const failure = error as Error & { stdout?: string; stderr?: string };

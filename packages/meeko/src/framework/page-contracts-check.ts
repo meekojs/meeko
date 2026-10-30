@@ -1,16 +1,15 @@
 import { execFile } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import ts from "@typescript/typescript6";
 import { parseSfc } from "../compiler/sfc.js";
 import { frameworkTsconfigPaths, resolveProjectAliases } from "./aliases.js";
 import type { AppTypesOptions } from "./check-app.js";
 import { prepareFrameworkTypeDeclarations } from "./type-declarations.js";
+import { tscCommand } from "../typescript-cli.js";
 
 const execute = promisify(execFile);
-const typescriptPackage = fileURLToPath(import.meta.resolve("typescript/package.json"));
 
 export interface PageContractDiagnostic {
   readonly filename: string;
@@ -90,10 +89,10 @@ export async function checkFrameworkPageContracts(projectRoot: string, options: 
   }, null, 2)}\n`;
   try { if (await readFile(config, "utf8") !== configSource) await writeFile(config, configSource); }
   catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") await writeFile(config, configSource); else throw error; }
-  const compiler = join(dirname(typescriptPackage), "bin", "tsc");
   let output = "";
-  // The language server runs this without a console: a visible window would open on Windows.
-  try { await execute(process.execPath, [compiler, "-p", config, "--noEmit", "--pretty", "false"], { windowsHide: true }); }
+  // The language server runs this without a console: tsc.exe directly, or Windows opens a window.
+  const tsc = tscCommand(["-p", config, "--noEmit", "--pretty", "false"]);
+  try { await execute(tsc.file, tsc.args, { windowsHide: true }); }
   catch (error) {
     const failure = error as Error & { stdout?: string; stderr?: string };
     output = `${failure.stdout ?? ""}${failure.stderr ?? ""}`;

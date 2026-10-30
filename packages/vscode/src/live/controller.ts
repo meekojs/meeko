@@ -1,8 +1,9 @@
 import * as vscode from "vscode";
-import { BridgeConnection } from "./client.js";
+import { readFile } from "node:fs/promises";
+import { BridgeConnection, isAlive } from "./client.js";
 import type { LiveChange } from "./client.js";
-import { bridgeDescriptorGlob, editableValue, groupSignals, hoverMarkdown, inlineText, isWorkspaceBridgeDescriptor, parseEditedValue, placeGroups } from "./model.js";
-import type { EditorLiveSignal, LiveGroup } from "./model.js";
+import { bridgeDescriptorGlob, bridgeOffFromRecord, devServerRecordGlob, editableValue, groupSignals, hoverMarkdown, inlineText, isWorkspaceBridgeDescriptor, isWorkspaceDevServerRecord, liveStatus, parseEditedValue, placeGroups } from "./model.js";
+import type { BridgeOff, EditorLiveSignal, LiveGroup } from "./model.js";
 
 const descriptorGlob = bridgeDescriptorGlob;
 const editCommand = "meeko.live.editSignal";
@@ -41,6 +42,8 @@ export interface MeekoLiveApi {
  */
 export function registerLiveValues(context: vscode.ExtensionContext, output: vscode.LogOutputChannel): MeekoLiveApi {
   const connections = new Map<string, BridgeConnection>();
+  /** `meeko dev` en marcha sin puente, por la ruta de su `.meeko/dev/server.json`. */
+  const bridgesOff = new Map<string, BridgeOff>();
   const flashing = new Map<string, number>();
   const rendered = new Map<string, LiveDecoration[]>();
   let flashTimer: ReturnType<typeof setTimeout> | undefined;
@@ -95,14 +98,13 @@ export function registerLiveValues(context: vscode.ExtensionContext, output: vsc
   const updateStatus = (): void => {
     const live = settings();
     const active = vscode.window.activeTextEditor?.document.languageId === "meeko";
-    if (!live.enabled || (connections.size === 0 && !active)) { status.hide(); statusVisible = false; return; }
-    const connected = [...connections.values()].filter((connection) => connection.isConnected);
-    status.text = connected.length ? "$(pulse) Meeko live: conectado" : "$(debug-disconnect) Meeko live: desconectado";
-    status.tooltip = connected.length
-      ? `Valores en vivo de ${connected.map((connection) => connection.url).join(", ")}. Pulsa para reconectar.`
-      : connections.size
-        ? "meeko dev no responde. Pulsa para reconectar."
-        : "Arranca meeko dev para ver los valores de las señales junto al código.";
+    // A record whose process ended without removing it (a killed meeko dev) no longer counts.
+    for (const [key, off] of bridgesOff) if (!isAlive(off.pid)) bridgesOff.delete(key);
+    if (!live.enabled || (connections.size === 0 && bridgesOff.size === 0 && !active)) { status.hide(); statusVisible = false; return; }
+    const connected = [...connections.values()].filter((connection) => connection.isConnected).map((connection) => connection.url ?? "meeko dev");
+    const shown = liveStatus(connected, connections.size, [...bridgesOff.values()]);
+    status.text = shown.text;
+    status.tooltip = shown.tooltip;
     status.show();
     statusVisible = true;
   };
@@ -190,22 +192,47 @@ export function registerLiveValues(context: vscode.ExtensionContext, output: vsc
   const disconnectAll = (): void => {
     for (const connection of connections.values()) connection.dispose();
     connections.clear();
+    bridgesOff.clear();
     updateStatus();
     scheduleRender();
   };
 
+  /** Lee el registro de un `meeko dev`: desde Meeko 1.7.1 dice si se arrancó sin puente y por qué. */
+  const readRecord = async (uri: vscode.Uri): Promise<void> => {
+    if (!settings().enabled || uri.scheme !== "file" || !isWorkspaceDevServerRecord(vscode.workspace.asRelativePath(uri, false))) return;
+    let off: BridgeOff | undefined;
+    try { off = bridgeOffFromRecord(await readFile(uri.fsPath, "utf8")); }
+    catch { off = undefined; }
+    if (off && isAlive(off.pid)) bridgesOff.set(uri.fsPath, off);
+    else bridgesOff.delete(uri.fsPath);
+    updateStatus();
+  };
+
+  const dropRecord = (uri: vscode.Uri): void => {
+    if (bridgesOff.delete(uri.fsPath)) updateStatus();
+  };
+
   const discover = async (): Promise<void> => {
     if (!settings().enabled) return;
-    const found = await vscode.workspace.findFiles(descriptorGlob, "**/node_modules/**", 50);
+    const [found, records] = await Promise.all([
+      vscode.workspace.findFiles(descriptorGlob, "**/node_modules/**", 50),
+      vscode.workspace.findFiles(devServerRecordGlob, "**/node_modules/**", 50),
+    ]);
     for (const uri of found) connect(uri);
+    await Promise.all(records.map(readRecord));
   };
 
   const watcher = vscode.workspace.createFileSystemWatcher(descriptorGlob);
+  const recordWatcher = vscode.workspace.createFileSystemWatcher(devServerRecordGlob);
   context.subscriptions.push(
     watcher,
     watcher.onDidCreate(connect),
     watcher.onDidChange(connect),
     watcher.onDidDelete(disconnect),
+    recordWatcher,
+    recordWatcher.onDidCreate((uri) => { void readRecord(uri); }),
+    recordWatcher.onDidChange((uri) => { void readRecord(uri); }),
+    recordWatcher.onDidDelete(dropRecord),
     { dispose: () => { disconnectAll(); if (renderTimer) clearTimeout(renderTimer); if (flashTimer) clearTimeout(flashTimer); } },
     vscode.window.onDidChangeVisibleTextEditors(scheduleRender),
     vscode.window.onDidChangeActiveTextEditor(() => { updateStatus(); }),

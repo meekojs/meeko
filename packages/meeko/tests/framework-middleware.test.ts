@@ -146,7 +146,7 @@ test("generated starter discovers app and server middleware in development", { t
   await new Promise<void>((done, fail) => {
     const start = Date.now();
     const timer = setInterval(() => {
-      if (logs.includes(origin)) { clearInterval(timer); done(); }
+      if (logs.includes(`http://localhost:${port}\n`)) { clearInterval(timer); done(); }
       else if (running.exitCode !== null) { clearInterval(timer); fail(new Error(logs)); }
       else if (Date.now() - start > 20_000) { clearInterval(timer); fail(new Error(`Starter did not listen: ${logs}`)); }
     }, 25);

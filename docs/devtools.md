@@ -124,7 +124,7 @@ Cada petición al puente debe cumplir todas estas condiciones; si no, responde `
 - **Sin `Origin`.** Una petición con cabecera `Origin` se rechaza, aunque venga de loopback. Los editores son procesos locales y no la envían; una página abierta en el navegador siempre la envía, así que ninguna puede usar el puente. Además, el plugin de Vite añade `**/.meeko/dev/**` a `server.fs.deny`, así que ninguna página puede leer el descriptor ni su token.
 - **Token.** La cabecera `Authorization: Bearer <token>` lleva el token del descriptor, que se compara en tiempo constante.
 
-`meeko dev` sólo arranca el puente cuando el servidor escucha en loopback o en todas las interfaces (`0.0.0.0` o `::`); en ese caso el descriptor apunta a `127.0.0.1`. Con otra dirección no hay puente. Para desactivarlo, arranque con `MEEKO_EDITOR_BRIDGE=0`:
+`meeko dev` sólo arranca el puente cuando el servidor escucha en loopback o en todas las interfaces (`0.0.0.0` o `::`); en ese caso el descriptor apunta a `127.0.0.1`. Con otra dirección no hay puente. Para desactivarlo, arranque con `MEEKO_EDITOR_BRIDGE=0`; desde `1.7.1`, sin puente `meeko dev` lo dice tras la URL y lo anota en `.meeko/dev/server.json` (`editorBridge: false` y `editorBridgeReason`), y la extensión de VS Code lo muestra en su barra de estado:
 
 ```powershell
 $env:MEEKO_EDITOR_BRIDGE = "0"; npm run dev

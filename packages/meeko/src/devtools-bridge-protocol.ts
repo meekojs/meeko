@@ -26,6 +26,19 @@ export interface EditorBridgeDescriptor {
   startedAt: string;
 }
 
+/**
+ * Contenido de `.meeko/dev/server.json`, el registro del `meeko dev` que sirve el proyecto mientras
+ * se ejecuta. Desde `1.7.1`, `editorBridge: false` indica que ese servidor no publica valores en
+ * vivo (no hay descriptor `editor-bridge-<puerto>.json`) y `editorBridgeReason` explica por qué,
+ * como `MEEKO_EDITOR_BRIDGE=0`; el editor lo muestra en lugar de esperar al descriptor.
+ */
+export interface DevelopmentServerRecord {
+  pid: number;
+  startedAt: string;
+  editorBridge?: false;
+  editorBridgeReason?: string;
+}
+
 /** Valor actual de una señal de una instancia montada en una pestaña del navegador. */
 export interface EditorLiveSignal {
   /** Identidad estable mientras viva la instancia: `pestaña/instancia/nombre`. */

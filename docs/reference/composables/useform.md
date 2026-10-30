@@ -220,6 +220,26 @@ const props = defineProps<{ field: FormField<string>; label: string; type?: stri
 </form>
 ```
 
+### Un checkbox opcional con valor por defecto
+
+Los campos tienen el tipo de la **entrada** del schema, también cuando la clave tiene un valor por defecto. Con `consent: v.optional(v.boolean(), false)`, `form.fields.consent` es `Signal<boolean | undefined>` y `form.field("consent")` es `FormField<boolean | undefined>`, aunque `initial` lo empiece en `false` y `submit` reciba un `boolean`. Desde `1.7.1`, `model` en un `<input type="checkbox">` acepta esa señal y trata `undefined` como desmarcado. Un componente de campo declara el mismo tipo que recibe:
+
+```html
+<!-- app/components/AppCheckbox.meeko -->
+<script lang="ts">
+import type { FormField } from "@meekojs/meeko/framework";
+
+const props = defineProps<{ field: FormField<boolean | undefined>; label: string }>();
+</script>
+
+<template>
+  <label><input type="checkbox" bind:id="props.field.id" bind:name="props.field.name" model="props.field.value"> {props.label}</label>
+  <p if:when="props.field.error.value" bind:id="props.field.errorId">{props.field.error.value}</p>
+</template>
+```
+
+Un `FormField<boolean>` no admite ese campo (`TS2322`): el tipo de salida no puede usarse para el campo, porque el mismo tipo describe un schema cuya entrada admite de verdad `undefined` hasta que el usuario elige.
+
 ### Un formulario que funciona sin JavaScript (desde 1.7)
 
 Con `form` en el endpoint y `action` en `useForm`, el mismo formulario se envía con JSON cuando hay JavaScript y como un `<form method="post">` nativo antes de hidratar o sin él. Cada control lleva el `name` de su campo:

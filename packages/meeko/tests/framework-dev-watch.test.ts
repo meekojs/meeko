@@ -262,7 +262,7 @@ test("meeko dev serves a page added or removed while it runs", { timeout: 60_000
   await new Promise<void>((done, fail) => {
     const start = Date.now();
     const timer = setInterval(() => {
-      if (logs.includes(origin)) { clearInterval(timer); done(); }
+      if (logs.includes(`http://localhost:${port}\n`)) { clearInterval(timer); done(); }
       else if (running.exitCode !== null) { clearInterval(timer); fail(new Error(logs)); }
       else if (Date.now() - start > 20_000) { clearInterval(timer); fail(new Error(`Starter did not listen: ${logs}`)); }
     }, 25);
@@ -321,7 +321,7 @@ test("meeko dev makes a file added to an imports.appDirs folder available", { ti
   await new Promise<void>((done, fail) => {
     const start = Date.now();
     const timer = setInterval(() => {
-      if (logs.includes(origin)) { clearInterval(timer); done(); }
+      if (logs.includes(`http://localhost:${port}\n`)) { clearInterval(timer); done(); }
       else if (running.exitCode !== null) { clearInterval(timer); fail(new Error(logs)); }
       else if (Date.now() - start > 20_000) { clearInterval(timer); fail(new Error(`Starter did not listen: ${logs}`)); }
     }, 25);
@@ -373,7 +373,7 @@ test("meeko dev serves a page added after Vite restarts", { timeout: 60_000 }, a
       await new Promise((done) => setTimeout(done, 50));
     }
   };
-  await until(() => logs.includes(origin) || running.exitCode !== null, () => `meeko dev did not listen: ${logs}`, 30_000);
+  await until(() => logs.includes(`http://localhost:${port}\n`) || running.exitCode !== null, () => `meeko dev did not listen: ${logs}`, 30_000);
   assert.equal(running.exitCode, null, logs);
   const status = async (path: string): Promise<number> => {
     const response = await fetch(`${origin}${path}`, { headers: { accept: "text/html" } });
@@ -436,7 +436,7 @@ test("meeko dev keeps serving pages across Vite restarts", { timeout: 90_000 }, 
     }
   };
   const count = (text: string): number => logs.split(text).length - 1;
-  await until(() => logs.includes(origin) || running.exitCode !== null, () => `meeko dev did not listen: ${logs}`, 30_000);
+  await until(() => logs.includes(`http://localhost:${port}\n`) || running.exitCode !== null, () => `meeko dev did not listen: ${logs}`, 30_000);
   assert.equal(running.exitCode, null, logs);
   const status = async (path: string): Promise<number> => {
     const response = await fetch(`${origin}${path}`, { headers: { accept: "text/html" } });

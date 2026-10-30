@@ -2,10 +2,8 @@ import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { createRequire as createModuleRequire } from "node:module";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
-import { fileURLToPath } from "node:url";
 import { applyAutoImports, compileWithAutoImports, discoverAutoImports } from "./autoimports.js";
 import type { AutoImport } from "./autoimports.js";
 import { aliasCandidates } from "./compiler/aliases.js";
@@ -21,15 +19,9 @@ import { routeBlockTypeSource } from "./framework/route-block-types.js";
 import { pageRouteId } from "./framework/server-script.js";
 import { resolveProjectAliases, resolveProjectAliasesSync } from "./framework/aliases.js";
 import type { ProjectAliases } from "./framework/aliases.js";
+import { tscCommand } from "./typescript-cli.js";
 
 const execFileAsync = promisify(execFile);
-const typescriptPackage = fileURLToPath(import.meta.resolve("typescript/package.json"));
-const tscPath = join(dirname(typescriptPackage), "bin", "tsc");
-// The JS launcher spawns tsc.exe without windowsHide, which flashes a terminal in VS Code.
-const nativeTscPath = process.platform === "win32"
-  ? join(dirname(createModuleRequire(typescriptPackage).resolve(`@typescript/typescript-win32-${process.arch}/package.json`)), "lib", "tsc.exe")
-  : undefined;
-const tscExecutable = nativeTscPath && nativeTscPath.length >= 248 ? `\\\\?\\${nativeTscPath}` : nativeTscPath ?? process.execPath;
 
 interface GeneratedEntry {
   original: string;
@@ -359,12 +351,13 @@ export async function checkSource(source: string, filename: string, options: Che
     const project = resolution ? join(graph.tempDirectory, "tsconfig.json") : undefined;
     if (project) await writeFile(project, JSON.stringify({ compilerOptions: resolution, files }), { encoding: "utf8", flag: "wx" });
     try {
-      const result = await execFileAsync(tscExecutable, [
-        ...(nativeTscPath ? [] : [tscPath]), ...(project ? ["--project", project] : ["--ignoreConfig"]), "--noEmit", "--pretty", "false", "--strict", "--skipLibCheck",
+      const tsc = tscCommand([
+        ...(project ? ["--project", project] : ["--ignoreConfig"]), "--noEmit", "--pretty", "false", "--strict", "--skipLibCheck",
         "--noUncheckedIndexedAccess", "--exactOptionalPropertyTypes", "--verbatimModuleSyntax",
         "--module", "esnext", "--moduleResolution", "bundler", "--target", "es2022",
         "--lib", "es2022,dom", ...(project ? [] : files),
-      ], { cwd: dirname(absolute), maxBuffer: 8 * 1024 * 1024, windowsHide: true });
+      ]);
+      const result = await execFileAsync(tsc.file, tsc.args, { cwd: dirname(absolute), maxBuffer: 8 * 1024 * 1024, windowsHide: true });
       output = result.stdout + result.stderr;
     } catch (error) {
       const failure = error as Error & { stdout?: string; stderr?: string };

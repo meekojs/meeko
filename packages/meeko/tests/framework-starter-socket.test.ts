@@ -174,7 +174,7 @@ test("generated starter serves a real Socket channel and shuts its Node transpor
   await new Promise<void>((done, fail) => {
     const start = Date.now();
     const timer = setInterval(() => {
-      if (logs.includes(origin)) { clearInterval(timer); done(); }
+      if (logs.includes(`http://localhost:${port}\n`)) { clearInterval(timer); done(); }
       else if (running.exitCode !== null) { clearInterval(timer); fail(new Error(`Starter exited before listening: ${logs}`)); }
       else if (Date.now() - start > 20_000) { clearInterval(timer); fail(new Error(`Starter did not listen: ${logs}`)); }
     }, 25);
@@ -203,6 +203,12 @@ test("generated starter serves a real Socket channel and shuts its Node transpor
   const reply = once(peer, "message");
   peer.send(JSON.stringify({ event: "message", payload: { text: "from starter" } }));
   assert.deepEqual(JSON.parse(String((await reply)[0])) as unknown, { event: "message", payload: { text: "from starter" } });
+  // A page opened at the printed localhost reaches the Socket of a server on 127.0.0.1.
+  const printedPeer = new WebSocket(`ws://127.0.0.1:${port}/_meeko/socket/chat`, { headers: { origin: `http://localhost:${port}` } });
+  await once(printedPeer, "open");
+  const printedClosed = once(printedPeer, "close");
+  printedPeer.close();
+  await printedClosed;
   const closed = once(peer, "close");
   const exited = once(running, "exit");
   running.kill("SIGINT");
@@ -237,7 +243,7 @@ test("generated starter reloads edited pages in SSR and Chrome development", { t
   await new Promise<void>((done, fail) => {
     const start = Date.now();
     const timer = setInterval(() => {
-      if (logs.includes(origin)) { clearInterval(timer); done(); }
+      if (logs.includes(`http://localhost:${port}\n`)) { clearInterval(timer); done(); }
       else if (child?.exitCode !== null) { clearInterval(timer); fail(new Error("Starter exited before listening: " + logs)); }
       else if (Date.now() - start > 20_000) { clearInterval(timer); fail(new Error("Starter did not listen: " + logs)); }
     }, 25);
@@ -260,7 +266,8 @@ test("generated starter reloads edited pages in SSR and Chrome development", { t
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
-  await page.goto(origin, { waitUntil: "networkidle" });
+  // The browser opens the URL meeko dev prints; HMR still reaches Vite's socket on 127.0.0.1.
+  await page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" });
   assert.equal(await page.locator("h1").innerText(), "Welcome to Meeko");
   // The global stylesheet loads once, as the server's link, and its imports update it in place.
   const globalSheets = () => page.evaluate(() => [...document.styleSheets].filter((sheet) =>

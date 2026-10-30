@@ -108,7 +108,7 @@ test("meeko dev keeps the editor bridge working after Vite restarts", { timeout:
   let logs = "";
   running.stdout?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
   running.stderr?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
-  await until(() => logs.includes(origin) || running.exitCode !== null, () => `meeko dev did not listen: ${logs}`, 30_000);
+  await until(() => logs.includes(`http://localhost:${port}\n`) || running.exitCode !== null, () => `meeko dev did not listen: ${logs}`, 30_000);
   assert.equal(running.exitCode, null, logs);
 
   const descriptorFile = join(root, editorBridgeFile(port));
@@ -180,4 +180,32 @@ test("meeko dev keeps the editor bridge working after Vite restarts", { timeout:
   assert.equal(editor.open, true, "The editor stream survives the restart");
   assert.equal(events.filter((event) => event.type === "hello").length, 1);
   assert.equal(await readFile(descriptorFile, "utf8"), before);
+});
+
+test("meeko dev with MEEKO_EDITOR_BRIDGE=0 says so after the URL and notes it in .meeko/dev/server.json", { timeout: 60_000 }, async (context) => {
+  let child: ChildProcess | undefined;
+  const root = await tempProject(context, "dev-editor-bridge-off", async () => { await stopChild(child); });
+  await initFrameworkProject(root);
+  await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
+  await symlink(repositoryRoot, join(root, "node_modules", "@meekojs", "meeko"), "junction");
+  await symlink(join(repositoryRoot, "node_modules", "vite"), join(root, "node_modules", "vite"), "junction");
+  const port = await freePort();
+  const hmrPort = await freePort();
+  const running = spawn(process.execPath, [join(repositoryRoot, "dist", "cli.js"), "dev", root], {
+    cwd: root, env: { ...process.env, PORT: String(port), MEEKO_HMR_PORT: String(hmrPort), MEEKO_LINK_WATCH: "0", MEEKO_EDITOR_BRIDGE: "0" }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
+  });
+  child = running;
+  let stdout = "";
+  let stderr = "";
+  running.stdout?.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+  running.stderr?.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
+  const notice = "Valores en vivo del editor desactivados (MEEKO_EDITOR_BRIDGE=0)\n";
+  await until(() => (stdout.includes(`http://localhost:${port}\n`) && stderr.includes(notice)) || running.exitCode !== null, () => `meeko dev did not listen or say it: ${stdout} ${stderr}`, 30_000);
+  assert.equal(running.exitCode, null, stderr);
+  // The editor finds no descriptor and, in its place, the reason in the record of this meeko dev.
+  await assert.rejects(readFile(join(root, editorBridgeFile(port)), "utf8"), { code: "ENOENT" });
+  const record = JSON.parse(await readFile(join(root, ".meeko", "dev", "server.json"), "utf8")) as Record<string, unknown>;
+  assert.equal(record.pid, running.pid);
+  assert.equal(record.editorBridge, false);
+  assert.equal(record.editorBridgeReason, "MEEKO_EDITOR_BRIDGE=0");
 });

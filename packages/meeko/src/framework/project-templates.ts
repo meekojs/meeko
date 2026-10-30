@@ -74,9 +74,10 @@ export function createApp(options: AppHostOptions): Promise<ServerApp> {
 
 /** Node adapter entry; \`meeko build\` bundles it to .meeko/output/node/index.mjs. */
 export const nodeEntrySource = `import { readFile } from "node:fs/promises";
+import { networkInterfaces } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { meekoEnv } from "@meekojs/meeko/internal";
+import { listeningMessage, meekoEnv } from "@meekojs/meeko/internal";
 import { createNodeAssetReader, serveNode } from "@meekojs/meeko/node";
 import type { PrerenderSource, PrerenderedPage } from "@meekojs/meeko/server";
 import { nodeServer } from "virtual:meeko-server-app";
@@ -140,12 +141,14 @@ export async function createNodeApp(options: { readonly prerendering?: boolean }
 export async function start() {
   const app = await createNodeApp();
   const port = meekoEnv(process.env, "PORT");
+  const host = meekoEnv(process.env, "HOST") || nodeServer.host;
   const server = await serveNode(app, {
-    host: meekoEnv(process.env, "HOST") || nodeServer.host,
+    host,
     port: port ? Number(port) : nodeServer.port,
     handleSignals: true,
   });
-  process.stdout.write(server.url + "\\n");
+  // Shows localhost for loopback and the network addresses with 0.0.0.0 or ::; server.url keeps the listening address.
+  process.stdout.write(listeningMessage(host, Number(new URL(server.url).port) || 80, networkInterfaces));
   return server;
 }
 

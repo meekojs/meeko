@@ -28,7 +28,7 @@ meeko dev
 ```
 
 ```text
-http://127.0.0.1:4173
+http://localhost:4173
 ```
 
 El starter de [`meeko init-framework`](/docs/reference/meeko-init-framework) lo declara como `"dev": "meeko dev ."`, así que lo habitual es `npm run dev` o `pnpm dev`.
@@ -42,16 +42,17 @@ El starter de [`meeko init-framework`](/docs/reference/meeko-init-framework) lo 
 | `MEEKO_HOST` | texto | `127.0.0.1` | Dirección en la que escucha. Sustituye a `server.host`. Con `0.0.0.0` acepta conexiones de otras máquinas. `HOST` sigue valiendo, con un aviso, hasta `2.0`. |
 | `MEEKO_PUBLIC_ORIGIN` | origen | ninguno | Origen público para las comprobaciones de `Origin` de HTTP y Socket cuando hay un proxy o un túnel delante. |
 | `MEEKO_HMR_PORT` | número | derivado del puerto HTTP | Puerto del WebSocket de HMR de Vite, que sólo escucha en `127.0.0.1`. |
-| `MEEKO_EDITOR_BRIDGE=0` | `0` | activo | Desactiva el puente con el editor (los valores en vivo de la extensión). |
+| `MEEKO_EDITOR_BRIDGE=0` | `0` | activo | Desactiva el puente con el editor (los valores en vivo de la extensión). Desde `1.7.1`, `meeko dev` lo dice tras la URL y la extensión lo muestra en su barra de estado. |
 | `MEEKO_LINK_WATCH=0` | `0` | activo | Con un `@meekojs/meeko` enlazado (`link:`, `npm link`, un workspace), no reinicia el servidor cuando ese paquete se reconstruye: sólo avisa. |
 
 No admite banderas: `meeko dev --port 3000` termina con `Opción desconocida para dev: --port`. Los puertos y la dirección se indican con variables de entorno, en la shell o en el `.env`.
 
 ## Resultado
 
-- **En la salida estándar**, la URL en la que escucha, como `http://127.0.0.1:4173` (con `MEEKO_HOST=0.0.0.0` muestra `127.0.0.1`). Si no se indicó un puerto y `4173` está ocupado, antes avisa: `[meeko] El puerto 4173 está en uso; meeko dev usa el 4174`.
+- **En la salida estándar**, la URL para abrirla, como `http://localhost:4173`: desde `1.7.1`, una dirección de loopback (`127.0.0.1`, `::1`) o de todas las interfaces (`0.0.0.0`, `::`) se muestra como `localhost`, aunque el servidor siga escuchando en la dirección configurada. Con `0.0.0.0` o `::` añade una línea `Red: http://<IP>:4173` por cada dirección de red; con un host concreto, muestra ese host. La primera línea es siempre la URL local, sola. Si no se indicó un puerto y `4173` está ocupado, antes avisa: `[meeko] El puerto 4173 está en uso; meeko dev usa el 4174`.
+- **En la salida de errores**, sin puente con el editor, desde `1.7.1`, una línea tras la URL con el motivo: `Valores en vivo del editor desactivados (MEEKO_EDITOR_BRIDGE=0)` o, si el servidor escucha en una dirección concreta fuera de loopback, `Valores en vivo del editor desactivados (meeko dev escucha en 192.168.1.5, fuera de loopback)`.
 - **En `.meeko/`**, las entradas `generated/`, los manifiestos, las declaraciones de `types/` y los `tsconfig.*.json` que usa el editor, como `meeko check` pero sin ejecutar TypeScript. Se generan al arrancar: mientras el proceso sigue vivo, los tipos no se regeneran (ejecuta `meeko check`).
-- **En `.meeko/dev/`**, el descriptor `editor-bridge-<puerto>.json` del puente con el editor, que se borra al cerrar con `Ctrl+C`.
+- **En `.meeko/dev/`**, el descriptor `editor-bridge-<puerto>.json` del puente con el editor, que se borra al cerrar con `Ctrl+C`, y `server.json`, el registro del proceso que sirve el proyecto (`pid` y `startedAt`), que también se borra al salir. Sin puente, desde `1.7.1`, ese registro añade `editorBridge: false` y `editorBridgeReason` con el motivo, para que el editor lo explique.
 - **El proceso** sigue en marcha hasta `SIGINT` o `SIGTERM`, que cierran el puente, Socket, HTTP, la aplicación y Vite en ese orden. Un error de arranque termina con código `1` y el mensaje en la salida de errores.
 
 Mientras corre, crear o borrar una página, un layout, un middleware o un módulo de `server/api`, `server/rpc` o `server/socket` vuelve a descubrir las rutas y crea la aplicación de nuevo, sin reiniciar el proceso. Cambiar `meeko.config.ts`, el `setup` de un módulo o un canal Socket existente exige reiniciar.
@@ -67,7 +68,7 @@ MEEKO_PORT=3000
 
 ```sh
 meeko dev
-# http://127.0.0.1:3000
+# http://localhost:3000
 ```
 
 Una variable de la shell gana al `.env`: `MEEKO_PORT=3100 meeko dev` usa el `3100` aunque el `.env` diga otra cosa.
@@ -79,18 +80,20 @@ Sin puerto con nombre, el segundo `meeko dev` toma el siguiente libre en lugar d
 ```sh
 # terminal 1, en ./tienda
 meeko dev
-# http://127.0.0.1:4173
+# http://localhost:4173
 
 # terminal 2, en ./panel
 meeko dev
 # [meeko] El puerto 4173 está en uso; meeko dev usa el 4174
-# http://127.0.0.1:4174
+# http://localhost:4174
 ```
 
 ### Probar desde el móvil en la red local
 
 ```sh
 MEEKO_HOST=0.0.0.0 meeko dev
+# http://localhost:4173
+# Red: http://192.168.1.20:4173
 ```
 
 En PowerShell:
@@ -99,7 +102,7 @@ En PowerShell:
 $env:MEEKO_HOST = "0.0.0.0"; meeko dev
 ```
 
-El móvil abre `http://<IP del equipo>:4173`. El WebSocket de HMR y los logs del servidor siguen escuchando sólo en `127.0.0.1`: el navegador del móvil no recibe HMR ni los logs en su consola.
+El móvil abre la URL de la línea `Red:`. El WebSocket de HMR y los logs del servidor siguen escuchando sólo en `127.0.0.1`: el navegador del móvil no recibe HMR ni los logs en su consola.
 
 ### Tras un túnel o un proxy HTTPS
 

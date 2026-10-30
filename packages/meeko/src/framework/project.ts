@@ -4,6 +4,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { Server } from "node:http";
+import { networkInterfaces } from "node:os";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { InlineConfig, Plugin, ViteDevServer } from "vite";
@@ -14,6 +15,8 @@ import type { AssetManifest, AssetRecord } from "../framework-server/assets.js";
 import { reportServerError } from "../framework-server/contracts.js";
 import { handleProcessErrors, processErrorObserver } from "../framework-server/process-errors.js";
 import { meekoEnv } from "../framework-server/env.js";
+import { visibleHost } from "../framework-server/fetch-host.js";
+import { listeningMessage } from "../framework-server/listen-address.js";
 import { buildDataFile, frameworkClientEntry, frameworkNodeEntry, frameworkServerEntry } from "./app-manifest.js";
 import type { BuildAppData } from "./app-manifest.js";
 import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./config.js";
@@ -32,7 +35,8 @@ import type { MeekoAdapterName } from "./config-type.js";
 import { prerenderForBuild } from "./prerender.js";
 import { bunEntrySource, cloudflareEntrySource, denoEntrySource } from "./adapter-templates.js";
 import { cloudflareAssetsDirectory, cloudflarePrerenderDirectory, resolveWrangler, wranglerConfig, wranglerSource } from "./cloudflare-build.js";
-import { editorBridgeHost, startEditorBridge } from "./editor-bridge.js";
+import { editorBridgeHost, editorBridgeOffReason, startEditorBridge } from "./editor-bridge.js";
+import { recordEditorBridgeOff } from "./dev-lock.js";
 import { createDevServerLogs } from "./dev-server-logs.js";
 import type { DevServerLogs } from "./dev-server-logs.js";
 import type { EditorBridge } from "./editor-bridge.js";
@@ -683,10 +687,12 @@ async function startDevelopment(root: string): Promise<Server> {
       }
       devServer.middlewares(request, response, () => listener(request, response));
     });
-    const visibleHost = host === "0.0.0.0" ? "127.0.0.1" : host;
+    // The Socket handshake keeps the listening address as its identity; upgrade.ts accepts the
+    // other loopback names, so a page opened at the printed localhost connects too.
+    const listeningOrigin = `http://${visibleHost(host)}:${port}`;
     const attachSocket = (running: ServerApp): ReturnType<typeof attachNodeWebSocketServer> | undefined => running.socket ? attachNodeWebSocketServer({
       server: httpServer, hub: running.socket.hub,
-      publicOrigin: origin ?? `http://${visibleHost.includes(":") ? `[${visibleHost}]` : visibleHost}:${port}`,
+      publicOrigin: origin ?? listeningOrigin,
       pathnamePrefix: running.socket.pathnamePrefix,
       ...(running.socket.maxMessageBytes === undefined ? {} : { maxMessageBytes: running.socket.maxMessageBytes }),
       onError: (error) => reportError(error, randomUUID()),
@@ -753,13 +759,18 @@ async function startDevelopment(root: string): Promise<Server> {
     });
     // Live values for local editors, only in development and only when this server listens on loopback.
     const address = httpServer.address();
-    const bridgeHost = address && typeof address !== "string" && process.env.MEEKO_EDITOR_BRIDGE !== "0" ? editorBridgeHost(address.address) : undefined;
+    // Without a bridge, the reason is said after the URL and noted in `.meeko/dev/server.json`, so the
+    // editor can explain it instead of only finding no descriptor.
+    const bridgeOff = address && typeof address !== "string" ? editorBridgeOffReason(process.env.MEEKO_EDITOR_BRIDGE, address.address) : undefined;
+    const bridgeHost = address && typeof address !== "string" && !bridgeOff ? editorBridgeHost(address.address) : undefined;
     if (bridgeHost && address && typeof address !== "string") {
       try {
         bridge = await startEditorBridge({ root, origin: `http://${bridgeHost}:${address.port}`, hot: () => devServer.ws });
       } catch (error) {
         // The application keeps running without live values in the editor.
-        process.stderr.write(`[meeko] editor bridge unavailable: ${error instanceof Error ? error.message : String(error)}\n`);
+        const message = error instanceof Error ? error.message : String(error);
+        process.stderr.write(`[meeko] editor bridge unavailable: ${message}\n`);
+        recordEditorBridgeOff(root, `el puente no arrancó: ${message}`);
       }
     }
     // In the background: the first request shares the transform instead of waiting for it.
@@ -799,7 +810,11 @@ async function startDevelopment(root: string): Promise<Server> {
     developmentPorts.set(httpServer, { port: address && typeof address !== "string" ? address.port : port, hmrPort });
     process.once("SIGINT", shutdown);
     process.once("SIGTERM", shutdown);
-    process.stdout.write(`http://${visibleHost.includes(":") ? `[${visibleHost}]` : visibleHost}:${port}\n`);
+    process.stdout.write(listeningMessage(host, port, networkInterfaces));
+    if (bridgeOff) {
+      process.stderr.write(`Valores en vivo del editor desactivados (${bridgeOff})\n`);
+      recordEditorBridgeOff(root, bridgeOff);
+    }
     return httpServer;
   } catch (error) {
     serverLogs?.close();

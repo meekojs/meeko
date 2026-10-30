@@ -33,7 +33,7 @@ Con `meeko dev` en marcha y la página abierta en el navegador, la extensión mu
 - **Conexión.** Cada `meeko dev` escribe su descriptor `.meeko/dev/editor-bridge-<puerto>.json`; la extensión se conecta a todos los que encuentra, con el token de cada sesión, así que funcionan varios `meeko dev` a la vez. Sólo acepta direcciones de loopback y se reconecta sola cuando `meeko dev` se reinicia. Al conectarse espera un instante el estado de las pestañas abiertas, de modo que los valores aparecen sin recargar la página.
 - **Confianza.** Sólo funciona en workspaces de confianza.
 
-`meeko dev` no publica valores si se arranca con `MEEKO_EDITOR_BRIDGE=0` o si escucha en una dirección que no es de loopback. El protocolo y sus reglas de seguridad se describen en [docs/devtools.md](https://github.com/meekojs/meeko/blob/main/docs/devtools.md#puente-del-editor).
+`meeko dev` no publica valores si se arranca con `MEEKO_EDITOR_BRIDGE=0` o si escucha en una dirección que no es de loopback. Con Meeko 1.7.1 o posterior, mientras ese `meeko dev` sigue en marcha, el indicador muestra **Meeko live: desactivado en meeko dev**, con el motivo y cómo activarlo en el tooltip (por ejemplo, quitar `MEEKO_EDITOR_BRIDGE=0` del `.env` y reiniciar `meeko dev`). El protocolo y sus reglas de seguridad se describen en [docs/devtools.md](https://github.com/meekojs/meeko/blob/main/docs/devtools.md#puente-del-editor).
 
 ## Primeros pasos
 

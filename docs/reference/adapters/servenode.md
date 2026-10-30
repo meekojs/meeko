@@ -57,7 +57,7 @@ Una promesa con un `NodeServer`:
 | Miembro | Descripción |
 | --- | --- |
 | `server` | El `http.Server` de Node. |
-| `url` | La URL local, como `http://127.0.0.1:4173` (con `0.0.0.0`, la de loopback). |
+| `url` | La URL local con la dirección en la que escucha, como `http://127.0.0.1:4173` (con `0.0.0.0`, la de loopback). No cambia en `1.7.1`: `meeko start` y la salida de Node *muestran* `http://localhost:4173`, pero `url` sigue siendo la dirección real y la identidad de Socket sin `publicOrigin`. |
 | `close()` | Cierra, por este orden, los peers de Socket, HTTP (con `shutdownTimeout`), las tareas de `waitUntil` y la aplicación. Es idempotente. |
 
 Si el servidor arranca pero falla la conexión de Socket, libera el puerto y cierra la aplicación antes de rechazar.

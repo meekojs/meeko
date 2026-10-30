@@ -167,6 +167,39 @@ test("model on native controls hydrates and syncs both directions", async () => 
   }
 });
 
+test("a checkbox model of boolean | undefined renders undefined unchecked and writes a boolean", async () => {
+  const optional = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const consent = signal<boolean | undefined>(undefined);
+</script>
+<template><form><input class="consent" type="checkbox" model="consent" /><output>{String(consent.value)}</output><button type="button" class="clear" on:click="() => { consent.value = undefined; }">clear</button></form></template>`;
+  const { component, cleanup } = await load({ Optional: optional }, "Optional");
+  const window = new Window();
+  try {
+    const root = window.document.createElement("main");
+    root.innerHTML = component.renderToString({});
+    const box = root.querySelector("input.consent") as unknown as HTMLInputElement;
+    const output = (): string => root.querySelector("output")?.textContent ?? "";
+    assert.equal(box.hasAttribute("checked"), false);
+    const release = component.hydrate(root as unknown as Element, {});
+    assert.equal(box.checked, false);
+    assert.equal(output(), "undefined");
+    box.checked = true;
+    fire(window, box as unknown as Element, "change");
+    assert.equal(output(), "true");
+    (root.querySelector("button.clear") as unknown as HTMLButtonElement).click();
+    assert.equal(box.checked, false);
+    assert.equal(output(), "undefined");
+    box.checked = false;
+    fire(window, box as unknown as Element, "change");
+    assert.equal(output(), "false");
+    release();
+  } finally {
+    window.happyDOM.abort();
+    await cleanup();
+  }
+});
+
 test("a control edited before hydration keeps the user's value", async () => {
   const { component, cleanup } = await load({ Controls: controls }, "Controls");
   const window = new Window();
@@ -488,6 +521,7 @@ test("meeko check types models: names, value types, writability and required one
     { name: "Plain", source: parentWith(`<Child model="name.value" />`), codes: ["TS2322"], at: "model=" },
     { name: "NativeText", source: parentWith(`<input model="number" />`), codes: ["TS2322"], at: `number" />` },
     { name: "NativeCheckbox", source: parentWith(`<input type="checkbox" model="name" />`), codes: ["TS2322"], at: `name" />` },
+    { name: "NativeCheckboxOptional", source: parentWith(`<input type="checkbox" model="consent" />`, "const consent = signal<boolean | undefined>(undefined);\n"), codes: [] },
     { name: "NativeMultiple", source: parentWith(`<select multiple model="name"></select>`), codes: ["TS2322"], at: `name"></select>` },
     { name: "NativeComputed", source: parentWith(`<input model="derived" />`), codes: ["TS2345"], at: `derived" />` },
     { name: "NativeDynamicType", source: parentWith(`<input bind:type="flag.value ? 'text' : 'password'" model="name" />`), codes: [] },

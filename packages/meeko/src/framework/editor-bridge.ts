@@ -133,6 +133,16 @@ export function editorBridgeHost(address: string): string | undefined {
   return isIP(bare) === 6 ? `[${bare}]` : bare;
 }
 
+/**
+ * Why `meeko dev` starts no editor bridge on `address`, or `undefined` when it starts one: the
+ * `MEEKO_EDITOR_BRIDGE=0` setting, or an address outside loopback, where its token would be exposed.
+ */
+export function editorBridgeOffReason(setting: string | undefined, address: string): string | undefined {
+  if (setting === "0") return "MEEKO_EDITOR_BRIDGE=0";
+  if (editorBridgeHost(address) === undefined) return `meeko dev escucha en ${address}, fuera de loopback`;
+  return undefined;
+}
+
 function digest(value: string): Buffer {
   return createHash("sha256").update(value).digest();
 }

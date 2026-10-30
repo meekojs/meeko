@@ -1,5 +1,11 @@
 # Cambios de Meeko Language
 
+## [1.7.1] - 2026-10-29
+
+- «Meeko live» explica un `meeko dev` sin puente: si el `meeko dev` del proyecto se arrancó con `MEEKO_EDITOR_BRIDGE=0` (o escucha fuera de loopback), la barra de estado muestra «Meeko live: desactivado en meeko dev», con el motivo y cómo activarlo en el tooltip, en lugar de «desconectado». Lo lee de `.meeko/dev/server.json`, que escribe Meeko 1.7.1 o posterior.
+- En Windows, el servidor de lenguaje incluido ya no abre una ventana de consola cada pocos segundos al editar un `.meeko`: las comprobaciones de los contratos de páginas y del proyecto ejecutan `tsc.exe` directamente y ocultas.
+- `model` en un `<input type="checkbox">` acepta una señal `boolean | undefined`, como el campo de `useForm` de `v.optional(v.boolean(), false)`, sin el `TS2322` que daba el editor; es el tipo de Meeko 1.7.1.
+
 ## [1.7.0] - 2026-10-29
 
 - `context.services` tipado de Meeko 1.7: el editor incluye `.meeko/types/services.d.ts` en los programas de las páginas y del código de servidor, así que `usePage().context.services.db`, los handlers de API, RPC y Socket y el middleware de ruta de servidor completan y comprueban los servicios que devuelve `server/runtime.ts`, sin `as unknown as`.

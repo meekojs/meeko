@@ -150,7 +150,8 @@ const server = createServer(async (request, response) => {
 });
 
 const port = Number(process.env.MEEKO_PORT || process.env.PORT || 4173);
-server.listen(port, "127.0.0.1", () => console.log("http://127.0.0.1:" + port));
+// It listens on loopback only; the address it prints is the name a browser opens.
+server.listen(port, "127.0.0.1", () => console.log("http://localhost:" + port));
 let shutdownPromise;
 const closeServer = () => new Promise((resolveClose, rejectClose) => {
   server.close((error) => error ? rejectClose(error) : resolveClose());
@@ -188,7 +189,7 @@ npm install
 npm run dev
 \`\`\`
 
-Abre http://127.0.0.1:4173. El servidor produce HTML y transfiere las props y señales al navegador.
+Abre http://localhost:4173. El servidor produce HTML y transfiere las props y señales al navegador.
 
 \`npm run check\` genera los tipos del componente y comprueba TypeScript. \`npm run build\` compila cliente y servidor; \`npm start\` sirve ambas compilaciones con SSR.
 `,

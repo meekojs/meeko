@@ -14,7 +14,7 @@ import { connectLiveBridge, disconnectLiveBridge } from "../src/devtools-live.ts
 import type { LiveHotContext } from "../src/devtools-live.ts";
 import { registerDevtoolsInstance } from "../src/devtools.ts";
 import {
-  editorBridgeDirectory, editorBridgeFile, editorBridgeFilePattern, editorBridgeHost, editorBridgePath, startEditorBridge,
+  editorBridgeDirectory, editorBridgeFile, editorBridgeFilePattern, editorBridgeHost, editorBridgeOffReason, editorBridgePath, startEditorBridge,
 } from "../src/framework/editor-bridge.ts";
 import type { EditorBridge, EditorBridgeHotChannel, EditorBridgeHotClient, EditorBridgeOptions } from "../src/framework/editor-bridge.ts";
 import { signal } from "../src/reactivity.ts";
@@ -553,6 +553,15 @@ test("el puente sólo se publica en loopback", async () => {
   assert.equal(editorBridgeHost("::ffff:10.0.0.1"), undefined);
   const { channel } = fakeHot();
   await assert.rejects(startEditorBridge({ root: tmpdir(), origin: "http://192.168.1.5:4173", hot: channel }), /loopback/);
+});
+
+test("meeko dev dice por qué no arranca el puente: MEEKO_EDITOR_BRIDGE=0 o una dirección fuera de loopback", () => {
+  assert.equal(editorBridgeOffReason(undefined, "127.0.0.1"), undefined);
+  assert.equal(editorBridgeOffReason("1", "0.0.0.0"), undefined);
+  assert.equal(editorBridgeOffReason("", "::1"), undefined);
+  assert.equal(editorBridgeOffReason("0", "127.0.0.1"), "MEEKO_EDITOR_BRIDGE=0");
+  assert.equal(editorBridgeOffReason("0", "192.168.1.5"), "MEEKO_EDITOR_BRIDGE=0");
+  assert.equal(editorBridgeOffReason(undefined, "192.168.1.5"), "meeko dev escucha en 192.168.1.5, fuera de loopback");
 });
 
 test("el plugin de Vite conecta el puente sólo en módulos .meeko servidos en desarrollo", async () => {

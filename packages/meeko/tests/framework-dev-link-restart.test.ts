@@ -97,7 +97,9 @@ test("meeko dev restarts when a linked Meeko is rebuilt", { timeout: 240_000 }, 
   const port = Number(moved.exec(logs)?.[1]);
   assert.ok(port > 4173, logs);
   const origin = `http://127.0.0.1:${port}`;
-  await until(() => logs.includes(`${origin}\n`) || running.exitCode !== null, () => `meeko dev did not listen: ${logs}`, 60_000);
+  // meeko dev listens on 127.0.0.1 and prints localhost.
+  const printed = `http://localhost:${port}\n`;
+  await until(() => logs.includes(printed) || running.exitCode !== null, () => `meeko dev did not listen: ${logs}`, 60_000);
   assert.equal(running.exitCode, null, logs);
   const descriptorFile = join(app, editorBridgeFile(port));
   const pid = async () => (JSON.parse(await readFile(descriptorFile, "utf8")) as EditorBridgeDescriptor).pid;
@@ -124,8 +126,8 @@ test("meeko dev restarts when a linked Meeko is rebuilt", { timeout: 240_000 }, 
   await until(serves, () => `The restarted server does not answer on ${origin}: ${logs}`);
   assert.equal(isAlive(first), false, "The previous server exited");
   assert.equal(count(logs, restartLine), 1, logs);
-  assert.equal(count(logs, `${origin}\n`), 2, logs);
-  assert.doesNotMatch(logs, /http:\/\/127\.0\.0\.1:4173\n/);
+  assert.equal(count(logs, printed), 2, logs);
+  assert.doesNotMatch(logs, /http:\/\/localhost:4173\n/);
   assert.match(await (await fetch(`${origin}/@vite/client`)).text(), new RegExp(`const hmrPort = ${hmrPortFor(port)};`));
   await new Promise((done) => setTimeout(done, 1500));
   assert.equal(count(logs, restartLine), 1, `The build settled into one restart: ${logs}`);
@@ -140,7 +142,7 @@ test("meeko dev restarts when a linked Meeko is rebuilt", { timeout: 240_000 }, 
   assert.equal(isAlive(second), false);
   // The build finishes: the next server listens on the same port.
   await writeFile(partial, complete);
-  await until(async () => count(logs, `${origin}\n`) === 3 && await serves(), () => `No server after the build completed: ${logs}`, 60_000);
+  await until(async () => count(logs, printed) === 3 && await serves(), () => `No server after the build completed: ${logs}`, 60_000);
   const third = await pid();
   lastPid = third;
   assert.notEqual(third, second);
@@ -289,7 +291,8 @@ async function rebuild(meeko: string, marker: string): Promise<void> {
   }
 }
 
-const listening = /http:\/\/127\.0\.0\.1:(\d+)\n/;
+/** The URL meeko dev prints: localhost, although it listens on 127.0.0.1. */
+const listening = /http:\/\/localhost:(\d+)\n/;
 
 // The scenario of an app that consumes Meeko through `link:` and runs `cmd /c meeko dev .`: the
 // shim reaches the CLI through the junction, the supervisor sees the link, reading the build does
@@ -301,7 +304,9 @@ test("meeko dev launched through the bin of a linked Meeko serves one build afte
   running = dev.process;
   await until(() => listening.test(dev.logs()) || running?.exitCode !== null, () => `meeko dev did not listen: ${dev.logs()}`, 90_000);
   assert.equal(running.exitCode, null, dev.logs());
-  const origin = `http://127.0.0.1:${listening.exec(dev.logs())?.[1]}`;
+  const port = listening.exec(dev.logs())?.[1];
+  const origin = `http://127.0.0.1:${port}`;
+  const printed = `http://localhost:${port}\n`;
   assert.equal(await serverBuild(origin), "build-1", dev.logs());
   assert.equal(await clientBuild(origin), "build-1", dev.logs());
   // Loading and serving the build only reads it.
@@ -310,14 +315,14 @@ test("meeko dev launched through the bin of a linked Meeko serves one build afte
 
   await rebuild(linked.meeko, "build-2");
   await until(async () => {
-    if (count(dev.logs(), `${origin}\n`) < 2) return false;
+    if (count(dev.logs(), printed) < 2) return false;
     try { return await serverBuild(origin) === "build-2"; } catch { return false; }
   }, () => `No server with the new build: ${dev.logs()}`, 90_000);
   assert.equal(await clientBuild(origin), "build-2", dev.logs());
   assert.equal(count(dev.logs(), restartLine), 1, dev.logs());
   await pause(1500);
   assert.equal(count(dev.logs(), restartLine), 1, `The rebuild settled into one restart: ${dev.logs()}`);
-  assert.equal(count(dev.logs(), `${origin}\n`), 2, dev.logs());
+  assert.equal(count(dev.logs(), printed), 2, dev.logs());
 });
 
 // MEEKO_LINK_WATCH=0 in the app's `.env` keeps one process: its server stays on the build it loaded,
@@ -330,7 +335,8 @@ test("meeko dev with MEEKO_LINK_WATCH=0 says to restart it when the linked Meeko
   running = dev.process;
   await until(() => listening.test(dev.logs()) || running?.exitCode !== null, () => `meeko dev did not listen: ${dev.logs()}`, 90_000);
   assert.equal(running.exitCode, null, dev.logs());
-  const origin = `http://127.0.0.1:${listening.exec(dev.logs())?.[1]}`;
+  const port = listening.exec(dev.logs())?.[1];
+  const origin = `http://127.0.0.1:${port}`;
   assert.equal(await serverBuild(origin), "build-1", dev.logs());
 
   const warning = `[meeko] Meeko enlazado cambió (${join(linked.meeko, "dist")}), pero este meeko dev no se reinicia solo (MEEKO_LINK_WATCH=0): `
@@ -342,7 +348,7 @@ test("meeko dev with MEEKO_LINK_WATCH=0 says to restart it when the linked Meeko
   await pause(1500);
   assert.equal(count(dev.logs(), warning), 1, `One warning per build: ${dev.logs()}`);
   assert.equal(count(dev.logs(), restartLine), 0, dev.logs());
-  assert.equal(count(dev.logs(), `${origin}\n`), 1, dev.logs());
+  assert.equal(count(dev.logs(), `http://localhost:${port}\n`), 1, dev.logs());
   // The reason for the warning: the same process still renders with the build it loaded.
   assert.equal(await serverBuild(origin), "build-1", dev.logs());
 });
@@ -380,5 +386,5 @@ test("meeko dev with an explicit port in use fails with a clear message", { time
   assert.equal(code, 1, logs);
   assert.match(logs, new RegExp(`El puerto ${port} de 127\\.0\\.0\\.1 ya está en uso; usa MEEKO_PORT=<otro puerto> o cierra el otro meeko dev`));
   assert.doesNotMatch(logs, /WebSocket server error/);
-  assert.doesNotMatch(logs, /http:\/\/127\.0\.0\.1:/);
+  assert.doesNotMatch(logs, /http:\/\/localhost:/);
 });

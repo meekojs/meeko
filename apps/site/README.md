@@ -10,7 +10,7 @@ Depende del Meeko de este repositorio con `workspace:*`, así que usa su `dist/`
 pnpm install                         # en la raíz del repositorio: instala todo el workspace
 pnpm run build                       # en la raíz: compila packages/meeko/dist/
 cd apps/site
-pnpm run dev                         # http://127.0.0.1:4173
+pnpm run dev                         # http://localhost:4173
 pnpm run check                       # meeko check
 pnpm run build                       # sitio estático en .meeko/output/static y dist-static/
 pnpm run preview                     # build y meeko preview (sirve la salida como un hosting estático)

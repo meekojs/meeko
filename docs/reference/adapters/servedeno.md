@@ -58,7 +58,7 @@ Una promesa con un `DenoServer`:
 
 | Miembro | Descripción |
 | --- | --- |
-| `url` | La URL local, como `http://127.0.0.1:4173`. |
+| `url` | La URL local con la dirección en la que escucha, como `http://127.0.0.1:4173`. La salida de `meeko build --adapter deno` *muestra* `http://localhost:4173` desde `1.7.1`; `url` no cambia. |
 | `finished` | Se resuelve cuando el servidor HTTP se ha detenido. |
 | `close()` | Cierra los peers de Socket con `1001`, detiene HTTP, espera las tareas de `waitUntil` y cierra la aplicación, por ese orden. Durante el cierre, las peticiones nuevas reciben `503`. |
 

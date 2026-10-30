@@ -217,6 +217,30 @@ test("a hostile return or redirect never leaves the site", async () => {
   await server.close();
 });
 
+test("return arrives the same raw, encoded, multipart or absolute; a Windows path rewritten by the shell is not a path", async () => {
+  const server = await app();
+  const expect = async (response: Response, location: string, label: string) => {
+    assert.equal(response.status, 303, label);
+    assert.equal(response.headers.get("location"), location, label);
+    assert.equal(flashOf(flashCookie(response)).p, new URL(location, origin).pathname, `${label} (flash)`);
+  };
+  // A `/` without encoding is what curl and many clients send; browsers send `%2F`.
+  await expect(await server.fetch(post("/api/feedback", "page=%2Fdocs&rating=1&return=/docs?tab=one")), "/docs?tab=one", "urlencoded raw");
+  await expect(await server.fetch(post("/api/feedback", "page=%2Fdocs&rating=1&return=%2Fdocs%3Ftab%3Done")), "/docs?tab=one", "urlencoded encoded");
+  await expect(await server.fetch(post("/api/feedback", "rating=9&return=/docs")), "/docs", "urlencoded raw, failed");
+  const multipart = new FormData();
+  multipart.set("page", "/docs");
+  multipart.set("rating", "1");
+  multipart.set("return", "/docs");
+  await expect(await server.fetch(post("/api/feedback", multipart)), "/docs", "multipart");
+  await expect(await server.fetch(post("/api/feedback", `page=%2Fdocs&rating=1&return=${origin}/docs`)), "/docs", "absolute raw");
+  // Git Bash rewrites `return=/docs` into this before curl sends it: a `c:` scheme, so `/`.
+  for (const hostile of ["C:/Program Files/Git/docs", "//evil.example/x", "/\\evil.example", "/./docs/../..//evil.example", "/%2e%2e//evil.example", "https:evil.example"]) {
+    await expect(await server.fetch(post("/api/feedback", `page=%2Fdocs&rating=1&return=${hostile}`)), "/", hostile);
+  }
+  await server.close();
+});
+
 test("a validation error returns with its issues and values, the SSR page shows them once, and hydration keeps them", async () => {
   received.length = 0;
   const server = await app();

@@ -253,8 +253,9 @@ export default defineServerRouteMiddleware(({ session, url }) => {
   const origin = await new Promise<string>((done, fail) => {
     const start = Date.now();
     const timer = setInterval(() => {
-      const url = /http:\/\/127\.0\.0\.1:\d+/.exec(logs)?.[0];
-      if (url) { clearInterval(timer); done(url); }
+      // It listens on 127.0.0.1 and prints localhost.
+      const port = /http:\/\/localhost:(\d+)\n/.exec(logs)?.[1];
+      if (port) { clearInterval(timer); done(`http://127.0.0.1:${port}`); }
       else if (running.exitCode !== null) { clearInterval(timer); fail(new Error(`Server exited: ${logs}`)); }
       else if (Date.now() - start > 30_000) { clearInterval(timer); fail(new Error(`Server did not listen: ${logs}`)); }
     }, 25);

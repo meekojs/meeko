@@ -8,6 +8,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import WebSocket from "ws";
+import { createBunServer } from "../src/bun.ts";
+import type { BunServerLike } from "../src/bun.ts";
 import {
   createServerApp, defineApiRoute, defineRpc, defineServerMiddleware, defineServerRuntime, defineSocketChannel,
   MemorySessionStore, SessionManager,
@@ -273,6 +275,28 @@ test("serveNode binds the requested host, defaults to loopback and closes the ap
     await namedServer.close();
   }
   await assert.rejects(serveNode((await fixture()).app, { port: 70000 }), /Invalid port: 70000/);
+});
+
+test("Bun's Socket handshake keeps the listening address and accepts the localhost that is printed", async () => {
+  const { app } = await fixture();
+  const bun = createBunServer(app, { platform: platform({}) });
+  try {
+    for (const listening of ["http://0.0.0.0:4173/", "http://127.0.0.1:4173/"]) {
+      const handshake = async (origin: string): Promise<number | undefined> => {
+        let upgraded = false;
+        const server: BunServerLike = { url: new URL(listening), upgrade: () => { upgraded = true; return true; } };
+        const response = await bun.fetch(new Request("http://127.0.0.1:4173/_meeko/socket/chat", { headers: { upgrade: "websocket", origin } }), server);
+        return upgraded ? 101 : response?.status;
+      };
+      assert.equal(await handshake("http://localhost:4173"), 101, listening);
+      assert.equal(await handshake("http://127.0.0.1:4173"), 101, listening);
+      assert.equal(await handshake("http://[::1]:4173"), 101, listening);
+      assert.equal(await handshake("http://localhost:4174"), 403, listening);
+      assert.equal(await handshake("http://evil.test"), 403, listening);
+    }
+  } finally {
+    await app.close();
+  }
 });
 
 test("toNodeListener builds URLs from publicOrigin and rejects absolute targets outside it", async () => {

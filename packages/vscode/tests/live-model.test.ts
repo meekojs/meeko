@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  SseParser, aliasDescription, bridgeDescriptorGlob, editableValue, fileKey, formatValue, groupSignals, hoverMarkdown, inlineText, isWorkspaceBridgeDescriptor, loopbackBridgeUrl, parseEditedValue, placeGroups, previewValue,
+  SseParser, aliasDescription, bridgeDescriptorGlob, bridgeOffFromRecord, devServerRecordGlob, editableValue, fileKey, formatValue, groupSignals, hoverMarkdown, inlineText, isWorkspaceBridgeDescriptor, isWorkspaceDevServerRecord, liveStatus, loopbackBridgeUrl, parseEditedValue, placeGroups, previewValue,
 } from "../src/live/model.js";
 import type { EditorLiveSignal } from "../src/live/model.js";
 
@@ -135,4 +135,31 @@ test("lee eventos SSE partidos en trozos y omite comentarios", () => {
   parser.push("lo\ndata: {\"a\":1}\r\n\r\n");
   parser.push("data: x\ndata: y\n\n");
   assert.deepEqual(events, [["hello", "{\"a\":1}"], ["message", "x\ny"]]);
+});
+
+test("el registro de meeko dev dice si se arrancó sin puente, sólo en proyectos del workspace", () => {
+  assert.equal(devServerRecordGlob, "**/.meeko/dev/server.json");
+  assert.equal(isWorkspaceDevServerRecord(".meeko/dev/server.json"), true);
+  assert.equal(isWorkspaceDevServerRecord("apps/site/.meeko/dev/server.json"), true);
+  assert.equal(isWorkspaceDevServerRecord("node_modules/@meekojs/meeko/.meeko/dev/server.json"), false);
+  assert.equal(isWorkspaceDevServerRecord(".meeko/tmp/app/.meeko/dev/server.json"), false);
+  assert.equal(isWorkspaceDevServerRecord(".meeko/dev/editor-bridge-4173.json"), false);
+  // Un meeko dev con puente, o anterior a 1.7.1, no escribe editorBridge.
+  assert.equal(bridgeOffFromRecord(JSON.stringify({ pid: 42, startedAt: "2026-10-29T00:00:00.000Z" })), undefined);
+  assert.deepEqual(bridgeOffFromRecord(JSON.stringify({ pid: 42, startedAt: "x", editorBridge: false, editorBridgeReason: "MEEKO_EDITOR_BRIDGE=0" })), { pid: 42, reason: "MEEKO_EDITOR_BRIDGE=0" });
+  assert.deepEqual(bridgeOffFromRecord(JSON.stringify({ pid: 42, editorBridge: false })), { pid: 42, reason: "sin motivo registrado" });
+  for (const invalid of ["", "null", "{", JSON.stringify({ pid: -1, editorBridge: false }), JSON.stringify({ pid: "42", editorBridge: false })]) {
+    assert.equal(bridgeOffFromRecord(invalid), undefined, invalid);
+  }
+});
+
+test("la barra de estado explica un meeko dev sin puente; una conexión gana", () => {
+  const off = [{ pid: 42, reason: "MEEKO_EDITOR_BRIDGE=0" }];
+  const disabled = liveStatus([], 0, off);
+  assert.equal(disabled.text, "$(circle-slash) Meeko live: desactivado en meeko dev");
+  assert.match(disabled.tooltip, /meeko dev \(PID 42\): MEEKO_EDITOR_BRIDGE=0/);
+  assert.match(disabled.tooltip, /MEEKO_EDITOR_BRIDGE=0 \(en el entorno o en el \.env del proyecto\)/);
+  assert.equal(liveStatus(["http://127.0.0.1:4173/__meeko/editor-bridge"], 1, off).text, "$(pulse) Meeko live: conectado");
+  assert.deepEqual(liveStatus([], 1, []), { text: "$(debug-disconnect) Meeko live: desconectado", tooltip: "meeko dev no responde. Pulsa para reconectar." });
+  assert.equal(liveStatus([], 0, []).tooltip, "Arranca meeko dev para ver los valores de las señales junto al código.");
 });

@@ -84,8 +84,11 @@ export function checkWritableSignal<S>(model: S & WritableSignalCheck<S>): void 
 export interface NativeModelValues {
   /** Text-like `<input>` and `<textarea>`: `value`, on `input`. Number inputs also give strings. */
   text: string;
-  /** `<input type="checkbox">`: `checked`, on `change`. */
-  checkbox: boolean;
+  /**
+   * `<input type="checkbox">`: `checked`, on `change`. `undefined` renders unchecked, so the field of
+   * an optional schema key (`v.optional(v.boolean(), false)`) binds as it is; `change` writes a boolean.
+   */
+  checkbox: boolean | undefined;
   /** `<input type="radio">`: checked while the signal equals its value; `change` writes that value. */
   radio: string | null | undefined;
   /** `<select>`: `value`, on `change`. */

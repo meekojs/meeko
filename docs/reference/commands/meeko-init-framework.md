@@ -70,7 +70,7 @@ Si la carpeta tenía `pnpm-lock.yaml`, el siguiente paso dice `pnpm install && p
 npx @meekojs/meeko init-framework tienda
 cd tienda
 npm install
-npm run dev      # http://127.0.0.1:4173
+npm run dev      # http://localhost:4173
 npm run check    # tipos y contratos
 npm run build    # .meeko/output/node
 ```

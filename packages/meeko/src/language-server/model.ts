@@ -178,7 +178,7 @@ const channelDeclarations = [
   "type __MeekoEquals<A, B> = (<V>() => V extends A ? 1 : 2) extends (<V>() => V extends B ? 1 : 2) ? true : false;",
   "type __MeekoWritable<S> = S extends { readonly value: unknown } ? __MeekoEquals<Pick<S, \"value\">, { -readonly [K in keyof Pick<S, \"value\">]: Pick<S, \"value\">[K] }> extends true ? unknown : { readonly \"a model needs a writable signal; computed and readonly signals cannot be written\": never } : unknown;",
   "declare function __meeko_writable<S>(model: S & __MeekoWritable<S>): void;",
-  "type __MeekoNativeModels = { text: string; checkbox: boolean; radio: string | null | undefined; select: string; multiple: string[] };",
+  "type __MeekoNativeModels = { text: string; checkbox: boolean | undefined; radio: string | null | undefined; select: string; multiple: string[] };",
   "type __MeekoChannelsOf<M> = M extends { readonly __meekoChannels: infer C } ? C : { readonly models: null; readonly snippets: null };",
   "type __MeekoLoose = { readonly [name: string]: unknown };",
   "type __MeekoTagModels<Models> = [Models] extends [null] ? { readonly [name: string]: \"this component declares no defineModel\" } : Models;",

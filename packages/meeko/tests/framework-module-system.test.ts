@@ -289,12 +289,14 @@ async function moduleApp(root: string): Promise<void> {
   for (const [path, source] of Object.entries(appFiles)) await put(root, path, source);
 }
 
-async function listening(logs: () => string, child: ReturnType<typeof spawn>, pattern: RegExp): Promise<string> {
+/** Waits for the printed `http://localhost:<port>` and returns the origin on the 127.0.0.1 it listens on. */
+async function listening(logs: () => string, child: ReturnType<typeof spawn>, port = "\\d+"): Promise<string> {
+  const pattern = new RegExp(`http://localhost:(${port})\\n`);
   return new Promise<string>((done, fail) => {
     const start = Date.now();
     const timer = setInterval(() => {
-      const url = logs().match(pattern)?.[0];
-      if (url) { clearInterval(timer); done(url); }
+      const printed = logs().match(pattern)?.[1];
+      if (printed) { clearInterval(timer); done(`http://127.0.0.1:${printed}`); }
       else if (child.exitCode !== null) { clearInterval(timer); fail(new Error(`Server exited: ${logs()}`)); }
       else if (Date.now() - start > 30_000) { clearInterval(timer); fail(new Error(`Server did not listen: ${logs()}`)); }
     }, 25);
@@ -367,7 +369,7 @@ test("a module adds components, autoimports, plugins, middleware, handlers and p
   let logs = "";
   child.stdout?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
   child.stderr?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
-  const origin = await listening(() => logs, child, /http:\/\/127\.0\.0\.1:\d+/);
+  const origin = await listening(() => logs, child);
   browser = await chromium.launch({
     ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: "chrome" as const }),
     headless: true,
@@ -387,7 +389,7 @@ test("meeko dev serves what a module adds", { timeout: 120_000 }, async (context
   let logs = "";
   child.stdout?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
   child.stderr?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
-  const origin = await listening(() => logs, child, new RegExp(`http://127\\.0\\.0\\.1:${port}`));
+  const origin = await listening(() => logs, child, String(port));
   assert.match(logs, /\[meeko\] hello: ready \(dev\)/);
   browser = await chromium.launch({
     ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: "chrome" as const }),

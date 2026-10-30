@@ -1,4 +1,4 @@
-import type { EditorLiveAlias, EditorLiveSignal } from "../../../meeko/src/devtools-bridge-protocol.js";
+import type { DevelopmentServerRecord, EditorLiveAlias, EditorLiveSignal } from "../../../meeko/src/devtools-bridge-protocol.js";
 
 export type { EditorBridgeDescriptor, EditorBridgeEvent, EditorCommandResult, EditorLiveAlias, EditorLiveSignal } from "../../../meeko/src/devtools-bridge-protocol.js";
 
@@ -17,6 +17,64 @@ export function isWorkspaceBridgeDescriptor(path: string): boolean {
   if (!/^editor-bridge-\d+\.json$/.test(name) || segments.at(-2) !== "dev" || segments.at(-3) !== ".meeko") return false;
   const project = segments.slice(0, -3);
   return !project.some((segment) => segment === "node_modules" || segment === ".meeko");
+}
+
+/** Registro de cada `meeko dev` en marcha: `.meeko/dev/server.json` del proyecto que sirve. */
+export const devServerRecordGlob = "**/.meeko/dev/server.json";
+
+/**
+ * `true` si el registro de `meeko dev`, con su ruta relativa a la carpeta del workspace, es de un
+ * proyecto del workspace, con los mismos descartes que {@link isWorkspaceBridgeDescriptor}.
+ */
+export function isWorkspaceDevServerRecord(path: string): boolean {
+  const segments = path.split(/[\\/]/).filter(Boolean);
+  if (segments.at(-1) !== "server.json" || segments.at(-2) !== "dev" || segments.at(-3) !== ".meeko") return false;
+  return !segments.slice(0, -3).some((segment) => segment === "node_modules" || segment === ".meeko");
+}
+
+/** `meeko dev` en marcha que no publica valores en vivo, con el motivo que escribió. */
+export interface BridgeOff {
+  pid: number;
+  reason: string;
+}
+
+/**
+ * Lee `.meeko/dev/server.json` y devuelve el `meeko dev` sin puente que registra (`editorBridge:
+ * false`, desde Meeko 1.7.1), o `undefined` si el registro no es válido o el servidor tiene puente.
+ * No comprueba si el proceso sigue vivo.
+ */
+export function bridgeOffFromRecord(text: string): BridgeOff | undefined {
+  let record: Partial<DevelopmentServerRecord>;
+  try { record = JSON.parse(text) as Partial<DevelopmentServerRecord>; }
+  catch { return undefined; }
+  if (record === null || typeof record !== "object" || !Number.isSafeInteger(record.pid) || (record.pid ?? 0) <= 0 || record.editorBridge !== false) return undefined;
+  return { pid: record.pid!, reason: typeof record.editorBridgeReason === "string" && record.editorBridgeReason ? record.editorBridgeReason : "sin motivo registrado" };
+}
+
+/** Texto y tooltip de la barra de estado de «Meeko live». */
+export interface LiveStatus {
+  text: string;
+  tooltip: string;
+}
+
+/**
+ * Estado de «Meeko live» a partir de las URL conectadas, del número de descriptores conocidos y de
+ * los `meeko dev` en marcha sin puente. Una conexión gana; sin ninguna, un `meeko dev` sin puente
+ * explica por qué no hay valores en vivo en lugar de mostrar sólo «desconectado».
+ */
+export function liveStatus(connected: readonly string[], descriptors: number, off: readonly BridgeOff[]): LiveStatus {
+  if (connected.length) return { text: "$(pulse) Meeko live: conectado", tooltip: `Valores en vivo de ${connected.join(", ")}. Pulsa para reconectar.` };
+  if (off.length) {
+    const servers = off.map((item) => `meeko dev (PID ${item.pid}): ${item.reason}`).join("\n");
+    return {
+      text: "$(circle-slash) Meeko live: desactivado en meeko dev",
+      tooltip: `${servers}\n\nEse meeko dev no publica valores en vivo. MEEKO_EDITOR_BRIDGE=0 (en el entorno o en el .env del proyecto) desactiva el puente con el editor: quítalo y reinicia meeko dev. El puente sólo arranca cuando meeko dev escucha en loopback o en todas las interfaces.`,
+    };
+  }
+  return {
+    text: "$(debug-disconnect) Meeko live: desconectado",
+    tooltip: descriptors ? "meeko dev no responde. Pulsa para reconectar." : "Arranca meeko dev para ver los valores de las señales junto al código.",
+  };
 }
 
 /** Valores de una misma declaración de señal en todas las instancias montadas. */

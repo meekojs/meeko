@@ -96,7 +96,7 @@ test("composables with framework autoimports, pages without a script and static 
   await new Promise<void>((done, fail) => {
     const start = Date.now();
     const timer = setInterval(() => {
-      if (logs.includes(origin)) { clearInterval(timer); done(); }
+      if (logs.includes(`http://localhost:${port}\n`)) { clearInterval(timer); done(); }
       else if (running.exitCode !== null) { clearInterval(timer); fail(new Error(`Dev server exited before listening: ${logs}`)); }
       else if (Date.now() - start > 30_000) { clearInterval(timer); fail(new Error(`Dev server did not listen: ${logs}`)); }
     }, 25);

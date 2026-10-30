@@ -35,7 +35,7 @@ meeko preview --adapter static
 ```
 
 ```text
-http://127.0.0.1:4173
+http://localhost:4173
 ```
 
 ## Opciones
@@ -49,7 +49,7 @@ http://127.0.0.1:4173
 
 ## Resultado
 
-- **Node y `static`** imprimen la URL y sirven en este proceso hasta `Ctrl+C`.
+- **Node y `static`** imprimen la URL y sirven en este proceso hasta `Ctrl+C`. Como en [`meeko start`](/docs/reference/meeko-start), loopback y `0.0.0.0` se muestran como `http://localhost:4173` y, con `0.0.0.0` o `::`, siguen líneas `Red:` con las direcciones de red. Las salidas de Bun y Deno escriben lo mismo; Deno sólo lista la red con `--allow-sys=networkInterfaces`, que `-A` incluye.
 - **Bun, Deno y Cloudflare** heredan la consola del proceso hijo, que escribe su propia salida; `meeko preview` le reenvía `SIGINT` y `SIGTERM` y termina con el código de salida del hijo.
 - **`static`** sirve el archivo pedido, el `index.html` de la carpeta o `404.html` con estado `404` (o el texto `Not Found` si el build no tiene `404.html`, porque falta `app/error.meeko`), sin publicar `_headers` ni `_meeko/`, y aplica `contentSecurityPolicy` y `headers` como lo haría el hosting con `headerFiles`. Sólo admite `GET` y `HEAD` (otro método da `405` con `Allow: GET, HEAD`) y todo lleva `cache-control: no-cache`.
 

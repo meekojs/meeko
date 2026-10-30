@@ -1,9 +1,10 @@
-node_modules/
-dist/
+.impeccable/
 .meeko/
 .pnpm-store/
 .serena/
-*.generated.ts
-*.d.meeko.ts
 *.bundle.js
+*.d.meeko.ts
+*.generated.ts
 *.tsbuildinfo
+dist/
+node_modules/

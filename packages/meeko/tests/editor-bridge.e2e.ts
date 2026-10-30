@@ -79,7 +79,7 @@ test("meeko dev publishes live signal values to the editor and applies its edits
     if (child.exitCode === null && child.signalCode === null) { const exited = once(child, "exit"); child.kill("SIGINT"); await exited; }
     await project.remove();
   });
-  await until(() => logs.includes(origin) || child.exitCode !== null, () => `meeko dev did not listen: ${logs}`, 30_000);
+  await until(() => logs.includes(`http://localhost:${port}\n`) || child.exitCode !== null, () => `meeko dev did not listen: ${logs}`, 30_000);
   assert.equal(child.exitCode, null, logs);
 
   const descriptorFile = join(root, editorBridgeFile(port));

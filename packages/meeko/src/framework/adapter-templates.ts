@@ -39,8 +39,9 @@ async function prerenderSource(): Promise<PrerenderSource | undefined> {
 `;
 
 /** Bun adapter entry; \`meeko build --adapter bun\` bundles it to .meeko/output/bun/index.js. */
-export const bunEntrySource = `import { createBunAssetReader, createBunServer } from "@meekojs/meeko/bun";
-import { meekoEnv } from "@meekojs/meeko/internal";
+export const bunEntrySource = `import { networkInterfaces } from "node:os";
+import { createBunAssetReader, createBunServer } from "@meekojs/meeko/bun";
+import { listeningMessage, meekoEnv } from "@meekojs/meeko/internal";
 import { handleProcessErrors } from "@meekojs/meeko/server";
 import type { PrerenderSource, PrerenderedPage } from "@meekojs/meeko/server";
 import { createApp, load, manifest } from "./entry-server.ts";
@@ -83,8 +84,8 @@ export async function start() {
   const host = meekoEnv(bun.env, "HOST") || "127.0.0.1";
   const port = meekoEnv(bun.env, "PORT");
   const server = bun.serve({ hostname: host, port: port ? Number(port) : 4173, ...createBunServer(app) });
-  const visible = host === "0.0.0.0" ? "127.0.0.1" : host === "::" ? "::1" : host;
-  process.stdout.write(\`http://\${visible.includes(":") ? \`[\${visible}]\` : visible}:\${server.port}\\n\`);
+  // Shows localhost for loopback and the network addresses with 0.0.0.0 or ::.
+  process.stdout.write(listeningMessage(host, server.port, networkInterfaces));
   let stopping: Promise<void> | undefined;
   const stop = () => {
     stopping ??= (async () => {
@@ -107,7 +108,7 @@ if (import.meta.main) await start();
 
 /** Deno adapter entry; \`meeko build --adapter deno\` bundles it to .meeko/output/deno/main.js. */
 export const denoEntrySource = `import { createDenoAssetReader, serveDeno } from "@meekojs/meeko/deno";
-import { meekoEnv } from "@meekojs/meeko/internal";
+import { listeningMessage, meekoEnv } from "@meekojs/meeko/internal";
 import type { PrerenderSource, PrerenderedPage } from "@meekojs/meeko/server";
 import { createApp, load, manifest } from "./entry-server.ts";
 
@@ -115,7 +116,9 @@ export { load, manifest };
 
 interface DenoRuntime {
   readonly env: { get(name: string): string | undefined; toObject(): Record<string, string> };
+  readonly permissions: { querySync(descriptor: { name: "sys"; kind: "networkInterfaces" }): { readonly state: string } };
   readTextFile(path: URL): Promise<string>;
+  networkInterfaces(): { address: string; family: string }[];
 }
 
 const deno = (globalThis as unknown as { Deno: DenoRuntime }).Deno;
@@ -148,12 +151,15 @@ export async function start() {
   const app = await createDenoApp();
   const env = deno.env.toObject();
   const port = meekoEnv(env, "PORT");
+  const host = meekoEnv(env, "HOST") || "127.0.0.1";
   const server = await serveDeno(app, {
-    host: meekoEnv(env, "HOST") || "127.0.0.1",
+    host,
     port: port ? Number(port) : 4173,
     handleSignals: true,
   });
-  console.log(server.url);
+  // Shows localhost for loopback; the network addresses need --allow-sys=networkInterfaces, never a prompt.
+  const interfaces = () => deno.permissions.querySync({ name: "sys", kind: "networkInterfaces" }).state === "granted" ? deno.networkInterfaces() : [];
+  console.log(listeningMessage(host, Number(new URL(server.url).port) || 80, interfaces).trimEnd());
   return server;
 }
 

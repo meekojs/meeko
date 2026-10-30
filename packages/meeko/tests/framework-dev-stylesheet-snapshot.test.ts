@@ -77,7 +77,7 @@ test("meeko dev keeps the processed global stylesheet in .meeko/styles/main.css"
   let logs = "";
   running.stdout?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
   running.stderr?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
-  await until(() => logs.includes(origin) || running.exitCode !== null, () => `meeko dev did not listen: ${logs}`, 30_000);
+  await until(() => logs.includes(`http://localhost:${port}\n`) || running.exitCode !== null, () => `meeko dev did not listen: ${logs}`, 30_000);
   assert.equal(running.exitCode, null, logs);
 
   const snapshotFile = join(root, globalStylesheetSnapshotFile);

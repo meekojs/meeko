@@ -218,8 +218,9 @@ export async function startConformanceOutput(adapter: ConformanceAdapter): Promi
     const origin = await new Promise<string>((done, fail) => {
       const start = Date.now();
       const timer = setInterval(() => {
-        const url = logs.match(/http:\/\/127\.0\.0\.1:\d+/)?.[0];
-        if (url) { clearInterval(timer); done(url); }
+        // The output listens on 127.0.0.1 and prints localhost.
+        const port = /http:\/\/localhost:(\d+)\n/.exec(logs)?.[1];
+        if (port) { clearInterval(timer); done(`http://127.0.0.1:${port}`); }
         else if (running.exitCode !== null) { clearInterval(timer); fail(new Error(`${adapter} output exited: ${logs}`)); }
         else if (Date.now() - start > 30_000) { clearInterval(timer); fail(new Error(`${adapter} output did not listen: ${logs}`)); }
       }, 25);

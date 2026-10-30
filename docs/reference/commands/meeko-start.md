@@ -27,7 +27,7 @@ meeko start
 ```
 
 ```text
-http://127.0.0.1:4173
+http://localhost:4173
 ```
 
 El starter lo declara como `"start": "meeko start ."`, así que en el servidor basta con `npm start`.
@@ -48,7 +48,7 @@ El starter lo declara como `"start": "meeko start ."`, así que en el servidor b
 
 ## Resultado
 
-- **En la salida estándar**, la URL en la que escucha, como `http://127.0.0.1:4173`.
+- **En la salida estándar**, la URL para abrirla, como `http://localhost:4173`: desde `1.7.1`, loopback (`127.0.0.1`, `::1`) y todas las interfaces (`0.0.0.0`, `::`) se muestran como `localhost`, aunque el servidor escuche en la dirección configurada. Con `0.0.0.0` o `::` siguen líneas `Red: http://<IP>:4173` con las direcciones de red. La primera línea es siempre la URL local, sola, para los scripts que la leen.
 - **El proceso** sigue en marcha hasta `SIGINT` o `SIGTERM`, que cierran Socket, HTTP, las tareas de `waitUntil` y el runtime, por ese orden. Las respuestas abiertas tienen `shutdownTimeout` milisegundos (10 000 por defecto) para terminar.
 - **Las respuestas** llevan los assets con `ETag` (y `immutable` los que tienen hash), las páginas prerenderizadas desde su archivo y, desde `1.7`, `Content-Security-Policy` y las cabeceras de `server.headers`.
 

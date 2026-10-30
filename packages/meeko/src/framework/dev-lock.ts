@@ -1,13 +1,11 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import type { DevelopmentServerRecord } from "../devtools-bridge-protocol.js";
 
 /** The process of `meeko dev` that serves a project, under its `.meeko/dev/`. */
 export const developmentLockFile = join(".meeko", "dev", "server.json");
 
-interface DevelopmentLock {
-  readonly pid: number;
-  readonly startedAt: string;
-}
+type DevelopmentLock = Readonly<DevelopmentServerRecord>;
 
 /** Records this process already removes when it exits. */
 const claimed = new Set<string>();
@@ -59,4 +57,20 @@ export function claimDevelopmentProject(projectRoot: string, warn: (message: str
     if (readLock(file)?.pid !== process.pid) return;
     try { rmSync(file, { force: true }); } catch { /* The process is leaving anyway. */ }
   });
+}
+
+/**
+ * Notes in this process's record that it publishes no live values for the editor, and `reason`, so
+ * the editor can say so instead of waiting for a descriptor. Only this process's own record changes:
+ * a second dev of the project, which does not hold it, leaves the first one's alone.
+ */
+export function recordEditorBridgeOff(projectRoot: string, reason: string): void {
+  const file = resolve(projectRoot, developmentLockFile);
+  const lock = readLock(file);
+  if (lock?.pid !== process.pid) return;
+  try {
+    writeFileSync(file, `${JSON.stringify({ ...lock, editorBridge: false, editorBridgeReason: reason } satisfies DevelopmentServerRecord)}\n`, "utf8");
+  } catch {
+    // The editor then shows the bridge as disconnected; serving does not depend on it.
+  }
 }

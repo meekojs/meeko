@@ -72,7 +72,7 @@ npx @meekojs/meeko init contador
 cd contador
 npm install
 npm run dev
-# http://127.0.0.1:4173
+# http://localhost:4173
 ```
 
 ### En la carpeta actual, con el paquete ya instalado

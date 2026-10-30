@@ -39,5 +39,6 @@ export type { Signal } from "./reactivity.js";
 export { definePageBody, pageData } from "./framework/page-body.js";
 export type { JsonShape, SerializableExport, ServerData } from "./framework/page-body.js";
 export { meekoEnv } from "./framework-server/env.js";
+export { listeningMessage } from "./framework-server/listen-address.js";
 export { bindTeleport, renderTeleport } from "./teleport.js";
 export type { MeekoTeleportTarget } from "./teleport.js";
