@@ -13,6 +13,14 @@
   "keywords": ["meeko", "components", "ssr", "hydration", "reactivity", "vite", "typescript", "devtools"],
   "publishConfig": { "access": "public" },
   "exports": {
+    "./compiler": {
+      "types": "./dist/compiler.d.ts",
+      "default": "./dist/compiler.js"
+    },
+    "./parse": {
+      "types": "./dist/parse.d.ts",
+      "default": "./dist/parse.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"

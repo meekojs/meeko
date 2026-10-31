@@ -13,6 +13,7 @@ import { generateRoutes } from "./generate.js";
 import { generatePageContracts } from "./page-contracts-generate.js";
 import { generateRouteBlockTypes, routeBlockTypesDirectory } from "../compiler/codegen/route-block-types.js";
 import { generateServicesTypes, servicesDeclaration } from "./services-types.js";
+import { generateModuleTypes } from "./module-types.js";
 
 export const projectNames = ["app", "server", "shared"] as const;
 
@@ -25,18 +26,20 @@ const compilerOptions = {
 
 const generatedIncludes: Record<(typeof projectNames)[number], string[]> = {
   app: [
+    "types/modules/**/*.d.ts",
     "generated/entry-client.ts", "generated/clients.client.ts", "generated/socket-contracts.ts", "generated/components.ts",
     "types/**/*.d.meeko.ts", "types/components.d.ts", "types/routes.d.ts", "types/virtual-pages.d.ts",
     "types/server-contracts.d.ts", "types/autoimports/client.d.ts", "types/i18n.d.ts",
   ],
   server: [
+    "types/modules/**/*.d.ts",
     "generated/entry-server.ts", "generated/clients.server.ts", "generated/socket-contracts.ts", "generated/components.ts",
     "generated/page-contracts.server.ts", "types/virtual-pages.d.ts", "types/routes.d.ts",
     "types/**/*.d.meeko.ts", "types/components.d.ts", "types/autoimports/server.d.ts", "types/i18n.d.ts", `${routeBlockTypesDirectory}/**/*.route.ts`,
     // The type of RequestContext.services, from server/runtime.ts.
     servicesDeclaration,
   ],
-  shared: ["types/autoimports/shared.d.ts"],
+  shared: ["types/autoimports/shared.d.ts", "types/modules/**/*.d.ts"],
 };
 
 async function writeIfChanged(file: string, source: string): Promise<void> {
@@ -128,6 +131,7 @@ export async function prepareFrameworkTypeDeclarations(projectRoot: string, opti
   const root = resolve(projectRoot);
   const i18nTypes = join(root, ".meeko", "types", "i18n.d.ts");
   const { modules } = await loadConfiguredModules(root);
+  const moduleTypes = await generateModuleTypes(root, modules.typeTemplates);
   if (!modules.names.includes("@meekojs/meeko/i18n")) {
     const existing = await readFile(i18nTypes, "utf8").catch((error: NodeJS.ErrnoException) => {
       if (error.code !== "ENOENT") throw error;
@@ -146,7 +150,7 @@ export async function prepareFrameworkTypeDeclarations(projectRoot: string, opti
   const imports = await generateTypeScriptAutoImports(root);
   const tsconfigs = await generateFrameworkTsconfigs(root);
   // What `meeko routes` lists: the declarations and manifests a project reads, not the copies.
-  return [routes.types, routes.manifest, server.types, server.manifest, ...components, componentRegistryTypes, componentRegistry, pageContracts, services, imports.client, imports.server, imports.shared, ...(existsSync(i18nTypes) ? [i18nTypes] : []), ...tsconfigs];
+  return [routes.types, routes.manifest, server.types, server.manifest, ...components, componentRegistryTypes, componentRegistry, pageContracts, services, imports.client, imports.server, imports.shared, ...moduleTypes, ...(existsSync(i18nTypes) ? [i18nTypes] : []), ...tsconfigs];
 }
 
 /** Whether the project has the `.meeko/tsconfig.*.json` that Vite resolves from its `tsconfig.json`. */

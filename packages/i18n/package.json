@@ -1,0 +1,35 @@
+{
+  "name": "@meekojs/i18n",
+  "version": "0.1.0",
+  "description": "Typed localization and catalogs for Meeko.",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist/"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./module": {
+      "types": "./dist/module.d.ts",
+      "default": "./dist/module.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test tests/*.test.mjs",
+    "prepack": "pnpm run build"
+  },
+  "peerDependencies": {
+    "@meekojs/meeko": ">=1.7 <2"
+  },
+  "devDependencies": {
+    "@meekojs/meeko": "workspace:*",
+    "@types/node": "^24.0.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.5"
+  }
+}

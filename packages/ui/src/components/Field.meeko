@@ -1,0 +1,49 @@
+<script lang="ts">
+	interface Props {
+		id: string
+		label: string
+		description?: string
+		error?: string
+		required?: boolean
+		class?: string
+	}
+
+	const props = defineProps<Props>()
+	const snippets = defineSnippets<{ default: [id: string, describedBy: string | undefined] }>()
+</script>
+
+<template>
+	<div bind:class="['meeko-ui-field', props.class].filter(Boolean).join(' ')">
+		<label
+			class="meeko-ui-field-label"
+			bind:for="props.id"
+		>
+			{props.label}
+			<span
+				if:when="props.required"
+				aria-hidden="true"
+			>
+				*
+			</span>
+		</label>
+		<render
+			snippet="snippets.default"
+			args="props.id, props.error ? props.id + '-error' : props.description ? props.id + '-description' : undefined"
+		/>
+		<p
+			if:when="props.description && !props.error"
+			class="meeko-ui-field-description"
+			bind:id="props.id + '-description'"
+		>
+			{props.description}
+		</p>
+		<p
+			if:when="props.error"
+			class="meeko-ui-field-error"
+			bind:id="props.id + '-error'"
+			role="alert"
+		>
+			{props.error}
+		</p>
+	</div>
+</template>

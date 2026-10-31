@@ -224,6 +224,7 @@ export interface ResolvedModules {
   readonly serverMiddleware: readonly string[];
   readonly serverHandlers: readonly { readonly route: string; readonly file: string }[];
   readonly publicFiles: ReadonlyMap<string, PublicFileContents>;
+  readonly typeTemplates: ReadonlyMap<string, string>;
   /** `<head>` entries of the modules, before `document.head` of the configuration. */
   readonly head: HeadInput | undefined;
   readonly vitePlugins: readonly object[];
@@ -235,7 +236,7 @@ export interface ResolvedModules {
 
 const emptyModules: ResolvedModules = Object.freeze({
   names: [], entryFiles: [], layers: [], componentsDirs: [], layouts: [], autoImports: [], autoImportsDirs: [], plugins: [],
-  serverMiddleware: [], serverHandlers: [], publicFiles: new Map(), head: undefined, vitePlugins: [], viteExtenders: [], ownedDirectories: [],
+  serverMiddleware: [], serverHandlers: [], publicFiles: new Map(), typeTemplates: new Map(), head: undefined, vitePlugins: [], viteExtenders: [], ownedDirectories: [],
   callHook: async () => {},
 });
 
@@ -358,6 +359,7 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
   const serverMiddleware: string[] = [];
   const serverHandlers: Array<{ route: string; file: string }> = [];
   const publicFiles = new Map<string, PublicFileContents>();
+  const typeTemplates = new Map<string, string>();
   let head: HeadInput | undefined;
   const vitePlugins: object[] = [];
   const viteExtenders: Array<ResolvedModules["viteExtenders"][number]> = [];
@@ -462,6 +464,12 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
         if (typeof contents !== "string" && typeof contents !== "function" && !(contents instanceof Uint8Array)) throw new TypeError(`Módulo de Meeko ${name}: el archivo público ${key} necesita una cadena, bytes o una función`);
         publicFiles.set(key, contents);
       },
+      addTypeTemplate(filename: string, contents: string) {
+        if (!/^[A-Za-z0-9_-]+\.d\.ts$/.test(filename) || typeof contents !== "string") throw new TypeError(`Módulo ${name}: declaración de tipos no válida`);
+        const key = `${encodeURIComponent(name)}/${filename}`;
+        if (typeTemplates.has(key)) throw new Error(`Módulo ${name}: declaración repetida ${filename}`);
+        typeTemplates.set(key, contents);
+      },
       addHead(input: DocumentHead) {
         if (!input || typeof input !== "object") throw new TypeError(`Módulo de Meeko ${name}: addHead necesita un objeto de head`);
         // It joins `document`, which the build bakes as JSON: fail here, naming the module.
@@ -481,7 +489,7 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
   }
   const resolved: ResolvedModules = {
     names, entryFiles, layers, componentsDirs, layouts, autoImports, autoImportsDirs, plugins, serverMiddleware, serverHandlers,
-    publicFiles, head, vitePlugins, viteExtenders, ownedDirectories: [...ownedDirectories],
+    publicFiles, typeTemplates, head, vitePlugins, viteExtenders, ownedDirectories: [...ownedDirectories],
     async callHook(hookName, ...args) {
       for (const handler of [...hooks.get(hookName) ?? []]) await (handler as (...values: unknown[]) => unknown)(...args);
     },

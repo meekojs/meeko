@@ -47,7 +47,7 @@ jobs:
       - name: Comprobar permiso de publicación
         shell: pwsh
         run: |
-          npx --yes '@vscode/vsce@4.0.0' verify-pat --azure-credential meekojs
+          npx --yes '@vscode/vsce@4.1.0' verify-pat --azure-credential meekojs
           if ($LASTEXITCODE -ne 0) {
             Write-Output '::warning title=Sin permiso todavía::La identidad aún no puede publicar en meekojs; añádela al publisher con el ID del resumen y vuelve a ejecutar.'
             exit 0

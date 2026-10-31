@@ -5,11 +5,11 @@
  * hydration, and attaches the keyboard and the pointer in the browser.
  */
 import { computed, effect, onCleanup, signal, untrack } from "../../../core/reactivity.js";
-import type { ReadonlySignal, Signal } from "../../../core/reactivity.js";
+import type { Signal } from "../../../core/reactivity.js";
 import { adoptStyle, createTypeahead, listKeyTarget, normalizeText, typeaheadIndex, typeaheadKey } from "../MeekoPopover/popover.js";
 
 
-import type { MeekoSelectProps, SelectEntry, SelectGroup, SelectSettings, SelectOptionState } from "./types.js";
+import type { SelectEntry, SelectGroup, SelectSettings, SelectOptionState } from "./types.js";
 
 /** A value of the record of an object option, or `undefined`. */
 function field(option: unknown, key: string): unknown {

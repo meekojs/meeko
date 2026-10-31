@@ -247,6 +247,8 @@ export interface MeekoModuleContext {
    * petición), por ejemplo con las rutas de `routes:resolved`.
    */
   addPublicFile(path: string, contents: string | Uint8Array | (() => string | Uint8Array | Promise<string | Uint8Array>)): void;
+  /** Registers a declaration in .meeko/types/modules; removed when the module is disabled. */
+  addTypeTemplate(filename: string, contents: string): void;
   /**
    * Añade entradas al `<head>` de todos los documentos (`document.head`). Los arrays se concatenan
    * en el orden de los módulos; `title` y `titleTemplate` se quedan con el último valor, y

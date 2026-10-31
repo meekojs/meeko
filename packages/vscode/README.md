@@ -117,6 +117,18 @@ code --new-window --extensionDevelopmentPath="$(Get-Location)" "$(Resolve-Path .
 
 ## Desarrollo: paquetes por plataforma
 
+Para compilar, empaquetar e instalar la extensión en el VS Code local, desde la raíz del repositorio:
+
+```powershell
+pnpm run vscode:install
+```
+
+También puedes ejecutar `pnpm run install:local` desde `packages/vscode`, o `pwsh -NoProfile -File packages/vscode/install-local.ps1` desde la raíz. El script detecta la plataforma y versión, comprueba tipos, construye el VSIX y lo instala con `code --install-extension --force`, también si ya está instalada esa versión. Después ejecuta **Developer: Reload Window** en VS Code.
+
+Para reinstalar el último VSIX sin compilar: `pnpm run install:local -- -UseExistingVsix` desde `packages/vscode`. Esta opción reutiliza el artefacto existente; no incorpora nuevos cambios de fuente. Si el CLI tiene otro nombre o ruta, usa `-CodeCommand`, por ejemplo `pwsh -NoProfile -File install-local.ps1 -CodeCommand code-insiders`.
+
+El empaquetado usa VSCE `4.1.0`. El instalador suprime exclusivamente el aviso `DEP0169` durante la ejecución del CLI de VS Code y restaura `NODE_OPTIONS` al terminar. Es una solución temporal al uso de `url.parse()` dentro de VS Code ([incidencia abierta](https://github.com/microsoft/vscode/issues/319867)), no un cambio en esa API. Para ver también ese aviso durante una investigación, ejecuta el script con `-ShowCliDeprecations`.
+
 ```powershell
 pnpm run package:vsix
 pwsh -NoProfile -File package-vsix.ps1 -Target linux-x64

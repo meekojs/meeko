@@ -1,7 +1,7 @@
 import { type Config } from 'prettier'
 
 const config: Config = {
-	plugins: ['@meekojs/meeko/prettier', 'prettier-plugin-css-order'],
+	plugins: ['@meekojs/prettier-plugin', 'prettier-plugin-css-order'],
 	cssDeclarationSorterKeepOverrides: false,
 	cssDeclarationSorterOrder: 'concentric-css',
 	endOfLine: 'auto',

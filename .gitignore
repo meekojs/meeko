@@ -9,3 +9,8 @@
 *.tsbuildinfo
 dist/
 node_modules/
+
+# Agent worktrees
+/.claude/worktrees/
+/.codex/worktrees/
+/.worktrees/

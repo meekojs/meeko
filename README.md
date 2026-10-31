@@ -9,12 +9,17 @@
 La gu铆a de uso del paquete est谩 en [`packages/meeko/README.md`](packages/meeko/README.md), que tambi茅n es el README publicado en npm y la portada del sitio <https://meeko.diegootayza.com>.
 
 El m贸dulo de traducciones est谩 documentado en [i18n](docs/i18n.md).
+La base de componentes visuales de `@meekojs/ui` est谩 documentada en [UI](docs/ui.md); su app de demostraci贸n vive en `apps/ui-demo`.
 
 ## Contenido
 
 | Ruta | Qu茅 es |
 | --- | --- |
 | [`packages/meeko`](packages/meeko) | `@meekojs/meeko`, el paquete publicado en npm: compilador, runtime, framework, CLI `meeko`, plugin de Vite y servidor de lenguaje. Incluye sus pruebas, ejemplos y benchmarks. |
+| [`packages/ui`](packages/ui) | `@meekojs/ui`: componentes visuales y temas. |
+| [`packages/i18n`](packages/i18n) | `@meekojs/i18n`: traducciones, cat醠ogos y m骴ulo. |
+| [`packages/eslint-plugin`](packages/eslint-plugin) | `@meekojs/eslint-plugin`: parser ESLint y reglas para `.meeko`. |
+| [`packages/prettier-plugin`](packages/prettier-plugin) | `@meekojs/prettier-plugin`: formato de componentes. |
 | [`packages/vscode`](packages/vscode) | Extensi贸n de VS Code `meeko-language`: resaltado y cliente del servidor de lenguaje. |
 | [`packages/devtools`](packages/devtools) | Extensi贸n Meeko DevTools para Chrome. |
 | [`apps/site`](apps/site) | Sitio de documentaci贸n, hecho con Meeko a partir de estos Markdown. |

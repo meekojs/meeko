@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import { discoverAutoImports } from "./autoimports/registry.js";
 import { applyAutoImports, compileWithAutoImports } from "./autoimports/transform.js";
@@ -77,7 +77,7 @@ function componentTarget(rootDirectory: string, filename: string): "client" | "s
  */
 function generatedDeclarations(rootDirectory: string, filename: string): string[] {
   const types = join(rootDirectory, ".meeko", "types");
-  return [join(types, "autoimports", `${componentTarget(rootDirectory, filename)}.d.ts`), join(types, "routes.d.ts"), join(types, "i18n.d.ts")]
+  return [join(types, "autoimports", `${componentTarget(rootDirectory, filename)}.d.ts`), join(types, "routes.d.ts"), join(types, "i18n.d.ts"), join(types, "modules.d.ts")]
     .filter((file) => existsSync(file));
 }
 
@@ -94,9 +94,15 @@ async function compileGraph(source: string, filename: string, options: CheckSour
     const registry = options.autoImports ? await options.autoImports(projectRoot(original)) : undefined;
     const aliases = await projectAliasesFor(projectRoot(original), options);
     const compiled = await compileWithAutoImports(content, original, { typeCheck: true }, target, registry, aliases);
+    const location = relative(rootDirectory, original);
+    // A module component can live outside the consumer project. Keep its temporary copy inside
+    // this check's nonce directory, or a second check/build will collide with the escaped file.
+    const generatedPath = isAbsolute(location) || location === ".." || location.startsWith(`..${sep}`)
+      ? join("external", createHash("sha256").update(resolve(original)).digest("hex").slice(0, 16), `${basename(original)}.ts`)
+      : `${location}.ts`;
     const entry: GeneratedEntry = {
       original, source: content, code: compiled.code,
-      generated: join(generatedDirectory, relative(rootDirectory, original) + ".ts"),
+      generated: join(generatedDirectory, generatedPath),
       mappings: compiled.mappings.map((mapping) => ({ ...mapping })),
       warnings: compiled.warnings ?? [],
     };

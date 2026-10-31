@@ -62,7 +62,7 @@ try {
       throw "El paquete aislado contiene binarios nativos inesperados: $($installedNativePackages -join ', ')."
     }
     New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
-    & npm exec --yes --package=@vscode/vsce@4.0.0 -- vsce package --target $Target --allow-missing-repository --out $outputFile
+    & npm exec --yes --package=@vscode/vsce@4.1.0 -- vsce package --target $Target --allow-missing-repository --out $outputFile
     if ($LASTEXITCODE -ne 0) { throw 'Falló la creación del VSIX.' }
     $binaryEntry = "extension/node_modules/@typescript/$nativePackage/lib/$nativeExecutable"
     if ($targetOs -ne 'win32') {

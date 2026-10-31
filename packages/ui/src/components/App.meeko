@@ -1,0 +1,11 @@
+<script lang="ts">
+	interface Props {}
+
+	const props = defineProps<Props>()
+</script>
+
+<template>
+	<div>
+		<!--  -->
+	</div>
+</template>

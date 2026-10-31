@@ -1,0 +1,32 @@
+<script lang="ts">
+	interface Props {
+		id?: string
+		name?: string
+		type?: 'text' | 'email' | 'password' | 'search' | 'url' | 'tel'
+		placeholder?: string
+		required?: boolean
+		disabled?: boolean
+		invalid?: boolean
+		describedBy?: string
+		class?: string
+	}
+
+	const props = defineProps<Props>()
+	const value = defineModel<string>({ default: '' })
+</script>
+
+<template>
+	<input
+		bind:id="props.id"
+		bind:name="props.name"
+		bind:type="props.type ?? 'text'"
+		bind:placeholder="props.placeholder"
+		bind:required="props.required"
+		bind:disabled="props.disabled"
+		bind:aria-invalid="props.invalid ? 'true' : undefined"
+		bind:aria-describedby="props.describedBy"
+		bind:class="['meeko-ui-input', props.class].filter(Boolean).join(' ')"
+		bind:value="value.value"
+		on:input="(event) => (value.value = event.currentTarget.value)"
+	/>
+</template>

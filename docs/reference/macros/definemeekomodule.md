@@ -79,6 +79,7 @@ El objeto `meeko` de `setup`:
 | `addPlugin({ src, mode?, options? })` | Un plugin de aplicación (`definePlugin`). |
 | `addServerMiddleware(file)` / `addServerHandler({ route, handler })` | Middleware de servidor (antes que el del proyecto) y un handler para una ruta exacta. |
 | `addPublicFile(path, contents)` | Un archivo público. |
+| `addTypeTemplate(filename, contents)` | Una declaración `.d.ts` generada, retirada cuando se desactiva el módulo. |
 | `addHead(input)` | Entradas de `document.head`. |
 | `addVitePlugin(plugin)` / `extendViteConfig(fn)` | Plugins y configuración de Vite en `meeko dev` y `meeko build`. |
 | `hooks.hook(name, fn)` | `ready`, `routes:resolved`, `build:before`, `prerender:routes`, `build:done`. |
