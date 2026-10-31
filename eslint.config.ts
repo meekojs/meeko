@@ -121,7 +121,7 @@ export default defineEslint(
 	},
 	{
 		name: 'meeko/ui-templates',
-		files: ['packages/ui/**/*.meeko', 'apps/ui-demo/**/*.meeko'],
+		files: ['packages/ui/**/*.meeko', 'apps/ui/**/*.meeko'],
 		rules: { 'meeko/button-has-type': 'error', 'meeko/no-autofocus': 'warn' },
 	},
 	{

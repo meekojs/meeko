@@ -1,7 +1,9 @@
+@import './docs.css';
+
 .view-transition-demo {
 	margin: auto;
-	padding: clamp(1.5rem, 5vw, 4rem);
-	max-width: 68rem;
+	padding: 0;
+	max-width: none;
 }
 .view-transition-demo h1 {
 	margin: 2rem 0 1rem;

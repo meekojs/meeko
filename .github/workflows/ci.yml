@@ -50,7 +50,7 @@ jobs:
         shell: pwsh
         run: |
           $env:MEEKO_CHROME_PATH = node -p "require('./packages/ui/node_modules/playwright-core').chromium.executablePath()"
-          pnpm -F meeko-ui-demo run build
+          pnpm -F meeko-ui-site run build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node --test --test-concurrency=1 packages/ui/tests/*.e2e.mjs 2>&1 | Tee-Object -FilePath .meeko/ci-logs/ui-e2e.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

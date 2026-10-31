@@ -9,7 +9,7 @@
 La guía de uso del paquete está en [`packages/meeko/README.md`](packages/meeko/README.md), que también es el README publicado en npm y la portada del sitio <https://meeko.diegootayza.com>.
 
 El módulo de traducciones está documentado en [i18n](docs/i18n.md).
-La base de componentes visuales de `@meekojs/ui` está documentada en [UI](docs/ui.md); su app de demostración vive en `apps/ui-demo`.
+La base de componentes visuales de `@meekojs/ui` está documentada en [UI](docs/ui.md); su web de documentación vive en `apps/ui`.
 
 ## Contenido
 

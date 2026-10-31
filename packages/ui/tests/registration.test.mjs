@@ -10,7 +10,7 @@ import ui from '../dist/index.js'
 import * as runtime from '../dist/runtime.js'
 
 test('UI registers public components and composables without leaking private globals', async () => {
-	const root = fileURLToPath(new URL('../../../apps/ui-demo', import.meta.url))
+	const root = fileURLToPath(new URL('../../../apps/ui', import.meta.url))
 	const components = await discoverComponents(root)
 	assert.ok(components.some(({ name }) => name === 'UIApp'))
 	assert.ok(components.some(({ name }) => name === 'UIModal'))

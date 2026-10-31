@@ -1,0 +1,62 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+</script>
+
+<template>
+	<DocsPage
+		title="Link y LinkCard"
+		description="Navega con enlaces reales y comparte la jerarquía visual de tus acciones."
+	>
+		<h2 id="link">UILink</h2>
+		<div class="preview">
+			<UILink href="/installation">Instalación</UILink>
+			<UILink
+				href="/theming"
+				variant="outline"
+			>
+				Personalización
+			</UILink>
+		</div>
+		<DocsCode bind:code="examples.link" />
+		<DocsApi
+			caption="Propiedades de UILink"
+			bind:rows="[
+				{ name: 'href', type: 'string', description: 'Obligatoria. Destino del enlace.' },
+				{ name: 'variant / size / shape', type: 'UIActionVariant / UIActionSize / UIActionShape', default: 'primary / md / rounded', description: 'Misma API visual que UIButton.' },
+				{ name: 'target / rel', type: 'string', description: 'Atributos nativos del enlace. Para _blank se añade noopener noreferrer cuando rel no está definido.' },
+				{ name: 'ariaLabel', type: 'string', description: 'Nombre accesible cuando el contenido visible no basta.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<h2 id="link-card">UILinkCard</h2>
+		<div class="preview preview-stack">
+			<UILinkCard
+				href="/theming"
+				title="Personaliza tu interfaz"
+				description="Conecta tus colores, radios y tipografía con los tokens de UI."
+			/>
+		</div>
+		<DocsApi
+			caption="Propiedades de UILinkCard"
+			bind:rows="[
+				{ name: 'href', type: 'string', description: 'Obligatoria. Destino de toda la superficie.' },
+				{ name: 'title', type: 'string', description: 'Obligatoria. Texto principal del enlace.' },
+				{ name: 'description', type: 'string', description: 'Texto de apoyo opcional.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<p>
+			<code>UILink</code>
+			requiere el snippet
+			<code>default</code>
+			y emite
+			<code>click</code>
+			.
+			<code>UILinkCard</code>
+			admite contenido adicional con el snippet
+			<code>default</code>
+			opcional. No incluyas enlaces ni botones dentro de una LinkCard: toda la superficie ya es un enlace.
+		</p>
+		<p>Los enlaces internos participan en la navegación de Meeko; conservan el clic central, abrir en otra pestaña y el fallback sin JavaScript.</p>
+	</DocsPage>
+</template>

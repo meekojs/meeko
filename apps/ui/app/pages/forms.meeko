@@ -1,0 +1,109 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+	const name = signal('')
+	const error = signal<string | undefined>(undefined)
+	const saved = signal(false)
+	function save(event: SubmitEvent) {
+		event.preventDefault()
+		error.value = name.value.trim() ? undefined : 'Escribe un nombre.'
+		saved.value = !error.value
+	}
+	function reset() {
+		name.value = ''
+		error.value = undefined
+		saved.value = false
+	}
+</script>
+
+<template>
+	<DocsPage
+		title="Field e Input"
+		description="Conecta señales de texto con etiquetas, descripciones y errores accesibles."
+	>
+		<h2 id="usage">Un campo completo</h2>
+		<p>El ejemplo valida un nombre localmente. No envía información ni guarda datos en un servidor.</p>
+		<div class="preview">
+			<form
+				class="form-example"
+				novalidate
+				on:submit="save"
+			>
+				<UIField
+					id="name"
+					label="Nombre"
+					description="Como aparecerá en tu proyecto."
+					bind:error="error.value"
+					required
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UIInput
+							bind:id="id"
+							bind:describedBy="describedBy"
+							model="name"
+							bind:invalid="Boolean(error.value)"
+							required
+							placeholder="Proyecto Aurora"
+						/>
+					</snippet>
+				</UIField>
+				<div class="example-actions">
+					<UIButton type="submit">Guardar nombre</UIButton>
+					<UIButton
+						variant="outline"
+						on:click="reset"
+					>
+						Restablecer
+					</UIButton>
+				</div>
+				<p
+					class="status"
+					role="status"
+				>
+					{saved.value ? 'Nombre validado en este ejemplo.' : 'Completa el nombre para continuar.'}
+				</p>
+			</form>
+		</div>
+		<DocsCode bind:code="examples.form" />
+		<div class="doc-note">
+			UIField entrega
+			<code>id</code>
+			y
+			<code>describedBy</code>
+			a su snippet. Debes pasarlos al control, junto con
+			<code>invalid</code>
+			y
+			<code>required</code>
+			cuando corresponda. No se propagan automáticamente.
+		</div>
+		<DocsApi
+			caption="Propiedades de UIField"
+			bind:rows="[
+				{ name: 'id / label', type: 'string', description: 'Obligatorias. Identidad del control y etiqueta visible.' },
+				{ name: 'description / error', type: 'string', description: 'El error tiene prioridad y se anuncia con role=alert.' },
+				{ name: 'required', type: 'boolean', default: 'false', description: 'Muestra el indicador de campo obligatorio.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<DocsApi
+			caption="Propiedades de UIInput"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<string>', default: 'Cadena vacía', description: 'Modelo de texto de doble vía; se actualiza con input.' },
+				{ name: 'type', type: 'text | email | password | search | url | tel', default: 'text', description: 'Tipo nativo del control.' },
+				{ name: 'id / name / placeholder', type: 'string', description: 'Atributos del input.' },
+				{ name: 'describedBy', type: 'string', description: 'IDs de descripción y error para aria-describedby.' },
+				{ name: 'required / disabled / invalid', type: 'boolean', default: 'false', description: 'Estado del control. invalid activa aria-invalid.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<h2>Otros controles</h2>
+		<p>
+			<code>MeekoSelect</code>
+			pertenece al núcleo. El módulo UI añade su apariencia; consulta la
+			<a href="https://meeko.diegootayza.com/docs/reference">referencia de Meeko</a>
+			para su contrato completo.
+		</p>
+	</DocsPage>
+</template>

@@ -12,7 +12,7 @@ pnpm check
 pnpm check:apps
 ```
 
-El build prepara los cinco paquetes públicos y sus entradas `dist/`, incluidas las que importa `eslint.config.ts`. Por eso precede al lint en un checkout limpio. `check` comprueba los paquetes y `check:apps`, la web pública y la demo.
+El build prepara los cinco paquetes públicos y sus entradas `dist/`, incluidas las que importa `eslint.config.ts`. Por eso precede al lint en un checkout limpio. `check` comprueba los paquetes y `check:apps`, las webs públicas del framework y de UI.
 
 ## Pruebas por categoría
 

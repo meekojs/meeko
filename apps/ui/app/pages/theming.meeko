@@ -1,0 +1,91 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+</script>
+
+<template>
+	<DocsPage
+		title="Temas y personalización"
+		description="Conecta los componentes con tu marca sin duplicar la paleta de tu aplicación."
+	>
+		<h2 id="theme">Claro, oscuro y sistema</h2>
+		<p>
+			<code>theme</code>
+			pertenece al framework. Guarda la preferencia y aplica
+			<code>data-theme</code>
+			antes del primer pintado.
+			<code>MeekoThemeToggle</code>
+			permite cambiarla; esta misma web lo usa en su cabecera.
+		</p>
+		<div class="token-list">
+			<div class="token-swatch">
+				<i style="background: var(--accent)"></i>
+				<strong>Acento</strong>
+				<code>--meeko-ui-accent</code>
+			</div>
+			<div class="token-swatch">
+				<i style="background: var(--pill)"></i>
+				<strong>Acción principal</strong>
+				<code>--meeko-ui-primary</code>
+			</div>
+			<div class="token-swatch">
+				<i style="background: var(--surface-2)"></i>
+				<strong>Superficie</strong>
+				<code>--meeko-ui-surface</code>
+			</div>
+		</div>
+		<h2 id="tokens">Tokens semánticos</h2>
+		<p>
+			Las opciones
+			<code>ui.tokens</code>
+			aceptan valores CSS o referencias a variables existentes. El acento puede ser azul y la acción principal neutra, como en la identidad de Meeko.
+		</p>
+		<DocsCode
+			bind:code="examples.theme"
+			label="meeko.config.ts"
+		/>
+		<DocsCode
+			bind:code="examples.themeCss"
+			label="app/styles/main.css"
+		/>
+		<DocsApi
+			caption="Familias de tokens"
+			bind:rows="[
+				{ name: 'accent / primary', type: 'string', description: 'Color, hover y contraste: accentHover, onAccent, primaryHover y onPrimary.' },
+				{ name: 'surface / surfaceHover', type: 'string', description: 'Fondos de componentes y estados interactivos.' },
+				{ name: 'text / textSoft / muted', type: 'string', description: 'Texto principal, secundario y auxiliar.' },
+				{ name: 'border / borderStrong', type: 'string', description: 'Separadores y contornos.' },
+				{ name: 'focus / danger', type: 'string', description: 'Foco de teclado y errores.' },
+				{ name: 'accentSoft / accentText', type: 'string', description: 'Fondos y texto de estados de acento.' },
+				{ name: 'font / radius', type: 'string', description: 'Familia tipográfica y radio base.' },
+				{ name: 'controlHeight / controlPadding', type: 'string', description: 'Dimensiones de las acciones.' },
+				{ name: 'controlWeight / controlFontSize', type: 'string', description: 'Peso y tamaño de texto de las acciones.' },
+			]"
+		/>
+		<h2 id="defaults">Valores por defecto</h2>
+		<p>
+			<code>ui.defaults</code>
+			admite
+			<code>button</code>
+			,
+			<code>link</code>
+			y
+			<code>card</code>
+			. La prioridad es: props explícitas, defaults de aplicación y valores de base. Los defaults se aíslan por aplicación y petición SSR.
+		</p>
+		<p>
+			Las hojas de
+			<code>app/styles</code>
+			se cargan después del módulo. También puedes sobrescribir directamente las variables
+			<code>--meeko-ui-*</code>
+			. Los tipos
+			<code>UIOptions</code>
+			,
+			<code>UITokens</code>
+			y
+			<code>UIDefaults</code>
+			se exportan desde
+			<code>@meekojs/ui</code>
+			.
+		</p>
+	</DocsPage>
+</template>

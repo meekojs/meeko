@@ -1,0 +1,60 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+	const count = signal(0)
+</script>
+
+<template>
+	<DocsPage
+		title="Button"
+		description="Ejecuta acciones con una semántica de botón y una API visual compartida con Link."
+	>
+		<h2 id="usage">Uso</h2>
+		<div class="preview">
+			<UIButton on:click="() => count.value++">Guardar cambio</UIButton>
+			<UIButton variant="secondary">Secundario</UIButton>
+			<UIButton variant="outline">Outline</UIButton>
+			<UIButton variant="ghost">Ghost</UIButton>
+		</div>
+		<p role="status">Cambios en este ejemplo: {count.value}</p>
+		<DocsCode bind:code="examples.button" />
+		<h2 id="sizes">Tamaños y estados</h2>
+		<div class="preview">
+			<UIButton size="sm">Pequeño</UIButton>
+			<UIButton size="md">Mediano</UIButton>
+			<UIButton size="lg">Grande</UIButton>
+			<UIButton
+				shape="pill"
+				variant="outline"
+			>
+				Pill
+			</UIButton>
+			<UIButton disabled>No disponible</UIButton>
+		</div>
+		<DocsApi
+			bind:rows="[
+				{ name: 'type', type: 'button | submit | reset', default: 'button', description: 'Comportamiento nativo en formularios.' },
+				{ name: 'variant', type: 'primary | secondary | outline | ghost', default: 'primary', description: 'Jerarquía visual de la acción.' },
+				{ name: 'size', type: 'sm | md | lg', default: 'md', description: 'Tamaño del control.' },
+				{ name: 'shape', type: 'rounded | pill', default: 'rounded', description: 'Forma del contorno.' },
+				{ name: 'disabled', type: 'boolean', default: 'false', description: 'Desactiva la interacción nativa.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<h2 id="events">Eventos y contenido</h2>
+		<p>
+			<code>on:click</code>
+			recibe el evento de ratón. El snippet
+			<code>default</code>
+			es obligatorio. Para estados asíncronos controla
+			<code>disabled</code>
+			y el texto con tus señales; no hay una prop
+			<code>loading</code>
+			.
+		</p>
+		<p>
+			Si la acción cambia la URL, usa
+			<a href="/links">UILink</a>
+			.
+		</p>
+	</DocsPage>
+</template>

@@ -23,7 +23,7 @@
 		"check": "tsc -p tsconfig.json --noEmit",
 		"prepack": "pnpm run build",
 		"test": "pnpm run build && node --test tests/*.test.mjs",
-		"test:e2e": "pnpm run build && pnpm -F meeko-ui-demo build && node --test --test-concurrency=1 tests/*.e2e.mjs"
+		"test:e2e": "pnpm run build && pnpm -F meeko-ui-site build && node --test --test-concurrency=1 tests/*.e2e.mjs"
 	},
 	"devDependencies": {
 		"@meekojs/eslint-plugin": "workspace:*",

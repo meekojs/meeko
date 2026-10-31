@@ -7,7 +7,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
 
-const demo = fileURLToPath(new URL('../../../apps/ui-demo/', import.meta.url))
+const demo = fileURLToPath(new URL('../../../apps/ui/', import.meta.url))
 const output = fileURLToPath(new URL('../.meeko/', import.meta.url))
 
 async function until(check, message) {
@@ -184,9 +184,9 @@ test('modals hydrate, stack, settle, restore focus and work on mobile', { timeou
 		async () => (await page.locator('dialog[open]').count()) === 0,
 		() => 'Close button did not dismiss',
 	)
-	await page.getByRole('link', { name: 'Volver a los controles' }).click()
-	await page.getByRole('heading', { name: 'Una base para tu interfaz.' }).waitFor()
-	await page.getByRole('link', { name: 'Probar modales' }).click()
+	await page.getByRole('link', { name: 'Meeko UI, inicio', exact: true }).click()
+	await page.getByRole('heading', { name: 'Tu interfaz. Con el lenguaje de Meeko.' }).waitFor()
+	await page.getByRole('link', { name: /Interacciones completas/ }).click()
 	await page.emulateMedia({ reducedMotion: 'reduce' })
 	await trigger.click()
 	await page.locator('dialog[open]').waitFor()

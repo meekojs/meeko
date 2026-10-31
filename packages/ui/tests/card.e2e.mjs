@@ -7,7 +7,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
 
-const demo = fileURLToPath(new URL('../../../apps/ui-demo/', import.meta.url))
+const demo = fileURLToPath(new URL('../../../apps/ui/', import.meta.url))
 const output = fileURLToPath(new URL('../.meeko/', import.meta.url))
 async function port() {
 	const server = createServer().listen(0, '127.0.0.1')

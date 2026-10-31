@@ -1,0 +1,61 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+</script>
+
+<template>
+	<DocsPage
+		title="Instalación"
+		description="Activa el módulo, configura el host y empieza con tu primer componente."
+	>
+		<h2 id="requirements">Antes de empezar</h2>
+		<p>
+			Necesitas una aplicación Meeko, Node.js 24 o superior y Meeko compatible con el rango
+			<code>&gt;=1.7 &lt;2</code>
+			. UI pertenece al ecosistema de Meeko y se distribuye como paquete independiente.
+		</p>
+		<h2 id="install">Instala el paquete</h2>
+		<DocsCode
+			bind:code="examples.install"
+			label="Terminal"
+		/>
+		<h2 id="module">Registra el módulo</h2>
+		<p>
+			Importa el módulo para disponer del tipado de
+			<code>ui</code>
+			en la configuración. Los componentes se registran con el prefijo
+			<code>UI</code>
+			.
+		</p>
+		<DocsCode
+			bind:code="examples.config"
+			label="meeko.config.ts"
+		/>
+		<p>El módulo registra su CSS y Vite lo procesa con el PostCSS de tu proyecto. No tienes que importar una hoja CSS manualmente ni añadir otro procesador.</p>
+		<h2 id="host">Añade UIApp</h2>
+		<p>
+			Envuelve tu aplicación para alojar los modales abiertos mediante
+			<code>useModal()</code>
+			. El plugin del módulo crea el manager y
+			<code>UIApp</code>
+			representa su pila.
+		</p>
+		<DocsCode
+			bind:code="examples.app"
+			label="app/app.meeko"
+		/>
+		<h2 id="first-component">Usa un componente</h2>
+		<div class="preview">
+			<UIButton>Guardar cambios</UIButton>
+			<UIButton variant="outline">Cancelar</UIButton>
+		</div>
+		<DocsCode bind:code="examples.button" />
+		<div class="doc-note">Las señales, los macros y los componentes UI se descubren en tu aplicación. Los tipos que necesites explícitamente se importan desde los exports públicos del paquete.</div>
+		<p>
+			Continúa con
+			<a href="/theming">temas y personalización</a>
+			o explora
+			<a href="/components">todos los componentes</a>
+			.
+		</p>
+	</DocsPage>
+</template>

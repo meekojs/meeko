@@ -1,0 +1,39 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+</script>
+<template>
+	<DocsPage
+		title="View Transitions"
+		description="Conecta una superficie de lista y detalle con la API nativa del navegador."
+	>
+		<div class="view-transition-demo">
+			<p>Al abrir el proyecto, su card se transforma en la vista de detalle mediante la API nativa del navegador.</p>
+			<div class="view-transition-demo-list">
+				<UICard
+					title="Proyecto Aurora"
+					description="Sitio web del equipo"
+					class="view-transition-demo-project"
+				>
+					<p>Una misma superficie, dos vistas. La navegación conserva la identidad visual del proyecto.</p>
+					<snippet name="footer"><MeekoLink to="/transitions/project">Ver proyecto</MeekoLink></snippet>
+				</UICard>
+			</div>
+			<p>
+				También puedes
+				<MeekoLink
+					to="/transitions/project"
+					data-meeko-view-transition="false"
+				>
+					abrir sin transición
+				</MeekoLink>
+				.
+			</p>
+		</div>
+		<h2>Configuración</h2>
+		<p>Esta función pertenece al framework, no al módulo UI. Requiere soporte del navegador y respeta movimiento reducido; la navegación sigue funcionando cuando no puede animarse.</p>
+		<DocsCode
+			bind:code="examples.transitions"
+			label="Configuración, CSS y enlace"
+		/>
+	</DocsPage>
+</template>

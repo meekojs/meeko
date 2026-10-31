@@ -1,0 +1,56 @@
+<template>
+	<DocsPage
+		title="Componentes"
+		description="Encuentra cada componente por su tarea. Cada guía incluye ejemplos, código y referencia de API."
+	>
+		<h2>Acciones y navegación</h2>
+		<div class="directory">
+			<a href="/buttons">
+				<strong>Button</strong>
+				<span>Acciones con variantes, tamaños y estados.</span>
+			</a>
+			<a href="/links">
+				<strong>Link y LinkCard</strong>
+				<span>Enlaces reales y superficies de navegación.</span>
+			</a>
+			<a href="/badges">
+				<strong>Badge</strong>
+				<span>Metadatos y estados sin interacción.</span>
+			</a>
+		</div>
+		<h2>Captura y presentación</h2>
+		<div class="directory">
+			<a href="/forms">
+				<strong>Field e Input</strong>
+				<span>Etiquetas, modelos de texto y mensajes de error.</span>
+			</a>
+			<a href="/cards">
+				<strong>Card</strong>
+				<span>Contenido con cabecera, cuerpo y acciones.</span>
+			</a>
+			<a href="/tables">
+				<strong>Table</strong>
+				<span>Filas y columnas correlacionadas por TypeScript.</span>
+			</a>
+		</div>
+		<h2>Superposiciones</h2>
+		<div class="directory">
+			<a href="/modals">
+				<strong>Modal</strong>
+				<span>Declarativo o programático, con soporte de anidación.</span>
+			</a>
+			<a href="/app">
+				<strong>App</strong>
+				<span>El host de los modales programáticos.</span>
+			</a>
+		</div>
+		<p>
+			<code>MeekoSelect</code>
+			,
+			<code>MeekoPopover</code>
+			y
+			<code>MeekoThemeToggle</code>
+			pertenecen al núcleo. UI aporta su apariencia y conserva sus nombres.
+		</p>
+	</DocsPage>
+</template>

@@ -1,0 +1,21 @@
+<script lang="ts">
+	const props = defineProps<{ title: string; description: string; landing?: boolean }>()
+
+	const snippets = defineSnippets<{ default: [] }>()
+
+	useHead(() => ({ title: props.title + ' · Meeko UI', meta: [{ name: 'description', content: props.description }] }))
+</script>
+
+<template>
+	<main
+		id="contenido"
+		bind:class="props.landing ? 'doc-page landing-page' : 'doc-page'"
+		tabindex="-1"
+	>
+		<header class="doc-heading">
+			<h1>{props.title}</h1>
+			<p>{props.description}</p>
+		</header>
+		<render snippet="snippets.default" />
+	</main>
+</template>

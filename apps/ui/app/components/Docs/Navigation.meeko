@@ -1,0 +1,34 @@
+<script lang="ts">
+	const props = defineProps<{ groups: readonly { title: string; items: readonly { href: string; label: string }[] }[] }>()
+
+	const route = useRoute()
+</script>
+
+<template>
+	<nav aria-label="Documentación de UI">
+		<section
+			each:of="props.groups"
+			each:as="group"
+			each:key="group.title"
+			class="nav-group"
+		>
+			<h2>{group.title}</h2>
+			<a
+				each:of="group.items"
+				each:as="item"
+				each:key="item.href"
+				bind:href="item.href"
+				bind:aria-current="route.path.value === item.href ? 'page' : undefined"
+			>
+				{item.label}
+			</a>
+		</section>
+		<p
+			if:when="!props.groups.length"
+			class="nav-empty"
+			role="status"
+		>
+			No hay coincidencias. Prueba con otro nombre.
+		</p>
+	</nav>
+</template>

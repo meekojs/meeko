@@ -8,7 +8,7 @@ Meeko es un monorepo pnpm. Instala dependencias desde la raíz y conserva el ún
 - `packages/ui/src/app/`: componentes `.meeko` y estilos CSS; `packages/i18n/`: internacionalización.
 - `packages/eslint-plugin/` y `packages/prettier-plugin/`: herramientas compartidas.
 - `packages/vscode/` y `packages/devtools/`: extensiones de editor y navegador.
-- `apps/site/`, `apps/ui-demo/`: documentación y aplicación de demostración.
+- `apps/site/`, `apps/ui/`: webs públicas de documentación del framework y de UI.
 - `docs/`, `assets/brand/`, `scripts/`: documentación, recursos de marca y automatización.
 
 ## Comandos de desarrollo y validación
@@ -18,7 +18,7 @@ Requiere Node.js 24+ y pnpm 12.14.0. En Windows usa PowerShell 7.
 - `pnpm install`: instala el workspace.
 - `pnpm build`: construye núcleo, UI, i18n y plugins.
 - `pnpm tooling:build`: prepara los paquetes usados por ESLint y Prettier.
-- `pnpm site:dev`: inicia el sitio; `pnpm -F meeko-ui-demo dev`: inicia la demo.
+- `pnpm dev` o `pnpm site:dev`: inicia el sitio del framework; `pnpm ui:dev`: inicia la web de UI.
 - `pnpm check`: comprueba tipos de los cinco paquetes principales.
 - `pnpm test`: ejecuta las pruebas del núcleo; `pnpm verify`: amplía la validación con ejemplos, compilación y DevTools.
 - `pnpm lint` y `pnpm format:check`: revisan lint y formato.

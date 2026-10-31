@@ -1,0 +1,44 @@
+<script lang="ts">
+	const props = defineProps<{ rows: readonly { name: string; type: string; description: string; default?: string }[]; caption?: string }>()
+</script>
+
+<template>
+	<div
+		class="api-scroll"
+		tabindex="0"
+		role="region"
+		bind:aria-label="props.caption ?? 'Propiedades'"
+	>
+		<table class="api-table">
+			<caption>{props.caption ?? 'Propiedades'}</caption>
+			<thead>
+				<tr>
+					<th scope="col">Nombre</th>
+					<th scope="col">Tipo / valor inicial</th>
+					<th scope="col">Descripción</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr
+					each:of="props.rows"
+					each:as="row"
+					each:key="row.name"
+				>
+					<th scope="row">
+						<code>{row.name}</code>
+					</th>
+					<td>
+						<code>{row.type}</code>
+						<span
+							if:when="row.default"
+							class="api-default"
+						>
+							{row.default}
+						</span>
+					</td>
+					<td>{row.description}</td>
+				</tr>
+			</tbody>
+		</table>
+	</div>
+</template>

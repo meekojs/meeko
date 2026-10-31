@@ -1182,7 +1182,7 @@ Para desactivar o activar una navegación concreta, usa `app.navigate('/projects
 
 `data-meeko-view-transition="true"` activa ese enlace aunque la opción global esté desactivada; movimiento reducido sigue teniendo prioridad. La promesa de navegación espera al cambio de DOM, sin esperar al final de la animación. Una navegación posterior o desmontar la aplicación omite la animación anterior; una actualización abortada no puede sustituir la página nueva. Los fallos de animación no se convierten en fallos de navegación; los errores del render siguen propagándose como antes.
 
-Esta opción controla cambios dentro del mismo documento. Las navegaciones a documentos nuevos pueden usar `@view-transition { navigation: auto; }` en las hojas de ambas páginas del mismo origen, sujeto al soporte del navegador y a las reglas de esa API. Los modales de UI mantienen sus animaciones locales y no necesitan capturas de toda la página. La demo `/transitions` de `apps/ui-demo` incluye una superficie compartida entre lista y detalle, además de enlaces sin transición.
+Esta opción controla cambios dentro del mismo documento. Las navegaciones a documentos nuevos pueden usar `@view-transition { navigation: auto; }` en las hojas de ambas páginas del mismo origen, sujeto al soporte del navegador y a las reglas de esa API. Los modales de UI mantienen sus animaciones locales y no necesitan capturas de toda la página. El ejemplo `/transitions` de la web pública `apps/ui` incluye una superficie compartida entre lista y detalle, además de enlaces sin transición.
 
 ### Estado de navegación
 

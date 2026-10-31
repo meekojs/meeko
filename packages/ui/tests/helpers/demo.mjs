@@ -14,7 +14,7 @@ async function port() {
 }
 
 export async function startDemo(context) {
-	const demo = fileURLToPath(new URL('../../../../apps/ui-demo/', import.meta.url))
+	const demo = fileURLToPath(new URL('../../../../apps/ui/', import.meta.url))
 	const output = fileURLToPath(new URL('../../.meeko/', import.meta.url))
 	const cli = fileURLToPath(new URL('../../../meeko/dist/cli.js', import.meta.url))
 	const httpPort = await port(),

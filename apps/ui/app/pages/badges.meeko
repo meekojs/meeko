@@ -1,0 +1,32 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+</script>
+
+<template>
+	<DocsPage
+		title="Badge"
+		description="Describe estados y metadatos con etiquetas de texto."
+	>
+		<h2 id="usage">Uso</h2>
+		<div class="preview">
+			<UIBadge>Información</UIBadge>
+			<UIBadge tone="accent">Publicado</UIBadge>
+			<UIBadge tone="danger">Revisar</UIBadge>
+		</div>
+		<DocsCode bind:code="examples.badge" />
+		<DocsApi
+			bind:rows="[
+				{ name: 'tone', type: 'neutral | accent | danger', default: 'neutral', description: 'Tratamiento visual de la etiqueta.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+			]"
+		/>
+		<h2 id="content">Contenido y accesibilidad</h2>
+		<p>
+			El snippet
+			<code>default</code>
+			es obligatorio. Badge se representa como un
+			<code>span</code>
+			: no añade interacción, roles ni anuncios. Usa texto que explique el estado; el color no debe ser su único significado.
+		</p>
+	</DocsPage>
+</template>

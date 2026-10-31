@@ -1,0 +1,26 @@
+{
+	"name": "meeko-ui-site",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "meeko build .",
+		"check": "meeko check .",
+		"dev": "meeko dev .",
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"preview": "meeko preview .",
+		"start": "meeko start ."
+	},
+	"dependencies": {
+		"@meekojs/meeko": "workspace:*",
+		"@meekojs/ui": "workspace:*"
+	},
+	"devDependencies": {
+		"@meekojs/eslint-plugin": "workspace:*",
+		"@types/node": "^24.0.0",
+		"eslint": "10.13.0",
+		"jiti": "2.7.0",
+		"typescript": "7.0.2",
+		"vite": "8.3.5"
+	}
+}

@@ -1,0 +1,35 @@
+<script lang="ts">
+	const props = defineProps<{ code: string; label?: string }>()
+
+	const status = signal('')
+	async function copy() {
+		try {
+			await navigator.clipboard.writeText(props.code)
+			status.value = 'Copiado'
+		} catch {
+			status.value = 'Selecciona el código para copiarlo.'
+		}
+	}
+</script>
+
+<template>
+	<figure class="code-block">
+		<figcaption>
+			<span>{props.label ?? 'Ejemplo .meeko'}</span>
+			<button
+				type="button"
+				on:click="copy"
+				aria-label="Copiar código"
+			>
+				Copiar
+			</button>
+		</figcaption>
+		<pre tabindex="0"><code>{props.code}</code></pre>
+		<span
+			class="code-status"
+			role="status"
+		>
+			{status.value}
+		</span>
+	</figure>
+</template>
