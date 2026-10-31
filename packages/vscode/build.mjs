@@ -1,4 +1,7 @@
 import { build } from "esbuild";
+import { readFile } from "node:fs/promises";
+
+const { version: meekoVersion } = JSON.parse(await readFile(new URL("../meeko/package.json", import.meta.url), "utf8"));
 
 const common = {
   bundle: true,
@@ -31,5 +34,6 @@ await build({
   ...common,
   entryPoints: ["../meeko/src/language-server/main.ts"],
   outfile: "dist/server.js",
+  define: { __MEEKO_BUNDLED_VERSION__: JSON.stringify(meekoVersion) },
   external: ["@typescript/typescript6", "prettier", "prettier/*", "vite"],
 });

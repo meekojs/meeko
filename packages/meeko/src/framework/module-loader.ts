@@ -137,7 +137,11 @@ export function warnLegacyLayerEntries(projectRoot: string, config: MeekoConfig,
 
 // --- Version ranges -------------------------------------------------------------------------
 
+declare const __MEEKO_BUNDLED_VERSION__: string | undefined;
+
 function meekoVersion(): string {
+  // A single-file language server no longer has this module's package-relative URL.
+  if (typeof __MEEKO_BUNDLED_VERSION__ === "string") return __MEEKO_BUNDLED_VERSION__;
   const metadata = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string };
   return metadata.version;
 }
