@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { Server } from "node:http";
@@ -43,7 +43,7 @@ import type { EditorBridge } from "./editor-bridge";
 import { clientEntrySource, nodeEntrySource, serverEntrySource, staticClientEntrySource } from "./project-templates";
 import { assertNoLegacySessionFile } from "./runtime-migration";
 import { hasFrameworkTsconfigs, prepareFrameworkTypeDeclarations } from "./type-declarations";
-import { createGlobalStylesheetSnapshot, devStylesheetLink, globalStylesheetFile, globalStylesheetUrl } from "./styles";
+import { createGlobalStylesheetSnapshot, devStylesheetLink, frameworkStylesheets, stylesheetUrl } from "./styles";
 
 export { frameworkClientEntry, frameworkServerEntry } from "./app-manifest";
 
@@ -567,7 +567,7 @@ async function startDevelopment(root: string): Promise<Server> {
   /** Runs a Vite restart once the app's work in flight drains, and rebuilds the app after it; set once the app exists. */
   let onRestart: ((start: () => Promise<void>) => Promise<void>) | undefined;
   // The processed global stylesheet on disk, for editor tools that read class names from CSS files.
-  const stylesheetSnapshot = createGlobalStylesheetSnapshot(root, (message) => process.stderr.write(`[meeko] ${message}\n`));
+  const stylesheetSnapshot = createGlobalStylesheetSnapshot(root, (message) => process.stderr.write(`[meeko] ${message}\n`), modules.stylesheets);
   const reportError = (error: unknown, requestId: string): void => {
     if (app) { app.reportError(error, requestId); return; }
     reportServerError(error, requestId, (failure, id) => {
@@ -632,13 +632,12 @@ async function startDevelopment(root: string): Promise<Server> {
       },
       appType: "custom",
     }, "serve"));
-    const globalCss = resolve(root, globalStylesheetFile);
     const globalStylesheet = (): string => {
       // Vite names the module by its real path with forward slashes, as the client entry imports it.
-      let moduleId: string;
-      try { moduleId = realpathSync.native(globalCss).replaceAll("\\", "/"); }
-      catch { return ""; }
-      return devStylesheetLink(globalStylesheetUrl, moduleId);
+      return frameworkStylesheets(root, modules.stylesheets).map((file) => {
+        const moduleId = file.replaceAll("\\", "/");
+        return devStylesheetLink(`${stylesheetUrl(root, file)}?direct`, moduleId);
+      }).join("");
     };
     const devServer = vite;
     const publicOrigin = meekoEnv(process.env, "PUBLIC_ORIGIN");

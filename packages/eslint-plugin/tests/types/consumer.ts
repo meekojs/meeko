@@ -1,6 +1,7 @@
-import {defineEslint} from '@meekojs/eslint-plugin';
-import type {DefineEslintRules, DefineEslintOptions} from '@meekojs/eslint-plugin';
+import type {DefineEslintOptions, DefineEslintRules} from '@meekojs/eslint-plugin';
 import type {Linter} from 'eslint';
+
+import {defineEslint} from '@meekojs/eslint-plugin';
 
 const rules = {
   'no-debugger': 'error',
@@ -9,6 +10,9 @@ const rules = {
   '@typescript-eslint/no-explicit-any': ['error', {ignoreRestArgs:true}],
   'meeko/button-has-type': ['error'],
   'meeko/no-autofocus': 0,
+  'meeko/order-macros': ['error', {order:['defineProps','defineEmits','defineModel','defineSnippets','useElementRef','defineExpose']}],
+  'meeko/order-sections': ['warn', {order:['server','script','template','style']}],
+  'meeko/prefer-static-bindings': 'warn',
 } satisfies DefineEslintRules;
 const options: DefineEslintOptions = {ignores:['**/build/**'],rules};
 const config: Linter.Config[] = defineEslint(options,{files:['**/*.js'],rules:{'no-debugger':'off'}});
@@ -31,6 +35,14 @@ defineEslint({rules:{'no-debbuger':'error'}});
 defineEslint({rules:{'meeko/button-has-type':['error',{allow:true}]}});
 // @ts-expect-error Meeko rule severity is checked.
 defineEslint({rules:{'meeko/no-autofocus':'fatal'}});
+// @ts-expect-error Macro names are checked.
+defineEslint({rules:{'meeko/order-macros':['error',{order:['defineProp']}]}});
+// @ts-expect-error Section names are checked.
+defineEslint({rules:{'meeko/order-sections':['error',{order:['client']}]}});
+// @ts-expect-error Unknown style options are rejected.
+defineEslint({rules:{'meeko/order-macros':['error',{sort:true}]}});
+// @ts-expect-error Static binding rule has no options.
+defineEslint({rules:{'meeko/prefer-static-bindings':['error',{unsafe:true}]}});
 // @ts-expect-error Core rule options use official ESLint types.
 defineEslint({rules:{eqeqeq:['error','sometimes']}});
 // @ts-expect-error TypeScript-ESLint rule names are finite.

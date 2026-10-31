@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -224,6 +224,7 @@ export interface ResolvedModules {
   readonly serverMiddleware: readonly string[];
   readonly serverHandlers: readonly { readonly route: string; readonly file: string }[];
   readonly publicFiles: ReadonlyMap<string, PublicFileContents>;
+  readonly stylesheets: readonly string[];
   readonly typeTemplates: ReadonlyMap<string, string>;
   /** `<head>` entries of the modules, before `document.head` of the configuration. */
   readonly head: HeadInput | undefined;
@@ -236,7 +237,7 @@ export interface ResolvedModules {
 
 const emptyModules: ResolvedModules = Object.freeze({
   names: [], entryFiles: [], layers: [], componentsDirs: [], layouts: [], autoImports: [], autoImportsDirs: [], plugins: [],
-  serverMiddleware: [], serverHandlers: [], publicFiles: new Map(), typeTemplates: new Map(), head: undefined, vitePlugins: [], viteExtenders: [], ownedDirectories: [],
+  serverMiddleware: [], serverHandlers: [], publicFiles: new Map(), stylesheets: [], typeTemplates: new Map(), head: undefined, vitePlugins: [], viteExtenders: [], ownedDirectories: [],
   callHook: async () => {},
 });
 
@@ -359,6 +360,7 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
   const serverMiddleware: string[] = [];
   const serverHandlers: Array<{ route: string; file: string }> = [];
   const publicFiles = new Map<string, PublicFileContents>();
+  const stylesheets: string[] = [];
   const typeTemplates = new Map<string, string>();
   let head: HeadInput | undefined;
   const vitePlugins: object[] = [];
@@ -470,6 +472,12 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
         if (typeTemplates.has(key)) throw new Error(`Módulo ${name}: declaración repetida ${filename}`);
         typeTemplates.set(key, contents);
       },
+      addStylesheet(value: string | URL) {
+        const file = realpathSync.native(existingFile(value, "stylesheet"));
+        if (!file.toLowerCase().endsWith(".css")) throw new TypeError(`Módulo de Meeko ${name}: la hoja de estilos debe ser un archivo .css: ${file}`);
+        if (!stylesheets.includes(file)) stylesheets.push(file);
+        ownedDirectories.add(dirname(file));
+      },
       addHead(input: DocumentHead) {
         if (!input || typeof input !== "object") throw new TypeError(`Módulo de Meeko ${name}: addHead necesita un objeto de head`);
         // It joins `document`, which the build bakes as JSON: fail here, naming the module.
@@ -489,7 +497,7 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
   }
   const resolved: ResolvedModules = {
     names, entryFiles, layers, componentsDirs, layouts, autoImports, autoImportsDirs, plugins, serverMiddleware, serverHandlers,
-    publicFiles, typeTemplates, head, vitePlugins, viteExtenders, ownedDirectories: [...ownedDirectories],
+    publicFiles, stylesheets, typeTemplates, head, vitePlugins, viteExtenders, ownedDirectories: [...ownedDirectories],
     async callHook(hookName, ...args) {
       for (const handler of [...hooks.get(hookName) ?? []]) await (handler as (...values: unknown[]) => unknown)(...args);
     },

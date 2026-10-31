@@ -1,12 +1,13 @@
+import {Linter} from 'eslint';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {readFile} from 'node:fs/promises';
-import {fileURLToPath} from 'node:url';
 import test from 'node:test';
-import {Linter} from 'eslint';
+import {fileURLToPath} from 'node:url';
+
 import {defineEslint} from '../dist/index.js';
-import {generatedTypes, schemaHash} from '../scripts/generate-rule-types.mjs';
 import {typeScriptRuleSchemaHash} from '../dist/typescript-rules.generated.js';
+import {generatedTypes, schemaHash} from '../scripts/generate-rule-types.mjs';
 
 const messages = (source, filename, config = defineEslint()) => new Linter().verify(source, config, {filename});
 
@@ -61,4 +62,64 @@ test('generated TypeScript rule options match the pinned public schemas', async 
 test('consumer type checks known rule options and rejects typos and invalid tuples', () => {
   const tsc = fileURLToPath(new URL('../bin/tsc6', import.meta.resolve('typescript')));
   execFileSync(process.execPath,[tsc,'--ignoreConfig','--noEmit','--strict','--skipLibCheck','--module','nodenext','--target','es2022',fileURLToPath(new URL('./types/consumer.ts',import.meta.url))],{stdio:'pipe'});
+});
+
+test('component style rules are opt-in and scoped to Meeko files', () => {
+  const source = '<script lang="ts">defineEmits<{save: []}>(); defineProps<{title: string}>();</script><template><p bind:title="\'Hello\'"></p></template>';
+  assert.deepEqual(messages(source, 'App.meeko'), []);
+  const config = defineEslint({rules:{
+    'meeko/order-macros':'error',
+    'meeko/order-sections':['error',{order:['server','script','template','style']}],
+    'meeko/prefer-static-bindings':'warn',
+  }});
+  const diagnostics = messages(source, 'App.meeko', config);
+  assert.ok(diagnostics.some(({ruleId}) => ruleId === 'meeko/order-macros'));
+  assert.ok(diagnostics.some(({ruleId, severity}) => ruleId === 'meeko/prefer-static-bindings' && severity === 1));
+  assert.deepEqual(messages('export const value = 1;', 'app.ts', config), []);
+  assert.deepEqual(messages('export const value = 1;', 'app.js', config), []);
+  assert.throws(() => defineEslint({meeko:false,rules:{'meeko/order-macros':'error'}}), /requires meeko/);
+});
+
+test('type import fixes compose with import sorting and removal in both scripts', () => {
+  const source = `<script server lang="ts">import { URL } from 'node:url'; export const base: URL | undefined = undefined;</script>
+<script lang="ts">import { URL } from 'node:url'; const url: URL | undefined = undefined;</script><template>{url}</template>`;
+  const config = defineEslint({perfectionist:true,unusedImports:true,rules:{
+    '@typescript-eslint/consistent-type-imports':['error',{prefer:'type-imports',fixStyle:'separate-type-imports'}],
+  }});
+  const linter = new Linter();
+  const fixed = linter.verifyAndFix(source, config, {filename:'App.meeko'});
+  assert.deepEqual(fixed.messages, []);
+  assert.equal((fixed.output.match(/import type/g) ?? []).length, 2);
+  assert.match(fixed.output, /<\/script>\s*<script lang="ts">/);
+  assert.equal(linter.verifyAndFix(fixed.output, config, {filename:'App.meeko'}).fixed, false);
+});
+
+test('type import fixes never merge same-source imports across server and component scripts', () => {
+  const config = defineEslint({perfectionist:true,unusedImports:true,rules:{
+    '@typescript-eslint/consistent-type-imports':['error',{prefer:'type-imports',fixStyle:'separate-type-imports'}],
+  }});
+  const server = `<script server lang="ts">import type { URL } from 'node:url'; export const base: URL | undefined = undefined;</script>`;
+  const client = `<script lang="ts">import { URL, URLSearchParams } from 'node:url'; const url: URL | undefined = undefined; const query = new URLSearchParams();</script>`;
+  for (const [first, second] of [[server,client],[client,server]]) {
+    const linter = new Linter();
+    const fixed = linter.verifyAndFix(first + second + '<template>{url}{query}</template>', config, {filename:'App.meeko'});
+    assert.deepEqual(fixed.messages, []);
+    const scripts = [...fixed.output.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)];
+    assert.equal(scripts.length, 2);
+    for (const script of scripts) assert.equal((script[1].match(/import type\s*\{\s*URL\s*\}/g) ?? []).length, 1);
+    assert.equal(linter.verifyAndFix(fixed.output, config, {filename:'App.meeko'}).fixed, false);
+  }
+});
+
+test('type import consistency preserves template component values and generic type references', () => {
+  const config = defineEslint({perfectionist:true,unusedImports:true,rules:{
+    '@typescript-eslint/consistent-type-imports':'error',
+  }});
+  const source = `<script lang="ts" generic="T extends User">import Card from './Card.meeko'; import { User } from './types'; const props = defineProps<{ user: T }>();</script><template><Card bind:user="props.user" /></template>`;
+  const linter = new Linter();
+  const fixed = linter.verifyAndFix(source, config, {filename:'App.meeko'});
+  assert.deepEqual(fixed.messages, []);
+  assert.match(fixed.output, /import Card from/);
+  assert.match(fixed.output, /import type\s*\{\s*User\s*\}/);
+  assert.equal(linter.verifyAndFix(fixed.output, config, {filename:'App.meeko'}).fixed, false);
 });

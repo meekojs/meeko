@@ -110,6 +110,7 @@ export async function generateRoutes(projectRoot: string): Promise<GeneratedRout
   await writeFile(types, declarations, "utf8");
   await writeFile(virtualTypes, [
     'declare module "virtual:meeko-client-pages" { export const modules: Record<string, () => Promise<unknown>>; }',
+    'declare module "virtual:meeko-global-styles" {}',
     'declare module "virtual:meeko-manifest/client" { export const routes: readonly import("@meekojs/meeko/framework").RouteRecord[]; export const errorPage: import("@meekojs/meeko/framework").ErrorPageRecord | undefined; export const documentConfig: import("@meekojs/meeko/framework").DocumentConfig | undefined; }',
     'declare module "virtual:meeko-client-routes" { export const modules: Record<string, () => Promise<unknown>>; }',
     'declare module "virtual:meeko-plugins/client" { export const plugins: readonly import("@meekojs/meeko/framework").PluginRegistration[]; }',

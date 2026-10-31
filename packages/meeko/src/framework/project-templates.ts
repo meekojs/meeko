@@ -24,8 +24,8 @@ const loadNamedMiddleware = async (file: string): Promise<RouteMiddleware> => {
 // app/error.meeko joins the bundle even when no route falls back to it.
 const errorPages = import.meta.glob("/app/error.meeko");
 
-// Optional global stylesheet. Vite includes it in the client bundle when present.
-import.meta.glob("/app/styles/main.css", { eager: true });
+// Module stylesheets followed by the optional application stylesheet, processed by Vite/PostCSS.
+import "virtual:meeko-global-styles";
 
 const root = document.getElementById("app");
 const payload = document.getElementById("meeko-payload")?.textContent;

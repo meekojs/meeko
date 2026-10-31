@@ -83,6 +83,42 @@ export default defineEslint({
 
 `eslint --fix` puede entonces ordenar imports y eliminar los realmente sin uso en los archivos seleccionados. Los usados sólo en la plantilla, etiquetas de componentes, tipos o restricciones genéricas se conservan. Los bloques `<script>` y `<script server>` tienen límites de tokens propios: ordenar y eliminar imports no cruza esos límites ni consume `</script>` o `<template>`. Las pruebas cubren imports únicos/finales, bloques adyacentes en ambos órdenes, comentarios, CRLF y la idempotencia de ambas correcciones juntas. La limpieza de variables que no son imports sigue siendo un aviso de error, sin autofix de eliminación por defecto.
 
+## Orden de componentes e imports de tipos
+
+Las reglas de estilo de componentes son optativas y tienen opciones tipadas en `defineEslint`:
+
+```ts
+export default defineEslint({
+  perfectionist: true,
+  unusedImports: true,
+  rules: {
+    'meeko/order-macros': ['error', {
+      order: ['defineProps', 'defineEmits', 'defineModel', 'defineSnippets', 'useElementRef', 'defineExpose'],
+    }],
+    'meeko/order-sections': ['error', {
+      order: ['server', 'script', 'template', 'style'],
+    }],
+    'meeko/prefer-static-bindings': 'warn',
+    '@typescript-eslint/consistent-type-imports': ['error', {
+      prefer: 'type-imports',
+      fixStyle: 'separate-type-imports',
+    }],
+  },
+})
+```
+
+Esos órdenes son los predeterminados: también puedes usar simplemente `'error'`. Las tres reglas `meeko/*` sólo se aplican a `.meeko`; los imports de tipos se comprueban tanto en TypeScript como en los scripts de componentes.
+
+`order-macros` detecta el orden de las macros de componente. Su autofix se limita a bloques consecutivos seguros: las dependencias, las llamadas con posibles efectos secundarios y los comentarios impiden mover declaraciones automáticamente. `defineExpose` se revisa manualmente para conservar las declaraciones que necesita. `order-sections` comprueba la posición de las secciones del SFC. `prefer-static-bindings` simplifica bindings literales sólo cuando puede conservar su semántica, por ejemplo `bind:title="'Guardar'"` a `title="Guardar"`. Los casos dinámicos siguen siendo bindings.
+
+En `.meeko`, la integración de `consistent-type-imports` mantiene un estado independiente por script. Dos imports del mismo módulo en servidor y cliente no se combinan entre secciones, incluso al corregir imports mixtos de valores y tipos.
+
+Estas reglas no forman parte de `recommended`; se activan explícitamente en la configuración del repositorio. Para corregir un archivo seleccionado:
+
+```sh
+pnpm exec eslint app/components/Example.meeko --fix
+```
+
 ## Uso directo del plugin
 
 La exportación por defecto y las configuraciones existentes continúan disponibles:
@@ -121,8 +157,11 @@ Los imports y locales del bloque servidor permanecen en su ámbito. Una referenc
 | --- | --- | --- |
 | [`meeko/button-has-type`](docs/rules/button-has-type.md) | warning | Suggestions para elegir `button` o `submit`. |
 | [`meeko/no-autofocus`](docs/rules/no-autofocus.md) | warning | Suggestion para quitar el atributo. |
+| [`meeko/order-macros`](docs/rules/order-macros.md) | optativo | Autofix conservador de macros consecutivas. |
+| [`meeko/order-sections`](docs/rules/order-sections.md) | optativo | Orden de secciones del componente. |
+| [`meeko/prefer-static-bindings`](docs/rules/prefer-static-bindings.md) | optativo | Simplifica bindings literales equivalentes. |
 
-Las suggestions requieren una elección explícita. Estas reglas no cambian el comportamiento de un formulario o el foco mediante `eslint --fix`.
+Las suggestions de `button-has-type` y `no-autofocus` requieren una elección explícita: no cambian el comportamiento de un formulario o el foco mediante `eslint --fix`.
 
 ## Parser y servicios
 
@@ -135,7 +174,7 @@ export default [{
 }]
 ```
 
-El parser devuelve un AST TypeScript-ESLint con nodos `MeekoScope` para los ámbitos de plantilla. Estos nodos se recorren mediante `visitorKeys.children`; sus expresiones conservan nodos y referencias TypeScript. Los tokens corresponden exclusivamente a texto del archivo original, incluidos tokens `MeekoScriptBoundary` para las etiquetas de apertura/cierre de cada script. Estos límites permiten que reglas que utilizan `getTokenAfter` o `getTokensBetween` distingan los bloques del SFC. `context.sourceCode.parserServices` ofrece `isMeeko: true` y `templateBody`, el AST de plantilla de la API pública `@meekojs/meeko/parse`.
+El parser devuelve un AST TypeScript-ESLint con nodos `MeekoScope` para los ámbitos de plantilla. Estos nodos se recorren mediante `visitorKeys.children`; sus expresiones conservan nodos y referencias TypeScript. Los tokens corresponden exclusivamente a texto del archivo original, incluidos tokens `MeekoScriptBoundary` para las etiquetas de apertura/cierre de cada script. Estos límites permiten que reglas que utilizan `getTokenAfter` o `getTokensBetween` distingan los bloques del SFC. `context.sourceCode.parserServices` ofrece `isMeeko: true` y `templateBody`, el AST de plantilla de la API pública `@meekojs/meeko/parse`. También conserva los servicios sintácticos de TypeScript-ESLint, sin un programa de tipos; esto permite usar `consistent-type-imports` sin activar análisis tipado.
 
 La infraestructura sintética sólo se usa para construir ámbitos. No se ejecuta ni se presenta como código escrito por el usuario. Las pruebas comprueban correcciones de reglas existentes tanto en scripts como en expresiones de atributos y su idempotencia.
 
@@ -143,7 +182,7 @@ La infraestructura sintética sólo se usa para construir ámbitos. No se ejecut
 
 - Es análisis sintáctico. `parserOptions.project`, `projectService` y `programs` se rechazan explícitamente; usa `meeko check` para tipos, props, modelos, rutas y errores del compilador.
 - No sustituye a Prettier ni implementa un AST de formato HTML/CSS. Las reglas de formato diseñadas para un archivo JavaScript completo pueden asumir delimitadores que una plantilla no tiene; usa el plugin Prettier de Meeko para el formato.
-- No promete compatibilidad con cualquier regla de terceros que suponga un AST exclusivamente JavaScript. Las dos reglas propias, `no-unused-vars`, `prefer-const`, `no-unneeded-ternary`, los dos ordenamientos de imports de Perfectionist y las dos reglas de unused-imports tienen pruebas específicas. Las demás reglas Perfectionist tienen opciones tipadas y se pueden configurar explícitamente, pero no forman parte de los defaults ni de esta matriz de validación.
+- No promete compatibilidad con cualquier regla de terceros que suponga un AST exclusivamente JavaScript. Las reglas propias, `no-unused-vars`, `prefer-const`, `no-unneeded-ternary`, `consistent-type-imports`, los dos ordenamientos de imports de Perfectionist y las dos reglas de unused-imports tienen pruebas específicas. Las demás reglas Perfectionist tienen opciones tipadas y se pueden configurar explícitamente, pero no forman parte de los defaults ni de esta matriz de validación.
 - Los exports por defecto y reexports del bloque servidor se rechazan con un error de parsing explícito. Los exports de declaraciones nombradas y listas de nombres locales están cubiertos.
 - Las comprobaciones de accesibilidad son parciales: `no-autofocus` cubre atributos estáticos en HTML y omite componentes y custom elements. No equivale a una auditoría completa de accesibilidad.
 - Antes de publicar, la versión mínima del peer Meeko debe ser la primera versión publicada que incluya `@meekojs/meeko/parse`. Esta entrega se valida con el workspace actual.

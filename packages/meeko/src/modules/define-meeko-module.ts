@@ -247,6 +247,12 @@ export interface MeekoModuleContext {
    * petición), por ejemplo con las rutas de `routes:resolved`.
    */
   addPublicFile(path: string, contents: string | Uint8Array | (() => string | Uint8Array | Promise<string | Uint8Array>)): void;
+  /**
+   * Registers a CSS file in Vite's client graph, processed with the project's PostCSS config.
+   * Relative paths resolve from rootDir; use a file URL for a stylesheet shipped by a module.
+   * Files are deduplicated in registration order, before app/styles/main.css.
+   */
+  addStylesheet(file: string | URL): void;
   /** Registers a declaration in .meeko/types/modules; removed when the module is disabled. */
   addTypeTemplate(filename: string, contents: string): void;
   /**

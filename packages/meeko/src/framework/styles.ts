@@ -1,6 +1,6 @@
 import { existsSync, realpathSync } from "node:fs";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
 import type { EnvironmentModuleGraph, EnvironmentModuleNode, Plugin, ViteDevServer } from "vite";
 import { escapeHtml } from "../core/server";
 
@@ -10,9 +10,29 @@ export const globalStylesheetFile = "app/styles/main.css";
 /** The URL under which development serves the global stylesheet as plain CSS. */
 export const globalStylesheetUrl = `/${globalStylesheetFile}?direct`;
 
+/** Client entry of the module stylesheets and the optional app stylesheet, in cascade order. */
+export const globalStylesheetsModule = "virtual:meeko-global-styles";
+
+/** Module styles first; the application stylesheet can override their defaults. */
+export function frameworkStylesheets(root: string, registered: readonly string[]): string[] {
+  const application = resolve(root, globalStylesheetFile);
+  const last = existsSync(application) ? realpathSync.native(application) : undefined;
+  const files = [...new Set(registered)].filter((file) => file !== last);
+  if (last) files.push(last);
+  return files;
+}
+
+/** Vite request URL of a local or linked package stylesheet, without the direct-CSS query. */
+export function stylesheetUrl(root: string, file: string): string {
+  const path = relative(root, file).replaceAll("\\", "/");
+  const url = path === ".." || path.startsWith("../") || isAbsolute(path)
+    ? `/@fs/${file.replaceAll("\\", "/")}` : `/${path}`;
+  return encodeURI(url).replace(/[?#]/g, (character) => encodeURIComponent(character));
+}
+
 /**
  * Where `meeko dev` keeps the processed global stylesheet, relative to the project: imports
- * inlined, PostCSS plugins (`@utilities` among them) applied, not minified. It exists for editor
+ * inlined, module styles included, PostCSS plugins (`@utilities` among them) applied, not minified. It exists for editor
  * tools that read class names from CSS files on disk; nothing loads it at run time. The dev
  * watcher skips `.meeko/` (see `isDevWatchIgnored`), so writing it never reaches Vite.
  */
@@ -90,10 +110,10 @@ function reachesStylesheet(graph: EnvironmentModuleGraph, file: string, targets:
  * and rewrites it whenever the stylesheet or one of its dependencies changes: files it imports and
  * the modules of its `@utilities` at-rules, which PostCSS reports to Vite as dependencies. The file is
  * replaced atomically and only when its contents change. A stylesheet that fails to compile keeps the
- * last good snapshot and is reported once through `report`; without `app/styles/main.css` there is
- * no snapshot.
+ * last good snapshot and is reported once through `report`. Without module styles or an application
+ * stylesheet there is no snapshot.
  */
-export function createGlobalStylesheetSnapshot(root: string, report: (message: string) => void): GlobalStylesheetSnapshot {
+export function createGlobalStylesheetSnapshot(root: string, report: (message: string) => void, registered: readonly string[] = []): GlobalStylesheetSnapshot {
   const source = resolve(root, globalStylesheetFile);
   const target = resolve(root, globalStylesheetSnapshotFile);
   let server: ViteDevServer | undefined;
@@ -106,7 +126,8 @@ export function createGlobalStylesheetSnapshot(root: string, report: (message: s
   let again = false;
 
   const write = async (vite: ViteDevServer): Promise<void> => {
-    if (!existsSync(source)) {
+    const files = frameworkStylesheets(root, registered);
+    if (!files.length) {
       if (written !== null) await rm(target, { force: true });
       written = null;
       failure = undefined;
@@ -115,17 +136,24 @@ export function createGlobalStylesheetSnapshot(root: string, report: (message: s
     let css: string;
     const environments = vite.environments;
     try {
-      css = (await environments.client.transformRequest(globalStylesheetUrl))?.code ?? "";
+      const parts: string[] = [];
+      for (const file of files) {
+        const result = await environments.client.transformRequest(`${stylesheetUrl(root, file)}?direct`);
+        if (!result) throw new Error(`Stylesheet could not be loaded: ${file}`);
+        parts.push(result.code);
+      }
+      css = parts.join("\n");
     } catch (error) {
       // A Vite restart closed the environment midway; the restart writes the snapshot again.
       if (closed || vite.environments !== environments) return;
       const message = (error instanceof Error ? error.message : String(error)).split("\n", 1)[0]!;
-      if (message !== failure) report(`${globalStylesheetSnapshotFile} conserva la versión anterior: ${globalStylesheetFile} no compila (${message})`);
+      if (message !== failure) report(`${globalStylesheetSnapshotFile} conserva la versión anterior: las hojas de estilos no compilan (${message})`);
       failure = message;
       return;
     }
     failure = undefined;
-    const contents = `${snapshotHeader}${css.endsWith("\n") ? css : `${css}\n`}`;
+    const header = registered.length ? "/* Generated by meeko dev from module stylesheets and the optional app/styles/main.css; edits are overwritten. */\n" : snapshotHeader;
+    const contents = `${header}${css.endsWith("\n") ? css : `${css}\n`}`;
     if (contents === written) return;
     // A snapshot left by an earlier run with the same contents keeps its date: watchers stay quiet.
     if (written === undefined && await readFile(target, "utf8").catch(() => undefined) === contents) {
@@ -156,7 +184,8 @@ export function createGlobalStylesheetSnapshot(root: string, report: (message: s
       hotUpdate({ type, file, read }) {
         if (!server || this.environment.name !== "client") return;
         // While the stylesheet fails, any change may be the fix, such as creating a missing module.
-        if (failure === undefined && !reachesStylesheet(this.environment.moduleGraph, file, graphNames(source))) return;
+        const targets = new Set([source, ...registered].flatMap((path) => [...graphNames(path)]));
+        if (failure === undefined && !reachesStylesheet(this.environment.moduleGraph, file, targets)) return;
         // The watcher may report a file as soon as a writer truncates it and then drop the change
         // of the write that follows. The client environment caches what the snapshot transforms and
         // the browser's request for the stylesheet reuses it, so transforming the empty file would

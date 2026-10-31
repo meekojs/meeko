@@ -1,7 +1,5 @@
 import { defineMeekoModule } from '@meekojs/meeko/framework'
 
-import { uiCss } from './styles'
-
 export default defineMeekoModule({
 	meta: {
 		name: '@meekojs/ui',
@@ -10,18 +8,8 @@ export default defineMeekoModule({
 		},
 	},
 	setup(_options, meeko) {
-		meeko.addComponentsDir(new URL('./components', import.meta.url), { prefix: 'Ui' })
+		meeko.addComponentsDir(new URL('./app/components', import.meta.url), { prefix: 'Ui' })
 
-		meeko.addPublicFile('_meeko/ui.css', uiCss)
-
-		meeko.addHead({
-			link: [
-				{
-					rel: 'stylesheet',
-					href: '/_meeko/ui.css',
-					key: 'meeko-ui',
-				},
-			],
-		})
+		meeko.addStylesheet(new URL('../src/app/styles/main.css', import.meta.url))
 	},
 })

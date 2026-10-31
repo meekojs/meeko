@@ -6,6 +6,12 @@ export default defineEslint(
 	{
 		perfectionist: true,
 		unusedImports: true,
+		rules: {
+			'meeko/order-macros': 'error',
+			'meeko/order-sections': 'error',
+			'meeko/prefer-static-bindings': 'warn',
+			'@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports', fixStyle: 'separate-type-imports' }],
+		},
 		ignores: [
 			// Build output, caches and local tooling state.
 			'**/dist/**',

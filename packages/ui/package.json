@@ -11,7 +11,8 @@
 		}
 	},
 	"files": [
-		"dist/"
+		"dist/",
+		"src/app/styles/"
 	],
 	"scripts": {
 		"build": "node ../../scripts/build-package.mjs && node scripts/copy-components.mjs",

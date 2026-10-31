@@ -61,6 +61,26 @@ import type { MeekoPrettierOptions } from '@meekojs/prettier-plugin';
 const formatting: MeekoPrettierOptions = { meekoIndentSections: true };
 export const smoke = { state: signal(1), ui, i18n, formatting, lint: defineEslint({ perfectionist: true, unusedImports: true }), module: defineMeekoModule({ meta: { name: 'smoke' }, setup() {} }) };
 '@ | Set-Content -LiteralPath (Join-Path $consumer 'main.ts') -Encoding utf8
+  New-Item -ItemType Directory -Path (Join-Path $consumer 'app/pages') -Force | Out-Null
+  'export default { modules: ["@meekojs/ui"] };' | Set-Content -LiteralPath (Join-Path $consumer 'meeko.config.mjs') -Encoding utf8
+  '<template><UiButton>Styled package</UiButton></template>' | Set-Content -LiteralPath (Join-Path $consumer 'app/pages/index.meeko') -Encoding utf8
+  @'
+export default { plugins: [{ postcssPlugin: 'consumer-ui-colors', Declaration(node) {
+  if (node.prop === '--meeko-ui-accent') node.value = '#123456';
+} }] };
+'@ | Set-Content -LiteralPath (Join-Path $consumer 'postcss.config.mjs') -Encoding utf8
+  @'
+import assert from 'node:assert/strict';
+import { readFile, readdir } from 'node:fs/promises';
+const directory = '.meeko/output/node/client/assets';
+const files = (await readdir(directory)).filter((file) => file.endsWith('.css'));
+assert.ok(files.length, 'UI emits production CSS');
+const css = (await Promise.all(files.map((file) => readFile(`${directory}/${file}`, 'utf8')))).join('\n');
+assert.match(css, /\.meeko-ui-button/);
+assert.match(css, /--meeko-ui-accent:\s*#123456/);
+assert.doesNotMatch(css, /@import/);
+console.log('Installed UI CSS uses consumer PostCSS and ships as a production asset.');
+'@ | Set-Content -LiteralPath (Join-Path $consumer 'styles-smoke.mjs') -Encoding utf8
   Push-Location $consumer
   try {
     & pnpm install --offline --ignore-scripts
@@ -71,6 +91,10 @@ export const smoke = { state: signal(1), ui, i18n, formatting, lint: defineEslin
     # use skipLibCheck, as in Meeko's generated app configuration. User code stays strict.
     & pnpm exec tsc --ignoreConfig --noEmit --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext main.ts
     if ($LASTEXITCODE -ne 0) { throw 'NodeNext consumer type check failed' }
+    & pnpm exec meeko build .
+    if ($LASTEXITCODE -ne 0) { throw 'Installed UI build failed' }
+    & node styles-smoke.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'Installed UI stylesheet smoke failed' }
   } finally { Pop-Location }
   Write-Host "Workspace package smoke passed: $consumer"
 } finally { Pop-Location }

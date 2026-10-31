@@ -23,6 +23,7 @@ import { editorBridgeDirectory } from "./framework/editor-bridge";
 import { aliasImporterScope, aliasScopeProblem, matchPathAlias } from "./compiler/aliases";
 import { resolveProjectAliases, resolveProjectAliasesSync } from "./framework/aliases";
 import type { ProjectAliases } from "./framework/aliases";
+import { frameworkStylesheets, globalStylesheetFile, globalStylesheetsModule, stylesheetUrl } from "./framework/styles";
 
 /**
  * A component's CSS is the module `Card.meeko?meeko-style=<hash>&lang.css`: a real path, as Vue
@@ -36,7 +37,7 @@ const clientSidecarsModule = "virtual:meeko-client-routes";
 const serverAppModule = "virtual:meeko-server-app";
 const clientPluginsModule = "virtual:meeko-plugins/client";
 const clientMiddlewareModule = "virtual:meeko-middleware/client";
-const virtualModules = new Set([clientPagesModule, clientRoutesModule, clientSidecarsModule, serverAppModule, clientPluginsModule, clientMiddlewareModule]);
+const virtualModules = new Set([clientPagesModule, clientRoutesModule, clientSidecarsModule, serverAppModule, clientPluginsModule, clientMiddlewareModule, globalStylesheetsModule]);
 /** A module that imports `defineMeekoModule` holds build code: the browser must never load it. */
 const moduleDefinitionImport = /\bimport\s*\{[^}]*\bdefineMeekoModule\b[^}]*\}\s*from\s*["']@meekojs\/meeko\/framework["']/;
 /** This package (its `src/` and `dist/`), whose documentation shows module imports in comments. */
@@ -272,6 +273,11 @@ export function meeko(): Plugin {
         return body ? { code: body.code, map: body.map as never } : block;
       }
       const virtual = id.startsWith("\0") ? id.slice(1) : undefined;
+      if (virtual === globalStylesheetsModule) {
+        if (options?.ssr || ssrBuild) throw new Error(`${globalStylesheetsModule} belongs to the client bundle`);
+        const { modules } = await loadConfiguredModules(root);
+        return frameworkStylesheets(root, modules.stylesheets).map((file) => `import ${JSON.stringify(stylesheetUrl(root, file))};`).join("\n");
+      }
       if (virtual === clientRoutesModule) return clientRoutesSource(root);
       if (virtual === clientSidecarsModule) return clientSidecarsSource(root);
       if (virtual === serverAppModule) return serverAppSource(root, ssrBuild && !isDev ? await readBuildAppData(root) : undefined, { redis: !workerBuild });
@@ -451,6 +457,11 @@ export function meeko(): Plugin {
       const onTreeChange = (file: string): void => {
         void (async () => {
           if (configSource(file)) { await onConfigChange(); return; }
+          if (normalizePath(resolve(file)) === normalizePath(resolve(root, globalStylesheetFile))) {
+            server.moduleGraph.invalidateAll();
+            server.ws.send({ type: "full-reload" });
+            return;
+          }
           const component = isComponentSource(file, activeComponentDirectories);
           const changed = component || await watchedSource(file, true);
           if (!changed) return;
@@ -476,6 +487,8 @@ export function meeko(): Plugin {
       // directories outside Vite's root. A new autoimport must invalidate consumers already loaded.
       server.watcher.add([...new Set([
         ...directories, ...await autoImportWatchDirectories(),
+        dirname(resolve(root, globalStylesheetFile)),
+        ...(await loadConfiguredModules(root)).modules.stylesheets,
         ...["ts", "mts", "js", "mjs"].map((extension) => join(root, `meeko.config.${extension}`)),
       ])]);
       await refreshComponentRegistry();

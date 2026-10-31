@@ -1,6 +1,6 @@
 # Meeko UI
 
-El módulo `@meekojs/ui` pertenece al mismo paquete y versión que Meeko. Actívalo en la configuración:
+El módulo `@meekojs/ui` pertenece al ecosistema Meeko y se distribuye como un paquete con versión propia. Su instalación y API se describen en el [README del paquete](../packages/ui/README.md). Actívalo en la configuración:
 
 ```ts
 import { defineMeekoConfig } from '@meekojs/meeko/framework'
@@ -11,7 +11,7 @@ export default defineMeekoConfig({
 })
 ```
 
-Registra `UiButton`, `UiInput` y `UiField`, y sirve `/_meeko/ui.css`. La hoja añade una apariencia a `MeekoSelect`, `MeekoPopover` y `MeekoThemeToggle`, cuyas etiquetas y exports existentes siguen funcionando sin activar UI. Las primitivas sin estilos conservan sus fuentes en `packages/meeko/src/app/components`; `useTheme` y la configuración del tema siguen en el framework.
+Registra `UiButton`, `UiInput` y `UiField`, y añade su CSS mediante `meeko.addStylesheet`. La hoja pasa por Vite y la configuración PostCSS del proyecto, con imports, assets, HMR en desarrollo y nombres de assets con hash en producción. Se carga antes de `app/styles/main.css`, donde la aplicación puede sobrescribir los estilos. La hoja añade una apariencia a `MeekoSelect`, `MeekoPopover` y `MeekoThemeToggle`, cuyas etiquetas y exports existentes siguen funcionando sin activar UI. Las primitivas sin estilos conservan sus fuentes en `packages/meeko/src/app/components`; `useTheme` y la configuración del tema siguen en el framework.
 
 ```html
 <script lang="ts">
@@ -32,4 +32,4 @@ const name = signal('')
 
 Personaliza las variables `--meeko-ui-*` desde el CSS de la aplicación: `accent`, `accent-hover`, `on-accent`, `surface`, `surface-hover`, `text`, `muted`, `border`, `danger`, `focus`, `radius` y `font`. El tema oscuro usa `data-theme="dark"`; los temas propios pueden definir los mismos tokens con su selector. La hoja sólo estiliza controles UI y las tres etiquetas mencionadas; la aplicación define su layout y tipografía general.
 
-La app `apps/ui-demo` muestra esta primera base. Desde la raíz, ejecuta `pnpm -F meeko-ui-demo run dev`. Sus componentes y declaraciones se incluyen en `dist/components` al construir `@meekojs/ui`, por lo que un consumidor no necesita escribir archivos dentro de la instalación de Meeko.
+La app `apps/ui-demo` muestra esta primera base. Desde la raíz, ejecuta `pnpm -F meeko-ui-demo run dev`. Las fuentes de UI están en `src/app/components` y `src/app/styles`. Sus componentes y declaraciones se incluyen en `dist/app/components` al construir `@meekojs/ui`, y los CSS se distribuyen desde `src/app/styles` para procesarlos con Vite/PostCSS, por lo que un consumidor no necesita escribir archivos dentro de la instalación de Meeko.

@@ -1,12 +1,17 @@
+import type { Linter } from "eslint";
+import type { ESLintRules } from "eslint/rules";
+
 import js from "@eslint/js";
 import typescript from "@typescript-eslint/eslint-plugin";
 import perfectionist from "eslint-plugin-perfectionist";
 import unusedImports from "eslint-plugin-unused-imports";
-import type { Linter } from "eslint";
-import type { ESLintRules } from "eslint/rules";
-import plugin from "./plugin";
-import type { TypeScriptRules } from "./typescript-rules.generated";
+
 import type { PerfectionistRules, UnusedImportsRules } from "./optional-rules";
+import type { MacroName } from "./rules/order-macros";
+import type { SectionName } from "./rules/order-sections";
+import type { TypeScriptRules } from "./typescript-rules.generated";
+
+import plugin from "./plugin";
 
 /** Keep literal core rule keys and their official options; discard RulesRecord's open index. */
 type CoreRules = { [Name in keyof ESLintRules as string extends Name ? never : Name]: ESLintRules[Name] };
@@ -15,6 +20,9 @@ type CoreRules = { [Name in keyof ESLintRules as string extends Name ? never : N
 export type DefineEslintRules = Partial<CoreRules & TypeScriptRules & PerfectionistRules & UnusedImportsRules & {
   "meeko/button-has-type": Linter.RuleEntry<[]>;
   "meeko/no-autofocus": Linter.RuleEntry<[]>;
+  "meeko/order-macros": Linter.RuleEntry<[{ order?: MacroName[] }]>;
+  "meeko/order-sections": Linter.RuleEntry<[{ order?: SectionName[] }]>;
+  "meeko/prefer-static-bindings": Linter.RuleEntry<[]>;
 }>;
 
 export interface DefineEslintOptions {

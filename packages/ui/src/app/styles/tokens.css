@@ -1,0 +1,26 @@
+:root {
+	--meeko-ui-accent: #285ac8;
+	--meeko-ui-accent-hover: #1c49af;
+	--meeko-ui-on-accent: #fff;
+	--meeko-ui-surface: #fff;
+	--meeko-ui-surface-hover: #f3f5f9;
+	--meeko-ui-text: #18202d;
+	--meeko-ui-muted: #5d6879;
+	--meeko-ui-border: #b8c2d0;
+	--meeko-ui-danger: #b42335;
+	--meeko-ui-focus: #285ac8;
+	--meeko-ui-radius: 0.625rem;
+	--meeko-ui-font: system-ui, sans-serif;
+}
+:root[data-theme='dark'] {
+	--meeko-ui-accent: #9ab9ff;
+	--meeko-ui-accent-hover: #b5ccff;
+	--meeko-ui-on-accent: #101827;
+	--meeko-ui-surface: #1c2330;
+	--meeko-ui-surface-hover: #293242;
+	--meeko-ui-text: #f0f3f8;
+	--meeko-ui-muted: #b4bfce;
+	--meeko-ui-border: #69778c;
+	--meeko-ui-danger: #ffa0a9;
+	--meeko-ui-focus: #9ab9ff;
+}

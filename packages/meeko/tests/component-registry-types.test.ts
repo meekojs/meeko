@@ -136,6 +136,50 @@ test("a project without registered components still has a valid generated resolv
   assert.deepEqual((await checkFrameworkProject(root)).filter((item) => (item.severity ?? "error") === "error"), []);
 });
 
+test("a modal composable forwards correlated props and keeps only Modal-prefixed component results", async (context) => {
+  const root = await tempProject(context, "modal-component-registry");
+  await linkRepositoryPackages(root);
+  await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}');
+  await mkdir(join(root, "app", "components", "Modal"), { recursive: true });
+  await mkdir(join(root, "app", "pages"), { recursive: true });
+  await mkdir(join(root, "app", "composables"), { recursive: true });
+  await writeFile(join(root, "app", "components", "Button.meeko"), button);
+  await writeFile(join(root, "app", "components", "Modal", "UserCreate.meeko"), '<script lang="ts">const props = defineProps<{ name: string }>();</script><template><p>{props.name}</p></template>');
+  await writeFile(join(root, "app", "components", "Modal", "Confirm.meeko"), '<script lang="ts">const props = defineProps<{ message: string; danger?: boolean }>();</script><template><p>{props.message}</p></template>');
+  await writeFile(join(root, "app", "pages", "index.meeko"), '<template><main>Modals</main></template>');
+  await writeFile(join(root, "app", "composables", "useModal.client.ts"), `
+type ModalName = Extract<ComponentName, \`Modal\${string}\`>;
+type ModalArgs = Extract<ComponentArgs, [name: ModalName, props: unknown]>;
+interface ModalInstance { id: number; component: ResolvedComponent<ModalName> }
+export function useModal() {
+  const selected = signal<ResolvedComponent<ModalName> | undefined>(undefined);
+  async function open(...request: ModalArgs) {
+    selected.value = await resolveComponent(...request);
+  }
+  return { open, selected };
+}
+const modal = useModal();
+modal.open("ModalUserCreate", { name: "Diego" });
+modal.open("ModalConfirm", { message: "Continue?", danger: true });
+// @ts-expect-error a non-modal cannot be opened by this composable
+modal.open("Button", { label: "Save" });
+// @ts-expect-error the creation form does not accept confirmation props
+modal.open("ModalUserCreate", { message: "Wrong" });
+// @ts-expect-error required form name is checked
+modal.open("ModalUserCreate", {});
+// @ts-expect-error wrong property type
+modal.open("ModalConfirm", { message: 123 });
+declare const name: ModalName;
+// @ts-expect-error a union name is not enough to correlate an arbitrary props object
+modal.open(name, { name: "Diego" });
+async function instance(): Promise<ModalInstance> {
+  return { id: 1, component: await resolveComponent("ModalUserCreate", { name: "Diego" }) };
+}
+void instance;
+`);
+  assert.deepEqual((await checkFrameworkProject(root)).filter((item) => (item.severity ?? "error") === "error"), []);
+});
+
 test("bound components keep required models, snippets and exact template overrides", async (context) => {
   const root = await tempProject(context, "bound-component-channels");
   await linkRepositoryPackages(root);

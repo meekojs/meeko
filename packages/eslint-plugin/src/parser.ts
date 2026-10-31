@@ -1,8 +1,10 @@
-import { parseForESLint as parseTypeScript } from "@typescript-eslint/parser";
+import type { TemplateNode } from "@meekojs/meeko/parse";
 import type { ParserOptions } from "@typescript-eslint/parser";
 import type { TSESTree } from "@typescript-eslint/utils";
+
 import { locate, MeekoCompileError } from "@meekojs/meeko/parse";
-import type { TemplateNode } from "@meekojs/meeko/parse";
+import { parseForESLint as parseTypeScript } from "@typescript-eslint/parser";
+
 import { Source } from "./source";
 
 interface Point { line: number; column: number }
@@ -13,7 +15,7 @@ interface Node {
   [key: string]: unknown;
 }
 
-export interface MeekoParserServices {
+export type MeekoParserServices = ReturnType<typeof parseTypeScript>["services"] & {
   readonly isMeeko: true;
   readonly templateBody: TemplateNode;
 }
@@ -153,7 +155,7 @@ export function parseForESLint(text: string, options: ParserOptions = {}): Omit<
     ast: result.ast,
     scopeManager: manager,
     visitorKeys: { ...keys, MeekoScope: ["children"] },
-    services: { isMeeko: true, templateBody: source.template } satisfies MeekoParserServices,
+    services: { ...result.services, isMeeko: true, templateBody: source.template } satisfies MeekoParserServices,
   };
 }
 

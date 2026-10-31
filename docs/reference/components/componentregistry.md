@@ -133,6 +133,18 @@ El condicional evita renderizar el componente antes de que se resuelva la promes
 
 El segundo argumento es un objeto de `ComponentProps<Name>`: TypeScript comprueba props obligatorias, nombres, literales y callbacks contra el componente elegido. Los nombres de una unión y sus props deben formar una pareja válida; una unión de nombres no permite mezclar props de componentes distintos. Cada llamada crea su propia asociación sin modificar el módulo compartido ni las props de otra llamada.
 
+Para limitar una API a un subconjunto del registro, filtre `ComponentArgs` y reenvíe la tupla completa. El resultado conserva ese subconjunto de nombres:
+
+<!-- no-check -->
+```ts
+type ModalName = Extract<ComponentName, `Modal${string}`>;
+type ModalArgs = Extract<ComponentArgs, [name: ModalName, props: unknown]>;
+
+async function openModal(...request: ModalArgs): Promise<ResolvedComponent<ModalName>> {
+  return resolveComponent(...request);
+}
+```
+
 Los valores asociados se capturan cuando termina la carga. Para valores que deban cambiar después, use `bind:` en la plantilla: sus props y eventos explícitos tienen prioridad sobre los valores asociados. Los modelos y snippets siguen pasando por `model`, `model:nombre` y el contenido de la etiqueta. Si cambia la asociación manteniendo el mismo componente, sus props se actualizan en la instancia existente.
 
 ```html
