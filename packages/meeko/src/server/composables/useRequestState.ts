@@ -1,4 +1,4 @@
-import type { RequestContext } from "../runtime/request-context.js";
+import type { RequestContext } from "../runtime/request-context";
 
 /**
  * Devuelve el valor de `key` en el estado de la petición y lo crea con `factory()` la primera vez.

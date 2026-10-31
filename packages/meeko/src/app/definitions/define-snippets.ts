@@ -50,7 +50,7 @@ export function analyzeSnippets(file: ts.SourceFile): SnippetsDeclaration | unde
   return found;
 }
 
-import { apiDocs, jsdoc } from "./compiler-docs.js";
+import { apiDocs, jsdoc } from "./compiler-docs";
 
 export const defineSnippetsDocs = jsdoc(
     "Macro de compilación: declara los snippets del componente, contenido de plantilla que el padre",
@@ -90,8 +90,8 @@ export const defineSnippetsDocs = jsdoc(
     "</Card>",
     "```",
   );
-import type { ChannelsOf } from "../runtime/channels.js";
-import type { Snippet } from "../runtime/snippets.js";
+import type { ChannelsOf } from "../runtime/channels";
+import type { Snippet } from "../runtime/snippets";
 
 /**
  * What each key of a `defineSnippets` type may hold: the tuple of its parameters or, since 1.4, a

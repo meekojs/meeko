@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { ServerApp } from "./app.js";
-import { observeServerError } from "../errors.js";
-import type { ServerErrorInfo, ServerErrorObserver } from "../errors.js";
+import type { ServerApp } from "./app";
+import { observeServerError } from "../errors";
+import type { ServerErrorInfo, ServerErrorObserver } from "../errors";
 
 /**
  * Qué hace Meeko con los fallos que ocurren fuera del flujo de una petición: una promesa rechazada

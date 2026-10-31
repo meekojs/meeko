@@ -10,26 +10,26 @@ import {
   WatchKind,
 } from "vscode-languageserver/node";
 import type { Connection, Diagnostic, InitializeResult, Position, Range, SemanticTokens, TextDocumentIdentifier } from "vscode-languageserver/node";
-import { projectRoot } from "../compiler/project-root.js";
-import { MeekoCompileError } from "../compiler/parser/sfc.js";
-import { checkFrameworkPageContracts } from "../framework/page-contracts-check.js";
-import { componentDiagnostics, contractRange, frameworkContractRoot, projectCheckRoot, tokenEnd } from "./diagnostics.js";
+import { projectRoot } from "../compiler/project-root";
+import { MeekoCompileError } from "../compiler/parser/sfc";
+import { checkFrameworkPageContracts } from "../framework/page-contracts-check";
+import { componentDiagnostics, contractRange, frameworkContractRoot, projectCheckRoot, tokenEnd } from "./diagnostics";
 import {
   codeActions, completionList, componentNameCompletion, definition, directiveNameCompletion, documentSymbols, foldingRanges, formatting, hover, prepareRename, references,
   rename, resolveCompletion, semanticTokens, semanticTokensLegend, shadowedTagsOf, signatureHelp,
-} from "./features.js";
-import type { CompletionData, FeatureContext, LocatedDocument, MeekoFormatSettings } from "./features.js";
-import { classCompletion, classDefinition, classHover, ClassIndex, classView, isClassCompletionData, resolveClassCompletion, withItemDefaults } from "./classes.js";
+} from "./features";
+import type { CompletionData, FeatureContext, LocatedDocument, MeekoFormatSettings } from "./features";
+import { classCompletion, classDefinition, classHover, ClassIndex, classView, isClassCompletionData, resolveClassCompletion, withItemDefaults } from "./classes";
 import {
   colorPresentations, cssCompletion, cssHover, documentColors, htmlCompletion, htmlHover, linkedEditingRanges, specialTemplateHover, styleDiagnostics, tagCompletion,
-} from "./embedded.js";
-import { codeLenses } from "./lenses.js";
-import { createComponentActions, listItemActions, propsReadActions } from "./quick-fixes.js";
-import { documentLinks, inlayHints, linkRouteCompletion, workspaceSymbols } from "./nav.js";
-import { MeekoProject, MeekoWorkspace, pathKey } from "./project.js";
-import { teleportCompletion, teleportHover } from "./teleport.js";
-import { executionZones } from "./zones.js";
-import type { ExecutionZoneKind, ExecutionZoneReason } from "./zones.js";
+} from "./embedded";
+import { codeLenses } from "./lenses";
+import { createComponentActions, listItemActions, propsReadActions } from "./quick-fixes";
+import { documentLinks, inlayHints, linkRouteCompletion, workspaceSymbols } from "./nav";
+import { MeekoProject, MeekoWorkspace, pathKey } from "./project";
+import { teleportCompletion, teleportHover } from "./teleport";
+import { executionZones } from "./zones";
+import type { ExecutionZoneKind, ExecutionZoneReason } from "./zones";
 
 /** A zone of `meeko/executionZones`: whole lines of a component and where they run. */
 export interface ExecutionZoneItem {

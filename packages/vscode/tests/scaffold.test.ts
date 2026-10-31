@@ -3,8 +3,8 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
-import { componentFile, endpointFiles, pageFile, projectRootOf, schemaLibrary } from "../src/scaffold.js";
-import type { ScaffoldFile } from "../src/scaffold.js";
+import { componentFile, endpointFiles, pageFile, projectRootOf, schemaLibrary } from "../src/scaffold";
+import type { ScaffoldFile } from "../src/scaffold";
 
 let root: string;
 

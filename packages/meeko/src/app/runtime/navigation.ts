@@ -1,8 +1,8 @@
-import type { GeneratedRoutes, RouteId } from "../../framework.js";
-import { routeCurrent } from "../../shared/link.js";
-import { batch, createContext, provide, signal } from "../../core/reactivity.js";
-import type { ReadonlySignal } from "../../core/reactivity.js";
-import { activeRouteManifest, href } from "./router.js";
+import type { GeneratedRoutes, RouteId } from "../../framework";
+import { routeCurrent } from "../../shared/link";
+import { batch, createContext, provide, signal } from "../../core/reactivity";
+import type { ReadonlySignal } from "../../core/reactivity";
+import { activeRouteManifest, href } from "./router";
 
 /**
  * Estado de navegación de la aplicación del navegador que renderiza un componente. Lo devuelve

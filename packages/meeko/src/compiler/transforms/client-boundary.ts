@@ -1,14 +1,14 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import ts from "@typescript/typescript6";
-import type { AutoImport } from "../../autoimports/registry.js";
-import type { FreeReference } from "../../autoimports/transform.js";
-import { aliasCandidates, aliasScopeProblem, matchPathAlias } from "../aliases.js";
-import type { PathAlias } from "../aliases.js";
-import type { SourceMapping } from "../mapping.js";
-import { frameworkModule, pageRequestApis } from "./server-script.js";
-import { compileError, locate, parseSfc } from "../parser/sfc.js";
-import type { CompileDiagnostic } from "../parser/sfc.js";
+import type { AutoImport } from "../../autoimports/registry";
+import type { FreeReference } from "../../autoimports/transform";
+import { aliasCandidates, aliasScopeProblem, matchPathAlias } from "../aliases";
+import type { PathAlias } from "../aliases";
+import type { SourceMapping } from "../mapping";
+import { frameworkModule, pageRequestApis } from "./server-script";
+import { compileError, locate, parseSfc } from "../parser/sfc";
+import type { CompileDiagnostic } from "../parser/sfc";
 
 /**
  * Package entries whose module fails to load in the browser: they create an `AsyncLocalStorage` of

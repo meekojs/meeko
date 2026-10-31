@@ -1,7 +1,7 @@
-import type { RequestContext } from "../runtime/request-context.js";
-import type { RateLimitOptions } from "../runtime/rate-limit.js";
-import type { Schema } from "../schema.js";
-import type { Output, OptionalOutput } from "../schema.js";
+import type { RequestContext } from "../runtime/request-context";
+import type { RateLimitOptions } from "../runtime/rate-limit";
+import type { Schema } from "../schema";
+import type { Output, OptionalOutput } from "../schema";
 
 /**
  * Estados de éxito que un endpoint JSON puede elegir con `status` (desde `1.2`). `204` responde sin

@@ -1,8 +1,8 @@
-import type { ServerErrorObserver } from "../errors.js";
-import type { PlatformName, ServerPlatform } from "../runtime/platform.js";
-import type { ProcessErrorPolicy } from "../runtime/process-errors.js";
-import type { SessionManager } from "../runtime/sessions.js";
-import type { SocketDeliveryErrorContext, SocketPubSub } from "../socket/runtime.js";
+import type { ServerErrorObserver } from "../errors";
+import type { PlatformName, ServerPlatform } from "../runtime/platform";
+import type { ProcessErrorPolicy } from "../runtime/process-errors";
+import type { SessionManager } from "../runtime/sessions";
+import type { SocketDeliveryErrorContext, SocketPubSub } from "../socket/runtime";
 
 /**
  * Lo que recibe la fábrica de `server/runtime.ts` al crear el runtime de la aplicación.

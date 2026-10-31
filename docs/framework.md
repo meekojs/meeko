@@ -1476,7 +1476,7 @@ Un host propio que pasa `DocumentOptions.config` a `createFrameworkHandler` pone
 
 ## Autoimports y TypeScript
 
-Los componentes `.meeko` de directorios configurados también forman un [registro tipado por nombre](reference/components/componentregistry.md): `ComponentName`, `ComponentOf<Name>` y `ComponentProps<Name>` describen los módulos descubiertos, y `resolveComponent(name)` los carga de forma asíncrona. La guía incluye configuración, layers, módulos, `<component is>` y límites de SSR de la carga diferida.
+Los componentes `.meeko` de directorios configurados también forman un [registro tipado por nombre](reference/components/componentregistry.md): `ComponentName`, `ComponentOf<Name>` y `ComponentProps<Name>` describen los módulos descubiertos, y `resolveComponent(name)` los carga de forma asíncrona. `resolveComponent(name, props)` también permite asociar sus props y devuelve un `ResolvedComponent<Name>` que se renderiza directamente con `<component is>`. La guía incluye configuración, layers, módulos y límites de SSR de la carga diferida.
 
 **Imports sin extensión.** Desde `1.2`, Meeko comprueba los tipos con `"module": "ESNext"` y `"moduleResolution": "Bundler"`, como Vite y Nuxt: un import relativo no necesita extensión (`import { format } from "../utils/format"`), porque Vite resuelve y empaqueta todo el código en `meeko dev` y en `meeko build`, y Node nunca ejecuta un `.ts` directamente. Los imports con `.js` siguen funcionando. `meeko init-framework` genera el `tsconfig.json` con esos valores; un proyecto anterior puede cambiar sus dos líneas `"module": "NodeNext"` y `"moduleResolution": "NodeNext"` para que el editor también acepte los imports sin extensión en sus `.ts`.
 

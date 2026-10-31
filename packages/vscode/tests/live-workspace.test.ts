@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { join, resolve } from 'node:path'
-import { localWorkspacePath, reconcileWatchedFolders } from '../src/live/workspace.js'
+import { localWorkspacePath, reconcileWatchedFolders } from '../src/live/workspace'
 
 test('accepts only descendants of a local workspace root', () => {
     const root = resolve('workspace')

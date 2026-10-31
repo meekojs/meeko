@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import type { HotState } from "@meekojs/meeko";
 import { createServer as createViteServer, type ViteDevServer } from "vite";
-import { initialTasks, type Task, type TaskView } from "./model.js";
-import { renderPilotPage } from "./page.js";
+import { initialTasks, type Task, type TaskView } from "./model";
+import { renderPilotPage } from "./page";
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 const logoFile = resolve(projectRoot, "../../../../assets/brand/meeko-logo.png");

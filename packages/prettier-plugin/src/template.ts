@@ -2,8 +2,8 @@ import type { AstPath, Doc, Options, Parser, ParserOptions, Plugin, Printer } fr
 import { builders, utils } from "prettier/doc";
 import { scanInterpolations } from "@meekojs/meeko/parse";
 import { isCustomElementTag } from "@meekojs/meeko/parse";
-import { classOrderOption, classTokens, sortClassTokens } from "./classes.js";
-import type { ClassSortMode } from "./classes.js";
+import { classOrderOption, classTokens, sortClassTokens } from "./classes";
+import type { ClassSortMode } from "./classes";
 
 const { group, indent, label, softline } = builders;
 const { mapDoc } = utils;

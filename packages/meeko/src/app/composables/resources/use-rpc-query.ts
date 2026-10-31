@@ -1,7 +1,7 @@
-import { requestRpc } from "../../../shared/clients.js";
-import type { ClientOptions, PublicServerManifest, RpcOperation } from "../../../shared/clients.js";
-import { createResource, readerOf, stableJson, rpcEndpoint } from "./engine.js";
-import type { DataResource, DataResourceOptions, UseRpcQuery } from "./engine.js";
+import { requestRpc } from "../../../shared/clients";
+import type { ClientOptions, PublicServerManifest, RpcOperation } from "../../../shared/clients";
+import { createResource, readerOf, stableJson, rpcEndpoint } from "./engine";
+import type { DataResource, DataResourceOptions, UseRpcQuery } from "./engine";
 
 /**
  * Crea `useRpcQuery` para los procedimientos de un manifiesto público, como hacen los clientes

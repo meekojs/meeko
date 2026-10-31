@@ -50,7 +50,7 @@ export function analyzeEmits(file: ts.SourceFile): EmitsDeclaration | undefined 
   return found;
 }
 
-import { apiDocs, jsdoc } from "./compiler-docs.js";
+import { apiDocs, jsdoc } from "./compiler-docs";
 
 export const defineEmitsDocs = jsdoc(
     "Macro de compilación: declara los eventos del componente. Cada clave de `T` es un evento y su valor,",

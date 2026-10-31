@@ -9,7 +9,7 @@
         "build": "pnpm -r --filter @meekojs/meeko --filter @meekojs/ui --filter @meekojs/i18n --filter @meekojs/prettier-plugin --filter @meekojs/eslint-plugin run build",
         "check": "pnpm -r --filter @meekojs/meeko --filter @meekojs/ui --filter @meekojs/i18n --filter @meekojs/prettier-plugin --filter @meekojs/eslint-plugin run check",
         "test": "pnpm -F @meekojs/meeko run test",
-        "verify": "pnpm -F @meekojs/meeko run verify && pnpm -F meeko-devtools-extension run check",
+        "verify": "pnpm run test:build && pnpm -F @meekojs/meeko run verify && pnpm -F meeko-devtools-extension run check",
         "lint": "eslint . --cache --cache-location node_modules/.cache/eslint/",
         "lint:fix": "eslint . --fix --cache --cache-location node_modules/.cache/eslint/",
         "e2e": "pnpm -F @meekojs/meeko run e2e",
@@ -33,17 +33,26 @@
         "vscode:install": "pnpm -F meeko-language run install:local",
         "site:dev": "pnpm -F meeko-site run dev",
         "site:build": "pnpm -F @meekojs/meeko run build && pnpm -F meeko-site run build",
-        "site:docs:sync": "pnpm -F meeko-site run docs:sync"
+        "site:docs:sync": "pnpm -F meeko-site run docs:sync",
+        "tooling:build": "pnpm -F @meekojs/meeko run build && pnpm -F @meekojs/eslint-plugin run build && pnpm -F @meekojs/prettier-plugin run build",
+        "format": "prettier . --write",
+        "format:check": "prettier . --check",
+        "test:build": "node --test scripts/build-package.test.mjs",
+        "package:workspace-smoke": "pwsh -NoProfile -File scripts/package-workspace-smoke.ps1"
     },
     "engines": {
         "node": ">=24"
     },
     "devDependencies": {
-        "@eslint/js": "10.0.1",
         "eslint": "10.13.0",
         "globals": "17.13.0",
         "jiti": "2.7.0",
         "typescript": "npm:@typescript/typescript6@6.0.2",
-        "typescript-eslint": "8.72.1"
+        "@meekojs/eslint-plugin": "workspace:*",
+        "@meekojs/prettier-plugin": "workspace:*",
+        "esbuild": "0.28.2",
+        "prettier": "3.9.10",
+        "prettier-plugin-css-order": "2.2.0",
+        "prettier-plugin-packagejson": "3.0.3"
     }
 }

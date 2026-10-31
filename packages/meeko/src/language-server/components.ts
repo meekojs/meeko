@@ -1,5 +1,5 @@
 import ts from "@typescript/typescript6";
-import type { VirtualComponent } from "./model.js";
+import type { VirtualComponent } from "./model";
 
 /** A member of a component channel with its display type. */
 export interface ComponentMember {

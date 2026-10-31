@@ -1,6 +1,6 @@
 import type { Linter } from "eslint";
 import type * as Perfectionist from "eslint-plugin-perfectionist";
-import type { TypeScriptRules } from "./typescript-rules.generated.js";
+import type { TypeScriptRules } from "./typescript-rules.generated";
 
 /** Perfectionist publishes precise options on its public entry; keep them linked to that API. */
 export interface PerfectionistRules {

@@ -7,11 +7,11 @@
  * `onCleanup` and composables it creates belong to the component. Releasing the component
  * cancels it: a pending `await` never resumes.
  */
-import { componentErrorReporter } from "./component-errors.js";
-import { browserValue } from "./element-refs.js";
-import type { UnexposedRef, UnexposedRefMessage } from "./element-refs.js";
-import { enterMountedScope, whenMounted } from "./lifecycle.js";
-import { createRoot, currentEffectOwner, onCleanup, switchOwner } from "../../core/reactivity.js";
+import { componentErrorReporter } from "./component-errors";
+import { browserValue } from "./element-refs";
+import type { UnexposedRef, UnexposedRefMessage } from "./element-refs";
+import { enterMountedScope, whenMounted } from "./lifecycle";
+import { createRoot, currentEffectOwner, onCleanup, switchOwner } from "../../core/reactivity";
 
 /** Unwinds a continuation whose component was released while it waited. */
 const cancelled: unique symbol = Symbol("meeko.continuationCancelled");

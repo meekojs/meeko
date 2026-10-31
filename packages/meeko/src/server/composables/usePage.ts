@@ -1,6 +1,6 @@
-import type { GeneratedRoutes } from "../../framework.js";
-import type { RequestContext } from "../runtime/request-context.js";
-import type { PageSchema } from "../../app/definitions/define-page.js";
+import type { GeneratedRoutes } from "../../framework";
+import type { RequestContext } from "../runtime/request-context";
+import type { PageSchema } from "../../app/definitions/define-page";
 
 /**
  * PeticiÃ³n para la que se ejecuta el cÃ³digo de nivel superior del `<script server>` de una pÃ¡gina,

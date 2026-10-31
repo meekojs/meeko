@@ -1,5 +1,5 @@
-import type { RequestContext } from "../runtime/request-context.js";
-import type { Schema } from "../schema.js";
+import type { RequestContext } from "../runtime/request-context";
+import type { Schema } from "../schema";
 
 type Output<S> = S extends Schema<unknown, infer O> ? O : never;
 type SchemaMap = Readonly<Record<string, Schema>>;

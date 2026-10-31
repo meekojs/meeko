@@ -2,13 +2,13 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
-import { autoImportCollision, discoverAutoImports } from "./registry.js";
-import { applyAutoImports } from "./transform.js";
-import type { AutoImport, ImportScope } from "./registry.js";
-import { readMeekoConfigSync } from "../framework/config.js";
-import { legacyLayerEntries } from "../framework/module-loader.js";
-import { aliasTsconfigPaths } from "../compiler/aliases.js";
-import { aliasesForScope, resolveProjectAliasesSync } from "../framework/aliases.js";
+import { autoImportCollision, discoverAutoImports } from "./registry";
+import { applyAutoImports } from "./transform";
+import type { AutoImport, ImportScope } from "./registry";
+import { readMeekoConfigSync } from "../framework/config";
+import { legacyLayerEntries } from "../framework/module-loader";
+import { aliasTsconfigPaths } from "../compiler/aliases";
+import { aliasesForScope, resolveProjectAliasesSync } from "../framework/aliases";
 
 export type TypeScriptScope = Exclude<ImportScope, "app">;
 
@@ -191,6 +191,7 @@ export async function generateAutoImportTypes(projectRoot: string): Promise<{ cl
         ["ComponentOf", '  type ComponentOf<Name extends import("@meekojs/meeko").ComponentName> = import("@meekojs/meeko").ComponentOf<Name>;'],
         ["ComponentProps", '  type ComponentProps<Name extends import("@meekojs/meeko").ComponentName> = import("@meekojs/meeko").ComponentProps<Name>;'],
         ["ComponentArgs", '  type ComponentArgs = import("@meekojs/meeko").ComponentArgs;'],
+        ["ResolvedComponent", '  type ResolvedComponent<Name extends import("@meekojs/meeko").ComponentName = import("@meekojs/meeko").ComponentName> = import("@meekojs/meeko").ResolvedComponent<Name>;'],
       ] as const) if (!names.has(name)) declarations.push(declaration);
     }
     // `meeko check` loads this file for each individual `.meeko` graph, so bring in the

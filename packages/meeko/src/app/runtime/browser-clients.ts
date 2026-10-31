@@ -1,4 +1,4 @@
-import type { ClientOptions } from "../../shared/clients.js";
+import type { ClientOptions } from "../../shared/clients";
 
 /**
  * Opciones de cliente para el navegador: leen el token CSRF de la meta `meeko-csrf-token` en cada

@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 import { LanguageClient, Trace, TransportKind } from "vscode-languageclient/node";
 import type { LanguageClientOptions, ServerOptions } from "vscode-languageclient/node";
-import { resolveLanguageServer } from "./server-resolution.js";
-import type { ResolvedLanguageServer } from "./server-resolution.js";
+import { resolveLanguageServer } from "./server-resolution";
+import type { ResolvedLanguageServer } from "./server-resolution";
 
 interface RunningServer {
   readonly client: LanguageClient;

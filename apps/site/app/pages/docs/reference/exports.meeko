@@ -1,8 +1,8 @@
 <script server lang="ts">
 	import { definePage } from '@meekojs/meeko/framework'
-	import type { ApiIndexGroup, ApiKind } from '../../../../shared/types/api.js'
-	import type { NavSection, Pager, TocEntry } from '../../../../shared/types/docs.js'
-	import { readPage } from '../../../../server/content/db.js'
+	import type { ApiIndexGroup, ApiKind } from '../../../../shared/types/api'
+	import type { NavSection, Pager, TocEntry } from '../../../../shared/types/docs'
+	import { readPage } from '../../../../server/content/db'
 
 	export const route = definePage({ render: 'ssr' })
 

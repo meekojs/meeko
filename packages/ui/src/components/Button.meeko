@@ -7,7 +7,9 @@
 	}
 
 	const props = defineProps<Props>()
+
 	const snippets = defineSnippets<{ default: [] }>()
+
 	const emit = defineEmits<{ click: [event: MouseEvent] }>()
 </script>
 

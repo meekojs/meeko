@@ -9,12 +9,12 @@
  * it. Storage that the browser blocks (private mode, quota) never throws: the signal keeps working
  * in memory.
  */
-import { componentErrorReporter } from "../runtime/component-errors.js";
-import { logClientError } from "../../core/error-observer.js";
-import { afterMountBatch, setupPhase } from "../runtime/lifecycle.js";
-import { createContext, findContext, isDryRender, markExternalSignal, onCleanup, provide, signal, untrack } from "../../core/reactivity.js";
-import type { Signal } from "../../core/reactivity.js";
-import { canSuspendLate } from "../runtime/suspense.js";
+import { componentErrorReporter } from "../runtime/component-errors";
+import { logClientError } from "../../core/error-observer";
+import { afterMountBatch, setupPhase } from "../runtime/lifecycle";
+import { createContext, findContext, isDryRender, markExternalSignal, onCleanup, provide, signal, untrack } from "../../core/reactivity";
+import type { Signal } from "../../core/reactivity";
+import { canSuspendLate } from "../runtime/suspense";
 
 /**
  * Almacenamiento del navegador de {@link useStorage}: `"local"` (`localStorage`, persiste entre

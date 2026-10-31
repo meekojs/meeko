@@ -1,6 +1,6 @@
-import { findContext } from "../../core/reactivity.js";
-import { navigationKey } from "../runtime/navigation.js";
-import type { NavigationState } from "../runtime/navigation.js";
+import { findContext } from "../../core/reactivity";
+import { navigationKey } from "../runtime/navigation";
+import type { NavigationState } from "../runtime/navigation";
 
 const idle: NavigationState = /*#__PURE__*/ Object.freeze({ pending: /*#__PURE__*/ Object.freeze({ value: false }) });
 

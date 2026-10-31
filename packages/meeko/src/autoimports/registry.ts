@@ -3,9 +3,9 @@ import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { realpath } from "node:fs/promises";
 import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
-import { componentDirectories, importDirectoryOptions, loadMeekoConfig, normalizeImportDirectory, readMeekoConfigSync, resolveConfigSources } from "../framework/config.js";
-import type { MeekoConfig } from "../framework/config.js";
-import { legacyLayerEntries, resolveMeekoModules } from "../framework/module-loader.js";
+import { componentDirectories, importDirectoryOptions, loadMeekoConfig, normalizeImportDirectory, readMeekoConfigSync, resolveConfigSources } from "../framework/config";
+import type { MeekoConfig } from "../framework/config";
+import { legacyLayerEntries, resolveMeekoModules } from "../framework/module-loader";
 
 export type ImportScope = "client" | "server" | "shared" | "app";
 export interface AutoImport {
@@ -104,6 +104,7 @@ function builtins(root: string): AutoImport[] {
     // Form and storage run in app component setup on both SSR and hydration; no server/ or shared/ autoimport.
     ...["useForm", "useStorage", "useHead", "useSeoMeta", "useTheme", "useLayout"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "app", typeOnly: false, component: false, browserCode: true })),
     ...["Form", "FormField", "FormSubmission"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/framework", specifier: "@meekojs/meeko/framework", scope: "app", typeOnly: true, component: false, browserCode: true })),
+    { name: "ResolvedComponent", imported: "ResolvedComponent", file: "@meekojs/meeko", specifier: "@meekojs/meeko", scope: "app", typeOnly: true, component: false, browserCode: true },
     // The definitions of server/ (contract discovery reads the call by name, not by its import).
     ...["defineApiRoute", "defineRpc", "defineServerMiddleware", "defineSocketChannel", "defineServerRuntime"].map((name): AutoImport => ({ name, imported: name, file: "@meekojs/meeko/server", specifier: "@meekojs/meeko/server", scope: "server", typeOnly: false, component: false })),
     // Since 1.7, for `<script server>` (also inside the route options), `*.route.ts` sidecars and server/.

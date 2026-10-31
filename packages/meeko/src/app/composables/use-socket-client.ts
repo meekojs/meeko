@@ -1,9 +1,9 @@
-import { createRoot, effect, onCleanup } from "../../core/reactivity.js";
-import type { useSocketChannel } from "./use-socket-channel.js";
-import { browserReady } from "../runtime/element-refs.js";
-import { setupPhase } from "../runtime/lifecycle.js";
-import { createSocketClient, contextualSocketObserver, renderOnlyClient } from "../runtime/socket.js";
-import type { SocketClient, SocketClientOptions, SocketContract } from "../runtime/socket.js";
+import { createRoot, effect, onCleanup } from "../../core/reactivity";
+import type { useSocketChannel } from "./use-socket-channel";
+import { browserReady } from "../runtime/element-refs";
+import { setupPhase } from "../runtime/lifecycle";
+import { createSocketClient, contextualSocketObserver, renderOnlyClient } from "../runtime/socket";
+import type { SocketClient, SocketClientOptions, SocketContract } from "../runtime/socket";
 
 /**
  * Crea un cliente Socket ligado a la raíz del componente actual, que se cierra al desmontarlo.

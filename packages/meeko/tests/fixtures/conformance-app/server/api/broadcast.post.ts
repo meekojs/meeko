@@ -1,5 +1,5 @@
 import { defineApiRoute } from "@meekojs/meeko/server";
-import { empty, roomText } from "../../shared/schemas.js";
+import { empty, roomText } from "../../shared/schemas";
 
 export default defineApiRoute({
   body: roomText,

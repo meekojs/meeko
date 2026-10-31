@@ -1,7 +1,7 @@
-import type { RequestContext } from "../runtime/request-context.js";
-import type { ServerPlatform } from "../runtime/platform.js";
-import type { ContextServices } from "../runtime/definition.js";
-import type { RouteMatch, RouteRecord } from "../../app/runtime/router.js";
+import type { RequestContext } from "../runtime/request-context";
+import type { ServerPlatform } from "../runtime/platform";
+import type { ContextServices } from "../runtime/definition";
+import type { RouteMatch, RouteRecord } from "../../app/runtime/router";
 
 /**
  * Contexto del middleware de ruta de servidor (`app/middleware/*.server.ts`): el de `usePage()` en el

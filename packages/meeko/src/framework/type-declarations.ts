@@ -1,19 +1,19 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import { discoverComponents } from "../autoimports/registry.js";
-import { generateComponentRegistry } from "../autoimports/components.js";
-import { generateTypeScriptAutoImports } from "../autoimports/typescript.js";
-import { generateAppTypes } from "./check-app.js";
-import type { AppTypesOptions } from "./check-app.js";
-import { frameworkTsconfigPaths, resolveProjectAliases } from "./aliases.js";
-import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./config.js";
-import { generateServerContracts } from "./contracts-generate.js";
-import { generateRoutes } from "./generate.js";
-import { generatePageContracts } from "./page-contracts-generate.js";
-import { generateRouteBlockTypes, routeBlockTypesDirectory } from "../compiler/codegen/route-block-types.js";
-import { generateServicesTypes, servicesDeclaration } from "./services-types.js";
-import { generateModuleTypes } from "./module-types.js";
+import { discoverComponents } from "../autoimports/registry";
+import { generateComponentRegistry } from "../autoimports/components";
+import { generateTypeScriptAutoImports } from "../autoimports/typescript";
+import { generateAppTypes } from "./check-app";
+import type { AppTypesOptions } from "./check-app";
+import { frameworkTsconfigPaths, resolveProjectAliases } from "./aliases";
+import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./config";
+import { generateServerContracts } from "./contracts-generate";
+import { generateRoutes } from "./generate";
+import { generatePageContracts } from "./page-contracts-generate";
+import { generateRouteBlockTypes, routeBlockTypesDirectory } from "../compiler/codegen/route-block-types";
+import { generateServicesTypes, servicesDeclaration } from "./services-types";
+import { generateModuleTypes } from "./module-types";
 
 export const projectNames = ["app", "server", "shared"] as const;
 

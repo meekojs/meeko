@@ -1,8 +1,8 @@
 import { resolve } from "node:path";
-import { createRouteManifest } from "../app/runtime/router.js";
-import type { RouteRecord } from "../app/runtime/router.js";
-import { discoverRouteMiddleware } from "./route-middleware-discovery.js";
-import { discoverLayouts, discoverRoutes } from "./routes-discovery.js";
+import { createRouteManifest } from "../app/runtime/router";
+import type { RouteRecord } from "../app/runtime/router";
+import { discoverRouteMiddleware } from "./route-middleware-discovery";
+import { discoverLayouts, discoverRoutes } from "./routes-discovery";
 
 /**
  * Un layer de rutas: una carpeta con su propio árbol `app/pages`, cuyas páginas se muestran dentro

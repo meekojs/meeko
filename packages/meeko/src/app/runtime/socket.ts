@@ -1,10 +1,10 @@
-import { currentEffectOwner, onCleanup, signal } from "../../core/reactivity.js";
-import type { ReadonlySignal } from "../../core/reactivity.js";
-import { logClientError, observeCallback } from "../../core/error-observer.js";
-import { currentAppErrorChannel, currentComponentErrorHandler } from "./component-errors.js";
-import { serializeJson } from "../../core/server.js";
-import { setupPhase } from "./lifecycle.js";
-import { ClientError } from "../../shared/clients.js";
+import { currentEffectOwner, onCleanup, signal } from "../../core/reactivity";
+import type { ReadonlySignal } from "../../core/reactivity";
+import { logClientError, observeCallback } from "../../core/error-observer";
+import { currentAppErrorChannel, currentComponentErrorHandler } from "./component-errors";
+import { serializeJson } from "../../core/server";
+import { setupPhase } from "./lifecycle";
+import { ClientError } from "../../shared/clients";
 
 /**
  * Subconjunto de Standard Schema v1 que valida los payloads de un evento Socket, como los schemas

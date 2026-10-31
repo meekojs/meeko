@@ -3,9 +3,9 @@ import { dirname, extname, resolve } from "node:path";
 import type * as CSS from "csstype";
 import type { AtRule, ChildNode, Container, Helpers, Plugin, Result, Root } from "postcss";
 import selectorParser from "postcss-selector-parser";
-import { meekoProjectRoot, utilityAutoImports } from "./autoimports.js";
-import type { UtilityAutoImports } from "./autoimports.js";
-import { canBundleUtilities, loadUtilityModule } from "./module-loader.js";
+import { meekoProjectRoot, utilityAutoImports } from "./autoimports";
+import type { UtilityAutoImports } from "./autoimports";
+import { canBundleUtilities, loadUtilityModule } from "./module-loader";
 
 /**
  * Valor de una declaración generada: una cadena se escribe tal cual (puede llevar

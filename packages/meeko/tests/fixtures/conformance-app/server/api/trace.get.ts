@@ -1,5 +1,5 @@
 import { defineApiRoute } from "@meekojs/meeko/server";
-import { trace } from "../../shared/schemas.js";
+import { trace } from "../../shared/schemas";
 
 export default defineApiRoute({
   response: trace,

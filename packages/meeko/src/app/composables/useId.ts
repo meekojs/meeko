@@ -1,4 +1,4 @@
-import { nextId } from "../runtime/ids.js";
+import { nextId } from "../runtime/ids";
 
 /**
  * Devuelve un ID único para atributos como `id`, `for`, `aria-describedby` o `aria-controls`, el

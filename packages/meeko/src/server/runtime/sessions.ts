@@ -1,9 +1,9 @@
-import { encodeBase64Url } from "./base64url.js";
-import { ApiError, SessionRevokedError, SessionSecurityError } from "../errors.js";
-import { warnOnce } from "./env.js";
-import { countRateLimit, MemoryRateCounter } from "./rate-limit.js";
-import type { RateLimitHit } from "./rate-limit.js";
-import type { Unsubscribe } from "../socket/runtime.js";
+import { encodeBase64Url } from "./base64url";
+import { ApiError, SessionRevokedError, SessionSecurityError } from "../errors";
+import { warnOnce } from "./env";
+import { countRateLimit, MemoryRateCounter } from "./rate-limit";
+import type { RateLimitHit } from "./rate-limit";
+import type { Unsubscribe } from "../socket/runtime";
 
 /**
  * Forma de los datos de sesión de la aplicación (desde `1.2`). Está vacía: la aplicación la

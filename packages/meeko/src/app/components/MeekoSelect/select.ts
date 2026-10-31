@@ -4,12 +4,12 @@
  * their own; `createSelect` keeps the state that the template renders, the same in SSR and
  * hydration, and attaches the keyboard and the pointer in the browser.
  */
-import { computed, effect, onCleanup, signal, untrack } from "../../../core/reactivity.js";
-import type { Signal } from "../../../core/reactivity.js";
-import { adoptStyle, createTypeahead, listKeyTarget, normalizeText, typeaheadIndex, typeaheadKey } from "../MeekoPopover/popover.js";
+import { computed, effect, onCleanup, signal, untrack } from "../../../core/reactivity";
+import type { Signal } from "../../../core/reactivity";
+import { adoptStyle, createTypeahead, listKeyTarget, normalizeText, typeaheadIndex, typeaheadKey } from "../MeekoPopover/popover";
 
 
-import type { SelectEntry, SelectGroup, SelectSettings, SelectOptionState } from "./types.js";
+import type { SelectEntry, SelectGroup, SelectSettings, SelectOptionState } from "./types";
 
 /** A value of the record of an object option, or `undefined`. */
 function field(option: unknown, key: string): unknown {

@@ -95,8 +95,8 @@
     "meeko-language-server": "dist/language-server/main.js"
   },
   "scripts": {
-    "prepack": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json",
-    "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json",
+    "prepack": "pnpm run build",
+    "build": "node ../../scripts/build-package.mjs",
     "check": "tsc -p tsconfig.json --noEmit",
     "builtins": "tsx scripts/builtin-components.ts",
     "test": "node scripts/clean-test-tmp.mjs && pnpm run build && pnpm run example:compile && tsx --test --test-concurrency=1 tests/*.test.ts",

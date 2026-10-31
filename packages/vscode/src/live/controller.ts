@@ -1,10 +1,10 @@
 import * as vscode from 'vscode'
 import { readFile } from 'node:fs/promises'
-import { BridgeConnection, isAlive } from './client.js'
-import type { LiveChange } from './client.js'
-import { bridgeDescriptorGlob, bridgeOffFromRecord, devServerRecordGlob, editableValue, groupSignals, hoverMarkdown, inlineText, isWorkspaceBridgeDescriptor, isWorkspaceDevServerRecord, liveStatus, parseEditedValue, placeGroups } from './model.js'
-import type { BridgeOff, EditorLiveSignal, LiveGroup } from './model.js'
-import { localWorkspacePath, reconcileWatchedFolders } from './workspace.js'
+import { BridgeConnection, isAlive } from './client'
+import type { LiveChange } from './client'
+import { bridgeDescriptorGlob, bridgeOffFromRecord, devServerRecordGlob, editableValue, groupSignals, hoverMarkdown, inlineText, isWorkspaceBridgeDescriptor, isWorkspaceDevServerRecord, liveStatus, parseEditedValue, placeGroups } from './model'
+import type { BridgeOff, EditorLiveSignal, LiveGroup } from './model'
+import { localWorkspacePath, reconcileWatchedFolders } from './workspace'
 
 const descriptorGlob = bridgeDescriptorGlob
 const editCommand = 'meeko.live.editSignal'

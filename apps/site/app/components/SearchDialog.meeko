@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { computed, signal } from '@meekojs/meeko'
-	import type { SearchResult } from '../utils/search.js'
+	import type { SearchResult } from '../utils/search'
 
 	const dialog = useElementRef('dialog')
 	const input = useElementRef('input')

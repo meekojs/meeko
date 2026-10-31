@@ -1,6 +1,6 @@
-import type { DocumentHead } from "../shared/head.js";
-import type { MeekoAdapterName, MeekoConfig } from "./define-meeko-config.js";
-import type { RouteRecord } from "../app/runtime/router.js";
+import type { DocumentHead } from "../shared/head";
+import type { MeekoAdapterName, MeekoConfig } from "./define-meeko-config";
+import type { RouteRecord } from "../app/runtime/router";
 
 /** Brand of the objects `defineMeekoModule` returns; `Symbol.for` so two copies of Meeko agree. */
 export const moduleBrand: unique symbol = Symbol.for("meeko.module") as never;

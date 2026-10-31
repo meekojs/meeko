@@ -1,8 +1,8 @@
 <script server lang="ts">
 	import { definePage } from '@meekojs/meeko/framework'
-	import type { NavSection, Pager, TocEntry } from '../../../../shared/types/docs.js'
-	import type { ReferenceIndexGroup } from '../../../../shared/types/reference.js'
-	import { readPage } from '../../../../server/content/db.js'
+	import type { NavSection, Pager, TocEntry } from '../../../../shared/types/docs'
+	import type { ReferenceIndexGroup } from '../../../../shared/types/reference'
+	import { readPage } from '../../../../server/content/db'
 
 	export const route = definePage({ render: 'ssr' })
 

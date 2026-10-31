@@ -1,6 +1,6 @@
-import { serializeJson } from "../../core/server.js";
-import { ApiError } from "../errors.js";
-import type { SocketMessage, SocketPubSub, Unsubscribe } from "../socket/runtime.js";
+import { serializeJson } from "../../core/server";
+import { ApiError } from "../errors";
+import type { SocketMessage, SocketPubSub, Unsubscribe } from "../socket/runtime";
 
 /**
  * Firma del listener de `subscribe` y `sSubscribe` en node-redis 4 o posterior.

@@ -1,21 +1,21 @@
-import { sourceRange, toRange } from "./locations.js";
+import { sourceRange, toRange } from "./locations";
 import { relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "@typescript/typescript6";
 import type { TextDocument } from "vscode-languageserver-textdocument";
 import { CompletionItemKind, InlayHintKind, SymbolKind } from "vscode-languageserver/node";
 import type { CompletionItem, DocumentLink, InlayHint, Position, Range, SymbolInformation } from "vscode-languageserver/node";
-import { parseSfc } from "../compiler/parser/sfc.js";
-import { attributeValueStart, parseTemplate } from "../compiler/parser/template.js";
-import type { TemplateNode } from "../compiler/parser/template.js";
-import { appTargetAt } from "./app-index.js";
-import type { AppIndex } from "./app-index.js";
-import { tagAt } from "./embedded.js";
-import { snippetParameters, virtualDocuments } from "./features.js";
-import type { FeatureContext } from "./features.js";
-import { appTargetDefinition } from "./insights.js";
-import type { MeekoProject } from "./project.js";
-import { nodeAt } from "./reactivity.js";
+import { parseSfc } from "../compiler/parser/sfc";
+import { attributeValueStart, parseTemplate } from "../compiler/parser/template";
+import type { TemplateNode } from "../compiler/parser/template";
+import { appTargetAt } from "./app-index";
+import type { AppIndex } from "./app-index";
+import { tagAt } from "./embedded";
+import { snippetParameters, virtualDocuments } from "./features";
+import type { FeatureContext } from "./features";
+import { appTargetDefinition } from "./insights";
+import type { MeekoProject } from "./project";
+import { nodeAt } from "./reactivity";
 
 /**
  * Links on the strings that name a page or an endpoint: `href("/users/[id]")`, `useApi("/api/…")`,

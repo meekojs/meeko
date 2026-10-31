@@ -1,9 +1,9 @@
-import { requestApi } from "../../../shared/clients.js";
-import type { AnyApiOperation, ApiRequestInput, ClientOptions, PublicServerManifest } from "../../../shared/clients.js";
-import { createMutation } from "../../runtime/mutations.js";
-import type { MutationOptions } from "../../runtime/mutations.js";
-import { requireSetup } from "./engine.js";
-import type { ApiMutation, ApiMutationContract, UseApiMutation } from "./engine.js";
+import { requestApi } from "../../../shared/clients";
+import type { AnyApiOperation, ApiRequestInput, ClientOptions, PublicServerManifest } from "../../../shared/clients";
+import { createMutation } from "../../runtime/mutations";
+import type { MutationOptions } from "../../runtime/mutations";
+import { requireSetup } from "./engine";
+import type { ApiMutation, ApiMutationContract, UseApiMutation } from "./engine";
 
 /**
  * Crea `useApiMutation` para los endpoints `POST`, `PUT`, `PATCH` y `DELETE` de un manifiesto

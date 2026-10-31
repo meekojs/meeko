@@ -1,8 +1,8 @@
-import { readChannels } from "../runtime/channels.js";
-import { passedSnippetsKey } from "../runtime/props.js";
-import type { PassedSnippets } from "../runtime/props.js";
-import { snippetOf } from "../runtime/snippets.js";
-import type { SnippetMap } from "../../app/definitions/define-snippets.js";
+import { readChannels } from "../runtime/channels";
+import { passedSnippetsKey } from "../runtime/props";
+import type { PassedSnippets } from "../runtime/props";
+import { snippetOf } from "../runtime/snippets";
+import type { SnippetMap } from "../../app/definitions/define-snippets";
 
 function readOnlySnippets(): never {
   throw new TypeError("Meeko snippets are read-only: the parent passes them with <snippet>");

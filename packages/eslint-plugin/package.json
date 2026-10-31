@@ -10,7 +10,7 @@
     "./parser": { "types": "./dist/parser.d.ts", "default": "./dist/parser.js" }
   },
   "scripts": {
-    "build": "tsc6 -p tsconfig.json",
+    "build": "node ../../scripts/build-package.mjs",
     "check": "tsc6 -p tsconfig.json --noEmit",
     "test": "pnpm run build && node --test tests/*.test.mjs",
     "types:generate": "node scripts/generate-rule-types.mjs",

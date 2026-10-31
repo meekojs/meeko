@@ -1,5 +1,5 @@
-import type { ContextKey } from "../core/reactivity.js";
-import type { GeneratedI18nMessages } from "../i18n.js";
+import type { ContextKey } from "../core/reactivity";
+import type { GeneratedI18nMessages } from "../i18n";
 
 type MessageKey = keyof GeneratedI18nMessages extends never ? string : keyof GeneratedI18nMessages & string;
 type Values = Readonly<Record<string, string | number | boolean | null | undefined>>;

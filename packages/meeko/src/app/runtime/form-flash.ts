@@ -1,5 +1,5 @@
-import { createContext } from "../../core/reactivity.js";
-import type { FormFlash } from "../../shared/form-flash.js";
+import { createContext } from "../../core/reactivity";
+import type { FormFlash } from "../../shared/form-flash";
 
 /** What the server publishes for `useForm` while it renders a page. */
 export interface FormFlashSource {

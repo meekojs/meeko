@@ -1,8 +1,8 @@
-import { definePlugin } from "../../app/definitions/define-plugin.js";
+import { definePlugin } from "../../app/definitions/define-plugin";
 import { catalogs } from "virtual:meeko-i18n";
-import { createI18n, localeOf } from "./index.js";
-import { i18nContext } from "../../shared/i18n.js";
-import type { Message } from "./messages.js";
+import { createI18n, localeOf } from "./index";
+import { i18nContext } from "../../shared/i18n";
+import type { Message } from "./messages";
 
 interface Options {
   readonly defaultLocale: string;

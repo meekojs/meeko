@@ -4,9 +4,9 @@ import { builders, utils } from "prettier/doc";
 import { compile } from "@meekojs/meeko/compiler";
 import { locate, MeekoCompileError, parseSfc } from "@meekojs/meeko/parse";
 import type { SfcSection } from "@meekojs/meeko/parse";
-import { preserveArrayBreaksPrinter } from "./arrays.js";
-import { appendClassOrder, classOrderOption, stylesheetClassOrder } from "./classes.js";
-import { templateParserName, templatePlugin } from "./template.js";
+import { preserveArrayBreaksPrinter } from "./arrays";
+import { appendClassOrder, classOrderOption, stylesheetClassOrder } from "./classes";
+import { templateParserName, templatePlugin } from "./template";
 
 const { hardline, indent } = builders;
 const { replaceEndOfLine } = utils;

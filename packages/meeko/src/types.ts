@@ -2,11 +2,11 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import ts from "@typescript/typescript6";
-import { compileWithAutoImports } from "./autoimports/transform.js";
-import { moduleSpecifiers, replaceModuleSpecifiers } from "./compiler/import-graph.js";
-import { projectRoot } from "./compiler/project-root.js";
-import { aliasCandidates } from "./compiler/aliases.js";
-import { resolveProjectAliases } from "./framework/aliases.js";
+import { compileWithAutoImports } from "./autoimports/transform";
+import { moduleSpecifiers, replaceModuleSpecifiers } from "./compiler/import-graph";
+import { projectRoot } from "./compiler/project-root";
+import { aliasCandidates } from "./compiler/aliases";
+import { resolveProjectAliases } from "./framework/aliases";
 
 /** Stable ownership marker for generated component declarations. */
 export const componentTypeDeclarationMarker = "// @meeko-generated component-declaration v1";

@@ -1,6 +1,6 @@
-import type { NavLink, NavSection, Pager } from "../../shared/types/docs.js";
-import { exportsHref, referenceHref } from "./api-groups.js";
-import { taxonomy } from "./reference-taxonomy.js";
+import type { NavLink, NavSection, Pager } from "../../shared/types/docs";
+import { exportsHref, referenceHref } from "./api-groups";
+import { taxonomy } from "./reference-taxonomy";
 
 /** A page of the site and the Markdown file of the repository it renders. */
 export interface CatalogEntry {

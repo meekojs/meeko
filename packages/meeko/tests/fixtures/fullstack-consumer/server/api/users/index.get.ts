@@ -1,5 +1,5 @@
 import { defineApiRoute } from "@meekojs/meeko/server";
-import { userSchema } from "../../../shared/schemas/demo.js";
+import { userSchema } from "../../../shared/schemas/demo";
 
 export default defineApiRoute({
   response: userSchema,

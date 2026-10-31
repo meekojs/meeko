@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { compile } from "../src/compiler.js";
+import { compile } from "../src/compiler";
 
 const cases = [
   ["examples/counter/Counter.meeko", "29563779bd27ddf34ebd3143a30548e27e67fcf3dd6290b444080677f5bce2ea", "0b7543eab376a28cf5e10a23888bdeb552a33951158a5cf6dc6bb143aa8f52a8", "2f6b35eb05f4c16e143195d2df58fc9e0d423af5df7bba29cfc8cfad8154d393", "0081d2ca435fa6a9b92c9caeedd99a0989a2115bfcd77a0b30f60f0173b08c84"],

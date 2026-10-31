@@ -3,7 +3,7 @@ import type { ParserOptions } from "@typescript-eslint/parser";
 import type { TSESTree } from "@typescript-eslint/utils";
 import { locate, MeekoCompileError } from "@meekojs/meeko/parse";
 import type { TemplateNode } from "@meekojs/meeko/parse";
-import { Source } from "./source.js";
+import { Source } from "./source";
 
 interface Point { line: number; column: number }
 interface Node {

@@ -1,14 +1,14 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
-import { discoverAutoImports } from "../autoimports/registry.js";
-import { autoImportCompilerHost, autoImportSourceReader } from "../autoimports/typescript.js";
-import { discoverServerManifest } from "../server/api/manifest-discovery.js";
-import type { ApiEndpoint, RpcEndpoint } from "../server/runtime/discovery.js";
-import { resolveProjectAliases, withAliasPaths } from "./aliases.js";
-import { resolveConfigSources } from "./config.js";
-import { generateSocketContracts } from "./socket-contracts-generate.js";
-import { standardSchemaTypes } from "./standard-schema-types.js";
+import { discoverAutoImports } from "../autoimports/registry";
+import { autoImportCompilerHost, autoImportSourceReader } from "../autoimports/typescript";
+import { discoverServerManifest } from "../server/api/manifest-discovery";
+import type { ApiEndpoint, RpcEndpoint } from "../server/runtime/discovery";
+import { resolveProjectAliases, withAliasPaths } from "./aliases";
+import { resolveConfigSources } from "./config";
+import { generateSocketContracts } from "./socket-contracts-generate";
+import { standardSchemaTypes } from "./standard-schema-types";
 
 export interface GeneratedServerContracts {
   readonly types: string;

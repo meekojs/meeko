@@ -1,19 +1,19 @@
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import ts from "@typescript/typescript6";
-import { discoverAutoImports, discoverAutoImportsSync } from "../autoimports/registry.js";
-import type { AutoImport } from "../autoimports/registry.js";
-import { generatedServicesDeclaration, projectDeclarationFiles } from "../compiler/project-declarations.js";
-import { projectRoot } from "../compiler/project-root.js";
-import { readMeekoConfigSync, readThemeOptionSync, resolveConfigSources } from "../framework/config.js";
-import { generatedThemeLines } from "../framework/generate.js";
-import { resolveThemeConfig } from "../shared/theme.js";
-import { resolveProjectAliases, resolveProjectAliasesSync } from "../framework/aliases.js";
-import type { ProjectAliases } from "../framework/aliases.js";
-import { emptyAppIndex, loadAppIndex } from "./app-index.js";
-import type { AppIndex } from "./app-index.js";
-import { createVirtualComponent, diskVersion, resolveProjectCompilerOptions, serverVirtualSuffix, virtualFilenameOf } from "./model.js";
-import type { ProjectCompilerOptions, VirtualComponent } from "./model.js";
+import { discoverAutoImports, discoverAutoImportsSync } from "../autoimports/registry";
+import type { AutoImport } from "../autoimports/registry";
+import { generatedServicesDeclaration, projectDeclarationFiles } from "../compiler/project-declarations";
+import { projectRoot } from "../compiler/project-root";
+import { readMeekoConfigSync, readThemeOptionSync, resolveConfigSources } from "../framework/config";
+import { generatedThemeLines } from "../framework/generate";
+import { resolveThemeConfig } from "../shared/theme";
+import { resolveProjectAliases, resolveProjectAliasesSync } from "../framework/aliases";
+import type { ProjectAliases } from "../framework/aliases";
+import { emptyAppIndex, loadAppIndex } from "./app-index";
+import type { AppIndex } from "./app-index";
+import { createVirtualComponent, diskVersion, resolveProjectCompilerOptions, serverVirtualSuffix, virtualFilenameOf } from "./model";
+import type { ProjectCompilerOptions, VirtualComponent } from "./model";
 
 /** Políticas comunes a todos los proyectos de un servidor de lenguaje. */
 export interface WorkspaceOptions {

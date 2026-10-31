@@ -1,8 +1,8 @@
 <script server lang="ts">
 	import type { TrustedHtml } from '@meekojs/meeko'
 	import { definePage } from '@meekojs/meeko/framework'
-	import type { DemoSource } from '../../shared/types/demo.js'
-	import { readPage } from '../../server/content/db.js'
+	import type { DemoSource } from '../../shared/types/demo'
+	import { readPage } from '../../server/content/db'
 
 	export const route = definePage({ render: 'ssr' })
 

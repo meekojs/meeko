@@ -1,8 +1,8 @@
-import { markExternalSignal, signal } from "../../core/reactivity.js";
-import type { Signal } from "../../core/reactivity.js";
-import { isThemeChoice, readCookie, resolveChoice } from "../../shared/theme.js";
-import type { ResolvedThemeConfig, ServerTheme, ThemeState } from "../../shared/theme.js";
-export { provideServerTheme } from "../../app/runtime/theme-context.js";
+import { markExternalSignal, signal } from "../../core/reactivity";
+import type { Signal } from "../../core/reactivity";
+import { isThemeChoice, readCookie, resolveChoice } from "../../shared/theme";
+import type { ResolvedThemeConfig, ServerTheme, ThemeState } from "../../shared/theme";
+export { provideServerTheme } from "../../app/runtime/theme-context";
 
 /** The value of `Sec-CH-Prefers-Color-Scheme` (a structured-field string), or `undefined`. */
 function readPreferenceHint(header: string | null): "light" | "dark" | undefined {

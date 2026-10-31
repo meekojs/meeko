@@ -9,7 +9,7 @@
  * export default { plugins: [meekoUtilities()] };
  * ```
  */
-export { defineUtilities, meekoUtilities, meekoUtilities as default } from "./compiler/css/utilities.js";
+export { defineUtilities, meekoUtilities, meekoUtilities as default } from "./compiler/css/utilities";
 export type {
   MeekoUtilitiesOptions,
   UtilityAtRule,
@@ -22,4 +22,4 @@ export type {
   UtilityOutput,
   UtilityRule,
   UtilityValue,
-} from "./compiler/css/utilities.js";
+} from "./compiler/css/utilities";

@@ -1,7 +1,7 @@
 import { hydrate as hydrateTree } from "./cases/Tree.generated.ts";
 import { hydrate as hydrateList } from "./cases/List.generated.ts";
 import { hydrate as hydrateNavigation } from "./cases/Navigation.generated.ts";
-import { assertScenario, type Scenario } from "./scenario-protocol.js";
+import { assertScenario, type Scenario } from "./scenario-protocol";
 
 const root = document.getElementById("app");
 if (!root) throw new Error("Missing benchmark root");

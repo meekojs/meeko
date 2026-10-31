@@ -8,6 +8,7 @@ symbols:
   - "@meekojs/meeko#ComponentName"
   - "@meekojs/meeko#ComponentOf"
   - "@meekojs/meeko#ComponentProps"
+  - "@meekojs/meeko#ResolvedComponent"
 related:
   - "syntax:component-tag"
   - docs/framework.md#autoimports-y-typescript
@@ -56,6 +57,7 @@ Meeko genera `.meeko/types/components.d.ts` con las entradas de `ComponentRegist
 | `ComponentName` | Unión de los nombres registrados. |
 | `ComponentOf<Name>` | Módulo renderizable correspondiente a `Name`, con sus exports públicos. |
 | `ComponentProps<Name>` | Props de entrada extraídas del contrato de `renderToString` de ese módulo. |
+| `ResolvedComponent<Name>` | Componente con sus props ya asociadas mediante `resolveComponent(name, props)`. `Name` es opcional para almacenar distintos componentes en un mismo estado. |
 
 <!-- no-check -->
 ```ts
@@ -108,10 +110,13 @@ const props = defineProps<{ name: string; role: "admin" | "user" }>();
 ```html
 <!-- app/pages/create.meeko -->
 <script lang="ts">
-const selected = signal<ComponentOf<"FormUserCreate"> | undefined>(undefined);
+const selected = signal<ResolvedComponent<"FormUserCreate"> | undefined>(undefined);
 
 async function showForm(): Promise<void> {
-  selected.value = await resolveComponent("FormUserCreate");
+  selected.value = await resolveComponent("FormUserCreate", {
+    name: "Diego",
+    role: "admin",
+  });
 }
 </script>
 
@@ -120,13 +125,25 @@ async function showForm(): Promise<void> {
   <component
     if:when="selected.value"
     is="selected.value!"
-    bind:name="'Diego'"
-    bind:role="'admin'"
   />
 </template>
 ```
 
 El condicional evita renderizar el componente antes de que se resuelva la promesa. Este ejemplo inicia la carga mediante una interacción del navegador: durante SSR se muestra el botón, y el componente aparece tras la carga en el cliente. No presupone que una promesa sin resolver pueda pasarse a `is` ni que el contenido diferido esté presente en el HTML de SSR. `<component is>` sigue recibiendo el módulo renderizable, no su nombre ni una promesa. Para contenido que deba salir en el HTML inicial, use un componente ya disponible durante el render SSR.
+
+El segundo argumento es un objeto de `ComponentProps<Name>`: TypeScript comprueba props obligatorias, nombres, literales y callbacks contra el componente elegido. Los nombres de una unión y sus props deben formar una pareja válida; una unión de nombres no permite mezclar props de componentes distintos. Cada llamada crea su propia asociación sin modificar el módulo compartido ni las props de otra llamada.
+
+Los valores asociados se capturan cuando termina la carga. Para valores que deban cambiar después, use `bind:` en la plantilla: sus props y eventos explícitos tienen prioridad sobre los valores asociados. Los modelos y snippets siguen pasando por `model`, `model:nombre` y el contenido de la etiqueta. Si cambia la asociación manteniendo el mismo componente, sus props se actualizan en la instancia existente.
+
+```html
+<component
+  if:when="selected.value"
+  is="selected.value!"
+  bind:name="'Otro nombre'"
+/>
+```
+
+La forma de un argumento conserva el comportamiento anterior: `await resolveComponent("FormUserCreate")` devuelve el módulo original, y sus props siguen siendo obligatorias al renderizarlo mediante `bind:` o `bind="objeto"`.
 
 ## Ejemplos
 

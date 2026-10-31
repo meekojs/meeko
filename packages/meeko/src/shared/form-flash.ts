@@ -7,7 +7,7 @@
  * This contract has no render or request dependencies. The app context lives in
  * `app/runtime/form-flash.ts`; cookie handling lives in `server/forms/index.ts`.
  */
-import type { ValidationIssue } from "./clients.js";
+import type { ValidationIssue } from "./clients";
 
 /** What a native submission of the form of `action` left: its outcome and, on failure, its messages. */
 export interface FormFlash {

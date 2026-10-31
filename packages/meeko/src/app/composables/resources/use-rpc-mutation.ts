@@ -1,9 +1,9 @@
-import { requestRpc } from "../../../shared/clients.js";
-import type { ClientOptions, PublicServerManifest, RpcOperation } from "../../../shared/clients.js";
-import { createMutation } from "../../runtime/mutations.js";
-import type { MutationOptions } from "../../runtime/mutations.js";
-import { requireSetup, rpcEndpoint } from "./engine.js";
-import type { RpcMutation, UseRpcMutation } from "./engine.js";
+import { requestRpc } from "../../../shared/clients";
+import type { ClientOptions, PublicServerManifest, RpcOperation } from "../../../shared/clients";
+import { createMutation } from "../../runtime/mutations";
+import type { MutationOptions } from "../../runtime/mutations";
+import { requireSetup, rpcEndpoint } from "./engine";
+import type { RpcMutation, UseRpcMutation } from "./engine";
 
 /**
  * Crea `useRpcMutation` para los procedimientos de un manifiesto público, como hacen los clientes

@@ -1,4 +1,4 @@
-import { locationOf, sourceRange, toRange } from "./locations.js";
+import { locationOf, sourceRange, toRange } from "./locations";
 import { isBuiltin } from "node:module";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import ts from "@typescript/typescript6";
@@ -13,28 +13,28 @@ import type {
   ParameterInformation, Position, Range, SemanticTokens, SemanticTokensLegend, SignatureHelp, SignatureInformation,
   TextEdit, WorkspaceEdit,
 } from "vscode-languageserver/node";
-import { autoImportedValues } from "../autoimports/transform.js";
-import type { AutoImport } from "../autoimports/registry.js";
-import { shadowedBuiltinTags } from "../compiler.js";
-import { serverOnlyCompletion } from "../compiler/transforms/client-boundary.js";
-import { parseSfc } from "../compiler/parser/sfc.js";
-import type { SfcSection } from "../compiler/parser/sfc.js";
-import { eachKeyActions, sidecarActions } from "./actions.js";
-import { bindAttributeCompletion, domEventCompletion, dynamicTagAttributeCompletion, dynamicTagHover, dynamicTags, htmlAttributeCompletion, specialTemplateDocumentation, tagAt } from "./embedded.js";
-import { builtinTag, builtinTags } from "./builtin-tags.js";
-import { builtinTagDefinition, builtinTagHover } from "./builtins.js";
-import { componentSummaryMarkdown, documentationMarkdown, memberDocumentation, tagSummary } from "./components.js";
-import type { EditCapabilities } from "./actions.js";
-import type { AppIndex } from "./app-index.js";
-import { appTargetDefinition, appTargetHover, componentFile, componentMarkdown, componentModuleAt, componentTagName, componentTypeAt, reactiveHover } from "./insights.js";
-import type { HoverSection } from "./insights.js";
-import { componentFiles, htmlDirectiveDocs } from "./model.js";
-import type { ComponentTag, SnippetTag, VirtualComponent } from "./model.js";
-import { meekoAutoImport, packageCompletion } from "./project.js";
-import type { MeekoProject } from "./project.js";
-import { analyzeReactivity } from "./reactivity.js";
+import { autoImportedValues } from "../autoimports/transform";
+import type { AutoImport } from "../autoimports/registry";
+import { shadowedBuiltinTags } from "../compiler";
+import { serverOnlyCompletion } from "../compiler/transforms/client-boundary";
+import { parseSfc } from "../compiler/parser/sfc";
+import type { SfcSection } from "../compiler/parser/sfc";
+import { eachKeyActions, sidecarActions } from "./actions";
+import { bindAttributeCompletion, domEventCompletion, dynamicTagAttributeCompletion, dynamicTagHover, dynamicTags, htmlAttributeCompletion, specialTemplateDocumentation, tagAt } from "./embedded";
+import { builtinTag, builtinTags } from "./builtin-tags";
+import { builtinTagDefinition, builtinTagHover } from "./builtins";
+import { componentSummaryMarkdown, documentationMarkdown, memberDocumentation, tagSummary } from "./components";
+import type { EditCapabilities } from "./actions";
+import type { AppIndex } from "./app-index";
+import { appTargetDefinition, appTargetHover, componentFile, componentMarkdown, componentModuleAt, componentTagName, componentTypeAt, reactiveHover } from "./insights";
+import type { HoverSection } from "./insights";
+import { componentFiles, htmlDirectiveDocs } from "./model";
+import type { ComponentTag, SnippetTag, VirtualComponent } from "./model";
+import { meekoAutoImport, packageCompletion } from "./project";
+import type { MeekoProject } from "./project";
+import { analyzeReactivity } from "./reactivity";
 
-export { documentationMarkdown } from "./components.js";
+export { documentationMarkdown } from "./components";
 
 /** Documento resuelto para traducir posiciones de cualquier archivo de un resultado. */
 export interface LocatedDocument {
@@ -1253,8 +1253,8 @@ export async function formatting(
   const { component, document } = context;
   const source = document.getText();
   const describe = (error: unknown): string => error instanceof Error ? error.message : String(error);
-  let editor: typeof import("../formatters/prettier/editor.js") | undefined;
-  try { editor = await import("../formatters/prettier/editor.js"); }
+  let editor: typeof import("../formatters/prettier/editor") | undefined;
+  try { editor = await import("../formatters/prettier/editor"); }
   catch (error) { environment.log?.(`Prettier no está disponible; se usa el formateador incluido: ${describe(error)}`); }
   if (editor) {
     try {

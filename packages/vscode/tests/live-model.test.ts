@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   SseParser, aliasDescription, bridgeDescriptorGlob, bridgeOffFromRecord, devServerRecordGlob, editableValue, fileKey, formatValue, groupSignals, hoverMarkdown, inlineText, isWorkspaceBridgeDescriptor, isWorkspaceDevServerRecord, liveStatus, loopbackBridgeUrl, maxSseFrameBytes, parseEditedValue, placeGroups, previewValue,
-} from "../src/live/model.js";
-import type { EditorLiveSignal } from "../src/live/model.js";
+} from "../src/live/model";
+import type { EditorLiveSignal } from "../src/live/model";
 
 function signal(overrides: Partial<EditorLiveSignal>): EditorLiveSignal {
   const base: EditorLiveSignal = { id: "tab1/meeko-1/count", tab: "tab1", instanceId: "meeko-1", component: "Counter", name: "count", file: "D:/app/pages/Counter.meeko", line: 2, column: 7, json: "3", truncated: false };

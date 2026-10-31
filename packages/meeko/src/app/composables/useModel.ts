@@ -1,7 +1,7 @@
-import { readChannels } from "../runtime/channels.js";
-import { isWritableSignal, signal } from "../../core/reactivity.js";
-import type { Signal } from "../../core/reactivity.js";
-import type { ModelOptions } from "../../app/definitions/define-model.js";
+import { readChannels } from "../runtime/channels";
+import { isWritableSignal, signal } from "../../core/reactivity";
+import type { Signal } from "../../core/reactivity";
+import type { ModelOptions } from "../../app/definitions/define-model";
 
 function attributeOf(name: string): string {
   return name === "default" ? "model" : `model:${name}`;

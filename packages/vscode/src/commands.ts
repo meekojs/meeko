@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import * as vscode from "vscode";
-import { componentFile, endpointFiles, endpointMethods, pageFile, projectRootOf, schemaLibrary } from "./scaffold.js";
-import type { ScaffoldFile } from "./scaffold.js";
+import { componentFile, endpointFiles, endpointMethods, pageFile, projectRootOf, schemaLibrary } from "./scaffold";
+import type { ScaffoldFile } from "./scaffold";
 
 /** The Meeko project of the active file or, without one, of the first workspace folder that is a project. */
 function currentProject(): string | undefined {

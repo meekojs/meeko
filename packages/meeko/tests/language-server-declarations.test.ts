@@ -43,7 +43,7 @@ describe("language server: generated component declarations", () => {
     // `./TmpList.meeko` to a generated `TmpList.d.meeko.ts` before any other candidate.
     await writeFile(join(root, "tsconfig.json"), `${JSON.stringify({ compilerOptions: {
       strict: true, module: "NodeNext", moduleResolution: "NodeNext", target: "ES2022", lib: ["ES2022", "DOM"], types: [], noEmit: true, skipLibCheck: true,
-      paths: { "@meekojs/meeko/internal": ["../../src/internal.ts"], "@meekojs/meeko": ["../../src/index.ts"] },
+      paths: { "@meekojs/meeko/internal": ["../../dist/internal.d.ts"], "@meekojs/meeko": ["../../dist/index.d.ts"] },
     } })}\n`);
     await mkdir(join(root, ".meeko", "types"), { recursive: true });
     await writeFile(join(root, ".meeko", "types", "TmpList.d.meeko.ts"), stale);

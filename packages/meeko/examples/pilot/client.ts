@@ -1,6 +1,6 @@
 import { hydrate, type ComponentProps } from "./App.meeko";
 import type { HotState } from "@meekojs/meeko";
-import { parseTasks } from "./model.js";
+import { parseTasks } from "./model";
 
 /** Comprueba el límite JSON antes de conectar los eventos del cliente. */
 function readPayload(value: unknown): { props: ComponentProps; state: HotState } {

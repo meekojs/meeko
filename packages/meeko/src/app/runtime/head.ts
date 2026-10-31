@@ -1,11 +1,11 @@
-import { createContext, createRoot, findContext, finishWithCleanup, provide } from "../../core/reactivity.js";
-import type { ReadonlySignal } from "../../core/reactivity.js";
-import type { ComponentRelease, DomScope } from "./renderer.js";
-import { applyColorScheme, applyThemeClass } from "./theme-dom.js";
-import { withThemeAttributes } from "../../shared/theme.js";
-import type { DocumentTheme, ThemeHead } from "../../shared/theme.js";
-import { CONFIG_LEVEL, HEAD_END_MARKER, HEAD_START_MARKER, ROUTE_LEVEL, documentHeadInput, normalizeHeadInput, rawText, resolveHead, resolveSeo } from "../../shared/head.js";
-import type { DocumentConfig, HeadInput, HeadSource, HeadTag, ResolvedSeo } from "../../shared/head.js";
+import { createContext, createRoot, findContext, finishWithCleanup, provide } from "../../core/reactivity";
+import type { ReadonlySignal } from "../../core/reactivity";
+import type { ComponentRelease, DomScope } from "./renderer";
+import { applyColorScheme, applyThemeClass } from "./theme-dom";
+import { withThemeAttributes } from "../../shared/theme";
+import type { DocumentTheme, ThemeHead } from "../../shared/theme";
+import { CONFIG_LEVEL, HEAD_END_MARKER, HEAD_START_MARKER, ROUTE_LEVEL, documentHeadInput, normalizeHeadInput, rawText, resolveHead, resolveSeo } from "../../shared/head";
+import type { DocumentConfig, HeadInput, HeadSource, HeadTag, ResolvedSeo } from "../../shared/head";
 
 export interface LiveEntry {
   level: number;

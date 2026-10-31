@@ -1,4 +1,4 @@
-import { packageFolder, readRepositoryFile } from './repository.js'
+import { packageFolder, readRepositoryFile } from './repository'
 
 /** A group of the API reference: the `.meeko` syntax or a public subpath of `@meekojs/meeko`. */
 export interface ApiGroup {

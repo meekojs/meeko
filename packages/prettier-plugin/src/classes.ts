@@ -4,7 +4,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import postcss from "postcss";
 import selectorParser from "postcss-selector-parser";
-import { isMeekoProject } from "./project.js";
+import { isMeekoProject } from "./project";
 
 /** Valores de `meekoSortClasses`. */
 export type ClassSortMode = "off" | "stylesheet" | "alphabetical";

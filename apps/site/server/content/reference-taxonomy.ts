@@ -1,5 +1,5 @@
 import GithubSlugger from 'github-slugger'
-import { readRepositoryFile } from './repository.js'
+import { readRepositoryFile } from './repository'
 
 /*
  * The taxonomy of the API reference: `docs/reference/taxonomy.json`, the groups of the sidebar

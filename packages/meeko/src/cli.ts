@@ -2,25 +2,25 @@
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { existsSync, readdirSync } from "node:fs";
 import { join, parse, resolve } from "node:path";
-import { checkSource } from "./check.js";
-import { compile } from "./compiler.js";
-import { projectRoot } from "./compiler/project-root.js";
-import { loadMeekoConfig } from "./framework/config.js";
-import { setModuleDevelopmentMode, warnLegacyLayerEntries } from "./framework/module-loader.js";
-import { generateTypes } from "./types.js";
-import { initProject } from "./init.js";
-import { initFrameworkProject } from "./framework/init.js";
-import { checkApp } from "./framework/check-app.js";
-import { prerenderProject } from "./framework/prerender.js";
-import { assertBuildAdapter, buildProject, developmentServerPorts, prepareProject, previewProject, startProject, stopDevelopmentServer } from "./framework/project.js";
-import { prepareFrameworkTypeDeclarations } from "./framework/type-declarations.js";
-import { claimDevelopmentProject } from "./framework/dev-lock.js";
-import { findLinkedMeeko, isSupervisedDevelopment, linkWatchEnabled, runSupervisedDevelopment, superviseDevelopment, warnLinkedMeekoRebuilds } from "./framework/dev-link.js";
-import { checkFrameworkProject, loadCheckedMeekoConfig, prepareFrameworkTypes } from "./framework/check-project.js";
-import { cleanProject, formatCleanResult } from "./framework/clean.js";
-import { loadProjectEnv } from "./framework/env-file.js";
-import { formatDiagnostic, hasErrors } from "./compiler/parser/sfc.js";
-import type { CompileDiagnostic } from "./compiler/parser/sfc.js";
+import { checkSource } from "./check";
+import { compile } from "./compiler";
+import { projectRoot } from "./compiler/project-root";
+import { loadMeekoConfig } from "./framework/config";
+import { setModuleDevelopmentMode, warnLegacyLayerEntries } from "./framework/module-loader";
+import { generateTypes } from "./types";
+import { initProject } from "./init";
+import { initFrameworkProject } from "./framework/init";
+import { checkApp } from "./framework/check-app";
+import { prerenderProject } from "./framework/prerender";
+import { assertBuildAdapter, buildProject, developmentServerPorts, prepareProject, previewProject, startProject, stopDevelopmentServer } from "./framework/project";
+import { prepareFrameworkTypeDeclarations } from "./framework/type-declarations";
+import { claimDevelopmentProject } from "./framework/dev-lock";
+import { findLinkedMeeko, isSupervisedDevelopment, linkWatchEnabled, runSupervisedDevelopment, superviseDevelopment, warnLinkedMeekoRebuilds } from "./framework/dev-link";
+import { checkFrameworkProject, loadCheckedMeekoConfig, prepareFrameworkTypes } from "./framework/check-project";
+import { cleanProject, formatCleanResult } from "./framework/clean";
+import { loadProjectEnv } from "./framework/env-file";
+import { formatDiagnostic, hasErrors } from "./compiler/parser/sfc";
+import type { CompileDiagnostic } from "./compiler/parser/sfc";
 
 const usage = "Uso: meeko dev [directorio]\n     meeko check [directorio | componente.meeko] [--json]\n     meeko build [directorio] [--adapter <node|cloudflare|deno|bun|static>]\n     meeko start [directorio]\n     meeko preview [directorio] [--adapter <node|cloudflare|bun|deno|static>]\n     meeko clean [directorio] [--all] [--dry-run]\n     meeko auth hash  (pide una contraseña sin mostrarla, o la lee de stdin, e imprime su hash)\n     meeko check-app <directorio>\n     meeko compile <componente.meeko> <salida.ts>\n     meeko types <componente.meeko>\n     meeko routes <directorio>\n     meeko prerender <directorio>\n     meeko init <directorio>\n     meeko init-framework <directorio>\n     meeko lsp --stdio | --node-ipc | --socket=<puerto> | --pipe=<nombre>\n     meeko <comando> --help  (la ayuda de un comando)\n     meeko --help | --version\n\n" +
   "Variables de entorno:\n" +
@@ -170,7 +170,7 @@ if (problem !== undefined) {
   const metadata = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
   process.stdout.write(`${metadata.version}\n`);
 } else if (command === "lsp") {
-  const { runLanguageServer } = await import("./language-server/server.js");
+  const { runLanguageServer } = await import("./language-server/server");
   runLanguageServer(process.argv.slice(3));
 } else {
   try {
@@ -213,8 +213,8 @@ if (problem !== undefined) {
       }
     } else if (command === "auth") {
       // Only the hash goes to stdout, so `meeko auth hash >> .env` or a pipe gets a clean line.
-      const { promptPassword } = await import("./password-prompt.js");
-      const { hashPassword } = await import("./password.js");
+      const { promptPassword } = await import("./password-prompt");
+      const { hashPassword } = await import("./password");
       const password = await promptPassword(process.stdin, process.stderr);
       process.stdout.write(`${await hashPassword(password)}\n`);
     } else if (command === "clean") {

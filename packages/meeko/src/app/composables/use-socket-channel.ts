@@ -1,6 +1,6 @@
-import { socketUrl } from "../runtime/socket.js";
-import type { SocketClient, SocketContract, SocketRegistryOptions } from "../runtime/socket.js";
-import { useSocketClient } from "./use-socket-client.js";
+import { socketUrl } from "../runtime/socket";
+import type { SocketClient, SocketContract, SocketRegistryOptions } from "../runtime/socket";
+import { useSocketClient } from "./use-socket-client";
 
 /**
  * Abre el canal `name` de un registro de contratos ligado a la raíz del componente actual, como

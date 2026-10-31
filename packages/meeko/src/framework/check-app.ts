@@ -1,14 +1,14 @@
 import { access, mkdir, readFile, readdir, realpath, unlink, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
-import { checkSource } from "../check.js";
-import { MeekoCompileError } from "../compiler/parser/sfc.js";
-import type { CompileDiagnostic } from "../compiler/parser/sfc.js";
-import { componentTypeDeclarationMarker, componentTypesPath, generateTypes } from "../types.js";
-import { discoverComponents } from "../autoimports/registry.js";
-import { checkAliasScopes, resolveProjectAliases } from "./aliases.js";
-import { loadConfiguredModules, resolveConfigSources } from "./config.js";
-import { assertRouteBlockPlacement } from "../compiler/transforms/route-block.js";
+import { checkSource } from "../check";
+import { MeekoCompileError } from "../compiler/parser/sfc";
+import type { CompileDiagnostic } from "../compiler/parser/sfc";
+import { componentTypeDeclarationMarker, componentTypesPath, generateTypes } from "../types";
+import { discoverComponents } from "../autoimports/registry";
+import { checkAliasScopes, resolveProjectAliases } from "./aliases";
+import { loadConfiguredModules, resolveConfigSources } from "./config";
+import { assertRouteBlockPlacement } from "../compiler/transforms/route-block";
 
 const componentTypesManifest = "component-types.json";
 const componentTypeSuffix = ".d.meeko.ts";

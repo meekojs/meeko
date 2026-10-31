@@ -1,9 +1,9 @@
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
-import type { SocketHub, SocketPeer } from "../socket/runtime.js";
-import { observeErrorCallback } from "../errors.js";
-import { setSocketAddress } from "./env.js";
-import { createSocketUpgradeHandler, socketPathnamePrefix, socketPublicOrigin } from "./upgrade.js";
+import type { SocketHub, SocketPeer } from "../socket/runtime";
+import { observeErrorCallback } from "../errors";
+import { setSocketAddress } from "./env";
+import { createSocketUpgradeHandler, socketPathnamePrefix, socketPublicOrigin } from "./upgrade";
 
 /**
  * Conexión que devuelve la librería WebSocket del host tras el upgrade; la librería se encarga del

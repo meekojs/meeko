@@ -3,11 +3,11 @@
 // this file into theme-toggle.compiled.ts, which the package ships as
 // @meekojs/meeko/builtins/theme-toggle and which only the components that use the tag import; edit
 // this file, not that one.
-import { computed } from "../../../core/reactivity.js";
-import { useRoute } from "../../composables/useRoute.js";
-import { themeToggleGroupLabel, themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from "../../../shared/theme-toggle.js";
-import { useThemeToggle } from "../../composables/use-theme-toggle.js";
-import type { ThemeChoice, ThemeToggleItem, ThemeToggleMessages, ThemeToggleSnippets } from "../../../shared/theme.js";
+import { computed } from "../../../core/reactivity";
+import { useRoute } from "../../composables/useRoute";
+import { themeToggleGroupLabel, themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from "../../../shared/theme-toggle";
+import { useThemeToggle } from "../../composables/use-theme-toggle";
+import type { ThemeChoice, ThemeToggleItem, ThemeToggleMessages, ThemeToggleSnippets } from "../../../shared/theme";
 
 interface Props {
   /** `"cycle"` (por defecto), un botón que pasa al tema siguiente; `"select"`, un grupo de radios. */

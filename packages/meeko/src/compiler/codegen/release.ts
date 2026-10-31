@@ -1,5 +1,5 @@
 import { basename } from "node:path";
-import { locate } from "../parser/sfc.js";
+import { locate } from "../parser/sfc";
 
 export function emitComponentRelease(source: string, filename: string, declarations: ReadonlyMap<string, number>, exposed: boolean, hot: boolean): string {
   const exposedValue = exposed ? ", __bindings[__meeko.exposedKey]" : "";

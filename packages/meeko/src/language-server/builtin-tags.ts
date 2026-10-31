@@ -5,8 +5,8 @@
  * an entry here, its props type in `@meekojs/meeko/framework` and that type's name in
  * `builtinTagTypes` of `autoimports/registry.ts`, which autoimports it.
  */
-import { readThemeEnabledSync } from "../framework/config.js";
-import { builtinComponentModules } from "../compiler.js";
+import { readThemeEnabledSync } from "../framework/config";
+import { builtinComponentModules } from "../compiler";
 
 /** A prop of a built-in tag, as the template writes it. */
 export interface BuiltinTagProp {

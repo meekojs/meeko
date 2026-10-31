@@ -1,5 +1,5 @@
 import type { TrustedHtml } from '@meekojs/meeko'
-import type { TocEntry } from './docs.js'
+import type { TocEntry } from './docs'
 
 /** A group of the API reference as its index shows it: one per kind of symbol. */
 export interface ReferenceIndexGroup {

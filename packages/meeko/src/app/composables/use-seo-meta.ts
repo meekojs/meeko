@@ -1,7 +1,7 @@
-import type { HeadSource, SeoMetaInput } from "../../shared/head.js";
-import { seoMetaHead } from "../../shared/head.js";
-import { reader } from "../runtime/head.js";
-import { useHead } from "./use-head.js";
+import type { HeadSource, SeoMetaInput } from "../../shared/head";
+import { seoMetaHead } from "../../shared/head";
+import { reader } from "../runtime/head";
+import { useHead } from "./use-head";
 
 /**
  * Atajo tipado de {@link useHead} para SEO: cada campo produce la etiqueta correcta, `name` en

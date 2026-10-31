@@ -1,7 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
-import { assertCallablePaths, assertClientSegments, clientKey, collisionKey, parts } from "../runtime/discovery.js";
-import type { ApiEndpoint, ApiMethod, RpcEndpoint, ServerManifest, SocketEndpoint } from "../runtime/discovery.js";
+import { assertCallablePaths, assertClientSegments, clientKey, collisionKey, parts } from "../runtime/discovery";
+import type { ApiEndpoint, ApiMethod, RpcEndpoint, ServerManifest, SocketEndpoint } from "../runtime/discovery";
 
 async function files(directory: string): Promise<string[]> {
   let entries;

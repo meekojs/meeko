@@ -1,4 +1,4 @@
-// Generado desde src/devtools-protocol.ts con `pnpm run devtools:types`. No editar a mano.
+// Generado desde src/core/devtools-protocol.ts con `pnpm run devtools:types`. No editar a mano.
 /**
  * Contrato serializable entre el runtime de desarrollo y los paneles de Meeko DevTools.
  *

@@ -3,12 +3,12 @@ import { pathToFileURL } from "node:url";
 import ts from "@typescript/typescript6";
 import { CodeActionKind } from "vscode-languageserver/node";
 import type { CodeAction, Range } from "vscode-languageserver/node";
-import { parseSfc } from "../compiler/parser/sfc.js";
-import { attributeValueStart, parseTemplate } from "../compiler/parser/template.js";
-import type { TemplateNode } from "../compiler/parser/template.js";
-import { isPageFile } from "../compiler/transforms/route-block.js";
-import type { FeatureContext } from "./features.js";
-import { nodeAt } from "./reactivity.js";
+import { parseSfc } from "../compiler/parser/sfc";
+import { attributeValueStart, parseTemplate } from "../compiler/parser/template";
+import type { TemplateNode } from "../compiler/parser/template";
+import { isPageFile } from "../compiler/transforms/route-block";
+import type { FeatureContext } from "./features";
+import { nodeAt } from "./reactivity";
 
 /** What the client can apply in a workspace edit. */
 export interface EditCapabilities {

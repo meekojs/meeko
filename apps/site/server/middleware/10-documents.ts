@@ -1,5 +1,5 @@
 import { defineServerMiddleware } from "@meekojs/meeko/server";
-import { listPages, readPage, searchPages } from "../content/db.js";
+import { listPages, readPage, searchPages } from "../content/db";
 
 const origin = "https://meeko.diegootayza.com";
 const xmlText = (value: string): string => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");

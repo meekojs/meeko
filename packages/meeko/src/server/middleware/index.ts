@@ -1,4 +1,4 @@
-import { copySocketAddress } from "../runtime/env.js";
+import { copySocketAddress } from "../runtime/env";
 
 /**
  * Middleware de servidor: envuelve las peticiones HTTP de páginas, API y RPC antes de que Meeko cree
@@ -23,7 +23,7 @@ export type ServerMiddleware = (
   next: (request?: Request) => Promise<Response>,
 ) => Response | Promise<Response>;
 
-export { defineServerMiddleware } from "./definitions.js";
+export { defineServerMiddleware } from "./definitions";
 
 /**
  * Compone una lista de middleware de servidor alrededor de un handler, en orden de fuera hacia

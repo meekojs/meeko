@@ -1,8 +1,8 @@
 import { lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { resolve, relative, isAbsolute, sep } from "node:path";
-import { defineMeekoModule } from "../define-meeko-module.js";
-import { compileCatalog } from "./messages.js";
-import type { Catalog } from "./messages.js";
+import { defineMeekoModule } from "../define-meeko-module";
+import { compileCatalog } from "./messages";
+import type { Catalog } from "./messages";
 
 export interface I18nModuleOptions {
   /** Locale to use for an unprefixed URL. */

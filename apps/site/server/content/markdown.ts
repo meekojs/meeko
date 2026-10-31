@@ -5,10 +5,10 @@ import type { TrustedHtml } from "@meekojs/meeko";
 import GithubSlugger from "github-slugger";
 import markdownIt from "markdown-it";
 import type { MarkdownIt, Token } from "markdown-it";
-import type { RenderedDoc, TocEntry } from "../../shared/types/docs.js";
-import { pageOfSource } from "./catalog.js";
-import { blockLanguage, createHighlight } from "./highlight.js";
-import { githubUrl, readRepositoryFile, repositoryPath, repositoryRoot, repositoryUrl, sitePath } from "./repository.js";
+import type { RenderedDoc, TocEntry } from "../../shared/types/docs";
+import { pageOfSource } from "./catalog";
+import { blockLanguage, createHighlight } from "./highlight";
+import { githubUrl, readRepositoryFile, repositoryPath, repositoryRoot, repositoryUrl, sitePath } from "./repository";
 
 const blobPrefix = `${repositoryUrl}/blob/main/`;
 const treePrefix = `${repositoryUrl}/tree/main/`;

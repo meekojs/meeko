@@ -1,4 +1,4 @@
-import type { SourceMapping } from "./mapping.js";
+import type { SourceMapping } from "./mapping";
 
 const base64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 

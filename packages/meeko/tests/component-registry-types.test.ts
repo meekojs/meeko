@@ -9,6 +9,7 @@ import { linkRepositoryPackages, tempProject } from "./helpers/temp-project.ts";
 
 const button = `<script lang="ts">
 const props = defineProps<{ label: string; tone?: "primary" | "quiet" }>();
+const emit = defineEmits<{ save: [value: number] }>();
 </script>
 <template><button>{props.label}</button></template>
 `;
@@ -32,8 +33,12 @@ test("registered modules keep their real props and reject invalid names and inpu
   await writeFile(join(root, "app", "pages", "index.meeko"), `<script lang="ts">
 type P = ComponentProps<"Button">;
 const example: P = { label: "Home" };
+const selected = signal<ResolvedComponent<"Button"> | undefined>(undefined);
+async function open(): Promise<void> {
+  selected.value = await resolveComponent("Button", { label: "Save", onSave: (id) => id.toFixed() });
+}
 </script>
-<template><main>{example.label}</main></template>
+<template><main>{example.label}<button type="button" on:click="open">Open</button><component if:when="selected.value" is="selected.value!" bind:tone="'quiet'" on:save="(id) => id.toFixed()" /></main></template>
 `);
   const consumer = join(root, "app", "utils", "consumer.ts");
   await writeFile(consumer, `import type { ComponentName as Names, ComponentOf as Of, ComponentProps as Props, ComponentArgs as Args } from "@meekojs/meeko";
@@ -50,6 +55,8 @@ const globalArgs: ComponentArgs = ["Button", auto];
 const plain: Props<"Plain"> = {};
 const badge: Props<"UiBadge"> = { count: 2 };
 function openModal(...args: Args): void { void args; }
+function loadModal(...args: Args): Promise<ResolvedComponent> { return resolveComponent(...args); }
+void loadModal;
 openModal("Button", { label: "Save" });
 openModal("UiBadge", { count: 2 });
 const current: "Button" | "UiBadge" = Math.random() > 0.5 ? "Button" : "UiBadge";
@@ -69,6 +76,32 @@ const wrong: Props<"Button"> = { label: "Save", tone: "other" };
 const extra: Props<"Plain"> = { extra: true };
 // @ts-expect-error badge count is required
 const emptyBadge: Props<"UiBadge"> = {};
+const bound: Promise<ResolvedComponent<"Button">> = resolveComponent("Button", { label: "Save", onSave: (id) => id.toFixed() });
+bound.then((module) => { module.renderToString(); module.renderToString({ label: "Override" }); });
+resolveComponent("Plain", {});
+resolveComponent("Button").then((module) => {
+  module.renderToString({ label: "Original" });
+  // @ts-expect-error the original one-argument form still requires the props
+  module.renderToString();
+});
+// @ts-expect-error required label is checked at resolution
+resolveComponent("Button", {});
+// @ts-expect-error unknown component
+resolveComponent("Missing", {});
+// @ts-expect-error invalid literal
+resolveComponent("Button", { label: "Save", tone: "other" });
+// @ts-expect-error unknown prop beside a valid prop
+resolveComponent("Button", { label: "Save", extra: true });
+// @ts-expect-error no props are declared by Plain
+resolveComponent("Plain", { extra: true });
+// @ts-expect-error events retain their payload type
+resolveComponent("Button", { label: "Save", onSave: (id: string) => id });
+// @ts-expect-error an unrelated pair with a union name is rejected
+resolveComponent(current, { label: "Save" });
+// @ts-expect-error even an explicitly widened name must remain correlated with props
+resolveComponent<"Button" | "UiBadge">("UiBadge", { label: "Save" });
+// @ts-expect-error passing undefined is different from the one-argument loader
+resolveComponent("Button", undefined);
 void name; void html; void direct; void auto; void globalArgs; void plain; void badge; void missing; void absent; void wrong; void extra; void emptyBadge;
 `);
   const declaration = await generateComponentRegistryTypes(root);
@@ -92,6 +125,45 @@ void invalid; void wrong;
   assert.doesNotMatch(await readFile(declaration, "utf8"), /readonly "Plain"/);
   assert.doesNotMatch(await readFile(declaration, "utf8"), /readonly "UiBadge"/);
   await assert.rejects(readFile(badgeDeclaration, "utf8"), /ENOENT/);
+});
+
+test("a project without registered components still has a valid generated resolver", async (context) => {
+  const root = await tempProject(context, "empty-component-registry");
+  await linkRepositoryPackages(root);
+  await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}');
+  await mkdir(join(root, "app", "pages"), { recursive: true });
+  await writeFile(join(root, "app", "pages", "index.meeko"), "<template><main>Empty registry</main></template>");
+  assert.deepEqual((await checkFrameworkProject(root)).filter((item) => (item.severity ?? "error") === "error"), []);
+});
+
+test("bound components keep required models, snippets and exact template overrides", async (context) => {
+  const root = await tempProject(context, "bound-component-channels");
+  await linkRepositoryPackages(root);
+  await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}');
+  await mkdir(join(root, "app", "components"), { recursive: true });
+  await mkdir(join(root, "app", "pages"), { recursive: true });
+  await writeFile(join(root, "app", "components", "Field.meeko"), `<script lang="ts">
+const props = defineProps<{ label: string }>();
+const count = defineModel<number>();
+const snippets = defineSnippets<{ detail: [value: number] }>();
+defineExpose({ label: () => props.label });
+</script><template><p>{props.label}:{count.value}<render snippet="snippets.detail" args="count.value" /></p></template>`);
+  const page = join(root, "app", "pages", "index.meeko");
+  const source = `<script lang="ts">
+const field = signal<ResolvedComponent<"Field"> | undefined>(undefined);
+const count = signal(1);
+async function open(): Promise<void> { field.value = await resolveComponent("Field", { label: "Count" }); }
+</script><template><button type="button" on:click="open">Open</button><component if:when="field.value" is="field.value!" model="count" bind:label="'Override'"><snippet name="detail" params="value">{value.toFixed()}</snippet></component></template>`;
+  await writeFile(page, source);
+  assert.deepEqual((await checkFrameworkProject(root)).filter((item) => (item.severity ?? "error") === "error"), []);
+  await writeFile(page, source.replace(' model="count"', ""));
+  await assert.rejects(checkFrameworkProject(root), /default|model/i);
+  await writeFile(page, source.replace('<snippet name="detail" params="value">{value.toFixed()}</snippet>', ""));
+  await assert.rejects(checkFrameworkProject(root), /detail|snippet/i);
+  await writeFile(page, source.replace('bind:label="\'Override\'"', 'bind:label="123"'));
+  await assert.rejects(checkFrameworkProject(root), /TS2322|TS2345/);
+  await writeFile(page, source.replace('bind:label="\'Override\'"', 'bind:missing="123"'));
+  await assert.rejects(checkFrameworkProject(root), /missing|TS2353/);
 });
 
 test("external component modules require resolvable adjacent declarations", { timeout: 120_000 }, async (context) => {

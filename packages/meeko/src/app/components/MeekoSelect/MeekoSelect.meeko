@@ -2,10 +2,10 @@
 // <MeekoSelect>, Meeko's own tag since 1.5, built on <MeekoPopover>. `pnpm run builtins` compiles this
 // file into select.compiled.ts, which the package ships as @meekojs/meeko/builtins/select and which
 // only the components that use the tag import; edit this file, not that one.
-import { useId } from "../../composables/useId.js";
-import { onMounted } from "../../runtime/lifecycle.js";
-import { createSelect } from "./select.js";
-import type { MeekoSelectProps, SelectModel, SelectSettings, SelectSnippets } from "./types.js";
+import { useId } from "../../composables/useId";
+import { onMounted } from "../../runtime/lifecycle";
+import { createSelect } from "./select";
+import type { MeekoSelectProps, SelectModel, SelectSettings, SelectSnippets } from "./types";
 
 const props = defineProps<MeekoSelectProps<T, Multiple>>();
 const snippets = defineSnippets<SelectSnippets<T>>();

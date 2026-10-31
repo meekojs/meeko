@@ -7,10 +7,10 @@
  * hidden by its `popover` attribute from the first byte, and every style is applied through CSSOM
  * in the browser, so a strict CSP without `'unsafe-inline'` is enough.
  */
-import { computed, effect, untrack } from "../../../core/reactivity.js";
-import type { ReadonlySignal, Signal } from "../../../core/reactivity.js";
+import { computed, effect, untrack } from "../../../core/reactivity";
+import type { ReadonlySignal, Signal } from "../../../core/reactivity";
 
-import type { MeekoPopoverProps, PopoverMode, PopoverPlacement, PopoverRole, PopoverSide, PopoverTrigger } from "./types.js";
+import type { MeekoPopoverProps, PopoverMode, PopoverPlacement, PopoverRole, PopoverSide, PopoverTrigger } from "./types";
 
 /** `position-area` of each placement: the side, and the span that aligns it with an edge. */
 const areas: Readonly<Record<PopoverPlacement, string>> = {

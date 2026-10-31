@@ -15,5 +15,9 @@ export const templateEventDeclaration = "type __MeekoEventOf<Name extends string
  * union of the elements of its possible tags.
  */
 export function templateEventType(prefix: "__meeko." | "__Meeko", name: string, tag: string, svg: boolean, tagType?: string): string {
-  return `${prefix}EventOf<${JSON.stringify(name)}, ${svg}> & { readonly currentTarget: ${prefix}ElementOf<${tagType ?? JSON.stringify(tag)}, ${svg}> }`;
+  const target = `${prefix}ElementOf<${tagType ?? JSON.stringify(tag)}, ${svg}>`;
+  const event = `${prefix}EventOf<${JSON.stringify(name)}, ${svg}> & { readonly currentTarget: ${target} }`;
+  // A dynamic value may turn out to be component-only. Its other generated branch checks
+  // the handler against the component's emitted payload; the nonexistent DOM branch must not.
+  return tagType ? `([${target}] extends [never] ? any : ${event})` : event;
 }

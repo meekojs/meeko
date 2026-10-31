@@ -48,7 +48,7 @@ export function analyzeExpose(file: ts.SourceFile): ExposeDeclaration | undefine
   return found;
 }
 
-import { apiDocs, jsdoc } from "./compiler-docs.js";
+import { apiDocs, jsdoc } from "./compiler-docs";
 
 export const defineExposeDocs = jsdoc(
     "Macro de compilación: publica `exposed` para el padre que nombra este componente con `ref:` y lo",

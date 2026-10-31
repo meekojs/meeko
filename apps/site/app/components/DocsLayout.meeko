@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { computed, signal } from '@meekojs/meeko'
-	import type { NavSection, Pager, TocEntry } from '../../shared/types/docs.js'
+	import type { NavSection, Pager, TocEntry } from '../../shared/types/docs'
 
 	interface Props {
 		nav: readonly NavSection[]

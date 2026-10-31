@@ -4,7 +4,7 @@
  * see them. A compiled module declares their types in `__meekoChannels`, a declaration without
  * runtime value that the parent's type checks read from the imported module.
  */
-import type { ExposedOf } from "./expose.js";
+import type { ExposedOf } from "./expose";
 
 /** Key of the models and snippets that a parent passes next to the props of a child. */
 export const channelsKey: unique symbol = Symbol("meeko.channels");

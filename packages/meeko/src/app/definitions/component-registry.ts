@@ -1,3 +1,5 @@
+import type { ComponentWithProps } from "../runtime/resolved-component";
+
 /**
  * Project component modules registered by Meeko. The generated declaration augments this interface.
  * @example
@@ -35,6 +37,17 @@ export type ComponentOf<Name extends ComponentName> = ComponentRegistry[Name];
 export type ComponentProps<Name extends ComponentName> = ComponentOf<Name> extends {
   renderToString: (props: infer Props, ...args: never[]) => string;
 } ? Props : never;
+
+/**
+ * A registered component with its props already supplied to `resolveComponent(name, props)`.
+ * Render it directly with `<component is>`; explicit template props override the bound values.
+ * @example
+ * ```ts
+ * const form = signal<ResolvedComponent<"FormUserCreate"> | undefined>(undefined);
+ * ```
+ */
+export type ResolvedComponent<Name extends ComponentName = ComponentName> = Name extends ComponentName
+  ? ComponentWithProps<ComponentOf<Name>> : never;
 
 /**
  * Correlated name and props pairs for dynamic APIs. Use a rest parameter of this type when the

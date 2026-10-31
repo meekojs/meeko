@@ -1,13 +1,13 @@
-import { serializeJson } from "../../core/server.js";
-import type { RequestContext } from "../runtime/request-context.js";
-import { echoValues, formEncoding, formFlashCookie, formObject, formReturnPath, issueRoot, planFormConversion, sameOriginPath, seeOther } from "../forms/index.js";
-import type { FormFieldValue, ParsedForm } from "../forms/index.js";
-import { isAllowedOrigin, type SessionManager } from "../runtime/sessions.js";
-import { ApiError, InvalidInputError, issuePath, maxPublicIssues, normalizeServerError, publicIssues, reportServerError, sentIssues } from "../errors.js";
-import type { ApiErrorIssue, ServerErrorObserver } from "../errors.js";
-import { defaultMaxBodyBytes, enforceRateLimit, errorResponse, finish, guard, readBounded, readJson, validate } from "../contract-runtime.js";
-import type { Schema, OptionalOutput } from "../schema.js";
-import { successStatuses, type ApiFormOptions, type ApiRouteDefinition, type ApiSuccessStatus } from "./contracts.js";
+import { serializeJson } from "../../core/server";
+import type { RequestContext } from "../runtime/request-context";
+import { echoValues, formEncoding, formFlashCookie, formObject, formReturnPath, issueRoot, planFormConversion, sameOriginPath, seeOther } from "../forms/index";
+import type { FormFieldValue, ParsedForm } from "../forms/index";
+import { isAllowedOrigin, type SessionManager } from "../runtime/sessions";
+import { ApiError, InvalidInputError, issuePath, maxPublicIssues, normalizeServerError, publicIssues, reportServerError, sentIssues } from "../errors";
+import type { ApiErrorIssue, ServerErrorObserver } from "../errors";
+import { defaultMaxBodyBytes, enforceRateLimit, errorResponse, finish, guard, readBounded, readJson, validate } from "../contract-runtime";
+import type { Schema, OptionalOutput } from "../schema";
+import { successStatuses, type ApiFormOptions, type ApiRouteDefinition, type ApiSuccessStatus } from "./contracts";
 
 /** The fields of a native form, with `_csrf` and `return` apart. */
 async function readForm(request: Request, encoding: "urlencoded" | "multipart", maxBytes: number, files: boolean): Promise<ParsedForm> {

@@ -1,5 +1,5 @@
 import type { TrustedHtml } from '@meekojs/meeko'
-import type { TocEntry } from './docs.js'
+import type { TocEntry } from './docs'
 
 /** What a page of the API reference documents. */
 export type ApiKind = 'function' | 'class' | 'interface' | 'type' | 'const' | 'enum' | 'macro' | 'tag' | 'directive' | 'block'

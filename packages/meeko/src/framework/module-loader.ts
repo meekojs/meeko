@@ -2,12 +2,12 @@ import { readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import type { MeekoConfig } from "../modules/define-meeko-config.js";
-import { meekoEnv } from "../server/runtime/env.js";
-import { normalizeHeadInput, resolveDocumentConfig, siteOrigin } from "../shared/head.js";
-import type { DocumentConfig, DocumentHead, HeadInput } from "../shared/head.js";
-import { isMeekoModule } from "../modules/define-meeko-module.js";
-import type { MeekoHooks, MeekoModule, MeekoModuleContext, ModuleAutoImport, ModulePlugin } from "../modules/define-meeko-module.js";
+import type { MeekoConfig } from "../modules/define-meeko-config";
+import { meekoEnv } from "../server/runtime/env";
+import { normalizeHeadInput, resolveDocumentConfig, siteOrigin } from "../shared/head";
+import type { DocumentConfig, DocumentHead, HeadInput } from "../shared/head";
+import { isMeekoModule } from "../modules/define-meeko-module";
+import type { MeekoHooks, MeekoModule, MeekoModuleContext, ModuleAutoImport, ModulePlugin } from "../modules/define-meeko-module";
 
 /**
  * Build-time half of the module system: it runs `defineMeekoModule` setups in Node and records

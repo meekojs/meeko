@@ -1,6 +1,6 @@
 import ts from "@typescript/typescript6";
-import { analyzeElementRefCall } from "../app/definitions/use-element-ref.js";
-import type { ElementRefCall } from "../app/definitions/use-element-ref.js";
+import { analyzeElementRefCall } from "../app/definitions/use-element-ref";
+import type { ElementRefCall } from "../app/definitions/use-element-ref";
 
 /**
  * Composables that the compiler resolves from the top level of a `<script>`. Calling one inside

@@ -5,13 +5,13 @@ import ts from "@typescript/typescript6";
 import type { TextDocument } from "vscode-languageserver-textdocument";
 import { CodeActionKind } from "vscode-languageserver/node";
 import type { CodeAction, Diagnostic } from "vscode-languageserver/node";
-import { parseSfc } from "../compiler/parser/sfc.js";
-import type { SfcSection } from "../compiler/parser/sfc.js";
-import type { EditCapabilities } from "./actions.js";
-import { tagAt } from "./embedded.js";
-import { usageEdits } from "./features.js";
-import type { FeatureContext } from "./features.js";
-import { nodeAt } from "./reactivity.js";
+import { parseSfc } from "../compiler/parser/sfc";
+import type { SfcSection } from "../compiler/parser/sfc";
+import type { EditCapabilities } from "./actions";
+import { tagAt } from "./embedded";
+import { usageEdits } from "./features";
+import type { FeatureContext } from "./features";
+import { nodeAt } from "./reactivity";
 
 /** The top-level statement of the script that contains `node`. */
 function topStatement(node: ts.Node): ts.Statement | undefined {

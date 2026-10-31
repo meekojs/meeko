@@ -1,4 +1,4 @@
-import type { TeleportEntry } from "../../app/runtime/teleport.js";
+import type { TeleportEntry } from "../../app/runtime/teleport";
 
 /** Elements without content or end tag: a teleport cannot render inside them. */
 const voidElements = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);

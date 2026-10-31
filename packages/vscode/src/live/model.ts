@@ -1,6 +1,6 @@
-import type { DevelopmentServerRecord, EditorLiveAlias, EditorLiveSignal } from "../../../meeko/src/shared/devtools-bridge-protocol.js";
+import type { DevelopmentServerRecord, EditorLiveAlias, EditorLiveSignal } from "../../../meeko/src/shared/devtools-bridge-protocol";
 
-export type { EditorBridgeDescriptor, EditorBridgeEvent, EditorCommandResult, EditorLiveAlias, EditorLiveSignal } from "../../../meeko/src/shared/devtools-bridge-protocol.js";
+export type { EditorBridgeDescriptor, EditorBridgeEvent, EditorCommandResult, EditorLiveAlias, EditorLiveSignal } from "../../../meeko/src/shared/devtools-bridge-protocol";
 
 /** Descriptores del puente: cada `meeko dev` en marcha escribe el suyo, con su puerto en el nombre. */
 export const bridgeDescriptorGlob = "**/.meeko/dev/editor-bridge-*.json";

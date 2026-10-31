@@ -4,19 +4,19 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import ts from "@typescript/typescript6";
-import { composeFrameworkRoutes } from "./modules.js";
-import { discoverLayouts } from "./routes-discovery.js";
-import { contentSecurityPolicy } from "../server/runtime/csp.js";
-import type { ContentSecurityPolicy } from "../server/runtime/csp.js";
-import { normalizeDocumentConfig, siteOrigin } from "../shared/head.js";
-import { resolveThemeConfig } from "../shared/theme.js";
-import type { RouteRecord } from "../app/runtime/router.js";
-import type { MeekoConfig } from "../modules/define-meeko-config.js";
-import { isMeekoModule } from "../modules/define-meeko-module.js";
-import { classifyModuleEntry, resolveMeekoModules, resolvedDocument, warnUnknownConfigKeys } from "./module-loader.js";
-import type { ResolvedModules } from "./module-loader.js";
+import { composeFrameworkRoutes } from "./modules";
+import { discoverLayouts } from "./routes-discovery";
+import { contentSecurityPolicy } from "../server/runtime/csp";
+import type { ContentSecurityPolicy } from "../server/runtime/csp";
+import { normalizeDocumentConfig, siteOrigin } from "../shared/head";
+import { resolveThemeConfig } from "../shared/theme";
+import type { RouteRecord } from "../app/runtime/router";
+import type { MeekoConfig } from "../modules/define-meeko-config";
+import { isMeekoModule } from "../modules/define-meeko-module";
+import { classifyModuleEntry, resolveMeekoModules, resolvedDocument, warnUnknownConfigKeys } from "./module-loader";
+import type { ResolvedModules } from "./module-loader";
 
-export type { MeekoConfig } from "../modules/define-meeko-config.js";
+export type { MeekoConfig } from "../modules/define-meeko-config";
 
 /**
  * Una fuente de páginas y autoimports del proyecto: la aplicación, un layer de `layers` (o

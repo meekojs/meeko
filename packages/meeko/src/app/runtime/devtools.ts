@@ -1,19 +1,19 @@
-import type { DomScope } from "./renderer.js";
+import type { DomScope } from "./renderer";
 import type {
   DevtoolsAssignmentSite, DevtoolsCommandResult, DevtoolsEvent, DevtoolsHook, DevtoolsInstance,
   DevtoolsProtocolVersion, DevtoolsReadSite, DevtoolsSignalSite, DevtoolsValue, DevtoolsWriteSite,
-} from "../../core/devtools-protocol.js";
-import { logClientError, observeCallback } from "../../core/error-observer.js";
-import { borrowedKey } from "./models.js";
-import { isReactiveProps, trackProps } from "./props.js";
-import { currentEffectOwner, effect, isWritableSignal, signalReadSites, untrack } from "../../core/reactivity.js";
-import type { Signal } from "../../core/reactivity.js";
+} from "../../core/devtools-protocol";
+import { logClientError, observeCallback } from "../../core/error-observer";
+import { borrowedKey } from "./models";
+import { isReactiveProps, trackProps } from "./props";
+import { currentEffectOwner, effect, isWritableSignal, signalReadSites, untrack } from "../../core/reactivity";
+import type { Signal } from "../../core/reactivity";
 
 export type {
   DevtoolsAssignmentSite, DevtoolsCommandResult, DevtoolsEditSite, DevtoolsEvent, DevtoolsEventKind, DevtoolsHook,
   DevtoolsInstance, DevtoolsProtocolVersion, DevtoolsReadKind, DevtoolsReadSite, DevtoolsSignalSite, DevtoolsSnapshot,
   DevtoolsValue, DevtoolsWriteSite,
-} from "../../core/devtools-protocol.js";
+} from "../../core/devtools-protocol";
 
 /** Versión del protocolo que implementa este runtime. */
 export const DEVTOOLS_PROTOCOL_VERSION: DevtoolsProtocolVersion = 1;

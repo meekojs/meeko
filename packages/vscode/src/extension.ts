@@ -1,13 +1,13 @@
 import * as vscode from "vscode";
 import type { LanguageClient } from "vscode-languageclient/node";
-import type { ResolvedLanguageServer } from "./server-resolution.js";
-import { ExecutionZoneDecorations, executionZonesRequest } from "./zones.js";
-import type { ExecutionZoneItem } from "./zones.js";
-import { LanguageServers } from "./language-servers.js";
-import { registerLiveValues } from "./live/controller.js";
-import { registerAutoClosingTags } from "./auto-close.js";
-import { registerScaffoldCommands } from "./commands.js";
-import type { MeekoLiveApi } from "./live/controller.js";
+import type { ResolvedLanguageServer } from "./server-resolution";
+import { ExecutionZoneDecorations, executionZonesRequest } from "./zones";
+import type { ExecutionZoneItem } from "./zones";
+import { LanguageServers } from "./language-servers";
+import { registerLiveValues } from "./live/controller";
+import { registerAutoClosingTags } from "./auto-close";
+import { registerScaffoldCommands } from "./commands";
+import type { MeekoLiveApi } from "./live/controller";
 
 /** API que devuelve la activación; las pruebas la usan para saber qué servidor se eligió. */
 export interface MeekoExtensionApi {

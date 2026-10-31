@@ -1,9 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
-import { discoverConfiguredLayouts, discoverConfiguredRoutes, loadMeekoConfig } from "./config.js";
-import { discoverRouteMiddleware } from "./route-middleware-discovery.js";
-import { resolveThemeConfig } from "../shared/theme.js";
-import type { ResolvedThemeConfig } from "../shared/theme.js";
+import { discoverConfiguredLayouts, discoverConfiguredRoutes, loadMeekoConfig } from "./config";
+import { discoverRouteMiddleware } from "./route-middleware-discovery";
+import { resolveThemeConfig } from "../shared/theme";
+import type { ResolvedThemeConfig } from "../shared/theme";
 
 export interface GeneratedRouteFiles {
   readonly types: string;

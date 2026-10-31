@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ReferencePage } from '../../shared/types/reference.js'
+	import type { ReferencePage } from '../../shared/types/reference'
 
 	interface Props {
 		/** A written page of the reference, merged with its generated types (server/content/reference.ts). */

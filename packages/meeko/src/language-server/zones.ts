@@ -1,11 +1,11 @@
 import ts from "@typescript/typescript6";
-import { parseSfc } from "../compiler/parser/sfc.js";
-import type { SfcDocument } from "../compiler/parser/sfc.js";
-import { isPageFile } from "../compiler/transforms/route-block.js";
-import { extractRouteRender } from "../framework/routes-discovery.js";
-import type { PageRender } from "../app/definitions/define-page.js";
-import { continuationStart, nodeAt, templateBinding, unwrap } from "./reactivity.js";
-import type { VirtualComponent } from "./model.js";
+import { parseSfc } from "../compiler/parser/sfc";
+import type { SfcDocument } from "../compiler/parser/sfc";
+import { isPageFile } from "../compiler/transforms/route-block";
+import { extractRouteRender } from "../framework/routes-discovery";
+import type { PageRender } from "../app/definitions/define-page";
+import { continuationStart, nodeAt, templateBinding, unwrap } from "./reactivity";
+import type { VirtualComponent } from "./model";
 
 /** Where code of a `.meeko` runs. */
 export type ExecutionZoneKind = "server" | "shared" | "browser";

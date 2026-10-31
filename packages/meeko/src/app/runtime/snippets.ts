@@ -6,9 +6,9 @@
  * places with `<render>`. Its content belongs to the parent: it reads the parent's scope, and its
  * bindings live in the parent's reactive root although its nodes sit in the child's DOM.
  */
-import type { DomScope } from "./renderer.js";
-import { currentEffectOwner } from "../../core/reactivity.js";
-import type { ReadonlySignal } from "../../core/reactivity.js";
+import type { DomScope } from "./renderer";
+import { currentEffectOwner } from "../../core/reactivity";
+import type { ReadonlySignal } from "../../core/reactivity";
 
 declare const snippetArguments: unique symbol;
 
@@ -65,4 +65,4 @@ export function snippetOf(value: unknown): SnippetData | undefined {
   return typeof value === "object" && value !== null ? (value as { [snippetData]?: SnippetData })[snippetData] : undefined;
 }
 
-export type { SnippetArgs, SnippetMap, SnippetTypes } from "../definitions/define-snippets.js";
+export type { SnippetArgs, SnippetMap, SnippetTypes } from "../definitions/define-snippets";

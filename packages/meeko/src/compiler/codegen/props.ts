@@ -1,5 +1,5 @@
-import type { GenericParameters } from "../generic.js";
-import { markSource } from "../mapping.js";
+import type { GenericParameters } from "../generic";
+import { markSource } from "../mapping";
 
 interface PropsSource {
   propsType: string;

@@ -1,9 +1,9 @@
-import type { SitemapEntriesContext, SitemapEntry } from "../../shared/definitions/sitemap.js";
-import type { StateStore } from "../runtime/state.js";
-import { normalizeHeadInput } from "../../shared/head.js";
-import type { HeadInput } from "../../shared/head.js";
-import type { LayoutProps, PageLayoutOptions } from "../../shared/layout.js";
-import type { ClientRouteMiddlewareName, RouteMiddlewareName } from "../middleware/runtime.js";
+import type { SitemapEntriesContext, SitemapEntry } from "../../shared/definitions/sitemap";
+import type { StateStore } from "../runtime/state";
+import { normalizeHeadInput } from "../../shared/head";
+import type { HeadInput } from "../../shared/head";
+import type { LayoutProps, PageLayoutOptions } from "../../shared/layout";
+import type { ClientRouteMiddlewareName, RouteMiddlewareName } from "../middleware/runtime";
 
 /**
  * Subconjunto de Standard Schema v1 que se puede usar en el navegador, como el que implementan los

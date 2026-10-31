@@ -1,5 +1,5 @@
 import { defineApiRoute } from "@meekojs/meeko/server";
-import { createUserBody, userSchema } from "../../../shared/schemas/demo.js";
+import { createUserBody, userSchema } from "../../../shared/schemas/demo";
 
 export default defineApiRoute({
   body: createUserBody,

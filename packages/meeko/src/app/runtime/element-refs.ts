@@ -5,8 +5,8 @@
  * instance's refs; the hydration of `ref:name` publishes the element, or the `defineExpose`
  * value of a component, and withdraws it when its region is released.
  */
-import { signal } from "../../core/reactivity.js";
-import type { ReadonlySignal, Signal } from "../../core/reactivity.js";
+import { signal } from "../../core/reactivity";
+import type { ReadonlySignal, Signal } from "../../core/reactivity";
 
 /** Marks values that an `await` of a browser continuation waits for in its own way. */
 export const browserReady: unique symbol = Symbol("meeko.browserReady");

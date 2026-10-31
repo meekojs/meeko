@@ -1,10 +1,10 @@
 import { mkdir, readdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { replaceModuleSpecifiers } from "../import-graph.js";
+import { replaceModuleSpecifiers } from "../import-graph";
 
-import { MeekoCompileError } from "../parser/sfc.js";
-import { routeBlockFile, routeBlockSource } from "../transforms/route-block.js";
-import { readServerScript, serverScriptTypes } from "./server-script.js";
+import { MeekoCompileError } from "../parser/sfc";
+import { routeBlockFile, routeBlockSource } from "../transforms/route-block";
+import { readServerScript, serverScriptTypes } from "./server-script";
 
 /** Directory, relative to `.meeko`, that mirrors `<script server>` blocks as TypeScript. */
 export const routeBlockTypesDirectory = "routes";

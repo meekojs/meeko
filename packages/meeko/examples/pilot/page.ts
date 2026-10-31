@@ -1,5 +1,5 @@
 import { serializeJson, type HotState } from "@meekojs/meeko";
-import type { Task, TaskView } from "./model.js";
+import type { Task, TaskView } from "./model";
 
 /** Renderiza HTML SSR con el estado serializado y un cliente configurable. */
 export function renderPilotPage(view: TaskView, rendered: { html: string; state: HotState }, tasks: Task[], clientPath: string): string {

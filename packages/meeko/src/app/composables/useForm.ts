@@ -3,17 +3,17 @@
  * validation with a Standard Schema, the server's `400` issues mapped onto the same fields, a
  * form-level message, `pending`, `dirty`, `reset` and `load`.
  */
-import { componentErrorReporter } from "../runtime/component-errors.js";
-import { useId } from "./useId.js";
-import { setupPhase } from "../runtime/lifecycle.js";
-import { batch, computed, effect, findContext, signal, untrack } from "../../core/reactivity.js";
-import type { ReadonlySignal, Signal } from "../../core/reactivity.js";
-import { ClientError } from "../../shared/clients.js";
-import type { ValidationIssue } from "../../shared/clients.js";
-import { actionPathname, formStateKey, parseFormFlash } from "../../shared/form-flash.js";
-import type { FormFlash } from "../../shared/form-flash.js";
-import { formFlashKey } from "../runtime/form-flash.js";
-import { findState } from "../runtime/state.js";
+import { componentErrorReporter } from "../runtime/component-errors";
+import { useId } from "./useId";
+import { setupPhase } from "../runtime/lifecycle";
+import { batch, computed, effect, findContext, signal, untrack } from "../../core/reactivity";
+import type { ReadonlySignal, Signal } from "../../core/reactivity";
+import { ClientError } from "../../shared/clients";
+import type { ValidationIssue } from "../../shared/clients";
+import { actionPathname, formStateKey, parseFormFlash } from "../../shared/form-flash";
+import type { FormFlash } from "../../shared/form-flash";
+import { formFlashKey } from "../runtime/form-flash";
+import { findState } from "../runtime/state";
 
 type SchemaResult<O> = { value: O; issues?: undefined } | { issues: readonly unknown[] };
 

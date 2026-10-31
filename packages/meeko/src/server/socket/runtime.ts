@@ -1,16 +1,16 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { createRequestContext, type RequestContext } from "../runtime/request-context.js";
-import { ApiError, normalizeServerError, observeErrorCallback, SessionRevokedError } from "../errors.js";
-import type { Schema } from "../schema.js";
-import { serializeJson } from "../../core/server.js";
-import type { SessionHandle, SessionManager } from "../runtime/sessions.js";
-import type { ServerPlatform } from "../runtime/platform.js";
-import type { SocketClient, SocketContract } from "../../app/runtime/socket.js";
+import { createRequestContext, type RequestContext } from "../runtime/request-context";
+import { ApiError, normalizeServerError, observeErrorCallback, SessionRevokedError } from "../errors";
+import type { Schema } from "../schema";
+import { serializeJson } from "../../core/server";
+import type { SessionHandle, SessionManager } from "../runtime/sessions";
+import type { ServerPlatform } from "../runtime/platform";
+import type { SocketClient, SocketContract } from "../../app/runtime/socket";
 
 type SchemaMap = Readonly<Record<string, Schema>>;
-import type { SocketChannelDefinition } from "./definitions.js";
-export type { SocketChannelDefinition } from "./definitions.js";
-export { defineSocketChannel } from "./definitions.js";
+import type { SocketChannelDefinition } from "./definitions";
+export type { SocketChannelDefinition } from "./definitions";
+export { defineSocketChannel } from "./definitions";
 
 type SchemaInput<T> = T extends { readonly "~standard": { readonly types?: infer U } }
   ? NonNullable<U> extends { readonly input: infer I } ? I : never

@@ -4,10 +4,10 @@ import { pathToFileURL } from "node:url";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { CompletionItemKind, MarkupKind } from "vscode-languageserver/node";
 import type { CompletionItem, CompletionList, Hover, Location, MarkupContent, Position } from "vscode-languageserver/node";
-import { classRuleSnippet, cssClassRules, cssImports } from "./class-rules.js";
-import type { ClassRule } from "./class-rules.js";
-import { styleRegion, tagAt } from "./embedded.js";
-import { pathKey } from "./project.js";
+import { classRuleSnippet, cssClassRules, cssImports } from "./class-rules";
+import type { ClassRule } from "./class-rules";
+import { styleRegion, tagAt } from "./embedded";
+import { pathKey } from "./project";
 
 // CSS classes of a project for `class="…"` and the string literals of `bind:class`: the
 // `<style>` of the component (also unsaved), the `<style>` without `scoped` of the other

@@ -1,8 +1,8 @@
 import ts from "@typescript/typescript6";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import type { Location, Range } from "vscode-languageserver/node";
-import type { FeatureContext } from "./features.js";
-import type { VirtualComponent } from "./model.js";
+import type { FeatureContext } from "./features";
+import type { VirtualComponent } from "./model";
 
 /** Rango fuente de un tramo generado; ambos extremos deben pertenecer a un mismo tramo mapeado. */
 export function sourceRange(component: VirtualComponent, start: number, length: number): [number, number] | undefined {

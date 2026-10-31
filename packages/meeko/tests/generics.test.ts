@@ -333,7 +333,7 @@ export type { Wrong };
       compilerOptions: {
         noEmit: true, strict: true, skipLibCheck: true, module: "nodenext", moduleResolution: "nodenext", target: "es2022",
         allowArbitraryExtensions: true, types: ["node"], rootDirs: [root, join(root, ".meeko", "types")],
-        paths: { "@meekojs/meeko/internal": [resolve("src/internal.ts")], "@meekojs/meeko": [resolve("src/index.ts")] },
+        paths: { "@meekojs/meeko/internal": [resolve("dist/internal.d.ts")], "@meekojs/meeko": [resolve("dist/index.d.ts")] },
       },
       files: [join(root, "consumer.ts")],
     }));

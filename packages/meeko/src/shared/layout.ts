@@ -1,4 +1,4 @@
-import type { GeneratedLayouts, GeneratedPageLayouts, GeneratedRouteMiddleware } from "../framework.js";
+import type { GeneratedLayouts, GeneratedPageLayouts, GeneratedRouteMiddleware } from "../framework";
 
 type RouteMiddlewareName = keyof GeneratedRouteMiddleware extends never ? string : Exclude<keyof GeneratedRouteMiddleware, "#none"> & string;
 

@@ -8,7 +8,7 @@
  * pass completes. A plain `renderToString` has no such loop and fails with `SuspendedRenderError`.
  */
 
-import { runDry, switchOwner } from "../../core/reactivity.js";
+import { runDry, switchOwner } from "../../core/reactivity";
 
 /**
  * Thrown through a render pass while data it needs is loading. Never an `Error`. `late` marks a

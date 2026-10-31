@@ -1,7 +1,7 @@
-import { effect, findContext, isDryRender, onCleanup } from "../../core/reactivity.js";
-import { normalizeHeadInput } from "../../shared/head.js";
-import type { HeadInput, HeadSource } from "../../shared/head.js";
-import { headLevelKey, headManagerKey, pageHeadSink, reader } from "../runtime/head.js";
+import { effect, findContext, isDryRender, onCleanup } from "../../core/reactivity";
+import { normalizeHeadInput } from "../../shared/head";
+import type { HeadInput, HeadSource } from "../../shared/head";
+import { headLevelKey, headManagerKey, pageHeadSink, reader } from "../runtime/head";
 
 /**
  * Añade etiquetas al `<head>` del documento y atributos a `<html>` y `<body>` mientras el componente

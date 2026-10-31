@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 import test from "node:test";
-import { checkFrameworkProject } from "../src/framework/check-project.js";
+import { checkFrameworkProject } from "../src/framework/check-project";
 
 test("page contract checks data from an indirectly declared loader", async () => {
   const parent = resolve(".meeko");

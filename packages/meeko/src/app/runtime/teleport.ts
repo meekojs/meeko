@@ -1,10 +1,10 @@
-import { markerRegion, nestedRegionEnd, parseRegionHtml } from "./renderer.js";
-import type { DomScope } from "./renderer.js";
-import { componentErrorReporter } from "./component-errors.js";
-import { observeCallback } from "../../core/error-observer.js";
-import { afterMountBatch } from "./lifecycle.js";
-import { effect, untrack } from "../../core/reactivity.js";
-import { lateRender } from "./suspense.js";
+import { markerRegion, nestedRegionEnd, parseRegionHtml } from "./renderer";
+import type { DomScope } from "./renderer";
+import { componentErrorReporter } from "./component-errors";
+import { observeCallback } from "../../core/error-observer";
+import { afterMountBatch } from "./lifecycle";
+import { effect, untrack } from "../../core/reactivity";
+import { lateRender } from "./suspense";
 
 /**
  * Destino de `<MeekoTeleport to>`: `"body"`, el final de `<body>`, o `"#id"`, el elemento con ese

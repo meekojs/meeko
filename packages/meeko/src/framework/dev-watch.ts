@@ -1,5 +1,5 @@
 import { isAbsolute, relative } from "node:path";
-import { builtinComponentModules } from "../compiler.js";
+import { builtinComponentModules } from "../compiler";
 
 /**
  * Files whose addition or removal changes what Meeko discovers: routes,

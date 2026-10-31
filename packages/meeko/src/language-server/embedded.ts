@@ -4,10 +4,10 @@ import { getDefaultHTMLDataProvider, getLanguageService as getHtmlLanguageServic
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { CompletionItemKind, DiagnosticSeverity, DiagnosticTag, InsertTextFormat, MarkupKind } from "vscode-languageserver/node";
 import type { CompletionItem, CompletionList, Diagnostic, Hover, MarkupContent, Position, Range } from "vscode-languageserver/node";
-import { builtinTag } from "./builtin-tags.js";
-import { cssClassRules } from "./class-rules.js";
-import { isCandidates } from "../compiler/transforms/dynamic-tag.js";
-import { elementAccepts } from "../shared/html-attributes.js";
+import { builtinTag } from "./builtin-tags";
+import { cssClassRules } from "./class-rules";
+import { isCandidates } from "../compiler/transforms/dynamic-tag";
+import { elementAccepts } from "../shared/html-attributes";
 
 // HTML of the template and CSS of `<style>`, outside the TypeScript model: what the editor offers
 // while writing markup and styles. Every function reads the text, so it works while a tag or a

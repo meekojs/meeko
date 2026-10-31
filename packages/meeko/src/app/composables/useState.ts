@@ -1,6 +1,6 @@
-import { inject } from "../../core/reactivity.js";
-import type { Signal } from "../../core/reactivity.js";
-import { stateKey } from "../runtime/state.js";
+import { inject } from "../../core/reactivity";
+import type { Signal } from "../../core/reactivity";
+import { stateKey } from "../runtime/state";
 
 /**
  * Devuelve la señal de estado de la aplicación con clave `key`, creada con `factory()` la primera

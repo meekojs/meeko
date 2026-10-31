@@ -1,12 +1,12 @@
 import ts from "@typescript/typescript6";
 import type { AstPath, Doc, Options, Parser, ParserOptions, Plugin, Printer, SupportLanguage, SupportOptions } from "prettier";
 import { builders, utils } from "prettier/doc";
-import { compile } from "../../compiler.js";
-import { locate, MeekoCompileError, parseSfc } from "../../compiler/parser/sfc.js";
-import type { SfcSection } from "../../compiler/parser/sfc.js";
-import { preserveArrayBreaksPrinter } from "./arrays.js";
-import { appendClassOrder, classOrderOption, stylesheetClassOrder } from "./classes.js";
-import { templateParserName, templatePlugin } from "./template.js";
+import { compile } from "../../compiler";
+import { locate, MeekoCompileError, parseSfc } from "../../compiler/parser/sfc";
+import type { SfcSection } from "../../compiler/parser/sfc";
+import { preserveArrayBreaksPrinter } from "./arrays";
+import { appendClassOrder, classOrderOption, stylesheetClassOrder } from "./classes";
+import { templateParserName, templatePlugin } from "./template";
 
 const { hardline, indent } = builders;
 const { replaceEndOfLine } = utils;

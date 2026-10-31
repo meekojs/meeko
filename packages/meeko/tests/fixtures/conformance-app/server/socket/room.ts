@@ -1,6 +1,6 @@
 import { defineSocketChannel } from "@meekojs/meeko/server";
 import type { SocketPubSub } from "@meekojs/meeko/server";
-import { ack, roomText, sequence, text } from "../../shared/schemas.js";
+import { ack, roomText, sequence, text } from "../../shared/schemas";
 
 export default defineSocketChannel({
   clientToServer: { say: text, seq: sequence, relay: roomText },

@@ -1,2 +1,2 @@
-export { default, languages, options, parsers, printers } from "./plugin.js";
-export type { MeekoPrettierOptions } from "./plugin.js";
+export { default, languages, options, parsers, printers } from "./plugin";
+export type { MeekoPrettierOptions } from "./plugin";

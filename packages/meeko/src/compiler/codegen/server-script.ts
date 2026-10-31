@@ -1,8 +1,8 @@
-import { analyzeServerScript, frameworkModule } from "../transforms/server-script.js";
-import type { ServerScript } from "../transforms/server-script.js";
-import type { SourceMapping } from "../mapping.js";
-import { sourceMapForCompiled } from "../sourcemap.js";
-import { parseSfc } from "../parser/sfc.js";
+import { analyzeServerScript, frameworkModule } from "../transforms/server-script";
+import type { ServerScript } from "../transforms/server-script";
+import type { SourceMapping } from "../mapping";
+import { sourceMapForCompiled } from "../sourcemap";
+import { parseSfc } from "../parser/sfc";
 
 /** The page's `<script server>` section and what it declares, or undefined without one. */
 export function readServerScript(source: string, filename: string): { readonly script: ServerScript; readonly contentStart: number; readonly content: string } | undefined {

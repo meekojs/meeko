@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
-import { scaffoldDestinationEntries } from "../init.js";
+import { scaffoldDestinationEntries } from "../init";
 
 const files: Readonly<Record<string, string>> = {
   ".gitignore": "node_modules/\n.meeko/\n.env\n",

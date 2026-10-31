@@ -42,7 +42,7 @@ async function project(): Promise<{ filename: string; cleanup: () => Promise<voi
   await writeFile(join(root, "tsconfig.json"), `${JSON.stringify({
     compilerOptions: {
       strict: true, module: "nodenext", moduleResolution: "nodenext", target: "es2023", types: [],
-      paths: { "@meekojs/meeko/framework": ["../../src/framework.ts"], "@meekojs/meeko": ["../../src/index.ts"] },
+      paths: { "@meekojs/meeko/framework": ["../../dist/framework.d.ts"], "@meekojs/meeko": ["../../dist/index.d.ts"] },
     },
   })}\n`);
   await writeFile(join(root, "data.ts"), data);

@@ -68,7 +68,7 @@ export function analyzePropsDefaults(call: ts.CallExpression): PropsDefaults | u
   return { argument, keys };
 }
 
-import { apiDocs, jsdoc } from "./compiler-docs.js";
+import { apiDocs, jsdoc } from "./compiler-docs";
 
 export const definePropsDocs = jsdoc(
     "Macro de compilación: declara las props del componente con el tipo `T` y devuelve el objeto de props.",

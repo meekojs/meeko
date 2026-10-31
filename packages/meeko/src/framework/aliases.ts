@@ -1,14 +1,14 @@
 import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
-import { aliasImporterScope, aliasScopeProblem, aliasTsconfigPaths, matchPathAlias } from "../compiler/aliases.js";
-import type { AliasImporterScope, PathAlias, PathAliasScope } from "../compiler/aliases.js";
-import { moduleSpecifiers } from "../compiler/import-graph.js";
-import type { CompileDiagnostic } from "../compiler/parser/sfc.js";
-import { locate } from "../compiler/parser/sfc.js";
-import type { MeekoConfig } from "../modules/define-meeko-config.js";
-import { isExecutedConfig, loadMeekoConfig, readMeekoConfigSync, resolveConfigSources } from "./config.js";
-import { legacyLayerEntries, resolveMeekoModules } from "./module-loader.js";
+import { aliasImporterScope, aliasScopeProblem, aliasTsconfigPaths, matchPathAlias } from "../compiler/aliases";
+import type { AliasImporterScope, PathAlias, PathAliasScope } from "../compiler/aliases";
+import { moduleSpecifiers } from "../compiler/import-graph";
+import type { CompileDiagnostic } from "../compiler/parser/sfc";
+import { locate } from "../compiler/parser/sfc";
+import type { MeekoConfig } from "../modules/define-meeko-config";
+import { isExecutedConfig, loadMeekoConfig, readMeekoConfigSync, resolveConfigSources } from "./config";
+import { legacyLayerEntries, resolveMeekoModules } from "./module-loader";
 
 /**
  * The default path aliases: each prefix and the folder it names in the project and in each layer

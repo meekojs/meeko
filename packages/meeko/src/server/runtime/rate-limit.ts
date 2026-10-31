@@ -1,6 +1,6 @@
-import { encodeBase64Url } from "./base64url.js";
-import type { RequestContext } from "./request-context.js";
-import { addressBucket, parseDuration, warnOnce } from "./env.js";
+import { encodeBase64Url } from "./base64url";
+import type { RequestContext } from "./request-context";
+import { addressBucket, parseDuration, warnOnce } from "./env";
 
 /**
  * Límite de peticiones de un endpoint de API o un procedimiento RPC (desde `1.2`): como mucho

@@ -4,9 +4,9 @@ import perfectionist from "eslint-plugin-perfectionist";
 import unusedImports from "eslint-plugin-unused-imports";
 import type { Linter } from "eslint";
 import type { ESLintRules } from "eslint/rules";
-import plugin from "./plugin.js";
-import type { TypeScriptRules } from "./typescript-rules.generated.js";
-import type { PerfectionistRules, UnusedImportsRules } from "./optional-rules.js";
+import plugin from "./plugin";
+import type { TypeScriptRules } from "./typescript-rules.generated";
+import type { PerfectionistRules, UnusedImportsRules } from "./optional-rules";
 
 /** Keep literal core rule keys and their official options; discard RulesRecord's open index. */
 type CoreRules = { [Name in keyof ESLintRules as string extends Name ? never : Name]: ESLintRules[Name] };

@@ -1,4 +1,4 @@
-import { encodeBase64Url } from "./base64url.js";
+import { encodeBase64Url } from "./base64url";
 
 /**
  * Política `Content-Security-Policy` por directiva: cada clave es el nombre de una directiva

@@ -5,7 +5,7 @@
  * (`src/app/runtime/devtools-live.ts`), el servidor de desarrollo (`src/framework/editor-bridge.ts`)
  * y la extensión de VS Code (`packages/vscode/src/live` en el repositorio).
  */
-import type { DevtoolsCommandResult, DevtoolsValue } from "../core/devtools-protocol.js";
+import type { DevtoolsCommandResult, DevtoolsValue } from "../core/devtools-protocol";
 
 /** Versión del protocolo del puente. Cambia sólo con incompatibilidades. */
 export type EditorBridgeProtocolVersion = 1;

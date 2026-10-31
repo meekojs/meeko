@@ -44,7 +44,8 @@ function imports(file: string): Dependency[] {
     if (!node.moduleSpecifier || !ts.isStringLiteral(node.moduleSpecifier)) return [];
     const specifier = node.moduleSpecifier.text;
     if (!specifier.startsWith(".")) return [];
-    const target = resolve(dirname(file), specifier).replace(/\.js$/, ".ts");
+    const path = resolve(dirname(file), specifier).replace(/\.js$/, ".ts");
+    const target = [path, `${path}.ts`, join(path, "index.ts")].find((candidate) => candidate.endsWith(".ts") && existsSync(candidate)) ?? path;
     return [{ target, runtime: !typeOnly(node) }];
   });
 }

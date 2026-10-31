@@ -1,5 +1,5 @@
-import { signal } from "../../core/reactivity.js";
-import type { Signal } from "../../core/reactivity.js";
+import { signal } from "../../core/reactivity";
+import type { Signal } from "../../core/reactivity";
 
 /**
  * Estado de un valor devuelto con `defer`. Puede ganar miembros en un minor: un `switch`

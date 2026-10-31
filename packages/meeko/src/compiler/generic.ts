@@ -1,5 +1,5 @@
 import ts from "@typescript/typescript6";
-import type { SfcSection } from "./parser/sfc.js";
+import type { SfcSection } from "./parser/sfc";
 
 /**
  * `generic="T extends { id: string }"` en el `<script lang="ts">` de un componente: sus parámetros

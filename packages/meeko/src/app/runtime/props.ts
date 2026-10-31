@@ -14,9 +14,9 @@
  * `<snippet if:when>` makes one appear or disappear while the child stays mounted, so the view also
  * keeps one signal per snippet name that the child reads, through {@link passedSnippetsKey}.
  */
-import { readChannels } from "./channels.js";
-import { batch, signal, untrack } from "../../core/reactivity.js";
-import type { Signal } from "../../core/reactivity.js";
+import { readChannels } from "./channels";
+import { batch, signal, untrack } from "../../core/reactivity";
+import type { Signal } from "../../core/reactivity";
 
 /** Props view of a child instance and the writer that its parent's binding keeps. */
 export interface PropsSource<Props extends object> {

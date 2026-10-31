@@ -1,6 +1,6 @@
 import { basename, relative, sep } from "node:path";
-import { sectionAttribute } from "../generic.js";
-import { compileError, MeekoCompileError, parseSfc } from "../parser/sfc.js";
+import { sectionAttribute } from "../generic";
+import { compileError, MeekoCompileError, parseSfc } from "../parser/sfc";
 
 /**
  * Module id suffix of a page's `<script server>` block. The `lang.ts` ending

@@ -1,5 +1,5 @@
 import { defineApiRoute } from "@meekojs/meeko/server";
-import { echo, text } from "../../shared/schemas.js";
+import { echo, text } from "../../shared/schemas";
 
 export default defineApiRoute({
   body: text,

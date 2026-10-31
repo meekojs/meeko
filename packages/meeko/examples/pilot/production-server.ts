@@ -4,8 +4,8 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import type { HotState } from "@meekojs/meeko";
-import { initialTasks, type Task, type TaskView } from "./model.js";
-import { renderPilotPage } from "./page.js";
+import { initialTasks, type Task, type TaskView } from "./model";
+import { renderPilotPage } from "./page";
 
 const outputRoot = dirname(fileURLToPath(import.meta.url));
 const clientRoot = resolve(outputRoot, "../client");

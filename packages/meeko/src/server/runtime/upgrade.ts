@@ -1,6 +1,6 @@
-import { normalizeServerError, observeErrorCallback } from "../errors.js";
-import { copySocketAddress } from "./env.js";
-import type { SocketConnection, SocketHub, SocketPeer } from "../socket/runtime.js";
+import { normalizeServerError, observeErrorCallback } from "../errors";
+import { copySocketAddress } from "./env";
+import type { SocketConnection, SocketHub, SocketPeer } from "../socket/runtime";
 
 /**
  * Opciones de {@link createSocketUpgradeHandler}.

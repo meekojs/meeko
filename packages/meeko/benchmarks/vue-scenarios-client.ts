@@ -1,6 +1,6 @@
 import { createSSRApp } from "vue";
-import { VueList, VueNavigation, VueNavigationMount, VueTree, nextTick } from "./vue-scenarios.js";
-import { assertScenario, type Scenario } from "./scenario-protocol.js";
+import { VueList, VueNavigation, VueNavigationMount, VueTree, nextTick } from "./vue-scenarios";
+import { assertScenario, type Scenario } from "./scenario-protocol";
 
 const root = document.getElementById("app");
 if (!root) throw new Error("Missing benchmark root");

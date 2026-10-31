@@ -1,7 +1,7 @@
-import { componentErrorReporter } from "./component-errors.js";
-import { observeCallback } from "../../core/error-observer.js";
-import { enterIdInstance } from "./ids.js";
-import { currentEffectOwner, onCleanup, switchOwner, untrack } from "../../core/reactivity.js";
+import { componentErrorReporter } from "./component-errors";
+import { observeCallback } from "../../core/error-observer";
+import { enterIdInstance } from "./ids";
+import { currentEffectOwner, onCleanup, switchOwner, untrack } from "../../core/reactivity";
 
 /**
  * What an `onMounted` callback may return: nothing, a synchronous cleanup that runs when the

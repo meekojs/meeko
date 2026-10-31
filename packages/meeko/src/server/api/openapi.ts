@@ -1,8 +1,8 @@
-import type { ApiRouteDefinition, ApiSuccessStatus } from "./contracts.js";
-import type { RpcDefinition } from "../rpc/contracts.js";
-import type { Schema } from "../schema.js";
-import type { ServerManifest, ServerModuleLoader } from "../runtime/discovery.js";
-import { serializeJson } from "../../core/server.js";
+import type { ApiRouteDefinition, ApiSuccessStatus } from "./contracts";
+import type { RpcDefinition } from "../rpc/contracts";
+import type { Schema } from "../schema";
+import type { ServerManifest, ServerModuleLoader } from "../runtime/discovery";
+import { serializeJson } from "../../core/server";
 
 /**
  * Opciones de {@link generateOpenApi}.

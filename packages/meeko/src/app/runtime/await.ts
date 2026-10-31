@@ -9,9 +9,9 @@
  * first paint; in the browser, the component keeps them up to date and adopts them before it
  * inserts a zone.
  */
-import type { ReadonlySignal } from "../../core/reactivity.js";
-import { resourceInternals } from "../composables/resources/engine.js";
-import type { ResourceInternals } from "../composables/resources/engine.js";
+import type { ReadonlySignal } from "../../core/reactivity";
+import { resourceInternals } from "../composables/resources/engine";
+import type { ResourceInternals } from "../composables/resources/engine";
 
 /**
  * Lo que `<MeekoAwait for="…">` espera: el resultado de `useApi` o `useRpcQuery` (sin `await`), o

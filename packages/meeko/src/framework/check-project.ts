@@ -2,16 +2,16 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { formatDiagnostic, hasErrors } from "../compiler/parser/sfc.js";
-import type { CompileDiagnostic } from "../compiler/parser/sfc.js";
-import { checkApp } from "./check-app.js";
-import { discoverConfiguredRoutes, loadMeekoConfig } from "./config.js";
-import type { MeekoConfig } from "./config.js";
-import { prepareProject } from "./project.js";
-import { assertNoLegacySessionFile } from "./runtime-migration.js";
-import { mapRouteBlockPaths, routeBlockTypeFiles } from "../compiler/codegen/route-block-types.js";
-import { prepareFrameworkTypeDeclarations, projectNames } from "./type-declarations.js";
-import { tscCommand } from "../typescript-cli.js";
+import { formatDiagnostic, hasErrors } from "../compiler/parser/sfc";
+import type { CompileDiagnostic } from "../compiler/parser/sfc";
+import { checkApp } from "./check-app";
+import { discoverConfiguredRoutes, loadMeekoConfig } from "./config";
+import type { MeekoConfig } from "./config";
+import { prepareProject } from "./project";
+import { assertNoLegacySessionFile } from "./runtime-migration";
+import { mapRouteBlockPaths, routeBlockTypeFiles } from "../compiler/codegen/route-block-types";
+import { prepareFrameworkTypeDeclarations, projectNames } from "./type-declarations";
+import { tscCommand } from "../typescript-cli";
 
 const execute = promisify(execFile);
 

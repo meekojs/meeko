@@ -1,4 +1,4 @@
-import type { GroupDefinition, LayoutName } from "../layout.js";
+import type { GroupDefinition, LayoutName } from "../layout";
 
 /**
  * Declara las opciones de una carpeta de `app/pages` en su `+group.ts`: el layout con nombre y sus

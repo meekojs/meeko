@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { request as httpRequest } from 'node:http'
 import type { ClientRequest } from 'node:http'
-import { SseParser, loopbackBridgeUrl } from './model.js'
-import type { EditorBridgeDescriptor, EditorBridgeEvent, EditorCommandResult, EditorLiveSignal } from './model.js'
+import { SseParser, loopbackBridgeUrl } from './model'
+import type { EditorBridgeDescriptor, EditorBridgeEvent, EditorCommandResult, EditorLiveSignal } from './model'
 
 /** `true` si el proceso existe; un error de permisos también indica que existe. */
 export function isAlive(pid: number): boolean {

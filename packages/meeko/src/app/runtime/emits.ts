@@ -1,4 +1,4 @@
-import type { ComponentModule } from "./renderer.js";
+import type { ComponentModule } from "./renderer";
 
 /**
  * Runtime and types behind `defineEmits<T>()`.
@@ -8,8 +8,8 @@ import type { ComponentModule } from "./renderer.js";
  * names through `@meekojs/meeko/internal`.
  */
 
-export type { Emit, EmitArgs, EmitConflicts, EmitMap, EmitProps, Emits, NoEmitConflict } from "../definitions/define-emits.js";
-import type { Emit } from "../definitions/define-emits.js";
+export type { Emit, EmitArgs, EmitConflicts, EmitMap, EmitProps, Emits, NoEmitConflict } from "../definitions/define-emits";
+import type { Emit } from "../definitions/define-emits";
 
 /**
  * Type-only check of the `on:event` props of a child component; generated code never calls it.

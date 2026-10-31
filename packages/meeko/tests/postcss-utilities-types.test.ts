@@ -127,8 +127,8 @@ test("the documented utilities, built with Object.fromEntries, still compile", a
 });
 
 test("rule() and atRule() complete CSS properties and keywords in the declarations object", () => {
-  // In memory only, next to the sources so `./postcss.js` resolves; TypeScript uses `/` separators.
-  const file = resolve("src/__postcss-completions.ts").replaceAll("\\", "/");
+  // In memory only, next to the published declarations; TypeScript uses `/` separators.
+  const file = resolve("dist/__postcss-completions.ts").replaceAll("\\", "/");
   const source = `import type { UtilityHelpers } from "./postcss.js";
 declare const { rule, atRule }: UtilityHelpers;
 rule(".card", { });

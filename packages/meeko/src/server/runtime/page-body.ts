@@ -1,11 +1,11 @@
-import type { RequestContext } from "./request-context.js";
-import type { Deferred } from "../../app/runtime/deferred.js";
-import type { PageHead } from "../../app/definitions/define-page.js";
-import { activePage, currentPage, runPage } from "../composables/usePage.js";
-import type { PageRequest } from "../composables/usePage.js";
-import { mergeHeadInputs } from "../../shared/head.js";
-import type { HeadInput } from "../../shared/head.js";
-import { providePageHeadSink } from "../../app/runtime/head.js";
+import type { RequestContext } from "./request-context";
+import type { Deferred } from "../../app/runtime/deferred";
+import type { PageHead } from "../../app/definitions/define-page";
+import { activePage, currentPage, runPage } from "../composables/usePage";
+import type { PageRequest } from "../composables/usePage";
+import { mergeHeadInputs } from "../../shared/head";
+import type { HeadInput } from "../../shared/head";
+import { providePageHeadSink } from "../../app/runtime/head";
 
 /**
  * Tipo de `export const head` en el código de nivel superior de un `<script server>`: el head de la

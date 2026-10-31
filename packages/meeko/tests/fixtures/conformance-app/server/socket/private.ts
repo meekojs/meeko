@@ -1,5 +1,5 @@
 import { defineSocketChannel } from "@meekojs/meeko/server";
-import { text } from "../../shared/schemas.js";
+import { text } from "../../shared/schemas";
 
 export default defineSocketChannel({
   clientToServer: { say: text },

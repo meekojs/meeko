@@ -1,9 +1,9 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, extname, join, relative, resolve } from "node:path";
-import { discoverAutoImports } from "../autoimports/registry.js";
-import { applyAutoImports } from "../autoimports/transform.js";
-import { replaceModuleSpecifiers } from "../compiler/import-graph.js";
-import { findRuntimeFile } from "./app-manifest.js";
+import { discoverAutoImports } from "../autoimports/registry";
+import { applyAutoImports } from "../autoimports/transform";
+import { replaceModuleSpecifiers } from "../compiler/import-graph";
+import { findRuntimeFile } from "./app-manifest";
 
 /** Declaration that types `GeneratedServices` from `server/runtime.ts`, relative to `.meeko`. */
 export const servicesDeclaration = "types/services.d.ts";

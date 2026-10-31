@@ -1,8 +1,8 @@
 import type { Linter, ESLint } from "eslint";
 import typescript from "@typescript-eslint/eslint-plugin";
-import parser from "./parser.js";
-import buttonHasType from "./rules/button-has-type.js";
-import noAutofocus from "./rules/no-autofocus.js";
+import parser from "./parser";
+import buttonHasType from "./rules/button-has-type";
+import noAutofocus from "./rules/no-autofocus";
 
 const plugin: ESLint.Plugin & { configs: Record<string, Linter.Config[]> } = {
   meta: { name: "@meekojs/eslint-plugin", version: "0.1.0" },

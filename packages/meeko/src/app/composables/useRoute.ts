@@ -1,6 +1,6 @@
-import { findContext } from "../../core/reactivity.js";
-import { routeKey } from "../runtime/navigation.js";
-import type { RouteState } from "../runtime/navigation.js";
+import { findContext } from "../../core/reactivity";
+import { routeKey } from "../runtime/navigation";
+import type { RouteState } from "../runtime/navigation";
 
 /**
  * Lee la ruta confirmada de la aplicación actual: `url`, `path`, `id`, `params` y `search`. En SSR

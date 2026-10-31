@@ -1,6 +1,6 @@
-import type { RequestContext } from "../runtime/request-context.js";
-import type { RateLimitOptions } from "../runtime/rate-limit.js";
-import type { Schema, Input, Output } from "../schema.js";
+import type { RequestContext } from "../runtime/request-context";
+import type { RateLimitOptions } from "../runtime/rate-limit";
+import type { Schema, Input, Output } from "../schema";
 
 /**
  * Contrato de un procedimiento de `server/rpc/`: schemas de entrada y salida, guardas y handler.

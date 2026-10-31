@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import type { AutoImport } from "../../autoimports/registry.js";
+import type { AutoImport } from "../../autoimports/registry";
 
 /**
  * The autoimports of a Meeko project for the modules of `@utilities`, which run in Node while the
@@ -69,7 +69,7 @@ function dependsOnMeeko(manifest: string): boolean {
 /** Reads the registry of `root` now; call it again to see added or removed exports. */
 export async function utilityAutoImports(root: string): Promise<UtilityAutoImports> {
   const [autoimports, autoimportsTs, autoimportsTransform, config, aliases, aliasMatching] = await Promise.all([
-    import("../../autoimports/registry.js"), import("../../autoimports/typescript.js"), import("../../autoimports/transform.js"), import("../../framework/config.js"), import("../../framework/aliases.js"), import("../aliases.js"),
+    import("../../autoimports/registry"), import("../../autoimports/typescript"), import("../../autoimports/transform"), import("../../framework/config"), import("../../framework/aliases"), import("../aliases"),
   ]);
   const registry = await autoimports.discoverAutoImports(root);
   const sourceRoots = (await config.resolveConfigSources(root)).map((source) => source.root);

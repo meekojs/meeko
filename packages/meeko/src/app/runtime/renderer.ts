@@ -1,22 +1,23 @@
-import { batch, createRoot, currentEffectOwner, effect, effectInOrder, finishWithCleanup, isWritableSignal, reserveUpdateOrder, signal, switchOwner, untrack } from "../../core/reactivity.js";
-import { observeCallback } from "../../core/error-observer.js";
-import { componentErrorReporter } from "./component-errors.js";
-import type { EffectSource, Signal } from "../../core/reactivity.js";
-import { attributeValue, rawHtml, serializeJson } from "../../core/server.js";
-import { refTarget } from "./element-refs.js";
-import type { ElementRefs } from "./element-refs.js";
-import { isLateSuspension, isPassSuspension, lateRender, loadDeferred } from "./suspense.js";
-import { afterMountBatch, mountBatch } from "./lifecycle.js";
-import { contentNamespace, inertElement } from "./html-content-dom.js";
-import { sameChannels } from "./channels.js";
-import type { NativeModelKind, NativeModelValues } from "./models.js";
-import { snippetOf } from "./snippets.js";
-import type { Snippet, SnippetData } from "./snippets.js";
-import { reactiveProps } from "./props.js";
-import type { PropsSource } from "./props.js";
-import { childIdBase, currentIdBase, withIdBase } from "./ids.js";
-import { closeTag, dynamicTagName } from "./dynamic-tag.js";
-import type { TagPart } from "./dynamic-tag.js";
+import { batch, createRoot, currentEffectOwner, effect, effectInOrder, finishWithCleanup, isWritableSignal, reserveUpdateOrder, signal, switchOwner, untrack } from "../../core/reactivity";
+import { observeCallback } from "../../core/error-observer";
+import { componentErrorReporter } from "./component-errors";
+import type { EffectSource, Signal } from "../../core/reactivity";
+import { attributeValue, rawHtml, serializeJson } from "../../core/server";
+import { refTarget } from "./element-refs";
+import type { ElementRefs } from "./element-refs";
+import { isLateSuspension, isPassSuspension, lateRender, loadDeferred } from "./suspense";
+import { afterMountBatch, mountBatch } from "./lifecycle";
+import { contentNamespace, inertElement } from "./html-content-dom";
+import { sameChannels } from "./channels";
+import type { NativeModelKind, NativeModelValues } from "./models";
+import { snippetOf } from "./snippets";
+import type { Snippet, SnippetData } from "./snippets";
+import { reactiveProps } from "./props";
+import type { PropsSource } from "./props";
+import { childIdBase, currentIdBase, withIdBase } from "./ids";
+import { closeTag, dynamicTagName } from "./dynamic-tag";
+import type { TagPart } from "./dynamic-tag";
+import { resolvedComponentInput } from "./resolved-component";
 
 /**
  * Fragmento de DOM que pertenece a una instancia o a una región dinámica: los hijos de `root` o,
@@ -299,6 +300,8 @@ export function collectStyles<T>(styles: Set<string>, render: () => T): T {
 export function renderComponent<Props extends object>(id: number, component: Component<Props>, props: Props, transferState: boolean): string;
 export function renderComponent<Props extends object>(id: number, component: ComponentModule<Props>, props: Props, transferState?: false): string;
 export function renderComponent<Props extends object>(id: number, component: ComponentModule<Props>, props: Props, transferState = false): string {
+  const resolved = resolvedComponentInput(component, props);
+  if (resolved) ({ component, props } = resolved);
   try { return renderComponentHtml(id, component, props, transferState); }
   catch (error) {
     // A child waiting for data does not stop its siblings: the pass collects every request, then renders again.
@@ -397,6 +400,8 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
   const unmounted: ComponentRelease = () => {};
   let component = resolveComponent();
   let props = read();
+  const initialInput = resolvedComponentInput(component, props);
+  if (initialInput) ({ component, props } = initialInput);
   let release: ComponentRelease = unmounted;
   /** Props view of the mounted instance, when its module reads props reactively. */
   let source: PropsSource<Props> | undefined;
@@ -457,8 +462,10 @@ export function bindComponent<Props extends object>(scope: DomScope, id: number,
   let first = true;
   // The onMounted callbacks of a new child run once the whole update has finished.
   stop = effectInOrder(order, () => mountBatch(() => {
-    const nextComponent = resolveComponent();
-    const next = read();
+    let nextComponent = resolveComponent();
+    let next = read();
+    const nextInput = resolvedComponentInput(nextComponent, next);
+    if (nextInput) ({ component: nextComponent, props: next } = nextInput);
     // The first run reads the props again only to track them. An inline callback such as
     // `on:save="(id) => save(id)"` is a new function then, but not a new value: keep the hydrated child.
     const initial = first;

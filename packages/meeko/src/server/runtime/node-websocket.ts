@@ -2,9 +2,9 @@ import { STATUS_CODES, type IncomingMessage, type Server as HttpServer } from "n
 import { createRequire } from "node:module";
 import type { Duplex } from "node:stream";
 import type WebSocket from "ws";
-import { createNodeSocketUpgradeHandler } from "./node-upgrade.js";
-import { observeErrorCallback } from "../errors.js";
-import type { NodeAcceptedSocket, NodeSocketUpgradeOptions } from "./node-upgrade.js";
+import { createNodeSocketUpgradeHandler } from "./node-upgrade";
+import { observeErrorCallback } from "../errors";
+import type { NodeAcceptedSocket, NodeSocketUpgradeOptions } from "./node-upgrade";
 
 /**
  * Opciones de {@link attachNodeWebSocketServer}.

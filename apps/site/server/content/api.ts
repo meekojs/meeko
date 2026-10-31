@@ -1,19 +1,19 @@
 import { posix, relative } from 'node:path'
 import { existsSync } from 'node:fs'
 import type TS from '@typescript/typescript6'
-import type { ApiIndexGroup, ApiIndexItem, ApiKind, ApiLink, ApiMember, ApiPage, ApiParameter } from '../../shared/types/api.js'
-import type { NavLink, Pager, TocEntry } from '../../shared/types/docs.js'
-import { builtins } from './api-builtins.js'
-import type { BuiltinEntry } from './api-builtins.js'
-import { apiGroups, groupHref, referenceHref } from './api-groups.js'
-import type { ApiGroup } from './api-groups.js'
-import { catalog } from './catalog.js'
+import type { ApiIndexGroup, ApiIndexItem, ApiKind, ApiLink, ApiMember, ApiPage, ApiParameter } from '../../shared/types/api'
+import type { NavLink, Pager, TocEntry } from '../../shared/types/docs'
+import { builtins } from './api-builtins'
+import type { BuiltinEntry } from './api-builtins'
+import { apiGroups, groupHref, referenceHref } from './api-groups'
+import type { ApiGroup } from './api-groups'
+import { catalog } from './catalog'
 import { trustHtml } from '@meekojs/meeko'
 import type { TrustedHtml } from '@meekojs/meeko'
-import { blockLanguage, createTokenizer } from './highlight.js'
-import type { HighlightedToken } from './highlight.js'
-import { codeBlockHtml, documentHeadings, escapeHtml, renderFragment, renderInline, rewriteHref } from './markdown.js'
-import { githubUrl, packageFolder, readRepositoryFile, repositoryRoot, repositoryUrl, sitePath } from './repository.js'
+import { blockLanguage, createTokenizer } from './highlight'
+import type { HighlightedToken } from './highlight'
+import { codeBlockHtml, documentHeadings, escapeHtml, renderFragment, renderInline, rewriteHref } from './markdown'
+import { githubUrl, packageFolder, readRepositoryFile, repositoryRoot, repositoryUrl, sitePath } from './repository'
 
 /*
  * The API reference, generated from the sources of `@meekojs/meeko`. For each export of each
@@ -716,7 +716,7 @@ function readSourceDocs(ts: Ts): SourceDocs {
 	for (const statement of model.statements) {
 		if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier) || !statement.moduleSpecifier.text.startsWith('../app/definitions/')) continue
 		for (const specifier of statement.importClause?.namedBindings && ts.isNamedImports(statement.importClause.namedBindings) ? statement.importClause.namedBindings.elements : []) {
-			macroSources.set(specifier.name.text, posix.normalize(`${posix.dirname(modelPath)}/${statement.moduleSpecifier.text.replace(/\.js$/, '.ts')}`))
+			macroSources.set(specifier.name.text, posix.normalize(`${posix.dirname(modelPath)}/${statement.moduleSpecifier.text.replace(/\.(?:js|ts)$/, '')}.ts`))
 		}
 	}
 	const macros = new Map<string, ReturnType<typeof parseDocLines>>()

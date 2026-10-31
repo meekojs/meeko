@@ -1,4 +1,4 @@
-import type { HtmlContentNamespace } from "../../core/html-content.js";
+import type { HtmlContentNamespace } from "../../core/html-content";
 
 const namespaceUris: Record<HtmlContentNamespace, string> = {
   html: "http://www.w3.org/1999/xhtml",

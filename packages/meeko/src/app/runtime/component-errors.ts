@@ -1,5 +1,5 @@
-import { logClientError, markingObserver, observeCallback } from "../../core/error-observer.js";
-import { createContext, findContext, onCleanup, provide, provideAsyncFailureReporter } from "../../core/reactivity.js";
+import { logClientError, markingObserver, observeCallback } from "../../core/error-observer";
+import { createContext, findContext, onCleanup, provide, provideAsyncFailureReporter } from "../../core/reactivity";
 
 /**
  * Dónde se observó un fallo del navegador: un handler `on:` (`"event"`), un `effect`, una

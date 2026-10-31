@@ -1,4 +1,4 @@
-import type { RouteMiddleware, RouteMiddlewareOptions } from "../middleware/runtime.js";
+import type { RouteMiddleware, RouteMiddlewareOptions } from "../middleware/runtime";
 
 /**
  * Declara el middleware de ruta que exporta por defecto un archivo de `app/middleware/`. Meeko

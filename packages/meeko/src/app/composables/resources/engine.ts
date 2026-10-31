@@ -8,12 +8,12 @@
  * browser once the component mounts. After mounting, a change of a signal in the input loads
  * the data again.
  */
-import { setupPhase, whenMounted } from "../../runtime/lifecycle.js";
-import { batch, createContext, effect, findContext, isSignal, onCleanup, provide, signal, untrack } from "../../../core/reactivity.js";
-import type { ReadonlySignal } from "../../../core/reactivity.js";
-import { awaitSync, canSuspendLate, provideDeferredData, suspend, suspendLate } from "../../runtime/suspense.js";
-import type { AnyApiOperation, ApiMutationArguments, ApiMutationInput, PublicServerManifest, RpcOperation } from "../../../shared/clients.js";
-import type { MutationOptions, RetrySafeMutation, RetrySafeOptions } from "../../runtime/mutations.js";
+import { setupPhase, whenMounted } from "../../runtime/lifecycle";
+import { batch, createContext, effect, findContext, isSignal, onCleanup, provide, signal, untrack } from "../../../core/reactivity";
+import type { ReadonlySignal } from "../../../core/reactivity";
+import { awaitSync, canSuspendLate, provideDeferredData, suspend, suspendLate } from "../../runtime/suspense";
+import type { AnyApiOperation, ApiMutationArguments, ApiMutationInput, PublicServerManifest, RpcOperation } from "../../../shared/clients";
+import type { MutationOptions, RetrySafeMutation, RetrySafeOptions } from "../../runtime/mutations";
 
 /**
  * Datos reactivos que devuelven `useApi` y `useRpcQuery`. Sin `await`, `data` vale `null` hasta la

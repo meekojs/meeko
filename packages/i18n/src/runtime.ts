@@ -1,5 +1,5 @@
-import type { I18n } from "./context.js";
-import type { Catalog, Message } from "./messages.js";
+import type { I18n } from "./context";
+import type { Catalog, Message } from "./messages";
 
 type Values = Readonly<Record<string, string | number | boolean | null | undefined>>;
 

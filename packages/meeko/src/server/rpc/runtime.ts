@@ -1,11 +1,11 @@
-import { serializeJson } from "../../core/server.js";
-import type { RequestContext } from "../runtime/request-context.js";
-import type { SessionManager } from "../runtime/sessions.js";
-import { ApiError, reportServerError } from "../errors.js";
-import type { ServerErrorObserver } from "../errors.js";
-import { errorResponse, finish, guard, readJson, validate } from "../contract-runtime.js";
-import type { Schema, Output } from "../schema.js";
-import type { RpcDefinition } from "./contracts.js";
+import { serializeJson } from "../../core/server";
+import type { RequestContext } from "../runtime/request-context";
+import type { SessionManager } from "../runtime/sessions";
+import { ApiError, reportServerError } from "../errors";
+import type { ServerErrorObserver } from "../errors";
+import { errorResponse, finish, guard, readJson, validate } from "../contract-runtime";
+import type { Schema, Output } from "../schema";
+import type { RpcDefinition } from "./contracts";
 
 /**
  * Ejecuta un procedimiento RPC con sus guardas y validaciones y devuelve su salida validada. Es la

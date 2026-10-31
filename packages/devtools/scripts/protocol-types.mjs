@@ -1,4 +1,4 @@
-// Genera packages/devtools/types/protocol.d.ts desde packages/meeko/src/devtools-protocol.ts.
+// Genera packages/devtools/types/protocol.d.ts desde packages/meeko/src/core/devtools-protocol.ts.
 // Uso: node packages/devtools/scripts/protocol-types.mjs --write | --check (o pnpm run devtools:types en la raíz)
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -6,10 +6,10 @@ import { fileURLToPath } from "node:url";
 import ts from "@typescript/typescript6";
 
 const extensionRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-export const sourcePath = join(extensionRoot, "..", "meeko", "src", "devtools-protocol.ts");
+export const sourcePath = join(extensionRoot, "..", "meeko", "src", "core", "devtools-protocol.ts");
 export const outputPath = join(extensionRoot, "types", "protocol.d.ts");
 
-const header = "// Generado desde src/devtools-protocol.ts con `pnpm run devtools:types`. No editar a mano.\n";
+const header = "// Generado desde src/core/devtools-protocol.ts con `pnpm run devtools:types`. No editar a mano.\n";
 
 /** Normaliza saltos de línea para que la comparación no dependa de la plataforma. */
 function normalize(text) {

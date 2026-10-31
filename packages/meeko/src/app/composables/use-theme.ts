@@ -1,8 +1,8 @@
-import { currentServerTheme, useServerTheme } from "../runtime/theme-context.js";
-import { currentBrowser } from "./useStorage.js";
-import { browserTheme } from "../runtime/theme-browser.js";
-import type { ThemeState } from "../../shared/theme.js";
-export type { ThemeChoice, ThemeConfig, ThemeName, ThemeState, ThemeToggleMessages, ThemeToggleSnippets } from "../../shared/theme.js";
+import { currentServerTheme, useServerTheme } from "../runtime/theme-context";
+import { currentBrowser } from "./useStorage";
+import { browserTheme } from "../runtime/theme-browser";
+import type { ThemeState } from "../../shared/theme";
+export type { ThemeChoice, ThemeConfig, ThemeName, ThemeState, ThemeToggleMessages, ThemeToggleSnippets } from "../../shared/theme";
 
 /**
  * Devuelve el tema de la aplicación: `theme`, la elección (editable, `"system"` incluido),

@@ -1,5 +1,6 @@
 import { defineMeekoModule } from '@meekojs/meeko/framework'
-import { uiCss } from './styles.js'
+
+import { uiCss } from './styles'
 
 export default defineMeekoModule({
 	meta: {

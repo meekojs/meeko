@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { computed, signal } from '@meekojs/meeko'
-	import type { DemoSource } from '../../shared/types/demo.js'
+	import type { DemoSource } from '../../shared/types/demo'
 
 	interface Props {
 		/** The counter example of the package, highlighted on the server line by line. */

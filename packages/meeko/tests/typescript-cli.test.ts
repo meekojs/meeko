@@ -3,7 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { tscCommand } from "../src/typescript-cli.js";
+import { tscCommand } from "../src/typescript-cli";
 
 const source = fileURLToPath(new URL("../src/", import.meta.url));
 

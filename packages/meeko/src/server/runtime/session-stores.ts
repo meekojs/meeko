@@ -1,9 +1,9 @@
-import { serializeJson } from "../../core/server.js";
-import type { RateLimitHit } from "./rate-limit.js";
-import { RedisChannelSubscriptions } from "./redis-pubsub.js";
-import type { RedisSubscriberClient } from "./redis-pubsub.js";
-import type { SessionRecord, SessionStore } from "./sessions.js";
-import type { Unsubscribe } from "../socket/runtime.js";
+import { serializeJson } from "../../core/server";
+import type { RateLimitHit } from "./rate-limit";
+import { RedisChannelSubscriptions } from "./redis-pubsub";
+import type { RedisSubscriberClient } from "./redis-pubsub";
+import type { SessionRecord, SessionStore } from "./sessions";
+import type { Unsubscribe } from "../socket/runtime";
 
 /**
  * Interfaz mínima de un cliente Redis para {@link RedisSessionStore}: `get`, `set` con `PX`, `del` y

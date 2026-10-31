@@ -9,7 +9,7 @@ import { build, version as esbuildVersion } from "esbuild";
 import { chromium, type Browser, type Page } from "playwright-core";
 import { createSSRApp, version as vueVersion } from "vue";
 import { renderToString as renderVueToString } from "vue/server-renderer";
-import { VueCounter } from "./vue-counter.js";
+import { VueCounter } from "./vue-counter";
 import { renderToString as renderMeekoToString } from "../examples/counter/Counter.generated.ts";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");

@@ -4,23 +4,23 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
-import { discoverAutoImports } from "./autoimports/registry.js";
-import { applyAutoImports, compileWithAutoImports } from "./autoimports/transform.js";
-import type { AutoImport } from "./autoimports/registry.js";
-import { aliasCandidates } from "./compiler/aliases.js";
-import { originalOffset } from "./compiler/mapping.js";
-import type { SourceMapping } from "./compiler/mapping.js";
-import { moduleSpecifiers, replaceModuleSpecifiers } from "./compiler/import-graph.js";
-import { projectDeclarationFiles } from "./compiler/project-declarations.js";
-import { projectRoot } from "./compiler/project-root.js";
-import { compileError, MeekoCompileError, locate } from "./compiler/parser/sfc.js";
-import type { CompileDiagnostic } from "./compiler/parser/sfc.js";
-import { UnexposedRefError } from "./app/runtime/element-refs.js";
-import { routeBlockTypeSource } from "./compiler/codegen/route-block-types.js";
-import { pageRouteId } from "./compiler/codegen/server-script.js";
-import { resolveProjectAliases, resolveProjectAliasesSync } from "./framework/aliases.js";
-import type { ProjectAliases } from "./framework/aliases.js";
-import { tscCommand } from "./typescript-cli.js";
+import { discoverAutoImports } from "./autoimports/registry";
+import { applyAutoImports, compileWithAutoImports } from "./autoimports/transform";
+import type { AutoImport } from "./autoimports/registry";
+import { aliasCandidates } from "./compiler/aliases";
+import { originalOffset } from "./compiler/mapping";
+import type { SourceMapping } from "./compiler/mapping";
+import { moduleSpecifiers, replaceModuleSpecifiers } from "./compiler/import-graph";
+import { projectDeclarationFiles } from "./compiler/project-declarations";
+import { projectRoot } from "./compiler/project-root";
+import { compileError, MeekoCompileError, locate } from "./compiler/parser/sfc";
+import type { CompileDiagnostic } from "./compiler/parser/sfc";
+import { UnexposedRefError } from "./app/runtime/element-refs";
+import { routeBlockTypeSource } from "./compiler/codegen/route-block-types";
+import { pageRouteId } from "./compiler/codegen/server-script";
+import { resolveProjectAliases, resolveProjectAliasesSync } from "./framework/aliases";
+import type { ProjectAliases } from "./framework/aliases";
+import { tscCommand } from "./typescript-cli";
 
 const execFileAsync = promisify(execFile);
 
@@ -192,7 +192,7 @@ async function prepareStandaloneCheck(source: string, filename: string): Promise
   if (!existsSync(join(root, "app"))) return undefined;
   // Loaded on demand: the project generators import this module.
   const [{ prepareFrameworkTypeDeclarations }, { resolveConfigSources }, { assertRouteBlockPlacement }] = await Promise.all([
-    import("./framework/type-declarations.js"), import("./framework/config.js"), import("./compiler/transforms/route-block.js"),
+    import("./framework/type-declarations"), import("./framework/config"), import("./compiler/transforms/route-block"),
   ]);
   try { assertRouteBlockPlacement(source, filename, (await resolveConfigSources(root)).map((entry) => entry.root)); }
   catch (error) {
@@ -219,7 +219,7 @@ const resolutionOptions = ["types", "typeRoots", "customConditions", "resolveJso
  * 1.5 the project's path aliases are `paths` too, also without a tsconfig.
  */
 async function projectResolutionOptions(root: string, aliases: ProjectAliases): Promise<Record<string, unknown> | undefined> {
-  const { resolveProjectCompilerOptions } = await import("./language-server/model.js");
+  const { resolveProjectCompilerOptions } = await import("./language-server/model");
   const { options } = resolveProjectCompilerOptions(root, aliases);
   const baseUrl = typeof options.baseUrl === "string" ? options.baseUrl : undefined;
   const pathsBase = baseUrl ?? (typeof options["pathsBasePath"] === "string" ? options["pathsBasePath"] : root);

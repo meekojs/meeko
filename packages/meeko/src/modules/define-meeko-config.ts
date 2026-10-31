@@ -1,7 +1,7 @@
-import type { ContentSecurityPolicy } from "../server/runtime/csp.js";
-import type { DocumentConfig } from "../shared/head.js";
-import type { MeekoModuleEntry } from "./define-meeko-module.js";
-import type { ThemeConfig } from "../shared/theme.js";
+import type { ContentSecurityPolicy } from "../server/runtime/csp";
+import type { DocumentConfig } from "../shared/head";
+import type { MeekoModuleEntry } from "./define-meeko-module";
+import type { ThemeConfig } from "../shared/theme";
 
 /**
  * Archivo de cabeceras que escribe el adaptador `static` en su salida: `"_headers"` es el formato
@@ -190,7 +190,7 @@ export interface SitemapConfig {
   readonly exclude?: readonly string[];
 }
 
-export type { SitemapEntriesContext, SitemapEntry } from "../shared/definitions/sitemap.js";
+export type { SitemapEntriesContext, SitemapEntry } from "../shared/definitions/sitemap";
 
 /**
  * Opciones de `robots` en `meeko.config.ts`: las reglas para `User-agent: *`.

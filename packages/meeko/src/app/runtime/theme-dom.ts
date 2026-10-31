@@ -1,4 +1,4 @@
-import type { DocumentTheme } from "../../shared/theme.js";
+import type { DocumentTheme } from "../../shared/theme";
 
 /**
  * In `"class"` mode, switches the theme class of `<html>` with `classList`, as the inline script

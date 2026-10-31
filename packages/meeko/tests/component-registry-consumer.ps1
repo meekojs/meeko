@@ -53,7 +53,14 @@ const props = defineProps<{ name: string; role?: "admin" | "reader" }>();
 </script>
 <template><p>{props.name}</p></template>
 '@
-  Write-Fixture 'app/pages/index.meeko' '<template><main>Registry consumer</main></template>'
+  Write-Fixture 'app/pages/index.meeko' @'
+<script lang="ts">
+const selected = signal<ResolvedComponent<"FormUserCreate"> | undefined>(undefined);
+async function open(): Promise<void> {
+  selected.value = await resolveComponent("FormUserCreate", { name: "Diego", role: "admin" });
+}
+</script><template><main><button type="button" on:click="open">Open form</button><component if:when="selected.value" is="selected.value!" /></main></template>
+'@
   Write-Fixture 'app/utils/registry-positive.ts' @'
 import type { ComponentName as Name, ComponentProps as Props, ComponentOf as Of, ComponentArgs } from "@meekojs/meeko";
 
@@ -65,6 +72,8 @@ const autoName: ComponentName = "FormUserCreate";
 const autoProps: ComponentProps<"Button"> = { label: "Open", tone: "quiet" };
 const modulePromise: Promise<Of<"FormUserCreate">> = resolveComponent("FormUserCreate");
 const modulePromiseAuto: Promise<ComponentOf<"Button">> = resolveComponent("Button");
+const prepared: Promise<ResolvedComponent<"FormUserCreate">> = resolveComponent("FormUserCreate", { name: "Diego", role: "admin" });
+prepared.then((component) => component.renderToString());
 function openModal(...args: ComponentArgs): void { void args; }
 openModal("FormUserCreate", { name: "Diego", role: "reader" });
 void button; void form; void input; void optional; void autoName; void autoProps;
@@ -83,8 +92,8 @@ import { resolveComponent } from "./.meeko/generated/components.ts";
 const root = document.querySelector("#app");
 if (root) {
   root.addEventListener("click", () => {
-    void resolveComponent("FormUserCreate").then((component) => {
-      root.textContent = component.renderToString({ name: "Diego" });
+    void resolveComponent("FormUserCreate", { name: "Diego" }).then((component) => {
+      root.textContent = component.renderToString();
     });
   });
 }
@@ -100,6 +109,13 @@ try {
   const component = await pending;
   if (!component.renderToString({ name: "Diego" }).includes("Diego")) {
     throw new Error("The installed component module did not render its props in SSR");
+  }
+  const [bound, other] = await Promise.all([
+    registry.resolveComponent("FormUserCreate", { name: "Diego" }),
+    registry.resolveComponent("FormUserCreate", { name: "Other" }),
+  ]);
+  if (!bound.renderToString().includes("Diego") || !other.renderToString().includes("Other")) {
+    throw new Error("Bound component props did not stay isolated in SSR");
   }
   await import("node:assert/strict").then(({ default: assert }) =>
     assert.rejects(registry.resolveComponent("Missing"), /no registrado: Missing/));
@@ -137,11 +153,15 @@ const unknown: ComponentName = "Missing";
 const missing: ComponentProps<"FormUserCreate"> = {};
 const invalid: ComponentProps<"Button"> = { label: "Save", tone: "danger" };
 const wrongModule: Promise<ComponentOf<"Button">> = resolveComponent("FormUserCreate");
+resolveComponent("FormUserCreate", {});
+resolveComponent("FormUserCreate", { name: 123 });
+resolveComponent("FormUserCreate", { name: "Diego", extra: true });
+resolveComponent("Missing", {});
 void unknown; void missing; void invalid; void wrongModule;
 '@
     $diagnostics = & node node_modules/typescript/bin/tsc -p .meeko/tsconfig.app.json --noEmit --pretty false 2>&1 | Out-String
     if ($LASTEXITCODE -eq 0) { throw 'Negative TypeScript fixture unexpectedly passed.' }
-    foreach ($line in @(2, 3, 4, 5)) {
+    foreach ($line in 2..9) {
       if ($diagnostics -notmatch "registry-negative\.ts\($line,\d+\): error TS\d+") {
         throw "Negative TypeScript fixture did not report line $line. Diagnostics: $diagnostics"
       }

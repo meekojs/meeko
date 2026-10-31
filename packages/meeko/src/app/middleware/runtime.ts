@@ -1,5 +1,5 @@
-import type { GeneratedRouteMiddleware } from "../../framework.js";
-import type { RouteMatch, RouteRecord } from "../runtime/router.js";
+import type { GeneratedRouteMiddleware } from "../../framework";
+import type { RouteMatch, RouteRecord } from "../runtime/router";
 
 /**
  * Contexto del middleware de ruta, que se ejecuta antes del loader en las peticiones SSR de una

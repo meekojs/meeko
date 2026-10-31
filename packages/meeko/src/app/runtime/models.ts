@@ -6,7 +6,7 @@
  * parent's own signal. Without a parent signal the child keeps a local one, initialized from its
  * `default`; a model without `default` is required.
  */
-import { escapeHtml } from "../../core/server.js";
+import { escapeHtml } from "../../core/server";
 
 /**
  * Key of the signals that a component borrows from its parent in the object its setup returns.
@@ -14,7 +14,7 @@ import { escapeHtml } from "../../core/server.js";
  */
 export const borrowedKey: unique symbol = Symbol("meeko.borrowed");
 
-export type { ModelOptions } from "../definitions/define-model.js";
+export type { ModelOptions } from "../definitions/define-model";
 
 /** Value of a model signal during SSR. */
 export function modelValue(model: unknown): unknown {

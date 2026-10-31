@@ -1,5 +1,5 @@
 import { defineApiRoute } from "@meekojs/meeko/server";
-import { loginBody, loginResult } from "../../../shared/schemas/demo.js";
+import { loginBody, loginResult } from "../../../shared/schemas/demo";
 
 export default defineApiRoute({
   body: loginBody,

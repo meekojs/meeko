@@ -1,17 +1,17 @@
 import { join, relative, resolve } from "node:path";
 import ts from "@typescript/typescript6";
-import { compile } from "../compiler.js";
-import type { CompileOptions, CompileResult } from "../compiler.js";
-import type { PathAlias } from "../compiler/aliases.js";
-import { checkClientBoundary } from "../compiler/transforms/client-boundary.js";
-import { projectRoot } from "../compiler/project-root.js";
-import { parseSfc } from "../compiler/parser/sfc.js";
-import type { CompileDiagnostic } from "../compiler/parser/sfc.js";
-import { readThemeEnabledSync } from "../framework/config.js";
-import { resolveProjectAliases, resolveProjectAliasesSync } from "../framework/aliases.js";
-import type { ProjectAliases } from "../framework/aliases.js";
-import { autoImportCollision, discoverAutoImports } from "./registry.js";
-import type { AutoImport, ImportScope } from "./registry.js";
+import { compile } from "../compiler";
+import type { CompileOptions, CompileResult } from "../compiler";
+import type { PathAlias } from "../compiler/aliases";
+import { checkClientBoundary } from "../compiler/transforms/client-boundary";
+import { projectRoot } from "../compiler/project-root";
+import { parseSfc } from "../compiler/parser/sfc";
+import type { CompileDiagnostic } from "../compiler/parser/sfc";
+import { readThemeEnabledSync } from "../framework/config";
+import { resolveProjectAliases, resolveProjectAliasesSync } from "../framework/aliases";
+import type { ProjectAliases } from "../framework/aliases";
+import { autoImportCollision, discoverAutoImports } from "./registry";
+import type { AutoImport, ImportScope } from "./registry";
 
 function bindingNames(name: ts.BindingName, names: Set<string>): void {
   if (ts.isIdentifier(name)) names.add(name.text);

@@ -12,14 +12,14 @@
  * `data` or `error`, `pending` and the stored intent in another one, for every mutation that waits
  * for that request. `onSuccess` and `onError` run after that batch, once per mutation.
  */
-import { componentErrorReporter } from "./component-errors.js";
-import { observeCallback } from "../../core/error-observer.js";
-import { whenMounted } from "./lifecycle.js";
-import { batch, computed, signal, untrack } from "../../core/reactivity.js";
-import type { ReadonlySignal, Signal } from "../../core/reactivity.js";
-import { ClientError, idempotencyHeader, isIdempotencyKey } from "../../shared/clients.js";
-import { currentBrowser, storageSignal } from "../composables/useStorage.js";
-import type { Decoded, StorageArea } from "../composables/useStorage.js";
+import { componentErrorReporter } from "./component-errors";
+import { observeCallback } from "../../core/error-observer";
+import { whenMounted } from "./lifecycle";
+import { batch, computed, signal, untrack } from "../../core/reactivity";
+import type { ReadonlySignal, Signal } from "../../core/reactivity";
+import { ClientError, idempotencyHeader, isIdempotencyKey } from "../../shared/clients";
+import { currentBrowser, storageSignal } from "../composables/useStorage";
+import type { Decoded, StorageArea } from "../composables/useStorage";
 
 /**
  * Opciones del modo `retrySafe` de `useRpcMutation` y `useApiMutation`.

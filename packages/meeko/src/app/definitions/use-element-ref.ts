@@ -1,5 +1,5 @@
 import ts from "@typescript/typescript6";
-import { apiDocs, jsdoc } from "./compiler-docs.js";
+import { apiDocs, jsdoc } from "./compiler-docs";
 
 /** A direct `useElementRef("name")` call in component setup. */
 export interface ElementRefCall {

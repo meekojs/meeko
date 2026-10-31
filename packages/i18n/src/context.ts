@@ -1,5 +1,5 @@
 import type { ContextKey } from "@meekojs/meeko";
-import type { GeneratedI18nMessages } from "./index.js";
+import type { GeneratedI18nMessages } from "./index";
 
 type MessageKey = keyof GeneratedI18nMessages extends never ? string : keyof GeneratedI18nMessages & string;
 type Values = Readonly<Record<string, string | number | boolean | null | undefined>>;

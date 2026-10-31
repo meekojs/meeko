@@ -12,8 +12,8 @@ import { renderToString as renderVueToString } from "vue/server-renderer";
 import { renderToString as renderMeekoTree } from "./cases/Tree.generated.ts";
 import { renderToString as renderMeekoList } from "./cases/List.generated.ts";
 import { renderToString as renderMeekoNavigation } from "./cases/Navigation.generated.ts";
-import { VueTree, VueList, VueNavigation, VueNavigationMount } from "./vue-scenarios.js";
-import type { Scenario } from "./scenario-protocol.js";
+import { VueTree, VueList, VueNavigation, VueNavigationMount } from "./vue-scenarios";
+import type { Scenario } from "./scenario-protocol";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const warmupRounds = 2;

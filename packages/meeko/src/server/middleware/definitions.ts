@@ -1,4 +1,4 @@
-import type { ServerMiddleware } from "./index.js";
+import type { ServerMiddleware } from "./index";
 
 /**
  * Declara el middleware de servidor que exporta por defecto un archivo de `server/middleware/`.
@@ -24,8 +24,8 @@ import type { ServerMiddleware } from "./index.js";
 export function defineServerMiddleware(middleware: ServerMiddleware): ServerMiddleware {
   return middleware;
 }
-import type { RouteMiddlewareOptions } from "../../app/middleware/runtime.js";
-import type { ServerRouteMiddleware } from "./runtime.js";
+import type { RouteMiddlewareOptions } from "../../app/middleware/runtime";
+import type { ServerRouteMiddleware } from "./runtime";
 
 /**
  * Declara el middleware de ruta de servidor que exporta por defecto un archivo

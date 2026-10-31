@@ -1,5 +1,5 @@
-import { isThemeChoice, themeChoices } from "./theme.js";
-import type { ResolvedThemeConfig, ThemeToggleContext, ThemeToggleItem, ThemeToggleMessages, ThemeToggleOptions, ThemeToggleStatus } from "./theme.js";
+import { isThemeChoice, themeChoices } from "./theme";
+import type { ResolvedThemeConfig, ThemeToggleContext, ThemeToggleItem, ThemeToggleMessages, ThemeToggleOptions, ThemeToggleStatus } from "./theme";
 
 const defaultLabels: Readonly<Record<string, string>> = { light: "Claro", dark: "Oscuro", system: "Sistema" };
 

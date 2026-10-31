@@ -1,6 +1,6 @@
-import { findContext } from "../../core/reactivity.js";
-import { layoutKey } from "../runtime/layout.js";
-import type { LayoutHandle, LayoutName, LayoutProps } from "../../shared/layout.js";
+import { findContext } from "../../core/reactivity";
+import { layoutKey } from "../runtime/layout";
+import type { LayoutHandle, LayoutName, LayoutProps } from "../../shared/layout";
 
 /**
  * Da acceso a las props del layout con nombre de la página desde su `<script>` (y desde sus

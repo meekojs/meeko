@@ -28,4 +28,4 @@ export function defineExpose<T>(value: T): T {
   return value;
 }
 
-export type { ExposedOf } from "../definitions/define-expose.js";
+export type { ExposedOf } from "../definitions/define-expose";

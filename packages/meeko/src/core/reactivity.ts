@@ -1,5 +1,5 @@
-import type { DevtoolsReadSite } from "./devtools-protocol.js";
-import { logClientError, observeCallback, observeReturnedPromise } from "./error-observer.js";
+import type { DevtoolsReadSite } from "./devtools-protocol";
+import { logClientError, observeCallback, observeReturnedPromise } from "./error-observer";
 
 /**
  * Señal de sólo lectura: leer `value` dentro de un `effect`, un `computed` o la plantilla registra

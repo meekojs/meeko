@@ -6,11 +6,11 @@ import type { Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { editorBridgeFile, startEditorBridge } from "../../meeko/src/framework/editor-bridge.js";
-import type { EditorBridge, EditorBridgeHotChannel, EditorBridgeHotClient } from "../../meeko/src/framework/editor-bridge.js";
-import { BridgeConnection } from "../src/live/client.js";
-import { maxSseFrameBytes } from "../src/live/model.js";
-import type { LiveChange } from "../src/live/client.js";
+import { editorBridgeFile, startEditorBridge } from "../../meeko/src/framework/editor-bridge";
+import type { EditorBridge, EditorBridgeHotChannel, EditorBridgeHotClient } from "../../meeko/src/framework/editor-bridge";
+import { BridgeConnection } from "../src/live/client";
+import { maxSseFrameBytes } from "../src/live/model";
+import type { LiveChange } from "../src/live/client";
 
 type Listener = (data: unknown, client: EditorBridgeHotClient) => void;
 

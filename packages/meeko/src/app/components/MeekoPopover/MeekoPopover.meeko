@@ -2,10 +2,10 @@
 // <MeekoPopover>, Meeko's own tag since 1.5. `pnpm run builtins` compiles this file into
 // popover.compiled.ts, which the package ships as @meekojs/meeko/builtins/popover and which only the
 // components that use the tag import; edit this file, not that one.
-import { useId } from "../../composables/useId.js";
-import { onMounted } from "../../runtime/lifecycle.js";
-import { createPopover } from "./popover.js";
-import type { MeekoPopoverProps, PopoverSnippets, PopoverToggleEvent } from "./types.js";
+import { useId } from "../../composables/useId";
+import { onMounted } from "../../runtime/lifecycle";
+import { createPopover } from "./popover";
+import type { MeekoPopoverProps, PopoverSnippets, PopoverToggleEvent } from "./types";
 
 const props = defineProps<MeekoPopoverProps>();
 const snippets = defineSnippets<PopoverSnippets>();

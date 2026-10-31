@@ -9,11 +9,11 @@
  * `bind="obj"` writes the keys of an object as attributes of an element, or passes them as props of
  * a component. Keys that start with `on` are rejected: event handlers never come from data.
  */
-import { elementAccepts, elementAttributeNames } from "../../shared/html-attributes.js";
-import type { AttributeNameOf, AttributeValue, HtmlTagName, Words } from "../../shared/html-attributes.js";
-import { attributeValue, escapeHtml } from "../../core/server.js";
-import type { ElementOf } from "./element-refs.js";
-import type { ExposedOf } from "./expose.js";
+import { elementAccepts, elementAttributeNames } from "../../shared/html-attributes";
+import type { AttributeNameOf, AttributeValue, HtmlTagName, Words } from "../../shared/html-attributes";
+import { attributeValue, escapeHtml } from "../../core/server";
+import type { ElementOf } from "./element-refs";
+import type { ExposedOf } from "./expose";
 
 /** Elements that `<component is>` refuses: document metadata, scripts, embedded documents and raw text. */
 const forbiddenTagNames = "base body embed fencedframe head html iframe link meta noscript object param script slot style template textarea title";

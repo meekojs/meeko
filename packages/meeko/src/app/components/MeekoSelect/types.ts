@@ -1,5 +1,5 @@
-import type { ReadonlySignal, Signal } from "../../../core/reactivity.js";
-import type { PopoverPlacement } from "../MeekoPopover/types.js";
+import type { ReadonlySignal, Signal } from "../../../core/reactivity";
+import type { PopoverPlacement } from "../MeekoPopover/types";
 /**
  * Valor del modelo de `<MeekoSelect>`: la opción elegida o `null` y, con `multiple`, un array de
  * opciones. Se infiere del tipo de `options` y de `multiple`.

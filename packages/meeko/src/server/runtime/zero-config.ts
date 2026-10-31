@@ -1,10 +1,10 @@
-import { envString, parseDuration, warnOnce } from "./env.js";
-import type { PlatformName } from "./platform.js";
-import type { RedisSubscriberClient } from "./redis-pubsub.js";
-import { RedisSessionStore } from "./session-stores.js";
-import type { RedisSessionClient } from "./session-stores.js";
-import { MemorySessionStore, SessionManager } from "./sessions.js";
-import type { SessionOptions } from "./sessions.js";
+import { envString, parseDuration, warnOnce } from "./env";
+import type { PlatformName } from "./platform";
+import type { RedisSubscriberClient } from "./redis-pubsub";
+import { RedisSessionStore } from "./session-stores";
+import type { RedisSessionClient } from "./session-stores";
+import { MemorySessionStore, SessionManager } from "./sessions";
+import type { SessionOptions } from "./sessions";
 
 /** What the session defaults need from the application host. */
 export interface SessionDefaultsContext {

@@ -8,44 +8,44 @@ import { networkInterfaces } from "node:os";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { InlineConfig, Plugin, ViteDevServer } from "vite";
-import { escapeHtml } from "../core/server.js";
-import { attachNodeWebSocketServer, toNodeListener } from "../node.js";
-import type { ServerApp, ServerAppOptions } from "../server/runtime/app.js";
-import type { AssetManifest, AssetRecord } from "../server/runtime/assets.js";
-import { reportServerError } from "../server/errors.js";
-import { handleProcessErrors, processErrorObserver } from "../server/runtime/process-errors.js";
-import { meekoEnv } from "../server/runtime/env.js";
-import { visibleHost } from "../server/runtime/fetch-host.js";
-import { listeningMessage } from "../server/runtime/listen-address.js";
-import { buildDataFile, frameworkClientEntry, frameworkNodeEntry, frameworkServerEntry } from "./app-manifest.js";
-import type { BuildAppData } from "./app-manifest.js";
-import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./config.js";
-import { contentTypes } from "./content-types.js";
-import { resolvedDocument, resolveSiteOrigin, setModuleDevelopmentMode } from "./module-loader.js";
-import type { PrerenderIndex } from "./prerender.js";
-import { discoverErrorPage } from "./routes-discovery.js";
-import { discoverRouteMiddleware } from "./route-middleware-discovery.js";
-import { robotsTxt, siteFilesOptions, sitemapEntryRoutes, sitemapUrls, sitemapXml } from "./site-files.js";
-import { assertStaticApp, previewStatic, writeStaticOutput } from "./static-adapter.js";
-import type { ResolvedModules } from "./module-loader.js";
-import { createDevAppReloader, isDiscoverySource, isRouteOptionsSource, routeOptionsKey } from "./dev-watch.js";
-import { supervisedHmrPortEnv, supervisedPortEnv } from "./dev-link.js";
-import { devHmrHost, devPortInUse, resolveDevPorts } from "./dev-port.js";
-import type { MeekoAdapterName } from "../modules/define-meeko-config.js";
-import { prerenderForBuild } from "./prerender.js";
-import { bunEntrySource, cloudflareEntrySource, denoEntrySource } from "./adapter-templates.js";
-import { cloudflareAssetsDirectory, cloudflarePrerenderDirectory, resolveWrangler, wranglerConfig, wranglerSource } from "./cloudflare-build.js";
-import { editorBridgeHost, editorBridgeOffReason, startEditorBridge } from "./editor-bridge.js";
-import { recordEditorBridgeOff } from "./dev-lock.js";
-import { createDevServerLogs } from "./dev-server-logs.js";
-import type { DevServerLogs } from "./dev-server-logs.js";
-import type { EditorBridge } from "./editor-bridge.js";
-import { clientEntrySource, nodeEntrySource, serverEntrySource, staticClientEntrySource } from "./project-templates.js";
-import { assertNoLegacySessionFile } from "./runtime-migration.js";
-import { hasFrameworkTsconfigs, prepareFrameworkTypeDeclarations } from "./type-declarations.js";
-import { createGlobalStylesheetSnapshot, devStylesheetLink, globalStylesheetFile, globalStylesheetUrl } from "./styles.js";
+import { escapeHtml } from "../core/server";
+import { attachNodeWebSocketServer, toNodeListener } from "../node";
+import type { ServerApp, ServerAppOptions } from "../server/runtime/app";
+import type { AssetManifest, AssetRecord } from "../server/runtime/assets";
+import { reportServerError } from "../server/errors";
+import { handleProcessErrors, processErrorObserver } from "../server/runtime/process-errors";
+import { meekoEnv } from "../server/runtime/env";
+import { visibleHost } from "../server/runtime/fetch-host";
+import { listeningMessage } from "../server/runtime/listen-address";
+import { buildDataFile, frameworkClientEntry, frameworkNodeEntry, frameworkServerEntry } from "./app-manifest";
+import type { BuildAppData } from "./app-manifest";
+import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./config";
+import { contentTypes } from "./content-types";
+import { resolvedDocument, resolveSiteOrigin, setModuleDevelopmentMode } from "./module-loader";
+import type { PrerenderIndex } from "./prerender";
+import { discoverErrorPage } from "./routes-discovery";
+import { discoverRouteMiddleware } from "./route-middleware-discovery";
+import { robotsTxt, siteFilesOptions, sitemapEntryRoutes, sitemapUrls, sitemapXml } from "./site-files";
+import { assertStaticApp, previewStatic, writeStaticOutput } from "./static-adapter";
+import type { ResolvedModules } from "./module-loader";
+import { createDevAppReloader, isDiscoverySource, isRouteOptionsSource, routeOptionsKey } from "./dev-watch";
+import { supervisedHmrPortEnv, supervisedPortEnv } from "./dev-link";
+import { devHmrHost, devPortInUse, resolveDevPorts } from "./dev-port";
+import type { MeekoAdapterName } from "../modules/define-meeko-config";
+import { prerenderForBuild } from "./prerender";
+import { bunEntrySource, cloudflareEntrySource, denoEntrySource } from "./adapter-templates";
+import { cloudflareAssetsDirectory, cloudflarePrerenderDirectory, resolveWrangler, wranglerConfig, wranglerSource } from "./cloudflare-build";
+import { editorBridgeHost, editorBridgeOffReason, startEditorBridge } from "./editor-bridge";
+import { recordEditorBridgeOff } from "./dev-lock";
+import { createDevServerLogs } from "./dev-server-logs";
+import type { DevServerLogs } from "./dev-server-logs";
+import type { EditorBridge } from "./editor-bridge";
+import { clientEntrySource, nodeEntrySource, serverEntrySource, staticClientEntrySource } from "./project-templates";
+import { assertNoLegacySessionFile } from "./runtime-migration";
+import { hasFrameworkTsconfigs, prepareFrameworkTypeDeclarations } from "./type-declarations";
+import { createGlobalStylesheetSnapshot, devStylesheetLink, globalStylesheetFile, globalStylesheetUrl } from "./styles";
 
-export { frameworkClientEntry, frameworkServerEntry } from "./app-manifest.js";
+export { frameworkClientEntry, frameworkServerEntry } from "./app-manifest";
 
 const clientOutput = ".meeko/output/client";
 const nodeOutput = ".meeko/output/node";
@@ -280,7 +280,7 @@ export async function buildProject(projectRoot: string, options: BuildProjectOpt
   }
   await modules.callHook("routes:resolved", { routes: await discoverConfiguredRoutes(root) });
   const vite = await import("vite");
-  const { meeko } = await import("../vite.js");
+  const { meeko } = await import("../vite");
   const build = (base: InlineConfig): ReturnType<typeof vite.build> => vite.build(withModules(modules, base, "build"));
   await build({
     root, configFile: false, plugins: [meeko()], logLevel: "warn",
@@ -577,7 +577,7 @@ async function startDevelopment(root: string): Promise<Server> {
   };
   try {
     const { createServer: createViteServer, searchForWorkspaceRoot } = await import("vite");
-    const { meeko } = await import("../vite.js");
+    const { meeko } = await import("../vite");
     if (config.dev?.serverLogs !== false) {
       serverLogs = createDevServerLogs({ hot: () => vite?.ws });
     }

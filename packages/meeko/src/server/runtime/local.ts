@@ -1,17 +1,17 @@
-import { ApiError, reportServerError } from "../errors.js";
-import { errorResponse, setRateLimitRoute } from "../contract-runtime.js";
-import { dispatchApiRoute } from "../api/runtime.js";
-import { dispatchRpc } from "../rpc/runtime.js";
-import type { ApiRouteDefinition } from "../api/contracts.js";
-import type { RpcDefinition } from "../rpc/contracts.js";
-import type { Schema } from "../schema.js";
-import type { ServerErrorObserver } from "../errors.js";
-import { idempotencyKeyOf } from "./request-context.js";
-import type { RequestContext } from "./request-context.js";
-import type { ApiMethod, ServerManifest, ServerModuleLoader } from "./discovery.js";
-import { copySocketAddress } from "./env.js";
-import type { SessionManager } from "./sessions.js";
-import { serializeJson } from "../../core/server.js";
+import { ApiError, reportServerError } from "../errors";
+import { errorResponse, setRateLimitRoute } from "../contract-runtime";
+import { dispatchApiRoute } from "../api/runtime";
+import { dispatchRpc } from "../rpc/runtime";
+import type { ApiRouteDefinition } from "../api/contracts";
+import type { RpcDefinition } from "../rpc/contracts";
+import type { Schema } from "../schema";
+import type { ServerErrorObserver } from "../errors";
+import { idempotencyKeyOf } from "./request-context";
+import type { RequestContext } from "./request-context";
+import type { ApiMethod, ServerManifest, ServerModuleLoader } from "./discovery";
+import { copySocketAddress } from "./env";
+import type { SessionManager } from "./sessions";
+import { serializeJson } from "../../core/server";
 
 /**
  * Opciones de {@link createLocalCalls}.

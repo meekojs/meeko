@@ -1,12 +1,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
-import { discoverAutoImports } from "../autoimports/registry.js";
-import { autoImportCompilerHost, autoImportSourceReader } from "../autoimports/typescript.js";
-import { resolveProjectAliases, withAliasPaths } from "./aliases.js";
-import { resolveConfigSources } from "./config.js";
-import { discoverServerManifest } from "../server/api/manifest-discovery.js";
-import { standardSchemaTypes } from "./standard-schema-types.js";
+import { discoverAutoImports } from "../autoimports/registry";
+import { autoImportCompilerHost, autoImportSourceReader } from "../autoimports/typescript";
+import { resolveProjectAliases, withAliasPaths } from "./aliases";
+import { resolveConfigSources } from "./config";
+import { discoverServerManifest } from "../server/api/manifest-discovery";
+import { standardSchemaTypes } from "./standard-schema-types";
 
 /** An import of a channel file; its specifier resolves only when a schema uses it. */
 interface ImportedSymbol { specifier: string; exported: string; }

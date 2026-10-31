@@ -1,6 +1,6 @@
-import { createContext, createRoot, findContext, finishWithCleanup, provide, signal } from "../../core/reactivity.js";
-import type { Signal } from "../../core/reactivity.js";
-import { serializeJson } from "../../core/server.js";
+import { createContext, createRoot, findContext, finishWithCleanup, provide, signal } from "../../core/reactivity";
+import type { Signal } from "../../core/reactivity";
+import { serializeJson } from "../../core/server";
 
 export const stateKey = /*#__PURE__*/ createContext<StateStore>("Meeko framework state");
 
