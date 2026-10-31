@@ -478,7 +478,7 @@ Los archivos de runtime de un módulo (plugins, componentes, autoimports, middle
 | --- | --- |
 | `rootDir`, `dev`, `config` | Carpeta del proyecto, `true` en `meeko dev` y la configuración cargada. |
 | `addLayer(dir)` | Añade un layer, después de los de `layers`. Debe tener `app/pages` y estar dentro del proyecto; un paquete instalado en `node_modules` lo está, también con pnpm. |
-| `addComponentsDir(dir, { prefix })` | Autoimporta los `.meeko` de la carpeta y sus subcarpetas, con el nombre en PascalCase tras el prefijo (`components/picker.meeko` con `prefix: "Accent"` es `AccentPicker`). |
+| `addComponentsDir(dir, { prefix?, exclude? })` | Autoimporta los `.meeko` de la carpeta y sus subcarpetas, con el nombre en PascalCase tras el prefijo (`components/picker.meeko` con `prefix: "Accent"` es `AccentPicker`). `exclude` admite globs relativos a esa carpeta, como `['internal/**', '**/*.private.meeko']`: los archivos excluidos no entran en `ComponentName`, los loaders ni los tipos globales generados, pero siguen disponibles mediante imports explícitos. |
 | `addLayout(name, file)` | Desde `1.5`, añade un [layout con nombre](#layouts-con-nombre), como un archivo de `app/layouts`: `meeko.addLayout("docs", here("./docs-layout.meeko"))`. El archivo debe estar dentro del proyecto. Un layout del proyecto o de un layer con el mismo nombre gana; dos módulos con el mismo nombre son un error. |
 | `addAutoImports(entries)` | Autoimporta exports de un paquete o archivo: `{ name, as?, from, type?, scope?, componentOnly? }`; `scope` es `"app"` por defecto (componentes y `app/`, en el navegador y en SSR), `"client"`, `"server"` o `"shared"`. Con `componentOnly: true` y `scope: "app"`, el nombre se ofrece en componentes y módulos de `app/` que pueden ejecutarse en el navegador, pero no en `<script server>` ni en `server/`. |
 | `addAutoImportsDir(dir, { scope })` | Autoimporta los exports de los `.ts` de una carpeta, con ámbito `"app"`, `"server"` o `"shared"`; los sufijos `.client.ts`, `.server.ts` y `.shared.ts` mandan. |
@@ -1146,6 +1146,43 @@ La respuesta lleva `Vary: Accept, Cookie` (y `Sec-CH-Prefers-Color-Scheme` con e
 `mountClientApp` convierte en navegación cliente los clics en enlaces del mismo origen hacia una ruta de la aplicación, también los del HTML insertado con `html`. Un enlace a un fragmento de la página actual (`#seccion`, o `/docs#seccion` estando en `/docs`) no se intercepta: el navegador desplaza la página y añade la entrada al historial sin volver a pedir ni renderizar la página, y volver atrás o adelante entre esos fragmentos tampoco la renderiza. `app.navigate("#seccion")` hace lo mismo.
 
 Una navegación nueva empieza arriba de la página o, si su URL tiene un fragmento que nombra un elemento (`id` o `name`), en ese elemento, de forma inmediata aunque la página use `scroll-behavior: smooth`. Una navegación por el historial o con `replace` sólo se desplaza al fragmento, si lo hay. Si la petición de datos de una navegación recibe HTML en lugar de un payload (un hosting estático que sirve el `index.html` prerenderizado, un proxy o una CDN), Meeko carga ese documento en vez de fallar.
+
+### View Transitions nativas
+
+Activa las transiciones de navegación cliente en `meeko.config.ts`:
+
+```ts
+export default defineMeekoConfig({
+  viewTransitions: true,
+})
+```
+
+La opción es booleana y está desactivada por defecto. Meeko carga la página, sus módulos y sus datos antes de iniciar `document.startViewTransition()`, y coloca dentro del callback el cambio de DOM y de head. No anima SSR, la hidratación inicial ni los cambios de fragmento de la página actual. Funciona con enlaces internos y atrás/adelante. Sin la API, con la pestaña oculta o con `prefers-reduced-motion: reduce`, navega normalmente.
+
+El navegador proporciona una transición básica; personaliza la animación desde `app/styles/main.css` con CSS nativo:
+
+```css
+.project-surface {
+  view-transition-name: project-surface;
+}
+
+::view-transition-group(project-surface) {
+  animation-duration: 280ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+```
+
+Usa el mismo `view-transition-name` en el elemento de origen y destino. Cada nombre debe ser único entre los elementos visibles de una página; los duplicados pueden impedir la animación, aunque la navegación se completa. No se necesita una directiva ni un componente envolvente. Consulta la [API nativa](https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition).
+
+Para desactivar o activar una navegación concreta, usa `app.navigate('/projects', { viewTransition: false })` en un host que dispone del `ClientApp` devuelto por `mountClientApp`. Los enlaces admiten un atributo HTML estándar, tanto en `<MeekoLink>` como en `<a>`:
+
+```html
+<MeekoLink to="/projects" data-meeko-view-transition="false">Abrir sin transición</MeekoLink>
+```
+
+`data-meeko-view-transition="true"` activa ese enlace aunque la opción global esté desactivada; movimiento reducido sigue teniendo prioridad. La promesa de navegación espera al cambio de DOM, sin esperar al final de la animación. Una navegación posterior o desmontar la aplicación omite la animación anterior; una actualización abortada no puede sustituir la página nueva. Los fallos de animación no se convierten en fallos de navegación; los errores del render siguen propagándose como antes.
+
+Esta opción controla cambios dentro del mismo documento. Las navegaciones a documentos nuevos pueden usar `@view-transition { navigation: auto; }` en las hojas de ambas páginas del mismo origen, sujeto al soporte del navegador y a las reglas de esa API. Los modales de UI mantienen sus animaciones locales y no necesitan capturas de toda la página. La demo `/transitions` de `apps/ui-demo` incluye una superficie compartida entre lista y detalle, además de enlaces sin transición.
 
 ### Estado de navegación
 

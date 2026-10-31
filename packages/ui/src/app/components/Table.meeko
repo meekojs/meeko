@@ -1,0 +1,145 @@
+<script lang="ts" generic="T extends object">
+	import type { TableCellValue, TableColumn, TableRowKey } from '@meekojs/ui/runtime'
+
+	interface Props<T extends object> {
+		rows: readonly T[]
+		columns: readonly TableColumn<T>[]
+		rowKey: TableRowKey<T>
+		layout?: 'grid' | 'native'
+		gridColumns?: string
+		caption?: string
+		hideHeader?: boolean
+		emptyText?: string
+		class?: string
+	}
+
+	const props = defineProps<Props<T>>({ layout: 'native', hideHeader: false, emptyText: 'No hay datos.' })
+
+	const snippets = defineSnippets<{
+		header?: [column: TableColumn<T>]
+		cell?: [row: T, column: TableColumn<T>, value: T[keyof T], index: number]
+		footer?: [column: TableColumn<T>, rows: readonly T[]]
+		empty?: []
+	}>()
+
+	const id = useId()
+
+	function keyOf(row: T): string | number {
+		return typeof props.rowKey === 'function' ? props.rowKey(row) : (row[props.rowKey] as string | number)
+	}
+
+	function cellText(row: T, column: TableColumn<T>): string {
+		// La unión pública correlaciona key y format; la llamada conserva esa relación.
+		const format = column.format as ((value: T[keyof T], row: T) => TableCellValue) | undefined
+		const value = format ? format(row[column.key], row) : row[column.key]
+		return value == null ? '' : String(value)
+	}
+
+	function footerText(column: TableColumn<T>): string {
+		const value = typeof column.footer === 'function' ? column.footer(props.rows) : column.footer
+		return value == null ? '' : String(value)
+	}
+</script>
+
+<template>
+	<div
+		class="meeko-ui-table-scroll"
+		tabindex="0"
+		bind:role="props.caption ? 'region' : undefined"
+		bind:aria-labelledby="props.caption ? id + '-caption' : undefined"
+	>
+		<table
+			role="table"
+			bind:class="['meeko-ui-table', props.class].filter(Boolean).join(' ')"
+			bind:data-layout="props.layout"
+			bind:style="'--table-columns: ' + (props.gridColumns ?? 'repeat(' + Math.max(1, props.columns.length) + ', minmax(160px, 1fr))')"
+		>
+			<caption
+				if:when="props.caption"
+				bind:id="id + '-caption'"
+			>
+				{props.caption}
+			</caption>
+			<thead
+				if:when="!props.hideHeader"
+				role="rowgroup"
+			>
+				<tr role="row">
+					<th
+						each:of="props.columns"
+						each:as="column"
+						each:key="column.key"
+						role="columnheader"
+						scope="col"
+					>
+						<render
+							if:when="snippets.header"
+							snippet="snippets.header"
+							args="column"
+						/>
+						<span if:when="!snippets.header">{column.label}</span>
+					</th>
+				</tr>
+			</thead>
+			<tbody role="rowgroup">
+				<tr
+					each:of="props.rows"
+					each:as="row"
+					each:key="keyOf(row)"
+					each:index="_index"
+					role="row"
+				>
+					<td
+						each:of="props.columns"
+						each:as="column"
+						each:key="column.key"
+						role="cell"
+					>
+						<render
+							if:when="snippets.cell"
+							snippet="snippets.cell"
+							args="row, column, row[column.key], _index"
+						/>
+						<span if:when="!snippets.cell">{cellText(row, column)}</span>
+					</td>
+				</tr>
+				<tr
+					if:when="props.rows.length === 0"
+					role="row"
+				>
+					<td
+						role="cell"
+						class="meeko-ui-table-empty"
+						bind:colspan="Math.max(1, props.columns.length)"
+					>
+						<render
+							if:when="snippets.empty"
+							snippet="snippets.empty"
+						/>
+						<span if:when="!snippets.empty">{props.emptyText}</span>
+					</td>
+				</tr>
+			</tbody>
+			<tfoot
+				if:when="snippets.footer || props.columns.some((column) => column.footer !== undefined)"
+				role="rowgroup"
+			>
+				<tr role="row">
+					<td
+						each:of="props.columns"
+						each:as="column"
+						each:key="column.key"
+						role="cell"
+					>
+						<render
+							if:when="snippets.footer"
+							snippet="snippets.footer"
+							args="column, props.rows"
+						/>
+						<span if:when="!snippets.footer">{footerText(column)}</span>
+					</td>
+				</tr>
+			</tfoot>
+		</table>
+	</div>
+</template>

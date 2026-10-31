@@ -1,8 +1,10 @@
+import { isFunctionLiteral, namesOf, narrowed, rewriteLocals, unshadowed, validateExpression } from "./compiler/expressions";
+import type { Guard } from "./compiler/expressions";
+import { scopeCss } from "./compiler/transforms/scoped-css";
 import { createHash } from "node:crypto";
 import { basename } from "node:path";
 import ts from "@typescript/typescript6";
 import postcss from "postcss";
-import selectorParser from "postcss-selector-parser";
 import { extractSourceMappings, markSource } from "./compiler/mapping";
 import { emitComponentChannels } from "./compiler/codegen/channels";
 import { emitComponentProps } from "./compiler/codegen/props";
@@ -32,7 +34,6 @@ import { attributeValueStart, decodeTemplateText, isCustomElementTag, parseTempl
 import { templateEventType } from "./compiler/transforms/events";
 import { layoutShiftHints } from "./compiler/transforms/layout-shift";
 import { propsReadsOnce } from "./compiler/transforms/props-reactivity";
-import { scopeTargets } from "./compiler/transforms/scope-targets";
 import type { ScopeCandidate, ScopeTargets } from "./compiler/transforms/scope-targets";
 import type { TemplateNode } from "./compiler/parser/template";
 import { importedComponents, isCandidates } from "./compiler/transforms/dynamic-tag";
@@ -314,37 +315,6 @@ interface TemplateContext {
   knownComponents: ReadonlySet<string>;
   /** Built-in components of {@link builtinComponentModules} that the template uses. */
   builtinModules: Set<string>;
-}
-
-/**
- * An `if:when` condition around a template expression, as code of the render path that reads it,
- * and the names it reads. Only `meeko check` emits guards: TypeScript narrows the expressions
- * behind them, as `v-if` does in Vue, and the module is never run.
- */
-interface Guard {
-  readonly code: string;
-  readonly names: ReadonlySet<string>;
-}
-
-/** Free names of a template expression. */
-function namesOf(expression: string): ReadonlySet<string> {
-  return new Set(freeIdentifiers(expression).map(({ name }) => name));
-}
-
-/**
- * `code` behind the conditions around it: TypeScript narrows each condition's references inside,
- * also in a callback, where the narrowing of the enclosing code does not reach. `!!` keeps a
- * function or a promise from being reported as always truthy. The type of the result is the type
- * of `code`; without guards it is `code` itself.
- */
-function narrowed(code: string, guards: readonly Guard[]): string {
-  return guards.length ? `(${guards.map((guard) => `!!(${guard.code})`).join(" && ")} ? ${code} : null!)` : code;
-}
-
-/** The guards that still mean the same where `names` (list items, snippet parameters) shadow names. */
-function unshadowed(guards: readonly Guard[], names: Iterable<string | undefined>): Guard[] {
-  const shadowing = [...names].filter((name): name is string => name !== undefined);
-  return guards.filter((guard) => !shadowing.some((name) => guard.names.has(name)));
 }
 
 function emptyBindings(): TemplateBindings {
@@ -633,16 +603,6 @@ function quote(value: string): string {
   return JSON.stringify(value);
 }
 
-function validateExpression(expression: string, source: string, filename: string, offset: number): void {
-  const prefix = "const __check = (";
-  const parsed = ts.createSourceFile(filename, `${prefix}${expression});`, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS) as ts.SourceFile & { parseDiagnostics: readonly ts.DiagnosticWithLocation[] };
-  const error = parsed.parseDiagnostics[0];
-  if (error) {
-    const position = Math.max(0, Math.min(expression.length, (error.start ?? prefix.length) - prefix.length));
-    throw compileError(source, filename, "MEEK020", ts.flattenDiagnosticMessageText(error.messageText, "\n"), offset + position);
-  }
-}
-
 function attributeValueOffset(node: TemplateNode, name: string, context: TemplateContext): number {
   const position = node.sourceCodeLocation?.attrs?.[name];
   if (!position) return context.templateOffset + (node.sourceCodeLocation?.startOffset ?? 0);
@@ -696,59 +656,6 @@ function templateRef(node: TemplateNode, context: TemplateContext, target: RefBi
   const ref: RefBinding = { id: context.nextRef++, name, offset, list: context.listDepth > 0, target };
   context.refs.set(name, ref);
   return ref;
-}
-
-/**
- * Replaces the template locals of an expression (a snippet parameter, for example) with the code
- * that reads them in the hydration. With `offset`, the expression's source position, every kept
- * piece and every replacement is mapped to its own span, so a TypeScript error after a rewritten
- * name (`.name` in `row.name`) is placed exactly, as in the other render paths.
- */
-function rewriteLocals(expression: string, locals: ReadonlyMap<string, string>, offset?: number): string {
-  if (locals.size === 0) return expression;
-  const prefix = "const __value = (";
-  const file = ts.createSourceFile("template-expression.ts", `${prefix}${expression});`, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const changes: Array<{ start: number; end: number; text: string }> = [];
-  function isShadowed(node: ts.Identifier): boolean {
-    for (let parent = node.parent; parent; parent = parent.parent) {
-      if ((ts.isArrowFunction(parent) || ts.isFunctionExpression(parent)) && parent.parameters.some((parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === node.text)) return true;
-      if (ts.isSourceFile(parent)) break;
-    }
-    return false;
-  }
-  function visit(node: ts.Node): void {
-    if (ts.isIdentifier(node)) {
-      const replacement = locals.get(node.text);
-      const parent = node.parent;
-      if (replacement && parent && !isShadowed(node)
-        && !(ts.isPropertyAccessExpression(parent) && parent.name === node)
-        && !(ts.isPropertyAssignment(parent) && parent.name === node)
-        && !(ts.isParameter(parent) && parent.name === node)
-        && !(ts.isVariableDeclaration(parent) && parent.name === node)) {
-        const shorthand = ts.isShorthandPropertyAssignment(parent) && parent.name === node;
-        changes.push({ start: node.getStart(file) - prefix.length, end: node.getEnd() - prefix.length, text: shorthand ? `${node.text}: (${replacement})` : `(${replacement})` });
-      }
-    }
-    ts.forEachChild(node, visit);
-  }
-  visit(file);
-  const valid = changes.filter((change) => change.start >= 0 && change.end <= expression.length);
-  if (offset !== undefined && valid.length > 0) {
-    const parts: string[] = [];
-    let cursor = 0;
-    for (const change of valid) {
-      if (change.start > cursor) parts.push(markSource(expression.slice(cursor, change.start), offset + cursor));
-      parts.push(markSource(change.text, offset + change.start, change.end - change.start));
-      cursor = change.end;
-    }
-    if (cursor < expression.length) parts.push(markSource(expression.slice(cursor), offset + cursor));
-    return parts.join("");
-  }
-  let result = expression;
-  for (const change of changes.reverse()) {
-    if (change.start >= 0 && change.end <= expression.length) result = result.slice(0, change.start) + change.text + result.slice(change.end);
-  }
-  return result;
 }
 
 /** `raw` is the source text of a text node, so every offset is a source position. */
@@ -1649,15 +1556,6 @@ function renderSnippetTag(node: TemplateNode, bindings: TemplateBindings, contex
   return `__meeko.renderSnippet(${id}, ${markSource(snippet, snippetOffset)}, ${list})`;
 }
 
-/** Whether a template expression is an arrow function or a function expression. */
-function isFunctionLiteral(expression: string): boolean {
-  const file = ts.createSourceFile("template-expression.ts", `(${expression});`, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
-  const statement = file.statements[0];
-  let node: ts.Expression | undefined = statement && ts.isExpressionStatement(statement) ? statement.expression : undefined;
-  while (node && ts.isParenthesizedExpression(node)) node = node.expression;
-  return node !== undefined && (ts.isArrowFunction(node) || ts.isFunctionExpression(node));
-}
-
 /**
  * The element as scoped selectors see it: the static attributes it renders and the attributes
  * that `bind:`, `model` or a `<select model>` may change. `ref:` and `on:` hand the element to
@@ -1681,61 +1579,6 @@ function scopeCandidate(node: TemplateNode, tag: string, custom: boolean, model:
 
 function escapeAttribute(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
-}
-
-function scopeCss(css: string, scopeAttribute: string): { css: string; targets: ScopeTargets } {
-  const root = postcss.parse(css);
-  root.walkRules((rule) => {
-    let parent: postcss.Node | undefined = rule.parent;
-    while (parent) {
-      if (parent.type === "atrule" && /keyframes$/i.test((parent as postcss.AtRule).name)) return;
-      parent = parent.parent;
-    }
-    const fail = (message: string, node: selectorParser.Node): never => {
-      throw rule.error(message, { index: node.sourceIndex });
-    };
-    rule.selector = selectorParser((selectors) => {
-      selectors.each((selector) => scopeSelector(selector, scopeAttribute, fail));
-    }).processSync(rule.selector);
-  });
-  return { css: root.toString(), targets: scopeTargets(root, scopeAttribute) };
-}
-
-function isGlobalPseudo(node: selectorParser.Node): node is selectorParser.Pseudo {
-  return node.type === "pseudo" && node.value.toLowerCase() === ":global";
-}
-
-/**
- * Añade el atributo de ámbito al último compuesto local del selector y desenvuelve `:global(...)`.
- * Un compuesto que contiene `:global(...)` no se limita; si todo el selector es global, no recibe atributo.
- */
-function scopeSelector(selector: selectorParser.Selector, scopeAttribute: string, fail: (message: string, node: selectorParser.Node) => never): void {
-  const globals: selectorParser.Pseudo[] = [];
-  selector.walkPseudos((pseudo) => {
-    if (!isGlobalPseudo(pseudo)) return;
-    if (pseudo.parent !== selector) fail(":global(<selector>) debe ir en el nivel superior de un selector, no dentro de otra pseudoclase", pseudo);
-    if (pseudo.nodes.length > 1) fail(":global(...) admite un solo selector; escribe un :global(<selector>) por cada selector de la lista", pseudo);
-    if (!pseudo.nodes[0]?.nodes.some((node) => node.type !== "comment")) fail(":global necesita un selector como argumento; usa :global(<selector>)", pseudo);
-    globals.push(pseudo);
-  });
-  const compounds: Array<Array<selectorParser.Selector["nodes"][number]>> = [[]];
-  for (const node of selector.nodes) {
-    if (node.type === "combinator") compounds.push([]);
-    else if (node.type !== "comment") compounds.at(-1)!.push(node);
-  }
-  const scoped = compounds.filter((compound) => compound.length > 0 && !compound.some(isGlobalPseudo)).at(-1);
-  if (scoped) {
-    const attribute = selectorParser.attribute({ attribute: scopeAttribute, value: undefined, raws: {} });
-    const pseudoElement = scoped.find((node) => node.type === "pseudo" && node.value.startsWith("::"));
-    if (pseudoElement) selector.insertBefore(pseudoElement, attribute);
-    else selector.insertAfter(scoped.at(-1)!, attribute);
-  }
-  for (const pseudo of globals) {
-    const inner = pseudo.nodes[0]!.nodes.slice();
-    inner[0]!.rawSpaceBefore = pseudo.rawSpaceBefore;
-    inner.at(-1)!.rawSpaceAfter = pseudo.rawSpaceAfter;
-    pseudo.replaceWith(...inner);
-  }
 }
 
 interface ScriptParts {

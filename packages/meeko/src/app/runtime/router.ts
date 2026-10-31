@@ -323,6 +323,8 @@ export function href(routes: readonly RouteRecord[], id: string, options: {
  * ```
  */
 export interface NavigationContext {
+  /** Sobrescribe la opción global de View Transitions para esta navegación. */
+  readonly viewTransition?: boolean;
   /** URL de destino. */
   readonly url: URL;
   /** Ruta de destino y sus parámetros. */
@@ -349,7 +351,7 @@ export interface Navigator {
    * Navega a `to` dentro del mismo origen. Devuelve `false` si la URL no tiene ruta o la navegación
    * se canceló, y rechaza si falla el render o la URL es de otro origen.
    */
-  navigate(to: string, options?: { replace?: boolean }): Promise<boolean>;
+  navigate(to: string, options?: { replace?: boolean; viewTransition?: boolean }): Promise<boolean>;
   /** Aborta la navegación pendiente y deja de escuchar `popstate`; después, `navigate` lanza. */
   dispose(): void;
 }
@@ -432,7 +434,7 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
   let currentUrl = browser.location.href;
   let pending: AbortController | undefined;
   let disposed = false;
-  const navigate = async (to: string, options: { replace?: boolean } = {}): Promise<boolean> => {
+  const navigate = async (to: string, options: { replace?: boolean; viewTransition?: boolean } = {}): Promise<boolean> => {
     if (disposed) throw new Error("Navigator disposed");
     const url = new URL(to, browser.location.href);
     if (url.origin !== browser.location.origin) throw new TypeError("External navigation is not a Meeko route");
@@ -473,8 +475,8 @@ export function createAppNavigator(routes: readonly RouteRecord[], render: (cont
     let result: void | boolean;
     try {
       result = match
-        ? await render({ url, match, signal: controller.signal, retainedLayouts })
-        : await unmatched!.render({ url, signal: controller.signal, retainedLayouts });
+        ? await render({ url, match, signal: controller.signal, retainedLayouts, ...(options.viewTransition === undefined ? {} : { viewTransition: options.viewTransition }) })
+        : await unmatched!.render({ url, signal: controller.signal, retainedLayouts, ...(options.viewTransition === undefined ? {} : { viewTransition: options.viewTransition }) });
     }
     catch (error) {
       if (pending === controller) pending = undefined;

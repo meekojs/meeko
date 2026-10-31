@@ -266,8 +266,9 @@ export async function clientRoutesSource(projectRoot: string): Promise<string> {
   const root = resolve(projectRoot);
   const routes = portableRoutes(root, await discoverConfiguredRoutes(root), { sidecars: "client" });
   const errorPage = await portableErrorPage(root);
-  const document = await documentManifest(root);
-  return `export const routes = ${serializeJson(routes)};\nexport const errorPage = ${errorPage ? serializeJson(errorPage) : "undefined"};\nexport const documentConfig = ${document ? serializeJson(document) : "undefined"};\n`;
+  const { config, modules } = await loadConfiguredModules(root);
+  const document = resolvedDocument(config, modules);
+  return `export const routes = ${serializeJson(routes)};\nexport const errorPage = ${errorPage ? serializeJson(errorPage) : "undefined"};\nexport const documentConfig = ${document ? serializeJson(document) : "undefined"};\nexport const viewTransitions = ${config.viewTransitions === true};\n`;
 }
 
 /**

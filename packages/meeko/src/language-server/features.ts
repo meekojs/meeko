@@ -675,10 +675,12 @@ export function completionList(base: FeatureContext, position: Position, trigger
   const program = context.project.service.getProgram();
   const file = program?.getSourceFile(context.component.virtualFilename);
   const generated = file ? generatedExports(context.component, file) : new Set<string>();
+  // getProgram synchronizes the language-service host: capture it once, never per suggestion.
+  const publicExports = context.project.publicMeekoExports(program);
   const visible = result.entries.filter((entry) => {
     if (internalName(entry.name) || (entry.hasAction && autoTypes.has(entry.name))) return false;
     if (entry.source === undefined && !entry.hasAction && generated.has(entry.name)) return false;
-    const meeko = meekoAutoImport(context.project, entry);
+    const meeko = meekoAutoImport(context.project, entry, publicExports);
     if (meeko && "hidden" in meeko) return false;
     if (serverBlock && entry.hasAction && context.project.autoImports().some((item) => item.name === entry.name && item.browserCode)) return false;
     if (meeko) publicImports.set(entry, meeko.specifier);

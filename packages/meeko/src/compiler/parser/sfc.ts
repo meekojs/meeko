@@ -111,6 +111,8 @@ const componentTag = /<(\/?)[A-Z][\w$]*(?=[\s/>])/y;
 const formTag = /<(\/?)f[Oo][Rr][Mm](?=[\s/>])/y;
 /** The name a masked `<form>` has while parse5 reads the template; see `maskComponentTags`. */
 export const maskedFormTag = "jorm";
+/** Table tags whose structure must survive when supplied through component snippets. */
+export const snippetTableTags: ReadonlySet<string> = new Set(["table", "caption", "colgroup", "col", "thead", "tbody", "tfoot", "tr", "th", "td"]);
 
 /** Final `>` of a start tag whose attributes begin at `from`, and whether it ends in `/>`. */
 function startTagEnd(html: string, from: number): { end: number; selfClosing: boolean } | undefined {
@@ -144,12 +146,16 @@ function startTagEnd(html: string, from: number): { end: number; selfClosing: bo
  * `blankComponents` borra cada etiqueta de componente cuando sólo interesan las secciones del
  * archivo: la plantilla valida después su cierre con mensajes propios.
  */
-export function maskComponentTags(html: string, options: { blankComponents?: boolean } = {}): MaskedHtml {
+export function maskComponentTags(html: string, options: { blankComponents?: boolean; tableSnippets?: boolean } = {}): MaskedHtml {
   const chars = html.split("");
   const lower = html.toLowerCase();
   const selfClosing = new Set<number>();
   const tags: number[] = [];
   let changed = false;
+  type TableTag = { name: string; at: number; offset: number; end: number; selfClosing: boolean };
+  const tables: Array<{ tags: TableTag[]; template: boolean; cells: number; componentDepth: number }> = [];
+  const preserve: TableTag[] = [];
+  let componentDepth = 0;
   for (let index = html.indexOf("<"); index >= 0 && index < html.length; index = html.indexOf("<", index)) {
     if (html.startsWith("<!--", index)) {
       const close = html.indexOf("-->", index + 4);
@@ -177,8 +183,29 @@ export function maskComponentTags(html: string, options: { blankComponents?: boo
     const tag = componentTag.exec(html);
     if (!tag) {
       // Skip the attributes of an HTML start tag: a value may contain `<Name`.
-      const element = /^<[a-z][^\s/>]*/i.exec(html.slice(index, index + 256));
+      const element = /^<(\/?)([a-z][^\s/>]*)/i.exec(html.slice(index, index + 256));
       const end = element ? startTagEnd(html, index + element[0].length) : undefined;
+      if (options.tableSnippets && element && end) {
+        const closing = element[1] === "/";
+        const name = element[2]!.toLowerCase();
+        const token: TableTag = { name, at: index + (closing ? 2 : 1), offset: index, end: end.end, selfClosing: end.selfClosing };
+        if (name === "table" && !closing) tables.push({ tags: [token], template: false, cells: 0, componentDepth });
+        else if (name === "table" && closing) {
+          const table = tables.pop();
+          if (table) { table.tags.push(token); if (table.template) preserve.push(...table.tags); }
+        } else if (snippetTableTags.has(name)) {
+          const table = tables.at(-1);
+          if (table && componentDepth <= table.componentDepth) {
+            table.tags.push(token);
+            if (name === "th" || name === "td") table.cells = Math.max(0, table.cells + (closing ? -1 : 1));
+          }
+          else if (componentDepth > 0) preserve.push(token);
+        } else if (!closing && (name === "render" || name === "snippet" || name === "component")) {
+          const table = tables.at(-1);
+          if (table && table.cells === 0) table.template = true;
+        }
+        if (name === "component" && !end.selfClosing) componentDepth = Math.max(0, componentDepth + (closing ? -1 : 1));
+      }
       // `<render ... />`, `<snippet ... />` and `<component is="..." />` close themselves like a component tag.
       if (end?.selfClosing && (element![0] === "<render" || element![0] === "<snippet" || element![0] === "<component")) {
         chars[end.end - 1] = " ";
@@ -198,9 +225,25 @@ export function maskComponentTags(html: string, options: { blankComponents?: boo
       chars[end.end - 1] = " ";
       selfClosing.add(index);
     }
+    if (options.tableSnippets) {
+      const table = tables.at(-1);
+      if (table && table.cells === 0) table.template = true;
+      if (!end.selfClosing) componentDepth = Math.max(0, componentDepth + (tag[1] ? -1 : 1));
+    }
     // Section parsing does not need the element; a blank keeps `</template>` from closing it.
     if (options.blankComponents) chars.fill(" ", index, end.end + 1);
     index = end.end + 1;
+  }
+  if (options.tableSnippets) {
+    for (const table of tables) if (table.template) preserve.push(...table.tags);
+    for (const token of preserve) {
+      chars[token.at] = "j";
+      if (token.name === "col" && html[token.offset + 1] !== "/") {
+        selfClosing.add(token.offset);
+        if (token.selfClosing) chars[token.end - 1] = " ";
+      }
+      changed = true;
+    }
   }
   return { text: changed ? chars.join("") : html, selfClosing, tags };
 }
@@ -254,7 +297,7 @@ function implicitScript(offset: number): SfcSection {
 /** Analiza y valida las secciones superiores de un archivo .meeko. */
 export function parseSfc(source: string, filename = "anonymous.meeko"): SfcDocument {
   const parseErrors: Array<{ code: string; startOffset: number }> = [];
-  const masked = maskComponentTags(source, { blankComponents: true });
+  const masked = maskComponentTags(source, { blankComponents: true, tableSnippets: true });
   const root = parseFragment(masked.text, {
     sourceCodeLocationInfo: true,
     onParseError(error) {

@@ -95,6 +95,7 @@ export default defineEslint({
     'meeko/order-macros': ['error', {
       order: ['defineProps', 'defineEmits', 'defineModel', 'defineSnippets', 'useElementRef', 'defineExpose'],
     }],
+    'meeko/padding-line-between-macros': 'error',
     'meeko/order-sections': ['error', {
       order: ['server', 'script', 'template', 'style'],
     }],
@@ -107,7 +108,9 @@ export default defineEslint({
 })
 ```
 
-Esos órdenes son los predeterminados: también puedes usar simplemente `'error'`. Las tres reglas `meeko/*` sólo se aplican a `.meeko`; los imports de tipos se comprueban tanto en TypeScript como en los scripts de componentes.
+Esos órdenes son los predeterminados: también puedes usar simplemente `'error'`. Estas reglas `meeko/*` sólo se aplican a `.meeko`; los imports de tipos se comprueban tanto en TypeScript como en los scripts de componentes.
+
+`padding-line-between-macros` exige al menos una línea en blanco después de cada macro cuando hay otra declaración o instrucción debajo: macros, variables, funciones o tipos. También contempla macros multilínea o de la misma clase. Su autofix conserva comentarios, indentación y LF/CRLF; funciona junto con el orden de macros. No añade separación al final del script si no hay más código. No admite opciones. Consulta la [regla de separación de macros](docs/rules/padding-line-between-macros.md).
 
 `order-macros` detecta el orden de las macros de componente. Su autofix se limita a bloques consecutivos seguros: las dependencias, las llamadas con posibles efectos secundarios y los comentarios impiden mover declaraciones automáticamente. `defineExpose` se revisa manualmente para conservar las declaraciones que necesita. `order-sections` comprueba la posición de las secciones del SFC. `prefer-static-bindings` simplifica bindings literales sólo cuando puede conservar su semántica, por ejemplo `bind:title="'Guardar'"` a `title="Guardar"`. Los casos dinámicos siguen siendo bindings.
 

@@ -1,5 +1,5 @@
 import { parseFragment } from "parse5";
-import { compileError, maskComponentTags, maskedFormTag, parseErrorMessage } from "./sfc";
+import { compileError, maskComponentTags, maskedFormTag, parseErrorMessage, snippetTableTags } from "./sfc";
 import type { SfcSection } from "./sfc";
 
 /** Atributo normalizado de una etiqueta de plantilla. */
@@ -114,6 +114,10 @@ function normalize(node: ParsedNode, context: NormalizeContext): TemplateNode {
     result.nodeName = "form";
     result.tagName = "form";
   } else if (node.tagName !== undefined) result.tagName = node.tagName;
+  if (node.tagName?.startsWith("j") && location) {
+    const original = /^<([a-z][\w-]*)/.exec(template.content.slice(location.startOffset, location.startOffset + 256))?.[1];
+    if (original && snippetTableTags.has(original)) { result.nodeName = original; result.tagName = original; }
+  }
   if (node.tagName !== undefined && node.namespaceURI !== undefined) result.namespaceURI = node.namespaceURI;
   const componentName = componentTagName(node, context);
   if (componentName !== undefined) {
@@ -125,7 +129,7 @@ function normalize(node: ParsedNode, context: NormalizeContext): TemplateNode {
   if (node.childNodes !== undefined) result.childNodes = normalizeChildren(node.childNodes, context);
   if (node.content !== undefined) result.content = { childNodes: normalizeChildren(node.content.childNodes ?? [], context) };
   if (location !== undefined) result.sourceCodeLocation = location;
-  if ((componentName !== undefined || node.tagName === "render" || node.tagName === "snippet" || node.tagName === "component") && location?.startTag && context.selfClosing.has(location.startOffset)) {
+  if ((componentName !== undefined || node.tagName === "render" || node.tagName === "snippet" || node.tagName === "component" || result.tagName === "col") && location?.startTag && context.selfClosing.has(location.startOffset)) {
     // The parser kept `<Name />` open; the element ends with its start tag.
     result.selfClosing = true;
     result.end = template.contentStart + location.startTag.endOffset;
@@ -206,7 +210,7 @@ function onlySelfClosingOpen(root: ParsedNode, offset: number, selfClosing: Read
 /** Analiza HTML y entrega un AST independiente del parser con posiciones originales. */
 export function parseTemplate(source: string, template: SfcSection, filename: string): TemplateNode {
   const errors: Array<{ code: string; startOffset: number }> = [];
-  const masked = maskComponentTags(template.content);
+  const masked = maskComponentTags(template.content, { tableSnippets: true });
   const parsed = parseFragment(masked.text, {
     sourceCodeLocationInfo: true,
     onParseError(error) { errors.push({ code: error.code, startOffset: error.startOffset }); },

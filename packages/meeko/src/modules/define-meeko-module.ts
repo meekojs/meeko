@@ -208,8 +208,8 @@ export interface MeekoModuleContext {
    * `node_modules` lo está).
    */
   addLayer(dir: string | URL): void;
-  /** Añade los componentes `.meeko` de una carpeta (y subcarpetas) al autoimport, con un prefijo opcional en PascalCase. */
-  addComponentsDir(dir: string | URL, options?: { readonly prefix?: string }): void;
+  /** Añade componentes al autoimport. `exclude` son globs relativos a esta carpeta; los imports explícitos siguen funcionando. */
+  addComponentsDir(dir: string | URL, options?: { readonly prefix?: string; readonly exclude?: readonly string[] }): void;
   /**
    * Añade un layout con nombre, como un archivo de `app/layouts`: las páginas lo eligen con
    * `definePage({ layout: name })` o un `+group.ts`. Un layout del proyecto o de un layer con el

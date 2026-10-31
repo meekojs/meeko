@@ -9,6 +9,7 @@
 	}
 
 	const props = defineProps<Props>()
+
 	const snippets = defineSnippets<{ default: [id: string, describedBy: string | undefined] }>()
 </script>
 

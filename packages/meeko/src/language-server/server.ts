@@ -20,6 +20,7 @@ import {
 } from "./features";
 import type { CompletionData, FeatureContext, LocatedDocument, MeekoFormatSettings } from "./features";
 import { classCompletion, classDefinition, classHover, ClassIndex, classView, isClassCompletionData, resolveClassCompletion, withItemDefaults } from "./classes";
+import { cssVariableCompletion, cssVariableDefinition, cssVariableHover, isCssVariableCompletionData, resolveCssVariableCompletion } from "./css-variables";
 import {
   colorPresentations, cssCompletion, cssHover, documentColors, htmlCompletion, htmlHover, linkedEditingRanges, specialTemplateHover, styleDiagnostics, tagCompletion,
 } from "./embedded";
@@ -385,7 +386,7 @@ export function startLanguageServer(connection: Connection): void {
     return {
       capabilities: {
         textDocumentSync: { openClose: true, change: TextDocumentSyncKind.Incremental, save: { includeText: false } },
-        completionProvider: { triggerCharacters: [".", ":", "<", "/", "\""], resolveProvider: true },
+        completionProvider: { triggerCharacters: [".", ":", "<", "/", "\"", "-"], resolveProvider: true },
         linkedEditingRangeProvider: true,
         documentLinkProvider: { resolveProvider: false },
         workspaceSymbolProvider: true,
@@ -538,6 +539,8 @@ export function startLanguageServer(connection: Connection): void {
       if (teleport) return teleport;
       const directives = directiveNameCompletion(document, position, shadowed);
       if (directives) return directives;
+      const variables = cssVariableCompletion(document, position, () => classView(document, filename, classesOf(project), project.componentSources()));
+      if (variables) return completionDefaults ? withItemDefaults(variables) : variables;
       const classes = classCompletion(document, position, filename, classesOf(project), project.componentSources());
       if (classes) return completionDefaults ? withItemDefaults(classes) : classes;
       const routes = linkRouteCompletion(document, position, await project.appIndex(), project.root, shadowed);
@@ -549,6 +552,10 @@ export function startLanguageServer(connection: Connection): void {
     return htmlCompletion(document, position) ?? cssCompletion(document, position) ?? null;
   });
   connection.onCompletionResolve(async (item) => {
+    if (isCssVariableCompletionData(item.data)) {
+      const open = await componentOf(item.data.meekoCssVariable);
+      return open ? resolveCssVariableCompletion(item, classView(open.document, open.filename, classesOf(open.project), open.project.componentSources())) : item;
+    }
     if (isClassCompletionData(item.data)) {
       const open = await componentOf(item.data.meekoClass);
       if (!open) return item;
@@ -560,6 +567,8 @@ export function startLanguageServer(connection: Connection): void {
   });
   connection.onHover(async ({ textDocument, position }) => {
     const open = await componentOf(textDocument.uri);
+    const variables = open && cssVariableHover(open.document, position, () => classView(open.document, open.filename, classesOf(open.project), open.project.componentSources()));
+    if (variables) return variables;
     const classes = open && classHover(open.document, position, open.filename, classesOf(open.project), open.project.componentSources());
     if (classes) return classes;
     const teleport = open && teleportHover(open.document, position, shadowedTagsOf(open.project, open.document.getText()));
@@ -574,6 +583,8 @@ export function startLanguageServer(connection: Connection): void {
   connection.onDefinition(async ({ textDocument, position }) => {
     // A class in `class="…"` or `bind:class` goes to its selectors in <style> and the stylesheets.
     const open = await componentOf(textDocument.uri);
+    const variables = open && cssVariableDefinition(open.document, position, () => classView(open.document, open.filename, classesOf(open.project), open.project.componentSources()));
+    if (variables) return variables;
     const classes = open && classDefinition(open.document, position, open.filename, classesOf(open.project), open.project.componentSources());
     if (classes) return classes;
     return withContext(textDocument.uri, (context) => definition(context, position), true);

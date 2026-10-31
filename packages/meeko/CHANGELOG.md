@@ -1,5 +1,9 @@
 # Cambios de Meeko
 
+## Sin publicar
+
+- **View Transitions nativas en navegación cliente.** `viewTransitions: true` en `meeko.config.ts` activa la API del navegador alrededor del commit de DOM y head, después de cargar módulos y datos. Admite historial, nombres compartidos mediante CSS y excepciones con `data-meeko-view-transition="false"` o `app.navigate(to, { viewTransition: false })`. La hidratación inicial, movimiento reducido y navegadores sin soporte conservan la navegación habitual. Las transiciones omitidas no bloquean la navegación ni permiten commits de rutas abortadas. Véase [View Transitions nativas](../../docs/framework.md#view-transitions-nativas).
+
 ## [1.7.1] - 2026-10-29
 
 ### Correcciones

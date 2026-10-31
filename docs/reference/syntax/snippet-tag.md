@@ -17,6 +17,8 @@ related:
 
 El contenido suelto de la etiqueta (lo que no está en un `<snippet>`) llena el snippet `default`. El contenido pertenece al padre: lee sus señales y funciones y sigue siendo reactivo.
 
+También puedes suministrar filas y celdas de tabla a un componente propio, por ejemplo `<AppTable><tr><td>Ana</td></tr></AppTable>`. El compilador conserva esas etiquetas en los snippets y permite que el hijo las pinte con `<render>` dentro de `<thead>`, `<tbody>` o `<tfoot>`. El HTML resultante debe respetar la estructura de una tabla: las secciones reciben filas y las filas reciben celdas.
+
 ## Uso
 
 ```html

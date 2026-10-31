@@ -3,10 +3,12 @@ import type { TSESTree } from "@typescript-eslint/utils";
 import { parseSfc } from "@meekojs/meeko/parse";
 import { ESLintUtils } from "@typescript-eslint/utils";
 
+import type { MacroName } from "../macros";
+
+import { macroStatement, macroNames as names } from "../macros";
 import { template } from "../template";
 
-const names = ["defineProps", "defineEmits", "defineModel", "defineSnippets", "useElementRef", "defineExpose"] as const;
-export type MacroName = typeof names[number];
+export type { MacroName } from "../macros";
 
 function literal(node: TSESTree.Node): boolean {
   if (node.type === "Literal") return !("regex" in node);
@@ -42,13 +44,9 @@ export default ESLintUtils.RuleCreator((name) => `https://github.com/meekojs/mee
           if (!section || section.implicit) continue;
           const entries = statements.filter((node) => node.range[0] >= section.contentStart && node.range[1] <= section.contentEnd).sort((a, b) => a.range[0] - b.range[0]);
           const macros = entries.flatMap((node) => {
-            if (node.type !== "ExpressionStatement" && node.type !== "VariableDeclaration") return [];
-            const expression = node.type === "ExpressionStatement" ? node.expression : node.declarations.length === 1 ? node.declarations[0]!.init : undefined;
-            if (expression?.type !== "CallExpression" || expression.callee.type !== "Identifier" || !names.includes(expression.callee.name as MacroName)) return [];
-            const name = expression.callee.name as MacroName;
-            for (let scope = source.getScope(expression); scope; scope = scope.upper!) {
-              if (scope.set.get(name)?.defs.length) return [];
-            }
+            const macro = macroStatement(source, node);
+            if (!macro) return [];
+            const { name, expression } = macro;
             const safe = name !== "defineExpose" && expression.arguments.every(literal) && (node.type !== "VariableDeclaration" || node.declarations[0]!.id.type === "Identifier");
             return [{ node, name, safe }];
           });

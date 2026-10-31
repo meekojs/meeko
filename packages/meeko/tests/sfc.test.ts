@@ -6,6 +6,42 @@ import { compile } from "../src/compiler.ts";
 
 const validSource = `<script lang="ts">\nconst label = "<template>literal</template>";\n</script>\n<template><button>{label}</button></template>\n<style scoped>button { color: red; }</style>`;
 
+test("component snippets preserve table fragments and original attribute positions", () => {
+  const source = '<template><Panel><snippet name="head"><tr><th scope="col">Title</th></tr></snippet><colgroup><col /><col></colgroup><tr each:of="rows" each:as="row" each:key="row.id"><td>{row.name}</td></tr></Panel></template>';
+  const ast = parseTemplate(source, parseSfc(source, "Table.meeko").template, "Table.meeko");
+  const all: typeof ast[] = [];
+  const walk = (node: typeof ast): void => { all.push(node); for (const child of node.childNodes ?? []) walk(child); };
+  walk(ast);
+  assert.equal(all.filter((node) => node.tagName === "tr").length, 2);
+  assert.equal(all.filter((node) => node.tagName === "col").length, 2);
+  const rows = all.find((node) => node.attrs?.some((attribute) => attribute.name === "each:of"))!;
+  const attribute = rows.attrs!.find((attribute) => attribute.name === "each:of")!;
+  assert.equal(attribute.start, source.indexOf('each:of="rows"'));
+  assert.equal(source.slice(rows.start, rows.start + 3), "<tr");
+  assert.equal(all.find((node) => node.tagName === "th")?.attrs?.[0]?.value, "col");
+});
+
+test("ordinary HTML tables keep implicit tbody and native cell parsing", () => {
+  const source = '<template><table><tr><td><Button /></td><td>Second</td></tr></table></template>';
+  const ast = parseTemplate(source, parseSfc(source, "Native.meeko").template, "Native.meeko");
+  const table = ast.childNodes!.find((node) => node.tagName === "table")!;
+  const body = table.childNodes!.find((node) => node.tagName === "tbody")!;
+  assert.ok(body, "native HTML insertion modes remain active when table slots are not needed");
+  assert.equal(body.childNodes![0]!.childNodes?.filter((node) => node.tagName === "td").length, 2);
+});
+
+test("table fragments inside a component in a native cell keep their own structure", () => {
+  const source = '<template><table><tr><td><NestedTable><tr><td>Nested</td></tr></NestedTable></td><td>Sibling</td></tr></table></template>';
+  const ast = parseTemplate(source, parseSfc(source, "Nested.meeko").template, "Nested.meeko");
+  const table = ast.childNodes!.find((node) => node.tagName === "table")!;
+  const row = table.childNodes!.find((node) => node.tagName === "tbody")!.childNodes![0]!;
+  const cells = row.childNodes!.filter((node) => node.tagName === "td");
+  assert.equal(cells.length, 2);
+  const nested = cells[0]!.childNodes!.find((node) => node.componentName === "NestedTable")!;
+  assert.equal(nested.childNodes![0]!.tagName, "tr");
+  assert.equal(nested.childNodes![0]!.childNodes![0]!.tagName, "td");
+});
+
 test("conserva contenido y posiciones de secciones .meeko", () => {
   const document = parseSfc(validSource, "Counter.meeko");
   assert.match(document.script.content, /<template>literal<\/template>/);

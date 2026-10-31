@@ -1,4 +1,7 @@
 @import './tokens.css';
+@import './modal.css';
+@import './table.css';
+@import './card.css';
 
 .meeko-ui-button,
 .meeko-ui-input,

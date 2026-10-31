@@ -58,7 +58,7 @@ function componentSource(origin: "own" | "component", filename: string | undefin
   const style = styleRegion(text);
   if (!style) return undefined;
   const rules = cssClassRules(text.slice(style.contentStart, style.contentEnd), style.contentStart);
-  if (!rules) return previous && sourceOf(origin, filename, previous.text, previous.rules, true);
+  if (!rules) return previous ? sourceOf(origin, filename, previous.text, previous.rules, true) : sourceOf(origin, filename, text, [], true);
   const scoped = /\bscoped\b/.test(style.attributes);
   return sourceOf(origin, filename, text, origin === "component" && scoped ? rules.filter((rule) => rule.global) : rules);
 }
@@ -75,6 +75,8 @@ export interface ClassView {
   readonly own: ClassSource | undefined;
   /** Global sources that define each class, in priority order, without the component itself. */
   readonly global: ReadonlyMap<string, readonly ClassSource[]>;
+  /** All visible CSS sources, including files that only declare custom properties. */
+  readonly sources: readonly ClassSource[];
 }
 
 const maximumImports = 64;
@@ -93,9 +95,13 @@ export class ClassIndex {
 
   constructor(readonly root: string) {}
 
-  /** Forgets the stylesheets among `paths`, as reported by the client's file watcher. */
+  /** Invalidates stamps but retains the last valid CSS while an edited stylesheet does not parse. */
   filesChanged(paths: readonly string[]): void {
-    for (const path of paths) this.files.delete(pathKey(path));
+    for (const path of paths) {
+      const key = pathKey(path);
+      const cached = this.files.get(key);
+      if (cached) this.files.set(key, { ...cached, stamp: "" });
+    }
   }
 
   /** The classes for the component `filename` with the text `text`. */
@@ -108,16 +114,17 @@ export class ClassIndex {
       this.own.set(key, { text, source: own });
     }
     const table = this.table(components);
+    const sources = [...own ? [own] : [], ...this.merged?.sources.filter((source) => source.key !== key) ?? []];
     // The table holds the saved `<style>` of this component too; its live text is `own`.
     const saved = this.merged?.sources.find((source) => source.origin === "component" && source.key === key);
-    if (!saved) return { root: this.root, own, global: table };
+    if (!saved) return { root: this.root, own, global: table, sources };
     const global = new Map(table);
     for (const name of saved.byName.keys()) {
       const others = table.get(name)!.filter((source) => source !== saved);
       if (others.length) global.set(name, others);
       else global.delete(name);
     }
-    return { root: this.root, own, global };
+    return { root: this.root, own, global, sources };
   }
 
   private table(components: readonly ComponentText[]): Map<string, ClassSource[]> {
@@ -131,7 +138,7 @@ export class ClassIndex {
         ? cached
         : { text: component.source, source: componentSource("component", component.filename, component.source, cached?.source) };
       next.set(key, entry);
-      if (entry.source?.rules.length) sources.push(entry.source);
+      if (entry.source && (entry.source.rules.length || entry.source.text.includes("--"))) sources.push(entry.source);
     }
     this.components = next;
     sources.push(...this.stylesheets());
@@ -199,7 +206,8 @@ export class ClassIndex {
 
 /** The classes of the component alone, for callers without a project. */
 function ownView(text: string): ClassView {
-  return { root: undefined, own: componentSource("own", undefined, text, undefined), global: new Map() };
+  const own = componentSource("own", undefined, text, undefined);
+  return { root: undefined, own, global: new Map(), sources: own ? [own] : [] };
 }
 
 /** The class word under the cursor in `class="…"` or in a string literal of `bind:class`. */
@@ -213,7 +221,7 @@ export interface ClassToken {
 }
 
 /** The text of the string literal of `code` that contains `offset`, outside `${…}`. */
-function literalAt(code: string, offset: number): { start: number; end: number } | undefined {
+export function literalAt(code: string, offset: number): { start: number; end: number } | undefined {
   type Frame = { kind: "code"; depth: number } | { kind: "string"; quote: string; start: number } | { kind: "template"; start: number };
   const stack: Frame[] = [{ kind: "code", depth: 0 }];
   for (let index = 0; index < offset; index++) {

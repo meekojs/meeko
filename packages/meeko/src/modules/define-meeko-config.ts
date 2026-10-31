@@ -228,6 +228,8 @@ export interface RobotsConfig {
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#layers
  */
 export interface MeekoConfig {
+  /** Activa View Transitions nativas en la navegación cliente; desactivadas por defecto. Respeta movimiento reducido. */
+  readonly viewTransitions?: boolean;
   /** Component directories, relative to each source root. The default `app/components` is always included. */
   readonly components?: {
     readonly dirs?: readonly {

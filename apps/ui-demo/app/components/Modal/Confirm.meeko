@@ -1,0 +1,41 @@
+<script lang="ts">
+	const props = defineProps<{ message: string; level?: number; size?: 'sm' | 'md' | 'lg' }>({ level: 0, size: 'lg' })
+
+	const modal = useModalInstance<boolean>()
+	const manager = useModal()
+	const nested = signal('')
+	async function openNested() {
+		const level = props.level + 1
+		const result = await manager.open<boolean>('ModalConfirm', { message: 'Esta confirmación está encima de la anterior.', level, size: level === 1 ? 'md' : 'sm' })
+		nested.value = result ? 'Confirmación adicional aceptada.' : 'Confirmación adicional cancelada.'
+	}
+</script>
+
+<template>
+	<UIModal
+		bind:title="props.level === 0 ? 'Confirmar acción' : 'Confirmación nivel ' + (props.level + 1)"
+		bind:description="props.message"
+		bind:size="props.size"
+	>
+		<p>Modal {props.size.toUpperCase()} · Nivel {props.level + 1}</p>
+		<p>El resultado vuelve al código que abrió este modal.</p>
+		<p if:when="props.level === 0">Al abrir el siguiente, este diálogo conserva su contenido y queda detrás, reducido y bloqueado. Al volver, recupera su tamaño y el foco.</p>
+		<UIButton
+			if:when="props.level < 2"
+			variant="secondary"
+			on:click="openNested"
+		>
+			Abrir otro modal
+		</UIButton>
+		<p role="status">{nested.value}</p>
+		<snippet name="footer">
+			<UIButton
+				variant="secondary"
+				on:click="() => modal.dismiss()"
+			>
+				Cancelar
+			</UIButton>
+			<UIButton on:click="() => modal.close(true)">Confirmar</UIButton>
+		</snippet>
+	</UIModal>
+</template>

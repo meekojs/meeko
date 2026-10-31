@@ -1,0 +1,78 @@
+.meeko-ui-table-scroll {
+	max-width: 100%;
+	overflow-x: auto;
+	overscroll-behavior-inline: contain;
+}
+.meeko-ui-table-scroll:focus-visible {
+	outline: 2px solid var(--meeko-ui-focus);
+	outline-offset: 2px;
+}
+.meeko-ui-table {
+	--table-columns: minmax(160px, 2fr) minmax(200px, 3fr) 120px;
+	--table-border: var(--color-border, var(--meeko-ui-border));
+	--table-background: var(--color-surface, var(--meeko-ui-surface));
+	--table-hover: color-mix(in oklch, var(--color-text, var(--meeko-ui-text)) 4%, transparent);
+	border-collapse: separate;
+	border-spacing: 0;
+	background: var(--table-background);
+
+	width: 100%;
+	color: var(--color-text, var(--meeko-ui-text));
+	font-size: 0.875rem;
+	font-family: var(--meeko-ui-font);
+	font-variant-numeric: tabular-nums;
+	text-align: left;
+
+	& > caption {
+		padding: 0.75rem 1rem;
+		color: var(--color-text-muted, var(--meeko-ui-muted));
+		text-align: inherit;
+	}
+	& > :is(thead, tbody, tfoot) > tr > :is(th, td) {
+		vertical-align: middle;
+		border-bottom: 1px solid var(--table-border);
+		padding: 12px 16px;
+		text-align: inherit;
+	}
+	& > :is(thead, tbody, tfoot) > tr > th {
+		color: var(--color-text-muted, var(--meeko-ui-muted));
+		font-weight: 500;
+	}
+	& > tbody > tr:hover {
+		background: var(--table-hover);
+	}
+	& > tbody > tr:last-child > td {
+		border-bottom: 0;
+	}
+	& > tfoot > tr:first-child > :is(th, td) {
+		border-top: 1px solid var(--table-border);
+	}
+	& > tfoot > tr:last-child > :is(th, td) {
+		border-bottom: 0;
+	}
+}
+
+@supports (grid-template-columns: subgrid) {
+	.meeko-ui-table[data-layout='grid'] {
+		display: grid;
+		grid-template-columns: var(--table-columns);
+
+		& > caption {
+			grid-column: 1 / -1;
+		}
+		& > tbody > tr > .meeko-ui-table-empty {
+			grid-column: 1 / -1;
+		}
+		& > :is(thead, tbody, tfoot),
+		& > :is(thead, tbody, tfoot) > tr {
+			display: grid;
+			grid-template-columns: subgrid;
+			grid-column: 1 / -1;
+		}
+		& > :is(thead, tbody, tfoot) > tr > :is(th, td) {
+			display: flex;
+			align-items: center;
+			min-width: 0;
+		}
+	}
+}

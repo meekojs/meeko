@@ -58,12 +58,23 @@ import ui from '@meekojs/ui';
 import i18n from '@meekojs/i18n/module';
 import { defineEslint } from '@meekojs/eslint-plugin';
 import type { MeekoPrettierOptions } from '@meekojs/prettier-plugin';
+import { useModal } from '@meekojs/ui/runtime';
 const formatting: MeekoPrettierOptions = { meekoIndentSections: true };
-export const smoke = { state: signal(1), ui, i18n, formatting, lint: defineEslint({ perfectionist: true, unusedImports: true }), module: defineMeekoModule({ meta: { name: 'smoke' }, setup() {} }) };
+export const smoke = { state: signal(1), ui, i18n, useModal, formatting, lint: defineEslint({ perfectionist: true, unusedImports: true }), module: defineMeekoModule({ meta: { name: 'smoke' }, setup() {} }) };
 '@ | Set-Content -LiteralPath (Join-Path $consumer 'main.ts') -Encoding utf8
   New-Item -ItemType Directory -Path (Join-Path $consumer 'app/pages') -Force | Out-Null
-  'export default { modules: ["@meekojs/ui"] };' | Set-Content -LiteralPath (Join-Path $consumer 'meeko.config.mjs') -Encoding utf8
-  '<template><UiButton>Styled package</UiButton></template>' | Set-Content -LiteralPath (Join-Path $consumer 'app/pages/index.meeko') -Encoding utf8
+  'export default { modules: ["@meekojs/ui"], viewTransitions: true };' | Set-Content -LiteralPath (Join-Path $consumer 'meeko.config.mjs') -Encoding utf8
+  @'
+<script lang="ts">
+  import type { TableColumn } from '@meekojs/ui/runtime';
+  const rows = [{ id: 1, name: 'Packaged component' }];
+  const columns = [{ key: 'name', label: 'Name', footer: (rows) => rows.length }] satisfies TableColumn<typeof rows[number]>[];
+</script>
+<template>
+  <UICard title="Installed card" variant="soft"><UIButton>Styled package</UIButton></UICard>
+  <UITable caption="Installed table" layout="grid" bind:columns="columns" bind:rows="rows" rowKey="id" />
+</template>
+'@ | Set-Content -LiteralPath (Join-Path $consumer 'app/pages/index.meeko') -Encoding utf8
   @'
 export default { plugins: [{ postcssPlugin: 'consumer-ui-colors', Declaration(node) {
   if (node.prop === '--meeko-ui-accent') node.value = '#123456';
@@ -77,6 +88,8 @@ const files = (await readdir(directory)).filter((file) => file.endsWith('.css'))
 assert.ok(files.length, 'UI emits production CSS');
 const css = (await Promise.all(files.map((file) => readFile(`${directory}/${file}`, 'utf8')))).join('\n');
 assert.match(css, /\.meeko-ui-button/);
+assert.match(css, /\.meeko-ui-table/);
+assert.match(css, /\.meeko-ui-card/);
 assert.match(css, /--meeko-ui-accent:\s*#123456/);
 assert.doesNotMatch(css, /@import/);
 console.log('Installed UI CSS uses consumer PostCSS and ships as a production asset.');
@@ -91,6 +104,8 @@ console.log('Installed UI CSS uses consumer PostCSS and ships as a production as
     # use skipLibCheck, as in Meeko's generated app configuration. User code stays strict.
     & pnpm exec tsc --ignoreConfig --noEmit --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext main.ts
     if ($LASTEXITCODE -ne 0) { throw 'NodeNext consumer type check failed' }
+    & pnpm exec meeko check .
+    if ($LASTEXITCODE -ne 0) { throw 'Installed UI check failed' }
     & pnpm exec meeko build .
     if ($LASTEXITCODE -ne 0) { throw 'Installed UI build failed' }
     & node styles-smoke.mjs

@@ -7,6 +7,7 @@ import buttonHasType from "./rules/button-has-type";
 import noAutofocus from "./rules/no-autofocus";
 import orderMacros from "./rules/order-macros";
 import orderSections from "./rules/order-sections";
+import paddingLineBetweenMacros from "./rules/padding-line-between-macros";
 import preferStaticBindings from "./rules/prefer-static-bindings";
 import scriptTypeImports from "./script-type-imports";
 
@@ -23,6 +24,7 @@ const plugin: ESLint.Plugin & { configs: Record<string, Linter.Config[]> } = {
     "no-autofocus": noAutofocus,
     "order-macros": orderMacros,
     "order-sections": orderSections,
+    "padding-line-between-macros": paddingLineBetweenMacros,
     "prefer-static-bindings": preferStaticBindings,
   } as unknown as ESLint.Plugin["rules"],
   configs: {},

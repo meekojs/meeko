@@ -1,0 +1,52 @@
+<script lang="ts">
+	interface Props {
+		title?: string
+		description?: string
+		variant?: 'outline' | 'soft' | 'solid' | 'elevated'
+		class?: string
+	}
+
+	const props = defineProps<Props>({ variant: 'outline' })
+
+	const snippets = defineSnippets<{ header?: []; default: []; footer?: [] }>()
+
+	const id = useId()
+</script>
+
+<template>
+	<section
+		bind:class="['meeko-ui-card', props.class].filter(Boolean).join(' ')"
+		bind:data-variant="props.variant"
+		bind:aria-labelledby="props.title && !snippets.header ? id + '-title' : undefined"
+	>
+		<header
+			if:when="snippets.header || props.title || props.description"
+			class="meeko-ui-card-header"
+		>
+			<render
+				if:when="snippets.header"
+				snippet="snippets.header"
+			/>
+			<h2
+				if:when="!snippets.header && props.title"
+				class="meeko-ui-card-title"
+				bind:id="id + '-title'"
+			>
+				{props.title}
+			</h2>
+			<p
+				if:when="!snippets.header && props.description"
+				class="meeko-ui-card-description"
+			>
+				{props.description}
+			</p>
+		</header>
+		<div class="meeko-ui-card-body"><render snippet="snippets.default" /></div>
+		<footer
+			if:when="snippets.footer"
+			class="meeko-ui-card-footer"
+		>
+			<render snippet="snippets.footer" />
+		</footer>
+	</section>
+</template>

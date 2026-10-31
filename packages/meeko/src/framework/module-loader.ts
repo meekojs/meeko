@@ -1,4 +1,5 @@
 import { readFileSync, realpathSync, statSync } from "node:fs";
+import { normalizeComponentExcludes } from "./component-exclusions";
 import { createRequire } from "node:module";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -215,7 +216,7 @@ export interface ResolvedModules {
   /** Module files resolved from string entries; they never reach a browser bundle. */
   readonly entryFiles: readonly string[];
   readonly layers: readonly string[];
-  readonly componentsDirs: readonly { readonly dir: string; readonly prefix: string }[];
+  readonly componentsDirs: readonly { readonly dir: string; readonly prefix: string; readonly exclude?: readonly string[] }[];
   /** Named layouts of `addLayout`, in the order the modules add them. */
   readonly layouts: readonly { readonly name: string; readonly file: string; readonly module: string }[];
   readonly autoImports: readonly ResolvedModuleAutoImport[];
@@ -248,11 +249,11 @@ const emptyModules: ResolvedModules = Object.freeze({
  */
 const ownConfigKeys = Object.keys({
   layers: true, extends: true, modules: true, imports: true, components: true, server: true, css: true, document: true,
-  dev: true, site: true, sitemap: true, robots: true, theme: true, alias: true,
+  dev: true, site: true, sitemap: true, robots: true, theme: true, alias: true, viewTransitions: true,
 } satisfies Record<keyof MeekoConfig, true>);
 
 /** Version of Meeko that added each key of `ownConfigKeys` after 1.2, for the message. */
-const ownConfigKeySince: Readonly<Record<string, string>> = { dev: "1.3", site: "1.3", sitemap: "1.3", robots: "1.3", theme: "1.4", alias: "1.5" };
+const ownConfigKeySince: Readonly<Record<string, string>> = { dev: "1.3", site: "1.3", sitemap: "1.3", robots: "1.3", theme: "1.4", alias: "1.5", viewTransitions: "1.7" };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
@@ -352,7 +353,7 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
   const names: string[] = [];
   const entryFiles: string[] = [];
   const layers: string[] = [];
-  const componentsDirs: Array<{ dir: string; prefix: string }> = [];
+  const componentsDirs: Array<{ dir: string; prefix: string; exclude?: readonly string[] }> = [];
   const layouts: Array<{ name: string; file: string; module: string }> = [];
   const autoImports: ResolvedModuleAutoImport[] = [];
   const autoImportsDirs: Array<{ dir: string; scope: "app" | "server" | "shared" }> = [];
@@ -416,10 +417,11 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
         },
       }),
       addLayer(dir: string | URL) { layers.push(existingDirectory(dir, "layer")); },
-      addComponentsDir(dir: string | URL, componentOptions?: { readonly prefix?: string }) {
+      addComponentsDir(dir: string | URL, componentOptions?: { readonly prefix?: string; readonly exclude?: readonly string[] }) {
         const prefix = componentOptions?.prefix === undefined ? "" : pascalCase(componentOptions.prefix);
         if (componentOptions?.prefix !== undefined && !/^[A-Z][A-Za-z0-9]*$/.test(prefix)) throw new TypeError(`Módulo de Meeko ${name}: prefijo de componentes no válido ${componentOptions.prefix}`);
-        componentsDirs.push({ dir: existingDirectory(dir, "components directory"), prefix });
+        const exclude = normalizeComponentExcludes(componentOptions?.exclude);
+        componentsDirs.push({ dir: existingDirectory(dir, "components directory"), prefix, ...(exclude.length ? { exclude } : {}) });
       },
       addLayout(layoutName: string, file: string | URL) {
         if (typeof layoutName !== "string" || !/^[A-Za-z0-9][\w-]*(?:\/[A-Za-z0-9][\w-]*)*$/.test(layoutName)) {

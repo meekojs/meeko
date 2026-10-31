@@ -1,11 +1,19 @@
 <script lang="ts">
-	interface Props {}
+	import { useModalHost } from '../composables/useModal'
+	import * as ModalInstance from './internal/ModalInstance.meeko'
 
-	const props = defineProps<Props>()
+	const snippets = defineSnippets<{ default: [] }>()
+
+	const modals = useModalHost()
 </script>
 
 <template>
-	<div>
-		<!--  -->
-	</div>
+	<render snippet="snippets.default" />
+
+	<ModalInstance
+		each:of="[...modals.instances.value.values()]"
+		each:as="instance"
+		each:key="instance.id"
+		bind:instance="instance"
+	/>
 </template>

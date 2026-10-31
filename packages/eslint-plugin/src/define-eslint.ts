@@ -22,6 +22,7 @@ export type DefineEslintRules = Partial<CoreRules & TypeScriptRules & Perfection
   "meeko/no-autofocus": Linter.RuleEntry<[]>;
   "meeko/order-macros": Linter.RuleEntry<[{ order?: MacroName[] }]>;
   "meeko/order-sections": Linter.RuleEntry<[{ order?: SectionName[] }]>;
+  "meeko/padding-line-between-macros": Linter.RuleEntry<[]>;
   "meeko/prefer-static-bindings": Linter.RuleEntry<[]>;
 }>;
 

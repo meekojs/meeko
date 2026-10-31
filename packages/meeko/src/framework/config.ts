@@ -166,6 +166,7 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
     }
   }
   const document = config.document as Record<string, unknown> | undefined;
+  if (config.viewTransitions !== undefined && typeof config.viewTransitions !== "boolean") throw new TypeError(`${file}: viewTransitions debe ser un booleano`);
   if (document !== undefined) {
     if (!document || typeof document !== "object" || Array.isArray(document)) throw new TypeError(`${file}: document debe ser un objeto`);
     if (document.lang !== undefined && typeof document.lang !== "string") throw new TypeError(`${file}: document.lang debe ser una cadena`);

@@ -2,7 +2,7 @@
 export const clientEntrySource = `import { mountClientApp, type ClientComponent, type ClientRoute, type RouteMiddleware } from "@meekojs/meeko/framework";
 import { modules as pages } from "virtual:meeko-client-pages";
 import { modules as clientRoutes } from "virtual:meeko-client-routes";
-import { documentConfig, errorPage, routes } from "virtual:meeko-manifest/client";
+import { documentConfig, errorPage, routes, viewTransitions } from "virtual:meeko-manifest/client";
 import { plugins } from "virtual:meeko-plugins/client";
 import { middleware as middlewareModules, namedMiddleware } from "virtual:meeko-middleware/client";
 
@@ -33,7 +33,7 @@ if (!root || !payload) throw new Error("Missing Meeko SSR data");
 
 const hydrationStart = performance.now();
 await mountClientApp({
-  root, payload, routes, errorPage, serverData: true, loadMiddleware, loadNamedMiddleware, plugins,
+  root, payload, routes, errorPage, viewTransitions, serverData: true, loadMiddleware, loadNamedMiddleware, plugins,
   // The head that the server renders from meeko.config.ts and the modules; useHead and navigation update it.
   ...(documentConfig ? { document: documentConfig } : {}),
   async loadPage(file) {

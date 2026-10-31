@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { realpath } from "node:fs/promises";
 import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
+import { componentExcluded } from "../framework/component-exclusions";
 import { componentDirectories, importDirectoryOptions, loadMeekoConfig, normalizeImportDirectory, readMeekoConfigSync, resolveConfigSources } from "../framework/config";
 import type { MeekoConfig } from "../framework/config";
 import { legacyLayerEntries, resolveMeekoModules } from "../framework/module-loader";
@@ -246,6 +247,7 @@ interface ComponentDirectory {
   readonly source: string;
   readonly sourceRoot?: string;
   readonly priority: number;
+  readonly exclude?: readonly string[];
 }
 
 function componentName(file: string, directory: ComponentDirectory): string {
@@ -255,12 +257,12 @@ function componentName(file: string, directory: ComponentDirectory): string {
   return name;
 }
 
-function componentDirectoriesForSources(sources: readonly { root: string; name: string }[], config: MeekoConfig, modules: readonly { dir: string; prefix: string }[] = []): ComponentDirectory[] {
+function componentDirectoriesForSources(sources: readonly { root: string; name: string }[], config: MeekoConfig, modules: readonly { dir: string; prefix: string; exclude?: readonly string[] }[] = []): ComponentDirectory[] {
   const directories: ComponentDirectory[] = [];
   for (const [priority, source] of sources.entries()) {
     for (const entry of componentDirectories(config.components)) directories.push({ dir: resolve(source.root, entry.path), prefix: entry.prefix, source: source.name, sourceRoot: source.root, priority });
   }
-  for (const [index, entry] of modules.entries()) directories.push({ dir: resolve(entry.dir), prefix: entry.prefix, source: `module:${index}`, priority: sources.length + index });
+  for (const [index, entry] of modules.entries()) directories.push({ dir: resolve(entry.dir), prefix: entry.prefix, ...(entry.exclude ? { exclude: entry.exclude } : {}), source: `module:${index}`, priority: sources.length + index });
   return directories;
 }
 
@@ -297,7 +299,7 @@ async function collectComponents(directories: readonly ComponentDirectory[]): Pr
       const path = relative(await realpath(directory.sourceRoot), await realpath(directory.dir));
       if (path === ".." || path.startsWith(`..${sep}`) || isAbsolute(path)) throw new Error(`Directorio de componentes fuera de su fuente: ${directory.dir}`);
     }
-    for (const file of await filesIn(directory.dir)) if (file.endsWith(".meeko")) files.push({ directory, file, identity: physicalIdentity(await realpath(file)) });
+    for (const file of await filesIn(directory.dir)) if (file.endsWith(".meeko") && !componentExcluded(file, directory)) files.push({ directory, file, identity: physicalIdentity(await realpath(file)) });
   }
   return catalog(files);
 }
@@ -309,7 +311,7 @@ function collectComponentsSync(directories: readonly ComponentDirectory[]): read
       const path = relative(realpathSync(directory.sourceRoot), realpathSync(directory.dir));
       if (path === ".." || path.startsWith(`..${sep}`) || isAbsolute(path)) throw new Error(`Directorio de componentes fuera de su fuente: ${directory.dir}`);
     }
-    for (const file of filesInSync(directory.dir)) if (file.endsWith(".meeko")) files.push({ directory, file, identity: physicalIdentity(realpathSync(file)) });
+    for (const file of filesInSync(directory.dir)) if (file.endsWith(".meeko") && !componentExcluded(file, directory)) files.push({ directory, file, identity: physicalIdentity(realpathSync(file)) });
   }
   return catalog(files);
 }

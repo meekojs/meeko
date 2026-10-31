@@ -5,6 +5,20 @@ export type Message = readonly (string | { readonly arg: string })[]
 
 export type Catalog = Readonly<Record<string, Message>>;
 
+/** Parámetros requeridos por un mensaje, independientes del orden o de las categorías del idioma. */
+export function messageParameters(message: Message): Readonly<Record<string, "value" | "number">> {
+  const parameters: Record<string, "value" | "number"> = Object.create(null);
+  const structured = !Array.isArray(message) ? message as Exclude<Message, readonly unknown[]> : undefined;
+  const forms = structured ? Object.values(structured.forms) : [message as Extract<Message, readonly unknown[]>];
+  for (const form of forms) for (const part of form) {
+    if (typeof part === "string" || (structured && "plural" in structured && part.arg === "count")) continue;
+    parameters[part.arg] = "value";
+  }
+  if (structured && "plural" in structured) parameters[structured.plural] = "number";
+  else if (structured) parameters[structured.select] = "value";
+  return Object.fromEntries(Object.entries(parameters).sort(([a], [b]) => a.localeCompare(b)));
+}
+
 const placeholder = /\{([A-Za-z_][A-Za-z_0-9]*)\}/g;
 
 function parts(value: string): readonly (string | { readonly arg: string })[] {

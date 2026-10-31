@@ -4,16 +4,23 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 
+import { rebaseComponentDeclaration } from '../../../scripts/rebase-component-declaration.mjs'
+
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const target = join(root, 'dist', 'app', 'components')
 if (dirname(target) !== join(root, 'dist', 'app')) throw new Error('Refusing to clean components outside UI dist/app')
 await rm(target, { recursive: true, force: true })
 await mkdir(dirname(target), { recursive: true })
 await cp(join(root, 'src', 'app', 'components'), target, { recursive: true })
-for (const filename of (await readdir(target)).filter((name) => name.endsWith('.meeko'))) {
-	const file = join(target, filename)
+async function componentFiles(directory) {
+	const entries = await readdir(directory, { withFileTypes: true })
+	return (await Promise.all(entries.map((entry) => (entry.isDirectory() ? componentFiles(join(directory, entry.name)) : entry.name.endsWith('.meeko') ? [join(directory, entry.name)] : [])))).flat()
+}
+for (const file of await componentFiles(target)) {
 	const cli = fileURLToPath(new URL('./cli.js', import.meta.resolve('@meekojs/meeko')))
 	const { stdout } = await promisify(execFile)(process.execPath, [cli, 'types', file], { cwd: root, windowsHide: true })
-	const declaration = await readFile(stdout.trim(), 'utf8')
-	await writeFile(file.replace(/\.meeko$/, '.d.meeko.ts'), declaration)
+	const generatedFile = stdout.trim().split(/\r?\n/)[0]
+	const destinationFile = file.replace(/\.meeko$/, '.d.meeko.ts')
+	const declaration = await readFile(generatedFile, 'utf8')
+	await writeFile(destinationFile, rebaseComponentDeclaration(declaration, generatedFile, destinationFile))
 }

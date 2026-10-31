@@ -1,0 +1,27 @@
+<template>
+	<main class="view-transition-demo">
+		<MeekoLink to="/">Volver a los controles</MeekoLink>
+		<h1>De una vista al detalle.</h1>
+		<p>Al abrir el proyecto, su card se transforma en la vista de detalle mediante la API nativa del navegador.</p>
+		<div class="view-transition-demo-list">
+			<UICard
+				title="Proyecto Aurora"
+				description="Sitio web del equipo"
+				class="view-transition-demo-project"
+			>
+				<p>Una misma superficie, dos vistas. La navegación conserva la identidad visual del proyecto.</p>
+				<snippet name="footer"><MeekoLink to="/transitions/project">Ver proyecto</MeekoLink></snippet>
+			</UICard>
+		</div>
+		<p>
+			También puedes
+			<MeekoLink
+				to="/transitions/project"
+				data-meeko-view-transition="false"
+			>
+				abrir sin transición
+			</MeekoLink>
+			.
+		</p>
+	</main>
+</template>

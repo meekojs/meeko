@@ -18,6 +18,35 @@ interface RuntimeModule {
 
 const runtime = (path: string): string => JSON.stringify(pathToFileURL(resolve(path)).href);
 
+test("table sections preserve snippet rows through SSR, hydration and reactive updates", async () => {
+  const table = `<script lang="ts">const snippets = defineSnippets<{ head: []; default: []; footer: [] }>();</script>
+<template><table><thead><render snippet="snippets.head" /></thead><tbody><render snippet="snippets.default" /></tbody><tfoot><render snippet="snippets.footer" /></tfoot></table></template>`;
+  const page = `<script lang="ts">import * as Table from "./Table.meeko"; import { signal } from "@meekojs/meeko"; const rows = signal([{ id: 1, value: 1 }, { id: 2, value: 2 }]);</script>
+<template><button type="button" id="update" on:click="() => rows.value = rows.value.map(row => ({ ...row, value: row.value + 10 }))">Update</button><Table>
+<snippet name="head"><tr><th scope="col">Value</th></tr></snippet>
+<tr each:of="rows.value" each:as="row" each:key="row.id"><td>{row.value}</td></tr>
+<snippet name="footer"><tr><td>Total {rows.value.reduce((sum, row) => sum + row.value, 0)}</td></tr></snippet>
+</Table></template>`;
+  const { component, cleanup } = await load({ Table: table, Page: page }, "Page");
+  const window = new Window();
+  try {
+    const root = window.document.createElement("main");
+    const rendered = component.renderWithState({});
+    root.innerHTML = rendered.html;
+    const row = root.querySelector("tbody tr");
+    assert.equal(root.querySelectorAll("tbody tr").length, 2);
+    assert.equal(root.querySelector("thead th")?.textContent, "Value");
+    assert.equal(root.querySelector("tfoot td")?.textContent, "Total 3");
+    const release = component.hydrate(root as unknown as Element, {}, rendered.state);
+    assert.equal(root.querySelector("tbody tr"), row, "hydration retains the server's first row");
+    // Adding table rows is exercised in Chrome: happy-dom lacks table-context Range fragments.
+    (root.querySelector("#update") as unknown as HTMLButtonElement).click();
+    assert.deepEqual([...root.querySelectorAll("tbody td")].map((cell) => cell.textContent), ["11", "12"]);
+    assert.equal(root.querySelector("tfoot td")?.textContent, "Total 23");
+    release();
+  } finally { await window.happyDOM.close(); await cleanup(); }
+});
+
 /** Compiles components inside the repository; the runtime is imported by file URL, as one instance. */
 async function load(components: Record<string, string>, entry: string, transform: (name: string, code: string) => string = (_name, code) => code): Promise<{ component: RuntimeModule; cleanup: () => Promise<void> }> {
   const parent = resolve(".meeko");

@@ -90,14 +90,14 @@ function entryModule(entry: ts.CompletionEntry): { file?: string; specifier?: st
  * TypeScript names the module that declares the export (`dist/modules/define-meeko-module.d.ts`), also for
  * `MeekoModule` from `@meekojs/meeko/framework`: the module specifier and the public exports decide.
  */
-export function meekoAutoImport(project: MeekoProject, entry: ts.CompletionEntry): { readonly hidden: true } | { readonly specifier: string } | undefined {
+export function meekoAutoImport(project: MeekoProject, entry: ts.CompletionEntry, publicExports: ReadonlyMap<string, string>): { readonly hidden: true } | { readonly specifier: string } | undefined {
   if (!entry.hasAction) return undefined;
   const specifier = entry.data?.moduleSpecifier;
   const name = entry.data?.exportName ?? entry.name;
   if (specifier && /^@meekojs\/meeko(?:\/|$)/.test(specifier)) {
     const subpath = `.${specifier.slice("@meekojs/meeko".length)}`;
     if (!privateEntries.has(subpath) && !/^\.\/(?:dist|src)(?:\/|$)/.test(subpath)) return undefined;
-    const publicEntry = project.publicMeekoExports().get(name);
+    const publicEntry = publicExports.get(name);
     return publicEntry ? { specifier: publicEntry } : { hidden: true };
   }
   const meeko = project.meekoPackage();
@@ -105,7 +105,7 @@ export function meekoAutoImport(project: MeekoProject, entry: ts.CompletionEntry
   if (!meeko || !file) return undefined;
   const key = pathKey(file);
   if (!meeko.roots.some((root) => key.startsWith(`${root}/`))) return undefined;
-  const publicEntry = project.publicMeekoExports().get(name);
+  const publicEntry = publicExports.get(name);
   return publicEntry ? { specifier: publicEntry } : { hidden: true };
 }
 
@@ -363,8 +363,7 @@ export class MeekoProject {
    * Nombres que exportan las entradas públicas de `@meekojs/meeko` presentes en el programa actual,
    * con el especificador de la entrada (`@meekojs/meeko/framework`); gana la primera de `exports`.
    */
-  publicMeekoExports(): ReadonlyMap<string, string> {
-    const program = this.service.getProgram();
+  publicMeekoExports(program: ts.Program | undefined): ReadonlyMap<string, string> {
     const meeko = this.meekoPackage();
     if (!program || !meeko) return new Map();
     if (this.publicExports?.program === program) return this.publicExports.names;

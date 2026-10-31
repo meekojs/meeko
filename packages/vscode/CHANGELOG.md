@@ -1,5 +1,10 @@
 # Cambios de Meeko Language
 
+## Sin publicar
+
+- El parser conserva filas y celdas suministradas mediante snippets y los `<render>` dentro de secciones de tabla, manteniendo sus posiciones para el análisis del editor.
+- Autocompletado, hover e ir a definición de variables CSS en `<style>`, estilos inline y cadenas de `bind:style`. Lee declaraciones de componentes, imports locales y la hoja procesada de desarrollo, incluidos registros `@property`, sin ejecutar código del proyecto en modo restringido.
+
 ## [1.7.6] - 2026-10-30
 
 - Los archivos `.meeko` de workspaces virtuales reciben análisis del archivo abierto: completado, hover, símbolos y diagnósticos que se actualizan al editar. La extensión declara soporte limitado porque la navegación y las referencias entre archivos siguen requiriendo un proyecto en disco.

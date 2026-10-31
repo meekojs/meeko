@@ -11,6 +11,7 @@ const rules = {
   'meeko/button-has-type': ['error'],
   'meeko/no-autofocus': 0,
   'meeko/order-macros': ['error', {order:['defineProps','defineEmits','defineModel','defineSnippets','useElementRef','defineExpose']}],
+  'meeko/padding-line-between-macros': 'error',
   'meeko/order-sections': ['warn', {order:['server','script','template','style']}],
   'meeko/prefer-static-bindings': 'warn',
 } satisfies DefineEslintRules;
@@ -43,6 +44,8 @@ defineEslint({rules:{'meeko/order-sections':['error',{order:['client']}]}});
 defineEslint({rules:{'meeko/order-macros':['error',{sort:true}]}});
 // @ts-expect-error Static binding rule has no options.
 defineEslint({rules:{'meeko/prefer-static-bindings':['error',{unsafe:true}]}});
+// @ts-expect-error Macro padding has no options.
+defineEslint({rules:{'meeko/padding-line-between-macros':['error',{blankLine:'never'}]}});
 // @ts-expect-error Core rule options use official ESLint types.
 defineEslint({rules:{eqeqeq:['error','sometimes']}});
 // @ts-expect-error TypeScript-ESLint rule names are finite.
