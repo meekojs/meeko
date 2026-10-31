@@ -10,6 +10,7 @@ apps/site/public/
 .claude/
 .codex/
 .worktrees/
+.hc-reports/
 .impeccable/
 .serena/
 .pnpm-store/

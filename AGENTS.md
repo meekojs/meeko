@@ -37,6 +37,27 @@ Predomina `node:test`, con `tsx` para TypeScript; las reglas ESLint también usa
 
 Añade regresiones de comportamiento. Para cambios del compilador, cubre SSR, hidratación, actualizaciones y liberación de recursos cuando corresponda. Ejecuta pruebas del paquete afectado y `pnpm e2e` para cambios de navegador. No hay un umbral numérico de cobertura configurado.
 
+## Trabajo con varios agentes
+
+Claude Code y Codex leen este archivo. Una sola sesión coordina: reparte tareas, integra, revisa el diff final y resuelve conflictos. Los agentes trabajadores no hacen commit ni push y no lanzan otros agentes salvo que la tarea lo indique.
+
+- Lanza trabajadores con `hc` (herdr) en segundo plano: `hc run --bg --name <tarea> --cwd <worktree> <plantilla> "<tarea>"`. Espera con `hc wait --children all`, nunca con `sleep`; lee resultados con `hc read <tarea>` y, al aceptarlos, cierra con `hc kill` y `hc rm`.
+- Elige la plantilla por complejidad: `*-quick` para cambios acotados y mecánicos; `*-impl` para features y bugs normales; `claude-impl` para compilador, runtime, hidratación o cambios entre paquetes; `*-review` para revisión independiente de sólo lectura. Revisa con el agente contrario al que implementó. Codex se lanza siempre con `--no-daemon` y su sandbox no puede usar `hc send`: recoge su informe con `hc read` cuando `hc wait` indique `done`.
+- Usa un worktree por tarea, siempre bajo `.claude/worktrees/<tarea>`. Claude los crea solo (`claude -w <tarea>` o subagentes con `isolation: worktree`); para Codex u otros, `git worktree add .claude/worktrees/<tarea> -b <rama>` y `pnpm install` dentro. Nunca asignes los mismos archivos a dos agentes y elimina el worktree con `git worktree remove` al integrar.
+- En un worktree no uses Serena: está ligada al checkout principal y editaría `main`. Las plantillas de `hc` ya la desactivan.
+- Los especialistas viven en `.codex/agents/*.toml`, que es la fuente única. `pnpm agents:sync` genera `.claude/agents/*.md` y `pnpm agents:check` (incluido en `pnpm verify`) detecta desajustes; no edites los archivos generados.
+
+### Git y recursos seguros
+
+Los hooks de `.claude/settings.json` (`.claude/hooks/`) aplican parte de estas reglas en Claude Code; Codex debe cumplirlas por su cuenta.
+
+- No uses `--ignored`, `-x` ni `-X` con `git status`, `ls-files` o `clean` en la raíz ni sobre carpetas con `node_modules`: recorren los enlaces de pnpm durante minutos. Usa `git check-ignore -v <ruta>` o limita la orden a un subdirectorio.
+- En lecturas automáticas usa `git --no-optional-locks ...`. No interrumpas un git que escribe (`add`, `commit`, `checkout`, `stash`, `worktree` o `status` sin `--no-optional-locks`).
+- Si aparece `.git/index.lock`, no lo borres: avisa al coordinador, que comprueba que no queda ningún `git.exe` escritor vivo antes de quitarlo.
+- No cambies el cwd ni ejecutes herramientas que escanean el disco (Tailwind/oxide, Vite, `find`, git con `--ignored`) fuera de la raíz del proyecto o de un directorio temporal propio: un `process.chdir('D:/')` hizo que el escáner nativo de Tailwind recorriera todo el disco y llegara a 97 GB.
+- Todo proceso `node` de pruebas, build o servidor lleva un timeout y `NODE_OPTIONS=--max-old-space-size=8192`, salvo que el script ya lo fije. Ese límite solo cubre el heap de V8, no la memoria nativa; el hook `memory-guard` bloquea órdenes nuevas de Node si la memoria comprometida libre baja del 10 % y lista los procesos que más ocupan.
+- Cierra los servidores de desarrollo al terminar y no dejes procesos huérfanos. El coordinador no tiene más de tres agentes ejecutando suites pesadas o e2e a la vez.
+
 ## Commits y pull requests
 
 El historial usa prefijos como `feat(scope):`, `fix:` y `chore(release):`; `CONTRIBUTING.md` pide descripciones concretas en español e imperativo.
