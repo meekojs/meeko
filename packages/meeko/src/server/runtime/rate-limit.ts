@@ -1,5 +1,6 @@
-import { encodeBase64Url } from "./base64url";
 import type { RequestContext } from "./request-context";
+
+import { encodeBase64Url } from "./base64url";
 import { addressBucket, parseDuration, warnOnce } from "./env";
 
 /**

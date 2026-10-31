@@ -7,10 +7,12 @@
  * left alone, because its loading may be handled there.
  */
 import ts from "@typescript/typescript6";
-import { scanInterpolations } from "../parser/interpolation";
-import { locate } from "../parser/sfc";
+
 import type { CompileDiagnostic } from "../parser/sfc";
 import type { TemplateNode } from "../parser/template";
+
+import { scanInterpolations } from "../parser/interpolation";
+import { locate } from "../parser/sfc";
 
 /** Pages, layouts and `app/app.meeko`: the components whose HTML is the first paint. */
 export function isPageOrLayout(filename: string): boolean {

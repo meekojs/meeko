@@ -1,27 +1,30 @@
+import type { ViteDevServer } from "vite";
+
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
-import { Window as HappyWindow } from "happy-dom";
 import { createServer as createViteServer } from "vite";
-import type { ViteDevServer } from "vite";
+
+import type { ClientComponent } from "../src/app/runtime/client.ts";
+import type { PageRoute } from "../src/server/runtime/framework-render.ts";
+
+import { mountClientApp } from "../src/app/runtime/client.ts";
+import { defer } from "../src/app/runtime/deferred.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
-import { analyzeServerScript } from "../src/compiler/transforms/server-script.ts";
-import { MeekoCompileError, parseSfc } from "../src/compiler/parser/sfc.ts";
-import { checkFrameworkProject, prepareFrameworkTypes } from "../src/framework/check-project.ts";
-import { mountClientApp } from "../src/app/runtime/client.ts";
-import type { ClientComponent } from "../src/app/runtime/client.ts";
-import { defer } from "../src/app/runtime/deferred.ts";
-import { definePageBody, notFound, redirect } from "../src/server/runtime/page-body.ts";
-import { usePage } from "../src/server/composables/usePage.ts";
-import { prerenderRoutes } from "../src/framework/prerender.ts";
-import { routeBlockId } from "../src/compiler/transforms/route-block.ts";
-import { createRouteManifest } from "../src/app/runtime/router.ts";
-import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
-import type { PageRoute } from "../src/server/runtime/framework-render.ts";
 import { serverScriptModule } from "../src/compiler/codegen/server-script.ts";
+import { MeekoCompileError, parseSfc } from "../src/compiler/parser/sfc.ts";
+import { routeBlockId } from "../src/compiler/transforms/route-block.ts";
+import { analyzeServerScript } from "../src/compiler/transforms/server-script.ts";
+import { checkFrameworkProject, prepareFrameworkTypes } from "../src/framework/check-project.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
+import { prerenderRoutes } from "../src/framework/prerender.ts";
+import { usePage } from "../src/server/composables/usePage.ts";
+import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
+import { definePageBody, notFound, redirect } from "../src/server/runtime/page-body.ts";
 import { meeko } from "../src/vite.ts";
 
 const page = (server: string, script = "", template = "<p>Page</p>") => [

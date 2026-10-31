@@ -1,11 +1,12 @@
-import type { RequestContext } from "./request-context";
-import type { Deferred } from "../../app/runtime/deferred";
 import type { PageHead } from "../../app/definitions/define-page";
-import { activePage, currentPage, runPage } from "../composables/usePage";
-import type { PageRequest } from "../composables/usePage";
-import { mergeHeadInputs } from "../../shared/head";
+import type { Deferred } from "../../app/runtime/deferred";
 import type { HeadInput } from "../../shared/head";
+import type { PageRequest } from "../composables/usePage";
+import type { RequestContext } from "./request-context";
+
 import { providePageHeadSink } from "../../app/runtime/head";
+import { mergeHeadInputs } from "../../shared/head";
+import { activePage, currentPage, runPage } from "../composables/usePage";
 
 /**
  * Tipo de `export const head` en el código de nivel superior de un `<script server>`: el head de la

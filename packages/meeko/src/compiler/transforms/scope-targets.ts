@@ -1,4 +1,5 @@
 import type postcss from "postcss";
+
 import selectorParser from "postcss-selector-parser";
 
 /**

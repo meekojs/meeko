@@ -1,16 +1,18 @@
+import type { CompletionItem, MarkupContent } from "vscode-languageserver/node";
+
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { Window as HappyWindow } from "happy-dom";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import type { CompletionItem, MarkupContent } from "vscode-languageserver/node";
-import { compile } from "../src/compiler.ts";
-import { checkSource } from "../src/check.ts";
+
 import { computePopoverPosition, listKeyTarget, normalizeText, placementArea, placementMargin, popoverPlacement, typeaheadIndex } from "../src/app/components/MeekoPopover/popover.ts";
 import { defaultSelectFilter, groupOptions, sameOption, selectDisabled, selectLabel, selectValue, toggleSelection } from "../src/app/components/MeekoSelect/select.ts";
+import { checkSource } from "../src/check.ts";
+import { compile } from "../src/compiler.ts";
 import { componentDiagnostics } from "../src/language-server/diagnostics.ts";
 import { completion, componentNameCompletion, directiveNameCompletion, hover } from "../src/language-server/features.ts";
 import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";

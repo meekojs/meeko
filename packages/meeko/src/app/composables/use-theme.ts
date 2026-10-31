@@ -1,7 +1,7 @@
-import { currentServerTheme, useServerTheme } from "../runtime/theme-context";
-import { currentBrowser } from "./useStorage";
-import { browserTheme } from "../runtime/theme-browser";
 import type { ThemeState } from "../../shared/theme";
+
+import { browserTheme } from "../runtime/theme-browser";
+import { currentServerTheme, useServerTheme } from "../runtime/theme-context";
 export type { ThemeChoice, ThemeConfig, ThemeName, ThemeState, ThemeToggleMessages, ThemeToggleSnippets } from "../../shared/theme";
 
 /**

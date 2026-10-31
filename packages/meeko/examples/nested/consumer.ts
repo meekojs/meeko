@@ -1,5 +1,6 @@
-import { hydrate, renderToString } from "./Parent.meeko";
 import type { ComponentProps } from "./Parent.meeko";
+
+import { hydrate, renderToString } from "./Parent.meeko";
 
 const props: ComponentProps = { initial: "Hello" };
 void renderToString(props);

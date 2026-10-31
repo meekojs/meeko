@@ -1,0 +1,11 @@
+{
+	"defaults": {
+		"ms": { "increasePercent": 35, "minimumIncrease": 0.05 },
+		"bytes": { "increasePercent": 5, "minimumIncrease": 256 }
+	},
+	"metrics": {
+		"compile.cold": { "increasePercent": 35, "minimumIncrease": 1 },
+		"lsp.completion.cold": { "increasePercent": 35, "minimumIncrease": 50 },
+		"lsp.completion.warm": { "increasePercent": 35, "minimumIncrease": 5 }
+	}
+}

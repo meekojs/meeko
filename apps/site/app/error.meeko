@@ -5,6 +5,7 @@
 	}
 
 	const props = defineProps<Props>()
+
 	const home = href('/')
 	const guide = href('/docs/[slug]', { params: { slug: 'framework' } })
 	const reference = '/docs/reference'
@@ -27,24 +28,19 @@
 				o vuelve a un punto conocido.
 			</p>
 			<p class="actions">
-				<a
-					class="pill"
-					bind:href="home"
-				>
-					Volver al inicio
-				</a>
-				<a
-					class="ghost"
+				<UILink bind:href="home">Volver al inicio</UILink>
+				<UILink
+					variant="outline"
 					bind:href="guide"
 				>
 					Leer la guía
-				</a>
-				<a
-					class="ghost"
+				</UILink>
+				<UILink
+					variant="outline"
 					bind:href="reference"
 				>
 					Referencia de la API
-				</a>
+				</UILink>
 			</p>
 		</div>
 		<div class="figure">
@@ -84,34 +80,6 @@
 		flex-wrap: wrap;
 		gap: 0.6rem;
 		margin: 2rem 0 0;
-	}
-	.actions a {
-		display: inline-flex;
-		align-items: center;
-		transition:
-			background-color 0.15s,
-			border-color 0.15s,
-			color 0.15s;
-		border-radius: 999px;
-		padding: 0 1.1rem;
-		height: 2.5rem;
-		font-weight: 500;
-		font-size: 0.92rem;
-		text-decoration: none;
-	}
-	.pill {
-		background: var(--pill);
-		color: var(--on-pill);
-	}
-	.pill:hover {
-		background: var(--pill-hover);
-	}
-	.ghost {
-		border: 1px solid var(--line-strong);
-		color: var(--ink);
-	}
-	.ghost:hover {
-		background: var(--surface-2);
 	}
 	@media (max-width: 860px) {
 		.error {

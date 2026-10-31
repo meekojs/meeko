@@ -227,6 +227,9 @@ importers:
       '@meekojs/meeko':
         specifier: workspace:*
         version: link:../../packages/meeko
+      '@meekojs/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@typescript/typescript6':
         specifier: 6.0.2
         version: 6.0.2

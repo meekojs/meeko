@@ -1,8 +1,8 @@
+import plugin from '@typescript-eslint/eslint-plugin';
 // Public plugin schemas are the source of truth; no private TypeScript-ESLint imports.
 import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import plugin from '@typescript-eslint/eslint-plugin';
 
 const entries = Object.entries(plugin.rules).sort(([a], [b]) => a.localeCompare(b));
 const schemas = Object.fromEntries(entries.map(([name, rule]) => [name, rule.meta.schema]));

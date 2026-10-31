@@ -1,17 +1,20 @@
-import { posix, relative } from 'node:path'
-import { existsSync } from 'node:fs'
+import type { TrustedHtml } from '@meekojs/meeko'
 import type TS from '@typescript/typescript6'
+
+import { trustHtml } from '@meekojs/meeko'
+import { existsSync } from 'node:fs'
+import { posix, relative } from 'node:path'
+
 import type { ApiIndexGroup, ApiIndexItem, ApiKind, ApiLink, ApiMember, ApiPage, ApiParameter } from '../../shared/types/api'
 import type { NavLink, Pager, TocEntry } from '../../shared/types/docs'
-import { builtins } from './api-builtins'
 import type { BuiltinEntry } from './api-builtins'
-import { apiGroups, groupHref, referenceHref } from './api-groups'
 import type { ApiGroup } from './api-groups'
-import { catalog } from './catalog'
-import { trustHtml } from '@meekojs/meeko'
-import type { TrustedHtml } from '@meekojs/meeko'
-import { blockLanguage, createTokenizer } from './highlight'
 import type { HighlightedToken } from './highlight'
+
+import { builtins } from './api-builtins'
+import { apiGroups, groupHref, referenceHref } from './api-groups'
+import { catalog } from './catalog'
+import { blockLanguage, createTokenizer } from './highlight'
 import { codeBlockHtml, documentHeadings, escapeHtml, renderFragment, renderInline, rewriteHref } from './markdown'
 import { githubUrl, packageFolder, readRepositoryFile, repositoryRoot, repositoryUrl, sitePath } from './repository'
 

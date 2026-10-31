@@ -1,6 +1,7 @@
-import { escapeHtml } from "../../core/server";
-import { CONFIG_LEVEL, HEAD_END_MARKER, HEAD_START_MARKER, ROUTE_LEVEL, documentHeadInput, normalizeHeadInput, rawText } from "../../shared/head";
 import type { DocumentConfig, HeadEntry, HeadInput, HeadTag, ResolvedHead } from "../../shared/head";
+
+import { escapeHtml } from "../../core/server";
+import { CONFIG_LEVEL, documentHeadInput, HEAD_END_MARKER, HEAD_START_MARKER, normalizeHeadInput, rawText, ROUTE_LEVEL } from "../../shared/head";
 
 /**
  * Collects the head entries of a server render. A suspended pass starts over with `clear`. Values

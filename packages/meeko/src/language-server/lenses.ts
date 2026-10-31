@@ -1,14 +1,17 @@
-import { relative, sep } from "node:path";
-import ts from "@typescript/typescript6";
 import type { CodeLens, Location } from "vscode-languageserver/node";
-import { isPageFile } from "../compiler/transforms/route-block";
-import { extractRouteRender } from "../framework/routes-discovery";
+
+import ts from "@typescript/typescript6";
+import { relative, sep } from "node:path";
+
 import type { RouteRecord } from "../app/runtime/router";
 import type { FeatureContext } from "./features";
 import type { VirtualComponent } from "./model";
+import type { ReactiveDeclaration } from "./reactivity";
+
+import { isPageFile } from "../compiler/transforms/route-block";
+import { extractRouteRender } from "../framework/routes-discovery";
 import { pathKey } from "./project";
 import { analyzeReactivity } from "./reactivity";
-import type { ReactiveDeclaration } from "./reactivity";
 
 /** VS Code's command to show a list of locations next to a position. */
 export const showReferencesCommand = "editor.action.showReferences";

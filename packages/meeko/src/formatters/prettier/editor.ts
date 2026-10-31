@@ -1,6 +1,8 @@
+import type { Options, Plugin } from "prettier";
+
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import type { Options, Plugin } from "prettier";
+
 import plugin from "./plugin";
 
 /** Formateo de un `.meeko` abierto en un editor. */

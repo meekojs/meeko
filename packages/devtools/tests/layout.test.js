@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
+import { access, mkdir, readFile } from "node:fs/promises";
 import { createServer } from "node:http";
-import { readFile, access } from "node:fs/promises";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const chromePath = process.env.MEEKO_CHROME ?? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
@@ -149,4 +149,42 @@ test("el panel permanece legible y sin desbordamiento horizontal en DevTools est
     await browser.close();
     server.close();
   }
+});
+
+test("el panel filtra navegación y datos y conserva tiempos y origen en pantallas estrechas", { skip: !chromium }, async () => {
+  const server = servePanel();
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 900, height: 740 } });
+    await page.addInitScript(() => {
+      window.__MEEKO_DEVTOOLS__ = {
+        protocolVersion: 1,
+        snapshot: () => ({ protocolVersion: 1, instances: [], selectedId: null, events: [
+          { id: 1, at: Date.now(), kind: "signal", instanceId: "fixture", detail: "count", value: 1 },
+          { id: 2, at: Date.now(), kind: "navigation", instanceId: "operation-1", detail: "commit · /users/[id] · 14.5 ms", activity: { operationId: 1, route: "/users/[id]", phase: "commit", durationMs: 14.5 } },
+          { id: 3, at: Date.now(), kind: "data", instanceId: "operation-2", detail: "ready · cache · 0.0 ms", activity: { operationId: 2, route: null, phase: "ready", source: "cache", durationMs: 0 } },
+        ] }),
+      };
+      Object.defineProperty(window, "chrome", { configurable: true, value: { devtools: { inspectedWindow: { eval: (expression, callback) => { callback(window.eval(expression)); } } } } });
+    });
+    await page.goto(`http://127.0.0.1:${address.port}/panel.html`, { waitUntil: "domcontentloaded" });
+    await page.locator("#event-list > li").first().waitFor();
+    assert.equal(await page.locator("#event-list > li").count(), 3);
+    await page.getByLabel("Navegación y datos", { exact: true }).check();
+    assert.equal(await page.locator("#event-list > li").count(), 2);
+    assert.match(await page.locator("#event-list").innerText(), /Navegación.*\/users\/\[id\].*14\.5 ms/s);
+    assert.match(await page.locator("#event-list").innerText(), /Datos.*cache/s);
+    await mkdir(join(root, ".meeko"), { recursive: true });
+    await page.screenshot({ path: join(root, ".meeko/activity-timeline.png"), fullPage: true });
+    await page.getByLabel("Sólo señales", { exact: true }).check();
+    assert.equal(await page.getByLabel("Navegación y datos", { exact: true }).isChecked(), false);
+    assert.equal(await page.locator("#event-list > li").count(), 1);
+    await page.getByLabel("Navegación y datos", { exact: true }).check();
+    await page.setViewportSize({ width: 360, height: 740 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await page.screenshot({ path: join(root, ".meeko/activity-timeline-mobile.png"), fullPage: true });
+  } finally { await browser.close(); server.close(); }
 });

@@ -52,19 +52,9 @@
 			class="meta"
 			data-pagefind-ignore
 		>
-			<span class="badge kind">{props.page.kindLabel}</span>
-			<span
-				class="badge"
-				if:when="props.page.since"
-			>
-				Desde {props.page.since}
-			</span>
-			<span
-				class="badge"
-				if:when="props.page.autoImport"
-			>
-				Sin import
-			</span>
+			<UIBadge tone="accent">{props.page.kindLabel}</UIBadge>
+			<UIBadge if:when="props.page.since">Desde {props.page.since}</UIBadge>
+			<UIBadge if:when="props.page.autoImport">Sin import</UIBadge>
 			<code
 				class="specifier"
 				if:when="props.page.specifier"
@@ -172,19 +162,6 @@
 		margin: 0 0 1.25rem;
 		border-bottom: 1px solid var(--line);
 		padding-bottom: 1.25rem;
-	}
-	.badge {
-		border: 1px solid var(--line);
-		border-radius: 999px;
-		background: var(--surface);
-		padding: 0.08rem 0.6rem;
-		color: var(--ink-soft);
-		font: 500 0.78rem/1.6 var(--font-ui);
-	}
-	.badge.kind {
-		border-color: transparent;
-		background: var(--accent-soft);
-		color: var(--accent-ink);
 	}
 	.meta .specifier {
 		border-radius: 0;

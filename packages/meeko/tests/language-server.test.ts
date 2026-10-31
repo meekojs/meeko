@@ -1,3 +1,8 @@
+import type {
+  CodeAction, CompletionItem, Diagnostic, DocumentSymbol, InitializeResult, Location, MarkupContent, ProtocolConnection, TextEdit,
+  WorkspaceEdit,
+} from "vscode-languageserver/node";
+
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -15,14 +20,12 @@ import {
   RegistrationRequest, RenameRequest, SemanticTokensRefreshRequest, SemanticTokensRequest, ShutdownRequest, SignatureHelpRequest,
   StreamMessageReader, StreamMessageWriter,
 } from "vscode-languageserver/node";
-import type {
-  CodeAction, CompletionItem, Diagnostic, DocumentSymbol, InitializeResult, Location, MarkupContent, ProtocolConnection, TextEdit,
-  WorkspaceEdit,
-} from "vscode-languageserver/node";
-import { checkSource } from "../src/check.ts";
-import { startLanguageServer } from "../src/language-server/server.ts";
+
 import type { CompletionData } from "../src/language-server/features.ts";
 import type { LanguageServerInitializationOptions } from "../src/language-server/server.ts";
+
+import { checkSource } from "../src/check.ts";
+import { startLanguageServer } from "../src/language-server/server.ts";
 import { createTempProject, linkRepositoryPackages, repositoryRoot } from "./helpers/temp-project.ts";
 
 /** Cliente LSP mínimo que registra diagnósticos y documentos abiertos. */

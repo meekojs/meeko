@@ -1,10 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+
+import type { RouteRecord } from "../app/runtime/router";
 import type { MeekoConfig, RobotsConfig, SitemapConfig, SitemapEntriesContext, SitemapEntry } from "../modules/define-meeko-config";
 import type { PrerenderIndex } from "./prerender";
-import { routeBlockFile } from "../compiler/transforms/route-block";
+
 import { href, matchRoute } from "../app/runtime/router";
-import type { RouteRecord } from "../app/runtime/router";
+import { routeBlockFile } from "../compiler/transforms/route-block";
 
 /** `sitemap` and `robots` of the configuration with their defaults; absent when off. */
 export interface SiteFilesOptions {

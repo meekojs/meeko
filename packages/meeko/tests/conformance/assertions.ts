@@ -3,8 +3,10 @@ import { once } from "node:events";
 import { request as httpRequest } from "node:http";
 import { after, before, describe, it } from "node:test";
 import WebSocket from "ws";
-import { missingRuntime, runtimeVersion, startConformanceOutput } from "./harness.ts";
+
 import type { ConformanceAdapter, RunningOutput } from "./harness.ts";
+
+import { missingRuntime, runtimeVersion, startConformanceOutput } from "./harness.ts";
 
 /** Sends a raw request target, bypassing the URL normalization of fetch. */
 function rawGet(origin: string, path: string): Promise<{ status: number; body: string }> {

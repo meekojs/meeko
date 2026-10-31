@@ -1,12 +1,15 @@
+import type { CodeAction, TextEdit } from "vscode-languageserver/node";
+
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import type { CodeAction, TextEdit } from "vscode-languageserver/node";
+
+import type { LanguageProject } from "./language-server-workspace.ts";
+
 import { componentDiagnostics } from "../src/language-server/diagnostics.ts";
 import { createComponentActions, itemName, listItemActions, propsReadActions } from "../src/language-server/quick-fixes.ts";
 import { languageProject } from "./language-server-workspace.ts";
-import type { LanguageProject } from "./language-server-workspace.ts";
 
 const reads = `<script lang="ts">
 const props = defineProps<{ label: string; items: string[] }>();

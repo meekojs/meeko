@@ -1,8 +1,10 @@
 import ts from "@typescript/typescript6";
-import { analyzeComposables } from "../compiler/composables";
-import { parseSfc } from "../compiler/parser/sfc";
+
 import type { SfcDocument } from "../compiler/parser/sfc";
 import type { VirtualComponent } from "./model";
+
+import { analyzeComposables } from "../compiler/composables";
+import { parseSfc } from "../compiler/parser/sfc";
 
 /** Family of a reactive declaration of the script, as the editor colors and summarizes it. */
 export type ReactiveKind = "signal" | "computed" | "resource";

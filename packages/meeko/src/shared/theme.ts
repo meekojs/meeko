@@ -1,5 +1,5 @@
-import type { GeneratedTheme } from "../framework";
 import type { ReadonlySignal, Signal } from "../core/reactivity";
+import type { GeneratedTheme } from "../framework";
 
 /**
  * Opciones de `theme` en `meeko.config.ts`. Todas son opcionales; `theme: true` usa los valores

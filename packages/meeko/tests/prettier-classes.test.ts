@@ -3,11 +3,13 @@ import { mkdir, utimes, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { after, before, describe, test } from "node:test";
 import * as prettier from "prettier";
-import { compile } from "../src/compiler.ts";
-import plugin from "../src/prettier.ts";
+
 import type { MeekoPrettierOptions } from "../src/prettier.ts";
+
+import { compile } from "../src/compiler.ts";
 import { classOrderWarnings } from "../src/formatters/prettier/classes.ts";
 import { formatWithPrettier } from "../src/formatters/prettier/editor.ts";
+import plugin from "../src/prettier.ts";
 import { createTempProject, linkRepositoryPackages, type TempProject } from "./helpers/temp-project.ts";
 
 type FormatOptions = prettier.Options & MeekoPrettierOptions;

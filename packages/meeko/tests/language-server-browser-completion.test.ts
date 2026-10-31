@@ -1,6 +1,8 @@
+import type { CompletionItem } from "vscode-languageserver/node";
+
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { CompletionItem } from "vscode-languageserver/node";
+
 import { completion } from "../src/language-server/features.ts";
 import { languageProject } from "./language-server-workspace.ts";
 

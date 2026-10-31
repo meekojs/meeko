@@ -1,15 +1,22 @@
+import type { Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import type { Page } from "playwright-core";
+
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer as createHttpServer } from "node:http";
-import type { AddressInfo } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
-import type { Page } from "playwright-core";
+
+import type * as framework_server_tsTypes from "../src/framework-server.ts";
+import type * as node_tsTypes from "../src/node.ts";
+
 import { buildProject } from "../src/framework/project.ts";
 import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
+
 
 const countrySchema = `type Issue = { message: string; path: Array<{ key: string }> };
 type Values = { country: string };
@@ -97,9 +104,9 @@ const rect = (page: Page, selector: string, popover = false) => page.locator(sel
 test("<MeekoPopover> and <MeekoSelect> in Chrome: menu, tooltip, select with keyboard and mouse, search, multiple, forms, flip and a strict CSP", { timeout: 300_000 }, async () => {
   const project = await createTempProject("popover-select-e2e");
   const root = project.root;
-  type ServerModule = typeof import("../src/framework-server.ts");
-  type NodeModule = typeof import("../src/node.ts");
-  let server: import("node:http").Server | undefined;
+  type ServerModule = typeof framework_server_tsTypes;
+  type NodeModule = typeof node_tsTypes;
+  let server: Server | undefined;
   let app: Awaited<ReturnType<ServerModule["createServerApp"]>> | undefined;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   try {

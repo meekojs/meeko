@@ -1,12 +1,14 @@
+import ts from "@typescript/typescript6";
 import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import ts from "@typescript/typescript6";
-import { aliasImporterScope, aliasScopeProblem, aliasTsconfigPaths, matchPathAlias } from "../compiler/aliases";
+
 import type { AliasImporterScope, PathAlias, PathAliasScope } from "../compiler/aliases";
-import { moduleSpecifiers } from "../compiler/import-graph";
 import type { CompileDiagnostic } from "../compiler/parser/sfc";
-import { locate } from "../compiler/parser/sfc";
 import type { MeekoConfig } from "../modules/define-meeko-config";
+
+import { aliasImporterScope, aliasScopeProblem, aliasTsconfigPaths, matchPathAlias } from "../compiler/aliases";
+import { moduleSpecifiers } from "../compiler/import-graph";
+import { locate } from "../compiler/parser/sfc";
 import { isExecutedConfig, loadMeekoConfig, readMeekoConfigSync, resolveConfigSources } from "./config";
 import { legacyLayerEntries, resolveMeekoModules } from "./module-loader";
 

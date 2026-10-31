@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { computed, signal } from '@meekojs/meeko'
+
 	import type { NavSection, Pager, TocEntry } from '../../shared/types/docs'
 
 	interface Props {
@@ -14,12 +15,16 @@
 	}
 
 	const props = defineProps<Props>()
+
 	// The page writes the article; `aside` adds a block under the table of contents.
 	const snippets = defineSnippets<{ default: []; aside?: [] }>()
+
 	const menuOpen = signal(false)
 	const activeHeading = signal('')
 	const toggle = useElementRef('toggle')
+
 	const sidebar = useElementRef('sidebar')
+
 	/** Label of the current page in the sidebar, for the small-screen bar. */
 	const currentLabel = computed(() => props.nav.flatMap((section) => section.links).find((link) => link.href === props.current)?.label ?? 'Documentación')
 

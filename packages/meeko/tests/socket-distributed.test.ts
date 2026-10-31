@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
+import type { RedisPublisherClient, RedisSubscriberClient, Schema, SocketDeliveryErrorContext, SocketPeer } from "../src/framework-server.ts";
+
 import {
   ApiError, createServerApp, createSocketHub, defineServerRuntime, defineSocketChannel, LocalSocketPubSub, MemorySessionStore, RedisSocketPubSub, SessionManager,
 } from "../src/framework-server.ts";
-import type { RedisPublisherClient, RedisSubscriberClient, Schema, SocketDeliveryErrorContext, SocketPeer } from "../src/framework-server.ts";
 
 const messageSchema: Schema<{ text: string }> = {
   "~standard": {

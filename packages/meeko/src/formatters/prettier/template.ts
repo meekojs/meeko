@@ -1,9 +1,12 @@
 import type { AstPath, Doc, Options, Parser, ParserOptions, Plugin, Printer } from "prettier";
+
 import { builders, utils } from "prettier/doc";
+
+import type { ClassSortMode } from "./classes";
+
 import { scanInterpolations } from "../../compiler/parser/interpolation";
 import { isCustomElementTag } from "../../compiler/parser/template";
 import { classOrderOption, classTokens, sortClassTokens } from "./classes";
-import type { ClassSortMode } from "./classes";
 
 const { group, indent, label, softline } = builders;
 const { mapDoc } = utils;

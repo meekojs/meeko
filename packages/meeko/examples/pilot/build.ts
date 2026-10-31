@@ -1,7 +1,7 @@
+import { build as bundleNodeServer } from "esbuild";
 import { copyFile, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { build as bundleNodeServer } from "esbuild";
 import { build as buildVite } from "vite";
 
 const root = dirname(fileURLToPath(import.meta.url));

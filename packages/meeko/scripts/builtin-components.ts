@@ -7,6 +7,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, posix } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { builtinComponentModules, compile } from "../src/compiler.ts";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");

@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { onCleanup } from "../src/core/reactivity.ts";
-import { StateStore, hydrateWithStateStore, withStateStore } from "../src/app/runtime/state.ts";
+
 import { useState } from "../src/app/composables/useState.ts";
+import { hydrateWithStateStore, StateStore, withStateStore } from "../src/app/runtime/state.ts";
+import { onCleanup } from "../src/core/reactivity.ts";
 
 test("keyed state is isolated between requests and snapshots safely", () => {
   const first = new StateStore();

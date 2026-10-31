@@ -1,22 +1,27 @@
 <script lang="ts">
+	import type { UICardVariant } from '../types/config'
+
+	import { uiDefaults } from '../utils/defaults'
+
 	interface Props {
 		title?: string
 		description?: string
-		variant?: 'outline' | 'soft' | 'solid' | 'elevated'
+		variant?: UICardVariant
 		class?: string
 	}
 
-	const props = defineProps<Props>({ variant: 'outline' })
+	const props = defineProps<Props>()
 
 	const snippets = defineSnippets<{ header?: []; default: []; footer?: [] }>()
 
 	const id = useId()
+	const defaults = uiDefaults().card
 </script>
 
 <template>
 	<section
 		bind:class="['meeko-ui-card', props.class].filter(Boolean).join(' ')"
-		bind:data-variant="props.variant"
+		bind:data-variant="props.variant ?? defaults?.variant ?? 'outline'"
 		bind:aria-labelledby="props.title && !snippets.header ? id + '-title' : undefined"
 	>
 		<header

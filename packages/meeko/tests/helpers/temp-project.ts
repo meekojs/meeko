@@ -1,8 +1,10 @@
 import type { ChildProcess } from "node:child_process";
+
 import { once } from "node:events";
 import { lstat, mkdir, mkdtemp, readdir, realpath, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { testTempRoot } from "../../scripts/test-tmp-root.mjs";
 
 /** The repository root, independent of the working directory of the test run. */

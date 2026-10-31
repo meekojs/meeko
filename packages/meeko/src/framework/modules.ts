@@ -1,6 +1,8 @@
 import { resolve } from "node:path";
-import { createRouteManifest } from "../app/runtime/router";
+
 import type { RouteRecord } from "../app/runtime/router";
+
+import { createRouteManifest } from "../app/runtime/router";
 import { discoverRouteMiddleware } from "./route-middleware-discovery";
 import { discoverLayouts, discoverRoutes } from "./routes-discovery";
 

@@ -1,3 +1,4 @@
+import type { ReadonlySignal } from "../../core/reactivity";
 /**
  * Runtime and types behind `defineSnippets<T>()`, `<snippet name params>` and
  * `<render snippet args>`.
@@ -7,8 +8,8 @@
  * bindings live in the parent's reactive root although its nodes sit in the child's DOM.
  */
 import type { DomScope } from "./renderer";
+
 import { currentEffectOwner } from "../../core/reactivity";
-import type { ReadonlySignal } from "../../core/reactivity";
 
 declare const snippetArguments: unique symbol;
 

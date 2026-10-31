@@ -201,7 +201,30 @@ export interface DevtoolsInstance {
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#protocolo
  */
-export type DevtoolsEventKind = "mount" | "unmount" | "signal" | "breakpoint" | "select" | "hmr";
+export type DevtoolsEventKind = "mount" | "unmount" | "signal" | "breakpoint" | "select" | "hmr" | "navigation" | "data";
+
+/**
+ * Metadatos de navegación o carga; no contienen URLs, parámetros, cabeceras ni valores del usuario.
+ * `route` es el patrón declarado de la ruta, no su pathname resuelto.
+ * @example
+ * ```ts
+ * const activity = window.__MEEKO_DEVTOOLS__?.snapshot().events.find((event) => event.kind === "navigation")?.activity;
+ * console.log(activity?.phase, activity?.durationMs);
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#navegación-y-datos
+ */
+export interface DevtoolsActivity {
+  /** Identidad de la operación, compartida entre su inicio y final. */
+  operationId: number;
+  /** Patrón de ruta del manifiesto, o null para operaciones sin ruta conocida. */
+  route: string | null;
+  /** Fase de la operación. */
+  phase: "start" | "ready" | "commit" | "cancel" | "error";
+  /** Duración medida en el navegador, presente al finalizar la operación. */
+  durationMs?: number;
+  /** Transporte de datos o uso de la caché local de recursos. */
+  source?: "server" | "client" | "static" | "cache";
+}
 
 /**
  * Cambio reciente del árbol de componentes o de una señal en la línea de tiempo.
@@ -236,6 +259,8 @@ export interface DevtoolsEvent {
   reads?: DevtoolsReadSite[];
   /** Asignación instrumentada o edición desde un panel que escribió el nuevo valor, si se conoce. */
   write?: DevtoolsWriteSite;
+  /** Operación de navegación o datos; los clientes antiguos pueden omitirla. */
+  activity?: DevtoolsActivity;
 }
 
 /**

@@ -1,6 +1,8 @@
 import ts from "@typescript/typescript6";
-import { compileError } from "../parser/sfc";
+
 import type { SfcSection } from "../parser/sfc";
+
+import { compileError } from "../parser/sfc";
 
 /** Request APIs of a page's top-level server code, exported by `@meekojs/meeko/framework`. */
 export const pageRequestApis = ["usePage", "redirect", "notFound"] as const;

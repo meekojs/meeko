@@ -1,6 +1,6 @@
 // @ts-check
 
-// Los tipos proceden de src/devtools-protocol.ts mediante types/protocol.d.ts (pnpm run devtools:types).
+// Los tipos proceden de src/core/devtools-protocol.ts mediante types/protocol.d.ts (pnpm run devtools:types).
 /** @typedef {import('./types/protocol.js').DevtoolsHook} DevtoolsHook */
 /** @typedef {import('./types/protocol.js').DevtoolsInstance} DevtoolsInstance */
 /** @typedef {import('./types/protocol.js').DevtoolsEvent} DevtoolsEvent */
@@ -20,7 +20,7 @@ export const SUPPORTED_PROTOCOL_VERSION = 1;
 /** @type {ReadonlySet<string>} */
 const commands = new Set(["select", "highlight", "setBreakpoint", "setSignal"]);
 /** @type {ReadonlySet<string>} */
-const eventKinds = new Set(/** @type {DevtoolsEventKind[]} */ (["mount", "unmount", "signal", "breakpoint", "select", "hmr"]));
+const eventKinds = new Set(/** @type {DevtoolsEventKind[]} */ (["mount", "unmount", "signal", "breakpoint", "select", "hmr", "navigation", "data"]));
 /** @type {ReadonlySet<string>} */
 const readKinds = new Set(/** @type {DevtoolsReadKind[]} */ (["text", "attribute", "computed", "if", "each", "prop"]));
 
@@ -153,6 +153,20 @@ export function normalizeSnapshot(value) {
     if (typeof item.detail === "string") event.detail = item.detail;
     if (typeof item.componentName === "string") event.componentName = item.componentName;
     if (typeof item.file === "string") event.file = item.file;
+    if (item.activity && typeof item.activity === "object") {
+      const activity = /** @type {Record<string, unknown>} */ (item.activity);
+      if (typeof activity.operationId === "number" && Number.isSafeInteger(activity.operationId) && activity.operationId > 0
+        && (activity.route === null || (typeof activity.route === "string" && activity.route.startsWith("/") && activity.route.length <= 512 && !/[?#]/.test(activity.route)))
+        && typeof activity.phase === "string" && ["start", "ready", "commit", "cancel", "error"].includes(activity.phase)) {
+        event.activity = {
+          operationId: activity.operationId,
+          route: /** @type {string | null} */ (activity.route),
+          phase: /** @type {import('./types/protocol.js').DevtoolsActivity['phase']} */ (activity.phase),
+        };
+        if (typeof activity.durationMs === "number" && Number.isFinite(activity.durationMs) && activity.durationMs >= 0) event.activity.durationMs = activity.durationMs;
+        if (typeof activity.source === "string" && ["server", "client", "static", "cache"].includes(activity.source)) event.activity.source = /** @type {import('./types/protocol.js').DevtoolsActivity['source']} */ (activity.source);
+      }
+    }
     if (Object.hasOwn(item, "value")) event.value = jsonValue(item.value);
     if (Array.isArray(item.reads)) {
       /** @type {DevtoolsReadSite[]} */

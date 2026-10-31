@@ -1,4 +1,5 @@
 import type { NavLink, NavSection, Pager } from "../../shared/types/docs";
+
 import { exportsHref, referenceHref } from "./api-groups";
 import { taxonomy } from "./reference-taxonomy";
 
@@ -32,11 +33,17 @@ export const catalog: readonly CatalogEntry[] = [
     transform: (text) => text.replace(/^# Meeko\n+<p align="center">[\s\S]*?<\/p>\n+/, "# Inicio rápido\n\n"),
   },
   { slug: "primeros-pasos", href: "/docs/primeros-pasos", source: "docs/primeros-pasos.md", label: "Primera aplicación", section: "Empezar" },
-  { slug: "como-elegir", href: "/docs/como-elegir", source: "docs/como-elegir.md", label: "Cómo elegir", section: "Guías" },
-  { slug: "framework", href: "/docs/framework", source: "docs/framework.md", label: "Framework full-stack", section: "Guías" },
-  { slug: "api", href: "/docs/api", source: "docs/api.md", label: "Componentes y API", section: "Guías" },
+  { slug: "documentacion", href: "/docs/documentacion", source: "docs/README.md", label: "Mapa de documentación", section: "Empezar" },
+  { slug: "como-elegir", href: "/docs/como-elegir", source: "docs/como-elegir.md", label: "Cómo elegir", section: "Empezar" },
+  { slug: "framework", href: "/docs/framework", source: "docs/framework.md", label: "Framework full-stack", section: "Framework" },
+  { slug: "api", href: "/docs/api", source: "docs/api.md", label: "Componentes y API", section: "Componentes y módulos" },
+  { slug: "ui", href: "/docs/ui", source: "docs/ui.md", label: "Meeko UI", section: "Componentes y módulos" },
+  { slug: "i18n", href: "/docs/i18n", source: "docs/i18n.md", label: "Internacionalización", section: "Componentes y módulos" },
+  { slug: "doctor", href: "/docs/doctor", source: "docs/doctor.md", label: "Doctor", section: "Herramientas" },
   { slug: "editors", href: "/docs/editors", source: "docs/editors.md", label: "Editores", section: "Herramientas" },
+  { slug: "tooling", href: "/docs/tooling", source: "docs/tooling.md", label: "ESLint y Prettier", section: "Herramientas" },
   { slug: "devtools", href: "/docs/devtools", source: "docs/devtools.md", label: "DevTools", section: "Herramientas" },
+  { slug: "testing", href: "/docs/testing", source: "docs/testing.md", label: "Pruebas y CI", section: "Herramientas" },
   { slug: "stability", href: "/docs/stability", source: "docs/stability.md", label: "Estabilidad 1.x", section: "Referencia" },
   { slug: "architecture", href: "/docs/architecture", source: "docs/architecture.md", label: "Arquitectura", section: "Referencia" },
   { slug: "migration-1.6", href: "/docs/migration-1.6", source: "docs/migration-1.6.md", label: "Actualizar a 1.6", section: "Referencia" },
@@ -48,6 +55,7 @@ export const catalog: readonly CatalogEntry[] = [
   { slug: "migration-1.1", href: "/docs/migration-1.1", source: "docs/migration-1.1.md", label: "Actualizar a 1.1", section: "Referencia" },
   { slug: "migration-1.0", href: "/docs/migration-1.0", source: "docs/migration-1.0.md", label: "Migrar a 1.0", section: "Referencia" },
   { slug: "benchmarks", href: "/docs/benchmarks", source: "docs/benchmarks.md", label: "Rendimiento", section: "Referencia" },
+  { slug: "performance", href: "/docs/performance", source: "docs/performance.md", label: "Presupuestos de rendimiento", section: "Referencia" },
   { slug: "roadmap", href: "/docs/roadmap", source: "docs/roadmap.md", label: "Plan de desarrollo", section: "Proyecto" },
   { slug: "changelog", href: "/docs/changelog", source: "CHANGELOG.md", label: "Cambios", section: "Proyecto" },
 ];
@@ -82,7 +90,7 @@ export function navigation(): NavSection[] {
       { href: exportsHref, label: "Todos los exports" },
     ],
   };
-  const guides = sections.findIndex((section) => section.title === "Guías");
+  const guides = sections.findIndex((section) => section.title === "Componentes y módulos");
   sections.splice(guides < 0 ? sections.length : guides + 1, 0, reference);
   return sections;
 }

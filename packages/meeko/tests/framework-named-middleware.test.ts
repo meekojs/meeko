@@ -1,14 +1,16 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Window as HappyWindow } from "happy-dom";
-import { createServerApp } from "../src/framework-server.ts";
-import type { AppManifest } from "../src/framework-server.ts";
-import { renderPage } from "../src/server/runtime/app.ts";
-import type { InternalServerApp } from "../src/server/runtime/app.ts";
-import { mountClientApp } from "../src/app/runtime/client.ts";
-import { defineRouteMiddleware } from "../src/app/definitions/define-route-middleware.ts";
+
 import type { RouteMiddleware } from "../src/app/middleware/runtime.ts";
+import type { AppManifest } from "../src/framework-server.ts";
+import type { InternalServerApp } from "../src/server/runtime/app.ts";
+
+import { defineRouteMiddleware } from "../src/app/definitions/define-route-middleware.ts";
+import { mountClientApp } from "../src/app/runtime/client.ts";
 import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { createServerApp } from "../src/framework-server.ts";
+import { renderPage } from "../src/server/runtime/app.ts";
 import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 
 const page = {

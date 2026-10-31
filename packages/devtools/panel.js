@@ -30,6 +30,7 @@ const breakpointButton = /** @type {HTMLButtonElement} */ (required("breakpoint"
 const search = /** @type {HTMLInputElement} */ (required("search"));
 const selectedEvents = /** @type {HTMLInputElement} */ (required("selected-events"));
 const signalEvents = /** @type {HTMLInputElement} */ (required("signal-events"));
+const activityEvents = /** @type {HTMLInputElement} */ (required("activity-events"));
 const eventList = required("event-list");
 const eventCount = required("event-count");
 const editorForm = /** @type {HTMLFormElement} */ (required("signal-editor"));
@@ -271,7 +272,7 @@ function eventTime(/** @type {number} */ at) {
 function renderEvents() {
   const all = snapshot?.events ?? [];
   const selectedId = snapshot?.selectedId;
-  const events = all.filter((event) => (!selectedEvents.checked || event.instanceId === selectedId) && (!signalEvents.checked || event.kind === "signal"));
+  const events = all.filter((event) => (!selectedEvents.checked || event.instanceId === selectedId) && (!signalEvents.checked || event.kind === "signal") && (!activityEvents.checked || event.kind === "navigation" || event.kind === "data"));
   eventCount.textContent = String(events.length);
   const fragment = document.createDocumentFragment();
   for (const event of [...events].reverse()) {
@@ -280,7 +281,7 @@ function renderEvents() {
     const time = node("time", eventTime(event.at));
     if (event.at > 1_000_000_000_000) time.setAttribute("datetime", new Date(event.at).toISOString());
     const instance = snapshot?.instances.find((entry) => entry.id === event.instanceId);
-    const name = event.componentName ?? instance?.name ?? event.instanceId;
+    const name = event.activity ? event.kind === "navigation" ? "Navegación" : "Datos" : event.componentName ?? instance?.name ?? event.instanceId;
     const file = event.file ?? instance?.file ?? "";
     const sourceLabel = `${name} · ${event.instanceId}${file ? ` · ${file}` : ""}`;
     const source = node(instance ? "button" : "span", sourceLabel, "event-source");
@@ -387,7 +388,8 @@ editorForm.addEventListener("submit", async (event) => {
 
 search.addEventListener("input", renderInstances);
 selectedEvents.addEventListener("change", renderEvents);
-signalEvents.addEventListener("change", renderEvents);
+signalEvents.addEventListener("change", () => { if (signalEvents.checked) activityEvents.checked = false; renderEvents(); });
+activityEvents.addEventListener("change", () => { if (activityEvents.checked) { signalEvents.checked = false; selectedEvents.checked = false; } renderEvents(); });
 instanceList.addEventListener("keydown", (event) => {
   if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
   const buttons = [...instanceList.querySelectorAll("button[data-instance-id]")];

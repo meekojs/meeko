@@ -1,10 +1,12 @@
+import type { Location } from "vscode-languageserver/node";
+
 import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import postcss from "postcss";
 import { createServer } from "vite";
-import type { Location } from "vscode-languageserver/node";
+
 import { buildProjectAliases, checkAliasScopes, resolveProjectAliases, viteAliasShadow } from "../src/framework/aliases.ts";
 import { checkApp } from "../src/framework/check-app.ts";
 import { checkFrameworkProject } from "../src/framework/check-project.ts";
@@ -14,8 +16,8 @@ import { componentDiagnostics } from "../src/language-server/diagnostics.ts";
 import { completionList, definition } from "../src/language-server/features.ts";
 import { meekoUtilities } from "../src/postcss.ts";
 import { meeko } from "../src/vite.ts";
-import { languageProject } from "./language-server-workspace.ts";
 import { linkRepositoryPackages, tempProject } from "./helpers/temp-project.ts";
+import { languageProject } from "./language-server-workspace.ts";
 
 async function write(root: string, files: Record<string, string>): Promise<void> {
   for (const [path, contents] of Object.entries(files)) {

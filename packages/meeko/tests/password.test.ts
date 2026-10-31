@@ -4,8 +4,9 @@ import { randomBytes, scryptSync } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { resolve } from "node:path";
 import test from "node:test";
+
+import { PromptCancelled, promptPassword } from "../src/password-prompt.ts";
 import { hashPassword, needsRehash, verifyPassword } from "../src/password.ts";
-import { promptPassword, PromptCancelled } from "../src/password-prompt.ts";
 
 // A hash in the format that apps wrote by hand before 1.2: scrypt N=2^17, r=8, p=1, a 32-byte salt
 // and a 64-byte key. Generated once with node:crypto for the password below.

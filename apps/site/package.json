@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@meekojs/meeko": "workspace:*",
+    "@meekojs/ui": "workspace:*",
     "@typescript/typescript6": "6.0.2",
     "github-slugger": "2.0.0",
     "markdown-it": "15.0.3",

@@ -1,0 +1,21 @@
+.meeko-ui-badge {
+	display: inline-flex;
+	align-items: center;
+	vertical-align: middle;
+	border: 1px solid var(--meeko-ui-border);
+	border-radius: 999px;
+	background: var(--meeko-ui-surface);
+	padding: 0.08rem 0.6rem;
+	color: var(--meeko-ui-text-soft);
+	font: 500 0.78rem/1.6 var(--meeko-ui-font);
+}
+.meeko-ui-badge[data-tone='accent'] {
+	border-color: transparent;
+	background: var(--meeko-ui-accent-soft);
+	color: var(--meeko-ui-accent-text);
+}
+.meeko-ui-badge[data-tone='danger'] {
+	border-color: transparent;
+	background: color-mix(in oklab, var(--meeko-ui-danger) 12%, transparent);
+	color: var(--meeko-ui-danger);
+}

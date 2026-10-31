@@ -1,7 +1,8 @@
-import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
 import { serializeJson } from "@meekojs/meeko";
-import { css, renderWithState, type ComponentProps } from "./Counter.generated.ts";
+import { readFile } from "node:fs/promises";
+import { createServer } from "node:http";
+
+import { type ComponentProps, css, renderWithState } from "./Counter.generated.ts";
 
 /** Genera la página completa con HTML inicial y props para hidratación. */
 export function renderExamplePage(props: ComponentProps): string {

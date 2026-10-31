@@ -1,6 +1,8 @@
 <script server lang="ts">
 	import { definePage } from '@meekojs/meeko/framework'
+
 	import type { NavSection, Pager, RenderedDoc } from '../../../shared/types/docs'
+
 	import { readPage } from '../../../server/content/db'
 
 	export const route = definePage({ render: 'ssr' })

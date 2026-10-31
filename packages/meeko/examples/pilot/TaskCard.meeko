@@ -1,9 +1,11 @@
 <script lang="ts">
 import { signal } from "@meekojs/meeko";
+
 import type { Task } from "./model.js";
 
 /** Datos de una tarjeta, sin estado global compartido con otras instancias. */
 const props = defineProps<{ task: Task }>();
+
 const expanded = signal(false);
 </script>
 

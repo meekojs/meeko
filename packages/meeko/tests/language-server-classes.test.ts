@@ -1,3 +1,5 @@
+import type { CompletionItem, CompletionList, Location, MarkupContent, ProtocolConnection, TextEdit } from "vscode-languageserver/node";
+
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -10,10 +12,11 @@ import {
   DidChangeWatchedFilesNotification, DidOpenTextDocumentNotification, FileChangeType, HoverRequest, InitializedNotification, InitializeRequest,
   PublishDiagnosticsNotification, RegistrationRequest, ShutdownRequest, StreamMessageReader, StreamMessageWriter,
 } from "vscode-languageserver/node";
-import type { CompletionItem, CompletionList, Location, MarkupContent, ProtocolConnection, TextEdit } from "vscode-languageserver/node";
+
+import type { ComponentText } from "../src/language-server/classes.ts";
+
 import { classRuleSnippet, cssClassRules, cssImports } from "../src/language-server/class-rules.ts";
 import { classCompletion, classDefinition, classHover, ClassIndex, classTokenAt, classView, resolveClassCompletion } from "../src/language-server/classes.ts";
-import type { ComponentText } from "../src/language-server/classes.ts";
 import { startLanguageServer } from "../src/language-server/server.ts";
 import { createTempProject } from "./helpers/temp-project.ts";
 

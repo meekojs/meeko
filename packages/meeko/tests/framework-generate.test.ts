@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
+
 import { generateRoutes } from "../src/framework/generate.ts";
 
 const execFileAsync = promisify(execFile);

@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import test from "node:test";
+
 import { createI18n } from "../dist/index.js";
 import { compileCatalog, messageParameters } from "../dist/messages.js";
 
@@ -52,7 +53,7 @@ test("external module generates typed keys, builds SSR, and removes its types wh
       await put("app/pages/index.meeko", `<script lang="ts">const { t } = useI18n();</script><template><h1>{${expression}}</h1></template>`);
       await assert.rejects(run("check"), /TS\d+/);
     }
-    await put("app/pages/index.meeko", '<script lang="ts">const { t } = useI18n();</script><template><h1>{t("unknown")}</h1></template>');
+    await put("app/pages/index.meeko", '<script lang="ts">const { t } = useI18n();</script><template><h1>{t("unknown", { name: "Meeko" })}</h1></template>');
     await assert.rejects(run("check"), /unknown/);
     await put("app/pages/index.meeko", '<script lang="ts">const { t } = useI18n();</script><template><h1>{t("hello", { name: "Meeko" })}</h1></template>');
     await run("build");

@@ -1,10 +1,11 @@
-import assert from "node:assert/strict";
-import test from "node:test";
-import { resolve } from "node:path";
 import { Window as HappyWindow } from "happy-dom";
+import assert from "node:assert/strict";
+import { resolve } from "node:path";
+import test from "node:test";
 import { createServer } from "vite";
-import { bindEvent } from "../src/app/runtime/renderer.ts";
+
 import { provideErrorHandler } from "../src/app/runtime/component-errors.ts";
+import { bindEvent } from "../src/app/runtime/renderer.ts";
 import { createRoot } from "../src/core/reactivity.ts";
 import { meeko } from "../src/vite.ts";
 

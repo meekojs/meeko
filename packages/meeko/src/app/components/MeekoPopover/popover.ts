@@ -1,3 +1,6 @@
+import type { ReadonlySignal, Signal } from "../../../core/reactivity";
+import type { MeekoPopoverProps, PopoverMode, PopoverPlacement, PopoverRole, PopoverSide, PopoverTrigger } from "./types";
+
 /**
  * `<MeekoPopover>`: what `MeekoPopover.meeko` needs besides its template. The pure helpers (the
  * position area of a placement, the fallback position, the keys of a menu, typeahead) are tested on
@@ -8,9 +11,6 @@
  * in the browser, so a strict CSP without `'unsafe-inline'` is enough.
  */
 import { computed, effect, untrack } from "../../../core/reactivity";
-import type { ReadonlySignal, Signal } from "../../../core/reactivity";
-
-import type { MeekoPopoverProps, PopoverMode, PopoverPlacement, PopoverRole, PopoverSide, PopoverTrigger } from "./types";
 
 /** `position-area` of each placement: the side, and the span that aligns it with an edge. */
 const areas: Readonly<Record<PopoverPlacement, string>> = {

@@ -1,0 +1,9 @@
+<script lang="ts">
+import { onCleanup } from "@meekojs/meeko";
+
+function message(): string {
+  onCleanup(() => { throw new Error("cleanup failed"); });
+  throw new Error("render failed");
+}
+</script>
+<template><p>{message()}</p></template>

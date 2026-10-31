@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
+
 import { generateAppTypes } from "../src/framework/check-app.ts";
 import { checkFrameworkProject } from "../src/framework/check-project.ts";
 import { generateComponentRegistryTypes } from "../src/framework/type-declarations.ts";

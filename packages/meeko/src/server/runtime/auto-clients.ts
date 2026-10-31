@@ -1,5 +1,6 @@
-import { currentRequest } from "./request-context";
 import type { ClientOptions } from "../../shared/clients";
+
+import { currentRequest } from "./request-context";
 
 /**
  * Opciones de cliente para el servidor: leen la URL, las cookies, `authorization`, el token CSRF y

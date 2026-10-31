@@ -1,6 +1,7 @@
+import type { HeadInput, HeadSource } from "../../shared/head";
+
 import { effect, findContext, isDryRender, onCleanup } from "../../core/reactivity";
 import { normalizeHeadInput } from "../../shared/head";
-import type { HeadInput, HeadSource } from "../../shared/head";
 import { headLevelKey, headManagerKey, pageHeadSink, reader } from "../runtime/head";
 
 /**

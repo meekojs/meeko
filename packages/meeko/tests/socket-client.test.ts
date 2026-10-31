@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createSocketClient, createSocketRegistry } from "../src/app/runtime/socket.ts";
+
 import { useSocketChannel } from "../src/app/composables/use-socket-channel.ts";
 import { useSocketClient } from "../src/app/composables/use-socket-client.ts";
-import * as framework from "../src/framework.ts";
-import { createRoot, effect } from "../src/core/reactivity.ts";
 import { createAppErrorChannel, provideAppErrorChannel, provideErrorHandler } from "../src/app/runtime/component-errors.ts";
+import { createSocketClient, createSocketRegistry } from "../src/app/runtime/socket.ts";
+import { createRoot, effect } from "../src/core/reactivity.ts";
+import * as framework from "../src/framework.ts";
 
 class FakeSocket extends EventTarget {
   readyState: number = WebSocket.CONNECTING;

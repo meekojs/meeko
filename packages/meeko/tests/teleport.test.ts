@@ -1,25 +1,27 @@
+import { Window } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { Window } from "happy-dom";
 import { TextDocument } from "vscode-languageserver-textdocument";
+
+import type { ClientComponent } from "../src/app/runtime/client.ts";
+import type { ComponentRelease } from "../src/app/runtime/renderer.ts";
+import type { TeleportEntry } from "../src/app/runtime/teleport.ts";
+import type { PageModule } from "../src/server/runtime/framework-render.ts";
+
+import { mountClientApp } from "../src/app/runtime/client.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { collectTeleports, isTeleportTarget, renderTeleport, TeleportCollector } from "../src/app/runtime/teleport.ts";
 import { compile } from "../src/compiler.ts";
 import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
-import type { ComponentRelease } from "../src/app/runtime/renderer.ts";
-import { mountClientApp } from "../src/app/runtime/client.ts";
-import type { ClientComponent } from "../src/app/runtime/client.ts";
-import { prerenderRoutes } from "../src/framework/prerender.ts";
-import { createRouteManifest } from "../src/app/runtime/router.ts";
-import { createPageHandler } from "../src/server/runtime/framework-render.ts";
-import type { PageModule } from "../src/server/runtime/framework-render.ts";
-import { placeTeleports } from "../src/server/runtime/teleports.ts";
 import { checkApp } from "../src/framework/check-app.ts";
+import { prerenderRoutes } from "../src/framework/prerender.ts";
 import { teleportCompletion, teleportHover } from "../src/language-server/teleport.ts";
-import { collectTeleports, isTeleportTarget, renderTeleport, TeleportCollector } from "../src/app/runtime/teleport.ts";
-import type { TeleportEntry } from "../src/app/runtime/teleport.ts";
+import { createPageHandler } from "../src/server/runtime/framework-render.ts";
+import { placeTeleports } from "../src/server/runtime/teleports.ts";
 import { linkRepositoryPackages, tempProject } from "./helpers/temp-project.ts";
 
 interface RuntimeModule {

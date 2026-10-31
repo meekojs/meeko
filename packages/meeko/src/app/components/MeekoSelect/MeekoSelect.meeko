@@ -1,17 +1,23 @@
 <script lang="ts" generic="T, Multiple extends boolean = false">
+import type { MeekoSelectProps, SelectModel, SelectSettings, SelectSnippets } from "./types";
+
 // <MeekoSelect>, Meeko's own tag since 1.5, built on <MeekoPopover>. `pnpm run builtins` compiles this
 // file into select.compiled.ts, which the package ships as @meekojs/meeko/builtins/select and which
 // only the components that use the tag import; edit this file, not that one.
 import { useId } from "../../composables/useId";
 import { onMounted } from "../../runtime/lifecycle";
 import { createSelect } from "./select";
-import type { MeekoSelectProps, SelectModel, SelectSettings, SelectSnippets } from "./types";
 
 const props = defineProps<MeekoSelectProps<T, Multiple>>();
-const snippets = defineSnippets<SelectSnippets<T>>();
+
 const emit = defineEmits<{ change: [value: SelectModel<T, Multiple>] }>();
+
 const model = defineModel<SelectModel<T, Multiple>>({ default: null as unknown as SelectModel<T, Multiple> });
+
+const snippets = defineSnippets<SelectSnippets<T>>();
+
 const root = useElementRef("root");
+
 // The IDs of the trigger, the list and each option come from useId: the same in SSR and hydration.
 const select = createSelect<T>(props as SelectSettings<T>, model, useId(), (value) => emit("change", value as SelectModel<T, Multiple>));
 onMounted(() => select.mount(root.value));

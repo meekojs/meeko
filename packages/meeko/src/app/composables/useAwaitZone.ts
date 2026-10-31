@@ -1,14 +1,15 @@
+import type { ReadonlySignal } from "../../core/reactivity";
+import type { HeadInput } from "../../shared/head";
+import type { AwaitMessages, AwaitProps, AwaitState } from "../runtime/await";
+
+import { computed, effect, isDryRender, untrack } from "../../core/reactivity";
+import { useHead } from "../composables/use-head";
+import { awaitRequestKeys, awaitResources, awaitStatus, hasData, minimumRule, prepareReserve, rememberHeight, reserveEnabled, reserveMinimum, reserveScript, reserveZoneKey } from "../runtime/await";
+import { onMounted, setupPhase } from "../runtime/lifecycle";
 /** Render-scoped state, reserve and focus for the built-in <MeekoAwait> component. */
 import { useId } from "./useId";
-import { onMounted, setupPhase } from "../runtime/lifecycle";
-import { computed, effect, isDryRender, untrack } from "../../core/reactivity";
-import type { ReadonlySignal } from "../../core/reactivity";
-import { useHead } from "../composables/use-head";
-import type { HeadInput } from "../../shared/head";
 import { useRoute } from "./useRoute";
 import { currentBrowser } from "./useStorage";
-import { awaitRequestKeys, awaitResources, awaitStatus, hasData, minimumRule, prepareReserve, rememberHeight, reserveEnabled, reserveMinimum, reserveScript, reserveZoneKey } from "../runtime/await";
-import type { AwaitMessages, AwaitProps, AwaitState, AwaitResource } from "../runtime/await";
 
 /** Key of the reserve entries in <head>. */
 const HEAD_KEY = "meeko:await";

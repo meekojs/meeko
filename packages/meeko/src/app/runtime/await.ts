@@ -10,8 +10,9 @@
  * inserts a zone.
  */
 import type { ReadonlySignal } from "../../core/reactivity";
-import { resourceInternals } from "../composables/resources/engine";
 import type { ResourceInternals } from "../composables/resources/engine";
+
+import { resourceInternals } from "../composables/resources/engine";
 
 /**
  * Lo que `<MeekoAwait for="…">` espera: el resultado de `useApi` o `useRpcQuery` (sin `await`), o

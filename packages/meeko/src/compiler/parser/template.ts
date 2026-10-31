@@ -1,6 +1,8 @@
 import { parseFragment } from "parse5";
-import { compileError, maskComponentTags, maskedFormTag, parseErrorMessage, snippetTableTags } from "./sfc";
+
 import type { SfcSection } from "./sfc";
+
+import { compileError, maskComponentTags, maskedFormTag, parseErrorMessage, snippetTableTags } from "./sfc";
 
 /** Atributo normalizado de una etiqueta de plantilla. */
 export interface TemplateAttribute {

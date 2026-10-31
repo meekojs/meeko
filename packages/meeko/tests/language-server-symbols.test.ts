@@ -1,10 +1,12 @@
+import type { DocumentSymbol, Range } from "vscode-languageserver/node";
+
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
 import { pathToFileURL } from "node:url";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import type { DocumentSymbol, Range } from "vscode-languageserver/node";
+
 import { documentSymbols } from "../src/language-server/features.ts";
 import { MeekoProject } from "../src/language-server/project.ts";
 

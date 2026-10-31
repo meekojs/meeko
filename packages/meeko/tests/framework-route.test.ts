@@ -1,28 +1,34 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { Window as HappyWindow } from "happy-dom";
-import { compile } from "../src/compiler.ts";
+
+import type { PageSchema } from "../src/app/definitions/define-page.ts";
+import type { ClientComponent, ClientRoute } from "../src/app/runtime/client.ts";
+import type * as client_tsTypes from "../src/app/runtime/client.ts";
+import type { ErrorPageRecord, RouteRecord } from "../src/app/runtime/router.ts";
+import type * as prerender_tsTypes from "../src/framework/prerender.ts";
+import type * as framework_render_tsTypes from "../src/server/runtime/framework-render.ts";
+
+import { createRouteManifest } from "../src/app/runtime/router.ts";
 import { discoverAutoImports } from "../src/autoimports/registry.ts";
 import { applyAutoImports } from "../src/autoimports/transform.ts";
+import { compile } from "../src/compiler.ts";
 import { checkApp } from "../src/framework/check-app.ts";
 import { prepareFrameworkTypeDeclarations } from "../src/framework/type-declarations.ts";
-import type { ClientComponent, ClientRoute } from "../src/app/runtime/client.ts";
-import type { PageSchema } from "../src/app/definitions/define-page.ts";
-import { createRouteManifest } from "../src/app/runtime/router.ts";
-import type { ErrorPageRecord, RouteRecord } from "../src/app/runtime/router.ts";
 import { createTempProject } from "./helpers/temp-project.ts";
+
 
 const fileUrl = (path: string): string => pathToFileURL(resolve(path)).href;
 
 /** The runtime as the compiled components import it, by file URL: one instance for pages, server and browser. */
 const runtime = async () => ({
-  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof import("../src/server/runtime/framework-render.ts"),
-  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof import("../src/app/runtime/client.ts"),
-  ...await import(fileUrl("src/framework/prerender.ts")) as typeof import("../src/framework/prerender.ts"),
+  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof framework_render_tsTypes,
+  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof client_tsTypes,
+  ...await import(fileUrl("src/framework/prerender.ts")) as typeof prerender_tsTypes,
 });
 
 const globals = globalThis as unknown as { meekoRouteCalls?: string[] };

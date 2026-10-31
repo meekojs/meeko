@@ -1,11 +1,14 @@
+import type { CompletionItem, CompletionList, Hover, Location, MarkupContent, Position } from "vscode-languageserver/node";
+
 import { readFileSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { CompletionItemKind, MarkupKind } from "vscode-languageserver/node";
-import type { CompletionItem, CompletionList, Hover, Location, MarkupContent, Position } from "vscode-languageserver/node";
-import { classRuleSnippet, cssClassRules, cssImports } from "./class-rules";
+
 import type { ClassRule } from "./class-rules";
+
+import { classRuleSnippet, cssClassRules, cssImports } from "./class-rules";
 import { styleRegion, tagAt } from "./embedded";
 import { pathKey } from "./project";
 

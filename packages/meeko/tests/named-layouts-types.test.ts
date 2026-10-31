@@ -1,9 +1,10 @@
+import ts from "@typescript/typescript6";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
-import ts from "@typescript/typescript6";
+
 import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
 
 const compilerOptions = {

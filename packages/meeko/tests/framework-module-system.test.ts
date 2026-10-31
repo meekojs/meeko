@@ -1,23 +1,24 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
+
+import { definePlugin, runPlugins } from "../src/app/definitions/define-plugin.ts";
+import { fixedRoute } from "../src/app/runtime/navigation.ts";
 import { discoverAutoImports, discoverAutoImportsSync } from "../src/autoimports/registry.ts";
+import { createContext, createRoot, inject } from "../src/core/reactivity.ts";
 import { discoverAppPlugins } from "../src/framework/app-manifest.ts";
 import { checkFrameworkProject, prepareFrameworkTypes } from "../src/framework/check-project.ts";
 import { discoverConfiguredRoutes, loadConfiguredModules, readMeekoConfigSync, resolveConfigSources, resolveMeekoConfig } from "../src/framework/config.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
-import { defineMeekoModule } from "../src/modules/define-meeko-module.ts";
 import { mergeHeadInput, mergeModuleOptions, resolveMeekoModules, satisfiesVersion, warnLegacyLayerEntries } from "../src/framework/module-loader.ts";
-import { definePlugin, runPlugins } from "../src/app/definitions/define-plugin.ts";
-import { fixedRoute } from "../src/app/runtime/navigation.ts";
 import { buildProject } from "../src/framework/project.ts";
-import { inject, createContext, createRoot } from "../src/core/reactivity.ts";
+import { defineMeekoModule } from "../src/modules/define-meeko-module.ts";
 import { linkRepositoryPackages, repositoryRoot, stopChild, tempProject } from "./helpers/temp-project.ts";
 
 const fixture = fileURLToPath(new URL("./fixtures/module-hello", import.meta.url));

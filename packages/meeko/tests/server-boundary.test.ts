@@ -1,9 +1,9 @@
+import { build } from "esbuild";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { build } from "esbuild";
 
 // parse5 is not tooling since 1.7: the server reads a document's inline scripts and styles with it, as
 // the browser does, to hash them for Meeko's CSP (server/runtime/inline-sources.ts). It is portable.

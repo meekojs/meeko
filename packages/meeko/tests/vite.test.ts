@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
 import { createLogger, createServer } from "vite";
+
 import { meeko } from "../src/vite.ts";
 import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
 
@@ -16,12 +16,16 @@ test("Vite carga el mismo componente .meeko en el entorno SSR", async () => {
   });
   try {
     const filename = resolve("examples/counter/Counter.meeko");
+    const source = await readFile(filename, "utf8");
+    const originalMarker = source.lastIndexOf("doubled.value");
+    assert.ok(originalMarker >= 0);
+    const originalLine = source.slice(0, originalMarker).split(/\r\n|\r|\n/).length;
     const transformed = await server.transformRequest(filename, { ssr: true });
     assert.ok(transformed?.map && "sources" in transformed.map && transformed.map.sources.some((source) => source.endsWith("Counter.meeko")));
     const marker = transformed?.code.indexOf("doubled.value") ?? -1;
     assert.ok(marker >= 0);
     const prior = transformed!.code.slice(0, marker).split("\n");
-    assert.equal(mappedLine(transformed!.map!.mappings, prior.length, prior.at(-1)!.length), 16);
+    assert.equal(mappedLine(transformed!.map!.mappings, prior.length, prior.at(-1)!.length), originalLine);
     const module = await server.ssrLoadModule(filename) as { renderToString: (props: { initial: number }) => string; css: string };
     assert.match(module.renderToString({ initial: 4 }), /meeko:text:0-->4/);
     assert.match(module.css, /data-meeko-s-/);

@@ -1,13 +1,16 @@
+import type { MarkupContent } from "vscode-languageserver/node";
+
+import ts from "@typescript/typescript6";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { after, before, describe, test } from "node:test";
 import { pathToFileURL } from "node:url";
-import ts from "@typescript/typescript6";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import type { MarkupContent } from "vscode-languageserver/node";
-import { completion, hover } from "../src/language-server/features.ts";
+
 import type { FeatureContext } from "../src/language-server/features.ts";
+
+import { completion, hover } from "../src/language-server/features.ts";
 import { MeekoProject } from "../src/language-server/project.ts";
 
 const list = `<script lang="ts" generic="T extends { id: string }">

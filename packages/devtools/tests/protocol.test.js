@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import {
-  SUPPORTED_PROTOCOL_VERSION, commandExpression, groupInstances, normalizeCommandResult, normalizeSnapshot, parseSignalValue,
-  protocolMismatch, readKindLabel, snapshotExpression, writeLabel,
+  commandExpression, groupInstances, normalizeCommandResult, normalizeSnapshot, parseSignalValue, protocolMismatch,
+  readKindLabel, snapshotExpression, SUPPORTED_PROTOCOL_VERSION, writeLabel,
 } from "../protocol.js";
 
 /** Evalúa una expresión del puente contra un `window` simulado, como haría `inspectedWindow.eval`. */
@@ -13,6 +14,21 @@ function evaluateWith(bridge, expression) {
 test("la expresión de captura consulta el puente sin ejecutar acciones", () => {
   assert.match(snapshotExpression(), /__MEEKO_DEVTOOLS__/);
   assert.match(snapshotExpression(), /bridge\.snapshot\(\)/);
+});
+
+test("normaliza navegación y datos con metadatos acotados sin aceptar URLs o duraciones inválidas", () => {
+  const snapshot = normalizeSnapshot({
+    protocolVersion: 1, instances: [], selectedId: null,
+    events: [
+      { id: 1, at: 100, kind: "navigation", instanceId: "operation-1", activity: { operationId: 1, route: "/users/[id]", phase: "commit", durationMs: 12.5, secret: "discard" } },
+      { id: 2, at: 100, kind: "data", instanceId: "operation-2", activity: { operationId: 2, route: null, phase: "ready", source: "cache", durationMs: Infinity } },
+      { id: 3, at: 100, kind: "navigation", instanceId: "operation-3", activity: { operationId: 3, route: "/users?token=secret", phase: "commit" } },
+    ],
+  });
+  assert.ok(snapshot);
+  assert.deepEqual(snapshot.events[0].activity, { operationId: 1, route: "/users/[id]", phase: "commit", durationMs: 12.5 });
+  assert.deepEqual(snapshot.events[1].activity, { operationId: 2, route: null, phase: "ready", source: "cache" });
+  assert.equal(snapshot.events[2].activity, undefined);
 });
 
 test("los comandos sólo aceptan operaciones conocidas y codifican los argumentos", () => {

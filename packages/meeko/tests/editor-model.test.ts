@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
+
 import { createEditorModel } from "../src/language-server/model.ts";
 
 test("editor positions follow the compiler template AST", () => {

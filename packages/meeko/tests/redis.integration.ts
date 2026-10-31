@@ -5,13 +5,15 @@ import { createInterface } from "node:readline";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { createClient } from "redis";
+
+import type { Schema } from "../src/framework-server.ts";
+import type { SessionRecord } from "../src/server/runtime/sessions.ts";
+
 import {
   createServerApp, createSocketHub, defineApiRoute, defineServerRuntime, defineSocketChannel, MemorySessionStore, RedisSocketPubSub, SessionRevokedError,
 } from "../src/framework-server.ts";
-import type { Schema } from "../src/framework-server.ts";
 import { RedisSessionStore } from "../src/server/runtime/session-stores.ts";
 import { SessionManager } from "../src/server/runtime/sessions.ts";
-import type { SessionRecord } from "../src/server/runtime/sessions.ts";
 
 const url = process.env.MEEKO_REDIS_URL;
 

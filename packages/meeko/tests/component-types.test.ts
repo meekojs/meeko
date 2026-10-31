@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import test from "node:test";
+
 import { builtinTagTypes, discoverAutoImports, discoverAutoImportsSync } from "../src/autoimports/registry.ts";
 import { applyAutoImports } from "../src/autoimports/transform.ts";
 import { generateAutoImportTypes } from "../src/autoimports/typescript.ts";

@@ -3,18 +3,20 @@ import { access, mkdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { inspect } from "node:util";
-import { renderPage } from "../server/runtime/app";
-import type { InternalServerApp, ServerApp } from "../server/runtime/app";
-import { serializeJson } from "../core/server";
-import { href, matchRoute } from "../app/runtime/router";
+
 import type { RouteRecord } from "../app/runtime/router";
-import { DOCUMENT_HEAD_PREFIX } from "../server/runtime/framework-render";
-import { loadConfiguredModules } from "./config";
+import type { InternalServerApp, ServerApp } from "../server/runtime/app";
 import type { PageRoute } from "../server/runtime/framework-render";
+import type { DeclaredSitemapUrl } from "./site-files";
+
+import { href, matchRoute } from "../app/runtime/router";
+import { serializeJson } from "../core/server";
+import { renderPage } from "../server/runtime/app";
+import { DOCUMENT_HEAD_PREFIX } from "../server/runtime/framework-render";
 import { documentShell } from "../server/runtime/inline-sources";
+import { loadConfiguredModules } from "./config";
 import { inlineScriptHashes, inlineStyleHashes } from "./script-hashes";
 import { collectSitemapEntries } from "./site-files";
-import type { DeclaredSitemapUrl } from "./site-files";
 
 /**
  * Opciones de {@link prerenderRoutes}.

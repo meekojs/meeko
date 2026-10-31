@@ -1,5 +1,6 @@
-import type { TSESLint } from "@typescript-eslint/utils";
 import type { TemplateNode } from "@meekojs/meeko/parse";
+import type { TSESLint } from "@typescript-eslint/utils";
+
 import type { MeekoParserServices } from "./parser";
 
 export function template(context: TSESLint.RuleContext<string, readonly unknown[]>): TemplateNode | undefined {

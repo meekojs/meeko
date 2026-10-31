@@ -1,18 +1,20 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import test from "node:test";
+
+import type { RouteRecord } from "../src/app/runtime/router.ts";
+
 import { clientMiddlewareSource, clientRoutesSource, discoverAppManifest } from "../src/framework/app-manifest.ts";
 import { checkFrameworkProject } from "../src/framework/check-project.ts";
 import { discoverConfiguredRoutes } from "../src/framework/config.ts";
 import { routeOptionsKey } from "../src/framework/dev-watch.ts";
 import { generateRoutes } from "../src/framework/generate.ts";
-import { discoverRouteMiddleware, extractRouteMiddlewareOptions } from "../src/framework/route-middleware-discovery.ts";
-import { discoverRoutes } from "../src/framework/routes-discovery.ts";
-import type { RouteRecord } from "../src/app/runtime/router.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
 import { buildProject } from "../src/framework/project.ts";
+import { discoverRouteMiddleware, extractRouteMiddlewareOptions } from "../src/framework/route-middleware-discovery.ts";
+import { discoverRoutes } from "../src/framework/routes-discovery.ts";
 import { assertStaticApp } from "../src/framework/static-adapter.ts";
 import { linkRepositoryPackages, stopChild, tempProject } from "./helpers/temp-project.ts";
 

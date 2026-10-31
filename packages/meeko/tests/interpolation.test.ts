@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { scanInterpolations } from "../src/compiler/parser/interpolation.ts";
 import { decodeTemplateText } from "../src/compiler/parser/template.ts";
 

@@ -1,11 +1,14 @@
+import type { Location, MarkupContent } from "vscode-languageserver/node";
+
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import type { Location, MarkupContent } from "vscode-languageserver/node";
+
+import type { LanguageProject, OpenedComponent } from "./language-server-workspace.ts";
+
 import { definition, hover } from "../src/language-server/features.ts";
 import { documentLinks, inlayHints, workspaceSymbols } from "../src/language-server/nav.ts";
 import { languageProject } from "./language-server-workspace.ts";
-import type { LanguageProject, OpenedComponent } from "./language-server-workspace.ts";
 
 const index = `<script lang="ts">
 const link = href("/users/[id]", { params: { id: "1" } });

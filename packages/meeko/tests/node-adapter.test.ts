@@ -1,7 +1,9 @@
+import type { AddressInfo } from "node:net";
+
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import type { AddressInfo } from "node:net";
 import test from "node:test";
+
 import { toNodeListener } from "../src/node.ts";
 
 test("Node adapter forwards method, body, headers and response", async () => {

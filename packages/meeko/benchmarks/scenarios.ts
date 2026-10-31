@@ -1,3 +1,4 @@
+import { build, version as esbuildVersion } from "esbuild";
 import { execFileSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { cpus, platform, release } from "node:os";
@@ -5,15 +6,16 @@ import { dirname, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
-import { build, version as esbuildVersion } from "esbuild";
-import { chromium, type Browser, type Page } from "playwright-core";
+import { type Browser, chromium, type Page } from "playwright-core";
 import { createSSRApp, version as vueVersion } from "vue";
 import { renderToString as renderVueToString } from "vue/server-renderer";
-import { renderToString as renderMeekoTree } from "./cases/Tree.generated.ts";
+
+import type { Scenario } from "./scenario-protocol";
+
 import { renderToString as renderMeekoList } from "./cases/List.generated.ts";
 import { renderToString as renderMeekoNavigation } from "./cases/Navigation.generated.ts";
-import { VueTree, VueList, VueNavigation, VueNavigationMount } from "./vue-scenarios";
-import type { Scenario } from "./scenario-protocol";
+import { renderToString as renderMeekoTree } from "./cases/Tree.generated.ts";
+import { VueList, VueNavigation, VueNavigationMount, VueTree } from "./vue-scenarios";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const warmupRounds = 2;

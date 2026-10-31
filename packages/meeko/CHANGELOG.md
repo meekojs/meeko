@@ -2,6 +2,9 @@
 
 ## Sin publicar
 
+- **Diagnóstico y observabilidad.** `meeko doctor [directorio] [--json]` inspecciona versiones, resolución de paquetes, LSP disponible y artefactos generados sin ejecutar la configuración ni leer `.env`. DevTools incorpora una línea de actividad de navegación y datos, con fases, duración y origen, sin registrar URLs resueltas, claves de caché ni payloads. Véanse [Doctor](../../docs/doctor.md) y [DevTools](../../docs/devtools.md).
+- **Compilador y cliente separados por responsabilidades.** El análisis de expresiones y el scoping de CSS tienen módulos propios; el navegador separa validación de payloads y transporte deferred/stream del commit transaccional. Se conservan sourcemaps, SSR, hidratación, rollback, CSRF y View Transitions.
+- **Calidad del workspace.** La CI prepara los paquetes antes de lint, verifica todos los paquetes públicos y aplicaciones, y prueba consumidores de tarballs fuera del workspace. Las declaraciones de componentes UI se reubican con imports portables. Nuevos benchmarks reproducibles de compilación, SSR, hidratación, bundle y LSP, con presupuestos y comparación por entorno; véanse [Pruebas](../../docs/testing.md) y [Rendimiento](../../docs/performance.md).
 - **View Transitions nativas en navegación cliente.** `viewTransitions: true` en `meeko.config.ts` activa la API del navegador alrededor del commit de DOM y head, después de cargar módulos y datos. Admite historial, nombres compartidos mediante CSS y excepciones con `data-meeko-view-transition="false"` o `app.navigate(to, { viewTransition: false })`. La hidratación inicial, movimiento reducido y navegadores sin soporte conservan la navegación habitual. Las transiciones omitidas no bloquean la navegación ni permiten commits de rutas abortadas. Véase [View Transitions nativas](../../docs/framework.md#view-transitions-nativas).
 
 ## [1.7.1] - 2026-10-29

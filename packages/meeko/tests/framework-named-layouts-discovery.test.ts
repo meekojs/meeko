@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import test from "node:test";
+
+import type { RouteRecord } from "../src/app/runtime/router.ts";
+
 import { discoverConfiguredRoutes } from "../src/framework/config.ts";
 import { isRouteOptionsSource, routeOptionsKey } from "../src/framework/dev-watch.ts";
 import { generateRoutes } from "../src/framework/generate.ts";
 import { discoverErrorPage, discoverLayouts, discoverRoutes, extractGroupOptions, extractRouteOptions } from "../src/framework/routes-discovery.ts";
-import type { RouteRecord } from "../src/app/runtime/router.ts";
 import { linkRepositoryPackages, tempProject } from "./helpers/temp-project.ts";
 
 async function put(root: string, path: string, source: string): Promise<void> {

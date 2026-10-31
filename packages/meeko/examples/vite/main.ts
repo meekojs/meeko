@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 
 import { hydrate, renderToString } from "../counter/Counter.meeko";
+import { hydrate as hydrateNested, renderToString as renderNested } from "../nested/Parent.meeko";
 import { hydrate as hydrateRegions, renderToString as renderRegions } from "../regions/Regions.meeko";
 import { hydrate as hydrateHot, renderToString as renderHot } from "./Hot.meeko";
-import { hydrate as hydrateNested, renderToString as renderNested } from "../nested/Parent.meeko";
 
 const root = document.querySelector("#app");
 if (!root) throw new Error("Missing #app root");

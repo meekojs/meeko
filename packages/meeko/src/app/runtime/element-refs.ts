@@ -1,3 +1,5 @@
+import type { ReadonlySignal, Signal } from "../../core/reactivity";
+
 /**
  * Runtime behind `useElementRef("name")` and the template directive `ref:name`.
  *
@@ -6,7 +8,6 @@
  * value of a component, and withdraws it when its region is released.
  */
 import { signal } from "../../core/reactivity";
-import type { ReadonlySignal, Signal } from "../../core/reactivity";
 
 /** Marks values that an `await` of a browser continuation waits for in its own way. */
 export const browserReady: unique symbol = Symbol("meeko.browserReady");

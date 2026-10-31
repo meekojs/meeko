@@ -1,9 +1,11 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
+
 import assert from "node:assert/strict";
 import { EventEmitter, once } from "node:events";
 import { createServer } from "node:http";
-import type { IncomingMessage, ServerResponse } from "node:http";
 import { connect } from "node:net";
 import test from "node:test";
+
 import { ApiError } from "../src/framework-server";
 import { toNodeListener } from "../src/node";
 

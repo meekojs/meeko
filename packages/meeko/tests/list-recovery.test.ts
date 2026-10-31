@@ -1,6 +1,7 @@
+import { Window } from "happy-dom";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Window } from "happy-dom";
+
 import { bindFor, renderFor } from "../src/app/runtime/renderer.ts";
 import { signal } from "../src/core/reactivity.ts";
 

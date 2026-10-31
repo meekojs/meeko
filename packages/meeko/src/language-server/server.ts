@@ -1,36 +1,39 @@
+import type { Connection, Diagnostic, InitializeResult, Position, Range, SemanticTokens, TextDocumentIdentifier } from "vscode-languageserver/node";
+
+import ts from "@typescript/typescript6";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import ts from "@typescript/typescript6";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
   CodeActionKind, CodeLensRefreshRequest, createConnection, DiagnosticSeverity, DidChangeWatchedFilesNotification, RequestType, TextDocuments, TextDocumentSyncKind,
   WatchKind,
 } from "vscode-languageserver/node";
-import type { Connection, Diagnostic, InitializeResult, Position, Range, SemanticTokens, TextDocumentIdentifier } from "vscode-languageserver/node";
-import { projectRoot } from "../compiler/project-root";
+
+import type { CompletionData, FeatureContext, LocatedDocument, MeekoFormatSettings } from "./features";
+import type { ExecutionZoneKind, ExecutionZoneReason } from "./zones";
+
 import { MeekoCompileError } from "../compiler/parser/sfc";
+import { projectRoot } from "../compiler/project-root";
 import { checkFrameworkPageContracts } from "../framework/page-contracts-check";
+import { classCompletion, classDefinition, classHover, ClassIndex, classView, isClassCompletionData, resolveClassCompletion, withItemDefaults } from "./classes";
+import { cssVariableCompletion, cssVariableDefinition, cssVariableHover, isCssVariableCompletionData, resolveCssVariableCompletion } from "./css-variables";
 import { componentDiagnostics, contractRange, frameworkContractRoot, projectCheckRoot, tokenEnd } from "./diagnostics";
+import {
+  colorPresentations, cssCompletion, cssHover, documentColors, htmlCompletion, htmlHover, linkedEditingRanges, specialTemplateHover, styleDiagnostics, tagCompletion,
+} from "./embedded";
 import {
   codeActions, completionList, componentNameCompletion, definition, directiveNameCompletion, documentSymbols, foldingRanges, formatting, hover, prepareRename, references,
   rename, resolveCompletion, semanticTokens, semanticTokensLegend, shadowedTagsOf, signatureHelp,
 } from "./features";
-import type { CompletionData, FeatureContext, LocatedDocument, MeekoFormatSettings } from "./features";
-import { classCompletion, classDefinition, classHover, ClassIndex, classView, isClassCompletionData, resolveClassCompletion, withItemDefaults } from "./classes";
-import { cssVariableCompletion, cssVariableDefinition, cssVariableHover, isCssVariableCompletionData, resolveCssVariableCompletion } from "./css-variables";
-import {
-  colorPresentations, cssCompletion, cssHover, documentColors, htmlCompletion, htmlHover, linkedEditingRanges, specialTemplateHover, styleDiagnostics, tagCompletion,
-} from "./embedded";
 import { codeLenses } from "./lenses";
-import { createComponentActions, listItemActions, propsReadActions } from "./quick-fixes";
 import { documentLinks, inlayHints, linkRouteCompletion, workspaceSymbols } from "./nav";
 import { MeekoProject, MeekoWorkspace, pathKey } from "./project";
+import { createComponentActions, listItemActions, propsReadActions } from "./quick-fixes";
 import { teleportCompletion, teleportHover } from "./teleport";
 import { executionZones } from "./zones";
-import type { ExecutionZoneKind, ExecutionZoneReason } from "./zones";
 
 /** A zone of `meeko/executionZones`: whole lines of a component and where they run. */
 export interface ExecutionZoneItem {

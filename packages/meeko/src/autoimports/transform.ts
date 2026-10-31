@@ -1,17 +1,19 @@
-import { join, relative, resolve } from "node:path";
 import ts from "@typescript/typescript6";
-import { compile } from "../compiler";
+import { join, relative, resolve } from "node:path";
+
 import type { CompileOptions, CompileResult } from "../compiler";
 import type { PathAlias } from "../compiler/aliases";
-import { checkClientBoundary } from "../compiler/transforms/client-boundary";
-import { projectRoot } from "../compiler/project-root";
-import { parseSfc } from "../compiler/parser/sfc";
 import type { CompileDiagnostic } from "../compiler/parser/sfc";
-import { readThemeEnabledSync } from "../framework/config";
-import { resolveProjectAliases, resolveProjectAliasesSync } from "../framework/aliases";
 import type { ProjectAliases } from "../framework/aliases";
-import { autoImportCollision, discoverAutoImports } from "./registry";
 import type { AutoImport, ImportScope } from "./registry";
+
+import { compile } from "../compiler";
+import { parseSfc } from "../compiler/parser/sfc";
+import { projectRoot } from "../compiler/project-root";
+import { checkClientBoundary } from "../compiler/transforms/client-boundary";
+import { resolveProjectAliases, resolveProjectAliasesSync } from "../framework/aliases";
+import { readThemeEnabledSync } from "../framework/config";
+import { autoImportCollision, discoverAutoImports } from "./registry";
 
 function bindingNames(name: ts.BindingName, names: Set<string>): void {
   if (ts.isIdentifier(name)) names.add(name.text);

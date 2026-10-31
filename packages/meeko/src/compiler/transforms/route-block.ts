@@ -1,4 +1,5 @@
 import { basename, relative, sep } from "node:path";
+
 import { sectionAttribute } from "../generic";
 import { compileError, MeekoCompileError, parseSfc } from "../parser/sfc";
 

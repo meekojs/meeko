@@ -1,17 +1,22 @@
+import type { ConsoleMessage } from "playwright-core";
+
 import assert from "node:assert/strict";
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { chromium } from "playwright-core";
 import WebSocket from "ws";
+
+import type { ServerLogBatch } from "../src/framework/dev-server-logs.ts";
+
 import { prepareFrameworkTypes } from "../src/framework/check-project.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
 import { buildProject } from "../src/framework/project.ts";
-import type { ServerLogBatch } from "../src/framework/dev-server-logs.ts";
 import { repositoryRoot, stopChild, tempProject } from "./helpers/temp-project.ts";
+
 
 async function freePort(): Promise<number> {
   const server = createServer();
@@ -259,7 +264,7 @@ test("meeko dev forwards the server's console to the browser of the request that
     headless: true,
   });
   const tab = await browser.newPage();
-  const messages: Array<{ type: string; text: string; message: import("playwright-core").ConsoleMessage }> = [];
+  const messages: Array<{ type: string; text: string; message: ConsoleMessage }> = [];
   tab.on("console", (message) => messages.push({ type: message.type(), text: message.text(), message }));
   const pageErrors: string[] = [];
   tab.on("pageerror", (error) => pageErrors.push(error.message));

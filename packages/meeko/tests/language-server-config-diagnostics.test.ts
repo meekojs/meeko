@@ -1,12 +1,15 @@
+import type { Diagnostic } from "vscode-languageserver/node";
+
 import assert from "node:assert/strict";
 import { utimes, writeFile } from "node:fs/promises";
 import { after, before, describe, test } from "node:test";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import type { Diagnostic } from "vscode-languageserver/node";
+
+import type { LanguageProject } from "./language-server-workspace.ts";
+
 import { componentDiagnostics, configErrorRange } from "../src/language-server/diagnostics.ts";
 import { MeekoProject } from "../src/language-server/project.ts";
 import { languageProject, locateOnDisk } from "./language-server-workspace.ts";
-import type { LanguageProject } from "./language-server-workspace.ts";
 
 /** The configuration of the report: a function titleTemplate in `document.head`, as a method. */
 const userConfig = `import { defineMeekoConfig } from '@meekojs/meeko/framework'

@@ -1,4 +1,4 @@
-import { lstat, mkdir, readFile, readdir, realpath, unlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, realpath, unlink, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 const marker = "// @meeko-generated module-type v1\n";

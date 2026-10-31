@@ -22,6 +22,7 @@ El resultado aparece en `packages/devtools/artifacts/meeko-devtools-1.0.0.zip`, 
 
 - Agrupa instancias por componente y permite buscarlas por nombre o archivo.
 - Muestra propiedades, señales, parentesco, estado y eventos del puente de desarrollo.
+- El filtro **Navegación y datos** muestra inicio y final de cada operación, su duración, el patrón de ruta y el origen `server`, `client`, `static` o `cache`. Los metadatos no copian URLs resueltas, parámetros, cabeceras ni resultados del loader. Consulta [Navegación y datos](../../docs/devtools.md#navegación-y-datos).
 - **Editar señal**: sustituye el valor de una señal editable de la instancia seleccionada por un valor JSON. El panel valida el JSON y muestra junto a **Aplicar** el error o la confirmación. El texto que estés escribiendo no se pisa con los refrescos del panel.
 - La línea de tiempo muestra el componente, el archivo `.meeko`, la señal y el valor posterior. Permite filtrar sólo señales o la instancia seleccionada. Pulsa un evento para volver a una instancia que siga activa. Los eventos conservan su origen después del desmontaje.
 - Cada evento de señal indica qué la escribió: «Escrita en `archivo:línea:columna`» para una asignación `.value` del archivo `.meeko` (script o handler `on:`) o «Escrita desde DevTools» para una edición. Al desplegarlo se ven las lecturas que dependían de ella, con línea, columna y tipo: texto, atributo, `computed`, condición (`if:when`), lista (`each:of`) o prop de un componente hijo.

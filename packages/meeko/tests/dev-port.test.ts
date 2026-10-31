@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createServer } from "node:net";
 import test from "node:test";
+
 import { devPortInUse, hmrPortFor, isPortFree, resolveDevPorts } from "../src/framework/dev-port.ts";
 
 /** A probe over a fixed set of busy `host:port` pairs. */

@@ -1,9 +1,11 @@
-import ts from "@typescript/typescript6";
+import type { SfcSection } from "@meekojs/meeko/parse";
 import type { AstPath, Doc, Options, Parser, ParserOptions, Plugin, Printer, SupportLanguage, SupportOptions } from "prettier";
-import { builders, utils } from "prettier/doc";
+
 import { compile } from "@meekojs/meeko/compiler";
 import { locate, MeekoCompileError, parseSfc } from "@meekojs/meeko/parse";
-import type { SfcSection } from "@meekojs/meeko/parse";
+import ts from "@typescript/typescript6";
+import { builders, utils } from "prettier/doc";
+
 import { preserveArrayBreaksPrinter } from "./arrays";
 import { appendClassOrder, classOrderOption, stylesheetClassOrder } from "./classes";
 import { templateParserName, templatePlugin } from "./template";

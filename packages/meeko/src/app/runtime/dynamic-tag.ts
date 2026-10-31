@@ -1,3 +1,8 @@
+import type { AttributeNameOf, AttributeValue, HtmlTagName, Words } from "../../shared/html-attributes";
+import type { ElementOf } from "./element-refs";
+import type { ExposedOf } from "./expose";
+
+import { attributeValue, escapeHtml } from "../../core/server";
 /**
  * Runtime and types behind `<component is>` with an HTML tag and the `bind="obj"` directive.
  *
@@ -10,10 +15,6 @@
  * a component. Keys that start with `on` are rejected: event handlers never come from data.
  */
 import { elementAccepts, elementAttributeNames } from "../../shared/html-attributes";
-import type { AttributeNameOf, AttributeValue, HtmlTagName, Words } from "../../shared/html-attributes";
-import { attributeValue, escapeHtml } from "../../core/server";
-import type { ElementOf } from "./element-refs";
-import type { ExposedOf } from "./expose";
 
 /** Elements that `<component is>` refuses: document metadata, scripts, embedded documents and raw text. */
 const forbiddenTagNames = "base body embed fencedframe head html iframe link meta noscript object param script slot style template textarea title";

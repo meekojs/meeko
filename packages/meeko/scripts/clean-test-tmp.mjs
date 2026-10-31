@@ -7,6 +7,7 @@
 import { lstat, rm, unlink } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { testTempRoot } from "./test-tmp-root.mjs";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");

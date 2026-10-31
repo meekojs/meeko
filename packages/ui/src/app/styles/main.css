@@ -2,6 +2,8 @@
 @import './modal.css';
 @import './table.css';
 @import './card.css';
+@import './link-card.css';
+@import './badge.css';
 
 .meeko-ui-button,
 .meeko-ui-input,
@@ -15,17 +17,51 @@
 	display: inline-flex;
 	justify-content: center;
 	align-items: center;
+	transition:
+		background-color 150ms,
+		border-color 150ms;
 	cursor: pointer;
+	box-sizing: border-box;
 	border: 1px solid transparent;
 	border-radius: var(--meeko-ui-radius);
-	background: var(--meeko-ui-accent);
-	padding: 0.55rem 0.9rem;
-	min-height: 2.5rem;
-	color: var(--meeko-ui-on-accent);
-	font: 600 0.9rem/1.2 var(--meeko-ui-font);
+	background: var(--meeko-ui-primary);
+	padding: var(--meeko-ui-control-padding);
+	min-height: var(--meeko-ui-control-height);
+	color: var(--meeko-ui-on-primary);
+	font: var(--meeko-ui-control-weight) var(--meeko-ui-control-font-size)/1.2 var(--meeko-ui-font);
+	text-decoration: none;
+	white-space: nowrap;
 }
 .meeko-ui-button:hover:not(:disabled) {
-	background: var(--meeko-ui-accent-hover);
+	background: var(--meeko-ui-primary-hover);
+}
+.meeko-ui-button[data-size='sm'] {
+	padding: 0 0.9rem;
+	min-height: 2rem;
+	font-size: 0.84rem;
+}
+.meeko-ui-button[data-size='lg'] {
+	padding: 0.75rem 1.25rem;
+	min-height: 3rem;
+	font-size: 1rem;
+}
+.meeko-ui-button[data-shape='pill'] {
+	border-radius: 999px;
+}
+.meeko-ui-button[data-variant='ghost'] {
+	background: transparent;
+	color: var(--meeko-ui-text);
+}
+.meeko-ui-button[data-variant='ghost']:hover:not(:disabled) {
+	background: var(--meeko-ui-surface-hover);
+}
+.meeko-ui-button[data-variant='outline'] {
+	border-color: var(--meeko-ui-border-strong);
+	background: transparent;
+	color: var(--meeko-ui-text);
+}
+.meeko-ui-button[data-variant='outline']:hover:not(:disabled) {
+	background: var(--meeko-ui-surface-hover);
 }
 .meeko-ui-button[data-variant='secondary'] {
 	border-color: var(--meeko-ui-border);
@@ -73,6 +109,11 @@
 [data-meeko-theme-toggle] button:focus-visible {
 	outline: 2px solid var(--meeko-ui-focus);
 	outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+	.meeko-ui-button {
+		transition: none;
+	}
 }
 .meeko-ui-field {
 	display: grid;

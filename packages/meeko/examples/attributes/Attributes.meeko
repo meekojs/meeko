@@ -2,6 +2,7 @@
 import { signal } from "@meekojs/meeko";
 
 const props = defineProps<{ initial: string }>();
+
 const message = signal(props.initial);
 const enabled = signal(false);
 

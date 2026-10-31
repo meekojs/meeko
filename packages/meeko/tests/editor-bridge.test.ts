@@ -1,23 +1,26 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
+
+import { Window } from "happy-dom";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { EventEmitter, once } from "node:events";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, request as httpRequest } from "node:http";
-import type { IncomingMessage, ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { Window } from "happy-dom";
-import type { EditorBridgeDescriptor, EditorBridgeEvent, LiveServerMessage } from "../src/shared/devtools-bridge-protocol.ts";
-import { connectLiveBridge, disconnectLiveBridge } from "../src/app/runtime/devtools-live.ts";
+
 import type { LiveHotContext } from "../src/app/runtime/devtools-live.ts";
+import type { EditorBridge, EditorBridgeHotChannel, EditorBridgeHotClient, EditorBridgeOptions } from "../src/framework/editor-bridge.ts";
+import type { EditorBridgeDescriptor, EditorBridgeEvent, LiveServerMessage } from "../src/shared/devtools-bridge-protocol.ts";
+
+import { connectLiveBridge, disconnectLiveBridge } from "../src/app/runtime/devtools-live.ts";
 import { registerDevtoolsInstance } from "../src/app/runtime/devtools.ts";
+import { signal } from "../src/core/reactivity.ts";
 import {
   editorBridgeDirectory, editorBridgeFile, editorBridgeFilePattern, editorBridgeHost, editorBridgeOffReason, editorBridgePath, startEditorBridge,
 } from "../src/framework/editor-bridge.ts";
-import type { EditorBridge, EditorBridgeHotChannel, EditorBridgeHotClient, EditorBridgeOptions } from "../src/framework/editor-bridge.ts";
-import { signal } from "../src/core/reactivity.ts";
 import { meeko } from "../src/vite.ts";
 
 type Listener = (data: unknown, client: EditorBridgeHotClient) => void;

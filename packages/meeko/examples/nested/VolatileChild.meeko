@@ -2,6 +2,7 @@
 import { signal } from "@meekojs/meeko";
 
 const props = defineProps<{ label: string }>();
+
 const token = signal(Math.random());
 </script>
 

@@ -1,7 +1,8 @@
-import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
-import { existsSync, readFileSync, statSync, watch } from "node:fs";
 import type { FSWatcher, Stats } from "node:fs";
+
+import { spawn } from "node:child_process";
+import { existsSync, readFileSync, statSync, watch } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, sep } from "node:path";
 

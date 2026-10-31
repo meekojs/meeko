@@ -4,9 +4,11 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import postcss from "postcss";
 import { build, createServer, normalizePath } from "vite";
-import { meekoUtilities } from "../src/postcss.ts";
+
 import type { MeekoUtilitiesOptions } from "../src/postcss.ts";
+
 import { checkFrameworkProject } from "../src/framework/check-project.ts";
+import { meekoUtilities } from "../src/postcss.ts";
 import { meeko } from "../src/vite.ts";
 import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
 

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { TextDocument } from "vscode-languageserver-textdocument";
+
 import { directiveNameCompletion } from "../src/language-server/features.ts";
 
 /** Directive labels offered where `|` marks the cursor, or `undefined`. */

@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { DiagnosticSeverity } from "vscode-languageserver/node";
+
+import type { LanguageProject } from "./language-server-workspace.ts";
+
 import { componentDiagnostics } from "../src/language-server/diagnostics.ts";
 import { languageProject } from "./language-server-workspace.ts";
-import type { LanguageProject } from "./language-server-workspace.ts";
 
 const badge = `<script lang="ts">
 import { onMounted } from "@meekojs/meeko";

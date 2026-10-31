@@ -1,3 +1,4 @@
+import { builtinComponentModules } from "../compiler";
 /**
  * Meeko's own template tags (`<MeekoLink>`, `<MeekoOutlet />`…) as the editor sees them: their props,
  * their content, their documentation and where they are valid. One entry per tag; the virtual code,
@@ -6,7 +7,6 @@
  * `builtinTagTypes` of `autoimports/registry.ts`, which autoimports it.
  */
 import { readThemeEnabledSync } from "../framework/config";
-import { builtinComponentModules } from "../compiler";
 
 /** A prop of a built-in tag, as the template writes it. */
 export interface BuiltinTagProp {

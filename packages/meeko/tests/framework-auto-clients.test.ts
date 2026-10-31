@@ -1,25 +1,27 @@
+import { Window } from "happy-dom";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import test from "node:test";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
+import test from "node:test";
 import { promisify } from "node:util";
-import { Window } from "happy-dom";
+
+import type { Schema, ServerManifest } from "../src/framework-server.ts";
+import type { ApiOperation } from "../src/shared/clients.ts";
+
+import { createBrowserClientOptions } from "../src/app/runtime/browser-clients.ts";
 import { discoverAutoImports, discoverAutoImportsSync } from "../src/autoimports/registry.ts";
 import { applyAutoImports } from "../src/autoimports/transform.ts";
 import { generateAutoImportTypes } from "../src/autoimports/typescript.ts";
 import { generateServerContracts } from "../src/framework/contracts-generate.ts";
-import { createApiClient, createRpcClient } from "../src/shared/clients.ts";
-import { createBrowserClientOptions } from "../src/app/runtime/browser-clients.ts";
-import { createRequestContext, withRequestContext } from "../src/server/runtime/request-context.ts";
-import { createServerClientOptions } from "../src/server/runtime/auto-clients.ts";
-import { MemorySessionStore, SessionManager } from "../src/server/runtime/sessions.ts";
-import { createLocalServerFetch } from "../src/server/runtime/discovery.ts";
 import { defineApiRoute } from "../src/server/api/define-api-route.ts";
-import { defineRpc } from "../src/server/rpc/define-rpc.ts";
 import { dispatchApiRoute } from "../src/server/api/runtime.ts";
-import type { Schema, ServerManifest } from "../src/framework-server.ts";
-import type { ApiOperation } from "../src/shared/clients.ts";
+import { defineRpc } from "../src/server/rpc/define-rpc.ts";
+import { createServerClientOptions } from "../src/server/runtime/auto-clients.ts";
+import { createLocalServerFetch } from "../src/server/runtime/discovery.ts";
+import { createRequestContext, withRequestContext } from "../src/server/runtime/request-context.ts";
+import { MemorySessionStore, SessionManager } from "../src/server/runtime/sessions.ts";
+import { createApiClient, createRpcClient } from "../src/shared/clients.ts";
 
 const execFileAsync = promisify(execFile);
 

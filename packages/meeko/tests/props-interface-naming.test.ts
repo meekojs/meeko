@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import test from "node:test";
+
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
 

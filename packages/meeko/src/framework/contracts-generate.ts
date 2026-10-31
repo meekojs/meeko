@@ -1,10 +1,12 @@
+import ts from "@typescript/typescript6";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import ts from "@typescript/typescript6";
+
+import type { ApiEndpoint, RpcEndpoint } from "../server/runtime/discovery";
+
 import { discoverAutoImports } from "../autoimports/registry";
 import { autoImportCompilerHost, autoImportSourceReader } from "../autoimports/typescript";
 import { discoverServerManifest } from "../server/api/manifest-discovery";
-import type { ApiEndpoint, RpcEndpoint } from "../server/runtime/discovery";
 import { resolveProjectAliases, withAliasPaths } from "./aliases";
 import { resolveConfigSources } from "./config";
 import { generateSocketContracts } from "./socket-contracts-generate";

@@ -1,14 +1,15 @@
+import ts from "@typescript/typescript6";
 import assert from "node:assert/strict";
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
+
+import { generateComponentRegistry } from "../src/autoimports/components";
 import { generateAppTypes } from "../src/framework/check-app.ts";
+import { prepareFrameworkTypes } from "../src/framework/check-project";
 import { generateComponentRegistryTypes } from "../src/framework/type-declarations.ts";
 import { MeekoProject } from "../src/language-server/project.ts";
 import { linkRepositoryPackages, tempProject } from "./helpers/temp-project.ts";
-import { generateComponentRegistry } from "../src/autoimports/components";
-import ts from "@typescript/typescript6";
-import { prepareFrameworkTypes } from "../src/framework/check-project";
 
 test("editor program completes registry names and refreshes diagnostics after a rename", { timeout: 120_000 }, async (context) => {
   const root = await tempProject(context, "lsp-component-registry");

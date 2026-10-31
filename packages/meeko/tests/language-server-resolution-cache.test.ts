@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
+
+import type { TempProject } from "./helpers/temp-project.ts";
+
 import { MeekoProject } from "../src/language-server/project.ts";
 import { createTempProject } from "./helpers/temp-project.ts";
-import type { TempProject } from "./helpers/temp-project.ts";
 
 const helper = `export function greet(name: string): string { return \`Hola, \${name}\`; }\n`;
 

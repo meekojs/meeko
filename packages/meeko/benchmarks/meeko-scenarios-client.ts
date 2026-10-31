@@ -1,6 +1,6 @@
-import { hydrate as hydrateTree } from "./cases/Tree.generated.ts";
 import { hydrate as hydrateList } from "./cases/List.generated.ts";
 import { hydrate as hydrateNavigation } from "./cases/Navigation.generated.ts";
+import { hydrate as hydrateTree } from "./cases/Tree.generated.ts";
 import { assertScenario, type Scenario } from "./scenario-protocol";
 
 const root = document.getElementById("app");

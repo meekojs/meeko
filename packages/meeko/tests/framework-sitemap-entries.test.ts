@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { buildProject } from "../src/framework/project.ts";
+
+import type { SitemapEntriesContext } from "../src/modules/define-meeko-config.ts";
+
 import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { buildProject } from "../src/framework/project.ts";
 import { discoverRoutes } from "../src/framework/routes-discovery.ts";
 import { collectSitemapEntries, sitemapEntryRoutes, sitemapUrls, sitemapXml } from "../src/framework/site-files.ts";
-import type { SitemapEntriesContext } from "../src/modules/define-meeko-config.ts";
 import { staticAppConfig, writeStaticApp } from "./helpers/static-app.ts";
 import { tempProject } from "./helpers/temp-project.ts";
 

@@ -4,8 +4,8 @@ import { once } from "node:events";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 
 test("CLI init creates an SSR project and refuses to overwrite it", async () => {
   const root = await mkdtemp(join(tmpdir(), "meeko-init-"));

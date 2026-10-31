@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+
 import { generateModuleTypes } from "../src/framework/module-types.ts";
 
 test("module types reconcile generated files and preserve unowned declarations", async () => {

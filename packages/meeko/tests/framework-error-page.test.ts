@@ -1,21 +1,23 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { Window as HappyWindow } from "happy-dom";
-import { bindComponent, renderComponent } from "../src/app/runtime/renderer.ts";
-import type { Component, DomScope } from "../src/app/runtime/renderer.ts";
-import { href } from "../src/framework.ts";
-import { mountClientApp } from "../src/app/runtime/client.ts";
+
 import type { ClientComponent } from "../src/app/runtime/client.ts";
-import { clientRoutesSource, discoverAppManifest } from "../src/framework/app-manifest.ts";
-import { createRouteManifest } from "../src/app/runtime/router.ts";
+import type { Component, DomScope } from "../src/app/runtime/renderer.ts";
 import type { ErrorPageRecord } from "../src/app/runtime/router.ts";
-import { discoverErrorPage, discoverRoutes } from "../src/framework/routes-discovery.ts";
-import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 import type { PageModule } from "../src/server/runtime/framework-render.ts";
+
+import { mountClientApp } from "../src/app/runtime/client.ts";
+import { bindComponent, renderComponent } from "../src/app/runtime/renderer.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { href } from "../src/framework.ts";
+import { clientRoutesSource, discoverAppManifest } from "../src/framework/app-manifest.ts";
+import { discoverErrorPage, discoverRoutes } from "../src/framework/routes-discovery.ts";
 import { createServerApp } from "../src/server/runtime/app.ts";
+import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 
 async function project(files: readonly string[]): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "meeko-error-page-"));

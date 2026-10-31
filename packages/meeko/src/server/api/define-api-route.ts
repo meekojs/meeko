@@ -1,5 +1,5 @@
-import type { ApiRouteDefinition, ApiSuccessStatus } from "./contracts";
 import type { Schema } from "../schema";
+import type { ApiRouteDefinition, ApiSuccessStatus } from "./contracts";
 
 /**
  * Declara un endpoint de API, el export por defecto de `server/api/<ruta>.<método>.ts`. El

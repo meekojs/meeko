@@ -1,11 +1,13 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Window as HappyWindow } from "happy-dom";
-import { mountClientApp } from "../src/app/runtime/client.ts";
+
 import type { ClientComponent } from "../src/app/runtime/client.ts";
+import type { PageRoute } from "../src/server/runtime/framework-render.ts";
+
+import { mountClientApp } from "../src/app/runtime/client.ts";
 import { createRouteManifest } from "../src/app/runtime/router.ts";
 import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
-import type { PageRoute } from "../src/server/runtime/framework-render.ts";
 
 const page = (name: string): ClientComponent => ({
   renderWithState: () => ({ html: `<p>${name}</p>`, state: {} }),

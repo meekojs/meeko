@@ -1,5 +1,6 @@
-import { normalizeHtmlContent } from "./html-content";
 import type { HtmlContentNamespace } from "./html-content";
+
+import { normalizeHtmlContent } from "./html-content";
 
 /** Escapa texto dinámico antes de insertarlo en HTML generado por SSR. */
 export function escapeHtml(value: unknown): string {

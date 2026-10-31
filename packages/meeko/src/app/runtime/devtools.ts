@@ -1,16 +1,18 @@
-import type { DomScope } from "./renderer";
 import type {
-  DevtoolsAssignmentSite, DevtoolsCommandResult, DevtoolsEvent, DevtoolsHook, DevtoolsInstance,
+  DevtoolsActivity, DevtoolsAssignmentSite, DevtoolsCommandResult, DevtoolsEvent, DevtoolsHook, DevtoolsInstance,
   DevtoolsProtocolVersion, DevtoolsReadSite, DevtoolsSignalSite, DevtoolsValue, DevtoolsWriteSite,
 } from "../../core/devtools-protocol";
+import type { Signal } from "../../core/reactivity";
+import type { DomScope } from "./renderer";
+
 import { logClientError, observeCallback } from "../../core/error-observer";
+import { currentEffectOwner, effect, isWritableSignal, signalReadSites, untrack } from "../../core/reactivity";
+import { installDevtoolsActivitySink } from "./devtools-activity";
 import { borrowedKey } from "./models";
 import { isReactiveProps, trackProps } from "./props";
-import { currentEffectOwner, effect, isWritableSignal, signalReadSites, untrack } from "../../core/reactivity";
-import type { Signal } from "../../core/reactivity";
 
 export type {
-  DevtoolsAssignmentSite, DevtoolsCommandResult, DevtoolsEditSite, DevtoolsEvent, DevtoolsEventKind, DevtoolsHook,
+  DevtoolsActivity, DevtoolsAssignmentSite, DevtoolsCommandResult, DevtoolsEditSite, DevtoolsEvent, DevtoolsEventKind, DevtoolsHook,
   DevtoolsInstance, DevtoolsProtocolVersion, DevtoolsReadKind, DevtoolsReadSite, DevtoolsSignalSite, DevtoolsSnapshot,
   DevtoolsValue, DevtoolsWriteSite,
 } from "../../core/devtools-protocol";
@@ -201,7 +203,7 @@ function notify(): void {
   }
 }
 
-function record(kind: DevtoolsEvent["kind"], instanceId: string, detail?: string, value?: DevtoolsValue, source?: ActiveInstance, reads?: DevtoolsReadSite[], write?: DevtoolsWriteSite): void {
+function record(kind: DevtoolsEvent["kind"], instanceId: string, detail?: string, value?: DevtoolsValue, source?: ActiveInstance, reads?: DevtoolsReadSite[], write?: DevtoolsWriteSite, activity?: DevtoolsActivity): void {
   const event: DevtoolsEvent = { id: nextEvent++, at: Date.now(), kind, instanceId };
   if (detail !== undefined) event.detail = detail;
   const entry = source ?? active.get(instanceId);
@@ -212,6 +214,7 @@ function record(kind: DevtoolsEvent["kind"], instanceId: string, detail?: string
   if (value !== undefined) event.value = value;
   if (reads?.length) event.reads = reads;
   if (write) event.write = write;
+  if (activity) event.activity = { ...activity };
   recent.push(event);
   if (recent.length > 100) recent.shift();
   for (const observer of [...observers]) {
@@ -322,7 +325,7 @@ const hook: DevtoolsHook = {
       for (const instance of instances) {
         if (instance.parentId) byId.get(instance.parentId)?.childIds.push(instance.id);
       }
-      return { protocolVersion: DEVTOOLS_PROTOCOL_VERSION, instances, events: recent.map((event) => ({ ...event })), selectedId };
+      return { protocolVersion: DEVTOOLS_PROTOCOL_VERSION, instances, events: recent.map((event) => ({ ...event, ...(event.activity ? { activity: { ...event.activity } } : {}) })), selectedId };
     });
   },
   subscribe(listener) {
@@ -432,6 +435,10 @@ function unregister(entry: ActiveInstance): void {
 export function registerDevtoolsInstance(input: DevtoolsRegistration): () => void {
   if (typeof window === "undefined" || typeof Node === "undefined") return () => {};
   installed = true;
+  installDevtoolsActivitySink(window, (kind, activity) => {
+    const detail = `${activity.phase}${activity.route ? ` · ${activity.route}` : ""}${activity.source ? ` · ${activity.source}` : ""}${activity.durationMs === undefined ? "" : ` · ${activity.durationMs.toFixed(1)} ms`}`;
+    record(kind, `operation-${activity.operationId}`, detail, undefined, undefined, undefined, undefined, activity);
+  });
   if (!window.__MEEKO_DEVTOOLS__) {
     window.__MEEKO_DEVTOOLS__ = hook;
     window.dispatchEvent(new window.Event("meeko:devtools-ready"));

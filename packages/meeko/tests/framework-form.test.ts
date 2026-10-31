@@ -1,22 +1,27 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { Window as HappyWindow } from "happy-dom";
+
+import type { ClientComponent } from "../src/app/runtime/client.ts";
+import type * as client_tsTypes from "../src/app/runtime/client.ts";
+import type { RouteRecord } from "../src/app/runtime/router.ts";
+import type { Form } from "../src/framework.ts";
+import type { Signal } from "../src/index.ts";
+import type * as framework_render_tsTypes from "../src/server/runtime/framework-render.ts";
+
+import { createRouteManifest } from "../src/app/runtime/router.ts";
 import { discoverAutoImports } from "../src/autoimports/registry.ts";
 import { applyAutoImports } from "../src/autoimports/transform.ts";
 import { compile } from "../src/compiler.ts";
 import { ClientError, useForm } from "../src/framework.ts";
-import type { Form } from "../src/framework.ts";
 import { checkApp } from "../src/framework/check-app.ts";
-import type { ClientComponent } from "../src/app/runtime/client.ts";
 import { prepareFrameworkTypeDeclarations } from "../src/framework/type-declarations.ts";
-import { createRouteManifest } from "../src/app/runtime/router.ts";
-import type { RouteRecord } from "../src/app/runtime/router.ts";
 import { createRoot, provideErrorHandler } from "../src/index.ts";
-import type { Signal } from "../src/index.ts";
 import { createTempProject } from "./helpers/temp-project.ts";
+
 
 type Issue = { readonly message: string; readonly path?: readonly (PropertyKey | { readonly key: PropertyKey })[] };
 type Result<O> = { readonly value: O; readonly issues?: undefined } | { readonly issues: readonly Issue[] };
@@ -319,8 +324,8 @@ test("useForm marks pending during an asynchronous validation and drops results 
 const fileUrl = (path: string): string => pathToFileURL(resolve(path)).href;
 
 const runtime = async () => ({
-  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof import("../src/server/runtime/framework-render.ts"),
-  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof import("../src/app/runtime/client.ts"),
+  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof framework_render_tsTypes,
+  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof client_tsTypes,
 });
 
 const globals = globalThis as unknown as { meekoFormFetch?: typeof fetch };

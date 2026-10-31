@@ -3,6 +3,7 @@ import { stat } from "node:fs/promises";
 import { createRequire, isBuiltin } from "node:module";
 import { dirname, isAbsolute, join } from "node:path";
 import { pathToFileURL } from "node:url";
+
 import type { UtilityAutoImports } from "./autoimports";
 
 /**

@@ -1,8 +1,10 @@
+import type { TextDocument } from "vscode-languageserver-textdocument";
+import type { CompletionItem, Hover, Position } from "vscode-languageserver/node";
+
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import type { TextDocument } from "vscode-languageserver-textdocument";
 import { CompletionItemKind, InsertTextFormat, MarkupKind } from "vscode-languageserver/node";
-import type { CompletionItem, Hover, Position } from "vscode-languageserver/node";
+
 import { tagAt } from "./embedded";
 
 const teleportTag = "MeekoTeleport";

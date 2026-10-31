@@ -4,22 +4,24 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
+
+import type { AutoImport } from "./autoimports/registry";
+import type { SourceMapping } from "./compiler/mapping";
+import type { CompileDiagnostic } from "./compiler/parser/sfc";
+import type { ProjectAliases } from "./framework/aliases";
+
+import { UnexposedRefError } from "./app/runtime/element-refs";
 import { discoverAutoImports } from "./autoimports/registry";
 import { applyAutoImports, compileWithAutoImports } from "./autoimports/transform";
-import type { AutoImport } from "./autoimports/registry";
 import { aliasCandidates } from "./compiler/aliases";
-import { originalOffset } from "./compiler/mapping";
-import type { SourceMapping } from "./compiler/mapping";
-import { moduleSpecifiers, replaceModuleSpecifiers } from "./compiler/import-graph";
-import { projectDeclarationFiles } from "./compiler/project-declarations";
-import { projectRoot } from "./compiler/project-root";
-import { compileError, MeekoCompileError, locate } from "./compiler/parser/sfc";
-import type { CompileDiagnostic } from "./compiler/parser/sfc";
-import { UnexposedRefError } from "./app/runtime/element-refs";
 import { routeBlockTypeSource } from "./compiler/codegen/route-block-types";
 import { pageRouteId } from "./compiler/codegen/server-script";
+import { moduleSpecifiers, replaceModuleSpecifiers } from "./compiler/import-graph";
+import { originalOffset } from "./compiler/mapping";
+import { compileError, locate, MeekoCompileError } from "./compiler/parser/sfc";
+import { projectDeclarationFiles } from "./compiler/project-declarations";
+import { projectRoot } from "./compiler/project-root";
 import { resolveProjectAliases, resolveProjectAliasesSync } from "./framework/aliases";
-import type { ProjectAliases } from "./framework/aliases";
 import { tscCommand } from "./typescript-cli";
 
 const execFileAsync = promisify(execFile);

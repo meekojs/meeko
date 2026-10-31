@@ -6,17 +6,19 @@ import { PassThrough } from "node:stream";
 import { after, describe, test } from "node:test";
 import { pathToFileURL } from "node:url";
 import * as prettier from "prettier";
+import { TextDocument } from "vscode-languageserver-textdocument";
 import {
   createConnection, createProtocolConnection, DidOpenTextDocumentNotification, DocumentFormattingRequest, InitializedNotification,
   InitializeRequest, ShutdownRequest, StreamMessageReader, StreamMessageWriter,
 } from "vscode-languageserver/node";
-import { TextDocument } from "vscode-languageserver-textdocument";
-import { compile } from "../src/compiler.ts";
-import plugin from "../src/prettier.ts";
+
+import type { LanguageServerInitializationOptions } from "../src/language-server/server.ts";
 import type { MeekoPrettierOptions } from "../src/prettier.ts";
+
+import { compile } from "../src/compiler.ts";
 import { formatWithPrettier } from "../src/formatters/prettier/editor.ts";
 import { startLanguageServer } from "../src/language-server/server.ts";
-import type { LanguageServerInitializationOptions } from "../src/language-server/server.ts";
+import plugin from "../src/prettier.ts";
 
 const fixtures = resolve("tests/fixtures/prettier");
 

@@ -1,23 +1,24 @@
-import { batch, createRoot, currentEffectOwner, effect, effectInOrder, finishWithCleanup, isWritableSignal, reserveUpdateOrder, signal, switchOwner, untrack } from "../../core/reactivity";
-import { observeCallback } from "../../core/error-observer";
-import { componentErrorReporter } from "./component-errors";
 import type { EffectSource, Signal } from "../../core/reactivity";
-import { attributeValue, rawHtml, serializeJson } from "../../core/server";
-import { refTarget } from "./element-refs";
-import type { ElementRefs } from "./element-refs";
-import { isLateSuspension, isPassSuspension, lateRender, loadDeferred } from "./suspense";
-import { afterMountBatch, mountBatch } from "./lifecycle";
-import { contentNamespace, inertElement } from "./html-content-dom";
-import { sameChannels } from "./channels";
-import type { NativeModelKind, NativeModelValues } from "./models";
-import { snippetOf } from "./snippets";
-import type { Snippet, SnippetData } from "./snippets";
-import { reactiveProps } from "./props";
-import type { PropsSource } from "./props";
-import { childIdBase, currentIdBase, withIdBase } from "./ids";
-import { closeTag, dynamicTagName } from "./dynamic-tag";
 import type { TagPart } from "./dynamic-tag";
+import type { ElementRefs } from "./element-refs";
+import type { NativeModelKind, NativeModelValues } from "./models";
+import type { PropsSource } from "./props";
+import type { Snippet, SnippetData } from "./snippets";
+
+import { observeCallback } from "../../core/error-observer";
+import { batch, createRoot, currentEffectOwner, effect, effectInOrder, finishWithCleanup, isWritableSignal, reserveUpdateOrder, signal, switchOwner, untrack } from "../../core/reactivity";
+import { attributeValue, rawHtml, serializeJson } from "../../core/server";
+import { sameChannels } from "./channels";
+import { componentErrorReporter } from "./component-errors";
+import { closeTag, dynamicTagName } from "./dynamic-tag";
+import { refTarget } from "./element-refs";
+import { contentNamespace, inertElement } from "./html-content-dom";
+import { childIdBase, currentIdBase, withIdBase } from "./ids";
+import { afterMountBatch, mountBatch } from "./lifecycle";
+import { reactiveProps } from "./props";
 import { resolvedComponentInput } from "./resolved-component";
+import { snippetOf } from "./snippets";
+import { isLateSuspension, isPassSuspension, lateRender, loadDeferred } from "./suspense";
 
 /**
  * Fragmento de DOM que pertenece a una instancia o a una región dinámica: los hijos de `root` o,

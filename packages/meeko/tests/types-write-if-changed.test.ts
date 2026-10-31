@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
+
 import { componentTypesPath, generateTypes } from "../src/types.ts";
 import { tempProject } from "./helpers/temp-project.ts";
 

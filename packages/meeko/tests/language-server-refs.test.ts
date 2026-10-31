@@ -1,7 +1,8 @@
+import ts from "@typescript/typescript6";
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { test } from "node:test";
-import ts from "@typescript/typescript6";
+
 import { componentDiagnostics } from "../src/language-server/diagnostics.ts";
 import { createEditorModel } from "../src/language-server/model.ts";
 import { languageProject, locateOnDisk } from "./language-server-workspace.ts";

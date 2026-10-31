@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const root = await mkdtemp(join(tmpdir(), "meeko-untrusted-host-"));
+if (!resolve(root).startsWith(resolve(tmpdir(), "meeko-untrusted-host-"))) throw new Error("Unexpected test directory");
 const workspace = join(root, "workspace");
 const userData = join(root, "user-data");
 const packageRoot = join(workspace, "node_modules", "@meekojs", "meeko");
@@ -42,6 +43,5 @@ try {
   });
   if (exitCode !== 0) throw new Error(`VS Code host failed with exit code ${exitCode}`);
 } finally {
-  if (!resolve(root).startsWith(resolve(tmpdir(), "meeko-untrusted-host-"))) throw new Error("Unexpected test directory");
   await rm(root, { recursive: true, force: true });
 }

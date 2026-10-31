@@ -1,13 +1,15 @@
+import { Window } from "happy-dom";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Window } from "happy-dom";
-import { compile } from "../src/compiler.ts";
-import type { LiveBrowserResult, LiveBrowserUpdate, LiveServerMessage } from "../src/shared/devtools-bridge-protocol.ts";
-import { connectLiveBridge, disconnectLiveBridge, liveThrottleMs, liveValueLimit } from "../src/app/runtime/devtools-live.ts";
+
 import type { LiveHotContext } from "../src/app/runtime/devtools-live.ts";
-import { registerDevtoolsInstance } from "../src/app/runtime/devtools.ts";
 import type { DevtoolsHook } from "../src/app/runtime/devtools.ts";
+import type { LiveBrowserResult, LiveBrowserUpdate, LiveServerMessage } from "../src/shared/devtools-bridge-protocol.ts";
+
+import { connectLiveBridge, disconnectLiveBridge, liveThrottleMs, liveValueLimit } from "../src/app/runtime/devtools-live.ts";
+import { registerDevtoolsInstance } from "../src/app/runtime/devtools.ts";
 import { borrowedKey } from "../src/app/runtime/models.ts";
+import { compile } from "../src/compiler.ts";
 import { signal } from "../src/core/reactivity.ts";
 
 /** `import.meta.hot` falso: guarda lo enviado y entrega mensajes del servidor a sus oyentes. */

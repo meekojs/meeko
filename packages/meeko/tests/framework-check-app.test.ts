@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
+
 import { checkApp } from "../src/framework/check-app.ts";
 
 const execFileAsync = promisify(execFile);

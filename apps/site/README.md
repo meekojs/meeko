@@ -4,6 +4,8 @@ El sitio conserva Markdown, taxonomía y JSDoc en este repositorio como fuente. 
 
 ## Desarrollo
 
+La web consume `@meekojs/ui` como módulo. Su configuración `ui.tokens` apunta a las variables existentes de `app/styles/tokens.css`, de modo que conserva la misma paleta clara/oscura. Las acciones usan `UILink`, el índice documental `UILinkCard` y los metadatos de referencia `UIBadge`; la base visual vive en el paquete UI. Los defaults de formas y variantes se configuran en `ui.defaults`, y las props explícitas tienen prioridad. Véase la [guía de UI](../../docs/ui.md).
+
 Se necesita Node.js 24, pnpm y una base PostgreSQL **dedicada al sitio**. La URL de conexión va en `apps/site/.env`, ignorado por Git:
 
 ```dotenv

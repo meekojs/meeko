@@ -1,7 +1,8 @@
-import { createContext, findContext, isDryRender, provide } from "../../core/reactivity";
-import { useState } from "../composables/useState";
-import { THEME_STATE_KEY } from "../../shared/theme";
 import type { ServerTheme, ThemeSnapshot } from "../../shared/theme";
+
+import { createContext, findContext, isDryRender, provide } from "../../core/reactivity";
+import { THEME_STATE_KEY } from "../../shared/theme";
+import { useState } from "../composables/useState";
 
 const serverThemeKey = /*#__PURE__*/ createContext<ServerTheme>("Meeko theme");
 

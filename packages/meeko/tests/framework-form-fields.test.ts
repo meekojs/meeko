@@ -1,13 +1,15 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { Window as HappyWindow } from "happy-dom";
+
+import type { FormField, FormSubmission } from "../src/framework.ts";
+import type { ReadonlySignal, Signal } from "../src/index.ts";
+
 import { checkSource } from "../src/check.ts";
 import { ClientError, useForm } from "../src/framework.ts";
-import type { FormField, FormSubmission } from "../src/framework.ts";
 import { createRoot, provideErrorHandler } from "../src/index.ts";
-import type { ReadonlySignal, Signal } from "../src/index.ts";
 import { linkRepositoryPackages, repositoryRoot, tempProject } from "./helpers/temp-project.ts";
 
 type Issue = { readonly message: string; readonly path?: readonly (PropertyKey | { readonly key: PropertyKey })[] };

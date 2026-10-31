@@ -1,0 +1,40 @@
+<script lang="ts">
+	import type { UIActionShape, UIActionSize, UIActionVariant } from '../types/config'
+
+	import { uiDefaults } from '../utils/defaults'
+
+	interface Props {
+		href: string
+		variant?: UIActionVariant
+		size?: UIActionSize
+		shape?: UIActionShape
+		target?: '_self' | '_blank' | '_parent' | '_top'
+		rel?: string
+		ariaLabel?: string
+		class?: string
+	}
+
+	const props = defineProps<Props>()
+
+	const emit = defineEmits<{ click: [event: MouseEvent] }>()
+
+	const snippets = defineSnippets<{ default: [] }>()
+
+	const defaults = uiDefaults().link
+</script>
+
+<template>
+	<a
+		bind:href="props.href"
+		bind:target="props.target"
+		bind:rel="props.rel ?? (props.target === '_blank' ? 'noopener noreferrer' : undefined)"
+		bind:aria-label="props.ariaLabel"
+		bind:class="['meeko-ui-button', 'meeko-ui-link', props.class].filter(Boolean).join(' ')"
+		bind:data-variant="props.variant ?? defaults?.variant ?? 'primary'"
+		bind:data-size="props.size ?? defaults?.size ?? 'md'"
+		bind:data-shape="props.shape ?? defaults?.shape ?? 'rounded'"
+		on:click="(event) => emit('click', event)"
+	>
+		<render snippet="snippets.default" />
+	</a>
+</template>

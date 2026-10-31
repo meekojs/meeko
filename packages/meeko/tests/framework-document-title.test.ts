@@ -1,15 +1,17 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Window as HappyWindow } from "happy-dom";
-import { bindComponent, renderComponent } from "../src/app/runtime/renderer.ts";
-import type { Component, DomScope } from "../src/app/runtime/renderer.ts";
-import { mountClientApp } from "../src/app/runtime/client.ts";
+
 import type { ClientComponent, ClientRoute } from "../src/app/runtime/client.ts";
-import { definePageBody, notFound } from "../src/server/runtime/page-body.ts";
-import { createRouteManifest } from "../src/app/runtime/router.ts";
+import type { Component, DomScope } from "../src/app/runtime/renderer.ts";
 import type { ErrorPageRecord } from "../src/app/runtime/router.ts";
-import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 import type { PageRoute } from "../src/server/runtime/framework-render.ts";
+
+import { mountClientApp } from "../src/app/runtime/client.ts";
+import { bindComponent, renderComponent } from "../src/app/runtime/renderer.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
+import { definePageBody, notFound } from "../src/server/runtime/page-body.ts";
 
 const page = (render: (props: Record<string, unknown>) => string): ClientComponent => ({
   renderWithState: (props) => ({ html: render(props), state: {} }),

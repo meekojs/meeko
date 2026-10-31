@@ -1,5 +1,6 @@
-import { chmod, lstat, readdir, readFile, realpath, rmdir, stat, unlink } from "node:fs/promises";
 import type { Stats } from "node:fs";
+
+import { chmod, lstat, readdir, readFile, realpath, rmdir, stat, unlink } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";

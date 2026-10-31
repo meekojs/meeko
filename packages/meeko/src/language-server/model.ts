@@ -1,39 +1,41 @@
-import { definePropsDocs } from "../app/definitions/define-props";
+import ts from "@typescript/typescript6";
+import { existsSync, statSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
+
+import type { AutoImport } from "../autoimports/registry";
+import type { GenericParameters } from "../compiler/generic";
+import type { SfcSection } from "../compiler/parser/sfc";
+import type { TemplateNode } from "../compiler/parser/template";
+import type { ServerScript } from "../compiler/transforms/server-script";
+import type { ProjectAliases } from "../framework/aliases";
+import type { BuiltinTag } from "./builtin-tags";
+
+import { apiDocs, jsdoc } from "../app/definitions/compiler-docs";
 import { defineEmitsDocs } from "../app/definitions/define-emits";
 import { defineExposeDocs } from "../app/definitions/define-expose";
 import { defineModelDocs } from "../app/definitions/define-model";
+import { definePropsDocs } from "../app/definitions/define-props";
+import { analyzePropsDefaults, PropsDefaultsError } from "../app/definitions/define-props";
 import { defineSnippetsDocs } from "../app/definitions/define-snippets";
 import { useElementRefDocs, useElementRefEditorDeclaration, useElementRefUnexposedEditorType } from "../app/definitions/use-element-ref";
-import { basename, dirname, join, resolve } from "node:path";
-import { apiDocs, jsdoc } from "../app/definitions/compiler-docs";
-import { existsSync, statSync } from "node:fs";
-import ts from "@typescript/typescript6";
 import { discoverAutoImportsSync } from "../autoimports/registry";
 import { applyAutoImports, autoImportedValues } from "../autoimports/transform";
-import type { AutoImport } from "../autoimports/registry";
 import { awaitForReferences, shadowedBuiltinTags } from "../compiler";
-import { generatedServicesDeclaration, projectDeclarationFiles } from "../compiler/project-declarations";
-import { projectRoot } from "../compiler/project-root";
-import { GenericError, parseGeneric, sectionAttribute } from "../compiler/generic";
-import type { GenericParameters } from "../compiler/generic";
-import { analyzePropsDefaults, PropsDefaultsError } from "../app/definitions/define-props";
+import { aliasCandidates, aliasTsconfigPaths } from "../compiler/aliases";
+import { pageRouteId, serverScriptTypes } from "../compiler/codegen/server-script";
 import { freeIdentifiers } from "../compiler/composables";
-import { templateEventDeclaration, templateEventType } from "../compiler/transforms/events";
-import { isCandidates } from "../compiler/transforms/dynamic-tag";
+import { GenericError, parseGeneric, sectionAttribute } from "../compiler/generic";
 import { scanInterpolations } from "../compiler/parser/interpolation";
 import { MeekoCompileError, parseSfc } from "../compiler/parser/sfc";
-import { analyzeServerScript } from "../compiler/transforms/server-script";
-import type { ServerScript } from "../compiler/transforms/server-script";
-import { pageRouteId, serverScriptTypes } from "../compiler/codegen/server-script";
-import type { SfcSection } from "../compiler/parser/sfc";
 import { attributeValueStart, decodeTemplateText, isCustomElementTag, parseTemplate } from "../compiler/parser/template";
-import type { TemplateNode } from "../compiler/parser/template";
+import { generatedServicesDeclaration, projectDeclarationFiles } from "../compiler/project-declarations";
+import { projectRoot } from "../compiler/project-root";
+import { isCandidates } from "../compiler/transforms/dynamic-tag";
+import { templateEventDeclaration, templateEventType } from "../compiler/transforms/events";
+import { analyzeServerScript } from "../compiler/transforms/server-script";
+import { aliasesForScope, resolveProjectAliasesSync } from "../framework/aliases";
 import { extractRouteRender } from "../framework/routes-discovery";
 import { builtinTag, builtinTagProp } from "./builtin-tags";
-import { aliasCandidates, aliasTsconfigPaths } from "../compiler/aliases";
-import { aliasesForScope, resolveProjectAliasesSync } from "../framework/aliases";
-import type { ProjectAliases } from "../framework/aliases";
-import type { BuiltinTag } from "./builtin-tags";
 
 /** Tramo equivalente entre el componente y el archivo TypeScript virtual. */
 export interface SourceSpan {

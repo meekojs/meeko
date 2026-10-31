@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { defer } from "../src/app/runtime/deferred.ts";
-import { definePlugin } from "../src/app/definitions/define-plugin.ts";
+
 import type { PluginErrorInfo } from "../src/app/definitions/define-plugin.ts";
-import { createServerApp, defineServerRuntime } from "../src/framework-server.ts";
 import type { AppManifest, ServerApp } from "../src/framework-server.ts";
+
+import { definePlugin } from "../src/app/definitions/define-plugin.ts";
+import { defer } from "../src/app/runtime/deferred.ts";
+import { createServerApp, defineServerRuntime } from "../src/framework-server.ts";
 
 // Page failures through the whole server application: the nearest +error.meeko renders, and the
 // `onError` of server/runtime.ts and the plugins' `app.onError` observe the private error with the

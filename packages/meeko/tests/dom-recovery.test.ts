@@ -1,8 +1,10 @@
+import { Window } from "happy-dom";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Window } from "happy-dom";
-import { bindComponent, bindIf, renderComponent, renderIf } from "../src/app/runtime/renderer.ts";
+
 import type { ComponentModule, DomScope } from "../src/app/runtime/renderer.ts";
+
+import { bindComponent, bindIf, renderComponent, renderIf } from "../src/app/runtime/renderer.ts";
 import { signal } from "../src/core/reactivity.ts";
 
 test("a failed reactive child hydration restores its previous DOM and listener", () => {

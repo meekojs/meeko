@@ -1,4 +1,5 @@
 import type { GenericParameters } from "../generic";
+
 import { markSource } from "../mapping";
 
 interface PropsSource {

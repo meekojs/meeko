@@ -1,19 +1,21 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import { discoverComponents } from "../autoimports/registry";
-import { generateComponentRegistry } from "../autoimports/components";
-import { generateTypeScriptAutoImports } from "../autoimports/typescript";
-import { generateAppTypes } from "./check-app";
+
 import type { AppTypesOptions } from "./check-app";
+
+import { generateComponentRegistry } from "../autoimports/components";
+import { discoverComponents } from "../autoimports/registry";
+import { generateTypeScriptAutoImports } from "../autoimports/typescript";
+import { generateRouteBlockTypes, routeBlockTypesDirectory } from "../compiler/codegen/route-block-types";
 import { frameworkTsconfigPaths, resolveProjectAliases } from "./aliases";
+import { generateAppTypes } from "./check-app";
 import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./config";
 import { generateServerContracts } from "./contracts-generate";
 import { generateRoutes } from "./generate";
-import { generatePageContracts } from "./page-contracts-generate";
-import { generateRouteBlockTypes, routeBlockTypesDirectory } from "../compiler/codegen/route-block-types";
-import { generateServicesTypes, servicesDeclaration } from "./services-types";
 import { generateModuleTypes } from "./module-types";
+import { generatePageContracts } from "./page-contracts-generate";
+import { generateServicesTypes, servicesDeclaration } from "./services-types";
 
 export const projectNames = ["app", "server", "shared"] as const;
 

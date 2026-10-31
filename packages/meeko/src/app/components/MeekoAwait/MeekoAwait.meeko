@@ -1,9 +1,10 @@
 <script lang="ts">
+import type { AwaitMessages, AwaitResource, MeekoAwaitSnippets } from "../../runtime/await";
+
 // <MeekoAwait>, Meeko's own tag for data that loads after the first paint. `pnpm run builtins`
 // compiles this file into await.compiled.ts, which the package ships as @meekojs/meeko/builtins/await
 // and which only the components that use the tag import; edit this file, not that one.
 import { useAwaitZone } from "../../composables/useAwaitZone";
-import type { AwaitMessages, AwaitResource, MeekoAwaitSnippets } from "../../runtime/await";
 
 interface Props {
   /** Recurso de `useApi` o `useRpcQuery` sin `await`, o una lista de recursos: `for="items"`. */
@@ -19,8 +20,11 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
 const snippets = defineSnippets<MeekoAwaitSnippets>();
+
 const box = useElementRef("box");
+
 const zone = useAwaitZone(props, box);
 </script>
 

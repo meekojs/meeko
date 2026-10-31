@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import test from "node:test";
+
+import type { RouteRecord } from "../src/app/runtime/router.ts";
+
 import { clientMiddlewareSource, discoverAppManifest } from "../src/framework/app-manifest.ts";
 import { checkFrameworkProject } from "../src/framework/check-project.ts";
 import { discoverConfiguredRoutes } from "../src/framework/config.ts";
@@ -10,7 +13,6 @@ import { generateRoutes } from "../src/framework/generate.ts";
 import { composeFrameworkRoutes } from "../src/framework/modules.ts";
 import { discoverRouteMiddleware, extractRouteMiddlewareOptions } from "../src/framework/route-middleware-discovery.ts";
 import { discoverRoutes, extractGroupOptions, extractRouteOptions } from "../src/framework/routes-discovery.ts";
-import type { RouteRecord } from "../src/app/runtime/router.ts";
 import { tempProject } from "./helpers/temp-project.ts";
 
 async function put(root: string, path: string, source: string): Promise<void> {

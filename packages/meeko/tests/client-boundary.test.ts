@@ -2,18 +2,20 @@ import assert from "node:assert/strict";
 import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { after, before, describe, test } from "node:test";
+
+import type { AutoImport } from "../src/autoimports/registry.ts";
+import type { CompileDiagnostic } from "../src/compiler/parser/sfc.ts";
+import type { TempProject } from "./helpers/temp-project.ts";
+
 import { discoverAutoImportsSync } from "../src/autoimports/registry.ts";
 import { checkComponentBoundary, compileWithAutoImports } from "../src/autoimports/transform.ts";
-import type { AutoImport } from "../src/autoimports/registry.ts";
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
 import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
-import type { CompileDiagnostic } from "../src/compiler/parser/sfc.ts";
 import { checkFrameworkProject } from "../src/framework/check-project.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
 import { meeko } from "../src/vite.ts";
 import { createTempProject } from "./helpers/temp-project.ts";
-import type { TempProject } from "./helpers/temp-project.ts";
 
 const component = (script: string, template = "<p>Page</p>", server?: string) => [
   ...(server === undefined ? [] : ['<script server lang="ts">', server, "</script>", ""]),

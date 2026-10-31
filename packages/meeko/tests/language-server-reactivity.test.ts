@@ -1,11 +1,14 @@
+import type { CodeLens, Location, MarkupContent } from "vscode-languageserver/node";
+
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
-import type { CodeLens, Location, MarkupContent } from "vscode-languageserver/node";
+
+import type { LanguageProject, OpenedComponent } from "./language-server-workspace.ts";
+
 import { hover, semanticTokens, semanticTokensLegend } from "../src/language-server/features.ts";
 import { codeLenses, showReferencesCommand } from "../src/language-server/lenses.ts";
 import { analyzeReactivity } from "../src/language-server/reactivity.ts";
 import { decodeTokens, languageProject } from "./language-server-workspace.ts";
-import type { LanguageProject, OpenedComponent } from "./language-server-workspace.ts";
 
 const counter = `<script lang="ts">
 import { computed, effect, signal } from "@meekojs/meeko";

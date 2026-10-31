@@ -1,19 +1,21 @@
+import ts from "@typescript/typescript6";
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
-import ts from "@typescript/typescript6";
-import { discoverAutoImports, discoverAutoImportsSync } from "../autoimports/registry";
+
 import type { AutoImport } from "../autoimports/registry";
+import type { ProjectAliases } from "../framework/aliases";
+import type { AppIndex } from "./app-index";
+import type { ProjectCompilerOptions, VirtualComponent } from "./model";
+
+import { discoverAutoImports, discoverAutoImportsSync } from "../autoimports/registry";
 import { generatedServicesDeclaration, projectDeclarationFiles } from "../compiler/project-declarations";
 import { projectRoot } from "../compiler/project-root";
+import { resolveProjectAliases, resolveProjectAliasesSync } from "../framework/aliases";
 import { readMeekoConfigSync, readThemeOptionSync, resolveConfigSources } from "../framework/config";
 import { generatedThemeLines } from "../framework/generate";
 import { resolveThemeConfig } from "../shared/theme";
-import { resolveProjectAliases, resolveProjectAliasesSync } from "../framework/aliases";
-import type { ProjectAliases } from "../framework/aliases";
 import { emptyAppIndex, loadAppIndex } from "./app-index";
-import type { AppIndex } from "./app-index";
 import { createVirtualComponent, diskVersion, resolveProjectCompilerOptions, serverVirtualSuffix, virtualFilenameOf } from "./model";
-import type { ProjectCompilerOptions, VirtualComponent } from "./model";
 
 /** Políticas comunes a todos los proyectos de un servidor de lenguaje. */
 export interface WorkspaceOptions {

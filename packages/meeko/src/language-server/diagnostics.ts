@@ -1,22 +1,25 @@
-import { sourceRange } from "./locations";
+import type { TextDocument } from "vscode-languageserver-textdocument";
+import type { Diagnostic, Range } from "vscode-languageserver/node";
+
+import ts from "@typescript/typescript6";
 import { existsSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
-import ts from "@typescript/typescript6";
-import type { TextDocument } from "vscode-languageserver-textdocument";
 import { DiagnosticSeverity, DiagnosticTag } from "vscode-languageserver/node";
-import type { Diagnostic, Range } from "vscode-languageserver/node";
-import { discoverAutoImportsSync } from "../autoimports/registry";
+
 import type { AutoImport } from "../autoimports/registry";
-import { checkSource } from "../check";
-import { projectRoot } from "../compiler/project-root";
-import { MeekoCompileError, parseSfc } from "../compiler/parser/sfc";
 import type { CompileDiagnostic } from "../compiler/parser/sfc";
-import { assertRouteBlockPlacement } from "../compiler/transforms/route-block";
-import { documentationMarkdown, identifierRange, virtualDocuments } from "./features";
 import type { LocatedDocument } from "./features";
 import type { VirtualComponent } from "./model";
-import { pathKey } from "./project";
 import type { MeekoProject } from "./project";
+
+import { discoverAutoImportsSync } from "../autoimports/registry";
+import { checkSource } from "../check";
+import { MeekoCompileError, parseSfc } from "../compiler/parser/sfc";
+import { projectRoot } from "../compiler/project-root";
+import { assertRouteBlockPlacement } from "../compiler/transforms/route-block";
+import { documentationMarkdown, identifierRange, virtualDocuments } from "./features";
+import { sourceRange } from "./locations";
+import { pathKey } from "./project";
 
 /** Fin del token que empieza en `offset`; un carácter si no hay token reconocible. */
 export function tokenEnd(source: string, offset: number): number {

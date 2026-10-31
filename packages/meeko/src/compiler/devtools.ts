@@ -1,7 +1,9 @@
 import ts from "@typescript/typescript6";
+
+import type { StatementEdit } from "./composables";
+
 import { markSource } from "./mapping";
 import { locate } from "./parser/sfc";
-import type { StatementEdit } from "./composables";
 
 /** Archivo `.meeko` cuyos desplazamientos describen las ubicaciones emitidas para DevTools. */
 export interface DevtoolsSourceContext {

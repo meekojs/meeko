@@ -1,6 +1,7 @@
 import { RuleTester } from 'eslint';
-import parser from '../dist/parser.js';
+
 import plugin from '../dist/index.js';
+import parser from '../dist/parser.js';
 
 const tester = new RuleTester({ languageOptions: { parser } });
 tester.run('button-has-type', plugin.rules['button-has-type'], {

@@ -1,11 +1,13 @@
-import { readdir, readFile } from "node:fs/promises";
+import ts from "@typescript/typescript6";
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { readdir, readFile } from "node:fs/promises";
 import { realpath } from "node:fs/promises";
 import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import ts from "@typescript/typescript6";
+
+import type { MeekoConfig } from "../framework/config";
+
 import { componentExcluded } from "../framework/component-exclusions";
 import { componentDirectories, importDirectoryOptions, loadMeekoConfig, normalizeImportDirectory, readMeekoConfigSync, resolveConfigSources } from "../framework/config";
-import type { MeekoConfig } from "../framework/config";
 import { legacyLayerEntries, resolveMeekoModules } from "../framework/module-loader";
 
 export type ImportScope = "client" | "server" | "shared" | "app";

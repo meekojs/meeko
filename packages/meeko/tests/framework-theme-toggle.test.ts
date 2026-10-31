@@ -1,16 +1,26 @@
+import type { CompletionItem, MarkupContent } from "vscode-languageserver/node";
+
+import ts from "@typescript/typescript6";
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import ts from "@typescript/typescript6";
-import { Window as HappyWindow } from "happy-dom";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import type { CompletionItem, MarkupContent } from "vscode-languageserver/node";
-import { builtinOutputs } from "../scripts/builtin-components.ts";
-import { compileWithAutoImports } from "../src/autoimports/transform.ts";
+
+import type { ClientComponent } from "../src/app/runtime/client.ts";
+import type * as client_tsTypes from "../src/app/runtime/client.ts";
+import type { ErrorPageRecord, RouteRecord } from "../src/app/runtime/router.ts";
 import type { AutoImport } from "../src/autoimports/registry.ts";
+import type * as framework_render_tsTypes from "../src/server/runtime/framework-render.ts";
+import type { DocumentConfig } from "../src/shared/head.ts";
+import type { ResolvedThemeConfig, ThemeToggleContext, ThemeToggleOptions } from "../src/shared/theme.ts";
+
+import { builtinOutputs } from "../scripts/builtin-components.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { compileWithAutoImports } from "../src/autoimports/transform.ts";
 import { compile } from "../src/compiler.ts";
 import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
 import { checkApp } from "../src/framework/check-app.ts";
@@ -18,19 +28,15 @@ import { readThemeEnabledSync, readThemeOptionSync } from "../src/framework/conf
 import { buildProject } from "../src/framework/project.ts";
 import { inlineScriptHashes, inlineStyleHashes } from "../src/framework/script-hashes.ts";
 import { prepareFrameworkTypeDeclarations } from "../src/framework/type-declarations.ts";
-import type { ClientComponent } from "../src/app/runtime/client.ts";
-import type { DocumentConfig } from "../src/shared/head.ts";
-import { createRouteManifest } from "../src/app/runtime/router.ts";
-import type { ErrorPageRecord, RouteRecord } from "../src/app/runtime/router.ts";
-import { themeEndpoint, themeReturnPath } from "../src/server/runtime/theme-endpoint.ts";
-import { resolveThemeConfig, THEME_ENDPOINT, themeStyle } from "../src/shared/theme.ts";
-import { themeToggleGroupLabel, themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from "../src/shared/theme-toggle.ts";
-import type { ResolvedThemeConfig, ThemeToggleContext, ThemeToggleOptions } from "../src/shared/theme.ts";
-import { contentSecurityPolicy } from "../src/server/runtime/csp.ts";
 import { completion, componentNameCompletion, definition, directiveNameCompletion, hover } from "../src/language-server/features.ts";
+import { contentSecurityPolicy } from "../src/server/runtime/csp.ts";
+import { themeEndpoint, themeReturnPath } from "../src/server/runtime/theme-endpoint.ts";
+import { themeToggleGroupLabel, themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from "../src/shared/theme-toggle.ts";
+import { resolveThemeConfig, THEME_ENDPOINT, themeStyle } from "../src/shared/theme.ts";
 import { staticAppConfig, writeStaticApp } from "./helpers/static-app.ts";
 import { createTempProject, tempProject } from "./helpers/temp-project.ts";
 import { languageProject } from "./language-server-workspace.ts";
+
 
 const fileUrl = (path: string): string => pathToFileURL(resolve(path)).href;
 const sha256 = (text: string): string => `'sha256-${createHash("sha256").update(text, "utf8").digest("base64")}'`;
@@ -274,8 +280,8 @@ test("POST /_meeko/theme validates the theme and the Origin, writes the cookie a
 
 /** The runtime as the compiled components import it, by file URL: one instance for pages, server and browser. */
 const runtime = async () => ({
-  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof import("../src/server/runtime/framework-render.ts"),
-  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof import("../src/app/runtime/client.ts"),
+  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof framework_render_tsTypes,
+  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof client_tsTypes,
 });
 
 const sources: Record<string, string> = {

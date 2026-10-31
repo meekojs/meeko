@@ -1,4 +1,5 @@
 import ts from "@typescript/typescript6";
+
 import { freeIdentifiers } from "./composables";
 import { markSource } from "./mapping";
 import { compileError } from "./parser/sfc";

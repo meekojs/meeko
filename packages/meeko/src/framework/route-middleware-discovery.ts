@@ -1,6 +1,6 @@
-import { readFile, readdir } from "node:fs/promises";
-import { basename, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
+import { readdir, readFile } from "node:fs/promises";
+import { basename, join, relative, resolve, sep } from "node:path";
 
 /** Files of `app/middleware` that are never route middleware. */
 const excludedScript = /\.(?:test|spec|d|client)\.ts$/;

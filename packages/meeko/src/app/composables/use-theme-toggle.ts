@@ -1,7 +1,8 @@
 import type { ReadonlySignal } from "../../core/reactivity";
-import { currentServerTheme, useServerTheme } from "../runtime/theme-context";
-import { browserTheme } from "../runtime/theme-browser";
 import type { ThemeToggleContext } from "../../shared/theme";
+
+import { browserTheme } from "../runtime/theme-browser";
+import { currentServerTheme, useServerTheme } from "../runtime/theme-context";
 
 function constant<T>(value: T): ReadonlySignal<T> {
   return Object.freeze({ get value() { return value; } });

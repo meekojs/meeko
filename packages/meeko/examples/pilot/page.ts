@@ -1,4 +1,5 @@
-import { serializeJson, type HotState } from "@meekojs/meeko";
+import { type HotState, serializeJson } from "@meekojs/meeko";
+
 import type { Task, TaskView } from "./model";
 
 /** Renderiza HTML SSR con el estado serializado y un cliente configurable. */

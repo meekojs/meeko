@@ -1,3 +1,5 @@
+import type { Diagnostic } from "vscode-languageserver/node";
+
 import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import { test } from "node:test";
@@ -6,7 +8,7 @@ import {
   DidOpenTextDocumentNotification, DocumentSymbolRequest, HoverRequest, InitializedNotification, InitializeRequest,
   PublishDiagnosticsNotification, ShutdownRequest, StreamMessageReader, StreamMessageWriter,
 } from "vscode-languageserver/node";
-import type { Diagnostic } from "vscode-languageserver/node";
+
 import { startLanguageServer } from "../src/language-server/server.ts";
 
 test("virtual Meeko document receives single-file language features over LSP", async () => {

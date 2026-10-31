@@ -27,10 +27,25 @@ El panel ofrece:
 - el detalle de props y señales;
 - un editor de señales;
 - una línea de tiempo filtrable;
+- navegación y preparación de datos con duración y origen, sin copiar sus valores;
 - resaltado del DOM;
 - un punto de parada por instancia.
 
 Cada evento conserva el nombre y el archivo `.meeko` del componente y una copia segura del nuevo valor. Al seleccionar un evento de una instancia activa se abre su detalle. Los estilos viven en Shadow DOM para no alterar los de la aplicación.
+
+## Navegación y datos
+
+El filtro **Navegación y datos** de ambos paneles muestra las operaciones de la aplicación, separadas de las señales y del ciclo de vida de componentes:
+
+| Evento | Fases | Qué mide |
+| --- | --- | --- |
+| `navigation` | `start` → `commit`, `cancel` o `error` | Desde que comienza una navegación cliente hasta confirmar su vista, cancelarla o fallar. |
+| `data` | `start` → `ready`, `cancel` o `error` | Preparación de módulos y datos antes del commit de la vista. |
+| `data` con `source: "cache"` | `ready` | Lectura satisfecha por la caché local de recursos, sin repetir la petición. |
+
+Cada operación tiene un `operationId` que enlaza inicio y final, el patrón declarado de la ruta (por ejemplo, `/users/[id]`) y `durationMs` al finalizar. El origen de datos es `server`, `client` o `static` según el transporte de la ruta; las lecturas de recursos locales se identifican como `cache`. La duración de una navegación no espera al final visual de una View Transition.
+
+Estos eventos no incluyen la URL resuelta, query, fragmento, parámetros, cabeceras, mensajes de error ni resultados del loader. Los eventos de caché tampoco incluyen claves de recursos ni valores. Las props y señales siguen siendo inspeccionables por sus mecanismos existentes: esta limitación se refiere a los metadatos de navegación y datos. Sin un runtime de desarrollo que instale el hook no se registran estas operaciones. Se conserva el límite compartido de los últimos 100 eventos.
 
 ## Panel de Chrome DevTools
 
@@ -50,6 +65,7 @@ La extensión consulta el hook de la página inspeccionada. No necesita cuenta, 
 El hook y cada captura declaran `protocolVersion: 1`. Los tipos públicos se exportan desde `@meekojs/meeko`:
 
 - `DevtoolsHook`, `DevtoolsSnapshot`, `DevtoolsInstance`, `DevtoolsEvent`, `DevtoolsEventKind` y `DevtoolsValue`;
+- `DevtoolsActivity`, para los metadatos opcionales de navegación y datos;
 - `DevtoolsReadSite` y `DevtoolsReadKind`, para las lecturas;
 - `DevtoolsWriteSite`, `DevtoolsAssignmentSite` y `DevtoolsEditSite`, para las escrituras;
 - `DevtoolsCommandResult` y `DevtoolsProtocolVersion`;

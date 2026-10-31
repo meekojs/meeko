@@ -1,11 +1,14 @@
-import { existsSync, statSync } from "node:fs";
-import { join, posix } from "node:path";
-import { trustHtml } from "@meekojs/meeko";
 import type { TrustedHtml } from "@meekojs/meeko";
+import type { MarkdownIt, Token } from "markdown-it";
+
+import { trustHtml } from "@meekojs/meeko";
 import GithubSlugger from "github-slugger";
 import markdownIt from "markdown-it";
-import type { MarkdownIt, Token } from "markdown-it";
+import { existsSync, statSync } from "node:fs";
+import { join, posix } from "node:path";
+
 import type { RenderedDoc, TocEntry } from "../../shared/types/docs";
+
 import { pageOfSource } from "./catalog";
 import { blockLanguage, createHighlight } from "./highlight";
 import { githubUrl, readRepositoryFile, repositoryPath, repositoryRoot, repositoryUrl, sitePath } from "./repository";

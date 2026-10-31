@@ -1,6 +1,7 @@
+import type { LayoutHandle, LayoutName, LayoutProps } from "../../shared/layout";
+
 import { findContext } from "../../core/reactivity";
 import { layoutKey } from "../runtime/layout";
-import type { LayoutHandle, LayoutName, LayoutProps } from "../../shared/layout";
 
 /**
  * Da acceso a las props del layout con nombre de la página desde su `<script>` (y desde sus

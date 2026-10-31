@@ -1,7 +1,8 @@
 import type { ReadonlySignal } from "../core/reactivity";
+import type { ThemeConfig } from "./theme";
+
 import { isIdPrefix } from "./id-prefix";
 import { resolveThemeConfig, themeScript, themeStyle } from "./theme";
-import type { ThemeConfig } from "./theme";
 
 /**
  * Etiqueta `<meta>` de {@link HeadInput}. Se deduplica por `key` o, si falta, por `name`,

@@ -2,6 +2,7 @@
 import { signal } from "@meekojs/meeko";
 
 const props = defineProps<{ mode: "reuse" | "mount" }>();
+
 const view = signal(0);
 const rows = Array.from({ length: 40 }, (_, index) => index);
 const names = ["Home", "Catalog", "Profile"];

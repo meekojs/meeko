@@ -1,7 +1,8 @@
+import ts from "@typescript/typescript6";
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { test } from "node:test";
-import ts from "@typescript/typescript6";
+
 import { createEditorModel } from "../src/language-server/model.ts";
 
 const filename = resolve("tests/fixtures/LifecycleModel.meeko");

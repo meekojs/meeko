@@ -1,4 +1,5 @@
 import type { TrustedHtml } from '@meekojs/meeko'
+
 import type { TocEntry } from './docs'
 
 /** What a page of the API reference documents. */

@@ -1,21 +1,23 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Window as HappyWindow } from "happy-dom";
-import type { DomScope } from "../src/app/runtime/renderer.ts";
-import { effect } from "../src/core/reactivity.ts";
-import { mountClientApp } from "../src/app/runtime/client.ts";
+
 import type { ClientComponent } from "../src/app/runtime/client.ts";
-import { defer } from "../src/app/runtime/deferred.ts";
 import type { Deferred } from "../src/app/runtime/deferred.ts";
+import type { DomScope } from "../src/app/runtime/renderer.ts";
+import type { RequestContext, SessionRecord } from "../src/framework-server.ts";
+import type { FrameworkHandlerOptions, PageRequestContext, PageRoute } from "../src/server/runtime/framework-render.ts";
+
+import { useState } from "../src/app/composables/useState.ts";
 import { definePage, PAYLOAD_VERSION } from "../src/app/definitions/define-page.ts";
+import { mountClientApp } from "../src/app/runtime/client.ts";
+import { defer } from "../src/app/runtime/deferred.ts";
 import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { StateStore } from "../src/app/runtime/state.ts";
+import { effect } from "../src/core/reactivity.ts";
+import { ApiError, createRequestContext, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
 import { extractRouteRender } from "../src/framework/routes-discovery.ts";
 import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
-import type { FrameworkHandlerOptions, PageRequestContext, PageRoute } from "../src/server/runtime/framework-render.ts";
-import { StateStore } from "../src/app/runtime/state.ts";
-import { useState } from "../src/app/composables/useState.ts";
-import { ApiError, createRequestContext, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
-import type { RequestContext, SessionRecord } from "../src/framework-server.ts";
 
 type Slow = { text: string };
 

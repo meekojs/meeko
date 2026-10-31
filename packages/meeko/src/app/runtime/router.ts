@@ -1,5 +1,6 @@
-import { observeCallback } from "../../core/error-observer";
 import type { PageRender } from "../definitions/define-page";
+
+import { observeCallback } from "../../core/error-observer";
 
 /**
  * Una ruta del manifiesto que comparten el renderizador del servidor y el navegador. Lo produce

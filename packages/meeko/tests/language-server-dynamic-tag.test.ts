@@ -1,11 +1,14 @@
+import type { MarkupContent } from "vscode-languageserver/node";
+
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import type { MarkupContent } from "vscode-languageserver/node";
+
+import type { LanguageProject } from "./language-server-workspace.ts";
+
 import { componentDiagnostics } from "../src/language-server/diagnostics.ts";
 import { completion, directiveNameCompletion, hover } from "../src/language-server/features.ts";
 import { languageProject } from "./language-server-workspace.ts";
-import type { LanguageProject } from "./language-server-workspace.ts";
 
 const card = `<script lang="ts">
 const props = defineProps<{ title: string; tone?: "info" | "warn" }>();

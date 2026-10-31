@@ -1,11 +1,14 @@
+import type { MarkupContent } from "vscode-languageserver/node";
+
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
-import type { MarkupContent } from "vscode-languageserver/node";
+
+import type { LanguageProject } from "./language-server-workspace.ts";
+
 import { componentSummary } from "../src/language-server/components.ts";
 import { componentDiagnostics } from "../src/language-server/diagnostics.ts";
 import { completion, definition, hover } from "../src/language-server/features.ts";
 import { languageProject } from "./language-server-workspace.ts";
-import type { LanguageProject } from "./language-server-workspace.ts";
 
 const button = `<script lang="ts">
 import { signal } from "@meekojs/meeko";

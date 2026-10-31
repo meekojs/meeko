@@ -1,20 +1,23 @@
-import { sourceRange, toRange } from "./locations";
+import type { TextDocument } from "vscode-languageserver-textdocument";
+import type { CompletionItem, DocumentLink, InlayHint, Position, Range, SymbolInformation } from "vscode-languageserver/node";
+
+import ts from "@typescript/typescript6";
 import { relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import ts from "@typescript/typescript6";
-import type { TextDocument } from "vscode-languageserver-textdocument";
 import { CompletionItemKind, InlayHintKind, SymbolKind } from "vscode-languageserver/node";
-import type { CompletionItem, DocumentLink, InlayHint, Position, Range, SymbolInformation } from "vscode-languageserver/node";
+
+import type { TemplateNode } from "../compiler/parser/template";
+import type { AppIndex } from "./app-index";
+import type { FeatureContext } from "./features";
+import type { MeekoProject } from "./project";
+
 import { parseSfc } from "../compiler/parser/sfc";
 import { attributeValueStart, parseTemplate } from "../compiler/parser/template";
-import type { TemplateNode } from "../compiler/parser/template";
 import { appTargetAt } from "./app-index";
-import type { AppIndex } from "./app-index";
 import { tagAt } from "./embedded";
 import { snippetParameters, virtualDocuments } from "./features";
-import type { FeatureContext } from "./features";
 import { appTargetDefinition } from "./insights";
-import type { MeekoProject } from "./project";
+import { sourceRange, toRange } from "./locations";
 import { nodeAt } from "./reactivity";
 
 /**

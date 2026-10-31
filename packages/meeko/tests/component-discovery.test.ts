@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
+
 import { discoverAutoImports, discoverAutoImportsSync, discoverComponents, discoverComponentsSync } from "../src/autoimports/registry.ts";
 import { loadMeekoConfig, readMeekoConfigSync } from "../src/framework/config.ts";
 

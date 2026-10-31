@@ -1,0 +1,19 @@
+<script lang="ts">
+	interface Props {
+		tone?: 'neutral' | 'accent' | 'danger'
+		class?: string
+	}
+
+	const props = defineProps<Props>({ tone: 'neutral' })
+
+	const snippets = defineSnippets<{ default: [] }>()
+</script>
+
+<template>
+	<span
+		bind:class="['meeko-ui-badge', props.class].filter(Boolean).join(' ')"
+		bind:data-tone="props.tone"
+	>
+		<render snippet="snippets.default" />
+	</span>
+</template>

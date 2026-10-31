@@ -1,21 +1,28 @@
+import type { Server } from "node:http";
+import type { AddressInfo } from "node:net";
+
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer as createHttpServer } from "node:http";
-import type { AddressInfo } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
 import { createServer, preview } from "vite";
+
+import type * as framework_server_tsTypes from "../src/framework-server.ts";
+import type * as node_tsTypes from "../src/node.ts";
+
 import { createExampleServer } from "../examples/counter/server.ts";
-import { generateServerContracts } from "../src/framework/contracts-generate.ts";
 import { prepareFrameworkTypes } from "../src/framework/check-project.ts";
+import { generateServerContracts } from "../src/framework/contracts-generate.ts";
 import { buildProject } from "../src/framework/project.ts";
 import { previewStatic } from "../src/framework/static-adapter.ts";
 import { startConformanceOutput } from "./conformance/harness.ts";
 import { staticAppConfig, writeStaticApp } from "./helpers/static-app.ts";
 import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
+
 
 async function assertBrowserBehavior(url: string, development: boolean): Promise<void> {
   const browser = await chromium.launch({
@@ -160,8 +167,8 @@ test("una página render: stream es interactiva antes del diferido y respeta una
   // Builds the conformance fixture with the Node adapter, then serves its
   // output in-process with a CSP nonce and no 'unsafe-inline'.
   const built = await startConformanceOutput("node");
-  type ServerModule = typeof import("../src/framework-server.ts");
-  type NodeModule = typeof import("../src/node.ts");
+  type ServerModule = typeof framework_server_tsTypes;
+  type NodeModule = typeof node_tsTypes;
   const { createServerApp } = await import(pathToFileURL(resolve("dist/framework-server.js")).href) as ServerModule;
   const { createNodeAssetReader, toNodeListener } = await import(pathToFileURL(resolve("dist/node.js")).href) as NodeModule;
   const output = await import(pathToFileURL(join(built.output, "index.mjs")).href) as Pick<Parameters<ServerModule["createServerApp"]>[0], "load" | "manifest">;
@@ -287,7 +294,7 @@ test("Chrome real envía las excepciones y los rechazos globales a onError sin d
 
 test("el 404.html del adaptador static hidrata en cualquier URL y navega en el cliente bajo su CSP", { timeout: 240_000 }, async () => {
   const project = await createTempProject("static-e2e");
-  let server: import("node:http").Server | undefined;
+  let server: Server | undefined;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   try {
     await writeStaticApp(project.root, staticAppConfig);
@@ -397,9 +404,9 @@ const { resolved, set } = useTheme();
 test("el tema llega en el primer byte con la cookie y sin parpadeo en modo sistema, bajo una CSP estricta con nonce", { timeout: 240_000 }, async () => {
   const project = await createTempProject("theme-e2e");
   const root = project.root;
-  type ServerModule = typeof import("../src/framework-server.ts");
-  type NodeModule = typeof import("../src/node.ts");
-  let server: import("node:http").Server | undefined;
+  type ServerModule = typeof framework_server_tsTypes;
+  type NodeModule = typeof node_tsTypes;
+  let server: Server | undefined;
   let app: Awaited<ReturnType<ServerModule["createServerApp"]>> | undefined;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   try {
@@ -519,7 +526,7 @@ test("el tema llega en el primer byte con la cookie y sin parpadeo en modo siste
 
 test("una página estática aplica el tema guardado antes del primer pintado con el script permitido por su hash", { timeout: 240_000 }, async () => {
   const project = await createTempProject("theme-static-e2e");
-  let server: import("node:http").Server | undefined;
+  let server: Server | undefined;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   try {
     await writeStaticApp(project.root, staticAppConfig.replace("sitemap: true,", "sitemap: true,\n  theme: true,"));
@@ -607,9 +614,9 @@ const toggleProbe = (): void => {
 test("<MeekoThemeToggle> shows the right icon in the first frame, cycles with JavaScript and posts without it, under a strict CSP", { timeout: 240_000 }, async () => {
   const project = await createTempProject("theme-toggle-e2e");
   const root = project.root;
-  type ServerModule = typeof import("../src/framework-server.ts");
-  type NodeModule = typeof import("../src/node.ts");
-  let server: import("node:http").Server | undefined;
+  type ServerModule = typeof framework_server_tsTypes;
+  type NodeModule = typeof node_tsTypes;
+  let server: Server | undefined;
   let app: Awaited<ReturnType<ServerModule["createServerApp"]>> | undefined;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   try {
@@ -815,9 +822,9 @@ async function send(event: SubmitEvent): Promise<void> {
 test("useForm en Chrome real: revalida la confirmación, lleva el 409 con issues al campo y enfoca el primer inválido", { timeout: 240_000 }, async () => {
   const project = await createTempProject("form-e2e");
   const root = project.root;
-  type ServerModule = typeof import("../src/framework-server.ts");
-  type NodeModule = typeof import("../src/node.ts");
-  let server: import("node:http").Server | undefined;
+  type ServerModule = typeof framework_server_tsTypes;
+  type NodeModule = typeof node_tsTypes;
+  let server: Server | undefined;
   let app: Awaited<ReturnType<ServerModule["createServerApp"]>> | undefined;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   try {
@@ -911,9 +918,9 @@ test("useForm en Chrome real: revalida la confirmación, lleva el 409 con issues
 test("named layouts: the page chooses the layout and its props, the same layout keeps its state and another replaces it", { timeout: 240_000 }, async () => {
   const project = await createTempProject("named-layouts-e2e");
   const root = project.root;
-  type ServerModule = typeof import("../src/framework-server.ts");
-  type NodeModule = typeof import("../src/node.ts");
-  let server: import("node:http").Server | undefined;
+  type ServerModule = typeof framework_server_tsTypes;
+  type NodeModule = typeof node_tsTypes;
+  let server: Server | undefined;
   let app: Awaited<ReturnType<ServerModule["createServerApp"]>> | undefined;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   try {
@@ -1055,9 +1062,9 @@ const items = useApi("/api/items");
 test("<MeekoAwait reserve> keeps a card with late data from shifting the page on a second visit, under a strict CSP", { timeout: 300_000 }, async () => {
   const project = await createTempProject("await-e2e");
   const root = project.root;
-  type ServerModule = typeof import("../src/framework-server.ts");
-  type NodeModule = typeof import("../src/node.ts");
-  let server: import("node:http").Server | undefined;
+  type ServerModule = typeof framework_server_tsTypes;
+  type NodeModule = typeof node_tsTypes;
+  let server: Server | undefined;
   let app: Awaited<ReturnType<ServerModule["createServerApp"]>> | undefined;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   try {
@@ -1252,9 +1259,9 @@ function onClick(event: MouseEvent): void {
 test("un <component is> con etiqueta pasa de <button> a <a> al recibir href y conserva el foco y el texto", { timeout: 240_000 }, async () => {
   const project = await createTempProject("dynamic-tag-e2e");
   const root = project.root;
-  type ServerModule = typeof import("../src/framework-server.ts");
-  type NodeModule = typeof import("../src/node.ts");
-  let server: import("node:http").Server | undefined;
+  type ServerModule = typeof framework_server_tsTypes;
+  type NodeModule = typeof node_tsTypes;
+  let server: Server | undefined;
   let app: Awaited<ReturnType<ServerModule["createServerApp"]>> | undefined;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   try {

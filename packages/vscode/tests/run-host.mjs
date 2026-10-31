@@ -1,5 +1,5 @@
-import { join } from "node:path";
 import { runTests } from "@vscode/test-electron";
+import { join } from "node:path";
 
 const executable = process.env.MEEKO_HOST_VSCODE;
 const extension = process.env.MEEKO_HOST_EXTENSION;

@@ -1,5 +1,6 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, extname, join, relative, resolve } from "node:path";
+
 import { discoverAutoImports } from "../autoimports/registry";
 import { applyAutoImports } from "../autoimports/transform";
 import { replaceModuleSpecifiers } from "../compiler/import-graph";

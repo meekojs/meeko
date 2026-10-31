@@ -1,22 +1,24 @@
+import { Window } from "happy-dom";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
-import { Window } from "happy-dom";
 import { createServer } from "vite";
+
+import type { Component } from "../src/app/runtime/renderer.ts";
+
+import { hydrate as hydrateAttributes, renderToString as renderAttributes } from "../examples/attributes/Attributes.generated.ts";
+import { hydrate, renderToString, renderWithState } from "../examples/counter/Counter.generated.ts";
+import { renderExamplePage } from "../examples/counter/server.ts";
+import { hydrate as hydratePrimitives, renderToString as renderPrimitives } from "../examples/primitives/Primitives.generated.ts";
+import { hydrate as hydrateRegions, renderToString as renderRegions } from "../examples/regions/Regions.generated.ts";
+import { bindAttribute, bindComponent, bindFor, bindText, renderFor } from "../src/app/runtime/renderer.ts";
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
 import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
-import { meeko } from "../src/vite.ts";
 import { batch, computed, createContext, createRoot, effect, inject, provide, signal } from "../src/core/reactivity.ts";
 import { escapeHtml, serializeJson } from "../src/core/server.ts";
-import { bindAttribute, bindComponent, bindFor, bindText, renderFor } from "../src/app/runtime/renderer.ts";
-import type { Component } from "../src/app/runtime/renderer.ts";
-import { hydrate, renderToString, renderWithState } from "../examples/counter/Counter.generated.ts";
-import { renderExamplePage } from "../examples/counter/server.ts";
-import { hydrate as hydrateAttributes, renderToString as renderAttributes } from "../examples/attributes/Attributes.generated.ts";
-import { hydrate as hydrateRegions, renderToString as renderRegions } from "../examples/regions/Regions.generated.ts";
-import { hydrate as hydratePrimitives, renderToString as renderPrimitives } from "../examples/primitives/Primitives.generated.ts";
+import { meeko } from "../src/vite.ts";
 
 test("el contexto usa la instancia antecesora más cercana sin mezclar raíces", () => {
   const key = createContext<number>("count");

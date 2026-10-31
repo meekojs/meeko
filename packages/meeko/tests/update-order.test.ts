@@ -1,10 +1,11 @@
+import { Window } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { Window } from "happy-dom";
+
 import { compile } from "../src/compiler.ts";
 
 // A region updates before the bindings inside it: `if:when="v.value"` guarding `v.value!.n` must

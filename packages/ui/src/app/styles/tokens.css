@@ -2,6 +2,17 @@
 	--meeko-ui-accent: #285ac8;
 	--meeko-ui-accent-hover: #1c49af;
 	--meeko-ui-on-accent: #fff;
+	--meeko-ui-primary: var(--meeko-ui-accent);
+	--meeko-ui-primary-hover: var(--meeko-ui-accent-hover);
+	--meeko-ui-on-primary: var(--meeko-ui-on-accent);
+	--meeko-ui-accent-soft: color-mix(in oklab, var(--meeko-ui-accent) 12%, transparent);
+	--meeko-ui-accent-text: var(--meeko-ui-accent);
+	--meeko-ui-text-soft: var(--meeko-ui-text);
+	--meeko-ui-border-strong: var(--meeko-ui-border);
+	--meeko-ui-control-padding: 0.55rem 0.9rem;
+	--meeko-ui-control-height: 2.5rem;
+	--meeko-ui-control-weight: 600;
+	--meeko-ui-control-font-size: 0.9rem;
 	--meeko-ui-surface: #fff;
 	--meeko-ui-surface-hover: #f3f5f9;
 	--meeko-ui-text: #18202d;

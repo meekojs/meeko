@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
+
 import { discoverAutoImports } from "../src/autoimports/registry.ts";
 import { generateAutoImportTypes, transformTypeScriptAutoImports, typeScriptAutoImportMap, typeScriptScope } from "../src/autoimports/typescript.ts";
 
@@ -15,6 +16,7 @@ test("TS autoimports generate isolated client/server/shared declarations and tra
     "shared/types/labels.ts": "export type Label = string;",
     "shared/internal/box.ts": 'interface Hidden { id: string }\ntype HiddenDefault = Hidden & { kind: "default" };\nexport type Box<T extends Hidden = HiddenDefault> = { value: T };',
     "shared/types/box.ts": 'export type { Box } from "../internal/box.js";',
+    "shared/types/resolved.ts": 'export type { ResolvedComponent as ResolvedAlias } from "@meekojs/meeko";',
     "server/utils/secret.ts": "export function getSecret(): string { return 'private'; }",
   };
   for (const [name, source] of Object.entries(files)) {
@@ -23,6 +25,11 @@ test("TS autoimports generate isolated client/server/shared declarations and tra
     await writeFile(path, source);
   }
   try {
+    // Match the consumer's NodeNext resolution before resolving re-export targets; this
+    // fixture lives below Meeko's own tsconfig, whose outDir maps self imports back to src.
+    await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: {
+      target: "es2022", module: "nodenext", moduleResolution: "nodenext", strict: true, skipLibCheck: false, noEmit: true,
+    } }));
     const output = await generateAutoImportTypes(root);
     const client = await readFile(output.client, "utf8");
     const server = await readFile(output.server, "utf8");
@@ -32,6 +39,8 @@ test("TS autoimports generate isolated client/server/shared declarations and tra
     assert.doesNotMatch(client, /serverOnly/);
     assert.match(client, /export import Label = __meeko_type_\d+\.Label/);
     assert.match(client, /export import Box = __meeko_type_\d+\.Box/);
+    assert.match(client, /type ResolvedComponent<Name extends import\("@meekojs\/meeko"\)\.ComponentName = import\("@meekojs\/meeko"\)\.ComponentName>/);
+    assert.doesNotMatch(client, /export import ResolvedComponent =/);
     assert.doesNotMatch(client, /T extends Hidden|HiddenDefault/);
     assert.doesNotMatch(client, /getSecret/);
     assert.match(server, /const getSecret: typeof import/);
@@ -59,6 +68,7 @@ test("TS autoimports generate isolated client/server/shared declarations and tra
     assert.equal(typeScriptScope(root, join(root, "app", "pages", "page.shared.ts")), "shared");
     const consumer = join(root, "consumer.ts");
     await writeFile(consumer, `const count: number = useCount();\nconst label: Label = "ok";\nconst box: Box<{ id: string; extra: number }> = { value: { id: "ok", extra: 1 } };\nconst defaultBox: Box = { value: { id: "ok", kind: "default" } };\n// @ts-expect-error the private re-exported generic constraint must remain intact\nconst invalidBox: Box<number> = { value: 1 };\ntype Field = FormField<string>; type FormState = Form<{ name: string }, void>; type Submission = FormSubmission<void>;\nvoid count; void label; void box; void defaultBox; void invalidBox;\n`);
+    await writeFile(consumer, `export {};\ndeclare module "@meekojs/meeko" {\n  interface ComponentRegistry { Example: { renderToString(props: { id: number }): string } }\n}\ntype DefaultResolved = ResolvedComponent;\ntype NamedResolved = ResolvedComponent<"Example">;\ntype RenamedResolved = ResolvedAlias<"Example">;\n// @ts-expect-error unknown component names remain rejected\ntype UnknownResolved = ResolvedComponent<"Missing">;\n// @ts-expect-error the renamed re-export keeps the original generic constraint\ntype UnknownAlias = ResolvedAlias<"Missing">;\n// @ts-expect-error type-only autoimports never create runtime globals\nvoid ResolvedComponent;\n` + await readFile(consumer, "utf8"));
     await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: {
       target: "es2022", module: "nodenext", moduleResolution: "nodenext", strict: true, skipLibCheck: false, noEmit: true,
     }, files: [consumer, output.client] }));

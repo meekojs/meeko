@@ -93,7 +93,7 @@ export function analyzeModels(file: ts.SourceFile): ModelDeclaration[] {
   return found;
 }
 
-import { apiDocs, jsdoc } from "./compiler-docs";
+import { jsdoc } from "./compiler-docs";
 
 export const defineModelDocs = jsdoc(
     "Macro de compilación: declara un modelo, una señal escribible que el padre comparte con",

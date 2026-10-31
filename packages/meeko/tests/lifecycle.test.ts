@@ -1,16 +1,18 @@
+import { Window } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { Window } from "happy-dom";
+
+import type { ComponentModule, ComponentRelease } from "../src/app/runtime/renderer.ts";
+
+import { onMounted } from "../src/app/runtime/lifecycle.ts";
+import { bindComponent, renderComponent } from "../src/app/runtime/renderer.ts";
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
 import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
-import { bindComponent, renderComponent } from "../src/app/runtime/renderer.ts";
-import type { ComponentModule, ComponentRelease } from "../src/app/runtime/renderer.ts";
-import { onMounted } from "../src/app/runtime/lifecycle.ts";
 import { createRoot } from "../src/core/reactivity.ts";
 import { generateTypes } from "../src/types.ts";
 

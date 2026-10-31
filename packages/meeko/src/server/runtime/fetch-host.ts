@@ -1,8 +1,9 @@
-import { observeServerError } from "../errors";
-import { errorResponse } from "../contract-runtime";
-import { copySocketAddress } from "./env";
 import type { ServerApp } from "./app";
 import type { ServerPlatform } from "./platform";
+
+import { errorResponse } from "../contract-runtime";
+import { observeServerError } from "../errors";
+import { copySocketAddress } from "./env";
 
 /** Normalizes a configured public origin to `scheme://host[:port]`. */
 export function publicOriginOf(value: string): string {

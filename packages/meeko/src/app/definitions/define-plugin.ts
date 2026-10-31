@@ -1,9 +1,10 @@
-import { provide } from "../../core/reactivity";
 import type { ContextKey } from "../../core/reactivity";
+import type { HeadInput } from "../../shared/head";
 import type { ErrorSource } from "../runtime/component-errors";
 import type { RouteState } from "../runtime/navigation";
+
+import { provide } from "../../core/reactivity";
 import { useHead } from "../composables/use-head";
-import type { HeadInput } from "../../shared/head";
 
 /** Brand of the objects `definePlugin` returns; `Symbol.for` so two copies of Meeko agree. */
 const pluginBrand: unique symbol = Symbol.for("meeko.app-plugin") as never;

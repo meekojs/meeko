@@ -1,17 +1,19 @@
+import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { formatDiagnostic, hasErrors } from "../compiler/parser/sfc";
+
 import type { CompileDiagnostic } from "../compiler/parser/sfc";
+import type { MeekoConfig } from "./config";
+
+import { mapRouteBlockPaths, routeBlockTypeFiles } from "../compiler/codegen/route-block-types";
+import { formatDiagnostic, hasErrors } from "../compiler/parser/sfc";
+import { tscCommand } from "../typescript-cli";
 import { checkApp } from "./check-app";
 import { discoverConfiguredRoutes, loadMeekoConfig } from "./config";
-import type { MeekoConfig } from "./config";
 import { prepareProject } from "./project";
 import { assertNoLegacySessionFile } from "./runtime-migration";
-import { mapRouteBlockPaths, routeBlockTypeFiles } from "../compiler/codegen/route-block-types";
 import { prepareFrameworkTypeDeclarations, projectNames } from "./type-declarations";
-import { tscCommand } from "../typescript-cli";
 
 const execute = promisify(execFile);
 

@@ -1,10 +1,12 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+
+import type { ContextServices } from "./definition";
+import type { ServerPlatform } from "./platform";
 import type { SessionData, SessionHandle } from "./sessions";
+
 import { clientAddressOf, requestEnvironmentOf } from "./env";
 import { defaultPlatform } from "./platform";
-import type { ServerPlatform } from "./platform";
 import { takeScopedRequestId } from "./process-errors";
-import type { ContextServices } from "./definition";
 
 /**
  * Contexto de una petición HTTP: sesión, servicios, plataforma y estado propios de esa petición,

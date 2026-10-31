@@ -1,15 +1,16 @@
+import { Window } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { Window } from "happy-dom";
+
+import { createEmit } from "../src/app/runtime/emits.ts";
 import { compileWithAutoImports } from "../src/autoimports/transform.ts";
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
 import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
-import { createEmit } from "../src/app/runtime/emits.ts";
 import { generateTypes } from "../src/types.ts";
 
 const child = `<script lang="ts">

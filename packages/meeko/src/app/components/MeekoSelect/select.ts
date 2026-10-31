@@ -1,3 +1,6 @@
+import type { Signal } from "../../../core/reactivity";
+import type { SelectEntry, SelectGroup, SelectOptionState, SelectSettings } from "./types";
+
 /**
  * `<MeekoSelect>`: what `MeekoSelect.meeko` needs besides its template. The pure helpers (labels,
  * comparison with `by`, search with accents removed, grouping, selection with `max`) are tested on
@@ -5,11 +8,7 @@
  * hydration, and attaches the keyboard and the pointer in the browser.
  */
 import { computed, effect, onCleanup, signal, untrack } from "../../../core/reactivity";
-import type { Signal } from "../../../core/reactivity";
 import { adoptStyle, createTypeahead, listKeyTarget, normalizeText, typeaheadIndex, typeaheadKey } from "../MeekoPopover/popover";
-
-
-import type { SelectEntry, SelectGroup, SelectSettings, SelectOptionState } from "./types";
 
 /** A value of the record of an object option, or `undefined`. */
 function field(option: unknown, key: string): unknown {

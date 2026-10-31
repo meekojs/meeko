@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 import { createServer } from "vite";
+
 import { commandExpression, normalizeSnapshot } from "../protocol.js";
 
 const extensionRoot = dirname(dirname(fileURLToPath(import.meta.url)));

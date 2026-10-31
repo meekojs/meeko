@@ -17,6 +17,14 @@ i18n.t("ready", {});
 i18n.t("legacy");
 const values: I18nMessageValues<"items"> = { total: 1, owner: "Team" };
 i18n.t("items", values);
+declare const dynamic: "welcome" | "ready";
+i18n.t(dynamic, { name: "Team" });
+// @ts-expect-error A dynamic key can require parameters, even when another alternative is static.
+i18n.t(dynamic);
+declare const requiredUnion: "welcome" | "items";
+i18n.t(requiredUnion, { name: "Team", owner: "Team", total: 2 });
+// @ts-expect-error Values must satisfy every possible dynamic message contract.
+i18n.t(requiredUnion, { name: "Team" });
 // @ts-expect-error A message key is checked against the generated registry.
 i18n.t("missing");
 // @ts-expect-error Required interpolation values cannot be omitted.

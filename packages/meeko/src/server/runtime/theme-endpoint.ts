@@ -1,10 +1,11 @@
+import type { ResolvedThemeConfig } from "../../shared/theme";
+
 /**
  * `POST /_meeko/theme`: the form of `<MeekoThemeToggle>` without JavaScript. It changes the theme
  * cookie and sends the browser back to the page with a `303`, so the next SSR document already has
  * the new theme. Server code only: the browser bundle never imports it.
  */
 import { isThemeChoice } from "../../shared/theme";
-import type { ResolvedThemeConfig } from "../../shared/theme";
 
 /** The form has two short fields; anything longer is not that form. */
 const maxBodyBytes = 2048;

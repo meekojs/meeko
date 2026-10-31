@@ -1,17 +1,20 @@
+import type { TrustedHtml } from '@meekojs/meeko'
+import type TS from '@typescript/typescript6'
+
+import { trustHtml } from '@meekojs/meeko'
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import type TS from '@typescript/typescript6'
-import { trustHtml } from '@meekojs/meeko'
-import type { TrustedHtml } from '@meekojs/meeko'
+
 import type { NavLink, NavSection, Pager } from '../../shared/types/docs'
 import type { ReferenceIndexEntry, ReferenceIndexGroup, ReferencePage, ReferenceRelated } from '../../shared/types/reference'
-import { apiCodeLinks, apiConfigBlock, apiConfigKeys, apiHref, apiSlugSet, apiSymbolInfo, apiSymbolMarkdown, apiTypeBlocks } from './api'
 import type { ApiSymbolInfo, ApiTypeBlock } from './api'
+import type { TaxonomyEntry, TaxonomyGroup } from './reference-taxonomy'
+
+import { apiCodeLinks, apiConfigBlock, apiConfigKeys, apiHref, apiSlugSet, apiSymbolInfo, apiSymbolMarkdown, apiTypeBlocks } from './api'
 import { apiGroups, exportsHref, groupHref, referenceHref } from './api-groups'
 import { createHighlight } from './highlight'
 import { codeBlockHtml, documentHeadings, escapeHtml, renderInline, renderMarkdown, rewriteHref } from './markdown'
-import { taxonomy, groupIcons, referenceFolder, taxonomyPath } from './reference-taxonomy'
-import type { TaxonomyEntry, TaxonomyGroup } from './reference-taxonomy'
+import { groupIcons, referenceFolder, taxonomy, taxonomyPath } from './reference-taxonomy'
 import { githubUrl, packageFolder, readRepositoryFile, repositoryRoot, repositoryUrl } from './repository'
 
 /*

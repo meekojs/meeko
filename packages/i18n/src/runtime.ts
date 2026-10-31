@@ -37,7 +37,9 @@ export function createI18n(locale: string, catalog: Catalog, locales: readonly s
   const dates = new Map<string, Intl.DateTimeFormat>();
   return {
     locale,
-    t(key, values = {}) {
+    t(key: string, ...request: readonly unknown[]) {
+      // La firma pública correlaciona clave y valores; el runtime interpreta el catálogo ya validado.
+      const values = request[0] === undefined ? {} : request[0] as Values;
       const message = catalog[key];
       if (message === undefined) throw new ReferenceError(`Missing i18n message ${key} for ${locale}`);
       if (Array.isArray(message)) return render(message, values);

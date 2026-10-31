@@ -1,7 +1,8 @@
-import { PAYLOAD_VERSION, payloadHead } from "../definitions/define-page";
 import type { PageHead, PageRender } from "../definitions/define-page";
-import { isRecord, readDeferredEntries } from "./client-deferred";
 import type { PayloadDeferred } from "./client-deferred";
+
+import { PAYLOAD_VERSION, payloadHead } from "../definitions/define-page";
+import { isRecord, readDeferredEntries } from "./client-deferred";
 
 export interface HydrationPayload {
   /** Empty in an application error page payload (`error: true`), which has no route. */

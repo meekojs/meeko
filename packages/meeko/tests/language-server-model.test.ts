@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
+
 import { checkSource } from "../src/check.ts";
 import { createEditorModel } from "../src/language-server/model.ts";
 

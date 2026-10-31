@@ -1,21 +1,24 @@
-import { existsSync } from "node:fs";
-import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
-import { createServer } from "node:http";
 import type { Server } from "node:http";
+
+import { existsSync } from "node:fs";
+import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { networkInterfaces } from "node:os";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
+
+import type { MeekoServerConfig } from "../modules/define-meeko-config";
+import type { InternalServerApp } from "../server/runtime/app";
+import type { PrerenderIndex } from "./prerender";
+
+import { renderNotFound } from "../server/runtime/app";
 import { contentSecurityPolicy } from "../server/runtime/csp";
 import { meekoEnv } from "../server/runtime/env";
-import { listeningMessage } from "../server/runtime/listen-address";
-import { renderNotFound } from "../server/runtime/app";
-import type { InternalServerApp } from "../server/runtime/app";
-import { discoverAppManifest } from "./app-manifest";
-import type { MeekoServerConfig } from "../modules/define-meeko-config";
-import { contentTypes } from "./content-types";
-import { discoverRouteMiddleware } from "./route-middleware-discovery";
 import { documentShell } from "../server/runtime/inline-sources";
+import { listeningMessage } from "../server/runtime/listen-address";
+import { discoverAppManifest } from "./app-manifest";
+import { contentTypes } from "./content-types";
 import { importNodeOutput } from "./prerender";
-import type { PrerenderIndex } from "./prerender";
+import { discoverRouteMiddleware } from "./route-middleware-discovery";
 import { inlineScriptHashes, inlineStyleHashes } from "./script-hashes";
 
 type StaticConfig = Extract<MeekoServerConfig, { adapter: "static" }>;

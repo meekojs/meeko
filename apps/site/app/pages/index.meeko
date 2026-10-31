@@ -1,7 +1,10 @@
 <script server lang="ts">
 	import type { TrustedHtml } from '@meekojs/meeko'
+
 	import { definePage } from '@meekojs/meeko/framework'
+
 	import type { DemoSource } from '../../shared/types/demo'
+
 	import { readPage } from '../../server/content/db'
 
 	export const route = definePage({ render: 'ssr' })
@@ -62,12 +65,7 @@
 			</h1>
 			<p class="lead">Un motor de componentes para TypeScript y un framework full-stack. Un solo archivo da el HTML del servidor y la reactividad que lo actualiza, sin DOM virtual.</p>
 			<div class="actions">
-				<a
-					class="pill"
-					href="#inicio-rápido"
-				>
-					Empezar
-				</a>
+				<UILink href="#inicio-rápido">Empezar</UILink>
 				<button
 					type="button"
 					class="command"
@@ -118,7 +116,11 @@
 							<code>.meeko</code>
 							tipado
 						</h3>
-						<p>Script, plantilla y estilos juntos. TypeScript comprueba props, eventos, modelos y cada expresión de la plantilla, con el error en la línea del <code>.meeko</code>.</p>
+						<p>
+							Script, plantilla y estilos juntos. TypeScript comprueba props, eventos, modelos y cada expresión de la plantilla, con el error en la línea del
+							<code>.meeko</code>
+							.
+						</p>
 						<a bind:href="api">
 							Componentes y API
 							<svg
@@ -132,7 +134,14 @@
 					</li>
 					<li>
 						<h3>Signals sin DOM virtual</h3>
-						<p><code>signal</code>, <code>computed</code> y <code>effect</code> actualizan sólo el texto o el atributo que cambia. Las listas conservan sus nodos por clave.</p>
+						<p>
+							<code>signal</code>
+							,
+							<code>computed</code>
+							y
+							<code>effect</code>
+							actualizan sólo el texto o el atributo que cambia. Las listas conservan sus nodos por clave.
+						</p>
 						<a href="/docs/api#reactividad">
 							Reactividad
 							<svg
@@ -615,7 +624,13 @@
 			<div class="tools-row">
 				<div class="fact">
 					<h3>Un editor con superpoderes</h3>
-					<p>Servidor de lenguaje con los diagnósticos de <code>meeko check</code>, zonas de ejecución servidor/navegador, hover de señales y valores en vivo desde <code>meeko dev</code>.</p>
+					<p>
+						Servidor de lenguaje con los diagnósticos de
+						<code>meeko check</code>
+						, zonas de ejecución servidor/navegador, hover de señales y valores en vivo desde
+						<code>meeko dev</code>
+						.
+					</p>
 					<a bind:href="editors">
 						Editores
 						<svg
@@ -682,7 +697,11 @@
 						</div>
 						<div>
 							<dt><code>build</code></dt>
-							<dd>Cliente, servidor y páginas prerenderizadas; con <code>--adapter</code>, una salida para Bun, Deno, Cloudflare o un hosting estático.</dd>
+							<dd>
+								Cliente, servidor y páginas prerenderizadas; con
+								<code>--adapter</code>
+								, una salida para Bun, Deno, Cloudflare o un hosting estático.
+							</dd>
 						</div>
 						<div>
 							<dt><code>start</code></dt>
@@ -690,18 +709,13 @@
 						</div>
 					</dl>
 					<p class="start-links">
-						<a
-							class="pill"
-							bind:href="quickStartPage"
-						>
-							Inicio rápido completo
-						</a>
-						<a
-							class="ghost"
+						<UILink bind:href="quickStartPage">Inicio rápido completo</UILink>
+						<UILink
+							variant="outline"
 							bind:href="framework"
 						>
 							Guía del framework
-						</a>
+						</UILink>
 					</p>
 				</div>
 			</div>
@@ -714,8 +728,8 @@
 	@keyframes settle {
 		from {
 			transform: translateY(0.4em);
-			filter: blur(6px);
 			opacity: 0;
+			filter: blur(6px);
 		}
 	}
 	@keyframes rise {
@@ -762,22 +776,6 @@
 		align-items: center;
 		gap: 0.75rem;
 		margin-top: 2.25rem;
-	}
-	.pill {
-		display: inline-flex;
-		align-items: center;
-		transition: background-color 0.15s;
-		border-radius: 999px;
-		background: var(--pill);
-		padding: 0 1.25rem;
-		height: 2.6rem;
-		color: var(--on-pill);
-		font-weight: 520;
-		font-size: 0.95rem;
-		text-decoration: none;
-	}
-	.pill:hover {
-		background: var(--pill-hover);
 	}
 	.command {
 		display: inline-flex;
@@ -1029,12 +1027,12 @@
 		min-height: 1.85em;
 	}
 	.editor-code .ln {
+		opacity: 0.6;
 		padding-right: 1.25rem;
 		color: var(--muted);
-		text-align: right;
-		opacity: 0.6;
 		font-variant-numeric: tabular-nums;
 		user-select: none;
+		text-align: right;
 	}
 	.editor-code .text {
 		padding-left: 2ch;
@@ -1047,8 +1045,8 @@
 		background: var(--accent-soft);
 	}
 	.editor-code .line[data-live] .ln {
-		color: var(--accent-ink);
 		opacity: 1;
+		color: var(--accent-ink);
 	}
 	.live {
 		padding-left: 2.5ch;
@@ -1178,22 +1176,6 @@
 		flex-wrap: wrap;
 		gap: 0.6rem;
 		margin: 1.75rem 0 0;
-	}
-	.ghost {
-		display: inline-flex;
-		align-items: center;
-		transition: background-color 0.15s;
-		border: 1px solid var(--line-strong);
-		border-radius: 999px;
-		padding: 0 1.15rem;
-		height: 2.6rem;
-		color: var(--ink);
-		font-weight: 500;
-		font-size: 0.95rem;
-		text-decoration: none;
-	}
-	.ghost:hover {
-		background: var(--surface-2);
 	}
 	.chapter-start .chapter-inner {
 		padding-bottom: clamp(5rem, 10vw, 8rem);

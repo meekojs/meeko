@@ -1,24 +1,34 @@
+import type { CompletionItem, MarkupContent } from "vscode-languageserver/node";
+
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { Window as HappyWindow } from "happy-dom";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import type { CompletionItem, MarkupContent } from "vscode-languageserver/node";
+
+import type { DataResource } from "../src/app/composables/resources/engine.ts";
+import type * as use_api_tsTypes from "../src/app/composables/resources/use-api.ts";
+import type { AwaitResource } from "../src/app/runtime/await.ts";
+import type { ClientComponent } from "../src/app/runtime/client.ts";
+import type * as client_tsTypes from "../src/app/runtime/client.ts";
+import type * as lifecycle_tsTypes from "../src/app/runtime/lifecycle.ts";
+import type { RouteRecord } from "../src/app/runtime/router.ts";
+import type * as reactivity_tsTypes from "../src/core/reactivity.ts";
+import type * as framework_render_tsTypes from "../src/server/runtime/framework-render.ts";
+
+import { awaitStatus, minimumRule, prepareReserve, rememberedHeight, rememberHeight, RESERVE_STORAGE_KEY, reserveMinimum, reserveRules, reserveScript, reserveZoneKey } from "../src/app/runtime/await.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
 import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
-import { awaitStatus, minimumRule, prepareReserve, rememberedHeight, rememberHeight, reserveMinimum, reserveRules, reserveScript, reserveZoneKey, RESERVE_STORAGE_KEY } from "../src/app/runtime/await.ts";
-import type { AwaitResource } from "../src/app/runtime/await.ts";
-import type { ClientComponent } from "../src/app/runtime/client.ts";
-import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { signal } from "../src/core/reactivity.ts";
 import { completion, componentNameCompletion, definition, directiveNameCompletion, hover } from "../src/language-server/features.ts";
 import { createEditorModel } from "../src/language-server/model.ts";
-import type { RouteRecord } from "../src/app/runtime/router.ts";
-import { signal } from "../src/core/reactivity.ts";
 import { createTempProject } from "./helpers/temp-project.ts";
 import { languageProject } from "./language-server-workspace.ts";
+
 
 const fileUrl = (path: string): string => pathToFileURL(resolve(path)).href;
 
@@ -298,8 +308,8 @@ const routes: readonly RouteRecord[] = createRouteManifest([
 ]);
 
 const runtime = async () => ({
-  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof import("../src/server/runtime/framework-render.ts"),
-  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof import("../src/app/runtime/client.ts"),
+  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof framework_render_tsTypes,
+  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof client_tsTypes,
 });
 
 const flush = async (): Promise<void> => {
@@ -464,10 +474,10 @@ test("without reserve there is no key, no script and no style; the default error
 test("keepPrevious: false empties data when the input changes; refresh keeps it", { timeout: 60_000 }, async () => {
   const { open, close } = installDataServer();
   try {
-    const { createUseApi } = await import(fileUrl("src/app/composables/resources/use-api.ts")) as typeof import("../src/app/composables/resources/use-api.ts");
-    const { collectMounted, runMounted } = await import(fileUrl("src/app/runtime/lifecycle.ts")) as typeof import("../src/app/runtime/lifecycle.ts");
-    const reactivity = await import(fileUrl("src/core/reactivity.ts")) as typeof import("../src/core/reactivity.ts");
-    const useApi = createUseApi({ api: [{ clientKey: "items", pathname: "/api/items", method: "GET" }] } as const, { baseUrl: "https://example.test", fetch: ((input: RequestInfo | URL, init?: RequestInit) => globals.meekoAwaitFetch!(input, init)) as typeof fetch }) as unknown as (path: string, input: unknown, options?: unknown) => import("../src/app/composables/resources/engine.ts").DataResource<string[]>;
+    const { createUseApi } = await import(fileUrl("src/app/composables/resources/use-api.ts")) as typeof use_api_tsTypes;
+    const { collectMounted, runMounted } = await import(fileUrl("src/app/runtime/lifecycle.ts")) as typeof lifecycle_tsTypes;
+    const reactivity = await import(fileUrl("src/core/reactivity.ts")) as typeof reactivity_tsTypes;
+    const useApi = createUseApi({ api: [{ clientKey: "items", pathname: "/api/items", method: "GET" }] } as const, { baseUrl: "https://example.test", fetch: ((input: RequestInfo | URL, init?: RequestInit) => globals.meekoAwaitFetch!(input, init)) as typeof fetch }) as unknown as (path: string, input: unknown, options?: unknown) => DataResource<string[]>;
     const q = reactivity.signal("a");
     const mounted: Array<() => void> = [];
     const [strict, kept, dispose] = reactivity.createRoot((dispose) => collectMounted(mounted, () => [

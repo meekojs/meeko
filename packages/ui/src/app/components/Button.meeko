@@ -1,16 +1,24 @@
 <script lang="ts">
+	import type { UIActionShape, UIActionSize, UIActionVariant } from '../types/config'
+
+	import { uiDefaults } from '../utils/defaults'
+
 	interface Props {
 		type?: 'button' | 'submit' | 'reset'
-		variant?: 'primary' | 'secondary'
+		variant?: UIActionVariant
+		size?: UIActionSize
+		shape?: UIActionShape
 		disabled?: boolean
 		class?: string
 	}
 
 	const props = defineProps<Props>()
 
+	const emit = defineEmits<{ click: [event: MouseEvent] }>()
+
 	const snippets = defineSnippets<{ default: [] }>()
 
-	const emit = defineEmits<{ click: [event: MouseEvent] }>()
+	const defaults = uiDefaults().button
 </script>
 
 <template>
@@ -18,7 +26,9 @@
 		bind:type="props.type ?? 'button'"
 		bind:disabled="props.disabled"
 		bind:class="['meeko-ui-button', props.class].filter(Boolean).join(' ')"
-		bind:data-variant="props.variant ?? 'primary'"
+		bind:data-variant="props.variant ?? defaults?.variant ?? 'primary'"
+		bind:data-size="props.size ?? defaults?.size ?? 'md'"
+		bind:data-shape="props.shape ?? defaults?.shape ?? 'rounded'"
 		on:click="(event) => emit('click', event)"
 	>
 		<render snippet="snippets.default" />

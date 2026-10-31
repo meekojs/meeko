@@ -1,10 +1,13 @@
-import { existsSync, statSync } from "node:fs";
-import { dirname, extname, resolve } from "node:path";
 import type * as CSS from "csstype";
 import type { AtRule, ChildNode, Container, Helpers, Plugin, Result, Root } from "postcss";
+
+import { existsSync, statSync } from "node:fs";
+import { dirname, extname, resolve } from "node:path";
 import selectorParser from "postcss-selector-parser";
-import { meekoProjectRoot, utilityAutoImports } from "./autoimports";
+
 import type { UtilityAutoImports } from "./autoimports";
+
+import { meekoProjectRoot, utilityAutoImports } from "./autoimports";
 import { canBundleUtilities, loadUtilityModule } from "./module-loader";
 
 /**

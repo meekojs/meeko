@@ -1,8 +1,10 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Window as HappyWindow } from "happy-dom";
-import { mountClientApp } from "../src/app/runtime/client.ts";
+
 import type { ClientComponent } from "../src/app/runtime/client.ts";
+
+import { mountClientApp } from "../src/app/runtime/client.ts";
 import { createNavigator, createRouteManifest } from "../src/app/runtime/router.ts";
 
 /** A mock browser that records history and scrolling. */

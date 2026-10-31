@@ -1,14 +1,16 @@
+import ts from "@typescript/typescript6";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import ts from "@typescript/typescript6";
+
+import type { ServerScript } from "../compiler/transforms/server-script";
+import type { StaticGroupOptions } from "./routes-discovery";
+
+import { routeBlockTypeFile } from "../compiler/codegen/route-block-types";
+import { readServerScript } from "../compiler/codegen/server-script";
+import { MeekoCompileError } from "../compiler/parser/sfc";
+import { routeBlockFile, routeBlockSource } from "../compiler/transforms/route-block";
 import { configuredModuleLayouts, discoverConfiguredRoutes } from "./config";
 import { discoverErrorPage, extractGroupOptions, extractRouteOptions } from "./routes-discovery";
-import type { StaticGroupOptions } from "./routes-discovery";
-import { routeBlockFile, routeBlockSource } from "../compiler/transforms/route-block";
-import { routeBlockTypeFile } from "../compiler/codegen/route-block-types";
-import { MeekoCompileError } from "../compiler/parser/sfc";
-import type { ServerScript } from "../compiler/transforms/server-script";
-import { readServerScript } from "../compiler/codegen/server-script";
 
 function importPath(from: string, target: string): string {
   const path = relative(dirname(from), target).replaceAll("\\", "/");

@@ -1,9 +1,11 @@
-import * as vscode from 'vscode'
 import { readFile } from 'node:fs/promises'
-import { BridgeConnection, isAlive } from './client'
+import * as vscode from 'vscode'
+
 import type { LiveChange } from './client'
-import { bridgeDescriptorGlob, bridgeOffFromRecord, devServerRecordGlob, editableValue, groupSignals, hoverMarkdown, inlineText, isWorkspaceBridgeDescriptor, isWorkspaceDevServerRecord, liveStatus, parseEditedValue, placeGroups } from './model'
 import type { BridgeOff, EditorLiveSignal, LiveGroup } from './model'
+
+import { BridgeConnection, isAlive } from './client'
+import { bridgeDescriptorGlob, bridgeOffFromRecord, devServerRecordGlob, editableValue, groupSignals, hoverMarkdown, inlineText, isWorkspaceBridgeDescriptor, isWorkspaceDevServerRecord, liveStatus, parseEditedValue, placeGroups } from './model'
 import { localWorkspacePath, reconcileWatchedFolders } from './workspace'
 
 const descriptorGlob = bridgeDescriptorGlob

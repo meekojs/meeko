@@ -1,8 +1,9 @@
+import ts from "@typescript/typescript6";
 import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import ts from "@typescript/typescript6";
+
 import { generateRoutes } from "../src/framework/generate.ts";
 import { clientEntrySource, serverEntrySource, staticClientEntrySource } from "../src/framework/project-templates.ts";
 import { tempProject } from "./helpers/temp-project.ts";

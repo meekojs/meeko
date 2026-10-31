@@ -1,4 +1,5 @@
 import ts from "@typescript/typescript6";
+
 import type { SfcSection } from "./parser/sfc";
 
 /**

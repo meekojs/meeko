@@ -1,13 +1,16 @@
-import ts from "@typescript/typescript6";
 import type { Location } from "vscode-languageserver/node";
-import { builtinTag } from "./builtin-tags";
+
+import ts from "@typescript/typescript6";
+
 import type { BuiltinTag } from "./builtin-tags";
-import { componentMemberDocs, componentSignature, memberDocumentation, typeFormat } from "./components";
 import type { ComponentMember, ComponentSummary } from "./components";
-import { locationOf } from "./locations";
 import type { FeatureContext } from "./features";
-import { positionLink } from "./insights";
 import type { ComponentTag } from "./model";
+
+import { builtinTag } from "./builtin-tags";
+import { componentMemberDocs, componentSignature, memberDocumentation, typeFormat } from "./components";
+import { positionLink } from "./insights";
+import { locationOf } from "./locations";
 
 /** The props type of a built-in tag in the virtual code (`MeekoLinkProps<"/users/[id]">`) and the interface that declares it. */
 interface BuiltinProps {

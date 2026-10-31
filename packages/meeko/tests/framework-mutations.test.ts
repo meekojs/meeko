@@ -1,29 +1,37 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import { writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { Window as HappyWindow } from "happy-dom";
-import { compile } from "../src/compiler.ts";
+
 import type { ClientComponent } from "../src/app/runtime/client.ts";
-import type { ApiClient, ApiOperation, RpcClient, RpcOperation } from "../src/shared/clients.ts";
-import { createRouteManifest } from "../src/app/runtime/router.ts";
+import type * as client_tsTypes from "../src/app/runtime/client.ts";
+import type * as lifecycle_tsTypes from "../src/app/runtime/lifecycle.ts";
 import type { RouteRecord } from "../src/app/runtime/router.ts";
-import { createRequestContext, defineRpc, dispatchRpc, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
+import type * as reactivity_tsTypes from "../src/core/reactivity.ts";
 import type { Schema } from "../src/framework-server.ts";
-import { createUseApiMutation, createUseRpcMutation } from "../src/framework.ts";
 import type { ApiMutation, RetrySafeMutation, RpcMutation } from "../src/framework.ts";
+import type * as framework_render_tsTypes from "../src/server/runtime/framework-render.ts";
+import type { ApiClient, ApiOperation, RpcClient, RpcOperation } from "../src/shared/clients.ts";
+import type * as clients_tsTypes from "../src/shared/clients.ts";
+
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { compile } from "../src/compiler.ts";
+import { createRequestContext, defineRpc, dispatchRpc, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
+import { createUseApiMutation, createUseRpcMutation } from "../src/framework.ts";
 import { createTempProject } from "./helpers/temp-project.ts";
+
 
 const fileUrl = (path: string): string => pathToFileURL(resolve(path)).href;
 
 /** The runtime as the compiled pages import it, by file URL: one instance for pages, server and browser. */
 const runtime = async () => ({
-  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof import("../src/server/runtime/framework-render.ts"),
-  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof import("../src/app/runtime/client.ts"),
-  ...await import(fileUrl("src/shared/clients.ts")) as typeof import("../src/shared/clients.ts"),
-  ...await import(fileUrl("src/core/reactivity.ts")) as typeof import("../src/core/reactivity.ts"),
-  ...await import(fileUrl("src/app/runtime/lifecycle.ts")) as typeof import("../src/app/runtime/lifecycle.ts"),
+  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof framework_render_tsTypes,
+  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof client_tsTypes,
+  ...await import(fileUrl("src/shared/clients.ts")) as typeof clients_tsTypes,
+  ...await import(fileUrl("src/core/reactivity.ts")) as typeof reactivity_tsTypes,
+  ...await import(fileUrl("src/app/runtime/lifecycle.ts")) as typeof lifecycle_tsTypes,
 });
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;

@@ -1,39 +1,50 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { Window as HappyWindow } from "happy-dom";
-import { compile } from "../src/compiler.ts";
+
+import type * as use_head_tsTypes from "../src/app/composables/use-head.ts";
+import type { ClientComponent, ClientRoute } from "../src/app/runtime/client.ts";
+import type * as client_tsTypes from "../src/app/runtime/client.ts";
+import type * as head_tsTypesType from "../src/app/runtime/head.ts";
+import type { ErrorPageRecord, RouteRecord } from "../src/app/runtime/router.ts";
+import type * as prerender_tsTypes from "../src/framework/prerender.ts";
+import type { MeekoModuleContext } from "../src/modules/define-meeko-module.ts";
+import type * as framework_render_tsTypes from "../src/server/runtime/framework-render.ts";
+import type * as head_tsTypesType2 from "../src/server/runtime/head.ts";
+import type * as page_body_tsTypes from "../src/server/runtime/page-body.ts";
+import type { DocumentConfig, DocumentHead, HeadInput } from "../src/shared/head.ts";
+import type * as head_tsTypes from "../src/shared/head.ts";
+
+import { createRouteManifest } from "../src/app/runtime/router.ts";
 import { discoverAutoImports } from "../src/autoimports/registry.ts";
 import { applyAutoImports } from "../src/autoimports/transform.ts";
-import { checkApp } from "../src/framework/check-app.ts";
-import { prepareFrameworkTypeDeclarations } from "../src/framework/type-declarations.ts";
-import { clientRoutesSource, discoverAppManifest } from "../src/framework/app-manifest.ts";
-import { loadMeekoConfig } from "../src/framework/config.ts";
+import { compile } from "../src/compiler.ts";
 import { serverScriptModule } from "../src/compiler/codegen/server-script.ts";
-import type { ClientComponent, ClientRoute } from "../src/app/runtime/client.ts";
-import type { DocumentConfig, DocumentHead, HeadInput } from "../src/shared/head.ts";
-import { defineMeekoConfig } from "../src/modules/define-meeko-config.ts";
-import type { MeekoModuleContext } from "../src/modules/define-meeko-module.ts";
-import { createRouteManifest } from "../src/app/runtime/router.ts";
-import type { ErrorPageRecord, RouteRecord } from "../src/app/runtime/router.ts";
-import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
+import { clientRoutesSource, discoverAppManifest } from "../src/framework/app-manifest.ts";
+import { checkApp } from "../src/framework/check-app.ts";
 import { loadCheckedMeekoConfig } from "../src/framework/check-project.ts";
+import { loadMeekoConfig } from "../src/framework/config.ts";
+import { prepareFrameworkTypeDeclarations } from "../src/framework/type-declarations.ts";
+import { defineMeekoConfig } from "../src/modules/define-meeko-config.ts";
+import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
+
 
 const fileUrl = (path: string): string => pathToFileURL(resolve(path)).href;
 
 /** The runtime as the compiled components import it, by file URL: one instance for pages, server and browser. */
 const runtime = async () => ({
-  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof import("../src/server/runtime/framework-render.ts"),
-  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof import("../src/app/runtime/client.ts"),
-  ...await import(fileUrl("src/framework/prerender.ts")) as typeof import("../src/framework/prerender.ts"),
-  ...await import(fileUrl("src/server/runtime/page-body.ts")) as typeof import("../src/server/runtime/page-body.ts"),
-  ...await import(fileUrl("src/shared/head.ts")) as typeof import("../src/shared/head.ts"),
-  ...await import(fileUrl("src/app/composables/use-head.ts")) as typeof import("../src/app/composables/use-head.ts"),
-  ...await import(fileUrl("src/app/runtime/head.ts")) as typeof import("../src/app/runtime/head.ts"),
-  ...await import(fileUrl("src/server/runtime/head.ts")) as typeof import("../src/server/runtime/head.ts"),
+  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof framework_render_tsTypes,
+  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof client_tsTypes,
+  ...await import(fileUrl("src/framework/prerender.ts")) as typeof prerender_tsTypes,
+  ...await import(fileUrl("src/server/runtime/page-body.ts")) as typeof page_body_tsTypes,
+  ...await import(fileUrl("src/shared/head.ts")) as typeof head_tsTypes,
+  ...await import(fileUrl("src/app/composables/use-head.ts")) as typeof use_head_tsTypes,
+  ...await import(fileUrl("src/app/runtime/head.ts")) as typeof head_tsTypesType,
+  ...await import(fileUrl("src/server/runtime/head.ts")) as typeof head_tsTypesType2,
 });
 
 const appShell = `<script lang="ts">

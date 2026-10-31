@@ -1,8 +1,8 @@
+import ts from "@typescript/typescript6";
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import test from "node:test";
-import ts from "@typescript/typescript6";
 
 const sourceRoot = resolve(import.meta.dirname, "../src");
 const layers = new Set(["core", "shared", "app", "server", "compiler", "modules", "formatters"]);

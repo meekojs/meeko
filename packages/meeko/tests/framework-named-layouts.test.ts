@@ -1,25 +1,33 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { Window as HappyWindow } from "happy-dom";
-import { compile } from "../src/compiler.ts";
+
+import type * as useLayout_tsTypes from "../src/app/composables/useLayout.ts";
 import type { ClientComponent, ClientRoute } from "../src/app/runtime/client.ts";
-import { createRouteManifest } from "../src/app/runtime/router.ts";
+import type * as client_tsTypes from "../src/app/runtime/client.ts";
+import type * as layout_tsTypes from "../src/app/runtime/layout.ts";
 import type { ErrorPageRecord, RouteRecord } from "../src/app/runtime/router.ts";
+import type * as prerender_tsTypes from "../src/framework/prerender.ts";
+import type * as framework_render_tsTypes from "../src/server/runtime/framework-render.ts";
+
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { compile } from "../src/compiler.ts";
 import { createTempProject } from "./helpers/temp-project.ts";
+
 
 const fileUrl = (path: string): string => pathToFileURL(resolve(path)).href;
 
 /** The runtime as the compiled components import it, by file URL: one instance for pages, server and browser. */
 const runtime = async () => ({
-  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof import("../src/server/runtime/framework-render.ts"),
-  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof import("../src/app/runtime/client.ts"),
-  ...await import(fileUrl("src/framework/prerender.ts")) as typeof import("../src/framework/prerender.ts"),
-  ...await import(fileUrl("src/app/runtime/layout.ts")) as typeof import("../src/app/runtime/layout.ts"),
-  ...await import(fileUrl("src/app/composables/useLayout.ts")) as typeof import("../src/app/composables/useLayout.ts"),
+  ...await import(fileUrl("src/server/runtime/framework-render.ts")) as typeof framework_render_tsTypes,
+  ...await import(fileUrl("src/app/runtime/client.ts")) as typeof client_tsTypes,
+  ...await import(fileUrl("src/framework/prerender.ts")) as typeof prerender_tsTypes,
+  ...await import(fileUrl("src/app/runtime/layout.ts")) as typeof layout_tsTypes,
+  ...await import(fileUrl("src/app/composables/useLayout.ts")) as typeof useLayout_tsTypes,
 });
 
 const appShell = `<script lang="ts">

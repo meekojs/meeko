@@ -1,4 +1,5 @@
 import type { ComponentErrorHandler } from "./component-errors";
+
 import { logClientError, markObserved, observeCallback, wasObserved } from "../../core/error-observer";
 
 /** The parts of `ErrorEvent` that a browser (or a test window) fills in. */

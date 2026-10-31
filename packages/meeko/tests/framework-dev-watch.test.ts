@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { once } from "node:events";
 import { appendFile, mkdir, readFile, stat, symlink, unlink, writeFile } from "node:fs/promises";
 import { createServer as createNetServer } from "node:net";
 import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import test from "node:test";
-import { createServer, normalizePath, resolveConfig, type InlineConfig, type Plugin, type ViteDevServer } from "vite";
+import { pathToFileURL } from "node:url";
+import { createServer, type InlineConfig, normalizePath, type Plugin, resolveConfig, type ViteDevServer } from "vite";
+
 import { createDevAppReloader, isComponentSource, isDevWatchIgnored, isDiscoverySource } from "../src/framework/dev-watch.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
 import { meeko } from "../src/vite.ts";

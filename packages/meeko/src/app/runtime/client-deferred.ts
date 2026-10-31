@@ -1,5 +1,6 @@
-import { createDeferred, deferredSettle, deferredSource, extractDeferred, placeDeferred } from "./deferred";
 import type { DeferredError, DeferredInternals, DeferredOutcome } from "./deferred";
+
+import { createDeferred, deferredSettle, deferredSource, extractDeferred, placeDeferred } from "./deferred";
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

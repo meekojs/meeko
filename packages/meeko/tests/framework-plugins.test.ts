@@ -1,12 +1,14 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Window as HappyWindow } from "happy-dom";
-import { createContext, inject } from "../src/core/reactivity.ts";
-import { mountClientApp } from "../src/app/runtime/client.ts";
-import type { ClientComponent } from "../src/app/runtime/client.ts";
-import { definePlugin } from "../src/app/definitions/define-plugin.ts";
+
 import type { PluginErrorInfo, PluginRegistration } from "../src/app/definitions/define-plugin.ts";
+import type { ClientComponent } from "../src/app/runtime/client.ts";
+
+import { definePlugin } from "../src/app/definitions/define-plugin.ts";
+import { mountClientApp } from "../src/app/runtime/client.ts";
 import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { createContext, inject } from "../src/core/reactivity.ts";
 import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 
 const themeKey = createContext<string>("theme");

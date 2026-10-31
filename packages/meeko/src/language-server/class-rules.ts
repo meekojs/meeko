@@ -1,5 +1,6 @@
-import postcss from "postcss";
 import type { AtRule, Container, Rule } from "postcss";
+
+import postcss from "postcss";
 import selectorParser from "postcss-selector-parser";
 
 // Class selectors of a stylesheet, read from its text: no PostCSS plugin runs, so reading a

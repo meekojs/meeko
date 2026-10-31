@@ -1,16 +1,19 @@
+import type { TextDocument } from "vscode-languageserver-textdocument";
+import type { CodeAction, Diagnostic } from "vscode-languageserver/node";
+
+import ts from "@typescript/typescript6";
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
-import ts from "@typescript/typescript6";
-import type { TextDocument } from "vscode-languageserver-textdocument";
 import { CodeActionKind } from "vscode-languageserver/node";
-import type { CodeAction, Diagnostic } from "vscode-languageserver/node";
-import { parseSfc } from "../compiler/parser/sfc";
+
 import type { SfcSection } from "../compiler/parser/sfc";
 import type { EditCapabilities } from "./actions";
+import type { FeatureContext } from "./features";
+
+import { parseSfc } from "../compiler/parser/sfc";
 import { tagAt } from "./embedded";
 import { usageEdits } from "./features";
-import type { FeatureContext } from "./features";
 import { nodeAt } from "./reactivity";
 
 /** The top-level statement of the script that contains `node`. */

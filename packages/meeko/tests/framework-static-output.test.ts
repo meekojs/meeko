@@ -1,14 +1,18 @@
+import type { Server } from "node:http";
+import type { AddressInfo } from "node:net";
+
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
-import type { AddressInfo } from "node:net";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
+
 import { buildProject } from "../src/framework/project.ts";
 import { previewStatic } from "../src/framework/static-adapter.ts";
 import { staticAppConfig, writeStaticApp } from "./helpers/static-app.ts";
 import { tempProject } from "./helpers/temp-project.ts";
+
 
 const sha256 = (text: string): string => `'sha256-${createHash("sha256").update(text, "utf8").digest("base64")}'`;
 
@@ -36,7 +40,7 @@ test("the static adapter rejects what needs a server and a URL it cannot know, b
 });
 
 test("the static adapter writes a site for any static host, with 404.html, sitemap, robots and the CSP of its inline scripts", { timeout: 180_000 }, async (context) => {
-  let server: import("node:http").Server | undefined;
+  let server: Server | undefined;
   const root = await tempProject(context, "static-output", () => new Promise<void>((done) => server ? server.close(() => done()) : done()));
   await writeStaticApp(root, staticAppConfig);
   const result = await buildProject(root);

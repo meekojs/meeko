@@ -1,18 +1,19 @@
 import assert from "node:assert/strict";
-import test from "node:test";
 import { spawn } from "node:child_process";
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { compileCatalog } from "../src/modules/i18n/messages.ts";
-import { createI18n, localeOf, localizedPath } from "../src/i18n.ts";
+import test from "node:test";
+import { chromium } from "playwright-core";
+
 import { definePlugin, runPlugins } from "../src/app/definitions/define-plugin.ts";
 import { fixedRoute, routeSnapshot } from "../src/app/runtime/navigation.ts";
 import { createContext, createRoot, inject } from "../src/core/reactivity.ts";
 import { checkFrameworkProject } from "../src/framework/check-project.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
 import { buildProject } from "../src/framework/project.ts";
+import { createI18n, localeOf, localizedPath } from "../src/i18n.ts";
+import { compileCatalog } from "../src/modules/i18n/messages.ts";
 import { linkRepositoryPackages, stopChild, tempProject } from "./helpers/temp-project.ts";
-import { chromium } from "playwright-core";
 
 test("catalogs compile nested keys, placeholders and plural categories", () => {
   const catalog = compileCatalog({

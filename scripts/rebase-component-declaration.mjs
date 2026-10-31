@@ -7,11 +7,7 @@ export function rebaseComponentDeclaration(text, generatedFile, destinationFile)
 	const source = ts.createSourceFile(generatedFile, text, ts.ScriptTarget.Latest, true)
 	const edits = []
 	function visit(node) {
-		if (ts.isStringLiteral(node) && (
-			((ts.isImportDeclaration(node.parent) || ts.isExportDeclaration(node.parent)) && node.parent.moduleSpecifier === node)
-			|| (ts.isLiteralTypeNode(node.parent) && ts.isImportTypeNode(node.parent.parent))
-			|| (ts.isModuleDeclaration(node.parent) && node.text.startsWith('.'))
-		)) {
+		if (ts.isStringLiteral(node) && (((ts.isImportDeclaration(node.parent) || ts.isExportDeclaration(node.parent)) && node.parent.moduleSpecifier === node) || (ts.isLiteralTypeNode(node.parent) && ts.isImportTypeNode(node.parent.parent)) || (ts.isModuleDeclaration(node.parent) && node.text.startsWith('.')))) {
 			const specifier = node.text
 			// generateTypes leaves .meeko imports relative to the original component, next to destinationFile.
 			if (specifier.startsWith('.') && !specifier.endsWith('.meeko')) {

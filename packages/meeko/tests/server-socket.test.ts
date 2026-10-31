@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ApiError, createSocketHub, createSocketUpgradeHandler, defineSocketChannel, MemorySessionStore, openSocketSession, SessionManager } from "../src/framework-server.ts";
+
 import type { Schema, SocketPeer } from "../src/framework-server.ts";
+
+import { ApiError, createSocketHub, createSocketUpgradeHandler, defineSocketChannel, MemorySessionStore, openSocketSession, SessionManager } from "../src/framework-server.ts";
 
 const messageSchema: Schema<{ text: string }> = {
   "~standard": {

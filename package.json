@@ -9,6 +9,8 @@
         "build": "pnpm -r --filter @meekojs/meeko --filter @meekojs/ui --filter @meekojs/i18n --filter @meekojs/prettier-plugin --filter @meekojs/eslint-plugin run build",
         "check": "pnpm -r --filter @meekojs/meeko --filter @meekojs/ui --filter @meekojs/i18n --filter @meekojs/prettier-plugin --filter @meekojs/eslint-plugin run check",
         "test": "pnpm -F @meekojs/meeko run test",
+        "test:packages": "node --test --test-concurrency=1 packages/ui/tests/*.test.mjs packages/i18n/tests/*.test.mjs packages/eslint-plugin/tests/*.test.mjs packages/prettier-plugin/tests/*.test.mjs",
+        "check:apps": "pnpm -F meeko-site run check && pnpm -F meeko-ui-demo run check",
         "verify": "pnpm run test:build && pnpm -F @meekojs/meeko run verify && pnpm -F meeko-devtools-extension run check",
         "lint": "eslint . --cache --cache-location node_modules/.cache/eslint/",
         "lint:fix": "eslint . --fix --cache --cache-location node_modules/.cache/eslint/",

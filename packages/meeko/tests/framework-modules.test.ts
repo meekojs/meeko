@@ -1,13 +1,15 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { Window as HappyWindow } from "happy-dom";
-import { bindComponent, renderComponent } from "../src/app/runtime/renderer.ts";
-import type { Component, DomScope } from "../src/app/runtime/renderer.ts";
-import { mountClientApp } from "../src/app/runtime/client.ts";
+
 import type { ClientComponent } from "../src/app/runtime/client.ts";
+import type { Component, DomScope } from "../src/app/runtime/renderer.ts";
+
+import { mountClientApp } from "../src/app/runtime/client.ts";
+import { bindComponent, renderComponent } from "../src/app/runtime/renderer.ts";
 import { discoverConfiguredRoutes } from "../src/framework/config.ts";
 import { composeFrameworkRoutes } from "../src/framework/modules.ts";
 import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";

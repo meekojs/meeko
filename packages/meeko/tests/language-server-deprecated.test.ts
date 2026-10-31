@@ -1,12 +1,15 @@
+import type ts from "@typescript/typescript6";
+import type { MarkupContent } from "vscode-languageserver/node";
+
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { DiagnosticSeverity, DiagnosticTag } from "vscode-languageserver/node";
-import type { MarkupContent } from "vscode-languageserver/node";
-import type ts from "@typescript/typescript6";
+
+import type { LanguageProject } from "./language-server-workspace.ts";
+
 import { componentDiagnostics } from "../src/language-server/diagnostics.ts";
 import { documentationMarkdown, hover } from "../src/language-server/features.ts";
 import { languageProject } from "./language-server-workspace.ts";
-import type { LanguageProject } from "./language-server-workspace.ts";
 
 const page = `<script lang="ts">
 import { useSocket, useSocketClient } from "@meekojs/meeko/framework";

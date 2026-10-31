@@ -8,6 +8,7 @@ export interface Props {
 }
 
 const props = defineProps<Props>();
+
 const count = signal(props.initial ?? 0);
 const doubled = computed(() => count.value * 2);
 </script>

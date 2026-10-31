@@ -1,7 +1,8 @@
-import type { GeneratedRoutes, RouteId } from "../../framework";
-import { routeCurrent } from "../../shared/link";
-import { batch, createContext, provide, signal } from "../../core/reactivity";
 import type { ReadonlySignal } from "../../core/reactivity";
+import type { GeneratedRoutes, RouteId } from "../../framework";
+
+import { batch, createContext, provide, signal } from "../../core/reactivity";
+import { routeCurrent } from "../../shared/link";
 import { activeRouteManifest, href } from "./router";
 
 /**

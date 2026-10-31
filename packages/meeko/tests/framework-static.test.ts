@@ -1,20 +1,22 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { Window as HappyWindow } from "happy-dom";
-import { contentSecurityPolicy } from "../src/server/runtime/csp.ts";
-import { inlineScriptHashes } from "../src/framework/script-hashes.ts";
-import { robotsTxt, siteFilesOptions, sitemapPathnames, sitemapXml } from "../src/framework/site-files.ts";
+
+import type { ClientComponent } from "../src/app/runtime/client.ts";
+import type { ResolvedModules } from "../src/framework/module-loader.ts";
+
 import { BrowserHead } from "../src/app/runtime/head.ts";
-import { normalizeDocumentConfig, resolveHead, resolveSeo } from "../src/shared/head.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
 import { loadMeekoConfig } from "../src/framework/config.ts";
 import { resolvedDocument, resolveSiteOrigin } from "../src/framework/module-loader.ts";
-import type { ResolvedModules } from "../src/framework/module-loader.ts";
-import { createRouteManifest } from "../src/app/runtime/router.ts";
-import type { ClientComponent } from "../src/app/runtime/client.ts";
+import { inlineScriptHashes } from "../src/framework/script-hashes.ts";
+import { robotsTxt, siteFilesOptions, sitemapPathnames, sitemapXml } from "../src/framework/site-files.ts";
+import { contentSecurityPolicy } from "../src/server/runtime/csp.ts";
 import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
+import { normalizeDocumentConfig, resolveHead, resolveSeo } from "../src/shared/head.ts";
 import { tempProject } from "./helpers/temp-project.ts";
 
 const sha256 = (text: string): string => `'sha256-${createHash("sha256").update(text, "utf8").digest("base64")}'`;

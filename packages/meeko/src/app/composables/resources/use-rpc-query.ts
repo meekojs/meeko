@@ -1,7 +1,8 @@
-import { requestRpc } from "../../../shared/clients";
 import type { ClientOptions, PublicServerManifest, RpcOperation } from "../../../shared/clients";
-import { createResource, readerOf, stableJson, rpcEndpoint } from "./engine";
 import type { DataResource, DataResourceOptions, UseRpcQuery } from "./engine";
+
+import { requestRpc } from "../../../shared/clients";
+import { createResource, readerOf, rpcEndpoint, stableJson } from "./engine";
 
 /**
  * Crea `useRpcQuery` para los procedimientos de un manifiesto público, como hacen los clientes

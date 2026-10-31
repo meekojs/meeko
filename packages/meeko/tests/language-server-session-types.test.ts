@@ -1,8 +1,9 @@
+import ts from "@typescript/typescript6";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
-import ts from "@typescript/typescript6";
+
 import { MeekoProject } from "../src/language-server/project.ts";
 
 const page = (field: string) => `<script server lang="ts">

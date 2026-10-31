@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
+
 import { generateServerContracts } from "../src/framework/contracts-generate.ts";
 
 const execFileAsync = promisify(execFile);

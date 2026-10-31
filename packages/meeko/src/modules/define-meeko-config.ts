@@ -1,7 +1,7 @@
 import type { ContentSecurityPolicy } from "../server/runtime/csp";
 import type { DocumentConfig } from "../shared/head";
-import type { MeekoModuleEntry } from "./define-meeko-module";
 import type { ThemeConfig } from "../shared/theme";
+import type { MeekoModuleEntry } from "./define-meeko-module";
 
 /**
  * Archivo de cabeceras que escribe el adaptador `static` en su salida: `"_headers"` es el formato

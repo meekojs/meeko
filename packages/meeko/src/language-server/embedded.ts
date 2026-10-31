@@ -1,13 +1,15 @@
-import { getCSSLanguageService } from "vscode-css-languageservice";
 import type { Color, ColorInformation, ColorPresentation } from "vscode-css-languageservice";
+import type { CompletionItem, CompletionList, Diagnostic, Hover, MarkupContent, Position, Range } from "vscode-languageserver/node";
+
+import { getCSSLanguageService } from "vscode-css-languageservice";
 import { getDefaultHTMLDataProvider, getLanguageService as getHtmlLanguageService } from "vscode-html-languageservice";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { CompletionItemKind, DiagnosticSeverity, DiagnosticTag, InsertTextFormat, MarkupKind } from "vscode-languageserver/node";
-import type { CompletionItem, CompletionList, Diagnostic, Hover, MarkupContent, Position, Range } from "vscode-languageserver/node";
-import { builtinTag } from "./builtin-tags";
-import { cssClassRules } from "./class-rules";
+
 import { isCandidates } from "../compiler/transforms/dynamic-tag";
 import { elementAccepts } from "../shared/html-attributes";
+import { builtinTag } from "./builtin-tags";
+import { cssClassRules } from "./class-rules";
 
 // HTML of the template and CSS of `<style>`, outside the TypeScript model: what the editor offers
 // while writing markup and styles. Every function reads the text, so it works while a tag or a
@@ -212,7 +214,7 @@ export function bindAttributeCompletion(document: TextDocument, position: Positi
     .map((item) => ({
       ...item,
       label: `bind:${item.label}`,
-      textEdit: { range: { start: document.positionAt(document.offsetAt(position) - word.length), end: position }, newText: `bind:${item.label}=\"$1\"` },
+      textEdit: { range: { start: document.positionAt(document.offsetAt(position) - word.length), end: position }, newText: `bind:${item.label}="$1"` },
     }));
 }
 

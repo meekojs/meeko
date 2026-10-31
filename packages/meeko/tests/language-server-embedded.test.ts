@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { TextDocument } from "vscode-languageserver-textdocument";
+
 import { classCompletion, classDefinition } from "../src/language-server/classes.ts";
 import {
   cssCompletion, cssHover, documentColors, hoverText, htmlCompletion, htmlHover, linkedEditingRanges, specialTemplateHover, styleClasses, styleDiagnostics, tagCompletion,

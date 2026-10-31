@@ -1,5 +1,6 @@
-import * as vscode from "vscode";
 import type { LanguageClient } from "vscode-languageclient/node";
+
+import * as vscode from "vscode";
 
 /** Petición del servidor de Meeko que devuelve la etiqueta de cierre como snippet (`$0</div>`). */
 export const tagCompletionRequest = "meeko/tagComplete";

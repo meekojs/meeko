@@ -1,7 +1,8 @@
-import { markExternalSignal, signal } from "../../core/reactivity";
 import type { Signal } from "../../core/reactivity";
-import { isThemeChoice, readCookie, resolveChoice } from "../../shared/theme";
 import type { ResolvedThemeConfig, ServerTheme, ThemeState } from "../../shared/theme";
+
+import { markExternalSignal, signal } from "../../core/reactivity";
+import { isThemeChoice, readCookie, resolveChoice } from "../../shared/theme";
 export { provideServerTheme } from "../../app/runtime/theme-context";
 
 /** The value of `Sec-CH-Prefers-Color-Scheme` (a structured-field string), or `undefined`. */

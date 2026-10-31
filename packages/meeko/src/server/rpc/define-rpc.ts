@@ -1,5 +1,5 @@
-import type { RpcDefinition } from "./contracts";
 import type { Schema } from "../schema";
+import type { RpcDefinition } from "./contracts";
 
 /**
  * Declara un procedimiento RPC, el export por defecto de `server/rpc/<ruta>.ts`, que se llama con

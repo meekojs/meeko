@@ -6,10 +6,12 @@ import {
   CodeLensRequest, createConnection, createProtocolConnection, DidOpenTextDocumentNotification, InitializedNotification, InitializeRequest,
   PublishDiagnosticsNotification, ShutdownRequest, StreamMessageReader, StreamMessageWriter,
 } from "vscode-languageserver/node";
+
+import type { LanguageProject } from "./language-server-workspace.ts";
+
 import { ExecutionZonesRequest, startLanguageServer } from "../src/language-server/server.ts";
 import { executionZones } from "../src/language-server/zones.ts";
 import { languageProject } from "./language-server-workspace.ts";
-import type { LanguageProject } from "./language-server-workspace.ts";
 
 const page = `<script server lang="ts">
 import { definePage } from "@meekojs/meeko/framework";

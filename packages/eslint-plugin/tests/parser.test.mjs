@@ -1,6 +1,7 @@
+import { Linter } from "eslint";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Linter } from "eslint";
+
 import plugin from "../dist/index.js";
 import parser from "../dist/parser.js";
 

@@ -21,7 +21,19 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Build workspace and lint tooling
+        run: pnpm run build
       - run: pnpm lint
+      - name: Check every public package and application
+        run: pnpm run check && pnpm run check:apps
+      - name: Test UI, i18n, ESLint and Prettier
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .meeko/ci-logs | Out-Null
+          pnpm run test:packages 2>&1 | Tee-Object -FilePath .meeko/ci-logs/packages.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Test public documentation site
+        run: pnpm -F meeko-site run test
       - name: Verify package and DevTools
         shell: pwsh
         run: |
@@ -34,6 +46,14 @@ jobs:
           pnpm run conformance:node 2>&1 | Tee-Object -FilePath .meeko/ci-logs/conformance-node.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - run: node packages/meeko/node_modules/playwright-core/cli.js install chromium firefox webkit
+      - name: UI browser E2E
+        shell: pwsh
+        run: |
+          $env:MEEKO_CHROME_PATH = node -p "require('./packages/ui/node_modules/playwright-core').chromium.executablePath()"
+          pnpm -F meeko-ui-demo run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --test --test-concurrency=1 packages/ui/tests/*.e2e.mjs 2>&1 | Tee-Object -FilePath .meeko/ci-logs/ui-e2e.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Browser E2E
         shell: pwsh
         run: |
@@ -45,6 +65,11 @@ jobs:
           pnpm run pilot:e2e 2>&1 | Tee-Object -FilePath .meeko/ci-logs/pilot-e2e.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - run: pnpm run package:smoke
+      - name: Installed workspace packages consumer
+        shell: pwsh
+        run: |
+          pnpm run package:workspace-smoke 2>&1 | Tee-Object -FilePath .meeko/ci-logs/workspace-consumer.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Pack public artifact
         shell: pwsh
         working-directory: packages/meeko
@@ -73,6 +98,35 @@ jobs:
         with:
           name: meeko-tarball
           path: packages/meeko/.meeko/ci-artifacts/*.tgz
+          if-no-files-found: ignore
+
+  performance:
+    name: Performance budgets
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.14.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node packages/meeko/node_modules/playwright-core/cli.js install chromium
+      - name: Measure and compare reproducible performance budgets
+        run: pnpm -F @meekojs/meeko run benchmark:budget
+        env:
+          MEEKO_BROWSER_CHANNEL: chromium
+      - name: Performance report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: meeko-performance
+          path: |
+            packages/meeko/.meeko/performance/current.json
+            packages/meeko/.meeko/performance/comparison.json
           if-no-files-found: ignore
 
   redis-integration:

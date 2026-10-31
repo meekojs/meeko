@@ -1,4 +1,5 @@
 import { createSSRApp, nextTick } from "vue";
+
 import { VueCounter } from "./vue-counter";
 
 declare global {

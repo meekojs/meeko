@@ -13,7 +13,7 @@ export type { HotState } from "./app/runtime/hmr";
 export type { Snippet } from "./app/runtime/snippets";
 export type { ElementAttributes, TagName } from "./app/runtime/dynamic-tag";
 export type {
-  DevtoolsAssignmentSite, DevtoolsCommandResult, DevtoolsEditSite, DevtoolsEvent, DevtoolsEventKind, DevtoolsHook,
+  DevtoolsActivity, DevtoolsAssignmentSite, DevtoolsCommandResult, DevtoolsEditSite, DevtoolsEvent, DevtoolsEventKind, DevtoolsHook,
   DevtoolsInstance, DevtoolsProtocolVersion, DevtoolsReadKind, DevtoolsReadSite, DevtoolsRegistration, DevtoolsSignalSite,
   DevtoolsSnapshot, DevtoolsValue, DevtoolsWriteSite,
 } from "./app/runtime/devtools";

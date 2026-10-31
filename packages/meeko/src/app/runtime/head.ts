@@ -1,11 +1,12 @@
-import { createContext, createRoot, findContext, finishWithCleanup, provide } from "../../core/reactivity";
 import type { ReadonlySignal } from "../../core/reactivity";
-import type { ComponentRelease, DomScope } from "./renderer";
-import { applyColorScheme, applyThemeClass } from "./theme-dom";
-import { withThemeAttributes } from "../../shared/theme";
-import type { DocumentTheme, ThemeHead } from "../../shared/theme";
-import { CONFIG_LEVEL, HEAD_END_MARKER, HEAD_START_MARKER, ROUTE_LEVEL, documentHeadInput, normalizeHeadInput, rawText, resolveHead, resolveSeo } from "../../shared/head";
 import type { DocumentConfig, HeadInput, HeadSource, HeadTag, ResolvedSeo } from "../../shared/head";
+import type { DocumentTheme, ThemeHead } from "../../shared/theme";
+import type { ComponentRelease, DomScope } from "./renderer";
+
+import { createContext, createRoot, finishWithCleanup, provide } from "../../core/reactivity";
+import { CONFIG_LEVEL, documentHeadInput, HEAD_END_MARKER, HEAD_START_MARKER, rawText, resolveHead, resolveSeo, ROUTE_LEVEL } from "../../shared/head";
+import { withThemeAttributes } from "../../shared/theme";
+import { applyColorScheme, applyThemeClass } from "./theme-dom";
 
 export interface LiveEntry {
   level: number;

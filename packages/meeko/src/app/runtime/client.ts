@@ -1,39 +1,42 @@
-import { readPayload } from "./client-payload";
-import type { HydrationPayload } from "./client-payload";
-import { deferredReceiver, driveClientDeferred, ndjsonLines, placePayloadDeferred, readDeferredLine, watchDeferredChunks } from "./client-deferred";
-import type { DeferredLine } from "./client-deferred";
-import { hasRegionRecoveryFailure, parseRegionHtml } from "./renderer";
-import type { Component, DomScope } from "./renderer";
-import { createAppErrorChannel, provideAppErrorChannel } from "./component-errors";
-import { markingObserver } from "../../core/error-observer";
-import type { ComponentErrorHandler } from "./component-errors";
-import { batch, finishWithCleanup, runDry, signal } from "../../core/reactivity";
-import { ERROR_PAGE_TITLE, PageInputError, pageSearchObject, validatePageInputs } from "../definitions/define-page";
+import type { DocumentConfig, HeadInput } from "../../shared/head";
 import type { PageHead, PageSchema } from "../definitions/define-page";
-import { ClientError } from "../../shared/clients";
-import { hasRouteMiddleware, routeMiddlewareChain, runRouteMiddleware } from "../middleware/runtime";
-import { fixedRoute, liveRoute, provideNavigation, provideRoute, routeIsActive, routeSnapshot } from "./navigation";
-import type { LiveRoute, NavigationState, RouteState } from "./navigation";
+import type { PluginRegistration } from "../definitions/define-plugin";
 import type { RouteMiddleware } from "../middleware/runtime";
-import { activateRouteManifest, createAppNavigator, matchRoute, reportNavigationError, sameDocument } from "./router";
-import { watchGlobalErrors } from "./global-errors";
+import type { DeferredLine } from "./client-deferred";
+import type { HydrationPayload } from "./client-payload";
+import type { ComponentErrorHandler } from "./component-errors";
+import type { DeferredInternals } from "./deferred";
+import type { NavigationTrace } from "./devtools-activity";
+import type { BrowserLayoutWriter, LayoutSlot } from "./layout";
+import type { LiveRoute, NavigationState, RouteState } from "./navigation";
+import type { Component, DomScope } from "./renderer";
 import type { ErrorPageRecord, NamedLayoutRecord, NavigationContext, Navigator, RouteMatch, RouteRecord, UnmatchedNavigationContext } from "./router";
-import { hydrateWithStateStore, StateStore, withStateStore } from "./state";
+
+import { markingObserver } from "../../core/error-observer";
+import { batch, finishWithCleanup, runDry, signal } from "../../core/reactivity";
+import { ClientError } from "../../shared/clients";
+import { routeHeadInput } from "../../shared/head";
+import { resolveThemeConfig, THEME_STATE_KEY } from "../../shared/theme";
 import { provideResourceCache, ResourceCache, ResourceScope, withResourceScope } from "../composables/resources/engine";
 import { provideBrowserWindow } from "../composables/useStorage";
-import { lateRender, mayAwaitData, renderWithSuspense } from "./suspense";
-import { mountBatch } from "./lifecycle";
+import { ERROR_PAGE_TITLE, PageInputError, pageSearchObject, validatePageInputs } from "../definitions/define-page";
 import { notifyPluginErrorHandlers, runPlugins } from "../definitions/define-plugin";
-import type { PluginRegistration } from "../definitions/define-plugin";
-import type { DeferredInternals } from "./deferred";
+import { hasRouteMiddleware, routeMiddlewareChain, runRouteMiddleware } from "../middleware/runtime";
+import { deferredReceiver, driveClientDeferred, ndjsonLines, placePayloadDeferred, readDeferredLine, watchDeferredChunks } from "./client-deferred";
+import { readPayload } from "./client-payload";
+import { createAppErrorChannel, provideAppErrorChannel } from "./component-errors";
+import { traceNavigation, traceResourceCacheHit } from "./devtools-activity";
+import { watchGlobalErrors } from "./global-errors";
 import { BrowserHead, provideHead, withHeadLevel } from "./head";
-import { routeHeadInput } from "../../shared/head";
-import { browserLayoutWriter, createLayoutSlot, resolveLayoutProps, withLayoutWriter } from "./layout";
-import type { BrowserLayoutWriter, LayoutSlot } from "./layout";
-import { BrowserTheme, registerBrowserTheme } from "./theme-browser";
-import { resolveThemeConfig, THEME_STATE_KEY } from "../../shared/theme";
 import { withIdRoot } from "./ids";
-import type { DocumentConfig, HeadInput } from "../../shared/head";
+import { browserLayoutWriter, createLayoutSlot, resolveLayoutProps, withLayoutWriter } from "./layout";
+import { mountBatch } from "./lifecycle";
+import { fixedRoute, liveRoute, provideNavigation, provideRoute, routeIsActive, routeSnapshot } from "./navigation";
+import { hasRegionRecoveryFailure, parseRegionHtml } from "./renderer";
+import { activateRouteManifest, createAppNavigator, matchRoute, reportNavigationError, sameDocument } from "./router";
+import { hydrateWithStateStore, StateStore, withStateStore } from "./state";
+import { lateRender, mayAwaitData, renderWithSuspense } from "./suspense";
+import { BrowserTheme, registerBrowserTheme } from "./theme-browser";
 import { createViewTransitionController } from "./view-transitions";
 
 export { useNavigation } from "../composables/useNavigation";
@@ -405,7 +408,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   let committedRoute: LiveRoute = liveRoute(payload.error
     ? routeSnapshot(serverUrl, null, {}, pageSearchObject(serverUrl.searchParams), false)
     : routeSnapshot(serverUrl, payload.route, payload.props.params as Record<string, unknown>, payload.props.search as Record<string, unknown>, false));
-  const resourceCache = new ResourceCache();
+  const resourceCache = new ResourceCache(200, () => traceResourceCacheHit(browser));
   // The route of the plugins follows the committed route, also when a navigation replaces the
   // whole tree (and its live route): reading it also reads `routeGeneration`.
   const routeGeneration = signal(0);
@@ -561,12 +564,20 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       if (!signal.aborted) receiver.end();
     })();
   };
-  const renderRoute = async (context: RenderContext, initialLoad: boolean): Promise<void | boolean> => {
-    const stream: { control?: AbortController; committed?: boolean } = {};
-    try { return await renderRouteData(context, initialLoad, stream); }
+  const renderRoute = async (context: RenderContext, initialLoad: boolean, trace?: NavigationTrace): Promise<void | boolean> => {
+    const source = context.match?.route.render === "client" || !options.serverData || options.loadRoute ? "client" : options.serverData === "static" ? "static" : "server";
+    const stream: { control?: AbortController; committed?: boolean; data?: (phase: "ready" | "cancel" | "error") => void } = { ...(trace ? { data: trace.data(source) } : {}) };
+    try {
+      const result = await renderRouteData(context, initialLoad, stream);
+      stream.data?.(context.signal.aborted || disposed || result === false ? "cancel" : "ready");
+      return result;
+    } catch (error) {
+      stream.data?.(context.signal.aborted ? "cancel" : "error");
+      throw error;
+    }
     finally { if (!stream.committed) stream.control?.abort(); }
   };
-  const renderRouteData = async (context: RenderContext, initialLoad: boolean, stream: { control?: AbortController; committed?: boolean }): Promise<void | boolean> => {
+  const renderRouteData = async (context: RenderContext, initialLoad: boolean, stream: { control?: AbortController; committed?: boolean; data?: (phase: "ready" | "cancel" | "error") => void }): Promise<void | boolean> => {
     const match = context.match;
     if (match && hasRouteMiddleware(match.route, options) && !initialLoad) {
       const response = await runRouteMiddleware(await routeMiddlewareChain(match.route, options), {
@@ -628,6 +639,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         layoutDeclared = { ...groupLayoutProps(), ...resolveLayoutProps(sidecar?.layoutProps, { ...routeContext, data }) };
       } catch (error) {
         if (!onLoaderError || context.signal.aborted || disposed) throw error;
+        stream.data?.("error");
         onLoaderError(error);
       }
     };
@@ -768,6 +780,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       pageData = await prepare(next);
     } catch (error) {
       if (context.signal.aborted || disposed) return;
+      stream.data?.("error");
       // A failed data await shows the nearest +error.meeko (or app/error.meeko) inside the layouts, like a loader failure.
       const routeError = errorPage === undefined ? route?.error ?? appError?.file : undefined;
       if (!routeError) throw error;
@@ -783,6 +796,7 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
       pageData = await prepare(next);
     }
     if (context.signal.aborted || disposed) return;
+    stream.data?.("ready");
     const committedData = new ResourceScope("read", Object.fromEntries(pageData.loadedData()));
     // A region that the loaded data does not cover, such as an if: that an onMounted shows, mounts once its own data loads.
     // onMounted callbacks of the new tree run once the commit has finished.
@@ -884,13 +898,22 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   };
   const run = async (context: RenderContext): Promise<void | boolean> => {
     viewTransitions.skip();
+    const trace = traceNavigation(browser, context.match?.route.id ?? null);
     const token = ++navigationCount;
     const initialLoad = initialClientLoad;
     initialClientLoad = false;
     pending.value = true;
     try {
-      if (!initialLoad && !await plugins.beforeNavigate(context.url, context.match?.route.id ?? null)) return false;
-      return await renderRoute(context, initialLoad);
+      if (!initialLoad && !await plugins.beforeNavigate(context.url, context.match?.route.id ?? null)) {
+        trace?.finish("cancel");
+        return false;
+      }
+      const result = await renderRoute(context, initialLoad, trace);
+      trace?.finish(context.signal.aborted || disposed || result === false ? "cancel" : "commit");
+      return result;
+    } catch (error) {
+      trace?.finish(context.signal.aborted ? "cancel" : "error");
+      throw error;
     }
     finally { if (token === navigationCount) pending.value = false; }
   };

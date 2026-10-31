@@ -3,9 +3,11 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
+
+import type { AutoImport } from "../src/autoimports/registry.ts";
+
 import { autoImportDirectories, discoverAutoImports, discoverAutoImportsSync } from "../src/autoimports/registry.ts";
 import { applyAutoImports } from "../src/autoimports/transform.ts";
-import type { AutoImport } from "../src/autoimports/registry.ts";
 import { generateAutoImportTypes } from "../src/autoimports/typescript.ts";
 import { loadMeekoConfig, readMeekoConfigSync } from "../src/framework/config.ts";
 import { configErrorRange } from "../src/language-server/diagnostics.ts";

@@ -1,5 +1,6 @@
-import { hydrate, type ComponentProps } from "./App.meeko";
 import type { HotState } from "@meekojs/meeko";
+
+import { type ComponentProps, hydrate } from "./App.meeko";
 import { parseTasks } from "./model";
 
 /** Comprueba el límite JSON antes de conectar los eventos del cliente. */

@@ -1,11 +1,15 @@
-import assert from "node:assert/strict";
+import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
+
+import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { chromium, firefox, webkit } from "playwright-core";
+
 import { buildPilot } from "../examples/pilot/build.ts";
 import { createPilotServer } from "../examples/pilot/server.ts";
+
 
 const browsers = { chromium, firefox, webkit } as const;
 type PilotBrowser = keyof typeof browsers;
@@ -177,7 +181,7 @@ test("el piloto entrega SSR e hidrata en desarrollo", { timeout: suiteTimeoutMs 
 test("el piloto entrega SSR e hidrata los artefactos de producción", { timeout: suiteTimeoutMs }, async (context) => {
   await buildPilot();
   const moduleUrl = pathToFileURL(resolve("examples/pilot/.output/server/http.js")).href;
-  const productionModule = await import(moduleUrl) as { createProductionPilotServer(): Promise<import("node:http").Server> };
+  const productionModule = await import(moduleUrl) as { createProductionPilotServer(): Promise<Server> };
   const server = await productionModule.createProductionPilotServer();
   await new Promise<void>((ready) => server.listen(0, "127.0.0.1", ready));
   const address = server.address() as AddressInfo;

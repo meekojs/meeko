@@ -2,6 +2,7 @@
 import * as Leaf from "./TreeLeaf.generated.js";
 
 const props = defineProps<{ branch: number }>();
+
 const leaves = Array.from({ length: 8 }, (_, index) => index);
 </script>
 

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { renderComponent } from "../src/app/runtime/renderer.ts";
-import type { Component } from "../src/app/runtime/renderer.ts";
+
 import type { ClientComponent } from "../src/app/runtime/client.ts";
+import type { Component } from "../src/app/runtime/renderer.ts";
+
+import { renderComponent } from "../src/app/runtime/renderer.ts";
 import { createRouteManifest } from "../src/app/runtime/router.ts";
 import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 

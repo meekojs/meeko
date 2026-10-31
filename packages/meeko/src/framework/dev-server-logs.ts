@@ -1,10 +1,12 @@
+import type { Plugin } from "vite";
+
 // Development only: what server code writes with `console.*` while it serves a request reaches the
 // browser console too, marked as the server's. Only `meeko dev` imports this module; the build, the
 // production servers and the client bundle never do.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { readFile } from "node:fs/promises";
 import { inspect, types } from "node:util";
-import type { Plugin } from "vite";
+
 import { normalizeAddress, socketAddressOf } from "../server/runtime/env";
 
 /** `console` methods whose calls are forwarded. */

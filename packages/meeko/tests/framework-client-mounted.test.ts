@@ -1,14 +1,16 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { Window as HappyWindow } from "happy-dom";
-import { compile } from "../src/compiler.ts";
-import { mountClientApp } from "../src/app/runtime/client.ts";
+
 import type { ClientComponent } from "../src/app/runtime/client.ts";
+
+import { mountClientApp } from "../src/app/runtime/client.ts";
 import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { compile } from "../src/compiler.ts";
 import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 
 const page = (name: string): string => `<script lang="ts">

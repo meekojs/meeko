@@ -1,15 +1,17 @@
+import { Window } from "happy-dom";
 import assert from "node:assert/strict";
-import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { build, createServer } from "vite";
-import { Window } from "happy-dom";
+
+import type { ComponentModule, ComponentRelease } from "../src/app/runtime/renderer";
+import type { Signal } from "../src/core/reactivity";
+
 import { generateComponentRegistry } from "../src/autoimports/components.ts";
 import { compileWithAutoImports } from "../src/autoimports/transform.ts";
 import { meeko } from "../src/vite.ts";
 import { createTempProject, linkRepositoryPackages, tempProject } from "./helpers/temp-project.ts";
-import type { ComponentModule, ComponentRelease } from "../src/app/runtime/renderer";
-import type { Signal } from "../src/core/reactivity";
 
 test("the generated component resolver uses only literal lazy imports and rejects unknown names", async (context) => {
   const root = await tempProject(context, "component-registry-runtime");

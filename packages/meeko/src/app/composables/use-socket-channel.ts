@@ -1,5 +1,6 @@
-import { socketUrl } from "../runtime/socket";
 import type { SocketClient, SocketContract, SocketRegistryOptions } from "../runtime/socket";
+
+import { socketUrl } from "../runtime/socket";
 import { useSocketClient } from "./use-socket-client";
 
 /**

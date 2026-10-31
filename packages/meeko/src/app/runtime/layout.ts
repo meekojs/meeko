@@ -1,7 +1,8 @@
-import { createContext, createRoot, finishWithCleanup, isDryRender, provide, signal, untrack } from "../../core/reactivity";
-import { reactiveProps } from "./props";
 import type { PropsSource } from "./props";
 import type { Component, ComponentRelease, DomScope } from "./renderer";
+
+import { createContext, createRoot, finishWithCleanup, isDryRender, provide, signal, untrack } from "../../core/reactivity";
+import { reactiveProps } from "./props";
 
 /** One instance of a named layout in a browser tree: what it receives and the page that writes it. */
 export interface LayoutSlot {

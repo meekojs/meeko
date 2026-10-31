@@ -1,7 +1,9 @@
+import type { EnvironmentModuleGraph, EnvironmentModuleNode, Plugin, ViteDevServer } from "vite";
+
 import { existsSync, realpathSync } from "node:fs";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
-import type { EnvironmentModuleGraph, EnvironmentModuleNode, Plugin, ViteDevServer } from "vite";
+
 import { escapeHtml } from "../core/server";
 
 /** The optional global stylesheet of an application, relative to the project. */

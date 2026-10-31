@@ -1,6 +1,7 @@
-import ts from "@typescript/typescript6";
-import { TextDocument } from "vscode-languageserver-textdocument";
+import type ts from "@typescript/typescript6";
+import type { TextDocument } from "vscode-languageserver-textdocument";
 import type { Location, Range } from "vscode-languageserver/node";
+
 import type { FeatureContext } from "./features";
 import type { VirtualComponent } from "./model";
 

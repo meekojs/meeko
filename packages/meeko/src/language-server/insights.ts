@@ -1,16 +1,19 @@
+import type { Location } from "vscode-languageserver/node";
+
+import ts from "@typescript/typescript6";
 import { basename } from "node:path";
 import { pathToFileURL } from "node:url";
-import ts from "@typescript/typescript6";
-import type { Location } from "vscode-languageserver/node";
-import { appTargetAt, handlerContract, routeParams } from "./app-index";
-import { isServerRouteMiddleware } from "../framework/route-middleware-discovery";
+
 import type { AppTarget } from "./app-index";
-import { componentSummary, componentSummaryMarkdown } from "./components";
 import type { FeatureContext } from "./features";
-import { projectPath } from "./lenses";
 import type { VirtualComponent } from "./model";
-import { analyzeReactivity, crossing, nodeAt, reactiveDeclarationAt } from "./reactivity";
 import type { ReactiveAccess, ReactiveDeclaration } from "./reactivity";
+
+import { isServerRouteMiddleware } from "../framework/route-middleware-discovery";
+import { appTargetAt, handlerContract, routeParams } from "./app-index";
+import { componentSummary, componentSummaryMarkdown } from "./components";
+import { projectPath } from "./lenses";
+import { analyzeReactivity, crossing, nodeAt, reactiveDeclarationAt } from "./reactivity";
 
 /** A Markdown section that the hover appends to TypeScript's quick info. */
 export interface HoverSection {

@@ -1,10 +1,12 @@
-import { spawn, spawnSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
+
+import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { readFileSync } from "node:fs";
 import { cp, mkdir, mkdtemp, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
+
 import { prepareFrameworkTypes } from "../../src/framework/check-project.ts";
 import { initFrameworkProject } from "../../src/framework/init.ts";
 import { buildProject } from "../../src/framework/project.ts";

@@ -1,20 +1,23 @@
+import type { MarkupContent } from "vscode-languageserver/node";
+
+import { Window } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { Window } from "happy-dom";
 import * as prettier from "prettier";
 import { DiagnosticSeverity } from "vscode-languageserver/node";
-import type { MarkupContent } from "vscode-languageserver/node";
+
+import type { JsonShape, SerializableExport, ServerData } from "../src/framework.ts";
+import type { TrustedHtml } from "../src/index.ts";
+
+import { parseRegionHtml } from "../src/app/runtime/renderer.ts";
 import { checkSource, untrustedHtmlMessage } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
 import { hasErrors, MeekoCompileError } from "../src/compiler/parser/sfc.ts";
-import { parseRegionHtml } from "../src/app/runtime/renderer.ts";
 import { definePage } from "../src/framework.ts";
-import type { JsonShape, SerializableExport, ServerData } from "../src/framework.ts";
 import { trustHtml } from "../src/index.ts";
-import type { TrustedHtml } from "../src/index.ts";
 import { componentDiagnostics } from "../src/language-server/diagnostics.ts";
 import { hover, semanticTokens, semanticTokensLegend } from "../src/language-server/features.ts";
 import plugin from "../src/prettier.ts";
@@ -395,9 +398,8 @@ test("a TrustedHtml export of <script server> and of load reaches the page props
   const shape: JsonShape<{ body: TrustedHtml }> = { body };
   const checked: SerializableExport<{ body: TrustedHtml }, JsonShape<{ body: TrustedHtml }>> = shape;
   // `definePage` infers the data of `load` with the brand, and the page contract only removes `Response`.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the value only feeds the type checks below.
-  const route = definePage({ load: async () => ({ body: trustHtml("<p>a</p>") }) });
-  type Loaded = Exclude<Awaited<ReturnType<typeof route.load>>, Response>;
+  const _route = definePage({ load: async () => ({ body: trustHtml("<p>a</p>") }) });
+  type Loaded = Exclude<Awaited<ReturnType<typeof _route.load>>, Response>;
   const loaded: Loaded["body"] extends TrustedHtml ? true : false = true;
   // @ts-expect-error A plain string is not a TrustedHtml.
   const plain: ServerData<{ body: TrustedHtml }> = { body: "<p>a</p>" };

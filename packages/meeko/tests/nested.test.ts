@@ -1,8 +1,9 @@
+import { Window } from "happy-dom";
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import test from "node:test";
-import { Window } from "happy-dom";
 import { createServer } from "vite";
+
 import { compile } from "../src/compiler.ts";
 import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
 import { meeko } from "../src/vite.ts";

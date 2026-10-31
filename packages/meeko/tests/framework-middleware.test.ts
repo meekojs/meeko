@@ -1,17 +1,18 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { once } from "node:events";
 import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { join } from "node:path";
 import test from "node:test";
-import { Window as HappyWindow } from "happy-dom";
-import { composeServerMiddleware, defineServerMiddleware } from "../src/server/middleware/index.ts";
-import { mountClientApp } from "../src/app/runtime/client.ts";
+
 import { defineRouteMiddleware } from "../src/app/definitions/define-route-middleware.ts";
+import { mountClientApp } from "../src/app/runtime/client.ts";
 import { createRouteManifest } from "../src/app/runtime/router.ts";
-import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
+import { composeServerMiddleware, defineServerMiddleware } from "../src/server/middleware/index.ts";
+import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 import { repositoryRoot, stopChild, tempProject } from "./helpers/temp-project.ts";
 
 test("server middleware composes in filename order and can stop an HTTP request", async () => {

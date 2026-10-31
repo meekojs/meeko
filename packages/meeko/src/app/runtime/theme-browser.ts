@@ -1,9 +1,10 @@
+import type { ReadonlySignal, Signal } from "../../core/reactivity";
+import type { ResolvedThemeConfig, ThemeHead, ThemeSnapshot, ThemeState, ThemeToggleContext } from "../../shared/theme";
+
+import { batch, computed, createRoot, effect, markExternalSignal, signal, untrack } from "../../core/reactivity";
+import { isThemeChoice, readCookie, resolveChoice } from "../../shared/theme";
 import { currentBrowser } from "../composables/useStorage";
 import { afterMountBatch, setupPhase } from "./lifecycle";
-import { batch, computed, createRoot, effect, markExternalSignal, signal, untrack } from "../../core/reactivity";
-import type { ReadonlySignal, Signal } from "../../core/reactivity";
-import { isThemeChoice, readCookie, resolveChoice } from "../../shared/theme";
-import type { DocumentTheme, ResolvedThemeConfig, ThemeHead, ThemeSnapshot, ThemeState, ThemeToggleContext } from "../../shared/theme";
 
 function snapshotOf(config: ResolvedThemeConfig, value: unknown): ThemeSnapshot | undefined {
   if (typeof value !== "object" || value === null) return undefined;

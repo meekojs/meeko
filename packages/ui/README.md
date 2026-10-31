@@ -37,6 +37,45 @@ export default defineMeekoConfig({
 
 El módulo registra los componentes con el prefijo `UI` y su hoja CSS mediante `meeko.addStylesheet`. Vite la procesa con el PostCSS del proyecto, resuelve sus imports y genera los assets del build. En desarrollo, los cambios de CSS usan HMR. No hace falta importar el CSS manualmente ni enlazar una URL fija. `theme: true` activa los temas del framework; el módulo UI también puede utilizarse sin esa opción.
 
+### Opciones tipadas y marca existente
+
+Importa el módulo para que `ui` tenga tipado en la configuración. No necesitas copiar la paleta de UI: sus tokens pueden apuntar a las variables que ya tiene tu web.
+
+```ts
+import { defineMeekoConfig } from '@meekojs/meeko/framework'
+import ui from '@meekojs/ui'
+
+export default defineMeekoConfig({
+	modules: [ui],
+	ui: {
+		tokens: {
+			primary: 'var(--pill)',
+			primaryHover: 'var(--pill-hover)',
+			onPrimary: 'var(--on-pill)',
+			accent: 'var(--accent)',
+			focus: 'var(--accent)',
+			surface: 'var(--surface)',
+			surfaceHover: 'var(--surface-2)',
+			text: 'var(--ink)',
+			muted: 'var(--muted)',
+			border: 'var(--line)',
+			font: 'var(--font-ui)',
+		},
+		defaults: {
+			button: { shape: 'pill' },
+			link: { shape: 'pill', variant: 'outline' },
+			card: { variant: 'soft' },
+		},
+	},
+})
+```
+
+`UIOptions`, `UITokens` y `UIDefaults` se exportan como tipos de `@meekojs/ui`. Los defaults son por aplicación y petición SSR; no hay estado mutable global. Las props explícitas ganan sobre `ui.defaults`, y éstos sobre los valores de base. Los defaults disponibles son `button` y `link` (`variant`, `size`, `shape`), y `card` (`variant`). Sin opciones se conserva la configuración original y no se instala el plugin de defaults.
+
+`tokens` admite `accent`, `accentHover`, `onAccent`, `primary`, `primaryHover`, `onPrimary`, `accentSoft`, `accentText`, `surface`, `surfaceHover`, `text`, `textSoft`, `muted`, `border`, `borderStrong`, `danger`, `focus`, `radius`, `font`, `controlHeight`, `controlPadding`, `controlWeight` y `controlFontSize`. Cada clave se convierte a `--meeko-ui-*` con guiones. `primary` controla las acciones; `accent` puede seguir teniendo otro color para foco y estados. Si no se configura `primary`, utiliza el acento como antes. Las referencias `var(...)` siguen los temas de la aplicación sin duplicar sus colores.
+
+Las opciones se validan al cargar el módulo. Los tokens se añaden a la hoja CSS de UI antes de pasar por PostCSS; no se generan estilos inline ni archivos en `node_modules`. Las hojas de la aplicación se cargan después y pueden sobrescribirlos.
+
 ## Uso
 
 ```html
@@ -79,13 +118,36 @@ El módulo registra los componentes con el prefijo `UI` y su hoja CSS mediante `
 
 ## Componentes
 
-| Componente | API                                                                                                                                                                                                                                                 |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `UIButton` | `type` (`button`, `submit`, `reset`), `variant` (`primary`, `secondary`), `disabled`, `class`, evento `click` y contenido mediante el snippet `default`. Por defecto usa `type="button"` y `variant="primary"`.                                     |
-| `UIInput`  | Modelo de texto con `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` y `class`. Tipos admitidos: `text`, `email`, `password`, `search`, `url`, `tel`. Por defecto usa `text` y un valor vacío. |
-| `UIField`  | Requiere `id`, `label` y el snippet `default(id, describedBy)`. Props opcionales: `description`, `error`, `required`, `class`. El error tiene prioridad sobre la descripción y se anuncia con `role="alert"`.                                       |
+| Componente | API                                                                                                                                                                                                                                                              |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UIButton` | `type` (`button`, `submit`, `reset`), `variant` (`primary`, `secondary`, `outline`, `ghost`), `size` (`sm`, `md`, `lg`), `shape` (`rounded`, `pill`), `disabled`, `class`, evento `click` y snippet `default`. Por defecto `button`, `primary`, `md`, `rounded`. |
+| `UIInput`  | Modelo de texto con `model`. Props: `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` y `class`. Tipos admitidos: `text`, `email`, `password`, `search`, `url`, `tel`. Por defecto usa `text` y un valor vacío.              |
+| `UIField`  | Requiere `id`, `label` y el snippet `default(id, describedBy)`. Props opcionales: `description`, `error`, `required`, `class`. El error tiene prioridad sobre la descripción y se anuncia con `role="alert"`.                                                    |
 
-También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [tablas](#tablas) y `UICard` para [cards](#cards).
+También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [tablas](#tablas), `UICard` para [cards](#cards), y los componentes de navegación y etiquetas siguientes.
+
+### Navegación y etiquetas
+
+- `UILink` da apariencia de acción a un `<a>` real. Requiere `href`, comparte `variant`, `size` y `shape` con `UIButton`, y admite `target`, `rel`, `ariaLabel`, `class` y evento `click`. No simula botones ni utiliza roles artificiales; los enlaces internos participan en la navegación normal de Meeko. Para `target="_blank"` añade `noopener noreferrer` si no se especifica `rel`.
+- `UILinkCard` es una superficie enlazada: requiere `href` y `title`, con `description`, `class` y snippet `default` opcionales. El contenido no debe incluir otros enlaces ni botones porque toda la card es un único enlace.
+- `UIBadge` muestra metadatos, con `tone="neutral|accent|danger"` (`neutral` por defecto), `class` y snippet `default` obligatorio. Conserva semántica de texto; no añade anuncios o interacción.
+
+```html
+<UILink
+	href="/docs"
+	variant="primary"
+>
+	Empezar
+</UILink>
+<UILinkCard
+	href="/docs/framework"
+	title="Framework"
+	description="Rutas, SSR y datos."
+/>
+<UIBadge tone="accent">Función</UIBadge>
+```
+
+La web pública `apps/site` consume estas acciones en su portada, cabecera y errores; `UILinkCard` compone el índice documental y `UIBadge` los metadatos de referencia. Su `meeko.config.ts` enlaza los tokens con la paleta actual, incluidas las acciones neutras y el foco azul.
 
 La hoja de UI da apariencia a `MeekoSelect`, `MeekoPopover` y `MeekoThemeToggle`. Sus implementaciones pertenecen al núcleo de Meeko y sus etiquetas se pueden usar sin activar este módulo. Conservan sus nombres `Meeko…`.
 

@@ -1,14 +1,23 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { Window as HappyWindow } from "happy-dom";
-import { compile } from "../src/compiler.ts";
-import { createRouteManifest } from "../src/app/runtime/router.ts";
-import type { RouteRecord } from "../src/app/runtime/router.ts";
+
 import type { ClientComponent } from "../src/app/runtime/client.ts";
+import type * as client_tsTypes from "../src/app/runtime/client.ts";
+import type * as head_tsTypesType from "../src/app/runtime/head.ts";
+import type * as ids_tsTypes from "../src/app/runtime/ids.ts";
+import type { RouteRecord } from "../src/app/runtime/router.ts";
+import type * as index_tsTypes from "../src/index.ts";
+import type * as framework_render_tsTypes from "../src/server/runtime/framework-render.ts";
+import type * as head_tsTypes from "../src/shared/head.ts";
+
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { compile } from "../src/compiler.ts";
+
 
 const runtimeUrl = (path: string): string => JSON.stringify(pathToFileURL(resolve(path)).href);
 
@@ -17,11 +26,11 @@ const runtimeUrl = (path: string): string => JSON.stringify(pathToFileURL(resolv
  * second copy of its modules under tsx, with IDs of its own.
  */
 const runtime = async () => ({
-  ...await import(pathToFileURL(resolve("src/index.ts")).href) as typeof import("../src/index.ts"),
-  ...await import(pathToFileURL(resolve("src/shared/head.ts")).href) as typeof import("../src/shared/head.ts"),
-  ...await import(pathToFileURL(resolve("src/app/runtime/head.ts")).href) as typeof import("../src/app/runtime/head.ts"),
-  ...await import(pathToFileURL(resolve("src/server/runtime/framework-render.ts")).href) as typeof import("../src/server/runtime/framework-render.ts"),
-  ...await import(pathToFileURL(resolve("src/app/runtime/client.ts")).href) as typeof import("../src/app/runtime/client.ts"),
+  ...await import(pathToFileURL(resolve("src/index.ts")).href) as typeof index_tsTypes,
+  ...await import(pathToFileURL(resolve("src/shared/head.ts")).href) as typeof head_tsTypes,
+  ...await import(pathToFileURL(resolve("src/app/runtime/head.ts")).href) as typeof head_tsTypesType,
+  ...await import(pathToFileURL(resolve("src/server/runtime/framework-render.ts")).href) as typeof framework_render_tsTypes,
+  ...await import(pathToFileURL(resolve("src/app/runtime/client.ts")).href) as typeof client_tsTypes,
 });
 
 /** A field whose label, control and hint are linked by `useId`. */
@@ -208,7 +217,7 @@ const view = (): "div" | Component<Record<string, never>> => kind.value === "box
   const files = { "Field.meeko": field, "Box.meeko": box };
   const asTag = await load<Record<string, never>>({ ...files, "Host.meeko": host("div") }, "Host.meeko");
   const asComponent = await load<Record<string, never>>({ ...files, "Host.meeko": host("box") }, "Host.meeko");
-  const { withIdRoot } = await import(pathToFileURL(resolve("src/app/runtime/ids.ts")).href) as typeof import("../src/app/runtime/ids.ts");
+  const { withIdRoot } = await import(pathToFileURL(resolve("src/app/runtime/ids.ts")).href) as typeof ids_tsTypes;
   const browser = new HappyWindow();
   try {
     const ids = (root: { querySelectorAll(selector: string): Iterable<unknown> }): string[] => [...root.querySelectorAll("[id]")].map((node) => (node as Element).getAttribute("id")!);

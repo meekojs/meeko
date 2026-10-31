@@ -1,16 +1,18 @@
+import { Window } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { Window } from "happy-dom";
-import { compile } from "../src/compiler.ts";
-import { DEVTOOLS_PROTOCOL_VERSION, devtoolsUpdate, devtoolsWrite, registerDevtoolsInstance } from "../src/app/runtime/devtools.ts";
+
 import type { DevtoolsAssignmentSite, DevtoolsEvent, DevtoolsHook } from "../src/app/runtime/devtools.ts";
-import { bindAttribute, bindText } from "../src/app/runtime/renderer.ts";
-import { enableHotModule, registerHotInstance, replaceHotModule } from "../src/app/runtime/hmr.ts";
 import type { HotComponent, HotState } from "../src/app/runtime/hmr.ts";
+
+import { DEVTOOLS_PROTOCOL_VERSION, devtoolsUpdate, devtoolsWrite, registerDevtoolsInstance } from "../src/app/runtime/devtools.ts";
+import { enableHotModule, registerHotInstance, replaceHotModule } from "../src/app/runtime/hmr.ts";
+import { bindAttribute, bindText } from "../src/app/runtime/renderer.ts";
+import { compile } from "../src/compiler.ts";
 import { batch, computed, createRoot, effect, signal } from "../src/core/reactivity.ts";
 
 interface CompiledFixture {

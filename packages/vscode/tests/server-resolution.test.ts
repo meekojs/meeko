@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+
 import { resolveLanguageServer } from "../src/server-resolution";
 
 function workspace(manifest?: object, withServer = true): string {

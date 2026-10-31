@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { lstat, readlink, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
+
 import { createTempProject, repositoryRoot, tempProjectsRoot } from "./helpers/temp-project.ts";
 
 // pnpm links the dependencies with relative symlinks where Windows lets it create them (an

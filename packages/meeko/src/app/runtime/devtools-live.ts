@@ -1,5 +1,6 @@
 import type { DevtoolsCommandResult, DevtoolsEvent, DevtoolsValue } from "../../core/devtools-protocol";
 import type { LiveBrowserResult, LiveBrowserSignal, LiveBrowserUpdate, LiveServerMessage } from "../../shared/devtools-bridge-protocol";
+
 import { devtoolsHook, devtoolsInstanceIds, devtoolsLiveInstance, observeDevtoolsEvents } from "./devtools";
 
 /** Subconjunto de `import.meta.hot` de Vite que usa el puente del editor. */

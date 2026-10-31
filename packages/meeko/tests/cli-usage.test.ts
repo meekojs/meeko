@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
+
 import { initFrameworkProject } from "../src/framework/init.ts";
 import { linkRepositoryPackages, tempProject } from "./helpers/temp-project.ts";
 
@@ -47,7 +48,7 @@ test("the help names the environment variables that dev, start and preview read"
 });
 
 test("meeko <command> --help and meeko help <command> print that command's help", () => {
-  const commands = ["dev", "check", "build", "start", "preview", "clean", "auth", "check-app", "compile", "types", "routes", "prerender", "init", "init-framework", "lsp"];
+  const commands = ["dev", "check", "doctor", "build", "start", "preview", "clean", "auth", "check-app", "compile", "types", "routes", "prerender", "init", "init-framework", "lsp"];
   for (const command of commands) {
     for (const args of [[command, "--help"], [command, ".", "-h"], ["help", command]]) {
       const result = cli(...args);

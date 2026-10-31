@@ -1,13 +1,15 @@
+import ts from "@typescript/typescript6";
 import { execFile } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
-import ts from "@typescript/typescript6";
-import { parseSfc } from "../compiler/parser/sfc";
-import { frameworkTsconfigPaths, resolveProjectAliases } from "./aliases";
+
 import type { AppTypesOptions } from "./check-app";
-import { prepareFrameworkTypeDeclarations } from "./type-declarations";
+
+import { parseSfc } from "../compiler/parser/sfc";
 import { tscCommand } from "../typescript-cli";
+import { frameworkTsconfigPaths, resolveProjectAliases } from "./aliases";
+import { prepareFrameworkTypeDeclarations } from "./type-declarations";
 
 const execute = promisify(execFile);
 

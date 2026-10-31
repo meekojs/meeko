@@ -1,6 +1,8 @@
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
+
 import type { SocketHub, SocketPeer } from "../socket/runtime";
+
 import { observeErrorCallback } from "../errors";
 import { setSocketAddress } from "./env";
 import { createSocketUpgradeHandler, socketPathnamePrefix, socketPublicOrigin } from "./upgrade";

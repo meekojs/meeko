@@ -1,10 +1,13 @@
+import { build } from "esbuild";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { build } from "esbuild";
+
+import type * as compiler_tsTypes from "../src/compiler.ts";
+
 
 test("engine and framework browser bundles exclude server transports", async () => {
   const result = await build({
@@ -100,7 +103,7 @@ test("published entry source maps carry their sources without local absolute pat
 test("a component without the framework leaves the theme, the router state and <MeekoThemeToggle> out of its bundle", async () => {
   // A compiled component imports `@meekojs/meeko/internal`; Meeko's own components come from
   // `@meekojs/meeko/builtins/*`, which only a component that uses their tags imports.
-  const { compile } = await import(pathToFileURL(resolve("dist/compiler.js")).href) as typeof import("../src/compiler.ts");
+  const { compile } = await import(pathToFileURL(resolve("dist/compiler.js")).href) as typeof compiler_tsTypes;
   const component = compile(`<script lang="ts">\nimport { signal } from "@meekojs/meeko";\nconst count = signal(0);\n</script>\n<template><button on:click="() => count.value++">{count.value}</button></template>\n`, resolve("Counter.meeko")).code;
   const result = await build({
     stdin: { contents: component, loader: "ts", resolveDir: resolve("."), sourcefile: "Counter.ts" },

@@ -1,4 +1,5 @@
 import type { AstPath, Doc, ParserOptions, Printer } from "prettier";
+
 import { printers as estreePrinters } from "prettier/plugins/estree";
 
 /** Nodo ESTree con lo que necesita la regla: posiciones, decoradores y elementos. */

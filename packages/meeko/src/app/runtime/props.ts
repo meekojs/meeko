@@ -1,3 +1,6 @@
+import type { Signal } from "../../core/reactivity";
+
+import { batch, signal, untrack } from "../../core/reactivity";
 /**
  * Reactive props of a child component instance.
  *
@@ -15,8 +18,6 @@
  * keeps one signal per snippet name that the child reads, through {@link passedSnippetsKey}.
  */
 import { readChannels } from "./channels";
-import { batch, signal, untrack } from "../../core/reactivity";
-import type { Signal } from "../../core/reactivity";
 
 /** Props view of a child instance and the writer that its parent's binding keeps. */
 export interface PropsSource<Props extends object> {

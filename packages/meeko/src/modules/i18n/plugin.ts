@@ -1,8 +1,10 @@
-import { definePlugin } from "../../app/definitions/define-plugin";
 import { catalogs } from "virtual:meeko-i18n";
-import { createI18n, localeOf } from "./index";
-import { i18nContext } from "../../shared/i18n";
+
 import type { Message } from "./messages";
+
+import { definePlugin } from "../../app/definitions/define-plugin";
+import { i18nContext } from "../../shared/i18n";
+import { createI18n, localeOf } from "./index";
 
 interface Options {
   readonly defaultLocale: string;

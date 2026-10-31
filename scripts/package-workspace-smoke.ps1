@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $workspace = Split-Path -Parent $PSScriptRoot
-$temporaryRoot = Join-Path $workspace '.meeko'
-$consumerRoot = Join-Path $temporaryRoot ('build-consumer-' + [guid]::NewGuid().ToString('N'))
+# Outside the workspace: an undeclared dependency cannot leak through an ancestor node_modules.
+$consumerRoot = Join-Path ([IO.Path]::GetTempPath()) ('meeko-build-consumer-' + [guid]::NewGuid().ToString('N'))
 $tarballs = Join-Path $consumerRoot 'tarballs'
 $consumer = Join-Path $consumerRoot 'consumer'
 New-Item -ItemType Directory -Path $tarballs, $consumer -Force | Out-Null
@@ -52,6 +52,18 @@ assert.match(formatted, /Save/);
 console.log('All public package entry points, ESLint and Prettier work from installed tarballs.');
 '@ | Set-Content -LiteralPath (Join-Path $consumer 'smoke.mjs') -Encoding utf8
   @'
+import { readdir, writeFile } from 'node:fs/promises';
+import { relative, resolve } from 'node:path';
+async function declarations(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  return (await Promise.all(entries.map((entry) => entry.isDirectory() ? declarations(resolve(directory, entry.name)) : entry.name.endsWith('.d.meeko.ts') ? [resolve(directory, entry.name)] : []))).flat();
+}
+const files = await declarations(resolve('node_modules/@meekojs/ui/dist/app/components'));
+if (!files.length) throw new Error('Installed UI contains no component declarations');
+const imports = files.map((file, index) => `import type * as Component${index} from './${relative(process.cwd(), file).replaceAll('\\', '/')}';`);
+await writeFile('component-declarations.ts', imports.join('\n') + '\nexport type Components = [' + files.map((_file, index) => `typeof Component${index}`).join(', ') + '];\n');
+'@ | Set-Content -LiteralPath (Join-Path $consumer 'component-declarations.mjs') -Encoding utf8
+  @'
 import { signal } from '@meekojs/meeko';
 import { defineMeekoModule } from '@meekojs/meeko/framework';
 import ui from '@meekojs/ui';
@@ -63,7 +75,7 @@ const formatting: MeekoPrettierOptions = { meekoIndentSections: true };
 export const smoke = { state: signal(1), ui, i18n, useModal, formatting, lint: defineEslint({ perfectionist: true, unusedImports: true }), module: defineMeekoModule({ meta: { name: 'smoke' }, setup() {} }) };
 '@ | Set-Content -LiteralPath (Join-Path $consumer 'main.ts') -Encoding utf8
   New-Item -ItemType Directory -Path (Join-Path $consumer 'app/pages') -Force | Out-Null
-  'export default { modules: ["@meekojs/ui"], viewTransitions: true };' | Set-Content -LiteralPath (Join-Path $consumer 'meeko.config.mjs') -Encoding utf8
+  'export default { modules: ["@meekojs/ui"], viewTransitions: true, ui: { tokens: { primary: "var(--consumer-primary)" }, defaults: { link: { shape: "pill" } } } };' | Set-Content -LiteralPath (Join-Path $consumer 'meeko.config.mjs') -Encoding utf8
   @'
 <script lang="ts">
   import type { TableColumn } from '@meekojs/ui/runtime';
@@ -72,6 +84,7 @@ export const smoke = { state: signal(1), ui, i18n, useModal, formatting, lint: d
 </script>
 <template>
   <UICard title="Installed card" variant="soft"><UIButton>Styled package</UIButton></UICard>
+  <UILink href="/#packaged">Packaged link defaults</UILink>
   <UITable caption="Installed table" layout="grid" bind:columns="columns" bind:rows="rows" rowKey="id" />
 </template>
 '@ | Set-Content -LiteralPath (Join-Path $consumer 'app/pages/index.meeko') -Encoding utf8
@@ -91,15 +104,22 @@ assert.match(css, /\.meeko-ui-button/);
 assert.match(css, /\.meeko-ui-table/);
 assert.match(css, /\.meeko-ui-card/);
 assert.match(css, /--meeko-ui-accent:\s*#123456/);
+assert.match(css, /--meeko-ui-primary:\s*var\(--consumer-primary\)/);
 assert.doesNotMatch(css, /@import/);
 console.log('Installed UI CSS uses consumer PostCSS and ships as a production asset.');
 '@ | Set-Content -LiteralPath (Join-Path $consumer 'styles-smoke.mjs') -Encoding utf8
   Push-Location $consumer
   try {
-    & pnpm install --offline --ignore-scripts
+    # A genuinely external consumer cannot rely on workspace resolution or cached registry metadata.
+    & pnpm install --prefer-offline --ignore-scripts
     if ($LASTEXITCODE -ne 0) { throw 'Consumer installation failed' }
     & node smoke.mjs
     if ($LASTEXITCODE -ne 0) { throw 'Installed exports smoke failed' }
+    & node component-declarations.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'Installed component declaration inventory failed' }
+    # These are the actual adjacent declarations from the tarball, not regenerated app stubs.
+    & pnpm exec tsc --ignoreConfig --noEmit --strict --allowImportingTsExtensions --allowArbitraryExtensions --target ES2022 --module NodeNext --moduleResolution NodeNext component-declarations.ts
+    if ($LASTEXITCODE -ne 0) { throw 'Installed UI component declarations do not resolve in strict NodeNext' }
     # TypeScript-ESLint's declarations reference the TS 6 compiler API; TS 7 consumers
     # use skipLibCheck, as in Meeko's generated app configuration. User code stays strict.
     & pnpm exec tsc --ignoreConfig --noEmit --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext main.ts

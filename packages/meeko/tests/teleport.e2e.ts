@@ -1,15 +1,22 @@
+import type { Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import type { Page } from "playwright-core";
+
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer as createHttpServer } from "node:http";
-import type { AddressInfo } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
-import type { Page } from "playwright-core";
+
+import type * as framework_server_tsTypes from "../src/framework-server.ts";
+import type * as node_tsTypes from "../src/node.ts";
+
 import { buildProject } from "../src/framework/project.ts";
 import { previewStatic } from "../src/framework/static-adapter.ts";
 import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
+
 
 /** A layout with a toolbar and a page that injects its action there and a notice at the end of <body>. */
 async function writeTeleportApp(root: string, staticAdapter: boolean): Promise<void> {
@@ -92,9 +99,9 @@ async function assertTeleport(origin: string): Promise<void> {
 
 test("Chrome: una página pone su acción en la barra del layout desde el SSR y navegar fuera la quita", { timeout: 240_000 }, async () => {
   const project = await createTempProject("teleport-e2e");
-  type ServerModule = typeof import("../src/framework-server.ts");
-  type NodeModule = typeof import("../src/node.ts");
-  let server: import("node:http").Server | undefined;
+  type ServerModule = typeof framework_server_tsTypes;
+  type NodeModule = typeof node_tsTypes;
+  let server: Server | undefined;
   let app: Awaited<ReturnType<ServerModule["createServerApp"]>> | undefined;
   try {
     await writeTeleportApp(project.root, false);
@@ -119,7 +126,7 @@ test("Chrome: una página pone su acción en la barra del layout desde el SSR y 
 
 test("Chrome: el adaptador static deja el contenido en su destino del HTML prerenderizado", { timeout: 240_000 }, async () => {
   const project = await createTempProject("teleport-static-e2e");
-  let server: import("node:http").Server | undefined;
+  let server: Server | undefined;
   try {
     await writeTeleportApp(project.root, true);
     await buildProject(project.root);

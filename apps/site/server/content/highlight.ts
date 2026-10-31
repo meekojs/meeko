@@ -1,8 +1,10 @@
-import { trustHtml } from "@meekojs/meeko";
 import type { TrustedHtml } from "@meekojs/meeko";
-import { createHighlighterCore } from "shiki/core";
 import type { HighlighterCore, LanguageRegistration, ThemeRegistration } from "shiki/core";
+
+import { trustHtml } from "@meekojs/meeko";
+import { createHighlighterCore } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
+
 import { readRepositoryFile } from "./repository";
 
 /** Languages of the fenced blocks in the documents; a block in another language stays plain text. */

@@ -1,7 +1,8 @@
-import { requestApi } from "../../../shared/clients";
 import type { AnyApiOperation, ApiRequestInput, ClientOptions, PublicServerManifest } from "../../../shared/clients";
-import { createResource, readerOf, stableJson } from "./engine";
 import type { ApiQueryContract, DataResource, DataResourceOptions, UseApi } from "./engine";
+
+import { requestApi } from "../../../shared/clients";
+import { createResource, readerOf, stableJson } from "./engine";
 
 /**
  * Crea `useApi` para los endpoints GET de un manifiesto público. Los clientes generados

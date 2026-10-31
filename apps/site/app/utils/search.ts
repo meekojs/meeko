@@ -1,5 +1,6 @@
-import { trustHtml } from "@meekojs/meeko";
 import type { TrustedHtml } from "@meekojs/meeko";
+
+import { trustHtml } from "@meekojs/meeko";
 
 export interface SearchSection {
   readonly url: string;

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { generateProtocolTypes, readProtocolTypes } from "../scripts/protocol-types.mjs";
 
 test("types/protocol.d.ts coincide con src/core/devtools-protocol.ts", async () => {

@@ -1,9 +1,10 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import typescript from '@typescript-eslint/eslint-plugin';
 import {Linter} from 'eslint';
 import perfectionist from 'eslint-plugin-perfectionist';
 import unusedImports from 'eslint-plugin-unused-imports';
-import typescript from '@typescript-eslint/eslint-plugin';
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
 import {defineEslint} from '../dist/index.js';
 
 const config = defineEslint({perfectionist:true,unusedImports:true});

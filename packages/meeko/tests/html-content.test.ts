@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { parse } from "parse5";
-import { normalizeHtmlContent } from "../src/core/html-content.ts";
+
 import type { HtmlContentNamespace } from "../src/core/html-content.ts";
+
+import { normalizeHtmlContent } from "../src/core/html-content.ts";
 
 /** A parse5 node, as far as these checks read it. */
 interface ParsedNode {

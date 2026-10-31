@@ -1,4 +1,5 @@
 import { defineServerMiddleware } from "@meekojs/meeko/server";
+
 import { listPages, readPage, searchPages } from "../content/db";
 
 const origin = "https://meeko.diegootayza.com";

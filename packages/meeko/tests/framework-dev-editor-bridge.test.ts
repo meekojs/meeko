@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { once } from "node:events";
 import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { join } from "node:path";
 import test from "node:test";
+
 import type { EditorBridgeDescriptor, EditorBridgeEvent, LiveServerMessage } from "../src/shared/devtools-bridge-protocol.ts";
+
 import { editorBridgeFile } from "../src/framework/editor-bridge.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";
 import { repositoryRoot, stopChild, tempProject } from "./helpers/temp-project.ts";

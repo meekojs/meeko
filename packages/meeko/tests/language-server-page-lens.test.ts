@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
+
+import type { LanguageProject } from "./language-server-workspace.ts";
+
 import { codeLenses, largePayloadFields, pageRouteId } from "../src/language-server/lenses.ts";
 import { languageProject } from "./language-server-workspace.ts";
-import type { LanguageProject } from "./language-server-workspace.ts";
 
 const user = `<script server lang="ts">
 import { definePage } from "@meekojs/meeko/framework";

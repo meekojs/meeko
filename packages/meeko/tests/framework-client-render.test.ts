@@ -1,23 +1,25 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { Window as HappyWindow } from "happy-dom";
 import { build } from "vite";
-import { bindComponent, renderComponent } from "../src/app/runtime/renderer.ts";
-import type { Component, DomScope } from "../src/app/runtime/renderer.ts";
-import type { ReadonlySignal } from "../src/core/reactivity.ts";
-import { mountClientApp, useNavigation } from "../src/app/runtime/client.ts";
-import type { ClientComponent, ClientRoute } from "../src/app/runtime/client.ts";
-import { definePage } from "../src/app/definitions/define-page.ts";
+
 import type { PageSchema } from "../src/app/definitions/define-page.ts";
-import { prerenderRoutes } from "../src/framework/prerender.ts";
-import { createRouteManifest } from "../src/app/runtime/router.ts";
+import type { ClientComponent, ClientRoute } from "../src/app/runtime/client.ts";
+import type { Component, DomScope } from "../src/app/runtime/renderer.ts";
 import type { RouteRecord } from "../src/app/runtime/router.ts";
+import type { ReadonlySignal } from "../src/core/reactivity.ts";
+import type { PageRoute } from "../src/server/runtime/framework-render.ts";
+
+import { definePage } from "../src/app/definitions/define-page.ts";
+import { mountClientApp, useNavigation } from "../src/app/runtime/client.ts";
+import { bindComponent, renderComponent } from "../src/app/runtime/renderer.ts";
+import { createRouteManifest } from "../src/app/runtime/router.ts";
+import { prerenderRoutes } from "../src/framework/prerender.ts";
 import { discoverRoutes, extractRouteRender } from "../src/framework/routes-discovery.ts";
 import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
-import type { PageRoute } from "../src/server/runtime/framework-render.ts";
 import { meeko } from "../src/vite.ts";
 
 const numericId: PageSchema<unknown, { id: string }> = {

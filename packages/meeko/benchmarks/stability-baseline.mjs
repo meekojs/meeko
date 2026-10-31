@@ -1,13 +1,13 @@
-import { Worker } from "node:worker_threads";
+import { build } from "esbuild";
 import { spawn } from "node:child_process";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
-import { readFile, readdir, stat, writeFile, mkdir } from "node:fs/promises";
 import { cpus, platform, release } from "node:os";
 import { dirname, extname, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
 import { performance } from "node:perf_hooks";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { Worker } from "node:worker_threads";
 import { gzipSync } from "node:zlib";
-import { build } from "esbuild";
 import { chromium } from "playwright-core";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");

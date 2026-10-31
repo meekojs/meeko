@@ -127,6 +127,8 @@ function eventLabel(event: DevtoolsEvent): string {
     breakpoint: "Punto de parada",
     select: "Selección",
     hmr: "HMR",
+    navigation: "Navegación",
+    data: "Datos",
   };
   const time = Number.isFinite(event.at) ? new Date(event.at).toLocaleTimeString("es", { hour12: false }) : "hora desconocida";
   const detail = event.detail ? ` · ${event.detail}` : "";
@@ -239,6 +241,12 @@ export function mountDevtoolsPanel(options: DevtoolsPanelOptions = {}): Devtools
   signalFilter.setAttribute("aria-label", "Mostrar sólo eventos de señales");
   signalFilterLabel.prepend(signalFilter);
   eventsHead.append(eventsTitle, signalFilterLabel);
+  const activityFilterLabel = element(ownerDocument, "label", " Navegación y datos");
+  const activityFilter = element(ownerDocument, "input");
+  activityFilter.type = "checkbox";
+  activityFilter.setAttribute("aria-label", "Mostrar sólo navegación y datos");
+  activityFilterLabel.prepend(activityFilter);
+  eventsHead.append(activityFilterLabel);
   const eventsList = element(ownerDocument, "ol");
   eventsList.setAttribute("aria-label", "Eventos recientes de Meeko");
   eventsSection.append(eventsHead, eventsList);
@@ -420,7 +428,7 @@ export function mountDevtoolsPanel(options: DevtoolsPanelOptions = {}): Devtools
       detailSection.append(element(ownerDocument, "p", "Selecciona una instancia para ver props y señales."));
     }
 
-    const recent = snapshot.events.filter((event) => !signalFilter.checked || event.kind === "signal").slice(-30).reverse();
+    const recent = snapshot.events.filter((event) => (!signalFilter.checked || event.kind === "signal") && (!activityFilter.checked || event.kind === "navigation" || event.kind === "data")).slice(-30).reverse();
     if (recent.length === 0) eventsList.append(element(ownerDocument, "li", "Sin eventos.", "muted"));
     for (const event of recent) {
       const row = element(ownerDocument, "li");
@@ -546,7 +554,8 @@ export function mountDevtoolsPanel(options: DevtoolsPanelOptions = {}): Devtools
   }
 
   view.addEventListener("meeko:devtools-ready", connect);
-  signalFilter.addEventListener("change", render);
+  signalFilter.addEventListener("change", () => { if (signalFilter.checked) activityFilter.checked = false; render(); });
+  activityFilter.addEventListener("change", () => { if (activityFilter.checked) signalFilter.checked = false; render(); });
   refreshButton.addEventListener("click", connect);
   closeButton.addEventListener("click", unmount);
   connect();

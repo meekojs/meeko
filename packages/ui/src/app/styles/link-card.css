@@ -1,0 +1,43 @@
+.meeko-ui-link-card {
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+	transition:
+		border-color 150ms,
+		background-color 150ms;
+	box-sizing: border-box;
+	border: 1px solid var(--meeko-ui-border);
+	border-radius: var(--meeko-ui-radius);
+	background: var(--meeko-ui-surface);
+	padding: var(--meeko-ui-link-card-padding, 1.1rem 1.15rem 1.2rem);
+	min-width: 0;
+	height: 100%;
+	color: var(--meeko-ui-text);
+	font-family: var(--meeko-ui-font);
+	text-decoration: none;
+	overflow-wrap: anywhere;
+}
+.meeko-ui-link-card:hover {
+	border-color: var(--meeko-ui-border-strong);
+	background: var(--meeko-ui-surface-hover);
+}
+.meeko-ui-link-card:focus-visible {
+	outline: 2px solid var(--meeko-ui-focus);
+	outline-offset: 2px;
+}
+.meeko-ui-link-card-title {
+	font-weight: 540;
+	font-size: 0.98rem;
+	line-height: 1.5;
+	letter-spacing: -0.012em;
+}
+.meeko-ui-link-card-description {
+	color: var(--meeko-ui-muted);
+	font-size: 0.86rem;
+	line-height: 1.55;
+}
+@media (prefers-reduced-motion: reduce) {
+	.meeko-ui-link-card {
+		transition: none;
+	}
+}

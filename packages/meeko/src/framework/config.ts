@@ -1,20 +1,22 @@
+import ts from "@typescript/typescript6";
 import { createHash } from "node:crypto";
-import { readFile, realpath, stat } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
+import { readFile, realpath, stat } from "node:fs/promises";
 import { basename, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
-import ts from "@typescript/typescript6";
-import { composeFrameworkRoutes } from "./modules";
-import { discoverLayouts } from "./routes-discovery";
-import { contentSecurityPolicy } from "../server/runtime/csp";
-import type { ContentSecurityPolicy } from "../server/runtime/csp";
-import { normalizeDocumentConfig, siteOrigin } from "../shared/head";
-import { resolveThemeConfig } from "../shared/theme";
+
 import type { RouteRecord } from "../app/runtime/router";
 import type { MeekoConfig } from "../modules/define-meeko-config";
-import { isMeekoModule } from "../modules/define-meeko-module";
-import { classifyModuleEntry, resolveMeekoModules, resolvedDocument, warnUnknownConfigKeys } from "./module-loader";
+import type { ContentSecurityPolicy } from "../server/runtime/csp";
 import type { ResolvedModules } from "./module-loader";
+
+import { isMeekoModule } from "../modules/define-meeko-module";
+import { contentSecurityPolicy } from "../server/runtime/csp";
+import { normalizeDocumentConfig, siteOrigin } from "../shared/head";
+import { resolveThemeConfig } from "../shared/theme";
+import { classifyModuleEntry, resolvedDocument, resolveMeekoModules, warnUnknownConfigKeys } from "./module-loader";
+import { composeFrameworkRoutes } from "./modules";
+import { discoverLayouts } from "./routes-discovery";
 
 export type { MeekoConfig } from "../modules/define-meeko-config";
 

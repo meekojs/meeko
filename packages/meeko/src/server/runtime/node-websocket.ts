@@ -1,10 +1,15 @@
-import { STATUS_CODES, type IncomingMessage, type Server as HttpServer } from "node:http";
-import { createRequire } from "node:module";
 import type { Duplex } from "node:stream";
 import type WebSocket from "ws";
-import { createNodeSocketUpgradeHandler } from "./node-upgrade";
-import { observeErrorCallback } from "../errors";
+import type * as wsTypes from "ws";
+
+import { type Server as HttpServer, type IncomingMessage, STATUS_CODES } from "node:http";
+import { createRequire } from "node:module";
+
 import type { NodeAcceptedSocket, NodeSocketUpgradeOptions } from "./node-upgrade";
+
+import { observeErrorCallback } from "../errors";
+import { createNodeSocketUpgradeHandler } from "./node-upgrade";
+
 
 /**
  * Opciones de {@link attachNodeWebSocketServer}.
@@ -65,7 +70,7 @@ export function attachNodeWebSocketServer(options: NodeWebSocketOptions): NodeWe
   if (!Number.isSafeInteger(maxPayload) || maxPayload <= 0) throw new RangeError("Invalid socket message limit");
   if (!Number.isSafeInteger(heartbeatMs) || heartbeatMs <= 0) throw new RangeError("Invalid socket heartbeat interval");
   // Keep the optional server transport out of engine-only and HTTP-only imports.
-  const { WebSocket: WebSocketClass, WebSocketServer } = createRequire(import.meta.url)("ws") as typeof import("ws");
+  const { WebSocket: WebSocketClass, WebSocketServer } = createRequire(import.meta.url)("ws") as typeof wsTypes;
   const webSockets = new WebSocketServer({ noServer: true, maxPayload, perMessageDeflate: false });
   const observeError = (error: unknown): void => observeErrorCallback(error, options.onError);
   const alive = new WeakMap<WebSocket, boolean>();

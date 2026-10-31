@@ -1,7 +1,8 @@
 <script lang="ts">
 import { computed, signal } from "@meekojs/meeko";
-import * as TaskCard from "./TaskCard.meeko";
+
 import { parseTasks, type Task, type TaskView } from "./model.js";
+import * as TaskCard from "./TaskCard.meeko";
 
 /** Estado inicial que llega del servidor junto con la ruta solicitada. */
 export interface Props {
@@ -10,6 +11,7 @@ export interface Props {
 }
 
 const props = defineProps<Props>();
+
 const tasks = signal<Task[]>([...props.tasks]);
 const draft = signal("");
 const busy = signal(false);

@@ -1,8 +1,9 @@
+import ts from "@typescript/typescript6";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
-import ts from "@typescript/typescript6";
+
 import { standardSchemaTypes } from "../src/framework/standard-schema-types.ts";
 
 test("Standard Schema types reject nested erasure and accept recursive contracts", async () => {

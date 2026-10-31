@@ -1,7 +1,9 @@
 import postcss from "postcss";
 import selectorParser from "postcss-selector-parser";
-import { scopeTargets } from "./scope-targets";
+
 import type { ScopeTargets } from "./scope-targets";
+
+import { scopeTargets } from "./scope-targets";
 
 export function scopeCss(css: string, scopeAttribute: string): { css: string; targets: ScopeTargets } {
   const root = postcss.parse(css);

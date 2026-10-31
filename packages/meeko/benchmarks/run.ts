@@ -1,16 +1,17 @@
-import { createServer, type Server } from "node:http";
+import { build, version as esbuildVersion } from "esbuild";
 import { execFileSync } from "node:child_process";
+import { createServer, type Server } from "node:http";
 import { cpus, platform, release } from "node:os";
 import { dirname, resolve } from "node:path";
+import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
-import { performance } from "node:perf_hooks";
-import { build, version as esbuildVersion } from "esbuild";
-import { chromium, type Browser, type Page } from "playwright-core";
+import { type Browser, chromium, type Page } from "playwright-core";
 import { createSSRApp, version as vueVersion } from "vue";
 import { renderToString as renderVueToString } from "vue/server-renderer";
-import { VueCounter } from "./vue-counter";
+
 import { renderToString as renderMeekoToString } from "../examples/counter/Counter.generated.ts";
+import { VueCounter } from "./vue-counter";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const warmupRounds = 2;

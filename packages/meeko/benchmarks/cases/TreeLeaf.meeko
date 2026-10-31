@@ -2,6 +2,7 @@
 import { signal } from "@meekojs/meeko";
 
 const props = defineProps<{ id: string }>();
+
 const count = signal(0);
 </script>
 

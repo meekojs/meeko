@@ -1,3 +1,4 @@
+import { Window } from "happy-dom";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
@@ -5,10 +6,10 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { Window } from "happy-dom";
 import postcss from "postcss";
 import selectorParser from "postcss-selector-parser";
 import { createServer } from "vite";
+
 import { compile } from "../src/compiler.ts";
 import { loadMeekoConfig } from "../src/framework/config.ts";
 import { meeko } from "../src/vite.ts";

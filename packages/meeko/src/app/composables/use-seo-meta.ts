@@ -1,4 +1,5 @@
 import type { HeadSource, SeoMetaInput } from "../../shared/head";
+
 import { seoMetaHead } from "../../shared/head";
 import { reader } from "../runtime/head";
 import { useHead } from "./use-head";

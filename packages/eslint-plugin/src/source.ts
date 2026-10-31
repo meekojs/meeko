@@ -1,7 +1,8 @@
-import { attributeValueStart, decodeTemplateText, isCustomElementTag, parseSfc, parseTemplate, scanInterpolations } from "@meekojs/meeko/parse";
 import type { SfcSection, TemplateAttribute, TemplateNode } from "@meekojs/meeko/parse";
-import { parseForESLint } from "@typescript-eslint/parser";
 import type { TSESTree } from "@typescript-eslint/utils";
+
+import { attributeValueStart, decodeTemplateText, isCustomElementTag, parseSfc, parseTemplate, scanInterpolations } from "@meekojs/meeko/parse";
+import { parseForESLint } from "@typescript-eslint/parser";
 
 export interface Part { start: number; end: number; from: number; to: number; source: boolean }
 

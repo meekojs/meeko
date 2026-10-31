@@ -1,14 +1,16 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
 import ts from "@typescript/typescript6";
-import { autoImportCollision, discoverAutoImports } from "./registry";
-import { applyAutoImports } from "./transform";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join, relative, resolve, sep } from "node:path";
+
 import type { AutoImport, ImportScope } from "./registry";
-import { readMeekoConfigSync } from "../framework/config";
-import { legacyLayerEntries } from "../framework/module-loader";
+
 import { aliasTsconfigPaths } from "../compiler/aliases";
 import { aliasesForScope, resolveProjectAliasesSync } from "../framework/aliases";
+import { readMeekoConfigSync } from "../framework/config";
+import { legacyLayerEntries } from "../framework/module-loader";
+import { autoImportCollision, discoverAutoImports } from "./registry";
+import { applyAutoImports } from "./transform";
 
 export type TypeScriptScope = Exclude<ImportScope, "app">;
 
@@ -67,11 +69,19 @@ function scopeEntries(registry: readonly AutoImport[], scope: TypeScriptScope): 
   return registry.filter((entry) => entry.scope === "shared" || (scope !== "shared" && (entry.scope === scope || entry.scope === "app") && !(entry.browserCode && scope === "server")));
 }
 
-/** Public form types are re-exported with `export type`, so TS 7 forbids namespace import aliases. */
-const formTypeParameters: Readonly<Record<string, string>> = {
-  Form: "Values, Result",
-  FormField: "Value",
-  FormSubmission: "Result",
+/** Public type-only re-exports cannot be namespace import aliases in TS 7. Keep their public contracts. */
+const publicTypeParameters: Readonly<Record<string, Readonly<Record<string, { parameters: string; arguments: string }>>>> = {
+  "@meekojs/meeko/framework": {
+    Form: { parameters: "Values, Result", arguments: "Values, Result" },
+    FormField: { parameters: "Value", arguments: "Value" },
+    FormSubmission: { parameters: "Result", arguments: "Result" },
+  },
+  "@meekojs/meeko": {
+    ResolvedComponent: {
+      parameters: 'Name extends import("@meekojs/meeko").ComponentName = import("@meekojs/meeko").ComponentName',
+      arguments: "Name",
+    },
+  },
 };
 
 function assertNoCollisions(entries: readonly AutoImport[], scope: TypeScriptScope): void {
@@ -163,9 +173,9 @@ export async function generateAutoImportTypes(projectRoot: string): Promise<{ cl
     const declarations = entries.sort((a, b) => a.name.localeCompare(b.name)).map((entry) => {
       const specifier = JSON.stringify(publicSpecifier(outputDirectory, entry));
       if (entry.typeOnly) {
-        if (entry.specifier === "@meekojs/meeko/framework" && entry.scope === "app" && Object.hasOwn(formTypeParameters, entry.name)) {
-          const parameters = formTypeParameters[entry.name]!;
-          return `  type ${entry.name}<${parameters}> = import(${specifier}).${entry.imported}<${parameters}>;`;
+        const publicParameters = entry.specifier && publicTypeParameters[entry.specifier]?.[entry.imported];
+        if (publicParameters) {
+          return `  type ${entry.name}<${publicParameters.parameters}> = import(${specifier}).${entry.imported}<${publicParameters.arguments}>;`;
         }
         const resolvedTarget = resolvedTypes.get(`${entry.file}\0${entry.imported}`);
         const target = resolvedTarget ?? entry;

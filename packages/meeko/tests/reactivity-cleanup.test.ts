@@ -1,9 +1,10 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { batch, createRoot, effect, onCleanup, signal } from "../src/core/reactivity.ts";
-import { Window as HappyWindow } from "happy-dom";
-import { checkSource } from "../src/check.ts";
+
 import { bindFor, releaseAll, renderFor } from "../src/app/runtime/renderer.ts";
+import { checkSource } from "../src/check.ts";
+import { batch, createRoot, effect, onCleanup, signal } from "../src/core/reactivity.ts";
 
 if (false) {
   // @ts-expect-error reactive effects cannot track work after an await

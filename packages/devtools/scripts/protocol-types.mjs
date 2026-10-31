@@ -1,9 +1,9 @@
+import ts from "@typescript/typescript6";
 // Genera packages/devtools/types/protocol.d.ts desde packages/meeko/src/core/devtools-protocol.ts.
 // Uso: node packages/devtools/scripts/protocol-types.mjs --write | --check (o pnpm run devtools:types en la raíz)
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import ts from "@typescript/typescript6";
 
 const extensionRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 export const sourcePath = join(extensionRoot, "..", "meeko", "src", "core", "devtools-protocol.ts");

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
+
 import { checkFrameworkPageContracts } from "../src/framework/page-contracts-check.ts";
 import { createEditorModel } from "../src/language-server/model.ts";
 

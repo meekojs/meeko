@@ -1,29 +1,32 @@
+import type { Plugin } from "vite";
+
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizePath, resolveConfig, transformWithOxc } from "vite";
-import type { Plugin } from "vite";
-import { compile } from "./compiler";
-import { moduleSpecifiers } from "./compiler/import-graph";
-import { sourceMapForCompiled } from "./compiler/sourcemap";
-import { autoImportDirectories, discoverAutoImports, discoverComponents } from "./autoimports/registry";
+
+import type { ProjectAliases } from "./framework/aliases";
+
 import { generateComponentRegistry } from "./autoimports/components";
-import { generateAppTypeForFile, generateAppTypes } from "./framework/check-app";
-import { generateComponentRegistryTypes } from "./framework/type-declarations";
+import { autoImportDirectories, discoverAutoImports, discoverComponents } from "./autoimports/registry";
 import { autoImportedValues, checkComponentBoundary, transformAutoImports } from "./autoimports/transform";
 import { transformTypeScriptAutoImports, typeScriptAutoImportMap } from "./autoimports/typescript";
-import { componentDirectories, discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./framework/config";
-import { clientMiddlewareSource, clientPluginsSource, clientRoutesSource, clientSidecarsSource, readBuildAppData, serverAppSource } from "./framework/app-manifest";
-import { assertRouteBlockPlacement, isPageFile, routeBlockFile, routeBlockId, routeBlockSource, withoutRouteBlock } from "./compiler/transforms/route-block";
-import { extractRouteRender } from "./framework/routes-discovery";
-import { builtinOptimizeInclude, devScanIgnored, isComponentSource, isDevWatchIgnored, isDiscoverySource } from "./framework/dev-watch";
-import { serverScriptModule } from "./compiler/codegen/server-script";
-import { editorBridgeDirectory } from "./framework/editor-bridge";
+import { compile } from "./compiler";
 import { aliasImporterScope, aliasScopeProblem, matchPathAlias } from "./compiler/aliases";
+import { serverScriptModule } from "./compiler/codegen/server-script";
+import { moduleSpecifiers } from "./compiler/import-graph";
+import { sourceMapForCompiled } from "./compiler/sourcemap";
+import { assertRouteBlockPlacement, isPageFile, routeBlockFile, routeBlockId, routeBlockSource, withoutRouteBlock } from "./compiler/transforms/route-block";
 import { resolveProjectAliases, resolveProjectAliasesSync } from "./framework/aliases";
-import type { ProjectAliases } from "./framework/aliases";
+import { clientMiddlewareSource, clientPluginsSource, clientRoutesSource, clientSidecarsSource, readBuildAppData, serverAppSource } from "./framework/app-manifest";
+import { generateAppTypeForFile, generateAppTypes } from "./framework/check-app";
+import { componentDirectories, discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./framework/config";
+import { builtinOptimizeInclude, devScanIgnored, isComponentSource, isDevWatchIgnored, isDiscoverySource } from "./framework/dev-watch";
+import { editorBridgeDirectory } from "./framework/editor-bridge";
+import { extractRouteRender } from "./framework/routes-discovery";
 import { frameworkStylesheets, globalStylesheetFile, globalStylesheetsModule, stylesheetUrl } from "./framework/styles";
+import { generateComponentRegistryTypes } from "./framework/type-declarations";
 
 /**
  * A component's CSS is the module `Card.meeko?meeko-style=<hash>&lang.css`: a real path, as Vue

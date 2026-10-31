@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
+
 import { compile } from "../src/compiler.ts";
 import { MeekoCompileError, parseSfc } from "../src/compiler/parser/sfc.ts";
+import { routeBlockFile, routeBlockId, routeBlockSource } from "../src/compiler/transforms/route-block.ts";
 import { checkApp } from "../src/framework/check-app.ts";
 import { checkFrameworkProject } from "../src/framework/check-project.ts";
-import { routeBlockFile, routeBlockId, routeBlockSource } from "../src/compiler/transforms/route-block.ts";
 import { discoverRoutes } from "../src/framework/routes-discovery.ts";
 import { meeko } from "../src/vite.ts";
 

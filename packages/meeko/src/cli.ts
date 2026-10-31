@@ -1,28 +1,30 @@
 #!/usr/bin/env node
-import { readFile, stat, writeFile } from "node:fs/promises";
 import { existsSync, readdirSync } from "node:fs";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import { join, parse, resolve } from "node:path";
+
+import type { CompileDiagnostic } from "./compiler/parser/sfc";
+
 import { checkSource } from "./check";
 import { compile } from "./compiler";
+import { formatDiagnostic, hasErrors } from "./compiler/parser/sfc";
 import { projectRoot } from "./compiler/project-root";
-import { loadMeekoConfig } from "./framework/config";
-import { setModuleDevelopmentMode, warnLegacyLayerEntries } from "./framework/module-loader";
-import { generateTypes } from "./types";
-import { initProject } from "./init";
-import { initFrameworkProject } from "./framework/init";
 import { checkApp } from "./framework/check-app";
+import { checkFrameworkProject, loadCheckedMeekoConfig, prepareFrameworkTypes } from "./framework/check-project";
+import { cleanProject, formatCleanResult } from "./framework/clean";
+import { loadMeekoConfig } from "./framework/config";
+import { findLinkedMeeko, isSupervisedDevelopment, linkWatchEnabled, runSupervisedDevelopment, superviseDevelopment, warnLinkedMeekoRebuilds } from "./framework/dev-link";
+import { claimDevelopmentProject } from "./framework/dev-lock";
+import { loadProjectEnv } from "./framework/env-file";
+import { initFrameworkProject } from "./framework/init";
+import { setModuleDevelopmentMode, warnLegacyLayerEntries } from "./framework/module-loader";
 import { prerenderProject } from "./framework/prerender";
 import { assertBuildAdapter, buildProject, developmentServerPorts, prepareProject, previewProject, startProject, stopDevelopmentServer } from "./framework/project";
 import { prepareFrameworkTypeDeclarations } from "./framework/type-declarations";
-import { claimDevelopmentProject } from "./framework/dev-lock";
-import { findLinkedMeeko, isSupervisedDevelopment, linkWatchEnabled, runSupervisedDevelopment, superviseDevelopment, warnLinkedMeekoRebuilds } from "./framework/dev-link";
-import { checkFrameworkProject, loadCheckedMeekoConfig, prepareFrameworkTypes } from "./framework/check-project";
-import { cleanProject, formatCleanResult } from "./framework/clean";
-import { loadProjectEnv } from "./framework/env-file";
-import { formatDiagnostic, hasErrors } from "./compiler/parser/sfc";
-import type { CompileDiagnostic } from "./compiler/parser/sfc";
+import { initProject } from "./init";
+import { generateTypes } from "./types";
 
-const usage = "Uso: meeko dev [directorio]\n     meeko check [directorio | componente.meeko] [--json]\n     meeko build [directorio] [--adapter <node|cloudflare|deno|bun|static>]\n     meeko start [directorio]\n     meeko preview [directorio] [--adapter <node|cloudflare|bun|deno|static>]\n     meeko clean [directorio] [--all] [--dry-run]\n     meeko auth hash  (pide una contraseña sin mostrarla, o la lee de stdin, e imprime su hash)\n     meeko check-app <directorio>\n     meeko compile <componente.meeko> <salida.ts>\n     meeko types <componente.meeko>\n     meeko routes <directorio>\n     meeko prerender <directorio>\n     meeko init <directorio>\n     meeko init-framework <directorio>\n     meeko lsp --stdio | --node-ipc | --socket=<puerto> | --pipe=<nombre>\n     meeko <comando> --help  (la ayuda de un comando)\n     meeko --help | --version\n\n" +
+const usage = "Uso: meeko dev [directorio]\n     meeko check [directorio | componente.meeko] [--json]\n     meeko doctor [directorio] [--json]\n     meeko build [directorio] [--adapter <node|cloudflare|deno|bun|static>]\n     meeko start [directorio]\n     meeko preview [directorio] [--adapter <node|cloudflare|bun|deno|static>]\n     meeko clean [directorio] [--all] [--dry-run]\n     meeko auth hash  (pide una contraseña sin mostrarla, o la lee de stdin, e imprime su hash)\n     meeko check-app <directorio>\n     meeko compile <componente.meeko> <salida.ts>\n     meeko types <componente.meeko>\n     meeko routes <directorio>\n     meeko prerender <directorio>\n     meeko init <directorio>\n     meeko init-framework <directorio>\n     meeko lsp --stdio | --node-ipc | --socket=<puerto> | --pipe=<nombre>\n     meeko <comando> --help  (la ayuda de un comando)\n     meeko --help | --version\n\n" +
   "Variables de entorno:\n" +
   "     MEEKO_PORT, MEEKO_HOST  puerto y dirección de dev, start y preview; sustituyen a server.port y\n" +
   "                      server.host de meeko.config.ts (por defecto, 127.0.0.1:4173; preview\n" +
@@ -38,6 +40,7 @@ const usage = "Uso: meeko dev [directorio]\n     meeko check [directorio | compo
   "dev, build, start, preview y check leen el .env del proyecto; el entorno real tiene prioridad.\n";
 /** Help of each command: `meeko <command> --help` or `meeko help <command>`. */
 const commandHelp: Readonly<Record<string, string>> = {
+  doctor: "Uso: meeko doctor [directorio] [--json]\n\nInspecciona versiones, resolución de paquetes, servidor LSP disponible y artefactos .meeko.\nNo ejecuta meeko.config ni módulos, no lee .env y no modifica archivos. --json produce un\ninforme estructurado. Los avisos no impiden usar el proyecto; los errores dan salida 1.\n",
   dev: "Uso: meeko dev [directorio]\n\nArranca el servidor de desarrollo con Vite, SSR y HMR. Antes de escuchar prepara .meeko/\n(entradas, tipos y tsconfig.*.json). Por defecto, el directorio actual. Avisa si otro meeko dev\nya sirve el mismo proyecto.\n",
   check: "Uso: meeko check [directorio | componente.meeko] [--json]\n\nCon un directorio (por defecto, el actual), prepara .meeko/, comprueba los componentes .meeko y\nejecuta TypeScript sobre los proyectos app, server y shared. Con un componente, sólo lo comprueba\na él; --json imprime sus diagnósticos en JSON.\n",
   build: "Uso: meeko build [directorio] [--adapter <node|cloudflare|deno|bun|static>]\n\nComprueba el proyecto como meeko check y escribe la salida de producción en\n.meeko/output/<adaptador>/. --adapter sustituye a server.adapter de meeko.config.ts.\n",
@@ -130,6 +133,15 @@ if (argv[0] === "build" || argv[0] === "preview") {
   }
 }
 // `meeko clean` accepts `--all` and `--dry-run` anywhere after the command.
+let doctorJson = false;
+if (argv[0] === "doctor") {
+  for (let index = 1; index < argv.length; index++) {
+    if (argv[index] !== "--json") continue;
+    if (doctorJson) problem ??= "--json aparece más de una vez en doctor";
+    doctorJson = true;
+    argv.splice(index--, 1);
+  }
+}
 let cleanAll = false;
 let cleanDryRun = false;
 if (argv[0] === "clean") {
@@ -149,12 +161,12 @@ const helpCommand = command === "--help" || command === "-h" || command === "hel
 const versionCommand = command === "--version" || command === "-v";
 if (command !== "lsp" && !helpCommand && !versionCommand) {
   if (command === undefined) problem ??= "Falta el comando";
-  else if (!projectCommand && !legacyCommand && command !== "check" && command !== "clean" && command !== "auth") problem ??= `Comando desconocido: ${command}`;
+  else if (!projectCommand && !legacyCommand && command !== "check" && command !== "clean" && command !== "auth" && command !== "doctor") problem ??= `Comando desconocido: ${command}`;
   if (command === "auth" && input !== "hash") problem ??= input === undefined ? "Falta el subcomando de auth: meeko auth hash" : `Subcomando desconocido de auth: ${input}`;
   // `check` accepts `--json` after the component; every other option was consumed above.
   const option = argv.slice(1).find((argument, index) => argument.startsWith("-") && !(command === "check" && argument === "--json" && index === 1));
   if (option !== undefined) problem ??= command === "check" && option === "--json" ? "--json va después del componente .meeko de check" : `Opción desconocida para ${command}: ${option}`;
-  if (!projectCommand && command !== "check" && command !== "clean" && command !== "auth" && !input) problem ??= `Falta ${command === "compile" || command === "types" ? "el componente .meeko" : "el directorio"} de ${command}`;
+  if (!projectCommand && command !== "check" && command !== "clean" && command !== "auth" && command !== "doctor" && !input) problem ??= `Falta ${command === "compile" || command === "types" ? "el componente .meeko" : "el directorio"} de ${command}`;
   if (command === "compile" && !output) problem ??= "Falta el archivo de salida de compile";
   const extra = argv[command === "compile" || (command === "check" && output === "--json") ? 3 : 2];
   if (extra !== undefined) problem ??= `Argumento de más para ${command}: ${extra}`;
@@ -174,7 +186,12 @@ if (problem !== undefined) {
   runLanguageServer(process.argv.slice(3));
 } else {
   try {
-    if (projectCommand) {
+    if (command === "doctor") {
+      const { diagnoseProject, formatDoctorReport } = await import("./framework/doctor");
+      const report = await diagnoseProject(input ?? ".");
+      process.stdout.write(doctorJson ? JSON.stringify(report, null, 2) + "\n" : formatDoctorReport(report));
+      if (!report.ok) process.exitCode = 1;
+    } else if (projectCommand) {
       const root = input ?? ".";
       await assertDirectory(root);
       // Before anything reads the environment: PORT, MEEKO_LINK_WATCH or the app's own variables.

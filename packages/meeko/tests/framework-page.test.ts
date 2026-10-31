@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { definePage } from "../src/app/definitions/define-page.ts";
+
 import type { PageSchema } from "../src/app/definitions/define-page.ts";
+
+import { definePage } from "../src/app/definitions/define-page.ts";
 import { createRouteManifest } from "../src/app/runtime/router.ts";
 import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 

@@ -1,3 +1,8 @@
+import type { ReadonlySignal } from "../../../core/reactivity";
+import type { AnyApiOperation, ApiMutationArguments, ApiMutationInput, PublicServerManifest, RpcOperation } from "../../../shared/clients";
+import type { MutationOptions, RetrySafeMutation, RetrySafeOptions } from "../../runtime/mutations";
+
+import { batch, createContext, effect, findContext, isSignal, onCleanup, provide, signal, untrack } from "../../../core/reactivity";
 /**
  * Data composables for component scripts: `useApi`, `useRpcQuery`, `useRpcMutation` and
  * `useApiMutation`.
@@ -9,11 +14,7 @@
  * the data again.
  */
 import { setupPhase, whenMounted } from "../../runtime/lifecycle";
-import { batch, createContext, effect, findContext, isSignal, onCleanup, provide, signal, untrack } from "../../../core/reactivity";
-import type { ReadonlySignal } from "../../../core/reactivity";
 import { awaitSync, canSuspendLate, provideDeferredData, suspend, suspendLate } from "../../runtime/suspense";
-import type { AnyApiOperation, ApiMutationArguments, ApiMutationInput, PublicServerManifest, RpcOperation } from "../../../shared/clients";
-import type { MutationOptions, RetrySafeMutation, RetrySafeOptions } from "../../runtime/mutations";
 
 /**
  * Datos reactivos que devuelven `useApi` y `useRpcQuery`. Sin `await`, `data` vale `null` hasta la
@@ -479,10 +480,13 @@ export function withResourceScope<T>(scope: ResourceScope, work: () => T): T {
  */
 export class ResourceCache {
   readonly #values = new Map<string, unknown>();
-  constructor(private readonly limit = 200) {}
+  constructor(private readonly limit = 200, private readonly onRead?: () => void) {}
 
   has(key: string): boolean { return this.#values.has(key); }
-  get(key: string): unknown { return this.#values.get(key); }
+  get(key: string): unknown {
+    if (this.onRead && this.#values.has(key)) this.onRead();
+    return this.#values.get(key);
+  }
 
   set(key: string, value: unknown): void {
     this.#values.delete(key);

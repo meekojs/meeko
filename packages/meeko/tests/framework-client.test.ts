@@ -1,15 +1,17 @@
+import { Window as HappyWindow } from "happy-dom";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Window as HappyWindow } from "happy-dom";
-import { bindComponent, bindEvent, renderComponent } from "../src/app/runtime/renderer.ts";
-import { createRoot, effect, onCleanup, signal } from "../src/core/reactivity.ts";
-import { provideErrorHandler } from "../src/app/runtime/component-errors.ts";
-import type { Component, DomScope } from "../src/app/runtime/renderer.ts";
-import { mountClientApp } from "../src/app/runtime/client.ts";
+
 import type { ClientComponent } from "../src/app/runtime/client.ts";
-import { createNavigator, createRouteManifest, reportNavigationError } from "../src/app/runtime/router.ts";
-import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
+import type { Component, DomScope } from "../src/app/runtime/renderer.ts";
+
 import { useState } from "../src/app/composables/useState.ts";
+import { mountClientApp } from "../src/app/runtime/client.ts";
+import { provideErrorHandler } from "../src/app/runtime/component-errors.ts";
+import { bindComponent, bindEvent, renderComponent } from "../src/app/runtime/renderer.ts";
+import { createNavigator, createRouteManifest, reportNavigationError } from "../src/app/runtime/router.ts";
+import { createRoot, effect, onCleanup, signal } from "../src/core/reactivity.ts";
+import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
 
 test("hydration preserves a common layout and cleans up exited page/layout scopes", async () => {
   const released: string[] = [];

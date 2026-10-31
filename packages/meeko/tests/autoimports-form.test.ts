@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+
 import { discoverAutoImports } from "../src/autoimports/registry.ts";
 import { applyAutoImports, compileWithAutoImports } from "../src/autoimports/transform.ts";
 import { generateAutoImportTypes, transformTypeScriptAutoImports } from "../src/autoimports/typescript.ts";

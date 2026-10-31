@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import test from "node:test";
+
 import { checkSource } from "../src/check.ts";
 import { checkFrameworkProject } from "../src/framework/check-project.ts";
 import { initFrameworkProject } from "../src/framework/init.ts";

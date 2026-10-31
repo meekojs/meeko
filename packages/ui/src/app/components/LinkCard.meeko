@@ -1,0 +1,28 @@
+<script lang="ts">
+	interface Props {
+		href: string
+		title: string
+		description?: string
+		class?: string
+	}
+
+	const props = defineProps<Props>()
+
+	const snippets = defineSnippets<{ default?: [] }>()
+</script>
+
+<template>
+	<a
+		bind:href="props.href"
+		bind:class="['meeko-ui-link-card', props.class].filter(Boolean).join(' ')"
+	>
+		<strong class="meeko-ui-link-card-title">{props.title}</strong>
+		<span
+			if:when="props.description"
+			class="meeko-ui-link-card-description"
+		>
+			{props.description}
+		</span>
+		<render snippet="snippets.default" />
+	</a>
+</template>

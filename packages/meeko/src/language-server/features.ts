@@ -1,37 +1,41 @@
-import { locationOf, sourceRange, toRange } from "./locations";
+import type {
+  CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentSymbol, FoldingRange, FormattingOptions, Hover, Location,
+  ParameterInformation, Position, Range, SemanticTokens, SemanticTokensLegend, SignatureHelp, SignatureInformation,
+  TextEdit, WorkspaceEdit,
+} from "vscode-languageserver/node";
+
+import ts from "@typescript/typescript6";
 import { isBuiltin } from "node:module";
 import { dirname, isAbsolute, join, relative } from "node:path";
-import ts from "@typescript/typescript6";
 import { getCSSLanguageService } from "vscode-css-languageservice";
 import { getLanguageService as getHtmlLanguageService } from "vscode-html-languageservice";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
   CodeActionKind, CompletionItemKind, FoldingRangeKind, InsertTextFormat, MarkupKind, SemanticTokensBuilder, SymbolKind,
 } from "vscode-languageserver/node";
-import type {
-  CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentSymbol, FoldingRange, FormattingOptions, Hover, Location,
-  ParameterInformation, Position, Range, SemanticTokens, SemanticTokensLegend, SignatureHelp, SignatureInformation,
-  TextEdit, WorkspaceEdit,
-} from "vscode-languageserver/node";
-import { autoImportedValues } from "../autoimports/transform";
+
 import type { AutoImport } from "../autoimports/registry";
-import { shadowedBuiltinTags } from "../compiler";
-import { serverOnlyCompletion } from "../compiler/transforms/client-boundary";
-import { parseSfc } from "../compiler/parser/sfc";
 import type { SfcSection } from "../compiler/parser/sfc";
+import type * as PrettierEditor from "../formatters/prettier/editor";
+import type { EditCapabilities } from "./actions";
+import type { AppIndex } from "./app-index";
+import type { HoverSection } from "./insights";
+import type { ComponentTag, SnippetTag, VirtualComponent } from "./model";
+import type { MeekoProject } from "./project";
+
+import { autoImportedValues } from "../autoimports/transform";
+import { shadowedBuiltinTags } from "../compiler";
+import { parseSfc } from "../compiler/parser/sfc";
+import { serverOnlyCompletion } from "../compiler/transforms/client-boundary";
 import { eachKeyActions, sidecarActions } from "./actions";
-import { bindAttributeCompletion, domEventCompletion, dynamicTagAttributeCompletion, dynamicTagHover, dynamicTags, htmlAttributeCompletion, specialTemplateDocumentation, tagAt } from "./embedded";
 import { builtinTag, builtinTags } from "./builtin-tags";
 import { builtinTagDefinition, builtinTagHover } from "./builtins";
 import { componentSummaryMarkdown, documentationMarkdown, memberDocumentation, tagSummary } from "./components";
-import type { EditCapabilities } from "./actions";
-import type { AppIndex } from "./app-index";
+import { bindAttributeCompletion, domEventCompletion, dynamicTagAttributeCompletion, dynamicTagHover, dynamicTags, htmlAttributeCompletion, specialTemplateDocumentation, tagAt } from "./embedded";
 import { appTargetDefinition, appTargetHover, componentFile, componentMarkdown, componentModuleAt, componentTagName, componentTypeAt, reactiveHover } from "./insights";
-import type { HoverSection } from "./insights";
+import { locationOf, sourceRange, toRange } from "./locations";
 import { componentFiles, htmlDirectiveDocs } from "./model";
-import type { ComponentTag, SnippetTag, VirtualComponent } from "./model";
 import { meekoAutoImport, packageCompletion } from "./project";
-import type { MeekoProject } from "./project";
 import { analyzeReactivity } from "./reactivity";
 
 export { documentationMarkdown } from "./components";
@@ -601,7 +605,7 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
         documentation: { kind: MarkupKind.Markdown, value: prop.documentation },
         sortText: `0${String(index).padStart(2, "0")}`,
         insertTextFormat: InsertTextFormat.Snippet,
-        textEdit: { range: { start, end: position }, newText: prop.insert.startsWith("bind:") ? prop.insert : `${attribute}=\"$1\"` },
+        textEdit: { range: { start, end: position }, newText: prop.insert.startsWith("bind:") ? prop.insert : `${attribute}="$1"` },
       }))) ?? [];
     const rejected = new Set(builtin?.rejected ?? []);
     const html = bindAttributeCompletion(document, position, word, tags ?? [builtin?.element ?? context.tag], present)
@@ -1255,7 +1259,7 @@ export async function formatting(
   const { component, document } = context;
   const source = document.getText();
   const describe = (error: unknown): string => error instanceof Error ? error.message : String(error);
-  let editor: typeof import("../formatters/prettier/editor") | undefined;
+  let editor: typeof PrettierEditor | undefined;
   try { editor = await import("../formatters/prettier/editor"); }
   catch (error) { environment.log?.(`Prettier no está disponible; se usa el formateador incluido: ${describe(error)}`); }
   if (editor) {

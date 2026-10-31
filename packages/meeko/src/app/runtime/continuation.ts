@@ -1,3 +1,6 @@
+import type { UnexposedRef, UnexposedRefMessage } from "./element-refs";
+
+import { createRoot, currentEffectOwner, onCleanup, switchOwner } from "../../core/reactivity";
 /**
  * The browser continuation of a component script: the statements from its first browser
  * `await` (`await useElementRef(...)`, `await useSocket(...)`) onward.
@@ -9,9 +12,7 @@
  */
 import { componentErrorReporter } from "./component-errors";
 import { browserValue } from "./element-refs";
-import type { UnexposedRef, UnexposedRefMessage } from "./element-refs";
 import { enterMountedScope, whenMounted } from "./lifecycle";
-import { createRoot, currentEffectOwner, onCleanup, switchOwner } from "../../core/reactivity";
 
 /** Unwinds a continuation whose component was released while it waited. */
 const cancelled: unique symbol = Symbol("meeko.continuationCancelled");

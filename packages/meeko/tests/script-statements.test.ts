@@ -1,13 +1,15 @@
+import { Window } from "happy-dom";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { Window } from "happy-dom";
+
+import type { CompileOptions } from "../src/compiler.ts";
+
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
-import type { CompileOptions } from "../src/compiler.ts";
 import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
 import { createTempProject, repositoryRoot } from "./helpers/temp-project.ts";
 

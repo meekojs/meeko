@@ -1,9 +1,11 @@
+import type WebSocket from "ws";
+
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { it } from "node:test";
-import type WebSocket from "ws";
+
 import { conformanceSuite, connect, messages, opened, send } from "./assertions.ts";
 
 /** Resolves with the next text frame, unparsed. */

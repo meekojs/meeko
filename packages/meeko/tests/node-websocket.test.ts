@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
-import { createServer } from "node:http";
 import { once } from "node:events";
+import { createServer } from "node:http";
 import test from "node:test";
 import WebSocket from "ws";
-import { attachNodeWebSocketServer } from "../src/node.ts";
-import { createSocketHub, defineSocketChannel, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
+
 import type { Schema } from "../src/framework-server.ts";
 import type { SocketHub } from "../src/server/socket/runtime.ts";
+
+import { createSocketHub, defineSocketChannel, MemorySessionStore, SessionManager } from "../src/framework-server.ts";
+import { attachNodeWebSocketServer } from "../src/node.ts";
 
 const textSchema: Schema<{ text: string }> = {
   "~standard": {

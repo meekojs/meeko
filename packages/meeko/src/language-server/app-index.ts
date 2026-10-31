@@ -1,14 +1,16 @@
+import ts from "@typescript/typescript6";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import ts from "@typescript/typescript6";
+
+import type { RouteRecord } from "../app/runtime/router";
+import type { ApiEndpoint, RpcEndpoint } from "../server/runtime/discovery";
+
+import { discoverConfiguredLayouts, discoverConfiguredRoutes, readMeekoConfigSync, resolveConfigSources } from "../framework/config";
+import { composeFrameworkRoutes } from "../framework/modules";
+import { discoverRouteMiddleware, globalMiddlewareNames } from "../framework/route-middleware-discovery";
+import { discoverLayouts } from "../framework/routes-discovery";
 import { discoverServerManifest } from "../server/api/manifest-discovery";
 import { clientSegment } from "../server/runtime/discovery";
-import type { ApiEndpoint, RpcEndpoint } from "../server/runtime/discovery";
-import { composeFrameworkRoutes } from "../framework/modules";
-import { discoverConfiguredLayouts, discoverConfiguredRoutes, readMeekoConfigSync, resolveConfigSources } from "../framework/config";
-import { discoverLayouts } from "../framework/routes-discovery";
-import { discoverRouteMiddleware, globalMiddlewareNames } from "../framework/route-middleware-discovery";
-import type { RouteRecord } from "../app/runtime/router";
 import { nodeAt } from "./reactivity";
 
 /**

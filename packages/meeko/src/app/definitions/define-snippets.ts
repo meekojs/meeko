@@ -50,7 +50,7 @@ export function analyzeSnippets(file: ts.SourceFile): SnippetsDeclaration | unde
   return found;
 }
 
-import { apiDocs, jsdoc } from "./compiler-docs";
+import { jsdoc } from "./compiler-docs";
 
 export const defineSnippetsDocs = jsdoc(
     "Macro de compilación: declara los snippets del componente, contenido de plantilla que el padre",

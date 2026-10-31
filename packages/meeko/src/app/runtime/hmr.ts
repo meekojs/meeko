@@ -1,8 +1,9 @@
+import type { DomScope } from "./renderer";
+
 import { captureParentOwner, isExternalSignal, isWritableSignal } from "../../core/reactivity";
+import { serializeJson } from "../../core/server";
 import { borrowedKey } from "./models";
 import { parseRegionHtml } from "./renderer";
-import type { DomScope } from "./renderer";
-import { serializeJson } from "../../core/server";
 
 /**
  * Valores de las señales editables de un componente, por nombre, que HMR transfiere en memoria

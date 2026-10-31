@@ -1,9 +1,10 @@
-import { markerRegion, nestedRegionEnd, parseRegionHtml } from "./renderer";
 import type { DomScope } from "./renderer";
-import { componentErrorReporter } from "./component-errors";
+
 import { observeCallback } from "../../core/error-observer";
-import { afterMountBatch } from "./lifecycle";
 import { effect, untrack } from "../../core/reactivity";
+import { componentErrorReporter } from "./component-errors";
+import { afterMountBatch } from "./lifecycle";
+import { markerRegion, nestedRegionEnd, parseRegionHtml } from "./renderer";
 import { lateRender } from "./suspense";
 
 /**

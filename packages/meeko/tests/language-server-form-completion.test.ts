@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { completionList } from "../src/language-server/features.ts";
 import { languageProject } from "./language-server-workspace.ts";
 

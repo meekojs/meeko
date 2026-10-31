@@ -1,13 +1,14 @@
-import { assetLocation, assetResponse, etagMatches, findAsset } from "./server/runtime/assets";
-import type { AssetManifest, AssetReader } from "./server/runtime/assets";
 import type { ServerApp } from "./server/runtime/app";
+import type { AssetManifest, AssetReader } from "./server/runtime/assets";
+import type { ServerPlatform } from "./server/runtime/platform";
+import type { SocketSession, SocketUpgrade, SocketUpgradeClose, SocketUpgradeHandler } from "./server/runtime/upgrade";
+import type { SocketPeer } from "./server/socket/runtime";
+
+import { assetLocation, assetResponse, etagMatches, findAsset } from "./server/runtime/assets";
 import { setSocketAddress, trustProxyOf } from "./server/runtime/env";
 import { createTrackedPlatform, fetchApp, positiveInteger, publicOriginOf, rebaseRequest, visibleHost } from "./server/runtime/fetch-host";
-import type { ServerPlatform } from "./server/runtime/platform";
 import { handleProcessErrors } from "./server/runtime/process-errors";
-import type { SocketPeer } from "./server/socket/runtime";
 import { createSocketUpgradeHandler } from "./server/runtime/upgrade";
-import type { SocketSession, SocketUpgrade, SocketUpgradeClose, SocketUpgradeHandler } from "./server/runtime/upgrade";
 
 // Minimal structural views of the Deno namespace, so this entry type-checks without Deno's types.
 

@@ -1,5 +1,6 @@
-import { inject } from "../../core/reactivity";
 import type { Signal } from "../../core/reactivity";
+
+import { inject } from "../../core/reactivity";
 import { stateKey } from "../runtime/state";
 
 /**

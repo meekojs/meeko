@@ -1,8 +1,10 @@
-import { readFileSync, realpathSync } from "node:fs";
-import { resolve, relative, isAbsolute, sep } from "node:path";
 import { defineMeekoModule } from "@meekojs/meeko/framework";
-import { compileCatalog, messageParameters } from "./messages";
+import { readFileSync, realpathSync } from "node:fs";
+import { isAbsolute, relative, resolve, sep } from "node:path";
+
 import type { Catalog } from "./messages";
+
+import { compileCatalog, messageParameters } from "./messages";
 
 export interface I18nModuleOptions {
   /** Locale to use for an unprefixed URL. */
