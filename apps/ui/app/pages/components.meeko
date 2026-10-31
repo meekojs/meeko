@@ -18,6 +18,13 @@
 				<span>Metadatos y estados sin interacción.</span>
 			</a>
 		</div>
+		<h2>Estructura</h2>
+		<div class="directory">
+			<a href="/container">
+				<strong>Container</strong>
+				<span>Anchos fluidos, espaciado lateral y superficies hasta 4K.</span>
+			</a>
+		</div>
 		<h2>Captura y presentación</h2>
 		<div class="directory">
 			<a href="/forms">

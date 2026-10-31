@@ -1,5 +1,20 @@
 /** Ejemplos copiables. Los controles de cada página ejercitan la misma API pública. */
 export const examples = {
+	container: `<UIContainer as="section" size="4k" gutter="md" ariaLabel="Proyectos">
+  <h2>Proyectos del equipo</h2>
+  <p>Contenido centrado, con espacio lateral adaptable.</p>
+</UIContainer>`,
+	containerNested: `<UIContainer size="4k">
+  <header>Cabecera del espacio de trabajo</header>
+  <UIContainer size="lg" gutter="none">
+    <h1>Contenido de lectura</h1>
+    <p>Un ancho menor dentro de una superficie amplia.</p>
+  </UIContainer>
+</UIContainer>`,
+	containerCss: `.workspace {
+  --meeko-ui-container-max-width: 110rem;
+  --meeko-ui-container-gutter: clamp(1rem, 3vw, 5rem);
+}`,
 	install: 'pnpm add @meekojs/ui',
 	config: `import { defineMeekoConfig } from '@meekojs/meeko/framework'
 import ui from '@meekojs/ui'

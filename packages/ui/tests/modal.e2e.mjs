@@ -202,11 +202,15 @@ test('modals hydrate, stack, settle, restore focus and work on mobile', { timeou
 	const original = await readFile(helper, 'utf8')
 	context.after(() => writeFile(helper, original))
 	const marker = `modal-context-reload-${Date.now()}`
+	// Wait for the reload caused by this edit before starting another navigation.
+	const reloaded = page.waitForEvent('framenavigated', { predicate: (frame) => frame === page.mainFrame() })
 	await writeFile(helper, `${original}\n// ${marker}\n`)
 	await until(
 		async () => (await (await fetch(`${origin}/@fs/${helper.replaceAll('\\', '/')}`)).text()).includes(marker),
 		() => 'Helper rebuild was not observed',
 	)
+	await reloaded
+	await page.waitForLoadState('networkidle')
 	const refreshed = await fetch(`${origin}/modals`)
 	assert.equal(refreshed.status, 200, 'SSR keeps its modal context after a linked helper rebuild')
 	await page.goto(`${origin}/modals`, { waitUntil: 'networkidle' })

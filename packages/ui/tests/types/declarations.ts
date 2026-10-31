@@ -1,6 +1,9 @@
+import type { UIContainerGutter, UIContainerSize, UIContainerTag } from '@meekojs/ui'
+
 import type * as App from '../../dist/app/components/App.d.meeko.ts'
 import type * as Button from '../../dist/app/components/Button.d.meeko.ts'
 import type * as Card from '../../dist/app/components/Card.d.meeko.ts'
+import type * as Container from '../../dist/app/components/Container.d.meeko.ts'
 import type * as Field from '../../dist/app/components/Field.d.meeko.ts'
 import type * as Input from '../../dist/app/components/Input.d.meeko.ts'
 import type * as InternalModal from '../../dist/app/components/internal/ModalInstance.d.meeko.ts'
@@ -24,3 +27,14 @@ const wrong: Modal.ComponentProps = {
 }
 export type { Components }
 void [modal, wrong]
+const container: Container.ComponentProps = { size: '4k', gutter: 'md', as: 'section', ariaLabel: 'Projects' }
+const size: UIContainerSize = 'full'
+const gutter: UIContainerGutter = 'none'
+const tag: UIContainerTag = 'main'
+// @ts-expect-error Unsupported sizes are rejected by the shipped declaration.
+const invalidContainerSize: Container.ComponentProps = { size: '8k' }
+// @ts-expect-error Only structural tags supported by the component are accepted.
+const invalidContainerTag: Container.ComponentProps = { as: 'button' }
+// @ts-expect-error Gutters use the public finite size contract.
+const invalidContainerGutter: Container.ComponentProps = { gutter: 24 }
+void [container, size, gutter, tag, invalidContainerSize, invalidContainerTag, invalidContainerGutter]

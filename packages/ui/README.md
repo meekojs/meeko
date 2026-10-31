@@ -118,6 +118,32 @@ Las opciones se validan al cargar el módulo. Los tokens se añaden a la hoja CS
 
 ## Componentes
 
+### Container
+
+`UIContainer` centra contenido con un ancho máximo y gutters fluidos, desde móvil hasta 4K. Se registra automáticamente con el módulo.
+
+```html
+<UIContainer
+	as="section"
+	size="4k"
+	gutter="md"
+	ariaLabel="Proyectos"
+>
+	<h2>Proyectos del equipo</h2>
+</UIContainer>
+```
+
+- `size`: `sm` (40rem), `md` (48rem), `lg` (64rem), `xl` (80rem, por defecto), `2xl` (96rem), `3xl` (120rem), `4k` (240rem) o `full` (sin máximo).
+- `gutter`: `none`, `sm`, `md` (por defecto) o `lg`. El padding lateral está incluido en el ancho exterior y usa propiedades lógicas para RTL. `md` equivale a `clamp(1rem, 2vw, 4rem)`; `sm`, a `clamp(0.75rem, 1vw, 1.5rem)`; `lg`, a `clamp(1.5rem, 3vw, 6rem)`.
+- `as`: `div` por defecto; también `section`, `main`, `article`, `header`, `footer`, `nav` y `aside`.
+- `id`, `ariaLabel` y `class`: identidad, nombre accesible y personalización. Requiere el snippet `default`.
+
+Con una raíz de 16px, `4k` admite hasta 3840px CSS. Siempre respeta el ancho del padre y se centra en pantallas mayores; `full` permite ocupar todo el espacio disponible. Para lectura o formularios usa un límite menor, o anida un contenedor con `gutter="none"`. El componente no recorta el contenido ni evita el scroll de sus hijos.
+
+Puedes sobrescribir `--meeko-ui-container-max-width` y `--meeko-ui-container-gutter` desde una clase. Los tipos `UIContainerSize`, `UIContainerGutter` y `UIContainerTag` se exportan desde `@meekojs/ui`. La web pública usa Container en su estructura y documenta su API en `/container`.
+
+### Controles básicos
+
 | Componente | API                                                                                                                                                                                                                                                              |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `UIButton` | `type` (`button`, `submit`, `reset`), `variant` (`primary`, `secondary`, `outline`, `ghost`), `size` (`sm`, `md`, `lg`), `shape` (`rounded`, `pill`), `disabled`, `class`, evento `click` y snippet `default`. Por defecto `button`, `primary`, `md`, `rounded`. |

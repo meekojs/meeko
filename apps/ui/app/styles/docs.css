@@ -150,7 +150,6 @@ button {
 	display: grid;
 	grid-template-columns: 244px minmax(0, 1fr);
 	margin: auto;
-	max-width: 1480px;
 }
 .sidebar {
 	position: sticky;

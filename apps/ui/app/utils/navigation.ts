@@ -11,6 +11,7 @@ export const navigation = [
 		title: 'Componentes',
 		items: [
 			{ label: 'Todos los componentes', href: '/components', description: 'Índice por categorías' },
+			{ label: 'Container', href: '/container', description: 'Anchos fluidos, gutters y pantallas hasta 4K' },
 			{ label: 'Button', href: '/buttons', description: 'Acciones, variantes, tamaños y estados' },
 			{ label: 'Link y LinkCard', href: '/links', description: 'Navegación y superficies enlazadas' },
 			{ label: 'Badge', href: '/badges', description: 'Etiquetas y metadatos' },

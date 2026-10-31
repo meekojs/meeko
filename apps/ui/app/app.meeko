@@ -67,7 +67,11 @@
 				</details>
 			</div>
 		</header>
-		<div class="site-layout">
+		<UIContainer
+			size="3xl"
+			gutter="none"
+			class="site-layout"
+		>
 			<aside
 				id="docs-navigation"
 				class="sidebar"
@@ -100,6 +104,6 @@
 					<a href="https://github.com/meekojs/meeko/blob/main/LICENSE">Licencia MIT</a>
 				</footer>
 			</div>
-		</div>
+		</UIContainer>
 	</UIApp>
 </template>
