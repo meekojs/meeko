@@ -1,0 +1,58 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		title="API pública"
+		description="Exports del paquete, opciones del módulo y contrato del traductor."
+	>
+		<h2 id="translator">useI18n y el traductor</h2>
+		<DocsApi
+			caption="@meekojs/i18n"
+			bind:rows="[
+				{ name: 'useI18n()', type: 'I18n', description: 'Obtiene la instancia proporcionada por el plugin. Autoimportado en componentes.' },
+				{ name: 'locale', type: 'readonly string', description: 'Idioma de esta instancia.' },
+				{ name: 't(key, values?)', type: 'string', description: 'Clave y parámetros correlacionados con el registro generado.' },
+				{ name: 'number(value, options?)', type: 'string', description: 'Formato Intl.NumberFormat.' },
+				{ name: 'date(value, options?)', type: 'string', description: 'Formato Intl.DateTimeFormat.' },
+				{ name: 'switchLocale(locale)', type: 'void', description: 'Navega a la misma ruta bajo el prefijo de otro idioma configurado.' },
+			]"
+		/>
+		<h2 id="module">Opciones del módulo</h2>
+		<DocsApi
+			caption="I18nModuleOptions · @meekojs/i18n/module"
+			bind:rows="[
+				{ name: 'defaultLocale', type: 'string', description: 'Obligatoria. Idioma para URLs sin prefijo.' },
+				{ name: 'catalogs', type: 'Record<string, string | Record<string, string>>', description: 'Obligatoria. Archivo JSON o mapa de namespaces por idioma. Requiere common.' },
+				{ name: 'routes', type: 'Record<string, readonly string[]>', description: 'Namespaces adicionales por ID exacto de ruta.' },
+				{ name: 'directions', type: 'Record<string, ltr | rtl>', description: 'Dirección por idioma; los demás usan ltr.' },
+			]"
+		/>
+		<h2 id="low-level">Integraciones de bajo nivel</h2>
+		<p>
+			<code>createI18n(locale, catalog, locales, navigate, path)</code>
+			recibe mensajes compilados y callbacks de navegación. Para aplicaciones Meeko el módulo prepara ese catálogo y su contexto.
+		</p>
+		<DocsCode
+			bind:code="examples.manual"
+			label="Integración en navegador"
+		/>
+		<p>
+			<code>i18nContext</code>
+			es la clave pública para proporcionar una instancia desde una integración propia.
+			<code>localeOf</code>
+			y
+			<code>localizedPath</code>
+			se documentan en
+			<a href="/routing">idiomas y rutas</a>
+			. Los tipos
+			<code>I18n</code>
+			,
+			<code>I18nValue</code>
+			e
+			<code>I18nMessageValues</code>
+			se importan desde la raíz del paquete.
+		</p>
+	</DocsPage>
+</template>

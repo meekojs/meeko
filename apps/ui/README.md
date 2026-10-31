@@ -25,11 +25,11 @@ El build usa el adaptador Node de Meeko y genera `.meeko/output/node`. Para camb
 ## Organización
 
 - `app/pages/`: portada, instalación, temas, índice y guías de componentes. Las rutas `/cards`, `/tables`, `/modals` y `/transitions` conservan los ejemplos interactivos anteriores.
-- `app/components/Docs/`: página documental, bloques de código copiables y tablas de API.
+- `packages/docs/`: módulo privado compartido con i18n: shell, navegación, página documental, bloques de código copiables y tablas de API. Las declaraciones de sus componentes se preparan antes de dev, build y check.
 - `app/utils/navigation.ts`: catálogo de navegación y filtro local por nombre o descripción; no es búsqueda de texto completo.
 - `app/utils/examples.ts`: código copiable de las guías.
-- `app/styles/`: tokens de la identidad Meeko y estilos del sitio. UI sigue usando su propio PostCSS.
-- `public/`: logo de Meeko y tipografía Inter con su licencia.
+- `app/styles/`: estilos específicos de los ejemplos; los tokens y estilos editoriales viven en `packages/docs/src/app/styles`. UI sigue usando el PostCSS del framework.
+- `public/`: logo y tipografía copiados desde `packages/docs/assets` por los scripts de dev/build; se ignoran en Git.
 
 Cada guía debe explicar el contrato real, mostrar un ejemplo interactivo, incluir código copiable y documentar props, snippets y eventos relevantes. Mantén los ejemplos sincronizados con `packages/ui/src/app` y actualiza el catálogo al añadir una ruta. Las comprobaciones de tipos validan los componentes vivos; las pruebas de navegador de UI cubren navegación, formularios, modales, tablas, temas y View Transitions.
 

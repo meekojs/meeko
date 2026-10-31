@@ -1,0 +1,77 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+	const i18n = useI18n()
+	const name = signal('Meeko')
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		landing
+		title="Cada idioma. El mismo contrato."
+		description="Traducciones tipadas, catálogos por idioma y formatos nativos para tus aplicaciones Meeko."
+	>
+		<div class="home-actions">
+			<UILink href="/installation">Empezar a traducir</UILink>
+			<UILink
+				href="/playground"
+				variant="outline"
+			>
+				Abrir laboratorio
+			</UILink>
+		</div>
+		<div class="home-showcase">
+			<div>
+				<h2>Un mensaje que entiende tus datos.</h2>
+				<p>Escribe una traducción con parámetros y úsala desde tu componente. Las claves y los argumentos llegan tipados a tu editor.</p>
+				<UIField
+					id="home-name"
+					label="Tu nombre"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UIInput
+							bind:id="id"
+							bind:describedBy="describedBy"
+							model="name"
+						/>
+					</snippet>
+				</UIField>
+				<section
+					class="translation-result"
+					aria-label="Traducción en vivo"
+				>
+					<p
+						data-output="greeting"
+						role="status"
+					>
+						{i18n.t('greeting', { name: name.value })}
+					</p>
+					<UIBadge tone="accent">{i18n.locale}</UIBadge>
+				</section>
+			</div>
+			<DocsCode bind:code="examples.usage" />
+		</div>
+		<h2>Del catálogo a la interfaz</h2>
+		<p>El módulo valida los idiomas al preparar la aplicación y genera el contrato de TypeScript. En SSR y en el navegador se utiliza el catálogo del idioma activo; los formateadores se reutilizan por opciones.</p>
+		<div class="directory">
+			<a href="/messages">
+				<strong>Parámetros tipados</strong>
+				<span>Claves, argumentos y contratos entre idiomas.</span>
+			</a>
+			<a href="/plurals">
+				<strong>Plurales y selectores</strong>
+				<span>Texto adecuado para cada cantidad y alternativa.</span>
+			</a>
+			<a href="/formatting">
+				<strong>Números y fechas</strong>
+				<span>Formatos de Intl y resultados consistentes en SSR.</span>
+			</a>
+			<a href="/namespaces">
+				<strong>Catálogos por ruta</strong>
+				<span>Carga common y añade namespaces cuando una ruta los necesita.</span>
+			</a>
+		</div>
+	</DocsPage>
+</template>

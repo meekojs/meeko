@@ -1,0 +1,17 @@
+{
+	"name": "meeko-docs",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/module.ts",
+		"./server": "./src/server.ts",
+		"./theme": "./src/theme.ts"
+	},
+	"scripts": {
+		"build": "node scripts/build.mjs"
+	},
+	"dependencies": {
+		"@meekojs/meeko": "workspace:*",
+		"@meekojs/ui": "workspace:*"
+	}
+}

@@ -1,0 +1,69 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		title="Instalación"
+		description="Registra el módulo, añade tus catálogos y usa tu primera traducción."
+	>
+		<h2 id="requirements">Antes de empezar</h2>
+		<p>
+			Necesitas una aplicación Meeko, Node.js 24 o superior y Meeko
+			<code>&gt;=1.7 &lt;2</code>
+			. El módulo i18n se distribuye de forma independiente; puedes usarlo con los componentes de tu aplicación.
+		</p>
+		<DocsCode
+			bind:code="examples.install"
+			label="Terminal"
+		/>
+		<h2 id="configuration">Configura el módulo</h2>
+		<DocsCode
+			bind:code="examples.config"
+			label="meeko.config.ts"
+		/>
+		<p>
+			Las rutas de los catálogos son relativas a la raíz del proyecto y deben permanecer dentro de ella.
+			<code>defaultLocale</code>
+			debe identificar uno de los idiomas configurados.
+		</p>
+		<h2 id="catalogs">Crea los catálogos</h2>
+		<DocsCode
+			bind:code="examples.catalog"
+			label="app/locales/es.json"
+		/>
+		<DocsCode
+			bind:code="examples.englishCatalog"
+			label="app/locales/en.json"
+		/>
+		<p>
+			Ambos idiomas declaran las mismas claves y parámetros. La estructura de
+			<code>cart</code>
+			produce la clave
+			<code>cart.items</code>
+			.
+		</p>
+		<h2 id="component">Traduce en un componente</h2>
+		<DocsCode bind:code="examples.usage" />
+		<p>
+			<code>useI18n</code>
+			se autoimporta en los componentes al registrar el módulo. También admite import explícito desde
+			<code>@meekojs/i18n</code>
+			. El plugin proporciona una instancia por aplicación y petición SSR.
+		</p>
+		<div class="doc-note">
+			Tras cambiar los catálogos, ejecuta
+			<code>meeko check</code>
+			para comprobar el contrato generado. No edites los tipos de
+			<code>.meeko</code>
+			manualmente.
+		</div>
+		<p>
+			Continúa con
+			<a href="/messages">mensajes y parámetros</a>
+			o prueba el
+			<a href="/playground">laboratorio</a>
+			.
+		</p>
+	</DocsPage>
+</template>

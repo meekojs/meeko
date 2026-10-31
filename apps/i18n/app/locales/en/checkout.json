@@ -1,0 +1,6 @@
+{
+	"checkout": {
+		"title": "Confirm order",
+		"summary": "Your order has {total} products."
+	}
+}

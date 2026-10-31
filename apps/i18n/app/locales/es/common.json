@@ -1,0 +1,21 @@
+{
+	"greeting": "Hola {name}",
+	"ready": "Listo para traducir",
+	"cart": {
+		"items": {
+			"plural": "total",
+			"forms": {
+				"=0": "Tu cesta está vacía",
+				"one": "{count} elemento en tu cesta",
+				"other": "{count} elementos en tu cesta"
+			}
+		}
+	},
+	"invitation": {
+		"select": "role",
+		"forms": {
+			"owner": "{name}, puedes administrar el proyecto.",
+			"other": "{name}, puedes consultar el proyecto."
+		}
+	}
+}

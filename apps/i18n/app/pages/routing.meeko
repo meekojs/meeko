@@ -1,0 +1,45 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		title="Idiomas y rutas"
+		description="Cambia el idioma conservando la ruta, la búsqueda y el fragmento de la URL."
+	>
+		<h2 id="switch">switchLocale</h2>
+		<DocsCode bind:code="examples.routing" />
+		<p>
+			El plugin reconoce el idioma en el primer segmento de la URL. Una ruta sin prefijo utiliza
+			<code>defaultLocale</code>
+			.
+			<code>switchLocale</code>
+			rechaza los idiomas que no están configurados.
+		</p>
+		<div class="doc-note">
+			El módulo mantiene la selección de catálogos; las rutas localizadas deben existir en tu aplicación. Por ejemplo, este sitio define
+			<code>/playground</code>
+			y
+			<code>/[locale]/playground</code>
+			, y valida es, en y ar en el servidor.
+		</div>
+		<h2 id="navigation">Navegación entre idiomas</h2>
+		<p>
+			Cambiar de idioma inicia una navegación completa mediante
+			<code>window.location.assign</code>
+			. La navegación interna del mismo idioma carga los namespaces que requiere la ruta. Conserva los borradores con un mecanismo de estado adecuado si deben sobrevivir a un cambio de documento.
+		</p>
+		<h2 id="helpers">Utilidades de URL</h2>
+		<DocsCode
+			bind:code="examples.paths"
+			label="Imports explícitos"
+		/>
+		<p>
+			<code>localeOf</code>
+			devuelve el idioma del primer segmento o el fallback recibido.
+			<code>localizedPath</code>
+			sustituye un prefijo conocido, conserva query y hash y devuelve una ruta relativa. Usa estas utilidades con rutas internas y tu lista de idiomas.
+		</p>
+		<UILink href="/playground?tab=demo#messages">Probar cambio con query y fragmento</UILink>
+	</DocsPage>
+</template>

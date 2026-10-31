@@ -1,0 +1,51 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+	const i18n = useI18n()
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		title="Namespaces"
+		description="Divide los catálogos y carga los mensajes que necesita cada ruta."
+	>
+		<h2 id="configuration">common y catálogos adicionales</h2>
+		<DocsCode
+			bind:code="examples.namespaces"
+			label="meeko.config.ts"
+		/>
+		<p>
+			<code>common</code>
+			se carga siempre.
+			<code>routes</code>
+			relaciona IDs exactos del manifiesto con namespaces adicionales. Todos los idiomas declaran los mismos namespaces.
+		</p>
+		<h2 id="example">Un namespace real en esta página</h2>
+		<p>
+			Esta ruta carga el namespace
+			<code>checkout</code>
+			mediante la opción
+			<code>routes</code>
+			del sitio. El siguiente resultado procede de ese catálogo:
+		</p>
+		<div
+			class="translation-result"
+			lang="es"
+		>
+			<h3>{i18n.t('checkout.title')}</h3>
+			<p data-output="namespace">{i18n.t('checkout.summary', { total: 3 })}</p>
+		</div>
+		<DocsCode
+			bind:code="examples.checkout"
+			label="app/locales/es/checkout.json"
+		/>
+		<h2 id="keys">Organización de las claves</h2>
+		<p>
+			El nombre del namespace organiza la carga; no añade un prefijo a las claves. Aquí
+			<code>checkout.title</code>
+			procede del objeto
+			<code>checkout</code>
+			del JSON. Las claves de namespaces distintos deben ser únicas.
+		</p>
+		<p>Los tipos generados incluyen las claves de todos los namespaces. Usa cada mensaje en una ruta que cargue su catálogo: una clave conocida por TypeScript también necesita estar disponible en ejecución.</p>
+	</DocsPage>
+</template>

@@ -1,33 +1,13 @@
 import { defineMeekoConfig } from '@meekojs/meeko/framework'
 import ui from '@meekojs/ui'
+import docs from 'meeko-docs'
+import { docsTheme } from 'meeko-docs/theme'
 
 export default defineMeekoConfig({
 	theme: { default: 'dark' },
 	viewTransitions: true,
-	modules: [ui],
-	ui: {
-		tokens: {
-			accent: 'var(--accent)',
-			accentHover: 'var(--accent-ink)',
-			onAccent: 'var(--on-accent)',
-			primary: 'var(--pill)',
-			primaryHover: 'var(--pill-hover)',
-			onPrimary: 'var(--on-pill)',
-			accentSoft: 'var(--accent-soft)',
-			accentText: 'var(--accent-ink)',
-			surface: 'var(--surface)',
-			surfaceHover: 'var(--surface-2)',
-			text: 'var(--ink)',
-			textSoft: 'var(--ink-soft)',
-			muted: 'var(--muted)',
-			border: 'var(--line)',
-			borderStrong: 'var(--line-strong)',
-			focus: 'var(--accent)',
-			danger: 'var(--danger)',
-			font: 'var(--font-ui)',
-			radius: 'var(--radius)',
-		},
-	},
+	modules: [ui, docs],
+	ui: docsTheme,
 	document: {
 		lang: 'es',
 		head: {

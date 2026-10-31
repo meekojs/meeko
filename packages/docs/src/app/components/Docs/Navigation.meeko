@@ -1,11 +1,11 @@
 <script lang="ts">
-	const props = defineProps<{ groups: readonly { title: string; items: readonly { href: string; label: string }[] }[] }>()
+	const props = defineProps<{ groups: readonly { title: string; items: readonly { href: string; label: string; aliases?: readonly string[] }[] }[]; product?: string }>({ product: 'UI' })
 
 	const route = useRoute()
 </script>
 
 <template>
-	<nav aria-label="Documentación de UI">
+	<nav bind:aria-label="'Documentación de ' + props.product">
 		<section
 			each:of="props.groups"
 			each:as="group"
@@ -18,7 +18,7 @@
 				each:as="item"
 				each:key="item.href"
 				bind:href="item.href"
-				bind:aria-current="route.path.value === item.href ? 'page' : undefined"
+				bind:aria-current="route.path.value === item.href || item.aliases?.includes(route.path.value) ? 'page' : undefined"
 			>
 				{item.label}
 			</a>

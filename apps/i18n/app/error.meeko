@@ -1,0 +1,16 @@
+<script lang="ts">
+	const props = defineProps<{ status: number; message: string }>()
+</script>
+
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		bind:title="props.status === 404 ? 'Esta página no existe' : 'No pudimos cargar la página'"
+		description="Vuelve a la documentación de i18n para continuar."
+	>
+		<div class="error-page">
+			<p>Comprueba la dirección o elige una guía del menú.</p>
+			<UILink href="/installation">Ir a la instalación</UILink>
+		</div>
+	</DocsPage>
+</template>

@@ -222,6 +222,43 @@ importers:
         specifier: npm:@typescript/typescript6@6.0.2
         version: '@typescript/typescript6@6.0.2'
 
+  apps/i18n:
+    dependencies:
+      '@meekojs/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
+      '@meekojs/meeko':
+        specifier: workspace:*
+        version: link:../../packages/meeko
+      '@meekojs/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      meeko-docs:
+        specifier: workspace:*
+        version: link:../../packages/docs
+    devDependencies:
+      '@meekojs/eslint-plugin':
+        specifier: workspace:*
+        version: link:../../packages/eslint-plugin
+      '@types/node':
+        specifier: ^24.19.2
+        version: 24.19.2
+      eslint:
+        specifier: 10.13.0
+        version: 10.13.0(jiti@2.7.0)(supports-color@10.2.2)
+      jiti:
+        specifier: 2.7.0
+        version: 2.7.0
+      playwright-core:
+        specifier: 1.64.1
+        version: 1.64.1
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vite:
+        specifier: 8.3.5
+        version: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)
+
   apps/site:
     dependencies:
       '@meekojs/meeko':
@@ -279,6 +316,9 @@ importers:
       '@meekojs/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      meeko-docs:
+        specifier: workspace:*
+        version: link:../../packages/docs
     devDependencies:
       '@meekojs/eslint-plugin':
         specifier: workspace:*
@@ -313,6 +353,15 @@ importers:
       vite:
         specifier: 8.3.5
         version: 8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)
+
+  packages/docs:
+    dependencies:
+      '@meekojs/meeko':
+        specifier: workspace:*
+        version: link:../meeko
+      '@meekojs/ui':
+        specifier: workspace:*
+        version: link:../ui
 
   packages/eslint-plugin:
     dependencies:

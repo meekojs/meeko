@@ -1,0 +1,37 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		title="Validación y errores"
+		description="Comprueba los contratos antes de compilar y reconoce los errores de ejecución."
+	>
+		<h2 id="commands">Comprobaciones del proyecto</h2>
+		<DocsCode
+			bind:code="examples.check"
+			label="Terminal"
+		/>
+		<p>
+			El módulo valida los catálogos al preparar la aplicación y genera las claves y los parámetros.
+			<code>meeko check</code>
+			comprueba las llamadas de tus componentes.
+		</p>
+		<DocsApi
+			caption="Errores y recuperación"
+			bind:rows="[
+				{ name: 'different message keys', type: 'Preparación', description: 'Comprueba que todos los idiomas declaren las mismas claves.' },
+				{ name: 'different parameters', type: 'Preparación', description: 'Revisa placeholders y el nombre/tipo de los selectores del mismo mensaje.' },
+				{ name: 'other is required', type: 'Preparación', description: 'Añade other a cada estructura plural o select.' },
+				{ name: 'duplicate message key', type: 'Preparación', description: 'Usa claves distintas entre namespaces.' },
+				{ name: 'Missing i18n message', type: 'Ejecución', description: 'Revisa que la clave exista y que la ruta cargue su namespace.' },
+				{ name: 'Missing i18n value', type: 'Ejecución', description: 'Pasa un valor para cada parámetro requerido.' },
+				{ name: 'must be a finite number', type: 'Ejecución', description: 'Usa un número finito en el selector plural.' },
+				{ name: 'Unsupported locale', type: 'Ejecución', description: 'Elige un idioma incluido en catalogs.' },
+			]"
+		/>
+		<h2 id="types">Tipos generados</h2>
+		<p>Las claves desconocidas y los argumentos ausentes o incorrectos producen diagnósticos TypeScript. Al desactivar el módulo se retira su plantilla generada. Mantén el código fuente y los catálogos como autoridad.</p>
+		<p>Prueba mensajes vacíos, cantidades 0/1/2 y mayores, formatos con zona horaria fija y navegación directa a cada idioma. El laboratorio del sitio cubre español, inglés y árabe tanto en SSR como en el navegador.</p>
+	</DocsPage>
+</template>

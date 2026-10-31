@@ -3,9 +3,9 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"build": "meeko build .",
-		"check": "meeko check .",
-		"dev": "meeko dev .",
+		"build": "pnpm -F meeko-docs run build && node ../../packages/docs/scripts/assets.mjs && meeko build .",
+		"check": "pnpm -F meeko-docs run build && meeko check .",
+		"dev": "pnpm -F meeko-docs run build && node ../../packages/docs/scripts/assets.mjs && meeko dev .",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"preview": "meeko preview .",
@@ -13,7 +13,8 @@
 	},
 	"dependencies": {
 		"@meekojs/meeko": "workspace:*",
-		"@meekojs/ui": "workspace:*"
+		"@meekojs/ui": "workspace:*",
+		"meeko-docs": "workspace:*"
 	},
 	"devDependencies": {
 		"@meekojs/eslint-plugin": "workspace:*",

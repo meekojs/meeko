@@ -22,6 +22,9 @@ La base de componentes visuales de `@meekojs/ui` está documentada en [UI](docs/
 | [`packages/prettier-plugin`](packages/prettier-plugin) | `@meekojs/prettier-plugin`: formato de componentes. |
 | [`packages/vscode`](packages/vscode) | Extensión de VS Code `meeko-language`: resaltado y cliente del servidor de lenguaje. |
 | [`packages/devtools`](packages/devtools) | Extensión Meeko DevTools para Chrome. |
+| [`apps/ui`](apps/ui) | Web de Meeko UI: componentes, API y ejemplos interactivos. |
+| [`apps/i18n`](apps/i18n) | Web de Meeko i18n: guias, API y laboratorio de idiomas. |
+| [`packages/docs`](packages/docs) | Base documental privada compartida por las webs de UI e i18n. |
 | [`apps/site`](apps/site) | Sitio de documentación, hecho con Meeko a partir de estos Markdown. |
 | [`docs`](docs) | Documentación del proyecto: framework, API, editores, DevTools, estabilidad, arquitectura y publicación. |
 | [`assets/brand`](assets/brand) | Logo de Meeko, fuente de las imágenes del sitio y los ejemplos. Las extensiones llevan una copia idéntica porque se empaquetan solas. |

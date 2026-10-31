@@ -1,109 +1,13 @@
 <script lang="ts">
 	import { navigation } from './utils/navigation'
-
-	const query = signal('')
-	const groups = computed(() => navigation.map((group) => ({ ...group, items: group.items.filter((item) => (item.label + ' ' + item.description).toLocaleLowerCase('es').includes(query.value.trim().toLocaleLowerCase('es'))) })).filter((group) => group.items.length))
-
-	function closeMenu(event: MouseEvent) {
-		if (event.target instanceof Element && event.target.closest('a')) event.currentTarget instanceof Element && event.currentTarget.closest('details')?.removeAttribute('open')
-	}
 </script>
-
 <template>
-	<UIApp>
-		<a
-			class="skip-link"
-			href="#contenido"
-		>
-			Saltar al contenido
-		</a>
-		<header class="site-header">
-			<a
-				class="brand"
-				href="/"
-				aria-label="Meeko UI, inicio"
-			>
-				<img
-					src="/brand/meeko-logo.png"
-					width="28"
-					height="28"
-					alt=""
-				/>
-				<span>
-					Meeko
-					<strong>UI</strong>
-				</span>
-			</a>
-			<nav
-				class="top-nav"
-				aria-label="Ecosistema"
-			>
-				<a href="/installation">Documentación</a>
-				<a href="https://meeko.diegootayza.com">Framework</a>
-				<a href="https://github.com/meekojs/meeko/tree/main/packages/ui">GitHub</a>
-			</nav>
-			<div class="header-actions">
-				<MeekoThemeToggle />
-				<details class="mobile-menu">
-					<summary>Menú</summary>
-					<div
-						class="mobile-panel"
-						on:click="closeMenu"
-					>
-						<label
-							class="search-label"
-							for="mobile-docs-search"
-						>
-							Buscar en la guía
-						</label>
-						<UIInput
-							id="mobile-docs-search"
-							type="search"
-							placeholder="Filtrar documentación…"
-							model="query"
-						/>
-						<DocsNavigation bind:groups="groups.value" />
-					</div>
-				</details>
-			</div>
-		</header>
-		<UIContainer
-			size="3xl"
-			gutter="none"
-			class="site-layout"
-		>
-			<aside
-				id="docs-navigation"
-				class="sidebar"
-			>
-				<label
-					class="search-label"
-					for="docs-search"
-				>
-					Buscar en la guía
-				</label>
-				<UIInput
-					id="docs-search"
-					type="search"
-					placeholder="Filtrar documentación…"
-					model="query"
-				/>
-				<DocsNavigation bind:groups="groups.value" />
-				<a
-					class="sidebar-package"
-					href="https://www.npmjs.com/package/@meekojs/ui"
-				>
-					<code>@meekojs/ui</code>
-					<span>Paquete de Meeko</span>
-				</a>
-			</aside>
-			<div class="page-content">
-				<MeekoOutlet />
-				<footer class="site-footer">
-					<span>Meeko UI · Hecho con Meeko y sus propios componentes.</span>
-					<a href="https://github.com/meekojs/meeko/blob/main/LICENSE">Licencia MIT</a>
-				</footer>
-			</div>
-		</UIContainer>
-	</UIApp>
+	<DocsShell
+		name="UI"
+		packageName="@meekojs/ui"
+		repository="https://github.com/meekojs/meeko/tree/main/packages/ui"
+		bind:navigation="navigation"
+	>
+		<MeekoOutlet />
+	</DocsShell>
 </template>

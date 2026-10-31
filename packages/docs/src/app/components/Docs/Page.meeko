@@ -1,9 +1,9 @@
 <script lang="ts">
-	const props = defineProps<{ title: string; description: string; landing?: boolean }>()
+	const props = defineProps<{ title: string; description: string; landing?: boolean; product?: string }>({ product: 'Meeko UI' })
 
 	const snippets = defineSnippets<{ default: [] }>()
 
-	useHead(() => ({ title: props.title + ' · Meeko UI', meta: [{ name: 'description', content: props.description }] }))
+	useHead(() => ({ title: props.title + ' · ' + props.product, meta: [{ name: 'description', content: props.description }] }))
 </script>
 
 <template>

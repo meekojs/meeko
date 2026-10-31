@@ -14,4 +14,4 @@ La portada muestra un componente vivo. Las guías reúnen uso, ejemplo, código 
 
 Usa `@meekojs/ui` en las acciones, formularios, metadatos y ejemplos. Las superficies editoriales no necesitan convertirse en cards. Mantén un único encabezado principal, nombres accesibles, foco visible y texto para errores y estados. Los modales y View Transitions conservan el soporte de movimiento reducido del runtime.
 
-Los tokens compartidos se copian desde el sitio principal y se conectan mediante `ui.tokens`. Al cambiar la identidad central, actualiza esta copia y comprueba ambos temas. Los ejemplos son datos locales; no sugieren persistencia ni peticiones que no existan.
+Los tokens compartidos viven en `packages/docs/src/app/styles` y se conectan mediante `docsTheme` y `ui.tokens`. Al cambiar la identidad central, actualiza esta copia y comprueba ambos temas. Los ejemplos son datos locales; no sugieren persistencia ni peticiones que no existan.

@@ -1,0 +1,129 @@
+<script lang="ts">
+	import * as DocsNavigation from './Navigation.meeko'
+	interface Item {
+		href: string
+		label: string
+		description: string
+		aliases?: readonly string[]
+	}
+	const props = defineProps<{ name: string; packageName: string; repository: string; navigation: readonly { title: string; items: readonly Item[] }[] }>()
+
+	const snippets = defineSnippets<{ default: [] }>()
+
+	const query = signal('')
+	const groups = computed(() => props.navigation.map((group) => ({ ...group, items: group.items.filter((item) => (item.label + ' ' + item.description).toLocaleLowerCase('es').includes(query.value.trim().toLocaleLowerCase('es'))) })).filter((group) => group.items.length))
+
+	function closeMenu(event: MouseEvent) {
+		if (event.target instanceof Element && event.target.closest('a')) event.currentTarget instanceof Element && event.currentTarget.closest('details')?.removeAttribute('open')
+	}
+</script>
+
+<template>
+	<div
+		lang="es"
+		dir="ltr"
+	>
+		<UIApp>
+			<a
+				class="skip-link"
+				href="#contenido"
+			>
+				Saltar al contenido
+			</a>
+			<header class="site-header">
+				<a
+					class="brand"
+					href="/"
+					bind:aria-label="'Meeko ' + props.name + ', inicio'"
+				>
+					<img
+						src="/brand/meeko-logo.png"
+						width="28"
+						height="28"
+						alt=""
+					/>
+					<span>
+						Meeko
+						<strong>{props.name}</strong>
+					</span>
+				</a>
+				<nav
+					class="top-nav"
+					aria-label="Ecosistema"
+				>
+					<a href="/installation">Documentación</a>
+					<a href="https://meeko.diegootayza.com">Framework</a>
+					<a bind:href="props.repository">GitHub</a>
+				</nav>
+				<div class="header-actions">
+					<MeekoThemeToggle />
+					<details class="mobile-menu">
+						<summary>Menú</summary>
+						<div
+							class="mobile-panel"
+							on:click="closeMenu"
+						>
+							<label
+								class="search-label"
+								for="mobile-docs-search"
+							>
+								Buscar en la guía
+							</label>
+							<UIInput
+								id="mobile-docs-search"
+								type="search"
+								placeholder="Filtrar documentación…"
+								model="query"
+							/>
+							<DocsNavigation
+								bind:groups="groups.value"
+								bind:product="props.name"
+							/>
+						</div>
+					</details>
+				</div>
+			</header>
+			<UIContainer
+				size="3xl"
+				gutter="none"
+				class="site-layout"
+			>
+				<aside
+					id="docs-navigation"
+					class="sidebar"
+				>
+					<label
+						class="search-label"
+						for="docs-search"
+					>
+						Buscar en la guía
+					</label>
+					<UIInput
+						id="docs-search"
+						type="search"
+						placeholder="Filtrar documentación…"
+						model="query"
+					/>
+					<DocsNavigation
+						bind:groups="groups.value"
+						bind:product="props.name"
+					/>
+					<a
+						class="sidebar-package"
+						bind:href="'https://www.npmjs.com/package/' + props.packageName"
+					>
+						<code>{props.packageName}</code>
+						<span>Paquete de Meeko</span>
+					</a>
+				</aside>
+				<div class="page-content">
+					<render snippet="snippets.default" />
+					<footer class="site-footer">
+						<span>Meeko {props.name} · Documentación del ecosistema Meeko.</span>
+						<a href="https://github.com/meekojs/meeko/blob/main/LICENSE">Licencia MIT</a>
+					</footer>
+				</div>
+			</UIContainer>
+		</UIApp>
+	</div>
+</template>

@@ -54,7 +54,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node --test --test-concurrency=1 packages/ui/tests/*.e2e.mjs 2>&1 | Tee-Object -FilePath .meeko/ci-logs/ui-e2e.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Browser E2E
+      - name: i18n public site E2E
+        shell: pwsh
+        run: |
+          pnpm -F meeko-i18n-site run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:MEEKO_CHROME_PATH = node -p "require('./apps/i18n/node_modules/playwright-core').chromium.executablePath()"
+          pnpm -F meeko-i18n-site run test:e2e 2>&1 | Tee-Object -FilePath .meeko/ci-logs/i18n-site-e2e.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Core browser E2E
         shell: pwsh
         run: |
           pnpm run e2e 2>&1 | Tee-Object -FilePath .meeko/ci-logs/browser-e2e.log

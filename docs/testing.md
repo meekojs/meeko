@@ -12,7 +12,7 @@ pnpm check
 pnpm check:apps
 ```
 
-El build prepara los cinco paquetes públicos y sus entradas `dist/`, incluidas las que importa `eslint.config.ts`. Por eso precede al lint en un checkout limpio. `check` comprueba los paquetes y `check:apps`, las webs públicas del framework y de UI.
+El build prepara los cinco paquetes públicos, la base documental privada y sus entradas `dist/`, incluidas las que importa `eslint.config.ts`. Por eso precede al lint en un checkout limpio. `check` comprueba los paquetes y `check:apps`, las webs públicas del framework, UI e i18n.
 
 ## Pruebas por categoría
 
@@ -22,7 +22,8 @@ El build prepara los cinco paquetes públicos y sus entradas `dist/`, incluidas 
 | Paquetes              | `pnpm test:packages`           | UI, i18n y plugins ESLint/Prettier, usando el build previo. |
 | Verificación ampliada | `pnpm verify`                  | Núcleo, ejemplos, tipos de pruebas, Vite y DevTools.        |
 | Navegador del núcleo  | `pnpm e2e`                     | Interacciones e hidratación del motor.                      |
-| Navegador de UI       | `pnpm -F @meekojs/ui test:e2e` | Demo con cards, tablas, modales y View Transitions.         |
+| Navegador de UI       | `pnpm -F @meekojs/ui test:e2e` | Web UI, Container, cards, tablas, modales y View Transitions.         |
+| Web i18n | `pnpm -F meeko-i18n-site build && pnpm -F meeko-i18n-site test:e2e` | Build de producción, catálogos reales, cambio de idioma y RTL. |
 | Web pública           | `pnpm -F meeko-site test`      | Referencias y contenido del sitio.                          |
 | Distribución          | `pnpm package:workspace-smoke` | Todos los paquetes instalados desde tarballs.               |
 

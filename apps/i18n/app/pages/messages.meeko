@@ -1,0 +1,53 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		title="Mensajes y parámetros"
+		description="Deja que TypeScript compruebe las claves y los valores que necesita cada mensaje."
+	>
+		<h2 id="interpolation">Interpolación</h2>
+		<p>
+			Escribe parámetros con la forma
+			<code>{'{name}'}</code>
+			. Cada argumento requerido admite string, number o boolean; un valor requerido no puede ser null ni undefined.
+		</p>
+		<DocsCode
+			bind:code="examples.catalog"
+			label="Catálogo JSON"
+		/>
+		<DocsCode
+			bind:code="examples.types"
+			label="Llamadas válidas y errores esperados"
+		/>
+		<h2 id="contracts">El mismo contrato entre idiomas</h2>
+		<p>
+			Todos los idiomas necesitan los mismos namespaces, claves y parámetros. Si una traducción usa
+			<code>name</code>
+			y otra
+			<code>user</code>
+			para el mismo mensaje, la preparación del módulo falla. Las categorías de plural pueden variar según el idioma.
+		</p>
+		<h2 id="types">Tipos públicos</h2>
+		<DocsApi
+			caption="Tipos exportados desde @meekojs/i18n"
+			bind:rows="[
+				{ name: 'I18n', type: 'interface', description: 'Contrato del traductor y sus formateadores.' },
+				{ name: 'I18nValue', type: 'string | number | boolean', description: 'Valores de interpolación y selectores.' },
+				{ name: 'I18nMessageValues<K>', type: 'tipo genérico', description: 'Argumentos requeridos para una clave del registro generado.' },
+			]"
+		/>
+		<h2 id="dynamic">Claves dinámicas</h2>
+		<p>
+			Una unión de claves necesita argumentos válidos para todas las alternativas. Estrecha la clave con un
+			<code>if</code>
+			cuando cada caso tenga parámetros diferentes. Si cualquier alternativa requiere valores, el argumento no se puede omitir.
+		</p>
+		<p>
+			Los registros antiguos declarados como
+			<code>true</code>
+			mantienen su contrato abierto. El módulo genera registros nuevos con parámetros explícitos.
+		</p>
+	</DocsPage>
+</template>

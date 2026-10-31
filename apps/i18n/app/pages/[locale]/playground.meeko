@@ -1,0 +1,22 @@
+<script server lang="ts">
+	const { params } = usePage()
+	if (typeof params.locale !== 'string' || !['es', 'en', 'ar'].includes(params.locale)) notFound()
+</script>
+
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		title="Laboratorio"
+		description="Prueba traducciones, plurales, selectores, formatos y dirección RTL con el módulo real."
+	>
+		<TranslationLab />
+		<p>La documentación permanece en español. El resultado traducido usa el idioma y la dirección del catálogo seleccionado. La navegación entre idiomas conserva la búsqueda y el fragmento de la URL.</p>
+		<p>
+			Consulta
+			<a href="/routing">idiomas y rutas</a>
+			y
+			<a href="/rtl">dirección RTL</a>
+			para conocer el contrato completo.
+		</p>
+	</DocsPage>
+</template>
