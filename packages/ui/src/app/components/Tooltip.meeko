@@ -1,0 +1,17 @@
+<script lang="ts">
+	// <UITooltip>: a <UIPopover mode="hint"> with the look of a tooltip. `interestfor` would save the delays,
+	// but only Chrome and Edge have it, so the hover, the focus and Escape stay in <UIPopover>. Its template
+	// stays on one line, outside Prettier (.prettierignore): whitespace would be text in the tooltip.
+	import type { TooltipSnippets, UITooltipProps } from '../types/tooltip'
+
+	import * as Popover from './Popover.meeko'
+
+	const props = defineProps<UITooltipProps>()
+
+	const open = defineModel<boolean>({ default: false })
+
+	const snippets = defineSnippets<TooltipSnippets>()
+</script>
+
+<!-- Keep this template on one line, without whitespace between the tags: it would be text inside the tooltip and the trigger. Do not format this file (it is in .prettierignore; tests/one-line-templates.test.mjs guards it). -->
+<template><Popover mode="hint" model="open" bind:placement="props.placement ?? 'top'" bind:offset="props.offset ?? 6" bind:delay="props.delay" bind:closeDelay="props.closeDelay" bind:triggerId="props.triggerId" bind:class="['meeko-ui-tooltip', props.class].filter(Boolean).join(' ')"><snippet name="anchor" params="trigger"><render if:when="snippets.anchor" snippet="snippets.anchor" args="trigger" /><button if:when="!snippets.anchor" type="button" bind:id="trigger.id" bind:aria-describedby="trigger['aria-describedby']" bind:class="['meeko-ui-tooltip-trigger', props.triggerClass].filter(Boolean).join(' ')"><render snippet="snippets.trigger" /></button></snippet><template if:when="props.text !== undefined">{props.text}</template><render if:when="snippets.default" snippet="snippets.default" /></Popover></template>

@@ -153,8 +153,6 @@
 	--ui-control-font-weight: var(--ui-font-weight-medium);
 	--ui-input-font-size: var(--ui-font-size-md);
 	--ui-opacity-disabled: 0.55;
-	--ui-opacity-hidden: 0;
-	--ui-opacity-visible: 1;
 
 	/* Depth */
 	--ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 8%);
@@ -210,6 +208,13 @@
 	--ui-duration-spin: 800ms;
 	--ui-z-sticky: 20;
 	--ui-z-floating: 30;
+	--ui-tooltip-max-width: 18rem;
+	--ui-command-width: 40rem;
+	--ui-command-max-height: 34rem;
+	--ui-command-offset: 12vh;
+	--ui-command-trigger-width: 12.5rem;
+	--ui-command-icon-size: 1rem;
+	--ui-command-icon-stroke: 1.6;
 }
 
 :root[data-theme='dark'] {

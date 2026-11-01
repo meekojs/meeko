@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 // text would change the accessible name of the buttons, the textContent of the options (typeahead)
 // and the markup, a stable contract inherited from MeekoPopover, MeekoSelect and MeekoThemeToggle.
 // Their templates are written on one line and listed in .prettierignore so no formatter breaks them.
-const components = ['Popover', 'Select', 'ThemeToggle']
+const components = ['Popover', 'Select', 'ThemeToggle', 'Tabs', 'Tooltip', 'CommandPalette']
 
 /** The text nodes of a template, with the element that holds them. */
 function* textNodes(node, parent = 'template') {

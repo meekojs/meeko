@@ -14,6 +14,9 @@
 @import './prose.css';
 @import './popover.css';
 @import './select.css';
+@import './tabs.css';
+@import './tooltip.css';
+@import './command-palette.css';
 @import './theme-toggle.css';
 
 .meeko-ui-button,

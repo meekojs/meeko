@@ -68,6 +68,16 @@ const spanish: UIMessages = {
 		languageEmpty: 'Sin resultados',
 		copy: 'Copiar',
 	},
+	commandPalette: {
+		label: 'Buscar',
+		input: 'Texto que buscar',
+		placeholder: 'Buscar…',
+		close: 'Cerrar la búsqueda',
+		idle: '',
+		loading: 'Buscando…',
+		empty: 'Sin resultados para «{query}».',
+		unavailable: 'La búsqueda no está disponible ahora mismo.',
+	},
 }
 
 const english: UIMessages = {
@@ -123,6 +133,16 @@ const english: UIMessages = {
 		languageEmpty: 'No results',
 		copy: 'Copy',
 	},
+	commandPalette: {
+		label: 'Search',
+		input: 'Text to search for',
+		placeholder: 'Search…',
+		close: 'Close search',
+		idle: '',
+		loading: 'Searching…',
+		empty: 'No results for “{query}”.',
+		unavailable: 'Search is not available right now.',
+	},
 }
 
 /** The texts that come with the package. Spanish is complete and the last fallback of every locale. */
@@ -170,6 +190,7 @@ function merge(messages: UIMessages, layer: UIMessageOverrides | undefined): UIM
 		code: { ...messages.code, ...layer.code },
 		diff: { ...messages.diff, ...layer.diff },
 		markdownEditor: { ...messages.markdownEditor, ...layer.markdownEditor },
+		commandPalette: { ...messages.commandPalette, ...layer.commandPalette },
 	}
 }
 
@@ -225,4 +246,10 @@ export function fillMessage(template: string, values: Readonly<Record<string, st
 /** `{current}` and `{next}` of the `cycle` text of `<UIThemeToggle>`. */
 export function themeCycleLabel(template: string, current: string, next: string): string {
 	return template.replaceAll('{current}', () => current).replaceAll('{next}', () => next)
+}
+
+/** The notice of `<UICommandPalette>` for a status other than `ready`. */
+export function commandPaletteStatusText(text: UIMessages['commandPalette'], status: 'idle' | 'loading' | 'ready' | 'empty' | 'unavailable', query: string): string {
+	if (status === 'ready') return ''
+	return text[status].replace('{query}', () => query)
 }

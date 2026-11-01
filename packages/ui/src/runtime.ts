@@ -7,3 +7,6 @@ export type { SelectField, SelectFilter, SelectFilterContext, SelectModel, Selec
 export type { TableCellValue, TableColumn, TableRowKey } from './app/types/table'
 export type { UIThemeToggleProps } from './app/types/theme-toggle'
 export type { UIBrand, UIBreadcrumbItem, UIBreadcrumbProps, UICodeBlockProps, UICodeBlockVerdict, UIDiffLineKind, UIDiffProps, UIDrawerClosedBy, UIDrawerProps, UIDrawerSide, UIFooterGroup, UIFooterProps, UIHeaderProps, UILinkTarget, UILocaleItem, UILocaleSuggestionProps, UILocaleSwitcherProps, UINavigationLink, UINavigationTabsProps, UINavigationTreeGroup, UINavigationTreeItem, UINavigationTreeProps, UIPageHeaderProps, UIPageLayout, UIPageNavigationProps, UIPageProps, UIPaginationProps, UIProseProps, UITableOfContentsEntry, UITableOfContentsProps, UITableOfContentsVariant } from './app/types/navigation'
+export type { TabsSnippets, UITabsItem, UITabsProps } from './app/types/tabs'
+export type { TooltipSnippets, UITooltipProps } from './app/types/tooltip'
+export type { CommandPaletteItemState, CommandPaletteSnippets, CommandPaletteStatus, UICommandPaletteProps } from './app/types/command-palette'

@@ -1,0 +1,186 @@
+.meeko-ui-command-trigger {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--ui-space-2);
+	transition:
+		background-color var(--ui-duration-fast),
+		color var(--ui-duration-fast);
+	cursor: pointer;
+	box-sizing: border-box;
+	border: var(--ui-border-width) solid var(--ui-color-border-strong);
+	border-radius: var(--ui-radius-md);
+	background: var(--ui-color-control);
+	padding: 0 var(--ui-space-1) 0 var(--ui-space-2);
+	min-width: var(--ui-command-trigger-width);
+	min-height: var(--ui-control-height-md);
+	color: var(--ui-color-text-soft);
+	font: var(--ui-font-weight-regular) var(--ui-control-font-size) / var(--ui-line-height-snug) var(--ui-font-sans);
+}
+.meeko-ui-command-trigger:hover {
+	background: var(--ui-color-control-hover);
+	color: var(--ui-color-text);
+}
+.meeko-ui-command-trigger:focus-visible {
+	outline: var(--ui-focus-ring);
+	outline-offset: var(--ui-focus-ring-offset);
+}
+.meeko-ui-command-icon {
+	flex: none;
+	fill: none;
+	stroke: currentColor;
+	stroke-linecap: round;
+	stroke-width: var(--ui-command-icon-stroke);
+	width: var(--ui-command-icon-size);
+	height: var(--ui-command-icon-size);
+}
+.meeko-ui-command-trigger-label {
+	flex: 1;
+	text-align: start;
+}
+.meeko-ui-command-keys {
+	display: inline-flex;
+	gap: var(--ui-space-0-5);
+}
+.meeko-ui-command-trigger kbd,
+.meeko-ui-command-close kbd {
+	border: var(--ui-border-width) solid var(--ui-color-border);
+	border-radius: var(--ui-radius-xs);
+	background: var(--ui-color-bg-subtle);
+	padding: 0 var(--ui-space-1);
+	color: var(--ui-color-text-soft);
+	font: var(--ui-font-weight-medium) var(--ui-font-size-xs) / var(--ui-line-height-normal) var(--ui-font-mono);
+}
+
+.meeko-ui-modal.meeko-ui-command {
+	margin: var(--ui-command-offset) auto auto;
+	width: min(var(--ui-command-width), calc(100vw - var(--ui-space-8)));
+	max-height: min(var(--ui-command-max-height), calc(100dvh - var(--ui-space-16)));
+}
+.meeko-ui-command-field {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: var(--ui-space-3);
+	transition: border-color var(--ui-duration-fast);
+	border-bottom: var(--ui-border-width) solid var(--ui-color-border);
+	padding: var(--ui-space-3) var(--ui-space-4);
+	color: var(--ui-color-text-soft);
+}
+/* The field has no outline of its own: its line shows where the keyboard is. */
+.meeko-ui-command-field:has(input:focus-visible) {
+	border-bottom-color: var(--ui-color-primary);
+}
+.meeko-ui-command-field input {
+	flex: 1;
+	outline: 0;
+	border: 0;
+	background: transparent;
+	min-width: 0;
+	color: var(--ui-color-text);
+	caret-color: var(--ui-color-primary);
+	font: var(--ui-font-weight-regular) var(--ui-font-size-lg) / var(--ui-line-height-normal) var(--ui-font-sans);
+}
+.meeko-ui-command-field input::placeholder {
+	color: var(--ui-color-text-soft);
+}
+.meeko-ui-command-field input::-webkit-search-cancel-button {
+	display: none;
+}
+.meeko-ui-command-close {
+	flex: none;
+	cursor: pointer;
+	border: 0;
+	border-radius: var(--ui-radius-sm);
+	background: transparent;
+	padding: 0;
+}
+.meeko-ui-command-close:hover kbd {
+	color: var(--ui-color-text);
+}
+.meeko-ui-command-close:focus-visible {
+	outline: var(--ui-focus-ring);
+	outline-offset: var(--ui-focus-ring-offset);
+}
+.meeko-ui-command-status {
+	flex: none;
+	color: var(--ui-color-text-soft);
+	font-size: var(--ui-font-size-sm);
+	line-height: var(--ui-line-height-relaxed);
+}
+.meeko-ui-command-status:not(:empty) {
+	padding: var(--ui-space-4);
+}
+.meeko-ui-command-list {
+	flex: 1;
+	margin: 0;
+	padding: var(--ui-space-1-5);
+	min-height: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	list-style: none;
+}
+.meeko-ui-command-list[hidden] {
+	display: none;
+}
+.meeko-ui-command-row {
+	display: block;
+	cursor: pointer;
+	box-sizing: border-box;
+	border: 0;
+	border-radius: var(--ui-radius-sm);
+	background: transparent;
+	padding: var(--ui-space-2) var(--ui-space-3);
+	width: 100%;
+	color: var(--ui-color-text);
+	font: inherit;
+	text-align: start;
+	text-decoration: none;
+}
+.meeko-ui-command-row[data-depth='1'] {
+	margin-inline-start: var(--ui-space-4);
+	width: calc(100% - var(--ui-space-4));
+}
+.meeko-ui-command-row:hover,
+.meeko-ui-command-row[data-active] {
+	background: var(--ui-color-control-active);
+}
+.meeko-ui-command-row[data-active] {
+	box-shadow: inset 0 0 0 var(--ui-border-width) var(--ui-color-primary-border);
+}
+.meeko-ui-command-row strong {
+	display: block;
+	font-weight: var(--ui-font-weight-medium);
+}
+.meeko-ui-command-excerpt {
+	display: block;
+	margin-block-start: var(--ui-space-0-5);
+	color: var(--ui-color-text-soft);
+	font-size: var(--ui-font-size-sm);
+	line-height: var(--ui-line-height-normal);
+}
+.meeko-ui-command mark {
+	border-radius: var(--ui-radius-xs);
+	background: var(--ui-color-primary-soft);
+	color: var(--ui-color-primary-text);
+}
+/* A phone keeps the icon: the label and the shortcut do not fit, and a phone has no keyboard for it. */
+@media (max-width: 40rem) {
+	.meeko-ui-command-trigger {
+		justify-content: center;
+		border-color: transparent;
+		background: transparent;
+		padding: 0;
+		width: var(--ui-control-height-md);
+		min-width: 0;
+	}
+	.meeko-ui-command-trigger-label,
+	.meeko-ui-command-keys {
+		display: none;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.meeko-ui-command-trigger,
+	.meeko-ui-command-field {
+		transition: none;
+	}
+}

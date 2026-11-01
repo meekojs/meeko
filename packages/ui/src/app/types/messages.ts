@@ -187,6 +187,25 @@ export interface UIMessages {
 		readonly languageEmpty: string
 		readonly copy: string
 	}
+	/** `<UICommandPalette>`. */
+	readonly commandPalette: {
+		/** `aria-label` del diálogo y texto del botón que lo abre, si no se pasa `label`. */
+		readonly label: string
+		/** `aria-label` del campo, si no se pasa `inputLabel`. */
+		readonly input: string
+		/** Texto de ejemplo del campo, si no se pasa `placeholder`. */
+		readonly placeholder: string
+		/** `aria-label` del botón de cierre, si no se pasa `closeLabel`. */
+		readonly close: string
+		/** Aviso antes de escribir; vacío, no se muestra nada. */
+		readonly idle: string
+		/** Aviso mientras se busca. */
+		readonly loading: string
+		/** Aviso sin resultados: `{query}` es el texto buscado. */
+		readonly empty: string
+		/** Aviso si la búsqueda falla. */
+		readonly unavailable: string
+	}
 }
 
 /**
