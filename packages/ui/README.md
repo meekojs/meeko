@@ -661,7 +661,7 @@ Meeko pinta un `<button>` con `popovertarget`, `aria-expanded`, `aria-controls` 
 </UIPopover>
 ```
 
-**Posición.** El contenido usa `position-anchor`, `position-area` y `position-try-fallbacks: flip-block, flip-inline`, así que se coloca al otro lado si no cabe. En un navegador sin anchor positioning, Meeko lo marca con `data-meeko-popover-fallback` y calcula su posición en JavaScript al abrirse y con cada `resize` o `scroll`: también se da la vuelta y nunca sale del viewport, y el lado elegido queda en `data-side`. El contenido abierto lleva `data-open`.
+**Posición.** El contenido usa `position-anchor: auto`, `position-area` y `position-try-fallbacks: flip-block, flip-inline`, así que se coloca al otro lado si no cabe, sin JavaScript. Las reglas están en la capa `meeko` de `popover.css`, así que cualquier regla de tu CSS gana. Un navegador sin anchor positioning lo abre sin anclar. El contenido abierto lleva `data-open`.
 
 **Disparador propio.** El snippet `anchor` sustituye el botón: recibe en `trigger` (tipo `PopoverTrigger`) los atributos que el disparador debe llevar, con el nombre de cada atributo como clave, así que basta con [`bind="trigger"`](../../docs/api.md). `<UIPopover>` encuentra el elemento por su `id` al montarse y le añade el teclado y el anclaje:
 
@@ -715,7 +715,7 @@ Tipos públicos de `@meekojs/ui/runtime`.
 
 ## UISelect
 
-Un select accesible construido sobre `<UIPopover>`. `model` es el valor y su tipo sale de `options`:
+Un select tipado. Sin `multiple`, `searchable` ni `filter` es un `<select>` nativo con `appearance: base-select`, que trae su lista, su teclado y su valor de formulario; Firefox y los navegadores antiguos muestran su lista propia. Con esas props, la plataforma no llega y es una lista propia sobre `<UIPopover>`. Las dos formas tienen la misma API. `model` es el valor y su tipo sale de `options`:
 
 ```html
 <script lang="ts">
@@ -793,6 +793,8 @@ Un select accesible construido sobre `<UIPopover>`. `model` es el valor y su tip
 
 **Tipos.** `meeko check` y el editor infieren de la etiqueta el tipo de las opciones (`T`) y si es múltiple: el modelo de un select simple es una `Signal<T | null>` y el de uno múltiple, `Signal<T[]>`; `by`, `labelBy` y `groupBy` sólo admiten claves de `T`, y los parámetros de los snippets tienen el tipo `T`. El tipo `SelectModel<T, Multiple>` describe el valor.
 
+**El select nativo.** El `id` y `data-meeko-select-trigger` van en el `<select>`, que el navegador expone como `combobox`, y los grupos son `<optgroup>`. El navegador se encarga del teclado: `Intro` o `Espacio` abren la lista, las flechas y las letras se mueven por ella. Con la lista cerrada varía según el motor: en WebKit, las flechas no abren. La opción oculta del principio representa «sin elegir» y un valor que ya no está en `options`, que el modelo conserva y el formulario sigue enviando. El disparador usa `<selectedcontent>`; con el snippet `option`, muestra `value` o la etiqueta, porque `<selectedcontent>` copiaría toda la opción. No pongas `id` dentro de `option`. `listClass` va en el `<select>` (`.mi-clase::picker(select)`) y `state.active` siempre es `false`. Lo que sigue en este apartado, salvo `clearable`, describe la lista propia.
+
 **ARIA y teclado.** El disparador es un `role="combobox"` (un `<button>` o, con `searchable`, un `<input>` con `aria-autocomplete="list"`) con `aria-expanded`, `aria-controls`, `aria-haspopup="listbox"` y `aria-activedescendant`: el foco nunca sale de él. La lista es un `role="listbox"` (con `aria-multiselectable` en un select múltiple) de `role="option"` con `aria-selected` y `aria-disabled`, agrupadas en `role="group"` con `groupBy`. Un `<label for>` externo nombra el disparador por su `id`. El patrón ARIA del combobox no define cómo vaciar la selección, así que `clearable` añade, fuera del combobox, un `<button type="button">` con `aria-label` («Quitar selección»): entra en el orden de tabulación justo después del disparador, sólo existe mientras hay algo elegido y al activarlo cierra la lista, emite `change` con `null` (o `[]`) y devuelve el foco al disparador.
 
 - `↓`, `↑`, `Intro` o `Espacio` abren la lista sobre la opción elegida (o la primera); `Inicio` y `Fin` abren en un extremo; las letras abren y buscan.
@@ -803,7 +805,7 @@ Un select accesible construido sobre `<UIPopover>`. `model` es el valor y su tip
 
 Con `max`, en cuanto hay `max` opciones elegidas las demás quedan `aria-disabled="true"` y `data-disabled` hasta que se quite una.
 
-**Atributos de estado.** Las opciones llevan `data-active`, `data-selected` y `data-disabled`, y la raíz (`data-meeko-select`) `data-open`, `data-multiple`, `data-disabled` y `data-loading`. La lista mide al menos lo que el disparador (`anchor-size(width)` o, sin anchor positioning, el ancho calculado), tiene una altura máxima y se desplaza; ambas reglas están en la capa `meeko`, así que su CSS las sustituye:
+**Atributos de estado.** Las opciones llevan `data-active`, `data-selected` y `data-disabled`, y la raíz (`data-meeko-select`) `data-open`, `data-multiple`, `data-disabled` y `data-loading`. La lista mide al menos lo que el disparador (`anchor-size(width)`), tiene una altura máxima y se desplaza; su CSS las sustituye:
 
 ```css
 [data-meeko-select] [role='option'][data-active] {
@@ -843,7 +845,7 @@ Con `max`, en cuanto hay `max` opciones elegidas las demás quedan `aria-disable
 </template>
 ```
 
-**Formularios.** Con `name`, el select envía un `<input type="hidden">` por valor (uno vacío en un select simple sin valor, ninguno en uno múltiple vacío), como un `<select>` nativo; con `disabled` no envía nada. El valor de cada opción es su clave de `by`, el propio primitivo o su etiqueta. `required` impide enviar el `<form>` sin valor: el disparador recibe el foco y `aria-invalid="true"` hasta que se elige una opción. Con `useForm`, `model="form.fields.color"` funciona como en cualquier control, y `bind:field="form.field('color')"` da además el valor, el `id` del campo (para su `<label for>`), el `name`, `aria-invalid` y `aria-describedby` con el mensaje de error; `focusInvalid` lleva el foco al select cuando falla la validación. El valor inicial `""` de un campo cuenta como «sin valor» (salvo que una opción sea `""`).
+**Formularios.** Con `name`, el `<select>` nativo envía su valor (vacío sin elegir) y la lista propia, un `<input type="hidden">` por valor (ninguno en uno múltiple vacío); con `disabled` no envía nada. El valor de cada opción es su clave de `by`, el propio primitivo o su etiqueta. `required` impide enviar el `<form>` sin valor: el disparador recibe el foco y `aria-invalid="true"` hasta que se elige una opción. Con `useForm`, `model="form.fields.color"` funciona como en cualquier control, y `bind:field="form.field('color')"` da además el valor, el `id` del campo (para su `<label for>`), el `name`, `aria-invalid` y `aria-describedby` con el mensaje de error; `focusInvalid` lleva el foco al select cuando falla la validación. El valor inicial `""` de un campo cuenta como «sin valor» (salvo que una opción sea `""`).
 
 ```html
 <form
@@ -1022,3 +1024,44 @@ Todo enlace de una lista acepta `href` (cualquier URL) o `to` (una ruta con `par
 - **`UICodeBlock`** recibe en `html` un `<pre>` ya resaltado (Shiki con `--shiki-light` y `--shiki-dark`) y en `code` lo que se copia. El botón de copiar es el único script y queda oculto hasta hidratar. `mode="log"` usa `role="log"`, parte las líneas y no muestra el botón salvo con `copy`.
 - **`UIProse`** viste Markdown renderizado. La clase `meeko-ui-prose` también sirve en cualquier elemento, y dentro de ella se visten `.heading-anchor`, `.table-wrap`, `.callout`, `.code-block` y `.shiki`, las clases de un snapshot. El componente atiende los botones `button[data-copy]` de ese HTML.
 - **`UIDiff`** recibe un diff unificado y marca cada línea con `data-kind` (`add`, `remove`, `hunk`, `file`, `context`) y un texto para lectores de pantalla.
+
+## Plataforma y View Transitions
+
+`UIModal`, `UIPopover`, `UITabs`, `UIThemeToggle` y el `UISelect` simple usan `<dialog>`, `popover`, anclaje CSS, `appearance: base-select`, `@starting-style` y View Transitions. Los navegadores antiguos funcionan sin animación y con el `<select>` más básico, igual que Firefox, que aún muestra su lista nativa. `searchable`, `filter` y `multiple` conservan la lista propia sobre `UIPopover`.
+
+Para tus propias transiciones, usa `withViewTransition()`:
+
+```ts
+import { withViewTransition } from '@meekojs/ui/runtime'
+
+withViewTransition(() => (section.value = 'team'), { types: ['app-section'] })
+```
+
+Las reglas y los nombres reservados están en [`DESIGN.md`](./DESIGN.md#movimiento).
+
+## Pestañas, tooltips y paleta
+
+```html
+<UITabs
+	model="tab"
+	label="Ajustes"
+	bind:items="[{ value: 'account', label: 'Cuenta' }, { value: 'team', label: 'Equipo' }]"
+>
+	<snippet name="panel-account">Tu cuenta</snippet>
+	<snippet name="panel-team">Tu equipo</snippet>
+</UITabs>
+
+<UITooltip text="Se publica al guardar"><snippet name="trigger">?</snippet></UITooltip>
+
+<UICommandPalette
+	model:query="query"
+	bind:results="results.value"
+	bind:status="status.value"
+	hrefBy="url"
+	labelBy="title"
+	childrenBy="sections"
+	on:open="preload"
+/>
+```
+
+`UICommandPalette` no busca: lee `query` en tu código, busca donde quieras (Pagefind, un servidor o una lista local) y pásale `results` y `status`.

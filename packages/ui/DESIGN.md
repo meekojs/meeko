@@ -16,24 +16,25 @@
 
 Pasos de cada escala: 1-2 fondos, 3-5 controles, 6-8 bordes, 9-10 sólidos, 11-12 texto.
 
-| Para                             | Token                                                                   | Paso                  |
-| -------------------------------- | ----------------------------------------------------------------------- | --------------------- |
-| Fondo de la página               | `--ui-color-bg`                                                         | surface 1             |
-| Banda o zona discreta            | `--ui-color-bg-subtle`                                                  | surface 2             |
-| Card, panel, tabla               | `--ui-color-surface`                                                    | surface 2             |
-| Popover, modal, card elevada     | `--ui-color-surface-raised`                                             | 1 claro, 3 oscuro     |
-| Fondo de control                 | `--ui-color-control`, `-hover`, `-active`                               | surface 3, 4, 5       |
-| Separador, borde de card         | `--ui-color-border`                                                     | surface 6             |
-| Borde de input, botón `outline`  | `--ui-color-border-strong`                                              | surface 8             |
-| Texto                            | `--ui-color-text`                                                       | surface 12            |
-| Texto suave y placeholder        | `--ui-color-text-soft`                                                  | surface 11            |
-| Acción principal                 | `--ui-color-primary`, `-hover`, `-active`                               | primary 9, 10, mezcla |
-| Texto sobre la acción            | `--ui-color-primary-contrast`, `-contrast-hover`                        | blanco                |
-| Etiqueta o fondo activo discreto | `--ui-color-primary-soft`, `-soft-hover`, con `--ui-color-primary-text` | primary 3, 4, 11      |
-| Borde violeta                    | `--ui-color-primary-border`                                             | primary 7             |
-| Foco                             | `--ui-focus-ring`, con `outline-offset: var(--ui-focus-ring-offset)`    | primary 9             |
-| Selección de texto               | `--ui-color-selection`                                                  | primary 5             |
-| Fondo de un modal abierto        | `--ui-color-overlay`                                                    | negro al 50 %         |
+| Para                              | Token                                                                   | Paso                  |
+| --------------------------------- | ----------------------------------------------------------------------- | --------------------- |
+| Fondo de la página                | `--ui-color-bg`                                                         | surface 1             |
+| Banda o zona discreta             | `--ui-color-bg-subtle`                                                  | surface 2             |
+| Card, panel, tabla                | `--ui-color-surface`                                                    | surface 2             |
+| Popover, modal, card elevada      | `--ui-color-surface-raised`                                             | 1 claro, 3 oscuro     |
+| Fondo de control                  | `--ui-color-control`, `-hover`, `-active`                               | surface 3, 4, 5       |
+| Separador, borde de card          | `--ui-color-border`                                                     | surface 6             |
+| Borde de input, botón `outline`   | `--ui-color-border-strong`                                              | surface 8             |
+| Borde de un control de formulario | `--ui-color-control-border` (3:1 o más)                                 | surface 9, 10 oscuro  |
+| Texto                             | `--ui-color-text`                                                       | surface 12            |
+| Texto suave y placeholder         | `--ui-color-text-soft`                                                  | surface 11            |
+| Acción principal                  | `--ui-color-primary`, `-hover`, `-active`                               | primary 9, 10, mezcla |
+| Texto sobre la acción             | `--ui-color-primary-contrast`, `-contrast-hover`                        | blanco                |
+| Etiqueta o fondo activo discreto  | `--ui-color-primary-soft`, `-soft-hover`, con `--ui-color-primary-text` | primary 3, 4, 11      |
+| Borde violeta                     | `--ui-color-primary-border`                                             | primary 7             |
+| Foco                              | `--ui-focus-ring`, con `outline-offset: var(--ui-focus-ring-offset)`    | primary 9             |
+| Selección de texto                | `--ui-color-selection`                                                  | primary 5             |
+| Fondo de un modal abierto         | `--ui-color-overlay`                                                    | negro al 50 %         |
 
 **Estados:** `info`, `success`, `warning` y `danger` tienen la misma forma. Ejemplo con `danger`: `--ui-color-danger` (sólido, borde de un campo inválido), `-hover`, `-soft` (fondo), `-border` y `-text` (texto de error).
 
@@ -100,7 +101,24 @@ Con `pointer: coarse` los altos crecen solos, y los inputs usan `--ui-input-font
 
 ## Movimiento
 
-`--ui-duration-fast` 120ms (color), `--ui-duration-base` 180ms y `--ui-duration-slow` 220ms (entrada de un panel). Curvas: `--ui-ease-out` para lo que aparece y `--ui-ease-in-out` para lo que se desplaza. Respeta siempre `prefers-reduced-motion`. Prefiere View Transitions a animar con JavaScript.
+`--ui-duration-fast` 120ms (color), `--ui-duration-base` 180ms y `--ui-duration-slow` 220ms (entrada de un panel). Curvas: `--ui-ease-out` para lo que aparece, `--ui-ease-in` para lo que se va y `--ui-ease-in-out` para lo que se desplaza. Respeta siempre `prefers-reduced-motion`.
+
+**Qué usar:** la entrada de un panel, `@starting-style`. La salida o un cambio dentro de la página, una View Transition con `withViewTransition()` (`@meekojs/ui/runtime`). No uses JavaScript para animar.
+
+**Reglas de las View Transitions:**
+
+1. Da `view-transition-name` sólo durante tu tipo: `html:active-view-transition-type(mi-tipo) .x { view-transition-name: x; }`. Toda transición captura todos los elementos con nombre: un nombre permanente repite animaciones ajenas, y dos elementos con el mismo nombre cancelan la animación.
+2. Dura 250 ms o menos: los clics durante una transición se pierden.
+3. No abras un modal ni un `<select>` con View Transition: en WebKit el modal no se pinta hasta el final y el `<select>` no abre.
+
+| Tipo             | Nombre                         | Quién                                                                          |
+| ---------------- | ------------------------------ | ------------------------------------------------------------------------------ |
+| `ui-modal-close` | `ui-modal`                     | Salida de `UIModal` y `UICommandPalette`.                                      |
+| `ui-tab`         | `ui-tabs-indicator`            | Indicador de `UITabs`, sólo el grupo que cambia (`data-ui-tabs-active`).       |
+| `ui-theme`       | Ninguno: el fundido de la raíz | `UIThemeToggle`.                                                               |
+| `meeko-route`    | `ui-navigation-tabs-indicator` | Reservado al indicador de `UINavigationTabs`, si se anima en las navegaciones. |
+
+**Sólo Chromium:** la salida de `UIPopover` y de la lista de `UISelect` usa `allow-discrete`. Firefox y WebKit las cierran de golpe, porque cerrar con un clic fuera no se puede interceptar para envolverlo en una transición.
 
 ## Carga
 
