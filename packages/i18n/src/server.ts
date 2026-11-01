@@ -1,5 +1,4 @@
 import { usePage } from "@meekojs/meeko/framework";
-import { catalogs, settings } from "virtual:meeko-i18n";
 
 import type { I18n } from "./context";
 import type { GeneratedI18nLocales } from "./index";
@@ -40,10 +39,10 @@ export type PageI18n = Omit<I18n, "locale"> & { readonly locale: I18nLocale };
 /** Every namespace of a locale. A process keeps one copy: the messages never change between requests. */
 const loaded = new Map<string, Promise<Catalog>>();
 
-function catalogOf(locale: string): Promise<Catalog> {
+function catalogOf(locale: string, namespaces: Readonly<Record<string, () => Promise<{ readonly default: Catalog }>>>): Promise<Catalog> {
   let catalog = loaded.get(locale);
   if (!catalog) {
-    catalog = Promise.all(Object.values(catalogs[locale]!).map((load) => load())).then((modules) => {
+    catalog = Promise.all(Object.values(namespaces).map((load) => load())).then((modules) => {
       const messages: Record<string, Message> = Object.create(null);
       for (const module of modules) Object.assign(messages, module.default);
       return messages;
@@ -75,9 +74,11 @@ function catalogOf(locale: string): Promise<Catalog> {
  */
 export async function usePageI18n(): Promise<PageI18n> {
   const { url } = usePage();
+  // Only a Meeko build resolves this module: imported statically, this public entry would not load in plain Node.
+  const { catalogs, settings } = await import("virtual:meeko-i18n");
   const { locales, defaultLocale, directions } = settings;
   const locale = localeOf(url.pathname, locales, defaultLocale);
-  const entries = await Promise.all(locales.map(async (target) => [target, await catalogOf(target)] as const));
+  const entries = await Promise.all(locales.map(async (target) => [target, await catalogOf(target, catalogs[target]!)] as const));
   const all = Object.fromEntries(entries);
   const reported = new Set<string>();
   return createI18n({
