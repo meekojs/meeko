@@ -14,14 +14,13 @@
 </script>
 
 <script lang="ts">
-	import type { AnnouncementRow, AnnouncementTone, KnownPageRow, ModerationAction, ModerationRuleRow } from '../../shared/schemas/moderation'
+	import type { AnnouncementRow, AnnouncementTone, KnownPageRow, ModerationAction, ModerationLocale, ModerationRuleRow } from '../../shared/schemas/moderation'
 	import type { Failure } from '../utils/errors'
 
 	import { maxMessageLength, maxReasonLength } from '../../shared/schemas/moderation'
 	import { describeError } from '../utils/errors'
-	import { formatDate } from '../utils/format'
 	import { siteLabels, sites } from '../utils/labels'
-	import { actionLabels, announcementStateLabels, announcementStateTones, fromLocalInput, toLocalInput, toneLabels, tones } from '../utils/moderation'
+	import { announcementStateTones, fromLocalInput, toLocalInput, tones } from '../utils/moderation'
 
 	export interface Props {
 		params: Record<string, string>
@@ -30,11 +29,36 @@
 
 	const props = defineProps<Props>()
 
+	const i18n = useI18n()
+	const { t, localePath } = i18n
+	const format = useFormat()
+	const formatDate = format.date
+
+	// A rule or an announcement applies to one language or, with `null`, to all of them. The selects
+	// cannot hold `null`, so they use `all`.
+	type LocaleChoice = 'all' | 'en' | 'es'
+	const localeChoices: readonly LocaleChoice[] = ['all', 'es', 'en']
+	const toLocale = (choice: LocaleChoice | null): ModerationLocale => (choice === 'es' || choice === 'en' ? choice : null)
+	const toChoice = (locale: ModerationLocale): LocaleChoice => locale ?? 'all'
+	const localeLabel = (choice: LocaleChoice) => (choice === 'all' ? t('locale.all') : t(`locale.${choice}`))
+	const localeShort = (locale: ModerationLocale) => t(`locale.short.${locale ?? 'all'}`)
+	/** The page as the readers of a language reach it: /en/docs/api in English, /docs/api otherwise. */
+	const publicPath = (path: string, locale: ModerationLocale) => (locale === 'en' ? '/en' + (path === '/' ? '' : path) : path)
+	const actionLabel = (value: ModerationAction) => t(`moderation.actions.${value}`)
+	const toneLabel = (value: AnnouncementTone) => t(`moderation.tones.${value}`)
+	const stateLabel = (value: AnnouncementRow['state']) => t(`moderation.states.${value}`)
+
 	// The page remounts for another web (a link of the tabs): its initial value is enough.
 	const site = untrack(() => props.search.site ?? 'site')
 	const data = signal(initial.ok ? initial.data : null)
 	const loadFailure = signal<Failure | null>(initial.ok ? null : initial.failure)
 	const notice = signal('')
+
+	// The lists show the rules and announcements that reach the readers of one language: its own and the global ones.
+	const listLocale = signal<LocaleChoice | null>('all')
+	const reaches = (locale: ModerationLocale) => listLocale.value === 'all' || listLocale.value === null || locale === null || locale === listLocale.value
+	const rules = computed(() => (data.value?.rules ?? []).filter((rule) => reaches(rule.locale)))
+	const announcements = computed(() => (data.value?.announcements ?? []).filter((item) => reaches(item.locale)))
 
 	async function reload() {
 		try {
@@ -59,26 +83,27 @@
 	const tabs = computed(() =>
 		sites.map((name) => ({
 			name,
-			href: name === 'site' ? '/moderation' : `/moderation?site=${name}`,
+			href: localePath(name === 'site' ? '/moderation' : `/moderation?site=${name}`),
 			label: siteLabels[name],
 			rules: data.value?.counts[name].rules ?? 0,
 			live: data.value?.counts[name].live ?? 0,
 		})),
 	)
 	const pageCount = computed(() => data.value?.pages.length ?? 0)
-	const delay = 'Las webs lo aplican en menos de 30 s, sin publicar ni reiniciar.'
+	const delay = t('moderation.delay')
 
 	// Rules ----------------------------------------------------------------------------------------
 
 	const page = signal<KnownPageRow | null>(null)
 	const action = signal<ModerationAction>('hide')
+	const ruleLocale = signal<LocaleChoice | null>('all')
 	const reason = signal('')
 	const ruleError = signal('')
 	const ruleFailure = signal<Failure | null>(null)
 	const savingRule = signal(false)
 	const pageLabel = (option: KnownPageRow) => `${option.title} · ${option.path}`
-	const pageGroup = (option: KnownPageRow) => (option.origin === 'source' ? 'Fuentes' : 'Solo en el snapshot (referencia generada)')
-	const existing = computed(() => (page.value ? (data.value?.rules.find((rule) => rule.path === page.value?.path) ?? null) : null))
+	const pageGroup = (option: KnownPageRow) => (option.origin === 'source' ? t('moderation.groups.sources') : t('moderation.groups.snapshot'))
+	const existing = computed(() => (page.value ? (data.value?.rules.find((rule) => rule.path === page.value?.path && rule.locale === toLocale(ruleLocale.value)) ?? null) : null))
 
 	/**
 	 * The rule the form writes over: the one its page had when the page was chosen or its row was
@@ -87,28 +112,30 @@
 	 * conflict instead of being overwritten. It is renewed only when a conflict is shown (saving
 	 * again then replaces the other change on purpose) or when the form is reset.
 	 */
-	const ruleBase = signal<{ readonly path: string; readonly id: number | null; readonly version: number | null } | null>(null)
+	const ruleBase = signal<{ readonly path: string; readonly locale: ModerationLocale; readonly id: number | null; readonly version: number | null } | null>(null)
 
-	/** Pins the rule that `path` has now in the list as the base of the form; `undefined` clears it. */
-	function pinRule(path: string | undefined) {
-		const rule = path === undefined ? undefined : untrack(() => data.value?.rules.find((item) => item.path === path))
-		ruleBase.value = path === undefined ? null : { path, id: rule?.id ?? null, version: rule?.version ?? null }
+	/** Pins the rule that `path` has now in `locale` in the list as the base of the form; `undefined` clears it. */
+	function pinRule(path: string | undefined, locale: ModerationLocale) {
+		const rule = path === undefined ? undefined : untrack(() => data.value?.rules.find((item) => item.path === path && item.locale === locale))
+		ruleBase.value = path === undefined ? null : { path, locale, id: rule?.id ?? null, version: rule?.version ?? null }
 	}
 
-	// Choosing another page in the select pins the rule it has; reloading the list does not, because
-	// only the page is tracked.
+	// Choosing another page or language in the form pins the rule it has; reloading the list does
+	// not, because only the page and the language are tracked.
 	effect(() => {
 		const path = page.value?.path
+		const locale = toLocale(ruleLocale.value)
 		untrack(() => {
-			if (ruleBase.value?.path !== path) pinRule(path)
+			if (ruleBase.value?.path !== path || ruleBase.value?.locale !== locale) pinRule(path, locale)
 		})
 	})
 	const reasonTooLong = computed(() => reason.value.trim().length > maxReasonLength)
-	const ruleSubmit = computed(() => (savingRule.value ? 'Guardando…' : existing.value ? 'Cambiar la regla' : action.value === 'hide' ? 'Ocultar la página…' : 'Destacar la página'))
+	const ruleSubmit = computed(() => (savingRule.value ? t('actions.saving') : existing.value ? t('moderation.rule.change') : action.value === 'hide' ? t('moderation.rule.hide') : t('moderation.rule.feature')))
 
 	function editRule(rule: ModerationRuleRow) {
 		page.value = data.value?.pages.find((option) => option.path === rule.path) ?? { path: rule.path, title: rule.title ?? rule.path, origin: 'source' }
-		ruleBase.value = { path: rule.path, id: rule.id, version: rule.version }
+		ruleLocale.value = toChoice(rule.locale)
+		ruleBase.value = { path: rule.path, locale: rule.locale, id: rule.id, version: rule.version }
 		action.value = rule.action
 		reason.value = rule.reason ?? ''
 		ruleError.value = ''
@@ -120,6 +147,7 @@
 		page.value = null
 		ruleBase.value = null
 		action.value = 'hide'
+		ruleLocale.value = 'all'
 		reason.value = ''
 		ruleError.value = ''
 	}
@@ -127,14 +155,16 @@
 	/** Checks the form, and asks first when the page would disappear from its web. */
 	function submitRule() {
 		ruleFailure.value = null
-		ruleError.value = !page.value ? 'Elige una página.' : reasonTooLong.value ? `El motivo tiene más de ${maxReasonLength} caracteres.` : ''
+		ruleError.value = !page.value ? t('moderation.rule.choosePage') : reasonTooLong.value ? t('moderation.rule.reasonTooLong', { max: maxReasonLength }) : ''
 		if (ruleError.value) return
 		if (action.value === 'hide') {
 			const target = page.value!
+			const locale = toLocale(ruleLocale.value)
+			const where = locale === null ? t('moderation.rule.everyLanguage', { path: target.path, enPath: publicPath(target.path, 'en') }) : publicPath(target.path, locale)
 			ask({
-				title: `¿Ocultar ${target.title}?`,
-				description: `${target.path} responderá 404 en ${siteLabels[site]} y saldrá de la navegación${site === 'site' ? ', la búsqueda, el sitemap y llms.txt' : ''}. Quitar la regla la devuelve.`,
-				confirm: 'Ocultar la página',
+				title: t('moderation.rule.hideTitle', { title: target.title }),
+				description: site === 'site' ? t('moderation.rule.hideTextSite', { where, site: siteLabels[site] }) : t('moderation.rule.hideText', { where, site: siteLabels[site] }),
+				confirm: t('moderation.rule.hideConfirm'),
 				run: () => saveRule(true),
 			})
 		} else void saveRule()
@@ -148,18 +178,19 @@
 		try {
 			// The rule this page had when the edit began (id and version), not the one of the last
 			// reload; none when it had no rule.
-			const base = ruleBase.value?.path === target.path ? ruleBase.value : null
-			const rule = await rpc.moderation.rules.save({ site, path: target.path, action: action.value, reason: reason.value, id: base?.id ?? null, version: base?.version ?? null })
+			const locale = toLocale(ruleLocale.value)
+			const base = ruleBase.value?.path === target.path && ruleBase.value.locale === locale ? ruleBase.value : null
+			const rule = await rpc.moderation.rules.save({ site, locale, path: target.path, action: action.value, reason: reason.value, id: base?.id ?? null, version: base?.version ?? null })
 			resetRule()
 			await reload()
-			notice.value = `${rule.action === 'hide' ? 'Oculta' : 'Destacada'}: ${rule.title ?? rule.path}. ${delay}`
+			notice.value = t('moderation.rule.saved', { action: actionLabel(rule.action), title: rule.title ?? rule.path, locale: localeLabel(toChoice(rule.locale)).toLocaleLowerCase(i18n.locale), delay })
 		} catch (error) {
 			// A conflict closes the confirmation: the form keeps its values and the reloaded table shows the other change.
 			const failure = describeError(error)
 			if (await reloadIfChanged(failure)) {
 				// The conflict is shown and the form keeps its values, now over the rule the page has:
 				// saving again replaces the other change on purpose.
-				pinRule(target.path)
+				pinRule(target.path, toLocale(ruleLocale.value))
 				ruleFailure.value = failure
 				return
 			}
@@ -172,26 +203,27 @@
 
 	function askRemoveRule(rule: ModerationRuleRow) {
 		ask({
-			title: `¿Quitar la regla de ${rule.title ?? rule.path}?`,
-			description: rule.action === 'hide' ? `${rule.path} vuelve a existir en ${siteLabels[site]}: su página, la navegación y la búsqueda.` : `${rule.path} deja de mostrarse como destacada.`,
-			confirm: 'Quitar la regla',
+			title: t('moderation.rule.removeTitle', { title: rule.title ?? rule.path }),
+			description: rule.action === 'hide' ? t('moderation.rule.removeHidden', { path: publicPath(rule.path, rule.locale), site: siteLabels[site] }) : t('moderation.rule.removeFeatured', { path: publicPath(rule.path, rule.locale) }),
+			confirm: t('moderation.rule.removeConfirm'),
 			focus: 'rules-heading',
 			section: 'rules',
 			run: async () => {
 				await rpc.moderation.rules.delete({ id: rule.id, version: rule.version })
 				await reload()
-				notice.value = `Regla quitada: ${rule.title ?? rule.path}. ${delay}`
+				notice.value = t('moderation.rule.removed', { title: rule.title ?? rule.path, delay })
 			},
 		})
 	}
 
 	const ruleColumns = [
-		{ key: 'path', label: 'Página' },
-		{ key: 'action', label: 'Regla' },
-		{ key: 'reason', label: 'Motivo' },
-		{ key: 'author', label: 'Autor' },
-		{ key: 'createdAt', label: 'Fecha' },
-		{ key: 'id', label: 'Acciones' },
+		{ key: 'path', label: t('moderation.columns.page') },
+		{ key: 'locale', label: t('moderation.columns.locale') },
+		{ key: 'action', label: t('moderation.columns.rule') },
+		{ key: 'reason', label: t('moderation.columns.reason') },
+		{ key: 'author', label: t('moderation.columns.author') },
+		{ key: 'createdAt', label: t('moderation.columns.date') },
+		{ key: 'id', label: t('moderation.columns.actions') },
 	] as const
 
 	// Announcements --------------------------------------------------------------------------------
@@ -201,6 +233,7 @@
 	const editingVersion = signal<number | null>(null)
 	const message = signal('')
 	const tone = signal<AnnouncementTone | null>('info')
+	const announcementLocale = signal<LocaleChoice | null>('all')
 	const startsAt = signal('')
 	const endsAt = signal('')
 	const active = signal(true)
@@ -208,17 +241,17 @@
 	const announcementFailure = signal<Failure | null>(null)
 	const savingAnnouncement = signal(false)
 	const messageLength = computed(() => message.value.trim().length)
-	const messageCounter = computed(() => `${messageLength.value} de ${maxMessageLength} caracteres`)
+	const messageCounter = computed(() => t('moderation.announcement.counter', { length: messageLength.value, max: maxMessageLength }))
 	const messageTooLong = computed(() => messageLength.value > maxMessageLength)
-	const preview = computed(() => [{ id: editing.value ?? 0, message: message.value.trim() || 'Escribe el mensaje para ver el aviso.', tone: tone.value ?? 'info' }])
+	const preview = computed(() => [{ id: editing.value ?? 0, message: message.value.trim() || t('moderation.announcement.placeholder'), tone: tone.value ?? 'info' }])
 	const previewNote = computed(() => {
-		if (!active.value) return 'Inactivo: no se mostrará hasta que lo actives.'
+		if (!active.value) return t('moderation.preview.inactive')
 		const start = fromLocalInput(startsAt.value)
 		const end = fromLocalInput(endsAt.value)
 		const now = Date.now()
-		if (end && Date.parse(end) <= now) return 'Su fin ya pasó: no se mostrará.'
-		if (start && Date.parse(start) > now) return `Se mostrará desde ${formatDate(start)}.`
-		return end ? `Se muestra ya, hasta ${formatDate(end)}.` : 'Se muestra ya, sin fecha de fin.'
+		if (end && Date.parse(end) <= now) return t('moderation.preview.ended')
+		if (start && Date.parse(start) > now) return t('moderation.preview.from', { date: formatDate(start) })
+		return end ? t('moderation.preview.until', { date: formatDate(end) }) : t('moderation.preview.now')
 	})
 
 	function editAnnouncement(item: AnnouncementRow) {
@@ -226,6 +259,7 @@
 		editingVersion.value = item.version
 		message.value = item.message
 		tone.value = item.tone
+		announcementLocale.value = toChoice(item.locale)
 		startsAt.value = toLocalInput(item.startsAt)
 		endsAt.value = toLocalInput(item.endsAt)
 		active.value = item.active
@@ -239,6 +273,7 @@
 		editingVersion.value = null
 		message.value = ''
 		tone.value = 'info'
+		announcementLocale.value = 'all'
 		startsAt.value = ''
 		endsAt.value = ''
 		active.value = true
@@ -246,12 +281,12 @@
 	}
 
 	function validateAnnouncement(): string {
-		if (!messageLength.value) return 'Escribe el mensaje.'
-		if (messageTooLong.value) return `El mensaje tiene más de ${maxMessageLength} caracteres.`
+		if (!messageLength.value) return t('validation.message')
+		if (messageTooLong.value) return t('moderation.announcement.tooLong', { max: maxMessageLength })
 		const start = fromLocalInput(startsAt.value)
 		const end = fromLocalInput(endsAt.value)
-		if ((startsAt.value && !start) || (endsAt.value && !end)) return 'Una de las fechas no es válida.'
-		if (start && end && Date.parse(end) <= Date.parse(start)) return 'El fin debe ser posterior al inicio.'
+		if ((startsAt.value && !start) || (endsAt.value && !end)) return t('moderation.announcement.badDate')
+		if (start && end && Date.parse(end) <= Date.parse(start)) return t('validation.endAfterStart')
 		return ''
 	}
 
@@ -264,6 +299,7 @@
 			const item = await rpc.moderation.announcements.save({
 				...(editing.value === null ? {} : { id: editing.value, version: editingVersion.value ?? 1 }),
 				site,
+				locale: toLocale(announcementLocale.value),
 				message: message.value,
 				tone: tone.value ?? 'info',
 				startsAt: fromLocalInput(startsAt.value),
@@ -273,7 +309,7 @@
 			const created = editing.value === null
 			resetAnnouncement()
 			await reload()
-			notice.value = `Aviso #${item.id} ${created ? 'creado' : 'guardado'}: ${announcementStateLabels[item.state].toLowerCase()}. ${delay}`
+			notice.value = t(created ? 'moderation.announcement.created' : 'moderation.announcement.saved', { id: item.id, state: stateLabel(item.state).toLocaleLowerCase(i18n.locale), delay })
 		} catch (error) {
 			const failure = describeError(error)
 			if (await reloadIfChanged(failure)) {
@@ -304,7 +340,7 @@
 		try {
 			const saved = await rpc.moderation.announcements.active({ id: item.id, version: item.version, active: !item.active })
 			await reload()
-			notice.value = `Aviso #${saved.id} ${saved.active ? 'activado' : 'desactivado'}. ${delay}`
+			notice.value = t(saved.active ? 'moderation.announcement.activated' : 'moderation.announcement.deactivated', { id: saved.id, delay })
 		} catch (error) {
 			const failure = describeError(error)
 			await reloadIfChanged(failure)
@@ -314,29 +350,30 @@
 
 	function askRemoveAnnouncement(item: AnnouncementRow) {
 		ask({
-			title: `¿Borrar el aviso #${item.id}?`,
-			description: 'Desaparece de la web y del historial. Para dejar de mostrarlo sin perderlo, desactívalo.',
-			confirm: 'Borrar el aviso',
+			title: t('moderation.announcement.deleteTitle', { id: item.id }),
+			description: t('moderation.announcement.deleteText'),
+			confirm: t('moderation.announcement.deleteConfirm'),
 			focus: 'announcements-heading',
 			section: 'announcements',
 			run: async () => {
 				await rpc.moderation.announcements.delete({ id: item.id, version: item.version })
 				if (editing.value === item.id) resetAnnouncement()
 				await reload()
-				notice.value = `Aviso #${item.id} borrado. ${delay}`
+				notice.value = t('moderation.announcement.deleted', { id: item.id, delay })
 			},
 		})
 	}
 
 	const announcementColumns = [
-		{ key: 'message', label: 'Mensaje' },
-		{ key: 'tone', label: 'Tono' },
-		{ key: 'startsAt', label: 'Vigencia' },
-		{ key: 'state', label: 'Estado' },
-		{ key: 'author', label: 'Autor' },
-		{ key: 'id', label: 'Acciones' },
+		{ key: 'message', label: t('moderation.columns.message') },
+		{ key: 'locale', label: t('moderation.columns.locale') },
+		{ key: 'tone', label: t('moderation.columns.tone') },
+		{ key: 'startsAt', label: t('moderation.columns.validity') },
+		{ key: 'state', label: t('moderation.columns.state') },
+		{ key: 'author', label: t('moderation.columns.author') },
+		{ key: 'id', label: t('moderation.columns.actions') },
 	] as const
-	const validity = (item: AnnouncementRow) => (item.startsAt || item.endsAt ? `${item.startsAt ? formatDate(item.startsAt) : 'Ya'} → ${item.endsAt ? formatDate(item.endsAt) : 'sin fin'}` : 'Sin fechas')
+	const validity = (item: AnnouncementRow) => (item.startsAt || item.endsAt ? `${item.startsAt ? formatDate(item.startsAt) : t('moderation.validity.now')} → ${item.endsAt ? formatDate(item.endsAt) : t('moderation.validity.noEnd')}` : t('moderation.validity.none'))
 
 	// Confirmation -----------------------------------------------------------------------------------
 
@@ -392,12 +429,12 @@
 
 <template>
 	<DashPage
-		title="Moderación"
-		description="Oculta o destaca páginas de cada web y publica avisos en su cabecera. Se aplica sin publicar un snapshot."
+		bind:title="t('moderation.title')"
+		bind:description="t('moderation.description')"
 	>
 		<nav
 			class="dash-tabs"
-			aria-label="Web"
+			bind:aria-label="t('moderation.columns.site')"
 		>
 			<a
 				each:of="tabs.value"
@@ -407,7 +444,7 @@
 				bind:aria-current="tab.name === site ? 'page' : undefined"
 			>
 				{tab.label}
-				<span class="dash-tab-count">{tab.rules === 1 ? '1 regla' : tab.rules + ' reglas'}{tab.live ? ' · ' + (tab.live === 1 ? '1 aviso' : tab.live + ' avisos') : ''}</span>
+				<span class="dash-tab-count">{t('moderation.tabRules', { count: tab.rules })}{tab.live ? ' · ' + t('moderation.tabLive', { count: tab.live }) : ''}</span>
 			</a>
 		</nav>
 		<DashFailure
@@ -425,6 +462,22 @@
 			if:when="data.value"
 			class="dash-stack"
 		>
+			<form
+				class="dash-filters dash-moderation-filter"
+				bind:aria-label="t('moderation.filterLabel')"
+				on:submit="(event) => event.preventDefault()"
+			>
+				<div class="dash-field">
+					<label for="moderation-locale">{t('moderation.filter')}</label>
+					<UISelect
+						id="moderation-locale"
+						model="listLocale"
+						bind:options="localeChoices"
+						bind:labelBy="localeLabel"
+					/>
+				</div>
+				<p class="dash-hint">{t('moderation.filterHint')}</p>
+			</form>
 			<section
 				class="dash-panel"
 				aria-labelledby="rules-heading"
@@ -434,9 +487,9 @@
 						id="rules-heading"
 						tabindex="-1"
 					>
-						Páginas
+						{t('moderation.pages')}
 					</h2>
-					<span class="dash-muted">{pageCount.value} páginas conocidas en {siteLabels[site]}</span>
+					<span class="dash-muted">{t('moderation.known', { count: pageCount.value, site: siteLabels[site] })}</span>
 				</div>
 				<form
 					class="dash-moderation-form"
@@ -449,21 +502,30 @@
 					"
 				>
 					<div class="dash-field dash-moderation-page">
-						<label for="rule-page">Página</label>
+						<label for="rule-page">{t('moderation.columns.page')}</label>
 						<UISelect
 							id="rule-page"
 							searchable
 							by="path"
-							placeholder="Busca por título o ruta…"
 							model="page"
+							bind:placeholder="t('moderation.rule.pagePlaceholder')"
 							bind:options="data.value?.pages ?? []"
 							bind:labelBy="pageLabel"
 							bind:groupBy="site === 'site' ? pageGroup : undefined"
-							bind:invalid="ruleError.value === 'Elige una página.'"
+							bind:invalid="ruleError.value === t('moderation.rule.choosePage')"
+						/>
+					</div>
+					<div class="dash-field">
+						<label for="rule-locale">{t('moderation.columns.locale')}</label>
+						<UISelect
+							id="rule-locale"
+							model="ruleLocale"
+							bind:options="localeChoices"
+							bind:labelBy="localeLabel"
 						/>
 					</div>
 					<fieldset class="dash-segmented">
-						<legend>Regla</legend>
+						<legend>{t('moderation.columns.rule')}</legend>
 						<label>
 							<input
 								type="radio"
@@ -472,7 +534,7 @@
 								bind:checked="action.value === 'hide'"
 								on:change="() => (action.value = 'hide')"
 							/>
-							Ocultar
+							{t('moderation.rule.hideShort')}
 						</label>
 						<label>
 							<input
@@ -482,16 +544,16 @@
 								bind:checked="action.value === 'feature'"
 								on:change="() => (action.value = 'feature')"
 							/>
-							Destacar
+							{t('moderation.rule.featureShort')}
 						</label>
 					</fieldset>
 					<div class="dash-field dash-field-grow">
-						<label for="rule-reason">Motivo</label>
+						<label for="rule-reason">{t('moderation.columns.reason')}</label>
 						<input
 							id="rule-reason"
 							class="meeko-ui-input"
-							placeholder="Opcional: por qué, para el resto del equipo"
 							model="reason"
+							bind:placeholder="t('moderation.rule.reasonPlaceholder')"
 							bind:aria-invalid="reasonTooLong.value ? 'true' : undefined"
 						/>
 					</div>
@@ -507,7 +569,7 @@
 							variant="ghost"
 							on:click="resetRule"
 						>
-							Limpiar
+							{t('moderation.rule.clear')}
 						</UIButton>
 					</div>
 				</form>
@@ -515,7 +577,7 @@
 					if:when="existing.value"
 					class="dash-hint"
 				>
-					Esta página ya tiene una regla ({actionLabels[existing.value?.action ?? 'hide'].toLowerCase()}, de {existing.value?.author}): guardar la sustituye.
+					{t('moderation.rule.existing', { action: actionLabel(existing.value?.action ?? 'hide').toLocaleLowerCase(i18n.locale), author: existing.value?.author ?? '' })}
 				</p>
 				<p
 					if:when="ruleError.value"
@@ -526,16 +588,16 @@
 				</p>
 				<DashFailure
 					if:when="ruleFailure.value"
-					title="No se guardó la regla"
+					bind:title="t('moderation.rule.notSaved')"
 					bind:failure="ruleFailure.value"
 				/>
 				<div class="dash-table-scroll">
 					<UITable
 						rowKey="id"
-						emptyText="Ninguna regla: la web muestra todas sus páginas sin destacar ninguna."
-						bind:caption="'Reglas de ' + siteLabels[site]"
+						bind:emptyText="t('moderation.rule.empty')"
+						bind:caption="t('moderation.rule.caption', { site: siteLabels[site] })"
 						bind:columns="ruleColumns"
-						bind:rows="data.value?.rules ?? []"
+						bind:rows="rules.value"
 					>
 						<snippet
 							name="cell"
@@ -545,14 +607,22 @@
 								if:when="column.key === 'path'"
 								class="dash-source-cell"
 							>
-								<strong>{row.title ?? 'Página que ya no existe'}</strong>
+								<strong>{row.title ?? t('moderation.rule.gone')}</strong>
 								<code>{row.path}</code>
 							</span>
+							<abbr
+								if:when="column.key === 'locale'"
+								class="dash-locale-tag"
+								bind:data-locale="row.locale ?? 'all'"
+								bind:title="localeLabel(toChoice(row.locale))"
+							>
+								{localeShort(row.locale)}
+							</abbr>
 							<UIBadge
 								if:when="column.key === 'action'"
 								bind:tone="row.action === 'hide' ? 'danger' : 'accent'"
 							>
-								{actionLabels[row.action]}
+								{actionLabel(row.action)}
 							</UIBadge>
 							<span if:when="column.key === 'reason'">{row.reason ?? '—'}</span>
 							<span if:when="column.key === 'author'">{row.author}</span>
@@ -571,16 +641,16 @@
 									variant="outline"
 									on:click="() => editRule(row)"
 								>
-									Cambiar
-									<span class="dash-visually-hidden">la regla de {row.path}</span>
+									{t('moderation.rule.edit')}
+									<span class="dash-visually-hidden">{t('moderation.rule.ofPath', { path: publicPath(row.path, row.locale) })}</span>
 								</UIButton>
 								<UIButton
 									size="sm"
 									variant="ghost"
 									on:click="() => askRemoveRule(row)"
 								>
-									Quitar
-									<span class="dash-visually-hidden">la regla de {row.path}</span>
+									{t('moderation.rule.remove')}
+									<span class="dash-visually-hidden">{t('moderation.rule.ofPath', { path: publicPath(row.path, row.locale) })}</span>
 								</UIButton>
 							</span>
 						</snippet>
@@ -597,9 +667,9 @@
 						id="announcements-heading"
 						tabindex="-1"
 					>
-						Avisos
+						{t('moderation.announcements')}
 					</h2>
-					<span class="dash-muted">En la cabecera de {siteLabels[site]}; cada lector puede cerrarlos.</span>
+					<span class="dash-muted">{t('moderation.announcementsHint', { site: siteLabels[site] })}</span>
 				</div>
 				<div class="dash-announcement-editor">
 					<form
@@ -613,16 +683,16 @@
 							}
 						"
 					>
-						<p class="dash-announcement-mode">{editing.value === null ? 'Nuevo aviso' : 'Editando el aviso #' + editing.value}</p>
+						<p class="dash-announcement-mode">{editing.value === null ? t('moderation.announcement.new') : t('moderation.announcement.editing', { id: editing.value })}</p>
 						<div class="dash-field">
-							<label for="announcement-message">Mensaje</label>
+							<label for="announcement-message">{t('moderation.columns.message')}</label>
 							<textarea
 								id="announcement-message"
 								class="meeko-ui-input dash-announcement-text"
 								rows="3"
 								aria-describedby="announcement-counter"
 								model="message"
-								bind:aria-invalid="messageTooLong.value || announcementError.value === 'Escribe el mensaje.' ? 'true' : undefined"
+								bind:aria-invalid="messageTooLong.value || announcementError.value === t('validation.message') ? 'true' : undefined"
 							/>
 							<p
 								id="announcement-counter"
@@ -634,16 +704,25 @@
 						</div>
 						<div class="dash-announcement-row">
 							<div class="dash-field">
-								<label for="announcement-tone">Tono</label>
+								<label for="announcement-tone">{t('moderation.columns.tone')}</label>
 								<UISelect
 									id="announcement-tone"
 									model="tone"
 									bind:options="tones"
-									bind:labelBy="(value) => toneLabels[value]"
+									bind:labelBy="toneLabel"
 								/>
 							</div>
 							<div class="dash-field">
-								<label for="announcement-start">Inicio</label>
+								<label for="announcement-locale">{t('moderation.columns.locale')}</label>
+								<UISelect
+									id="announcement-locale"
+									model="announcementLocale"
+									bind:options="localeChoices"
+									bind:labelBy="localeLabel"
+								/>
+							</div>
+							<div class="dash-field">
+								<label for="announcement-start">{t('moderation.announcement.start')}</label>
 								<input
 									id="announcement-start"
 									class="meeko-ui-input"
@@ -653,7 +732,7 @@
 								/>
 							</div>
 							<div class="dash-field">
-								<label for="announcement-end">Fin</label>
+								<label for="announcement-end">{t('moderation.announcement.end')}</label>
 								<input
 									id="announcement-end"
 									class="meeko-ui-input"
@@ -667,14 +746,14 @@
 							id="announcement-dates"
 							class="dash-hint"
 						>
-							Opcionales, en tu hora local. Sin inicio se muestra ya; sin fin, hasta que lo desactives.
+							{t('moderation.announcement.datesHint')}
 						</p>
 						<label class="dash-check">
 							<input
 								type="checkbox"
 								model="active"
 							/>
-							Activo
+							{t('moderation.announcement.active')}
 						</label>
 						<p
 							if:when="announcementError.value"
@@ -685,7 +764,7 @@
 						</p>
 						<DashFailure
 							if:when="announcementFailure.value"
-							title="No se guardó el aviso"
+							bind:title="t('moderation.announcement.notSaved')"
 							bind:failure="announcementFailure.value"
 						/>
 						<div class="dash-actions">
@@ -693,20 +772,20 @@
 								type="submit"
 								bind:disabled="savingAnnouncement.value"
 							>
-								{savingAnnouncement.value ? 'Guardando…' : editing.value === null ? 'Crear aviso' : 'Guardar cambios'}
+								{savingAnnouncement.value ? t('actions.saving') : editing.value === null ? t('moderation.announcement.create') : t('moderation.announcement.save')}
 							</UIButton>
 							<UIButton
 								if:when="editing.value !== null || message.value"
 								variant="ghost"
 								on:click="resetAnnouncement"
 							>
-								{editing.value === null ? 'Vaciar' : 'Cancelar edición'}
+								{editing.value === null ? t('moderation.announcement.empty') : t('moderation.announcement.cancelEdit')}
 							</UIButton>
 						</div>
 					</form>
 					<figure class="dash-announcement-preview">
 						<figcaption>
-							Vista previa
+							{t('moderation.preview.title')}
 							<span class="dash-muted">{previewNote.value}</span>
 						</figcaption>
 						<div
@@ -728,10 +807,10 @@
 				<div class="dash-table-scroll">
 					<UITable
 						rowKey="id"
-						emptyText="Ningún aviso en esta web."
-						bind:caption="'Avisos de ' + siteLabels[site] + ', del más reciente al más antiguo'"
+						bind:emptyText="t('moderation.announcement.none')"
+						bind:caption="t('moderation.announcement.caption', { site: siteLabels[site] })"
 						bind:columns="announcementColumns"
-						bind:rows="data.value?.announcements ?? []"
+						bind:rows="announcements.value"
 					>
 						<snippet
 							name="cell"
@@ -743,12 +822,20 @@
 							>
 								{row.message}
 							</span>
+							<abbr
+								if:when="column.key === 'locale'"
+								class="dash-locale-tag"
+								bind:data-locale="row.locale ?? 'all'"
+								bind:title="localeLabel(toChoice(row.locale))"
+							>
+								{localeShort(row.locale)}
+							</abbr>
 							<span
 								if:when="column.key === 'tone'"
 								class="dash-tone"
 								bind:data-tone="row.tone"
 							>
-								{toneLabels[row.tone]}
+								{toneLabel(row.tone)}
 							</span>
 							<span
 								if:when="column.key === 'startsAt'"
@@ -760,7 +847,7 @@
 								if:when="column.key === 'state'"
 								bind:tone="announcementStateTones[row.state]"
 							>
-								{announcementStateLabels[row.state]}
+								{stateLabel(row.state)}
 							</UIBadge>
 							<span if:when="column.key === 'author'">{row.author}</span>
 							<span
@@ -772,24 +859,24 @@
 									variant="outline"
 									on:click="() => editAnnouncement(row)"
 								>
-									Editar
-									<span class="dash-visually-hidden">el aviso #{String(row.id)}</span>
+									{t('moderation.announcement.edit')}
+									<span class="dash-visually-hidden">{t('moderation.announcement.ofId', { id: row.id })}</span>
 								</UIButton>
 								<UIButton
 									size="sm"
 									variant="ghost"
 									on:click="() => void toggleAnnouncement(row)"
 								>
-									{row.active ? 'Desactivar' : 'Activar'}
-									<span class="dash-visually-hidden">el aviso #{String(row.id)}</span>
+									{row.active ? t('moderation.announcement.deactivate') : t('moderation.announcement.activate')}
+									<span class="dash-visually-hidden">{t('moderation.announcement.ofId', { id: row.id })}</span>
 								</UIButton>
 								<UIButton
 									size="sm"
 									variant="ghost"
 									on:click="() => askRemoveAnnouncement(row)"
 								>
-									Borrar
-									<span class="dash-visually-hidden">el aviso #{String(row.id)}</span>
+									{t('moderation.announcement.delete')}
+									<span class="dash-visually-hidden">{t('moderation.announcement.ofId', { id: row.id })}</span>
 								</UIButton>
 							</span>
 						</snippet>
@@ -805,7 +892,7 @@
 		>
 			<DashFailure
 				if:when="questionFailure.value"
-				title="No se hizo el cambio"
+				bind:title="t('moderation.notChanged')"
 				bind:failure="questionFailure.value"
 			/>
 			<snippet name="footer">
@@ -813,13 +900,13 @@
 					variant="ghost"
 					on:click="() => (confirming.value = false)"
 				>
-					Cancelar
+					{t('actions.cancel')}
 				</UIButton>
 				<UIButton
 					bind:disabled="answering.value"
 					on:click="answer"
 				>
-					{answering.value ? 'Aplicando…' : (question.value?.confirm ?? 'Confirmar')}
+					{answering.value ? t('moderation.applying') : (question.value?.confirm ?? t('actions.confirm'))}
 				</UIButton>
 			</snippet>
 		</UIModal>

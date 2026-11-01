@@ -110,7 +110,8 @@ describe('dashboard server', { skip: url ? false : 'DATABASE_URL is not set' }, 
 			await dashboard.jobs.settled('import')
 			const job = dashboard.jobs.status().content!
 			assert.equal(job.status, 'succeeded', job.output.join('\n'))
-			assert.match(job.summary ?? '', /nuevas/)
+			assert.match(job.summary ?? '', / new, /)
+			assert.equal(job.facts?.kind, 'import', 'the screen says the result in its language from the facts')
 			const overview = await readOverview(dashboard.database(), dashboard.jobs.status())
 			assert.ok(
 				overview.sites.every((summary) => summary.total > 0),

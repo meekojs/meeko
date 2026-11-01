@@ -99,7 +99,7 @@ test('a failing job, a timeout and a long output are reported', async () => {
 	slow.jobs.start({ kind: 'import' })
 	await slow.jobs.settled('import')
 	assert.equal(slow.jobs.status().content?.status, 'failed')
-	assert.match(slow.jobs.status().content?.output.at(-1) ?? '', /Tiempo agotado/)
+	assert.match(slow.jobs.status().content?.output.at(-1) ?? '', /Timed out/)
 
 	const long = runner(`for (let i = 0; i < 50; i++) console.log('line ' + i)`, { maxLines: 10 })
 	long.jobs.start({ kind: 'import' })

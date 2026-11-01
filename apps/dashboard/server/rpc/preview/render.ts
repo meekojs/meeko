@@ -15,7 +15,7 @@ export default defineRpc({
 		const { dashboard } = context.services
 		const source = await databaseTask(() => getSource(dashboard.database(), input.sourceId))
 		if (!source) throw new ApiError('SOURCE_NOT_FOUND', 404, `Documentation source ${input.sourceId} does not exist`)
-		if (source.file === null || source.kind === 'page' || source.removedAt !== null) throw new ApiError('SOURCE_NOT_EDITABLE', 409, { message: 'Only the guides and the reference of the site are previewed', issues: [{ path: '', message: 'Solo las guías y la referencia del site tienen vista previa.' }] })
+		if (source.file === null || source.kind === 'page' || source.removedAt !== null) throw new ApiError('SOURCE_NOT_EDITABLE', 409, { message: 'Only the guides and the reference of the site are previewed', issues: [{ path: '', message: 'issues.previewOnly' }] })
 		return dashboard.preview.render({ file: source.file, kind: source.kind, markdown: input.markdown })
 	},
 })

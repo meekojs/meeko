@@ -1,6 +1,7 @@
 import type { RequestContext } from '@meekojs/meeko/server'
 
 import { ApiError } from '@meekojs/meeko/server'
+import { localizedPath, splitLocalePath } from 'meeko-docs-content/locale'
 
 /** The variables of the administrator login (F5). See the README, «F5: autenticación». */
 export interface AuthEnv {
@@ -91,30 +92,48 @@ export function authConfig(env: AuthEnv): AuthConfig {
 	}
 }
 
+/** The language of a path of the dashboard: `/en/…` is English, any other path Spanish. */
+export function pathLocale(pathname: string): 'en' | 'es' {
+	return splitLocalePath(pathname).locale
+}
+
+/** Whether `pathname` is the login page, in any language (`/login`, `/en/login`). */
+export function isLoginPath(pathname: string): boolean {
+	return splitLocalePath(pathname).path === '/login'
+}
+
 /**
- * Where to go after the login: `next` when it is a path of this dashboard, or `/`. Only a relative
- * path that starts with one `/` passes, so `//other.example`, `/\other.example`, `https://…`,
- * `javascript:` and control characters cannot send the browser to another site (open redirect).
- * `/login` itself goes to `/`.
+ * Where to go after the login: `next` when it is a path of this dashboard, or the overview in
+ * `locale` (`/`, `/en`). Only a relative path that starts with one `/` passes, so
+ * `//other.example`, `/\other.example`, `https://…`, `javascript:` and control characters cannot
+ * send the browser to another site (open redirect). The login page itself, in any language, goes
+ * to the overview of its language. `next` keeps its language prefix: an English page goes back
+ * to English.
  */
-export function safeNext(next: unknown): string {
-	if (typeof next !== 'string' || next.length > 2048) return '/'
-	if (!next.startsWith('/') || next.startsWith('//') || next.includes('\\') || /[\u0000-\u001f\u007f]/.test(next)) return '/'
+export function safeNext(next: unknown, locale: 'en' | 'es' = 'es'): string {
+	const home = localizedPath('/', locale)
+	if (typeof next !== 'string' || next.length > 2048) return home
+	if (!next.startsWith('/') || next.startsWith('//') || next.includes('\\') || /[\u0000-\u001f\u007f]/.test(next)) return home
 	let url: URL
 	try {
 		url = new URL(next, 'http://dashboard.invalid')
 	} catch {
-		return '/'
+		return home
 	}
-	if (url.origin !== 'http://dashboard.invalid' || url.pathname.startsWith('//')) return '/'
-	if (url.pathname === '/login') return '/'
+	if (url.origin !== 'http://dashboard.invalid' || url.pathname.startsWith('//')) return home
+	if (isLoginPath(url.pathname)) return localizedPath('/', pathLocale(url.pathname))
 	return `${url.pathname}${url.search}${url.hash}`
 }
 
-/** The login page that sends the browser back to `pathname` (with its query) afterwards. */
+/**
+ * The login page in the language of `pathname` that sends the browser back to it (with its query)
+ * afterwards: `/en/sources` gives `/en/login?next=%2Fen%2Fsources`.
+ */
 export function loginLocation(pathname: string, search = ''): string {
-	const next = safeNext(`${pathname}${search}`)
-	return next === '/' ? '/login' : `/login?next=${encodeURIComponent(next)}`
+	const locale = pathLocale(pathname)
+	const login = localizedPath('/login', locale)
+	const next = safeNext(`${pathname}${search}`, locale)
+	return next === localizedPath('/', locale) ? login : `${login}?next=${encodeURIComponent(next)}`
 }
 
 /** The user of the session of a request; `401 UNAUTHENTICATED` without one. */
@@ -149,4 +168,19 @@ export async function withConstantFailure<T>(task: () => Promise<T>, started: nu
 		if (left > 0) await new Promise((done) => setTimeout(done, left))
 		throw error
 	}
+}
+
+/**
+ * The login page after a logout, in the language of the page it was sent from (`referer`, a page
+ * of this `origin`): `/en/login` from an English page, `/login` from any other or without one.
+ */
+export function logoutLocation(referer: string | null, origin: string): string {
+	let pathname = '/'
+	try {
+		const url = referer ? new URL(referer) : null
+		if (url?.origin === origin) pathname = url.pathname
+	} catch {
+		// An unreadable Referer is a Spanish page.
+	}
+	return localizedPath('/login', pathLocale(pathname))
 }

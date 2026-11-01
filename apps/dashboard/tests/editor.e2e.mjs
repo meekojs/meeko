@@ -308,8 +308,12 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 	// child loads the package through Vite, which under load takes longer than any fixed pause.
 	await page
 		.getByRole('log')
-		.filter({ hasText: `Sobre el snapshot activo #${ids.second}` })
+		.filter({ hasText: `Over the active snapshot #${ids.second}` })
 		.waitFor({ timeout: 120_000 })
+		.catch(async (error) => {
+			const text = async (selector) => ((await page.locator(selector).allTextContents()).join(' | ') || '(none)').replace(/\s+/g, ' ')
+			throw new Error([error.message, `failure: ${await text('.dash-failure')}`, `job: ${await text('.dash-job')}`, `server: ${logs.slice(-1500)}`].join(' // '))
+		})
 	// The rollback commits while the publication renders, in the temporary schema.
 	const db = createDatabase({ connectionString: url, searchPath: schema })
 	try {
@@ -317,11 +321,17 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 	} finally {
 		await db.end()
 	}
-	await page.getByText('Otro cambio se publicó mientras tanto').waitFor({ timeout: 180_000 })
+	await page
+		.getByText('Otro cambio se publicó mientras tanto')
+		.waitFor({ timeout: 180_000 })
+		.catch(async (error) => {
+			const text = async (selector) => ((await page.locator(selector).allTextContents()).join(' | ') || '(none)').replace(/\s+/g, ' ')
+			throw new Error([error.message, `notice: ${await text('.dash-notice')}`, `failure: ${await text('.dash-failure')}`, `job: ${await text('.dash-job')}`].join(' // '))
+		})
 	await page.reload({ waitUntil: 'networkidle' })
 	await hydrated()
 	await page.getByRole('button', { name: 'Volver a publicar' }).click()
-	await page.getByRole('log').filter({ hasText: 'por e2e' }).waitFor({ timeout: 30_000 })
+	await page.getByRole('log').filter({ hasText: 'by e2e' }).waitFor({ timeout: 30_000 })
 	// The summary of the job, not the notice: the notice only appears if this very page saw the job
 	// go from running to finished, and a reload of `meeko dev` meanwhile (another change to the
 	// workspace) loses that transition, while the job keeps its summary.
@@ -404,7 +414,7 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 	assert.equal(refusedBySchema.status, 400, await refusedBySchema.clone().text())
 	const schemaError = await refusedBySchema.json()
 	assert.equal(schemaError.code, 'INVALID_INPUT')
-	assert.match(schemaError.issues?.[0]?.message ?? '', /una vez codificado/)
+	assert.match(schemaError.issues?.[0]?.message ?? '', /^validation.markdownTooLarge$/)
 	const huge = `# Límite\n${'\n'.repeat(600_000)}`
 	assert.ok(Buffer.byteLength(huge) < 900_000, 'within 900 kB as UTF-8')
 	const refusedByBody = await send('revisions/save', { sourceId: ids.doctor, markdown: huge, author: 'E2E' }, same)

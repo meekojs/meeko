@@ -3,7 +3,9 @@
 
 	const snippets = defineSnippets<{ default: []; actions?: [] }>()
 
-	useHead(() => ({ title: props.title + ' · Meeko Dashboard', meta: [{ name: 'description', content: props.description }] }))
+	const { t } = useI18n()
+
+	useHead(() => ({ title: t('app.titleSuffix', { title: props.title }), meta: [{ name: 'description', content: props.description }] }))
 </script>
 
 <template>

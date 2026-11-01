@@ -8,6 +8,10 @@ export const siteSchema = v.picklist(['site', 'ui', 'i18n'])
 export const kindSchema = v.picklist(['guide', 'reference', 'page'])
 /** How the published revision of a Markdown source relates to Git (meeko-docs-content/diff). */
 export const stateSchema = v.picklist(['git', 'same', 'edited', 'conflict', 'missing'])
+/** The languages of the documentation: Spanish is the original, English its translation (`docs/en/**`). */
+export const localeSchema = v.picklist(['es', 'en'])
+/** How a translation relates to its original (meeko-docs-content/locale `translationStatus`). */
+export const translationStatusSchema = v.picklist(['translated', 'outdated', 'missing'])
 
 const id = v.pipe(v.number(), v.integer(), v.minValue(1))
 const date = v.string()
@@ -15,6 +19,8 @@ const date = v.string()
 export const sourceSchema = v.object({
 	id: v.number(),
 	site: siteSchema,
+	/** `es` for an original, `en` for a translation of `docs/en/**` (same `path` as its original). */
+	locale: localeSchema,
 	path: v.string(),
 	kind: kindSchema,
 	title: v.string(),
@@ -34,6 +40,7 @@ export const sourceListSchema = v.array(sourceSchema)
 
 export const sourceListInput = v.object({
 	site: v.optional(siteSchema),
+	locale: v.optional(localeSchema),
 	kind: v.optional(kindSchema),
 	includeRemoved: v.optional(v.boolean()),
 })
@@ -43,12 +50,18 @@ export const snapshotSchema = v.object({
 	publishedAt: date,
 	active: v.boolean(),
 	pages: v.number(),
+	/** Pages of each language: one snapshot holds both. */
+	pagesByLocale: v.object({ es: v.number(), en: v.number() }),
 	publishedBy: v.nullable(v.string()),
 	note: v.nullable(v.string()),
 })
 
 export const snapshotListSchema = v.array(snapshotSchema)
 
+/** How many translations into English are in each status. */
+export const translationCountsSchema = v.object({ translated: v.number(), outdated: v.number(), missing: v.number(), total: v.number() })
+
+/** Counts of the Spanish originals of a web; the translations are counted in `translations` of the overview. */
 export const siteSummarySchema = v.object({
 	site: siteSchema,
 	total: v.number(),
@@ -63,6 +76,25 @@ export const siteSummarySchema = v.object({
 export const jobKindSchema = v.picklist(['import', 'publish', 'health'])
 export const jobStatusSchema = v.picklist(['running', 'succeeded', 'failed'])
 
+/**
+ * What a job found, as data: the screen says it in its language (`job.summary.*`). The job's own
+ * output stays a technical log in English.
+ */
+export const jobFactsSchema = v.variant('kind', [
+	v.object({ kind: v.literal('import'), inserted: v.number(), updated: v.number(), unchanged: v.number(), removed: v.number(), restored: v.number() }),
+	v.object({
+		kind: v.literal('publish'),
+		snapshotId: v.number(),
+		pages: v.number(),
+		revisions: v.number(),
+		locales: v.object({ es: v.number(), en: v.number() }),
+		translation: v.object({ translated: v.number(), outdated: v.number(), missing: v.number() }),
+	}),
+	v.object({ kind: v.literal('health'), pending: v.number(), exports: v.number(), broken: v.number(), links: v.number() }),
+	/** A publication that lost to another change of the active snapshot: the ids it expected and found. */
+	v.object({ kind: v.literal('conflict'), expected: v.nullable(v.number()), actual: v.nullable(v.number()) }),
+])
+
 export const jobSchema = v.object({
 	id: v.number(),
 	kind: jobKindSchema,
@@ -74,8 +106,10 @@ export const jobSchema = v.object({
 	output: v.pipe(v.array(v.string()), v.readonly()),
 	/** Lines dropped from the start of `output`. */
 	dropped: v.number(),
-	/** One line about the result, such as «Snapshot 12 publicado con 624 páginas». */
+	/** One technical line about the result, in English, such as «Snapshot 12 published with 1274 pages». */
 	summary: v.nullable(v.string()),
+	/** The result as data, for the screen; `null` while it runs or when the job printed none. */
+	facts: v.nullable(jobFactsSchema),
 	/**
 	 * A publication that lost to a rollback or another publication committed while it rendered
 	 * (`SnapshotConflictError`): nothing was stored, and publishing again renders the new state.
@@ -94,6 +128,8 @@ export const jobsSchema = v.object({
 
 export const overviewSchema = v.object({
 	sites: v.array(siteSummarySchema),
+	/** The translations of the guides and the written reference of the site into English. */
+	translations: translationCountsSchema,
 	activeSnapshot: v.nullable(snapshotSchema),
 	snapshots: v.number(),
 	jobs: jobsSchema,
@@ -140,7 +176,7 @@ export const startJobInput = v.variant('kind', [
 	// Who publishes is the user of the session (F5), not a field.
 	v.object({
 		kind: v.literal('publish'),
-		note: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500, 'Como mucho 500 caracteres.'))),
+		note: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500, 'validation.max500'))),
 	}),
 	v.object({ kind: v.literal('health') }),
 ])
@@ -201,11 +237,12 @@ export const encodedBytes = (text: string): number => utf8Bytes(JSON.stringify(t
 
 export const markdownSchema = v.pipe(
 	v.string(),
-	v.check((text) => text.trim().length > 0, 'El Markdown no puede estar vacío.'),
-	v.check((text) => encodedBytes(text) <= maxMarkdownBytes, `El Markdown supera ${maxMarkdownBytes / 1000} kB una vez codificado.`),
+	// The messages are catalog keys (app/locales/<locale>/common.json): the page says them in its language.
+	v.check((text) => text.trim().length > 0, 'validation.markdownEmpty'),
+	v.check((text) => encodedBytes(text) <= maxMarkdownBytes, 'validation.markdownTooLarge'),
 )
 
-const noteSchema = v.pipe(v.string(), v.trim(), v.maxLength(500, 'Como mucho 500 caracteres.'))
+const noteSchema = v.pipe(v.string(), v.trim(), v.maxLength(500, 'validation.max500'))
 const hashSchema = v.pipe(v.string(), v.regex(/^[0-9a-f]{64}$/))
 
 /** A revision with its Markdown. */
@@ -229,6 +266,11 @@ export const editorSchema = v.object({
 	gitHash: v.nullable(v.string()),
 	/** Size limit of the Markdown, in UTF-8 bytes. */
 	maxBytes: v.number(),
+	/**
+	 * For a translation: its Spanish original, whose hash in the last import «mark as translated»
+	 * writes as `source-hash`. `null` for an original.
+	 */
+	original: v.nullable(v.object({ id: v.number(), title: v.string(), baseHash: v.nullable(v.string()) })),
 })
 
 export const editorInput = v.object({
@@ -307,6 +349,7 @@ export const pendingRevisionSchema = v.object({
 	sourceId: v.number(),
 	title: v.string(),
 	path: v.string(),
+	locale: localeSchema,
 	author: v.string(),
 	change: v.picklist(['published', 'archived']),
 	publishedAt: date,
@@ -331,3 +374,57 @@ export type Preview = v.InferOutput<typeof previewSchema>
 export type PreviewIssue = v.InferOutput<typeof previewIssueSchema>
 export type PendingRevision = v.InferOutput<typeof pendingRevisionSchema>
 export type PendingList = v.InferOutput<typeof pendingListSchema>
+
+// Translations of the site into English ------------------------------------------------------------
+
+export const translationListInput = v.object({
+	kind: v.optional(v.picklist(['guide', 'reference'])),
+	status: v.optional(translationStatusSchema),
+})
+
+/** A guide or a written reference page of the site and its translation into English. */
+export const translationEntrySchema = v.object({
+	original: sourceSchema,
+	/** The translation, or `null` without one: the English web shows the original. */
+	translation: v.nullable(sourceSchema),
+	status: translationStatusSchema,
+	/** The hash of the original the translation says it was made from (`source-hash`). */
+	sourceHash: v.nullable(v.string()),
+	/** Where the translation lives or goes in the repository (`docs/en/…`). */
+	file: v.nullable(v.string()),
+})
+
+export const translationListSchema = v.object({
+	entries: v.array(translationEntrySchema),
+	counts: translationCountsSchema,
+})
+
+/** A translation compared with its original, by the id of either of them. */
+export const translationDetailInput = v.object({ id })
+
+export const translationDetailSchema = v.object({
+	original: sourceSchema,
+	translation: v.nullable(sourceSchema),
+	status: translationStatusSchema,
+	sourceHash: v.nullable(v.string()),
+	file: v.nullable(v.string()),
+	originalMarkdown: v.nullable(v.string()),
+	translationMarkdown: v.nullable(v.string()),
+	translationRevisionId: v.nullable(v.number()),
+	/** Where the text the translation was made from was found, or `null` when it was not. */
+	translatedFrom: v.nullable(v.picklist(['import', 'working-tree', 'commit'])),
+	/** Unified diff of the original since it was translated: what the translation must take in. */
+	originalChanges: v.string(),
+})
+
+/** Writes the hash of the original as `source-hash` of a translation's Markdown. */
+export const stampInput = v.object({ sourceId: id, markdown: v.pipe(v.string(), v.maxLength(1_000_000)) })
+export const stampSchema = v.object({ markdown: v.string(), sourceHash: v.string() })
+
+export type DocsLocale = v.InferOutput<typeof localeSchema>
+export type TranslationStatus = v.InferOutput<typeof translationStatusSchema>
+export type TranslationCounts = v.InferOutput<typeof translationCountsSchema>
+export type JobFacts = v.InferOutput<typeof jobFactsSchema>
+export type TranslationEntryRow = v.InferOutput<typeof translationEntrySchema>
+export type TranslationList = v.InferOutput<typeof translationListSchema>
+export type TranslationDetailView = v.InferOutput<typeof translationDetailSchema>

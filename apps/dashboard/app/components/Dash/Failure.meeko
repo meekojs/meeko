@@ -1,7 +1,11 @@
 <script lang="ts">
 	import type { Failure } from '../../utils/errors'
 
-	const props = defineProps<{ failure: Failure; title?: string }>({ title: 'No se pudieron cargar los datos' })
+	import { failureMessage, issueText } from '../../utils/i18n'
+
+	const props = defineProps<{ failure: Failure; title?: string }>()
+
+	const i18n = useI18n()
 </script>
 
 <template>
@@ -16,16 +20,16 @@
 			<path d="M8 1.75 14.75 13.75H1.25zM8 6.25v3.5M8 11.75v.01" />
 		</svg>
 		<div>
-			<p class="dash-failure-title">{props.title}</p>
-			<p>{props.failure.message}</p>
+			<p class="dash-failure-title">{props.title ?? i18n.t('errors.title')}</p>
+			<p>{failureMessage(i18n, props.failure)}</p>
 			<p
 				if:when="props.failure.detail"
 				class="dash-failure-detail"
 			>
-				{props.failure.detail}
+				{issueText(i18n, props.failure.detail)}
 			</p>
 			<p class="dash-failure-code">
-				Código
+				{i18n.t('errors.code')}
 				<code>{props.failure.code}</code>
 			</p>
 		</div>

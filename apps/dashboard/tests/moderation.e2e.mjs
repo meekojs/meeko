@@ -213,7 +213,7 @@ test('the moderation screen hides, features and announces, and asks first', { sk
 		// The other tab deletes the rule and creates it again, changed once: the same version 2 with
 		// another id. The form, pinned to the first rule at version 2, is refused again.
 		await db.query("DELETE FROM docs_moderation WHERE path = '/modals'")
-		const replaced = await db.query("INSERT INTO docs_moderation (site, path, action, reason, author, version) VALUES ('ui', '/modals', 'feature', 'Recreada en otra pestaña', 'Otra pestaña', 2) RETURNING id")
+		const replaced = await db.query("INSERT INTO docs_moderation (site, locale, path, action, reason, author, version) VALUES ('ui', NULL, '/modals', 'feature', 'Recreada en otra pestaña', 'Otra pestaña', 2) RETURNING id")
 		await page.getByRole('button', { name: 'Cambiar la regla', exact: true }).click()
 		await modals.filter({ hasText: 'Recreada en otra pestaña' }).waitFor()
 		await ruleConflict.waitFor()

@@ -1,9 +1,11 @@
 <script lang="ts">
 	import type { DivergenceState } from '../../../shared/schemas/dashboard'
 
-	import { stateDescriptions, stateLabels, stateTones } from '../../utils/labels'
+	import { stateTones } from '../../utils/labels'
 
 	const props = defineProps<{ state: DivergenceState | null; importStale?: boolean; removed?: boolean }>({ importStale: false, removed: false })
+
+	const { t } = useI18n()
 </script>
 
 <template>
@@ -12,26 +14,26 @@
 			if:when="props.removed"
 			tone="danger"
 		>
-			Retirada
+			{t('badge.removed')}
 		</UIBadge>
 		<span
 			if:when="props.state"
-			bind:title="props.state ? stateDescriptions[props.state] : undefined"
+			bind:title="props.state ? t(`labels.stateHelp.${props.state}`) : undefined"
 		>
-			<UIBadge bind:tone="props.state ? stateTones[props.state] : 'neutral'">{props.state ? stateLabels[props.state] : ''}</UIBadge>
+			<UIBadge bind:tone="props.state ? stateTones[props.state] : 'neutral'">{props.state ? t(`labels.state.${props.state}`) : ''}</UIBadge>
 		</span>
 		<span
 			if:when="!props.state && !props.removed"
 			class="dash-muted"
-			title="Las páginas .meeko no guardan su texto en la base: se editan en el repositorio."
+			bind:title="t('badge.noMarkdownHelp')"
 		>
-			Sin Markdown
+			{t('badge.noMarkdown')}
 		</span>
 		<span
 			if:when="props.importStale"
-			title="Git cambió desde la última importación: importa las fuentes de nuevo."
+			bind:title="t('badge.importStaleHelp')"
 		>
-			<UIBadge tone="accent">Importación desactualizada</UIBadge>
+			<UIBadge tone="accent">{t('badge.importStale')}</UIBadge>
 		</span>
 	</span>
 </template>

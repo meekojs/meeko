@@ -1,13 +1,9 @@
-import type { AnnouncementState, AnnouncementTone, ModerationAction } from '../../shared/schemas/moderation'
-
-export const actionLabels: Readonly<Record<ModerationAction, string>> = { hide: 'Oculta', feature: 'Destacada' }
+import type { AnnouncementState, AnnouncementTone } from '../../shared/schemas/moderation'
 
 export const tones: readonly AnnouncementTone[] = ['info', 'success', 'warning', 'danger']
 
-/** The tones as the screen names them; `danger` interrupts screen readers (`role="alert"`). */
-export const toneLabels: Readonly<Record<AnnouncementTone, string>> = { info: 'Información', success: 'Novedad', warning: 'Advertencia', danger: 'Incidencia' }
-
-export const announcementStateLabels: Readonly<Record<AnnouncementState, string>> = { live: 'En vigor', scheduled: 'Programado', ended: 'Terminado', inactive: 'Inactivo' }
+// The names of the actions, tones and states are the catalog keys `moderation.actions.*`,
+// `moderation.tones.*` and `moderation.states.*`; `danger` interrupts screen readers (`role="alert"`).
 
 export const announcementStateTones: Readonly<Record<AnnouncementState, 'accent' | 'danger' | 'neutral'>> = { live: 'accent', scheduled: 'neutral', ended: 'neutral', inactive: 'neutral' }
 

@@ -1,7 +1,8 @@
 // A job of the dashboard, in its own process: `node scripts/content-job.mjs import|publish|health`.
 // The modules of meeko-docs-content are TypeScript with extensionless imports, so Vite loads them
 // as `meeko build` does, without a server (as apps/meeko/scripts/content.mjs). Its last line is the
-// result as JSON after the marker of server/dashboard/jobs.ts.
+// result as JSON after the marker of server/dashboard/jobs.ts: a technical summary in English and the
+// facts, which the dashboard says in the language of its page. The log itself is English.
 import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -46,41 +47,53 @@ try {
 	const started = Date.now()
 	let result
 	if (kind === 'health') {
-		console.log('Comprobando la referencia, los exports y los enlaces del repositorio…')
+		console.log('Checking the reference, the exports and the links of the repository…')
 		const { documentationHealth } = await load('meeko-docs-content/health')
 		const health = await documentationHealth()
-		result = { summary: `${health.pendingReferences.length} referencias pendientes, ${health.undocumentedExports.length} exports sin página y ${health.brokenLinks.length} enlaces rotos en ${health.checked.links} enlaces`, health }
+		const facts = { kind: 'health', pending: health.pendingReferences.length, exports: health.undocumentedExports.length, broken: health.brokenLinks.length, links: health.checked.links }
+		result = { summary: `${facts.pending} pending references, ${facts.exports} exports without a page and ${facts.broken} broken links out of ${facts.links} links`, facts, health }
 	} else if (kind === 'import') {
-		console.log('Importando las fuentes de Git (site, ui e i18n)…')
+		console.log('Importing the sources from Git (site, ui and i18n, with docs/en)…')
 		db = await openDatabase()
 		const { importRepositorySources } = await load('meeko-docs-content/db')
 		const imported = await importRepositorySources(db)
 		console.log(JSON.stringify(imported))
-		result = { summary: `${imported.inserted} nuevas, ${imported.updated} actualizadas, ${imported.unchanged} sin cambios, ${imported.removed} retiradas y ${imported.restored} restauradas` }
+		const facts = { kind: 'import', inserted: imported.inserted, updated: imported.updated, unchanged: imported.unchanged, removed: imported.removed, restored: imported.restored }
+		result = { summary: `${facts.inserted} new, ${facts.updated} updated, ${facts.unchanged} unchanged, ${facts.removed} removed and ${facts.restored} restored`, facts }
 	} else {
 		const publishedBy = process.env.DASHBOARD_PUBLISHED_BY?.trim() || 'dashboard'
 		const note = process.env.DASHBOARD_PUBLISH_NOTE?.trim() || undefined
-		console.log(`Renderizando la documentación con las revisiones publicadas (por ${publishedBy})…`)
+		console.log(`Rendering the documentation in Spanish and English with the published revisions (by ${publishedBy})…`)
 		db = await openDatabase()
 		const { publishDocumentation } = await load('meeko-docs-content/db')
 		// After this line a rollback or another publication makes this one a conflict (the e2e waits for it).
-		const onRender = ({ activeSnapshotId, revisions }) => console.log(`Sobre el snapshot activo ${activeSnapshotId === null ? '(ninguno)' : '#' + activeSnapshotId}, con ${revisions} ${revisions === 1 ? 'revisión publicada' : 'revisiones publicadas'}.`)
+		const onRender = ({ activeSnapshotId, revisions }) => console.log(`Over the active snapshot ${activeSnapshotId === null ? '(none)' : '#' + activeSnapshotId}, with ${revisions} published ${revisions === 1 ? 'revision' : 'revisions'}.`)
 		const published = await publishDocumentation(db, { publishedBy, onRender, ...(note ? { note } : {}) })
-		const revisions = published.revisions.length ? `, ${published.revisions.length} con revisiones publicadas` : ''
-		result = { summary: `Snapshot ${published.snapshotId} publicado y activo con ${published.pages} páginas${revisions}` }
+		const english = published.locales?.en ?? { pages: 0, translation: { translated: 0, outdated: 0, missing: 0 } }
+		const facts = {
+			kind: 'publish',
+			snapshotId: published.snapshotId,
+			pages: published.pages,
+			revisions: published.revisions.length,
+			locales: { es: published.locales?.es?.pages ?? published.pages, en: english.pages },
+			translation: { translated: english.translation.translated, outdated: english.translation.outdated, missing: english.translation.missing },
+		}
+		const revisions = facts.revisions ? `, ${facts.revisions} with published revisions` : ''
+		result = { summary: `Snapshot ${facts.snapshotId} published and active with ${facts.pages} pages (${facts.locales.es} es, ${facts.locales.en} en)${revisions}`, facts }
 	}
-	console.log(`Terminado en ${((Date.now() - started) / 1000).toFixed(1)} s.`)
+	console.log(`Finished in ${((Date.now() - started) / 1000).toFixed(1)} s.`)
 	console.log(marker + JSON.stringify(result))
 } catch (error) {
 	if (error instanceof Error && error.name === 'SnapshotConflictError') {
 		// A rollback or another publication changed the active snapshot during the render: nothing
 		// was stored, and the dashboard offers to publish again over the new state.
-		const from = error.expected === null ? 'ninguno' : `#${error.expected}`
-		const to = error.actual === null ? 'ninguno' : `#${error.actual}`
+		const from = error.expected === null ? 'none' : `#${error.expected}`
+		const to = error.actual === null ? 'none' : `#${error.actual}`
 		// The same id on both sides: a rollback to another snapshot and back, or a new activation of it.
-		const change = error.expected === error.actual ? `el snapshot ${from} se volvió a activar` : `el snapshot activo cambió de ${from} a ${to}`
+		const change = error.expected === error.actual ? `snapshot ${from} was activated again` : `the active snapshot changed from ${from} to ${to}`
 		console.error(error.message)
-		console.log(marker + JSON.stringify({ summary: `Conflicto: ${change} mientras se renderizaba. No se guardó nada; vuelve a publicar.`, conflict: true }))
+		const facts = { kind: 'conflict', expected: error.expected ?? null, actual: error.actual ?? null }
+		console.log(marker + JSON.stringify({ summary: `Conflict: ${change} while rendering. Nothing was stored; publish again.`, facts, conflict: true }))
 		process.exitCode = 3
 	} else {
 		console.error(error instanceof Error ? (error.stack ?? error.message) : String(error))

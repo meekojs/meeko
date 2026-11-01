@@ -3,7 +3,7 @@ import type { Announcement, Database, ModerationRule } from 'meeko-docs-content/
 import { ApiError } from '@meekojs/meeko/server'
 import { announcementState, createAnnouncement, deleteAnnouncement, deleteModerationRule, listAnnouncements, listKnownPages, listModerationRules, ModerationError, saveModerationRule, setAnnouncementActive, updateAnnouncement } from 'meeko-docs-content/db'
 
-import type { DocsSite } from '../../shared/schemas/dashboard'
+import type { DocsLocale, DocsSite } from '../../shared/schemas/dashboard'
 import type { AnnouncementRow, ModerationRuleRow, ModerationView } from '../../shared/schemas/moderation'
 
 import { databaseTask } from './errors'
@@ -11,6 +11,8 @@ import { databaseTask } from './errors'
 /** The fields of a rule or an announcement: what the screen sends, signed with the user of the session. */
 export interface RuleInput {
 	readonly site: DocsSite
+	/** The language of the page, or `null` for every language; Spanish without it. */
+	readonly locale?: DocsLocale | null | undefined
 	readonly path: string
 	readonly action: 'feature' | 'hide'
 	readonly reason?: string | undefined
@@ -25,6 +27,8 @@ export interface AnnouncementInput {
 	readonly id?: number | undefined
 	readonly version?: number | undefined
 	readonly site: DocsSite
+	/** The language whose pages show it, or `null` for every language; without it, Spanish for a new one and the one it had for a change. */
+	readonly locale?: DocsLocale | null | undefined
 	readonly message: string
 	readonly tone: 'danger' | 'info' | 'success' | 'warning'
 	readonly startsAt: string | null
@@ -38,6 +42,7 @@ const sites: readonly DocsSite[] = ['site', 'ui', 'i18n']
 const ruleRow = (rule: ModerationRule, titles: ReadonlyMap<string, string>): ModerationRuleRow => ({
 	id: rule.id,
 	site: rule.site,
+	locale: rule.locale,
 	path: rule.path,
 	title: titles.get(rule.path) ?? null,
 	action: rule.action,
@@ -50,6 +55,7 @@ const ruleRow = (rule: ModerationRule, titles: ReadonlyMap<string, string>): Mod
 const announcementRow = (item: Announcement, now: Date): AnnouncementRow => ({
 	id: item.id,
 	site: item.site,
+	locale: item.locale,
 	message: item.message,
 	tone: item.tone,
 	startsAt: item.startsAt?.toISOString() ?? null,
@@ -80,7 +86,10 @@ export function moderationTask<T>(task: () => Promise<T>): Promise<T> {
 	})
 }
 
-/** The moderation of `site`: its known pages, its rules and its announcements, and the counters of every web. */
+/**
+ * The moderation of `site`: its known pages (paths without the language prefix, the same in every
+ * language), its rules and announcements of every language, and the counters of every web.
+ */
 export async function readModeration(db: Database, site: DocsSite): Promise<ModerationView> {
 	const [pages, rules, announcements] = await Promise.all([listKnownPages(db, site), listModerationRules(db), listAnnouncements(db)])
 	const titles = new Map(pages.map((page) => [page.path, page.title]))
@@ -102,7 +111,7 @@ export async function readModeration(db: Database, site: DocsSite): Promise<Mode
  */
 export async function saveRule(db: Database, input: RuleInput): Promise<ModerationRuleRow> {
 	const expected = input.id === null || input.version === null ? { expectedVersion: null } : { expectedId: input.id, expectedVersion: input.version }
-	const rule = await saveModerationRule(db, { site: input.site, path: input.path, action: input.action, reason: input.reason ?? null, author: input.author }, expected)
+	const rule = await saveModerationRule(db, { site: input.site, ...(input.locale === undefined ? {} : { locale: input.locale }), path: input.path, action: input.action, reason: input.reason ?? null, author: input.author }, expected)
 	const pages = await listKnownPages(db, input.site)
 	return ruleRow(rule, new Map(pages.map((page) => [page.path, page.title])))
 }
@@ -116,6 +125,7 @@ export async function removeRule(db: Database, id: number, version: number): Pro
 export async function saveAnnouncement(db: Database, input: AnnouncementInput): Promise<AnnouncementRow> {
 	const fields = {
 		site: input.site,
+		...(input.locale === undefined ? {} : { locale: input.locale }),
 		message: input.message,
 		tone: input.tone,
 		startsAt: input.startsAt === null ? null : new Date(input.startsAt),

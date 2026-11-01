@@ -1,0 +1,68 @@
+{
+	"snapshots": {
+		"title": "Snapshots",
+		"description": "The site serves one active snapshot, with the documentation in Spanish and in English. Import the sources from Git, publish a new one with the published revisions or go back to an earlier one.",
+		"actions": "Actions",
+		"actionsHint": "They run in a separate process, one at a time.",
+		"import": "Import from Git",
+		"publish": "Publish snapshot…",
+		"hint": "Importing updates the sources and their translations (docs/en) with the files of the repository and never touches the revisions. Publishing renders the whole documentation in both languages and activates the result on the site.",
+		"cannotStart": "The job could not start",
+		"conflict": "Another change was published meanwhile",
+		"retry": "Publish again",
+		"noJob": "No job since the dashboard started.",
+		"done": "Finished.",
+		"failed": "The job failed: check its output.",
+		"activated": "Snapshot #{id} is now the active one: the site serves it from now on.",
+		"rollback": "Back to #{id}",
+		"activate": "Activate #{id}",
+		"pending": {
+			"title": "Revisions not yet on the site",
+			"count": {
+				"plural": "count",
+				"forms": {
+					"one": "{count} revision",
+					"other": "{count} revisions"
+				}
+			},
+			"noActive": "No active snapshot: the site shows no revision until the first publication.",
+			"changedAfter": "They changed after the active snapshot #{id}: the site does not show these changes until you publish a snapshot.",
+			"publishedAfter": "They were published after the active snapshot #{id}: the site does not show them until you publish a snapshot.",
+			"unreadable": "The published revisions could not be read.",
+			"allIncluded": "The active snapshot #{id} includes every published revision.",
+			"none": "No pending published revisions.",
+			"archived": "revision #{id} archived: the page goes back to Git · {date}",
+			"published": "revision #{id} by {author} · {date}"
+		},
+		"saved": "Saved",
+		"retention": "The last 5 and the one that was active are kept.",
+		"caption": "Saved snapshots, newest first",
+		"empty": "No snapshots: publish the first one so the site has documentation.",
+		"byLocale": "{es} pages in Spanish and {en} in English",
+		"split": "es {es} · en {en}",
+		"activeBadge": "Active",
+		"columns": {
+			"id": "Snapshot",
+			"publishedAt": "Published",
+			"publishedBy": "By",
+			"pages": "Pages",
+			"note": "Note",
+			"active": "Status"
+		},
+		"confirm": {
+			"title": "Activate snapshot #{id}?",
+			"text": "The public site will serve this snapshot, in both languages, as soon as you confirm. You can go back to the current one from this same list.",
+			"replaces": "Replaces",
+			"failed": "Not activated",
+			"activating": "Activating…",
+			"activate": "Activate snapshot"
+		},
+		"publishModal": {
+			"title": "Publish a snapshot",
+			"text": "Renders the guides, the reference and the pages in Spanish and in English with the published revisions over Git, and activates it on the site.",
+			"noteHint": "Optional. What changes in this publication.",
+			"failed": "Could not start",
+			"submit": "Publish and activate"
+		}
+	}
+}

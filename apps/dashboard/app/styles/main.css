@@ -38,7 +38,7 @@ code {
 	display: grid;
 	position: sticky;
 	top: 0;
-	grid-template-columns: auto 1fr auto;
+	grid-template-columns: auto minmax(0, 1fr) auto;
 	align-items: center;
 	gap: 1.5rem;
 	z-index: 20;
@@ -64,10 +64,13 @@ code {
 	color: var(--muted);
 	font-weight: 500;
 }
+/* Seven sections and the end of the header: when they do not fit, the sections scroll, never overlap. */
 .dash-nav {
 	display: flex;
 	gap: 0.25rem;
 	min-width: 0;
+	overflow-x: auto;
+	scrollbar-width: none;
 }
 .dash-nav a {
 	display: inline-flex;
@@ -153,6 +156,146 @@ code {
 .dash-logout:focus-visible {
 	outline: 2px solid var(--accent);
 	outline-offset: 2px;
+}
+
+/*
+ * The language switch: two real links (es without a prefix, en under /en/…) in the pill of the
+ * logout, each as wide as its code so switching never moves the header. The current one is filled.
+ */
+.dash-locale {
+	display: inline-flex;
+	flex: none;
+	border: 1px solid var(--line-strong);
+	border-radius: 999px;
+	padding: 2px;
+	height: 1.875rem;
+}
+.dash-locale a {
+	display: inline-grid;
+	place-items: center;
+	transition:
+		background-color 160ms var(--ease-out),
+		color 160ms var(--ease-out);
+	border-radius: 999px;
+	width: 2.25rem;
+	color: var(--muted);
+	font-weight: 600;
+	font-size: 0.71875rem;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.04em;
+	text-decoration: none;
+}
+.dash-locale a:hover {
+	background: var(--surface-2);
+	color: var(--ink);
+}
+.dash-locale a[aria-current='true'] {
+	background: var(--surface-3);
+	color: var(--ink);
+}
+.dash-locale a:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+
+/*
+ * The suggestion of the browser's language: it floats over the corner instead of pushing the page
+ * down after hydration, and leaves with the choice to stay, which the language cookie remembers.
+ */
+.dash-locale-suggestion {
+	display: grid;
+	position: fixed;
+	right: max(var(--gutter), env(safe-area-inset-right));
+	bottom: max(1.25rem, env(safe-area-inset-bottom));
+	grid-template-columns: auto minmax(0, 1fr);
+	align-items: center;
+	gap: 0.625rem 0.75rem;
+	z-index: 30;
+	animation: dash-suggestion-in 320ms var(--ease-out) both;
+	box-shadow: var(--shadow-lg);
+	border: 1px solid var(--line-strong);
+	border-radius: var(--radius-l);
+	background: var(--bg-raised);
+	padding: 0.875rem 1rem;
+	width: min(calc(100vw - 2 * var(--gutter)), 22rem);
+	color: var(--ink-soft);
+	font-size: 0.875rem;
+}
+.dash-locale-suggestion svg {
+	fill: none;
+	stroke: var(--accent);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1.4;
+	width: 18px;
+	height: 18px;
+}
+.dash-locale-suggestion p {
+	margin: 0;
+	text-wrap: pretty;
+}
+.dash-locale-suggestion-actions {
+	display: flex;
+	grid-column: 1 / -1;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+.dash-locale-switch,
+.dash-locale-stay {
+	display: inline-flex;
+	align-items: center;
+	transition:
+		background-color 160ms var(--ease-out),
+		color 160ms var(--ease-out);
+	cursor: pointer;
+	border-radius: 999px;
+	padding: 0 0.875rem;
+	height: 2rem;
+	font: inherit;
+	font-weight: 500;
+	font-size: 0.8125rem;
+	text-decoration: none;
+}
+.dash-locale-switch {
+	border: 1px solid var(--accent-line);
+	background: var(--accent-soft);
+	color: var(--ink);
+}
+.dash-locale-switch:hover {
+	background: color-mix(in oklch, var(--accent) 22%, transparent);
+}
+.dash-locale-stay {
+	border: 1px solid transparent;
+	background: none;
+	color: var(--muted);
+}
+.dash-locale-stay:hover {
+	background: var(--surface-2);
+	color: var(--ink);
+}
+.dash-locale-switch:focus-visible,
+.dash-locale-stay:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+@keyframes dash-suggestion-in {
+	from {
+		transform: translateY(0.5rem);
+		opacity: 0;
+		filter: blur(2px);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.dash-locale-suggestion {
+		animation: none;
+	}
+}
+
+/* A phone: the logo keeps the name in its aria-label, so the logout, the language and the theme fit. */
+@media (max-width: 480px) {
+	.dash-brand span {
+		display: none;
+	}
 }
 
 /* F5: the login page. One quiet panel on the page's own background, at the optical center. */
@@ -778,10 +921,24 @@ code {
 	}
 }
 
-/* Narrow screens: the sections move under the brand and scroll sideways. */
-@media (max-width: 760px) {
+/* The header makes room step by step: first the icons, then the user name, which the logout's title keeps. */
+@media (max-width: 1360px) {
+	.dash-nav svg {
+		display: none;
+	}
+	.dash-nav a {
+		padding: 0 0.625rem;
+	}
+}
+@media (max-width: 1180px) {
+	.dash-user {
+		display: none;
+	}
+}
+/* Then the sections move under the brand and scroll sideways. */
+@media (max-width: 1040px) {
 	.dash-header {
-		grid-template-columns: 1fr auto;
+		grid-template-columns: minmax(0, 1fr) auto;
 		gap: 0.5rem 1rem;
 		padding-top: 0.5rem;
 	}
@@ -790,13 +947,13 @@ code {
 		grid-column: 1 / -1;
 		margin: 0 calc(var(--gutter) * -1);
 		padding: 0 var(--gutter) 0.5rem;
-		overflow-x: auto;
-		scrollbar-width: none;
 	}
 	/* The login page has no sections: brand and theme share the first row. */
 	.dash-header-spacer {
 		display: none;
 	}
+}
+@media (max-width: 760px) {
 	.dash-page {
 		padding-block: 1.5rem 3rem;
 	}
@@ -809,14 +966,6 @@ code {
 	}
 	.dash-strip-item {
 		box-shadow: 0 -1px 0 var(--line);
-	}
-}
-@media (max-width: 440px) {
-	.dash-nav svg {
-		display: none;
-	}
-	.dash-nav a {
-		padding: 0 0.625rem;
 	}
 }
 
@@ -1180,7 +1329,7 @@ code {
 }
 .dash-moderation-form {
 	display: grid;
-	grid-template-columns: minmax(16rem, 2fr) auto minmax(12rem, 1.5fr) minmax(10rem, 1fr) auto;
+	grid-template-columns: minmax(16rem, 2fr) minmax(10rem, 0.8fr) auto minmax(12rem, 1.5fr) auto;
 	align-items: end;
 	gap: 0.875rem 1rem;
 	margin-bottom: 1rem;
@@ -1263,7 +1412,7 @@ code {
 }
 .dash-announcement-row {
 	display: grid;
-	grid-template-columns: minmax(9rem, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
+	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: 0.875rem;
 }
 .dash-announcement-row .dash-field,
@@ -1355,4 +1504,126 @@ code {
 	.dash-announcement-row {
 		grid-template-columns: minmax(0, 1fr);
 	}
+}
+
+/* Translations ---------------------------------------------------------------------------------- */
+
+/* The filter by status: the dot next to its name, the counter under them. */
+.dash-tab-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4375rem;
+}
+.dash-translation-tabs .dash-dot {
+	background: var(--status);
+}
+/* The file of a translation stays in one line: the table scrolls before it breaks a path. */
+.dash-translations code {
+	white-space: nowrap;
+}
+
+/* The share of each status as one bar, with the counters as links to the filtered list. */
+.dash-translation-meter {
+	display: grid;
+	gap: 0.75rem;
+}
+.dash-translation-bar {
+	display: flex;
+	gap: 2px;
+	border-radius: 999px;
+	background: var(--surface-3);
+	height: 0.5rem;
+	overflow: hidden;
+}
+.dash-translation-bar span {
+	flex-basis: 0;
+	min-width: 0;
+}
+[data-status='translated'] {
+	--status: var(--success);
+}
+[data-status='outdated'] {
+	--status: var(--accent);
+}
+[data-status='missing'] {
+	--status: var(--muted);
+}
+.dash-translation-bar span,
+.dash-translation-legend .dash-dot,
+.dash-translation-status .dash-dot {
+	background: var(--status);
+}
+.dash-translation-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem 1.5rem;
+	margin: 0;
+	padding: 0;
+	font-size: 0.875rem;
+	list-style: none;
+}
+.dash-translation-legend a {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	color: var(--ink-soft);
+	text-decoration: none;
+}
+.dash-translation-legend a:hover {
+	color: var(--ink);
+}
+.dash-translation-legend strong {
+	color: var(--ink);
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+.dash-translation-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4375rem;
+	white-space: nowrap;
+}
+.dash-locale-tag {
+	display: inline-grid;
+	place-items: center;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--radius-s);
+	padding: 0 0.3125rem;
+	min-width: 1.75rem;
+	height: 1.25rem;
+	color: var(--muted);
+	font-weight: 600;
+	font-size: 0.6875rem;
+	letter-spacing: 0.04em;
+}
+.dash-locale-tag[data-locale='en'] {
+	border-color: var(--accent-line);
+	color: var(--ink);
+}
+/* Original and translation side by side, each with its own scroll; one column on narrow screens. */
+.dash-side-by-side {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr));
+	gap: var(--dash-gap);
+}
+.dash-side-by-side .dash-pane {
+	min-width: 0;
+}
+.dash-markdown {
+	margin: 0;
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	background: var(--code-bg);
+	padding: 0.875rem 1rem;
+	max-height: 36rem;
+	overflow: auto;
+	font-size: 0.8125rem;
+	line-height: 1.55;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+.dash-pages-split {
+	display: block;
+	font-size: 0.75rem;
+	white-space: nowrap;
 }

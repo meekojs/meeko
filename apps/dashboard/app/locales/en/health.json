@@ -1,0 +1,85 @@
+{
+	"health": {
+		"title": "Health",
+		"description": "What the documentation in the repository lacks or has broken: pending references, exports without a page, internal links and anchors, and the inventory of .meeko pages.",
+		"checking": "Checking…",
+		"check": "Check again",
+		"cannotStart": "The check could not start",
+		"running": "Checking the repository in a separate process…",
+		"checked": "Checked {date}: {guides}, {references} and {links}.",
+		"guides": {
+			"plural": "count",
+			"forms": {
+				"one": "{count} guide",
+				"other": "{count} guides"
+			}
+		},
+		"references": {
+			"plural": "count",
+			"forms": {
+				"one": "{count} reference page",
+				"other": "{count} reference pages"
+			}
+		},
+		"links": {
+			"plural": "count",
+			"forms": {
+				"one": "{count} link",
+				"other": "{count} links"
+			}
+		},
+		"lastFailed": "The last check failed; its output is at the end of the page.",
+		"pending": "Pending references",
+		"pendingNone": "None: every entry of the taxonomy has its written page.",
+		"broken": "Broken internal links",
+		"brokenLead": "Links of the guides and the reference pages of the site to pages, anchors or files of the repository that do not exist.",
+		"brokenNone": "No broken links.",
+		"reasons": {
+			"anchor": "Missing anchor",
+			"file": "Missing file",
+			"page": "Missing page"
+		},
+		"exports": "Exports without a reference page",
+		"exportsLead": "Exports of @meekojs/meeko that neither the taxonomy nor any written page names. They have their page generated from the JSDoc, but no reference guide.",
+		"filterExports": "Filter exports",
+		"exportsPlaceholder": "Name or module…",
+		"exportsNone": "No export matches.",
+		"deprecated": "Deprecated",
+		"showingAll": "Showing all {total}",
+		"showingSome": "Showing {shown} of {total}",
+		"showLess": "Show less",
+		"showAll": "Show all",
+		"meekoPages": ".meeko pages of UI and i18n",
+		"meekoLead": "Inventory of the last import, read from app/utils/navigation.ts of each web. They are edited in the repository.",
+		"meekoCaption": "Imported .meeko pages",
+		"meekoNone": "No pages imported. Import from Git in Snapshots.",
+		"meekoUnreadable": "The inventory could not be read.",
+		"lastCheck": "Last check",
+		"noCheck": "No check has run since the dashboard started.",
+		"columns": {
+			"export": "Export",
+			"module": "Module",
+			"kind": "Kind",
+			"file": "File",
+			"link": "Link",
+			"target": "Target",
+			"reason": "Reason",
+			"page": "Page",
+			"site": "Web",
+			"path": "Path",
+			"imported": "Imported"
+		},
+		"apiKind": {
+			"block": "Blocks",
+			"macro": "Macros",
+			"tag": "Tags",
+			"directive": "Directives",
+			"function": "Functions",
+			"class": "Classes",
+			"const": "Constants",
+			"enum": "Enums",
+			"interface": "Interfaces",
+			"type": "Types"
+		}
+	}
+}

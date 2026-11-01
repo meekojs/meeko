@@ -1,0 +1,82 @@
+{
+	"editor": {
+		"title": "Edit {title}",
+		"fallbackTitle": "Edit source {id}",
+		"fallbackDescription": "Editor of the Markdown of a source.",
+		"compareOriginal": "Compare with the original",
+		"back": "Back to the source",
+		"cannotOpen": "The editor cannot open",
+		"draft": "Draft",
+		"note": "Note",
+		"noteHint": "Optional. What changes and why.",
+		"status": {
+			"lines": {
+				"plural": "count",
+				"forms": {
+					"one": "{lines} changed line not saved",
+					"other": "{lines} changed lines not saved"
+				}
+			},
+			"note": "The note has unsaved changes",
+			"none": "No changes yet",
+			"saved": "Everything saved"
+		},
+		"origin": {
+			"draft": "Draft #{id}",
+			"revision": "New draft from revision #{id}",
+			"git": "New draft from Git ({hash})"
+		},
+		"tooLarge": "The Markdown takes {size} kB and the limit is {limit} kB.",
+		"created": "Draft #{id} created.",
+		"savedDraft": "Draft #{id} saved.",
+		"issues": {
+			"frontmatter": "Blocks the publication",
+			"render": "The render would fail",
+			"link": "Broken link"
+		},
+		"leave": "The draft has unsaved changes. Leave and lose them?",
+		"size": "{size} of {limit} kB",
+		"create": "Create draft",
+		"save": "Save draft",
+		"importStale": "Git changed since the last import. The draft starts from the Git file of now; import the sources so the overview shows it.",
+		"notSaved": "The draft was not saved",
+		"publishFromSource": "Publish it from the source",
+		"markdownLabel": "Markdown of the source",
+		"stamped": "source-hash set to the current original ({hash}). Save the draft to keep it.",
+		"translation": {
+			"title": "Translation of “{title}”.",
+			"text": "Once you have carried over the changes of the original, mark it as translated: the frontmatter keeps the hash of the current original, and it no longer shows as outdated once published.",
+			"stamp": "Mark as translated",
+			"stamping": "Marking…",
+			"failed": "It was not marked as translated"
+		},
+		"preview": {
+			"title": "Preview",
+			"auto": "While typing",
+			"rendering": "Rendering…",
+			"refresh": "Refresh",
+			"real": "Rendering with the real render of the site…",
+			"stale": "The preview does not include the latest changes.",
+			"done": "Rendered in {ms} ms, the same as on the site.",
+			"donePartial": "Rendered in {ms} ms, the same as on the site, except the generated sections.",
+			"failed": "No preview",
+			"issues": "Preview warnings",
+			"issueCount": {
+				"plural": "count",
+				"forms": {
+					"one": "{count} warning",
+					"other": "{count} warnings"
+				}
+			},
+			"blocking": {
+				"plural": "count",
+				"forms": {
+					"one": "{count} blocks the publication",
+					"other": "{count} block the publication"
+				}
+			},
+			"line": "Line {line}",
+			"frame": "Preview of the draft"
+		}
+	}
+}

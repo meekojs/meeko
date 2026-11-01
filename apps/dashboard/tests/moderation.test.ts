@@ -125,6 +125,30 @@ describe('moderation of the dashboard', { skip: url ? false : 'DATABASE_URL is n
 		assert.deepEqual((await readModeration(db, 'ui')).counts.ui, { rules: 0, live: 0 })
 	})
 
+	test('rules and announcements of one language or of every language', async () => {
+		const spanish = await moderationTask(() => saveRule(db, { site: 'site', path: '/docs/doctor', action: 'feature', author: 'Ana', id: null, version: null }))
+		const english = await moderationTask(() => saveRule(db, { site: 'site', locale: 'en', path: '/docs/doctor', action: 'hide', reason: 'Translation in review', author: 'Ana', id: null, version: null }))
+		const global = await moderationTask(() => saveRule(db, { site: 'site', locale: null, path: '/docs/reference/signal', action: 'hide', author: 'Ana', id: null, version: null }))
+		// Without a language, Spanish, as before; the same page has one rule per language.
+		assert.deepEqual([spanish.locale, english.locale, global.locale], ['es', 'en', null])
+		const notice = await moderationTask(() => saveAnnouncement(db, { site: 'site', locale: null, message: 'For everyone', tone: 'info', startsAt: null, endsAt: null, active: true, author: 'Ana' }))
+		const englishNotice = await moderationTask(() => saveAnnouncement(db, { site: 'site', locale: 'en', message: 'Only in English', tone: 'info', startsAt: null, endsAt: null, active: true, author: 'Ana' }))
+		assert.deepEqual([notice.locale, englishNotice.locale], [null, 'en'])
+		// A change without a language keeps the one it had.
+		const kept = await moderationTask(() => saveAnnouncement(db, { id: englishNotice.id, version: englishNotice.version, site: 'site', message: 'Only in English, again', tone: 'info', startsAt: null, endsAt: null, active: true, author: 'Ana' }))
+		assert.equal(kept.locale, 'en')
+
+		const view = await readModeration(db, 'site')
+		assert.deepEqual(view.rules.map((rule) => [rule.path, rule.locale, rule.action]).sort(), [
+			['/docs/doctor', 'en', 'hide'],
+			['/docs/doctor', 'es', 'feature'],
+			['/docs/reference/signal', null, 'hide'],
+		])
+		assert.deepEqual(view.counts.site, { rules: 3, live: 2 })
+		for (const rule of view.rules) await moderationTask(() => removeRule(db, rule.id, rule.version))
+		for (const item of view.announcements) await moderationTask(() => removeAnnouncement(db, item.id, item.version))
+	})
+
 	test('two tabs: the old one gets 409 and the newer change stays', async () => {
 		// Both tabs read the announcement at version 1. A fixes the message; B switches it off.
 		const item = await moderationTask(() => saveAnnouncement(db, { site: 'ui', message: 'Mensaje con errata', tone: 'info', startsAt: null, endsAt: null, active: true, author: 'Ana' }))

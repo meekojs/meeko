@@ -1,6 +1,6 @@
 import * as v from 'valibot'
 
-import type { DocsSite } from '../../shared/schemas/dashboard'
+import type { DocsLocale, DocsSite } from '../../shared/schemas/dashboard'
 import type { Failure } from './errors'
 
 import { isCalendarDay, metricsInput } from '../../shared/schemas/metrics'
@@ -34,9 +34,9 @@ export function defaultRange(from: string | undefined, to: string | undefined): 
 	return from && to && day.test(from) && day.test(to) ? { from, to } : lastDays(30)
 }
 
-/** The presets of the range, as rows before a custom range. */
+/** The presets of the range, as rows before a custom range; the page names them (`metrics.days`). */
 export const presets = [7, 30, 90].map((days) => ({
-	label: `${days} días`,
+	days,
 	range: () => lastDays(days),
 	matches: (range: DayRange) => {
 		const expected = lastDays(days)
@@ -44,10 +44,20 @@ export const presets = [7, 30, 90].map((days) => ({
 	},
 }))
 
-/** The address of the metrics of a web in a range. */
-export function metricsHref(site: DocsSite, range: DayRange): string {
-	const query = new URLSearchParams({ ...(site === 'site' ? {} : { site }), from: range.from, to: range.to })
+/** The address of the metrics of a web in a range, in one language (`lang`) or all, without the prefix of the page's language. */
+export function metricsHref(site: DocsSite, range: DayRange, locale: DocsLocale | null = null): string {
+	const query = new URLSearchParams({ ...(site === 'site' ? {} : { site }), ...(locale ? { lang: locale } : {}), from: range.from, to: range.to })
 	return `/metrics?${query}`
+}
+
+/** The language of the `lang` of the address, or `null` for every language. */
+export function metricsLocale(value: string | undefined): DocsLocale | null {
+	return value === 'es' || value === 'en' ? value : null
+}
+
+/** The public URL of a page of the metrics in its language: `/en/docs/api` in English. */
+export function localePagePath(path: string, locale: DocsLocale): string {
+	return locale === 'en' ? `/en${path === '/' ? '' : path}` : path
 }
 
 /**
@@ -73,19 +83,14 @@ export function pageWithin(page: number, total: number, pageSize: number): numbe
 	return Math.min(Math.max(1, page), Math.max(1, Math.ceil(total / pageSize)))
 }
 
-const short = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
-
-/** «1 oct 2026 – 30 oct 2026», or one day; «Rango no válido» when a day is not in the calendar. */
-export function formatRange(range: DayRange): string {
-	if (!isCalendarDay(range.from) || !isCalendarDay(range.to)) return 'Rango no válido'
+/**
+ * «1 oct 2026 – 30 oct 2026» in Spanish, «Oct 1, 2026 – Oct 30, 2026» in English, or one day;
+ * `invalid` when a day is not in the calendar.
+ */
+export function formatRange(range: DayRange, locale = 'es', invalid = ''): string {
+	if (!isCalendarDay(range.from) || !isCalendarDay(range.to)) return invalid
+	const short = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 	const from = short.format(new Date(`${range.from}T00:00:00Z`))
 	const to = short.format(new Date(`${range.to}T00:00:00Z`))
 	return from === to ? from : `${from} – ${to}`
-}
-
-const percentFormat = new Intl.NumberFormat('es-ES', { style: 'percent', maximumFractionDigits: 0 })
-
-/** A share from 0 to 1 as «67 %». */
-export function percent(share: number): string {
-	return percentFormat.format(Number.isFinite(share) ? share : 0)
 }

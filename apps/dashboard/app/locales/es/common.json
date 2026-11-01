@@ -1,0 +1,203 @@
+{
+	"app": {
+		"name": "Meeko Dashboard",
+		"titleSuffix": "{title} · Meeko Dashboard"
+	},
+	"nav": {
+		"overview": "Resumen",
+		"sources": "Fuentes",
+		"translations": "Traducciones",
+		"moderation": "Moderación",
+		"metrics": "Métricas",
+		"health": "Salud",
+		"snapshots": "Snapshots"
+	},
+	"a11y": {
+		"skip": "Saltar al contenido",
+		"brand": "Meeko Dashboard, resumen",
+		"sections": "Secciones",
+		"session": "Sesión iniciada"
+	},
+	"account": {
+		"logout": "Cerrar sesión",
+		"logoutTitle": "Cerrar la sesión de {user}"
+	},
+	"locale": {
+		"label": "Idioma",
+		"suggestion": "Tu navegador prefiere otro idioma.",
+		"switchTo": "Ver el dashboard en {name}",
+		"stay": "Seguir en español",
+		"dismiss": "Descartar la sugerencia de idioma",
+		"es": "Español",
+		"en": "Inglés",
+		"all": "Todos los idiomas",
+		"short": {
+			"es": "ES",
+			"en": "EN",
+			"all": "Todos"
+		}
+	},
+	"actions": {
+		"cancel": "Cancelar",
+		"close": "Cerrar",
+		"confirm": "Confirmar",
+		"starting": "Iniciando…",
+		"saving": "Guardando…",
+		"clearFilters": "Quitar filtros",
+		"search": "Buscar"
+	},
+	"filters": {
+		"allFeminine": "Todas",
+		"allMasculine": "Todos"
+	},
+	"errors": {
+		"title": "No se pudieron cargar los datos",
+		"code": "Código",
+		"unknownCode": "El servidor respondió con un error ({code}).",
+		"unknownCodeRequest": "El servidor respondió con un error ({code}, petición {request}).",
+		"notFoundTitle": "Esta página no existe",
+		"notFoundText": "La dirección no corresponde a ninguna sección del dashboard.",
+		"serverTitle": "No se pudo cargar la página",
+		"serverText": "El servidor del dashboard falló al preparar esta página. Revisa su consola.",
+		"backHome": "Volver al resumen",
+		"seeSources": "Ver las fuentes",
+		"DATABASE_UNAVAILABLE": "No se puede conectar con la base de documentación. Comprueba DATABASE_URL en apps/dashboard/.env y que voidcat-local:5432 responde.",
+		"SCHEMA_MISSING": "La base no tiene las tablas de la documentación. Ejecuta pnpm -F meeko-site run db:migrate.",
+		"SOURCE_NOT_FOUND": "Esa fuente no existe. Puede que una importación la haya cambiado de identificador.",
+		"SNAPSHOT_NOT_FOUND": "Ese snapshot ya no existe: la retención de snapshots lo borró.",
+		"SNAPSHOT_EMPTY": "Ese snapshot no tiene páginas y no se puede activar.",
+		"JOB_RUNNING": "Hay una importación o publicación en curso. Espera a que termine.",
+		"JOBS_CLOSED": "El servidor se está deteniendo.",
+		"INVALID_ORIGIN": "El servidor rechazó la petición por su origen. Abre el dashboard desde su dirección habitual.",
+		"INVALID_CSRF": "La sesión cambió en otra pestaña. Recarga la página y vuelve a intentarlo.",
+		"UNAUTHENTICATED": "La sesión terminó (caducó, se cerró por inactividad o se cerró en otra pestaña). Recarga la página para volver a iniciar sesión.",
+		"SESSION_REVOKED": "La sesión se cerró. Recarga la página para volver a iniciar sesión.",
+		"VALIDATION_ERROR": "Los datos enviados no son válidos.",
+		"REVISION_NOT_FOUND": "Esa revisión no existe o no es de esta fuente.",
+		"SOURCE_NOT_EDITABLE": "Esta fuente no se puede editar desde el dashboard.",
+		"INVALID_REVISION": "No se guardó: el Markdown no es válido para esta fuente.",
+		"REVISION_NOT_DRAFT": "Solo se modifican los borradores: las revisiones publicadas y archivadas son historial. Crea un borrador nuevo a partir de ella.",
+		"DRAFT_CHANGED": "Alguien guardó este borrador mientras lo editabas. No se sobrescribió: copia tus cambios, recarga y vuelve a aplicarlos.",
+		"REVISION_REJECTED": "No se publicó: el site rechazaría esta revisión. La revisión publicada anterior sigue intacta.",
+		"MERGE_NOT_TRIVIAL": "La fusión no es trivial: Git y la revisión cambiaron las mismas líneas. Resuélvela a mano en un borrador nuevo.",
+		"NO_CONFLICT": "Esta revisión ya parte del Git actual: no hay nada que fusionar.",
+		"PREVIEW_FAILED": "La vista previa falló.",
+		"PREVIEW_TIMEOUT": "La vista previa tardó demasiado y se detuvo. Vuelve a intentarlo.",
+		"PREVIEW_CLOSED": "El servidor se está deteniendo.",
+		"BODY_TOO_LARGE": "El Markdown es demasiado grande para enviarlo (el límite de Meeko es 1 MiB por petición).",
+		"TOO_LARGE": "El Markdown supera el límite de tamaño de una revisión.",
+		"NETWORK_ERROR": "No hay respuesta del servidor del dashboard.",
+		"INVALID_MODERATION": "No se guardó: la regla o el aviso no son válidos.",
+		"UNKNOWN_PAGE": "Esa web no tiene esa página. Importa las fuentes o publica un snapshot si es nueva.",
+		"MODERATION_NOT_FOUND": "Esa regla o ese aviso ya no existen: otra persona lo borró. La lista ya muestra lo que hay ahora.",
+		"MODERATION_CONFLICT": "Otra persona cambió esta regla o este aviso desde que cargaste la lista. No se guardó nada: la lista ya muestra su versión. Revísala; si vuelves a guardar, sustituirás ese cambio.",
+		"INVALID_RANGE": "El rango de fechas no es válido: la fecha inicial debe ser anterior a la final y abarcar como mucho un año.",
+		"FEEDBACK_NOT_FOUND": "Ese comentario ya no existe: otra persona lo borró. Recarga la lista.",
+		"TRANSLATION_NOT_FOUND": "Esa página no tiene traducción que comparar: no es una guía ni una referencia escrita del site.",
+		"UNKNOWN": "Ocurrió un error inesperado. Revisa la consola del servidor.",
+		"INVALID_INPUT": "Los datos enviados no son válidos."
+	},
+	"validation": {
+		"username": "Escribe tu usuario.",
+		"password": "Escribe tu contraseña.",
+		"max200": "Como mucho 200 caracteres.",
+		"max500": "Como mucho 500 caracteres.",
+		"max2000": "Como mucho 2000 caracteres.",
+		"max4096": "Como mucho 4096 caracteres.",
+		"markdownEmpty": "El Markdown no puede estar vacío.",
+		"markdownTooLarge": "El Markdown supera 900 kB una vez codificado.",
+		"date": "La fecha no es válida.",
+		"rangeReversed": "La fecha inicial es posterior a la final.",
+		"rangeTooLong": "El rango abarca como mucho 366 días.",
+		"choosePage": "Elige una página de la web.",
+		"ruleVersion": "Una regla que se cambia lleva el id y la versión que se leyeron.",
+		"message": "Escribe el mensaje.",
+		"endAfterStart": "El fin debe ser posterior al inicio.",
+		"announcementVersion": "Un aviso que se cambia lleva la versión que se leyó."
+	},
+	"labels": {
+		"kind": {
+			"guide": "Guía",
+			"reference": "Referencia",
+			"page": "Página .meeko"
+		},
+		"state": {
+			"git": "Git",
+			"same": "Igual a Git",
+			"edited": "Editada",
+			"conflict": "Conflicto",
+			"missing": "Falta en Git"
+		},
+		"stateHelp": {
+			"git": "Sin revisión publicada: la web muestra el archivo de Git.",
+			"same": "La revisión publicada coincide con Git.",
+			"edited": "La revisión publicada difiere de Git, y Git no ha cambiado desde que se escribió.",
+			"conflict": "La revisión publicada difiere y Git cambió después de escribirla.",
+			"missing": "El archivo ya no existe en Git."
+		},
+		"job": {
+			"import": "Importación desde Git",
+			"publish": "Publicación de snapshot",
+			"health": "Comprobación de salud"
+		},
+		"jobStatus": {
+			"running": "En curso",
+			"succeeded": "Terminado",
+			"failed": "Falló"
+		},
+		"translation": {
+			"translated": "Traducida",
+			"outdated": "Desactualizada",
+			"missing": "Sin traducir"
+		},
+		"translationHelp": {
+			"translated": "La traducción parte del original que tiene Git ahora.",
+			"outdated": "El original cambió después de traducirlo: falta trasladar esos cambios.",
+			"missing": "No hay traducción: la web en inglés muestra el original en español con el aviso «sin traducir»."
+		}
+	},
+	"badge": {
+		"removed": "Retirada",
+		"noMarkdown": "Sin Markdown",
+		"noMarkdownHelp": "Las páginas .meeko no guardan su texto en la base: se editan en el repositorio.",
+		"importStale": "Importación desactualizada",
+		"importStaleHelp": "Git cambió desde la última importación: importa las fuentes de nuevo."
+	},
+	"diff": {
+		"empty": "Sin diferencias.",
+		"added": "Añadida: ",
+		"removed": "Eliminada: "
+	},
+	"job": {
+		"started": "Iniciado {date}",
+		"exitCode": "código de salida {code}",
+		"output": "Salida de la {job}",
+		"outputFallback": "Salida del trabajo",
+		"dropped": {
+			"plural": "count",
+			"forms": {
+				"one": "… {count} línea anterior omitida",
+				"other": "… {count} líneas anteriores omitidas"
+			}
+		},
+		"noOutput": "Sin salida todavía.",
+		"seconds": "{value} s",
+		"minutes": "{minutes} min {seconds} s",
+		"summary": {
+			"import": "{inserted} nuevas, {updated} actualizadas, {unchanged} sin cambios, {removed} retiradas y {restored} restauradas.",
+			"publish": "Snapshot {id} publicado y activo con {pages} páginas: {es} en español y {en} en inglés ({translated} traducidas, {outdated} desactualizadas y {missing} sin traducir).",
+			"publishRevisions": "Snapshot {id} publicado y activo con {pages} páginas, {revisions} con revisiones publicadas: {es} en español y {en} en inglés ({translated} traducidas, {outdated} desactualizadas y {missing} sin traducir).",
+			"health": "{pending} referencias pendientes, {exports} exports sin página y {broken} enlaces rotos en {links} enlaces.",
+			"conflict": "Conflicto: el snapshot activo cambió de {from} a {to} mientras se renderizaba. No se guardó nada; vuelve a publicar.",
+			"reactivated": "Conflicto: el snapshot {from} se volvió a activar mientras se renderizaba. No se guardó nada; vuelve a publicar.",
+			"none": "ninguno",
+			"failed": "El trabajo falló sin resultado: revisa su salida."
+		}
+	},
+	"issues": {
+		"meekoPage": "Las páginas .meeko se editan en el repositorio.",
+		"gitMissing": "Git ya no tiene este archivo.",
+		"previewOnly": "Solo las guías y la referencia del site tienen vista previa.",
+		"notTranslation": "Solo una traducción con su original importado se puede marcar como traducida."
+	}
+}

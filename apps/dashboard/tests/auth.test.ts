@@ -12,7 +12,7 @@ import { join } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { assertProductionAuth, authConfig, loginLocation, parseDuration, safeNext, withConstantFailure } from '../server/dashboard/auth'
+import { assertProductionAuth, authConfig, loginLocation, logoutLocation, parseDuration, safeNext, withConstantFailure } from '../server/dashboard/auth'
 import { createDashboardSessions } from '../server/dashboard/sessions'
 import runtime from '../server/runtime'
 import { startDashboard, testAdmin } from './fixtures/auth.mjs'
@@ -61,6 +61,23 @@ describe('login rules', () => {
 		assert.equal(safeNext(['/x']), '/')
 		assert.equal(loginLocation('/sources', '?site=ui'), '/login?next=%2Fsources%3Fsite%3Dui')
 		assert.equal(loginLocation('/'), '/login')
+	})
+
+	test('the login keeps the language of the address: /en goes to /en/login and back to /en', () => {
+		assert.equal(loginLocation('/en/sources', '?site=ui'), '/en/login?next=%2Fen%2Fsources%3Fsite%3Dui')
+		assert.equal(loginLocation('/en'), '/en/login')
+		assert.equal(safeNext('/en/metrics?lang=en'), '/en/metrics?lang=en')
+		// The login page itself, in either language, goes to the overview of its language.
+		assert.equal(safeNext('/en/login?next=/x'), '/en')
+		assert.equal(safeNext('/login'), '/')
+		// The fallback is the overview of the language of the page that asks.
+		assert.equal(safeNext(undefined, 'en'), '/en')
+		assert.equal(safeNext('//evil.example', 'en'), '/en')
+		// The logout goes to the login of the page it was sent from, only from this origin.
+		assert.equal(logoutLocation('http://127.0.0.1:4310/en/sources', 'http://127.0.0.1:4310'), '/en/login')
+		assert.equal(logoutLocation('http://127.0.0.1:4310/sources', 'http://127.0.0.1:4310'), '/login')
+		assert.equal(logoutLocation('https://evil.example/en/x', 'http://127.0.0.1:4310'), '/login')
+		assert.equal(logoutLocation(null, 'http://127.0.0.1:4310'), '/login')
 	})
 
 	test('production does not start without the login or the database', async () => {
@@ -150,18 +167,22 @@ describe('login over HTTP', { skip: url ? false : 'DATABASE_URL is not set', tim
 
 	test('without a session every page redirects to /login and every RPC and API answers 401', async () => {
 		const routes = await discoverConfiguredRoutes(app)
-		const pages = routes.map((route) => route.id).filter((id) => id !== '/login')
-		assert.ok(pages.length >= 8, 'the manifest has the pages of the dashboard')
+		const pages = routes.map((route) => route.id).filter((id) => id !== '/login' && id !== '/en/login')
+		assert.ok(pages.length >= 16, 'the manifest has the pages of the dashboard in both languages')
+		assert.ok(pages.includes('/en/sources/[id]/edit'), 'the English versions are pages too')
 		for (const id of pages) {
 			const path = id.replace(/\[[^\]]+\]/g, '1')
 			const response = await page(path)
 			assert.ok([302, 303, 307].includes(response.status), `${path}: ${response.status}`)
 			const location = new URL(response.headers.get('location')!, origin)
-			assert.equal(location.pathname, '/login', path)
-			assert.equal(location.searchParams.get('next') ?? '/', path, `${path} comes back after the login`)
+			// The login of the language of the page, which comes back to the same address.
+			const english = path === '/en' || path.startsWith('/en/')
+			assert.equal(location.pathname, english ? '/en/login' : '/login', path)
+			assert.equal(location.searchParams.get('next') ?? (english ? '/en' : '/'), path, `${path} comes back after the login`)
 		}
-		// The login page itself is open, and so are the assets.
+		// The login page itself is open, in both languages, and so are the assets.
 		assert.equal((await page('/login')).status, 200)
+		assert.equal((await page('/en/login')).status, 200)
 		assert.equal((await page('/brand/meeko-logo.png')).status, 200)
 
 		// Every procedure, with an allowed Origin: 401, so a new one cannot stay open by mistake.
@@ -216,8 +237,10 @@ describe('login over HTTP', { skip: url ? false : 'DATABASE_URL is not set', tim
 		const overview = await page('/', id)
 		assert.equal(overview.status, 200)
 		assert.match(await overview.text(), new RegExp(`class="dash-user"[^>]*>(?:\\s|<!--[^>]*-->)*${account.username}`))
-		// Logged in, /login goes on to `next`.
+		// Logged in, /login goes on to `next`, and /en/login without one to the English overview.
 		assert.equal(new URL((await page('/login?next=%2Fhealth', id)).headers.get('location')!, origin).pathname, '/health')
+		assert.equal(new URL((await page('/en/login', id)).headers.get('location')!, origin).pathname, '/en')
+		assert.equal((await page('/en/sources', id)).status, 200, 'the English pages open with the same session')
 
 		// Logging in again with that cookie rotates the ID: the old one no longer opens anything. With
 		// a live session the login is an authenticated mutation, so it needs the session's CSRF token

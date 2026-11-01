@@ -1,0 +1,44 @@
+{
+	"overview": {
+		"title": "Overview",
+		"description": "State of the public documentation of the three webs: sources imported from Git, divergence of the revisions, translations into English and the snapshot the site serves.",
+		"publication": "Publication",
+		"activeSnapshot": "Active snapshot",
+		"pages": {
+			"plural": "count",
+			"forms": {
+				"one": "{pages} page",
+				"other": "{pages} pages"
+			}
+		},
+		"byLocale": "{es} in Spanish · {en} in English",
+		"by": "by {user}",
+		"unknownUser": "unknown",
+		"noSnapshot": "None: the site has no documentation to serve.",
+		"publishFirst": "Publish the first one",
+		"lastJob": "Last job",
+		"noJob": "None since the dashboard started.",
+		"savedSnapshots": "Saved snapshots",
+		"translations": "Translations into English",
+		"seeTranslations": "See the translations",
+		"translationsLead": "Guides and written reference of the site. What is not translated is published under /en in Spanish, with the “not translated” notice.",
+		"translationsShare": "{share} translated: {translated} of {total} pages",
+		"sourcesBySite": "Sources by web",
+		"sourcesCaption": "Number of Spanish sources of each web by kind and their last import",
+		"site": "Web",
+		"guides": "Guides",
+		"meekoPages": ".meeko pages",
+		"total": "Total",
+		"removed": "Removed",
+		"lastImport": "Last imported change",
+		"noSources": "No sources imported. Press “Import from Git” in",
+		"divergence": "Divergence from Git",
+		"divergenceLead": "Only the Markdown sources of the site have revisions; the .meeko pages of UI and i18n are edited in the repository. Each number opens the sources in that state.",
+		"divergenceCaption": "Markdown sources of each web by divergence state",
+		"attention": "Attention",
+		"stateLink": "{count} sources of {site}: {state}",
+		"notApplicable": "Not applicable",
+		"toReview": "{count} to review",
+		"upToDate": "Up to date"
+	}
+}

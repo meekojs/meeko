@@ -7,7 +7,7 @@ import type { ChildProcess } from 'node:child_process'
 import { ApiError } from '@meekojs/meeko/server'
 import { spawn } from 'node:child_process'
 
-import type { HealthReport, Job, JobKind, Jobs, StartJob } from '../../shared/schemas/dashboard'
+import type { HealthReport, Job, JobFacts, JobKind, Jobs, StartJob } from '../../shared/schemas/dashboard'
 
 /** A job to start: what the screen sends, and who publishes for a publication. */
 export type JobRequest = Exclude<StartJob, { kind: 'publish' }> | (Extract<StartJob, { kind: 'publish' }> & { readonly publishedBy: string })
@@ -17,7 +17,10 @@ export const resultMarker = '@@dashboard-result '
 
 /** What a job reports on its last line. */
 export interface JobResult {
+	/** One technical line in English, for the logs. */
 	readonly summary: string
+	/** The result as data, which the screen says in its language. */
+	readonly facts?: JobFacts
 	readonly health?: HealthReport
 	/** The publication lost to another change of the active snapshot. */
 	readonly conflict?: boolean
@@ -88,7 +91,7 @@ export class JobRunner {
 			else delete env.DASHBOARD_PUBLISH_NOTE
 		}
 		const publication = input.kind === 'publish' ? { publishedBy: input.publishedBy, note: input.note || null } : { publishedBy: null, note: null }
-		const job: MutableJob = { id: this.#nextId++, kind: input.kind, status: 'running', startedAt: new Date().toISOString(), finishedAt: null, exitCode: null, output: [], dropped: 0, summary: null, conflict: false, ...publication }
+		const job: MutableJob = { id: this.#nextId++, kind: input.kind, status: 'running', startedAt: new Date().toISOString(), finishedAt: null, exitCode: null, output: [], dropped: 0, summary: null, facts: null, conflict: false, ...publication }
 		// The IPC channel ties the child to this process: the child ends when it closes, so a crash or
 		// a kill of the dashboard never leaves an import or a publication running (scripts/parent-guard.mjs).
 		const child = this.#options.spawnJob?.(input.kind, env) ?? spawn(process.execPath, [this.#options.script, input.kind], { cwd: this.#options.cwd, env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] })
@@ -119,6 +122,7 @@ export class JobRunner {
 				try {
 					const result = JSON.parse(line.slice(resultMarker.length)) as JobResult
 					job.summary = typeof result.summary === 'string' ? result.summary : null
+					job.facts = result.facts && typeof result.facts === 'object' && typeof result.facts.kind === 'string' ? result.facts : null
 					if (result.health) this.#health = result.health
 					if (result.conflict === true) job.conflict = true
 				} catch {
@@ -158,8 +162,8 @@ export class JobRunner {
 				finished = true
 				clearTimeout(timer)
 				this.#append(job, `${buffers.stdout}\n${buffers.stderr}`)
-				if (failure) this.#append(job, `No se pudo iniciar el proceso: ${failure.message}`)
-				if (timedOut) this.#append(job, 'Tiempo agotado: el proceso se detuvo.')
+				if (failure) this.#append(job, `The process could not start: ${failure.message}`)
+				if (timedOut) this.#append(job, 'Timed out: the process was stopped.')
 				job.exitCode = code
 				job.status = code === 0 && !timedOut && !failure ? 'succeeded' : 'failed'
 				job.finishedAt = new Date().toISOString()

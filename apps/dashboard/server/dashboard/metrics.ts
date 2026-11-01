@@ -16,6 +16,7 @@ export const feedbackPageSize = 25
 const row = (item: FeedbackComment): FeedbackCommentRow => ({
 	id: item.id,
 	site: item.site,
+	locale: item.locale,
 	path: item.path,
 	helpful: item.helpful,
 	comment: item.comment,
@@ -36,9 +37,9 @@ export function metricsTask<T>(task: () => Promise<T>): Promise<T> {
 	})
 }
 
-/** What the screen shows of a web in a range of UTC days. */
+/** What the screen shows of a web in a range of UTC days, in one language or (without `locale`) all. */
 export async function readMetrics(db: Queryable, input: MetricsInput): Promise<MetricsSummaryView> {
-	const summary = await readMetricsSummary(db, input)
+	const summary = await readMetricsSummary(db, { site: input.site, from: input.from, to: input.to, ...(input.locale ? { locale: input.locale } : {}) })
 	return { ...summary, daily: [...summary.daily], topPages: [...summary.topPages], topSearches: [...summary.topSearches], emptySearches: [...summary.emptySearches], feedback: [...summary.feedback] }
 }
 
@@ -48,6 +49,7 @@ export async function readFeedback(db: Queryable, input: FeedbackListInput): Pro
 		site: input.site,
 		from: input.from,
 		to: input.to,
+		...(input.locale ? { locale: input.locale } : {}),
 		status: input.status,
 		...(input.answer === 'all' ? {} : { helpful: input.answer === 'helpful' }),
 		...(input.path.trim() ? { path: input.path } : {}),

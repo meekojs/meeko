@@ -1,0 +1,146 @@
+{
+	"moderation": {
+		"title": "Moderación",
+		"description": "Oculta o destaca páginas de cada web y publica avisos en su cabecera, en un idioma o en todos. Se aplica sin publicar un snapshot.",
+		"delay": "Las webs lo aplican en menos de 30 s, sin publicar ni reiniciar.",
+		"tabRules": {
+			"plural": "count",
+			"forms": {
+				"one": "{count} regla",
+				"other": "{count} reglas"
+			}
+		},
+		"tabLive": {
+			"plural": "count",
+			"forms": {
+				"one": "{count} aviso",
+				"other": "{count} avisos"
+			}
+		},
+		"filterLabel": "Filtrar por idioma",
+		"filter": "Mostrar lo que ven los lectores en",
+		"filterHint": "Cada idioma ve sus reglas y avisos y los de todos los idiomas.",
+		"pages": "Páginas",
+		"known": {
+			"plural": "count",
+			"forms": {
+				"one": "{count} página conocida en {site}",
+				"other": "{count} páginas conocidas en {site}"
+			}
+		},
+		"groups": {
+			"sources": "Fuentes",
+			"snapshot": "Solo en el snapshot (referencia generada)"
+		},
+		"actions": {
+			"hide": "Oculta",
+			"feature": "Destacada"
+		},
+		"tones": {
+			"info": "Información",
+			"success": "Novedad",
+			"warning": "Advertencia",
+			"danger": "Incidencia"
+		},
+		"states": {
+			"live": "En vigor",
+			"scheduled": "Programado",
+			"ended": "Terminado",
+			"inactive": "Inactivo"
+		},
+		"columns": {
+			"site": "Web",
+			"page": "Página",
+			"locale": "Idioma",
+			"rule": "Regla",
+			"reason": "Motivo",
+			"author": "Autor",
+			"date": "Fecha",
+			"actions": "Acciones",
+			"message": "Mensaje",
+			"tone": "Tono",
+			"validity": "Vigencia",
+			"state": "Estado"
+		},
+		"rule": {
+			"change": "Cambiar la regla",
+			"hide": "Ocultar la página…",
+			"feature": "Destacar la página",
+			"hideShort": "Ocultar",
+			"featureShort": "Destacar",
+			"choosePage": "Elige una página.",
+			"reasonTooLong": "El motivo tiene más de {max} caracteres.",
+			"everyLanguage": "{path} y {enPath}",
+			"hideTitle": "¿Ocultar {title}?",
+			"hideText": "{where} responderá 404 en {site} y saldrá de la navegación. Quitar la regla la devuelve.",
+			"hideTextSite": "{where} responderá 404 en {site} y saldrá de la navegación, la búsqueda, el sitemap y llms.txt. Quitar la regla la devuelve.",
+			"hideConfirm": "Ocultar la página",
+			"saved": "{action}: {title} ({locale}). {delay}",
+			"removeTitle": "¿Quitar la regla de {title}?",
+			"removeHidden": "{path} vuelve a existir en {site}: su página, la navegación y la búsqueda.",
+			"removeFeatured": "{path} deja de mostrarse como destacada.",
+			"removeConfirm": "Quitar la regla",
+			"removed": "Regla quitada: {title}. {delay}",
+			"pagePlaceholder": "Busca por título o ruta…",
+			"reasonPlaceholder": "Opcional: por qué, para el resto del equipo",
+			"clear": "Limpiar",
+			"existing": "Esta página ya tiene una regla en ese idioma ({action}, de {author}): guardar la sustituye.",
+			"notSaved": "No se guardó la regla",
+			"empty": "Ninguna regla: la web muestra todas sus páginas sin destacar ninguna.",
+			"caption": "Reglas de {site}",
+			"gone": "Página que ya no existe",
+			"edit": "Cambiar",
+			"remove": "Quitar",
+			"ofPath": "la regla de {path}"
+		},
+		"announcements": "Avisos",
+		"announcementsHint": "En la cabecera de {site}; cada lector puede cerrarlos.",
+		"announcement": {
+			"counter": "{length} de {max} caracteres",
+			"placeholder": "Escribe el mensaje para ver el aviso.",
+			"tooLong": "El mensaje tiene más de {max} caracteres.",
+			"badDate": "Una de las fechas no es válida.",
+			"created": "Aviso #{id} creado: {state}. {delay}",
+			"saved": "Aviso #{id} guardado: {state}. {delay}",
+			"activated": "Aviso #{id} activado. {delay}",
+			"deactivated": "Aviso #{id} desactivado. {delay}",
+			"deleteTitle": "¿Borrar el aviso #{id}?",
+			"deleteText": "Desaparece de la web y del historial. Para dejar de mostrarlo sin perderlo, desactívalo.",
+			"deleteConfirm": "Borrar el aviso",
+			"deleted": "Aviso #{id} borrado. {delay}",
+			"new": "Nuevo aviso",
+			"editing": "Editando el aviso #{id}",
+			"start": "Inicio",
+			"end": "Fin",
+			"datesHint": "Opcionales, en tu hora local. Sin inicio se muestra ya; sin fin, hasta que lo desactives.",
+			"active": "Activo",
+			"notSaved": "No se guardó el aviso",
+			"create": "Crear aviso",
+			"save": "Guardar cambios",
+			"empty": "Vaciar",
+			"cancelEdit": "Cancelar edición",
+			"none": "Ningún aviso en esta web.",
+			"caption": "Avisos de {site}, del más reciente al más antiguo",
+			"edit": "Editar",
+			"deactivate": "Desactivar",
+			"activate": "Activar",
+			"delete": "Borrar",
+			"ofId": "el aviso #{id}"
+		},
+		"validity": {
+			"now": "Ya",
+			"noEnd": "sin fin",
+			"none": "Sin fechas"
+		},
+		"preview": {
+			"title": "Vista previa",
+			"inactive": "Inactivo: no se mostrará hasta que lo actives.",
+			"ended": "Su fin ya pasó: no se mostrará.",
+			"from": "Se mostrará desde {date}.",
+			"until": "Se muestra ya, hasta {date}.",
+			"now": "Se muestra ya, sin fecha de fin."
+		},
+		"notChanged": "No se hizo el cambio",
+		"applying": "Aplicando…"
+	}
+}

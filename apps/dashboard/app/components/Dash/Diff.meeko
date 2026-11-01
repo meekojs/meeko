@@ -1,5 +1,7 @@
 <script lang="ts">
-	const props = defineProps<{ diff: string; label: string; empty?: string }>({ empty: 'Sin diferencias.' })
+	const props = defineProps<{ diff: string; label: string; empty?: string }>()
+
+	const { t } = useI18n()
 
 	type DiffKind = 'add' | 'context' | 'file' | 'hunk' | 'remove'
 
@@ -13,7 +15,7 @@
 			.map((text, index) => ({ index, text, kind: diffKind(text) })),
 	)
 
-	const lineLabels: Record<DiffKind, string> = { add: 'Añadida: ', remove: 'Eliminada: ', hunk: '', file: '', context: '' }
+	const lineLabels: Record<DiffKind, string> = { add: t('diff.added'), remove: t('diff.removed'), hunk: '', file: '', context: '' }
 </script>
 
 <template>
@@ -21,7 +23,7 @@
 		if:when="!props.diff"
 		class="dash-empty"
 	>
-		{props.empty}
+		{props.empty ?? t('diff.empty')}
 	</p>
 	<pre
 		if:when="props.diff"

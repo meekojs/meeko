@@ -1,0 +1,58 @@
+{
+	"translations": {
+		"title": "Translations",
+		"description": "The guides and the written reference of the site and their translation into English (docs/en): translated, outdated because the Spanish changed, or not translated, which /en publishes in Spanish with the “not translated” notice.",
+		"byStatus": "Translations by status",
+		"all": "All",
+		"filter": "Filter translations",
+		"placeholder": "Title, path or file…",
+		"count": "{shown} of {total} pages",
+		"caption": "Translations into English of the pages of the site",
+		"emptyFiltered": "No page matches the filters.",
+		"empty": "No sources imported. Import from Git in Snapshots.",
+		"compare": "Compare",
+		"edit": "Edit the translation",
+		"columns": {
+			"page": "Page",
+			"status": "Status",
+			"file": "Translation",
+			"imported": "Imported",
+			"actions": "Actions",
+			"kind": "Kind"
+		},
+		"origin": {
+			"import": "the last import",
+			"workingTree": "the working tree",
+			"commit": "a Git commit"
+		},
+		"detail": {
+			"title": "Translation of {title}",
+			"fallbackTitle": "Translation {id}",
+			"fallbackDescription": "A page of the site against its translation into English.",
+			"all": "All translations",
+			"original": "See the original",
+			"status": "Status",
+			"originalFile": "Original",
+			"originalHash": "Hash of the original (imported)",
+			"sourceHash": "source-hash of the translation",
+			"foundIn": "Translated text, found in",
+			"shown": "/en shows",
+			"revision": "Published revision #{id}",
+			"git": "The file in Git",
+			"fallback": "The Spanish original, with the “not translated” notice",
+			"missingTitle": "No translation.",
+			"missingText": "Create {file} in the repository with the translated text and its source-hash, and import the sources: from then on it is edited here as a revision.",
+			"download": "Download the original",
+			"changes": "Changes of the original since it was translated",
+			"changesLead": "What the translation must take in: the diff of the Spanish from the text it was translated from to the current one.",
+			"changesLabel": "Diff of the original since it was translated",
+			"noChanges": "The original did not change since it was translated.",
+			"noTranslation": "There is no translation yet.",
+			"baseUnknown": "The text it was translated from cannot be found: compare both texts below.",
+			"originalText": "Spanish original",
+			"translationText": "English translation"
+		},
+		"editShort": "Edit",
+		"editOf": "the translation of {path}"
+	}
+}

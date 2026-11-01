@@ -8,22 +8,25 @@
 </script>
 
 <script lang="ts">
-	import type { DivergenceState, SiteSummary } from '../../shared/schemas/dashboard'
+	import type { DivergenceState, SiteSummary, TranslationStatus } from '../../shared/schemas/dashboard'
 
-	import { formatDate, formatNumber } from '../utils/format'
-	import { jobLabels, siteLabels, stateDescriptions, stateLabels, states } from '../utils/labels'
+	import { siteLabels, states } from '../utils/labels'
+
+	const { t, localePath } = useI18n()
+	const format = useFormat()
 
 	const markdown = (summary: SiteSummary) => summary.kinds.guide + summary.kinds.reference
-	const stateHref = (summary: SiteSummary, state: DivergenceState) => `/sources?site=${summary.site}&state=${state}`
-	const staleHref = (summary: SiteSummary) => `/sources?site=${summary.site}&state=importStale`
-	const jobStatus = { running: 'en curso', succeeded: 'terminado', failed: 'falló' } as const
+	const stateHref = (summary: SiteSummary, state: DivergenceState) => localePath(`/sources?site=${summary.site}&state=${state}`)
+	const staleHref = (summary: SiteSummary) => localePath(`/sources?site=${summary.site}&state=importStale`)
 	const attention = (summary: SiteSummary) => summary.states.edited + summary.states.conflict + summary.states.missing + summary.importStale
+	const translationStates: readonly TranslationStatus[] = ['translated', 'outdated', 'missing']
+	const translated = computed(() => (overview.ok && overview.data.translations.total ? overview.data.translations.translated / overview.data.translations.total : 0))
 </script>
 
 <template>
 	<DashPage
-		title="Resumen"
-		description="Estado de la documentación pública de las tres webs: fuentes importadas de Git, divergencia de las revisiones y snapshot que sirve el site."
+		bind:title="t('overview.title')"
+		bind:description="t('overview.description')"
 	>
 		<DashFailure
 			if:when="!overview.ok"
@@ -35,46 +38,99 @@
 		>
 			<section
 				class="dash-strip"
-				aria-label="Publicación"
+				bind:aria-label="t('overview.publication')"
 			>
 				<div class="dash-strip-item">
-					<h2>Snapshot activo</h2>
+					<h2>{t('overview.activeSnapshot')}</h2>
 					<p if:when="overview.data.activeSnapshot">
 						<a
 							class="dash-strong-link"
-							href="/snapshots"
+							bind:href="localePath('/snapshots')"
 						>
 							#{String(overview.data.activeSnapshot.id)}
 						</a>
-						· {formatNumber(overview.data.activeSnapshot.pages)} páginas · {formatDate(overview.data.activeSnapshot.publishedAt)}
-						<span class="dash-muted">por {overview.data.activeSnapshot.publishedBy ?? 'desconocido'}</span>
+						· {t('overview.pages', { count: overview.data.activeSnapshot.pages, pages: format.number(overview.data.activeSnapshot.pages) })} · {format.date(overview.data.activeSnapshot.publishedAt)}
+						<span class="dash-muted">{t('overview.by', { user: overview.data.activeSnapshot.publishedBy ?? t('overview.unknownUser') })}</span>
+					</p>
+					<p
+						if:when="overview.data.activeSnapshot"
+						class="dash-muted"
+					>
+						{t('overview.byLocale', { es: format.number(overview.data.activeSnapshot.pagesByLocale.es), en: format.number(overview.data.activeSnapshot.pagesByLocale.en) })}
 					</p>
 					<p
 						if:when="!overview.data.activeSnapshot"
 						class="dash-muted"
 					>
-						Ninguno: el site no tiene documentación que servir.
-						<a href="/snapshots">Publica el primero</a>
-						.
+						{t('overview.noSnapshot')}
+						<a bind:href="localePath('/snapshots')">{t('overview.publishFirst')}</a>
 					</p>
 				</div>
 				<div class="dash-strip-item">
-					<h2>Último trabajo</h2>
+					<h2>{t('overview.lastJob')}</h2>
 					<p if:when="overview.data.jobs.content">
-						{jobLabels[overview.data.jobs.content.kind]}:
-						<span>{jobStatus[overview.data.jobs.content.status]}</span>
-						<span class="dash-muted">· {formatDate(overview.data.jobs.content.startedAt)}</span>
+						{t(`labels.job.${overview.data.jobs.content.kind}`)}:
+						<span>{t(`labels.jobStatus.${overview.data.jobs.content.status}`).toLocaleLowerCase()}</span>
+						<span class="dash-muted">· {format.date(overview.data.jobs.content.startedAt)}</span>
 					</p>
 					<p
 						if:when="!overview.data.jobs.content"
 						class="dash-muted"
 					>
-						Ninguno desde que arrancó el dashboard.
+						{t('overview.noJob')}
 					</p>
 				</div>
 				<div class="dash-strip-item">
-					<h2>Snapshots guardados</h2>
-					<p>{formatNumber(overview.data.snapshots)}</p>
+					<h2>{t('overview.savedSnapshots')}</h2>
+					<p>{format.number(overview.data.snapshots)}</p>
+				</div>
+			</section>
+
+			<section aria-labelledby="translations-heading">
+				<div class="dash-panel-head">
+					<h2
+						id="translations-heading"
+						class="dash-section-title"
+					>
+						{t('overview.translations')}
+					</h2>
+					<a bind:href="localePath('/translations')">{t('overview.seeTranslations')}</a>
+				</div>
+				<p class="dash-section-lead">{t('overview.translationsLead')}</p>
+				<div class="dash-translation-meter">
+					<div
+						class="dash-translation-bar"
+						role="img"
+						bind:aria-label="t('overview.translationsShare', { share: format.percent(translated.value), translated: format.number(overview.data.translations.translated), total: format.number(overview.data.translations.total) })"
+					>
+						<span
+							each:of="translationStates"
+							each:as="status"
+							each:key="status"
+							bind:data-status="status"
+							bind:style="'flex-grow: ' + overview.data.translations[status]"
+						/>
+					</div>
+					<ul class="dash-translation-legend">
+						<li
+							each:of="translationStates"
+							each:as="status"
+							each:key="status"
+							bind:data-status="status"
+						>
+							<a
+								bind:href="localePath('/translations?status=' + status)"
+								bind:title="t(`labels.translationHelp.${status}`)"
+							>
+								<span
+									class="dash-dot"
+									aria-hidden="true"
+								/>
+								<strong>{format.number(overview.data.translations[status])}</strong>
+								{t(`labels.translation.${status}`)}
+							</a>
+						</li>
+					</ul>
 				</div>
 			</section>
 
@@ -83,45 +139,45 @@
 					id="sources-heading"
 					class="dash-section-title"
 				>
-					Fuentes por web
+					{t('overview.sourcesBySite')}
 				</h2>
 				<div class="dash-table-scroll">
 					<table class="dash-table">
-						<caption class="dash-visually-hidden">Número de fuentes de cada web por tipo y su última importación</caption>
+						<caption class="dash-visually-hidden">{t('overview.sourcesCaption')}</caption>
 						<thead>
 							<tr>
-								<th scope="col">Web</th>
+								<th scope="col">{t('overview.site')}</th>
 								<th
 									scope="col"
 									class="dash-num"
 								>
-									Guías
+									{t('overview.guides')}
 								</th>
 								<th
 									scope="col"
 									class="dash-num"
 								>
-									Referencia
+									{t('labels.kind.reference')}
 								</th>
 								<th
 									scope="col"
 									class="dash-num"
 								>
-									Páginas .meeko
+									{t('overview.meekoPages')}
 								</th>
 								<th
 									scope="col"
 									class="dash-num"
 								>
-									Total
+									{t('overview.total')}
 								</th>
 								<th
 									scope="col"
 									class="dash-num"
 								>
-									Retiradas
+									{t('overview.removed')}
 								</th>
-								<th scope="col">Último cambio importado</th>
+								<th scope="col">{t('overview.lastImport')}</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -131,14 +187,14 @@
 								each:key="summary.site"
 							>
 								<th scope="row">
-									<a bind:href="'/sources?site=' + summary.site">{siteLabels[summary.site]}</a>
+									<a bind:href="localePath('/sources?site=' + summary.site)">{siteLabels[summary.site]}</a>
 								</th>
-								<td class="dash-num">{formatNumber(summary.kinds.guide)}</td>
-								<td class="dash-num">{formatNumber(summary.kinds.reference)}</td>
-								<td class="dash-num">{formatNumber(summary.kinds.page)}</td>
-								<td class="dash-num dash-strong">{formatNumber(summary.total)}</td>
-								<td class="dash-num">{summary.removed ? formatNumber(summary.removed) : '—'}</td>
-								<td>{formatDate(summary.lastImportedAt)}</td>
+								<td class="dash-num">{format.number(summary.kinds.guide)}</td>
+								<td class="dash-num">{format.number(summary.kinds.reference)}</td>
+								<td class="dash-num">{format.number(summary.kinds.page)}</td>
+								<td class="dash-num dash-strong">{format.number(summary.total)}</td>
+								<td class="dash-num">{summary.removed ? format.number(summary.removed) : '—'}</td>
+								<td>{format.date(summary.lastImportedAt)}</td>
 							</tr>
 						</tbody>
 					</table>
@@ -147,9 +203,8 @@
 					if:when="overview.data.sites.every((summary) => summary.total === 0)"
 					class="dash-empty"
 				>
-					No hay fuentes importadas. Ve a
-					<a href="/snapshots">Snapshots</a>
-					y pulsa «Importar desde Git» para leer las guías, la referencia y las páginas de las tres webs.
+					{t('overview.noSources')}
+					<a bind:href="localePath('/snapshots')">{t('nav.snapshots')}</a>
 				</p>
 			</section>
 
@@ -158,33 +213,33 @@
 					id="divergence-heading"
 					class="dash-section-title"
 				>
-					Divergencia con Git
+					{t('overview.divergence')}
 				</h2>
-				<p class="dash-section-lead">Solo las fuentes Markdown del site tienen revisiones; las páginas .meeko de UI e i18n se editan en el repositorio. Cada número abre las fuentes de ese estado.</p>
+				<p class="dash-section-lead">{t('overview.divergenceLead')}</p>
 				<div class="dash-table-scroll">
 					<table class="dash-table">
-						<caption class="dash-visually-hidden">Fuentes Markdown de cada web por estado de divergencia</caption>
+						<caption class="dash-visually-hidden">{t('overview.divergenceCaption')}</caption>
 						<thead>
 							<tr>
-								<th scope="col">Web</th>
+								<th scope="col">{t('overview.site')}</th>
 								<th
 									each:of="states"
 									each:as="state"
 									each:key="state"
 									scope="col"
 									class="dash-num"
-									bind:title="stateDescriptions[state]"
+									bind:title="t(`labels.stateHelp.${state}`)"
 								>
-									{stateLabels[state]}
+									{t(`labels.state.${state}`)}
 								</th>
 								<th
 									scope="col"
 									class="dash-num"
-									title="Git cambió desde la última importación"
+									bind:title="t('badge.importStaleHelp')"
 								>
-									Importación desactualizada
+									{t('badge.importStale')}
 								</th>
-								<th scope="col">Atención</th>
+								<th scope="col">{t('overview.attention')}</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -204,9 +259,9 @@
 									<a
 										if:when="markdown(summary) && summary.states[state]"
 										bind:href="stateHref(summary, state)"
-										bind:aria-label="formatNumber(summary.states[state]) + ' fuentes de ' + siteLabels[summary.site] + ': ' + stateLabels[state]"
+										bind:aria-label="t('overview.stateLink', { count: format.number(summary.states[state]), site: siteLabels[summary.site], state: t(`labels.state.${state}`) })"
 									>
-										{formatNumber(summary.states[state])}
+										{format.number(summary.states[state])}
 									</a>
 									<span
 										if:when="markdown(summary) && !summary.states[state]"
@@ -217,7 +272,7 @@
 									<span
 										if:when="!markdown(summary)"
 										class="dash-zero"
-										aria-label="No aplica"
+										bind:aria-label="t('overview.notApplicable')"
 									>
 										—
 									</span>
@@ -227,7 +282,7 @@
 										if:when="summary.importStale"
 										bind:href="staleHref(summary)"
 									>
-										{formatNumber(summary.importStale)}
+										{format.number(summary.importStale)}
 									</a>
 									<span
 										if:when="!summary.importStale"
@@ -241,13 +296,13 @@
 										if:when="attention(summary)"
 										tone="accent"
 									>
-										{formatNumber(attention(summary))} por revisar
+										{t('overview.toReview', { count: format.number(attention(summary)) })}
 									</UIBadge>
 									<span
 										if:when="!attention(summary)"
 										class="dash-muted"
 									>
-										Al día
+										{t('overview.upToDate')}
 									</span>
 								</td>
 							</tr>

@@ -1,0 +1,203 @@
+{
+	"app": {
+		"name": "Meeko Dashboard",
+		"titleSuffix": "{title} · Meeko Dashboard"
+	},
+	"nav": {
+		"overview": "Overview",
+		"sources": "Sources",
+		"translations": "Translations",
+		"moderation": "Moderation",
+		"metrics": "Metrics",
+		"health": "Health",
+		"snapshots": "Snapshots"
+	},
+	"a11y": {
+		"skip": "Skip to content",
+		"brand": "Meeko Dashboard, overview",
+		"sections": "Sections",
+		"session": "Signed in"
+	},
+	"account": {
+		"logout": "Sign out",
+		"logoutTitle": "Sign {user} out"
+	},
+	"locale": {
+		"label": "Language",
+		"suggestion": "Your browser prefers another language.",
+		"switchTo": "View the dashboard in {name}",
+		"stay": "Stay in English",
+		"dismiss": "Dismiss the language suggestion",
+		"es": "Spanish",
+		"en": "English",
+		"all": "All languages",
+		"short": {
+			"es": "ES",
+			"en": "EN",
+			"all": "All"
+		}
+	},
+	"actions": {
+		"cancel": "Cancel",
+		"close": "Close",
+		"confirm": "Confirm",
+		"starting": "Starting…",
+		"saving": "Saving…",
+		"clearFilters": "Clear filters",
+		"search": "Search"
+	},
+	"filters": {
+		"allFeminine": "All",
+		"allMasculine": "All"
+	},
+	"errors": {
+		"title": "The data could not be loaded",
+		"code": "Code",
+		"unknownCode": "The server answered with an error ({code}).",
+		"unknownCodeRequest": "The server answered with an error ({code}, request {request}).",
+		"notFoundTitle": "This page does not exist",
+		"notFoundText": "The address does not match any section of the dashboard.",
+		"serverTitle": "The page could not be loaded",
+		"serverText": "The dashboard server failed while preparing this page. Check its console.",
+		"backHome": "Back to the overview",
+		"seeSources": "See the sources",
+		"DATABASE_UNAVAILABLE": "Cannot connect to the documentation database. Check DATABASE_URL in apps/dashboard/.env and that voidcat-local:5432 answers.",
+		"SCHEMA_MISSING": "The database does not have the documentation tables. Run pnpm -F meeko-site run db:migrate.",
+		"SOURCE_NOT_FOUND": "That source does not exist. An import may have changed its id.",
+		"SNAPSHOT_NOT_FOUND": "That snapshot no longer exists: the snapshot retention deleted it.",
+		"SNAPSHOT_EMPTY": "That snapshot has no pages and cannot be activated.",
+		"JOB_RUNNING": "An import or a publication is running. Wait for it to finish.",
+		"JOBS_CLOSED": "The server is shutting down.",
+		"INVALID_ORIGIN": "The server refused the request because of its origin. Open the dashboard from its usual address.",
+		"INVALID_CSRF": "The session changed in another tab. Reload the page and try again.",
+		"UNAUTHENTICATED": "The session ended (it expired, closed after inactivity or was closed in another tab). Reload the page to sign in again.",
+		"SESSION_REVOKED": "The session was closed. Reload the page to sign in again.",
+		"VALIDATION_ERROR": "The data sent is not valid.",
+		"REVISION_NOT_FOUND": "That revision does not exist or does not belong to this source.",
+		"SOURCE_NOT_EDITABLE": "This source cannot be edited from the dashboard.",
+		"INVALID_REVISION": "Not saved: the Markdown is not valid for this source.",
+		"REVISION_NOT_DRAFT": "Only drafts can change: published and archived revisions are history. Create a new draft from it.",
+		"DRAFT_CHANGED": "Someone saved this draft while you were editing it. Nothing was overwritten: copy your changes, reload and apply them again.",
+		"REVISION_REJECTED": "Not published: the site would reject this revision. The previous published revision is untouched.",
+		"MERGE_NOT_TRIVIAL": "The merge is not trivial: Git and the revision changed the same lines. Resolve it by hand in a new draft.",
+		"NO_CONFLICT": "This revision already starts from the current Git: there is nothing to merge.",
+		"PREVIEW_FAILED": "The preview failed.",
+		"PREVIEW_TIMEOUT": "The preview took too long and was stopped. Try again.",
+		"PREVIEW_CLOSED": "The server is shutting down.",
+		"BODY_TOO_LARGE": "The Markdown is too large to send (Meeko's limit is 1 MiB per request).",
+		"TOO_LARGE": "The Markdown is over the size limit of a revision.",
+		"NETWORK_ERROR": "The dashboard server does not answer.",
+		"INVALID_MODERATION": "Not saved: the rule or the announcement is not valid.",
+		"UNKNOWN_PAGE": "That web does not have that page. Import the sources or publish a snapshot if it is new.",
+		"MODERATION_NOT_FOUND": "That rule or announcement no longer exists: someone else deleted it. The list already shows what is there now.",
+		"MODERATION_CONFLICT": "Someone else changed this rule or announcement since you loaded the list. Nothing was saved: the list already shows their version. Review it; saving again will replace that change.",
+		"INVALID_RANGE": "The date range is not valid: the start must come before the end and span one year at most.",
+		"FEEDBACK_NOT_FOUND": "That comment no longer exists: someone else deleted it. Reload the list.",
+		"TRANSLATION_NOT_FOUND": "That page has no translation to compare: it is not a guide or a written reference page of the site.",
+		"UNKNOWN": "An unexpected error happened. Check the server console.",
+		"INVALID_INPUT": "The data sent is not valid."
+	},
+	"validation": {
+		"username": "Enter your user name.",
+		"password": "Enter your password.",
+		"max200": "200 characters at most.",
+		"max500": "500 characters at most.",
+		"max2000": "2000 characters at most.",
+		"max4096": "4096 characters at most.",
+		"markdownEmpty": "The Markdown cannot be empty.",
+		"markdownTooLarge": "The Markdown is over 900 kB once encoded.",
+		"date": "The date is not valid.",
+		"rangeReversed": "The start date is after the end date.",
+		"rangeTooLong": "The range spans 366 days at most.",
+		"choosePage": "Choose a page of the web.",
+		"ruleVersion": "A rule that changes carries the id and the version that were read.",
+		"message": "Write the message.",
+		"endAfterStart": "The end must come after the start.",
+		"announcementVersion": "An announcement that changes carries the version that was read."
+	},
+	"labels": {
+		"kind": {
+			"guide": "Guide",
+			"reference": "Reference",
+			"page": ".meeko page"
+		},
+		"state": {
+			"git": "Git",
+			"same": "Same as Git",
+			"edited": "Edited",
+			"conflict": "Conflict",
+			"missing": "Missing in Git"
+		},
+		"stateHelp": {
+			"git": "No published revision: the web shows the file in Git.",
+			"same": "The published revision matches Git.",
+			"edited": "The published revision differs from Git, and Git has not changed since it was written.",
+			"conflict": "The published revision differs and Git changed after it was written.",
+			"missing": "The file no longer exists in Git."
+		},
+		"job": {
+			"import": "Import from Git",
+			"publish": "Snapshot publication",
+			"health": "Health check"
+		},
+		"jobStatus": {
+			"running": "Running",
+			"succeeded": "Finished",
+			"failed": "Failed"
+		},
+		"translation": {
+			"translated": "Translated",
+			"outdated": "Outdated",
+			"missing": "Not translated"
+		},
+		"translationHelp": {
+			"translated": "The translation starts from the original that Git has now.",
+			"outdated": "The original changed after it was translated: those changes still have to be carried over.",
+			"missing": "No translation: the English web shows the Spanish original with the “not translated” notice."
+		}
+	},
+	"badge": {
+		"removed": "Removed",
+		"noMarkdown": "No Markdown",
+		"noMarkdownHelp": ".meeko pages do not keep their text in the database: they are edited in the repository.",
+		"importStale": "Import out of date",
+		"importStaleHelp": "Git changed since the last import: import the sources again."
+	},
+	"diff": {
+		"empty": "No differences.",
+		"added": "Added: ",
+		"removed": "Removed: "
+	},
+	"job": {
+		"started": "Started {date}",
+		"exitCode": "exit code {code}",
+		"output": "Output of the {job}",
+		"outputFallback": "Output of the job",
+		"dropped": {
+			"plural": "count",
+			"forms": {
+				"one": "… {count} earlier line left out",
+				"other": "… {count} earlier lines left out"
+			}
+		},
+		"noOutput": "No output yet.",
+		"seconds": "{value} s",
+		"minutes": "{minutes} min {seconds} s",
+		"summary": {
+			"import": "{inserted} new, {updated} updated, {unchanged} unchanged, {removed} removed and {restored} restored.",
+			"publish": "Snapshot {id} published and active with {pages} pages: {es} in Spanish and {en} in English ({translated} translated, {outdated} outdated and {missing} not translated).",
+			"publishRevisions": "Snapshot {id} published and active with {pages} pages, {revisions} with published revisions: {es} in Spanish and {en} in English ({translated} translated, {outdated} outdated and {missing} not translated).",
+			"health": "{pending} pending references, {exports} exports without a page and {broken} broken links out of {links} links.",
+			"conflict": "Conflict: the active snapshot changed from {from} to {to} while rendering. Nothing was stored; publish again.",
+			"reactivated": "Conflict: snapshot {from} was activated again while rendering. Nothing was stored; publish again.",
+			"none": "none",
+			"failed": "The job failed without a result: check its output."
+		}
+	},
+	"issues": {
+		"meekoPage": ".meeko pages are edited in the repository.",
+		"gitMissing": "Git no longer has this file.",
+		"previewOnly": "Only the guides and the reference of the site have a preview.",
+		"notTranslation": "Only a translation whose original was imported can be marked as translated."
+	}
+}

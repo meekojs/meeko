@@ -12,11 +12,17 @@
 <script lang="ts">
 	import type { TableColumn } from '@meekojs/ui/runtime'
 
-	import type { SnapshotRow } from '../../shared/schemas/dashboard'
+	import type { PendingRevision, SnapshotRow } from '../../shared/schemas/dashboard'
 	import type { Failure } from '../utils/errors'
 
 	import { describeError } from '../utils/errors'
-	import { formatDate, formatNumber, plural } from '../utils/format'
+	import { jobSummary } from '../utils/i18n'
+
+	const i18n = useI18n()
+	const { t, localePath } = i18n
+	const format = useFormat()
+	const formatDate = format.date
+	const formatNumber = format.number
 
 	const list = signal<readonly SnapshotRow[]>(snapshots.ok ? snapshots.data : [])
 	const listFailure = signal<Failure | null>(snapshots.ok ? null : snapshots.failure)
@@ -26,9 +32,9 @@
 	const pending = signal(initialPending.ok ? initialPending.data : null)
 	const pendingLead = computed(() => {
 		const active = pending.value?.activeSnapshotId
-		if (!active) return 'No hay snapshot activo: el site no muestra ninguna revisión hasta la primera publicación.'
-		if (pending.value?.revisions.some((revision) => revision.change === 'archived')) return 'Cambiaron después del snapshot activo #' + active + ': el site no muestra estos cambios hasta que publiques un snapshot.'
-		return 'Se publicaron después del snapshot activo #' + active + ': el site no las muestra hasta que publiques un snapshot.'
+		if (!active) return t('snapshots.pending.noActive')
+		if (pending.value?.revisions.some((revision) => revision.change === 'archived')) return t('snapshots.pending.changedAfter', { id: active })
+		return t('snapshots.pending.publishedAfter', { id: active })
 	})
 
 	/** Reads again what the active snapshot lacks: it depends on which one is active. */
@@ -58,7 +64,7 @@
 		start,
 	} = useJobs(initialJobs.ok ? initialJobs.data : { content: null, health: null }, {
 		onFinish: (job) => {
-			notice.value = job.status === 'succeeded' ? (job.summary ?? 'Terminado.') : job.conflict ? '' : 'El trabajo falló: revisa su salida.'
+			notice.value = job.status === 'succeeded' ? (jobSummary(i18n, job) ?? t('snapshots.done')) : job.conflict ? '' : t('snapshots.failed')
 			// A publication, or a conflict with a rollback, changes which snapshot is active.
 			if (job.kind === 'publish') void reload()
 		},
@@ -87,7 +93,7 @@
 		try {
 			list.value = await rpc.snapshots.activate({ id: snapshot.id })
 			confirming.value = false
-			notice.value = `El snapshot #${snapshot.id} es ahora el activo: el site lo sirve desde ya.`
+			notice.value = t('snapshots.activated', { id: snapshot.id })
 			// A rollback to an older snapshot leaves out what was published after it, and a return
 			// includes it again: the pending revisions are those of the snapshot active now.
 			await reloadPending()
@@ -128,22 +134,24 @@
 	}
 
 	const active = computed(() => list.value.find((snapshot) => snapshot.active) ?? null)
-	const activateLabel = (snapshot: SnapshotRow) => (active.value && snapshot.id < active.value.id ? `Volver al #${snapshot.id}` : `Activar el #${snapshot.id}`)
+	const activateLabel = (snapshot: SnapshotRow) => (active.value && snapshot.id < active.value.id ? t('snapshots.rollback', { id: snapshot.id }) : t('snapshots.activate', { id: snapshot.id }))
+	const conflictSummary = computed(() => (conflict.value ? jobSummary(i18n, conflict.value) : null))
+	const pendingChange = (revision: PendingRevision) => (revision.change === 'archived' ? t('snapshots.pending.archived', { id: revision.id, date: formatDate(revision.archivedAt ?? revision.publishedAt) }) : t('snapshots.pending.published', { id: revision.id, author: revision.author, date: formatDate(revision.publishedAt) }))
 
 	const columns = [
-		{ key: 'id', label: 'Snapshot' },
-		{ key: 'publishedAt', label: 'Publicado' },
-		{ key: 'publishedBy', label: 'Por' },
-		{ key: 'pages', label: 'Páginas' },
-		{ key: 'note', label: 'Nota' },
-		{ key: 'active', label: 'Estado' },
+		{ key: 'id', label: t('snapshots.columns.id') },
+		{ key: 'publishedAt', label: t('snapshots.columns.publishedAt') },
+		{ key: 'publishedBy', label: t('snapshots.columns.publishedBy') },
+		{ key: 'pages', label: t('snapshots.columns.pages') },
+		{ key: 'note', label: t('snapshots.columns.note') },
+		{ key: 'active', label: t('snapshots.columns.active') },
 	] satisfies TableColumn<SnapshotRow>[]
 </script>
 
 <template>
 	<DashPage
-		title="Snapshots"
-		description="El site sirve un único snapshot activo. Importa las fuentes desde Git, publica uno nuevo con las revisiones publicadas o vuelve a uno anterior."
+		bind:title="t('snapshots.title')"
+		bind:description="t('snapshots.description')"
 	>
 		<div class="dash-stack">
 			<section
@@ -151,8 +159,8 @@
 				aria-labelledby="actions-heading"
 			>
 				<div class="dash-panel-head">
-					<h2 id="actions-heading">Acciones</h2>
-					<span class="dash-muted">Se ejecutan en un proceso aparte, de una en una.</span>
+					<h2 id="actions-heading">{t('snapshots.actions')}</h2>
+					<span class="dash-muted">{t('snapshots.actionsHint')}</span>
 				</div>
 				<div class="dash-actions">
 					<UIButton
@@ -160,19 +168,19 @@
 						bind:disabled="busy.value"
 						on:click="importSources"
 					>
-						{starting.value === 'import' ? 'Iniciando…' : 'Importar desde Git'}
+						{starting.value === 'import' ? t('actions.starting') : t('snapshots.import')}
 					</UIButton>
 					<UIButton
 						bind:disabled="busy.value"
 						on:click="askPublish"
 					>
-						Publicar snapshot…
+						{t('snapshots.publish')}
 					</UIButton>
 				</div>
-				<p class="dash-hint">Importar actualiza las fuentes con los archivos del repositorio y nunca toca las revisiones. Publicar renderiza toda la documentación y activa el resultado en el site.</p>
+				<p class="dash-hint">{t('snapshots.hint')}</p>
 				<DashFailure
 					if:when="jobFailure.value"
-					title="No se pudo iniciar el trabajo"
+					bind:title="t('snapshots.cannotStart')"
 					bind:failure="jobFailure.value"
 				/>
 				<div
@@ -181,14 +189,14 @@
 					role="alert"
 				>
 					<div>
-						<p class="dash-failure-title">Otro cambio se publicó mientras tanto</p>
-						<p>{conflict.value?.summary}</p>
+						<p class="dash-failure-title">{t('snapshots.conflict')}</p>
+						<p>{conflictSummary.value}</p>
 						<p class="dash-actions">
 							<UIButton
 								bind:disabled="busy.value"
 								on:click="retry"
 							>
-								Volver a publicar
+								{t('snapshots.retry')}
 							</UIButton>
 						</p>
 					</div>
@@ -201,7 +209,7 @@
 					{notice.value}
 				</p>
 				<DashJob
-					empty="Ningún trabajo desde que arrancó el dashboard."
+					bind:empty="t('snapshots.noJob')"
 					bind:job="jobs.value.content"
 				/>
 			</section>
@@ -211,20 +219,20 @@
 				aria-labelledby="pending-heading"
 			>
 				<div class="dash-panel-head">
-					<h2 id="pending-heading">Revisiones sin publicar en el site</h2>
-					<span class="dash-muted">{pending.value ? plural(pending.value.revisions.length, 'revisión', 'revisiones') : ''}</span>
+					<h2 id="pending-heading">{t('snapshots.pending.title')}</h2>
+					<span class="dash-muted">{pending.value ? t('snapshots.pending.count', { count: pending.value.revisions.length }) : ''}</span>
 				</div>
 				<p
 					if:when="!pending.value"
 					class="dash-empty"
 				>
-					No se pudieron leer las revisiones publicadas.
+					{t('snapshots.pending.unreadable')}
 				</p>
 				<p
 					if:when="pending.value && !pending.value.revisions.length"
 					class="dash-empty"
 				>
-					{pending.value?.activeSnapshotId ? 'El snapshot activo #' + pending.value.activeSnapshotId + ' incluye todas las revisiones publicadas.' : 'No hay revisiones publicadas pendientes.'}
+					{pending.value?.activeSnapshotId ? t('snapshots.pending.allIncluded', { id: pending.value.activeSnapshotId }) : t('snapshots.pending.none')}
 				</p>
 				<div
 					if:when="pending.value && pending.value.revisions.length"
@@ -239,10 +247,17 @@
 							each:as="revision"
 							each:key="revision.id"
 						>
-							<a bind:href="'/sources/' + revision.sourceId">{revision.title}</a>
+							<a bind:href="localePath('/sources/' + revision.sourceId)">{revision.title}</a>
+							<abbr
+								class="dash-locale-tag"
+								bind:data-locale="revision.locale"
+								bind:title="t(`locale.${revision.locale}`)"
+							>
+								{t(`locale.short.${revision.locale}`)}
+							</abbr>
 							<span class="dash-muted">
 								<code>{revision.path}</code>
-								· {revision.change === 'archived' ? 'revisión #' + revision.id + ' archivada: la página vuelve a Git · ' + formatDate(revision.archivedAt ?? revision.publishedAt) : 'revisión #' + revision.id + ' de ' + revision.author + ' · ' + formatDate(revision.publishedAt)}
+								· {pendingChange(revision)}
 							</span>
 						</li>
 					</ul>
@@ -255,9 +270,9 @@
 						id="snapshots-heading"
 						class="dash-section-title"
 					>
-						Guardados
+						{t('snapshots.saved')}
 					</h2>
-					<span class="dash-muted">Se conservan los 5 últimos y el que estaba activo.</span>
+					<span class="dash-muted">{t('snapshots.retention')}</span>
 				</div>
 				<DashFailure
 					if:when="listFailure.value"
@@ -268,10 +283,10 @@
 					class="dash-table-scroll"
 				>
 					<UITable
-						caption="Snapshots guardados, del más reciente al más antiguo"
 						class="dash-snapshots"
 						rowKey="id"
-						emptyText="No hay snapshots: publica el primero para que el site tenga documentación."
+						bind:caption="t('snapshots.caption')"
+						bind:emptyText="t('snapshots.empty')"
 						bind:columns="columns"
 						bind:rows="list.value"
 					>
@@ -290,8 +305,10 @@
 							<span
 								if:when="column.key === 'pages'"
 								class="dash-num"
+								bind:title="t('snapshots.byLocale', { es: formatNumber(row.pagesByLocale.es), en: formatNumber(row.pagesByLocale.en) })"
 							>
 								{formatNumber(row.pages)}
+								<span class="dash-muted dash-pages-split">{t('snapshots.split', { es: formatNumber(row.pagesByLocale.es), en: formatNumber(row.pagesByLocale.en) })}</span>
 							</span>
 							<span if:when="column.key === 'note'">{row.note ?? '—'}</span>
 							<span
@@ -302,7 +319,7 @@
 									if:when="row.active"
 									tone="accent"
 								>
-									Activo
+									{t('snapshots.activeBadge')}
 								</UIBadge>
 								<UIButton
 									if:when="!row.active"
@@ -321,34 +338,34 @@
 		</div>
 
 		<UIModal
-			description="El site público servirá este snapshot en cuanto confirmes. Puedes volver al actual desde esta misma lista."
 			model="confirming"
-			bind:title="'¿Activar el snapshot #' + (target.value?.id ?? '') + '?'"
+			bind:title="t('snapshots.confirm.title', { id: target.value?.id ?? '' })"
+			bind:description="t('snapshots.confirm.text')"
 		>
 			<dl
 				if:when="target.value"
 				class="dash-facts"
 			>
 				<div>
-					<dt>Publicado</dt>
+					<dt>{t('snapshots.columns.publishedAt')}</dt>
 					<dd>{formatDate(target.value?.publishedAt)}</dd>
 				</div>
 				<div>
-					<dt>Por</dt>
+					<dt>{t('snapshots.columns.publishedBy')}</dt>
 					<dd>{target.value?.publishedBy ?? '—'}</dd>
 				</div>
 				<div>
-					<dt>Páginas</dt>
-					<dd>{formatNumber(target.value?.pages ?? 0)}</dd>
+					<dt>{t('snapshots.columns.pages')}</dt>
+					<dd>{formatNumber(target.value?.pages ?? 0)} · {t('snapshots.split', { es: formatNumber(target.value?.pagesByLocale.es ?? 0), en: formatNumber(target.value?.pagesByLocale.en ?? 0) })}</dd>
 				</div>
 				<div if:when="active.value">
-					<dt>Sustituye a</dt>
+					<dt>{t('snapshots.confirm.replaces')}</dt>
 					<dd>#{String(active.value?.id)}</dd>
 				</div>
 			</dl>
 			<DashFailure
 				if:when="activateFailure.value"
-				title="No se activó"
+				bind:title="t('snapshots.confirm.failed')"
 				bind:failure="activateFailure.value"
 			/>
 			<snippet name="footer">
@@ -356,21 +373,21 @@
 					variant="ghost"
 					on:click="() => (confirming.value = false)"
 				>
-					Cancelar
+					{t('actions.cancel')}
 				</UIButton>
 				<UIButton
 					bind:disabled="activating.value"
 					on:click="activate"
 				>
-					{activating.value ? 'Activando…' : 'Activar snapshot'}
+					{activating.value ? t('snapshots.confirm.activating') : t('snapshots.confirm.activate')}
 				</UIButton>
 			</snippet>
 		</UIModal>
 
 		<UIModal
-			title="Publicar un snapshot"
-			description="Renderiza las guías, la referencia y las páginas con las revisiones publicadas sobre Git, y lo activa en el site."
 			model="publishing"
+			bind:title="t('snapshots.publishModal.title')"
+			bind:description="t('snapshots.publishModal.text')"
 		>
 			<form
 				id="publish-form"
@@ -384,8 +401,8 @@
 			>
 				<UIField
 					id="publish-note"
-					label="Nota"
-					description="Opcional. Qué cambia en esta publicación."
+					bind:label="t('snapshots.columns.note')"
+					bind:description="t('snapshots.publishModal.noteHint')"
 				>
 					<snippet
 						name="default"
@@ -401,7 +418,7 @@
 			</form>
 			<DashFailure
 				if:when="jobFailure.value"
-				title="No se pudo iniciar"
+				bind:title="t('snapshots.publishModal.failed')"
 				bind:failure="jobFailure.value"
 			/>
 			<snippet name="footer">
@@ -409,13 +426,13 @@
 					variant="ghost"
 					on:click="() => (publishing.value = false)"
 				>
-					Cancelar
+					{t('actions.cancel')}
 				</UIButton>
 				<UIButton
 					bind:disabled="busy.value"
 					on:click="publish"
 				>
-					{starting.value === 'publish' ? 'Iniciando…' : 'Publicar y activar'}
+					{starting.value === 'publish' ? t('actions.starting') : t('snapshots.publishModal.submit')}
 				</UIButton>
 			</snippet>
 		</UIModal>

@@ -98,8 +98,8 @@ export function revisionTask<T>(task: () => Promise<T>): Promise<T> {
 async function editable(db: Queryable, sourceId: number): Promise<StoredSource & { readonly file: string }> {
 	const source = await getSource(db, sourceId)
 	if (!source) throw new ApiError('SOURCE_NOT_FOUND', 404, `Documentation source ${sourceId} does not exist`)
-	if (source.file === null || source.kind === 'page') throw new ApiError('SOURCE_NOT_EDITABLE', 409, { message: 'A .meeko page is edited in the repository', issues: [{ path: '', message: 'Las páginas .meeko se editan en el repositorio.' }] })
-	if (source.removedAt !== null || !gitFileExists(source.file)) throw new ApiError('SOURCE_NOT_EDITABLE', 409, { message: 'Git no longer has the file', issues: [{ path: '', message: 'Git ya no tiene este archivo.' }] })
+	if (source.file === null || source.kind === 'page') throw new ApiError('SOURCE_NOT_EDITABLE', 409, { message: 'A .meeko page is edited in the repository', issues: [{ path: '', message: 'issues.meekoPage' }] })
+	if (source.removedAt !== null || !gitFileExists(source.file)) throw new ApiError('SOURCE_NOT_EDITABLE', 409, { message: 'Git no longer has the file', issues: [{ path: '', message: 'issues.gitMissing' }] })
 	return { ...source, file: source.file }
 }
 
@@ -115,7 +115,7 @@ async function revisionOf(db: Queryable, sourceId: number, id: number): Promise<
  * of a draft, that draft; of another revision, a new draft from its text and its base. Without it,
  * a new draft from the published revision when there is one, or else from Git now.
  */
-export async function readEditor(db: Queryable, sourceId: number, revisionId: number | undefined, statusOf: (source: StoredSource) => Promise<Editor['source']>): Promise<Editor> {
+export async function readEditor(db: Queryable, sourceId: number, revisionId: number | undefined, statusOf: (source: StoredSource) => Promise<Editor['source']>): Promise<Omit<Editor, 'original'>> {
 	const source = await editable(db, sourceId)
 	const git = gitText(source.file)
 	const gitHash = git === null ? null : textHash(git)
@@ -164,10 +164,11 @@ export async function compare(db: Queryable, sourceId: number, from: CompareSide
 	const side = async (choice: CompareSide): Promise<{ text: string; label: string }> => {
 		if (choice.kind === 'git') {
 			const git = gitText(source.file)
-			if (git === null) throw new ApiError('SOURCE_NOT_EDITABLE', 409, { message: 'Git no longer has the file', issues: [{ path: '', message: 'Git ya no tiene este archivo.' }] })
-			return { text: git, label: 'Git ahora' }
+			if (git === null) throw new ApiError('SOURCE_NOT_EDITABLE', 409, { message: 'Git no longer has the file', issues: [{ path: '', message: 'issues.gitMissing' }] })
+			// Technical labels of the diff header; the screen names the sides in its language.
+			return { text: git, label: 'git' }
 		}
-		return { text: (await revisionOf(db, sourceId, choice.id)).markdown, label: `Revisión #${choice.id}` }
+		return { text: (await revisionOf(db, sourceId, choice.id)).markdown, label: `revision-${choice.id}` }
 	}
 	const [a, b] = [await side(from), await side(to)]
 	try {
@@ -210,7 +211,7 @@ export async function mergeWithGit(db: Database, id: number, author: string, not
 	const found = await revisionConflict(db, id)
 	if (found.state !== 'conflict') throw new ApiError('NO_CONFLICT', 409, `Revision ${id} was written from the Git of now`)
 	if (!found.merge?.clean || found.gitHash === null) throw new ApiError('MERGE_NOT_TRIVIAL', 409, `Revision ${id} cannot be merged with Git automatically`)
-	const created = await createRevision(db, { sourceId: found.revision.sourceId, markdown: found.merge.markdown, author, note: note || `Git actual + cambios de la revisión #${id}`, baseHash: found.gitHash })
+	const created = await createRevision(db, { sourceId: found.revision.sourceId, markdown: found.merge.markdown, author, note: note || `Current Git + changes of revision #${id}`, baseHash: found.gitHash })
 	return revisionDetail(created, found.gitHash, await activeSince(db))
 }
 
@@ -228,8 +229,8 @@ export async function exportFile(db: Queryable, id: number): Promise<ExportedFil
  */
 export async function readPending(db: Queryable): Promise<PendingList> {
 	const active = (await listSnapshots(db)).find((snapshot) => snapshot.active) ?? null
-	const result = await db.query<{ id: string; source_id: string; title: string; path: string; author: string; status: 'archived' | 'published'; published_at: Date; archived_at: Date | null }>(
-		`SELECT r.id, r.source_id, s.title, s.path, r.author, r.status, r.published_at, r.archived_at
+	const result = await db.query<{ id: string; source_id: string; title: string; path: string; locale: 'en' | 'es'; author: string; status: 'archived' | 'published'; published_at: Date; archived_at: Date | null }>(
+		`SELECT r.id, r.source_id, s.title, s.path, s.locale, r.author, r.status, r.published_at, r.archived_at
 		FROM docs_revisions AS r JOIN docs_sources AS s ON s.id = r.source_id
 		WHERE s.removed_at IS NULL AND (
 			(r.status = 'published' AND ($1::timestamptz IS NULL OR r.published_at > $1))
@@ -246,6 +247,7 @@ export async function readPending(db: Queryable): Promise<PendingList> {
 			sourceId: Number(row.source_id),
 			title: row.title,
 			path: row.path,
+			locale: row.locale,
 			author: row.author,
 			change: row.status,
 			publishedAt: row.published_at.toISOString(),

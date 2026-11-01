@@ -20,8 +20,8 @@
 
 	import { downloadText } from '../../utils/download'
 	import { describeError } from '../../utils/errors'
-	import { formatDate, plural, shortHash } from '../../utils/format'
-	import { kindLabels, siteLabels, stateDescriptions } from '../../utils/labels'
+	import { shortHash } from '../../utils/format'
+	import { siteLabels } from '../../utils/labels'
 
 	export interface Props {
 		params: { id: string }
@@ -29,6 +29,11 @@
 	}
 
 	const props = defineProps<Props>()
+
+	const i18n = useI18n()
+	const { t, localePath } = i18n
+	const format = useFormat()
+	const formatDate = format.date
 
 	// The page remounts for another id: its initial value is enough.
 	const sourceId = untrack(() => Number(props.params.id))
@@ -51,18 +56,20 @@
 		noticeLink.value = link
 	}
 
-	const revisionStatus = { draft: 'Borrador', published: 'Publicada', archived: 'Archivada' } as const
+	const revisionStatus = (status: RevisionRow['status']) => t(`source.status.${status}`)
 	const pending = computed(() => data.value?.revisions.filter((revision) => revision.pending) ?? [])
 	// A published revision after the snapshot, or the snapshot's one archived since (back to Git).
 	const pendingPublished = computed(() => pending.value.filter((revision) => revision.status === 'published'))
 	const pendingTitle = computed(() => {
 		const published = pendingPublished.value
-		if (published.length === 1) return 'La revisión #' + published[0]?.id + ' está publicada'
-		if (published.length > 1) return plural(published.length, 'revisión publicada', 'revisiones publicadas')
-		return 'La revisión #' + pending.value[0]?.id + ' se archivó'
+		if (published.length === 1) return t('source.pending.one', { id: published[0]?.id ?? 0 })
+		if (published.length > 1) return t('source.pending.many', { count: published.length })
+		return t('source.pending.archived', { id: pending.value[0]?.id ?? 0 })
 	})
-	const pendingText = computed(() => (pendingPublished.value.length ? 'pero el snapshot activo aún no la incluye: el site sigue mostrando la versión anterior.' : 'pero el snapshot activo aún la muestra: el site volverá al texto de Git con la próxima publicación.'))
-	const editLabel = computed(() => (data.value?.source.publishedRevisionId ? 'Nuevo borrador' : 'Editar'))
+	const pendingText = computed(() => (pendingPublished.value.length ? t('source.pending.notIncluded') : t('source.pending.stillShown')))
+	const editLabel = computed(() => (data.value?.source.publishedRevisionId ? t('source.newDraft') : t('source.edit')))
+	const isTranslation = computed(() => data.value?.source.locale === 'en')
+	const canTranslate = computed(() => data.value?.source.site === 'site' && data.value.source.file !== null && data.value.source.kind !== 'page')
 
 	// Publish and archive: both ask first, because the next snapshot changes what the site shows.
 	type Action = 'publish' | 'archive'
@@ -85,10 +92,10 @@
 		try {
 			if (current.kind === 'publish') {
 				const revision = await rpc.revisions.publish({ id: current.revision.id })
-				announce(`Revisión #${revision.id} publicada. El site la mostrará cuando publiques la documentación.`, { href: '/snapshots', label: 'Publicar la documentación' })
+				announce(t('source.notice.published', { id: revision.id }), { href: localePath('/snapshots'), label: t('source.publishDocs') })
 			} else {
 				const revision = await rpc.revisions.archive({ id: current.revision.id })
-				announce(current.revision.status === 'published' ? `Revisión #${revision.id} archivada. La próxima publicación vuelve a mostrar Git.` : `Revisión #${revision.id} archivada.`, current.revision.status === 'published' ? { href: '/snapshots', label: 'Publicar la documentación' } : null)
+				announce(current.revision.status === 'published' ? t('source.notice.archivedPublished', { id: revision.id }) : t('source.notice.archived', { id: revision.id }), current.revision.status === 'published' ? { href: localePath('/snapshots'), label: t('source.publishDocs') } : null)
 			}
 			confirming.value = false
 			await reload()
@@ -104,7 +111,7 @@
 		try {
 			const file = await rpc.revisions.export({ id: revision.id })
 			downloadText(file.filename, file.markdown)
-			announce(`Descargado ${file.filename} con la revisión #${file.revisionId}. Cópialo a ${file.file} para llevarlo al repositorio.`)
+			announce(t('source.notice.exported', { filename: file.filename, id: file.revisionId, file: file.file }))
 		} catch (error) {
 			actionFailure.value = describeError(error)
 		}
@@ -112,7 +119,8 @@
 
 	// Comparison of two sides: Git now or any revision.
 	const sideOptions = computed(() => ['git', ...(data.value?.revisions.map((revision) => `r${revision.id}`) ?? [])])
-	const sideLabel = (value: string) => (value === 'git' ? 'Git ahora' : `Revisión #${value.slice(1)} · ${revisionStatus[data.value?.revisions.find((revision) => `r${revision.id}` === value)?.status ?? 'draft'].toLowerCase()}`)
+	const sideLabel = (value: string) => (value === 'git' ? t('source.gitNow') : t('source.sideRevision', { id: value.slice(1), status: revisionStatus(data.value?.revisions.find((revision) => `r${revision.id}` === value)?.status ?? 'draft').toLocaleLowerCase(i18n.locale) }))
+	const compared = signal<{ from: string; to: string } | null>(null)
 	const fromSide = signal<string | null>('git')
 	const toSide = signal<string | null>(data.value?.revisions[0] ? `r${data.value.revisions[0].id}` : null)
 	const comparison = signal<Comparison | null>(null)
@@ -125,6 +133,7 @@
 		comparing.value = true
 		try {
 			comparison.value = await rpc.revisions.compare({ sourceId, from: side(fromSide.value), to: side(toSide.value) })
+			compared.value = { from: sideLabel(fromSide.value), to: sideLabel(toSide.value) }
 			compareFailure.value = null
 		} catch (error) {
 			compareFailure.value = describeError(error)
@@ -138,7 +147,14 @@
 	const conflictFailure = signal<Failure | null>(null)
 	const loadingConflict = signal<number | null>(null)
 	const merging = signal(false)
-	const baseOrigins = { import: 'la última importación', 'working-tree': 'el working tree', commit: 'un commit' } as const
+	const baseOrigin = (origin: 'commit' | 'import' | 'working-tree') => t(`source.origin.${origin === 'working-tree' ? 'workingTree' : origin}`)
+	const conflictLead = computed(() => {
+		const current = conflict.value
+		if (!current) return ''
+		if (current.state === 'missing') return t('source.conflict.missing')
+		if (current.baseOrigin) return t('source.conflict.lead', { base: shortHash(current.baseHash), origin: baseOrigin(current.baseOrigin) + (current.baseCommit ? ' ' + current.baseCommit.slice(0, 10) : ''), git: shortHash(current.gitHash) })
+		return t('source.conflict.noBase', { base: shortHash(current.baseHash) })
+	})
 
 	async function openConflict(revision: RevisionRow) {
 		loadingConflict.value = revision.id
@@ -157,9 +173,9 @@
 		if (!current) return
 		merging.value = true
 		try {
-			const draft = await rpc.revisions.merge({ id: current.revisionId })
+			const draft = await rpc.revisions.merge({ id: current.revisionId, note: t('source.mergeNote', { id: current.revisionId }) })
 			conflict.value = null
-			announce(`Borrador #${draft.id} creado con Git actual y los cambios de la revisión #${current.revisionId}.`, { href: `/sources/${sourceId}/edit?revision=${draft.id}`, label: `Abrir el borrador #${draft.id}` })
+			announce(t('source.notice.merged', { id: draft.id, revision: current.revisionId }), { href: localePath(`/sources/${sourceId}/edit?revision=${draft.id}`), label: t('source.openDraft', { id: draft.id }) })
 			await reload()
 		} catch (error) {
 			conflictFailure.value = describeError(error)
@@ -173,19 +189,26 @@
 
 <template>
 	<DashPage
-		bind:title="data.value ? data.value.source.title : 'Fuente ' + props.params.id"
-		bind:description="data.value ? siteLabels[data.value.source.site] + ' · ' + kindLabels[data.value.source.kind] + ' · ' + data.value.source.path : 'Detalle de una fuente de la documentación.'"
+		bind:title="data.value ? data.value.source.title : t('source.fallbackTitle', { id: props.params.id })"
+		bind:description="data.value ? siteLabels[data.value.source.site] + ' · ' + t(`locale.${data.value.source.locale}`) + ' · ' + t(`labels.kind.${data.value.source.kind}`) + ' · ' + data.value.source.path : t('source.fallbackDescription')"
 	>
 		<snippet name="actions">
 			<UILink
-				href="/sources"
 				variant="ghost"
+				bind:href="localePath('/sources')"
 			>
-				Todas las fuentes
+				{t('source.allSources')}
+			</UILink>
+			<UILink
+				if:when="canTranslate.value"
+				variant="outline"
+				bind:href="localePath('/translations/' + props.params.id)"
+			>
+				{isTranslation.value ? t('source.compareOriginal') : t('source.seeTranslation')}
 			</UILink>
 			<UILink
 				if:when="data.value?.editable"
-				bind:href="'/sources/' + props.params.id + '/edit'"
+				bind:href="localePath('/sources/' + props.params.id + '/edit')"
 			>
 				{editLabel.value}
 			</UILink>
@@ -203,7 +226,7 @@
 				aria-labelledby="source-heading"
 			>
 				<div class="dash-panel-head">
-					<h2 id="source-heading">Fuente</h2>
+					<h2 id="source-heading">{t('source.heading')}</h2>
 					<DashStateBadge
 						bind:state="data.value?.source.state ?? null"
 						bind:importStale="data.value?.source.importStale ?? false"
@@ -214,50 +237,54 @@
 					if:when="data.value?.source.state"
 					class="dash-section-lead"
 				>
-					{data.value?.source.state ? stateDescriptions[data.value.source.state] : ''}
+					{data.value?.source.state ? t(`labels.stateHelp.${data.value.source.state}`) : ''}
 				</p>
 				<dl class="dash-facts">
 					<div>
-						<dt>Ruta pública</dt>
+						<dt>{t('source.facts.path')}</dt>
 						<dd>
-							<code>{data.value?.source.path}</code>
+							<code>{data.value?.source.locale === 'en' ? '/en' + (data.value?.source.path === '/' ? '' : data.value?.source.path) : data.value?.source.path}</code>
 						</dd>
 					</div>
 					<div>
-						<dt>Archivo</dt>
+						<dt>{t('source.facts.locale')}</dt>
+						<dd>{data.value ? t(`locale.${data.value.source.locale}`) : ''}</dd>
+					</div>
+					<div>
+						<dt>{t('source.facts.file')}</dt>
 						<dd>
 							<code if:when="data.value?.source.file">{data.value?.source.file}</code>
 							<span
 								if:when="!data.value?.source.file"
 								class="dash-muted"
 							>
-								Página .meeko: su texto vive en el repositorio
+								{t('source.facts.meekoFile')}
 							</span>
 						</dd>
 					</div>
 					<div>
-						<dt>Hash base (importado)</dt>
+						<dt>{t('source.facts.baseHash')}</dt>
 						<dd>
 							<code bind:title="data.value?.source.baseHash ?? undefined">{shortHash(data.value?.source.baseHash)}</code>
 						</dd>
 					</div>
 					<div>
-						<dt>Hash en Git ahora</dt>
+						<dt>{t('source.facts.gitHash')}</dt>
 						<dd>
 							<code bind:title="data.value?.gitHash ?? undefined">{shortHash(data.value?.gitHash)}</code>
 						</dd>
 					</div>
 					<div>
-						<dt>Importada</dt>
+						<dt>{t('source.facts.imported')}</dt>
 						<dd>{formatDate(data.value?.source.importedAt)}</dd>
 					</div>
 					<div if:when="data.value?.source.removedAt">
-						<dt>Retirada</dt>
+						<dt>{t('source.facts.removed')}</dt>
 						<dd>{formatDate(data.value?.source.removedAt)}</dd>
 					</div>
 					<div>
-						<dt>Revisión publicada</dt>
-						<dd>{data.value?.source.publishedRevisionId ? '#' + data.value.source.publishedRevisionId : 'Ninguna: se publica Git'}</dd>
+						<dt>{t('source.facts.published')}</dt>
+						<dd>{data.value?.source.publishedRevisionId ? '#' + data.value.source.publishedRevisionId : t('source.facts.noPublished')}</dd>
 					</div>
 				</dl>
 			</section>
@@ -272,11 +299,11 @@
 					{pendingText.value}
 				</p>
 				<UILink
-					href="/snapshots"
 					size="sm"
 					variant="outline"
+					bind:href="localePath('/snapshots')"
 				>
-					Publicar la documentación
+					{t('source.publishDocs')}
 				</UILink>
 			</div>
 
@@ -295,7 +322,7 @@
 			</p>
 			<DashFailure
 				if:when="actionFailure.value"
-				title="No se completó la acción"
+				bind:title="t('source.actionFailed')"
 				bind:failure="actionFailure.value"
 			/>
 
@@ -305,31 +332,31 @@
 				aria-labelledby="revisions-heading"
 			>
 				<div class="dash-panel-head">
-					<h2 id="revisions-heading">Revisiones</h2>
-					<span class="dash-muted">{plural(data.value?.revisions.length ?? 0, 'revisión', 'revisiones')}</span>
+					<h2 id="revisions-heading">{t('source.revisions')}</h2>
+					<span class="dash-muted">{t('source.revisionCount', { count: data.value?.revisions.length ?? 0 })}</span>
 				</div>
 				<p
 					if:when="!data.value?.revisions.length"
 					class="dash-empty"
 				>
-					{data.value?.editable ? 'Sin revisiones: el site publica el archivo de Git. Edita la fuente para crear el primer borrador.' : data.value?.source.file ? 'Sin revisiones. Git ya no tiene este archivo, así que no se puede editar.' : 'Las páginas .meeko no tienen revisiones: se cambian en el repositorio.'}
+					{data.value?.editable ? t('source.noRevisions.editable') : data.value?.source.file ? t('source.noRevisions.gone') : t('source.noRevisions.meeko')}
 				</p>
 				<div
 					if:when="data.value?.revisions.length"
 					class="dash-table-scroll"
 				>
 					<table class="dash-table dash-revisions">
-						<caption class="dash-visually-hidden">Revisiones de la fuente, de la más reciente a la más antigua</caption>
+						<caption class="dash-visually-hidden">{t('source.revisionsCaption')}</caption>
 						<thead>
 							<tr>
-								<th scope="col">Revisión</th>
-								<th scope="col">Estado</th>
-								<th scope="col">Autor</th>
-								<th scope="col">Creada</th>
-								<th scope="col">Publicada</th>
-								<th scope="col">Nota</th>
+								<th scope="col">{t('source.columns.revision')}</th>
+								<th scope="col">{t('source.columns.status')}</th>
+								<th scope="col">{t('source.columns.author')}</th>
+								<th scope="col">{t('source.columns.created')}</th>
+								<th scope="col">{t('source.columns.published')}</th>
+								<th scope="col">{t('source.columns.note')}</th>
 								<th scope="col">
-									<span class="dash-visually-hidden">Acciones</span>
+									<span class="dash-visually-hidden">{t('source.columns.actions')}</span>
 								</th>
 							</tr>
 						</thead>
@@ -343,25 +370,25 @@
 									#{String(revision.id)}
 									<code
 										class="dash-revision-hash"
-										bind:title="revision.baseHash ? 'Escrita sobre Git ' + revision.baseHash : undefined"
+										bind:title="revision.baseHash ? t('source.writtenOn', { hash: revision.baseHash }) : undefined"
 									>
 										{shortHash(revision.baseHash)}
 									</code>
 								</th>
 								<td>
 									<span class="dash-badges">
-										<UIBadge bind:tone="revision.status === 'published' ? 'accent' : 'neutral'">{revisionStatus[revision.status]}</UIBadge>
+										<UIBadge bind:tone="revision.status === 'published' ? 'accent' : 'neutral'">{revisionStatus(revision.status)}</UIBadge>
 										<span
 											if:when="revision.pending"
-											bind:title="revision.status === 'archived' ? 'Archivada después del snapshot activo, que aún la muestra: el site vuelve a Git con la próxima publicación.' : 'Publicada después del snapshot activo: el site aún no la muestra.'"
+											bind:title="revision.status === 'archived' ? t('source.badges.archivedAfter') : t('source.badges.publishedAfter')"
 										>
-											<UIBadge tone="accent">Sin snapshot</UIBadge>
+											<UIBadge tone="accent">{t('source.badges.noSnapshot')}</UIBadge>
 										</span>
 										<span
 											if:when="revision.conflict"
-											title="Git cambió después de escribirla: su base no es el archivo de ahora."
+											bind:title="t('source.badges.conflictHelp')"
 										>
-											<UIBadge tone="danger">Conflicto con Git</UIBadge>
+											<UIBadge tone="danger">{t('source.badges.conflict')}</UIBadge>
 										</span>
 									</span>
 								</td>
@@ -375,10 +402,10 @@
 											if:when="data.value?.editable"
 											size="sm"
 											variant="ghost"
-											bind:href="'/sources/' + props.params.id + '/edit?revision=' + revision.id"
-											bind:ariaLabel="(revision.status === 'draft' ? 'Editar el borrador #' : 'Nuevo borrador desde la revisión #') + revision.id"
+											bind:href="localePath('/sources/' + props.params.id + '/edit?revision=' + revision.id)"
+											bind:ariaLabel="revision.status === 'draft' ? t('source.row.editDraft', { id: revision.id }) : t('source.row.fromRevision', { id: revision.id })"
 										>
-											{revision.status === 'draft' ? 'Editar' : 'Partir de aquí'}
+											{revision.status === 'draft' ? t('source.edit') : t('source.row.startHere')}
 										</UILink>
 										<UIButton
 											if:when="revision.status !== 'published'"
@@ -387,8 +414,8 @@
 											bind:disabled="busyRow.value"
 											on:click="() => ask('publish', revision)"
 										>
-											Publicar
-											<span class="dash-visually-hidden">la revisión #{String(revision.id)}</span>
+											{t('source.row.publish')}
+											<span class="dash-visually-hidden">{t('source.row.theRevision', { id: revision.id })}</span>
 										</UIButton>
 										<UIButton
 											if:when="revision.status !== 'archived'"
@@ -397,15 +424,15 @@
 											bind:disabled="busyRow.value"
 											on:click="() => ask('archive', revision)"
 										>
-											Archivar
-											<span class="dash-visually-hidden">la revisión #{String(revision.id)}</span>
+											{t('source.row.archive')}
+											<span class="dash-visually-hidden">{t('source.row.theRevision', { id: revision.id })}</span>
 										</UIButton>
 										<UIButton
 											size="sm"
 											variant="ghost"
 											on:click="() => exportMarkdown(revision)"
 										>
-											<span class="dash-visually-hidden">Exportar la revisión #{String(revision.id)} a</span>
+											<span class="dash-visually-hidden">{t('source.row.export', { id: revision.id })}</span>
 											.md
 										</UIButton>
 										<UIButton
@@ -415,8 +442,8 @@
 											bind:disabled="loadingConflict.value !== null"
 											on:click="() => openConflict(revision)"
 										>
-											{loadingConflict.value === revision.id ? 'Cargando…' : 'Ver conflicto'}
-											<span class="dash-visually-hidden">de la revisión #{String(revision.id)}</span>
+											{loadingConflict.value === revision.id ? t('source.row.loading') : t('source.row.seeConflict')}
+											<span class="dash-visually-hidden">{t('source.row.ofRevision', { id: revision.id })}</span>
 										</UIButton>
 									</span>
 								</td>
@@ -432,7 +459,7 @@
 				aria-labelledby="conflict-heading"
 			>
 				<div class="dash-panel-head">
-					<h2 id="conflict-heading">{conflict.value ? 'Conflicto de la revisión #' + conflict.value.revisionId + ' con Git' : 'Conflicto con Git'}</h2>
+					<h2 id="conflict-heading">{conflict.value ? t('source.conflict.title', { id: conflict.value.revisionId }) : t('source.badges.conflict')}</h2>
 					<UIButton
 						size="sm"
 						variant="ghost"
@@ -443,12 +470,12 @@
 							}
 						"
 					>
-						Cerrar
+						{t('actions.close')}
 					</UIButton>
 				</div>
 				<DashFailure
 					if:when="conflictFailure.value"
-					title="No se completó"
+					bind:title="t('source.conflict.failed')"
 					bind:failure="conflictFailure.value"
 				/>
 				<div
@@ -456,7 +483,7 @@
 					class="dash-stack"
 				>
 					<p class="dash-section-lead">
-						{conflict.value?.state === 'missing' ? 'Git ya no tiene este archivo.' : conflict.value?.baseOrigin ? 'La revisión se escribió sobre una versión de Git (' + shortHash(conflict.value.baseHash) + ', encontrada en ' + baseOrigins[conflict.value.baseOrigin] + (conflict.value.baseCommit ? ' ' + conflict.value.baseCommit.slice(0, 10) : '') + ') que ya no es la de ahora (' + shortHash(conflict.value.gitHash) + ').' : 'No se encuentra el texto de Git sobre el que se escribió (' + shortHash(conflict.value?.baseHash) + '): solo se compara Git de ahora con la revisión, sin fusión.'}
+						{conflictLead.value}
 					</p>
 					<div
 						if:when="conflict.value?.merge"
@@ -464,12 +491,12 @@
 						bind:data-tone="conflict.value?.merge?.clean ? undefined : 'danger'"
 					>
 						<p if:when="conflict.value?.merge?.clean">
-							<strong>Fusión trivial.</strong>
-							Git y la revisión cambiaron partes distintas: puedes crear un borrador nuevo con Git de ahora y los cambios de la revisión, y revisarlo antes de publicar.
+							<strong>{t('source.conflict.trivial')}</strong>
+							{t('source.conflict.trivialText')}
 						</p>
 						<p if:when="!conflict.value?.merge?.clean">
-							<strong>{plural(conflict.value?.merge?.conflicts ?? 0, 'zona cambiada', 'zonas cambiadas')} por los dos lados.</strong>
-							No hay fusión automática: edita un borrador a mano a partir de Git o de la revisión.
+							<strong>{t('source.conflict.zones', { count: conflict.value?.merge?.conflicts ?? 0 })}</strong>
+							{t('source.conflict.manual')}
 						</p>
 						<form
 							if:when="conflict.value?.merge?.clean"
@@ -485,34 +512,34 @@
 								type="submit"
 								bind:disabled="merging.value"
 							>
-								{merging.value ? 'Creando…' : 'Crear borrador: Git actual + mis cambios'}
+								{merging.value ? t('source.conflict.creating') : t('source.conflict.merge')}
 							</UIButton>
 						</form>
 					</div>
 					<div class="dash-three-way">
 						<section aria-labelledby="base-git-heading">
-							<h3 id="base-git-heading">Base → Git ahora</h3>
-							<p class="dash-hint">Lo que cambió en Git desde que se escribió la revisión.</p>
+							<h3 id="base-git-heading">{t('source.conflict.baseGit')}</h3>
+							<p class="dash-hint">{t('source.conflict.baseGitHint')}</p>
 							<DashDiff
-								label="Diff de la base a Git de ahora"
+								bind:label="t('source.conflict.baseGitLabel')"
 								bind:diff="conflict.value?.diffs.baseToGit ?? ''"
-								bind:empty="conflict.value?.baseOrigin ? 'Sin cambios.' : 'Sin base: no se puede mostrar.'"
+								bind:empty="conflict.value?.baseOrigin ? t('source.conflict.noChanges') : t('source.conflict.noBaseDiff')"
 							/>
 						</section>
 						<section aria-labelledby="base-revision-heading">
-							<h3 id="base-revision-heading">Base → revisión</h3>
-							<p class="dash-hint">Lo que cambió la revisión.</p>
+							<h3 id="base-revision-heading">{t('source.conflict.baseRevision')}</h3>
+							<p class="dash-hint">{t('source.conflict.baseRevisionHint')}</p>
 							<DashDiff
-								label="Diff de la base a la revisión"
+								bind:label="t('source.conflict.baseRevisionLabel')"
 								bind:diff="conflict.value?.diffs.baseToRevision ?? ''"
-								bind:empty="conflict.value?.baseOrigin ? 'Sin cambios.' : 'Sin base: no se puede mostrar.'"
+								bind:empty="conflict.value?.baseOrigin ? t('source.conflict.noChanges') : t('source.conflict.noBaseDiff')"
 							/>
 						</section>
 						<section aria-labelledby="git-revision-heading">
-							<h3 id="git-revision-heading">Git ahora → revisión</h3>
-							<p class="dash-hint">Lo que verá el site si se publica la revisión tal cual.</p>
+							<h3 id="git-revision-heading">{t('source.conflict.gitRevision')}</h3>
+							<p class="dash-hint">{t('source.conflict.gitRevisionHint')}</p>
 							<DashDiff
-								label="Diff de Git de ahora a la revisión"
+								bind:label="t('source.conflict.gitRevisionLabel')"
 								bind:diff="conflict.value?.diffs.gitToRevision ?? ''"
 							/>
 						</section>
@@ -526,7 +553,7 @@
 				aria-labelledby="compare-heading"
 			>
 				<div class="dash-panel-head">
-					<h2 id="compare-heading">Comparar</h2>
+					<h2 id="compare-heading">{t('source.compare.title')}</h2>
 					<span
 						if:when="comparison.value && !comparison.value.tooLarge"
 						class="dash-diff-stat"
@@ -537,7 +564,7 @@
 				</div>
 				<form
 					class="dash-filters"
-					aria-label="Comparar dos versiones"
+					bind:aria-label="t('source.compare.label')"
 					on:submit="
 						(event) => {
 							event.preventDefault()
@@ -546,7 +573,7 @@
 					"
 				>
 					<div class="dash-field">
-						<label for="compare-from">Desde</label>
+						<label for="compare-from">{t('source.compare.from')}</label>
 						<UISelect
 							id="compare-from"
 							model="fromSide"
@@ -555,7 +582,7 @@
 						/>
 					</div>
 					<div class="dash-field">
-						<label for="compare-to">Hasta</label>
+						<label for="compare-to">{t('source.compare.to')}</label>
 						<UISelect
 							id="compare-to"
 							model="toSide"
@@ -568,25 +595,25 @@
 						variant="secondary"
 						bind:disabled="comparing.value || !fromSide.value || !toSide.value"
 					>
-						{comparing.value ? 'Comparando…' : 'Comparar'}
+						{comparing.value ? t('source.compare.running') : t('source.compare.submit')}
 					</UIButton>
 				</form>
 				<DashFailure
 					if:when="compareFailure.value"
-					title="No se pudo comparar"
+					bind:title="t('source.compare.failed')"
 					bind:failure="compareFailure.value"
 				/>
 				<p
 					if:when="comparison.value?.tooLarge"
 					class="dash-empty"
 				>
-					Los textos son demasiado distintos para compararlos línea a línea.
+					{t('source.compare.tooLarge')}
 				</p>
 				<DashDiff
 					if:when="comparison.value && !comparison.value.tooLarge"
-					empty="Las dos versiones son iguales."
+					bind:empty="t('source.compare.same')"
 					bind:diff="comparison.value?.diff ?? ''"
-					bind:label="'Diff de ' + (comparison.value?.fromLabel ?? '') + ' a ' + (comparison.value?.toLabel ?? '')"
+					bind:label="t('source.compare.diffLabel', { from: compared.value?.from ?? '', to: compared.value?.to ?? '' })"
 				/>
 			</section>
 
@@ -596,7 +623,7 @@
 				aria-labelledby="diff-heading"
 			>
 				<div class="dash-panel-head">
-					<h2 id="diff-heading">Diff con Git</h2>
+					<h2 id="diff-heading">{t('source.gitDiff.title')}</h2>
 					<span
 						if:when="data.value?.diff"
 						class="dash-diff-stat"
@@ -606,36 +633,36 @@
 					</span>
 				</div>
 				<DashDiff
-					label="Diff unificado de Git a la revisión publicada"
+					bind:label="t('source.gitDiff.label')"
 					bind:diff="data.value?.diff ?? ''"
-					bind:empty="data.value?.source.publishedRevisionId ? 'La revisión publicada coincide con Git.' : 'No hay revisión publicada: el site muestra exactamente Git.'"
+					bind:empty="data.value?.source.publishedRevisionId ? t('source.gitDiff.same') : t('source.gitDiff.none')"
 				/>
 			</section>
 		</div>
 
 		<UIModal
 			model="confirming"
-			bind:title="action.value ? (action.value.kind === 'publish' ? '¿Publicar la revisión #' : '¿Archivar la revisión #') + action.value.revision.id + '?' : ''"
-			bind:description="action.value?.kind === 'publish' ? 'Pasa a ser el texto publicado de esta fuente y archiva la publicada anterior. El site la muestra desde la próxima publicación de la documentación.' : action.value?.revision.status === 'published' ? 'Deja de ser el texto publicado: la próxima publicación de la documentación vuelve a mostrar Git.' : 'Queda en el historial y ya no se puede editar; puedes partir de ella en un borrador nuevo.'"
+			bind:title="action.value ? (action.value.kind === 'publish' ? t('source.confirm.publishTitle', { id: action.value.revision.id }) : t('source.confirm.archiveTitle', { id: action.value.revision.id })) : ''"
+			bind:description="action.value?.kind === 'publish' ? t('source.confirm.publishText') : action.value?.revision.status === 'published' ? t('source.confirm.archivePublishedText') : t('source.confirm.archiveText')"
 		>
 			<dl
 				if:when="action.value"
 				class="dash-facts"
 			>
 				<div>
-					<dt>Autor</dt>
+					<dt>{t('source.columns.author')}</dt>
 					<dd>{action.value?.revision.author}</dd>
 				</div>
 				<div>
-					<dt>Estado</dt>
-					<dd>{action.value ? revisionStatus[action.value.revision.status] : ''}</dd>
+					<dt>{t('source.columns.status')}</dt>
+					<dd>{action.value ? revisionStatus(action.value.revision.status) : ''}</dd>
 				</div>
 				<div if:when="action.value?.kind === 'publish' && data.value?.source.publishedRevisionId">
-					<dt>Sustituye a</dt>
+					<dt>{t('source.confirm.replaces')}</dt>
 					<dd>#{String(data.value?.source.publishedRevisionId)}</dd>
 				</div>
 				<div if:when="action.value?.revision.note">
-					<dt>Nota</dt>
+					<dt>{t('source.columns.note')}</dt>
 					<dd>{action.value?.revision.note}</dd>
 				</div>
 			</dl>
@@ -643,11 +670,11 @@
 				if:when="action.value?.kind === 'publish' && action.value?.revision.conflict"
 				class="dash-hint dash-editor-warning"
 			>
-				Esta revisión se escribió sobre otra versión de Git: publicarla descarta lo que cambió en Git desde entonces. Revisa el conflicto antes.
+				{t('source.confirm.conflictWarning')}
 			</p>
 			<DashFailure
 				if:when="confirmFailure.value"
-				bind:title="action.value?.kind === 'publish' ? 'No se publicó' : 'No se archivó'"
+				bind:title="action.value?.kind === 'publish' ? t('source.confirm.notPublished') : t('source.confirm.notArchived')"
 				bind:failure="confirmFailure.value"
 			/>
 			<snippet name="footer">
@@ -655,13 +682,13 @@
 					variant="ghost"
 					on:click="() => (confirming.value = false)"
 				>
-					Cancelar
+					{t('actions.cancel')}
 				</UIButton>
 				<UIButton
 					bind:disabled="acting.value"
 					on:click="confirm"
 				>
-					{acting.value ? 'Un momento…' : action.value?.kind === 'publish' ? 'Publicar revisión' : 'Archivar revisión'}
+					{acting.value ? t('source.confirm.working') : action.value?.kind === 'publish' ? t('source.confirm.publish') : t('source.confirm.archive')}
 				</UIButton>
 			</snippet>
 		</UIModal>

@@ -1,0 +1,127 @@
+{
+	"metrics": {
+		"title": "Métricas",
+		"description": "Vistas, búsquedas y respuestas a «¿Te sirvió?» de cada web, por día UTC y por idioma. Sin cookies ni datos de los lectores.",
+		"site": "Web",
+		"locale": "Idioma",
+		"range": "Rango de fechas",
+		"allLanguages": "Todos los idiomas",
+		"days": "{days} días",
+		"invalidRange": "Rango no válido",
+		"from": "Desde",
+		"to": "Hasta",
+		"apply": "Aplicar",
+		"failed": "No se pudieron cargar las métricas",
+		"totals": "Totales del rango",
+		"views": "Vistas",
+		"searches": "Búsquedas",
+		"helpful": "¿Te sirvió?",
+		"emptySearchCount": {
+			"plural": "count",
+			"forms": {
+				"one": "{total} sin resultados",
+				"other": "{total} sin resultados"
+			}
+		},
+		"allFound": "Todas con resultados",
+		"yesShare": "{share} sí",
+		"answers": {
+			"plural": "count",
+			"forms": {
+				"one": "{total} respuesta: {yes} sí, {no} no",
+				"other": "{total} respuestas: {yes} sí, {no} no"
+			}
+		},
+		"noAnswers": "Sin respuestas",
+		"viewsByDay": "Vistas por día",
+		"noViews": "Ninguna vista en este rango. Las webs cuentan una vista por página mostrada cuando tienen DATABASE_URL y DOCS_METRICS no está en off.",
+		"chartLabel": "Vistas por día de {site}, {range}",
+		"topPages": "Páginas más vistas",
+		"topPagesHint": "Las 20 primeras, por idioma",
+		"noPages": "Ninguna página vista en este rango.",
+		"topSearches": "Búsquedas más frecuentes",
+		"normalized": "Consultas normalizadas",
+		"noSearches": "Nadie buscó en este rango.",
+		"topSearchesCaption": "Búsquedas más frecuentes de {site}",
+		"query": "Consulta",
+		"times": "Veces",
+		"results": "Resultados",
+		"none": "Ninguno",
+		"emptySearches": "Búsquedas sin resultados",
+		"emptySearchesHint": "Lo que falta en la documentación",
+		"allFoundRange": "Todas las búsquedas de este rango encontraron algo.",
+		"timesCount": {
+			"plural": "count",
+			"forms": {
+				"one": "{total} vez",
+				"other": "{total} veces"
+			}
+		},
+		"helpfulByPage": "¿Te sirvió? por página",
+		"helpfulHint": "Primero las más respondidas",
+		"noAnswersRange": "Ninguna respuesta en este rango.",
+		"helpfulCaption": "Respuestas a «¿Te sirvió?» por página de {site}",
+		"page": "Página",
+		"yes": "Sí",
+		"answersColumn": "Respuestas",
+		"commentsColumn": "Comentarios",
+		"yesNo": "{yes} sí · {no} no",
+		"comments": {
+			"pending": "Pendientes",
+			"reviewed": "Revisados",
+			"bothAnswers": "Sí y no",
+			"answeredNo": "Respondió no",
+			"answeredYes": "Respondió sí",
+			"emptyFiltered": "Ningún comentario coincide con los filtros.",
+			"emptyPending": "No hay comentarios pendientes en este rango: todos están revisados.",
+			"emptyReviewed": "Aún no has revisado ningún comentario de este rango.",
+			"empty": "Nadie dejó un comentario en este rango.",
+			"markedReviewed": "Comentario sobre {path} marcado como revisado.",
+			"markedPending": "Comentario sobre {path} de nuevo pendiente.",
+			"deleted": "Comentario sobre {path} borrado.",
+			"count": {
+				"plural": "count",
+				"forms": {
+					"one": "{total} comentario",
+					"other": "{total} comentarios"
+				}
+			},
+			"status": "Estado",
+			"pathPlaceholder": "Filtra por ruta: /docs/signal…",
+			"failed": "No se pudieron cargar los comentarios",
+			"notChanged": "No se hizo el cambio",
+			"helped": "Le sirvió",
+			"notHelped": "No le sirvió",
+			"reviewedBy": "Revisado {date} por {user}",
+			"reviewedOn": "Revisado {date}",
+			"reopen": "Volver a pendiente",
+			"review": "Marcar como revisado",
+			"about": "el comentario sobre {path} del {date}",
+			"delete": "Borrar",
+			"pages": "Páginas de comentarios",
+			"newer": "Más recientes",
+			"older": "Más antiguos",
+			"pageOf": "Página {page} de {pages}",
+			"deleteTitle": "¿Borrar este comentario?",
+			"deleteText": "El comentario sobre {path} y su respuesta desaparecen de las métricas. No se puede deshacer; para conservarlo, márcalo como revisado.",
+			"notDeleted": "No se borró",
+			"deleting": "Borrando…",
+			"deleteConfirm": "Borrar el comentario"
+		}
+	},
+	"chart": {
+		"peak": "Máximo: {views} el {day}.",
+		"noViews": "Sin vistas.",
+		"keys": "Usa las flechas para recorrer los días; la tabla de abajo tiene todos los valores.",
+		"views": {
+			"plural": "count",
+			"forms": {
+				"one": "vista",
+				"other": "vistas"
+			}
+		},
+		"table": "Ver los valores como tabla",
+		"day": "Día (UTC)",
+		"viewsColumn": "Vistas"
+	}
+}

@@ -5,11 +5,11 @@ import type { SourceStatus } from 'meeko-docs-content/status'
 
 import { ApiError } from '@meekojs/meeko/server'
 import { gitFileExists, readGitFile } from 'meeko-docs-content/content/repository'
-import { getSource, listRevisions, sourceDivergence } from 'meeko-docs-content/db'
+import { countTranslations, getSource, listRevisions, listTranslations, sourceDivergence } from 'meeko-docs-content/db'
 import { listSnapshots } from 'meeko-docs-content/snapshots'
 import { listSourceStatuses } from 'meeko-docs-content/status'
 
-import type { DocsSite, Jobs, Overview, SiteSummary, SnapshotRow, SourceDetail, SourceKind, SourceRow } from '../../shared/schemas/dashboard'
+import type { DocsLocale, DocsSite, Jobs, Overview, SiteSummary, SnapshotRow, SourceDetail, SourceKind, SourceRow } from '../../shared/schemas/dashboard'
 
 import { activeSince, revisionRow, textHash } from './revisions'
 
@@ -22,6 +22,7 @@ export function sourceRow(source: SourceStatus): SourceRow {
 	return {
 		id: source.id,
 		site: source.site,
+		locale: source.locale,
 		path: source.path,
 		kind: source.kind,
 		title: source.title,
@@ -38,13 +39,16 @@ export function sourceRow(source: SourceStatus): SourceRow {
 }
 
 export function snapshotRow(snapshot: SnapshotSummary): SnapshotRow {
-	return { id: snapshot.id, publishedAt: snapshot.publishedAt.toISOString(), active: snapshot.active, pages: snapshot.pages, publishedBy: snapshot.publishedBy, note: snapshot.note }
+	return { id: snapshot.id, publishedAt: snapshot.publishedAt.toISOString(), active: snapshot.active, pages: snapshot.pages, pagesByLocale: { es: snapshot.pagesByLocale.es, en: snapshot.pagesByLocale.en }, publishedBy: snapshot.publishedBy, note: snapshot.note }
 }
 
-/** Counts of each web: sources by kind and by state, and its last import. Removed sources are counted apart. */
+/**
+ * Counts of each web: its Spanish sources by kind and by state, and its last import. Removed
+ * sources are counted apart; the translations, in the overview's `translations`.
+ */
 export function summarize(rows: readonly SourceRow[]): SiteSummary[] {
 	return sites.map((site) => {
-		const own = rows.filter((row) => row.site === site)
+		const own = rows.filter((row) => row.site === site && row.locale === 'es')
 		const current = own.filter((row) => row.removedAt === null)
 		const kinds: Record<SourceKind, number> = { guide: 0, reference: 0, page: 0 }
 		const states: SiteSummary['states'] = { git: 0, same: 0, edited: 0, conflict: 0, missing: 0 }
@@ -58,8 +62,8 @@ export function summarize(rows: readonly SourceRow[]): SiteSummary[] {
 }
 
 /** Every source, removed ones included, with its divergence. */
-export async function readSources(db: Queryable, filter: { readonly site?: DocsSite | undefined; readonly kind?: SourceKind | undefined; readonly includeRemoved?: boolean | undefined } = {}): Promise<SourceRow[]> {
-	const rows = await listSourceStatuses(db, { ...(filter.site ? { site: filter.site } : {}), ...(filter.kind ? { kind: filter.kind } : {}), includeRemoved: filter.includeRemoved ?? true })
+export async function readSources(db: Queryable, filter: { readonly site?: DocsSite | undefined; readonly locale?: DocsLocale | undefined; readonly kind?: SourceKind | undefined; readonly includeRemoved?: boolean | undefined } = {}): Promise<SourceRow[]> {
+	const rows = await listSourceStatuses(db, { ...(filter.site ? { site: filter.site } : {}), ...(filter.locale ? { locale: filter.locale } : {}), ...(filter.kind ? { kind: filter.kind } : {}), includeRemoved: filter.includeRemoved ?? true })
 	return rows.map(sourceRow)
 }
 
@@ -67,15 +71,15 @@ export async function readSnapshots(db: Queryable): Promise<SnapshotRow[]> {
 	return (await listSnapshots(db)).map(snapshotRow)
 }
 
-/** The Resumen: each web's counts and the active snapshot. */
+/** The overview: each web's counts, the translations into English and the active snapshot. */
 export async function readOverview(db: Queryable, jobs: Jobs): Promise<Overview> {
-	const [rows, snapshots] = await Promise.all([readSources(db), readSnapshots(db)])
-	return { sites: summarize(rows), activeSnapshot: snapshots.find((snapshot) => snapshot.active) ?? null, snapshots: snapshots.length, jobs }
+	const [rows, snapshots, translations] = await Promise.all([readSources(db), readSnapshots(db), listTranslations(db, { locale: 'en' })])
+	return { sites: summarize(rows), translations: countTranslations(translations), activeSnapshot: snapshots.find((snapshot) => snapshot.active) ?? null, snapshots: snapshots.length, jobs }
 }
 
 /** One source with its divergence, as the tables list it. */
 export async function readSourceRow(db: Queryable, source: SourceRecord): Promise<SourceRow> {
-	const [status] = (await listSourceStatuses(db, { site: source.site, kind: source.kind, includeRemoved: true })).filter((candidate) => candidate.id === source.id)
+	const [status] = (await listSourceStatuses(db, { site: source.site, locale: source.locale, kind: source.kind, includeRemoved: true })).filter((candidate) => candidate.id === source.id)
 	if (!status) throw new ApiError('SOURCE_NOT_FOUND', 404, `Documentation source ${source.id} does not exist`)
 	return sourceRow(status)
 }

@@ -22,8 +22,8 @@
 
 	import { encodedBytes } from '../../../../shared/schemas/dashboard'
 	import { describeError } from '../../../utils/errors'
-	import { formatNumber, plural, shortHash } from '../../../utils/format'
-	import { kindLabels, siteLabels } from '../../../utils/labels'
+	import { shortHash } from '../../../utils/format'
+	import { siteLabels } from '../../../utils/labels'
 	import { previewDocument, readPreviewTokens } from '../../../utils/preview-document'
 	import { setUnsaved } from '../../../utils/unsaved'
 
@@ -33,6 +33,11 @@
 	}
 
 	const props = defineProps<Props>()
+
+	const i18n = useI18n()
+	const { t, localePath } = i18n
+	const format = useFormat()
+	const formatNumber = format.number
 
 	const data = editor.ok ? editor.data : null
 	// The page remounts for another id: its initial value is enough.
@@ -70,16 +75,16 @@
 	const tooLarge = computed(() => bytes.value > maxBytes)
 
 	const status = computed(() => {
-		if (changed.value > 0) return `${plural(changed.value, 'línea cambiada', 'líneas cambiadas')} sin guardar`
-		if (noteChanged.value) return 'La nota tiene cambios sin guardar'
-		return draftId.value === null ? 'Sin cambios todavía' : 'Todo guardado'
+		if (changed.value > 0) return t('editor.status.lines', { count: changed.value, lines: formatNumber(changed.value) })
+		if (noteChanged.value) return t('editor.status.note')
+		return draftId.value === null ? t('editor.status.none') : t('editor.status.saved')
 	})
 
 	const origin = computed(() => {
 		if (!data) return ''
-		if (draftId.value !== null) return `Borrador #${draftId.value}`
-		if (data.start.from === 'revision') return `Nuevo borrador a partir de la revisión #${data.start.revisionId}`
-		return `Nuevo borrador a partir de Git (${shortHash(data.start.baseHash)})`
+		if (draftId.value !== null) return t('editor.origin.draft', { id: draftId.value })
+		if (data.start.from === 'revision') return t('editor.origin.revision', { id: data.start.revisionId ?? 0 })
+		return t('editor.origin.git', { hash: shortHash(data.start.baseHash) })
 	})
 
 	// Saving -----------------------------------------------------------------------------------
@@ -99,7 +104,7 @@
 		notice.value = ''
 		saveFailure.value = null
 		if (tooLarge.value) {
-			saveFailure.value = { code: 'TOO_LARGE', message: `El Markdown ocupa ${formatNumber(Math.round(bytes.value / 1000))} kB y el límite es ${formatNumber(maxBytes / 1000)} kB.` }
+			saveFailure.value = { code: 'TOO_LARGE', detail: t('editor.tooLarge', { size: formatNumber(Math.round(bytes.value / 1000)), limit: formatNumber(maxBytes / 1000) }) }
 			return
 		}
 		saving.value = true
@@ -115,7 +120,7 @@
 			draftId.value = revision.id
 			saved.value = markdown
 			savedNote.value = revision.note ?? ''
-			notice.value = created ? `Borrador #${revision.id} creado.` : `Borrador #${revision.id} guardado.`
+			notice.value = created ? t('editor.created', { id: revision.id }) : t('editor.savedDraft', { id: revision.id })
 			// A reload keeps editing the same draft.
 			if (created) history.replaceState(history.state, '', `${location.pathname}?revision=${revision.id}`)
 		} catch (error) {
@@ -173,7 +178,7 @@
 		return previewDocument({ html: current.html, theme: theme.value, tokens: readPreviewTokens(document.documentElement) })
 	})
 
-	const issueKinds: Record<PreviewIssue['kind'], string> = { frontmatter: 'Bloquea la publicación', render: 'El render fallaría', link: 'Enlace roto' }
+	const issueKind = (kind: PreviewIssue['kind']) => t(`editor.issues.${kind}`)
 	const blocking = computed(() => preview.value?.issues.filter((issue) => issue.kind !== 'link').length ?? 0)
 
 	// Moves the caret of the editor to a line of the draft. The textarea is inside DashPage's snippet,
@@ -195,7 +200,7 @@
 		event.preventDefault()
 		event.returnValue = ''
 	}
-	effect(() => setUnsaved(dirty.value ? 'Hay cambios sin guardar en el borrador. ¿Salir y perderlos?' : null))
+	effect(() => setUnsaved(dirty.value ? t('editor.leave') : null))
 	onMounted(() => {
 		window.addEventListener('beforeunload', leave)
 		// The preview follows the theme of the dashboard: its tokens are read again when it changes.
@@ -213,25 +218,53 @@
 		if (typeof window !== 'undefined') window.removeEventListener('beforeunload', leave)
 	})
 
-	const sizeLabel = computed(() => `${formatNumber(Math.ceil(bytes.value / 1000))} de ${formatNumber(maxBytes / 1000)} kB`)
+	const sizeLabel = computed(() => t('editor.size', { size: formatNumber(Math.ceil(bytes.value / 1000)), limit: formatNumber(maxBytes / 1000) }))
+
+	// A translation (docs/en/**) says which original it was made from in its `source-hash`. Marking it
+	// as translated writes the hash of the original that Git has now: the text of the editor changes
+	// and is saved as a draft like any other change.
+	const original = data?.original ?? null
+	const stamping = signal(false)
+	const stampFailure = signal<Failure | null>(null)
+	async function markTranslated() {
+		if (!original || stamping.value) return
+		stamping.value = true
+		stampFailure.value = null
+		try {
+			const stamped = await rpc.translations.stamp({ sourceId, markdown: text.value })
+			text.value = stamped.markdown
+			notice.value = t('editor.stamped', { hash: shortHash(stamped.sourceHash) })
+		} catch (error) {
+			stampFailure.value = describeError(error)
+		} finally {
+			stamping.value = false
+		}
+	}
 </script>
 
 <template>
 	<DashPage
-		bind:title="data ? 'Editar ' + data.source.title : 'Editar la fuente ' + props.params.id"
-		bind:description="data ? siteLabels[data.source.site] + ' · ' + kindLabels[data.source.kind] + ' · ' + (data.source.file ?? data.source.path) : 'Editor del Markdown de una fuente.'"
+		bind:title="data ? t('editor.title', { title: data.source.title }) : t('editor.fallbackTitle', { id: props.params.id })"
+		bind:description="data ? siteLabels[data.source.site] + ' · ' + t(`locale.${data.source.locale}`) + ' · ' + t(`labels.kind.${data.source.kind}`) + ' · ' + (data.source.file ?? data.source.path) : t('editor.fallbackDescription')"
 	>
 		<snippet name="actions">
 			<UILink
-				variant="ghost"
-				bind:href="'/sources/' + props.params.id"
+				if:when="original"
+				variant="outline"
+				bind:href="localePath('/translations/' + props.params.id)"
 			>
-				Volver a la fuente
+				{t('editor.compareOriginal')}
+			</UILink>
+			<UILink
+				variant="ghost"
+				bind:href="localePath('/sources/' + props.params.id)"
+			>
+				{t('editor.back')}
 			</UILink>
 		</snippet>
 		<DashFailure
 			if:when="!editor.ok"
-			title="No se puede abrir el editor"
+			bind:title="t('editor.cannotOpen')"
 			bind:failure="editor.failure"
 		/>
 		<div
@@ -240,7 +273,7 @@
 		>
 			<form
 				class="dash-panel dash-editor-bar"
-				aria-label="Borrador"
+				bind:aria-label="t('editor.draft')"
 				on:submit="
 					(event) => {
 						event.preventDefault()
@@ -251,8 +284,8 @@
 				<div class="dash-editor-fields">
 					<UIField
 						id="draft-note"
-						label="Nota"
-						description="Opcional. Qué cambia y por qué."
+						bind:label="t('editor.note')"
+						bind:description="t('editor.noteHint')"
 					>
 						<snippet
 							name="default"
@@ -284,18 +317,41 @@
 						type="submit"
 						bind:disabled="saving.value || !dirty.value || tooLarge.value"
 					>
-						{saving.value ? 'Guardando…' : draftId.value === null ? 'Crear borrador' : 'Guardar borrador'}
+						{saving.value ? t('actions.saving') : draftId.value === null ? t('editor.create') : t('editor.save')}
 					</UIButton>
 				</div>
 				<p
 					if:when="data.source.importStale"
 					class="dash-hint dash-editor-warning"
 				>
-					Git cambió desde la última importación. El borrador parte del archivo de Git de ahora; importa las fuentes para que el resumen lo refleje.
+					{t('editor.importStale')}
 				</p>
+				<div
+					if:when="original"
+					class="dash-callout dash-editor-translation"
+					role="note"
+				>
+					<p>
+						<strong>{t('editor.translation.title', { title: original?.title ?? '' })}</strong>
+						{t('editor.translation.text')}
+					</p>
+					<UIButton
+						size="sm"
+						variant="outline"
+						bind:disabled="stamping.value || !original?.baseHash"
+						on:click="markTranslated"
+					>
+						{stamping.value ? t('editor.translation.stamping') : t('editor.translation.stamp')}
+					</UIButton>
+				</div>
+				<DashFailure
+					if:when="stampFailure.value"
+					bind:title="t('editor.translation.failed')"
+					bind:failure="stampFailure.value"
+				/>
 				<DashFailure
 					if:when="saveFailure.value"
-					title="No se guardó el borrador"
+					bind:title="t('editor.notSaved')"
 					bind:failure="saveFailure.value"
 				/>
 				<p
@@ -306,9 +362,9 @@
 					{notice.value}
 					<a
 						if:when="notice.value && draftId.value !== null"
-						bind:href="'/sources/' + props.params.id + '#revisiones'"
+						bind:href="localePath('/sources/' + props.params.id + '#revisiones')"
 					>
-						Publicarlo desde la fuente
+						{t('editor.publishFromSource')}
 					</a>
 				</p>
 			</form>
@@ -331,7 +387,7 @@
 						for="draft-markdown"
 						class="dash-visually-hidden"
 					>
-						Markdown de la fuente
+						{t('editor.markdownLabel')}
 					</label>
 					<textarea
 						id="draft-markdown"
@@ -355,14 +411,14 @@
 					bind:aria-busy="previewing.value ? 'true' : undefined"
 				>
 					<div class="dash-pane-head">
-						<h2 id="preview-heading">Vista previa</h2>
+						<h2 id="preview-heading">{t('editor.preview.title')}</h2>
 						<div class="dash-pane-tools">
 							<label class="dash-check">
 								<input
 									type="checkbox"
 									model="auto"
 								/>
-								Al escribir
+								{t('editor.preview.auto')}
 							</label>
 							<UIButton
 								size="sm"
@@ -370,7 +426,7 @@
 								bind:disabled="previewing.value || tooLarge.value"
 								on:click="refreshPreview"
 							>
-								{previewing.value ? 'Renderizando…' : 'Actualizar'}
+								{previewing.value ? t('editor.preview.rendering') : t('editor.preview.refresh')}
 							</UIButton>
 						</div>
 					</div>
@@ -379,24 +435,24 @@
 						role="status"
 						aria-live="polite"
 					>
-						<span if:when="previewing.value">Renderizando con el render real del site…</span>
-						<span if:when="!previewing.value && stale.value">La vista previa no incluye los últimos cambios.</span>
-						<span if:when="!previewing.value && !stale.value && preview.value">Render en {formatNumber(preview.value?.durationMs ?? 0)} ms, igual que en el site{preview.value?.complete ? '' : ', salvo las secciones generadas'}.</span>
+						<span if:when="previewing.value">{t('editor.preview.real')}</span>
+						<span if:when="!previewing.value && stale.value">{t('editor.preview.stale')}</span>
+						<span if:when="!previewing.value && !stale.value && preview.value">{preview.value?.complete ? t('editor.preview.done', { ms: formatNumber(preview.value?.durationMs ?? 0) }) : t('editor.preview.donePartial', { ms: formatNumber(preview.value?.durationMs ?? 0) })}</span>
 					</p>
 					<DashFailure
 						if:when="previewFailure.value"
-						title="Sin vista previa"
+						bind:title="t('editor.preview.failed')"
 						bind:failure="previewFailure.value"
 					/>
 					<div
 						if:when="preview.value && preview.value.issues.length"
 						class="dash-issues"
 						role="region"
-						aria-label="Avisos de la vista previa"
+						bind:aria-label="t('editor.preview.issues')"
 					>
 						<p class="dash-issues-title">
-							{plural(preview.value?.issues.length ?? 0, 'aviso', 'avisos')}
-							<span if:when="blocking.value">· {plural(blocking.value, 'impide', 'impiden')} publicar</span>
+							{t('editor.preview.issueCount', { count: preview.value?.issues.length ?? 0 })}
+							<span if:when="blocking.value">· {t('editor.preview.blocking', { count: blocking.value })}</span>
 						</p>
 						<ul class="dash-issue-list">
 							<li
@@ -407,15 +463,20 @@
 								class="dash-issue"
 								bind:data-kind="issue.kind"
 							>
-								<span class="dash-issue-kind">{issueKinds[issue.kind]}</span>
-								<span class="dash-issue-message">{issue.message}</span>
+								<span class="dash-issue-kind">{issueKind(issue.kind)}</span>
+								<span
+									class="dash-issue-message"
+									lang="en"
+								>
+									{issue.message}
+								</span>
 								<button
 									if:when="issue.line !== null"
 									type="button"
 									class="dash-issue-line"
 									on:click="() => goToLine(issue.line ?? 1)"
 								>
-									Línea {String(issue.line)}
+									{t('editor.preview.line', { line: String(issue.line) })}
 								</button>
 							</li>
 						</ul>
@@ -432,9 +493,9 @@
 					<iframe
 						if:when="previewSource.value"
 						class="dash-preview-frame"
-						title="Vista previa del borrador"
 						sandbox=""
 						referrerpolicy="no-referrer"
+						bind:title="t('editor.preview.frame')"
 						bind:data-stale="stale.value ? 'true' : undefined"
 						bind:srcdoc="previewSource.value"
 					/>

@@ -1,0 +1,22 @@
+{
+	"sources": {
+		"title": "Fuentes",
+		"description": "Cada página pública de las tres webs tal como la importó Git, en español y sus traducciones al inglés (docs/en), con su estado frente a las revisiones publicadas.",
+		"filter": "Filtrar fuentes",
+		"placeholder": "Título, ruta o archivo…",
+		"noMarkdown": "Sin Markdown (.meeko)",
+		"includeRemoved": "Incluir retiradas",
+		"count": "{shown} de {total} fuentes",
+		"caption": "Fuentes de la documentación",
+		"emptyFiltered": "Ninguna fuente coincide con los filtros.",
+		"empty": "No hay fuentes importadas. Importa desde Git en Snapshots.",
+		"columns": {
+			"title": "Fuente",
+			"site": "Web",
+			"locale": "Idioma",
+			"kind": "Tipo",
+			"state": "Estado",
+			"importedAt": "Importada"
+		}
+	}
+}

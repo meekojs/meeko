@@ -1,0 +1,230 @@
+<script
+	server
+	lang="ts"
+>
+	import { attempt } from '../../utils/errors'
+
+	const { search } = usePage()
+	const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value) ?? ''
+
+	// Every guide and written reference page of the site with its English translation; the screen
+	// filters it, so the counters are always those of the whole list.
+	export const translations = await attempt(() => rpc.translations.list({}))
+	export const initial = { status: first(search.status), kind: first(search.kind), q: first(search.q) }
+</script>
+
+<script lang="ts">
+	import type { TableColumn } from '@meekojs/ui/runtime'
+
+	import type { TranslationEntryRow, TranslationStatus } from '../../../shared/schemas/dashboard'
+
+	const i18n = useI18n()
+	const { t, localePath } = i18n
+	const format = useFormat()
+
+	type All = 'all'
+	type Kind = 'guide' | 'reference'
+	const statuses: readonly TranslationStatus[] = ['translated', 'outdated', 'missing']
+	const kinds: readonly Kind[] = ['guide', 'reference']
+	const pick = <T extends string>(value: string, allowed: readonly T[]): T | All => (allowed.includes(value as T) ? (value as T) : 'all')
+
+	/** A row of the table: an entry with the date of its translation and the id its actions open. */
+	type Row = TranslationEntryRow & { readonly imported: string | null; readonly actions: number }
+	const entries: readonly Row[] = (translations.ok ? translations.data.entries : []).map((entry) => ({ ...entry, imported: entry.translation?.importedAt ?? null, actions: entry.original.id }))
+	const counts = translations.ok ? translations.data.counts : { translated: 0, outdated: 0, missing: 0, total: 0 }
+
+	const status = signal<TranslationStatus | All>(pick(initial.status, statuses))
+	const kind = signal<Kind | All | null>(pick(initial.kind, kinds))
+	const query = signal(initial.q)
+
+	const normalize = (text: string) =>
+		text
+			.normalize('NFD')
+			.replace(/\p{Diacritic}/gu, '')
+			.toLocaleLowerCase(i18n.locale)
+
+	const rows = computed(() => {
+		const text = normalize(query.value.trim())
+		return entries.filter((entry) => (status.value === 'all' || entry.status === status.value) && (!kind.value || kind.value === 'all' || entry.original.kind === kind.value) && (!text || normalize(`${entry.original.title} ${entry.translation?.title ?? ''} ${entry.original.path} ${entry.file ?? ''}`).includes(text)))
+	})
+
+	// The status filter is a row of real links with the counters, so it also works without JavaScript.
+	const statusLink = (value: TranslationStatus | All) => {
+		const params = new URLSearchParams()
+		if (value !== 'all') params.set('status', value)
+		if (kind.value && kind.value !== 'all') params.set('kind', kind.value)
+		if (query.value.trim()) params.set('q', query.value.trim())
+		return localePath(`/translations${params.size ? `?${params}` : ''}`)
+	}
+	const filters = computed(() => [
+		{ value: 'all' as const, label: t('translations.all'), count: counts.total },
+		...statuses.map((value) => ({ value, label: t(`labels.translation.${value}`), count: counts[value] })),
+	])
+	function choose(event: MouseEvent, value: TranslationStatus | All) {
+		if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+		event.preventDefault()
+		status.value = value
+	}
+
+	// The address keeps the filters, so a reload or a shared link opens the same list.
+	effect(() => {
+		const params = new URLSearchParams()
+		if (status.value !== 'all') params.set('status', status.value)
+		if (kind.value && kind.value !== 'all') params.set('kind', kind.value)
+		if (query.value.trim()) params.set('q', query.value.trim())
+		if (typeof window === 'undefined') return
+		const next = `${location.pathname}${params.size ? `?${params}` : ''}`
+		if (next !== `${location.pathname}${location.search}`) history.replaceState(history.state, '', next)
+	})
+
+	const kindOptions: readonly (Kind | All)[] = ['all', ...kinds]
+	const columns = [
+		{ key: 'original', label: t('translations.columns.page') },
+		{ key: 'status', label: t('translations.columns.status') },
+		{ key: 'file', label: t('translations.columns.file') },
+		{ key: 'imported', label: t('translations.columns.imported') },
+		{ key: 'actions', label: t('translations.columns.actions') },
+	] satisfies TableColumn<Row>[]
+</script>
+
+<template>
+	<DashPage
+		bind:title="t('translations.title')"
+		bind:description="t('translations.description')"
+	>
+		<DashFailure
+			if:when="!translations.ok"
+			bind:failure="translations.failure"
+		/>
+		<div
+			if:when="translations.ok"
+			class="dash-stack"
+		>
+			<nav
+				class="dash-tabs dash-translation-tabs"
+				bind:aria-label="t('translations.byStatus')"
+			>
+				<a
+					each:of="filters.value"
+					each:as="filter"
+					each:key="filter.value"
+					bind:href="statusLink(filter.value)"
+					bind:aria-current="status.value === filter.value ? 'page' : undefined"
+					bind:data-status="filter.value === 'all' ? undefined : filter.value"
+					on:click="(event) => choose(event, filter.value)"
+				>
+					<span class="dash-tab-label">
+						<span
+							if:when="filter.value !== 'all'"
+							class="dash-dot"
+							aria-hidden="true"
+						/>
+						{filter.label}
+					</span>
+					<span class="dash-tab-count">{format.number(filter.count)}</span>
+				</a>
+			</nav>
+
+			<form
+				class="dash-filters"
+				role="search"
+				bind:aria-label="t('translations.filter')"
+				on:submit="(event) => event.preventDefault()"
+			>
+				<div class="dash-field dash-field-grow">
+					<label for="translations-query">{t('actions.search')}</label>
+					<UIInput
+						id="translations-query"
+						type="search"
+						model="query"
+						bind:placeholder="t('translations.placeholder')"
+					/>
+				</div>
+				<div class="dash-field">
+					<label for="translations-kind">{t('translations.columns.kind')}</label>
+					<UISelect
+						id="translations-kind"
+						model="kind"
+						bind:placeholder="t('filters.allMasculine')"
+						bind:options="kindOptions"
+						bind:labelBy="(value) => (value === 'all' ? t('filters.allMasculine') : t(`labels.kind.${value}`))"
+					/>
+				</div>
+			</form>
+
+			<div class="dash-results">
+				<p
+					class="dash-count"
+					role="status"
+					aria-live="polite"
+				>
+					{t('translations.count', { shown: format.number(rows.value.length), total: format.number(counts.total) })}
+				</p>
+				<div class="dash-table-scroll">
+					<UITable
+						class="dash-translations"
+						rowKey="actions"
+						bind:caption="t('translations.caption')"
+						bind:columns="columns"
+						bind:rows="rows.value"
+						bind:emptyText="counts.total ? t('translations.emptyFiltered') : t('translations.empty')"
+					>
+						<snippet
+							name="cell"
+							params="row, column"
+						>
+							<span
+								if:when="column.key === 'original'"
+								class="dash-source-cell"
+							>
+								<a bind:href="localePath('/translations/' + row.original.id)">{row.translation?.title ?? row.original.title}</a>
+								<code>{row.original.path}</code>
+							</span>
+							<span
+								if:when="column.key === 'status'"
+								class="dash-translation-status"
+								bind:data-status="row.status"
+								bind:title="t(`labels.translationHelp.${row.status}`)"
+							>
+								<span
+									class="dash-dot"
+									aria-hidden="true"
+								/>
+								{t(`labels.translation.${row.status}`)}
+							</span>
+							<code if:when="column.key === 'file'">{row.file ?? '—'}</code>
+							<span
+								if:when="column.key === 'imported'"
+								class="dash-nowrap"
+							>
+								{format.date(row.imported)}
+							</span>
+							<span
+								if:when="column.key === 'actions'"
+								class="dash-row-actions"
+							>
+								<UILink
+									size="sm"
+									variant="outline"
+									bind:href="localePath('/translations/' + row.original.id)"
+								>
+									{t('translations.compare')}
+									<span class="dash-visually-hidden">{row.original.path}</span>
+								</UILink>
+								<UILink
+									if:when="row.translation && row.translation.removedAt === null"
+									size="sm"
+									variant="ghost"
+									bind:href="localePath('/sources/' + row.translation?.id + '/edit')"
+								>
+									{t('translations.editShort')}
+									<span class="dash-visually-hidden">{t('translations.editOf', { path: row.original.path })}</span>
+								</UILink>
+							</span>
+						</snippet>
+					</UITable>
+				</div>
+			</div>
+		</div>
+	</DashPage>
+</template>

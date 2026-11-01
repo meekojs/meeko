@@ -1,0 +1,85 @@
+{
+	"health": {
+		"title": "Salud",
+		"description": "Lo que le falta o tiene roto la documentación en el repositorio: referencias pendientes, exports sin página, enlaces internos y anclas, y el inventario de páginas .meeko.",
+		"checking": "Comprobando…",
+		"check": "Comprobar de nuevo",
+		"cannotStart": "No se pudo iniciar la comprobación",
+		"running": "Comprobando el repositorio en un proceso aparte…",
+		"checked": "Comprobado {date}: {guides}, {references} y {links}.",
+		"guides": {
+			"plural": "count",
+			"forms": {
+				"one": "{count} guía",
+				"other": "{count} guías"
+			}
+		},
+		"references": {
+			"plural": "count",
+			"forms": {
+				"one": "{count} página de referencia",
+				"other": "{count} páginas de referencia"
+			}
+		},
+		"links": {
+			"plural": "count",
+			"forms": {
+				"one": "{count} enlace",
+				"other": "{count} enlaces"
+			}
+		},
+		"lastFailed": "La última comprobación falló; su salida está al final de la página.",
+		"pending": "Referencias pendientes",
+		"pendingNone": "Ninguna: cada entrada de la taxonomía tiene su página escrita.",
+		"broken": "Enlaces internos rotos",
+		"brokenLead": "Enlaces de las guías y de las páginas de referencia del site a páginas, anclas o archivos del repositorio que no existen.",
+		"brokenNone": "Ningún enlace roto.",
+		"reasons": {
+			"anchor": "Ancla inexistente",
+			"file": "Archivo inexistente",
+			"page": "Página inexistente"
+		},
+		"exports": "Exports sin página de referencia",
+		"exportsLead": "Exports de @meekojs/meeko que no nombra la taxonomía ni ninguna página escrita. Tienen su página generada desde el JSDoc, pero no una guía de referencia.",
+		"filterExports": "Filtrar exports",
+		"exportsPlaceholder": "Nombre o módulo…",
+		"exportsNone": "Ningún export coincide.",
+		"deprecated": "Obsoleto",
+		"showingAll": "Se muestran los {total}",
+		"showingSome": "Se muestran {shown} de {total}",
+		"showLess": "Mostrar menos",
+		"showAll": "Mostrar todos",
+		"meekoPages": "Páginas .meeko de UI e i18n",
+		"meekoLead": "Inventario de la última importación, leído de app/utils/navigation.ts de cada web. Se editan en el repositorio.",
+		"meekoCaption": "Páginas .meeko importadas",
+		"meekoNone": "No hay páginas importadas. Importa desde Git en Snapshots.",
+		"meekoUnreadable": "No se pudo leer el inventario.",
+		"lastCheck": "Última comprobación",
+		"noCheck": "Todavía no se ha comprobado en este arranque del dashboard.",
+		"columns": {
+			"export": "Export",
+			"module": "Módulo",
+			"kind": "Tipo",
+			"file": "Archivo",
+			"link": "Enlace",
+			"target": "Destino",
+			"reason": "Motivo",
+			"page": "Página",
+			"site": "Web",
+			"path": "Ruta",
+			"imported": "Importada"
+		},
+		"apiKind": {
+			"block": "Bloques",
+			"macro": "Macros",
+			"tag": "Etiquetas",
+			"directive": "Directivas",
+			"function": "Funciones",
+			"class": "Clases",
+			"const": "Constantes",
+			"enum": "Enums",
+			"interface": "Interfaces",
+			"type": "Tipos"
+		}
+	}
+}

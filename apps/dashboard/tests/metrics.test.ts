@@ -40,12 +40,14 @@ test('a range of the URL with days that are not in the calendar is an error stat
 	// The URL of the report: the range is kept so the page says why, and its label does not throw.
 	const range = defaultRange('2026-99-99', '2026-99-99')
 	assert.deepEqual(range, { from: '2026-99-99', to: '2026-99-99' })
-	assert.equal(formatRange(range), 'Rango no válido')
+	assert.equal(formatRange(range, 'es', 'Rango no válido'), 'Rango no válido')
 	assert.doesNotThrow(() => formatRange({ from: '2026-10-01', to: '2026-02-30' }))
-	assert.deepEqual(rangeFailure('site', range), { code: 'INVALID_RANGE', message: rangeFailure('site', { from: '2026-10-31', to: '2026-10-01' })!.message, detail: 'La fecha no es válida.' })
+	// The failure carries the code and the catalog key of the schema; the page says both in its language.
+	assert.deepEqual(rangeFailure('site', range), { code: 'INVALID_RANGE', detail: 'validation.date' })
 	assert.equal(rangeFailure('site', { from: '2026-10-31', to: '2026-10-01' })?.code, 'INVALID_RANGE')
 	assert.equal(rangeFailure('site', { from: '2026-10-01', to: '2026-10-31' }), null)
 	assert.equal(formatRange({ from: '2026-10-01', to: '2026-10-31' }), '1 oct 2026 – 31 oct 2026')
+	assert.equal(formatRange({ from: '2026-10-01', to: '2026-10-31' }, 'en'), 'Oct 1, 2026 – Oct 31, 2026')
 })
 
 test('after a mutation the list of comments shows the last page that still exists', () => {

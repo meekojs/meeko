@@ -56,12 +56,24 @@ Las respuestas llevan `noindex`, una CSP sin scripts externos y `frame-ancestors
 ## Pantallas
 
 - **Resumen.** Fuentes de cada web por tipo y por estado de divergencia (`git`, `same`, `edited`, `conflict`, `missing` e importación desactualizada), el snapshot activo con fecha y autor, y el último cambio importado.
-- **Fuentes.** Tabla filtrable por web, tipo, estado y texto, con los filtros en la URL. El detalle muestra archivo, hashes, revisiones con sus acciones, la comparación de dos versiones y el diff de Git a la revisión publicada.
+- **Fuentes.** Tabla filtrable por web, idioma, tipo, estado y texto, con los filtros en la URL. Las traducciones (`docs/en/**`) son fuentes propias, con el `path` de su original. El detalle muestra archivo, hashes, revisiones con sus acciones, la comparación de dos versiones y el diff de Git a la revisión publicada.
+- **Traducciones** (`/translations`, `/translations/<id>`). Estado de cada guía y referencia escrita (traducida, desactualizada o sin traducir), con filtros y contadores; el detalle compara los dos textos y muestra lo que cambió en el español desde que se tradujo. Véase «Idiomas».
 - **Salud.** El informe anterior y el inventario de páginas `.meeko` de UI e i18n.
 - **Editor** (`/sources/<id>/edit`). Markdown y vista previa lado a lado (apilados en pantallas estrechas).
-- **Moderación** (`/moderation`, una pestaña por web). Reglas de ocultar o destacar páginas y avisos de cabecera; ver «F3».
-- **Métricas** (`/metrics`, una pestaña por web y un rango de días). Vistas por día, páginas más vistas, búsquedas, «¿Te sirvió?» y comentarios de los lectores; ver «F4».
+- **Moderación** (`/moderation`, una pestaña por web). Reglas de ocultar o destacar páginas y avisos de cabecera, de un idioma o de todos; ver «F3» e «Idiomas».
+- **Métricas** (`/metrics`, una pestaña por web, un idioma con `?lang=es|en` y un rango de días). Vistas por día, páginas más vistas, búsquedas, «¿Te sirvió?» y comentarios de los lectores; ver «F4».
 - **Snapshots.** Importar, publicar con una nota (firma el usuario de la sesión), y activar o volver a un snapshot anterior tras confirmarlo, con la salida del proceso a la vista. Lista los cambios de revisiones que el snapshot activo aún no incluye: las publicadas después y, desde la migración 003 (`archived_at`), la publicada que ese snapshot muestra y se archivó después sin otra en su lugar (su página vuelve a Git con la próxima publicación). «Volver a publicar» tras un conflicto reutiliza la nota del trabajo, también después de recargar.
+
+## Idiomas
+
+La interfaz está en español, sin prefijo (las URL de siempre), y en inglés, bajo `/en/…`, con `@meekojs/i18n`: las rutas inglesas salen de las mismas páginas, y el idioma lo decide siempre la dirección. El navegador solo sugiere: un aviso descartable que nunca redirige.
+
+- **Catálogos.** `app/locales/<idioma>/<namespace>.json`: `common` (cabecera, errores, validación, etiquetas y trabajos) y uno por página, declarados en `routes`. `shell` es el catálogo de `meeko-docs`, cuyo `DocsAnnouncements` pinta la vista previa de los avisos. `tests/translations.test.ts` comprueba que los dos idiomas tienen las mismas claves.
+- **Sin texto en el servidor.** Los fallos viajan como códigos (`errors.<CODE>`), los mensajes de los schemas son claves (`validation.*`, `issues.*`) y un trabajo devuelve `facts`, que la página dice en su idioma. La salida de los procesos es un log técnico en inglés. `app/utils/i18n.ts` comprueba con `i18n.has` la clave que llega de un dato: basta añadirla al catálogo, sin valores, y un código que el catálogo no explica recibe el mensaje genérico con el código.
+- **Sesión.** Sin sesión, `/en/x` va a `/en/login?next=/en/x` y vuelve allí; la página de login fija el idioma de `next`. Cerrar sesión lleva al login del idioma de la página, por su `Referer`. La cookie de sesión, el `Origin` y el token CSRF no dependen del idioma; la del idioma es otra (`meeko-dashboard-locale`), y solo sirve para sugerir.
+- **Contenido por idioma.** Las rutas de la base no llevan prefijo y el idioma va aparte. Una regla o un aviso se aplican a un idioma o, con `locale` nulo, a todos: el formulario preselecciona «Todos los idiomas» y la tabla muestra el alcance de cada uno. Las métricas filtran con `?lang=`.
+- **Traducir desde aquí.** Una traducción que existe en `docs/en/**` se edita como cualquier fuente: borrador, vista previa con el render inglés, publicación y exportación a su archivo. «Marcar como traducida» escribe en `source-hash` el hash del original importado. Una página sin traducir no tiene fuente que editar: el detalle dice dónde crear el archivo y permite descargar el original; aparece aquí tras importar.
+- **Publicar** sigue generando un único snapshot con los dos idiomas; la lista de snapshots muestra las páginas de cada uno.
 
 ## F2: edición del Markdown con revisiones
 
@@ -182,3 +194,4 @@ Un valor no válido (una duración, un límite, un `SameSite` o el hash) detiene
 | F3   | Moderación de páginas y avisos (hecho).                                         |
 | F4   | Métricas y feedback (hecho).                                                    |
 | F5   | Login de administrador, sesiones en PostgreSQL y autor real (hecho).            |
+| i18n | Interfaz bilingüe y gestión de traducciones, moderación y métricas por idioma.  |

@@ -12,6 +12,7 @@
 		"test:e2e": "pnpm run assets && node --test --test-concurrency=1 tests/*.e2e.mjs"
 	},
 	"dependencies": {
+		"@meekojs/i18n": "workspace:*",
 		"@meekojs/meeko": "workspace:*",
 		"@meekojs/ui": "workspace:*",
 		"meeko-docs": "workspace:*",

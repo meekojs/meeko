@@ -8,29 +8,34 @@
 
 	const { context, search } = usePage()
 	const { config } = context.services.auth
+	// The page says it in its language; the server only gives the durations.
 	const hours = (ms: number) => (ms % 3_600_000 === 0 ? `${ms / 3_600_000} h` : `${Math.round(ms / 60_000)} min`)
 	export const next = safeNext(typeof search.next === 'string' ? search.next : '/')
 	export const configured = config.admin !== null
-	export const lifetime = `La sesión dura ${hours(config.ttlMs)} y se cierra tras ${hours(config.idleMs)} sin actividad.`
+	export const lifetime = { ttl: hours(config.ttlMs), idle: hours(config.idleMs) }
 </script>
 
 <script lang="ts">
+	import { stripLocale } from '@meekojs/i18n'
 	import { ClientError } from '@meekojs/meeko/framework'
 
 	import { loginInput } from '../../shared/schemas/auth'
+	import { issueText } from '../utils/i18n'
 
-	useHead({ title: 'Iniciar sesión · Meeko Dashboard', meta: [{ name: 'description', content: 'Acceso de administración del dashboard de la documentación de Meeko.' }] })
+	const i18n = useI18n()
+	const { t } = i18n
 
-	const messages: Readonly<Record<string, string>> = {
-		INVALID_CREDENTIALS: 'El usuario o la contraseña no son correctos.',
-		RATE_LIMITED: 'Demasiados intentos. Espera unos minutos antes de volver a intentarlo.',
-		LOGIN_NOT_CONFIGURED: 'Este servidor no tiene cuenta de administrador. Define ADMIN_USERNAME y ADMIN_PASSWORD_HASH en apps/dashboard/.env y reinícialo.',
-		INVALID_ORIGIN: 'El servidor rechazó el envío por su origen. Abre el dashboard desde su dirección habitual.',
-	}
+	useHead({ title: t('app.titleSuffix', { title: t('login.title') }), meta: [{ name: 'description', content: t('login.description') }] })
+
+	const codes = ['INVALID_CREDENTIALS', 'RATE_LIMITED', 'LOGIN_NOT_CONFIGURED', 'INVALID_ORIGIN'] as const
+
+	// After the login the dashboard opens in the language of this page, also when `next` came from
+	// the other one (the language switch keeps the query): /en/login?next=/sources goes to /en/sources.
+	const target = i18n.localePath(stripLocale(next, i18n.locales))
 
 	const form = useForm({
 		schema: loginInput,
-		initial: { username: '', password: '', next },
+		initial: { username: '', password: '', next: target },
 		action: '/api/auth/login',
 		submit: async (values) => {
 			const result = await api.auth.login.post({ body: values })
@@ -38,11 +43,15 @@
 			window.location.assign(result.next)
 			return result
 		},
-		errorMessage: (failure) => (failure instanceof ClientError ? messages[failure.code] : undefined) ?? 'No se pudo iniciar sesión. Vuelve a intentarlo; si sigue fallando, revisa la consola del servidor.',
+		errorMessage: (failure) => {
+			const code = failure instanceof ClientError ? codes.find((known) => known === failure.code) : undefined
+			return code ? t(`login.errors.${code}`) : t('login.errors.generic')
+		},
 	})
 
-	// The native form comes back here after an error, with `next` kept.
-	const back = next === '/' ? '/login' : `/login?next=${encodeURIComponent(next)}`
+	// The native form comes back here after an error, with `next` kept, in the language of this page.
+	const back = target === i18n.localePath('/') ? i18n.localePath('/login') : `${i18n.localePath('/login')}?next=${encodeURIComponent(target)}`
+	const fieldError = (message: string | undefined) => issueText(i18n, message)
 </script>
 
 <template>
@@ -61,15 +70,15 @@
 				height="44"
 				alt=""
 			/>
-			<h1 id="login-title">Iniciar sesión</h1>
-			<p class="dash-login-lead">Administración de la documentación de Meeko: fuentes, snapshots, moderación y métricas.</p>
+			<h1 id="login-title">{t('login.title')}</h1>
+			<p class="dash-login-lead">{t('login.lead')}</p>
 
 			<p
 				if:when="!configured"
 				class="dash-login-alert"
 				role="status"
 			>
-				{messages.LOGIN_NOT_CONFIGURED}
+				{t('login.errors.LOGIN_NOT_CONFIGURED')}
 			</p>
 			<p
 				if:when="form.error.value"
@@ -100,8 +109,8 @@
 				/>
 				<UIField
 					id="login-username"
-					label="Usuario"
-					bind:error="form.errors.value.username"
+					bind:label="t('login.username')"
+					bind:error="fieldError(form.errors.value.username)"
 				>
 					<snippet
 						name="default"
@@ -124,8 +133,8 @@
 				</UIField>
 				<UIField
 					id="login-password"
-					label="Contraseña"
-					bind:error="form.errors.value.password"
+					bind:label="t('login.password')"
+					bind:error="fieldError(form.errors.value.password)"
 				>
 					<snippet
 						name="default"
@@ -149,10 +158,10 @@
 					class="dash-login-submit"
 					bind:disabled="form.pending.value"
 				>
-					{form.pending.value ? 'Entrando…' : 'Entrar'}
+					{form.pending.value ? t('login.submitting') : t('login.submit')}
 				</UIButton>
 			</form>
-			<p class="dash-login-note">{lifetime}</p>
+			<p class="dash-login-note">{t('login.lifetime', lifetime)}</p>
 		</section>
 	</UIContainer>
 </template>

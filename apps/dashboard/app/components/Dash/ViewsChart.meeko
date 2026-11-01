@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { formatNumber } from '../../utils/format'
-
 	interface Day {
 		day: string
 		views: number
@@ -8,11 +6,14 @@
 
 	const props = defineProps<{ days: readonly Day[]; label: string }>()
 
-	/** A UTC day as «31 oct», or «31 oct 2026» with `year`. */
-	const dayFormat = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' })
-	const longFormat = new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
-	const short = (day: string) => dayFormat.format(new Date(`${day}T00:00:00Z`))
-	const long = (day: string) => longFormat.format(new Date(`${day}T00:00:00Z`))
+	const i18n = useI18n()
+	const { t } = i18n
+	const format = useFormat()
+	const formatNumber = format.number
+
+	/** A UTC day as «31 oct», or with the weekday and the year. */
+	const short = (day: string) => format.day(day, { day: 'numeric', month: 'short' })
+	const long = (day: string) => format.day(day, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
 
 	/**
 	 * A clean top for the axis, at least the largest day: four gridline steps of 1, 2 or 5 times a
@@ -29,7 +30,7 @@
 	const top = computed(() => niceTop(Math.max(0, ...props.days.map((entry) => entry.views))))
 	/** Four gridlines from the top down to the baseline. */
 	const ticks = computed(() => [1, 0.75, 0.5, 0.25, 0].map((share) => ({ share, value: top.value * share })))
-	const tickLabel = (value: number) => (value >= 10_000 ? formatNumber(Math.round(value / 1000)) + ' mil' : formatNumber(Math.round(value * 100) / 100))
+	const tickLabel = (value: number) => (value >= 10_000 ? i18n.number(value, { notation: 'compact', maximumFractionDigits: 0 }) : formatNumber(Math.round(value * 100) / 100))
 	/** The days the axis names: the first, the middle and the last. */
 	const labelled = computed(() => {
 		const count = props.days.length
@@ -66,7 +67,7 @@
 			class="plot"
 			role="img"
 			tabindex="0"
-			bind:aria-label="props.label + '. ' + (peak.value ? 'Máximo: ' + formatNumber(peak.value.views) + ' el ' + long(peak.value.day) + '. ' : 'Sin vistas. ') + 'Usa las flechas para recorrer los días; la tabla de abajo tiene todos los valores.'"
+			bind:aria-label="props.label + '. ' + (peak.value ? t('chart.peak', { views: formatNumber(peak.value.views), day: long(peak.value.day) }) : t('chart.noViews')) + ' ' + t('chart.keys')"
 			on:keydown="onKeydown"
 			on:focus="() => (active.value ??= props.days.length - 1)"
 			on:blur="() => (active.value = null)"
@@ -114,7 +115,7 @@
 				bind:data-edge="tooltipLeft.value < 15 ? 'start' : tooltipLeft.value > 85 ? 'end' : undefined"
 			>
 				<strong>{formatNumber(current.value?.views ?? 0)}</strong>
-				<span>{current.value?.views === 1 ? 'vista' : 'vistas'} · {long(current.value?.day ?? '')}</span>
+				<span>{t('chart.views', { count: current.value?.views ?? 0 })} · {long(current.value?.day ?? '')}</span>
 			</div>
 		</div>
 		<div
@@ -131,18 +132,18 @@
 			</span>
 		</div>
 		<details class="table-view">
-			<summary>Ver los valores como tabla</summary>
+			<summary>{t('chart.table')}</summary>
 			<div class="table-scroll">
 				<table>
 					<caption>{props.label}</caption>
 					<thead>
 						<tr>
-							<th scope="col">Día (UTC)</th>
+							<th scope="col">{t('chart.day')}</th>
 							<th
 								scope="col"
 								class="num"
 							>
-								Vistas
+								{t('chart.viewsColumn')}
 							</th>
 						</tr>
 					</thead>

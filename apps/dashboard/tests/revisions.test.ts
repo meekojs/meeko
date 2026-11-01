@@ -108,7 +108,7 @@ describe('editing revisions', { skip: url ? false : 'DATABASE_URL is not set' },
 		assert.equal((await readSourceDetail(db, ids.doctor)).revisions[0]?.pending, false)
 
 		const comparison = await revisionTask(() => compare(db, ids.doctor, { kind: 'git' }, { kind: 'revision', id: draft.id }))
-		assert.deepEqual([comparison.added, comparison.removed, comparison.fromLabel, comparison.toLabel], [2, 0, 'Git ahora', `Revisión #${draft.id}`])
+		assert.deepEqual([comparison.added, comparison.removed, comparison.fromLabel, comparison.toLabel], [2, 0, 'git', `revision-${draft.id}`])
 		assert.match(comparison.diff, /^\+Borrador dos\.$/m)
 		const other = await createRevision(db, { sourceId: ids.doctor, markdown: `${doctor}\nOtra.\n`, author: 'Ana' })
 		assert.match((await compare(db, ids.doctor, { kind: 'revision', id: draft.id }, { kind: 'revision', id: other.id })).diff, /^-Borrador dos\.$/m)

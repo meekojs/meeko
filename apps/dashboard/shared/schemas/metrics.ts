@@ -2,7 +2,7 @@
 // the «¿Te sirvió?» answers of a web in a range of UTC days, and the comments of the readers.
 import * as v from 'valibot'
 
-import { siteSchema } from './dashboard'
+import { localeSchema, siteSchema } from './dashboard'
 
 const id = v.pipe(v.number(), v.integer(), v.minValue(1))
 /**
@@ -22,28 +22,31 @@ export function isCalendarDay(value: string): boolean {
 }
 
 /** A UTC day of the calendar as `YYYY-MM-DD`. */
-const day = v.pipe(v.string(), v.check(isCalendarDay, 'La fecha no es válida.'))
+const day = v.pipe(v.string(), v.check(isCalendarDay, 'validation.date'))
 
 /** Longest range the screen asks for, in days (meeko-docs-content `maxMetricsDays`). */
 export const maxRangeDays = 366
 
 /** A web and a range of UTC days, both included. */
 export const metricsInput = v.pipe(
-	v.object({ site: siteSchema, from: day, to: day }),
-	v.check((input) => input.from <= input.to, 'La fecha inicial es posterior a la final.'),
-	v.check((input) => (Date.parse(`${input.to}T00:00:00Z`) - Date.parse(`${input.from}T00:00:00Z`)) / 86_400_000 < maxRangeDays, `El rango abarca como mucho ${maxRangeDays} días.`),
+	// Without `locale`, every language together.
+	v.object({ site: siteSchema, from: day, to: day, locale: v.optional(localeSchema) }),
+	v.check((input) => input.from <= input.to, 'validation.rangeReversed'),
+	v.check((input) => (Date.parse(`${input.to}T00:00:00Z`) - Date.parse(`${input.from}T00:00:00Z`)) / 86_400_000 < maxRangeDays, 'validation.rangeTooLong'),
 )
 
 export const metricsSummarySchema = v.object({
 	site: siteSchema,
 	from: v.string(),
 	to: v.string(),
+	/** The language it is limited to, or `null` for every language. */
+	locale: v.nullable(localeSchema),
 	totals: v.object({ views: v.number(), searches: v.number(), emptySearches: v.number(), helpful: v.number(), unhelpful: v.number() }),
 	daily: v.array(v.object({ day: v.string(), views: v.number() })),
-	topPages: v.array(v.object({ path: v.string(), views: v.number() })),
+	topPages: v.array(v.object({ path: v.string(), locale: localeSchema, views: v.number() })),
 	topSearches: v.array(v.object({ query: v.string(), count: v.number(), results: v.number() })),
 	emptySearches: v.array(v.object({ query: v.string(), count: v.number() })),
-	feedback: v.array(v.object({ path: v.string(), helpful: v.number(), unhelpful: v.number(), ratio: v.number(), comments: v.number() })),
+	feedback: v.array(v.object({ path: v.string(), locale: localeSchema, helpful: v.number(), unhelpful: v.number(), ratio: v.number(), comments: v.number() })),
 })
 
 export const feedbackStatusSchema = v.picklist(['all', 'pending', 'reviewed'])
@@ -55,17 +58,20 @@ export const feedbackListInput = v.pipe(
 		site: siteSchema,
 		from: day,
 		to: day,
+		locale: v.optional(localeSchema),
 		status: v.optional(feedbackStatusSchema, 'all'),
 		answer: v.optional(feedbackAnswerSchema, 'all'),
 		path: v.optional(v.pipe(v.string(), v.maxLength(512)), ''),
 		page: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(10_000)), 1),
 	}),
-	v.check((input) => input.from <= input.to, 'La fecha inicial es posterior a la final.'),
+	v.check((input) => input.from <= input.to, 'validation.rangeReversed'),
 )
 
 export const feedbackCommentSchema = v.object({
 	id: v.number(),
 	site: siteSchema,
+	/** The language of the page the reader answered on. */
+	locale: localeSchema,
 	path: v.string(),
 	helpful: v.boolean(),
 	comment: v.string(),
