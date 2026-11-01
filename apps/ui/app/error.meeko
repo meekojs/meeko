@@ -4,8 +4,8 @@
 
 <template>
 	<DocsPage
-		bind:title="props.status === 404 ? 'Esta página no existe' : 'No pudimos cargar la página'"
 		description="Puedes volver a la documentación y continuar desde allí."
+		bind:title="props.status === 404 ? 'Esta página no existe' : 'No pudimos cargar la página'"
 	>
 		<div class="error-page">
 			<p>Comprueba la dirección o elige una guía del menú.</p>

@@ -13,8 +13,8 @@
 			representa el contenido de su snippet y la pila de modales del manager. No genera un contenedor visual adicional. Úsalo una sola vez alrededor del outlet.
 		</p>
 		<DocsCode
-			bind:code="examples.app"
 			label="app/app.meeko"
+			bind:code="examples.app"
 		/>
 		<h2 id="contract">Contrato</h2>
 		<p>
@@ -35,8 +35,8 @@
 			cierra la instancia actual con un resultado o la descarta.
 		</p>
 		<DocsCode
-			bind:code="examples.modalOpen"
 			label="Dentro de un componente"
+			bind:code="examples.modalOpen"
 		/>
 		<p>
 			Consulta la guía de

@@ -1,63 +1,88 @@
+<script lang="ts">
+	import { isFeaturedPath, isHiddenPath, useDocsModeration } from 'meeko-docs/state'
+
+	const directory = [
+		{
+			title: 'Acciones y navegación',
+			items: [
+				{ href: '/buttons', name: 'Button', description: 'Acciones con variantes, tamaños y estados.' },
+				{ href: '/links', name: 'Link y LinkCard', description: 'Enlaces reales y superficies de navegación.' },
+				{ href: '/badges', name: 'Badge', description: 'Metadatos y estados sin interacción.' },
+				{ href: '/theme-toggle', name: 'ThemeToggle', description: 'Tema claro, oscuro o del sistema, también sin JavaScript.' },
+			],
+		},
+		{ title: 'Estructura', items: [{ href: '/container', name: 'Container', description: 'Anchos fluidos, espaciado lateral y superficies hasta 4K.' }] },
+		{
+			title: 'Captura y presentación',
+			items: [
+				{ href: '/forms', name: 'Field e Input', description: 'Etiquetas, modelos de texto y mensajes de error.' },
+				{ href: '/select', name: 'Select', description: 'Una o varias opciones tipadas, con búsqueda y envío en formularios.' },
+				{ href: '/icons', name: 'Icon', description: 'Iconos de Iconify y SVG propios, incrustados al compilar.' },
+				{ href: '/cards', name: 'Card', description: 'Contenido con cabecera, cuerpo y acciones.' },
+				{ href: '/tables', name: 'Table', description: 'Filas y columnas correlacionadas por TypeScript.' },
+			],
+		},
+		{
+			title: 'Superposiciones',
+			items: [
+				{ href: '/modals', name: 'Modal', description: 'Declarativo o programático, con soporte de anidación.' },
+				{ href: '/popover', name: 'Popover', description: 'Menús, diálogos ligeros y tooltips anclados a su disparador.' },
+				{ href: '/app', name: 'App', description: 'El host de los modales programáticos.' },
+			],
+		},
+	]
+
+	// Las páginas que el dashboard oculta salen del índice y las destacadas llevan su insignia.
+	const moderation = useDocsModeration()
+	const groups = computed(() => directory.map((group) => ({ title: group.title, items: group.items.filter((item) => !isHiddenPath(moderation.value, item.href)).map((item) => ({ ...item, featured: isFeaturedPath(moderation.value, item.href) })) })).filter((group) => group.items.length > 0))
+</script>
+
 <template>
 	<DocsPage
 		title="Componentes"
 		description="Encuentra cada componente por su tarea. Cada guía incluye ejemplos, código y referencia de API."
 	>
-		<h2>Acciones y navegación</h2>
-		<div class="directory">
-			<a href="/buttons">
-				<strong>Button</strong>
-				<span>Acciones con variantes, tamaños y estados.</span>
-			</a>
-			<a href="/links">
-				<strong>Link y LinkCard</strong>
-				<span>Enlaces reales y superficies de navegación.</span>
-			</a>
-			<a href="/badges">
-				<strong>Badge</strong>
-				<span>Metadatos y estados sin interacción.</span>
-			</a>
-		</div>
-		<h2>Estructura</h2>
-		<div class="directory">
-			<a href="/container">
-				<strong>Container</strong>
-				<span>Anchos fluidos, espaciado lateral y superficies hasta 4K.</span>
-			</a>
-		</div>
-		<h2>Captura y presentación</h2>
-		<div class="directory">
-			<a href="/forms">
-				<strong>Field e Input</strong>
-				<span>Etiquetas, modelos de texto y mensajes de error.</span>
-			</a>
-			<a href="/cards">
-				<strong>Card</strong>
-				<span>Contenido con cabecera, cuerpo y acciones.</span>
-			</a>
-			<a href="/tables">
-				<strong>Table</strong>
-				<span>Filas y columnas correlacionadas por TypeScript.</span>
-			</a>
-		</div>
-		<h2>Superposiciones</h2>
-		<div class="directory">
-			<a href="/modals">
-				<strong>Modal</strong>
-				<span>Declarativo o programático, con soporte de anidación.</span>
-			</a>
-			<a href="/app">
-				<strong>App</strong>
-				<span>El host de los modales programáticos.</span>
-			</a>
-		</div>
-		<p>
+		<section
+			each:of="groups.value"
+			each:as="group"
+			each:key="group.title"
+		>
+			<h2>{group.title}</h2>
+			<div class="directory">
+				<a
+					each:of="group.items"
+					each:as="item"
+					each:key="item.href"
+					bind:href="item.href"
+				>
+					<strong>
+						{item.name}
+						<UIBadge
+							if:when="item.featured"
+							tone="accent"
+							class="directory-featured"
+						>
+							Destacado
+						</UIBadge>
+					</strong>
+					<span>{item.description}</span>
+				</a>
+			</div>
+		</section>
+		<div class="doc-note">
+			Las etiquetas del núcleo
 			<code>MeekoSelect</code>
 			,
 			<code>MeekoPopover</code>
 			y
 			<code>MeekoThemeToggle</code>
-			pertenecen al núcleo. UI aporta su apariencia y conserva sus nombres.
-		</p>
+			están obsoletas desde Meeko 1.8 y se retiran en 2.0. Sustitúyelas por
+			<code>UISelect</code>
+			,
+			<code>UIPopover</code>
+			y
+			<code>UIThemeToggle</code>
+			: conservan las mismas props, snippets y marcado.
+		</div>
 	</DocsPage>
 </template>

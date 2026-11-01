@@ -32,20 +32,20 @@
 					id="name"
 					label="Nombre"
 					description="Como aparecerá en tu proyecto."
-					bind:error="error.value"
 					required
+					bind:error="error.value"
 				>
 					<snippet
 						name="default"
 						params="id, describedBy"
 					>
 						<UIInput
-							bind:id="id"
-							bind:describedBy="describedBy"
-							model="name"
-							bind:invalid="Boolean(error.value)"
 							required
 							placeholder="Proyecto Aurora"
+							model="name"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:invalid="Boolean(error.value)"
 						/>
 					</snippet>
 				</UIField>
@@ -100,10 +100,13 @@
 		/>
 		<h2>Otros controles</h2>
 		<p>
+			Para elegir entre opciones, usa
+			<a href="/select">UISelect</a>
+			: admite opciones tipadas, búsqueda, selección múltiple y envío con formularios nativos o con
+			<code>useForm</code>
+			. Sustituye a la etiqueta obsoleta
 			<code>MeekoSelect</code>
-			pertenece al núcleo. El módulo UI añade su apariencia; consulta la
-			<a href="https://meeko.diegootayza.com/docs/reference">referencia de Meeko</a>
-			para su contrato completo.
+			del núcleo.
 		</p>
 	</DocsPage>
 </template>

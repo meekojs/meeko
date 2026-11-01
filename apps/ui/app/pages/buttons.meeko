@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { examples } from '../utils/examples'
 	const count = signal(0)
+	const actions = signal(0)
 </script>
 
 <template>
 	<DocsPage
 		title="Button"
-		description="Ejecuta acciones con una semántica de botón y una API visual compartida con Link."
+		description="Ejecuta una acción, abre una URL o navega a una ruta con una sola API visual."
 	>
 		<h2 id="usage">Uso</h2>
 		<div class="preview">
@@ -17,6 +18,75 @@
 		</div>
 		<p role="status">Cambios en este ejemplo: {count.value}</p>
 		<DocsCode bind:code="examples.button" />
+		<h2 id="kinds">Ruta, enlace o botón</h2>
+		<p>
+			<code>UIButton</code>
+			pinta el elemento que corresponde a lo que hace, con el mismo aspecto: con
+			<code>to</code>
+			, un enlace a una ruta de la aplicación que navega sin recargar; con
+			<code>href</code>
+			, un
+			<code>&lt;a&gt;</code>
+			a cualquier URL; sin ninguno, un
+			<code>&lt;button type="button"&gt;</code>
+			.
+		</p>
+		<div
+			id="button-kinds"
+			class="preview"
+		>
+			<UIButton
+				id="button-kind-route"
+				to="/links"
+				on:click="() => actions.value++"
+			>
+				Ver enlaces
+			</UIButton>
+			<UIButton
+				id="button-kind-anchor"
+				href="https://github.com/meekojs/meeko"
+				target="_blank"
+				on:click="() => actions.value++"
+			>
+				GitHub
+			</UIButton>
+			<UIButton
+				id="button-kind-button"
+				on:click="() => actions.value++"
+			>
+				Acción
+			</UIButton>
+		</div>
+		<p
+			id="button-kinds-status"
+			role="status"
+		>
+			Clics en estos tres: {actions.value}
+		</p>
+		<DocsCode bind:code="examples.buttonKinds" />
+		<p>
+			Las combinaciones sin sentido son errores de tipos en
+			<code>meeko check</code>
+			y en el editor:
+			<code>to</code>
+			con
+			<code>href</code>
+			,
+			<code>type</code>
+			o
+			<code>disabled</code>
+			en un enlace,
+			<code>target</code>
+			en un botón, una ruta que no existe o una ruta dinámica sin
+			<code>params</code>
+			. Un enlace no se puede deshabilitar: no tiene un estado nativo y
+			<code>aria-disabled</code>
+			sin quitar
+			<code>href</code>
+			seguiría navegando. Si la acción no está disponible, no pintes el enlace o usa un botón con
+			<code>disabled</code>
+			.
+		</p>
 		<h2 id="sizes">Tamaños y estados</h2>
 		<div class="preview">
 			<UIButton size="sm">Pequeño</UIButton>
@@ -32,18 +102,25 @@
 		</div>
 		<DocsApi
 			bind:rows="[
-				{ name: 'type', type: 'button | submit | reset', default: 'button', description: 'Comportamiento nativo en formularios.' },
+				{ name: 'to', type: 'RouteId', description: 'Ruta de la aplicación. Pinta un enlace que navega sin recargar. Excluye href, type y disabled.' },
+				{ name: 'params / search', type: 'parámetros de la ruta / objeto', description: 'Con to: los parámetros de una ruta dinámica (obligatorios en ella) y la query string.' },
+				{ name: 'href', type: 'string', description: 'Cualquier URL. Pinta un <a>. Excluye to, type y disabled.' },
+				{ name: 'target / rel / download', type: 'string', description: 'Con href. Para _blank se añade noopener noreferrer cuando rel no está definido.' },
+				{ name: 'type', type: 'button | submit | reset', default: 'button', description: 'Sin to ni href. Comportamiento nativo en formularios.' },
+				{ name: 'disabled', type: 'boolean', default: 'false', description: 'Sin to ni href. Desactiva el botón nativo.' },
 				{ name: 'variant', type: 'primary | secondary | outline | ghost', default: 'primary', description: 'Jerarquía visual de la acción.' },
 				{ name: 'size', type: 'sm | md | lg', default: 'md', description: 'Tamaño del control.' },
 				{ name: 'shape', type: 'rounded | pill', default: 'rounded', description: 'Forma del contorno.' },
-				{ name: 'disabled', type: 'boolean', default: 'false', description: 'Desactiva la interacción nativa.' },
 				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
+				{ name: 'id / title / aria-* / data-*', type: 'atributos HTML', description: 'Llegan tal cual al elemento.' },
 			]"
 		/>
 		<h2 id="events">Eventos y contenido</h2>
 		<p>
 			<code>on:click</code>
-			recibe el evento de ratón. El snippet
+			recibe el evento de ratón en las tres formas; en un enlace,
+			<code>event.preventDefault()</code>
+			cancela la navegación. El snippet
 			<code>default</code>
 			es obligatorio. Para estados asíncronos controla
 			<code>disabled</code>
@@ -52,7 +129,9 @@
 			.
 		</p>
 		<p>
-			Si la acción cambia la URL, usa
+			Para un enlace con su propia jerarquía visual y los defaults de
+			<code>ui.defaults.link</code>
+			, usa
 			<a href="/links">UILink</a>
 			.
 		</p>

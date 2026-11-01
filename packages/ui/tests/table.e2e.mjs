@@ -74,6 +74,16 @@ test('UITable keeps sections, reactive rows and accessible table semantics in na
 	)
 	assert.match(await table.locator('tfoot').innerText(), /4/)
 	assert.equal(await first.evaluate((element) => element.isConnected), true, 'reactive updates retain the server rows')
+	// cell-<clave> y header-<clave>: snippets por columna, con prioridad sobre cell y format.
+	const byColumn = page.getByRole('table', { name: 'Estado por proyecto', exact: true })
+	assert.equal(await byColumn.locator('thead th abbr').innerText(), 'Proyecto', 'header-name replaces the label of its column only')
+	assert.equal(await byColumn.locator('thead th').nth(1).innerText(), 'Tipo')
+	assert.equal(await byColumn.locator('tbody tr').first().locator('td').last().locator('.meeko-ui-badge, [data-tone]').first().innerText(), 'Publicado', 'cell-status wins over the column formatter')
+	await until(
+		async () => (await byColumn.locator('tbody tr').count()) === 4 && (await byColumn.locator('tbody tr').last().locator('td').last().innerText()).trim() === 'Borrador',
+		() => 'Column snippet did not render the added row',
+	)
+	assert.equal(await byColumn.locator('tbody tr').first().locator('td').first().innerText(), 'Sitio principal', 'other columns keep the default text')
 	const second = page.getByRole('table', { name: 'Tabla sin cabecera ni pie', exact: true })
 	assert.equal(await second.locator('thead, tfoot').count(), 0)
 	assert.equal(await second.locator('strong').innerText(), 'Entorno', 'cell snippet receives its typed row and column')

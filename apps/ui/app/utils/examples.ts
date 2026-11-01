@@ -33,6 +33,21 @@ export default defineMeekoConfig({
 <UIButton size="sm" disabled>No disponible</UIButton>
 <p role="status">Cambios: {count.value}</p>
 </template>`,
+	buttonKinds: `<!-- Una ruta de la aplicación: navega sin recargar, con params y search tipados -->
+<UIButton to="/links">Ver enlaces</UIButton>
+<UIButton to="/users/[id]" bind:params="{ id: user.id }"
+  bind:search="{ tab: 'actividad' }">Perfil</UIButton>
+
+<!-- Cualquier URL: un <a>; con target="_blank" añade rel="noopener noreferrer" -->
+<UIButton href="https://github.com/meekojs/meeko" target="_blank"
+  variant="outline">GitHub</UIButton>
+<UIButton href="/informe.pdf" download="informe.pdf">Descargar</UIButton>
+
+<!-- Sin to ni href: un <button type="button"> -->
+<UIButton type="submit" bind:disabled="saving.value">Guardar</UIButton>
+
+<!-- id, title, aria-* y data-* llegan al elemento -->
+<UIButton aria-describedby="hint" data-testid="reset" on:click="reset">Reiniciar</UIButton>`,
 	card: `<script lang="ts">
   const count = signal(0)
 </script>
@@ -45,7 +60,8 @@ export default defineMeekoConfig({
   </snippet>
 </UICard>
 </template>`,
-	link: `<UILink href="/installation">Empezar</UILink>
+	link: `<UILink to="/installation">Empezar</UILink>
+<UILink to="/users/[id]" bind:params="{ id: user.id }">Perfil</UILink>
 <UILink href="https://github.com/meekojs/meeko"
   target="_blank" variant="outline">GitHub</UILink>
 
@@ -88,6 +104,110 @@ export default defineMeekoConfig({
   <UITable bind:columns="columns" bind:rows="rows.value"
     rowKey="id" caption="Proyectos del equipo" />
 </template>`,
+	tableColumnSnippets: `<UITable bind:columns="columns" bind:rows="rows.value" rowKey="id">
+  <!-- value es string: el tipo de Project['status']. -->
+  <snippet name="cell-status" params="row, value">
+    <UIBadge bind:tone="value === 'Publicado' ? 'accent' : 'neutral'">{value}</UIBadge>
+  </snippet>
+  <snippet name="header-name" params="column">
+    <abbr title="Nombre del proyecto">{column.label}</abbr>
+  </snippet>
+  <!-- name="cell-email" no compila: Project no tiene email. -->
+</UITable>`,
+	select: `<script lang="ts">
+  const plans = ['Personal', 'Equipo', 'Empresa', 'Educación']
+  const topics = ['Accesibilidad', 'Diseño', 'Documentación', 'Rendimiento']
+  const plan = signal<string | null>(null)
+  const chosen = signal<string[]>([])
+</script>
+
+<template>
+  <form method="post" action="/subscriptions">
+    <label for="plan">Plan</label>
+    <UISelect id="plan" model="plan" bind:options="plans"
+      name="plan" placeholder="Elige un plan" required />
+
+    <label for="topics">Temas</label>
+    <UISelect id="topics" model="chosen" bind:options="topics"
+      name="topics" multiple searchable bind:max="2" />
+
+    <UIButton type="submit">Enviar selección</UIButton>
+  </form>
+</template>`,
+	selectObjects: `<script lang="ts">
+  interface Member { id: number; name: string; team: string; role: string; disabled?: boolean }
+  const members: Member[] = [
+    { id: 1, name: 'Lucía Martín', team: 'Diseño', role: 'Directora de arte' },
+    { id: 4, name: 'Mateo Gil', team: 'Ingeniería', role: 'De vacaciones', disabled: true },
+  ]
+  const owner = signal<Member | null>(null)
+</script>
+
+<template>
+  <UISelect model="owner" bind:options="members" by="id"
+    labelBy="name" groupBy="team" label="Responsable" clearable>
+    <snippet name="option" params="member, state">
+      <strong>{member.name}</strong>
+      <small>{state.disabled ? 'No disponible' : member.role}</small>
+    </snippet>
+  </UISelect>
+</template>`,
+	popoverMenu: `<script lang="ts">
+  const action = signal('')
+</script>
+
+<template>
+  <UIPopover role="menu" placement="bottom-start" bind:offset="6">
+    <snippet name="trigger">Acciones del proyecto</snippet>
+    <button role="menuitem" on:click="() => (action.value = 'renombrar')">Renombrar</button>
+    <button role="menuitem" on:click="() => (action.value = 'duplicar')">Duplicar</button>
+    <button role="menuitem" on:click="() => (action.value = 'archivar')">Archivar</button>
+  </UIPopover>
+</template>`,
+	popoverDialog: `<script lang="ts">
+  const opened = signal(false)
+</script>
+
+<template>
+  <UIPopover role="dialog" label="Filtrar proyectos" model="opened">
+    <snippet name="trigger">Filtrar</snippet>
+    <label><input type="checkbox"> Publicados</label>
+    <UIButton on:click="() => (opened.value = false)">Aplicar filtros</UIButton>
+  </UIPopover>
+</template>`,
+	popoverTooltip: `<UIPopover mode="hint" placement="top" bind:delay="300">
+  <snippet name="trigger">Estado: borrador</snippet>
+  Sólo tu equipo puede verlo hasta que lo publiques.
+</UIPopover>`,
+	popoverAnchor: `<UIPopover role="menu">
+  <snippet name="anchor" params="trigger">
+    <button type="button" class="avatar" bind="trigger">
+      <img src="/avatar.png" alt="Mi cuenta">
+    </button>
+  </snippet>
+  <button role="menuitem">Perfil</button>
+  <button role="menuitem">Cerrar sesión</button>
+</UIPopover>`,
+	themeToggle: `// meeko.config.ts
+export default defineMeekoConfig({
+  modules: [ui],
+  theme: { default: 'dark' },
+})
+
+<!-- app/app.meeko -->
+<UIThemeToggle />`,
+	themeToggleSelect: `<UIThemeToggle mode="select" />`,
+	themeToggleCustom: `<UIThemeToggle
+  bind:themes="['light', 'dark']"
+  bind:labels="{ light: 'Light', dark: 'Dark' }"
+  bind:messages="{
+    group: 'Theme',
+    unknown: 'Change theme',
+    cycle: (current, next) => 'Theme: ' + current + '. Switch to ' + next,
+  }">
+  <snippet name="light"><svg aria-hidden="true">…</svg></snippet>
+  <snippet name="dark"><svg aria-hidden="true">…</svg></snippet>
+</UIThemeToggle>`,
 	modal: `<script lang="ts">
   const opened = signal(false)
 </script>
@@ -184,4 +304,28 @@ export default defineMeekoConfig({ viewTransitions: true })
 <!-- Enlace con navegación normal si prefieres omitir la transición -->
 <MeekoLink to="/transitions/project"
   data-meeko-view-transition="false">Abrir sin transición</MeekoLink>`,
+	icon: `<p><UIIcon name="lucide:search" /> Buscar en el proyecto</p>
+<UIButton variant="outline">
+  <UIIcon name="lucide:trash-2" label="Eliminar" />
+</UIButton>`,
+	iconConfig: `// pnpm add @meekojs/icon && pnpm add -D @iconify-json/lucide
+// meeko.config.ts
+export default defineMeekoConfig({
+  modules: ['@meekojs/icon'],
+  icon: {
+    collections: ['lucide'], // @iconify-json/lucide del proyecto
+    local: 'app/icons', // SVG propios: 'local:<nombre>'
+    size: '1em',
+    include: ['lucide:sun', 'lucide:moon'], // para bind:name
+  },
+})`,
+	iconDynamic: `<!-- Literales de la expresión: se resuelven al compilar -->
+<UIIcon
+  bind:name="open.value ? 'lucide:x' : 'lucide:menu'"
+  bind:label="open.value ? 'Cerrar menú' : 'Abrir menú'" />
+
+<!-- Un valor que llega de datos: el icono debe estar en icon.include -->
+<UIIcon bind:name="mode.value" />`,
+	iconLocal: `<!-- app/icons/paw.svg -->
+<UIIcon name="local:paw" label="Meeko" size="1.5em" />`,
 } as const

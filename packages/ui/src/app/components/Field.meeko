@@ -41,8 +41,8 @@
 		<p
 			if:when="props.error"
 			class="meeko-ui-field-error"
-			bind:id="props.id + '-error'"
 			role="alert"
+			bind:id="props.id + '-error'"
 		>
 			{props.error}
 		</p>

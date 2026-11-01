@@ -9,8 +9,14 @@
 	>
 		<h2 id="link">UILink</h2>
 		<div class="preview">
-			<UILink href="/installation">Instalación</UILink>
 			<UILink
+				id="link-route"
+				to="/installation"
+			>
+				Instalación
+			</UILink>
+			<UILink
+				id="link-anchor"
 				href="/theming"
 				variant="outline"
 			>
@@ -21,10 +27,13 @@
 		<DocsApi
 			caption="Propiedades de UILink"
 			bind:rows="[
-				{ name: 'href', type: 'string', description: 'Obligatoria. Destino del enlace.' },
+				{ name: 'to', type: 'RouteId', description: 'Ruta de la aplicación, con navegación del cliente. Excluye href, target y rel.' },
+				{ name: 'params / search', type: 'parámetros de la ruta / objeto', description: 'Con to: los parámetros de una ruta dinámica (obligatorios en ella) y la query string.' },
+				{ name: 'href', type: 'string', description: 'Cualquier URL. Excluye to; hace falta uno de los dos.' },
 				{ name: 'variant / size / shape', type: 'UIActionVariant / UIActionSize / UIActionShape', default: 'primary / md / rounded', description: 'Misma API visual que UIButton.' },
 				{ name: 'target / rel', type: 'string', description: 'Atributos nativos del enlace. Para _blank se añade noopener noreferrer cuando rel no está definido.' },
-				{ name: 'ariaLabel', type: 'string', description: 'Nombre accesible cuando el contenido visible no basta.' },
+				{ name: 'ariaLabel', type: 'string', description: 'Nombre accesible cuando el contenido visible no basta; gana sobre aria-label.' },
+				{ name: 'id / title / aria-* / data-*', type: 'atributos HTML', description: 'Llegan tal cual al enlace.' },
 				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
 			]"
 		/>

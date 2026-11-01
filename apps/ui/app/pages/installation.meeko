@@ -15,8 +15,8 @@
 		</p>
 		<h2 id="install">Instala el paquete</h2>
 		<DocsCode
-			bind:code="examples.install"
 			label="Terminal"
+			bind:code="examples.install"
 		/>
 		<h2 id="module">Registra el módulo</h2>
 		<p>
@@ -27,8 +27,8 @@
 			.
 		</p>
 		<DocsCode
-			bind:code="examples.config"
 			label="meeko.config.ts"
+			bind:code="examples.config"
 		/>
 		<p>El módulo registra su CSS y Vite lo procesa con el PostCSS de tu proyecto. No tienes que importar una hoja CSS manualmente ni añadir otro procesador.</p>
 		<h2 id="host">Añade UIApp</h2>
@@ -40,8 +40,8 @@
 			representa su pila.
 		</p>
 		<DocsCode
-			bind:code="examples.app"
 			label="app/app.meeko"
+			bind:code="examples.app"
 		/>
 		<h2 id="first-component">Usa un componente</h2>
 		<div class="preview">

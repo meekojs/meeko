@@ -38,9 +38,9 @@
 							params="id, describedBy"
 						>
 							<UIInput
+								model="project"
 								bind:id="id"
 								bind:describedBy="describedBy"
-								model="project"
 							/>
 						</snippet>
 					</UIField>

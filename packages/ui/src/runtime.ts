@@ -1,3 +1,7 @@
 export { useModal, useModalInstance } from './app/composables/useModal'
+export type { UIActionAppearance, UIButtonProps, UIForwardedAttributes, UILinkProps, UIRouteTarget } from './app/types/button'
 export type { ModalContext, ModalDismissReason, ModalInstanceContext } from './app/types/modal'
+export type { PopoverExposed, PopoverMode, PopoverPlacement, PopoverRole, PopoverSnippets, PopoverToggleEvent, PopoverTrigger, UIPopoverProps } from './app/types/popover'
+export type { SelectField, SelectFilter, SelectFilterContext, SelectModel, SelectOptionState, SelectSnippets, UISelectProps } from './app/types/select'
 export type { TableCellValue, TableColumn, TableRowKey } from './app/types/table'
+export type { UIThemeToggleProps } from './app/types/theme-toggle'

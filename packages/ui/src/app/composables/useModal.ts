@@ -1,14 +1,14 @@
-import type { ContextKey, ResolvedComponent } from '@meekojs/meeko'
+import type { ResolvedComponent } from '@meekojs/meeko'
 import type { PluginApp } from '@meekojs/meeko/framework'
 
-import { inject, onCleanup, provide, signal } from '@meekojs/meeko'
+import { createContext, inject, onCleanup, provide, signal } from '@meekojs/meeko'
 
 import type { ModalArgs, ModalContext, ModalInstance, ModalInstanceContext, ModalName, ModalResolver } from '../types/modal'
 
-// Las claves sobreviven a HMR y a reevaluaciones del paquete enlazado. Los valores siguen
-// perteneciendo al proveedor de cada aplicación/petición; no se almacena estado global.
-const modalKey = Symbol.for('@meekojs/ui/modal') as ContextKey<ModalContext>
-const instanceKey = Symbol.for('@meekojs/ui/modal.instance') as ContextKey<ModalInstanceContext>
+const modalKey = createContext<ModalContext>('@meekojs/ui/modal')
+const instanceKey = createContext<ModalInstanceContext>('@meekojs/ui/modal.instance')
+
+const duplicateHost = 'Only one UIApp modal host can be mounted per provider'
 
 interface PendingModal {
 	id: number
@@ -18,14 +18,24 @@ interface PendingModal {
 	reject(error: unknown): void
 }
 
+interface ModalManagerOptions {
+	/**
+	 * Admite el relevo de host propio de la HMR: `replaceHotModule` ejecuta el setup del `UIApp` nuevo antes
+	 * de liberar el anterior para poder volver atrás. Por defecto es `import.meta.hot`, que Vite define sólo en
+	 * el cliente de desarrollo y sustituye por `undefined` en producción, SSR y Node.
+	 */
+	hot?: boolean
+}
+
 /** Estado por proveedor; las promesas y los resolvers no forman parte del estado reactivo. */
-export function createModalManager(load: ModalResolver) {
+export function createModalManager(load: ModalResolver, options: ModalManagerOptions = {}) {
+	const hot = options.hot ?? (import.meta as { hot?: unknown }).hot !== undefined
 	const instances = signal<ReadonlyMap<number, ModalInstance>>(new Map())
 	const pending = new Map<number, PendingModal>()
 	const exits = new Map<number, () => Promise<void>>()
 	let nextId = 0
 	let disposed = false
-	let hosted = false
+	const hosts = new Set<object>()
 
 	function publish() {
 		const ready = new Map<number, ModalInstance>()
@@ -118,14 +128,20 @@ export function createModalManager(load: ModalResolver) {
 			}
 		},
 		get hosted() {
-			return hosted
+			return hosts.size > 0
 		},
 		attachHost() {
-			if (hosted) throw new Error('Only one UIApp modal host can be mounted per provider')
-			hosted = true
+			if (hosts.size > 0 && !hot) throw new Error(duplicateHost)
+			const host = {}
+			hosts.add(host)
+			// En HMR el host anterior se libera justo después, en la misma tarea; si sigue ahí es un duplicado real.
+			if (hosts.size > 1) queueMicrotask(() => hosts.size > 1 && console.error(new Error(duplicateHost)))
 			return () => {
-				hosted = false
-				clear()
+				if (!hosts.delete(host) || hosts.size > 0) return
+				// Un host relevado no vacía los modales: pasan al host nuevo. La HMR libera el anterior y monta el nuevo
+				// en la misma tarea (el setup de prueba del nuevo ya se liberó), así que el vaciado espera a ese relevo.
+				if (hot) queueMicrotask(() => hosts.size === 0 && clear())
+				else clear()
 			}
 		},
 		dispose() {
@@ -159,7 +175,7 @@ export function provideModal(resolve: ModalResolver): ModalContext {
 	return context
 }
 
-const managerKey = Symbol.for('@meekojs/ui/modal.manager') as ContextKey<ReturnType<typeof createModalManager>>
+const managerKey = createContext<ReturnType<typeof createModalManager>>('@meekojs/ui/modal.manager')
 
 /** Registro del módulo: estado nuevo por aplicación y por petición SSR. */
 export function installModalPlugin(app: Pick<PluginApp, 'provide' | 'side'>, resolve: ModalResolver): void {

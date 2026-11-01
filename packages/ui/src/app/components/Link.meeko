@@ -1,40 +1,48 @@
 <script lang="ts">
-	import type { UIActionShape, UIActionSize, UIActionVariant } from '../types/config'
+	// <UILink>: an <a> with `href`, or a route with <MeekoLink> with `to`; both look the same.
+	import { computed } from '@meekojs/meeko'
+
+	import type { UILinkProps } from '../types/button'
 
 	import { uiDefaults } from '../utils/defaults'
 
-	interface Props {
-		href: string
-		variant?: UIActionVariant
-		size?: UIActionSize
-		shape?: UIActionShape
-		target?: '_self' | '_blank' | '_parent' | '_top'
-		rel?: string
-		ariaLabel?: string
-		class?: string
-	}
-
-	const props = defineProps<Props>()
+	const { to, params, search, href, target, rel, ariaLabel, variant, size, shape, class: className, ...rest } = defineProps<UILinkProps>()
 
 	const emit = defineEmits<{ click: [event: MouseEvent] }>()
 
 	const snippets = defineSnippets<{ default: [] }>()
 
 	const defaults = uiDefaults().link
+
+	const classes = computed(() => ['meeko-ui-button', 'meeko-ui-link', className].filter(Boolean).join(' '))
+	const linkRel = computed(() => rel ?? (target === '_blank' ? 'noopener noreferrer' : undefined))
+	// `ariaLabel` predates the forwarded `aria-label`; when both are given, `ariaLabel` wins.
+	const label = computed(() => ariaLabel ?? rest['aria-label'])
+
+	// Template comments cannot carry ESLint directives, so this one covers the template below. The
+	// spread `bind="rest"` stays before `bind:href` and `bind:class`: the compiler places and evaluates
+	// the spread at `bind` or at an explicit class or style written before it, so sorting `bind:class`
+	// ahead of it would change where its attributes render.
+	/* eslint-disable meeko/attributes-order */
 </script>
 
 <template>
-	<a
-		bind:href="props.href"
-		bind:target="props.target"
-		bind:rel="props.rel ?? (props.target === '_blank' ? 'noopener noreferrer' : undefined)"
-		bind:aria-label="props.ariaLabel"
-		bind:class="['meeko-ui-button', 'meeko-ui-link', props.class].filter(Boolean).join(' ')"
-		bind:data-variant="props.variant ?? defaults?.variant ?? 'primary'"
-		bind:data-size="props.size ?? defaults?.size ?? 'md'"
-		bind:data-shape="props.shape ?? defaults?.shape ?? 'rounded'"
+	<component
+		is="to !== undefined ? 'MeekoLink' : 'a'"
+		bind:to="to"
+		bind:params="params"
+		bind:search="search"
+		bind="rest"
+		bind:href="href"
+		bind:target="target"
+		bind:rel="linkRel.value"
+		bind:aria-label="label.value"
+		bind:class="classes.value"
+		bind:data-variant="variant ?? defaults?.variant ?? 'primary'"
+		bind:data-size="size ?? defaults?.size ?? 'md'"
+		bind:data-shape="shape ?? defaults?.shape ?? 'rounded'"
 		on:click="(event) => emit('click', event)"
 	>
 		<render snippet="snippets.default" />
-	</a>
+	</component>
 </template>

@@ -79,12 +79,12 @@
 			.
 		</p>
 		<DocsCode
-			bind:code="examples.modalOpen"
 			label="Dentro de un componente"
+			bind:code="examples.modalOpen"
 		/>
 		<DocsCode
-			bind:code="examples.modalInstance"
 			label="app/components/Modal/Confirm.meeko"
+			bind:code="examples.modalInstance"
 		/>
 		<h2 id="stack">Modales anidados</h2>
 		<p>

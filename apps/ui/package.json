@@ -12,11 +12,15 @@
 		"start": "meeko start ."
 	},
 	"dependencies": {
+		"@meekojs/icon": "workspace:*",
 		"@meekojs/meeko": "workspace:*",
 		"@meekojs/ui": "workspace:*",
-		"meeko-docs": "workspace:*"
+		"meeko-docs": "workspace:*",
+		"meeko-docs-content": "workspace:*",
+		"pg": "8.23.1"
 	},
 	"devDependencies": {
+		"@iconify-json/lucide": "1.2.149",
 		"@meekojs/eslint-plugin": "workspace:*",
 		"@types/node": "^24.0.0",
 		"eslint": "10.13.0",

@@ -1,0 +1,282 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+
+	interface Member {
+		id: number
+		name: string
+		team: string
+		role: string
+		disabled?: boolean
+	}
+
+	const plans = ['Personal', 'Equipo', 'Empresa', 'Educación']
+	const topics = ['Accesibilidad', 'Diseño', 'Documentación', 'Rendimiento', 'Pruebas', 'Seguridad']
+	const members: Member[] = [
+		{ id: 1, name: 'Lucía Martín', team: 'Diseño', role: 'Directora de arte' },
+		{ id: 2, name: 'Andrés Pérez', team: 'Diseño', role: 'Diseñador de producto' },
+		{ id: 3, name: 'Sofía Ramos', team: 'Ingeniería', role: 'Desarrolladora' },
+		{ id: 4, name: 'Mateo Gil', team: 'Ingeniería', role: 'De vacaciones', disabled: true },
+		{ id: 5, name: 'Valeria Ortiz', team: 'Ingeniería', role: 'Responsable de calidad' },
+	]
+
+	const plan = signal<string | null>(null)
+	const chosen = signal<string[]>([])
+	const owner = signal<Member | null>(null)
+	const planError = signal<string | undefined>(undefined)
+	const sent = signal('Elige un plan y hasta dos temas.')
+
+	function validate() {
+		planError.value = plan.value === null ? 'Elige un plan para continuar.' : undefined
+	}
+	function send(event: SubmitEvent) {
+		event.preventDefault()
+		const data = new FormData(event.currentTarget as HTMLFormElement)
+		const entries = [...data.entries()].map(([name, value]) => name + '=' + String(value))
+		sent.value = 'Enviado en este ejemplo: ' + entries.join(' · ')
+	}
+</script>
+
+<template>
+	<DocsPage
+		title="Select"
+		description="Elige una o varias opciones tipadas con teclado, ratón y búsqueda, y envíalas con un formulario."
+	>
+		<p>
+			<code>UISelect</code>
+			es un combobox accesible sobre
+			<a href="/popover">UIPopover</a>
+			. El foco permanece en el disparador mientras
+			<code>aria-activedescendant</code>
+			recorre la lista. El tipo del modelo se infiere de
+			<code>options</code>
+			y de
+			<code>multiple</code>
+			.
+		</p>
+		<h2 id="usage">Una opción en un formulario</h2>
+		<p>
+			Con
+			<code>name</code>
+			, el componente añade un
+			<code>input</code>
+			oculto por valor, así que un formulario nativo lo envía sin código adicional. Abre la lista con las flechas,
+			<code>Intro</code>
+			o un clic; escribe una letra para saltar a la opción que empieza por ella.
+		</p>
+		<div class="preview">
+			<form
+				id="select-form"
+				class="form-example"
+				on:submit="send"
+			>
+				<div class="select-field">
+					<label for="plan">Plan</label>
+					<UISelect
+						id="plan"
+						name="plan"
+						placeholder="Elige un plan"
+						required
+						model="plan"
+						bind:options="plans"
+						bind:describedBy="planError.value ? 'plan-error' : undefined"
+						bind:invalid="Boolean(planError.value)"
+						on:change="validate"
+					/>
+					<p
+						if:when="planError.value"
+						id="plan-error"
+						class="select-error"
+						role="alert"
+					>
+						{planError.value}
+					</p>
+				</div>
+				<div class="select-field">
+					<label for="topics">Temas</label>
+					<UISelect
+						id="topics"
+						name="topics"
+						multiple
+						searchable
+						placeholder="Busca un tema"
+						describedBy="topics-help"
+						model="chosen"
+						bind:options="topics"
+						bind:max="2"
+					/>
+					<p
+						id="topics-help"
+						class="select-help"
+					>
+						Hasta dos temas. La búsqueda ignora acentos y mayúsculas.
+					</p>
+				</div>
+				<div class="example-actions">
+					<UIButton
+						type="submit"
+						on:click="validate"
+					>
+						Enviar selección
+					</UIButton>
+				</div>
+				<p
+					id="select-sent"
+					class="status"
+					role="status"
+				>
+					{sent.value}
+				</p>
+			</form>
+		</div>
+		<DocsCode bind:code="examples.select" />
+		<div class="doc-note">
+			Con
+			<code>required</code>
+			, un formulario sin valor no se envía: el disparador recibe el foco y
+			<code>aria-invalid</code>
+			. Escribe además un mensaje visible y asócialo con
+			<code>describedBy</code>
+			, como en el ejemplo. Con
+			<code>useForm</code>
+			, pasa
+			<code>bind:field="form.field('plan')"</code>
+			y el campo aporta el id, el nombre, el valor y el estado de error.
+		</div>
+		<h2 id="multiple">Búsqueda y selección múltiple</h2>
+		<p>
+			<code>searchable</code>
+			convierte el disparador en un campo de texto que filtra las opciones. Con
+			<code>multiple</code>
+			, cada opción se alterna, la lista sigue abierta y el modelo es un array.
+			<code>max</code>
+			deshabilita el resto de opciones cuando se alcanza el límite. Para buscar en un servidor, pasa una función
+			<code>filter</code>
+			que devuelva una promesa y use su
+			<code>AbortSignal</code>
+			.
+		</p>
+		<h2 id="objects">Objetos, grupos y opciones propias</h2>
+		<p>
+			Las opciones pueden ser objetos.
+			<code>by</code>
+			decide cómo se comparan,
+			<code>labelBy</code>
+			qué texto se muestra y se busca,
+			<code>groupBy</code>
+			añade un encabezado por grupo y una opción con
+			<code>disabled: true</code>
+			no se puede elegir. Los snippets
+			<code>option</code>
+			y
+			<code>value</code>
+			reciben la opción con su tipo.
+		</p>
+		<div class="preview">
+			<div class="form-example">
+				<div class="select-field">
+					<label for="owner">Responsable</label>
+					<UISelect
+						id="owner"
+						by="id"
+						labelBy="name"
+						groupBy="team"
+						placeholder="Asigna una persona"
+						clearable
+						model="owner"
+						bind:options="members"
+					>
+						<snippet
+							name="option"
+							params="member"
+						>
+							<span class="select-member">
+								<strong>{member.name}</strong>
+								<small>{member.role}</small>
+							</span>
+						</snippet>
+					</UISelect>
+				</div>
+				<p
+					id="owner-status"
+					class="status"
+					role="status"
+				>
+					{owner.value ? owner.value.name + ' es responsable de ' + owner.value.team.toLowerCase() + '.' : 'Sin responsable asignado.'}
+				</p>
+			</div>
+		</div>
+		<DocsCode bind:code="examples.selectObjects" />
+		<h2 id="api">API</h2>
+		<DocsApi
+			caption="Propiedades de UISelect"
+			bind:rows="[
+				{ name: 'options', type: 'readonly T[]', description: 'Obligatoria. Primitivos u objetos; una lista nueva actualiza la abierta.' },
+				{ name: 'model', type: 'Signal<T | null> o Signal<T[]>', default: 'null', description: 'Valor elegido; un array con multiple.' },
+				{ name: 'multiple', type: 'boolean', default: 'false', description: 'Permite elegir varias opciones.' },
+				{ name: 'by / labelBy / disabledBy / groupBy', type: 'clave o función', description: 'Comparación, etiqueta, deshabilitado y grupo de cada opción.' },
+				{ name: 'searchable / filter', type: 'boolean / SelectFilter<T>', description: 'Búsqueda en la lista, síncrona o asíncrona.' },
+				{ name: 'max', type: 'number', description: 'Con multiple, número máximo de opciones elegidas.' },
+				{ name: 'clearable / clearLabel', type: 'boolean / string', default: 'false / Quitar selección', description: 'Botón accesible que quita la selección y devuelve el foco al disparador.' },
+				{ name: 'name / required / disabled', type: 'string / boolean', description: 'Envío y validación del formulario.' },
+				{ name: 'field', type: 'SelectField', description: 'Un campo de useForm: id, name, valor, aria-invalid y aria-describedby.' },
+				{ name: 'id / label / describedBy / invalid', type: 'string / boolean', description: 'Identidad y estado accesible del disparador.' },
+				{ name: 'placeholder', type: 'string', description: 'Texto del disparador sin valor.' },
+				{ name: 'placement / offset', type: 'PopoverPlacement / number', default: 'bottom-start / 0', description: 'Posición de la lista respecto al disparador.' },
+				{ name: 'class / listClass', type: 'string', description: 'Clases del elemento raíz y de la lista.' },
+			]"
+		/>
+		<p>
+			Admite los snippets
+			<code>option</code>
+			,
+			<code>value</code>
+			,
+			<code>group</code>
+			,
+			<code>empty</code>
+			y
+			<code>loading</code>
+			. El evento
+			<code>change</code>
+			recibe el nuevo valor. Los tipos
+			<code>UISelectProps</code>
+			,
+			<code>SelectModel</code>
+			y
+			<code>SelectFilter</code>
+			se exportan desde
+			<code>@meekojs/ui/runtime</code>
+			.
+		</p>
+	</DocsPage>
+</template>
+
+<style>
+	.select-field {
+		display: grid;
+		gap: 0.4rem;
+	}
+	.select-field > label {
+		font-weight: 600;
+		font-size: 0.875rem;
+	}
+	.select-field .select-help,
+	.select-field .select-error {
+		margin: 0;
+		font-size: 0.8125rem;
+	}
+	.select-field .select-help {
+		color: var(--meeko-ui-muted);
+	}
+	.select-field .select-error {
+		color: var(--meeko-ui-danger);
+	}
+	.select-member {
+		display: grid;
+		gap: 0.1rem;
+	}
+	.select-member small {
+		color: var(--meeko-ui-muted);
+		font-size: 0.75rem;
+	}
+</style>

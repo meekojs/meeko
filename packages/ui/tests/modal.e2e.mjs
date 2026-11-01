@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -197,22 +197,7 @@ test('modals hydrate, stack, settle, restore focus and work on mobile', { timeou
 		async () => (await page.locator('dialog[open]').count()) === 0,
 		() => 'Reduced-motion close did not finish',
 	)
-	// Linked package rebuilds reload this module while the app plugin still owns its context.
-	const helper = fileURLToPath(new URL('../dist/app/composables/useModal.js', import.meta.url))
-	const original = await readFile(helper, 'utf8')
-	context.after(() => writeFile(helper, original))
-	const marker = `modal-context-reload-${Date.now()}`
-	// Wait for the reload caused by this edit before starting another navigation.
-	const reloaded = page.waitForEvent('framenavigated', { predicate: (frame) => frame === page.mainFrame() })
-	await writeFile(helper, `${original}\n// ${marker}\n`)
-	await until(
-		async () => (await (await fetch(`${origin}/@fs/${helper.replaceAll('\\', '/')}`)).text()).includes(marker),
-		() => 'Helper rebuild was not observed',
-	)
-	await reloaded
-	await page.waitForLoadState('networkidle')
-	const refreshed = await fetch(`${origin}/modals`)
-	assert.equal(refreshed.status, 200, 'SSR keeps its modal context after a linked helper rebuild')
+	// The rebuild of the linked package is covered in the core (framework-context-identity); this test never writes to the shared dist.
 	await page.goto(`${origin}/modals`, { waitUntil: 'networkidle' })
 	await trigger.click()
 	await page.locator('dialog[open]').waitFor()

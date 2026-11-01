@@ -40,8 +40,8 @@
 			<UIContainer
 				as="section"
 				ariaLabel="Vista previa del contenedor"
-				bind:size="size.value"
 				class="container-example"
+				bind:size="size.value"
 			>
 				<div class="container-content">
 					<strong>Un espacio para tu interfaz</strong>
@@ -114,8 +114,8 @@
 			. El contenedor no oculta contenido que desborde: las tablas y los bloques de código deben gestionar su propio scroll.
 		</p>
 		<DocsCode
-			bind:code="examples.containerCss"
 			label="app/styles/main.css"
+			bind:code="examples.containerCss"
 		/>
 	</DocsPage>
 </template>

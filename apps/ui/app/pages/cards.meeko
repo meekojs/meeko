@@ -32,8 +32,8 @@
 			<UICard
 				title="Tu espacio de trabajo"
 				description="Una card controlada por props, con contenido reactivo."
-				bind:variant="variant.value"
 				class="card-demo-preview"
+				bind:variant="variant.value"
 			>
 				<p role="status">Cambios guardados: {count.value}</p>
 				<snippet name="footer">

@@ -2,7 +2,7 @@
 
 ## Dirección
 
-Modo de lectura: documentación técnica con ejemplos interactivos. El usuario eligió conservar la identidad de Meeko. La autoridad visual es `apps/site/app/styles/tokens.css`: Inter autoalojada, superficies neutras, acento azul, acciones principales neutras y temas claro/oscuro. No se introduce una marca independiente.
+Modo de lectura: documentación técnica con ejemplos interactivos. El usuario eligió conservar la identidad de Meeko. La autoridad visual es `apps/meeko/app/styles/tokens.css`: Inter autoalojada, superficies neutras, acento azul, acciones principales neutras y temas claro/oscuro. No se introduce una marca independiente.
 
 ## Estructura
 

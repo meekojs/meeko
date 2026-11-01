@@ -1,4 +1,5 @@
 <script lang="ts" generic="T extends object">
+	import type { Snippet } from '@meekojs/meeko'
 	import type { TableCellValue, TableColumn, TableRowKey } from '@meekojs/ui/runtime'
 
 	interface Props<T extends object> {
@@ -15,12 +16,28 @@
 
 	const props = defineProps<Props<T>>({ layout: 'native', hideHeader: false, emptyText: 'No hay datos.' })
 
-	const snippets = defineSnippets<{
-		header?: [column: TableColumn<T>]
-		cell?: [row: T, column: TableColumn<T>, value: T[keyof T], index: number]
-		footer?: [column: TableColumn<T>, rows: readonly T[]]
-		empty?: []
-	}>()
+	// `cell-<clave>` y `header-<clave>` salen de las claves de T: `value` tiene el tipo de esa columna.
+	const snippets = defineSnippets<
+		{ [K in Extract<keyof T, string> as `cell-${K}`]?: [row: T, value: T[K]] } & {
+			[K in Extract<keyof T, string> as `header-${K}`]?: [column: TableColumn<T>]
+		} & {
+			header?: [column: TableColumn<T>]
+			cell?: [row: T, column: TableColumn<T>, value: T[keyof T], index: number]
+			footer?: [column: TableColumn<T>, rows: readonly T[]]
+			empty?: []
+		}
+	>()
+
+	// Sobre T, TypeScript no lee un nombre calculado; los snippets de cada columna se leen de esta vista.
+	const byName = snippets as { readonly [name: string]: Snippet<never> | undefined }
+
+	function columnCell(column: TableColumn<T>): Snippet<[row: T, value: T[keyof T]]> | undefined {
+		return byName[`cell-${column.key}`] as Snippet<[row: T, value: T[keyof T]]> | undefined
+	}
+
+	function columnHeader(column: TableColumn<T>): Snippet<[column: TableColumn<T>]> | undefined {
+		return byName[`header-${column.key}`] as Snippet<[column: TableColumn<T>]> | undefined
+	}
 
 	const id = useId()
 
@@ -73,11 +90,16 @@
 						scope="col"
 					>
 						<render
-							if:when="snippets.header"
+							if:when="columnHeader(column)"
+							snippet="columnHeader(column)"
+							args="column"
+						/>
+						<render
+							if:when="!columnHeader(column) && snippets.header"
 							snippet="snippets.header"
 							args="column"
 						/>
-						<span if:when="!snippets.header">{column.label}</span>
+						<span if:when="!columnHeader(column) && !snippets.header">{column.label}</span>
 					</th>
 				</tr>
 			</thead>
@@ -85,8 +107,8 @@
 				<tr
 					each:of="props.rows"
 					each:as="row"
-					each:key="keyOf(row)"
 					each:index="_index"
+					each:key="keyOf(row)"
 					role="row"
 				>
 					<td
@@ -96,11 +118,16 @@
 						role="cell"
 					>
 						<render
-							if:when="snippets.cell"
+							if:when="columnCell(column)"
+							snippet="columnCell(column)"
+							args="row, row[column.key]"
+						/>
+						<render
+							if:when="!columnCell(column) && snippets.cell"
 							snippet="snippets.cell"
 							args="row, column, row[column.key], _index"
 						/>
-						<span if:when="!snippets.cell">{cellText(row, column)}</span>
+						<span if:when="!columnCell(column) && !snippets.cell">{cellText(row, column)}</span>
 					</td>
 				</tr>
 				<tr

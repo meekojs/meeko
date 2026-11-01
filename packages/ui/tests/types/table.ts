@@ -1,6 +1,7 @@
+import type { Snippet } from '@meekojs/meeko'
 import type { TableColumn, TableRowKey } from '@meekojs/ui/runtime'
 
-import type { ComponentProps } from '../../dist/app/components/Table.d.meeko.ts'
+import type { ComponentProps, ComponentSnippets } from '../../dist/app/components/Table.d.meeko.ts'
 
 interface User {
 	id: number
@@ -33,3 +34,16 @@ const missingRows: ComponentProps<User> = { columns, rowKey: 'id' }
 // @ts-expect-error Row shape remains checked against the selected type.
 const badRows: ComponentProps<User> = { rows: [{ id: 'wrong' }], columns, rowKey: 'id' }
 void [badColumn, badFormatter, badKey, optionalKey, missingRows, badRows]
+
+// `cell-<clave>` recibe el valor con el tipo de esa columna y `header-<clave>`, la columna.
+type Equal<A, B> = (<V>() => V extends A ? 1 : 2) extends <V>() => V extends B ? 1 : 2 ? true : false
+type Snippets = ComponentSnippets<User>
+const nameCell: Equal<NonNullable<Snippets['cell-name']>, Snippet<[row: User, value: string]>> = true
+const ageCell: Equal<NonNullable<Snippets['cell-age']>, Snippet<[row: User, value: number]>> = true
+const noteCell: Equal<NonNullable<Snippets['cell-note']>, Snippet<[row: User, value: string | undefined]>> = true
+const ageHeader: Equal<NonNullable<Snippets['header-age']>, Snippet<[column: TableColumn<User>]>> = true
+const optionalColumnSnippets: Equal<Pick<Snippets, 'cell-name'>, { 'cell-name'?: Snippet<[row: User, value: string]> }> = true
+const fallbackCell: Equal<NonNullable<Snippets['cell']>, Snippet<[row: User, column: TableColumn<User>, value: User[keyof User], index: number]>> = true
+// @ts-expect-error Column snippets exist only for keys of the row.
+const missingCell: Snippets['cell-email'] = undefined
+void [nameCell, ageCell, noteCell, ageHeader, optionalColumnSnippets, fallbackCell, missingCell]

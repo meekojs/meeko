@@ -13,22 +13,24 @@
 			pertenece al framework. Guarda la preferencia y aplica
 			<code>data-theme</code>
 			antes del primer pintado.
+			<a href="/theme-toggle">UIThemeToggle</a>
+			permite cambiarla, también sin JavaScript. Sustituye a la etiqueta obsoleta
 			<code>MeekoThemeToggle</code>
-			permite cambiarla; esta misma web lo usa en su cabecera.
+			del núcleo.
 		</p>
 		<div class="token-list">
 			<div class="token-swatch">
-				<i style="background: var(--accent)"></i>
+				<i style="background: var(--accent)" />
 				<strong>Acento</strong>
 				<code>--meeko-ui-accent</code>
 			</div>
 			<div class="token-swatch">
-				<i style="background: var(--pill)"></i>
+				<i style="background: var(--pill)" />
 				<strong>Acción principal</strong>
 				<code>--meeko-ui-primary</code>
 			</div>
 			<div class="token-swatch">
-				<i style="background: var(--surface-2)"></i>
+				<i style="background: var(--surface-2)" />
 				<strong>Superficie</strong>
 				<code>--meeko-ui-surface</code>
 			</div>
@@ -40,12 +42,12 @@
 			aceptan valores CSS o referencias a variables existentes. El acento puede ser azul y la acción principal neutra, como en la identidad de Meeko.
 		</p>
 		<DocsCode
-			bind:code="examples.theme"
 			label="meeko.config.ts"
+			bind:code="examples.theme"
 		/>
 		<DocsCode
-			bind:code="examples.themeCss"
 			label="app/styles/main.css"
+			bind:code="examples.themeCss"
 		/>
 		<DocsApi
 			caption="Familias de tokens"

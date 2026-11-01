@@ -14,7 +14,10 @@
 [data-meeko-theme-toggle] {
 	font-family: var(--meeko-ui-font);
 }
+/* <UIButton> and <UILink> paint an <a> or a <button> with the same look: the rules set what each
+   one takes from the user agent (text-align, letter-spacing, margin…) or from the app's link styles. */
 .meeko-ui-button {
+	--meeko-ui-button-color: var(--meeko-ui-on-primary);
 	display: inline-flex;
 	justify-content: center;
 	align-items: center;
@@ -23,15 +26,28 @@
 		border-color 150ms;
 	cursor: pointer;
 	box-sizing: border-box;
+	margin: 0;
 	border: 1px solid transparent;
 	border-radius: var(--meeko-ui-radius);
 	background: var(--meeko-ui-primary);
 	padding: var(--meeko-ui-control-padding);
 	min-height: var(--meeko-ui-control-height);
-	color: var(--meeko-ui-on-primary);
+	color: var(--meeko-ui-button-color);
 	font: var(--meeko-ui-control-weight) var(--meeko-ui-control-font-size)/1.2 var(--meeko-ui-font);
+	letter-spacing: normal;
+	text-align: center;
 	text-decoration: none;
+	text-indent: 0;
+	text-shadow: none;
+	text-transform: none;
 	white-space: nowrap;
+	word-spacing: normal;
+}
+/* An app rule such as "a:hover { color }" or "a { text-decoration: underline }" is more specific
+   than the class alone. */
+.meeko-ui-button:any-link {
+	color: var(--meeko-ui-button-color);
+	text-decoration: none;
 }
 .meeko-ui-button:hover:not(:disabled) {
 	background: var(--meeko-ui-primary-hover);
@@ -50,24 +66,24 @@
 	border-radius: 999px;
 }
 .meeko-ui-button[data-variant='ghost'] {
+	--meeko-ui-button-color: var(--meeko-ui-text);
 	background: transparent;
-	color: var(--meeko-ui-text);
 }
 .meeko-ui-button[data-variant='ghost']:hover:not(:disabled) {
 	background: var(--meeko-ui-surface-hover);
 }
 .meeko-ui-button[data-variant='outline'] {
 	border-color: var(--meeko-ui-border-strong);
+	--meeko-ui-button-color: var(--meeko-ui-text);
 	background: transparent;
-	color: var(--meeko-ui-text);
 }
 .meeko-ui-button[data-variant='outline']:hover:not(:disabled) {
 	background: var(--meeko-ui-surface-hover);
 }
 .meeko-ui-button[data-variant='secondary'] {
 	border-color: var(--meeko-ui-border);
+	--meeko-ui-button-color: var(--meeko-ui-text);
 	background: var(--meeko-ui-surface);
-	color: var(--meeko-ui-text);
 }
 .meeko-ui-button[data-variant='secondary']:hover:not(:disabled) {
 	background: var(--meeko-ui-surface-hover);
@@ -178,4 +194,65 @@
 }
 [data-meeko-theme-toggle] button:hover {
 	background: var(--meeko-ui-surface-hover);
+}
+[data-meeko-select-values] {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+}
+[data-meeko-select] > [data-meeko-select-values] {
+	margin-bottom: 0.4rem;
+}
+[data-meeko-select][data-clearable] {
+	position: relative;
+}
+[data-meeko-select][data-clearable] [data-meeko-select-trigger] {
+	padding-inline-end: 2.5rem;
+}
+[data-meeko-select-clear] {
+	display: inline-flex;
+	position: absolute;
+	justify-content: center;
+	align-items: center;
+	cursor: pointer;
+	inset-block-end: 0;
+	inset-inline-end: 0;
+	border: 0;
+	border-radius: var(--meeko-ui-radius);
+	background: transparent;
+	width: 2.5rem;
+	height: 2.5rem;
+	color: var(--meeko-ui-muted);
+	font: 400 1.25rem/1 var(--meeko-ui-font);
+}
+[data-meeko-select-clear]:hover {
+	color: var(--meeko-ui-text);
+}
+[data-meeko-select-clear]:focus-visible {
+	outline: 2px solid var(--meeko-ui-focus);
+	outline-offset: -2px;
+}
+[data-meeko-select] > [data-meeko-select-values] [data-meeko-select-value] {
+	border: 1px solid var(--meeko-ui-border);
+	border-radius: 999px;
+	background: var(--meeko-ui-surface);
+	padding: 0.15rem 0.6rem;
+	font-size: 0.8125rem;
+}
+[data-meeko-theme-toggle='select'] [role='radiogroup'] {
+	display: inline-flex;
+	gap: 0.25rem;
+	border: 1px solid var(--meeko-ui-border);
+	border-radius: var(--meeko-ui-radius);
+	padding: 0.25rem;
+}
+[data-meeko-theme-toggle='select'] [role='radio'] {
+	border-color: transparent;
+	background: transparent;
+	min-height: 2rem;
+}
+[data-meeko-theme-toggle='select'] [role='radio'][aria-checked='true'] {
+	border-color: var(--meeko-ui-border-strong);
+	background: var(--meeko-ui-surface-hover);
+	font-weight: 600;
 }

@@ -32,8 +32,8 @@
 		<h2>Configuración</h2>
 		<p>Esta función pertenece al framework, no al módulo UI. Requiere soporte del navegador y respeta movimiento reducido; la navegación sigue funcionando cuando no puede animarse.</p>
 		<DocsCode
-			bind:code="examples.transitions"
 			label="Configuración, CSS y enlace"
+			bind:code="examples.transitions"
 		/>
 	</DocsPage>
 </template>

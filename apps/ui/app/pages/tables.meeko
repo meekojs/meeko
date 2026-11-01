@@ -51,19 +51,19 @@
 			</div>
 			<UITable
 				caption="Proyectos del equipo"
+				rowKey="id"
+				gridColumns="minmax(180px, 2fr) minmax(180px, 3fr) 160px"
 				bind:columns="columns"
 				bind:rows="projects.value"
-				rowKey="id"
 				bind:layout="layout.value"
-				gridColumns="minmax(180px, 2fr) minmax(180px, 3fr) 160px"
 			/>
 			<UITable
 				caption="Tabla sin cabecera ni pie"
 				class="table-demo-secondary"
-				bind:columns="environmentColumns"
-				bind:rows="environment"
 				rowKey="name"
 				hideHeader
+				bind:columns="environmentColumns"
+				bind:rows="environment"
 			>
 				<snippet
 					name="cell"
@@ -76,10 +76,10 @@
 			<UITable
 				caption="Tabla vacía"
 				class="table-demo-secondary"
-				bind:columns="environmentColumns"
-				bind:rows="[]"
 				rowKey="name"
 				layout="grid"
+				bind:columns="environmentColumns"
+				bind:rows="[]"
 			/>
 		</div>
 		<h2 id="typed-data">Columnas y filas tipadas</h2>
@@ -121,5 +121,46 @@
 			<code>empty()</code>
 			. El pie aparece cuando hay contenido de footer. El contenedor permite desplazamiento horizontal en pantallas estrechas.
 		</p>
+		<h2 id="column-snippets">Celdas por columna</h2>
+		<p>
+			Cada clave de la fila tiene sus propios snippets:
+			<code>cell-&lt;clave&gt;(row, value)</code>
+			, con
+			<code>value</code>
+			del tipo de esa columna, y
+			<code>header-&lt;clave&gt;(column)</code>
+			. Una clave que la fila no tiene da error de tipos. Gana
+			<code>cell-&lt;clave&gt;</code>
+			; después
+			<code>cell</code>
+			y por último
+			<code>format</code>
+			. En la cabecera,
+			<code>header-&lt;clave&gt;</code>
+			,
+			<code>header</code>
+			y la etiqueta.
+		</p>
+		<UITable
+			caption="Estado por proyecto"
+			class="table-demo-secondary"
+			rowKey="id"
+			bind:columns="columns"
+			bind:rows="projects.value"
+		>
+			<snippet
+				name="cell-status"
+				params="_row, value"
+			>
+				<UIBadge bind:tone="value === 'Publicado' ? 'accent' : 'neutral'">{value}</UIBadge>
+			</snippet>
+			<snippet
+				name="header-name"
+				params="column"
+			>
+				<abbr title="Nombre del proyecto">{column.label}</abbr>
+			</snippet>
+		</UITable>
+		<DocsCode bind:code="examples.tableColumnSnippets" />
 	</DocsPage>
 </template>
