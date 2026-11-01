@@ -68,5 +68,6 @@ export default defineMeekoModule<UIOptions>({
 			},
 		})
 		meeko.addPlugin(new URL('./app/plugins/modal.js', import.meta.url))
+		meeko.addPlugin(new URL('./app/plugins/toast.js', import.meta.url))
 	},
 })

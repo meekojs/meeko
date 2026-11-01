@@ -32,7 +32,7 @@ test('UI registers public components and composables without leaking private glo
 	const fromUi = entries.filter((entry) => entry.file === '@meekojs/ui/runtime')
 	assert.deepEqual(fromUi.map(({ name }) => name).sort(), ['useModal', 'useModalInstance'])
 	assert.ok(!entries.some(({ name }) => name.startsWith('UIInternalModalInstance') || name.startsWith('UIModalInstance')))
-	assert.deepEqual(Object.keys(runtime).sort(), ['useModal', 'useModalInstance', 'withViewTransition'])
+	assert.deepEqual(Object.keys(runtime).sort(), ['useModal', 'useModalInstance', 'useToast', 'withViewTransition'])
 	await access(new URL('../dist/app/components/internal/ModalInstance.meeko', import.meta.url))
 	await access(new URL('../dist/app/components/internal/ModalInstance.d.meeko.ts', import.meta.url))
 })
@@ -58,9 +58,11 @@ test('UI registers a static app plugin and only aliases the consumer component r
 			addHead() {},
 		},
 	)
-	assert.equal(plugins.length, 1)
+	assert.equal(plugins.length, 2)
 	assert.match(fileURLToPath(plugins[0]).replaceAll('\\', '/'), /\/dist\/app\/plugins\/modal\.js$/)
 	await access(plugins[0])
+	assert.match(fileURLToPath(plugins[1]).replaceAll('\\', '/'), /\/dist\/app\/plugins\/toast\.js$/)
+	await access(plugins[1])
 	assert.equal(vitePlugins[0].resolveId('virtual:meeko-ui-components'), join(root, '.meeko', 'generated', 'components.ts'))
 	assert.equal(vitePlugins[0].resolveId('unrelated-module'), undefined)
 	await assert.rejects(access(join(root, '.meeko')), { code: 'ENOENT' })
