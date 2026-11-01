@@ -9,5 +9,5 @@ export default defineApiRoute({
 	body: viewInput,
 	status: 204,
 	rateLimit: metricsRateLimits.view,
-	handler: viewHandler({ site: 'ui', knownPath: navigationPaths('ui', navigation) }),
+	handler: viewHandler({ site: 'ui', localized: true, knownPath: navigationPaths('ui', navigation) }),
 })

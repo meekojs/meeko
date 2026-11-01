@@ -1,0 +1,287 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+
+	interface Member {
+		id: number
+		name: string
+		team: string
+		role: string
+		disabled?: boolean
+	}
+
+	const plans = ['Personal', 'Team', 'Business', 'Education']
+	const topics = ['Accessibility', 'Design', 'Documentation', 'Performance', 'Testing', 'Security']
+	const members: Member[] = [
+		{ id: 1, name: 'Lucía Martín', team: 'Design', role: 'Art director' },
+		{ id: 2, name: 'Andrés Pérez', team: 'Design', role: 'Product designer' },
+		{ id: 3, name: 'Sofía Ramos', team: 'Engineering', role: 'Developer' },
+		{ id: 4, name: 'Mateo Gil', team: 'Engineering', role: 'On vacation', disabled: true },
+		{ id: 5, name: 'Valeria Ortiz', team: 'Engineering', role: 'Quality lead' },
+	]
+
+	const plan = signal<string | null>(null)
+	const chosen = signal<string[]>([])
+	const owner = signal<Member | null>(null)
+	const planError = signal<string | undefined>(undefined)
+	const sent = signal('Choose a plan and up to two topics.')
+
+	function validate() {
+		planError.value = plan.value === null ? 'Choose a plan to continue.' : undefined
+	}
+	function send(event: SubmitEvent) {
+		event.preventDefault()
+		const data = new FormData(event.currentTarget as HTMLFormElement)
+		const entries = [...data.entries()].map(([name, value]) => name + '=' + String(value))
+		sent.value = 'Sent in this example: ' + entries.join(' · ')
+	}
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Select"
+		description="Choose one or several typed options with the keyboard, the mouse and search, and send them with a form."
+	>
+		<p>
+			<code>UISelect</code>
+			is an accessible combobox built on
+			<MeekoLink to="/popover">UIPopover</MeekoLink>
+			. Focus stays on the trigger while
+			<code>aria-activedescendant</code>
+			moves through the list. The type of the model is inferred from
+			<code>options</code>
+			and
+			<code>multiple</code>
+			.
+		</p>
+		<h2 id="usage">One option in a form</h2>
+		<p>
+			With
+			<code>name</code>
+			, the component adds a hidden
+			<code>input</code>
+			per value, so a native form sends it without extra code. Open the list with the arrow keys,
+			<code>Enter</code>
+			or a click; type a letter to jump to the option that starts with it.
+		</p>
+		<div class="preview">
+			<form
+				id="select-form"
+				class="form-example"
+				on:submit="send"
+			>
+				<div class="select-field">
+					<label for="plan">Plan</label>
+					<UISelect
+						id="plan"
+						name="plan"
+						placeholder="Choose a plan"
+						required
+						model="plan"
+						bind:options="plans"
+						bind:describedBy="planError.value ? 'plan-error' : undefined"
+						bind:invalid="Boolean(planError.value)"
+						on:change="validate"
+					/>
+					<p
+						if:when="planError.value"
+						id="plan-error"
+						class="select-error"
+						role="alert"
+					>
+						{planError.value}
+					</p>
+				</div>
+				<div class="select-field">
+					<label for="topics">Topics</label>
+					<UISelect
+						id="topics"
+						name="topics"
+						multiple
+						searchable
+						placeholder="Search for a topic"
+						describedBy="topics-help"
+						model="chosen"
+						bind:options="topics"
+						bind:max="2"
+					/>
+					<p
+						id="topics-help"
+						class="select-help"
+					>
+						Up to two topics. The search ignores accents and case.
+					</p>
+				</div>
+				<div class="example-actions">
+					<UIButton
+						type="submit"
+						on:click="validate"
+					>
+						Send selection
+					</UIButton>
+				</div>
+				<p
+					id="select-sent"
+					class="status"
+					role="status"
+				>
+					{sent.value}
+				</p>
+			</form>
+		</div>
+		<DocsCode bind:code="examples.select" />
+		<div class="doc-note">
+			With
+			<code>required</code>
+			, a form without a value is not sent: the trigger receives focus and
+			<code>aria-invalid</code>
+			. Also write a visible message and associate it with
+			<code>describedBy</code>
+			, as in the example. With
+			<code>useForm</code>
+			, pass
+			<code>bind:field="form.field('plan')"</code>
+			and the field provides the id, the name, the value and the error state.
+		</div>
+		<h2 id="multiple">Search and multiple selection</h2>
+		<p>
+			<code>searchable</code>
+			turns the trigger into a text field that filters the options. With
+			<code>multiple</code>
+			, each option toggles, the list stays open and the model is an array.
+			<code>max</code>
+			disables the remaining options when the limit is reached. To search on a server, pass a
+			<code>filter</code>
+			function that returns a promise and uses its
+			<code>AbortSignal</code>
+			.
+		</p>
+		<h2 id="objects">Objects, groups and custom options</h2>
+		<p>
+			Options can be objects.
+			<code>by</code>
+			decides how they are compared,
+			<code>labelBy</code>
+			which text is shown and searched,
+			<code>groupBy</code>
+			adds a heading per group and an option with
+			<code>disabled: true</code>
+			cannot be chosen. The
+			<code>option</code>
+			and
+			<code>value</code>
+			snippets receive the option with its type.
+		</p>
+		<div class="preview">
+			<div class="form-example">
+				<div class="select-field">
+					<label for="owner">Owner</label>
+					<UISelect
+						id="owner"
+						by="id"
+						labelBy="name"
+						groupBy="team"
+						placeholder="Assign a person"
+						clearable
+						model="owner"
+						bind:options="members"
+					>
+						<snippet
+							name="option"
+							params="member"
+						>
+							<span class="select-member">
+								<strong>{member.name}</strong>
+								<small>{member.role}</small>
+							</span>
+						</snippet>
+					</UISelect>
+				</div>
+				<p
+					id="owner-status"
+					class="status"
+					role="status"
+				>
+					{owner.value ? owner.value.name + ' owns ' + owner.value.team.toLowerCase() + '.' : 'No owner assigned.'}
+				</p>
+			</div>
+		</div>
+		<DocsCode bind:code="examples.selectObjects" />
+		<h2 id="api">API</h2>
+		<DocsApi
+			caption="UISelect props"
+			bind:rows="[
+				{ name: 'options', type: 'readonly T[]', description: 'Required. Primitives or objects; a new list updates the open one.' },
+				{ name: 'model', type: 'Signal<T | null> or Signal<T[]>', default: 'null', description: 'Chosen value; an array with multiple.' },
+				{ name: 'multiple', type: 'boolean', default: 'false', description: 'Allows choosing several options.' },
+				{ name: 'by / labelBy / disabledBy / groupBy', type: 'key or function', description: 'Comparison, label, disabled state and group of each option.' },
+				{ name: 'searchable / filter', type: 'boolean / SelectFilter<T>', description: 'Search in the list, synchronous or asynchronous.' },
+				{ name: 'max', type: 'number', description: 'With multiple, maximum number of chosen options.' },
+				{ name: 'clearable / clearLabel', type: 'boolean / string', default: 'false / Clear selection', description: 'Accessible button that clears the selection and returns focus to the trigger. The default label follows the language of the document (see Theming).' },
+				{ name: 'name / required / disabled', type: 'string / boolean', description: 'Form submission and validation.' },
+				{ name: 'field', type: 'SelectField', description: 'A useForm field: id, name, value, aria-invalid and aria-describedby.' },
+				{ name: 'id / label / describedBy / invalid', type: 'string / boolean', description: 'Identity and accessible state of the trigger.' },
+				{ name: 'placeholder', type: 'string', description: 'Text of the trigger without a value.' },
+				{ name: 'placement / offset', type: 'PopoverPlacement / number', default: 'bottom-start / 0', description: 'Position of the list relative to the trigger.' },
+				{ name: 'class / listClass', type: 'string', description: 'Classes of the root element and of the list.' },
+			]"
+		/>
+		<p>
+			It accepts the
+			<code>option</code>
+			,
+			<code>value</code>
+			,
+			<code>group</code>
+			,
+			<code>empty</code>
+			and
+			<code>loading</code>
+			snippets; without
+			<code>empty</code>
+			, an empty list says
+			<code>No results</code>
+			. The
+			<code>change</code>
+			event receives the new value. The
+			<code>UISelectProps</code>
+			,
+			<code>SelectModel</code>
+			and
+			<code>SelectFilter</code>
+			types are exported from
+			<code>@meekojs/ui/runtime</code>
+			.
+		</p>
+	</DocsPage>
+</template>
+
+<style>
+	.select-field {
+		display: grid;
+		gap: 0.4rem;
+	}
+	.select-field > label {
+		font-weight: 600;
+		font-size: 0.875rem;
+	}
+	.select-field .select-help,
+	.select-field .select-error {
+		margin: 0;
+		font-size: 0.8125rem;
+	}
+	.select-field .select-help {
+		color: var(--meeko-ui-muted);
+	}
+	.select-field .select-error {
+		color: var(--meeko-ui-danger);
+	}
+	.select-member {
+		display: grid;
+		gap: 0.1rem;
+	}
+	.select-member small {
+		color: var(--meeko-ui-muted);
+		font-size: 0.75rem;
+	}
+</style>

@@ -1,0 +1,113 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+	const name = signal('')
+	const error = signal<string | undefined>(undefined)
+	const saved = signal(false)
+	function save(event: SubmitEvent) {
+		event.preventDefault()
+		error.value = name.value.trim() ? undefined : 'Enter a name.'
+		saved.value = !error.value
+	}
+	function reset() {
+		name.value = ''
+		error.value = undefined
+		saved.value = false
+	}
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Field and Input"
+		description="Connect text signals with accessible labels, descriptions and errors."
+	>
+		<h2 id="usage">A complete field</h2>
+		<p>The example validates a name locally. It does not send information or store data on a server.</p>
+		<div class="preview">
+			<form
+				class="form-example"
+				novalidate
+				on:submit="save"
+			>
+				<UIField
+					id="name"
+					label="Name"
+					description="As it will appear in your project."
+					required
+					bind:error="error.value"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UIInput
+							required
+							placeholder="Project Aurora"
+							model="name"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:invalid="Boolean(error.value)"
+						/>
+					</snippet>
+				</UIField>
+				<div class="example-actions">
+					<UIButton type="submit">Save name</UIButton>
+					<UIButton
+						variant="outline"
+						on:click="reset"
+					>
+						Reset
+					</UIButton>
+				</div>
+				<p
+					class="status"
+					role="status"
+				>
+					{saved.value ? 'Name validated in this example.' : 'Fill in the name to continue.'}
+				</p>
+			</form>
+		</div>
+		<DocsCode bind:code="examples.form" />
+		<div class="doc-note">
+			UIField passes
+			<code>id</code>
+			and
+			<code>describedBy</code>
+			to its snippet. You must pass them to the control, together with
+			<code>invalid</code>
+			and
+			<code>required</code>
+			when they apply. They are not propagated automatically.
+		</div>
+		<DocsApi
+			caption="UIField props"
+			bind:rows="[
+				{ name: 'id / label', type: 'string', description: 'Required. Identity of the control and visible label.' },
+				{ name: 'description / error', type: 'string', description: 'The error takes priority and is announced with role=alert.' },
+				{ name: 'required', type: 'boolean', default: 'false', description: 'Shows the required field indicator.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<DocsApi
+			caption="UIInput props"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<string>', default: 'Empty string', description: 'Two-way text model; it updates on input.' },
+				{ name: 'type', type: 'text | email | password | search | url | tel', default: 'text', description: 'Native type of the control.' },
+				{ name: 'id / name / placeholder', type: 'string', description: 'Attributes of the input.' },
+				{ name: 'describedBy', type: 'string', description: 'IDs of the description and the error for aria-describedby.' },
+				{ name: 'required / disabled / invalid', type: 'boolean', default: 'false', description: 'State of the control. invalid sets aria-invalid.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<h2>Other controls</h2>
+		<p>
+			To choose between options, use
+			<MeekoLink to="/select">UISelect</MeekoLink>
+			: it supports typed options, search, multiple selection and submission with native forms or with
+			<code>useForm</code>
+			. It replaces the deprecated core tag
+			<code>MeekoSelect</code>
+			.
+		</p>
+	</DocsPage>
+</template>

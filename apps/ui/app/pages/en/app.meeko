@@ -1,0 +1,48 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="App"
+		description="Host programmatic modals without changing the visual structure of your application."
+	>
+		<h2 id="usage">A host at the root</h2>
+		<p>
+			<code>UIApp</code>
+			renders the content of its snippet and the modal stack of the manager. It does not create an extra visual container. Use it once around the outlet.
+		</p>
+		<DocsCode
+			label="app/app.meeko"
+			bind:code="examples.app"
+		/>
+		<h2 id="contract">Contract</h2>
+		<p>
+			It has no public props or events. It requires the
+			<code>default</code>
+			snippet. The plugin registered by
+			<code>@meekojs/ui</code>
+			provides the context; you do not need to create your own plugin or call
+			<code>provideModal</code>
+			.
+		</p>
+		<p>
+			<code>useModal()</code>
+			opens components whose name starts with
+			<code>Modal</code>
+			, with the props of your application's component registry.
+			<code>useModalInstance()</code>
+			closes the current instance with a result or dismisses it.
+		</p>
+		<DocsCode
+			label="Inside a component"
+			bind:code="examples.modalOpen"
+		/>
+		<p>
+			See the
+			<MeekoLink to="/modals">Modal</MeekoLink>
+			guide for the confirmation component, the sizes and the protected closes.
+		</p>
+	</DocsPage>
+</template>

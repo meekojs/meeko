@@ -1,0 +1,122 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Theming and customization"
+		description="Connect the components with your brand without duplicating your application's palette."
+	>
+		<h2 id="theme">Light, dark and system</h2>
+		<p>
+			<code>theme</code>
+			belongs to the framework. It stores the preference and applies
+			<code>data-theme</code>
+			before the first paint.
+			<MeekoLink to="/theme-toggle">UIThemeToggle</MeekoLink>
+			lets readers change it, also without JavaScript. It replaces the deprecated core tag
+			<code>MeekoThemeToggle</code>
+			.
+		</p>
+		<div class="token-list">
+			<div class="token-swatch">
+				<i style="background: var(--accent)" />
+				<strong>Accent</strong>
+				<code>--meeko-ui-accent</code>
+			</div>
+			<div class="token-swatch">
+				<i style="background: var(--pill)" />
+				<strong>Primary action</strong>
+				<code>--meeko-ui-primary</code>
+			</div>
+			<div class="token-swatch">
+				<i style="background: var(--surface-2)" />
+				<strong>Surface</strong>
+				<code>--meeko-ui-surface</code>
+			</div>
+		</div>
+		<h2 id="tokens">Semantic tokens</h2>
+		<p>
+			The
+			<code>ui.tokens</code>
+			options accept CSS values or references to existing variables. The accent can be blue and the primary action neutral, as in the Meeko identity.
+		</p>
+		<DocsCode
+			label="meeko.config.ts"
+			bind:code="examples.theme"
+		/>
+		<DocsCode
+			label="app/styles/main.css"
+			bind:code="examples.themeCss"
+		/>
+		<DocsApi
+			caption="Token families"
+			bind:rows="[
+				{ name: 'accent / primary', type: 'string', description: 'Color, hover and contrast: accentHover, onAccent, primaryHover and onPrimary.' },
+				{ name: 'surface / surfaceHover', type: 'string', description: 'Component backgrounds and interactive states.' },
+				{ name: 'text / textSoft / muted', type: 'string', description: 'Primary, secondary and auxiliary text.' },
+				{ name: 'border / borderStrong', type: 'string', description: 'Separators and outlines.' },
+				{ name: 'focus / danger', type: 'string', description: 'Keyboard focus and errors.' },
+				{ name: 'accentSoft / accentText', type: 'string', description: 'Backgrounds and text of accent states.' },
+				{ name: 'font / radius', type: 'string', description: 'Font family and base radius.' },
+				{ name: 'controlHeight / controlPadding', type: 'string', description: 'Dimensions of the actions.' },
+				{ name: 'controlWeight / controlFontSize', type: 'string', description: 'Text weight and size of the actions.' },
+			]"
+		/>
+		<h2 id="defaults">Defaults</h2>
+		<p>
+			<code>ui.defaults</code>
+			accepts
+			<code>button</code>
+			,
+			<code>link</code>
+			and
+			<code>card</code>
+			. The priority is: explicit props, application defaults and base values. Defaults are isolated per application and per SSR request.
+		</p>
+		<h2 id="messages">Texts and languages</h2>
+		<p>
+			The few texts that components paint on their own (the close button of
+			<code>UIModal</code>
+			, the empty state of
+			<code>UITable</code>
+			and
+			<code>UISelect</code>
+			, and the names of
+			<code>UIThemeToggle</code>
+			) come in Spanish and English. With
+			<code>@meekojs/i18n</code>
+			they follow the language of the document, with no configuration. Without that module,
+			<code>ui.locale</code>
+			chooses the language; Spanish by default.
+			<code>ui.messages</code>
+			overrides texts or adds other languages.
+		</p>
+		<DocsCode bind:code="examples.messages" />
+		<p>
+			A prop or a snippet of the component always wins over these texts. What a language lacks comes from its base language (
+			<code>pt</code>
+			for
+			<code>pt-BR</code>
+			), from
+			<code>ui.locale</code>
+			and, last, from Spanish. The server and the client choose the same text, so hydration changes nothing.
+		</p>
+		<p>
+			The stylesheets in
+			<code>app/styles</code>
+			load after the module. You can also override the
+			<code>--meeko-ui-*</code>
+			variables directly. The
+			<code>UIOptions</code>
+			,
+			<code>UITokens</code>
+			and
+			<code>UIDefaults</code>
+			types are exported from
+			<code>@meekojs/ui</code>
+			.
+		</p>
+	</DocsPage>
+</template>

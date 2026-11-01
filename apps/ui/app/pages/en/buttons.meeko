@@ -1,0 +1,140 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+	const count = signal(0)
+	const actions = signal(0)
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Button"
+		description="Run an action, open a URL or navigate to a route with a single visual API."
+	>
+		<h2 id="usage">Usage</h2>
+		<div class="preview">
+			<UIButton on:click="() => count.value++">Save change</UIButton>
+			<UIButton variant="secondary">Secondary</UIButton>
+			<UIButton variant="outline">Outline</UIButton>
+			<UIButton variant="ghost">Ghost</UIButton>
+		</div>
+		<p role="status">Changes in this example: {count.value}</p>
+		<DocsCode bind:code="examples.button" />
+		<h2 id="kinds">Route, link or button</h2>
+		<p>
+			<code>UIButton</code>
+			renders the element that matches what it does, with the same look: with
+			<code>to</code>
+			, a link to a route of the application that navigates without reloading; with
+			<code>href</code>
+			, an
+			<code>&lt;a&gt;</code>
+			to any URL; with neither, a
+			<code>&lt;button type="button"&gt;</code>
+			.
+		</p>
+		<div
+			id="button-kinds"
+			class="preview"
+		>
+			<UIButton
+				id="button-kind-route"
+				to="/links"
+				on:click="() => actions.value++"
+			>
+				See links
+			</UIButton>
+			<UIButton
+				id="button-kind-anchor"
+				href="https://github.com/meekojs/meeko"
+				target="_blank"
+				on:click="() => actions.value++"
+			>
+				GitHub
+			</UIButton>
+			<UIButton
+				id="button-kind-button"
+				on:click="() => actions.value++"
+			>
+				Action
+			</UIButton>
+		</div>
+		<p
+			id="button-kinds-status"
+			role="status"
+		>
+			Clicks on these three: {actions.value}
+		</p>
+		<DocsCode bind:code="examples.buttonKinds" />
+		<p>
+			Combinations that make no sense are type errors in
+			<code>meeko check</code>
+			and in the editor:
+			<code>to</code>
+			with
+			<code>href</code>
+			,
+			<code>type</code>
+			or
+			<code>disabled</code>
+			on a link,
+			<code>target</code>
+			on a button, a route that does not exist or a dynamic route without
+			<code>params</code>
+			. A link cannot be disabled: it has no native state, and
+			<code>aria-disabled</code>
+			without removing
+			<code>href</code>
+			would still navigate. If the action is not available, do not render the link, or use a button with
+			<code>disabled</code>
+			.
+		</p>
+		<h2 id="sizes">Sizes and states</h2>
+		<div class="preview">
+			<UIButton size="sm">Small</UIButton>
+			<UIButton size="md">Medium</UIButton>
+			<UIButton size="lg">Large</UIButton>
+			<UIButton
+				shape="pill"
+				variant="outline"
+			>
+				Pill
+			</UIButton>
+			<UIButton disabled>Unavailable</UIButton>
+		</div>
+		<DocsApi
+			bind:rows="[
+				{ name: 'to', type: 'RouteId', description: 'A route of the application. Renders a link that navigates without reloading. Excludes href, type and disabled.' },
+				{ name: 'params / search', type: 'route params / object', description: 'With to: the params of a dynamic route (required there) and the query string.' },
+				{ name: 'href', type: 'string', description: 'Any URL. Renders an <a>. Excludes to, type and disabled.' },
+				{ name: 'target / rel / download', type: 'string', description: 'With to or href. For _blank, noopener noreferrer is added when rel is not set.' },
+				{ name: 'type', type: 'button | submit | reset', default: 'button', description: 'Without to or href. Native behavior in forms.' },
+				{ name: 'disabled', type: 'boolean', default: 'false', description: 'Without to or href. Disables the native button.' },
+				{ name: 'variant', type: 'primary | secondary | outline | ghost', default: 'primary', description: 'Visual hierarchy of the action.' },
+				{ name: 'size', type: 'sm | md | lg', default: 'md', description: 'Size of the control.' },
+				{ name: 'shape', type: 'rounded | pill', default: 'rounded', description: 'Shape of the outline.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+				{ name: 'id / title / aria-* / data-*', type: 'HTML attributes', description: 'Reach the element as they are.' },
+			]"
+		/>
+		<h2 id="events">Events and content</h2>
+		<p>
+			<code>on:click</code>
+			receives the mouse event in all three forms; on a link,
+			<code>event.preventDefault()</code>
+			cancels the navigation. The
+			<code>default</code>
+			snippet is required. For asynchronous states, control
+			<code>disabled</code>
+			and the text with your signals; there is no
+			<code>loading</code>
+			prop.
+		</p>
+		<p>
+			For a link with its own visual hierarchy and the defaults of
+			<code>ui.defaults.link</code>
+			, use
+			<MeekoLink to="/links">UILink</MeekoLink>
+			.
+		</p>
+	</DocsPage>
+</template>

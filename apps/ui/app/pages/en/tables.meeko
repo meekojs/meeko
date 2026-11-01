@@ -1,0 +1,167 @@
+<script lang="ts">
+	import type { TableColumn } from '@meekojs/ui/runtime'
+
+	import { examples } from '../../utils/examples'
+
+	interface Project {
+		id: number
+		name: string
+		category: string
+		status: string
+	}
+	const columns = [
+		{ key: 'name', label: 'Project', footer: 'Total projects' },
+		{ key: 'category', label: 'Type', footer: (rows) => rows.length },
+		{ key: 'status', label: 'Status', footer: 'Meeko team', format: (value) => value.toUpperCase() },
+	] satisfies TableColumn<Project>[]
+	const environmentColumns = [
+		{ key: 'name', label: 'Environment' },
+		{ key: 'value', label: 'Value' },
+	] satisfies TableColumn<{ name: string; value: string }>[]
+	const environment = [{ name: 'Environment', value: 'Development' }]
+	const layout = signal<'native' | 'grid'>('native')
+	const projects = signal<Project[]>([
+		{ id: 1, name: 'Main site', category: 'Website', status: 'Published' },
+		{ id: 2, name: 'Customer portal', category: 'Application', status: 'In development' },
+		{ id: 3, name: 'Component guide', category: 'Documentation', status: 'Published' },
+	])
+	function addProject() {
+		const id = Math.max(0, ...projects.value.map((project) => project.id)) + 1
+		projects.value = [...projects.value, { id, name: 'Project ' + id, category: 'Application', status: 'Draft' }]
+	}
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Table"
+		description="Present typed rows and columns with a native or CSS Grid layout."
+	>
+		<div class="table-demo">
+			<div class="table-demo-controls">
+				<label for="table-layout">Layout</label>
+				<select
+					id="table-layout"
+					bind:value="layout.value"
+					on:change="(event) => (layout.value = event.currentTarget.value === 'grid' ? 'grid' : 'native')"
+				>
+					<option value="native">Native</option>
+					<option value="grid">Grid</option>
+				</select>
+				<UIButton on:click="addProject">Add project</UIButton>
+			</div>
+			<UITable
+				caption="Team projects"
+				rowKey="id"
+				gridColumns="minmax(180px, 2fr) minmax(180px, 3fr) 160px"
+				bind:columns="columns"
+				bind:rows="projects.value"
+				bind:layout="layout.value"
+			/>
+			<UITable
+				caption="Table without header or footer"
+				class="table-demo-secondary"
+				rowKey="name"
+				hideHeader
+				bind:columns="environmentColumns"
+				bind:rows="environment"
+			>
+				<snippet
+					name="cell"
+					params="row, column, value"
+				>
+					<strong if:when="column.key === 'name'">{row.name}</strong>
+					<span if:when="column.key !== 'name'">{String(value)}</span>
+				</snippet>
+			</UITable>
+			<UITable
+				caption="Empty table"
+				class="table-demo-secondary"
+				rowKey="name"
+				layout="grid"
+				bind:columns="environmentColumns"
+				bind:rows="[]"
+			/>
+		</div>
+		<h2 id="typed-data">Typed columns and rows</h2>
+		<DocsCode bind:code="examples.table" />
+		<p>
+			<code>TableColumn&lt;T&gt;</code>
+			relates
+			<code>key</code>
+			to the value that
+			<code>format</code>
+			receives. Use
+			<code>satisfies</code>
+			to keep that check without losing inference.
+			<code>rowKey</code>
+			can be a property with string/number values or a function.
+		</p>
+		<DocsApi
+			bind:rows="[
+				{ name: 'rows', type: 'readonly T[]', description: 'Required. Data of the rows.' },
+				{ name: 'columns', type: 'readonly TableColumn<T>[]', description: 'Required. key, label, optional format and optional footer.' },
+				{ name: 'rowKey', type: 'TableRowKey<T>', description: 'Required. Stable key of each row.' },
+				{ name: 'layout', type: 'native | grid', default: 'native', description: 'Layout of the columns.' },
+				{ name: 'gridColumns', type: 'string', description: 'CSS column template for the grid mode.' },
+				{ name: 'caption', type: 'string', description: 'Visible and accessible name of the table.' },
+				{ name: 'hideHeader', type: 'boolean', default: 'false', description: 'Hides the header.' },
+				{ name: 'emptyText', type: 'string', default: 'No data.', description: 'Fallback content when there are no rows. The default follows the language of the document (see Theming).' },
+				{ name: 'class', type: 'string', description: 'Additional classes of the table.' },
+			]"
+		/>
+		<h2 id="snippets">Customize the cells</h2>
+		<p>
+			The optional snippets are
+			<code>header(column)</code>
+			,
+			<code>cell(row, column, value, index)</code>
+			,
+			<code>footer(column, rows)</code>
+			and
+			<code>empty()</code>
+			. The footer appears when there is footer content. The container allows horizontal scrolling on narrow screens.
+		</p>
+		<h2 id="column-snippets">Cells per column</h2>
+		<p>
+			Each key of the row has its own snippets:
+			<code>cell-&lt;key&gt;(row, value)</code>
+			, with
+			<code>value</code>
+			of the type of that column, and
+			<code>header-&lt;key&gt;(column)</code>
+			. A key the row does not have is a type error.
+			<code>cell-&lt;key&gt;</code>
+			wins; then
+			<code>cell</code>
+			and finally
+			<code>format</code>
+			. In the header,
+			<code>header-&lt;key&gt;</code>
+			,
+			<code>header</code>
+			and the label.
+		</p>
+		<UITable
+			caption="Status per project"
+			class="table-demo-secondary"
+			rowKey="id"
+			bind:columns="columns"
+			bind:rows="projects.value"
+		>
+			<snippet
+				name="cell-status"
+				params="_row, value"
+			>
+				<UIBadge bind:tone="value === 'Published' ? 'accent' : 'neutral'">{value}</UIBadge>
+			</snippet>
+			<snippet
+				name="header-name"
+				params="column"
+			>
+				<abbr title="Project name">{column.label}</abbr>
+			</snippet>
+		</UITable>
+		<DocsCode bind:code="examples.tableColumnSnippets" />
+	</DocsPage>
+</template>

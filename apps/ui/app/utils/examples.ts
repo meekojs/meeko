@@ -65,7 +65,7 @@ export default defineMeekoConfig({
 <UILink href="https://github.com/meekojs/meeko"
   target="_blank" variant="outline">GitHub</UILink>
 
-<UILinkCard href="/theming" title="Personalización"
+<UILinkCard to="/theming" title="Personalización"
   description="Conecta los tokens con tu marca." />`,
 	badge: `<UIBadge>Información</UIBadge>
 <UIBadge tone="accent">Publicado</UIBadge>
@@ -273,6 +273,28 @@ export default defineMeekoConfig({
       button: { shape: 'pill', size: 'md' },
       link: { variant: 'outline' },
       card: { variant: 'soft' },
+    },
+  },
+})`,
+	messages: `// meeko.config.ts
+export default defineMeekoConfig({
+  modules: ['@meekojs/ui'],
+  ui: {
+    // Sin @meekojs/i18n, el idioma de los textos; con él, el respaldo de un idioma sin textos.
+    locale: 'en',
+    messages: {
+      en: { table: { empty: 'Nothing here yet.' } },
+      fr: {
+        modal: { close: 'Fermer' },
+        table: { empty: 'Aucune donnée.' },
+        select: { empty: 'Aucun résultat', clear: 'Effacer la sélection' },
+        themeToggle: {
+          labels: { light: 'Clair', dark: 'Sombre', system: 'Système' },
+          unknown: 'Changer de thème',
+          group: 'Thème',
+          cycle: 'Thème : {current}. Passer à {next}',
+        },
+      },
     },
   },
 })`,

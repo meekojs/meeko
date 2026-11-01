@@ -40,7 +40,7 @@
 		<h2 id="link-card">UILinkCard</h2>
 		<div class="preview preview-stack">
 			<UILinkCard
-				href="/theming"
+				to="/theming"
 				title="Personaliza tu interfaz"
 				description="Conecta tus colores, radios y tipografía con los tokens de UI."
 			/>
@@ -48,9 +48,13 @@
 		<DocsApi
 			caption="Propiedades de UILinkCard"
 			bind:rows="[
-				{ name: 'href', type: 'string', description: 'Obligatoria. Destino de toda la superficie.' },
+				{ name: 'to', type: 'RouteId', description: 'Ruta de la aplicación, con navegación del cliente. Excluye href; con @meekojs/i18n apunta a la versión en el idioma actual.' },
+				{ name: 'params / search / resolve', type: 'parámetros de la ruta / objeto / boolean', description: 'Con to, como en UILink: los parámetros de una ruta dinámica, la query string y si el href pasa por los resolvedores de enlaces.' },
+				{ name: 'href', type: 'string', description: 'Cualquier URL. Excluye to; hace falta uno de los dos.' },
 				{ name: 'title', type: 'string', description: 'Obligatoria. Texto principal del enlace.' },
 				{ name: 'description', type: 'string', description: 'Texto de apoyo opcional.' },
+				{ name: 'target / rel / hreflang / download', type: 'string', description: 'Atributos nativos del enlace, como en UILink.' },
+				{ name: 'id / aria-* / data-*', type: 'atributos HTML', description: 'Llegan tal cual al enlace.' },
 				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
 			]"
 		/>

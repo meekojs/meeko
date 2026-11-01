@@ -1,0 +1,318 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+
+	const action = signal('No action yet.')
+	const filtersOpen = signal(false)
+	const published = signal(true)
+	const drafts = signal(false)
+	const filters = signal('Showing published projects.')
+	function applyFilters() {
+		const shown = [published.value ? 'published' : '', drafts.value ? 'draft' : ''].filter(Boolean)
+		filters.value = shown.length ? 'Showing ' + shown.join(' and ') + ' projects.' : 'No filters: no project is shown.'
+		filtersOpen.value = false
+	}
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Popover"
+		description="Menus, lightweight dialogs and tooltips anchored to their trigger, with keyboard support and the native top layer."
+	>
+		<p>
+			<code>UIPopover</code>
+			places its content in the browser's top layer with the
+			<code>popover</code>
+			attribute and anchors it to the trigger with CSS anchor positioning. Where the browser does not support it, a JavaScript calculation positions it and flips it when it does not fit.
+		</p>
+		<h2 id="menu">Action menu</h2>
+		<p>
+			With
+			<code>role="menu"</code>
+			, the children with
+			<code>role="menuitem"</code>
+			are navigated with the arrow keys,
+			<code>Home</code>
+			,
+			<code>End</code>
+			and the first letter of each action.
+			<code>Esc</code>
+			closes the menu and returns focus to the trigger.
+		</p>
+		<div class="preview">
+			<div class="popover-example">
+				<UIPopover
+					role="menu"
+					placement="bottom-start"
+					class="popover-menu"
+					triggerClass="popover-trigger"
+					bind:offset="6"
+				>
+					<snippet name="trigger">Project actions</snippet>
+					<button
+						type="button"
+						role="menuitem"
+						on:click="() => (action.value = 'Project renamed.')"
+					>
+						Rename
+					</button>
+					<button
+						type="button"
+						role="menuitem"
+						on:click="() => (action.value = 'Project duplicated.')"
+					>
+						Duplicate
+					</button>
+					<button
+						type="button"
+						role="menuitem"
+						on:click="() => (action.value = 'Project archived.')"
+					>
+						Archive
+					</button>
+				</UIPopover>
+				<p
+					id="menu-status"
+					class="popover-status"
+					role="status"
+				>
+					{action.value}
+				</p>
+			</div>
+		</div>
+		<DocsCode bind:code="examples.popoverMenu" />
+		<h2 id="dialog">Lightweight dialog</h2>
+		<p>
+			With
+			<code>role="dialog"</code>
+			focus moves into the content when it opens. Use it for brief controls that do not need to block the page; for a task that demands attention, use
+			<MeekoLink to="/modals">Modal</MeekoLink>
+			. The model controls the opening from code.
+		</p>
+		<div class="preview">
+			<div class="popover-example">
+				<UIPopover
+					role="dialog"
+					label="Filter projects"
+					class="popover-dialog"
+					triggerClass="popover-trigger"
+					model="filtersOpen"
+					bind:offset="6"
+				>
+					<snippet name="trigger">Filter</snippet>
+					<fieldset>
+						<legend>Status</legend>
+						<label>
+							<input
+								type="checkbox"
+								bind:checked="published.value"
+								on:change="(event) => (published.value = event.currentTarget.checked)"
+							/>
+							Published
+						</label>
+						<label>
+							<input
+								type="checkbox"
+								bind:checked="drafts.value"
+								on:change="(event) => (drafts.value = event.currentTarget.checked)"
+							/>
+							Drafts
+						</label>
+					</fieldset>
+					<UIButton
+						size="sm"
+						on:click="applyFilters"
+					>
+						Apply filters
+					</UIButton>
+				</UIPopover>
+				<p
+					id="filters-status"
+					class="popover-status"
+					role="status"
+				>
+					{filters.value}
+				</p>
+			</div>
+		</div>
+		<DocsCode bind:code="examples.popoverDialog" />
+		<h2 id="tooltip">Tooltip</h2>
+		<p>
+			With
+			<code>mode="hint"</code>
+			the content is a tooltip: it opens when the pointer hovers, after
+			<code>delay</code>
+			, or when the trigger is focused, and it never receives focus. The trigger references it with
+			<code>aria-describedby</code>
+			. Write supplementary information in it, never the only explanation of an action.
+		</p>
+		<div class="preview">
+			<UIPopover
+				mode="hint"
+				placement="top"
+				class="popover-tooltip"
+				triggerClass="popover-trigger"
+				bind:offset="6"
+			>
+				<snippet name="trigger">Status: draft</snippet>
+				Only your team can see it until you publish it.
+			</UIPopover>
+		</div>
+		<DocsCode bind:code="examples.popoverTooltip" />
+		<h2 id="anchor">Your own trigger</h2>
+		<p>
+			The
+			<code>anchor</code>
+			snippet replaces the button that UI renders. It receives the attributes of the trigger to apply them with
+			<code>bind="trigger"</code>
+			; UIPopover finds it by its
+			<code>id</code>
+			and adds the keyboard handling and the anchoring.
+		</p>
+		<DocsCode bind:code="examples.popoverAnchor" />
+		<h2 id="api">API</h2>
+		<DocsApi
+			caption="UIPopover props"
+			bind:rows="[
+				{ name: 'model', type: 'Signal<boolean>', default: 'false', description: 'Two-way opening of the content.' },
+				{ name: 'mode', type: 'auto | manual | hint', default: 'auto', description: 'auto closes on an outside click and with Esc; manual only from the trigger, Esc or the model; hint is a tooltip.' },
+				{ name: 'role', type: 'menu | dialog | tooltip', description: 'ARIA pattern of the content. With mode=hint, tooltip by default.' },
+				{ name: 'placement', type: 'top | bottom | left | right, with -start or -end', default: 'bottom-start', description: 'Side and alignment relative to the trigger.' },
+				{ name: 'offset', type: 'number', default: '0', description: 'Distance in pixels from the trigger.' },
+				{ name: 'label', type: 'string', description: 'Accessible name of the content. Without it, a menu or a dialog is named after the trigger.' },
+				{ name: 'matchWidth', type: 'boolean', default: 'false', description: 'The content is at least as wide as the trigger.' },
+				{ name: 'delay / closeDelay', type: 'number', default: '300 / 150', description: 'With mode=hint, milliseconds before opening and closing.' },
+				{ name: 'class / triggerClass', type: 'string', description: 'Classes of the content and of the trigger button.' },
+				{ name: 'triggerId', type: 'string', description: 'id of the trigger. By default, one that is stable between SSR and hydration.' },
+			]"
+		/>
+		<p>
+			It accepts the
+			<code>default</code>
+			,
+			<code>trigger</code>
+			and
+			<code>anchor</code>
+			snippets. The
+			<code>toggle</code>
+			event receives an object with
+			<code>open</code>
+			every time the content opens or closes. With a
+			<code>ref:</code>
+			, the component exposes
+			<code>show()</code>
+			,
+			<code>hide()</code>
+			and
+			<code>toggle()</code>
+			. The
+			<code>UIPopoverProps</code>
+			,
+			<code>PopoverPlacement</code>
+			and
+			<code>PopoverTrigger</code>
+			types are exported from
+			<code>@meekojs/ui/runtime</code>
+			.
+		</p>
+	</DocsPage>
+</template>
+
+<style>
+	.popover-example {
+		display: grid;
+		justify-items: center;
+		gap: 1rem;
+	}
+	.popover-example .popover-status {
+		margin: 0;
+		min-height: 1.5rem;
+		color: var(--muted);
+		font-size: 0.875rem;
+	}
+	.popover-trigger {
+		display: inline-flex;
+		align-items: center;
+		transition: background-color 150ms;
+		cursor: pointer;
+		box-sizing: border-box;
+		border: 1px solid var(--meeko-ui-border-strong);
+		border-radius: var(--meeko-ui-radius);
+		background: transparent;
+		padding: var(--meeko-ui-control-padding);
+		min-height: var(--meeko-ui-control-height);
+		color: var(--meeko-ui-text);
+		font: var(--meeko-ui-control-weight) var(--meeko-ui-control-font-size)/1.2 var(--meeko-ui-font);
+	}
+	.popover-trigger:hover,
+	.popover-trigger[aria-expanded='true'] {
+		background: var(--meeko-ui-surface-hover);
+	}
+	.popover-menu {
+		min-width: 12rem;
+	}
+	.popover-menu [role='menuitem'] {
+		display: flex;
+		cursor: pointer;
+		box-sizing: border-box;
+		border: 0;
+		border-radius: calc(var(--meeko-ui-radius) - 0.2rem);
+		background: transparent;
+		padding: 0.5rem 0.65rem;
+		width: 100%;
+		color: inherit;
+		font: inherit;
+		font-size: 0.875rem;
+		text-align: start;
+	}
+	.popover-menu [role='menuitem']:hover,
+	.popover-menu [role='menuitem']:focus {
+		outline: none;
+		background: var(--meeko-ui-surface-hover);
+	}
+	.popover-menu [role='menuitem']:focus-visible,
+	.popover-trigger:focus-visible {
+		outline: 2px solid var(--meeko-ui-focus);
+		outline-offset: 2px;
+	}
+	.popover-menu [role='menuitem']:focus-visible {
+		outline-offset: -2px;
+	}
+	.popover-dialog {
+		padding: 1rem;
+		width: min(18rem, calc(100vw - 2rem));
+	}
+	.popover-dialog fieldset {
+		display: grid;
+		gap: 0.6rem;
+		margin: 0 0 1rem;
+		border: 0;
+		padding: 0;
+		font-size: 0.875rem;
+	}
+	.popover-dialog legend {
+		margin-bottom: 0.6rem;
+		padding: 0;
+		font-weight: 600;
+	}
+	.popover-dialog label {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.popover-dialog input {
+		margin: 0;
+		accent-color: var(--meeko-ui-accent);
+	}
+	.popover-tooltip {
+		padding: 0.5rem 0.7rem;
+		max-width: 16rem;
+		font-size: 0.8125rem;
+		line-height: 1.5;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.popover-trigger {
+			transition: none;
+		}
+	}
+</style>

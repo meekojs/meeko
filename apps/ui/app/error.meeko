@@ -1,15 +1,18 @@
 <script lang="ts">
 	const props = defineProps<{ status: number; message: string }>()
+
+	const { t } = useI18n()
 </script>
 
 <template>
 	<DocsPage
-		description="Puedes volver a la documentación y continuar desde allí."
-		bind:title="props.status === 404 ? 'Esta página no existe' : 'No pudimos cargar la página'"
+		bind:locale="t('shell.meta.lang')"
+		bind:description="t('error.description')"
+		bind:title="props.status === 404 ? t('error.notFound') : t('error.failed')"
 	>
 		<div class="error-page">
-			<p>Comprueba la dirección o elige una guía del menú.</p>
-			<UILink href="/components">Ver componentes</UILink>
+			<p>{t('error.hint')}</p>
+			<UILink to="/components">{t('error.action')}</UILink>
 		</div>
 	</DocsPage>
 </template>

@@ -1,0 +1,179 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+
+	const open = signal(false)
+	const mode = signal<'lucide:moon' | 'lucide:sun'>('lucide:sun')
+	const toggleMode = (): void => {
+		mode.value = mode.value === 'lucide:sun' ? 'lucide:moon' : 'lucide:sun'
+	}
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Icon"
+		description="Iconify icons and your own SVGs, typed and inlined in the HTML at build time."
+	>
+		<h2 id="usage">Usage</h2>
+		<div class="preview">
+			<p>
+				<UIIcon name="lucide:search" />
+				Search the project
+			</p>
+			<UIButton variant="outline">
+				<UIIcon
+					name="lucide:trash-2"
+					label="Delete"
+				/>
+			</UIButton>
+		</div>
+		<DocsCode bind:code="examples.icon" />
+		<p>
+			<code>UIIcon</code>
+			writes an inline
+			<code>&lt;svg&gt;</code>
+			. Each literal name is resolved during the build with the collection package installed in the project: there are no runtime requests or CDN, and the bundle only carries the icons you use.
+		</p>
+
+		<h2 id="setup">Installation and collections</h2>
+		<p>
+			Install the module and each Iconify collection you want to use as
+			<code>@iconify-json/&lt;collection&gt;</code>
+			. The module is registered by its name and its options go in the
+			<code>icon</code>
+			key, typed in
+			<code>meeko.config.ts</code>
+			.
+		</p>
+		<DocsCode bind:code="examples.iconConfig" />
+		<p>
+			The available names form a TypeScript union that Meeko generates in
+			<code>.meeko/types</code>
+			: the editor completes
+			<code>name="lucide:…"</code>
+			, and a name that does not exist is a
+			<code>meeko check</code>
+			error with the closest suggestion. If the package of a configured collection is missing, the build prints the command to install it.
+		</p>
+
+		<h2 id="dynamic">Dynamic names</h2>
+		<p>
+			With
+			<code>bind:name</code>
+			, the literals of the expression are resolved at build time just like a fixed name. A value that does not appear in the code, such as one that comes from data, only works if it is in
+			<code>icon.include</code>
+			(or with
+			<code>'collection:*'</code>
+			, which includes the whole collection). Otherwise an empty
+			<code>&lt;svg&gt;</code>
+			is rendered and
+			<code>meeko dev</code>
+			warns in the console.
+		</p>
+		<div class="preview">
+			<UIButton
+				variant="secondary"
+				on:click="() => (open.value = !open.value)"
+			>
+				<UIIcon
+					bind:name="open.value ? 'lucide:x' : 'lucide:menu'"
+					bind:label="open.value ? 'Close menu' : 'Open menu'"
+				/>
+			</UIButton>
+			<UIButton
+				variant="secondary"
+				on:click="toggleMode"
+			>
+				<UIIcon
+					bind:name="mode.value"
+					bind:label="mode.value === 'lucide:sun' ? 'Light mode' : 'Dark mode'"
+				/>
+			</UIButton>
+		</div>
+		<DocsCode bind:code="examples.iconDynamic" />
+
+		<h2 id="local">Your own SVGs</h2>
+		<p>
+			Each file in
+			<code>app/icons</code>
+			(or in the folder of
+			<code>icon.local</code>
+			) is
+			<code>local:&lt;name&gt;</code>
+			. It is cleaned at build time:
+			<code>&lt;script&gt;</code>
+			,
+			<code>&lt;style&gt;</code>
+			, event handlers, inline styles and external references are removed, and a single-color icon switches to
+			<code>currentColor</code>
+			.
+		</p>
+		<div class="preview">
+			<UIIcon
+				name="local:paw"
+				label="Meeko"
+				size="1.5em"
+			/>
+		</div>
+		<DocsCode bind:code="examples.iconLocal" />
+
+		<h2 id="accessibility">Accessibility, size and color</h2>
+		<p>
+			Without
+			<code>label</code>
+			, the icon is decorative:
+			<code>aria-hidden="true"</code>
+			and
+			<code>focusable="false"</code>
+			. With
+			<code>label</code>
+			, the
+			<code>&lt;svg&gt;</code>
+			gets
+			<code>role="img"</code>
+			and
+			<code>aria-label</code>
+			; use it when the icon is the only content of a button or a link.
+		</p>
+		<p>
+			It is
+			<code>1em</code>
+			tall by default, so it follows the surrounding text, and it takes its color from
+			<code>currentColor</code>
+			. Width, height and fill are attributes, never inline styles: it works with a strict Content Security Policy.
+		</p>
+		<div class="preview">
+			<UIIcon
+				name="lucide:star"
+				size="16px"
+			/>
+			<UIIcon
+				name="lucide:star"
+				size="24px"
+			/>
+			<UIIcon
+				name="lucide:star"
+				size="2.5em"
+			/>
+		</div>
+
+		<h2 id="api">API</h2>
+		<DocsApi
+			bind:rows="[
+				{ name: 'name', type: 'IconName', description: 'Icon: collection:icon or local:name. A literal is resolved at build time.' },
+				{ name: 'label', type: 'string', description: 'Accessible text. Without it, the icon is decorative.' },
+				{ name: 'size', type: 'string', default: 'icon.size (1em)', description: 'Height, a CSS length. The width follows the proportion of the icon.' },
+				{ name: 'class', type: 'string', description: 'Additional classes of the svg.' },
+			]"
+		/>
+		<h3 id="options">Module options</h3>
+		<DocsApi
+			bind:rows="[
+				{ name: 'collections', type: 'string[]', default: '[]', description: 'Iconify collections; each one, the @iconify-json/<collection> package of the project.' },
+				{ name: 'include', type: 'IconInclude[]', default: '[]', description: 'Icons for dynamic names, or collection:* for a whole one.' },
+				{ name: 'local', type: 'string | false', default: 'app/icons if it exists', description: 'Folder of your own SVGs.' },
+				{ name: 'size', type: 'string', default: '1em', description: 'Default height of the icons.' },
+			]"
+		/>
+	</DocsPage>
+</template>

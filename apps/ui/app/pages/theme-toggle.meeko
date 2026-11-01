@@ -65,7 +65,11 @@
 			<code>labels</code>
 			y
 			<code>messages</code>
-			traducen sus nombres y los textos accesibles. Un snippet con el nombre de cada elección sustituye su texto, por ejemplo por un icono; en ese caso el nombre se conserva como etiqueta accesible.
+			sustituyen sus nombres y los textos accesibles en un selector concreto: por defecto siguen el idioma del documento y
+			<code>ui.messages</code>
+			(véase
+			<MeekoLink to="/theming">Temas</MeekoLink>
+			). Un snippet con el nombre de cada elección sustituye su texto, por ejemplo por un icono; en ese caso el nombre se conserva como etiqueta accesible.
 		</p>
 		<DocsCode bind:code="examples.themeToggleCustom" />
 		<h2 id="api">API</h2>
@@ -74,7 +78,7 @@
 			bind:rows="[
 				{ name: 'mode', type: 'cycle | select', default: 'cycle', description: 'Un botón que alterna o un grupo de radios.' },
 				{ name: 'themes', type: 'ThemeChoice[]', description: 'Elecciones y su orden. Por defecto, los temas de la configuración y system si está activo.' },
-				{ name: 'labels', type: 'Partial<Record<ThemeChoice, string>>', default: 'Claro, Oscuro, Sistema', description: 'Nombre visible de cada elección.' },
+				{ name: 'labels', type: 'Partial<Record<ThemeChoice, string>>', default: 'Claro, Oscuro, Sistema', description: 'Nombre visible de cada elección. El valor por defecto sigue el idioma del documento.' },
 				{ name: 'messages', type: 'ThemeToggleMessages', description: 'Textos accesibles: cycle, unknown y group.' },
 				{ name: 'class / id', type: 'string', description: 'Clases e id del formulario raíz.' },
 			]"

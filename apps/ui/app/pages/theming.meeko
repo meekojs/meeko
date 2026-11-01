@@ -74,6 +74,34 @@
 			<code>card</code>
 			. La prioridad es: props explícitas, defaults de aplicación y valores de base. Los defaults se aíslan por aplicación y petición SSR.
 		</p>
+		<h2 id="messages">Textos e idiomas</h2>
+		<p>
+			Los pocos textos que los componentes pintan por su cuenta (el cierre de
+			<code>UIModal</code>
+			, el estado vacío de
+			<code>UITable</code>
+			y de
+			<code>UISelect</code>
+			, y los nombres de
+			<code>UIThemeToggle</code>
+			) vienen en español e inglés. Con
+			<code>@meekojs/i18n</code>
+			siguen el idioma del documento, sin configurar nada. Sin ese módulo,
+			<code>ui.locale</code>
+			elige el idioma; por defecto, español.
+			<code>ui.messages</code>
+			sobrescribe textos o añade otros idiomas.
+		</p>
+		<DocsCode bind:code="examples.messages" />
+		<p>
+			Una prop o un snippet del componente siempre ganan sobre estos textos. Lo que falta en un idioma se toma de su idioma base (
+			<code>pt</code>
+			para
+			<code>pt-BR</code>
+			), de
+			<code>ui.locale</code>
+			y, por último, del español. El servidor y el cliente eligen el mismo texto, así que la hidratación no cambia nada.
+		</p>
 		<p>
 			Las hojas de
 			<code>app/styles</code>

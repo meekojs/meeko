@@ -1,0 +1,78 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+
+	const i18n = useI18n()
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Link and LinkCard"
+		description="Navigate with real links that share the visual hierarchy of your actions."
+	>
+		<h2 id="link">UILink</h2>
+		<div class="preview">
+			<UILink
+				id="link-route"
+				to="/installation"
+			>
+				Installation
+			</UILink>
+			<UILink
+				id="link-anchor"
+				variant="outline"
+				bind:href="i18n.localePath('/theming')"
+			>
+				Customization
+			</UILink>
+		</div>
+		<DocsCode bind:code="examples.link" />
+		<DocsApi
+			caption="UILink props"
+			bind:rows="[
+				{ name: 'to', type: 'RouteId', description: 'A route of the application, with client-side navigation. Excludes href; with @meekojs/i18n it points to the version in the current language.' },
+				{ name: 'params / search', type: 'route params / object', description: 'With to: the params of a dynamic route (required there) and the query string.' },
+				{ name: 'href', type: 'string', description: 'Any URL. Excludes to; one of the two is required.' },
+				{ name: 'variant / size / shape', type: 'UIActionVariant / UIActionSize / UIActionShape', default: 'primary / md / rounded', description: 'The same visual API as UIButton.' },
+				{ name: 'target / rel / hreflang / download', type: 'string', description: 'Native attributes of the link. For _blank, noopener noreferrer is added when rel is not set.' },
+				{ name: 'ariaLabel', type: 'string', description: 'Accessible name when the visible content is not enough; wins over aria-label.' },
+				{ name: 'id / title / aria-* / data-*', type: 'HTML attributes', description: 'Reach the link as they are.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<h2 id="link-card">UILinkCard</h2>
+		<div class="preview preview-stack">
+			<UILinkCard
+				title="Customize your interface"
+				description="Connect your colors, radii and typography with the UI tokens."
+				to="/theming"
+			/>
+		</div>
+		<DocsApi
+			caption="UILinkCard props"
+			bind:rows="[
+				{ name: 'to', type: 'RouteId', description: 'A route of the application, with client-side navigation. Excludes href; with @meekojs/i18n it points to the version in the current language.' },
+				{ name: 'params / search / resolve', type: 'route params / object / boolean', description: 'With to, as in UILink: the params of a dynamic route, the query string and whether the href goes through the link resolvers.' },
+				{ name: 'href', type: 'string', description: 'Any URL. Excludes to; one of the two is required.' },
+				{ name: 'title', type: 'string', description: 'Required. Main text of the link.' },
+				{ name: 'description', type: 'string', description: 'Optional supporting text.' },
+				{ name: 'target / rel / hreflang / download', type: 'string', description: 'Native attributes of the link, as in UILink.' },
+				{ name: 'id / aria-* / data-*', type: 'HTML attributes', description: 'Reach the link as they are.' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<p>
+			<code>UILink</code>
+			requires the
+			<code>default</code>
+			snippet and emits
+			<code>click</code>
+			.
+			<code>UILinkCard</code>
+			accepts extra content with the optional
+			<code>default</code>
+			snippet. Do not put links or buttons inside a LinkCard: the whole surface is already a link.
+		</p>
+		<p>Internal links take part in Meeko's navigation; they keep middle click, opening in another tab and the fallback without JavaScript.</p>
+	</DocsPage>
+</template>

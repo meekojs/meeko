@@ -1,0 +1,130 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+
+	const modal = useModal()
+	const result = signal('No answer yet.')
+	const opened = signal(false)
+	const locked = signal(false)
+	async function ask() {
+		try {
+			const accepted = await modal.open<boolean>('ModalConfirm', { message: 'You can confirm, cancel or open another instance.' })
+			result.value = accepted ? 'Action confirmed.' : 'Action cancelled.'
+		} catch {
+			result.value = 'The modal could not be loaded. Try again.'
+		}
+	}
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Modal"
+		description="Declarative or programmatic dialogs with results and nesting support."
+	>
+		<div class="modal-demo">
+			<div class="modal-demo-actions">
+				<UIButton on:click="ask">Open confirmation</UIButton>
+				<UIButton
+					variant="secondary"
+					on:click="() => (opened.value = true)"
+				>
+					Declarative modal
+				</UIButton>
+				<UIButton
+					variant="secondary"
+					on:click="() => (locked.value = true)"
+				>
+					Protected close
+				</UIButton>
+			</div>
+			<p role="status">{result.value}</p>
+		</div>
+		<UIModal
+			title="A declarative modal"
+			description="Controlled with a signal and model."
+			model="opened"
+		>
+			<label for="modal-name">Name</label>
+			<UIInput
+				id="modal-name"
+				placeholder="Type your name"
+			/>
+			<snippet name="footer"><UIButton on:click="() => (opened.value = false)">Done</UIButton></snippet>
+		</UIModal>
+		<UIModal
+			title="Protected close"
+			description="Escape and the backdrop are disabled."
+			model="locked"
+			bind:closeOnEscape="false"
+			bind:closeOnBackdrop="false"
+			bind:closeButton="false"
+		>
+			<p>Use the explicit action to close this dialog.</p>
+			<snippet name="footer"><UIButton on:click="() => (locked.value = false)">Finish</UIButton></snippet>
+		</UIModal>
+		<h2 id="declarative">Declarative modal</h2>
+		<p>
+			Control the visibility with a boolean signal and
+			<code>model</code>
+			. The example above also lets you try a dialog whose close requires an explicit action.
+		</p>
+		<DocsCode bind:code="examples.modal" />
+		<h2 id="programmatic">Open and wait for a result</h2>
+		<p>
+			You need
+			<MeekoLink to="/app">UIApp</MeekoLink>
+			at the root. Registry components whose name starts with
+			<code>Modal</code>
+			can be opened with typed props. A loading error rejects the promise; dismissing the dialog resolves
+			<code>undefined</code>
+			.
+		</p>
+		<DocsCode
+			label="Inside a component"
+			bind:code="examples.modalOpen"
+		/>
+		<DocsCode
+			label="app/components/Modal/Confirm.meeko"
+			bind:code="examples.modalInstance"
+		/>
+		<h2 id="stack">Nested modals</h2>
+		<p>
+			Open the confirmation and then another modal to try the
+			<code>lg</code>
+			,
+			<code>md</code>
+			and
+			<code>sm</code>
+			sizes. Only the top one controls the backdrop and focus. The previous ones keep their state, stay blocked and recover focus and size when you come back. Motion is reduced when the user asks for it.
+		</p>
+		<DocsApi
+			bind:rows="[
+				{ name: 'title', type: 'string', description: 'Required. Accessible name of the dialog.' },
+				{ name: 'description', type: 'string', description: 'Description associated through aria-describedby.' },
+				{ name: 'model', type: 'Signal<boolean>', default: 'false', description: 'Declarative open control.' },
+				{ name: 'size', type: 'sm | md | lg', default: 'md', description: 'Maximum width of the dialog.' },
+				{ name: 'closeOnEscape / closeOnBackdrop', type: 'boolean', default: 'true', description: 'Allows dismissing with Escape or the backdrop.' },
+				{ name: 'closeButton', type: 'boolean', default: 'true', description: 'Shows the close button.' },
+				{ name: 'closeLabel', type: 'string', default: 'Close modal', description: 'Accessible name of the button. The default follows the language of the document (see Theming).' },
+				{ name: 'class', type: 'string', description: 'Additional classes.' },
+			]"
+		/>
+		<p>
+			It requires the
+			<code>default</code>
+			snippet and accepts
+			<code>footer</code>
+			. The
+			<code>dismiss</code>
+			event receives
+			<code>escape</code>
+			,
+			<code>backdrop</code>
+			,
+			<code>button</code>
+			or
+			<code>native</code>
+			. Do not use a modal for tasks that can be solved within the page.
+		</p>
+	</DocsPage>
+</template>

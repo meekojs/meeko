@@ -105,7 +105,7 @@
 				{ name: 'gridColumns', type: 'string', description: 'Plantilla de columnas CSS para el modo grid.' },
 				{ name: 'caption', type: 'string', description: 'Nombre visible y accesible de la tabla.' },
 				{ name: 'hideHeader', type: 'boolean', default: 'false', description: 'Oculta la cabecera.' },
-				{ name: 'emptyText', type: 'string', default: 'No hay datos.', description: 'Contenido alternativo cuando no hay filas.' },
+				{ name: 'emptyText', type: 'string', default: 'No hay datos.', description: 'Contenido alternativo cuando no hay filas. El valor por defecto sigue el idioma del documento (véase Temas).' },
 				{ name: 'class', type: 'string', description: 'Clases adicionales de la tabla.' },
 			]"
 		/>

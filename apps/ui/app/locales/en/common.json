@@ -1,0 +1,24 @@
+{
+	"error": {
+		"notFound": "This page does not exist",
+		"failed": "We could not load the page",
+		"description": "You can go back to the documentation and continue from there.",
+		"hint": "Check the address or choose a guide from the menu.",
+		"action": "See components"
+	},
+	"demo": {
+		"confirm": {
+			"title": "Confirm action",
+			"levelTitle": "Confirmation level {level}",
+			"meta": "Modal {size} · Level {level}",
+			"result": "The result goes back to the code that opened this modal.",
+			"stack": "When the next one opens, this dialog keeps its content and stays behind, reduced and blocked. When you come back, it recovers its size and focus.",
+			"openNested": "Open another modal",
+			"nestedMessage": "This confirmation is on top of the previous one.",
+			"nestedAccepted": "Additional confirmation accepted.",
+			"nestedCancelled": "Additional confirmation cancelled.",
+			"cancel": "Cancel",
+			"accept": "Confirm"
+		}
+	}
+}

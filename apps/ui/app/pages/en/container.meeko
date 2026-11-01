@@ -1,0 +1,155 @@
+<script lang="ts">
+	import type { UIContainerSize } from '@meekojs/ui'
+
+	import { examples } from '../../utils/examples'
+
+	const sizes = ['sm', 'md', 'lg', 'xl', '2xl', '3xl', '4k', 'full'] as const
+	const size = signal<UIContainerSize>('xl')
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Container"
+		description="Center your content and adapt its width from mobile to 4K screens."
+	>
+		<h2 id="usage">A width for each kind of content</h2>
+		<p>Container takes the available width of its parent up to the chosen limit. It does not scale the typography or stretch the columns: it controls the space of the composition.</p>
+		<div class="container-controls">
+			<label for="container-size">Maximum width</label>
+			<select
+				id="container-size"
+				bind:value="size.value"
+				on:change="
+					(event) => {
+						const selected = sizes.find((value) => value === event.currentTarget.value)
+						if (selected) size.value = selected
+					}
+				"
+			>
+				<option
+					each:of="sizes"
+					each:as="item"
+					each:key="item"
+					bind:value="item"
+				>
+					{item}
+				</option>
+			</select>
+		</div>
+		<div class="container-preview">
+			<UIContainer
+				as="section"
+				ariaLabel="Container preview"
+				class="container-example"
+				bind:size="size.value"
+			>
+				<div class="container-content">
+					<strong>A space for your interface</strong>
+					<p>The container uses size={size.value} and gutter=md.</p>
+				</div>
+			</UIContainer>
+		</div>
+		<p>
+			The preview is limited by this documentation column. In your application,
+			<code>4k</code>
+			allows an outer width of up to
+			<code>240rem</code>
+			: 3840 CSS pixels with a 16px root font.
+		</p>
+		<DocsCode bind:code="examples.container" />
+		<h2 id="sizes">Maximum widths</h2>
+		<DocsApi
+			caption="Container sizes"
+			bind:rows="[
+				{ name: 'sm', type: '40rem', description: '640px. Forms and compact content.' },
+				{ name: 'md', type: '48rem', description: '768px. Reading and settings.' },
+				{ name: 'lg', type: '64rem', description: '1024px. Application content.' },
+				{ name: 'xl', type: '80rem', description: '1280px. Default value.' },
+				{ name: '2xl', type: '96rem', description: '1536px. Wide panels.' },
+				{ name: '3xl', type: '120rem', description: '1920px. Large desktop views.' },
+				{ name: '4k', type: '240rem', description: '3840px. Work surfaces in 4K.' },
+				{ name: 'full', type: 'none', description: 'No limit: takes the available width of the parent.' },
+			]"
+		/>
+		<p>The pixel equivalents use a 16px root. The behavior depends on the CSS viewport, not on the physical resolution of the monitor. On screens wider than the maximum, the content stays centered.</p>
+		<h2 id="gutters">Adaptive side spacing</h2>
+		<p>
+			<code>gutter</code>
+			adds logical padding on both sides, included in the outer width. The
+			<code>md</code>
+			value grows between 16 and 64px;
+			<code>sm</code>
+			, between 12 and 24px;
+			<code>lg</code>
+			, between 24 and 96px. Use
+			<code>none</code>
+			when the parent already provides that space.
+		</p>
+		<DocsCode bind:code="examples.containerNested" />
+		<div class="doc-note">A 4K container does not make all the text 3840px wide. Combine a wide surface with smaller containers for reading, forms and details.</div>
+		<h2 id="api">API</h2>
+		<DocsApi
+			bind:rows="[
+				{ name: 'size', type: 'UIContainerSize', default: 'xl', description: 'Maximum width. sm, md, lg, xl, 2xl, 3xl, 4k or full.' },
+				{ name: 'gutter', type: 'none | sm | md | lg', default: 'md', description: 'Fluid side padding with RTL direction support.' },
+				{ name: 'as', type: 'UIContainerTag', default: 'div', description: 'div, section, main, article, header, footer, nav or aside.' },
+				{ name: 'id / ariaLabel / class', type: 'string', description: 'Identity, accessible name and additional classes.' },
+			]"
+		/>
+		<p>
+			It requires the
+			<code>default</code>
+			snippet. It adds no roles, headings or interactive behavior. Choose
+			<code>as</code>
+			according to the semantics of the content; do not nest another
+			<code>main</code>
+			inside the main one.
+		</p>
+		<h2 id="customize">Customization</h2>
+		<p>
+			Use a class to override
+			<code>--meeko-ui-container-max-width</code>
+			or
+			<code>--meeko-ui-container-gutter</code>
+			. The container does not hide overflowing content: tables and code blocks must manage their own scroll.
+		</p>
+		<DocsCode
+			label="app/styles/main.css"
+			bind:code="examples.containerCss"
+		/>
+	</DocsPage>
+</template>
+
+<style>
+	.container-controls {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem;
+		margin: 1.5rem 0;
+		font-size: 0.875rem;
+	}
+	.container-controls select {
+		border: 1px solid var(--line-strong);
+		border-radius: var(--radius-s);
+		background: var(--surface);
+		padding: 0.6rem 0.8rem;
+		color: var(--ink);
+		font: inherit;
+	}
+	.container-preview {
+		border-block: 1px solid var(--line);
+		padding-block: 2rem;
+	}
+	.container-example {
+		border-inline: 1px dashed var(--accent);
+		background: var(--accent-soft);
+	}
+	.container-content {
+		padding-block: 2rem;
+	}
+	.container-content p {
+		margin-bottom: 0;
+	}
+</style>

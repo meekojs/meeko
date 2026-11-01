@@ -1,12 +1,21 @@
 <script lang="ts">
 	import { navigation } from './utils/navigation'
+
+	const i18n = useI18n()
+	// Los textos de la navegación en el idioma del Shell (`en`, o el español de navigation.ts); los href,
+	// sin prefijo, los localiza el Shell.
+	const english = i18n.t('shell.meta.lang') === 'en'
+	const groups = navigation.map((group) => ({
+		title: english ? group.en.title : group.title,
+		items: group.items.map(({ en, ...item }) => ({ ...item, label: english ? en.label : item.label, description: english ? en.description : item.description })),
+	}))
 </script>
 <template>
 	<DocsShell
 		name="UI"
 		packageName="@meekojs/ui"
 		repository="https://github.com/meekojs/meeko/tree/main/packages/ui"
-		bind:navigation="navigation"
+		bind:navigation="groups"
 	>
 		<MeekoOutlet />
 	</DocsShell>

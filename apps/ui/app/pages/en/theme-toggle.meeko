@@ -1,0 +1,113 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+
+	// The status line of this page; the toggles bring their own texts in the language of the document.
+	const labels: Record<string, string> = { light: 'Light', dark: 'Dark', system: 'System' }
+	const { theme, resolved } = useTheme()
+	const summary = computed(() => {
+		const choice = labels[theme.value] ?? theme.value
+		const applied = labels[resolved.value] ?? resolved.value
+		return theme.value === 'system' ? 'Choice: system. The ' + applied.toLowerCase() + ' theme is applied.' : 'Choice: ' + choice.toLowerCase() + '.'
+	})
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="ThemeToggle"
+		description="Switch between the light, dark and system themes with a button or a group of options that work without JavaScript."
+	>
+		<p>
+			<code>UIThemeToggle</code>
+			uses the
+			<code>theme</code>
+			option of
+			<code>meeko.config.ts</code>
+			. It is a form that sends
+			<code>POST /_meeko/theme</code>
+			: without JavaScript, the server stores the preference and goes back to the same page. With JavaScript, the theme changes instantly, without navigating. Both examples and the header share the same preference.
+		</p>
+		<h2 id="cycle">A button that cycles</h2>
+		<p>
+			In
+			<code>mode="cycle"</code>
+			, the default, each press moves to the next choice. Its accessible name states the current theme and the next one.
+		</p>
+		<div class="preview preview-stack theme-toggle-preview">
+			<UIThemeToggle id="theme-cycle" />
+			<p
+				class="theme-toggle-status"
+				role="status"
+			>
+				{summary.value}
+			</p>
+		</div>
+		<DocsCode bind:code="examples.themeToggle" />
+		<h2 id="select">A group of options</h2>
+		<p>
+			In
+			<code>mode="select"</code>
+			, each choice is a radio. The arrow keys,
+			<code>Home</code>
+			and
+			<code>End</code>
+			move focus and the choice, as in a native radio group.
+		</p>
+		<div class="preview">
+			<UIThemeToggle
+				id="theme-select"
+				mode="select"
+			/>
+		</div>
+		<DocsCode bind:code="examples.themeToggleSelect" />
+		<h2 id="custom">Choices, texts and icons</h2>
+		<p>
+			<code>themes</code>
+			limits and orders the choices;
+			<code>labels</code>
+			and
+			<code>messages</code>
+			replace their names and the accessible texts for one toggle: by default they follow the language of the document and
+			<code>ui.messages</code>
+			(see
+			<MeekoLink to="/theming">Theming</MeekoLink>
+			). A snippet named after each choice replaces its text, for example with an icon; the name then stays as the accessible label.
+		</p>
+		<DocsCode bind:code="examples.themeToggleCustom" />
+		<h2 id="api">API</h2>
+		<DocsApi
+			caption="UIThemeToggle props"
+			bind:rows="[
+				{ name: 'mode', type: 'cycle | select', default: 'cycle', description: 'A button that cycles or a group of radios.' },
+				{ name: 'themes', type: 'ThemeChoice[]', description: 'Choices and their order. By default, the themes of the configuration and system if it is enabled.' },
+				{ name: 'labels', type: 'Partial<Record<ThemeChoice, string>>', default: 'Light, Dark, System', description: 'Visible name of each choice. The default follows the language of the document.' },
+				{ name: 'messages', type: 'ThemeToggleMessages', description: 'Accessible texts: cycle, unknown and group.' },
+				{ name: 'class / id', type: 'string', description: 'Classes and id of the root form.' },
+			]"
+		/>
+		<p>
+			To read or change the theme from your code, use
+			<code>useTheme()</code>
+			; to build your own switcher, use
+			<code>useThemeToggle()</code>
+			from
+			<code>@meekojs/meeko/framework</code>
+			. The
+			<code>UIThemeToggleProps</code>
+			type is exported from
+			<code>@meekojs/ui/runtime</code>
+			.
+		</p>
+	</DocsPage>
+</template>
+
+<style>
+	.theme-toggle-preview {
+		align-items: center;
+	}
+	.theme-toggle-preview .theme-toggle-status {
+		margin: 0;
+		color: var(--muted);
+		font-size: 0.875rem;
+	}
+</style>

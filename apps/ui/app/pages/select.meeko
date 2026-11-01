@@ -216,7 +216,7 @@
 				{ name: 'by / labelBy / disabledBy / groupBy', type: 'clave o función', description: 'Comparación, etiqueta, deshabilitado y grupo de cada opción.' },
 				{ name: 'searchable / filter', type: 'boolean / SelectFilter<T>', description: 'Búsqueda en la lista, síncrona o asíncrona.' },
 				{ name: 'max', type: 'number', description: 'Con multiple, número máximo de opciones elegidas.' },
-				{ name: 'clearable / clearLabel', type: 'boolean / string', default: 'false / Quitar selección', description: 'Botón accesible que quita la selección y devuelve el foco al disparador.' },
+				{ name: 'clearable / clearLabel', type: 'boolean / string', default: 'false / Quitar selección', description: 'Botón accesible que quita la selección y devuelve el foco al disparador. La etiqueta por defecto sigue el idioma del documento (véase Temas).' },
 				{ name: 'name / required / disabled', type: 'string / boolean', description: 'Envío y validación del formulario.' },
 				{ name: 'field', type: 'SelectField', description: 'Un campo de useForm: id, name, valor, aria-invalid y aria-describedby.' },
 				{ name: 'id / label / describedBy / invalid', type: 'string / boolean', description: 'Identidad y estado accesible del disparador.' },

@@ -10,5 +10,5 @@ export default defineApiRoute({
 	response: feedbackSaved,
 	form: true,
 	rateLimit: metricsRateLimits.feedback,
-	handler: feedbackHandler({ site: 'ui', knownPath: navigationPaths('ui', navigation) }),
+	handler: feedbackHandler({ site: 'ui', localized: true, knownPath: navigationPaths('ui', navigation) }),
 })

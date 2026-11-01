@@ -1,0 +1,101 @@
+<script lang="ts">
+	import { isFeaturedPath, isHiddenPath, useDocsModeration } from 'meeko-docs/state'
+
+	const i18n = useI18n()
+	const directory = [
+		{
+			title: 'Actions and navigation',
+			items: [
+				{ href: '/buttons', name: 'Button', description: 'Actions with variants, sizes and states.' },
+				{ href: '/links', name: 'Link and LinkCard', description: 'Real links and navigation surfaces.' },
+				{ href: '/badges', name: 'Badge', description: 'Metadata and states without interaction.' },
+				{ href: '/theme-toggle', name: 'ThemeToggle', description: 'Light, dark or system theme, also without JavaScript.' },
+			],
+		},
+		{ title: 'Structure', items: [{ href: '/container', name: 'Container', description: 'Fluid widths, side spacing and surfaces up to 4K.' }] },
+		{
+			title: 'Input and presentation',
+			items: [
+				{ href: '/forms', name: 'Field and Input', description: 'Labels, text models and error messages.' },
+				{ href: '/select', name: 'Select', description: 'One or several typed options, with search and form submission.' },
+				{ href: '/icons', name: 'Icon', description: 'Iconify icons and your own SVGs, inlined at build time.' },
+				{ href: '/cards', name: 'Card', description: 'Content with a header, body and actions.' },
+				{ href: '/tables', name: 'Table', description: 'Rows and columns correlated by TypeScript.' },
+			],
+		},
+		{
+			title: 'Overlays',
+			items: [
+				{ href: '/modals', name: 'Modal', description: 'Declarative or programmatic, with nesting support.' },
+				{ href: '/popover', name: 'Popover', description: 'Menus, lightweight dialogs and tooltips anchored to their trigger.' },
+				{ href: '/app', name: 'App', description: 'The host of programmatic modals.' },
+			],
+		},
+	]
+
+	// The pages the dashboard hides leave the index and the featured ones get their badge. The
+	// English moderation uses the public URLs (/en/…), so the links are localized first.
+	const moderation = useDocsModeration()
+	const groups = computed(() =>
+		directory
+			.map((group) => ({
+				title: group.title,
+				items: group.items
+					.map((item) => ({ ...item, href: i18n.localePath(item.href) }))
+					.filter((item) => !isHiddenPath(moderation.value, item.href))
+					.map((item) => ({ ...item, featured: isFeaturedPath(moderation.value, item.href) })),
+			}))
+			.filter((group) => group.items.length > 0),
+	)
+</script>
+
+<template>
+	<DocsPage
+		locale="en"
+		title="Components"
+		description="Find each component by its task. Every guide includes examples, code and an API reference."
+	>
+		<section
+			each:of="groups.value"
+			each:as="group"
+			each:key="group.title"
+		>
+			<h2>{group.title}</h2>
+			<div class="directory">
+				<a
+					each:of="group.items"
+					each:as="item"
+					each:key="item.href"
+					bind:href="item.href"
+				>
+					<strong>
+						{item.name}
+						<UIBadge
+							if:when="item.featured"
+							tone="accent"
+							class="directory-featured"
+						>
+							{i18n.t('shell.nav.featured')}
+						</UIBadge>
+					</strong>
+					<span>{item.description}</span>
+				</a>
+			</div>
+		</section>
+		<div class="doc-note">
+			The core tags
+			<code>MeekoSelect</code>
+			,
+			<code>MeekoPopover</code>
+			and
+			<code>MeekoThemeToggle</code>
+			are deprecated since Meeko 1.8 and will be removed in 2.0. Replace them with
+			<code>UISelect</code>
+			,
+			<code>UIPopover</code>
+			and
+			<code>UIThemeToggle</code>
+			: they keep the same props, snippets and markup.
+		</div>
+	</DocsPage>
+</template>

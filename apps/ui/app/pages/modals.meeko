@@ -104,7 +104,7 @@
 				{ name: 'size', type: 'sm | md | lg', default: 'md', description: 'Ancho máximo del diálogo.' },
 				{ name: 'closeOnEscape / closeOnBackdrop', type: 'boolean', default: 'true', description: 'Permite descartar con Escape o el fondo.' },
 				{ name: 'closeButton', type: 'boolean', default: 'true', description: 'Muestra el botón de cierre.' },
-				{ name: 'closeLabel', type: 'string', default: 'Cerrar modal', description: 'Nombre accesible del botón.' },
+				{ name: 'closeLabel', type: 'string', default: 'Cerrar modal', description: 'Nombre accesible del botón. El valor por defecto sigue el idioma del documento (véase Temas).' },
 				{ name: 'class', type: 'string', description: 'Clases adicionales.' },
 			]"
 		/>

@@ -9,9 +9,11 @@
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"preview": "meeko preview .",
-		"start": "meeko start ."
+		"start": "meeko start .",
+		"test:e2e": "node --test tests/*.e2e.mjs"
 	},
 	"dependencies": {
+		"@meekojs/i18n": "workspace:*",
 		"@meekojs/icon": "workspace:*",
 		"@meekojs/meeko": "workspace:*",
 		"@meekojs/ui": "workspace:*",
@@ -25,6 +27,7 @@
 		"@types/node": "^24.0.0",
 		"eslint": "10.13.0",
 		"jiti": "2.7.0",
+		"playwright-core": "1.64.1",
 		"typescript": "7.0.2",
 		"vite": "8.3.5"
 	}
