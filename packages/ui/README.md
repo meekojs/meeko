@@ -1098,3 +1098,45 @@ Las reglas y los nombres reservados están en [`DESIGN.md`](./DESIGN.md#movimien
 ```
 
 `UICommandPalette` no busca: lee `query` en tu código, busca donde quieras (Pagefind, un servidor o una lista local) y pásale `results` y `status`.
+
+## Formularios y estados
+
+Los controles nuevos conservan el HTML nativo, el teclado y el envío de formularios. Todos los modelos se enlazan con una señal (`model="field"`), no con `bind:model`.
+
+| Componente          | Contrato                                                                                                                                                                                                    |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UITextarea`        | Modelo string; atributos nativos `rows`, `name`, `maxlength`, `required`, `disabled`; `invalid`, `describedBy`.                                                                                             |
+| `UICheckbox`        | Modelo booleano; `label`, `description`, `name`, `value`, `required`, `disabled`, `invalid`, `describedBy`.                                                                                                 |
+| `UIRadioGroup`      | Modelo string; `legend`, `options` (`value`, `label`, `disabled`), `name`, `required`, `disabled`; `variant="default"` o `"segmented"`. Flechas y selección nativas.                                        |
+| `UISwitch`          | Modelo booleano y contrato de Checkbox, con `role="switch"`.                                                                                                                                                |
+| `UISlider`          | Modelo numérico; `label`, `name`, `min`, `max`, `step`, `disabled` y atributos nativos.                                                                                                                     |
+| `UIAlert`           | `tone`, `title`, `description`, `icon` (snippet), `dismiss`, `closeLabel`, `role`; snippets `default`, `icon`, `actions`; evento `dismiss`. Danger usa `alert`; los demás, `note`; puede elegirse `status`. |
+| `UIEmpty`           | `title`, `description`, `variant="inline"` o `"panel"`; snippets `default` y `actions`.                                                                                                                     |
+| `UISkeleton`        | `lines`, `widths` (`full`, `long`, `short`), `label`; anuncia carga una vez y respeta movimiento reducido.                                                                                                  |
+| `UIStat`            | `label`, `value`, `detail`, con `dl/dt/dd`.                                                                                                                                                                 |
+| `UIDescriptionList` | `items` (`label`, `value`, `detail`), `columns` (1, 2 o 3), una columna en móvil.                                                                                                                           |
+| `UIToast`           | `text`, `tone`, `duration`, `closeLabel`, `actions` (snippet o prop); evento `dismiss`. Popover nativo manual, sin tomar el foco.                                                                           |
+
+Los tipos de props, `UIDensity`, `UITone` y `UIToastContext` se exportan desde `@meekojs/ui/runtime`. Los textos predeterminados se configuran en `ui.messages.<locale>.feedback` (`close`, `empty`, `loading`); hay español e inglés.
+
+`UIButton` añade `tone="danger"`, `loading`, `iconOnly` y `ariaLabel`. Al usar sólo un icono, proporciona siempre `ariaLabel` o `aria-label`. `loading` conserva el texto, anuncia `aria-busy` e impide activar la acción. El botón de envío conserva `name`, `value` y `form`.
+
+`UIBadge` añade tonos `info`, `success`, `warning` y `dot`. `UIInput` admite `date`, `datetime-local` y atributos nativos como `autocomplete`, `autocapitalize`, `spellcheck`, `min`, `max` y `step`. `UIField` añade `hint` y `counter` (string o número); los IDs de ambos se incluyen en el `describedBy` que recibe su snippet.
+
+`UICard` y `UITable` aceptan `density="compact" | "normal" | "comfortable"`. Card añade `padding="none" | "sm" | "md" | "lg"`, que gana sobre density. Las columnas de Table admiten `numeric` (alineación al final) y `rowHeader` (`th scope="row"`), también en el layout grid.
+
+### Notificaciones desde una página
+
+El módulo instala un proveedor por aplicación; `<UIApp>` aloja las notificaciones. Llámalo durante el setup y añade avisos desde una acción del cliente. No se pueden añadir durante SSR. No hay estado compartido entre peticiones.
+
+```html
+<script lang="ts">
+	import { useToast } from '@meekojs/ui/runtime'
+	const toast = useToast()
+</script>
+<template>
+	<UIButton on:click="() => toast.add({ text: 'Cambios guardados', tone: 'success', duration: 5000 })">Guardar</UIButton>
+</template>
+```
+
+`add` devuelve un ID para `remove(id)`; `clear()` cierra todos. `duration: 0` conserva el aviso hasta cerrarlo. La cuenta se pausa con el cursor o el foco dentro del aviso; los temporizadores se liberan al desmontar. El host apila avisos sin solaparlos y desaparecen al desmontar UIApp. También puede usarse `UIToast` declarativamente con el snippet `actions`.
