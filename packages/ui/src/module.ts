@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 import type { UIOptions } from './options'
 
-import { tokenStyles, validateOptions } from './options'
+import { messagesConfig, tokenStyles, validateOptions } from './options'
 
 declare module '@meekojs/meeko/framework' {
 	interface MeekoConfig {
@@ -42,6 +42,13 @@ export default defineMeekoModule<UIOptions>({
 				},
 			})
 		if (options.defaults && Object.keys(options.defaults).length) meeko.addPlugin({ src: new URL('./app/plugins/config.js', import.meta.url), options: options.defaults })
+
+		// Without these options the components read the texts of the package, or the locale of i18n, by themselves.
+		if (options.locale !== undefined || options.messages !== undefined)
+			meeko.addPlugin({
+				src: new URL('./app/plugins/messages.js', import.meta.url),
+				options: messagesConfig(options),
+			})
 
 		meeko.addAutoImports(['useModal', 'useModalInstance'].map((name) => ({ name, from: '@meekojs/ui/runtime', scope: 'app' as const, componentOnly: true })))
 		const components = join(meeko.rootDir, '.meeko', 'generated', 'components.ts')

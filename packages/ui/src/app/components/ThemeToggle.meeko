@@ -12,6 +12,7 @@
 	import type { UIThemeToggleProps } from '../types/theme-toggle'
 	import type { ThemeToggleItem } from '../utils/theme-toggle'
 
+	import { uiMessages } from '../utils/messages'
 	import { themeToggleGroupLabel, themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from '../utils/theme-toggle'
 
 	const props = defineProps<UIThemeToggleProps>()
@@ -25,16 +26,17 @@
 	const toggle = useThemeToggle()
 	const route = useRoute()
 	const mode = computed(() => themeToggleMode(props.mode))
+	const { themeToggle: text, locale } = uiMessages()
 	// What it paints does not depend on the theme; what it says does, one primitive per binding, so
 	// the end of hydration rewrites only the values that change. The same choices keep their list.
 	let painted: readonly ThemeToggleItem[] | undefined
-	const items = computed(() => (painted = themeToggleItems(toggle, { themes: props.themes, labels: props.labels }, painted)))
-	const status = computed(() => themeToggleStatus(toggle, items.value, { labels: props.labels, messages: props.messages }))
+	const items = computed(() => (painted = themeToggleItems(toggle, { themes: props.themes, labels: props.labels, text }, painted)))
+	const status = computed(() => themeToggleStatus(toggle, items.value, { labels: props.labels, messages: props.messages, text, locale }))
 	const next = computed(() => status.value.next)
 	const label = computed(() => status.value.label)
 	const checked = computed(() => status.value.checked)
 	const focused = computed(() => status.value.focused)
-	const group = computed(() => themeToggleGroupLabel(props.messages))
+	const group = computed(() => themeToggleGroupLabel(props.messages, text))
 
 	/** With JavaScript the form never posts: the theme changes at once, without a navigation. */
 	const submit = (event: SubmitEvent): void => {

@@ -77,7 +77,7 @@ export interface SelectSnippets<T> {
 	value?: [option: T]
 	/** Encabezado de un grupo de `groupBy`; sin él, su nombre. */
 	group?: [name: string]
-	/** Lo que se muestra cuando no hay opciones; sin él, «Sin resultados». */
+	/** Lo que se muestra cuando no hay opciones; sin él, `select.empty` de `ui.messages` («Sin resultados» en español). */
 	empty?: []
 	/** Lo que se muestra mientras una búsqueda asíncrona carga. */
 	loading?: []
@@ -147,7 +147,7 @@ export interface UISelectProps<T, Multiple extends boolean = false> {
 	 * devuelve el foco al disparador. Sólo se muestra mientras hay algo elegido.
 	 */
 	readonly clearable?: boolean
-	/** `aria-label` del botón de `clearable`; `"Quitar selección"` por defecto. */
+	/** `aria-label` del botón de `clearable`; por defecto, `select.clear` de `ui.messages` («Quitar selección» en español). */
 	readonly clearLabel?: string
 	/** Búsqueda propia, síncrona o asíncrona; por defecto, la etiqueta contiene el texto, sin distinguir acentos ni mayúsculas. */
 	readonly filter?: SelectFilter<T>

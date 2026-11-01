@@ -1,4 +1,7 @@
 import type { UIDefaults, UIOptions, UITokens } from './app/types/config'
+import type { UIMessageOverrides, UIMessages, UIMessagesConfig } from './app/types/messages'
+
+import { builtinMessages, canonicalLocale } from './app/utils/messages'
 
 const tokenNames = {
 	accent: 'accent',
@@ -30,10 +33,49 @@ function object(value: unknown, name: string): asserts value is Record<string, u
 	if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError(`ui: ${name} must be an object`)
 }
 
+const localeTag = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*$/
+
+/** A language tag that `Intl` accepts too: the regular expression alone lets `en-u` through. */
+const validLocale = (locale: string): boolean => localeTag.test(locale) && canonicalLocale(locale) !== undefined
+
+function text(value: unknown, name: string): void {
+	if (typeof value !== 'string' || !value.trim()) throw new TypeError(`ui: ${name} must be a non-empty string`)
+}
+
+function validateMessages(messages: unknown): void {
+	object(messages, 'messages')
+	const known = builtinMessages.es as UIMessages
+	const seen = new Set<string>()
+	for (const [locale, sections] of Object.entries(messages)) {
+		if (!validLocale(locale)) throw new TypeError(`ui: invalid locale ${locale} in messages`)
+		// `EN` and `en` are one language: only one of them could win.
+		const canonical = canonicalLocale(locale)!
+		if (seen.has(canonical)) throw new TypeError(`ui: locale ${canonical} is repeated in messages`)
+		seen.add(canonical)
+		object(sections, `messages.${locale}`)
+		for (const [section, entries] of Object.entries(sections)) {
+			if (!Object.hasOwn(known, section)) throw new TypeError(`ui: unknown messages section ${section}`)
+			object(entries, `messages.${locale}.${section}`)
+			for (const [key, value] of Object.entries(entries)) {
+				const name = `messages.${locale}.${section}.${key}`
+				if (!Object.hasOwn(known[section as keyof UIMessages], key)) throw new TypeError(`ui: unknown message ${name}`)
+				if (key !== 'labels') {
+					text(value, name)
+					continue
+				}
+				object(value, name)
+				for (const [theme, label] of Object.entries(value)) text(label, `${name}.${theme}`)
+			}
+		}
+	}
+}
+
 /** Valida opciones antes de escribir CSS o serializar defaults al cliente. */
 export function validateOptions(options: UIOptions): void {
 	object(options, 'options')
-	for (const key of Object.keys(options)) if (key !== 'tokens' && key !== 'defaults') throw new TypeError(`ui: unknown option ${key}`)
+	for (const key of Object.keys(options)) if (!['tokens', 'defaults', 'locale', 'messages'].includes(key)) throw new TypeError(`ui: unknown option ${key}`)
+	if (options.locale !== undefined && (typeof options.locale !== 'string' || !validLocale(options.locale))) throw new TypeError('ui: locale must be a language tag such as "en" or "pt-BR"')
+	if (options.messages !== undefined) validateMessages(options.messages)
 	if (options.tokens !== undefined) {
 		object(options.tokens, 'tokens')
 		for (const [key, value] of Object.entries(options.tokens)) {
@@ -54,10 +96,21 @@ export function validateOptions(options: UIOptions): void {
 	}
 }
 
+/**
+ * `ui.locale` y `ui.messages` ya validados, con cada idioma en su forma canónica (`EN` es `en` y
+ * `pt-br` es `pt-BR`), que es como los busca `resolveUIMessages`.
+ */
+export function messagesConfig(options: UIOptions): UIMessagesConfig {
+	return {
+		...(options.locale !== undefined ? { locale: canonicalLocale(options.locale)! } : {}),
+		...(options.messages !== undefined ? { messages: Object.fromEntries(Object.entries(options.messages).map(([locale, messages]) => [canonicalLocale(locale)!, messages])) } : {}),
+	}
+}
+
 /** CSS de variables, aplicado después de los valores claros/oscuros del paquete. */
 export function tokenStyles(tokens: UITokens | undefined): string {
 	const entries = Object.entries(tokens ?? {}) as Array<[keyof UITokens, string]>
 	return entries.length ? `\n:root, :root[data-theme] {\n${entries.map(([key, value]) => `  --meeko-ui-${tokenNames[key]}: ${value};`).join('\n')}\n}\n` : ''
 }
 
-export type { UIDefaults, UIOptions, UITokens }
+export type { UIDefaults, UIMessageOverrides, UIMessages, UIOptions, UITokens }

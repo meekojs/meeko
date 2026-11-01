@@ -36,10 +36,7 @@ const columns = [{ key: 'name' as const, label: 'Name' }];
 		)
 	}
 	// `cell-<clave>` y `header-<clave>`: el valor tiene el tipo de su columna y la clave debe existir.
-	const columnSnippets = source.replace(
-		/<snippet name="cell".*<\/snippet>/,
-		'<snippet name="cell-name" params="row, value"><b>{value.toUpperCase()} {row.age.toFixed(0)}</b></snippet><snippet name="cell-age" params="row, value"><i>{value.toFixed(1)}</i></snippet><snippet name="header-name" params="column"><em>{column.label}</em></snippet>',
-	)
+	const columnSnippets = source.replace(/<snippet name="cell".*<\/snippet>/, '<snippet name="cell-name" params="row, value"><b>{value.toUpperCase()} {row.age.toFixed(0)}</b></snippet><snippet name="cell-age" params="row, value"><i>{value.toFixed(1)}</i></snippet><snippet name="header-name" params="column"><em>{column.label}</em></snippet>')
 	assert.deepEqual(errors(await checkSource(columnSnippets, filename)), [])
 	for (const [broken, pattern] of [
 		[columnSnippets.replace('name="cell-age"', 'name="cell-email"'), /cell-email/],
@@ -66,6 +63,7 @@ test('table renders cell-<key> before cell, header-<key> before header, then the
 			.code.replace(`from "@meekojs/meeko/internal"`, `from ${runtime('internal.js')}`)
 			.replaceAll(`from "@meekojs/meeko"`, `from ${runtime('index.js')}`)
 			.replace(`from "./Table.meeko"`, `from "./Table.ts"`)
+			.replace(/from ["']\.\.\/utils\/messages["']/, `from ${JSON.stringify(new URL('../dist/app/utils/messages.js', import.meta.url).href)}`)
 		await writeFile(`${directory}/${name}.ts`, code)
 	}
 	const table = await readFile(new URL('../src/app/components/Table.meeko', import.meta.url), 'utf8')

@@ -58,6 +58,9 @@ const valid = `<script lang="ts">
 	<UIButton class="wide" tabindex="0" on:click="() => clicks.value++">Count</UIButton>
 	<UILink href="/about" ariaLabel="About">About</UILink>
 	<UILink to="/users/[id]" bind:params="{ id: user.id }" data-testid="user">User</UILink>
+	<UILink to="/about" hreflang="en" lang="en" target="_blank">About in English</UILink>
+	<UILink href="https://example.com/en" hreflang="en">Example</UILink>
+	<UIButton to="/about" hreflang="en" bind:resolve="false">About as written</UIButton>
 </template>
 `
 
@@ -74,6 +77,8 @@ test('a template checks the routes, params and exclusive props of UIButton and U
 		'<UIButton autocomplete="off">Not shared by a and button</UIButton>',
 		'<UILink to="/" href="/">Both</UILink>',
 		'<UILink to="/missing">Missing</UILink>',
+		'<UIButton type="button" hreflang="en">Button hreflang</UIButton>',
+		'<UILink href="/about" bind:resolve="false">Resolve without to</UILink>',
 	]
 	const root = await createApp(context, {
 		'app/pages/index.meeko': valid,

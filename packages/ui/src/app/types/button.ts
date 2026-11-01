@@ -39,6 +39,47 @@ type SharedAttributes = Pick<ElementAttributes<'a'>, keyof ElementAttributes<'a'
 export type UIForwardedAttributes = Omit<SharedAttributes, 'class' | 'type'>
 
 /**
+ * Atributos propios de `<a>` que `<UILink>` y `<UIButton>` reenvían cuando pintan un enlace (con
+ * `to` o `href`), con el tipado de `ElementAttributes<'a'>`: `hreflang`, `ping`, `referrerpolicy`…
+ * `target`, `rel` y `download` son props propias; `lang` y los demás globales están en
+ * {@link UIForwardedAttributes}. Con `to`, `hreflang` también elige el idioma del enlace cuando la
+ * aplicación usa `@meekojs/i18n`.
+ *
+ * @since 0.2.0
+ * @example
+ * ```html
+ * <UILink href="https://example.com/en" hreflang="en" lang="en">English</UILink>
+ * <UILink to="/guide" hreflang="en">Guide</UILink>
+ * ```
+ */
+export type UIAnchorAttributes = Omit<ElementAttributes<'a'>, keyof SharedAttributes | 'href' | 'target' | 'rel' | 'download' | 'type' | 'aria-current'>
+
+/** Los atributos de {@link UIAnchorAttributes} prohibidos en un `<button>`. */
+type NoAnchorAttributes = { readonly [Name in keyof UIAnchorAttributes]?: never }
+
+/** `target`, `rel` y `download` de un enlace, con `to` o con `href`. */
+interface UILinkTargetProps {
+	/** Dónde se abre el enlace. Con `"_blank"` y sin `rel`, añade `rel="noopener noreferrer"`. */
+	readonly target?: '_self' | '_blank' | '_parent' | '_top'
+	/** Relación con el destino; gana sobre el valor por defecto de `target="_blank"`. */
+	readonly rel?: string
+	/** Descarga el destino, con el nombre de archivo indicado o el del servidor con `true`. */
+	readonly download?: string | boolean
+}
+
+/** `resolve` de un enlace con `to`: si su `href` pasa por los resolvedores de enlaces de la aplicación. */
+interface UIRouteResolveProps {
+	/**
+	 * Si el `href` pasa por los resolvedores de enlaces de la aplicación, como el prefijo de idioma
+	 * de `@meekojs/i18n`. `true` por defecto; `bind:resolve="false"` deja el `href` de la ruta tal
+	 * cual, como `<MeekoLink bind:resolve="false">`.
+	 *
+	 * @since 0.2.0
+	 */
+	readonly resolve?: boolean
+}
+
+/**
  * Aspecto compartido por `<UIButton>` y `<UILink>`: variante, tamaño, forma y clases. Sin ellas, se
  * usan los valores de `ui.defaults` en `meeko.config.ts` y, después, `primary`, `md` y `rounded`.
  *
@@ -60,34 +101,29 @@ export interface UIActionAppearance {
 }
 
 /** `<UIButton to>`: navega a una ruta de la aplicación con `<MeekoLink>`. */
-type UIButtonRouteProps = UIRouteTarget & {
-	readonly href?: never
-	readonly target?: never
-	readonly rel?: never
-	readonly download?: never
-	readonly type?: never
-	readonly disabled?: never
-}
+type UIButtonRouteProps = UIRouteTarget &
+	UILinkTargetProps &
+	UIRouteResolveProps &
+	UIAnchorAttributes & {
+		readonly href?: never
+		readonly type?: never
+		readonly disabled?: never
+	}
 
 /** `<UIButton href>`: un `<a>` a cualquier URL. */
-interface UIButtonAnchorProps {
+interface UIButtonAnchorProps extends UILinkTargetProps, UIAnchorAttributes {
 	/** URL de destino; pinta un `<a>`. */
 	readonly href: string
-	/** Dónde se abre el enlace. Con `"_blank"` y sin `rel`, añade `rel="noopener noreferrer"`. */
-	readonly target?: '_self' | '_blank' | '_parent' | '_top'
-	/** Relación con el destino; gana sobre el valor por defecto de `target="_blank"`. */
-	readonly rel?: string
-	/** Descarga el destino, con el nombre de archivo indicado o el del servidor con `true`. */
-	readonly download?: string | boolean
 	readonly to?: never
 	readonly params?: never
 	readonly search?: never
+	readonly resolve?: never
 	readonly type?: never
 	readonly disabled?: never
 }
 
 /** `<UIButton>` sin `to` ni `href`: un `<button>` nativo. */
-interface UIButtonNativeProps {
+interface UIButtonNativeProps extends NoAnchorAttributes {
 	/** Comportamiento en un formulario; `"button"` por defecto, así que nunca envía sin pedirlo. */
 	readonly type?: 'button' | 'submit' | 'reset'
 	/** Desactiva el botón nativo: no recibe foco ni clics. */
@@ -95,6 +131,7 @@ interface UIButtonNativeProps {
 	readonly to?: never
 	readonly params?: never
 	readonly search?: never
+	readonly resolve?: never
 	readonly href?: never
 	readonly target?: never
 	readonly rel?: never
@@ -106,9 +143,11 @@ interface UIButtonNativeProps {
  * de la aplicación con `<MeekoLink>` (navegación del cliente, `params` y `search` tipados), con
  * `href` es un `<a>` (`target`, `rel` y `download`) y sin ninguno es un `<button>` (`type`, por
  * defecto `"button"`, y `disabled`). Las combinaciones que no tienen sentido son errores de tipos:
- * `to` con `href`, `type` o `disabled` en un enlace, `target` en un botón. Un enlace no se puede
- * deshabilitar: no lo pinte, o use un `<button disabled>`. Los atributos de
- * {@link UIForwardedAttributes} (`id`, `title`, `aria-*`, `data-*`…) llegan al elemento.
+ * `to` con `href`, `type` o `disabled` en un enlace, `target` o `hreflang` en un botón. Un enlace
+ * no se puede deshabilitar: no lo pinte, o use un `<button disabled>`. Los atributos de
+ * {@link UIForwardedAttributes} (`id`, `title`, `aria-*`, `data-*`…) llegan al elemento, y los de
+ * {@link UIAnchorAttributes} (`hreflang`…), a un enlace. Con `to`, el `href` pasa por los
+ * resolvedores de enlaces de la aplicación, como en `<MeekoLink>` (`bind:resolve="false"` lo evita).
  *
  * @since 0.2.0
  * @example
@@ -121,40 +160,68 @@ interface UIButtonNativeProps {
 export type UIButtonProps = (UIButtonAnchorProps | UIButtonNativeProps | UIButtonRouteProps) & UIActionAppearance & UIForwardedAttributes
 
 /** `<UILink to>`: navega a una ruta de la aplicación con `<MeekoLink>`. */
-type UILinkRouteProps = UIRouteTarget & {
-	readonly href?: never
-	readonly target?: never
-	readonly rel?: never
-}
+type UILinkRouteProps = UIRouteTarget &
+	UIRouteResolveProps & {
+		readonly href?: never
+	}
 
 /** `<UILink href>`: un `<a>` a cualquier URL. */
 interface UILinkAnchorProps {
 	/** URL de destino. */
 	readonly href: string
-	/** Dónde se abre el enlace. Con `"_blank"` y sin `rel`, añade `rel="noopener noreferrer"`. */
-	readonly target?: '_self' | '_blank' | '_parent' | '_top'
-	/** Relación con el destino; gana sobre el valor por defecto de `target="_blank"`. */
-	readonly rel?: string
 	readonly to?: never
 	readonly params?: never
 	readonly search?: never
+	readonly resolve?: never
 }
+
+/**
+ * Props de `<UILinkCard>`, una superficie enlazada. Recibe `href` (cualquier URL) o `to` (una ruta
+ * de la aplicación con `params` y `search` tipados, que navega con `<MeekoLink>`), como `<UILink>`:
+ * los dos a la vez son un error de tipos, y con `to` el `href` pasa por los resolvedores de enlaces
+ * de la aplicación, así que con `@meekojs/i18n` apunta al idioma del documento o al de `hreflang`.
+ * `title` es el texto principal de la card, no el atributo HTML; los demás atributos llegan al `<a>`.
+ *
+ * @since 0.2.0
+ * @example
+ * ```html
+ * <UILinkCard to="/theming" title="Personalización" description="Conecta los tokens con tu marca." />
+ * <UILinkCard to="/users/[id]" bind:params="{ id: user.id }" bind:title="user.name" />
+ * <UILinkCard href="https://github.com/meekojs/meeko" target="_blank" title="GitHub" />
+ * ```
+ */
+export type UILinkCardProps = (UILinkAnchorProps | UILinkRouteProps) &
+	UILinkTargetProps &
+	UIAnchorAttributes &
+	Omit<UIForwardedAttributes, 'title'> & {
+		/** Texto principal de la card. */
+		readonly title: string
+		/** Texto de apoyo, bajo el título. */
+		readonly description?: string
+		/** Clases adicionales, tras la del componente. */
+		readonly class?: string
+	}
 
 /**
  * Props de `<UILink>`, un enlace con la API visual de `<UIButton>` y los defaults de
  * `ui.defaults.link`. Recibe `href` (cualquier URL) o, desde 0.2, `to` (una ruta de la aplicación
  * con `params` y `search` tipados, que navega con `<MeekoLink>`); los dos a la vez son un error de
- * tipos. `ariaLabel` sigue siendo el nombre accesible y reenvía además `id`, `title`, `aria-*` y
- * `data-*`.
+ * tipos. `ariaLabel` sigue siendo el nombre accesible y reenvía además `id`, `title`, `lang`,
+ * `aria-*`, `data-*` y los atributos de `<a>` (`target`, `rel`, `download`, `hreflang`…)
+ * con `to` o con `href`. Con `to`, el `href` pasa por los resolvedores de enlaces de la aplicación
+ * como en `<MeekoLink>`: con `@meekojs/i18n` apunta al idioma del documento o al de `hreflang`.
  *
  * @since 0.2.0
  * @example
  * ```html
  * <UILink to="/installation">Instalación</UILink>
+ * <UILink to="/installation" hreflang="en">Installation</UILink>
  * <UILink href="https://github.com/meekojs/meeko" target="_blank" variant="outline">GitHub</UILink>
  * ```
  */
 export type UILinkProps = (UILinkAnchorProps | UILinkRouteProps) &
+	UILinkTargetProps &
+	UIAnchorAttributes &
 	UIActionAppearance &
 	UIForwardedAttributes & {
 		/** Nombre accesible cuando el contenido visible no basta; equivale a `aria-label`. */

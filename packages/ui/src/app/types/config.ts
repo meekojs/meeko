@@ -1,3 +1,5 @@
+import type { UIMessageOverrides } from './messages'
+
 /** Variantes de acciones visuales; los enlaces conservan su semántica de navegación. */
 export type UIActionVariant = 'primary' | 'secondary' | 'outline' | 'ghost'
 export type UIActionSize = 'sm' | 'md' | 'lg'
@@ -42,4 +44,11 @@ export interface UITokens {
 export interface UIOptions {
 	readonly tokens?: UITokens
 	readonly defaults?: UIDefaults
+	/**
+	 * Idioma de los textos propios de los componentes sin `@meekojs/i18n` (`"es"` por defecto). Con
+	 * ese módulo manda el idioma del documento y éste es el respaldo de un idioma sin textos.
+	 */
+	readonly locale?: string
+	/** Textos por idioma: sobrescriben los del paquete (`es`, `en`) o añaden otros idiomas. */
+	readonly messages?: Readonly<Record<string, UIMessageOverrides>>
 }

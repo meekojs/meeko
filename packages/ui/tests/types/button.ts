@@ -29,6 +29,9 @@ button({})
 button({ to: '/', variant: 'outline', size: 'sm', shape: 'pill', class: 'wide', id: 'home', title: 'Home', 'aria-label': 'Home', 'aria-current': 'page', 'data-testid': 'home' })
 button({ href: '/file.pdf', tabindex: 0, 'aria-describedby': 'hint', 'data-state': 'idle' })
 button({ type: 'reset', id: 'reset', 'aria-busy': true, 'data-count': 3 })
+// The attributes of <a> on a link, with `to` or `href`; `resolve` only with `to`.
+button({ to: '/about', target: '_blank', rel: 'external', hreflang: 'en', lang: 'en', resolve: false })
+button({ href: '/report.pdf', hreflang: 'en', referrerpolicy: 'no-referrer', ping: '/ping' })
 
 // @ts-expect-error A route that does not exist.
 button({ to: '/missing' })
@@ -48,10 +51,12 @@ button({ href: '/about', disabled: true })
 button({ to: '/about', disabled: true })
 // @ts-expect-error A route has no `type`.
 button({ to: '/about', type: 'button' })
-// @ts-expect-error `target` belongs to `href`.
-button({ to: '/about', target: '_blank' })
 // @ts-expect-error A button has no `target`.
 button({ type: 'button', target: '_blank' })
+// @ts-expect-error A button has no `hreflang`.
+button({ type: 'button', hreflang: 'en' })
+// @ts-expect-error `resolve` belongs to `to`.
+button({ href: '/about', resolve: false })
 // @ts-expect-error A button has no `download`.
 button({ download: true })
 // @ts-expect-error Not a `type` of <button>.
@@ -74,5 +79,10 @@ link({ to: '/', href: '/' })
 link({ to: '/users/[id]' })
 // @ts-expect-error A route that does not exist.
 link({ to: '/missing' })
-// @ts-expect-error `target` belongs to `href`.
-link({ to: '/', target: '_blank' })
+// The attributes of <a>, with `to` or `href`; `resolve` only with `to`.
+link({ to: '/', target: '_blank', rel: 'help', hreflang: 'en', lang: 'en', download: true, resolve: false })
+link({ href: 'https://example.com/en', hreflang: 'en', referrerpolicy: 'no-referrer' })
+// @ts-expect-error `resolve` belongs to `to`.
+link({ href: '/', resolve: false })
+// @ts-expect-error Not an attribute of <a>.
+link({ to: '/', autocomplete: 'off' })

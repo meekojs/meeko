@@ -6,7 +6,7 @@
 
 	import { uiDefaults } from '../utils/defaults'
 
-	const { to, params, search, href, target, rel, ariaLabel, variant, size, shape, class: className, ...rest } = defineProps<UILinkProps>()
+	const { to, params, search, resolve, href, target, rel, ariaLabel, variant, size, shape, class: className, ...rest } = defineProps<UILinkProps>()
 
 	const emit = defineEmits<{ click: [event: MouseEvent] }>()
 
@@ -32,6 +32,7 @@
 		bind:to="to"
 		bind:params="params"
 		bind:search="search"
+		bind:resolve="resolve"
 		bind="rest"
 		bind:href="href"
 		bind:target="target"

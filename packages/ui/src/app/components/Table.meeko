@@ -2,6 +2,8 @@
 	import type { Snippet } from '@meekojs/meeko'
 	import type { TableCellValue, TableColumn, TableRowKey } from '@meekojs/ui/runtime'
 
+	import { uiMessages } from '../utils/messages'
+
 	interface Props<T extends object> {
 		rows: readonly T[]
 		columns: readonly TableColumn<T>[]
@@ -14,7 +16,7 @@
 		class?: string
 	}
 
-	const props = defineProps<Props<T>>({ layout: 'native', hideHeader: false, emptyText: 'No hay datos.' })
+	const props = defineProps<Props<T>>({ layout: 'native', hideHeader: false })
 
 	// `cell-<clave>` y `header-<clave>` salen de las claves de T: `value` tiene el tipo de esa columna.
 	const snippets = defineSnippets<
@@ -40,6 +42,7 @@
 	}
 
 	const id = useId()
+	const text = uiMessages().table
 
 	function keyOf(row: T): string | number {
 		return typeof props.rowKey === 'function' ? props.rowKey(row) : (row[props.rowKey] as string | number)
@@ -143,7 +146,7 @@
 							if:when="snippets.empty"
 							snippet="snippets.empty"
 						/>
-						<span if:when="!snippets.empty">{props.emptyText}</span>
+						<span if:when="!snippets.empty">{props.emptyText ?? text.empty}</span>
 					</td>
 				</tr>
 			</tbody>

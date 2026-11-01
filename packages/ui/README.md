@@ -75,6 +75,57 @@ export default defineMeekoConfig({
 
 Las opciones se validan al cargar el módulo. Los tokens se añaden a la hoja CSS de UI antes de pasar por PostCSS; no se generan estilos inline ni archivos en `node_modules`. Las hojas de la aplicación se cargan después y pueden sobrescribirlos.
 
+### Textos e idiomas
+
+`UIModal`, `UITable`, `UISelect` y `UIThemeToggle` pintan unos pocos textos por su cuenta. El paquete los trae en español e inglés y elige así:
+
+1. **Con `@meekojs/i18n`**, el idioma del documento (`useI18n().locale`), sin configurar nada. UI no depende de ese paquete: lee su contexto si existe.
+2. **Sin él**, `ui.locale`.
+3. **Sin ninguno**, español, como hasta ahora.
+
+```ts
+export default defineMeekoConfig({
+	modules: ['@meekojs/ui'],
+	ui: {
+		// Sin @meekojs/i18n, el idioma de los textos; con él, el respaldo de un idioma sin textos.
+		locale: 'en',
+		messages: {
+			en: { table: { empty: 'Nothing here yet.' } },
+			fr: {
+				modal: { close: 'Fermer' },
+				table: { empty: 'Aucune donnée.' },
+				select: { empty: 'Aucun résultat', clear: 'Effacer la sélection' },
+				themeToggle: {
+					labels: { light: 'Clair', dark: 'Sombre', system: 'Système' },
+					unknown: 'Changer de thème',
+					group: 'Thème',
+					cycle: 'Thème : {current}. Passer à {next}',
+				},
+			},
+		},
+	},
+})
+```
+
+| Texto                 | Español                             | Inglés                               | Lo sustituye en un componente |
+| --------------------- | ----------------------------------- | ------------------------------------ | ----------------------------- |
+| `modal.close`         | `Cerrar modal`                      | `Close modal`                        | `closeLabel`                  |
+| `table.empty`         | `No hay datos.`                     | `No data.`                           | `emptyText`, snippet `empty`  |
+| `select.empty`        | `Sin resultados`                    | `No results`                         | snippet `empty`               |
+| `select.clear`        | `Quitar selección`                  | `Clear selection`                    | `clearLabel`                  |
+| `themeToggle.labels`  | `Claro`, `Oscuro`, `Sistema`        | `Light`, `Dark`, `System`            | `labels`                      |
+| `themeToggle.unknown` | `Cambiar tema`                      | `Change theme`                       | `messages.unknown`            |
+| `themeToggle.group`   | `Tema`                              | `Theme`                              | `messages.group`              |
+| `themeToggle.cycle`   | `Tema: {current}. Cambiar a {next}` | `Theme: {current}. Switch to {next}` | `messages.cycle`              |
+
+- **Prioridad.** Una prop o un snippet del componente ganan sobre todo lo demás. Después, `ui.messages` gana sobre los textos del paquete en ese idioma.
+- **Idiomas.** `ui.locale` y las claves de `ui.messages` se validan al cargar y se leen en su forma canónica: `EN` es `en` y `pt-br` es `pt-BR`. Una etiqueta inválida, como `en-u`, es un error de configuración.
+- **Lo que falta** se toma del idioma base (`pt` para `pt-BR`), de `ui.locale` y, por último, del español. Un idioma de `@meekojs/i18n` sin textos de UI, como `ar`, se muestra en el idioma de `ui.locale`, o en español sin él.
+- **`themeToggle.cycle`** es una plantilla de texto, porque las opciones se serializan al cliente: `{current}` y `{next}` son las etiquetas en minúsculas. Para otra forma, usa la función `messages.cycle` del componente. `themeToggle.labels` admite también el nombre de un tema propio.
+- **Hidratación.** El idioma sale de la URL o de la configuración y no cambia sin un documento nuevo, así que SSR, prerender e hidratación eligen el mismo texto. `document.lang` y `Accept-Language` no intervienen.
+
+Los tipos `UIMessages` y `UIMessageOverrides` se exportan desde `@meekojs/ui`. Un idioma, una sección o un texto desconocidos, o un valor vacío, detienen el arranque con un error `ui:`.
+
 ## Uso
 
 ```html
@@ -183,15 +234,16 @@ También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [t
 </UIButton>
 ```
 
-- **Combinaciones inválidas.** `to` con `href`, `type` o `disabled` en un enlace, `target`, `rel` o `download` en un botón, una ruta inexistente y unos `params` que no son los de la ruta son errores de tipos en `meeko check` y en el editor.
+- **Combinaciones inválidas.** `to` con `href`, `type` o `disabled` en un enlace, `target`, `rel`, `download` o `hreflang` en un botón, `resolve` sin `to`, una ruta inexistente y unos `params` que no son los de la ruta son errores de tipos en `meeko check` y en el editor.
 - **Un enlace no se deshabilita.** `<a>` no tiene `disabled` nativo y emularlo con `aria-disabled` deja el `href` navegable con el teclado, el clic central o sin JavaScript; quitar el `href` lo saca del orden de tabulación. Por eso `disabled` sólo existe sin `to` ni `href`: si la acción no está disponible, no pinte el enlace o use un botón deshabilitado.
-- **Atributos.** `id`, `title`, `tabindex`, `aria-*` y `data-*` llegan al elemento en las tres formas (`UIForwardedAttributes`: los comunes a `<a>` y `<button>`). `on:click` recibe el `MouseEvent` en las tres; en un enlace, `event.preventDefault()` cancela la navegación.
-- **Tipos.** `UIButtonProps`, `UILinkProps`, `UIRouteTarget`, `UIForwardedAttributes` y `UIActionAppearance` se importan desde `@meekojs/ui/runtime`.
+- **Atributos.** `id`, `title`, `lang`, `tabindex`, `aria-*` y `data-*` llegan al elemento en las tres formas (`UIForwardedAttributes`: los comunes a `<a>` y `<button>`). Un enlace, con `to` o con `href`, acepta además `target`, `rel`, `download` y los atributos propios de `<a>` (`UIAnchorAttributes`: `hreflang`, `ping`, `referrerpolicy`…). `on:click` recibe el `MouseEvent` en las tres; en un enlace, `event.preventDefault()` cancela la navegación.
+- **Enlaces localizados.** Con `to`, el `href` pasa por los resolvedores de enlaces de la aplicación, como `<MeekoLink>`: con `@meekojs/i18n`, `<UIButton to="/guide">` apunta a `/en/guide` en una página en inglés, `hreflang="es"` elige otro idioma y `bind:resolve="false"` deja la ruta tal cual.
+- **Tipos.** `UIButtonProps`, `UILinkProps`, `UIRouteTarget`, `UIForwardedAttributes`, `UIAnchorAttributes` y `UIActionAppearance` se importan desde `@meekojs/ui/runtime`.
 
 ### Navegación y etiquetas
 
-- `UILink` da apariencia de acción a un `<a>` real, con los defaults de `ui.defaults.link`. Recibe `href` (cualquier URL, con `target` y `rel`) o `to` (una ruta de la aplicación con `params` y `search` tipados, como en `UIButton`, con navegación del cliente); uno de los dos, no ambos. Comparte `variant`, `size` y `shape` con `UIButton`, y admite `ariaLabel`, `class`, `id`, `title`, `aria-*`, `data-*` y evento `click`. No simula botones ni utiliza roles artificiales. Para `target="_blank"` añade `noopener noreferrer` si no se especifica `rel`.
-- `UILinkCard` es una superficie enlazada: requiere `href` y `title`, con `description`, `class` y snippet `default` opcionales. El contenido no debe incluir otros enlaces ni botones porque toda la card es un único enlace.
+- `UILink` da apariencia de acción a un `<a>` real, con los defaults de `ui.defaults.link`. Recibe `href` (cualquier URL) o `to` (una ruta de la aplicación con `params` y `search` tipados, como en `UIButton`, con navegación del cliente y el `href` localizado con `@meekojs/i18n`); uno de los dos, no ambos. Con los dos acepta `target`, `rel`, `download`, `hreflang` y `lang`. Comparte `variant`, `size` y `shape` con `UIButton`, y admite `ariaLabel`, `class`, `id`, `title`, `aria-*`, `data-*` y evento `click`. No simula botones ni utiliza roles artificiales. Para `target="_blank"` añade `noopener noreferrer` si no se especifica `rel`.
+- `UILinkCard` es una superficie enlazada: requiere `title` y un destino, `href` (cualquier URL) o `to` (una ruta de la aplicación con `params`, `search` y `resolve`, como en `UILink`, con navegación del cliente y el `href` localizado con `@meekojs/i18n`), con `description`, `class` y snippet `default` opcionales. Acepta `target`, `rel`, `download`, `hreflang`, `lang`, `id`, `aria-*`, `data-*` y evento `click`; `title` es el texto de la card, no el atributo HTML. El contenido no debe incluir otros enlaces ni botones porque toda la card es un único enlace.
 - `UIBadge` muestra metadatos, con `tone="neutral|accent|danger"` (`neutral` por defecto), `class` y snippet `default` obligatorio. Conserva semántica de texto; no añade anuncios o interacción.
 
 ```html
@@ -202,7 +254,7 @@ También incluye `UIApp` y `UIModal` para [modales](#modales), `UITable` para [t
 	Empezar
 </UILink>
 <UILinkCard
-	href="/docs/framework"
+	to="/docs/framework"
 	title="Framework"
 	description="Rutas, SSR y datos."
 />
@@ -292,14 +344,14 @@ Sólo `useModal` y `useModalInstance` se autoimportan en componentes y código d
 
 `UIModal` también funciona sin el gestor con `model="opened"`, siendo `opened` una señal booleana. Admite:
 
-| Prop                               | Comportamiento                                                       |
-| ---------------------------------- | -------------------------------------------------------------------- |
-| `title`                            | Obligatoria; proporciona el nombre accesible del diálogo.            |
-| `description`                      | Descripción accesible opcional.                                      |
-| `size`                             | `sm`, `md` (predeterminado) o `lg`.                                  |
-| `closeOnEscape`, `closeOnBackdrop` | Permiten cancelar por teclado o fondo; ambos `true` por defecto.     |
-| `closeButton`, `closeLabel`        | Botón de cierre visible por defecto, etiquetado como `Cerrar modal`. |
-| `class`                            | Clases adicionales del diálogo.                                      |
+| Prop                               | Comportamiento                                                                                           |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `title`                            | Obligatoria; proporciona el nombre accesible del diálogo.                                                |
+| `description`                      | Descripción accesible opcional.                                                                          |
+| `size`                             | `sm`, `md` (predeterminado) o `lg`.                                                                      |
+| `closeOnEscape`, `closeOnBackdrop` | Permiten cancelar por teclado o fondo; ambos `true` por defecto.                                         |
+| `closeButton`, `closeLabel`        | Botón de cierre visible por defecto, con `modal.close` de [los textos](#textos-e-idiomas) como etiqueta. |
+| `class`                            | Clases adicionales del diálogo.                                                                          |
 
 El snippet `default` es obligatorio y `footer` opcional. El evento `dismiss` recibe `escape`, `backdrop`, `button` o `native`; cambiar el modelo a `false` cierra sin emitir ese evento. Si desactivas las vías de cancelación, proporciona una acción explícita de cierre. La base usa `<dialog>` y `showModal()`, con nombre accesible, foco y capa modal nativos. `components/internal/ModalInstance.meeko` es infraestructura del host y sólo se importa explícitamente: no forma parte del registro ni genera nombres globales de componente o props.
 
@@ -352,7 +404,7 @@ El snippet `default` es obligatorio y `footer` opcional. El evento `dismiss` rec
 | `gridColumns` | Definición CSS de columnas para grid; por defecto genera una columna `minmax(160px, 1fr)` por cada entrada de `columns`.                                  |
 | `caption`     | Título visible y nombre de la región desplazable, opcional.                                                                                               |
 | `hideHeader`  | Oculta la cabecera; `false` por defecto.                                                                                                                  |
-| `emptyText`   | Mensaje cuando `rows` está vacío; por defecto `No hay datos.`                                                                                             |
+| `emptyText`   | Mensaje cuando `rows` está vacío; por defecto, `table.empty` de [los textos](#textos-e-idiomas).                                                          |
 | `class`       | Clases adicionales sobre `<table>`.                                                                                                                       |
 
 `format` devuelve texto, número, booleano o un valor vacío (`null`/`undefined`). Sin formateador, los valores se convierten a texto y los vacíos se muestran como una cadena vacía. El contenido se escapa como cualquier interpolación Meeko. Para objetos o fechas, proporciona un formateador. `footer` admite los mismos valores o una función que recibe todas las filas; el pie aparece cuando alguna columna lo define.
@@ -671,14 +723,14 @@ Un select accesible construido sobre `<UIPopover>`. `model` es el valor y su tip
 | `name`                                      | `name` de los `<input type="hidden">` que se envían con el `<form>`.                                                                                                                     |
 | `required`, `disabled`                      | Como en un control nativo.                                                                                                                                                               |
 | `searchable`                                | El disparador es un `<input>` que filtra las opciones.                                                                                                                                   |
-| `clearable`, `clearLabel`                   | Botón junto al disparador que quita la selección (`null`, o `[]` con `multiple`); `clearLabel` es su `aria-label` («Quitar selección» por defecto).                                      |
+| `clearable`, `clearLabel`                   | Botón junto al disparador que quita la selección (`null`, o `[]` con `multiple`); `clearLabel` es su `aria-label` (por defecto, `select.clear` de [los textos](#textos-e-idiomas)).      |
 | `filter`                                    | Búsqueda propia, síncrona o asíncrona.                                                                                                                                                   |
 | `max`                                       | Con `multiple`, cuántas opciones se pueden elegir como mucho.                                                                                                                            |
 | `field`                                     | El campo de `useForm`: `bind:field="form.field('color')"`.                                                                                                                               |
 | `id`, `label`, `describedBy`, `invalid`     | `id` del disparador (para `<label for>`), su `aria-label`, `aria-describedby` y `aria-invalid`.                                                                                          |
 | `class`, `listClass`, `placement`, `offset` | Clases de la raíz y de la lista, y la posición de la lista.                                                                                                                              |
 
-`on:change` emite el valor nuevo con cada elección del usuario. Los snippets son `option` (`[option, state]`, con `state.selected`, `state.active` y `state.disabled`), `value` (cómo se ve cada valor elegido en el disparador; sin él, las etiquetas separadas por comas), `group` (el encabezado de un grupo), `empty` (sin opciones; por defecto, «Sin resultados») y `loading` (mientras carga una búsqueda asíncrona).
+`on:change` emite el valor nuevo con cada elección del usuario. Los snippets son `option` (`[option, state]`, con `state.selected`, `state.active` y `state.disabled`), `value` (cómo se ve cada valor elegido en el disparador; sin él, las etiquetas separadas por comas), `group` (el encabezado de un grupo), `empty` (sin opciones; por defecto, `select.empty` de [los textos](#textos-e-idiomas)) y `loading` (mientras carga una búsqueda asíncrona).
 
 **Tipos.** `meeko check` y el editor infieren de la etiqueta el tipo de las opciones (`T`) y si es múltiple: el modelo de un select simple es una `Signal<T | null>` y el de uno múltiple, `Signal<T[]>`; `by`, `labelBy` y `groupBy` sólo admiten claves de `T`, y los parámetros de los snippets tienen el tipo `T`. El tipo `SelectModel<T, Multiple>` describe el valor.
 
@@ -813,13 +865,13 @@ Desde UI `0.2`, con el módulo UI activo y `theme` en `meeko.config.ts`, `UIThem
 />
 ```
 
-| Prop          | Por defecto                  | Qué hace                                                                                                                                                                |
-| ------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mode`        | `"cycle"`                    | `"cycle"`: un botón que pasa a la elección siguiente de la lista. `"select"`: un grupo de radios.                                                                       |
-| `themes`      | los temas y `"system"`       | Las elecciones y su orden (`bind:themes="['light', 'dark']"`).                                                                                                          |
-| `labels`      | «Claro», «Oscuro», «Sistema» | El nombre de cada elección; un tema propio, sin etiqueta, se llama como el tema.                                                                                        |
-| `messages`    | en español                   | Los textos accesibles: `cycle(current, next)` (el `aria-label` del botón), `unknown` («Cambiar tema») y `group` («Tema»), para traducirlos. Tipo `ThemeToggleMessages`. |
-| `class`, `id` | —                            | Del `<form>` raíz. Otros atributos no pasan: envuelva la etiqueta si los necesita.                                                                                      |
+| Prop          | Por defecto            | Qué hace                                                                                                                                                           |
+| ------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `mode`        | `"cycle"`              | `"cycle"`: un botón que pasa a la elección siguiente de la lista. `"select"`: un grupo de radios.                                                                  |
+| `themes`      | los temas y `"system"` | Las elecciones y su orden (`bind:themes="['light', 'dark']"`).                                                                                                     |
+| `labels`      | los de `ui.messages`   | El nombre de cada elección; un tema propio, sin etiqueta, se llama como el tema.                                                                                   |
+| `messages`    | los de `ui.messages`   | Los textos accesibles: `cycle(current, next)` (el `aria-label` del botón), `unknown` y `group`, sobre [los textos](#textos-e-idiomas). Tipo `ThemeToggleMessages`. |
+| `class`, `id` | —                      | Del `<form>` raíz. Otros atributos no pasan: envuelva la etiqueta si los necesita.                                                                                 |
 
 Cada snippet (`light`, `dark`, `system` o el nombre de un tema propio) es el icono de esa elección; sin snippet se pinta su etiqueta. `meeko check` y el editor tipan los snippets, `themes` y `labels` con los temas de `meeko.config.ts` (`system` sólo si está activo) y `mode` como `"cycle" | "select"`; el editor completa la etiqueta, sus props y sus snippets, y su hover muestra la ficha de la etiqueta. El tipo de sus props es `UIThemeToggleProps`, exportado desde `@meekojs/ui/runtime`. No tiene estilos visuales propios: el botón y los radios son elementos nativos que estiliza la aplicación (`.toggle button`, `[role="radio"][aria-checked="true"]`, `[data-meeko-theme-option="dark"]`). Para marcar el radio elegido también antes de hidratar, cuando la elección no se conoce y no hay `aria-checked`, use `data-theme-choice`, como los iconos: `[data-theme-choice="dark"] [data-meeko-theme-option="dark"]`.
 

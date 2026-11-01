@@ -23,7 +23,7 @@ export default defineMeekoConfig({
 - **Datos y metadatos:** `UITable` y `UIBadge`.
 - **Superficies y modales:** `UICard`, `UIModal` y el host `UIApp`.
 
-`UILink` comparte las variantes `primary`, `secondary`, `outline` y `ghost`, los tamaños `sm`, `md`, `lg` y las formas `rounded`, `pill` con `UIButton`. Requiere `href`; no simula un botón. `UILinkCard` requiere `href` y `title`, con descripción y contenido opcionales. `UIBadge` tiene tonos `neutral`, `accent` y `danger`, sin añadir interacción o anuncios.
+`UILink` comparte las variantes `primary`, `secondary`, `outline` y `ghost`, los tamaños `sm`, `md`, `lg` y las formas `rounded`, `pill` con `UIButton`. Requiere `href`; no simula un botón. `UILinkCard` requiere `to` o `href`, y `title`, con descripción y contenido opcionales. `UIBadge` tiene tonos `neutral`, `accent` y `danger`, sin añadir interacción o anuncios.
 
 Registra `UIContainer`, `UIApp`, `UIModal`, `UITable`, `UICard`, `UIButton`, `UIInput`, `UIField` y, desde UI 0.2, `UIPopover`, `UISelect` y `UIThemeToggle`, y añade su CSS mediante `meeko.addStylesheet`. La hoja pasa por Vite y la configuración PostCSS del proyecto, con imports, assets, HMR en desarrollo y nombres de assets con hash en producción. Se carga antes de `app/styles/main.css`, donde la aplicación puede sobrescribir los estilos. Desde core 1.8, `MeekoSelect`, `MeekoPopover` y `MeekoThemeToggle` están obsoletos (`MEEK121`, retirada en 2.0). UI 0.2 registra `UISelect`, `UIPopover` y `UIThemeToggle`, con las mismas props, snippets y atributos `data-meeko-*`. `useTheme`, `useThemeToggle`, la configuración del tema y `POST /_meeko/theme` permanecen en el framework. UI 0.2 necesita Meeko `>=1.8 <2`. Véase [Migración a 1.8](migration-1.8.md).
 
@@ -56,6 +56,48 @@ Registra `UIContainer`, `UIApp`, `UIModal`, `UITable`, `UICard`, `UIButton`, `UI
 `UIButton` admite `type`, `disabled`, `class`, `variant="primary|secondary"` y el evento `click`; su tipo por defecto es `button`. `UIInput` comparte un modelo de texto y admite `id`, `name`, `type`, `placeholder`, `required`, `disabled`, `invalid`, `describedBy` y `class`. `UIField` exige `id` y `label`, admite `description`, `error`, `required` y `class`, y entrega el ID del control y su descripción al snippet. El control debe recibir también `invalid` cuando tenga un error y `required` si es obligatorio.
 
 Personaliza las variables `--meeko-ui-*` desde el CSS de la aplicación: `accent`, `accent-hover`, `on-accent`, `surface`, `surface-hover`, `text`, `muted`, `border`, `danger`, `focus`, `radius` y `font`. El tema oscuro usa `data-theme="dark"`; los temas propios pueden definir los mismos tokens con su selector. La hoja sólo estiliza controles UI y las tres etiquetas mencionadas; la aplicación define su layout y tipografía general.
+
+## Textos e idiomas
+
+Con `@meekojs/i18n` activo no hay que configurar nada: `UIModal`, `UITable`, `UISelect` y `UIThemeToggle` siguen `useI18n().locale`. UI no depende de ese paquete: lee su contexto si existe. Las opciones `ui.locale` y `ui.messages` son opcionales:
+
+```ts
+// meeko.config.ts
+ui: {
+	// Sin i18n: el idioma de los textos ('es' por defecto). Con i18n: el respaldo de un idioma sin textos.
+	locale: 'en',
+	// Sobrescribe textos del paquete o añade idiomas; todo es opcional dentro de cada idioma.
+	messages: {
+		en: { table: { empty: 'Nothing here yet.' } },
+		fr: { modal: { close: 'Fermer' }, themeToggle: { group: 'Thème', cycle: 'Thème : {current}. Passer à {next}' } },
+	},
+}
+```
+
+- **Idioma elegido:** `useI18n().locale`, después `ui.locale` y después `es`. Lo que falta en un idioma se completa con su idioma base (`pt` para `pt-BR`), `ui.locale` y español.
+- **Prioridad:** la prop o el snippet del componente, después `ui.messages` y después los textos del paquete.
+- **Textos disponibles:** `modal.close`, `table.empty`, `select.empty`, `select.clear` y `themeToggle` (`labels`, `unknown`, `group` y `cycle`, con `{current}` y `{next}`). Un idioma, sección o texto desconocidos, un valor vacío o una función detienen la carga con un error `ui:`.
+- **Tipos:** `UIMessages` y `UIMessageOverrides`, exportados de `@meekojs/ui`. Sin `locale` ni `messages` no se instala ningún plugin.
+
+`UILinkCard` acepta `to` como `UILink`, con localización automática, `hreflang`, `resolve`, navegación de cliente y rutas tipadas:
+
+```html
+<UILinkCard
+	to="/theming"
+	title="Temas"
+	description="Variables y modo oscuro"
+/>
+<UILinkCard
+	to="/users/[id]"
+	bind:params="{ id }"
+	title="Perfil"
+/>
+<UILinkCard
+	href="https://example.com"
+	target="_blank"
+	title="Externo"
+/>
+```
 
 ## Adaptar UI a una marca existente
 

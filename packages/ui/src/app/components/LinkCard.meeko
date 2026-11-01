@@ -1,28 +1,46 @@
 <script lang="ts">
-	interface Props {
-		href: string
-		title: string
-		description?: string
-		class?: string
-	}
+	// <UILinkCard>: a linked surface, an <a> with `href` or a route with <MeekoLink> with `to`, as <UILink>.
+	import { computed } from '@meekojs/meeko'
 
-	const props = defineProps<Props>()
+	import type { UILinkCardProps } from '../types/button'
+
+	const { to, params, search, resolve, href, target, rel, title, description, class: className, ...rest } = defineProps<UILinkCardProps>()
+
+	const emit = defineEmits<{ click: [event: MouseEvent] }>()
 
 	const snippets = defineSnippets<{ default?: [] }>()
+
+	const classes = computed(() => ['meeko-ui-link-card', className].filter(Boolean).join(' '))
+	const linkRel = computed(() => rel ?? (target === '_blank' ? 'noopener noreferrer' : undefined))
+
+	// Template comments cannot carry ESLint directives, so this one covers the template below. The
+	// spread `bind="rest"` stays before `bind:href` and `bind:class`: the compiler places and evaluates
+	// the spread at `bind` or at an explicit class or style written before it, so sorting `bind:class`
+	// ahead of it would change where its attributes render.
+	/* eslint-disable meeko/attributes-order */
 </script>
 
 <template>
-	<a
-		bind:href="props.href"
-		bind:class="['meeko-ui-link-card', props.class].filter(Boolean).join(' ')"
+	<component
+		is="to !== undefined ? 'MeekoLink' : 'a'"
+		bind:to="to"
+		bind:params="params"
+		bind:search="search"
+		bind:resolve="resolve"
+		bind="rest"
+		bind:href="href"
+		bind:target="target"
+		bind:rel="linkRel.value"
+		bind:class="classes.value"
+		on:click="(event) => emit('click', event)"
 	>
-		<strong class="meeko-ui-link-card-title">{props.title}</strong>
+		<strong class="meeko-ui-link-card-title">{title}</strong>
 		<span
-			if:when="props.description"
+			if:when="description"
 			class="meeko-ui-link-card-description"
 		>
-			{props.description}
+			{description}
 		</span>
 		<render snippet="snippets.default" />
-	</a>
+	</component>
 </template>

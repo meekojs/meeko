@@ -2,6 +2,7 @@
 	import type { ModalDismissReason } from '../types/modal'
 
 	import { modalExitRegistration, optionalModalInstance } from '../composables/useModal'
+	import { uiMessages } from '../utils/messages'
 	import { mountModalDialog } from '../utils/modal-dialog'
 
 	interface Props {
@@ -26,6 +27,7 @@
 	const dialog = useElementRef('dialog')
 
 	const id = useId()
+	const text = uiMessages().modal
 	const instance = optionalModalInstance()
 	const registerExit = modalExitRegistration()
 	if (instance) open.value = true
@@ -72,7 +74,7 @@
 				if:when="props.closeButton !== false"
 				type="button"
 				class="meeko-ui-modal-close"
-				bind:aria-label="props.closeLabel ?? 'Cerrar modal'"
+				bind:aria-label="props.closeLabel ?? text.close"
 				on:click="() => dismiss('button')"
 			>
 				<svg

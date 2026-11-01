@@ -1,5 +1,9 @@
 import type { ThemeToggleMessages, ThemeToggleState } from '@meekojs/meeko/framework'
 
+import type { UIMessages } from '../types/messages'
+
+import { builtinMessages, canonicalLocale, themeCycleLabel } from './messages'
+
 /**
  * `<UIThemeToggle>`: what `ThemeToggle.meeko` needs besides its template. Pure helpers over the
  * public `useThemeToggle()` of the core, the same rules the deprecated `<MeekoThemeToggle>` follows.
@@ -11,6 +15,10 @@ export interface ThemeToggleOptions {
 	readonly themes?: readonly string[] | undefined
 	readonly labels?: Readonly<Record<string, string | undefined>> | undefined
 	readonly messages?: ThemeToggleMessages | undefined
+	/** The texts of the document's locale, below `labels` and `messages`; Spanish without them. */
+	readonly text?: UIMessages['themeToggle'] | undefined
+	/** The locale of `text`: it lowers the labels of the `cycle` text. */
+	readonly locale?: string | undefined
 }
 
 /** One choice of the toggle: what it paints, which does not depend on the current theme. */
@@ -37,11 +45,9 @@ export interface ThemeToggleStatus {
 	readonly focused: string | undefined
 }
 
-const defaultLabels: Readonly<Record<string, string>> = { light: 'Claro', dark: 'Oscuro', system: 'Sistema' }
+const textOf = (options: ThemeToggleOptions): UIMessages['themeToggle'] => options.text ?? builtinMessages.es!.themeToggle
 
-const lower = (label: string): string => label.toLocaleLowerCase('es')
-
-const labelOf = (options: ThemeToggleOptions, name: string): string => options.labels?.[name] ?? defaultLabels[name] ?? name
+const labelOf = (options: ThemeToggleOptions, name: string): string => options.labels?.[name] ?? (Object.hasOwn(textOf(options).labels, name) ? textOf(options).labels[name] : undefined) ?? name
 
 /** The `mode` of `<UIThemeToggle>`: `"cycle"` by default. */
 export function themeToggleMode(mode: string | undefined): 'cycle' | 'select' {
@@ -90,14 +96,17 @@ export function themeToggleStatus(toggle: Pick<ThemeToggleState<string, string>,
 	if (index < 0) index = list.indexOf(toggle.theme.resolved.value)
 	const next = list[(index + 1) % list.length]!
 	const messages = options.messages
-	const label = !known ? (messages?.unknown ?? 'Cambiar tema') : messages?.cycle ? messages.cycle(labelOf(options, choice), labelOf(options, next)) : `Tema: ${lower(labelOf(options, choice))}. Cambiar a ${lower(labelOf(options, next))}`
+	const text = textOf(options)
+	// `toLocaleLowerCase` throws on an invalid tag: a language never takes the toggle down.
+	const lower = (label: string): string => label.toLocaleLowerCase(canonicalLocale(options.locale) ?? 'es')
+	const label = !known ? (messages?.unknown ?? text.unknown) : messages?.cycle ? messages.cycle(labelOf(options, choice), labelOf(options, next)) : themeCycleLabel(text.cycle, lower(labelOf(options, choice)), lower(labelOf(options, next)))
 	const checked = known && list.includes(choice) ? choice : undefined
 	return { next, label, checked, focused: toggle.interactive.value ? (checked ?? list[0]) : undefined }
 }
 
 /** `aria-label` of the radio group of `<UIThemeToggle>`. */
-export function themeToggleGroupLabel(messages: ThemeToggleMessages | undefined): string {
-	return messages?.group ?? 'Tema'
+export function themeToggleGroupLabel(messages: ThemeToggleMessages | undefined, text?: UIMessages['themeToggle']): string {
+	return messages?.group ?? (text ?? builtinMessages.es!.themeToggle).group
 }
 
 /**

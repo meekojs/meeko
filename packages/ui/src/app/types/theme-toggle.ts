@@ -17,9 +17,9 @@ export interface UIThemeToggleProps {
 	readonly mode?: 'cycle' | 'select'
 	/** Elecciones y su orden; por defecto, los temas de la configuración y `"system"` si está activo. */
 	readonly themes?: readonly ThemeChoice[]
-	/** Nombres de cada elección; por defecto, «Claro», «Oscuro», «Sistema» y el nombre de los demás temas. */
+	/** Nombres de cada elección; por defecto, los de `themeToggle.labels` en `ui.messages` y el nombre de los demás temas. */
 	readonly labels?: Partial<Record<ThemeChoice, string>>
-	/** Textos accesibles del botón y del grupo, para traducirlos. */
+	/** Textos accesibles del botón y del grupo; ganan sobre los de `themeToggle` en `ui.messages`. */
 	readonly messages?: ThemeToggleMessages
 	/** Clases del elemento raíz, el `<form>`. */
 	readonly class?: string
