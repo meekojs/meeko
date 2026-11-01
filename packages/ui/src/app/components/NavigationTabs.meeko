@@ -1,0 +1,49 @@
+<script lang="ts">
+	// <UINavigationTabs>: links, not a tablist. The indicator follows the current link with CSS anchor
+	// positioning; where that is missing, the link marks itself. A narrow screen scrolls the row sideways.
+	import { effect } from '@meekojs/meeko'
+
+	import type { UINavigationTabsProps } from '../types/navigation'
+
+	import { uiMessages } from '../utils/messages'
+	import { isCurrentLink, linkTarget, revealInScroller } from '../utils/navigation'
+	import * as ItemLink from './internal/ItemLink.meeko'
+
+	const props = defineProps<UINavigationTabsProps>()
+
+	const text = uiMessages().navigationTabs
+	const root = useElementRef('root')
+
+	onMounted(() =>
+		effect(() => {
+			void props.current
+			void props.items
+			requestAnimationFrame(() => {
+				const link = root.value?.querySelector<HTMLElement>('a[aria-current]')
+				if (root.value && link) revealInScroller(root.value, link, 'inline')
+			})
+		}),
+	)
+</script>
+
+<template>
+	<nav
+		ref:root
+		bind:class="['meeko-ui-nav-tabs', props.class].filter(Boolean).join(' ')"
+		bind:aria-label="props.label ?? text.label"
+	>
+		<ItemLink
+			each:of="props.items"
+			each:as="item"
+			each:key="item.label"
+			bind:link="linkTarget(item)"
+			bind:current="isCurrentLink(item, props.current) ? 'page' : undefined"
+		>
+			{item.label}
+		</ItemLink>
+		<span
+			class="meeko-ui-nav-tabs-indicator"
+			aria-hidden="true"
+		/>
+	</nav>
+</template>

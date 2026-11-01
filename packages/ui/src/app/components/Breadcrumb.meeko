@@ -1,0 +1,43 @@
+<script lang="ts">
+	import type { UIBreadcrumbItem, UIBreadcrumbProps, UINavigationLink } from '../types/navigation'
+
+	import { uiMessages } from '../utils/messages'
+	import { linkTarget } from '../utils/navigation'
+	import * as ItemLink from './internal/ItemLink.meeko'
+
+	const props = defineProps<UIBreadcrumbProps>()
+
+	const text = uiMessages().breadcrumb
+
+	const isCurrent = (item: UIBreadcrumbItem, index: number): boolean => item.current ?? index === props.items.length - 1
+	const hasTarget = (item: UIBreadcrumbItem): boolean => item.href !== undefined || item.to !== undefined
+</script>
+
+<template>
+	<nav
+		bind:class="['meeko-ui-breadcrumb', props.class].filter(Boolean).join(' ')"
+		bind:aria-label="props.label ?? text.label"
+	>
+		<ol>
+			<li
+				each:of="props.items"
+				each:as="item"
+				each:index="index"
+				each:key="item.label"
+			>
+				<ItemLink
+					if:when="hasTarget(item) && !isCurrent(item, index)"
+					bind:link="linkTarget(item as UINavigationLink)"
+				>
+					{item.label}
+				</ItemLink>
+				<span
+					if:when="!hasTarget(item) || isCurrent(item, index)"
+					bind:aria-current="isCurrent(item, index) ? 'page' : undefined"
+				>
+					{item.label}
+				</span>
+			</li>
+		</ol>
+	</nav>
+</template>

@@ -1,0 +1,78 @@
+<script lang="ts">
+	// <UIPagination>: a count and a way to load more. While busy the action stays focusable, announced
+	// with aria-disabled, so the keyboard does not lose its place when the rows arrive.
+	import { computed } from '@meekojs/meeko'
+
+	import type { UIPaginationProps } from '../types/navigation'
+
+	import { fillMessage, uiMessages } from '../utils/messages'
+	import * as ItemLink from './internal/ItemLink.meeko'
+
+	const props = defineProps<UIPaginationProps>()
+
+	const emit = defineEmits<{ loadMore: [] }>()
+
+	const snippets = defineSnippets<{ default?: [] }>()
+
+	const messages = uiMessages()
+	const text = messages.pagination
+	const format = new Intl.NumberFormat(messages.locale)
+
+	const count = computed(() => {
+		if (props.countText !== undefined) return props.countText
+		if (props.total === undefined) return ''
+		const total = format.format(props.total)
+		return props.shown === undefined ? fillMessage(text.total, { total }) : fillMessage(text.count, { shown: format.format(props.shown), total })
+	})
+	const more = computed(() => props.hasMore ?? (props.shown !== undefined && props.total !== undefined && props.shown < props.total))
+	const action = computed(() => (props.busy ? (props.loadingLabel ?? text.loading) : (props.loadMoreLabel ?? text.loadMore)))
+
+	function load(): void {
+		if (!props.busy) emit('loadMore')
+	}
+
+	function holdLink(event: MouseEvent): void {
+		if (props.busy) event.preventDefault()
+	}
+</script>
+
+<template>
+	<nav
+		bind:class="['meeko-ui-pagination', props.class].filter(Boolean).join(' ')"
+		bind:aria-label="props.label ?? text.label"
+		bind:aria-busy="props.busy ? 'true' : undefined"
+		on:click="holdLink"
+	>
+		<p
+			class="meeko-ui-pagination-count"
+			role="status"
+		>
+			{count.value}
+		</p>
+		<render
+			if:when="snippets.default"
+			snippet="snippets.default"
+		/>
+		<ItemLink
+			if:when="more.value && props.moreLink"
+			class="meeko-ui-button"
+			data-variant="outline"
+			data-size="sm"
+			bind:link="props.moreLink!"
+			bind:aria-disabled="props.busy ? 'true' : undefined"
+		>
+			{action.value}
+		</ItemLink>
+		<button
+			if:when="more.value && !props.moreLink"
+			type="button"
+			class="meeko-ui-button"
+			data-variant="outline"
+			data-size="sm"
+			bind:aria-disabled="props.busy ? 'true' : undefined"
+			on:click="load"
+		>
+			{action.value}
+		</button>
+	</nav>
+</template>

@@ -1,0 +1,134 @@
+<script lang="ts">
+	// <UITableOfContents>: plain links. `scroll-target-group` paints the active one with no script where
+	// it exists; the observer below only keeps aria-current there, and is the paint everywhere else.
+	import { effect, signal } from '@meekojs/meeko'
+
+	import type { UITableOfContentsProps } from '../types/navigation'
+
+	import { icons } from '../utils/icons'
+	import { uiMessages } from '../utils/messages'
+	import { followsLink } from '../utils/navigation'
+	import * as Icon from './internal/Icon.meeko'
+
+	const props = defineProps<UITableOfContentsProps>({ variant: 'aside' })
+
+	const text = uiMessages().tableOfContents
+	const spied = signal<string | undefined>(undefined)
+	const viewportHeight = signal(0)
+	const panel = useElementRef('panel')
+
+	const activeId = (): string | undefined => props.active ?? spied.value
+	const nested = (level: number): number | undefined => (level > 2 ? level - 2 : undefined)
+
+	function closeOnChoice(event: MouseEvent): void {
+		if (followsLink(event)) panel.value?.removeAttribute('open')
+	}
+
+	onMounted(() => {
+		let stop: (() => void) | undefined
+		const measure = (): void => {
+			viewportHeight.value = window.innerHeight
+		}
+		measure()
+		window.addEventListener('resize', measure, { passive: true })
+		const stopEffect = effect(() => {
+			stop?.()
+			stop = undefined
+			if (props.active !== undefined) return
+			const ids = props.entries.map((entry) => entry.id)
+			const passed = new Set<string>()
+			// A band from far above the page to the line where an anchor leaves a heading, as the platform
+			// does: a heading enters it when it reaches that line, however fast the reader scrolls.
+			const line = (Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingBlockStart) || 0) + 1
+			const observer = new IntersectionObserver(
+				(changes) => {
+					for (const change of changes) {
+						if (change.isIntersecting) passed.add(change.target.id)
+						else passed.delete(change.target.id)
+					}
+					spied.value = [...ids].reverse().find((id) => passed.has(id)) ?? ids[0]
+				},
+				{ rootMargin: `100000% 0% ${line - viewportHeight.value}px 0%` },
+			)
+			// The headings of a new page render after the entries change.
+			const frame = requestAnimationFrame(() => {
+				for (const id of ids) {
+					const heading = document.getElementById(id)
+					if (heading) observer.observe(heading)
+				}
+			})
+			stop = () => {
+				cancelAnimationFrame(frame)
+				observer.disconnect()
+			}
+		})
+		return () => {
+			window.removeEventListener('resize', measure)
+			stop?.()
+			stopEffect()
+		}
+	})
+</script>
+
+<template>
+	<nav
+		if:when="props.variant === 'aside' && props.entries.length"
+		data-pagefind-ignore
+		bind:class="['meeko-ui-toc', props.class].filter(Boolean).join(' ')"
+		bind:aria-label="props.label ?? text.label"
+		bind:data-tracking="props.active === undefined ? 'auto' : 'manual'"
+	>
+		<p class="meeko-ui-toc-title">{props.label ?? text.label}</p>
+		<ul>
+			<li
+				each:of="props.entries"
+				each:as="entry"
+				each:key="entry.id"
+			>
+				<a
+					bind:href="'#' + entry.id"
+					bind:data-nested="nested(entry.level)"
+					bind:aria-current="activeId() === entry.id ? 'location' : undefined"
+				>
+					{entry.text}
+				</a>
+			</li>
+		</ul>
+	</nav>
+	<details
+		ref:panel
+		if:when="props.variant === 'collapsible' && props.entries.length"
+		data-pagefind-ignore
+		bind:class="['meeko-ui-toc-collapsible', props.class].filter(Boolean).join(' ')"
+	>
+		<summary>
+			{props.label ?? text.label}
+			<Icon
+				class="meeko-ui-nav-chevron"
+				bind:path="icons.chevron"
+			/>
+		</summary>
+		<nav
+			class="meeko-ui-toc"
+			bind:aria-label="props.label ?? text.label"
+			bind:data-tracking="props.active === undefined ? 'auto' : 'manual'"
+			on:click="closeOnChoice"
+		>
+			<ul>
+				<li
+					each:of="props.entries"
+					each:as="entry"
+					each:key="entry.id"
+				>
+					<a
+						bind:href="'#' + entry.id"
+						bind:data-nested="nested(entry.level)"
+						bind:aria-current="activeId() === entry.id ? 'location' : undefined"
+					>
+						{entry.text}
+					</a>
+				</li>
+			</ul>
+		</nav>
+	</details>
+</template>

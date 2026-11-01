@@ -1,0 +1,103 @@
+<script lang="ts">
+	// <UIDrawer>: a native modal <dialog>. `command` and `commandfor` open and close it without JavaScript
+	// where the browser has them; the handlers do the same elsewhere and keep the model in step. The
+	// platform traps the focus, closes on Escape and gives the focus back.
+	import { effect } from '@meekojs/meeko'
+
+	import type { UIDrawerProps } from '../types/navigation'
+
+	import { icons } from '../utils/icons'
+	import { uiMessages } from '../utils/messages'
+	import { followsLink } from '../utils/navigation'
+	import * as Icon from './internal/Icon.meeko'
+
+	const props = defineProps<UIDrawerProps>({ side: 'start', closedBy: 'any', closeOnNavigate: true })
+
+	const emit = defineEmits<{ close: [] }>()
+
+	const open = defineModel<boolean>({ default: false })
+
+	const snippets = defineSnippets<{ default: []; footer?: []; trigger?: [id: string] }>()
+
+	const generated = useId()
+	const text = uiMessages().drawer
+	const dialog = useElementRef('dialog')
+
+	const dialogId = (): string => props.id ?? generated
+
+	function onDialogClick(event: MouseEvent): void {
+		// The dialog has no padding: only the backdrop targets the element itself. `closedby` does this
+		// natively; this line is for the browsers that do not have it yet.
+		if (event.target === dialog.value && props.closedBy === 'any') open.value = false
+		else if (props.closeOnNavigate && followsLink(event)) open.value = false
+	}
+
+	function onClose(): void {
+		open.value = false
+		emit('close')
+	}
+
+	onMounted(() =>
+		effect(() => {
+			const element = dialog.value
+			if (!element) return
+			if (open.value && !element.open) element.showModal()
+			else if (!open.value && element.open) element.close()
+		}),
+	)
+</script>
+
+<template>
+	<render
+		if:when="snippets.trigger"
+		snippet="snippets.trigger"
+		args="dialogId()"
+	/>
+	<button
+		if:when="!snippets.trigger && props.triggerLabel"
+		type="button"
+		command="show-modal"
+		class="meeko-ui-button meeko-ui-drawer-trigger"
+		data-variant="outline"
+		data-size="sm"
+		aria-haspopup="dialog"
+		bind:commandfor="dialogId()"
+		on:click="() => (open.value = true)"
+	>
+		<Icon bind:path="icons.menu" />
+		{props.triggerLabel}
+	</button>
+	<dialog
+		ref:dialog
+		bind:id="dialogId()"
+		bind:class="['meeko-ui-drawer', props.class].filter(Boolean).join(' ')"
+		bind:data-side="props.side"
+		bind:closedby="props.closedBy"
+		bind:aria-labelledby="dialogId() + '-title'"
+		on:click="onDialogClick"
+		on:close="onClose"
+	>
+		<div class="meeko-ui-drawer-panel">
+			<div class="meeko-ui-drawer-heading">
+				<h2 bind:id="dialogId() + '-title'">{props.title}</h2>
+				<button
+					type="button"
+					command="close"
+					class="meeko-ui-drawer-close"
+					bind:commandfor="dialogId()"
+					bind:aria-label="props.closeLabel ?? text.close"
+					on:click="() => (open.value = false)"
+				>
+					<Icon bind:path="icons.close" />
+				</button>
+			</div>
+			<div class="meeko-ui-drawer-body"><render snippet="snippets.default" /></div>
+			<footer
+				if:when="snippets.footer"
+				class="meeko-ui-drawer-footer"
+			>
+				<render snippet="snippets.footer" />
+			</footer>
+		</div>
+	</dialog>
+</template>

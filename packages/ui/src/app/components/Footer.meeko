@@ -1,0 +1,93 @@
+<script lang="ts">
+	import type { UIFooterProps } from '../types/navigation'
+
+	import { uiMessages } from '../utils/messages'
+	import { linkTarget } from '../utils/navigation'
+	import * as Brand from './internal/Brand.meeko'
+	import * as ItemLink from './internal/ItemLink.meeko'
+
+	const props = defineProps<UIFooterProps>({ size: 'xl' })
+
+	const snippets = defineSnippets<{ brand?: []; about?: []; actions?: []; legal?: [] }>()
+
+	const text = uiMessages().footer
+</script>
+
+<template>
+	<footer
+		data-pagefind-ignore
+		bind:class="['meeko-ui-footer', props.class].filter(Boolean).join(' ')"
+	>
+		<div
+			class="meeko-ui-container meeko-ui-footer-inner"
+			data-gutter="md"
+			bind:data-size="props.size"
+		>
+			<div
+				if:when="snippets.brand || props.brand || snippets.about || props.description || snippets.actions"
+				class="meeko-ui-footer-about"
+			>
+				<render
+					if:when="snippets.brand"
+					snippet="snippets.brand"
+				/>
+				<Brand
+					if:when="!snippets.brand && props.brand"
+					bind:brand="props.brand!"
+				/>
+				<render
+					if:when="snippets.about"
+					snippet="snippets.about"
+				/>
+				<p if:when="!snippets.about && props.description">{props.description}</p>
+				<div
+					if:when="snippets.actions"
+					class="meeko-ui-footer-actions"
+				>
+					<render snippet="snippets.actions" />
+				</div>
+			</div>
+			<nav
+				if:when="props.groups?.length"
+				class="meeko-ui-footer-groups"
+				bind:aria-label="props.label ?? text.label"
+			>
+				<div
+					each:of="props.groups ?? []"
+					each:as="group"
+					each:key="group.title"
+				>
+					<p class="meeko-ui-footer-title">{group.title}</p>
+					<ul>
+						<li
+							each:of="group.items"
+							each:as="item"
+							each:key="item.label"
+						>
+							<ItemLink bind:link="linkTarget(item)">{item.label}</ItemLink>
+						</li>
+					</ul>
+				</div>
+			</nav>
+			<div
+				if:when="snippets.legal || props.items?.length"
+				class="meeko-ui-footer-legal"
+			>
+				<div if:when="snippets.legal"><render snippet="snippets.legal" /></div>
+				<nav
+					if:when="props.items?.length"
+					bind:aria-label="props.label ?? text.label"
+				>
+					<ItemLink
+						each:of="props.items ?? []"
+						each:as="item"
+						each:key="item.label"
+						bind:link="linkTarget(item)"
+					>
+						{item.label}
+					</ItemLink>
+				</nav>
+			</div>
+		</div>
+	</footer>
+</template>

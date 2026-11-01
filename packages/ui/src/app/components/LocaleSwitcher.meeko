@@ -1,0 +1,34 @@
+<script lang="ts">
+	// <UILocaleSwitcher>: real links, so it works without JavaScript and crawlers follow them. The code is
+	// what shows; the name of the language is what a screen reader hears.
+	import type { UILinkTarget, UILocaleItem, UILocaleSwitcherProps } from '../types/navigation'
+
+	import { uiMessages } from '../utils/messages'
+	import { linkTarget } from '../utils/navigation'
+	import * as ItemLink from './internal/ItemLink.meeko'
+
+	const props = defineProps<UILocaleSwitcherProps>()
+
+	const text = uiMessages().language
+
+	const target = (item: UILocaleItem): UILinkTarget => ({ ...linkTarget(item), hreflang: item.hreflang ?? item.code, lang: item.lang ?? item.code, title: item.title ?? item.label })
+</script>
+
+<template>
+	<nav
+		if:when="props.items.length > 1"
+		bind:class="['meeko-ui-locale-switcher', props.class].filter(Boolean).join(' ')"
+		bind:aria-label="props.label ?? text.label"
+	>
+		<ItemLink
+			each:of="props.items"
+			each:as="item"
+			each:key="item.code"
+			bind:link="target(item)"
+			bind:current="item.current ? 'page' : undefined"
+		>
+			<span aria-hidden="true">{item.code.toUpperCase()}</span>
+			<span class="meeko-ui-sr-only">{item.label}</span>
+		</ItemLink>
+	</nav>
+</template>

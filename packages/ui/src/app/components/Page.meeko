@@ -1,0 +1,76 @@
+<script lang="ts">
+	// <UIPage>: the structure every site shares, one <main> and its skip link; what goes inside is the app's.
+	import { computed } from '@meekojs/meeko'
+
+	import type { UIPageProps } from '../types/navigation'
+
+	import { uiMessages } from '../utils/messages'
+
+	const { layout = 'docs', mainId = 'contenido', mainLang, skipLabel, class: className, ...rest } = defineProps<UIPageProps>()
+
+	const snippets = defineSnippets<{ default: []; header?: []; notices?: []; bar?: []; sidebar?: []; aside?: []; footer?: [] }>()
+
+	const text = uiMessages().page
+	const classes = computed(() => ['meeko-ui-page', className].filter(Boolean).join(' '))
+
+	// The spread stays before the class, as in <UILink>: see the note there.
+	/* eslint-disable meeko/attributes-order */
+</script>
+
+<template>
+	<div
+		bind="rest"
+		bind:class="classes.value"
+		bind:data-layout="layout"
+	>
+		<a
+			class="meeko-ui-skip-link"
+			bind:href="'#' + mainId"
+		>
+			{skipLabel ?? text.skip}
+		</a>
+		<render
+			if:when="snippets.header"
+			snippet="snippets.header"
+		/>
+		<render
+			if:when="snippets.notices"
+			snippet="snippets.notices"
+		/>
+		<div
+			if:when="snippets.bar"
+			class="meeko-ui-page-bar"
+			data-pagefind-ignore
+		>
+			<render snippet="snippets.bar" />
+		</div>
+		<div class="meeko-ui-page-body">
+			<div
+				if:when="snippets.sidebar"
+				class="meeko-ui-page-sidebar"
+				data-pagefind-ignore
+			>
+				<render snippet="snippets.sidebar" />
+			</div>
+			<main
+				tabindex="-1"
+				class="meeko-ui-page-main"
+				bind:id="mainId"
+				bind:lang="mainLang"
+			>
+				<render snippet="snippets.default" />
+			</main>
+			<aside
+				if:when="snippets.aside"
+				class="meeko-ui-page-aside"
+				data-pagefind-ignore
+			>
+				<render snippet="snippets.aside" />
+			</aside>
+		</div>
+		<render
+			if:when="snippets.footer"
+			snippet="snippets.footer"
+		/>
+	</div>
+</template>

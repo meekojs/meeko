@@ -1,0 +1,132 @@
+<script lang="ts">
+	// <UINavigationTree>: a group folds with a native <details>. With a list long enough to scroll, the
+	// current link is brought into the view of its panel, without moving the document.
+	import { effect } from '@meekojs/meeko'
+
+	import type { UINavigationTreeGroup, UINavigationTreeItem, UINavigationTreeProps } from '../types/navigation'
+
+	import { icons } from '../utils/icons'
+	import { uiMessages } from '../utils/messages'
+	import { isCurrentLink, linkTarget, revealInScroller, scrollingAncestor } from '../utils/navigation'
+	import * as Icon from './internal/Icon.meeko'
+	import * as ItemLink from './internal/ItemLink.meeko'
+
+	const props = defineProps<UINavigationTreeProps>({ collapsible: true })
+
+	const snippets = defineSnippets<{ item?: [item: UINavigationTreeItem, current: boolean]; icon?: [entry: UINavigationTreeGroup | UINavigationTreeItem]; empty?: [] }>()
+
+	const text = uiMessages().navigationTree
+	const root = useElementRef('root')
+
+	const isCurrent = (item: UINavigationTreeItem): boolean => isCurrentLink(item, props.current)
+	const folds = (group: UINavigationTreeGroup): boolean => props.collapsible && group.title !== undefined
+	const startsOpen = (group: UINavigationTreeGroup): boolean => group.open !== false || group.items.some(isCurrent)
+	const groupKey = (group: UINavigationTreeGroup, index: number): string => group.title ?? String(index)
+
+	onMounted(() =>
+		effect(() => {
+			void props.current
+			void props.groups
+			requestAnimationFrame(() => {
+				const link = root.value?.querySelector<HTMLElement>('a[aria-current]')
+				const scroller = link && scrollingAncestor(link)
+				if (link && scroller) revealInScroller(scroller, link, 'block')
+			})
+		}),
+	)
+</script>
+
+<template>
+	<nav
+		ref:root
+		bind:class="['meeko-ui-nav-tree', props.class].filter(Boolean).join(' ')"
+		bind:aria-label="props.label ?? text.label"
+	>
+		<component
+			each:of="props.groups"
+			each:as="group"
+			each:index="index"
+			each:key="groupKey(group, index)"
+			is="folds(group) ? 'details' : 'div'"
+			class="meeko-ui-nav-group"
+			bind:open="folds(group) ? startsOpen(group) : undefined"
+		>
+			<component
+				if:when="group.title !== undefined"
+				is="folds(group) ? 'summary' : 'p'"
+				class="meeko-ui-nav-group-title"
+			>
+				<span>
+					<render
+						if:when="snippets.icon && group.icon"
+						snippet="snippets.icon"
+						args="group"
+					/>
+					<Icon
+						if:when="!snippets.icon && group.icon"
+						bind:path="group.icon!"
+					/>
+					{group.title}
+				</span>
+				<Icon
+					if:when="folds(group)"
+					class="meeko-ui-nav-chevron"
+					bind:path="icons.chevron"
+				/>
+			</component>
+			<ul>
+				<li
+					each:of="group.items"
+					each:as="item"
+					each:key="item.label"
+				>
+					<ItemLink
+						class="meeko-ui-nav-link"
+						bind:link="linkTarget(item)"
+						bind:current="isCurrent(item) ? 'page' : undefined"
+						bind:data-code="item.code ? '' : undefined"
+					>
+						<render
+							if:when="snippets.item"
+							snippet="snippets.item"
+							args="item, isCurrent(item)"
+						/>
+						<render
+							if:when="!snippets.item && snippets.icon && item.icon"
+							snippet="snippets.icon"
+							args="item"
+						/>
+						<Icon
+							if:when="!snippets.item && !snippets.icon && item.icon"
+							bind:path="item.icon!"
+						/>
+						<span
+							if:when="!snippets.item"
+							class="meeko-ui-nav-label"
+						>
+							{item.label}
+						</span>
+						<span
+							if:when="!snippets.item && item.featured"
+							class="meeko-ui-badge"
+							data-tone="accent"
+						>
+							{props.featuredLabel ?? text.featured}
+						</span>
+					</ItemLink>
+				</li>
+			</ul>
+		</component>
+		<div
+			if:when="props.groups.length === 0"
+			class="meeko-ui-nav-empty"
+			role="status"
+		>
+			<render
+				if:when="snippets.empty"
+				snippet="snippets.empty"
+			/>
+			<span if:when="!snippets.empty">{props.emptyText ?? text.empty}</span>
+		</div>
+	</nav>
+</template>

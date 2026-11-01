@@ -1,0 +1,112 @@
+<script lang="ts">
+	// <UIHeader>: a bar of a fixed height. The small-screen menu is a native popover: it opens, closes on
+	// Escape and on a click outside without JavaScript, and it floats, so it never moves the page.
+	import type { UIHeaderProps } from '../types/navigation'
+
+	import { icons } from '../utils/icons'
+	import { uiMessages } from '../utils/messages'
+	import { followsLink, isCurrentLink, linkTarget } from '../utils/navigation'
+	import * as Brand from './internal/Brand.meeko'
+	import * as Icon from './internal/Icon.meeko'
+	import * as ItemLink from './internal/ItemLink.meeko'
+
+	const props = defineProps<UIHeaderProps>({ sticky: true, size: 'xl' })
+
+	const snippets = defineSnippets<{ brand?: []; nav?: []; actions?: []; menu?: [] }>()
+
+	const id = useId()
+	const text = uiMessages().header
+	const panel = useElementRef('panel')
+
+	/** A client navigation keeps the header mounted: the chosen link closes the menu. */
+	function closeMenu(event: MouseEvent): void {
+		if (followsLink(event)) panel.value?.hidePopover()
+	}
+</script>
+
+<template>
+	<header
+		data-pagefind-ignore
+		bind:class="['meeko-ui-header', props.class].filter(Boolean).join(' ')"
+		bind:data-sticky="props.sticky ? '' : undefined"
+	>
+		<div
+			class="meeko-ui-container meeko-ui-header-bar"
+			data-gutter="md"
+			bind:data-size="props.size"
+		>
+			<render
+				if:when="snippets.brand"
+				snippet="snippets.brand"
+			/>
+			<Brand
+				if:when="!snippets.brand && props.brand"
+				bind:brand="props.brand!"
+			/>
+			<render
+				if:when="snippets.nav"
+				snippet="snippets.nav"
+			/>
+			<nav
+				if:when="!snippets.nav && props.items?.length"
+				class="meeko-ui-header-nav"
+				bind:aria-label="props.label ?? text.label"
+			>
+				<ItemLink
+					each:of="props.items ?? []"
+					each:as="item"
+					each:key="item.label"
+					bind:link="linkTarget(item)"
+					bind:current="isCurrentLink(item, props.current) ? 'page' : undefined"
+				>
+					{item.label}
+				</ItemLink>
+			</nav>
+			<div
+				if:when="snippets.actions || props.items?.length || snippets.menu"
+				class="meeko-ui-header-actions"
+			>
+				<render
+					if:when="snippets.actions"
+					snippet="snippets.actions"
+				/>
+				<button
+					if:when="props.items?.length || snippets.menu"
+					type="button"
+					class="meeko-ui-header-toggle"
+					bind:popovertarget="id + '-menu'"
+					bind:aria-label="props.menuLabel ?? text.menu"
+				>
+					<Icon bind:path="icons.menu" />
+				</button>
+			</div>
+		</div>
+		<div
+			ref:panel
+			if:when="props.items?.length || snippets.menu"
+			popover="auto"
+			class="meeko-ui-header-menu"
+			bind:id="id + '-menu'"
+			on:click="closeMenu"
+		>
+			<nav
+				if:when="props.items?.length"
+				bind:aria-label="props.menuLabel ?? text.menu"
+			>
+				<ItemLink
+					each:of="props.items ?? []"
+					each:as="item"
+					each:key="item.label"
+					bind:link="linkTarget(item)"
+					bind:current="isCurrentLink(item, props.current) ? 'page' : undefined"
+				>
+					{item.label}
+				</ItemLink>
+			</nav>
+			<render
+				if:when="snippets.menu"
+				snippet="snippets.menu"
+			/>
+		</div>
+	</header>
+</template>
