@@ -1,4 +1,4 @@
-import type { UIBreadcrumbItem, UICodeBlockProps, UIDrawerProps, UILinkTarget, UILocaleItem, UINavigationLink, UINavigationTreeGroup, UIPageProps, UIPaginationProps, UITableOfContentsEntry } from '@meekojs/ui/runtime'
+import type { UIBreadcrumbItem, UICodeBlockProps, UIDrawerProps, UILinkTarget, UILocaleItem, UINavigationLink, UINavigationTreeGroup, UIPageProps, UIPaginationProps, UIProseProps, UITableOfContentsEntry } from '@meekojs/ui/runtime'
 
 import type { ComponentProps as BreadcrumbProps } from '../../dist/app/components/Breadcrumb.d.meeko.ts'
 import type { ComponentProps as CodeBlockProps } from '../../dist/app/components/CodeBlock.d.meeko.ts'
@@ -46,7 +46,11 @@ const verdict: UICodeBlockProps = { verdict: 'maybe' }
 const closedBy: UIDrawerProps = { title: 'x', closedBy: 'never' }
 // @ts-expect-error An entry needs its level.
 const noLevel: UITableOfContentsEntry = { id: 'a', text: 'A' }
+// @ts-expect-error The root of a page is a <div>: an attribute of <a> and <button> does not reach it.
+const linkAttribute: UIPageProps = { interestfor: 'tip' }
+// @ts-expect-error The root of a prose is not a link either.
+const proseLinkAttribute: UIProseProps = { href: '/a' }
 // @ts-expect-error A layout of the list.
 const layout: UIPageProps = { layout: 'wide' }
 
-void [links, header, breadcrumb, group, entry, locale, drawer, code, pagination, page, missing, noParams, both, noLabel, verdict, closedBy, noLevel, layout]
+void [links, header, breadcrumb, group, entry, locale, drawer, code, pagination, page, linkAttribute, proseLinkAttribute, missing, noParams, both, noLabel, verdict, closedBy, noLevel, layout]

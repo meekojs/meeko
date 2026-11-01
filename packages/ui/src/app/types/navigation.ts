@@ -1,6 +1,6 @@
-import type { TrustedHtml } from '@meekojs/meeko'
+import type { ElementAttributes, TrustedHtml } from '@meekojs/meeko'
 
-import type { UIForwardedAttributes, UIRouteTarget } from './button'
+import type { UIRouteTarget } from './button'
 import type { UIContainerSize } from './container'
 
 /** `href` o `to`, excluyentes. */
@@ -183,7 +183,7 @@ export type UIPageLayout = 'docs' | 'dashboard' | 'landing'
  * </UIPage>
  * ```
  */
-export type UIPageProps = UIForwardedAttributes & {
+export type UIPageProps = Omit<ElementAttributes<'div'>, 'class'> & {
 	/** Disposición; `"docs"` por defecto. */
 	readonly layout?: UIPageLayout
 	/** `id` del `<main>`, destino del enlace para saltar; `"contenido"` por defecto. */
@@ -648,7 +648,7 @@ export interface UICodeBlockProps {
  * <UIProse><h2>Instalación</h2><p>Añade el paquete.</p></UIProse>
  * ```
  */
-export type UIProseProps = UIForwardedAttributes & {
+export type UIProseProps = Omit<ElementAttributes<'div' | 'article' | 'section'>, 'class'> & {
 	/** Etiqueta raíz; `"div"` por defecto. */
 	readonly as?: 'div' | 'article' | 'section'
 	/** HTML de confianza; sin él, se pinta el snippet `default`. */
