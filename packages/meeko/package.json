@@ -8,7 +8,7 @@
   "files": ["dist/"],
   "types": "./dist/index.d.ts",
   "repository": { "type": "git", "url": "git+https://github.com/meekojs/meeko.git", "directory": "packages/meeko" },
-  "homepage": "https://github.com/meekojs/meeko#readme",
+  "homepage": "https://meekojs.com",
   "bugs": { "url": "https://github.com/meekojs/meeko/issues" },
   "keywords": ["meeko", "components", "ssr", "hydration", "reactivity", "vite", "typescript", "devtools"],
   "publishConfig": { "access": "public" },
@@ -99,6 +99,7 @@
     "build": "node ../../scripts/build-package.mjs",
     "check": "tsc -p tsconfig.json --noEmit",
     "builtins": "tsx scripts/builtin-components.ts",
+    "html-data": "tsx scripts/html-data.ts",
     "test": "node scripts/clean-test-tmp.mjs && pnpm run build && pnpm run example:compile && tsx --test --test-concurrency=1 tests/*.test.ts",
     "example:compile": "node dist/cli.js compile examples/counter/Counter.meeko examples/counter/Counter.generated.ts && node dist/cli.js compile examples/attributes/Attributes.meeko examples/attributes/Attributes.generated.ts && node dist/cli.js compile examples/regions/Regions.meeko examples/regions/Regions.generated.ts && node dist/cli.js compile examples/primitives/Primitives.meeko examples/primitives/Primitives.generated.ts",
     "example:bundle": "pnpm run build && pnpm run example:compile && esbuild examples/counter/client.ts --bundle --format=esm --platform=browser --target=es2022 --outfile=examples/counter/client.bundle.js",
@@ -117,7 +118,7 @@
     "conformance:bun": "pnpm run build && tsx --test tests/conformance/bun.test.ts",
     "conformance:deno": "pnpm run build && tsx --test tests/conformance/deno.test.ts",
     "conformance:workerd": "pnpm run build && tsx --test tests/conformance/workerd.test.ts",
-    "e2e": "pnpm run example:bundle && pnpm run vite:build && tsx --test tests/browser.e2e.ts tests/editor-bridge.e2e.ts tests/teleport.e2e.ts tests/popover-select.e2e.ts",
+    "e2e": "pnpm run example:bundle && pnpm run vite:build && tsx --test tests/browser.e2e.ts tests/editor-bridge.e2e.ts tests/devtools-config.e2e.ts tests/teleport.e2e.ts tests/popover-select.e2e.ts tests/scoped-styles.e2e.ts",
     "benchmark:check": "pnpm run example:compile && node dist/cli.js compile benchmarks/cases/TreeLeaf.meeko benchmarks/cases/TreeLeaf.generated.ts && node dist/cli.js compile benchmarks/cases/TreeBranch.meeko benchmarks/cases/TreeBranch.generated.ts && node dist/cli.js compile benchmarks/cases/Tree.meeko benchmarks/cases/Tree.generated.ts && node dist/cli.js compile benchmarks/cases/List.meeko benchmarks/cases/List.generated.ts && node dist/cli.js compile benchmarks/cases/Navigation.meeko benchmarks/cases/Navigation.generated.ts && tsc -p tsconfig.benchmark.json --noEmit",
     "benchmark": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/run.ts",
     "benchmark:scenarios": "pnpm run build && pnpm run benchmark:check && node --expose-gc --import tsx benchmarks/scenarios.ts",
@@ -142,18 +143,24 @@
     "ws": "8.22.0"
   },
   "peerDependencies": {
+    "tailwindcss": "^4.0.0",
     "vite": "^8.3.5"
   },
   "peerDependenciesMeta": {
+    "tailwindcss": { "optional": true },
     "vite": { "optional": true }
   },
   "devDependencies": {
+    "@mdn/browser-compat-data": "8.1.7",
+    "@tailwindcss/postcss": "4.3.3",
+    "@tailwindcss/vite": "4.3.3",
     "@types/node": "^24.0.0",
     "@types/ws": "8.18.2",
     "esbuild": "0.28.2",
     "happy-dom": "^20.0.0",
     "playwright-core": "1.64.1",
     "redis": "6.3.0",
+    "tailwindcss": "4.3.3",
     "tsx": "^4.20.0",
     "vite": "8.3.5",
     "vue": "3.5.44",

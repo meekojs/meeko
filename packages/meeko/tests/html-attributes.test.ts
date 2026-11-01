@@ -1,30 +1,27 @@
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
 import test from "node:test";
 
 import { isTagName } from "../src/app/runtime/dynamic-tag.ts";
+import { booleanAttributeNames } from "../src/core/server.ts";
 import { elementAccepts, elementAttributeNames, globalAttributeNames, tagsAccepting } from "../src/shared/html-attributes.ts";
+import * as generated from "../src/shared/html-data/attribute-names.ts";
 
-interface HtmlData {
-  readonly tags: ReadonlyArray<{ readonly name: string; readonly attributes: ReadonlyArray<{ readonly name: string }> }>;
-  readonly globalAttributes: ReadonlyArray<{ readonly name: string }>;
-}
-
-/** The HTML data of `vscode-html-languageservice`, which the editor uses for completion. */
-const htmlData = (createRequire(import.meta.url)("vscode-html-languageservice/lib/umd/languageFacts/data/webCustomData.js") as { htmlData: HtmlData }).htmlData;
-
-test("the attribute data of <component is> is the editor's HTML data", () => {
-  const ignored = (name: string): boolean => /^on/.test(name) || name.startsWith("aria-") || name === "is";
-  const globals = htmlData.globalAttributes.map((attribute) => attribute.name).filter((name) => !ignored(name)).sort();
-  assert.equal(globalAttributeNames, globals.join(" "));
-  const global = new Set(globals);
+// Since 1.8 the lists come from the HTML data that scripts/html-data.ts generates from the standard;
+// tests/html-data.test.ts keeps them in sync with it and with what 1.7 accepted. Here: the
+// compiler and the runtime read exactly those lists, under the rules of Meeko.
+test("the attribute data of <component is> is the generated HTML data, without on*, is or aria-*", () => {
+  assert.equal(globalAttributeNames, generated.globalAttributeNames);
+  assert.equal(elementAttributeNames, generated.elementAttributeNames);
+  const lists = [globalAttributeNames, ...Object.values(elementAttributeNames)].flatMap((list) => list ? list.split(" ") : []);
+  assert.deepEqual(lists.filter((name) => /^on/.test(name) || name.startsWith("aria-") || name.startsWith("data-") || name === "is"), []);
   // `type` of <a> and <area> is a MIME hint: with `is="href ? 'a' : 'button'"` it is the button's.
-  const left: Record<string, readonly string[]> = { a: ["type"], area: ["type"] };
-  const expected = Object.fromEntries([...htmlData.tags].sort((first, second) => first.name.localeCompare(second.name)).map((tag) => [
-    tag.name,
-    [...new Set(tag.attributes.map((attribute) => attribute.name).filter((name) => !ignored(name) && !global.has(name) && !(left[tag.name] ?? []).includes(name)))].sort().join(" "),
-  ]));
-  assert.deepEqual({ ...elementAttributeNames }, expected);
+  assert.ok(!elementAttributeNames.a.split(" ").includes("type"));
+  assert.ok(!elementAttributeNames.area.split(" ").includes("type"));
+  // The renderer, in core, keeps a copy of the boolean attributes: the same list.
+  assert.equal(booleanAttributeNames, generated.booleanAttributeNames);
+  // Recent attributes of the standard reach the checks of <component is> and bind="obj".
+  assert.ok(elementAccepts("dialog", "closedby"));
+  assert.ok(elementAccepts("div", "popover"));
 });
 
 test("each attribute applies to the tags whose data has it, and global ones to all", () => {
