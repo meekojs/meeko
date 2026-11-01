@@ -90,7 +90,7 @@ export const smoke = { state: signal(1), ui, i18n, useModal, formatting, lint: d
 '@ | Set-Content -LiteralPath (Join-Path $consumer 'app/pages/index.meeko') -Encoding utf8
   @'
 export default { plugins: [{ postcssPlugin: 'consumer-ui-colors', Declaration(node) {
-  if (node.prop === '--meeko-ui-accent') node.value = '#123456';
+  if (node.prop === '--ui-color-info-9') node.value = '#123456';
 } }] };
 '@ | Set-Content -LiteralPath (Join-Path $consumer 'postcss.config.mjs') -Encoding utf8
   @'
@@ -103,8 +103,8 @@ const css = (await Promise.all(files.map((file) => readFile(`${directory}/${file
 assert.match(css, /\.meeko-ui-button/);
 assert.match(css, /\.meeko-ui-table/);
 assert.match(css, /\.meeko-ui-card/);
-assert.match(css, /--meeko-ui-accent:\s*#123456/);
-assert.match(css, /--meeko-ui-primary:\s*var\(--consumer-primary\)/);
+assert.match(css, /--ui-color-info-9:\s*#123456/);
+assert.match(css, /--ui-color-primary:\s*var\(--consumer-primary\)/);
 assert.doesNotMatch(css, /@import/);
 console.log('Installed UI CSS uses consumer PostCSS and ships as a production asset.');
 '@ | Set-Content -LiteralPath (Join-Path $consumer 'styles-smoke.mjs') -Encoding utf8

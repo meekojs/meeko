@@ -50,6 +50,8 @@ test('UI registers a static app plugin and only aliases the consumer component r
 			addVitePlugin(plugin) {
 				vitePlugins.push(plugin)
 			},
+			addPublicFile() {},
+			addHead() {},
 		},
 	)
 	assert.equal(plugins.length, 1)

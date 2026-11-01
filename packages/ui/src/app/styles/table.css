@@ -4,39 +4,39 @@
 	overscroll-behavior-inline: contain;
 }
 .meeko-ui-table-scroll:focus-visible {
-	outline: 2px solid var(--meeko-ui-focus);
-	outline-offset: 2px;
+	outline: var(--ui-focus-ring);
+	outline-offset: var(--ui-focus-ring-offset);
 }
 .meeko-ui-table {
-	--table-columns: minmax(160px, 2fr) minmax(200px, 3fr) 120px;
-	--table-border: var(--color-border, var(--meeko-ui-border));
-	--table-background: var(--color-surface, var(--meeko-ui-surface));
-	--table-hover: color-mix(in oklch, var(--color-text, var(--meeko-ui-text)) 4%, transparent);
+	--table-columns: minmax(var(--ui-table-column-min), 2fr) minmax(calc(var(--ui-table-column-min) * 1.25), 3fr) calc(var(--ui-table-column-min) * 0.75);
+	--table-border: var(--ui-color-border);
+	--table-background: var(--ui-color-surface);
+	--table-hover: var(--ui-color-control-hover);
 	border-collapse: separate;
 	border-spacing: 0;
 	background: var(--table-background);
 
 	width: 100%;
-	color: var(--color-text, var(--meeko-ui-text));
-	font-size: 0.875rem;
-	font-family: var(--meeko-ui-font);
+	color: var(--ui-color-text);
+	font-size: var(--ui-font-size-md);
+	font-family: var(--ui-font-sans);
 	font-variant-numeric: tabular-nums;
 	text-align: left;
 
 	& > caption {
-		padding: 0.75rem 1rem;
-		color: var(--color-text-muted, var(--meeko-ui-muted));
+		padding: var(--ui-space-2) var(--ui-space-3);
+		color: var(--ui-color-text-soft);
 		text-align: inherit;
 	}
 	& > :is(thead, tbody, tfoot) > tr > :is(th, td) {
 		vertical-align: middle;
-		border-bottom: 1px solid var(--table-border);
-		padding: 12px 16px;
+		border-bottom: var(--ui-border-width) solid var(--table-border);
+		padding: var(--ui-space-2) var(--ui-space-3);
 		text-align: inherit;
 	}
 	& > :is(thead, tbody, tfoot) > tr > th {
-		color: var(--color-text-muted, var(--meeko-ui-muted));
-		font-weight: 500;
+		color: var(--ui-color-text-soft);
+		font-weight: var(--ui-font-weight-medium);
 	}
 	& > tbody > tr:hover {
 		background: var(--table-hover);
@@ -45,7 +45,7 @@
 		border-bottom: 0;
 	}
 	& > tfoot > tr:first-child > :is(th, td) {
-		border-top: 1px solid var(--table-border);
+		border-top: var(--ui-border-width) solid var(--table-border);
 	}
 	& > tfoot > tr:last-child > :is(th, td) {
 		border-bottom: 0;

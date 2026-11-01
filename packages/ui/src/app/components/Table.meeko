@@ -72,7 +72,7 @@
 			role="table"
 			bind:class="['meeko-ui-table', props.class].filter(Boolean).join(' ')"
 			bind:data-layout="props.layout"
-			bind:style="'--table-columns: ' + (props.gridColumns ?? 'repeat(' + Math.max(1, props.columns.length) + ', minmax(160px, 1fr))')"
+			bind:style="'--table-columns: ' + (props.gridColumns ?? 'repeat(' + Math.max(1, props.columns.length) + ', minmax(var(--ui-table-column-min), 1fr))')"
 		>
 			<caption
 				if:when="props.caption"

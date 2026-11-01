@@ -25,7 +25,7 @@ function syncBackdrop(document: Document): void {
 		const depth = Math.max(0, Math.min(2, active.length - 1 - active.indexOf(dialog)))
 		dialog.toggleAttribute(topAttribute, dialog === top)
 		dialog.toggleAttribute('data-meeko-ui-modal-behind', dialog.open && dialog !== top)
-		dialog.style.setProperty('--meeko-ui-modal-depth', String(depth))
+		dialog.style.setProperty('--ui-modal-depth', String(depth))
 	}
 }
 
@@ -33,7 +33,7 @@ function releaseBackdrop(element: HTMLDialogElement): void {
 	element.removeAttribute(orderAttribute)
 	element.removeAttribute(topAttribute)
 	element.removeAttribute('data-meeko-ui-modal-behind')
-	element.style.removeProperty('--meeko-ui-modal-depth')
+	element.style.removeProperty('--ui-modal-depth')
 	syncBackdrop(element.ownerDocument)
 }
 

@@ -3,31 +3,35 @@ import type { UIMessageOverrides, UIMessages, UIMessagesConfig } from './app/typ
 
 import { builtinMessages, canonicalLocale } from './app/utils/messages'
 
+/**
+ * The variables each option sets. `surface` and `surfaceHover` predate the split into surfaces and
+ * controls, so they set every one of them; `accent` only reaches its deprecated alias.
+ */
 const tokenNames = {
-	accent: 'accent',
-	accentHover: 'accent-hover',
-	onAccent: 'on-accent',
-	primary: 'primary',
-	primaryHover: 'primary-hover',
-	onPrimary: 'on-primary',
-	surface: 'surface',
-	surfaceHover: 'surface-hover',
-	text: 'text',
-	textSoft: 'text-soft',
-	muted: 'muted',
-	border: 'border',
-	borderStrong: 'border-strong',
-	danger: 'danger',
-	focus: 'focus',
-	radius: 'radius',
-	font: 'font',
-	controlPadding: 'control-padding',
-	controlHeight: 'control-height',
-	controlWeight: 'control-weight',
-	controlFontSize: 'control-font-size',
-	accentSoft: 'accent-soft',
-	accentText: 'accent-text',
-} satisfies Record<keyof UITokens, string>
+	accent: ['--meeko-ui-accent'],
+	accentHover: ['--meeko-ui-accent-hover'],
+	onAccent: ['--meeko-ui-on-accent'],
+	primary: ['--ui-color-primary'],
+	primaryHover: ['--ui-color-primary-hover'],
+	onPrimary: ['--ui-color-primary-contrast'],
+	surface: ['--ui-color-surface', '--ui-color-surface-raised', '--ui-color-control'],
+	surfaceHover: ['--ui-color-control-hover', '--ui-color-control-active'],
+	text: ['--ui-color-text'],
+	textSoft: ['--ui-color-text-soft'],
+	muted: ['--ui-color-text-soft'],
+	border: ['--ui-color-border'],
+	borderStrong: ['--ui-color-border-strong'],
+	danger: ['--ui-color-danger', '--ui-color-danger-text'],
+	focus: ['--ui-color-focus'],
+	radius: ['--ui-radius-md'],
+	font: ['--ui-font-sans'],
+	controlPadding: ['--ui-control-padding-md'],
+	controlHeight: ['--ui-control-height-md'],
+	controlWeight: ['--ui-control-font-weight'],
+	controlFontSize: ['--ui-control-font-size'],
+	accentSoft: ['--ui-color-primary-soft'],
+	accentText: ['--ui-color-primary-text'],
+} satisfies Record<keyof UITokens, readonly string[]>
 
 function object(value: unknown, name: string): asserts value is Record<string, unknown> {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError(`ui: ${name} must be an object`)
@@ -73,7 +77,8 @@ function validateMessages(messages: unknown): void {
 /** Valida opciones antes de escribir CSS o serializar defaults al cliente. */
 export function validateOptions(options: UIOptions): void {
 	object(options, 'options')
-	for (const key of Object.keys(options)) if (!['tokens', 'defaults', 'locale', 'messages'].includes(key)) throw new TypeError(`ui: unknown option ${key}`)
+	for (const key of Object.keys(options)) if (!['tokens', 'defaults', 'locale', 'messages', 'base'].includes(key)) throw new TypeError(`ui: unknown option ${key}`)
+	if (options.base !== undefined && typeof options.base !== 'boolean') throw new TypeError('ui: base must be a boolean')
 	if (options.locale !== undefined && (typeof options.locale !== 'string' || !validLocale(options.locale))) throw new TypeError('ui: locale must be a language tag such as "en" or "pt-BR"')
 	if (options.messages !== undefined) validateMessages(options.messages)
 	if (options.tokens !== undefined) {
@@ -110,7 +115,7 @@ export function messagesConfig(options: UIOptions): UIMessagesConfig {
 /** CSS de variables, aplicado después de los valores claros/oscuros del paquete. */
 export function tokenStyles(tokens: UITokens | undefined): string {
 	const entries = Object.entries(tokens ?? {}) as Array<[keyof UITokens, string]>
-	return entries.length ? `\n:root, :root[data-theme] {\n${entries.map(([key, value]) => `  --meeko-ui-${tokenNames[key]}: ${value};`).join('\n')}\n}\n` : ''
+	return entries.length ? `\n:root, :root[data-theme] {\n${entries.flatMap(([key, value]) => tokenNames[key].map((name) => `  ${name}: ${value};`)).join('\n')}\n}\n` : ''
 }
 
 export type { UIDefaults, UIMessageOverrides, UIMessages, UIOptions, UITokens }

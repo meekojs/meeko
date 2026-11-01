@@ -81,6 +81,16 @@ test('UICard hydrates snippets, changes variants and supports both themes and mo
 	assert.notEqual(styles.outline.color, styles.solid.color)
 	assert.equal(styles.outline.shadow, 'none')
 	assert.notEqual(styles.elevated.shadow, 'none')
+	// The docs' own ".doc-page p" rule is more specific than the classes of the card: on a solid, the text must still be the card's.
+	const solidText = await page
+		.locator('.meeko-ui-card[data-variant="solid"]')
+		.last()
+		.evaluate((element) => {
+			const color = (selector) => globalThis.getComputedStyle(element.querySelector(selector)).color
+			return { card: globalThis.getComputedStyle(element).color, description: color('.meeko-ui-card-description'), body: color('.meeko-ui-card-body p') }
+		})
+	assert.equal(solidText.description, solidText.card, 'the description of a solid card is readable')
+	assert.equal(solidText.body, solidText.card, 'the content of a solid card is readable')
 	assert.equal(await body.evaluate((element) => element.isConnected), true, 'variant updates retain hydrated content')
 	assert.equal(await page.locator('.card-demo-custom .meeko-ui-card-header h2').innerText(), 'Cabecera personalizada')
 	assert.equal(await page.locator('.card-demo-minimal header, .card-demo-minimal footer').count(), 0)

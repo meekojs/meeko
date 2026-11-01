@@ -2,20 +2,20 @@
 	display: inline-flex;
 	align-items: center;
 	vertical-align: middle;
-	border: 1px solid var(--meeko-ui-border);
-	border-radius: 999px;
-	background: var(--meeko-ui-surface);
-	padding: 0.08rem 0.6rem;
-	color: var(--meeko-ui-text-soft);
-	font: 500 0.78rem/1.6 var(--meeko-ui-font);
+	border: var(--ui-border-width) solid var(--ui-color-border);
+	border-radius: var(--ui-radius-full);
+	background: var(--ui-color-control);
+	padding: var(--ui-space-0-5) var(--ui-space-2);
+	color: var(--ui-color-text-soft);
+	font: var(--ui-font-weight-medium) var(--ui-font-size-xs) / var(--ui-line-height-snug) var(--ui-font-sans);
 }
 .meeko-ui-badge[data-tone='accent'] {
 	border-color: transparent;
-	background: var(--meeko-ui-accent-soft);
-	color: var(--meeko-ui-accent-text);
+	background: var(--ui-color-primary-soft);
+	color: var(--ui-color-primary-text);
 }
 .meeko-ui-badge[data-tone='danger'] {
 	border-color: transparent;
-	background: color-mix(in oklab, var(--meeko-ui-danger) 12%, transparent);
-	color: var(--meeko-ui-danger);
+	background: var(--ui-color-danger-soft);
+	color: var(--ui-color-danger-text);
 }

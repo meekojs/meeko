@@ -1,37 +1,222 @@
+/*
+ * The design tokens of Meeko. Raw values live here and in palette.css only; everything else reads
+ * var(--ui-*). packages/ui/DESIGN.md says which one to use for what.
+ *
+ * Steps follow the Radix convention: 1-2 backgrounds, 3-5 controls, 6-8 borders, 9-10 solids, 11-12 text.
+ */
 :root {
-	--meeko-ui-accent: #285ac8;
-	--meeko-ui-accent-hover: #1c49af;
-	--meeko-ui-on-accent: #fff;
-	--meeko-ui-primary: var(--meeko-ui-accent);
-	--meeko-ui-primary-hover: var(--meeko-ui-accent-hover);
-	--meeko-ui-on-primary: var(--meeko-ui-on-accent);
-	--meeko-ui-accent-soft: color-mix(in oklab, var(--meeko-ui-accent) 12%, transparent);
-	--meeko-ui-accent-text: var(--meeko-ui-accent);
-	--meeko-ui-text-soft: var(--meeko-ui-text);
-	--meeko-ui-border-strong: var(--meeko-ui-border);
-	--meeko-ui-control-padding: 0.55rem 0.9rem;
-	--meeko-ui-control-height: 2.5rem;
-	--meeko-ui-control-weight: 600;
-	--meeko-ui-control-font-size: 0.9rem;
-	--meeko-ui-surface: #fff;
-	--meeko-ui-surface-hover: #f3f5f9;
-	--meeko-ui-text: #18202d;
-	--meeko-ui-muted: #5d6879;
-	--meeko-ui-border: #b8c2d0;
-	--meeko-ui-danger: #b42335;
-	--meeko-ui-focus: #285ac8;
-	--meeko-ui-radius: 0.625rem;
-	--meeko-ui-font: system-ui, sans-serif;
+	/* Backgrounds */
+	--ui-color-bg: var(--ui-color-surface-1);
+	--ui-color-bg-subtle: var(--ui-color-surface-2);
+	--ui-color-surface: var(--ui-color-surface-2);
+	--ui-color-surface-raised: var(--ui-color-surface-1);
+	--ui-color-overlay: rgb(0 0 0 / 50%);
+
+	/* Controls */
+	--ui-color-control: var(--ui-color-surface-3);
+	--ui-color-control-hover: var(--ui-color-surface-4);
+	--ui-color-control-active: var(--ui-color-surface-5);
+
+	/* Borders */
+	--ui-color-border: var(--ui-color-surface-6);
+	--ui-color-border-strong: var(--ui-color-surface-8);
+
+	/* Text */
+	--ui-color-text: var(--ui-color-surface-12);
+	--ui-color-text-soft: var(--ui-color-surface-11);
+
+	/* Browser surfaces */
+	--ui-color-focus: var(--ui-color-primary-9);
+	--ui-color-selection: var(--ui-color-primary-5);
+
+	/* Primary: --ui-color-primary-contrast comes with the other scales, below */
+	--ui-color-primary: var(--ui-color-primary-9);
+	--ui-color-primary-hover: var(--ui-color-primary-10);
+	--ui-color-primary-active: color-mix(in oklab, var(--ui-color-primary) 50%, var(--ui-color-primary-hover));
+	--ui-color-primary-soft: var(--ui-color-primary-3);
+	--ui-color-primary-soft-hover: var(--ui-color-primary-4);
+	--ui-color-primary-border: var(--ui-color-primary-7);
+	--ui-color-primary-text: var(--ui-color-primary-11);
+
+	/* States */
+	--ui-color-info: var(--ui-color-info-9);
+	--ui-color-info-hover: var(--ui-color-info-10);
+	--ui-color-info-soft: var(--ui-color-info-3);
+	--ui-color-info-border: var(--ui-color-info-7);
+	--ui-color-info-text: var(--ui-color-info-11);
+	--ui-color-success: var(--ui-color-success-9);
+	--ui-color-success-hover: var(--ui-color-success-10);
+	--ui-color-success-soft: var(--ui-color-success-3);
+	--ui-color-success-border: var(--ui-color-success-7);
+	--ui-color-success-text: var(--ui-color-success-11);
+	--ui-color-warning: var(--ui-color-warning-9);
+	--ui-color-warning-hover: var(--ui-color-warning-10);
+	--ui-color-warning-soft: var(--ui-color-warning-3);
+	--ui-color-warning-border: var(--ui-color-warning-7);
+	--ui-color-warning-text: var(--ui-color-warning-11);
+	--ui-color-danger: var(--ui-color-danger-9);
+	--ui-color-danger-hover: var(--ui-color-danger-10);
+	--ui-color-danger-soft: var(--ui-color-danger-3);
+	--ui-color-danger-border: var(--ui-color-danger-7);
+	--ui-color-danger-text: var(--ui-color-danger-11);
+
+	/*
+	 * Text on a solid: white when it reaches 4.5:1, black otherwise. Light step 10 is darker than 9,
+	 * so the text on a hovered solid is a token of its own. tests/tokens.test.mjs computes them all.
+	 */
+	--ui-color-primary-contrast: #ffffff;
+	--ui-color-primary-contrast-hover: #ffffff;
+	--ui-color-surface-contrast: #000000;
+	--ui-color-surface-contrast-hover: #000000;
+	--ui-color-info-contrast: #000000;
+	--ui-color-info-contrast-hover: #ffffff;
+	--ui-color-success-contrast: #000000;
+	--ui-color-success-contrast-hover: #ffffff;
+	--ui-color-warning-contrast: #000000;
+	--ui-color-warning-contrast-hover: #ffffff;
+	--ui-color-danger-contrast: #ffffff;
+	--ui-color-danger-contrast-hover: #ffffff;
+	--ui-color-cyan-contrast: #000000;
+	--ui-color-cyan-contrast-hover: #ffffff;
+	--ui-color-orange-contrast: #ffffff;
+	--ui-color-orange-contrast-hover: #ffffff;
+	--ui-color-pink-contrast: #ffffff;
+	--ui-color-pink-contrast-hover: #ffffff;
+
+	/* Type */
+	--ui-font-sans: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--ui-font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+	--ui-font-size-xs: 0.75rem;
+	--ui-font-size-sm: 0.8125rem;
+	--ui-font-size-md: 0.875rem;
+	--ui-font-size-lg: 1rem;
+	--ui-font-size-xl: 1.125rem;
+	--ui-font-size-2xl: 1.375rem;
+	--ui-font-size-3xl: 1.75rem;
+	--ui-font-size-4xl: 2.25rem;
+	--ui-font-size-5xl: 3rem;
+	--ui-font-size-6xl: 4rem;
+	--ui-line-height-none: 1;
+	--ui-line-height-tight: 1.2;
+	--ui-line-height-snug: 1.35;
+	--ui-line-height-normal: 1.5;
+	--ui-line-height-relaxed: 1.65;
+	--ui-font-weight-regular: 400;
+	--ui-font-weight-medium: 500;
+	--ui-font-weight-semibold: 600;
+	--ui-font-weight-bold: 700;
+	--ui-tracking-normal: 0;
+	--ui-tracking-snug: -0.006em;
+	--ui-tracking-tight: -0.014em;
+	--ui-tracking-display: -0.025em;
+	--ui-underline-offset: 0.2em;
+
+	/* Space, on a 0.25rem grid: the suffix counts steps */
+	--ui-space-0-5: 0.125rem;
+	--ui-space-1: 0.25rem;
+	--ui-space-1-5: 0.375rem;
+	--ui-space-2: 0.5rem;
+	--ui-space-3: 0.75rem;
+	--ui-space-4: 1rem;
+	--ui-space-5: 1.25rem;
+	--ui-space-6: 1.5rem;
+	--ui-space-8: 2rem;
+	--ui-space-10: 2.5rem;
+	--ui-space-12: 3rem;
+	--ui-space-16: 4rem;
+	--ui-space-20: 5rem;
+	--ui-space-24: 6rem;
+
+	/* Shape */
+	--ui-radius-xs: 0.1875rem;
+	--ui-radius-sm: 0.25rem;
+	--ui-radius-md: 0.375rem;
+	--ui-radius-lg: 0.5rem;
+	--ui-radius-xl: 0.75rem;
+	--ui-radius-full: 999px;
+	--ui-border-width: 1px;
+	--ui-focus-ring-width: 2px;
+	--ui-focus-ring-offset: 2px;
+	--ui-focus-ring: var(--ui-focus-ring-width) solid var(--ui-color-focus);
+
+	/* Controls: touch screens get taller ones and a text size that does not make iOS zoom in */
+	--ui-control-height-sm: 1.75rem;
+	--ui-control-height-md: 2rem;
+	--ui-control-height-lg: 2.5rem;
+	--ui-control-padding-sm: 0 var(--ui-space-2);
+	--ui-control-padding-md: 0 var(--ui-space-3);
+	--ui-control-padding-lg: 0 var(--ui-space-4);
+	--ui-control-font-size-sm: var(--ui-font-size-sm);
+	--ui-control-font-size: var(--ui-font-size-md);
+	--ui-control-font-size-lg: var(--ui-font-size-md);
+	--ui-control-font-weight: var(--ui-font-weight-medium);
+	--ui-input-font-size: var(--ui-font-size-md);
+	--ui-opacity-disabled: 0.55;
+
+	/* Depth */
+	--ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 8%);
+	--ui-shadow-md: 0 2px 4px rgb(0 0 0 / 6%), 0 6px 16px rgb(0 0 0 / 10%);
+	--ui-shadow-lg: 0 4px 8px rgb(0 0 0 / 8%), 0 16px 40px rgb(0 0 0 / 16%);
+
+	/* Motion */
+	--ui-duration-fast: 120ms;
+	--ui-duration-base: 180ms;
+	--ui-duration-slow: 220ms;
+	--ui-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+	--ui-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+	/* Layout */
+	--ui-container-sm: 40rem;
+	--ui-container-md: 48rem;
+	--ui-container-lg: 64rem;
+	--ui-container-xl: 80rem;
+	--ui-container-2xl: 96rem;
+	--ui-container-3xl: 120rem;
+	--ui-container-4k: 240rem;
+	--ui-container-gutter-sm: clamp(0.75rem, 1vw, 1.5rem);
+	--ui-container-gutter-md: clamp(1rem, 2vw, 4rem);
+	--ui-container-gutter-lg: clamp(1.5rem, 3vw, 6rem);
+	--ui-modal-width-sm: 26rem;
+	--ui-modal-width-md: 34rem;
+	--ui-modal-width-lg: 48rem;
+	--ui-modal-stack-offset: 12px;
+	--ui-modal-stack-scale: 0.04;
+	--ui-popover-max-height: min(20rem, 70vh);
+	--ui-table-column-min: 10rem;
 }
+
 :root[data-theme='dark'] {
-	--meeko-ui-accent: #9ab9ff;
-	--meeko-ui-accent-hover: #b5ccff;
-	--meeko-ui-on-accent: #101827;
-	--meeko-ui-surface: #1c2330;
-	--meeko-ui-surface-hover: #293242;
-	--meeko-ui-text: #f0f3f8;
-	--meeko-ui-muted: #b4bfce;
-	--meeko-ui-border: #69778c;
-	--meeko-ui-danger: #ffa0a9;
-	--meeko-ui-focus: #9ab9ff;
+	/* On pure black, panels rise by getting lighter; shadows only separate what overlaps. */
+	--ui-color-surface-raised: var(--ui-color-surface-3);
+	--ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 60%);
+	--ui-shadow-md: 0 2px 4px rgb(0 0 0 / 50%), 0 6px 16px rgb(0 0 0 / 60%);
+	--ui-shadow-lg: 0 4px 8px rgb(0 0 0 / 50%), 0 16px 40px rgb(0 0 0 / 70%);
+
+	--ui-color-primary-contrast: #ffffff;
+	--ui-color-primary-contrast-hover: #ffffff;
+	--ui-color-surface-contrast: #ffffff;
+	--ui-color-surface-contrast-hover: #ffffff;
+	--ui-color-info-contrast: #000000;
+	--ui-color-info-contrast-hover: #000000;
+	--ui-color-success-contrast: #000000;
+	--ui-color-success-contrast-hover: #000000;
+	--ui-color-warning-contrast: #000000;
+	--ui-color-warning-contrast-hover: #000000;
+	--ui-color-danger-contrast: #000000;
+	--ui-color-danger-contrast-hover: #000000;
+	--ui-color-cyan-contrast: #000000;
+	--ui-color-cyan-contrast-hover: #000000;
+	--ui-color-orange-contrast: #000000;
+	--ui-color-orange-contrast-hover: #000000;
+	--ui-color-pink-contrast: #000000;
+	--ui-color-pink-contrast-hover: #000000;
+}
+
+@media (pointer: coarse) {
+	:root {
+		--ui-control-height-sm: 2.25rem;
+		--ui-control-height-md: 2.5rem;
+		--ui-control-height-lg: 2.75rem;
+		--ui-input-font-size: var(--ui-font-size-lg);
+	}
 }

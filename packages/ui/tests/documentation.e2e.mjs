@@ -41,7 +41,7 @@ test('public UI documentation renders every guide, navigates, copies code and va
 		}, theme)
 		const palette = await page.evaluate(() => {
 			const style = globalThis.getComputedStyle(globalThis.document.documentElement)
-			return { ink: style.getPropertyValue('--ink').trim(), ui: style.getPropertyValue('--meeko-ui-text').trim() }
+			return { ink: style.getPropertyValue('--ink').trim(), ui: style.getPropertyValue('--ui-color-text').trim() }
 		})
 		assert.equal(palette.ink, palette.ui)
 	}

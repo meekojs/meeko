@@ -1,21 +1,23 @@
 .meeko-ui-modal {
-	translate: 0 calc(var(--meeko-ui-modal-depth, 0) * -12px);
-	scale: calc(1 - var(--meeko-ui-modal-depth, 0) * 0.04);
+	translate: 0 calc(var(--ui-modal-depth, 0) * var(--ui-modal-stack-offset) * -1);
+	scale: calc(1 - var(--ui-modal-depth, 0) * var(--ui-modal-stack-scale));
 	transition:
-		scale 220ms cubic-bezier(0.16, 1, 0.3, 1),
-		translate 220ms cubic-bezier(0.16, 1, 0.3, 1);
+		scale var(--ui-duration-slow) var(--ui-ease-out),
+		translate var(--ui-duration-slow) var(--ui-ease-out);
 	box-sizing: border-box;
 	margin: auto;
-	border: 1px solid var(--meeko-ui-border);
-	border-radius: var(--meeko-ui-radius);
-	background: var(--meeko-ui-surface);
+	box-shadow: var(--ui-shadow-lg);
+	border: var(--ui-border-width) solid var(--ui-color-border);
+	border-radius: var(--ui-radius-xl);
+	background: var(--ui-color-surface-raised);
 	padding: 0;
-	width: min(34rem, calc(100vw - 2rem));
+	width: min(var(--ui-modal-width-md), calc(100vw - var(--ui-space-8)));
 	max-width: none;
-	max-height: calc(100dvh - 2rem);
+	max-height: calc(100dvh - var(--ui-space-8));
 	overflow: hidden;
-	color: var(--meeko-ui-text);
-	font-family: var(--meeko-ui-font);
+	color: var(--ui-color-text);
+	font-size: var(--ui-font-size-md);
+	font-family: var(--ui-font-sans);
 }
 .meeko-ui-modal[data-meeko-ui-modal-behind],
 .meeko-ui-modal[data-meeko-ui-modal-state='closing'] {
@@ -26,34 +28,36 @@
 	flex-direction: column;
 }
 .meeko-ui-modal[data-size='sm'] {
-	width: min(26rem, calc(100vw - 2rem));
+	width: min(var(--ui-modal-width-sm), calc(100vw - var(--ui-space-8)));
 }
 .meeko-ui-modal[data-size='lg'] {
-	width: min(48rem, calc(100vw - 2rem));
+	width: min(var(--ui-modal-width-lg), calc(100vw - var(--ui-space-8)));
 }
 .meeko-ui-modal::backdrop {
 	background: transparent;
 }
 .meeko-ui-modal[data-meeko-ui-modal-top]::backdrop {
-	background: rgb(0 0 0 / 50%);
+	background: var(--ui-color-overlay);
 }
 .meeko-ui-modal-heading {
 	display: flex;
 	flex: none;
 	justify-content: space-between;
 	align-items: flex-start;
-	gap: 1rem;
-	padding: 1.5rem 1.5rem 0;
+	gap: var(--ui-space-4);
+	padding: var(--ui-space-5) var(--ui-space-5) 0;
 }
 .meeko-ui-modal-heading h2 {
 	margin: 0;
-	font-size: 1.25rem;
-	line-height: 1.4;
+	font-weight: var(--ui-font-weight-semibold);
+	font-size: var(--ui-font-size-xl);
+	line-height: var(--ui-line-height-snug);
+	letter-spacing: var(--ui-tracking-tight);
 }
 .meeko-ui-modal-heading p {
-	margin: 0.5rem 0 0;
-	color: var(--meeko-ui-muted);
-	line-height: 1.5;
+	margin: var(--ui-space-1-5) 0 0;
+	color: var(--ui-color-text-soft);
+	line-height: var(--ui-line-height-normal);
 }
 .meeko-ui-modal-close {
 	display: inline-flex;
@@ -61,25 +65,25 @@
 	justify-content: center;
 	align-items: center;
 	cursor: pointer;
-	margin: -0.5rem -0.5rem 0 0;
+	margin: calc(var(--ui-space-2) * -1) calc(var(--ui-space-2) * -1) 0 0;
 	border: 0;
-	border-radius: var(--meeko-ui-radius);
+	border-radius: var(--ui-radius-md);
 	background: transparent;
 	padding: 0;
-	width: 2.75rem;
-	height: 2.75rem;
-	color: var(--meeko-ui-muted);
+	width: var(--ui-control-height-lg);
+	height: var(--ui-control-height-lg);
+	color: var(--ui-color-text-soft);
 }
 .meeko-ui-modal-close:hover {
-	background: var(--meeko-ui-surface-hover);
-	color: var(--meeko-ui-text);
+	background: var(--ui-color-control-active);
+	color: var(--ui-color-text);
 }
 .meeko-ui-modal-close:focus-visible {
-	outline: 2px solid var(--meeko-ui-focus);
-	outline-offset: 2px;
+	outline: var(--ui-focus-ring);
+	outline-offset: var(--ui-focus-ring-offset);
 }
 .meeko-ui-modal-body {
-	padding: 1.5rem;
+	padding: var(--ui-space-5);
 	min-height: 0;
 	overflow: auto;
 	overscroll-behavior: contain;
@@ -89,17 +93,18 @@
 	flex: none;
 	flex-wrap: wrap;
 	justify-content: flex-end;
-	gap: 0.75rem;
-	border-top: 1px solid var(--meeko-ui-border);
-	padding: 1rem 1.5rem;
+	gap: var(--ui-space-2);
+	border-top: var(--ui-border-width) solid var(--ui-color-border);
+	padding: var(--ui-space-3) var(--ui-space-5);
 }
+/* A media query cannot read a custom property: this width is the only literal in the component sheets. */
 @media (max-width: 30rem) {
 	.meeko-ui-modal-heading {
-		padding: 1rem 1rem 0;
+		padding: var(--ui-space-4) var(--ui-space-4) 0;
 	}
 	.meeko-ui-modal-body,
 	.meeko-ui-modal-footer {
-		padding: 1rem;
+		padding: var(--ui-space-4);
 	}
 }
 @media (prefers-reduced-motion: reduce) {

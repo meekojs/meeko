@@ -166,6 +166,8 @@ test('the module options are validated and only installed when they are given', 
 			addAutoImports() {},
 			addPlugin: (plugin) => plugins.push(plugin),
 			addVitePlugin() {},
+			addPublicFile() {},
+			addHead() {},
 		})
 		return plugins.filter((plugin) => /plugins\/messages\.js$/.test(String(plugin.src ?? plugin)))
 	}

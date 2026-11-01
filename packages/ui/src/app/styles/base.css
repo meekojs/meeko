@@ -1,0 +1,54 @@
+/*
+ * The global base of a Meeko app: reset, body and browser surfaces. In a layer, so any unlayered rule
+ * of the app wins without a fight. The module loads it unless `ui: { base: false }`.
+ */
+@layer ui-base {
+	*,
+	::before,
+	::after {
+		box-sizing: border-box;
+	}
+	:root {
+		background: var(--ui-color-bg);
+		scrollbar-color: var(--ui-color-border-strong) transparent;
+		accent-color: var(--ui-color-primary);
+		color-scheme: light;
+		caret-color: var(--ui-color-primary-text);
+		-webkit-text-size-adjust: 100%;
+		text-size-adjust: 100%;
+	}
+	:root[data-theme='dark'] {
+		color-scheme: dark;
+	}
+	body {
+		margin: 0;
+		background: var(--ui-color-bg);
+		color: var(--ui-color-text);
+		font: var(--ui-font-weight-regular) var(--ui-font-size-lg) / var(--ui-line-height-normal) var(--ui-font-sans);
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+	}
+	:where(button, input, select, textarea) {
+		color: inherit;
+		font: inherit;
+		letter-spacing: inherit;
+	}
+	:where(code, kbd, pre, samp) {
+		font-family: var(--ui-font-mono);
+	}
+	:where(img, video) {
+		max-inline-size: 100%;
+		block-size: auto;
+	}
+	:where(a) {
+		text-underline-offset: var(--ui-underline-offset);
+	}
+	::selection {
+		background: var(--ui-color-selection);
+		color: var(--ui-color-text);
+	}
+	:focus-visible {
+		outline: var(--ui-focus-ring);
+		outline-offset: var(--ui-focus-ring-offset);
+	}
+}
