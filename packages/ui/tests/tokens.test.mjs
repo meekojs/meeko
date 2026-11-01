@@ -58,6 +58,13 @@ const tokens = { light: declarations(block(tokensCss, ':root')), dark: declarati
 const color = (theme, scale, step) => palette[theme][`--ui-color-${scale}-${step}`]
 const primary = (step) => color('dark', 'primary', step)
 
+test('form control borders reach 3:1 against their control and page backgrounds', () => {
+	for (const theme of ['light', 'dark']) {
+		const step = (tokens[theme]['--ui-color-control-border'] ?? tokens.light['--ui-color-control-border']).match(/surface-(\d+)/)[1]
+		for (const background of [1, 2, 3]) assert.ok(contrast(color(theme, 'surface', step), color(theme, 'surface', background)) >= 3, `${theme}: control border against surface ${background}`)
+	}
+})
+
 /** The value of a token that points to a step, in a theme: `--ui-color-text` becomes a hex. */
 function resolve(theme, name) {
 	const value = tokens[theme][name] ?? tokens.light[name]

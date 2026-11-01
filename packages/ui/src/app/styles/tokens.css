@@ -5,6 +5,19 @@
  * Steps follow the Radix convention: 1-2 backgrounds, 3-5 controls, 6-8 borders, 9-10 solids, 11-12 text.
  */
 :root {
+	--ui-space-0: 0;
+	--ui-skeleton-width-long: 80%;
+	--ui-skeleton-width-short: 50%;
+	--ui-switch-width: 2.25rem;
+	--ui-switch-height: 1.25rem;
+	--ui-switch-thumb: 0.875rem;
+	--ui-switch-travel: 1rem;
+	--ui-skeleton-duration: 1.5s;
+	--ui-skeleton-opacity: 0.45;
+	--ui-toast-width: 24rem;
+	--ui-close-rotation: 45deg;
+	--ui-icon-dot-size: 0.375rem;
+
 	/* Backgrounds */
 	--ui-color-bg: var(--ui-color-surface-1);
 	--ui-color-bg-subtle: var(--ui-color-surface-2);

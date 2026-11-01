@@ -12,6 +12,15 @@
  * ```
  */
 export interface UIMessages {
+	/** Avisos, notificaciones y estados vacíos o de carga. */
+	readonly feedback: {
+		/** Nombre accesible de los botones de cierre. */
+		readonly close: string
+		/** Título de estado vacío. */
+		readonly empty: string
+		/** Nombre accesible de carga. */
+		readonly loading: string
+	}
 	/** `<UIModal>`. */
 	readonly modal: {
 		/** `aria-label` del botón de cierre, si no se pasa `closeLabel`. */

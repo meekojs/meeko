@@ -16,6 +16,7 @@ export const uiMessagesKey = createContext<UIMessagesConfig>('@meekojs/ui/messag
 const i18nKey = Symbol.for('meeko.i18n') as ContextKey<{ readonly locale: string }>
 
 const spanish: UIMessages = {
+	feedback: { close: 'Cerrar aviso', empty: 'No hay resultados.', loading: 'Cargando' },
 	modal: { close: 'Cerrar modal' },
 	table: { empty: 'No hay datos.' },
 	select: { empty: 'Sin resultados', clear: 'Quitar selección' },
@@ -81,6 +82,7 @@ const spanish: UIMessages = {
 }
 
 const english: UIMessages = {
+	feedback: { close: 'Dismiss notification', empty: 'No results.', loading: 'Loading' },
 	modal: { close: 'Close modal' },
 	table: { empty: 'No data.' },
 	select: { empty: 'No results', clear: 'Clear selection' },
@@ -172,6 +174,7 @@ function localeChain(locale: string): readonly string[] {
 function merge(messages: UIMessages, layer: UIMessageOverrides | undefined): UIMessages {
 	if (!layer) return messages
 	return {
+		feedback: { ...messages.feedback, ...layer.feedback },
 		modal: { ...messages.modal, ...layer.modal },
 		table: { ...messages.table, ...layer.table },
 		select: { ...messages.select, ...layer.select },
