@@ -15,9 +15,9 @@ export function isCurrentLink(item: CurrentCandidate, current: string | undefine
 	return item.href === current || item.to === current || (item.aliases?.includes(current) ?? false)
 }
 
-/** The destination of an item, without the props that are not attributes of the link. */
-export function linkTarget<Item extends UILinkTarget>(item: Item): UILinkTarget {
-	return { href: item.href, to: item.to, params: item.params, search: item.search, resolve: item.resolve, match: item.match, target: item.target, rel: item.rel, download: item.download, hreflang: item.hreflang, lang: item.lang, title: item.title } as UILinkTarget
+/** The destination of an item and its own `current` flag, without the props that are not attributes of the link. */
+export function linkTarget<Item extends UILinkTarget & { readonly current?: boolean | undefined }>(item: Item): UILinkTarget & { readonly current?: boolean | undefined } {
+	return { href: item.href, to: item.to, params: item.params, search: item.search, resolve: item.resolve, match: item.match, target: item.target, rel: item.rel, download: item.download, hreflang: item.hreflang, lang: item.lang, title: item.title, current: item.current } as UILinkTarget & { readonly current?: boolean | undefined }
 }
 
 /** A click that follows a link in this tab: with a modifier, the reader is opening another one. */

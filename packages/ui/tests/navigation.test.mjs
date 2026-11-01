@@ -173,6 +173,18 @@ test('the navigation components render on the server with their semantics', { ti
 		assert.equal(attribute(tag(tabs, /users\/7/), 'aria-current'), undefined, 'match: prefix does not mark a route outside it')
 	})
 
+	await t.test('a link with to: its own current wins over the route, and without it the route decides', () => {
+		const row = block(es, 'aria-label="Estados"', '</nav>')
+		const links = [...row.matchAll(/<a\b[^>]*>/g)].map((match) => [attribute(match[0], 'href'), attribute(match[0], 'aria-current')])
+		assert.deepEqual(links, [
+			['/about', 'page'],
+			['/', undefined],
+			['/', 'page'],
+			['/about', undefined],
+		])
+		assert.doesNotMatch(row, /aria-current="[^"]*"[^>]*aria-current=/, 'one attribute per link')
+	})
+
 	await t.test('UIBreadcrumb: an ordered list whose last step is the current page', () => {
 		const crumb = block(es, 'meeko-ui-breadcrumb"', '</nav>')
 		assert.match(crumb, /<ol>/)

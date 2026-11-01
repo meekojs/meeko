@@ -11,7 +11,8 @@ type UILinkDestination = { readonly href: string; readonly to?: undefined; reado
  * para una ruta de la aplicación, con `params` y `search` tipados, que navega con `<MeekoLink>` y
  * pasa por los resolvedores de enlaces, así que con `@meekojs/i18n` apunta al idioma del documento o
  * al de `hreflang`. Los dos a la vez son un error de tipos. Con `to`, `aria-current` lo decide la ruta
- * activa y sigue a la navegación del cliente; `match: 'prefix'` marca también sus rutas hijas.
+ * activa y sigue a la navegación del cliente, salvo que el enlace lleve su propio `current`;
+ * `match: 'prefix'` marca también sus rutas hijas.
  *
  * @since 0.2.0
  * @example
@@ -37,15 +38,16 @@ export type UILinkTarget = UILinkDestination & {
 
 /**
  * Un enlace con texto, la unidad de `<UIHeader>`, `<UIFooter>`, `<UINavigationTabs>` y
- * `<UIPageNavigation>`. Un enlace con `to` se marca solo con la ruta activa. Uno con `href` es el
- * actual si `current` es `true` o, sin `current`, si su `href` coincide con la prop `current` del
- * componente.
+ * `<UIPageNavigation>`. `current` manda en cualquier enlace: `true` lo marca y `false` lo desmarca.
+ * Sin `current`, uno con `to` se marca solo con la ruta activa, y uno con `href` es el actual si
+ * coincide con la prop `current` del componente.
  *
  * @since 0.2.0
  * @example
  * ```ts
  * const items: UINavigationLink[] = [
  * 	{ label: 'Guía', to: '/docs' },
+ * 	{ label: 'Sección', to: '/docs/[slug]', params: { slug: 'inicio' }, current: true },
  * 	{ label: 'GitHub', href: 'https://github.com/meekojs/meeko' },
  * ]
  * ```
@@ -53,7 +55,7 @@ export type UILinkTarget = UILinkDestination & {
 export type UINavigationLink = UILinkTarget & {
 	/** Texto visible. */
 	readonly label: string
-	/** Con `href`, marca o desmarca el enlace como página actual, por encima de la prop `current` del componente. */
+	/** Marca (`true`) o desmarca (`false`) el enlace como página actual, por encima de la ruta activa y de la prop `current` del componente. */
 	readonly current?: boolean
 }
 

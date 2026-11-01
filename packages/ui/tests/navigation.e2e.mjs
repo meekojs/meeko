@@ -160,6 +160,20 @@ test('the navigation components work in a browser, with and without JavaScript',
 		await page.close()
 	})
 
+	await t.test('a link with to: its own current hydrates and updates over the route, without a mismatch', async () => {
+		const { page, errors } = await open()
+		const nav = page.getByRole('navigation', { name: 'Estados', exact: true })
+		const states = () => nav.getByRole('link').evaluateAll((links) => links.map((link) => link.getAttribute('aria-current')))
+		// Forced on a route that is not the active one, removed on the active one, and the route for the others.
+		assert.deepEqual(await states(), ['page', null, 'page', null])
+		await page.locator('#toggle-forced').click()
+		assert.deepEqual(await states(), [null, null, 'page', null])
+		await page.locator('#toggle-forced').click()
+		assert.deepEqual(await states(), ['page', null, 'page', null])
+		assert.deepEqual(errors, [])
+		await page.close()
+	})
+
 	await t.test('UINavigationTree: details fold with the keyboard, and a long list shows its current link', async () => {
 		const { page, errors } = await open()
 		const tree = page.getByRole('navigation', { name: 'Documentación', exact: true })

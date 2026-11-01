@@ -20,6 +20,7 @@ const links: UILinkTarget[] = [{ href: 'https://example.com', target: '_blank', 
 const items: UINavigationLink[] = [
 	{ label: 'A', to: '/', current: true },
 	{ label: 'B', href: '/b' },
+	{ label: 'C', to: '/about', current: false },
 ]
 const header: HeaderProps = { items, sticky: false, size: '2xl', brand: { name: 'Meeko', product: 'UI', to: '/', image: { src: '/logo.svg', width: 24, height: 24 } } }
 const crumbs: UIBreadcrumbItem[] = [{ label: 'Inicio', to: '/' }, { label: 'Actual' }]

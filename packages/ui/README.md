@@ -900,7 +900,7 @@ Usar `<UIThemeToggle>` sin `theme` produce `MEEK111` al renderizarse, a través 
 
 Componentes para el armazón de una web y su navegación, con HTML nativo y CSS: los enlaces, los menús, el panel lateral y el índice funcionan sin hidratar. Sus textos por defecto están en `ui.messages`, en español e inglés. Los tipos se importan de `@meekojs/ui/runtime`.
 
-Todo enlace de una lista acepta `href` (cualquier URL) o `to` (una ruta con `params` y `search` tipados), además de `target`, `rel`, `download`, `hreflang`, `lang` y `title`. Con `to` navega con `<MeekoLink>`, pasa por los resolvedores de enlaces (con `@meekojs/i18n` apunta al idioma del documento o al de `hreflang`) y `aria-current` lo decide la ruta activa; `match: 'prefix'` marca también sus rutas hijas y `resolve: false` deja el `href` tal cual. Con `href`, el enlace es el actual si `current` es `true` o si coincide con la prop `current` del componente.
+Todo enlace de una lista acepta `href` (cualquier URL) o `to` (una ruta con `params` y `search` tipados), además de `target`, `rel`, `download`, `hreflang`, `lang` y `title`. Con `to` navega con `<MeekoLink>`, pasa por los resolvedores de enlaces (con `@meekojs/i18n` apunta al idioma del documento o al de `hreflang`) y `aria-current` lo decide la ruta activa; `match: 'prefix'` marca también sus rutas hijas y `resolve: false` deja el `href` tal cual. Con `href`, el enlace es el actual si coincide con la prop `current` del componente. En los dos casos manda el `current` del propio enlace: `true` lo marca y `false` lo desmarca.
 
 ```html
 <UIPage layout="docs">

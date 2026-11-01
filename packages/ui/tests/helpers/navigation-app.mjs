@@ -50,6 +50,7 @@ const showcase = `<script lang="ts">
 	const diff = '--- a/guia.md\\n+++ b/guia.md\\n@@ -1,2 +1,2 @@\\n contexto\\n-antes\\n+después\\n'
 
 	const tabsCurrent = signal('/one')
+	const forced = signal(true)
 	const drawerOpen = signal(false)
 	const closes = signal(0)
 	const shown = signal(2)
@@ -90,6 +91,8 @@ const showcase = `<script lang="ts">
 		<UINavigationTabs bind:items="[{ label: 'Uno', href: '#one', current: tabsCurrent.value === '/one' }, { label: 'Dos más largo', href: '#two', current: tabsCurrent.value === '/two' }, { label: 'Tres', to: '/about' }, { label: 'Hijos', to: '/users/[id]', params: { id: '7' }, match: 'prefix' }, { label: 'Cuarto enlace al final', href: '#four', current: tabsCurrent.value === '/four' }]" label="Vistas" />
 		<button type="button" id="tab-two" on:click="() => (tabsCurrent.value = '/two')">Tab dos</button>
 		<button type="button" id="tab-four" on:click="() => (tabsCurrent.value = '/four')">Tab cuatro</button>
+		<UINavigationTabs bind:items="[{ label: 'Forzado', to: '/about', current: forced.value }, { label: 'Quitado', to: '/', current: false }, { label: 'Según la ruta', to: '/' }, { label: 'Otra ruta', to: '/about' }]" label="Estados" />
+		<button type="button" id="toggle-forced" on:click="() => (forced.value = !forced.value)">Forzar</button>
 		<button type="button" id="open-drawer" on:click="() => (drawerOpen.value = true)">Abrir panel</button>
 		<output id="drawer-state">{drawerOpen.value ? 'abierto' : 'cerrado'}:{closes.value}</output>
 		<UIPagination bind:shown="shown.value" bind:total="5" bind:busy="busy.value" on:loadMore="loadMore" />

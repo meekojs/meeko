@@ -6,7 +6,7 @@
 	import type { UILinkTarget } from '../../types/navigation'
 
 	type Props = UIForwardedAttributes & {
-		link: UILinkTarget
+		link: UILinkTarget & { readonly current?: boolean | undefined }
 		current?: 'page' | 'location' | undefined
 		class?: string
 	}
@@ -16,9 +16,12 @@
 	const snippets = defineSnippets<{ default: [] }>()
 
 	const linkRel = computed(() => link.rel ?? (link.target === '_blank' ? 'noopener noreferrer' : undefined))
-	// In the spread, not as `bind:aria-current`: <MeekoLink> sets it from the active route and leaves this
-	// key out of a spread, while a bound attribute would be written next to its own and fail hydration.
-	const attributes = computed(() => (current ? { ...rest, 'aria-current': current } : rest))
+	// The item's own flag always wins: `true` forces the state and `false` removes it. Without it, a route
+	// is left to <MeekoLink>, which follows the active route, and an <a> uses what its list worked out.
+	const ariaCurrent = computed(() => {
+		if (link.current !== undefined) return link.current ? (current ?? 'page') : false
+		return link.to === undefined ? current : undefined
+	})
 
 	// The spread stays before the attributes of the link, as in <UILink>: see the note there.
 	/* eslint-disable meeko/attributes-order */
@@ -32,7 +35,7 @@
 		bind:search="link.search"
 		bind:resolve="link.resolve"
 		bind:match="link.match"
-		bind="attributes.value"
+		bind="rest"
 		bind:href="link.href"
 		bind:target="link.target"
 		bind:rel="linkRel.value"
@@ -40,6 +43,7 @@
 		bind:hreflang="link.hreflang"
 		bind:lang="link.lang"
 		bind:title="link.title"
+		bind:aria-current="ariaCurrent.value"
 		bind:class="className"
 	>
 		<render snippet="snippets.default" />
