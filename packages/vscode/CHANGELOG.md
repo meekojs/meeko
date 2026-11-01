@@ -2,6 +2,14 @@
 
 ## Sin publicar
 
+- Formatear al guardar o con «Formatear documento» respeta `.prettierignore` y `.gitignore`: un `.meeko` excluido de Prettier ya no se reformatea. Véase el CHANGELOG de `@meekojs/meeko`.
+- Fragmentos con 25 prefijos `m` para componentes, páginas, layouts, macros, reactividad, formularios, API, RPC, middleware y composables. Incluyen props desestructuradas de Meeko 1.8 y limpieza dentro de `onMounted`; los fragmentos TypeScript se ofrecen en cualquier proyecto con la extensión habilitada. Sus expansiones se validan contra el compilador y los tipos actuales de Meeko.
+
+- `bind` en un elemento ofrece cada atributo con `bind:` y su tipo; `ref:` ofrece los nombres de `useElementRef`, y el valor de cada directiva (`on:`, `model`, `if:when`, `each:of`, `bind:`, `<render snippet>`, `{…}`) muestra primero lo que encaja con su tipo. `{{ expr }}` tiene su diagnóstico y sus correcciones rápidas («Convertir a {expr}», «Mostrar las llaves como texto», «Corregir todas las del archivo»), y `autoCloseBefore` ya no incluye `}`: el segundo `{` escrito delante de un `}` cerrado automáticamente no abre otro par. Véase el CHANGELOG de `@meekojs/meeko`.
+- En una etiqueta de componente, el completado ofrece las props del hijo como `title="…"` o `bind:item="…"` según su tipo, sus eventos (`on:save="…"`) y sus modelos (`model:open="…"`), con el cursor dentro de las comillas y antes de las directivas. Las expresiones vacías de una etiqueta de componente (`bind:item=""`) se completan, también al escribir la comilla. Véase el CHANGELOG de `@meekojs/meeko`.
+- `[meeko]` fija los tres valores de `editor.quickSuggestions` (`other`, `comments`, `strings`): un valor por lenguaje sustituye el objeto entero, y con sólo `strings` el completado de los nombres de atributo podía no abrirse al escribir. `wordPattern` trata `bind:class`, `on:click` y `aria-label` como una palabra, y las comillas y `` ` `` ya no se duplican dentro de una cadena o un comentario.
+- Tailwind CSS IntelliSense reconoce `.meeko` automáticamente; `meeko.classes.completion` evita duplicar las utilidades generadas y conserva las clases fuente. Las declaraciones `@utility` no generan avisos de clase sin uso.
+
 - El parser conserva filas y celdas suministradas mediante snippets y los `<render>` dentro de secciones de tabla, manteniendo sus posiciones para el análisis del editor.
 - Autocompletado, hover e ir a definición de variables CSS en `<style>`, estilos inline y cadenas de `bind:style`. Lee declaraciones de componentes, imports locales y la hoja procesada de desarrollo, incluidos registros `@property`, sin ejecutar código del proyecto en modo restringido.
 

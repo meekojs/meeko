@@ -68,9 +68,16 @@ export class LanguageServers {
         const clientOptions: LanguageClientOptions = {
           documentSelector: [{ language: "meeko", scheme: folder?.uri.scheme ?? "*", ...(folder ? { pattern: { baseUri: folder.uri.toString(), pattern: "**/*.meeko" } } : {}) }],
           ...(folder ? { workspaceFolder: folder } : {}),
-          initializationOptions: { trusted },
+          initializationOptions: { trusted, classes: { completion: vscode.workspace.getConfiguration("meeko", folder?.uri).get<string>("classes.completion", "auto"), tailwindActive: vscode.extensions.getExtension("bradlc.vscode-tailwindcss")?.isActive === true } },
           outputChannel: this.output,
           middleware: {
+            workspace: {
+              configuration: async (params, token, next) => {
+                const values = await next(params, token);
+                if (!Array.isArray(values)) return values;
+                return values.map((value: unknown, index: number) => (params.items[index]?.section === "meeko.classes" ? { ...(value && typeof value === "object" ? value : {}), tailwindActive: vscode.extensions.getExtension("bradlc.vscode-tailwindcss")?.isActive === true } : value));
+              },
+            },
             provideCodeLenses: async (document, token, next) => {
               const lenses = await next(document, token);
               const current = this.running.get(key)?.client;

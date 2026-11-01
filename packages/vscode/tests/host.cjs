@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { existsSync } = require("node:fs");
+const { existsSync, writeFileSync } = require("node:fs");
 const path = require("node:path");
 const vscode = require("vscode");
 
@@ -136,6 +136,68 @@ exports.run = async function run() {
   assert.ok(globalClass && classes.items.some((item) => labelOf(item) === "counter"), `Completado de clases: ${classes.items.map(labelOf).join(", ")}`);
   assert.equal(globalClass.detail, "main.css (global)");
   assert.match(String(globalClass.documentation?.value ?? globalClass.documentation ?? ""), /\.btn-primary \{/, "Documentación con la regla de la clase");
+
+  // A component tag: the child's props with their value and the cursor inside, never `prop={}`.
+  writeFileSync(path.join(process.env.MEEKO_HOST_CONSUMER, "Card.meeko"), '<script lang="ts">\nconst props = defineProps<{ item: { id: number }; title: string; disabled?: boolean }>();\nconst emit = defineEmits<{ save: [] }>();\n</script>\n<template><p>{props.title}{props.item.id}</p></template>\n');
+  const cardParentUri = vscode.Uri.file(path.join(process.env.MEEKO_HOST_CONSUMER, "CardParent.meeko"));
+  writeFileSync(cardParentUri.fsPath, '<script lang="ts">\nimport * as Card from "./Card.meeko";\n</script>\n<template><Card it /><div bind:class="x"></div></template>\n');
+  const cardParent = await vscode.workspace.openTextDocument(cardParentUri);
+  const cardPosition = cardParent.positionAt(cardParent.getText().indexOf("<Card it") + "<Card it".length);
+  const insertedText = (item) => item.insertText instanceof vscode.SnippetString ? item.insertText.value : item.insertText ?? labelOf(item);
+  let cardItems = [];
+  for (let attempt = 0; attempt < 60 && !cardItems.some((item) => labelOf(item) === "bind:item"); attempt++) {
+    cardItems = (await vscode.commands.executeCommand("vscode.executeCompletionItemProvider", cardParentUri, cardPosition)).items;
+    if (!cardItems.some((item) => labelOf(item) === "bind:item")) await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  const cardInserted = Object.fromEntries(cardItems.map((item) => [labelOf(item), insertedText(item)]));
+  assert.equal(cardInserted["bind:item"], 'bind:item="$1"', JSON.stringify(cardInserted));
+  assert.equal(cardInserted.title, 'title="$1"');
+  assert.equal(cardInserted.disabled, "disabled");
+  assert.equal(cardInserted["on:save"], 'on:save="$1"');
+  assert.deepEqual(cardItems.filter((item) => /=\{/.test(insertedText(item))).map(labelOf), [], "Sin props al estilo JSX");
+  // `bind:class` is one word for the editor.
+  const bindClass = cardParent.getWordRangeAtPosition(cardParent.positionAt(cardParent.getText().indexOf("bind:class") + 2));
+  assert.equal(cardParent.getText(bindClass), "bind:class");
+
+  // `bind` on an element offers each attribute with bind:, with its type; `bind:` written is replaced.
+  const bindUri = vscode.Uri.file(path.join(process.env.MEEKO_HOST_CONSUMER, "BindParent.meeko"));
+  writeFileSync(bindUri.fsPath, '<script lang="ts">\nconst props = defineProps<{ label: string }>();\n</script>\n<template><button bind></button><p>{props.label}</p></template>\n');
+  const bindDocument = await vscode.workspace.openTextDocument(bindUri);
+  const bindPosition = bindDocument.positionAt(bindDocument.getText().indexOf("<button bind") + "<button bind".length);
+  let bindItems = [];
+  for (let attempt = 0; attempt < 60 && !bindItems.some((item) => labelOf(item) === "bind:type"); attempt++) {
+    bindItems = (await vscode.commands.executeCommand("vscode.executeCompletionItemProvider", bindUri, bindPosition)).items;
+    if (!bindItems.some((item) => labelOf(item) === "bind:type")) await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  const bindType = bindItems.find((item) => labelOf(item) === "bind:type");
+  assert.equal(insertedText(bindType), 'bind:type="$1"', bindItems.map(labelOf).join(", "));
+  assert.equal(bindType.detail, "bind:type: 'submit' | 'reset' | 'button'");
+  for (const label of ["bind", "bind:", "bind:class", "bind:disabled"]) assert.ok(bindItems.some((item) => labelOf(item) === label), label);
+
+  // `{{` in the template's text: the second brace opens no second pair, and `{{ expr }}` has its fixes.
+  const bracesUri = vscode.Uri.file(path.join(process.env.MEEKO_HOST_CONSUMER, "BracesParent.meeko"));
+  writeFileSync(bracesUri.fsPath, '<script lang="ts">\nconst props = defineProps<{ label: string }>();\n</script>\n<template><p>{props.label}</p></template>\n');
+  const bracesDocument = await vscode.workspace.openTextDocument(bracesUri);
+  const bindEditor = await vscode.window.showTextDocument(bracesDocument);
+  const textStart = bracesDocument.positionAt(bracesDocument.getText().indexOf("<p>") + 3);
+  bindEditor.selection = new vscode.Selection(textStart, textStart);
+  await vscode.commands.executeCommand("type", { text: "{" });
+  await vscode.commands.executeCommand("type", { text: "{" });
+  const typed = bracesDocument.getText().slice(bracesDocument.offsetAt(textStart), bracesDocument.offsetAt(textStart) + 4);
+  assert.ok(typed.startsWith("{{") && !typed.startsWith("{{}}"), `Autocierre de {{: ${JSON.stringify(typed)}`);
+  await vscode.commands.executeCommand("undo");
+  await vscode.commands.executeCommand("undo");
+  await bindEditor.edit((builder) => builder.replace(new vscode.Range(bracesDocument.positionAt(bracesDocument.getText().indexOf("{props.label}")), bracesDocument.positionAt(bracesDocument.getText().indexOf("{props.label}") + "{props.label}".length)), "{{ props.label }}"));
+  let braces = [];
+  for (let attempt = 0; attempt < 80 && !braces.length; attempt++) {
+    braces = vscode.languages.getDiagnostics(bracesUri).filter((item) => /\{\{expr\}\}/.test(item.message));
+    if (!braces.length) await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  assert.equal(braces.length, 1, JSON.stringify(vscode.languages.getDiagnostics(bracesUri).map((item) => item.message)));
+  const braceFixes = await vscode.commands.executeCommand("vscode.executeCodeActionProvider", bracesUri, braces[0].range);
+  const fixTitles = braceFixes.map((action) => action.title);
+  for (const title of ["Convertir a {props.label}", "Mostrar las llaves como texto"]) assert.ok(fixTitles.includes(title), `${title}: ${fixTitles.join(", ")}`);
+  await vscode.commands.executeCommand("workbench.action.revertAndCloseActiveEditor");
 
   const references = await vscode.commands.executeCommand("vscode.executeReferenceProvider", uri, position);
   assert.ok(references.filter((item) => item.uri.toString() === uri.toString()).length >= 3, `Referencias en script y plantilla: ${references.length}`);

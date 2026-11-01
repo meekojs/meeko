@@ -60,6 +60,7 @@ test("Meeko tokens distinguish section attributes, HTML and TypeScript expressio
     "<p>{({ id: 1 }).id}</p>",
     '<li if:when="count" each:of="value" each:as="id">x</li>',
     '<article html="props.outlet" data-html="plain"></article>',
+    '<span data-gap="plain" bind:title="count" /><textarea name="plain" /><em>after</em>',
     "</template>",
     "<style scoped>",
     "button { color: red; }",
@@ -101,6 +102,9 @@ test("Meeko tokens distinguish section attributes, HTML and TypeScript expressio
   assert.ok(tokens.some((token) => token.text === "outlet" && token.scopes.includes("meta.embedded.inline.typescript")), "<render snippet> is TypeScript");
   assert.ok(tokens.some((token) => token.text === "1" && token.scopes.includes("constant.numeric.ts")), "<render args> is TypeScript");
   assert.ok(hasScope("html", directive), "html directive on an element");
+  // Since 1.8 `<span />` and `<textarea />` are empty elements: the next tag is a sibling.
+  assert.ok(hasScope("bind:title", directive) && hasScope("textarea", "entity.name.tag.html") && hasScope("em", "entity.name.tag.html"), "self-closing HTML elements");
+  assert.ok(tokens.some((token) => token.text === "after" && !token.scopes.some((scope) => scope.startsWith("meta.tag"))), "text after a self-closing element is content");
   assert.ok(hasScope("data-html", "entity.other.attribute-name.html") && !hasScope("data-html", directive), "data-html stays an HTML attribute");
   assert.equal(tokens.filter((token) => token.text === "outlet" && token.scopes.includes("meta.embedded.inline.typescript")).length, 3, "html value is TypeScript");
   assert.ok(hasScope("my-widget", "entity.name.tag.html") && !hasScope("my-widget", component), "custom elements stay HTML tags");

@@ -1,0 +1,57 @@
+{
+	"Endpoint de API (server/api/*.get.ts)": {
+		"prefix": "mapi",
+		"body": [
+			"import { defineApiRoute } from '@meekojs/meeko/server'",
+			"",
+			"export default defineApiRoute({",
+			"\thandler: () => Response.json({ ${1:ok}: ${2:true} }),",
+			"})",
+			"$0"
+		],
+		"description": "Endpoint de API (server/api/*.get.ts)"
+	},
+	"RPC con schemas compartidos (server/rpc/*.ts)": {
+		"prefix": "mrpc",
+		"body": [
+			"import { defineRpc } from '@meekojs/meeko/server'",
+			"import { ${1:inputSchema}, ${2:outputSchema} } from '${3:../../shared/schemas/example}'",
+			"",
+			"export default defineRpc({",
+			"\tinput: ${1},",
+			"\toutput: ${2},",
+			"\thandler: async ({ input }) => {",
+			"\t\t${4:return input}",
+			"\t},",
+			"})",
+			"$0"
+		],
+		"description": "RPC con schemas compartidos (server/rpc/*.ts)"
+	},
+	"Middleware de ruta de servidor (app/middleware/*.server.ts)": {
+		"prefix": "mmiddleware",
+		"body": [
+			"import { defineServerRouteMiddleware } from '@meekojs/meeko/framework'",
+			"",
+			"export default defineServerRouteMiddleware(({ url }) => {",
+			"\t${1:console.log(url.pathname)}",
+			"}, { global: false })",
+			"$0"
+		],
+		"description": "Middleware de ruta de servidor (app/middleware/*.server.ts)"
+	},
+	"Composable con liberación de recursos": {
+		"prefix": "mcomposable",
+		"body": [
+			"import { onCleanup } from '@meekojs/meeko'",
+			"",
+			"export function ${1:useAbortSignal}() {",
+			"\tconst controller = new AbortController()",
+			"\tonCleanup(() => controller.abort())",
+			"\treturn controller.signal",
+			"}",
+			"$0"
+		],
+		"description": "Composable con liberación de recursos"
+	}
+}

@@ -8,6 +8,41 @@ Las páginas pueden declarar su código de servidor y sus opciones de ruta en un
 
 `defineProps<Props>({ count: 0 })` ofrece defaults tipados en el editor: la prop puede omitirse al usar el componente y se reconoce como definida dentro de su script y plantilla. El compilador y el modelo semántico del editor comparten el análisis AST de esas claves.
 
+## Fragmentos de código
+
+Escribe un prefijo y elige el fragmento en el completado, o usa **Insert Snippet**. `Tab` recorre los campos editables y mantiene sincronizados los nombres repetidos. Los esqueletos usan el nombre del archivo como título inicial.
+
+| Prefijo          | Dónde                                | Contenido                                                                  |
+| ---------------- | ------------------------------------ | -------------------------------------------------------------------------- |
+| `meeko`, `mcomp` | Archivo `.meeko` vacío               | Componente con `<script lang="ts">` y `<template>`                         |
+| `mpage`          | Página `.meeko` vacía                | `definePage` en `<script server>` y plantilla                              |
+| `mlayout`        | Layout `.meeko` vacío                | Layout con `<MeekoOutlet />`                                               |
+| `mprops`         | `<script>`                           | Interfaz `Props` y `defineProps<Props>()`                                  |
+| `mpropsd`        | `<script>`                           | Props desestructuradas con defaults reactivos, desde Meeko 1.8             |
+| `memits`         | `<script>`                           | `defineEmits` con argumentos tipados                                       |
+| `mmodel`         | `<script>`                           | `defineModel` con valor por defecto                                        |
+| `msnippets`      | `<script>`                           | Contrato `defineSnippets`                                                  |
+| `mexpose`        | `<script>`                           | `defineExpose` de un valor del setup                                       |
+| `msignal`        | `<script>`                           | Señal con `signal`                                                         |
+| `mcomputed`      | `<script>`                           | Valor derivado con `computed`                                              |
+| `meffect`        | `<script>`                           | Efecto reactivo con `effect`                                               |
+| `mmounted`       | `<script>`                           | Temporizador de navegador con `onCleanup` dentro de `onMounted`            |
+| `mref`           | `<script>`                           | `useElementRef` y comentario con el `ref:` que debes añadir a la plantilla |
+| `mif`            | `<template>`                         | Elemento con `if:when`                                                     |
+| `meach`          | `<template>`                         | Lista con `each:of`, `each:as` y `each:key`                                |
+| `mrender`        | `<template>`                         | `<render>` con `snippet` y `args`                                          |
+| `msnippet`       | Dentro de una etiqueta de componente | `<snippet>` con `name` y `params`                                          |
+| `mis`            | `<template>`                         | `<component is>` dinámico                                                  |
+| `mform`          | Archivo `.meeko` vacío               | Componente con `useForm` y formulario enlazado                             |
+| `mapi`           | `server/api/*.get.ts`                | `defineApiRoute` con una respuesta JSON                                    |
+| `mrpc`           | `server/rpc/*.ts`                    | `defineRpc` con imports de schemas de `shared/`                            |
+| `mmiddleware`    | `app/middleware/*.server.ts`         | `defineServerRouteMiddleware` con nombre                                   |
+| `mcomposable`    | Composable `.ts`                     | `AbortController` con liberación mediante `onCleanup`                      |
+
+Los fragmentos de script y plantilla se insertan en el bloque indicado: ajusta los nombres a los valores del componente y reúne los imports si ya existen. `mmounted` registra la limpieza dentro del callback para respetar `MEEK128`. Llama al composable de `mcomposable` durante el setup de un componente. En `mrpc`, crea o reutiliza los schemas reales en `shared/`, ajusta la ruta relativa a la profundidad del archivo y adapta el handler al schema de salida. `mmiddleware` crea middleware con nombre (`global: false`): decláralo en `middleware` de la página o del grupo para ejecutarlo.
+
+La contribución declarativa [`contributes.snippets`](https://code.visualstudio.com/api/references/contribution-points#contributes.snippets) sólo selecciona el lenguaje y el archivo de fragmentos; no admite una condición por proyecto. Por eso los cuatro fragmentos TypeScript aparecen también fuera de proyectos Meeko mientras la extensión está habilitada. Sus prefijos específicos (`mapi`, `mrpc`, `mmiddleware`, `mcomposable`) reducen las coincidencias accidentales.
+
 ## Funciones de Meeko
 
 El servidor de lenguaje entiende la reactividad, los componentes y la estructura de la aplicación (detalles en la [guía de editores](https://github.com/meekojs/meeko/blob/main/docs/editors.md#funciones-propias-de-meeko)):
@@ -65,14 +100,14 @@ En un workspace no confiable la extensión nunca ejecuta código del proyecto: u
 
 ## Ajustes
 
-| Ajuste | Por defecto | Descripción |
-| --- | --- | --- |
-| `meeko.languageServer.preferWorkspace` | `true` | Usa el servidor de `@meekojs/meeko` del proyecto cuando existe. Se ignora en modo restringido. |
-| `meeko.format.indentSections` | `false` | Al formatear, indenta un nivel el contenido de cada sección (`<script>`, `<script server>`, `<template>` y `<style>`), como `vueIndentScriptAndStyle` de Prettier más la plantilla. El contenido de `<pre>` y `<textarea>` no cambia. Con `false`, el formato quita esa indentación base. |
-| `meeko.editor.executionZones` | `true` | Muestra las zonas de ejecución: una barra en el margen y un color de línea tenue para el código que se ejecuta sólo en el servidor, en ambos lados o sólo en el navegador. |
-| `meeko.live.enabled` | `true` | Conecta con `meeko dev` para mostrar y editar los valores en vivo de las señales. Sólo en workspaces de confianza y con un servidor de desarrollo en loopback. |
-| `meeko.live.inlineValues` | `true` | Muestra el valor en vivo al final de la línea de cada señal. Con `false`, el valor sigue en el hover. |
-| `meeko.trace.server` | `off` | Activa el trace de cada servidor (`messages` o `verbose`). Para ver los mensajes, cambia el nivel del canal **Meeko** a **Trace**. |
+| Ajuste                                 | Por defecto | Descripción                                                                                                                                                                                                                                                                               |
+| -------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `meeko.languageServer.preferWorkspace` | `true`      | Usa el servidor de `@meekojs/meeko` del proyecto cuando existe. Se ignora en modo restringido.                                                                                                                                                                                            |
+| `meeko.format.indentSections`          | `false`     | Al formatear, indenta un nivel el contenido de cada sección (`<script>`, `<script server>`, `<template>` y `<style>`), como `vueIndentScriptAndStyle` de Prettier más la plantilla. El contenido de `<pre>` y `<textarea>` no cambia. Con `false`, el formato quita esa indentación base. |
+| `meeko.editor.executionZones`          | `true`      | Muestra las zonas de ejecución: una barra en el margen y un color de línea tenue para el código que se ejecuta sólo en el servidor, en ambos lados o sólo en el navegador.                                                                                                                |
+| `meeko.live.enabled`                   | `true`      | Conecta con `meeko dev` para mostrar y editar los valores en vivo de las señales. Sólo en workspaces de confianza y con un servidor de desarrollo en loopback.                                                                                                                            |
+| `meeko.live.inlineValues`              | `true`      | Muestra el valor en vivo al final de la línea de cada señal. Con `false`, el valor sigue en el hover.                                                                                                                                                                                     |
+| `meeko.trace.server`                   | `off`       | Activa el trace de cada servidor (`messages` o `verbose`). Para ver los mensajes, cambia el nivel del canal **Meeko** a **Trace**.                                                                                                                                                        |
 
 Si usas Fira Code y has activado `editor.bracketPairColorization.enabled: true` explícitamente, VS Code puede colorear por separado el `>` de `=>` dentro del TypeScript de un `.meeko` y romper la ligadura. La preferencia global prevalece sobre el valor predeterminado de la extensión. Añade esta excepción a tus ajustes de VS Code:
 
@@ -88,11 +123,11 @@ Cambiar un ajuste `meeko.languageServer.*` reinicia el servidor. Los ajustes `me
 
 Los colores de las zonas se pueden cambiar en `workbench.colorCustomizations`:
 
-| Color | Por defecto |
-| --- | --- |
-| `meeko.executionZone.serverBackground` | Violeta tenue en los temas claros y oscuros. |
-| `meeko.executionZone.sharedBackground` | Transparente: el setup compartido no se colorea. |
-| `meeko.executionZone.browserBackground` | Turquesa tenue en los temas claros y oscuros. |
+| Color                                   | Por defecto                                      |
+| --------------------------------------- | ------------------------------------------------ |
+| `meeko.executionZone.serverBackground`  | Violeta tenue en los temas claros y oscuros.     |
+| `meeko.executionZone.sharedBackground`  | Transparente: el setup compartido no se colorea. |
+| `meeko.executionZone.browserBackground` | Turquesa tenue en los temas claros y oscuros.    |
 
 En los temas de alto contraste los tres son transparentes y sólo queda la barra del margen.
 
@@ -148,3 +183,27 @@ pnpm run test:host:isolated
 - El modelo virtual requiere que las secciones estén sintácticamente cerradas. Mientras se escribe un archivo incompleto, los diagnósticos siguen disponibles, pero las funciones semánticas pueden pausarse hasta que vuelva a ser válido.
 - El formato usa Prettier con el plugin de Meeko, en memoria: el del proyecto con su configuración si existe y el workspace es de confianza, o el incluido en la extensión. Normaliza los `class="…"` estáticos, mantiene expandidos los arrays con un salto tras `[` (`meekoPreserveArrayBreaks`) y, si la configuración de Prettier del proyecto lo pide, ordena las clases (`meekoSortClasses`); el orden por la hoja global usa el Vite del proyecto, porque la extensión no lo incluye, y no se aplica en modo restringido. Sólo formatea el documento completo y no formatea un archivo que no compila (véase [docs/editors.md](../../docs/editors.md#formato-con-prettier)).
 - Generar un VSIX cruzado confirma su contenido, pero no sustituye la prueba del host de destino. La matriz de CI comprueba la extensión en Windows, Linux y macOS.
+
+## Tailwind CSS
+
+Instala la extensión oficial **Tailwind CSS IntelliSense** (`bradlc.vscode-tailwindcss`) y configura Tailwind en el proyecto. Esta extensión aporta las utilidades, variantes, valores y documentación de Tailwind; Meeko aporta el análisis de componentes y las clases CSS escritas en sus `<style>` y en `app/styles/main.css`, incluidos sus imports locales.
+
+Meeko Language registra automáticamente `tailwindCSS.includeLanguages: { "meeko": "html" }` y activa `editor.quickSuggestions.strings` para `[meeko]`. Son valores predeterminados de VS Code: respetan tus ajustes explícitos y no escriben en `settings.json`. [VS Code documenta `configurationDefaults` para otras configuraciones registradas](https://code.visualstudio.com/api/references/contribution-points#contributes.configurationDefaults).
+
+`meeko.classes.completion` controla el completado y hover de clases de Meeko:
+
+- `auto` (predeterminado): si Tailwind IntelliSense está activo y el proyecto declara `tailwindcss` como dependencia o lo importa desde sus hojas fuente, delega las clases de la hoja procesada `.meeko/styles/main.css` a Tailwind. Conserva las clases escritas en componentes y hojas fuente.
+- `on`: incluye también las clases de la hoja procesada.
+- `off`: desactiva el completado y hover de clases de Meeko. La navegación a definiciones y las variables CSS siguen disponibles.
+
+Las cadenas de `bind:class="active.value ? 'bg-blue-500' : 'bg-gray-500'"` reciben sugerencias de clases; no hace falta añadir `bind:class` a `tailwindCSS.classAttributes`, porque el atributo `class` predeterminado reconoce el prefijo `:`. Meeko conserva además el análisis TypeScript de la expresión.
+
+Para funciones como `clsx` y `cn` dentro del `<script>`, configura las funciones que realmente usa tu proyecto:
+
+```json
+{
+	"tailwindCSS.classFunctions": ["clsx", "cn"]
+}
+```
+
+La detección de Meeko lee el manifiesto del paquete del componente y las hojas fuente indexadas, sin ejecutar plugins CSS. No clasifica individualmente la hoja procesada: en `auto` también delega sus clases de terceros que no tienen una definición fuente indexada. En otros clientes LSP, comunica `meeko.classes` mediante `workspace/configuration` (o `initializationOptions.classes`), incluido `tailwindActive: true` si el cliente tiene un proveedor Tailwind activo.

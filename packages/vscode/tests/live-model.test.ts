@@ -156,7 +156,7 @@ test("limita cada evento SSE y descarta definitivamente el búfer excesivo", () 
 test("el registro de meeko dev dice si se arrancó sin puente, sólo en proyectos del workspace", () => {
   assert.equal(devServerRecordGlob, "**/.meeko/dev/server.json");
   assert.equal(isWorkspaceDevServerRecord(".meeko/dev/server.json"), true);
-  assert.equal(isWorkspaceDevServerRecord("apps/site/.meeko/dev/server.json"), true);
+  assert.equal(isWorkspaceDevServerRecord("apps/meeko/.meeko/dev/server.json"), true);
   assert.equal(isWorkspaceDevServerRecord("node_modules/@meekojs/meeko/.meeko/dev/server.json"), false);
   assert.equal(isWorkspaceDevServerRecord(".meeko/tmp/app/.meeko/dev/server.json"), false);
   assert.equal(isWorkspaceDevServerRecord(".meeko/dev/editor-bridge-4173.json"), false);

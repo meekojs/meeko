@@ -62,6 +62,13 @@ test("angle brackets stay paired without recoloring TypeScript arrows", () => {
   assert.deepEqual(language.colorizedBracketPairs, [["{", "}"], ["(", ")"], ["[", "]"]]);
 });
 
+test("a second brace before an auto-closed one does not open another pair", () => {
+  // `{{` in the template's text would become `{{}}`: Meeko interpolates with a single brace.
+  const language = JSON.parse(readFileSync(join(root, "language-configuration.json"), "utf8")) as { autoCloseBefore: string };
+  assert.ok(!language.autoCloseBefore.includes("}"), language.autoCloseBefore);
+  for (const next of [" ", "\n", "<", ")", "]"]) assert.ok(language.autoCloseBefore.includes(next), JSON.stringify(next));
+});
+
 test("bracket colors are disabled for Meeko's embedded TypeScript by default", () => {
   assert.equal(manifest.contributes.configurationDefaults["[meeko]"]?.["editor.bracketPairColorization.enabled"], false);
 });
@@ -75,4 +82,11 @@ test("execution zones have a setting, theme colors and gutter icons", () => {
     for (const theme of ["dark", "light", "highContrast", "highContrastLight"]) assert.match(color.defaults[theme] ?? "", /^#[0-9A-Fa-f]{8}$/);
     for (const theme of ["dark", "light"]) assert.ok(existsSync(join(root, "icons", "zones", `${kind}-${theme}.svg`)), `${kind}-${theme}.svg`);
   }
+});
+
+test("Tailwind defaults support Meeko attributes without changing user settings", () => {
+  assert.deepEqual(manifest.contributes.configurationDefaults["tailwindCSS.includeLanguages"], { meeko: "html" });
+  // Every key: a language default replaces the whole object, and attribute names are "other".
+  assert.deepEqual(manifest.contributes.configurationDefaults["[meeko]"]?.["editor.quickSuggestions"], { other: "on", comments: "off", strings: "on" });
+  assert.equal(manifest.contributes.configuration.properties["meeko.classes.completion"]?.default, "auto");
 });
