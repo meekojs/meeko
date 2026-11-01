@@ -30,7 +30,7 @@ test('UI registers public components and composables without leaking private glo
 	assert.ok(!components.some(({ name }) => name === 'UIInternalModalInstance' || name === 'UIModalInstance'))
 	const entries = await discoverAutoImports(root)
 	const fromUi = entries.filter((entry) => entry.file === '@meekojs/ui/runtime')
-	assert.deepEqual(fromUi.map(({ name }) => name).sort(), ['useModal', 'useModalInstance'])
+	assert.deepEqual(fromUi.map(({ name }) => name).sort(), ['useModal', 'useModalInstance', 'useToast'])
 	assert.ok(!entries.some(({ name }) => name.startsWith('UIInternalModalInstance') || name.startsWith('UIModalInstance')))
 	assert.deepEqual(Object.keys(runtime).sort(), ['useModal', 'useModalInstance', 'useToast', 'withViewTransition'])
 	await access(new URL('../dist/app/components/internal/ModalInstance.meeko', import.meta.url))

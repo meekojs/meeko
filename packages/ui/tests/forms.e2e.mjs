@@ -26,14 +26,22 @@ test('forms hydrate, preserve native submission, keyboard and model updates; fee
 	assert.equal(await page.locator('#values').textContent(), 'Updated|true|false|week|6', JSON.stringify(errors))
 	assert.deepEqual(await page.locator('#editor').evaluate((form) => Object.fromEntries(new FormData(form, globalThis.document.querySelector('#save')))), { comment: 'Updated', date: '', accepted: 'yes', period: 'week', volume: '6', intent: 'save' })
 	await page.locator('#busy').click()
-	assert.equal(await page.locator('#save').isDisabled(), true)
+	// While busy it keeps the focus and does not act: the click must not submit nor reach the handler.
+	assert.equal(await page.locator('#save').evaluate((element) => element.disabled), false)
 	assert.equal(await page.locator('#save').getAttribute('aria-busy'), 'true')
+	assert.equal(await page.locator('#save').getAttribute('aria-disabled'), 'true')
+	// Enabled but busy: neither the click nor the keyboard submits, and the focus stays.
+	await page.locator('#editor').evaluate((form) => form.addEventListener('submit', () => (globalThis.submitted = true)))
+	await page.locator('#save').focus()
+	await page.keyboard.press('Enter')
+	assert.equal(await page.evaluate(() => globalThis.submitted), undefined)
+	assert.equal(await page.locator('#save').evaluate((element) => element === globalThis.document.activeElement), true)
 	await page.locator('#busy').click()
 	await page.getByRole('alert').getByRole('button', { name: 'Cerrar aviso' }).click()
 	assert.equal(await page.getByRole('alert').count(), 0)
 	await page.locator('#notify').click()
 	await page.locator('#notify').click()
-	assert.equal(await page.getByRole('status').filter({ hasText: 'Cambios guardados' }).count(), 2, JSON.stringify({ errors, html: await page.locator('.meeko-ui-toast-host').innerHTML() }))
+	assert.equal(await page.locator('.meeko-ui-toast-host[aria-live="polite"] .meeko-ui-toast').filter({ hasText: 'Cambios guardados' }).count(), 2, JSON.stringify({ errors, html: await page.locator('.meeko-ui-toast-host').innerHTML() }))
 	const boxes = await page.locator('.meeko-ui-toast').evaluateAll((elements) =>
 		elements.map((element) => {
 			const box = element.getBoundingClientRect()
@@ -51,6 +59,38 @@ test('forms hydrate, preserve native submission, keyboard and model updates; fee
 	assert.equal(await timed.count(), 1, 'hover pauses expiration')
 	await page.locator('h1').hover()
 	await timed.waitFor({ state: 'detached' })
+	// The exit is a View Transition of its own type, and the name exists only during it.
+	await page.evaluate(() => {
+		const start = globalThis.document.startViewTransition.bind(globalThis.document)
+		globalThis.viewTransitionTypes = []
+		globalThis.document.startViewTransition = (options) => {
+			globalThis.viewTransitionTypes.push(options.types ?? [])
+			return start(options)
+		}
+	})
+	await page.locator('#notify').click()
+	const closing = page.locator('.meeko-ui-toast').last()
+	assert.equal(await closing.evaluate((element) => globalThis.getComputedStyle(element).viewTransitionName), 'none')
+	await closing.getByRole('button').click()
+	await closing.waitFor({ state: 'detached' })
+	assert.deepEqual(await page.evaluate(() => globalThis.viewTransitionTypes), [['ui-toast-close']])
+	// With a modal open the host goes back to the top of the top layer, or the toast would stay behind it.
+	await page.evaluate(() => {
+		const dialog = globalThis.document.createElement('dialog')
+		dialog.id = 'modal'
+		globalThis.document.body.append(dialog)
+		dialog.showModal()
+		globalThis.hostToggles = 0
+		globalThis.document.querySelector('.meeko-ui-toast-host').addEventListener('beforetoggle', () => globalThis.hostToggles++)
+		globalThis.document.querySelector('#notify').click()
+	})
+	await page.waitForFunction(() => globalThis.hostToggles === 2)
+	assert.equal(await page.locator('.meeko-ui-toast-host').evaluate((element) => element.matches(':popover-open')), true)
+	await page.evaluate(() => {
+		globalThis.document.querySelector('#modal').remove()
+		globalThis.document.querySelector('#clear').click()
+	})
+	await page.locator('.meeko-ui-toast').first().waitFor({ state: 'detached' })
 	assert.equal(await page.getByRole('rowheader', { name: 'Ana' }).count(), 1)
 	await page.emulateMedia({ reducedMotion: 'reduce' })
 	assert.equal(
@@ -60,6 +100,11 @@ test('forms hydrate, preserve native submission, keyboard and model updates; fee
 			.evaluate((element) => globalThis.getComputedStyle(element).animationName),
 		'none',
 	)
+	// Less motion, no transition: the toast just goes.
+	await page.locator('#notify').click()
+	await page.locator('.meeko-ui-toast').last().getByRole('button').click()
+	assert.equal(await page.locator('.meeko-ui-toast').count(), 0)
+	assert.deepEqual(await page.evaluate(() => globalThis.viewTransitionTypes), [['ui-toast-close']])
 	assert.deepEqual(errors, [])
 	const native = await browser.newContext({ javaScriptEnabled: false })
 	context.after(() => native.close())

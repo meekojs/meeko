@@ -3,7 +3,10 @@
 
 	import type { UIToastProps } from '../types/feedback'
 
+	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
+	import { withViewTransition } from '../utils/view-transition'
+	import * as Icon from './internal/Icon.meeko'
 
 	const props = defineProps<UIToastProps & { hosted?: boolean }>()
 
@@ -20,12 +23,22 @@
 	let started = 0
 	let hovered = false
 	let focused = false
+	let closing = false
 
-	function close() {
-		clearTimeout(timer)
+	function finish() {
 		visible.value = false
 		if (!props.hosted && element.value?.hasAttribute('popover')) element.value.hidePopover?.()
 		emit('dismiss')
+	}
+
+	function close() {
+		clearTimeout(timer)
+		if (closing) return
+		closing = true
+		// The timer does not ask: it must not cut short a transition the user started, such as a navigation.
+		if ((document as { activeViewTransition?: unknown }).activeViewTransition) return finish()
+		element.value?.setAttribute('data-meeko-ui-toast-state', 'closing')
+		withViewTransition(finish, { types: ['ui-toast-close'] })
 	}
 
 	function pause() {
@@ -82,17 +95,19 @@
 		on:focusin="focus"
 		on:focusout="blur"
 	>
-		<p
-			class="meeko-ui-toast-message"
-			bind:role="props.tone === 'danger' ? 'alert' : 'status'"
-		>
-			{props.text}
-		</p>
-		<div
-			if:when="snippets.actions || props.actions"
-			class="meeko-ui-feedback-actions"
-		>
-			<render snippet="snippets.actions ?? props.actions" />
+		<div class="meeko-ui-toast-content">
+			<p
+				class="meeko-ui-toast-message"
+				bind:role="props.tone === 'danger' ? 'alert' : props.hosted ? undefined : 'status'"
+			>
+				{props.text}
+			</p>
+			<div
+				if:when="snippets.actions || props.actions"
+				class="meeko-ui-feedback-actions"
+			>
+				<render snippet="snippets.actions ?? props.actions" />
+			</div>
 		</div>
 		<button
 			type="button"
@@ -100,10 +115,7 @@
 			bind:aria-label="props.closeLabel ?? text.close"
 			on:click="close"
 		>
-			<span
-				class="meeko-ui-close-icon"
-				aria-hidden="true"
-			/>
+			<Icon bind:path="icons.close" />
 		</button>
 	</div>
 </template>

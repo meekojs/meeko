@@ -59,7 +59,7 @@ export default defineMeekoModule<UIOptions>({
 				options: messagesConfig(options),
 			})
 
-		meeko.addAutoImports(['useModal', 'useModalInstance'].map((name) => ({ name, from: '@meekojs/ui/runtime', scope: 'app' as const, componentOnly: true })))
+		meeko.addAutoImports(['useModal', 'useModalInstance', 'useToast'].map((name) => ({ name, from: '@meekojs/ui/runtime', scope: 'app' as const, componentOnly: true })))
 		const components = join(meeko.rootDir, '.meeko', 'generated', 'components.ts')
 		meeko.addVitePlugin({
 			name: 'meeko-ui:components',

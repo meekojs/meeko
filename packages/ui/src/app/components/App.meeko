@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMounted } from '@meekojs/meeko'
+	import { effect, onMounted } from '@meekojs/meeko'
 
 	import { useModalHost } from '../composables/useModal'
 	import { useToastHost } from '../composables/useToast'
@@ -13,6 +13,13 @@
 	const toastHost = useElementRef('toastHost')
 
 	onMounted(() => toastHost.value?.showPopover?.())
+
+	// A modal opened after the host covers it: back on top of the top layer, or the toast would not be seen.
+	effect(() => {
+		if (toasts.entries.value.length === 0 || !document.querySelector('dialog:modal')) return
+		toastHost.value?.hidePopover?.()
+		toastHost.value?.showPopover?.()
+	})
 </script>
 
 <template>
@@ -28,6 +35,7 @@
 		ref:toastHost
 		popover="manual"
 		class="meeko-ui-toast-host"
+		aria-live="polite"
 	>
 		<Toast
 			each:of="toasts.entries.value"
