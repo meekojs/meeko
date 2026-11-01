@@ -503,7 +503,7 @@
 				>
 					<div class="dash-field dash-moderation-page">
 						<label for="rule-page">{t('moderation.columns.page')}</label>
-						<UISelect
+						<UICombobox
 							id="rule-page"
 							searchable
 							by="path"

@@ -22,9 +22,9 @@ export interface UIMessages {
 		/** Mensaje sin filas, si no se pasa `emptyText` ni el snippet `empty`. */
 		readonly empty: string
 	}
-	/** `<UISelect>`. */
+	/** `<UISelect>` y `<UICombobox>`. */
 	readonly select: {
-		/** Mensaje sin opciones, si no se pasa el snippet `empty`. */
+		/** `<UICombobox>`: mensaje sin opciones, si no se pasa el snippet `empty`. */
 		readonly empty: string
 		/** `aria-label` del botón de `clearable`, si no se pasa `clearLabel`. */
 		readonly clear: string

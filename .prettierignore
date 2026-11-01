@@ -25,6 +25,7 @@ packages/devtools/types/protocol.d.ts
 # Templates on one line: whitespace between their tags would render as text (see each file).
 packages/ui/src/app/components/Popover.meeko
 packages/ui/src/app/components/Select.meeko
+packages/ui/src/app/components/Combobox.meeko
 packages/ui/src/app/components/ThemeToggle.meeko
 packages/ui/src/app/components/Tabs.meeko
 packages/ui/src/app/components/Tooltip.meeko

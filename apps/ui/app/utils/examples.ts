@@ -128,7 +128,7 @@ export default defineMeekoConfig({
       name="plan" placeholder="Elige un plan" required />
 
     <label for="topics">Temas</label>
-    <UISelect id="topics" model="chosen" bind:options="topics"
+    <UICombobox id="topics" model="chosen" bind:options="topics"
       name="topics" multiple searchable bind:max="2" />
 
     <UIButton type="submit">Enviar selección</UIButton>

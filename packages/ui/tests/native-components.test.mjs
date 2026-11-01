@@ -171,21 +171,6 @@ test('command palette: each status has its notice, and the query is inserted lit
 	assert.equal(commandPaletteStatusText(builtinMessages.es.commandPalette, 'empty', '$& <b>'), 'Sin resultados para «$& <b>».')
 })
 
-test('select: only multiple, searchable and filter leave the native select', () => {
-	const native = (settings) =>
-		createRoot((dispose) => {
-			const select = createSelect({ options: ['a'], ...settings }, signal(null), 'id', () => {})
-			const value = select.native.value
-			dispose()
-			return value
-		})
-	assert.equal(native({}), true)
-	assert.equal(native({ clearable: true, placeholder: 'x', groupBy: () => 'g' }), true)
-	assert.equal(native({ multiple: true }), false)
-	assert.equal(native({ searchable: true }), false)
-	assert.equal(native({ filter: () => [] }), false)
-})
-
 test('select: a hidden first option stands for no choice and for a value outside the options, only then', () => {
 	createRoot((dispose) => {
 		const model = signal(null)
@@ -207,7 +192,7 @@ test('select: a hidden first option stands for no choice and for a value outside
 		)
 		assert.deepEqual([select.nativeIndex.value, select.blankValue.value, select.blankLabel.value], [0, '', 'Elige'])
 		model.value = { id: 2, name: 'Bea' }
-		assert.deepEqual([select.nativeIndex.value, select.blankValue.value], [2, ''], 'by finds the option')
+		assert.equal(select.nativeIndex.value, 2, 'by finds the option')
 		// The options change: the model keeps the value, and the form still sends it.
 		options.value = [{ id: 1, name: 'Ana' }]
 		assert.deepEqual([select.nativeIndex.value, select.blankValue.value, select.blankLabel.value], [0, '2', 'Bea'])
@@ -227,15 +212,15 @@ test('select: a native change chooses by position, which also works for objects 
 		]
 		const select = createSelect({ options, by: 'id', groupBy: 'team' }, model, 'id', (value) => emitted.push(value))
 		// In the DOM, the groups in the order of their first option: Ana, Carla, Bea, after the hidden one.
-		select.nativeChange({ currentTarget: { selectedIndex: 2 } })
+		select.change({ currentTarget: { selectedIndex: 2 } })
 		assert.equal(model.value, options[2])
 		assert.equal(select.nativeIndex.value, 2)
 		// With a value chosen, the hidden option is gone and the positions move.
-		select.nativeChange({ currentTarget: { selectedIndex: 2 } })
+		select.change({ currentTarget: { selectedIndex: 2 } })
 		assert.equal(model.value, options[1])
 		assert.deepEqual(emitted, [options[2], options[1]])
 		model.value = null
-		select.nativeChange({ currentTarget: { selectedIndex: 0 } })
+		select.change({ currentTarget: { selectedIndex: 0 } })
 		assert.equal(model.value, null, 'the hidden option is never a choice')
 		dispose()
 	})
@@ -249,13 +234,18 @@ test('the new components type their props and snippets in a template', async (co
 	const filename = directory + '/Consumer.meeko'
 	const component = (name) => relative(dirname(filename), fileURLToPath(new URL(`../dist/app/components/${name}.meeko`, import.meta.url))).replaceAll('\\', '/')
 	const source = `<script lang="ts">
+import { signal } from '@meekojs/meeko';
 import * as UITabs from '${component('Tabs')}';
 import * as UITooltip from '${component('Tooltip')}';
 import * as UICommandPalette from '${component('CommandPalette')}';
+import * as UISelect from '${component('Select')}';
+import * as UICombobox from '${component('Combobox')}';
 const items = [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] as const;
 const pages = [{ title: 'Guía', url: '/guide', sections: [] as { title: string; url: string }[] }];
+const one = signal<string | null>(null);
+const many = signal<string[]>([]);
 </script>
-<template><UITabs bind:items="items"><snippet name="panel" params="item"><p>{item.label.toUpperCase()}</p></snippet><snippet name="panel-a"><p>A</p></snippet></UITabs><UITooltip text="Ayuda" placement="right"><snippet name="anchor" params="trigger"><button type="button" bind:id="trigger.id">?</button></snippet></UITooltip><UICommandPalette bind:results="pages" status="ready" hrefBy="url" labelBy="title"><snippet name="item" params="page, state"><b>{page.title.toUpperCase()} {state.depth.toFixed(0)}</b></snippet></UICommandPalette></template>`
+<template><UITabs bind:items="items"><snippet name="panel" params="item"><p>{item.label.toUpperCase()}</p></snippet><snippet name="panel-a"><p>A</p></snippet></UITabs><UITooltip text="Ayuda" placement="right"><snippet name="anchor" params="trigger"><button type="button" bind:id="trigger.id">?</button></snippet></UITooltip><UICommandPalette bind:results="pages" status="ready" hrefBy="url" labelBy="title"><snippet name="item" params="page, state"><b>{page.title.toUpperCase()} {state.depth.toFixed(0)}</b></snippet></UICommandPalette><UISelect model="one" bind:options="['a']" clearable><snippet name="option" params="option, state"><b>{option.toUpperCase()} {String(state.selected)}</b></snippet></UISelect><UICombobox model="many" multiple searchable bind:max="2" bind:options="['a']"><snippet name="option" params="option, state"><b>{option.toUpperCase()} {String(state.active)}</b></snippet><snippet name="empty">Nada</snippet></UICombobox></template>`
 	const errors = (diagnostics) => diagnostics.filter((item) => item.severity !== 'warning')
 	assert.deepEqual(errors(await checkSource(source, filename)), [])
 	for (const [broken, pattern] of [
@@ -264,6 +254,14 @@ const pages = [{ title: 'Guía', url: '/guide', sections: [] as { title: string;
 		[source.replace('status="ready"', 'status="done"'), /done/],
 		[source.replace('page.title.toUpperCase()', 'page.missing'), /missing/],
 		[source.replace('hrefBy="url"', 'hrefBy="missing"'), /missing/],
+		// A prop of the combobox on the native select says what to use instead.
+		[source.replace('clearable>', 'clearable searchable>'), /usa <UICombobox searchable>/],
+		[source.replace('clearable>', 'clearable multiple>'), /usa <UICombobox multiple>/],
+		[source.replace('clearable>', 'clearable bind:max="2">'), /usa <UICombobox max>/],
+		[source.replace('clearable>', 'clearable bind:filter="(query) => [query]">'), /usa <UICombobox filter>/],
+		[source.replace('clearable>', 'clearable bind:loading="true">'), /usa <UICombobox filter>/],
+		[source.replace('{String(state.selected)}', '{String(state.active)}'), /active/],
+		[source.replace('clearable>', 'clearable><snippet name="empty">Nada</snippet>'), /empty/],
 	]) {
 		const diagnostics = errors(await checkSource(broken, filename))
 		assert.ok(

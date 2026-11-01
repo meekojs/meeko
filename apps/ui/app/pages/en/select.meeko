@@ -94,7 +94,7 @@
 				</div>
 				<div class="select-field">
 					<label for="topics">Topics</label>
-					<UISelect
+					<UICombobox
 						id="topics"
 						name="topics"
 						multiple
@@ -215,7 +215,7 @@
 				{ name: 'model', type: 'Signal<T | null> or Signal<T[]>', default: 'null', description: 'Chosen value; an array with multiple.' },
 				{ name: 'multiple', type: 'boolean', default: 'false', description: 'Allows choosing several options.' },
 				{ name: 'by / labelBy / disabledBy / groupBy', type: 'key or function', description: 'Comparison, label, disabled state and group of each option.' },
-				{ name: 'searchable / filter', type: 'boolean / SelectFilter<T>', description: 'Search in the list, synchronous or asynchronous.' },
+				{ name: 'searchable / filter', type: 'boolean / ComboboxFilter<T>', description: 'Search in the list, synchronous or asynchronous.' },
 				{ name: 'max', type: 'number', description: 'With multiple, maximum number of chosen options.' },
 				{ name: 'clearable / clearLabel', type: 'boolean / string', default: 'false / Clear selection', description: 'Accessible button that clears the selection and returns focus to the trigger. The default label follows the language of the document (see Theming).' },
 				{ name: 'name / required / disabled', type: 'string / boolean', description: 'Form submission and validation.' },
@@ -248,7 +248,7 @@
 			,
 			<code>SelectModel</code>
 			and
-			<code>SelectFilter</code>
+			<code>ComboboxFilter</code>
 			types are exported from
 			<code>@meekojs/ui/runtime</code>
 			.

@@ -3,8 +3,9 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
+import { createCombobox, defaultComboboxFilter, toggleSelection } from '../dist/app/utils/combobox.js'
 import { listKeyTarget, normalizeText, popoverPlacement, typeaheadIndex } from '../dist/app/utils/popover.js'
-import { createSelect, defaultSelectFilter, groupOptions, sameOption, selectDisabled, selectLabel, selectValue, toggleSelection } from '../dist/app/utils/select.js'
+import { groupOptions, sameOption, selectDisabled, selectLabel, selectValue } from '../dist/app/utils/select-options.js'
 import { themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from '../dist/app/utils/theme-toggle.js'
 
 test('an unknown placement falls back to bottom-start, and popover.css places each one', async () => {
@@ -67,7 +68,7 @@ test('select helpers compare with by, label, group, filter without accents and r
 	assert.ok(selectDisabled({ id: 2, name: 'B', disabled: true }))
 	assert.ok(!selectDisabled(ana))
 	assert.ok(selectDisabled(ana, (user) => user.id === 1))
-	assert.deepEqual(defaultSelectFilter(['Rojo', 'Ámbar', 'Verde'], ' AMB ', String), ['Ámbar'])
+	assert.deepEqual(defaultComboboxFilter(['Rojo', 'Ámbar', 'Verde'], ' AMB ', String), ['Ámbar'])
 	const groups = groupOptions([ana, { id: 2, name: 'Bea', team: 'B', disabled: true }, { id: 3, name: 'Carla', team: 'A' }, { id: 4, name: 'Sin' }], { groupBy: 'team' }, 'list')
 	assert.deepEqual(
 		groups.map((group) => [group.name, group.id, group.entries.map((entry) => [entry.index, entry.id, entry.label, entry.disabled])]),
@@ -141,7 +142,7 @@ test('clearable shows its button only with a selection and clear empties a singl
 		createRoot((dispose) => {
 			const model = signal(initial)
 			const emitted = []
-			const select = createSelect({ options: ['a', 'b'], ...settings }, model, 'id', (value) => emitted.push(value))
+			const select = createCombobox({ options: ['a', 'b'], ...settings }, model, 'id', (value) => emitted.push(value))
 			const before = select.showClear.value
 			select.open.value = true
 			select.clear()

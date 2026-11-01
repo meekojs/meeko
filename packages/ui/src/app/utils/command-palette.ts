@@ -5,7 +5,7 @@ import { computed, effect, signal, untrack } from '@meekojs/meeko'
 import type { CommandPaletteStatus, UICommandPaletteProps } from '../types/command-palette'
 
 import { mountModalDialog } from './modal-dialog'
-import { selectLabel } from './select'
+import { selectLabel } from './select-options'
 
 /** A row of the list, flat in the order that the keyboard walks. */
 export interface CommandPaletteRow<T> {

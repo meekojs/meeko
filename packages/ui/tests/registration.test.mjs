@@ -23,6 +23,7 @@ test('UI registers public components and composables without leaking private glo
 	assert.ok(components.some(({ name }) => name === 'UIPopover'))
 	assert.ok(components.some(({ name }) => name === 'UISelect'))
 	assert.ok(components.some(({ name }) => name === 'UIThemeToggle'))
+	assert.ok(components.some(({ name }) => name === 'UICombobox'))
 	assert.ok(components.some(({ name }) => name === 'UITabs'))
 	assert.ok(components.some(({ name }) => name === 'UITooltip'))
 	assert.ok(components.some(({ name }) => name === 'UICommandPalette'))

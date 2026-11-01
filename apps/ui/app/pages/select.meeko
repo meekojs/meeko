@@ -93,7 +93,7 @@
 				</div>
 				<div class="select-field">
 					<label for="topics">Temas</label>
-					<UISelect
+					<UICombobox
 						id="topics"
 						name="topics"
 						multiple
@@ -214,7 +214,7 @@
 				{ name: 'model', type: 'Signal<T | null> o Signal<T[]>', default: 'null', description: 'Valor elegido; un array con multiple.' },
 				{ name: 'multiple', type: 'boolean', default: 'false', description: 'Permite elegir varias opciones.' },
 				{ name: 'by / labelBy / disabledBy / groupBy', type: 'clave o función', description: 'Comparación, etiqueta, deshabilitado y grupo de cada opción.' },
-				{ name: 'searchable / filter', type: 'boolean / SelectFilter<T>', description: 'Búsqueda en la lista, síncrona o asíncrona.' },
+				{ name: 'searchable / filter', type: 'boolean / ComboboxFilter<T>', description: 'Búsqueda en la lista, síncrona o asíncrona.' },
 				{ name: 'max', type: 'number', description: 'Con multiple, número máximo de opciones elegidas.' },
 				{ name: 'clearable / clearLabel', type: 'boolean / string', default: 'false / Quitar selección', description: 'Botón accesible que quita la selección y devuelve el foco al disparador. La etiqueta por defecto sigue el idioma del documento (véase Temas).' },
 				{ name: 'name / required / disabled', type: 'string / boolean', description: 'Envío y validación del formulario.' },
@@ -243,7 +243,7 @@
 			,
 			<code>SelectModel</code>
 			y
-			<code>SelectFilter</code>
+			<code>ComboboxFilter</code>
 			se exportan desde
 			<code>@meekojs/ui/runtime</code>
 			.
