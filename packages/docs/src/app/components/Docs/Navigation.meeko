@@ -1,5 +1,5 @@
 <script lang="ts">
-	const props = defineProps<{ groups: readonly { title: string; items: readonly { href: string; label: string; aliases?: readonly string[] }[] }[]; product?: string }>({ product: 'UI' })
+	const props = defineProps<{ groups: readonly { title: string; items: readonly { href: string; label: string; aliases?: readonly string[]; featured?: boolean }[] }[]; product?: string }>({ product: 'UI' })
 
 	const route = useRoute()
 </script>
@@ -21,6 +21,13 @@
 				bind:aria-current="route.path.value === item.href || item.aliases?.includes(route.path.value) ? 'page' : undefined"
 			>
 				{item.label}
+				<UIBadge
+					if:when="item.featured"
+					tone="accent"
+					class="nav-featured"
+				>
+					Destacado
+				</UIBadge>
 			</a>
 		</section>
 		<p

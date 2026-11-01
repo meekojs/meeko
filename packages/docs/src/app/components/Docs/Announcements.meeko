@@ -1,0 +1,71 @@
+<script lang="ts">
+	import type { AnnouncementTone, PublicAnnouncement } from '../../../runtime/state'
+
+	import { announcementRole, dismissCookie, useDocsModeration } from '../../../runtime/state'
+
+	// `preview` pinta esos avisos en lugar de los de la web: la vista previa del dashboard.
+	const props = defineProps<{ preview?: readonly PublicAnnouncement[] }>()
+
+	// Los avisos llegan en el HTML del servidor y el navegador hidrata la misma lista: sin parpadeo.
+	const moderation = useDocsModeration()
+	const items = computed(() => props.preview ?? moderation.value.announcements)
+
+	// Iconos de trazo de 16 px, como los avisos de las guías.
+	const icons: Record<AnnouncementTone, string> = {
+		info: 'M8 14.25A6.25 6.25 0 1 0 8 1.75a6.25 6.25 0 0 0 0 12.5ZM8 7.25v4M8 4.75v.01',
+		success: 'M8 14.25A6.25 6.25 0 1 0 8 1.75a6.25 6.25 0 0 0 0 12.5ZM5.25 8.25l1.9 1.9 3.6-3.9',
+		warning: 'M8 14.25A6.25 6.25 0 1 0 8 1.75a6.25 6.25 0 0 0 0 12.5ZM8 4.75v4M8 11.25v.01',
+		danger: 'M7.13 2.5 1.6 12a1 1 0 0 0 .87 1.5h11.06a1 1 0 0 0 .87-1.5L8.87 2.5a1 1 0 0 0-1.74 0ZM8 6v3.25M8 11.5v.01',
+	}
+
+	/** Cierra un aviso y lo recuerda en una cookie, que el servidor lee en la página siguiente. */
+	function close(id: number): void {
+		if (props.preview) return
+		document.cookie = dismissCookie(document.cookie, id, location.protocol === 'https:')
+		moderation.value = { ...moderation.value, announcements: moderation.value.announcements.filter((item) => item.id !== id) }
+		// El foco sigue en los avisos mientras queden y después pasa al contenido.
+		requestAnimationFrame(() => {
+			const next = document.querySelector<HTMLElement>('.docs-announcement-close')
+			if (next) next.focus()
+			else document.getElementById('contenido')?.focus({ preventScroll: true })
+		})
+	}
+</script>
+
+<template>
+	<div
+		if:when="items.value.length"
+		class="docs-announcements"
+	>
+		<div
+			each:of="items.value"
+			each:as="item"
+			each:key="item.id"
+			class="docs-announcement"
+			bind:data-tone="item.tone"
+			bind:role="announcementRole(item.tone)"
+		>
+			<svg
+				class="docs-announcement-icon"
+				viewBox="0 0 16 16"
+				aria-hidden="true"
+			>
+				<path bind:d="icons[item.tone]" />
+			</svg>
+			<p>{item.message}</p>
+			<button
+				type="button"
+				class="docs-announcement-close"
+				aria-label="Cerrar aviso"
+				on:click="() => close(item.id)"
+			>
+				<svg
+					viewBox="0 0 16 16"
+					aria-hidden="true"
+				>
+					<path d="m4.5 4.5 7 7M11.5 4.5l-7 7" />
+				</svg>
+			</button>
+		</div>
+	</div>
+</template>

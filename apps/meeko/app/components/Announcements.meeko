@@ -1,0 +1,173 @@
+<script lang="ts">
+	import type { AnnouncementTone, PublicAnnouncement } from 'meeko-docs-content/moderation/shared'
+
+	import { inject } from '@meekojs/meeko'
+	import { announcementRole, dismissCookie, moderationEndpoint } from 'meeko-docs-content/moderation/shared'
+	import { refreshOnNavigation } from 'meeko-docs/state'
+
+	import { announcementsKey } from '../utils/announcements'
+
+	/** What the server plugin provided for this request; nothing on the browser, which hydrates the state instead. */
+	function provided(): readonly PublicAnnouncement[] {
+		try {
+			return inject(announcementsKey)
+		} catch {
+			return []
+		}
+	}
+
+	// In SSR the plugin's list goes into the state, so the banner is in the first HTML and the
+	// browser hydrates the same list from the payload, without a flash.
+	const announcements = useState<readonly PublicAnnouncement[]>('site:announcements', provided)
+	// That state keeps its first value across client navigations: after each one the banner asks the
+	// server again (server/middleware/20-moderation.ts), so announcements that start, end or change
+	// in the dashboard show without a reload.
+	refreshOnNavigation(
+		announcements,
+		() => moderationEndpoint('site'),
+		(moderation) => moderation.announcements,
+	)
+
+	// 16 px stroke icons, as the callouts of the guides.
+	const icons: Record<AnnouncementTone, string> = {
+		info: 'M8 14.25A6.25 6.25 0 1 0 8 1.75a6.25 6.25 0 0 0 0 12.5ZM8 7.25v4M8 4.75v.01',
+		success: 'M8 14.25A6.25 6.25 0 1 0 8 1.75a6.25 6.25 0 0 0 0 12.5ZM5.25 8.25l1.9 1.9 3.6-3.9',
+		warning: 'M8 14.25A6.25 6.25 0 1 0 8 1.75a6.25 6.25 0 0 0 0 12.5ZM8 4.75v4M8 11.25v.01',
+		danger: 'M7.13 2.5 1.6 12a1 1 0 0 0 .87 1.5h11.06a1 1 0 0 0 .87-1.5L8.87 2.5a1 1 0 0 0-1.74 0ZM8 6v3.25M8 11.5v.01',
+	}
+
+	/** Closes an announcement and remembers it in a cookie, which the server reads on the next page. */
+	function close(id: number): void {
+		document.cookie = dismissCookie(document.cookie, id, location.protocol === 'https:')
+		const rest = announcements.value.filter((item) => item.id !== id)
+		announcements.value = rest
+		// The focus stays in the banner while it has announcements, and goes to the content after.
+		requestAnimationFrame(() => {
+			const next = document.querySelector<HTMLElement>('.announcement .close')
+			if (next) next.focus()
+			else document.getElementById('contenido')?.focus({ preventScroll: true })
+		})
+	}
+</script>
+
+<template>
+	<div
+		if:when="announcements.value.length"
+		class="announcements"
+		data-pagefind-ignore
+	>
+		<div
+			each:of="announcements.value"
+			each:as="item"
+			each:key="item.id"
+			class="announcement"
+			bind:data-tone="item.tone"
+			bind:role="announcementRole(item.tone)"
+		>
+			<div class="inner">
+				<svg
+					class="icon"
+					viewBox="0 0 16 16"
+					aria-hidden="true"
+				>
+					<path bind:d="icons[item.tone]" />
+				</svg>
+				<p>{item.message}</p>
+				<button
+					type="button"
+					class="close"
+					aria-label="Cerrar aviso"
+					on:click="() => close(item.id)"
+				>
+					<svg
+						viewBox="0 0 16 16"
+						aria-hidden="true"
+					>
+						<path d="m4.5 4.5 7 7M11.5 4.5l-7 7" />
+					</svg>
+				</button>
+			</div>
+		</div>
+	</div>
+</template>
+
+<style scoped>
+	.announcement {
+		--tone: var(--accent-ink);
+		border-bottom: 1px solid var(--line);
+		background: var(--bg-raised);
+	}
+	.announcement[data-tone='success'] {
+		--tone: var(--success);
+	}
+	.announcement[data-tone='warning'],
+	.announcement[data-tone='danger'] {
+		--tone: var(--danger);
+		border-bottom-color: color-mix(in oklab, var(--danger) 34%, var(--line));
+		background: color-mix(in oklab, var(--danger) 5%, var(--bg-raised));
+	}
+	.inner {
+		display: flex;
+		align-items: center;
+		gap: 0.7rem;
+		margin: 0 auto;
+		padding: 0.55rem var(--gutter);
+		max-width: var(--container);
+	}
+	.icon {
+		flex: none;
+		fill: none;
+		stroke: var(--tone);
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-width: 1.4;
+		width: 15px;
+		height: 15px;
+	}
+	p {
+		flex: 1;
+		margin: 0;
+		min-width: 0;
+		color: var(--ink-soft);
+		font-size: 0.875rem;
+		line-height: 1.5;
+		text-wrap: pretty;
+		overflow-wrap: anywhere;
+	}
+	.announcement[data-tone='danger'] p {
+		color: var(--ink);
+		font-weight: 500;
+	}
+	.close {
+		display: grid;
+		flex: none;
+		place-items: center;
+		transition:
+			color 0.15s,
+			background-color 0.15s;
+		cursor: pointer;
+		border: 0;
+		border-radius: var(--radius-s);
+		background: transparent;
+		padding: 0;
+		width: 28px;
+		height: 28px;
+		color: var(--muted);
+	}
+	.close:hover {
+		background: var(--surface-2);
+		color: var(--ink);
+	}
+	.close:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 1px;
+	}
+	.close svg {
+		fill: none;
+		stroke: currentColor;
+		stroke-linecap: round;
+		stroke-width: 1.4;
+		width: 14px;
+		height: 14px;
+	}
+</style>

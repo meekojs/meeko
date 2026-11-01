@@ -1,0 +1,41 @@
+{
+	"name": "meeko-docs-content",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./snapshots": "./src/db/snapshots.ts",
+		"./db": "./src/db/index.ts",
+		"./render": "./src/snapshot.ts",
+		"./diff": "./src/diff.ts",
+		"./health": "./src/health.ts",
+		"./liveness": "./src/liveness.ts",
+		"./status": "./src/db/status.ts",
+		"./preview": "./src/preview.ts",
+		"./moderation": "./src/moderation/index.ts",
+		"./moderation/shared": "./src/moderation/shared.ts",
+		"./metrics": "./src/metrics/index.ts",
+		"./metrics/shared": "./src/metrics/shared.ts",
+		"./types": "./src/types/index.ts",
+		"./content/*": "./src/content/*.ts"
+	},
+	"scripts": {
+		"check": "tsc -p tsconfig.json --noEmit",
+		"test": "tsx --test --test-concurrency=1 tests/*.test.ts"
+	},
+	"dependencies": {
+		"@meekojs/meeko": "workspace:*",
+		"@typescript/typescript6": "6.0.2",
+		"github-slugger": "2.0.0",
+		"markdown-it": "15.0.3",
+		"pg": "8.23.1",
+		"prettier": "3.9.10",
+		"shiki": "4.5.0",
+		"valibot": "1.5.0"
+	},
+	"devDependencies": {
+		"@types/node": "^24.0.0",
+		"@types/pg": "8.23.1",
+		"tsx": "^4.20.0",
+		"typescript": "7.0.2"
+	}
+}

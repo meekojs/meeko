@@ -199,6 +199,89 @@ button {
 	background: var(--accent-soft);
 	color: var(--accent-ink);
 }
+/* Una página que destaca el dashboard: una píldora discreta junto a su nombre. */
+.nav-group a:has(.nav-featured) {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.25rem 0.4rem;
+}
+.nav-group a .nav-featured {
+	padding: 0 0.45rem;
+	font-size: 0.66rem;
+	line-height: 1.5;
+}
+/* Avisos del dashboard bajo la cabecera, con el lenguaje de los avisos de las guías: ámbar para
+   advertir, nunca rosa; sin borde lateral grueso. */
+.docs-announcement {
+	--tone: var(--accent-ink);
+	display: flex;
+	align-items: center;
+	gap: 0.7rem;
+	border-bottom: 1px solid var(--line);
+	background: var(--bg-raised);
+	padding: 0.55rem clamp(1.25rem, 3vw, 2.5rem);
+}
+.docs-announcement[data-tone='success'] {
+	--tone: var(--success);
+}
+.docs-announcement[data-tone='warning'],
+.docs-announcement[data-tone='danger'] {
+	--tone: var(--danger);
+	border-bottom-color: color-mix(in oklab, var(--danger) 34%, var(--line));
+	background: color-mix(in oklab, var(--danger) 5%, var(--bg-raised));
+}
+.docs-announcement-icon {
+	flex: none;
+	fill: none;
+	stroke: var(--tone);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1.4;
+	width: 15px;
+	height: 15px;
+}
+.docs-announcement p {
+	flex: 1;
+	margin: 0;
+	min-width: 0;
+	color: var(--ink-soft);
+	font-size: 0.875rem;
+	line-height: 1.5;
+	text-wrap: pretty;
+	overflow-wrap: anywhere;
+}
+.docs-announcement[data-tone='danger'] p {
+	color: var(--ink);
+	font-weight: 500;
+}
+.docs-announcement-close {
+	display: grid;
+	flex: none;
+	place-items: center;
+	transition:
+		color 0.15s,
+		background-color 0.15s;
+	border: 0;
+	border-radius: var(--radius-s);
+	background: transparent;
+	padding: 0;
+	width: 28px;
+	height: 28px;
+	color: var(--muted);
+}
+.docs-announcement-close:hover {
+	background: var(--surface-2);
+	color: var(--ink);
+}
+.docs-announcement-close svg {
+	fill: none;
+	stroke: currentColor;
+	stroke-linecap: round;
+	stroke-width: 1.4;
+	width: 14px;
+	height: 14px;
+}
 .sidebar-package {
 	display: flex;
 	flex-direction: column;
@@ -506,6 +589,14 @@ button {
 .directory svg {
 	align-self: center;
 	color: var(--muted);
+}
+.directory strong .directory-featured {
+	vertical-align: 2px;
+	margin-left: 0.45rem;
+	padding: 0 0.5rem;
+	color: var(--accent-ink);
+	font-size: 0.7rem;
+	line-height: 1.5;
 }
 .directory a:hover strong,
 .directory a:hover svg {

@@ -1,7 +1,11 @@
 <script lang="ts">
+	import * as DocsFeedback from './Feedback.meeko'
+
 	const props = defineProps<{ title: string; description: string; landing?: boolean; product?: string }>({ product: 'Meeko UI' })
 
 	const snippets = defineSnippets<{ default: [] }>()
+
+	const route = useRoute()
 
 	useHead(() => ({ title: props.title + ' · ' + props.product, meta: [{ name: 'description', content: props.description }] }))
 </script>
@@ -9,13 +13,17 @@
 <template>
 	<main
 		id="contenido"
-		bind:class="props.landing ? 'doc-page landing-page' : 'doc-page'"
 		tabindex="-1"
+		bind:class="props.landing ? 'doc-page landing-page' : 'doc-page'"
 	>
 		<header class="doc-heading">
 			<h1>{props.title}</h1>
 			<p>{props.description}</p>
 		</header>
 		<render snippet="snippets.default" />
+		<DocsFeedback
+			if:when="!props.landing"
+			bind:path="route.path.value"
+		/>
 	</main>
 </template>

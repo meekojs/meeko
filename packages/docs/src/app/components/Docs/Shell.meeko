@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { metricsActive, normalizeQuery, sendMetric, storedQuery } from '../../../metrics/state'
+	import { moderateNavigation, useDocsModeration } from '../../../runtime/state'
+	import * as DocsAnnouncements from './Announcements.meeko'
 	import * as DocsNavigation from './Navigation.meeko'
 	interface Item {
 		href: string
@@ -10,8 +13,38 @@
 
 	const snippets = defineSnippets<{ default: [] }>()
 
+	// Páginas ocultas y destacadas desde el dashboard (vacío sin base de datos).
+	const moderation = useDocsModeration()
 	const query = signal('')
-	const groups = computed(() => props.navigation.map((group) => ({ ...group, items: group.items.filter((item) => (item.label + ' ' + item.description).toLocaleLowerCase('es').includes(query.value.trim().toLocaleLowerCase('es'))) })).filter((group) => group.items.length))
+	const groups = computed(() =>
+		moderateNavigation(props.navigation, moderation.value)
+			.map((group) => ({ ...group, items: group.items.filter((item) => (item.label + ' ' + item.description).toLocaleLowerCase('es').includes(query.value.trim().toLocaleLowerCase('es'))) }))
+			.filter((group) => group.items.length),
+	)
+
+	// The filter is a search of the guide: once the reader stops typing for 1.5 s (never per key), its
+	// normalized query and the pages it matched are counted, once per query. A query that looks like
+	// personal data or a secret is never sent (the server drops it too).
+	let searchTimer: ReturnType<typeof setTimeout> | undefined
+	let recorded = ''
+	function recordSearch() {
+		if (searchTimer !== undefined) clearTimeout(searchTimer)
+		searchTimer = undefined
+		const text = storedQuery(query.value)
+		if (text.length < 2 || text === recorded || !metricsActive()) return
+		recorded = text
+		sendMetric('/api/docs/search', { q: text, results: groups.value.reduce((count, group) => count + group.items.length, 0) })
+	}
+	onMounted(() => {
+		effect(() => {
+			const text = query.value
+			if (searchTimer !== undefined) clearTimeout(searchTimer)
+			searchTimer = normalizeQuery(text).length >= 2 ? setTimeout(recordSearch, 1500) : undefined
+		})
+		return () => {
+			if (searchTimer !== undefined) clearTimeout(searchTimer)
+		}
+	})
 
 	function closeMenu(event: MouseEvent) {
 		if (event.target instanceof Element && event.target.closest('a')) event.currentTarget instanceof Element && event.currentTarget.closest('details')?.removeAttribute('open')
@@ -52,11 +85,11 @@
 					aria-label="Ecosistema"
 				>
 					<a href="/installation">Documentación</a>
-					<a href="https://meeko.diegootayza.com">Framework</a>
+					<a href="https://meekojs.com">Framework</a>
 					<a bind:href="props.repository">GitHub</a>
 				</nav>
 				<div class="header-actions">
-					<MeekoThemeToggle />
+					<UIThemeToggle />
 					<details class="mobile-menu">
 						<summary>Menú</summary>
 						<div
@@ -83,6 +116,7 @@
 					</details>
 				</div>
 			</header>
+			<DocsAnnouncements />
 			<UIContainer
 				size="3xl"
 				gutter="none"

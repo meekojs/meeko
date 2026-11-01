@@ -1,0 +1,275 @@
+<script lang="ts">
+	import { feedbackInput, metricsLimits, useDocsMetrics } from '../../../metrics/state'
+
+	// «¿Te sirvió?» al final de una página: sí o no y un comentario opcional. Con JavaScript se envía
+	// como JSON; sin él (o antes de hidratar) es un <form method="post"> nativo que vuelve a esta
+	// página con 303 y el resultado ya pintado. Sólo se muestra con las métricas activas.
+	const props = defineProps<{ path: string }>()
+
+	const metrics = useDocsMetrics()
+	const route = useRoute()
+	const action = '/api/docs/feedback'
+	const form = useForm({
+		schema: feedbackInput,
+		initial: { path: untrack(() => props.path), helpful: false, comment: '' },
+		action,
+		submit: async (values) => {
+			const response = await fetch(action, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(values), credentials: 'same-origin' })
+			if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status })
+			return (await response.json()) as { saved: boolean }
+		},
+		errorMessage: (failure) => ((failure as { status?: number }).status === 429 ? 'Has enviado varias respuestas seguidas. Vuelve a intentarlo en unos minutos.' : 'No se pudo enviar tu respuesta. Comprueba la conexión y vuelve a intentarlo.'),
+	})
+	const returnTo = computed(() => String(route.url.value).split('#')[0] + '#docs-feedback')
+	const length = computed(() => form.fields.comment.value?.length ?? 0)
+	const over = computed(() => length.value > metricsLimits.comment)
+	const answered = computed(() => form.submitted.value)
+</script>
+
+<template>
+	<section
+		if:when="metrics.value.enabled"
+		id="docs-feedback"
+		class="docs-feedback"
+		aria-labelledby="docs-feedback-title"
+		data-pagefind-ignore
+	>
+		<p
+			class="thanks"
+			role="status"
+		>
+			{answered.value ? 'Gracias por tu respuesta: nos ayuda a mejorar la documentación.' : ''}
+		</p>
+		<form
+			if:when="!answered.value"
+			method="post"
+			novalidate
+			bind:action="action"
+			on:submit="form.submit"
+		>
+			<input
+				type="hidden"
+				name="return"
+				bind:value="returnTo.value"
+			/>
+			<input
+				type="hidden"
+				name="path"
+				bind:value="form.fields.path.value"
+			/>
+			<div class="question">
+				<h2 id="docs-feedback-title">¿Te sirvió esta página?</h2>
+				<div
+					class="answers"
+					role="group"
+					aria-labelledby="docs-feedback-title"
+				>
+					<button
+						type="submit"
+						name="helpful"
+						value="true"
+						bind:disabled="form.pending.value || over.value"
+						on:click="() => (form.fields.helpful.value = true)"
+					>
+						<svg
+							viewBox="0 0 16 16"
+							aria-hidden="true"
+						>
+							<path d="m3.25 8.5 3 3 6.5-7" />
+						</svg>
+						Sí
+					</button>
+					<button
+						type="submit"
+						name="helpful"
+						value="false"
+						bind:disabled="form.pending.value || over.value"
+						on:click="() => (form.fields.helpful.value = false)"
+					>
+						<svg
+							viewBox="0 0 16 16"
+							aria-hidden="true"
+						>
+							<path d="m4 4 8 8M12 4l-8 8" />
+						</svg>
+						No
+					</button>
+				</div>
+			</div>
+			<details
+				class="comment"
+				bind:open="Boolean(form.fields.comment.value) || Boolean(form.errors.value.comment)"
+			>
+				<summary>Añadir un comentario</summary>
+				<label for="docs-feedback-comment">Comentario opcional: qué falta, qué no se entiende o qué sobra</label>
+				<textarea
+					id="docs-feedback-comment"
+					name="comment"
+					rows="3"
+					aria-describedby="docs-feedback-counter docs-feedback-hint"
+					bind:value="form.fields.comment.value ?? ''"
+					bind:aria-invalid="over.value || form.errors.value.comment ? 'true' : undefined"
+					on:input="(event) => (form.fields.comment.value = (event.currentTarget as HTMLTextAreaElement).value)"
+				/>
+				<p
+					id="docs-feedback-counter"
+					class="counter"
+					bind:data-over="over.value ? 'true' : undefined"
+				>
+					{length.value} de {metricsLimits.comment} caracteres
+				</p>
+				<p
+					id="docs-feedback-hint"
+					class="hint"
+				>
+					Se envía al elegir «Sí» o «No». Solo se guardan la página, tu respuesta y el comentario: ni cookies ni datos tuyos.
+				</p>
+			</details>
+			<p
+				if:when="form.errors.value.comment || form.errors.value.helpful"
+				class="error"
+				role="alert"
+			>
+				{form.errors.value.comment ?? form.errors.value.helpful}
+			</p>
+			<p
+				if:when="form.error.value"
+				class="error"
+				role="alert"
+			>
+				{form.error.value}
+			</p>
+		</form>
+	</section>
+</template>
+
+<style scoped>
+	.docs-feedback {
+		margin-top: 3rem;
+		border-top: 1px solid var(--line);
+		padding-top: 1.5rem;
+		scroll-margin-top: calc(var(--header-height, 4rem) + 1rem);
+	}
+	.thanks:empty {
+		display: none;
+	}
+	.thanks {
+		margin: 0;
+		color: var(--ink-soft);
+		font-size: 0.95rem;
+	}
+	.question {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem 1.25rem;
+	}
+	h2 {
+		margin: 0;
+		font-weight: 560;
+		font-size: 1rem;
+		letter-spacing: -0.005em;
+	}
+	.answers {
+		display: flex;
+		gap: 0.5rem;
+	}
+	button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		transition:
+			border-color 0.15s,
+			background-color 0.15s,
+			color 0.15s;
+		cursor: pointer;
+		border: 1px solid var(--line-strong);
+		border-radius: 999px;
+		background: var(--surface);
+		padding: 0.35rem 0.95rem 0.35rem 0.75rem;
+		color: var(--ink);
+		font: 520 0.9rem/1.4 var(--font-ui);
+	}
+	button:hover:not(:disabled) {
+		border-color: var(--accent-line);
+		background: var(--surface-2);
+	}
+	button:focus-visible,
+	summary:focus-visible,
+	textarea:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+	button:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+	}
+	svg {
+		fill: none;
+		stroke: currentColor;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-width: 1.6;
+		width: 14px;
+		height: 14px;
+	}
+	.comment {
+		margin-top: 0.875rem;
+	}
+	summary {
+		cursor: pointer;
+		border-radius: 4px;
+		width: fit-content;
+		color: var(--muted);
+		font-size: 0.875rem;
+	}
+	summary:hover {
+		color: var(--ink-soft);
+	}
+	label {
+		display: block;
+		margin: 0.75rem 0 0.375rem;
+		color: var(--ink-soft);
+		font-size: 0.875rem;
+	}
+	textarea {
+		box-sizing: border-box;
+		border: 1px solid var(--line-strong);
+		border-radius: var(--radius-s);
+		background: var(--surface);
+		padding: 0.6rem 0.75rem;
+		width: 100%;
+		max-width: 40rem;
+		min-height: 5.5rem;
+		resize: vertical;
+		color: var(--ink);
+		caret-color: var(--accent);
+		font: 0.92rem/1.55 var(--font-ui);
+	}
+	textarea[aria-invalid='true'] {
+		border-color: var(--danger);
+	}
+	.counter,
+	.hint {
+		margin: 0.375rem 0 0;
+		max-width: 40rem;
+		color: var(--muted);
+		font-size: 0.8rem;
+	}
+	.counter {
+		font-variant-numeric: tabular-nums;
+	}
+	.counter[data-over='true'],
+	.error {
+		color: var(--danger);
+	}
+	.error {
+		margin: 0.75rem 0 0;
+		font-size: 0.875rem;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		button {
+			transition: none;
+		}
+	}
+</style>

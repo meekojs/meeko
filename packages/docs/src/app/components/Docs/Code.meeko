@@ -18,8 +18,8 @@
 			<span>{props.label ?? 'Ejemplo .meeko'}</span>
 			<button
 				type="button"
-				on:click="copy"
 				aria-label="Copiar código"
+				on:click="copy"
 			>
 				Copiar
 			</button>

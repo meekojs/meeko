@@ -1,0 +1,182 @@
+import type { DocsSite, SourceEntry, SourceKind } from '../sources/discover'
+import type { Database, Queryable } from './pool'
+
+import { collectRepositorySources } from '../sources/discover'
+import { contentHash, normalizeSourcePath, normalizeText } from '../sources/overlay'
+import { database, transaction } from './pool'
+
+/** A row of `docs_sources`, without its Markdown. */
+export interface SourceRecord {
+	readonly id: number
+	readonly site: DocsSite
+	readonly path: string
+	readonly kind: SourceKind
+	readonly title: string
+	/** Its Markdown file from the repository root, or `null` for a `.meeko` page. */
+	readonly file: string | null
+	readonly baseHash: string | null
+	readonly importedAt: Date
+	/** When the last import stopped finding it, or `null` while it exists. */
+	readonly removedAt: Date | null
+	/** Its published revision, or `null` when the site shows Git. */
+	readonly publishedRevisionId: number | null
+}
+
+/** A source with the Markdown of Git it was imported from. */
+export interface SourceDetail extends SourceRecord {
+	readonly markdown: string | null
+}
+
+/** What {@link importSources} changed. */
+export interface ImportResult {
+	readonly inserted: number
+	readonly updated: number
+	readonly unchanged: number
+	/** Sources of the imported sites that Git no longer has; marked removed, never deleted. */
+	readonly removed: number
+	/** Removed sources that Git has again. */
+	readonly restored: number
+}
+
+/** Filter of {@link listSources}. */
+export interface SourceFilter {
+	readonly site?: DocsSite
+	readonly kind?: SourceKind
+	/** Include sources that Git no longer has. */
+	readonly includeRemoved?: boolean
+}
+
+interface SourceRow {
+	id: string
+	site: DocsSite
+	path: string
+	kind: SourceKind
+	title: string
+	source_file: string | null
+	base_hash: string | null
+	imported_at: Date
+	removed_at: Date | null
+	published_revision_id: string | null
+	base_markdown?: string | null
+}
+
+const columns = `s.id, s.site, s.path, s.kind, s.title, s.source_file, s.base_hash, s.imported_at, s.removed_at,
+	(SELECT r.id FROM docs_revisions AS r WHERE r.source_id = s.id AND r.status = 'published') AS published_revision_id`
+
+function record(row: SourceRow): SourceRecord {
+	return {
+		id: Number(row.id),
+		site: row.site,
+		path: row.path,
+		kind: row.kind,
+		title: row.title,
+		file: row.source_file,
+		baseHash: row.base_hash,
+		importedAt: row.imported_at,
+		removedAt: row.removed_at,
+		publishedRevisionId: row.published_revision_id === null ? null : Number(row.published_revision_id),
+	}
+}
+
+/** Checks an entry before it is stored, with its Markdown normalized to `\n`. */
+function prepare(entry: SourceEntry): SourceEntry & { readonly hash: string | null } {
+	if (!['site', 'ui', 'i18n'].includes(entry.site)) throw new TypeError(`Unknown site: ${entry.site}`)
+	if (!entry.path.startsWith('/') || /[?#\s]/.test(entry.path)) throw new TypeError(`Invalid source path: ${entry.path}`)
+	if (!entry.title.trim()) throw new TypeError(`${entry.site} ${entry.path}: the title is empty`)
+	const page = entry.kind === 'page'
+	if (page !== (entry.markdown === null) || page !== (entry.file === null)) {
+		throw new TypeError(`${entry.site} ${entry.path}: a page has no Markdown or file, and a guide or reference page has both`)
+	}
+	if (!page && entry.site !== 'site') throw new TypeError(`${entry.site} ${entry.path}: only the site has Markdown sources`)
+	const markdown = entry.markdown === null ? null : normalizeText(entry.markdown)
+	const file = entry.file === null ? null : normalizeSourcePath(entry.file)
+	return { ...entry, file, markdown, hash: markdown === null ? null : contentHash(markdown) }
+}
+
+/**
+ * Stores the pages of Git as the base of the dashboard: new ones are inserted, changed ones get
+ * their new title and Markdown, and those of the imported sites that Git no longer has are marked
+ * removed. Revisions are never touched. `sites` are the sites `entries` cover entirely (those of
+ * the entries by default).
+ */
+export async function importSources(db: Database, entries: readonly SourceEntry[], sites: readonly DocsSite[] = [...new Set(entries.map((entry) => entry.site))]): Promise<ImportResult> {
+	const prepared = entries.map(prepare)
+	const keys = new Set<string>()
+	for (const entry of prepared) {
+		const key = `${entry.site}\0${entry.path}`
+		if (keys.has(key)) throw new TypeError(`Two sources for ${entry.site} ${entry.path}`)
+		if (!sites.includes(entry.site)) throw new TypeError(`${entry.site} ${entry.path} is outside the imported sites`)
+		keys.add(key)
+	}
+	return transaction(db, async (client) => {
+		const existing = await client.query<{ id: string; site: DocsSite; path: string; kind: SourceKind; title: string; source_file: string | null; base_hash: string | null; removed_at: Date | null }>('SELECT id, site, path, kind, title, source_file, base_hash, removed_at FROM docs_sources WHERE site = ANY($1::text[]) FOR UPDATE', [sites])
+		const rows = new Map(existing.rows.map((row) => [`${row.site}\0${row.path}`, row]))
+		let removed = 0
+		// Removals first, so a file that moved to another URL can take its place in the unique index.
+		for (const [key, row] of rows) {
+			if (keys.has(key) || row.removed_at) continue
+			await client.query('UPDATE docs_sources SET removed_at = now() WHERE id = $1', [row.id])
+			removed++
+		}
+		let inserted = 0
+		let updated = 0
+		let unchanged = 0
+		let restored = 0
+		for (const entry of prepared) {
+			const row = rows.get(`${entry.site}\0${entry.path}`)
+			if (!row) {
+				await client.query('INSERT INTO docs_sources (site, path, kind, title, source_file, base_markdown, base_hash) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
+					entry.site,
+					entry.path,
+					entry.kind,
+					entry.title,
+					entry.file,
+					entry.markdown,
+					entry.hash,
+				])
+				inserted++
+				continue
+			}
+			const changed = row.kind !== entry.kind || row.title !== entry.title || row.source_file !== entry.file || row.base_hash !== entry.hash
+			if (row.removed_at) restored++
+			if (changed) {
+				await client.query('UPDATE docs_sources SET kind = $2, title = $3, source_file = $4, base_markdown = $5, base_hash = $6, imported_at = now(), removed_at = NULL WHERE id = $1', [
+					row.id,
+					entry.kind,
+					entry.title,
+					entry.file,
+					entry.markdown,
+					entry.hash,
+				])
+				updated++
+			} else {
+				if (row.removed_at) await client.query('UPDATE docs_sources SET removed_at = NULL WHERE id = $1', [row.id])
+				unchanged++
+			}
+		}
+		return { inserted, updated, unchanged, removed, restored }
+	})
+}
+
+/** Imports every page of the repository's three sites: see {@link collectRepositorySources}. */
+export async function importRepositorySources(db: Database = database(), sites: readonly DocsSite[] = ['site', 'ui', 'i18n']): Promise<ImportResult> {
+	return importSources(db, await collectRepositorySources(sites), sites)
+}
+
+/** The sources, by site and path, without their Markdown. */
+export async function listSources(db: Queryable = database(), filter: SourceFilter = {}): Promise<SourceRecord[]> {
+	const result = await db.query<SourceRow>(
+		`SELECT ${columns} FROM docs_sources AS s
+		WHERE ($1::text IS NULL OR s.site = $1) AND ($2::text IS NULL OR s.kind = $2) AND ($3 OR s.removed_at IS NULL)
+		ORDER BY s.site, s.path`,
+		[filter.site ?? null, filter.kind ?? null, filter.includeRemoved ?? false],
+	)
+	return result.rows.map(record)
+}
+
+/** A source with its Markdown of Git, by id or by site and path; `null` when it does not exist. */
+export async function getSource(db: Queryable, key: number | { readonly site: DocsSite; readonly path: string }): Promise<SourceDetail | null> {
+	const result = typeof key === 'number' ? await db.query<SourceRow>(`SELECT ${columns}, s.base_markdown FROM docs_sources AS s WHERE s.id = $1`, [key]) : await db.query<SourceRow>(`SELECT ${columns}, s.base_markdown FROM docs_sources AS s WHERE s.site = $1 AND s.path = $2`, [key.site, key.path])
+	const row = result.rows[0]
+	return row ? { ...record(row), markdown: row.base_markdown ?? null } : null
+}
