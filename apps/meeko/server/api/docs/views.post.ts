@@ -10,5 +10,6 @@ export default defineApiRoute({
 	body: viewInput,
 	status: 204,
 	rateLimit: metricsRateLimits.view,
-	handler: viewHandler({ site: 'site', knownPath: async (path) => (await readPage(path)) !== null }),
+	// `/en/…` counts as an English view of the page without the prefix.
+	handler: viewHandler({ site: 'site', localized: true, knownPath: async (path, locale) => (await readPage(path, locale)) !== null }),
 })

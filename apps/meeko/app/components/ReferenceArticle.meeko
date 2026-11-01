@@ -9,6 +9,9 @@
 	}
 
 	const props = defineProps<Props>()
+
+	const { localePath, t } = useI18n()
+	const copyCode = useCodeCopy()
 </script>
 
 <template>
@@ -16,14 +19,14 @@
 		class="prose reference-page"
 		data-pagefind-body
 		bind:data-pagefind-meta="props.searchTitle"
-		on:click="copyCodeBlock"
+		on:click="copyCode"
 	>
 		<nav
 			class="crumbs"
-			aria-label="Ruta"
 			data-pagefind-ignore
+			bind:aria-label="t('docs.reference.breadcrumb')"
 		>
-			<a href="/docs/reference">Referencia de la API</a>
+			<a bind:href="localePath('/docs/reference')">{t('docs.reference.title')}</a>
 			<svg
 				class="chevron"
 				viewBox="0 0 16 16"
@@ -53,8 +56,8 @@
 			data-pagefind-ignore
 		>
 			<UIBadge tone="accent">{props.page.kindLabel}</UIBadge>
-			<UIBadge if:when="props.page.since">Desde {props.page.since}</UIBadge>
-			<UIBadge if:when="props.page.autoImport">Sin import</UIBadge>
+			<UIBadge if:when="props.page.since">{t('docs.reference.since', { version: props.page.since ?? '' })}</UIBadge>
+			<UIBadge if:when="props.page.autoImport">{t('docs.reference.noImport')}</UIBadge>
 			<code
 				if:when="props.page.specifier"
 				class="specifier"
@@ -73,7 +76,7 @@
 				>
 					<path d="m5.5 5-3 3 3 3M10.5 5l3 3-3 3M9 3.5l-2 9" />
 				</svg>
-				Código fuente
+				{t('docs.reference.source')}
 			</a>
 		</div>
 		<p

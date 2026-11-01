@@ -17,6 +17,8 @@
 
 	const props = defineProps<Props>()
 
+	const { t } = useI18n()
+
 	// The same state as examples/counter/Counter.meeko, rendered on the server and hydrated here.
 	const count = signal(0)
 	const doubled = computed(() => count.value * 2)
@@ -27,7 +29,7 @@
 		const latest = events.value[0]
 		return latest === undefined ? undefined : latest.id % 2 ? 'a' : 'b'
 	})
-	const announcement = computed(() => (events.value.length ? `count vale ${count.value}; doubled vale ${doubled.value}.` : ''))
+	const announcement = computed(() => (events.value.length ? t('home.demo.announcement', { count: count.value, doubled: doubled.value }) : ''))
 
 	function increment(): void {
 		const from = count.value
@@ -65,21 +67,21 @@
 					bind:disabled="events.value.length === 0"
 					on:click="reset"
 				>
-					Reiniciar
+					{t('home.demo.reset')}
 				</button>
 			</div>
 			<div class="panes">
 				<section
 					class="pane code"
-					aria-label="Código de Counter.meeko"
+					bind:aria-label="t('home.demo.code')"
 				>
 					<header class="pane-head">
-						<span>Editor</span>
+						<span>{t('home.demo.editor')}</span>
 						<a
 							rel="noopener"
 							bind:href="props.source.url"
 						>
-							Ver en GitHub
+							{t('home.demo.github')}
 						</a>
 					</header>
 					<pre
@@ -103,11 +105,11 @@
 				</section>
 				<section
 					class="pane result"
-					aria-label="Resultado en el navegador"
+					bind:aria-label="t('home.demo.result')"
 				>
 					<header class="pane-head">
-						<span>Resultado</span>
-						<span class="note">SSR e hidratado en esta página</span>
+						<span>{t('home.demo.resultTitle')}</span>
+						<span class="note">{t('home.demo.resultNote')}</span>
 					</header>
 					<div class="stage">
 						<button
@@ -115,18 +117,18 @@
 							class="counter"
 							on:click="increment"
 						>
-							{count.value} · doble: {doubled.value}
+							{t('home.demo.counter', { count: count.value, doubled: doubled.value })}
 						</button>
-						<p class="hint">Pulsa el botón: cambia la señal y sólo se actualiza su texto.</p>
+						<p class="hint">{t('home.demo.hint')}</p>
 					</div>
 				</section>
 				<section
 					class="pane devtools"
-					aria-label="Representación de DevTools"
+					bind:aria-label="t('home.demo.devtools')"
 				>
 					<header class="pane-head">
 						<span>DevTools</span>
-						<span class="tag">representación</span>
+						<span class="tag">{t('home.demo.devtoolsTag')}</span>
 					</header>
 					<div class="tree">
 						<span class="node">&lt;Counter&gt;</span>
@@ -140,7 +142,7 @@
 							<dd class="site" />
 						</div>
 					</dl>
-					<p class="group-title">Señales</p>
+					<p class="group-title">{t('home.demo.signals')}</p>
 					<dl class="rows">
 						<div
 							class="row signal"
@@ -162,7 +164,7 @@
 							<dd class="site">{fileName.value}:{props.source.doubledLine}</dd>
 						</div>
 					</dl>
-					<p class="group-title">Línea de tiempo</p>
+					<p class="group-title">{t('home.demo.timeline')}</p>
 					<ol class="timeline">
 						<li
 							each:of="events.value"
@@ -178,9 +180,9 @@
 						if:when="events.value.length === 0"
 						class="empty"
 					>
-						Sin cambios todavía.
+						{t('home.demo.empty')}
 					</p>
-					<p class="disclaimer">El panel real existe sólo en desarrollo, dentro de la página o en Chrome DevTools.</p>
+					<p class="disclaimer">{t('home.demo.disclaimer')}</p>
 				</section>
 			</div>
 		</div>
@@ -189,7 +191,7 @@
 			class="fig-label"
 		>
 			<b>FIG. 01</b>
-			<span>Counter.meeko del repositorio, su resultado y una representación de DevTools</span>
+			<span>{t('home.demo.caption')}</span>
 		</figcaption>
 		<p
 			class="sr-only"

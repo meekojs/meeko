@@ -7,6 +7,8 @@
 
 	import { announcementsKey } from '../utils/announcements'
 
+	const { locale, t } = useI18n()
+
 	/** What the server plugin provided for this request; nothing on the browser, which hydrates the state instead. */
 	function provided(): readonly PublicAnnouncement[] {
 		try {
@@ -24,7 +26,7 @@
 	// in the dashboard show without a reload.
 	refreshOnNavigation(
 		announcements,
-		() => moderationEndpoint('site'),
+		() => moderationEndpoint('site', locale === 'en' ? 'en' : 'es'),
 		(moderation) => moderation.announcements,
 	)
 
@@ -76,7 +78,7 @@
 				<button
 					type="button"
 					class="close"
-					aria-label="Cerrar aviso"
+					bind:aria-label="t('announcements.close')"
 					on:click="() => close(item.id)"
 				>
 					<svg

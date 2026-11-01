@@ -1,0 +1,74 @@
+<script lang="ts">
+	// The languages of this page as real links to its equivalent in each one: they work without
+	// JavaScript, crawlers follow them, and following one stores the choice in the locale cookie.
+	// A route without versions in other languages (an error page) shows nothing.
+	const i18n = useI18n()
+</script>
+
+<template>
+	<nav
+		if:when="i18n.pageLocales().length > 1"
+		class="locale-switcher"
+		bind:aria-label="i18n.t('locale.label')"
+	>
+		<a
+			each:of="i18n.pageLocales()"
+			each:as="code"
+			each:key="code"
+			bind:href="i18n.switchLocalePath(code)"
+			bind:hreflang="code"
+			bind:lang="code"
+			bind:title="i18n.localeName(code)"
+			bind:aria-current="code === i18n.locale ? 'page' : undefined"
+		>
+			<span aria-hidden="true">{code.toUpperCase()}</span>
+			<span class="sr-only">{i18n.localeName(code)}</span>
+		</a>
+	</nav>
+</template>
+
+<style scoped>
+	/* The size and hairline of the search trigger beside it: one 32 px row of tools. */
+	.locale-switcher {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		gap: 2px;
+		margin-right: 0.15rem;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		background: var(--surface);
+		padding: 2px;
+		height: 32px;
+	}
+	a {
+		display: grid;
+		place-items: center;
+		transition:
+			color 0.15s,
+			background-color 0.15s;
+		border-radius: 6px;
+		min-width: 1.9rem;
+		height: 100%;
+		color: var(--muted);
+		font-weight: 560;
+		font-size: 0.72rem;
+		letter-spacing: 0.04em;
+		text-decoration: none;
+	}
+	a:hover {
+		color: var(--ink);
+	}
+	a[aria-current='page'] {
+		background: var(--surface-3);
+		color: var(--ink);
+	}
+	a:focus-visible {
+		outline-offset: 1px;
+	}
+	@media (max-width: 480px) {
+		a {
+			min-width: 1.6rem;
+		}
+	}
+</style>

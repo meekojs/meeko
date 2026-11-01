@@ -1,0 +1,90 @@
+{
+	"home": {
+		"hero": {
+			"title": "Componentes <code>.meeko</code> tipados,",
+			"titleLine2": "del servidor al navegador.",
+			"lead": "Un motor de componentes para TypeScript y un framework full-stack. Un solo archivo da el HTML del servidor y la reactividad que lo actualiza, sin DOM virtual.",
+			"start": "Empezar",
+			"requires": "Requiere Node 24 y"
+		},
+		"flow": {
+			"title": "Un archivo tipado.",
+			"titleSoft": "El servidor envía HTML y el navegador sólo conecta lo que cambia.",
+			"typedTitle": "Un archivo <code>.meeko</code> tipado",
+			"typedBody": "Script, plantilla y estilos juntos. TypeScript comprueba props, eventos, modelos y cada expresión de la plantilla, con el error en la línea del <code>.meeko</code>.",
+			"typedLink": "Componentes y API",
+			"signalsTitle": "Signals sin DOM virtual",
+			"signalsAnd": "y",
+			"signalsBody": "actualizan sólo el texto o el atributo que cambia. Las listas conservan sus nodos por clave.",
+			"signalsLink": "Reactividad",
+			"signalsAnchor": "reactividad",
+			"ssrTitle": "SSR más hidratación",
+			"ssrBody": "El servidor envía la página completa y el estado de cada señal; el navegador la hidrata sin volver a pintarla. También streaming, prerender y páginas de cliente.",
+			"ssrLink": "Modos de render",
+			"ssrAnchor": "modos-de-render",
+			"figure": "Dibujo isométrico: el archivo Counter.meeko pasa al servidor, que envía HTML; el navegador lo hidrata y recibe el estado de las señales.",
+			"figureHydrate": "HIDRATAR",
+			"figureState": "ESTADO DE LAS SEÑALES",
+			"caption": "Compilar, renderizar en el servidor, hidratar"
+		},
+		"deploy": {
+			"title": "Full-stack de serie.",
+			"titleSoft": "Un build autónomo por adaptador y la misma suite de conformidad para los cuatro.",
+			"figure": "Dibujo isométrico: meeko build con un adaptador alimenta cuatro plataformas, Node, Bun, Deno y Workers, dentro del marco de una misma suite de conformidad.",
+			"figureSuite": "SUITE DE CONFORMIDAD",
+			"caption": "Un build, cuatro destinos",
+			"fullstackTitle": "Full-stack de serie",
+			"fullstackBody": "Rutas por archivos, layouts, código de servidor en la propia página, API y RPC tipados, sesiones con revocación y WebSocket entre instancias.",
+			"fullstackLink": "Guía del framework",
+			"platformsTitle": "Node, Bun, Deno y Cloudflare",
+			"platformsBody": "Un build autónomo por adaptador, comprobado por la misma suite de conformidad. SemVer desde 1.0, con una política de estabilidad explícita.",
+			"platformsLink": "Estabilidad 1.x"
+		},
+		"tools": {
+			"title": "Herramientas que ven el runtime.",
+			"titleSoft": "El editor y DevTools muestran las señales reales de cada instancia.",
+			"editorCode": "Líneas 10 a 17 de Counter.meeko",
+			"hover": "Hover de la señal count",
+			"instances": "Counter.meeko · 1 instancia",
+			"editValue": "Editar valor",
+			"connected": "conectado a meeko dev",
+			"caption": "Representación de la extensión de VS Code con meeko dev en marcha: el valor de cada señal al final de su línea y en el hover",
+			"editorTitle": "Un editor con superpoderes",
+			"editorBody": "Servidor de lenguaje con los diagnósticos de <code>meeko check</code>, zonas de ejecución servidor/navegador, hover de señales y valores en vivo desde <code>meeko dev</code>.",
+			"editorLink": "Editores",
+			"devtoolsTitle": "DevTools por instancia",
+			"devtoolsBody": "Un árbol de instancias con sus props y señales, una línea de tiempo filtrable y un punto de parada por instancia, dentro de la página o en un panel de Chrome DevTools. Sólo existe en desarrollo.",
+			"devtoolsLink": "DevTools",
+			"catCaption": "Meeko asomada al editor"
+		},
+		"start": {
+			"title": "Inicio rápido.",
+			"titleSoft": "Un comando crea la aplicación full-stack; sus scripts la llevan a producción.",
+			"dev": "Arranca el servidor de desarrollo.",
+			"check": "Genera los contratos y comprueba los tipos.",
+			"build": "Cliente, servidor y páginas prerenderizadas; con <code>--adapter</code>, una salida para Bun, Deno, Cloudflare o un hosting estático.",
+			"start": "SSR de producción con Node 24.",
+			"full": "Inicio rápido completo",
+			"guide": "Guía del framework"
+		},
+		"demo": {
+			"reset": "Reiniciar",
+			"code": "Código de Counter.meeko",
+			"editor": "Editor",
+			"github": "Ver en GitHub",
+			"result": "Resultado en el navegador",
+			"resultTitle": "Resultado",
+			"resultNote": "SSR e hidratado en esta página",
+			"counter": "{count} · doble: {doubled}",
+			"hint": "Pulsa el botón: cambia la señal y sólo se actualiza su texto.",
+			"devtools": "Representación de DevTools",
+			"devtoolsTag": "representación",
+			"signals": "Señales",
+			"timeline": "Línea de tiempo",
+			"empty": "Sin cambios todavía.",
+			"disclaimer": "El panel real existe sólo en desarrollo, dentro de la página o en Chrome DevTools.",
+			"caption": "Counter.meeko del repositorio, su resultado y una representación de DevTools",
+			"announcement": "count vale {count}; doubled vale {doubled}."
+		}
+	}
+}

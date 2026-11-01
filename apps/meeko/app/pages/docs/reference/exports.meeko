@@ -1,4 +1,6 @@
 <script server lang="ts">
+	import type { PageLocale } from 'meeko-docs-content/locale'
+
 	import { definePage } from '@meekojs/meeko/framework'
 
 	import type { ApiIndexGroup, ApiKind } from '../../../../shared/types/api'
@@ -20,10 +22,14 @@
 		readonly source: string
 		readonly editUrl: string
 		readonly head: { readonly title: string; readonly description: string }
+		readonly i18n?: PageLocale
 	}
-	const snapshot = await readPage<ExportsPage>('/docs/reference/exports')
+	const { locale } = await usePageI18n()
+	const snapshot = await readPage<ExportsPage>('/docs/reference/exports', locale)
 	if (!snapshot) notFound()
 	export const { groups, total, kinds, nav, current, toc, pages, index, source, editUrl, head } = snapshot
+	// Without it in the payload (a snapshot older than the languages), the page is the original.
+	export const i18n = snapshot.i18n ?? null
 </script>
 
 <script lang="ts">
@@ -32,6 +38,7 @@
 		search: Record<string, string | string[]>
 	}
 
+	const { t } = useI18n()
 	const query = signal('')
 	const kind = signal('all')
 
@@ -64,14 +71,20 @@
 		bind:pager="pages"
 		bind:editUrl="editUrl"
 		bind:source="source"
+		bind:i18n="i18n"
 	>
 		<article class="prose reference">
-			<h1>Todos los exports</h1>
-			<p class="lead">{total} páginas: una por cada export público del paquete y una por cada bloque, macro, etiqueta y directiva que reconoce el compilador de componentes. Salen del código fuente y de su JSDoc, la misma documentación que muestra el editor.</p>
+			<h1>{t('docs.reference.allExports')}</h1>
+			<p class="lead">{t('docs.exports.lead', { total })}</p>
 			<p>
-				El
-				<a bind:href="index">índice de la referencia</a>
-				agrupa los símbolos principales por tipo, con páginas que explican su uso, sus errores comunes y sus ejemplos.
+				<I18nT key="docs.exports.index">
+					<snippet
+						name="a"
+						params="text"
+					>
+						<a bind:href="index">{text}</a>
+					</snippet>
+				</I18nT>
 			</p>
 			<div
 				class="filters"
@@ -88,27 +101,27 @@
 					>
 						<path d="M4 6h16M7 12h10M10 18h4" />
 					</svg>
-					<span class="sr-only">Filtrar por nombre</span>
+					<span class="sr-only">{t('docs.exports.filter')}</span>
 					<input
 						id="api-filter"
 						type="search"
-						placeholder="Filtrar por nombre: signal, definePage, SessionManager…"
 						autocomplete="off"
 						spellcheck="false"
 						model="query"
+						bind:placeholder="t('docs.exports.placeholder')"
 					/>
 				</label>
 				<div
 					class="kinds"
 					role="group"
-					aria-label="Filtrar por tipo"
+					bind:aria-label="t('docs.exports.kinds')"
 				>
 					<button
 						type="button"
 						bind:aria-pressed="String(kind.value === 'all')"
 						on:click="() => choose('all')"
 					>
-						Todo
+						{t('docs.exports.all')}
 					</button>
 					<button
 						each:of="kinds"
@@ -126,16 +139,24 @@
 					class="count"
 					aria-live="polite"
 				>
-					{count.value === total ? total + ' símbolos' : count.value + ' de ' + total + ' símbolos'}
+					{count.value === total ? t('docs.exports.total', { total }) : t('docs.exports.partial', { count: count.value, total })}
 				</p>
 			</div>
 			<p
 				if:when="count.value === 0"
 				class="empty"
 			>
-				Ningún símbolo coincide con «{query.value.trim()}». La
-				<kbd>/</kbd>
-				abre la búsqueda en toda la documentación.
+				<I18nT
+					key="docs.exports.empty"
+					bind:values="{ query: query.value.trim() }"
+				>
+					<snippet
+						name="kbd"
+						params="text"
+					>
+						<kbd>{text}</kbd>
+					</snippet>
+				</I18nT>
 			</p>
 			<section
 				each:of="visible.value"
@@ -174,7 +195,7 @@
 								if:when="item.deprecated"
 								class="deprecated"
 							>
-								obsoleto
+								{t('docs.reference.deprecatedLower')}
 							</span>
 							<span
 								class="summary"

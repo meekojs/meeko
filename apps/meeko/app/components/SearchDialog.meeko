@@ -4,6 +4,9 @@
 
 	import type { SearchResult } from '../utils/search'
 
+	const { locale, t } = useI18n()
+	/** The language of the documentation that the dialog searches: the one of the page. */
+	const searchLocale = locale === 'en' ? 'en' : 'es'
 	const dialog = useElementRef('dialog')
 
 	const input = useElementRef('input')
@@ -31,7 +34,7 @@
 		const text = storedQuery(query.value)
 		if (text.length < 2 || text === recorded || !metricsActive()) return
 		recorded = text
-		sendMetric('/api/docs/search', { q: text })
+		sendMetric('/api/docs/search', { q: text, locale: searchLocale })
 	}
 
 	function open(): void {
@@ -82,7 +85,7 @@
 
 	async function run(text: string, id: number): Promise<void> {
 		try {
-			const found = await searchDocs(text)
+			const found = await searchDocs(text, searchLocale)
 			if (id !== request) return
 			results.value = found
 			active.value = 0
@@ -136,7 +139,7 @@
 	<button
 		type="button"
 		class="search-trigger"
-		aria-label="Buscar en la documentación"
+		bind:aria-label="t('search.open')"
 		on:click="open"
 	>
 		<svg
@@ -150,7 +153,7 @@
 			/>
 			<path d="m20 20-3.5-3.5" />
 		</svg>
-		<span class="label">Buscar…</span>
+		<span class="label">{t('search.trigger')}</span>
 		<span
 			class="keys"
 			aria-hidden="true"
@@ -162,7 +165,7 @@
 	<dialog
 		ref:dialog
 		class="search"
-		aria-label="Buscar en la documentación"
+		bind:aria-label="t('search.open')"
 		on:click="onDialogClick"
 		on:keydown="onKeydown"
 	>
@@ -184,11 +187,11 @@
 					id="meeko-search"
 					name="q"
 					type="search"
-					placeholder="Buscar: signals, defineModel, prerender…"
 					autocomplete="off"
 					spellcheck="false"
-					aria-label="Texto de búsqueda"
 					model="query"
+					bind:placeholder="t('search.placeholder')"
+					bind:aria-label="t('search.input')"
 				/>
 				<button
 					type="button"
@@ -202,36 +205,35 @@
 				if:when="status.value === 'idle'"
 				class="hint"
 			>
-				Escribe para buscar en las guías y en la referencia de la API. Ábrela desde cualquier página con
-				<kbd>/</kbd>
-				o
-				<kbd>{modifier.value}</kbd>
-				<kbd>K</kbd>
-				; muévete con las flechas y entra con
-				<kbd>Intro</kbd>
-				.
+				<I18nT
+					key="search.hint"
+					bind:values="{ modifier: modifier.value }"
+				>
+					<snippet
+						name="kbd"
+						params="text"
+					>
+						<kbd>{text}</kbd>
+					</snippet>
+				</I18nT>
 			</p>
 			<p
 				if:when="status.value === 'loading'"
 				class="hint"
 			>
-				Buscando…
+				{t('search.loading')}
 			</p>
 			<p
 				if:when="status.value === 'empty'"
 				class="hint"
 			>
-				Sin resultados para «{query.value.trim()}».
+				{t('search.empty', { query: query.value.trim() })}
 			</p>
 			<p
 				if:when="status.value === 'unavailable'"
 				class="hint"
 			>
-				El índice de búsqueda se genera con
-				<code>pnpm run build</code>
-				; no existe en
-				<code>meeko dev</code>
-				.
+				{t('search.unavailable')}
 			</p>
 			<ol
 				if:when="status.value === 'ready'"

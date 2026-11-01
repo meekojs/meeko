@@ -1,4 +1,6 @@
 <script server lang="ts">
+	import type { PageLocale } from 'meeko-docs-content/locale'
+
 	import { definePage } from '@meekojs/meeko/framework'
 
 	import type { NavSection, Pager, TocEntry } from '../../../../shared/types/docs'
@@ -22,10 +24,14 @@
 		readonly source: string
 		readonly editUrl: string
 		readonly head: { readonly title: string; readonly description: string }
+		readonly i18n?: PageLocale
 	}
-	const snapshot = await readPage<ReferenceIndexPage>('/docs/reference')
+	const { locale } = await usePageI18n()
+	const snapshot = await readPage<ReferenceIndexPage>('/docs/reference', locale)
 	if (!snapshot) notFound()
 	export const { groups, total, modules, exportsIcon, exportsLink, nav, current, toc, pages, source, editUrl, head } = snapshot
+	// Without it in the payload (a snapshot older than the languages), the page is the original.
+	export const i18n = snapshot.i18n ?? null
 </script>
 
 <script lang="ts">
@@ -33,6 +39,8 @@
 		params: Record<string, string>
 		search: Record<string, string | string[]>
 	}
+
+	const { t } = useI18n()
 </script>
 
 <template>
@@ -43,15 +51,14 @@
 		bind:pager="pages"
 		bind:editUrl="editUrl"
 		bind:source="source"
+		bind:i18n="i18n"
 	>
 		<article class="prose reference-index">
-			<h1>Referencia de la API</h1>
-			<p class="lead">
-				{total} símbolos de Meeko agrupados por lo que son. Cada página explica uno con su tipo exacto, generado desde el código fuente, sus parámetros, ejemplos reales y los errores que da usarlo mal.
-			</p>
+			<h1>{t('docs.reference.title')}</h1>
+			<p class="lead">{t('docs.reference.lead', { total })}</p>
 			<ul
 				class="cards"
-				aria-label="Grupos de la referencia"
+				bind:aria-label="t('docs.reference.groups')"
 			>
 				<li
 					each:of="groups"
@@ -90,9 +97,9 @@
 							>
 								<path bind:d="exportsIcon" />
 							</svg>
-							<span class="card-title">Todos los exports</span>
+							<span class="card-title">{t('docs.reference.allExports')}</span>
 						</span>
-						<span class="card-text">Cada export de cada módulo del paquete, con su página generada desde el JSDoc.</span>
+						<span class="card-text">{t('docs.reference.allExportsCard')}</span>
 					</a>
 				</li>
 			</ul>
@@ -113,8 +120,8 @@
 					{group.title}
 					<a
 						class="heading-anchor"
-						aria-label="Enlace a esta sección"
 						data-pagefind-ignore
+						bind:aria-label="t('docs.reference.anchor')"
 						bind:href="'#' + group.anchor"
 					>
 						#
@@ -140,7 +147,7 @@
 								tone="accent"
 								class="featured"
 							>
-								Destacado
+								{t('docs.layout.featured')}
 							</UIBadge>
 						</a>
 						<span
@@ -162,20 +169,25 @@
 					>
 						<path bind:d="exportsIcon" />
 					</svg>
-					Todos los exports
+					{t('docs.reference.allExports')}
 					<a
 						class="heading-anchor"
 						href="#todos-los-exports"
-						aria-label="Enlace a esta sección"
 						data-pagefind-ignore
+						bind:aria-label="t('docs.reference.anchor')"
 					>
 						#
 					</a>
 				</h2>
 				<p class="group-description">
-					Los tipos, las interfaces y las piezas de bajo nivel que no tienen su propia entrada arriba siguen documentados, uno por página, en el
-					<a bind:href="exportsLink">índice por módulo</a>
-					.
+					<I18nT key="docs.reference.modules">
+						<snippet
+							name="a"
+							params="text"
+						>
+							<a bind:href="exportsLink">{text}</a>
+						</snippet>
+					</I18nT>
 				</p>
 				<ul class="modules">
 					<li

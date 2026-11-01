@@ -301,6 +301,9 @@ importers:
 
   apps/meeko:
     dependencies:
+      '@meekojs/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@meekojs/meeko':
         specifier: workspace:*
         version: link:../../packages/meeko

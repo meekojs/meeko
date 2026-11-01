@@ -36,8 +36,11 @@ function excerptHtml(value: string, query: string): TrustedHtml {
 /** Search uses the active database snapshot. */
 export function preloadSearch(): void {}
 
-export async function searchDocs(query: string, limit = 8): Promise<SearchResult[]> {
-  const response = await fetch(`/api/docs/search?q=${encodeURIComponent(query.trim())}`);
+/** Searches the documentation of `locale`; the result URLs of English carry `/en`. */
+export async function searchDocs(query: string, locale: "en" | "es" = "es", limit = 8): Promise<SearchResult[]> {
+  const params = new URLSearchParams({ q: query.trim() });
+  if (locale === "en") params.set("locale", "en");
+  const response = await fetch(`/api/docs/search?${params}`);
   if (!response.ok) throw new Error(`Documentation search failed (${response.status})`);
   const rows = await response.json() as SearchRow[];
   return rows.slice(0, limit).map((row) => ({

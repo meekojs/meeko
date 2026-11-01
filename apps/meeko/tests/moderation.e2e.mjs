@@ -24,6 +24,10 @@ const origin = 'https://meekojs.com'
 const hidden = '/docs/doctor'
 const featured = '/docs/testing'
 const exportsIndex = '/docs/reference/exports'
+/** Hidden only in English: its Spanish page stays. */
+const hiddenInEnglish = '/docs/benchmarks'
+/** Hidden in every language (locale null): both URLs leave the site. */
+const hiddenEverywhere = '/docs/roadmap'
 /** Longer than the moderation cache of the server under test. */
 const cacheWait = () => new Promise((done) => setTimeout(done, 600))
 
@@ -55,15 +59,19 @@ async function seed(load, schema) {
 			const active = (await admin.query(`SELECT id FROM ${source}.docs_snapshots WHERE active`)).rows[0]
 			assert.ok(active, 'the development database has an active snapshot (run docs:sync)')
 			const snapshot = (await db.query("INSERT INTO docs_snapshots (active, published_by) VALUES (true, 'e2e') RETURNING id")).rows[0].id
-			await admin.query(`INSERT INTO ${schema}.docs_pages (snapshot_id, path, payload, searchable_text) SELECT $1, path, payload, searchable_text FROM ${source}.docs_pages WHERE snapshot_id = $2`, [snapshot, active.id])
-			const paths = (await db.query('SELECT path FROM docs_pages WHERE path = ANY($1)', [[hidden, featured, exportsIndex]])).rows.map((row) => row.path)
-			assert.deepEqual(paths.sort(), [hidden, featured, exportsIndex].sort(), 'the snapshot has the pages the test moderates')
+			await admin.query(`INSERT INTO ${schema}.docs_pages (snapshot_id, locale, path, payload, searchable_text, translation) SELECT $1, locale, path, payload, searchable_text, translation FROM ${source}.docs_pages WHERE snapshot_id = $2`, [snapshot, active.id])
+			const paths = (await db.query("SELECT path FROM docs_pages WHERE locale = 'es' AND path = ANY($1)", [[hidden, featured, exportsIndex, hiddenInEnglish, hiddenEverywhere]])).rows.map((row) => row.path)
+			assert.deepEqual(paths.sort(), [hidden, featured, exportsIndex, hiddenInEnglish, hiddenEverywhere].sort(), 'the snapshot has the pages the test moderates')
 			await saveModerationRule(db, { site: 'site', path: hidden, action: 'hide', reason: 'e2e', author: 'e2e' })
 			await saveModerationRule(db, { site: 'site', path: featured, action: 'feature', author: 'e2e' })
 			const warning = await createAnnouncement(db, { site: 'site', message: 'Aviso de prueba: mantenimiento el sábado.', tone: 'warning', active: true, author: 'e2e' })
 			const danger = await createAnnouncement(db, { site: 'site', message: 'Incidencia de prueba en la búsqueda.', tone: 'danger', active: true, author: 'e2e' })
 			await createAnnouncement(db, { site: 'ui', message: 'Aviso de otra web', tone: 'info', active: true, author: 'e2e' })
-			return { warning, danger }
+			// English: a rule of its own and an announcement for every language (locale null).
+			await saveModerationRule(db, { site: 'site', locale: 'en', path: hiddenInEnglish, action: 'hide', author: 'e2e' })
+			await saveModerationRule(db, { site: 'site', locale: null, path: hiddenEverywhere, action: 'hide', author: 'e2e' })
+			const everywhere = await createAnnouncement(db, { site: 'site', locale: null, message: 'Global test notice in every language.', tone: 'info', active: true, author: 'e2e' })
+			return { warning, danger, everywhere }
 		} finally {
 			await db.end()
 		}
@@ -99,7 +107,7 @@ test('the site hides, features and announces what the dashboard moderates', { sk
 			await vite.close()
 		}
 	})
-	const { warning, danger } = await seed(load, schema)
+	const { warning, danger, everywhere } = await seed(load, schema)
 
 	const httpPort = await port()
 	const hmrPort = await port()
@@ -143,6 +151,37 @@ test('the site hides, features and announces what the dashboard moderates', { sk
 		const results = await (await fetch(base + '/api/docs/search?q=doctor')).json()
 		assert.ok(results.length > 0, 'the search still answers')
 		assert.ok(!results.some((result) => result.url.split('#')[0] === hidden), 'not in the search')
+
+		// English has its own moderation: the Spanish rule does not hide /en/docs/doctor, the English
+		// one hides /en/docs/benchmarks (and only there), and the announcements are the English and
+		// global ones, also in the endpoint that the banner reads after each navigation.
+		assert.equal((await fetch(base + '/en' + hidden)).status, 200, 'a Spanish rule leaves the English page')
+		assert.equal((await fetch(base + '/en' + hiddenInEnglish)).status, 404, 'hidden in English')
+		assert.equal((await fetch(base + hiddenInEnglish)).status, 200, 'not in Spanish')
+		assert.ok(!sitemap.includes(`${origin}/en${hiddenInEnglish}<`) && sitemap.includes(`${origin}${hiddenInEnglish}<`), 'the sitemap per language')
+		// A global rule (locale null) hides the page in both languages: answers, sitemap, moderation.
+		for (const path of [hiddenEverywhere, '/en' + hiddenEverywhere]) {
+			assert.equal((await fetch(base + path)).status, 404, `a global rule hides ${path}`)
+			assert.equal((await fetch(base + path, { headers: { accept: 'application/meeko+json' } })).status, 404, `a global rule hides ${path} (navigation)`)
+			assert.ok(!sitemap.includes(`${origin}${path}<`) && !sitemap.includes(`href="${origin}${path}"`), `a global rule takes ${path} out of the sitemap`)
+		}
+		const spanishModeration = await (await fetch(base + '/_meeko-docs/moderation/site')).json()
+		assert.ok(spanishModeration.hidden.includes(hiddenEverywhere), 'in the moderation of the Spanish site')
+		assert.ok((await (await fetch(base + '/_meeko-docs/moderation/site/en')).json()).hidden.includes('/en' + hiddenEverywhere), 'and of the English site')
+		const englishResults = await (await fetch(base + '/api/docs/search?q=benchmarks&locale=en')).json()
+		assert.ok(!englishResults.some((result) => result.url.split('#')[0] === '/en' + hiddenInEnglish), 'not in the English search')
+		const englishModeration = await (await fetch(base + '/_meeko-docs/moderation/site/en')).json()
+		assert.ok(englishModeration.hidden.includes('/en' + hiddenInEnglish))
+		assert.deepEqual(
+			englishModeration.announcements.map((item) => item.message),
+			[everywhere.message],
+		)
+		const englishHtml = await (await fetch(base + '/en/docs')).text()
+		assert.ok(englishHtml.includes(everywhere.message) && !englishHtml.includes(warning.message), 'English and global announcements only')
+		assert.ok(!englishHtml.includes('Cerrar aviso') && englishHtml.includes('Close notice'))
+		// The rest of the test counts the Spanish announcements alone.
+		await moderate(load, schema, async (db, { deleteAnnouncement }) => deleteAnnouncement(db, everywhere.id))
+		await cacheWait()
 
 		// An equivalent URL of the hidden page is hidden too, in SSR and in the navigation payload.
 		for (const variant of [hidden, '/docs//doctor', '/docs/%64octor', '//docs/doctor/', `${hidden}?x=1`]) {

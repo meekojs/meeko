@@ -1,0 +1,10 @@
+{
+	"locale": {
+		"suggestion": {
+			"label": "Language suggestion",
+			"message": "This page is also available in English.",
+			"go": "Read in English",
+			"stay": "Stay in English"
+		}
+	}
+}

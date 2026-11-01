@@ -27,7 +27,45 @@ const permissions = [
 ].join(', ')
 
 export default defineMeekoConfig({
-	modules: ['@meekojs/ui'],
+	modules: ['@meekojs/ui', '@meekojs/i18n'],
+	// Spanish keeps the URLs of always, without prefix; English is served under /en/… from the same
+	// pages. Nothing redirects by Accept-Language or cookie: the layout only suggests the reader's
+	// language (app/components/LocaleSuggestion.meeko). The documentation comes from the snapshot in
+	// the language of the URL, with the Spanish page and a notice when its translation is missing.
+	i18n: {
+		defaultLocale: 'es',
+		catalogs: {
+			es: {
+				common: 'app/locales/es/common.json',
+				docs: 'app/locales/es/docs.json',
+				home: 'app/locales/es/home.json',
+				suggestion: 'app/locales/es/suggestion.json',
+				shell: 'node_modules/meeko-docs/locales/es/shell.json',
+			},
+			en: {
+				common: 'app/locales/en/common.json',
+				docs: 'app/locales/en/docs.json',
+				home: 'app/locales/en/home.json',
+				suggestion: 'app/locales/en/suggestion.json',
+				shell: 'node_modules/meeko-docs/locales/en/shell.json',
+			},
+		},
+		// The namespace of the shared shell (meeko-docs): its components (the «¿Te sirvió?» widget)
+		// read it on every route, the error page included.
+		global: ['shell'],
+		// The suggestion is written in the language it offers, so its few messages load in both.
+		multilingual: ['suggestion'],
+		// Shared with the other sites of meekojs.com; on another host (localhost) it stays on that host.
+		cookie: { name: 'meeko-locale', domain: 'meekojs.com' },
+		routes: {
+			'/': ['home'],
+			'/docs': ['docs'],
+			'/docs/[slug]': ['docs'],
+			'/docs/reference': ['docs'],
+			'/docs/reference/exports': ['docs'],
+			'/docs/reference/[symbol]': ['docs'],
+		},
+	},
 	ui: {
 		tokens: {
 			accent: 'var(--accent)',
@@ -119,7 +157,6 @@ export default defineMeekoConfig({
 				{ name: 'theme-color', content: '#0a0b0d' },
 				{ property: 'og:type', content: 'website' },
 				{ property: 'og:site_name', content: 'Meeko' },
-				{ property: 'og:locale', content: 'es_ES' },
 				{ property: 'og:image', content: 'https://meekojs.com/brand/apple-touch-icon.png' },
 			],
 		},

@@ -1,14 +1,16 @@
 import { defineServerMiddleware } from '@meekojs/meeko/server'
+import { docsLocales } from 'meeko-docs-content/locale'
 import { moderationEndpoint, moderationResponse } from 'meeko-docs-content/moderation'
 
-const endpoint = moderationEndpoint('site')
+/** The endpoint of each language: `/_meeko-docs/moderation/site` and `/_meeko-docs/moderation/site/en`. */
+const endpoints = new Map(docsLocales.map((locale) => [moderationEndpoint('site', locale), locale]))
 
 /**
- * The moderation of the site as JSON, never cached: the banner of announcements reads it again
- * after each navigation, so a long session sees the announcements that start, end or are closed
- * from the dashboard (`app/components/Announcements.meeko`).
+ * The moderation of the site in each language as JSON, never cached: the banner of announcements
+ * reads it again after each navigation, so a long session sees the announcements that start, end
+ * or are closed from the dashboard (`app/components/Announcements.meeko`).
  */
 export default defineServerMiddleware((request, next) => {
-	if ((request.method === 'GET' || request.method === 'HEAD') && new URL(request.url).pathname === endpoint) return moderationResponse('site', request)
-	return next(request)
+	const locale = request.method === 'GET' || request.method === 'HEAD' ? endpoints.get(new URL(request.url).pathname) : undefined
+	return locale ? moderationResponse('site', request, { locale }) : next(request)
 })

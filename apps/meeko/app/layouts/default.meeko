@@ -7,14 +7,18 @@
 
 	const props = defineProps<Props>()
 
-	const home = href('/')
-	const guide = href('/docs/[slug]', { params: { slug: 'framework' } })
-	const api = href('/docs/[slug]', { params: { slug: 'api' } })
-	const reference = href('/docs/reference')
-	const changes = href('/docs/[slug]', { params: { slug: 'changelog' } })
-	const stability = href('/docs/[slug]', { params: { slug: 'stability' } })
-	const devtools = href('/docs/[slug]', { params: { slug: 'devtools' } })
-	const start = href('/docs/[slug]', { params: { slug: 'inicio-rapido' } })
+	const { localePath, t } = useI18n()
+
+	// The links in the language of the document: /docs/api in Spanish, /en/docs/api in English.
+	const doc = (slug: string): string => localePath(href('/docs/[slug]', { params: { slug } }))
+	const home = localePath(href('/'))
+	const guide = doc('framework')
+	const api = doc('api')
+	const reference = localePath(href('/docs/reference'))
+	const changes = doc('changelog')
+	const stability = doc('stability')
+	const devtools = doc('devtools')
+	const start = doc('inicio-rapido')
 
 	/** Folds the small-screen menu once a link in it is chosen. */
 	function closeMenu(event: MouseEvent): void {
@@ -27,13 +31,13 @@
 		class="skip"
 		href="#contenido"
 	>
-		Saltar al contenido
+		{t('a11y.skip')}
 	</a>
 	<header class="site-header">
 		<div class="bar">
 			<a
 				class="brand"
-				aria-label="Meeko, inicio"
+				bind:aria-label="t('a11y.home')"
 				bind:href="home"
 			>
 				<img
@@ -46,20 +50,21 @@
 			</a>
 			<nav
 				class="primary"
-				aria-label="Principal"
+				bind:aria-label="t('a11y.primaryNav')"
 			>
-				<a bind:href="guide">Guía</a>
-				<a bind:href="reference">API</a>
-				<a bind:href="changes">Cambios</a>
+				<a bind:href="guide">{t('nav.guide')}</a>
+				<a bind:href="reference">{t('nav.api')}</a>
+				<a bind:href="changes">{t('nav.changes')}</a>
 			</nav>
 			<div class="tools">
 				<SearchDialog />
+				<LocaleSwitcher />
 				<ThemeToggle />
 				<a
 					class="icon-link github"
 					href="https://github.com/meekojs/meeko"
 					rel="noopener"
-					aria-label="Meeko en GitHub"
+					bind:aria-label="t('a11y.github')"
 				>
 					<svg
 						class="mark"
@@ -73,10 +78,10 @@
 					size="sm"
 					bind:href="start"
 				>
-					Empezar
+					{t('nav.start')}
 				</UILink>
 				<details class="menu">
-					<summary aria-label="Menú">
+					<summary bind:aria-label="t('a11y.menu')">
 						<svg
 							viewBox="0 0 16 16"
 							aria-hidden="true"
@@ -86,12 +91,12 @@
 					</summary>
 					<nav
 						class="menu-panel"
-						aria-label="Menú"
+						bind:aria-label="t('a11y.menu')"
 						on:click="closeMenu"
 					>
-						<a bind:href="guide">Guía</a>
-						<a bind:href="reference">API</a>
-						<a bind:href="changes">Cambios</a>
+						<a bind:href="guide">{t('nav.guide')}</a>
+						<a bind:href="reference">{t('nav.api')}</a>
+						<a bind:href="changes">{t('nav.changes')}</a>
 						<a
 							href="https://github.com/meekojs/meeko"
 							rel="noopener"
@@ -104,6 +109,7 @@
 		</div>
 	</header>
 	<Announcements />
+	<LocaleSuggestion />
 	<main
 		id="contenido"
 		tabindex="-1"
@@ -115,7 +121,7 @@
 			<div class="about">
 				<a
 					class="brand"
-					aria-label="Meeko, inicio"
+					bind:aria-label="t('a11y.home')"
 					bind:href="home"
 				>
 					<img
@@ -127,28 +133,33 @@
 					<span>Meeko</span>
 				</a>
 				<p>
-					Hecho con Meeko: cada página de este sitio es un componente
-					<code>.meeko</code>
-					prerenderizado.
+					<I18nT key="footer.built">
+						<snippet
+							name="code"
+							params="text"
+						>
+							<code>{text}</code>
+						</snippet>
+					</I18nT>
 				</p>
-				<p class="dedication">Dedicado a Meeko, la gatita del autor.</p>
+				<p class="dedication">{t('footer.dedication')}</p>
 			</div>
 			<nav
 				class="columns"
-				aria-label="Pie de página"
+				bind:aria-label="t('a11y.footerNav')"
 			>
 				<div>
-					<p class="column-title">Documentación</p>
-					<a bind:href="start">Inicio rápido</a>
-					<a bind:href="guide">Guía del framework</a>
-					<a bind:href="api">Componentes y API</a>
-					<a bind:href="reference">Referencia de la API</a>
-					<a bind:href="devtools">DevTools</a>
+					<p class="column-title">{t('footer.docs')}</p>
+					<a bind:href="start">{t('footer.quickStart')}</a>
+					<a bind:href="guide">{t('footer.frameworkGuide')}</a>
+					<a bind:href="api">{t('footer.componentsApi')}</a>
+					<a bind:href="reference">{t('footer.reference')}</a>
+					<a bind:href="devtools">{t('footer.devtools')}</a>
 				</div>
 				<div>
-					<p class="column-title">Proyecto</p>
-					<a bind:href="changes">Cambios</a>
-					<a bind:href="stability">Estabilidad 1.x</a>
+					<p class="column-title">{t('footer.project')}</p>
+					<a bind:href="changes">{t('footer.changes')}</a>
+					<a bind:href="stability">{t('footer.stability')}</a>
 					<a
 						href="https://github.com/meekojs/meeko"
 						rel="noopener"
@@ -165,7 +176,7 @@
 						href="https://github.com/meekojs/meeko/blob/main/LICENSE"
 						rel="noopener"
 					>
-						Licencia MIT
+						{t('footer.license')}
 					</a>
 				</div>
 			</nav>
@@ -376,7 +387,8 @@
 			display: block;
 		}
 	}
-	@media (max-width: 380px) {
+	/* The logo alone leaves room for the tools: search, language, theme, «Empezar» and the menu. */
+	@media (max-width: 480px) {
 		.brand span {
 			display: none;
 		}

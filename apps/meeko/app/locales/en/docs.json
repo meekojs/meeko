@@ -1,0 +1,69 @@
+{
+	"docs": {
+		"layout": {
+			"contents": "Contents",
+			"sidebar": "Documentation",
+			"featured": "Featured",
+			"onThisPage": "On this page",
+			"pager": "Previous and next pages",
+			"previous": "Previous",
+			"next": "Next",
+			"edit": "Edit on GitHub"
+		},
+		"notice": {
+			"untranslatedTitle": "This page is not translated yet.",
+			"untranslatedBody": "It is shown in its original Spanish until the translation arrives.",
+			"outdatedTitle": "This translation may be out of date.",
+			"outdatedBody": "The Spanish original changed after this page was translated.",
+			"original": "Read the Spanish version"
+		},
+		"index": {
+			"title": "Documentation",
+			"headTitle": "Documentation · Meeko",
+			"description": "All of Meeko's documentation: the framework guide, the component API, editors, DevTools, stability, architecture, migration and changes.",
+			"lead": "Everything you need to write <code>.meeko</code> components and full-stack applications with Meeko."
+		},
+		"reference": {
+			"title": "API reference",
+			"lead": "{total} Meeko symbols grouped by what they are. Each page explains one with its exact type, generated from the source code, its parameters, real examples and the errors you get from misusing it.",
+			"groups": "Reference groups",
+			"allExports": "All exports",
+			"allExportsCard": "Every export of every module of the package, with its page generated from the JSDoc.",
+			"anchor": "Link to this section",
+			"modules": "The types, interfaces and low-level pieces that have no entry of their own above are still documented, one per page, in the <a>index by module</a>.",
+			"breadcrumb": "Breadcrumb",
+			"since": "Since {version}",
+			"sinceLower": "since {version}",
+			"noImport": "No import",
+			"deprecated": "Deprecated",
+			"deprecatedLower": "deprecated",
+			"deprecatedNote": "Deprecated.",
+			"source": "Source code",
+			"typeParameters": "Type parameters",
+			"parameters": "Parameters",
+			"optional": "optional",
+			"returns": "Returns",
+			"throws": "Throws",
+			"examples": {
+				"plural": "count",
+				"forms": {
+					"one": "Example",
+					"other": "Examples"
+				}
+			},
+			"seeAlso": "See also",
+			"related": "Related symbols"
+		},
+		"exports": {
+			"lead": "{total} pages: one for each public export of the package and one for each block, macro, tag and directive that the component compiler recognizes. They come from the source code and its JSDoc, the same documentation the editor shows.",
+			"index": "The <a>reference index</a> groups the main symbols by kind, with pages that explain their usage, common mistakes and examples.",
+			"filter": "Filter by name",
+			"placeholder": "Filter by name: signal, definePage, SessionManager…",
+			"kinds": "Filter by kind",
+			"all": "All",
+			"total": "{total} symbols",
+			"partial": "{count} of {total} symbols",
+			"empty": "No symbol matches “{query}”. The <kbd>/</kbd> key opens the search across the whole documentation."
+		}
+	}
+}

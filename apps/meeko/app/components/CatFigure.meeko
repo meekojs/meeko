@@ -9,6 +9,8 @@
 	}
 
 	const props = defineProps<Props>()
+
+	const { t } = useI18n()
 </script>
 
 <template>
@@ -17,7 +19,7 @@
 			class="iso"
 			viewBox="-108.2 -108 249.7 250"
 			role="img"
-			aria-label="Dibujo de línea: Meeko, la gatita ragdoll del logo, con su melena de pelo largo, orejas grandes, la máscara alrededor de los ojos azules y el hocico blanco, asomada detrás de un editor en perspectiva isométrica; una tarjeta flota sobre una línea resaltada del código."
+			bind:aria-label="t('cat.drawing')"
 		>
 			<path
 				class="l f"

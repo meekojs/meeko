@@ -12,9 +12,10 @@ export default defineApiRoute({
 	rateLimit: metricsRateLimits.search,
 	handler: searchHandler({
 		site: 'site',
-		count: async (query) => {
+		// In the language the dialog sends (`locale`, Spanish without it).
+		count: async (query, locale) => {
 			const text = normalizeQuery(query)
-			return text && text.length <= metricsLimits.query ? (await searchPages(text, 8)).length : 0
+			return text && text.length <= metricsLimits.query ? (await searchPages(text, 8, locale)).length : 0
 		},
 	}),
 })

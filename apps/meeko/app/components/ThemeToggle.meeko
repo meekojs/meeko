@@ -6,9 +6,10 @@
 
 	/** The cycle: the default dark world first, then light, then the system's. */
 	const following = { dark: 'light', light: 'system', system: 'dark' } as const
-	const names = { dark: 'oscuro', light: 'claro', system: 'del sistema' } as const
+	const { t } = useI18n()
+	const names = { dark: t('theme.dark'), light: t('theme.light'), system: t('theme.system') } as const
 	const next = computed(() => following[theme.value])
-	const label = computed(() => `Tema ${names[theme.value]}. Cambiar a ${names[next.value]}`)
+	const label = computed(() => t('theme.label', { current: names[theme.value], next: names[next.value] }))
 
 	function cycle(): void {
 		theme.value = next.value

@@ -1,4 +1,6 @@
 <script server lang="ts">
+	import type { PageLocale } from 'meeko-docs-content/locale'
+
 	import { definePage } from '@meekojs/meeko/framework'
 
 	import type { ApiPage } from '../../../../shared/types/api'
@@ -10,6 +12,7 @@
 	export const route = definePage({ render: 'ssr' })
 
 	const { params } = usePage()
+	const { locale } = await usePageI18n()
 	type SymbolPage = {
 		readonly written: ReferencePage | null
 		readonly page: ApiPage | null
@@ -22,10 +25,13 @@
 		readonly index: string
 		readonly searchTitle: string
 		readonly head: { readonly title: string; readonly description: string }
+		readonly i18n?: PageLocale
 	}
-	const snapshot = await readPage<SymbolPage>(`/docs/reference/${params.symbol}`)
+	const snapshot = await readPage<SymbolPage>(`/docs/reference/${params.symbol}`, locale)
 	if (!snapshot) notFound()
 	export const { written, page, nav, current, pages, toc, editUrl, editPath, index, searchTitle, head } = snapshot
+	// Without it in the payload (a snapshot older than the languages), the page is the original.
+	export const i18n = snapshot.i18n ?? null
 </script>
 
 <script lang="ts">
@@ -33,6 +39,9 @@
 		params: { symbol: string }
 		search: Record<string, string | string[]>
 	}
+
+	const { t } = useI18n()
+	const copyCode = useCodeCopy()
 </script>
 
 <template>
@@ -43,6 +52,7 @@
 		bind:pager="pages"
 		bind:editUrl="editUrl"
 		bind:source="editPath"
+		bind:i18n="i18n"
 	>
 		<ReferenceArticle
 			if:when="written"
@@ -54,14 +64,14 @@
 			class="prose symbol"
 			data-pagefind-body
 			bind:data-pagefind-meta="searchTitle"
-			on:click="copyCodeBlock"
+			on:click="copyCode"
 		>
 			<nav
 				class="crumbs"
-				aria-label="Ruta"
 				data-pagefind-ignore
+				bind:aria-label="t('docs.reference.breadcrumb')"
 			>
-				<a bind:href="index">Referencia de la API</a>
+				<a bind:href="index">{t('docs.reference.title')}</a>
 				<span aria-hidden="true">/</span>
 				<a bind:href="page.group.href">{page.group.title}</a>
 			</nav>
@@ -70,21 +80,21 @@
 			</h1>
 			<p class="badges">
 				<UIBadge tone="accent">{page.kindLabel}</UIBadge>
-				<UIBadge if:when="page.since">Desde {page.since}</UIBadge>
+				<UIBadge if:when="page.since">{t('docs.reference.since', { version: page.since ?? '' })}</UIBadge>
 				<UIBadge
 					if:when="page.deprecated !== null"
 					tone="neutral"
 				>
-					Obsoleto
+					{t('docs.reference.deprecated')}
 				</UIBadge>
-				<UIBadge if:when="page.autoImport">Sin import</UIBadge>
+				<UIBadge if:when="page.autoImport">{t('docs.reference.noImport')}</UIBadge>
 			</p>
 			<div
 				if:when="page.deprecated !== null"
 				class="note deprecation"
 				role="note"
 			>
-				<strong>Obsoleto.</strong>
+				<strong>{t('docs.reference.deprecatedNote')}</strong>
 				<div html="page.deprecated" />
 			</div>
 			<div
@@ -116,7 +126,7 @@
 					>
 						<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14" />
 					</svg>
-					Código fuente
+					{t('docs.reference.source')}
 					<span class="path">{page.sourceLabel}</span>
 				</a>
 			</p>
@@ -127,8 +137,8 @@
 					<a
 						class="heading-anchor"
 						href="#firma"
-						aria-label="Enlace a esta sección"
 						data-pagefind-ignore
+						bind:aria-label="t('docs.reference.anchor')"
 					>
 						#
 					</a>
@@ -149,12 +159,12 @@
 
 			<section if:when="page.typeParameters.length > 0">
 				<h2 id="parametros-de-tipo">
-					Parámetros de tipo
+					{t('docs.reference.typeParameters')}
 					<a
 						class="heading-anchor"
 						href="#parametros-de-tipo"
-						aria-label="Enlace a esta sección"
 						data-pagefind-ignore
+						bind:aria-label="t('docs.reference.anchor')"
 					>
 						#
 					</a>
@@ -180,12 +190,12 @@
 
 			<section if:when="page.parameters.length > 0">
 				<h2 id="parametros">
-					Parámetros
+					{t('docs.reference.parameters')}
 					<a
 						class="heading-anchor"
 						href="#parametros"
-						aria-label="Enlace a esta sección"
 						data-pagefind-ignore
+						bind:aria-label="t('docs.reference.anchor')"
 					>
 						#
 					</a>
@@ -206,7 +216,7 @@
 								if:when="parameter.optional"
 								class="optional"
 							>
-								opcional
+								{t('docs.reference.optional')}
 							</span>
 						</dt>
 						<dd html="parameter.description" />
@@ -216,12 +226,12 @@
 
 			<section if:when="page.returns">
 				<h2 id="devuelve">
-					Devuelve
+					{t('docs.reference.returns')}
 					<a
 						class="heading-anchor"
 						href="#devuelve"
-						aria-label="Enlace a esta sección"
 						data-pagefind-ignore
+						bind:aria-label="t('docs.reference.anchor')"
 					>
 						#
 					</a>
@@ -241,12 +251,12 @@
 
 			<section if:when="page.throws.length > 0">
 				<h2 id="lanza">
-					Lanza
+					{t('docs.reference.throws')}
 					<a
 						class="heading-anchor"
 						href="#lanza"
-						aria-label="Enlace a esta sección"
 						data-pagefind-ignore
+						bind:aria-label="t('docs.reference.anchor')"
 					>
 						#
 					</a>
@@ -269,12 +279,12 @@
 
 			<section if:when="page.examples.length > 0">
 				<h2 id="ejemplos">
-					{page.examples.length > 1 ? 'Ejemplos' : 'Ejemplo'}
+					{t('docs.reference.examples', { count: page.examples.length })}
 					<a
 						class="heading-anchor"
 						href="#ejemplos"
-						aria-label="Enlace a esta sección"
 						data-pagefind-ignore
+						bind:aria-label="t('docs.reference.anchor')"
 					>
 						#
 					</a>
@@ -293,8 +303,8 @@
 					<a
 						class="heading-anchor"
 						href="#miembros"
-						aria-label="Enlace a esta sección"
 						data-pagefind-ignore
+						bind:aria-label="t('docs.reference.anchor')"
 					>
 						#
 					</a>
@@ -309,8 +319,8 @@
 						<code>{member.name}</code>
 						<a
 							class="heading-anchor"
-							aria-label="Enlace a esta sección"
 							data-pagefind-ignore
+							bind:aria-label="t('docs.reference.anchor')"
 							bind:href="'#' + member.id"
 						>
 							#
@@ -332,13 +342,13 @@
 							if:when="member.since"
 							class="since"
 						>
-							desde {member.since}
+							{t('docs.reference.sinceLower', { version: member.since ?? '' })}
 						</span>
 						<span
 							if:when="member.deprecated !== null"
 							class="obsolete"
 						>
-							obsoleto
+							{t('docs.reference.deprecatedLower')}
 						</span>
 					</p>
 					<div
@@ -359,12 +369,12 @@
 
 			<section if:when="page.see.length > 0 || page.related.length > 0">
 				<h2 id="vease-tambien">
-					Véase también
+					{t('docs.reference.seeAlso')}
 					<a
 						class="heading-anchor"
 						href="#vease-tambien"
-						aria-label="Enlace a esta sección"
 						data-pagefind-ignore
+						bind:aria-label="t('docs.reference.anchor')"
 					>
 						#
 					</a>
@@ -382,7 +392,7 @@
 				<ul
 					if:when="page.related.length > 0"
 					class="related"
-					aria-label="Símbolos relacionados"
+					bind:aria-label="t('docs.reference.related')"
 				>
 					<li
 						each:of="page.related"

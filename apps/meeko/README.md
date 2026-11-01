@@ -35,6 +35,17 @@ El render y el acceso a datos viven en el paquete privado [`meeko-docs-content`]
 
 Nunca publiques un snapshot parcial ni edites las filas a mano. Después de cambiar Markdown o JSDoc, ejecuta `docs:sync` para publicarlos en el sitio.
 
+## Idiomas
+
+El sitio está en español, sin prefijo (las URL de siempre), y en inglés bajo `/en/…`, con `@meekojs/i18n` (`i18n` en `meeko.config.ts`). El módulo genera las rutas `/en/…` desde las mismas páginas, pone `<html lang>`, `hreflang`, `x-default` y `og:locale`, y nunca redirige por idioma: `LocaleSuggestion` sólo ofrece la otra versión, una vez montada la página, y «Seguir en…» lo recuerda en la cookie `meeko-locale`, compartida con los subdominios de `meekojs.com` (en `localhost`, sólo en ese host). `LocaleSwitcher`, en la cabecera, enlaza la misma página en cada idioma.
+
+- **Interfaz.** Cada texto de las páginas, layouts y componentes está en `app/locales/<idioma>/` (`common` en todas las rutas; `docs` en la documentación; `home` en la portada), con las mismas claves en los dos idiomas. Las frases con un `<code>`, un `<kbd>` o un enlace se escriben enteras, con la etiqueta en el mensaje, y se pintan con `<I18nT>`. El namespace `shell` (`global`) es el de los componentes compartidos de `meeko-docs`, como «¿Te sirvió?». El namespace `suggestion` (`multilingual`) se carga en los dos idiomas, porque la sugerencia se escribe en el idioma que ofrece.
+- **Documentación.** Cada página lee el snapshot en el idioma de su URL (`usePageI18n()` en su `<script server>` y `readPage(path, locale)` de `server/content/db.ts`). El snapshot tiene las dos versiones de cada página: una sin traducir trae el texto español y `i18n.fallback`, y `DocsLayout` muestra el aviso «sin traducir» (`TranslationNotice`) con el enlace a la versión española y marca el artículo con `lang="es"`; una traducción desactualizada muestra un aviso más suave.
+- **Moderación, búsqueda y métricas por idioma.** Las reglas y los avisos de cada idioma se suman a los globales (`/_meeko-docs/moderation/site/en` para el banner inglés); la búsqueda recibe `locale=en`; las vistas y el feedback de `/en/…` cuentan en inglés (`localized`) y las búsquedas llevan su `locale`.
+- **Archivos de texto.** `/sitemap.xml`, escrito con `sitemapXml` de Meeko, lista las dos versiones de cada página con sus alternativas `xhtml:link` (`es`, `en`, `x-default`); `/en/llms.txt` y `/en/llms-full.txt` son la versión inglesa.
+
+`pnpm run test:e2e` incluye `tests/i18n.e2e.mjs`: HTML inglés sin textos de interfaz en español, `hreflang`, selector, enlaces que conservan `/en`, aviso de las páginas sin traducir, sitemap y sugerencia.
+
 ## Moderación y avisos
 
 El dashboard (`apps/dashboard`, pantalla «Moderación») oculta o destaca páginas y publica avisos sin publicar un snapshot. El site los lee de la misma base (`docs_moderation`, `docs_announcements`) con `meeko-docs-content/moderation`, con una caché de 30 s por proceso:

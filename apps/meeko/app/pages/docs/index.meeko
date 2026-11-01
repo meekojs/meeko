@@ -9,21 +9,25 @@
 
 	type DocCard = Pick<NavLink, 'featured' | 'href'> & Pick<RenderedDoc, 'title' | 'description'> & { readonly section: string }
 	type IndexPage = { readonly sections: readonly { readonly title: string; readonly docs: readonly DocCard[] }[] }
-	const snapshot = await readPage<IndexPage>('/docs')
+	const { locale } = await usePageI18n()
+	const snapshot = await readPage<IndexPage>('/docs', locale)
 	if (!snapshot) notFound()
 	export const sections = snapshot.sections
-
-	export const head = {
-		title: 'Documentación · Meeko',
-		description: 'Toda la documentación de Meeko: guía del framework, API de componentes, editores, DevTools, estabilidad, arquitectura, migración y cambios.',
-	}
 </script>
 
 <script lang="ts">
+	import { splitLocalePath } from 'meeko-docs-content/locale'
+
 	export interface Props {
 		params: Record<string, string>
 		search: Record<string, string | string[]>
 	}
+
+	const { t } = useI18n()
+	// The snapshot of each language has `/docs/<slug>` or `/en/docs/<slug>`, and every guide of the
+	// catalog has that form; `to` localizes the route again, so the link keeps the reader's language.
+	const slugOf = (href: string): string => splitLocalePath(href).path.slice('/docs/'.length)
+	useHead({ title: t('docs.index.headTitle'), meta: [{ name: 'description', content: t('docs.index.description') }] })
 </script>
 
 <template>
@@ -31,11 +35,16 @@
 		class="index"
 		data-pagefind-ignore
 	>
-		<h1>Documentación</h1>
+		<h1>{t('docs.index.title')}</h1>
 		<p class="lead">
-			Todo lo que necesitas para escribir componentes
-			<code>.meeko</code>
-			y aplicaciones full-stack con Meeko.
+			<I18nT key="docs.index.lead">
+				<snippet
+					name="code"
+					params="text"
+				>
+					<code>{text}</code>
+				</snippet>
+			</I18nT>
 		</p>
 		<section
 			each:of="sections"
@@ -50,7 +59,8 @@
 					each:key="doc.href"
 				>
 					<UILinkCard
-						bind:href="doc.href"
+						to="/docs/[slug]"
+						bind:params="{ slug: slugOf(doc.href) }"
 						bind:title="doc.title"
 						bind:description="doc.description"
 					>
@@ -59,7 +69,7 @@
 							tone="accent"
 							class="featured"
 						>
-							Destacado
+							{t('docs.layout.featured')}
 						</UIBadge>
 					</UILinkCard>
 				</li>

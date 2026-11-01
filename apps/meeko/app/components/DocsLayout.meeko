@@ -1,4 +1,6 @@
 <script lang="ts">
+	import type { PageLocale } from 'meeko-docs-content/locale'
+
 	import { computed, signal } from '@meekojs/meeko'
 
 	import type { NavSection, Pager, TocEntry } from '../../shared/types/docs'
@@ -16,9 +18,13 @@
 		/** "Edit on GitHub" link and repository path of the source. */
 		editUrl: string
 		source: string
+		/** The language of the page in the snapshot: a missing translation shows the Spanish text with a notice. */
+		i18n?: PageLocale | null
 	}
 
 	const props = defineProps<Props>()
+
+	const { t } = useI18n()
 
 	// The page writes the article; `aside` adds a block under the table of contents.
 	const snippets = defineSnippets<{ default: []; aside?: [] }>()
@@ -30,7 +36,7 @@
 	const sidebar = useElementRef('sidebar')
 
 	/** Label of the current page in the sidebar, for the small-screen bar. */
-	const currentLabel = computed(() => props.nav.flatMap((section) => section.links).find((link) => link.href === props.current)?.label ?? 'Documentación')
+	const currentLabel = computed(() => props.nav.flatMap((section) => section.links).find((link) => link.href === props.current)?.label ?? t('docs.layout.sidebar'))
 
 	function toggleMenu(): void {
 		menuOpen.value = !menuOpen.value
@@ -124,7 +130,7 @@
 				>
 					<path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h7" />
 				</svg>
-				Índice
+				{t('docs.layout.contents')}
 			</button>
 			<span class="docs-bar-current">{currentLabel.value}</span>
 		</div>
@@ -137,8 +143,8 @@
 			ref:sidebar
 			id="docs-nav"
 			class="sidebar"
-			aria-label="Documentación"
 			data-pagefind-ignore
+			bind:aria-label="t('docs.layout.sidebar')"
 			on:click="onNavClick"
 		>
 			<details
@@ -183,7 +189,7 @@
 								if:when="link.featured"
 								class="featured"
 							>
-								Destacado
+								{t('docs.layout.featured')}
 							</span>
 						</a>
 					</li>
@@ -191,13 +197,14 @@
 			</details>
 		</nav>
 		<div class="content">
+			<TranslationNotice bind:info="props.i18n" />
 			<details
 				if:when="props.toc.length > 0"
 				class="toc-mobile"
 				data-pagefind-ignore
 			>
 				<summary>
-					En esta página
+					{t('docs.layout.onThisPage')}
 					<svg
 						viewBox="0 0 16 16"
 						aria-hidden="true"
@@ -216,7 +223,13 @@
 					</li>
 				</ul>
 			</details>
-			<render snippet="snippets.default" />
+			<!-- The Spanish text of an untranslated page is marked as Spanish inside the English document. -->
+			<div
+				class="article"
+				bind:lang="props.i18n?.fallback ? 'es' : undefined"
+			>
+				<render snippet="snippets.default" />
+			</div>
 			<DocsFeedback bind:path="props.current" />
 			<footer
 				class="page-footer"
@@ -224,14 +237,14 @@
 			>
 				<nav
 					class="pager"
-					aria-label="Páginas anterior y siguiente"
+					bind:aria-label="t('docs.layout.pager')"
 				>
 					<a
 						if:when="props.pager.previous"
 						class="previous"
 						bind:href="props.pager.previous?.href"
 					>
-						<small>Anterior</small>
+						<small>{t('docs.layout.previous')}</small>
 						<span>{props.pager.previous?.label}</span>
 					</a>
 					<a
@@ -239,7 +252,7 @@
 						class="next"
 						bind:href="props.pager.next?.href"
 					>
-						<small>Siguiente</small>
+						<small>{t('docs.layout.next')}</small>
 						<span>{props.pager.next?.label}</span>
 					</a>
 				</nav>
@@ -254,22 +267,22 @@
 					>
 						<path d="M3 13h2.6l7.2-7.2-2.6-2.6L3 10.4V13ZM9.2 4.2l2.6 2.6" />
 					</svg>
-					Editar en GitHub
+					{t('docs.layout.edit')}
 					<span class="path">{props.source}</span>
 				</a>
 			</footer>
 		</div>
 		<aside
 			class="toc"
-			aria-label="En esta página"
 			data-pagefind-ignore
+			bind:aria-label="t('docs.layout.onThisPage')"
 		>
 			<div class="toc-inner">
 				<p
 					if:when="props.toc.length > 0"
 					class="toc-title"
 				>
-					En esta página
+					{t('docs.layout.onThisPage')}
 				</p>
 				<ul>
 					<li
@@ -447,6 +460,10 @@
 	.content {
 		padding: 2.5rem 0 5rem;
 		min-width: 0;
+	}
+	/* Only marks the language of the article; the layout is the article's. */
+	.article {
+		display: contents;
 	}
 	.toc {
 		font-size: 0.8rem;

@@ -1,0 +1,58 @@
+<script lang="ts">
+	import type { PageLocale } from 'meeko-docs-content/locale'
+
+	import { computed } from '@meekojs/meeko'
+
+	interface Props {
+		/** The language of the page, as its snapshot payload brings it in `i18n`. */
+		info: PageLocale | null | undefined
+	}
+
+	const props = defineProps<Props>()
+
+	const i18n = useI18n()
+
+	// A missing translation shows the Spanish page (`fallback`); an outdated one is still published,
+	// but the original changed since. Both link to the Spanish version, the source of truth.
+	const kind = computed(() => (props.info?.fallback ? 'untranslated' : props.info?.status === 'outdated' ? 'outdated' : undefined))
+</script>
+
+<template>
+	<aside
+		if:when="kind.value"
+		data-pagefind-ignore
+		bind:class="kind.value === 'untranslated' ? 'callout callout-note translation-notice' : 'callout callout-warning translation-notice'"
+	>
+		<p class="callout-title">
+			<svg
+				viewBox="0 0 16 16"
+				aria-hidden="true"
+			>
+				<path d="M2 3.5h6M5 2v1.5M3.5 3.5c.4 2.3 1.9 4.2 4 5.2M6.5 3.5c-.5 2.6-2.3 4.7-4.5 5.6M8.5 14l2.75-6.5L14 14M9.4 12h3.7" />
+			</svg>
+			{kind.value === 'untranslated' ? i18n.t('docs.notice.untranslatedTitle') : i18n.t('docs.notice.outdatedTitle')}
+		</p>
+		<p>
+			{kind.value === 'untranslated' ? i18n.t('docs.notice.untranslatedBody') : i18n.t('docs.notice.outdatedBody')}
+			<a
+				hreflang="es"
+				bind:href="i18n.switchLocalePath('es')"
+			>
+				{i18n.t('docs.notice.original')}
+			</a>
+		</p>
+	</aside>
+</template>
+
+<style scoped>
+	/* The callout of the guides (app/styles/main.css), above the article at its measure. */
+	.translation-notice {
+		margin: 0 0 2rem;
+		max-width: 70ch;
+	}
+	.translation-notice a {
+		color: var(--accent-ink);
+		font-weight: 500;
+		text-underline-offset: 0.2em;
+	}
+</style>

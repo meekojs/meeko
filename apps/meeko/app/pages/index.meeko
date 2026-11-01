@@ -17,7 +17,9 @@
 		readonly version: string
 		readonly head: { title: string; description: string }
 	}
-	const snapshot = await readPage<HomePayload>('/')
+	// `/en` is the English home page of the snapshot: its demo, quick start and head in English.
+	const { locale } = await usePageI18n()
+	const snapshot = await readPage<HomePayload>('/', locale)
 	if (!snapshot) notFound()
 	export const { demo, editorLines, command, quickStart, version, head } = snapshot
 </script>
@@ -30,12 +32,20 @@
 		search: Record<string, string | string[]>
 	}
 
-	const api = href('/docs/[slug]', { params: { slug: 'api' } })
-	const framework = href('/docs/[slug]', { params: { slug: 'framework' } })
-	const editors = href('/docs/[slug]', { params: { slug: 'editors' } })
-	const devtools = href('/docs/[slug]', { params: { slug: 'devtools' } })
-	const stability = href('/docs/[slug]', { params: { slug: 'stability' } })
-	const quickStartPage = href('/docs/[slug]', { params: { slug: 'inicio-rapido' } })
+	const { localePath, t } = useI18n()
+	const copyCode = useCodeCopy()
+
+	// The guides in the language of the page (/en/docs/… in English); a section of a guide has its
+	// own anchor in each language, so the catalog names it.
+	const doc = (slug: string, anchor?: string): string => localePath(href('/docs/[slug]', { params: { slug } }) + (anchor ? `#${anchor}` : ''))
+	const api = doc('api')
+	const framework = doc('framework')
+	const editors = doc('editors')
+	const devtools = doc('devtools')
+	const stability = doc('stability')
+	const quickStartPage = doc('inicio-rapido')
+	const reactivity = doc('api', t('home.flow.signalsAnchor'))
+	const renderModes = doc('framework', t('home.flow.ssrAnchor'))
 	const copied = signal<'idle' | 'done' | 'error'>('idle')
 	let reset: ReturnType<typeof setTimeout> | undefined
 
@@ -57,15 +67,20 @@
 		<div class="hero-copy">
 			<h1 id="hero-title">
 				<span class="line">
-					Componentes
-					<code>.meeko</code>
-					tipados,
+					<I18nT key="home.hero.title">
+						<snippet
+							name="code"
+							params="text"
+						>
+							<code>{text}</code>
+						</snippet>
+					</I18nT>
 				</span>
-				<span class="line tone-soft">del servidor al navegador.</span>
+				<span class="line tone-soft">{t('home.hero.titleLine2')}</span>
 			</h1>
-			<p class="lead">Un motor de componentes para TypeScript y un framework full-stack. Un solo archivo da el HTML del servidor y la reactividad que lo actualiza, sin DOM virtual.</p>
+			<p class="lead">{t('home.hero.lead')}</p>
 			<div class="actions">
-				<UILink href="#inicio-rápido">Empezar</UILink>
+				<UILink href="#inicio-rápido">{t('home.hero.start')}</UILink>
 				<button
 					type="button"
 					class="command"
@@ -79,14 +94,14 @@
 						$
 					</span>
 					<code>{command}</code>
-					<span class="copy-state">{copied.value === 'done' ? 'Copiado' : copied.value === 'error' ? 'Error' : 'Copiar'}</span>
+					<span class="copy-state">{copied.value === 'done' ? t('actions.copied') : copied.value === 'error' ? t('actions.copyFailed') : t('actions.copy')}</span>
 				</button>
 			</div>
 			<p class="meta">
 				<span>v{version}</span>
-				<span>Licencia MIT</span>
+				<span>{t('footer.license')}</span>
 				<span>
-					Requiere Node 24 y
+					{t('home.hero.requires')}
 					<code>pnpm add @meekojs/meeko</code>
 				</span>
 			</p>
@@ -105,24 +120,34 @@
 				id="flow-title"
 				class="chapter-title"
 			>
-				Un archivo tipado.
-				<span class="tone-soft">El servidor envía HTML y el navegador sólo conecta lo que cambia.</span>
+				{t('home.flow.title')}
+				<span class="tone-soft">{t('home.flow.titleSoft')}</span>
 			</h2>
 			<div class="split">
 				<ul class="facts">
 					<li>
 						<h3>
-							Un archivo
-							<code>.meeko</code>
-							tipado
+							<I18nT key="home.flow.typedTitle">
+								<snippet
+									name="code"
+									params="text"
+								>
+									<code>{text}</code>
+								</snippet>
+							</I18nT>
 						</h3>
 						<p>
-							Script, plantilla y estilos juntos. TypeScript comprueba props, eventos, modelos y cada expresión de la plantilla, con el error en la línea del
-							<code>.meeko</code>
-							.
+							<I18nT key="home.flow.typedBody">
+								<snippet
+									name="code"
+									params="text"
+								>
+									<code>{text}</code>
+								</snippet>
+							</I18nT>
 						</p>
 						<a bind:href="api">
-							Componentes y API
+							{t('home.flow.typedLink')}
 							<svg
 								class="arrow"
 								viewBox="0 0 16 16"
@@ -133,17 +158,17 @@
 						</a>
 					</li>
 					<li>
-						<h3>Signals sin DOM virtual</h3>
+						<h3>{t('home.flow.signalsTitle')}</h3>
 						<p>
 							<code>signal</code>
 							,
 							<code>computed</code>
-							y
+							{t('home.flow.signalsAnd')}
 							<code>effect</code>
-							actualizan sólo el texto o el atributo que cambia. Las listas conservan sus nodos por clave.
+							{t('home.flow.signalsBody')}
 						</p>
-						<a href="/docs/api#reactividad">
-							Reactividad
+						<a bind:href="reactivity">
+							{t('home.flow.signalsLink')}
 							<svg
 								class="arrow"
 								viewBox="0 0 16 16"
@@ -154,10 +179,10 @@
 						</a>
 					</li>
 					<li>
-						<h3>SSR más hidratación</h3>
-						<p>El servidor envía la página completa y el estado de cada señal; el navegador la hidrata sin volver a pintarla. También streaming, prerender y páginas de cliente.</p>
-						<a href="/docs/framework#modos-de-render">
-							Modos de render
+						<h3>{t('home.flow.ssrTitle')}</h3>
+						<p>{t('home.flow.ssrBody')}</p>
+						<a bind:href="renderModes">
+							{t('home.flow.ssrLink')}
 							<svg
 								class="arrow"
 								viewBox="0 0 16 16"
@@ -173,7 +198,7 @@
 						class="iso fig-flow"
 						viewBox="-101.1 -18.2 400.9 247.7"
 						role="img"
-						aria-label="Dibujo isométrico: el archivo Counter.meeko pasa al servidor, que envía HTML; el navegador lo hidrata y recibe el estado de las señales."
+						bind:aria-label="t('home.flow.figure')"
 					>
 						<path
 							class="l d"
@@ -306,19 +331,19 @@
 							y="213.5"
 							text-anchor="middle"
 						>
-							HIDRATAR
+							{t('home.flow.figureHydrate')}
 						</text>
 						<text
 							x="207.7"
 							y="46.5"
 							text-anchor="middle"
 						>
-							ESTADO DE LAS SEÑALES
+							{t('home.flow.figureState')}
 						</text>
 					</svg>
 					<figcaption class="fig-label">
 						<b>FIG. 02</b>
-						<span>Compilar, renderizar en el servidor, hidratar</span>
+						<span>{t('home.flow.caption')}</span>
 					</figcaption>
 				</figure>
 			</div>
@@ -334,8 +359,8 @@
 				id="deploy-title"
 				class="chapter-title"
 			>
-				Full-stack de serie.
-				<span class="tone-soft">Un build autónomo por adaptador y la misma suite de conformidad para los cuatro.</span>
+				{t('home.deploy.title')}
+				<span class="tone-soft">{t('home.deploy.titleSoft')}</span>
 			</h2>
 			<div class="split reverse">
 				<figure class="figure">
@@ -343,7 +368,7 @@
 						class="iso fig-deploy"
 						viewBox="-166.8 -54.6 492.9 296.8"
 						role="img"
-						aria-label="Dibujo isométrico: meeko build con un adaptador alimenta cuatro plataformas, Node, Bun, Deno y Workers, dentro del marco de una misma suite de conformidad."
+						bind:aria-label="t('home.deploy.figure')"
 					>
 						<path
 							class="l d s"
@@ -511,20 +536,20 @@
 							y="187.8"
 							text-anchor="start"
 						>
-							SUITE DE CONFORMIDAD
+							{t('home.deploy.figureSuite')}
 						</text>
 					</svg>
 					<figcaption class="fig-label">
 						<b>FIG. 03</b>
-						<span>Un build, cuatro destinos</span>
+						<span>{t('home.deploy.caption')}</span>
 					</figcaption>
 				</figure>
 				<ul class="facts">
 					<li>
-						<h3>Full-stack de serie</h3>
-						<p>Rutas por archivos, layouts, código de servidor en la propia página, API y RPC tipados, sesiones con revocación y WebSocket entre instancias.</p>
+						<h3>{t('home.deploy.fullstackTitle')}</h3>
+						<p>{t('home.deploy.fullstackBody')}</p>
 						<a bind:href="framework">
-							Guía del framework
+							{t('home.deploy.fullstackLink')}
 							<svg
 								class="arrow"
 								viewBox="0 0 16 16"
@@ -535,10 +560,10 @@
 						</a>
 					</li>
 					<li>
-						<h3>Node, Bun, Deno y Cloudflare</h3>
-						<p>Un build autónomo por adaptador, comprobado por la misma suite de conformidad. SemVer desde 1.0, con una política de estabilidad explícita.</p>
+						<h3>{t('home.deploy.platformsTitle')}</h3>
+						<p>{t('home.deploy.platformsBody')}</p>
 						<a bind:href="stability">
-							Estabilidad 1.x
+							{t('home.deploy.platformsLink')}
 							<svg
 								class="arrow"
 								viewBox="0 0 16 16"
@@ -562,8 +587,8 @@
 				id="tools-title"
 				class="chapter-title"
 			>
-				Herramientas que ven el runtime.
-				<span class="tone-soft">El editor y DevTools muestran las señales reales de cada instancia.</span>
+				{t('home.tools.title')}
+				<span class="tone-soft">{t('home.tools.titleSoft')}</span>
 			</h2>
 			<figure
 				class="editor-frame"
@@ -577,7 +602,7 @@
 					<div class="editor-body">
 						<pre
 							class="shiki editor-code"
-							aria-label="Líneas 10 a 17 de Counter.meeko"
+							bind:aria-label="t('home.tools.editorCode')"
 						><code><span
 								each:of="editorLines"
 								each:as="line"
@@ -597,20 +622,20 @@
 						<div
 							class="hover-card"
 							role="note"
-							aria-label="Hover de la señal count"
+							bind:aria-label="t('home.tools.hover')"
 						>
 							<p class="hover-sig"><code>const count: Signal&lt;number&gt;</code></p>
 							<p class="hover-value">
-								<span>Counter.meeko · 1 instancia</span>
+								<span>{t('home.tools.instances')}</span>
 								<code>count = 3</code>
 							</p>
-							<p class="hover-action">Editar valor</p>
+							<p class="hover-action">{t('home.tools.editValue')}</p>
 						</div>
 					</div>
 					<div class="editor-status">
 						<span class="live-dot" />
 						Meeko live
-						<span class="status-note">conectado a meeko dev</span>
+						<span class="status-note">{t('home.tools.connected')}</span>
 					</div>
 				</div>
 				<figcaption
@@ -618,21 +643,24 @@
 					class="fig-label"
 				>
 					<b>FIG. 04</b>
-					<span>Representación de la extensión de VS Code con meeko dev en marcha: el valor de cada señal al final de su línea y en el hover</span>
+					<span>{t('home.tools.caption')}</span>
 				</figcaption>
 			</figure>
 			<div class="tools-row">
 				<div class="fact">
-					<h3>Un editor con superpoderes</h3>
+					<h3>{t('home.tools.editorTitle')}</h3>
 					<p>
-						Servidor de lenguaje con los diagnósticos de
-						<code>meeko check</code>
-						, zonas de ejecución servidor/navegador, hover de señales y valores en vivo desde
-						<code>meeko dev</code>
-						.
+						<I18nT key="home.tools.editorBody">
+							<snippet
+								name="code"
+								params="text"
+							>
+								<code>{text}</code>
+							</snippet>
+						</I18nT>
 					</p>
 					<a bind:href="editors">
-						Editores
+						{t('home.tools.editorLink')}
 						<svg
 							class="arrow"
 							viewBox="0 0 16 16"
@@ -643,10 +671,10 @@
 					</a>
 				</div>
 				<div class="fact">
-					<h3>DevTools por instancia</h3>
-					<p>Un árbol de instancias con sus props y señales, una línea de tiempo filtrable y un punto de parada por instancia, dentro de la página o en un panel de Chrome DevTools. Sólo existe en desarrollo.</p>
+					<h3>{t('home.tools.devtoolsTitle')}</h3>
+					<p>{t('home.tools.devtoolsBody')}</p>
 					<a bind:href="devtools">
-						DevTools
+						{t('home.tools.devtoolsLink')}
 						<svg
 							class="arrow"
 							viewBox="0 0 16 16"
@@ -659,8 +687,8 @@
 				<div class="tools-cat">
 					<CatFigure
 						label="FIG. 05"
-						caption="Meeko asomada al editor"
 						note="HOVER · COUNT = 3"
+						bind:caption="t('home.tools.catCaption')"
 					/>
 				</div>
 			</div>
@@ -676,45 +704,50 @@
 				id="inicio-rápido"
 				class="chapter-title"
 			>
-				Inicio rápido.
-				<span class="tone-soft">Un comando crea la aplicación full-stack; sus scripts la llevan a producción.</span>
+				{t('home.start.title')}
+				<span class="tone-soft">{t('home.start.titleSoft')}</span>
 			</h2>
 			<div class="start">
 				<div
 					class="start-code"
-					on:click="copyCodeBlock"
+					on:click="copyCode"
 					html="quickStart"
 				/>
 				<div class="start-text">
 					<dl class="scripts">
 						<div>
 							<dt><code>dev</code></dt>
-							<dd>Arranca el servidor de desarrollo.</dd>
+							<dd>{t('home.start.dev')}</dd>
 						</div>
 						<div>
 							<dt><code>check</code></dt>
-							<dd>Genera los contratos y comprueba los tipos.</dd>
+							<dd>{t('home.start.check')}</dd>
 						</div>
 						<div>
 							<dt><code>build</code></dt>
 							<dd>
-								Cliente, servidor y páginas prerenderizadas; con
-								<code>--adapter</code>
-								, una salida para Bun, Deno, Cloudflare o un hosting estático.
+								<I18nT key="home.start.build">
+									<snippet
+										name="code"
+										params="text"
+									>
+										<code>{text}</code>
+									</snippet>
+								</I18nT>
 							</dd>
 						</div>
 						<div>
 							<dt><code>start</code></dt>
-							<dd>SSR de producción con Node 24.</dd>
+							<dd>{t('home.start.start')}</dd>
 						</div>
 					</dl>
 					<p class="start-links">
-						<UILink bind:href="quickStartPage">Inicio rápido completo</UILink>
+						<UILink bind:href="quickStartPage">{t('home.start.full')}</UILink>
 						<UILink
 							variant="outline"
 							bind:href="framework"
 						>
-							Guía del framework
+							{t('home.start.guide')}
 						</UILink>
 					</p>
 				</div>

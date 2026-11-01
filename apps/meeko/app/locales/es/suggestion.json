@@ -1,0 +1,10 @@
+{
+	"locale": {
+		"suggestion": {
+			"label": "Sugerencia de idioma",
+			"message": "Esta página también está en español.",
+			"go": "Leer en español",
+			"stay": "Seguir en español"
+		}
+	}
+}

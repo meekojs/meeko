@@ -77,7 +77,7 @@ test('the site counts views, confirmed searches and «¿Te sirvió?» without co
 	const active = (await admin.query(`SELECT id FROM ${source}.docs_snapshots WHERE active`)).rows[0]
 	assert.ok(active, 'the development database has an active snapshot (run docs:sync)')
 	const snapshot = (await db.query("INSERT INTO docs_snapshots (active, published_by) VALUES (true, 'e2e') RETURNING id")).rows[0].id
-	await admin.query(`INSERT INTO ${schema}.docs_pages (snapshot_id, path, payload, searchable_text) SELECT $1, path, payload, searchable_text FROM ${source}.docs_pages WHERE snapshot_id = $2`, [snapshot, active.id])
+	await admin.query(`INSERT INTO ${schema}.docs_pages (snapshot_id, locale, path, payload, searchable_text, translation) SELECT $1, locale, path, payload, searchable_text, translation FROM ${source}.docs_pages WHERE snapshot_id = $2`, [snapshot, active.id])
 	const views = async (path) => Number((await db.query('SELECT coalesce(sum(views), 0) AS views FROM docs_page_views WHERE site = $1 AND path = $2', ['site', path])).rows[0].views)
 
 	const httpPort = await port()
@@ -214,6 +214,21 @@ test('the site counts views, confirmed searches and «¿Te sirvió?» without co
 		for (const q of ['ana.garcia@example.com', 'Bearer sk_live_51HxExampleOnly0123456789abcdef', jwt]) assert.equal((await post('/api/docs/search', { q })).status, 204, q)
 		assert.equal((await db.query('SELECT count(*)::int AS n FROM docs_searches')).rows[0].n, searchesBefore)
 		assert.equal((await db.query("SELECT count(*)::int AS n FROM docs_searches WHERE query LIKE '%@%' OR query LIKE '%sk_live%' OR query LIKE 'eyj%'")).rows[0].n, 0)
+
+		// English: /en/… counts as the English page without the prefix, apart from the Spanish one; the
+		// feedback of an English page and a search sent with locale 'en' are stored in English.
+		const englishViews = async () => Number((await db.query("SELECT coalesce(sum(views), 0) AS views FROM docs_page_views WHERE site = 'site' AND locale = 'en' AND path = $1", [first])).rows[0].views)
+		assert.equal((await post('/api/docs/views', { path: '/en' + first })).status, 204)
+		assert.equal(await englishViews(), 1)
+		assert.equal(await views(first), 6, 'the Spanish and English views of the page, each in its language')
+		assert.equal((await post('/api/docs/views', { path: '/en/docs/inventada' })).status, 204)
+		assert.equal(await englishViews(), 1, 'an English page that does not exist is not counted')
+		assert.deepEqual(await (await post('/api/docs/feedback', { path: '/en' + first, helpful: true })).json(), { saved: true })
+		assert.deepEqual((await db.query('SELECT path, locale, helpful FROM docs_feedback ORDER BY id DESC LIMIT 1')).rows, [{ path: first, locale: 'en', helpful: true }])
+		assert.equal((await post('/api/docs/search', { q: 'hydration', locale: 'en' })).status, 204)
+		const englishSearch = (await db.query("SELECT locale, results FROM docs_searches WHERE query = 'hydration' ORDER BY id DESC LIMIT 1")).rows[0]
+		assert.equal(englishSearch?.locale, 'en')
+		assert.ok(englishSearch.results > 0, 'counted with the English search')
 	} catch (error) {
 		throw new Error(`${error instanceof Error ? error.stack : String(error)}\n\nServer log:\n${logs}`, { cause: error })
 	}

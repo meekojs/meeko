@@ -1,4 +1,6 @@
 <script server lang="ts">
+	import type { PageLocale } from 'meeko-docs-content/locale'
+
 	import { definePage } from '@meekojs/meeko/framework'
 
 	import type { NavSection, Pager, RenderedDoc } from '../../../shared/types/docs'
@@ -7,17 +9,22 @@
 
 	export const route = definePage({ render: 'ssr' })
 
+	// /en/docs/x reads the English page of the snapshot (the Spanish text and `i18n.fallback` when it is not translated).
 	const { params } = usePage()
+	const { locale } = await usePageI18n()
 	type GuidePage = {
 		readonly doc: RenderedDoc
 		readonly nav: readonly NavSection[]
 		readonly pages: Pager
 		readonly current: string
 		readonly head: { readonly title: string; readonly description: string }
+		readonly i18n?: PageLocale
 	}
-	const snapshot = await readPage<GuidePage>(`/docs/${params.slug}`)
+	const snapshot = await readPage<GuidePage>(`/docs/${params.slug}`, locale)
 	if (!snapshot) notFound()
 	export const { doc, nav, pages, current, head } = snapshot
+	// Without it in the payload (a snapshot older than the languages), the page is the original.
+	export const i18n = snapshot.i18n ?? null
 </script>
 
 <script lang="ts">
@@ -25,6 +32,8 @@
 		params: { slug: string }
 		search: Record<string, string | string[]>
 	}
+
+	const copyCode = useCodeCopy()
 </script>
 
 <template>
@@ -35,11 +44,12 @@
 		bind:pager="pages"
 		bind:editUrl="doc.editUrl"
 		bind:source="doc.source"
+		bind:i18n="i18n"
 	>
 		<article
 			class="prose"
 			data-pagefind-body
-			on:click="copyCodeBlock"
+			on:click="copyCode"
 			html="doc.html"
 		/>
 	</DocsLayout>

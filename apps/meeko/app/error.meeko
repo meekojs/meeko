@@ -6,47 +6,55 @@
 
 	const props = defineProps<Props>()
 
-	const home = href('/')
-	const guide = href('/docs/[slug]', { params: { slug: 'framework' } })
-	const reference = '/docs/reference'
+	const { localePath, t } = useI18n()
+
+	// An error under /en/… is shown in English, with its links to the English pages.
+	const home = localePath(href('/'))
+	const guide = localePath(href('/docs/[slug]', { params: { slug: 'framework' } }))
+	const reference = localePath(href('/docs/reference'))
 </script>
 
 <template>
 	<section class="error">
 		<div class="copy">
 			<h1 if:when="props.status === 404">
-				Esta página no existe.
-				<span class="tone-soft">Puede que el enlace sea antiguo o que la página haya cambiado de nombre.</span>
+				{t('error.notFoundTitle')}
+				<span class="tone-soft">{t('error.notFoundDetail')}</span>
 			</h1>
 			<h1 if:when="props.status !== 404">
-				Algo salió mal.
-				<span class="tone-soft">No se pudo mostrar la página ({props.message}).</span>
+				{t('error.failedTitle')}
+				<span class="tone-soft">{t('error.failedDetail', { message: props.message })}</span>
 			</h1>
 			<p class="hint">
-				Busca en la documentación con
-				<kbd>/</kbd>
-				o vuelve a un punto conocido.
+				<I18nT key="error.hint">
+					<snippet
+						name="kbd"
+						params="text"
+					>
+						<kbd>{text}</kbd>
+					</snippet>
+				</I18nT>
 			</p>
 			<p class="actions">
-				<UILink bind:href="home">Volver al inicio</UILink>
+				<UILink bind:href="home">{t('error.home')}</UILink>
 				<UILink
 					variant="outline"
 					bind:href="guide"
 				>
-					Leer la guía
+					{t('error.guide')}
 				</UILink>
 				<UILink
 					variant="outline"
 					bind:href="reference"
 				>
-					Referencia de la API
+					{t('error.reference')}
 				</UILink>
 			</p>
 		</div>
 		<div class="figure">
 			<CatFigure
 				bind:label="'FIG. ' + props.status"
-				bind:caption="props.status === 404 ? 'Meeko buscó por todas partes y no la encontró' : 'Meeko espera a que el servidor responda'"
+				bind:caption="props.status === 404 ? t('error.notFoundCaption') : t('error.failedCaption')"
 			/>
 		</div>
 	</section>

@@ -11,5 +11,6 @@ export default defineApiRoute({
 	response: feedbackSaved,
 	form: true,
 	rateLimit: metricsRateLimits.feedback,
-	handler: feedbackHandler({ site: 'site', knownPath: async (path) => (await readPage(path)) !== null }),
+	// `/en/…` counts as an English view of the page without the prefix.
+	handler: feedbackHandler({ site: 'site', localized: true, knownPath: async (path, locale) => (await readPage(path, locale)) !== null }),
 })
