@@ -1,5 +1,5 @@
 ---
-source-hash: bfd5b1bc4a0e3c36864776f514afb97293fed3879d8aa8575cccd8d438c90604
+source-hash: 80f23dc2ae80c946015f2049689e754c9b3d73d0d92c59b421aabd6624c8c207
 ---
 
 # Meeko as a full-stack framework
@@ -1360,6 +1360,16 @@ The browser provides a basic transition; customize the animation from `app/style
 ```
 
 Use the same `view-transition-name` on the source and destination elements. Each name must be unique among visible elements on a page; duplicates can prevent animation, though navigation still completes. No directive or wrapper component is needed. See the [native API](https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition).
+
+Since `1.8`, a navigation's transition has the type `meeko-route`, so CSS can tell it from one that a component starts. Name an element only during navigations:
+
+```css
+html:active-view-transition-type(meeko-route) .tabs-indicator {
+	view-transition-name: tabs-indicator;
+}
+```
+
+A browser without transition types (Chrome before 125, Safari before 18.2, Firefox before 147) still animates the navigation and ignores those rules.
 
 To disable or enable a particular navigation, use `app.navigate('/projects', { viewTransition: false })` in a host with the `ClientApp` returned by `mountClientApp`. Links support a standard HTML attribute, on both `<MeekoLink>` and `<a>`:
 

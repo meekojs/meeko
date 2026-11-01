@@ -12,10 +12,10 @@ export const globalAttributeNames = 'accesskey autocapitalize autocorrect autofo
 
 /** Attributes of each HTML element, besides the global ones. */
 export const elementAttributeNames = {
-	a: 'attributionsourceid download href hreflang ping referrerpolicy rel target',
+	a: 'attributionsourceid download href hreflang interestfor ping referrerpolicy rel target',
 	abbr: '',
 	address: '',
-	area: 'alt coords download href hreflang ping referrerpolicy rel shape target',
+	area: 'alt coords download href hreflang interestfor ping referrerpolicy rel shape target',
 	article: '',
 	aside: '',
 	audio: 'autoplay controls controlslist crossorigin disableremoteplayback loading loop mediagroup muted preload src',
@@ -26,7 +26,7 @@ export const elementAttributeNames = {
 	blockquote: 'cite',
 	body: 'alink background bgcolor bottommargin leftmargin link rightmargin text topmargin vlink',
 	br: 'clear',
-	button: 'autocomplete command commandfor disabled form formaction formenctype formmethod formnovalidate formtarget name popovertarget popovertargetaction type value',
+	button: 'autocomplete command commandfor disabled form formaction formenctype formmethod formnovalidate formtarget interestfor name popovertarget popovertargetaction type value',
 	camera: '',
 	canvas: 'height moz-opaque width',
 	caption: 'align',

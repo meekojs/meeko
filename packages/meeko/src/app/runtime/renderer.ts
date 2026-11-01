@@ -172,8 +172,9 @@ function visit(scope: DomScope, callback: (node: Node) => boolean): Node | undef
         node = end.nextSibling;
         continue;
       }
-      // Inserted HTML may imitate Meeko markers; a search never looks inside it.
-      if (node.nodeType === 1 && (node as Element).hasAttribute(htmlMarker)) {
+      // Inserted HTML may imitate Meeko markers; a search never looks inside it. `<selectedcontent>`
+      // holds the browser's copy of the chosen `<option>`, markers included: the bindings belong to the option.
+      if (node.nodeType === 1 && ((node as Element).hasAttribute(htmlMarker) || (node as Element).localName === "selectedcontent")) {
         node = node.nextSibling;
         continue;
       }

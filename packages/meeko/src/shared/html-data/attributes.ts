@@ -1120,6 +1120,9 @@ export const htmlElementAttributes = {
 			value: 'Valid BCP 47 language tag',
 			spec: 'https://html.spec.whatwg.org/#attr-hyperlink-hreflang',
 		},
+		interestfor: {
+			experimental: true,
+		},
 		ping: {
 			description: 'URLs to ping',
 			value: 'Set of space-separated tokens consisting of valid non-empty URLs',
@@ -1180,6 +1183,9 @@ export const htmlElementAttributes = {
 			spec: 'https://html.spec.whatwg.org/#attr-hyperlink-href',
 		},
 		hreflang: {
+			experimental: true,
+		},
+		interestfor: {
 			experimental: true,
 		},
 		ping: {
@@ -1393,6 +1399,9 @@ export const htmlElementAttributes = {
 			description: 'Navigable for form submission',
 			value: 'Valid navigable target name or keyword',
 			spec: 'https://html.spec.whatwg.org/#attr-fs-formtarget',
+		},
+		interestfor: {
+			experimental: true,
 		},
 		name: {
 			description: 'Name of the element to use for form submission and in the form.elements API',

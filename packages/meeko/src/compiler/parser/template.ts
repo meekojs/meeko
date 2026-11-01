@@ -2,7 +2,7 @@ import { parseFragment } from "parse5";
 
 import type { SfcSection } from "./sfc";
 
-import { compileError, hyphenatedStandardElements, maskComponentTags, maskedFormTag, parseErrorMessage, snippetTableTags } from "./sfc";
+import { compileError, hyphenatedStandardElements, maskComponentTags, maskedFormTag, maskedSelectTag, parseErrorMessage, snippetTableTags } from "./sfc";
 
 /** Atributo normalizado de una etiqueta de plantilla. */
 export interface TemplateAttribute {
@@ -118,9 +118,10 @@ function normalize(node: ParsedNode, context: NormalizeContext): TemplateNode {
     start: template.contentStart + (location?.startOffset ?? 0),
     end: template.contentStart + (location?.endOffset ?? template.content.length),
   };
-  if (node.tagName === maskedFormTag && /^<\/?form/i.test(template.content.slice(location?.startOffset ?? 0, (location?.startOffset ?? 0) + 6))) {
-    result.nodeName = "form";
-    result.tagName = "form";
+  const maskedName = node.tagName === maskedFormTag ? "form" : node.tagName === maskedSelectTag ? "select" : undefined;
+  if (maskedName && template.content.slice(location?.startOffset ?? 0).slice(1, maskedName.length + 1).toLowerCase() === maskedName) {
+    result.nodeName = maskedName;
+    result.tagName = maskedName;
   } else if (node.tagName !== undefined) result.tagName = node.tagName;
   if (node.tagName?.startsWith("j") && location) {
     const original = /^<([a-z][\w-]*)/.exec(template.content.slice(location.startOffset, location.startOffset + 256))?.[1];
@@ -338,6 +339,29 @@ function onlySelfClosingOpen(root: ParsedNode, offset: number, selfClosing: Read
   return found;
 }
 
+/** Start tags that close an open `<select>` in Chrome, Firefox and Safari, so what follows them leaves it. */
+const closesSelect = new Set(["select", "input"]);
+/** HTML elements that hide an open `<select>` from the tags inside them: the default scope of the HTML parser. */
+const selectScopeBarriers = new Set(["applet", "caption", "marquee", "object", "table", "td", "th"]);
+const htmlNamespace = "http://www.w3.org/1999/xhtml";
+
+/**
+ * The masked `<select>` reads like a `<div>`, so the parser no longer closes it at these tags as
+ * browsers do: the template would say one thing and the page another. The content of a component,
+ * a snippet or SVG may render elsewhere or is not HTML, so it stays out of this check.
+ */
+function rejectSelectClosers(nodes: readonly TemplateNode[], inSelect: boolean, source: string, filename: string): void {
+  for (const node of nodes) {
+    const tag = node.tagName;
+    if (tag === undefined || node.componentName !== undefined || node.namespaceURI !== htmlNamespace || tag === "component" || tag === "snippet") continue;
+    if (inSelect && closesSelect.has(tag)) {
+      throw compileError(source, filename, "MEEK008", `HTML de plantilla no válido: <${tag}> no puede ir dentro de <select>: el navegador cierra el <select> y saca de él lo que viene detrás; colócalo fuera`, node.start);
+    }
+    if (node.content) rejectSelectClosers(node.content.childNodes, false, source, filename);
+    rejectSelectClosers(node.childNodes ?? [], !selectScopeBarriers.has(tag) && (inSelect || tag === "select"), source, filename);
+  }
+}
+
 /** Analiza HTML y entrega un AST independiente del parser con posiciones originales. */
 export function parseTemplate(source: string, template: SfcSection, filename: string): TemplateNode {
   const errors: Array<{ code: string; startOffset: number }> = [];
@@ -362,5 +386,7 @@ export function parseTemplate(source: string, template: SfcSection, filename: st
     const tag = /^<\/[^\s>]*>?/.exec(template.content.slice(stray))?.[0] ?? "</";
     throw compileError(source, filename, "MEEK008", `HTML de plantilla no válido: ${tag} no cierra ninguna etiqueta de componente abierta`, template.contentStart + stray);
   }
-  return normalize(parsed, { source, filename, template, selfClosing: masked.selfClosing, elements: masked.elements });
+  const root = normalize(parsed, { source, filename, template, selfClosing: masked.selfClosing, elements: masked.elements });
+  rejectSelectClosers(root.childNodes ?? [], false, source, filename);
+  return root;
 }

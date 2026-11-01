@@ -1,9 +1,9 @@
 /**
  * Event map entry of `on:name` on a native element (HTML or SVG), or `Event` for a name the map
- * does not know. The editor declares it inline; the compiled component uses `EventOf` of the
- * package, which has the same definition.
+ * does not know; `command` is a `CommandEvent`, although those maps say `Event`. The editor declares
+ * it inline; the compiled component uses `EventOf` of the package, which has the same definition.
  */
-export const templateEventDeclaration = "type __MeekoEventOf<Name extends string, Svg extends boolean> = Svg extends true ? Name extends keyof SVGElementEventMap ? SVGElementEventMap[Name] : Event : Name extends keyof HTMLElementEventMap ? HTMLElementEventMap[Name] : Event;";
+export const templateEventDeclaration = "type __MeekoEventOf<Name extends string, Svg extends boolean> = Name extends \"command\" ? CommandEvent : Svg extends true ? Name extends keyof SVGElementEventMap ? SVGElementEventMap[Name] : Event : Name extends keyof HTMLElementEventMap ? HTMLElementEventMap[Name] : Event;";
 
 /**
  * Keeps CLI and editor callback contracts aligned for template events: the event of `on:name` on

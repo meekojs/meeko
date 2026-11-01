@@ -226,6 +226,19 @@ describe('language server: what template completion inserts', () => {
 		assert.equal(find((await complete('<div |></div>')).inserted, 'bind').newText, 'bind="$1"')
 	})
 
+	test('inside a <select> with rich content, tags, attributes and expressions complete as anywhere', async () => {
+		const rich = (inner: string): string => `<select><button type="button"><selectedcontent></selectedcontent></button><option value="a">${inner}</option></select>`
+		const tags = (await complete('<select><|</select>', '<')).inserted
+		for (const tag of ['button', 'selectedcontent', 'option', 'optgroup']) find(tags, tag)
+		find((await complete(rich('<|'), '<')).inserted, 'span')
+		assert.equal(find((await complete(rich('<span cl|></span>'))).inserted, 'class').newText, 'class="$1"')
+		assert.equal(find((await complete(rich('<span on:cl|></span>'))).inserted, 'on:click').newText, 'on:click="$1"')
+		assert.equal(find((await complete('<select><button comm|></button></select>')).inserted, 'commandfor').newText, 'commandfor="$1"')
+		assert.equal(find((await complete('<button interest|></button>')).inserted, 'interestfor').newText, 'interestfor="$1"')
+		find((await complete(rich('<span bind:title="na|"></span>'))).inserted, 'name')
+		find((await complete(rich('{na|}'))).inserted, 'name')
+	})
+
 	test('snippet, render and component tags offer their own attributes', async () => {
 		const snippet = (await complete('<Card><snippet |></snippet></Card>')).inserted
 		assert.deepEqual(

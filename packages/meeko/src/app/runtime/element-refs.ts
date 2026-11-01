@@ -65,13 +65,14 @@ export type ElementOf<Tag extends string, Svg extends boolean> = Svg extends tru
 
 /**
  * Event of `on:name` on a native element: the entry of the element's event map
- * (`HTMLElementEventMap` or `SVGElementEventMap`), or `Event` for an unknown name. The compiler
- * adds `currentTarget` typed with `ElementOf`; the editor declares the same type inline
- * (`templateEventDeclaration`).
+ * (`HTMLElementEventMap` or `SVGElementEventMap`), or `Event` for an unknown name. `command` is a
+ * `CommandEvent` although TypeScript's maps say `Event`. The compiler adds `currentTarget` typed
+ * with `ElementOf`; the editor declares the same type inline (`templateEventDeclaration`).
  */
-export type EventOf<Name extends string, Svg extends boolean> = Svg extends true
-  ? Name extends keyof SVGElementEventMap ? SVGElementEventMap[Name] : Event
-  : Name extends keyof HTMLElementEventMap ? HTMLElementEventMap[Name] : Event;
+export type EventOf<Name extends string, Svg extends boolean> = Name extends "command" ? CommandEvent
+  : Svg extends true
+    ? Name extends keyof SVGElementEventMap ? SVGElementEventMap[Name] : Event
+    : Name extends keyof HTMLElementEventMap ? HTMLElementEventMap[Name] : Event;
 
 interface Waiter {
   readonly resolve: (value: unknown) => void;

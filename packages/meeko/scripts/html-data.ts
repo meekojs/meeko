@@ -334,6 +334,13 @@ const omittedNames: { readonly global: readonly string[]; readonly elements: Rea
  */
 const forbiddenComponentTags = ['base', 'body', 'embed', 'fencedframe', 'head', 'html', 'iframe', 'link', 'meta', 'noscript', 'object', 'param', 'script', 'slot', 'style', 'template', 'textarea', 'title']
 
+/**
+ * Proposals that browsers ship outside the standard track: `@mdn/browser-compat-data` lists them
+ * as experimental on the elements and interfaces they apply to, and they stay marked so.
+ */
+const proposedAttributes: readonly string[] = ['interestfor']
+const proposedEvents: readonly string[] = ['interest', 'loseinterest']
+
 /** Data of one attribute in the generated modules. */
 interface AttributeData {
 	description?: string
@@ -455,7 +462,7 @@ export async function generateHtmlData(sources: { readonly whatwg: WhatwgSnapsho
 			const name = key.toLowerCase()
 			if (name === '__compat' || name.includes('_') || attributes.has(name) || global.has(name)) continue
 			const status = statusOf(node as CompatNode)
-			if (status.standard_track && !status.deprecated) attributes.set(name, flags(status))
+			if ((status.standard_track || proposedAttributes.includes(name)) && !status.deprecated) attributes.set(name, flags(status))
 		}
 	}
 	// `role` belongs to WAI-ARIA: a list of roles, the first one the user agent knows applies.
@@ -501,7 +508,8 @@ export async function generateHtmlData(sources: { readonly whatwg: WhatwgSnapsho
 	for (const face of [compat.api.Element, compat.api.HTMLElement]) {
 		for (const [key, node] of Object.entries(face)) {
 			const status = statusOf(node as CompatNode)
-			if (key.endsWith('_event') && status.standard_track && !status.deprecated) elementEvents.add(key.slice(0, -'_event'.length))
+			const event = key.slice(0, -'_event'.length)
+			if (key.endsWith('_event') && (status.standard_track || proposedEvents.includes(event)) && !status.deprecated) elementEvents.add(event)
 		}
 	}
 	const handlers = new Map<string, Set<string>>()

@@ -274,7 +274,7 @@ export function publicTypeText(program: ts.Program | undefined, text: string): s
     .replace(/__MeekoElementOf<"([^"]*)", (true|false)>/g, (_, tag: string, svg: string) =>
       libMember(program, svg === "true" ? "SVGElementTagNameMap" : "HTMLElementTagNameMap", tag) ?? (svg === "true" ? "SVGElement" : "HTMLElement"))
     .replace(/__MeekoEventOf<"([^"]*)", (true|false)>/g, (_, event: string, svg: string) =>
-      libMember(program, svg === "true" ? "SVGElementEventMap" : "HTMLElementEventMap", event) ?? "Event")
+      event === "command" ? "CommandEvent" : libMember(program, svg === "true" ? "SVGElementEventMap" : "HTMLElementEventMap", event) ?? "Event")
     .replace(/\b__MeekoEmit</g, "Emit<")
     .replace(/\b__MeekoSnippetMap</g, "SnippetMap<");
 }

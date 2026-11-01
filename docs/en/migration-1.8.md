@@ -1,5 +1,5 @@
 ---
-source-hash: b2d831457feb5de0c67d54b281784f4324ca343f19d18bafac924664f15bfae9
+source-hash: c9e64436d40b90a867be31484fb8beb337b71dc7c3df519c433e842ff6e51e2f
 ---
 
 # Upgrade from 1.7 to 1.8
@@ -164,6 +164,7 @@ Defaults can now read top-level literal constants and imports; a setup variable 
 - **A component's `css`.** With Meeko's Vite plugin, the `css` export is PostCSS-processed CSS in the SSR graph and `meeko dev`, and remains the compiler string in the production client bundle (see [stability.md](stability.md#meeko-format-and-generated-module)). A Vitest test reading `Componente.css` or SSR-rendering a component still receives nonempty CSS: without `test.css: true`, Vitest does not process CSS and `css` is the compiler string; with `css: true`, processed CSS.
 - **`on:toggle` on a fast popover.** A `<MeekoPopover>` or `UIPopover` `hint` opened and closed very quickly now emits `toggle` `true` followed by `false`; previously the browser merged both events and nothing was emitted. A handler counting openings now sees these too.
 - **Component `<style>` order.** SSR and prerendering write them at the end of `<head>`, after `app/styles/main.css`, module stylesheets and `document`'s `head`, as the client does on hydration. Previously they came first, and a global rule with the same specificity as a scoped rule won until JavaScript loaded. If a `main.css` rule was meant to override a component's, increase its specificity: after hydration, the component's already won.
+- **`<input>` or another `<select>` inside a `<select>`.** It is now `MEEK008`. It used to compile to an empty `<select>` followed by its loose options, which is what the browser does with that HTML. Move that tag out of the `<select>`.
 
 ## ESLint: natural import ordering by default
 

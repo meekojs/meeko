@@ -1,3 +1,15 @@
+/**
+ * Starts the transition of a navigation with its type, so CSS can tell it from a component's own
+ * transition (`:active-view-transition-type(meeko-route)`). A browser without transition types
+ * (Chrome before 125, Safari before 18.2, Firefox before 147) rejects the options object, so it
+ * gets the callback alone: the navigation still animates and those rules do not apply.
+ */
+function startRouteTransition(browser: Window, update: () => void): ViewTransition {
+  const prototype = (browser as unknown as { ViewTransition?: { prototype: object } }).ViewTransition?.prototype;
+  if (prototype && "types" in prototype) return browser.document.startViewTransition({ update, types: ["meeko-route"] });
+  return browser.document.startViewTransition(update);
+}
+
 /** Coordina las transiciones nativas de una aplicación sin retrasar la carga ni duplicar commits. */
 export function createViewTransitionController(browser: Window) {
   let active: ViewTransition | undefined;
@@ -25,7 +37,7 @@ export function createViewTransitionController(browser: Window) {
       }
       skip();
       let transition: ViewTransition;
-      try { transition = document.startViewTransition(apply); }
+      try { transition = startRouteTransition(browser, apply); }
       catch (error) {
         // A browser failure before the callback falls back; a failed update is never retried.
         if (started) throw error;

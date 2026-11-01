@@ -168,10 +168,17 @@ export function checkTag<const T, const Content extends boolean, const Svg exten
   void check;
 }
 
-/** Type text of MEEK112 for an attribute that no possible tag of `is` accepts. */
+/**
+ * Type text of MEEK112 for an attribute that no possible tag of `is` accepts. `value` on a `<select>`
+ * has its own text: the attribute does not exist there, and the value comes from its options.
+ */
 export type TagAttributeCheck<Tag extends string, Name extends string, Accepted extends string> = 0 extends 1 & Tag ? unknown
   : [Tag] extends [never] ? unknown
-    : [Extract<Tag, Accepted>] extends [never] ? `MEEK112: ${Name} no se aplica a ninguna etiqueta posible de is` : unknown;
+    : [Extract<Tag, Accepted>] extends [never]
+      ? Name extends "value"
+        ? "select" extends Tag ? "MEEK112: <select> no tiene el atributo value: Meeko no lo escribiría nunca; marca la opción elegida con bind:selected, o escribe <select> en la plantilla con model" : `MEEK112: ${Name} no se aplica a ninguna etiqueta posible de is`
+        : `MEEK112: ${Name} no se aplica a ninguna etiqueta posible de is`
+      : unknown;
 
 /**
  * Whether the current tag of `<component is>` accepts the attribute `name`: `accepted` lists the

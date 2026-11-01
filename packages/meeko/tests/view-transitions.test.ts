@@ -8,16 +8,20 @@ import { createViewTransitionController } from "../src/app/runtime/view-transiti
 import { clientRoutesSource } from "../src/framework/app-manifest.ts";
 import { loadMeekoConfig } from "../src/framework/config.ts";
 
-function fakeBrowser(options: { reduced?: boolean; hidden?: boolean; supported?: boolean; throws?: boolean; rejectedAnimation?: boolean; pendingAnimation?: boolean } = {}) {
+function fakeBrowser(options: { reduced?: boolean; hidden?: boolean; supported?: boolean; throws?: boolean; rejectedAnimation?: boolean; pendingAnimation?: boolean; types?: boolean } = {}) {
   const callbacks: Array<() => void> = [];
   const transitions: ViewTransition[] = [];
+  const started: unknown[] = [];
   let skips = 0;
   const browser = {
+    ...(options.types ? { ViewTransition: { prototype: { types: undefined } } } : { ViewTransition: { prototype: {} } }),
     matchMedia: () => ({ matches: options.reduced ?? false }),
     document: {
       visibilityState: options.hidden ? "hidden" : "visible",
-      startViewTransition: options.supported === false ? undefined : (update: () => void) => {
+      startViewTransition: options.supported === false ? undefined : (argument: (() => void) | { update: () => void; types: string[] }) => {
         if (options.throws) throw new Error("native unavailable");
+        started.push(argument);
+        const update = typeof argument === "function" ? argument : argument.update;
         let resolve!: () => void;
         let reject!: (error: unknown) => void;
         const updateCallbackDone = new Promise<void>((yes, no) => { resolve = yes; reject = no; });
@@ -33,8 +37,34 @@ function fakeBrowser(options: { reduced?: boolean; hidden?: boolean; supported?:
       },
     },
   } as unknown as Window;
-  return { browser, callbacks, transitions, get skips() { return skips; } };
+  return { browser, callbacks, transitions, started, get skips() { return skips; } };
 }
+
+test("a navigation names its transition type, and falls back to the callback where types do not exist", async () => {
+  const typed = fakeBrowser({ types: true });
+  let updates = 0;
+  const result = createViewTransitionController(typed.browser).commit(() => { updates++; }, new AbortController().signal, true);
+  assert.deepEqual((typed.started[0] as { types: string[] }).types, ["meeko-route"]);
+  typed.callbacks[0]!();
+  assert.equal(await result, true);
+  assert.equal(updates, 1);
+
+  const old = fakeBrowser({ types: false });
+  const fallback = createViewTransitionController(old.browser).commit(() => { updates++; }, new AbortController().signal, true);
+  assert.equal(typeof old.started[0], "function");
+  old.callbacks[0]!();
+  assert.equal(await fallback, true);
+  assert.equal(updates, 2);
+
+  // A browser without the ViewTransition interface on window, such as a minimal DOM.
+  const bare = fakeBrowser();
+  delete (bare.browser as unknown as { ViewTransition?: unknown }).ViewTransition;
+  const none = createViewTransitionController(bare.browser).commit(() => { updates++; }, new AbortController().signal, true);
+  assert.equal(typeof bare.started[0], "function");
+  bare.callbacks[0]!();
+  assert.equal(await none, true);
+  assert.equal(updates, 3);
+});
 
 test("view transitions update exactly once and skip unsupported, disabled, hidden and reduced-motion paths", async () => {
   for (const options of [{ supported: false }, { hidden: true }, { reduced: true }, { throws: true }, {}]) {

@@ -1357,6 +1357,16 @@ El navegador proporciona una transición básica; personaliza la animación desd
 
 Usa el mismo `view-transition-name` en el elemento de origen y destino. Cada nombre debe ser único entre los elementos visibles de una página; los duplicados pueden impedir la animación, aunque la navegación se completa. No se necesita una directiva ni un componente envolvente. Consulta la [API nativa](https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition).
 
+Desde `1.8`, la transición de una navegación lleva el tipo `meeko-route`, así el CSS la distingue de la que inicia un componente. Da nombre a un elemento sólo durante las navegaciones:
+
+```css
+html:active-view-transition-type(meeko-route) .tabs-indicator {
+	view-transition-name: tabs-indicator;
+}
+```
+
+Un navegador sin tipos de transición (Chrome anterior a 125, Safari anterior a 18.2, Firefox anterior a 147) anima igual la navegación e ignora esas reglas.
+
 Para desactivar o activar una navegación concreta, usa `app.navigate('/projects', { viewTransition: false })` en un host que dispone del `ClientApp` devuelto por `mountClientApp`. Los enlaces admiten un atributo HTML estándar, tanto en `<MeekoLink>` como en `<a>`:
 
 ```html

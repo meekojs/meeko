@@ -1413,3 +1413,212 @@ const clicks = signal(0);
     await project.remove();
   }
 });
+
+/** Builds an app in a temporary project, serves it and gives its origin and a Chrome to `run`. */
+async function withServedApp(name: string, files: Record<string, string>, run: (origin: string, browser: Awaited<ReturnType<typeof chromium.launch>>) => Promise<void>): Promise<void> {
+  const project = await createTempProject(name);
+  const root = project.root;
+  type ServerModule = typeof framework_server_tsTypes;
+  type NodeModule = typeof node_tsTypes;
+  let server: Server | undefined;
+  let app: Awaited<ReturnType<ServerModule["createServerApp"]>> | undefined;
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  try {
+    for (const [file, contents] of Object.entries(files)) {
+      await mkdir(dirname(join(root, file)), { recursive: true });
+      await writeFile(join(root, file), contents);
+    }
+    await linkRepositoryPackages(root, ["@meekojs/meeko", "vite"]);
+    const built = await buildProject(root);
+    const { createServerApp } = await import(pathToFileURL(resolve("dist/framework-server.js")).href) as ServerModule;
+    const { createNodeAssetReader, toNodeListener } = await import(pathToFileURL(resolve("dist/node.js")).href) as NodeModule;
+    const output = await import(pathToFileURL(join(built.output, "index.mjs")).href) as Pick<Parameters<ServerModule["createServerApp"]>[0], "load" | "manifest">;
+    app = await createServerApp({
+      manifest: output.manifest, load: output.load, production: false,
+      assets: createNodeAssetReader({ root: join(built.output, "client"), assets: output.manifest.assets ?? {} }),
+    });
+    const running = app;
+    server = createHttpServer(toNodeListener((request) => running.fetch(request)));
+    await new Promise<void>((ready) => server!.listen(0, "127.0.0.1", ready));
+    browser = await chromium.launch({
+      ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: "chrome" as const }),
+      headless: true,
+    });
+    await run(`http://127.0.0.1:${(server.address() as AddressInfo).port}`, browser);
+  } finally {
+    await browser?.close();
+    if (server) await new Promise<void>((done) => server!.close(() => done()));
+    await app?.close();
+    await project.remove();
+  }
+}
+
+const richSelectPage = `<script lang="ts">
+const value = signal("b");
+const label = signal("Beta");
+const tone = signal("warm");
+const clicks = signal(0);
+const rows = signal([{ id: "x", name: "Equis" }]);
+const badges = signal(["uno"]);
+const show = signal(true);
+function change(): void {
+  label.value = "Beta 2";
+  tone.value = "cold";
+  badges.value = ["uno", "dos"];
+}
+</script>
+<template><main><div if:when="show.value"><select id="rich" model="value"><button type="button" id="open"><selectedcontent id="chosen"></selectedcontent></button><option value="a"><span class="name">Alfa</span></option><option value="b" bind:data-tone="tone.value" on:click="() => clicks.value++"><svg viewBox="0 0 10 10" width="10" height="10"><circle cx="5" cy="5" r="4" /></svg><span class="name" bind:title="tone.value">{label.value}</span><i each:of="badges.value" each:as="badge" each:key="badge" class="badge">{badge}</i></option><option each:of="rows.value" each:as="row" each:key="row.id" bind:value="row.id"><span class="name">{row.name}</span></option></select></div><p id="out">{value.value}|{clicks.value}</p><button type="button" id="change" on:click="change">cambiar</button><button type="button" id="add" on:click="() => rows.value = [...rows.value, { id: 'z', name: 'Zeta' }]">añadir</button><button type="button" id="toggle" on:click="() => show.value = !show.value">mostrar</button></main></template>
+<style>
+select, select::picker(select) { appearance: base-select; }
+</style>
+`;
+
+test("un <select> con contenido rico hidrata en la opción real, no en el clon de <selectedcontent>, se actualiza y se libera", { timeout: 240_000 }, async () => {
+  await withServedApp("rich-select-e2e", {
+    "package.json": '{"name":"rich-select-app","private":true,"type":"module"}\n',
+    "meeko.config.mjs": "export default {};\n",
+    "app/pages/index.meeko": richSelectPage,
+  }, async (origin, browser) => {
+    const html = await (await fetch(`${origin}/`)).text();
+    assert.match(html, /<select id="rich"[^>]*><button type="button" id="open"><selectedcontent id="chosen"><\/selectedcontent><\/button>/);
+    assert.match(html, /<option value="a"[^>]*><span class="name">Alfa<\/span><\/option>/);
+    assert.match(html, /<svg viewBox="0 0 10 10"/);
+    assert.doesNotMatch(html, /&lt;\/?span/);
+
+    const page = await browser.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+    await page.goto(`${origin}/`);
+    await page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length > 0);
+    const read = () => page.evaluate(() => {
+      const select = document.querySelector("#rich") as HTMLSelectElement;
+      const option = select.querySelector('option[value="b"]') as HTMLOptionElement;
+      const chosen = document.querySelector("#chosen") as HTMLElement;
+      return {
+        value: select.value,
+        option: { name: option.querySelector(".name")!.textContent, title: option.querySelector(".name")!.getAttribute("title"), tone: option.getAttribute("data-tone"), badges: option.querySelectorAll(".badge").length },
+        chosen: { name: chosen.querySelector(".name")?.textContent, title: chosen.querySelector(".name")?.getAttribute("title"), svg: chosen.querySelectorAll("svg circle").length, badges: chosen.querySelectorAll(".badge").length },
+      };
+    });
+    // The browser copied the chosen static option into <selectedcontent>, with its markers.
+    assert.deepEqual(await read(), {
+      value: "b",
+      option: { name: "Beta", title: "warm", tone: "warm", badges: 1 },
+      chosen: { name: "Beta", title: "warm", svg: 1, badges: 1 },
+    });
+
+    // Signals, attributes and a list inside the option reach the option, and the copy stays as it was.
+    await page.locator("#change").click();
+    await page.waitForFunction(() => document.querySelector('#rich option[value="b"] .name')!.textContent === "Beta 2");
+    assert.deepEqual(await read(), {
+      value: "b",
+      option: { name: "Beta 2", title: "cold", tone: "cold", badges: 2 },
+      chosen: { name: "Beta", title: "warm", svg: 1, badges: 1 },
+    });
+    await page.evaluate(() => {
+      const select = document.querySelector("#rich") as HTMLSelectElement;
+      // The assignment makes the browser copy the option again.
+      select.selectedIndex = Number(select.selectedIndex);
+    });
+    assert.equal((await read()).chosen.name, "Beta 2");
+
+    // The event is on the real option of the picker, and the model follows the choice.
+    await page.locator("#rich").click();
+    await page.locator('#rich option[value="b"]').click();
+    assert.equal(await page.locator("#out").innerText(), "b|1");
+    await page.locator("#rich").click();
+    await page.locator('#rich option[value="a"]').click();
+    assert.equal(await page.locator("#out").innerText(), "a|1");
+    assert.equal((await read()).chosen.name, "Alfa");
+    assert.equal((await read()).chosen.svg, 0);
+
+    // A row of each:of added later keeps its rich content in the select.
+    await page.locator("#add").click();
+    await page.locator("#rich option[value=z] .name").waitFor({ state: "attached" });
+    await page.locator("#rich").click();
+    await page.locator("#rich option[value=z]").click();
+    assert.equal(await page.locator("#out").innerText(), "z|1");
+    assert.equal((await read()).chosen.name, "Zeta");
+
+    // Released with its region: no binding runs, and it renders and hydrates again in the client.
+    await page.locator("#toggle").click();
+    await page.locator("#rich").waitFor({ state: "detached" });
+    await page.locator("#change").click();
+    await page.locator("#toggle").click();
+    await page.locator("#rich").waitFor();
+    assert.equal(await page.evaluate(() => document.querySelectorAll("#rich > button > selectedcontent").length), 1);
+    assert.equal(await page.evaluate(() => (document.querySelector("#rich") as HTMLSelectElement).value), "z");
+    await page.locator("#rich").click();
+    await page.locator('#rich option[value="b"]').click();
+    assert.equal(await page.locator("#out").innerText(), "b|2");
+    assert.equal((await read()).option.name, "Beta 2");
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+});
+
+test("el router da a su View Transition el tipo meeko-route y funciona sin tipos en los navegadores que no los tienen", { timeout: 240_000 }, async () => {
+  await withServedApp("route-transition-type-e2e", {
+    "package.json": '{"name":"route-transition-type-app","private":true,"type":"module"}\n',
+    "meeko.config.mjs": "export default { viewTransitions: true };\n",
+    "app/pages/index.meeko": '<template><h1 id="home">Inicio</h1><a id="to-about" href="/about">Acerca</a></template>\n',
+    "app/pages/about.meeko": '<template><h1 id="about">Acerca</h1><a id="to-home" href="/">Inicio</a></template>\n',
+  }, async (origin, browser) => {
+    type Started = { options: boolean; types: string[] | null; active: boolean | null };
+    const spy = (withTypes: boolean): void => {
+      const scope = globalThis as unknown as { started: Started[] };
+      scope.started = [];
+      if (!withTypes) delete (ViewTransition.prototype as unknown as { types?: unknown }).types;
+      const native = Document.prototype.startViewTransition as (this: Document, argument: unknown) => ViewTransition;
+      (Document.prototype as unknown as { startViewTransition: unknown }).startViewTransition = function (this: Document, argument: unknown) {
+        const entry: Started = { options: typeof argument === "object", types: (argument as { types?: string[] }).types ?? null, active: null };
+        scope.started.push(entry);
+        const transition = native.call(this, argument);
+        void transition.ready.then(() => { entry.active = document.documentElement.matches(":active-view-transition-type(meeko-route)"); }, () => {});
+        return transition;
+      };
+    };
+    const open = async (withTypes: boolean) => {
+      const page = await browser.newPage();
+      const errors: string[] = [];
+      page.on("pageerror", (error) => errors.push(error.message));
+      page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+      await page.addInitScript(spy, withTypes);
+      await page.goto(`${origin}/`);
+      await page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length > 0);
+      const started = (): Promise<Started[]> => page.evaluate(() => (globalThis as unknown as { started: Started[] }).started);
+      return { page, errors, started };
+    };
+
+    const typed = await open(true);
+    assert.deepEqual(await typed.started(), [], "the first load does not animate");
+    await typed.page.locator("#to-about").click();
+    await typed.page.locator("#about").waitFor();
+    await typed.page.waitForFunction(() => (globalThis as unknown as { started: Started[] }).started.at(-1)?.active !== null);
+    assert.deepEqual(await typed.started(), [{ options: true, types: ["meeko-route"], active: true }]);
+    // History navigation has the type too, and a component's own transition does not match it.
+    await typed.page.goBack();
+    await typed.page.locator("#home").waitFor();
+    await typed.page.waitForFunction(() => (globalThis as unknown as { started: Started[] }).started.at(-1)?.active !== null);
+    assert.deepEqual((await typed.started())[1], { options: true, types: ["meeko-route"], active: true });
+    const own = await typed.page.evaluate(async () => {
+      const transition = document.startViewTransition({ update() {}, types: ["ui-tab"] });
+      await transition.ready;
+      return { route: document.documentElement.matches(":active-view-transition-type(meeko-route)"), own: document.documentElement.matches(":active-view-transition-type(ui-tab)") };
+    });
+    assert.deepEqual(own, { route: false, own: true });
+    assert.deepEqual(typed.errors, []);
+    await typed.page.close();
+
+    const old = await open(false);
+    await old.page.locator("#to-about").click();
+    await old.page.locator("#about").waitFor();
+    const fallback = await old.started();
+    assert.equal(fallback.length, 1);
+    assert.equal(fallback[0]!.options, false, "the browser without types gets the callback");
+    assert.equal(fallback[0]!.types, null);
+    assert.deepEqual(old.errors, []);
+    await old.page.close();
+  });
+});

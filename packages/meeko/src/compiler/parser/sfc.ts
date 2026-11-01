@@ -118,10 +118,12 @@ export interface MaskedHtml {
 
 const rawTextElement = /<(?:script|style|textarea|title|xmp|iframe|noembed|noframes|noscript|plaintext)(?=[\s/>])/iy;
 const componentTag = /<(\/?)[A-Z][\w$]*(?=[\s/>])/y;
-// A capital first letter makes `<Form>` a component tag, so only a lowercase `f` is the element.
-const formTag = /<(\/?)f[Oo][Rr][Mm](?=[\s/>])/y;
+// A capital first letter makes `<Form>` or `<Select>` a component tag, so only a lowercase first letter is the element.
+const maskedElementTag = /<(\/?)(?:f[Oo][Rr][Mm]|s[Ee][Ll][Ee][Cc][Tt])(?=[\s/>])/y;
 /** The name a masked `<form>` has while parse5 reads the template; see `maskComponentTags`. */
 export const maskedFormTag = "jorm";
+/** The name a masked `<select>` has while parse5 reads the template; see `maskComponentTags`. */
+export const maskedSelectTag = "jelect";
 /** Table tags whose structure must survive when supplied through component snippets. */
 export const snippetTableTags: ReadonlySet<string> = new Set(["table", "caption", "colgroup", "col", "thead", "tbody", "tfoot", "tr", "th", "td"]);
 
@@ -241,10 +243,12 @@ export function maskComponentTags(html: string, options: { blankComponents?: boo
     }
     // `</form>` only drops the form from the open elements, so a `<Name />` the parser kept open
     // inside it would swallow the rest of the template. Masked as `jorm`, it closes like a `<div>`.
-    formTag.lastIndex = index;
-    const form = formTag.exec(html);
-    if (form) {
-      chars[index + form[1]!.length + 1] = "j";
+    // parse5 still has the old select insertion mode, which drops `<button>`, `<selectedcontent>`,
+    // `<span>` or `<svg>` from a `<select>`; browsers keep them. Masked as `jelect`, it keeps them too.
+    maskedElementTag.lastIndex = index;
+    const masked = maskedElementTag.exec(html);
+    if (masked) {
+      chars[index + masked[1]!.length + 1] = "j";
       changed = true;
     }
     componentTag.lastIndex = index;

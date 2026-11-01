@@ -150,7 +150,7 @@ El texto de los mensajes puede mejorar en cualquier versión; desde `1.1` está 
 | `MEEK005` | **Retirado en `1.1`.** Señalaba la falta de `<script lang="ts">`, que pasa a ser opcional. |
 | `MEEK006` | `<script>` o `<script server>` sin `lang="ts"`. |
 | `MEEK007` | Falta `<template>`. |
-| `MEEK008` | HTML de la plantilla no válido, incluido un cierre de etiqueta de componente sin apertura. |
+| `MEEK008` | HTML de la plantilla no válido, incluido un cierre de etiqueta de componente sin apertura y, desde `1.8`, `<input>` u otro `<select>` dentro de un `<select>`. |
 | `MEEK009`, `MEEK010` | Expresión de plantilla vacía o sin cerrar. |
 | `MEEK011` | Nombre de evento no válido. |
 | `MEEK012` | Atributo dinámico o directiva no admitidos. |

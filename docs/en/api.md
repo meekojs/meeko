@@ -1,5 +1,5 @@
 ---
-source-hash: 50c6dee4c16fec6362e59779c00cc44cfc61567da8532b7232c13de03f6069cf
+source-hash: 8cbbec2ee94d6dbae5a510b941c08543ce27f3c385f7163aa549fac0aa680746
 ---
 
 # Meeko API
@@ -295,6 +295,40 @@ Since `1.1`, `model="signal"` binds a form control to a signal in both direction
   `bind:type` can only produce text types (`text`, `password`, `email`, `search`, `number`…). With `checkbox`, `radio`, `file`, `submit`, `reset`, `button` or `image`, which have no text value, the model changes neither the signal nor the control: if the control already has that type on hydration, hydration throws a `TypeError`; if it takes that type later, each model read or write delivers a `TypeError` to the nearest error observer (see `provideErrorHandler`). For a checkbox or radio, use another `<input>` with a static `type`.
 
 `MEEK065` flags unsupported uses: `model` on an element other than `<input>`, `<textarea>` or `<select>`; on `<input type="file">`, `submit`, `reset`, `button` or `image`; with both `bind:type` and `type="..."` on the same `<input>`; with `bind:multiple` instead of static `multiple`; with content in `<textarea model>`; alongside `value`, `bind:value` or `on:input` on a text control (or `checked`, `bind:checked` or `on:change` on a checkable control, and `value`, `bind:value` or `on:change` on a `<select>`); a second `model` or `model:nombre`, which is only for components. Other `on:` events are allowed.
+
+### `<select>` with rich content
+
+Since `1.8`, a `<select>` keeps the content current browsers accept: `<button>`, `<selectedcontent>`, `<legend>`, `<div>` and options with `<span>` or `<svg>`. With `appearance: base-select` on the `<select>` and on its `::picker(select)`, the browser paints that content in its own dropdown:
+
+```html
+<script lang="ts">
+	const plan = signal('pro')
+	const plans = [
+		{ id: 'free', name: 'Free' },
+		{ id: 'pro', name: 'Pro' },
+	]
+</script>
+<template>
+	<select model="plan">
+		<button type="button"><selectedcontent></selectedcontent></button>
+		<option
+			each:of="plans"
+			each:as="item"
+			each:key="item.id"
+			bind:value="item.id"
+		>
+			<span class="dot"></span>
+			<span>{item.name}</span>
+		</option>
+	</select>
+</template>
+```
+
+- **Hydration.** The browser copies the chosen option into `<selectedcontent>`, with its attributes. Bindings (`bind:`, `on:`, `{text}`) always belong to the real option, never to the copy. Do not put an `id` inside an option, because the copy duplicates it.
+- **The copy is not reactive.** If the content of the chosen option changes, the copy stays the same until another one is chosen. `select.selectedIndex = select.selectedIndex` rebuilds it.
+- **`<input>` and another `<select>`.** The browser closes the `<select>` when it finds them and moves what follows out of it, so inside a `<select>` they are `MEEK008`. Place them outside.
+- **Inner button.** The `<button>` of a `<select>` is inert: clicks reach the `<select>`. A button that clears the selection goes outside.
+- **Other browsers.** Firefox keeps this content, but without `base-select` it shows the native dropdown and `<selectedcontent>` stays empty. Check support on [MDN](https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Forms/Customizable_select).
 
 ### Unescaped HTML with `html`
 

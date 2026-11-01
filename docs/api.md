@@ -292,6 +292,40 @@ Desde `1.1`, `model="signal"` enlaza un control de formulario con una señal en 
 
 `MEEK065` señala los usos no admitidos: `model` en un elemento que no es `<input>`, `<textarea>` o `<select>`; en `<input type="file">`, `submit`, `reset`, `button` o `image`; con `bind:type` y además `type="..."` en el mismo `<input>`; con `bind:multiple` en lugar de `multiple` estático; con contenido en `<textarea model>`; junto a `value`, `bind:value` u `on:input` en un control de texto (o `checked`, `bind:checked` u `on:change` en uno marcable, y `value`, `bind:value` u `on:change` en un `<select>`); un segundo `model` o `model:nombre`, que es sólo para componentes. Los demás eventos `on:` se admiten.
 
+### `<select>` con contenido rico
+
+Desde `1.8`, un `<select>` conserva el contenido que admiten los navegadores actuales: `<button>`, `<selectedcontent>`, `<legend>`, `<div>` y opciones con `<span>` o `<svg>`. Con `appearance: base-select` en el `<select>` y en su `::picker(select)`, el navegador pinta ese contenido en un desplegable propio:
+
+```html
+<script lang="ts">
+	const plan = signal('pro')
+	const plans = [
+		{ id: 'free', name: 'Gratis' },
+		{ id: 'pro', name: 'Pro' },
+	]
+</script>
+<template>
+	<select model="plan">
+		<button type="button"><selectedcontent></selectedcontent></button>
+		<option
+			each:of="plans"
+			each:as="item"
+			each:key="item.id"
+			bind:value="item.id"
+		>
+			<span class="dot"></span>
+			<span>{item.name}</span>
+		</option>
+	</select>
+</template>
+```
+
+- **Hidratación.** El navegador copia la opción elegida dentro de `<selectedcontent>`, con sus atributos. Los enlaces (`bind:`, `on:`, `{texto}`) son siempre de la opción real, nunca de la copia. No pongas `id` dentro de una opción, porque la copia lo duplica.
+- **La copia no es reactiva.** Si cambia el contenido de la opción elegida, la copia sigue igual hasta que se elija otra. `select.selectedIndex = select.selectedIndex` la rehace.
+- **`<input>` y otro `<select>`.** El navegador cierra el `<select>` al encontrarlos y saca de él lo que viene detrás, así que dentro de un `<select>` son `MEEK008`. Colócalos fuera.
+- **Botón interno.** El `<button>` de un `<select>` es inerte: los clics llegan al `<select>`. Un botón para vaciar la selección va fuera.
+- **Otros navegadores.** Firefox conserva este contenido, pero sin `base-select` muestra el desplegable nativo y `<selectedcontent>` queda vacío. Comprueba el soporte en [MDN](https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Forms/Customizable_select).
+
 ### HTML sin escapar con `html`
 
 Desde `1.1`, `html="expression"` en un elemento lo llena con el HTML de la expresión, **sin escapar**. La expresión es un `string`; `null` y `undefined` dejan el elemento vacío. Desde `1.3`, ese `string` debe estar marcado como de confianza con `trustHtml` (tipo `TrustedHtml`) o `meeko check` avisa con `MEEK107`; véase [HTML de confianza](#html-de-confianza-trustedhtml-y-trusthtml).
