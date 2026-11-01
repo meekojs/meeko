@@ -1,0 +1,42 @@
+<script lang="ts">
+	// <UIIcon>: an inline <svg> with the icon resolved at build time (the `resolved` prop, written by
+	// @meekojs/icon in the template that uses it) or found in the registry of icon.include. No fetch,
+	// no inline style: width, height, fill and currentColor are attributes, compatible with a strict CSP.
+	import { computed, trustHtml } from '@meekojs/meeko'
+
+	import type { IconProps } from '../../index'
+
+	import { iconView } from '../../runtime'
+	import { dev, icons, size } from '../registry'
+
+	const props = defineProps<IconProps>()
+
+	const warned = new Set<string>()
+	const view = computed(() => {
+		const result = iconView(props.name, props.resolved, icons, props.size ?? size, props.label)
+		if (dev && result.missing && !warned.has(props.name)) {
+			warned.add(props.name)
+			console.warn(`[@meekojs/icon] "${props.name}" is not available: a dynamic name (bind:name) must be in icon.include or be a string literal of its expression.`)
+		}
+		return result
+	})
+	const body = computed(() => trustHtml(view.value.body))
+	const className = computed(() => ['meeko-icon', props.class].filter(Boolean).join(' '))
+</script>
+
+<template>
+	<svg
+		xmlns="http://www.w3.org/2000/svg"
+		fill="currentColor"
+		focusable="false"
+		bind:class="className.value"
+		bind:width="view.value.width"
+		bind:height="view.value.height"
+		bind:viewBox="view.value.viewBox"
+		bind:aria-hidden="view.value.hidden"
+		bind:role="view.value.role"
+		bind:aria-label="view.value.label"
+		bind:data-icon="props.name"
+		html="body.value"
+	/>
+</template>

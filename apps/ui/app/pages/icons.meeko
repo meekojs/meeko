@@ -1,0 +1,178 @@
+<script lang="ts">
+	import { examples } from '../utils/examples'
+
+	const open = signal(false)
+	const mode = signal<'lucide:moon' | 'lucide:sun'>('lucide:sun')
+	const toggleMode = (): void => {
+		mode.value = mode.value === 'lucide:sun' ? 'lucide:moon' : 'lucide:sun'
+	}
+</script>
+
+<template>
+	<DocsPage
+		title="Icon"
+		description="Iconos de Iconify y SVG propios, tipados e incrustados en el HTML al compilar."
+	>
+		<h2 id="usage">Uso</h2>
+		<div class="preview">
+			<p>
+				<UIIcon name="lucide:search" />
+				Buscar en el proyecto
+			</p>
+			<UIButton variant="outline">
+				<UIIcon
+					name="lucide:trash-2"
+					label="Eliminar"
+				/>
+			</UIButton>
+		</div>
+		<DocsCode bind:code="examples.icon" />
+		<p>
+			<code>UIIcon</code>
+			escribe un
+			<code>&lt;svg&gt;</code>
+			en línea. Cada nombre literal se resuelve durante el build con el paquete de la colección instalado en el proyecto: no hay peticiones en tiempo de ejecución ni CDN, y el bundle sólo lleva los iconos que usas.
+		</p>
+
+		<h2 id="setup">Instalación y colecciones</h2>
+		<p>
+			Instala el módulo y cada colección de Iconify que quieras usar como
+			<code>@iconify-json/&lt;colección&gt;</code>
+			. El módulo se registra por su nombre y sus opciones van en la clave
+			<code>icon</code>
+			, tipada en
+			<code>meeko.config.ts</code>
+			.
+		</p>
+		<DocsCode bind:code="examples.iconConfig" />
+		<p>
+			Los nombres disponibles forman una unión de TypeScript que Meeko genera en
+			<code>.meeko/types</code>
+			: el editor completa
+			<code>name="lucide:…"</code>
+			, y un nombre que no existe es un error de
+			<code>meeko check</code>
+			con la sugerencia más parecida. Si falta el paquete de una colección configurada, el build indica el comando para instalarlo.
+		</p>
+
+		<h2 id="dynamic">Nombres dinámicos</h2>
+		<p>
+			Con
+			<code>bind:name</code>
+			, los literales de la expresión se resuelven al compilar igual que un nombre fijo. Un valor que no aparece en el código, como el que llega de datos, sólo funciona si está en
+			<code>icon.include</code>
+			(o con
+			<code>'colección:*'</code>
+			, que incluye la colección entera). Si no, se pinta un
+			<code>&lt;svg&gt;</code>
+			vacío y
+			<code>meeko dev</code>
+			avisa en la consola.
+		</p>
+		<div class="preview">
+			<UIButton
+				variant="secondary"
+				on:click="() => (open.value = !open.value)"
+			>
+				<UIIcon
+					bind:name="open.value ? 'lucide:x' : 'lucide:menu'"
+					bind:label="open.value ? 'Cerrar menú' : 'Abrir menú'"
+				/>
+			</UIButton>
+			<UIButton
+				variant="secondary"
+				on:click="toggleMode"
+			>
+				<UIIcon
+					bind:name="mode.value"
+					bind:label="mode.value === 'lucide:sun' ? 'Modo claro' : 'Modo oscuro'"
+				/>
+			</UIButton>
+		</div>
+		<DocsCode bind:code="examples.iconDynamic" />
+
+		<h2 id="local">SVG propios</h2>
+		<p>
+			Cada archivo de
+			<code>app/icons</code>
+			(o de la carpeta de
+			<code>icon.local</code>
+			) es
+			<code>local:&lt;nombre&gt;</code>
+			. Al compilar se limpia: se quitan
+			<code>&lt;script&gt;</code>
+			,
+			<code>&lt;style&gt;</code>
+			, manejadores de eventos, estilos en línea y referencias externas, y un icono de un solo color pasa a
+			<code>currentColor</code>
+			.
+		</p>
+		<div class="preview">
+			<UIIcon
+				name="local:paw"
+				label="Meeko"
+				size="1.5em"
+			/>
+		</div>
+		<DocsCode bind:code="examples.iconLocal" />
+
+		<h2 id="accessibility">Accesibilidad, tamaño y color</h2>
+		<p>
+			Sin
+			<code>label</code>
+			, el icono es decorativo:
+			<code>aria-hidden="true"</code>
+			y
+			<code>focusable="false"</code>
+			. Con
+			<code>label</code>
+			, el
+			<code>&lt;svg&gt;</code>
+			lleva
+			<code>role="img"</code>
+			y
+			<code>aria-label</code>
+			; úsalo cuando el icono sea el único contenido de un botón o un enlace.
+		</p>
+		<p>
+			Mide
+			<code>1em</code>
+			de alto por defecto, así que sigue al texto que lo rodea, y toma el color con
+			<code>currentColor</code>
+			. Ancho, alto y relleno son atributos, nunca estilos en línea: funciona con una Content Security Policy estricta.
+		</p>
+		<div class="preview">
+			<UIIcon
+				name="lucide:star"
+				size="16px"
+			/>
+			<UIIcon
+				name="lucide:star"
+				size="24px"
+			/>
+			<UIIcon
+				name="lucide:star"
+				size="2.5em"
+			/>
+		</div>
+
+		<h2 id="api">API</h2>
+		<DocsApi
+			bind:rows="[
+				{ name: 'name', type: 'IconName', description: 'Icono: colección:icono o local:nombre. Un literal se resuelve al compilar.' },
+				{ name: 'label', type: 'string', description: 'Texto accesible. Sin él, el icono es decorativo.' },
+				{ name: 'size', type: 'string', default: 'icon.size (1em)', description: 'Alto, una longitud CSS. El ancho sigue la proporción del icono.' },
+				{ name: 'class', type: 'string', description: 'Clases adicionales del svg.' },
+			]"
+		/>
+		<h3 id="options">Opciones del módulo</h3>
+		<DocsApi
+			bind:rows="[
+				{ name: 'collections', type: 'string[]', default: '[]', description: 'Colecciones de Iconify; cada una, el paquete @iconify-json/<colección> del proyecto.' },
+				{ name: 'include', type: 'IconInclude[]', default: '[]', description: 'Iconos para nombres dinámicos, o colección:* para una entera.' },
+				{ name: 'local', type: 'string | false', default: 'app/icons si existe', description: 'Carpeta de SVG propios.' },
+				{ name: 'size', type: 'string', default: '1em', description: 'Alto por defecto de los iconos.' },
+			]"
+		/>
+	</DocsPage>
+</template>

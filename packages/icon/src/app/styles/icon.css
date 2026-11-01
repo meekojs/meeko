@@ -1,0 +1,6 @@
+/* @meekojs/icon: the icon sits on the text baseline like a glyph and never shrinks in a flex row. */
+.meeko-icon {
+	display: inline-block;
+	flex-shrink: 0;
+	vertical-align: -0.125em;
+}

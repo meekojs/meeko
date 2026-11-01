@@ -1,0 +1,51 @@
+{
+	"name": "@meekojs/icon",
+	"version": "0.1.0",
+	"description": "Typed Iconify icons for Meeko, resolved at build time.",
+	"keywords": [
+		"meeko",
+		"meeko-module",
+		"iconify",
+		"icons"
+	],
+	"homepage": "https://ui.meekojs.com/icons",
+	"license": "MIT",
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./module": {
+			"types": "./dist/module.d.ts",
+			"default": "./dist/module.js"
+		}
+	},
+	"files": [
+		"dist/",
+		"src/app/styles/"
+	],
+	"scripts": {
+		"build": "node ../../scripts/build-package.mjs && node scripts/copy-components.mjs",
+		"check": "tsc -p tsconfig.json --noEmit",
+		"prepack": "pnpm run build",
+		"test": "pnpm run build && node --test --test-concurrency=1 tests/*.test.mjs",
+		"test:e2e": "pnpm run build && node --test --test-concurrency=1 tests/*.e2e.mjs"
+	},
+	"dependencies": {
+		"@iconify/types": "^2.0.0",
+		"@iconify/utils": "^3.1.7"
+	},
+	"devDependencies": {
+		"@iconify-json/lucide": "^1.2.149",
+		"@iconify-json/mdi": "^1.2.3",
+		"@iconify-json/tabler": "^1.2.43",
+		"@meekojs/meeko": "workspace:*",
+		"@types/node": "^24.0.0",
+		"typescript": "7.0.2",
+		"vite": "8.3.5"
+	},
+	"peerDependencies": {
+		"@meekojs/meeko": ">=1.7 <2"
+	}
+}
