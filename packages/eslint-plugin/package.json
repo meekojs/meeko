@@ -11,8 +11,8 @@
     "./parser": { "types": "./dist/parser.d.ts", "default": "./dist/parser.js" }
   },
   "scripts": {
-    "build": "node ../../scripts/build-package.mjs",
-    "check": "tsc6 -p tsconfig.json --noEmit",
+    "build": "pnpm run types:generate && node ../../scripts/build-package.mjs",
+    "check": "pnpm run types:generate && tsc6 -p tsconfig.json --noEmit",
     "test": "pnpm run build && node --test tests/*.test.mjs",
     "types:generate": "node scripts/generate-rule-types.mjs",
     "prepack": "pnpm run build"

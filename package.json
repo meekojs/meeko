@@ -46,7 +46,7 @@
         "format": "prettier . --write",
         "format:check": "prettier . --check",
         "test:build": "node --test scripts/build-package.test.mjs",
-        "test:scripts": "node --test scripts/build-package.test.mjs scripts/git-guard.test.mjs scripts/sync-agents.test.mjs",
+        "test:scripts": "node --test scripts/build-package.test.mjs scripts/generated-sources.test.mjs scripts/git-guard.test.mjs scripts/sync-agents.test.mjs",
         "agents:sync": "node scripts/sync-agents.mjs",
         "agents:check": "node scripts/sync-agents.mjs --check",
         "package:workspace-smoke": "pwsh -NoProfile -File scripts/package-workspace-smoke.ps1"
