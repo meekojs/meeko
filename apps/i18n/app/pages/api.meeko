@@ -35,8 +35,8 @@
 			recibe mensajes compilados y callbacks de navegación. Para aplicaciones Meeko el módulo prepara ese catálogo y su contexto.
 		</p>
 		<DocsCode
-			bind:code="examples.manual"
 			label="Integración en navegador"
+			bind:code="examples.manual"
 		/>
 		<p>
 			<code>i18nContext</code>

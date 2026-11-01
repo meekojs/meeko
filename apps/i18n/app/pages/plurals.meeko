@@ -9,8 +9,8 @@
 	>
 		<h2 id="plural">Plurales con Intl.PluralRules</h2>
 		<DocsCode
-			bind:code="examples.plural"
 			label="Catálogo JSON"
+			bind:code="examples.plural"
 		/>
 		<p>
 			<code>plural</code>
@@ -35,8 +35,8 @@
 		</p>
 		<h2 id="select">Alternativas con select</h2>
 		<DocsCode
-			bind:code="examples.select"
 			label="Catálogo y llamada"
+			bind:code="examples.select"
 		/>
 		<p>
 			El selector se convierte a texto para buscar su forma; un valor sin alternativa propia usa

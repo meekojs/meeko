@@ -17,12 +17,20 @@ export interface I18nModuleOptions {
   readonly directions?: Readonly<Record<string, "ltr" | "rtl">>;
 }
 
+declare module "@meekojs/meeko/framework" {
+  interface MeekoConfig {
+    /** Opciones de `@meekojs/i18n`, que se registra con `modules: ["@meekojs/i18n"]`. */
+    readonly i18n?: I18nModuleOptions;
+  }
+}
+
 const manifestId = "virtual:meeko-i18n";
 const resolvedManifest = "\0meeko-i18n:manifest";
 const catalogPrefix = "\0meeko-i18n:catalog:";
 
 export default defineMeekoModule<I18nModuleOptions>({
-  meta: { name: "@meekojs/i18n", compatibility: { meeko: ">=1.7 <2" } },
+  // `modules: ["@meekojs/i18n"]` resolves this `./module` subpath; the options live in `i18n: { … }`.
+  meta: { name: "@meekojs/i18n", configKey: "i18n", compatibility: { meeko: ">=1.7 <2" } },
   setup(options, meeko) {
     if (!options.catalogs || typeof options.catalogs !== "object" || Array.isArray(options.catalogs)) throw new TypeError("i18n: catalogs must be an object");
     const locales = Object.keys(options.catalogs);

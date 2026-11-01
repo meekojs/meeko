@@ -10,8 +10,8 @@
 	>
 		<h2 id="configuration">common y catálogos adicionales</h2>
 		<DocsCode
-			bind:code="examples.namespaces"
 			label="meeko.config.ts"
+			bind:code="examples.namespaces"
 		/>
 		<p>
 			<code>common</code>
@@ -35,8 +35,8 @@
 			<p data-output="namespace">{i18n.t('checkout.summary', { total: 3 })}</p>
 		</div>
 		<DocsCode
-			bind:code="examples.checkout"
 			label="app/locales/es/checkout.json"
+			bind:code="examples.checkout"
 		/>
 		<h2 id="keys">Organización de las claves</h2>
 		<p>

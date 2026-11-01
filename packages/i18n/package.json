@@ -2,6 +2,11 @@
   "name": "@meekojs/i18n",
   "version": "0.1.0",
   "description": "Typed localization and catalogs for Meeko.",
+  "keywords": [
+    "meeko",
+    "meeko-module"
+  ],
+  "homepage": "https://i18n.meekojs.com",
   "type": "module",
   "license": "MIT",
   "files": [

@@ -14,13 +14,13 @@
 			. El módulo i18n se distribuye de forma independiente; puedes usarlo con los componentes de tu aplicación.
 		</p>
 		<DocsCode
-			bind:code="examples.install"
 			label="Terminal"
+			bind:code="examples.install"
 		/>
 		<h2 id="configuration">Configura el módulo</h2>
 		<DocsCode
-			bind:code="examples.config"
 			label="meeko.config.ts"
+			bind:code="examples.config"
 		/>
 		<p>
 			Las rutas de los catálogos son relativas a la raíz del proyecto y deben permanecer dentro de ella.
@@ -29,12 +29,12 @@
 		</p>
 		<h2 id="catalogs">Crea los catálogos</h2>
 		<DocsCode
-			bind:code="examples.catalog"
 			label="app/locales/es.json"
+			bind:code="examples.catalog"
 		/>
 		<DocsCode
-			bind:code="examples.englishCatalog"
 			label="app/locales/en.json"
+			bind:code="examples.englishCatalog"
 		/>
 		<p>
 			Ambos idiomas declaran las mismas claves y parámetros. La estructura de

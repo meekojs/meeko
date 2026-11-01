@@ -14,22 +14,22 @@
 		aria-label="Idioma del ejemplo"
 	>
 		<UIButton
-			bind:disabled="i18n.locale === 'es'"
 			variant="outline"
+			bind:disabled="i18n.locale === 'es'"
 			on:click="() => i18n.switchLocale('es')"
 		>
 			Español
 		</UIButton>
 		<UIButton
-			bind:disabled="i18n.locale === 'en'"
 			variant="outline"
+			bind:disabled="i18n.locale === 'en'"
 			on:click="() => i18n.switchLocale('en')"
 		>
 			English
 		</UIButton>
 		<UIButton
-			bind:disabled="i18n.locale === 'ar'"
 			variant="outline"
+			bind:disabled="i18n.locale === 'ar'"
 			on:click="() => i18n.switchLocale('ar')"
 		>
 			العربية
@@ -45,9 +45,9 @@
 				params="id, describedBy"
 			>
 				<UIInput
+					model="name"
 					bind:id="id"
 					bind:describedBy="describedBy"
-					model="name"
 				/>
 			</snippet>
 		</UIField>
@@ -83,10 +83,10 @@
 	<section
 		class="translation-result"
 		aria-label="Resultado traducido"
-		bind:lang="i18n.locale"
-		bind:dir="i18n.locale === 'ar' ? 'rtl' : 'ltr'"
 		aria-live="polite"
 		aria-atomic="true"
+		bind:lang="i18n.locale"
+		bind:dir="i18n.locale === 'ar' ? 'rtl' : 'ltr'"
 	>
 		<p data-output="greeting">{i18n.t('greeting', { name: name.value })}</p>
 		<p data-output="plural">{i18n.t('cart.items', { total: total.value })}</p>

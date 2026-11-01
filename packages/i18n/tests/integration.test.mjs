@@ -45,7 +45,8 @@ test("external module generates typed keys, builds SSR, and removes its types wh
     await put("package.json", '{"type":"module","private":true}');
     await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
     await symlink(packageRoot, join(root, "node_modules", "@meekojs", "i18n"), "junction");
-    await put("meeko.config.mjs", 'export default { modules: [["@meekojs/i18n/module", { defaultLocale: "es", catalogs: { es: "es.json" } }]] };');
+    // The documented form since Meeko 1.8: the module by its name, its options in its configKey.
+    await put("meeko.config.mjs", 'export default { modules: ["@meekojs/i18n"], i18n: { defaultLocale: "es", catalogs: { es: "es.json" } } };');
     await put("es.json", '{"hello":"Hola {name}"}');
     await put("app/pages/index.meeko", '<script lang="ts">const { t } = useI18n();</script><template><h1>{t("hello", { name: "Meeko" })}</h1></template>');
     await run("check");
@@ -61,8 +62,17 @@ test("external module generates typed keys, builds SSR, and removes its types wh
     assert.match(await readFile(types, "utf8"), /hello/);
     assert.match(await readFile(types, "utf8"), /readonly "name"/);
     await put("en.json", '{"hello":"Hello {user}"}');
-    await put("meeko.config.mjs", 'export default { modules: [["@meekojs/i18n/module", { defaultLocale: "es", catalogs: { es: "es.json", en: "en.json" } }]] };');
+    await put("meeko.config.mjs", 'export default { modules: ["@meekojs/i18n"], i18n: { defaultLocale: "es", catalogs: { es: "es.json", en: "en.json" } } };');
     await assert.rejects(run("check"), /different parameters/);
+    await put("en.json", '{"hello":"Hello {name}"}');
+    // meeko check types the i18n key with the module's augmentation, loaded by .meeko/types/config.d.ts.
+    await rm(join(root, "meeko.config.mjs"));
+    await put("meeko.config.ts", 'import { defineMeekoConfig } from "@meekojs/meeko/framework";\nexport default defineMeekoConfig({ modules: ["@meekojs/i18n"], i18n: { defaultLocale: "es", catalogs: { es: "es.json" }, directions: { es: "down" } } });\n');
+    await assert.rejects(run("check"), /meeko\.config\.ts:2:\d+ TS2322: Type '"down"' is not assignable to type '"ltr" \| "rtl"'/);
+    assert.match(await readFile(join(root, ".meeko", "types", "config.d.ts"), "utf8"), /import type \{\} from "@meekojs\/i18n\/module";/);
+    await put("meeko.config.ts", 'import { defineMeekoConfig } from "@meekojs/meeko/framework";\nexport default defineMeekoConfig({ modules: ["@meekojs/i18n"], i18n: { defaultLocale: "es", catalogs: { es: "es.json" }, directions: { es: "rtl" } } });\n');
+    await run("check");
+    await rm(join(root, "meeko.config.ts"));
     await put("meeko.config.mjs", 'export default {};');
     await put("app/pages/index.meeko", '<template><h1>Ready</h1></template>');
     await run("check");

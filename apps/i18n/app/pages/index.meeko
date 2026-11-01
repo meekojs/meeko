@@ -32,9 +32,9 @@
 						params="id, describedBy"
 					>
 						<UIInput
+							model="name"
 							bind:id="id"
 							bind:describedBy="describedBy"
-							model="name"
 						/>
 					</snippet>
 				</UIField>

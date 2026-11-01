@@ -1,30 +1,23 @@
-import i18n from '@meekojs/i18n/module'
 import { defineMeekoConfig } from '@meekojs/meeko/framework'
-import ui from '@meekojs/ui'
-import docs from 'meeko-docs'
 import { docsTheme } from 'meeko-docs/theme'
 
 export default defineMeekoConfig({
 	theme: { default: 'dark' },
 	viewTransitions: true,
-	modules: [
-		ui,
-		docs,
-		[
-			i18n,
-			{
-				defaultLocale: 'es',
-				catalogs: {
-					es: { common: 'app/locales/es/common.json', checkout: 'app/locales/es/checkout.json' },
-					en: { common: 'app/locales/en/common.json', checkout: 'app/locales/en/checkout.json' },
-					ar: { common: 'app/locales/ar/common.json', checkout: 'app/locales/ar/checkout.json' },
-				},
-				routes: { '/namespaces': ['checkout'] },
-				directions: { ar: 'rtl' },
-			},
-		],
-	],
+	modules: ['@meekojs/ui', 'meeko-docs', '@meekojs/i18n'],
 	ui: docsTheme,
+	// site: la moderación y los avisos del dashboard (DATABASE_URL, opcional).
+	docs: { site: 'i18n' },
+	i18n: {
+		defaultLocale: 'es',
+		catalogs: {
+			es: { common: 'app/locales/es/common.json', checkout: 'app/locales/es/checkout.json' },
+			en: { common: 'app/locales/en/common.json', checkout: 'app/locales/en/checkout.json' },
+			ar: { common: 'app/locales/ar/common.json', checkout: 'app/locales/ar/checkout.json' },
+		},
+		routes: { '/namespaces': ['checkout'] },
+		directions: { ar: 'rtl' },
+	},
 	document: {
 		lang: 'es',
 		head: {

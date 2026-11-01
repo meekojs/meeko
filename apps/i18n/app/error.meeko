@@ -5,8 +5,8 @@
 <template>
 	<DocsPage
 		product="Meeko i18n"
-		bind:title="props.status === 404 ? 'Esta página no existe' : 'No pudimos cargar la página'"
 		description="Vuelve a la documentación de i18n para continuar."
+		bind:title="props.status === 404 ? 'Esta página no existe' : 'No pudimos cargar la página'"
 	>
 		<div class="error-page">
 			<p>Comprueba la dirección o elige una guía del menú.</p>

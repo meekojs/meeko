@@ -14,12 +14,12 @@
 			. Cada argumento requerido admite string, number o boolean; un valor requerido no puede ser null ni undefined.
 		</p>
 		<DocsCode
-			bind:code="examples.catalog"
 			label="Catálogo JSON"
+			bind:code="examples.catalog"
 		/>
 		<DocsCode
-			bind:code="examples.types"
 			label="Llamadas válidas y errores esperados"
+			bind:code="examples.types"
 		/>
 		<h2 id="contracts">El mismo contrato entre idiomas</h2>
 		<p>

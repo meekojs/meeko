@@ -18,8 +18,8 @@
 			. Los idiomas sin override usan LTR.
 		</p>
 		<DocsCode
-			bind:code="examples.rtl"
 			label="Configuración y CSS"
+			bind:code="examples.rtl"
 		/>
 		<h2 id="layout">Propiedades lógicas</h2>
 		<p>

@@ -16,7 +16,9 @@
 		"@meekojs/i18n": "workspace:*",
 		"@meekojs/meeko": "workspace:*",
 		"@meekojs/ui": "workspace:*",
-		"meeko-docs": "workspace:*"
+		"meeko-docs": "workspace:*",
+		"meeko-docs-content": "workspace:*",
+		"pg": "8.23.1"
 	},
 	"devDependencies": {
 		"@meekojs/eslint-plugin": "workspace:*",

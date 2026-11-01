@@ -31,8 +31,8 @@
 		</p>
 		<h2 id="helpers">Utilidades de URL</h2>
 		<DocsCode
-			bind:code="examples.paths"
 			label="Imports explícitos"
+			bind:code="examples.paths"
 		/>
 		<p>
 			<code>localeOf</code>

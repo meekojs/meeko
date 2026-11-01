@@ -9,8 +9,8 @@
 	>
 		<h2 id="commands">Comprobaciones del proyecto</h2>
 		<DocsCode
-			bind:code="examples.check"
 			label="Terminal"
+			bind:code="examples.check"
 		/>
 		<p>
 			El módulo valida los catálogos al preparar la aplicación y genera las claves y los parámetros.

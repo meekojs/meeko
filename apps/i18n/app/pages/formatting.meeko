@@ -9,8 +9,8 @@
 	>
 		<h2 id="formatters">number y date</h2>
 		<DocsCode
-			bind:code="examples.format"
 			label="Dentro de un componente"
+			bind:code="examples.format"
 		/>
 		<p>
 			<code>number</code>
