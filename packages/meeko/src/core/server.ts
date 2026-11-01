@@ -30,11 +30,25 @@ export function rawHtml(value: string | null | undefined, tag?: string, namespac
   return tag === undefined ? value : normalizeHtmlContent(value, tag, namespace);
 }
 
-const booleanAttributes = new Set(["allowfullscreen", "async", "autofocus", "autoplay", "checked", "controls", "default", "defer", "disabled", "formnovalidate", "hidden", "inert", "ismap", "loop", "multiple", "muted", "nomodule", "novalidate", "open", "playsinline", "readonly", "required", "reversed", "selected"]);
+/**
+ * Boolean attributes of the standard: `booleanAttributeNames` of `src/shared/html-data/attribute-names.ts`,
+ * which `core` cannot import (it is the lowest layer); `tests/html-attributes.test.ts` keeps both equal.
+ */
+export const booleanAttributeNames = "allowfullscreen alpha async autofocus autoplay checked controls default defer disabled formnovalidate headingreset inert ismap itemscope loop multiple muted nomodule novalidate open playsinline readonly required reversed scoped seamless selected shadowrootclonable shadowrootcustomelementregistry shadowrootdelegatesfocus shadowrootserializable typemustmatch";
 
-/** Convierte un valor de atributo dinámico en su forma DOM; null lo elimina. */
+// Built on first use.
+let booleanAttributes: ReadonlySet<string> | undefined;
+
+/**
+ * Convierte un valor de atributo dinámico en su forma DOM; null lo elimina. Un atributo booleano
+ * del estándar (`disabled`, `open`…) se escribe vacío con un valor verdadero. `hidden`, booleano
+ * hasta `1.8` y hoy enumerado, conserva esa regla salvo con un texto no vacío, que se escribe tal
+ * cual: `"until-found"` lo oculta hasta que la búsqueda de la página lo encuentra.
+ */
 export function attributeValue(name: string, value: unknown): string | null {
+  booleanAttributes ??= new Set(booleanAttributeNames.split(" "));
   if (booleanAttributes.has(name)) return value ? "" : null;
+  if (name === "hidden") return typeof value === "string" && value !== "" ? value : value ? "" : null;
   if (value === null || value === undefined || value === false) return null;
   return String(value);
 }

@@ -1,43 +1,50 @@
 import ts from "@typescript/typescript6";
 import { createHash } from "node:crypto";
 import { basename } from "node:path";
+import { foreignContent } from "parse5";
 import postcss from "postcss";
 
 import type { EmitsDeclaration } from "./app/definitions/define-emits";
 import type { ExposeDeclaration } from "./app/definitions/define-expose";
 import type { ModelDeclaration } from "./app/definitions/define-model";
+import type { PropsPattern } from "./app/definitions/define-props";
 import type { SnippetsDeclaration } from "./app/definitions/define-snippets";
+import type { PropsDefaultsCode } from "./compiler/codegen/props";
 import type { ScriptComposables, StatementEdit } from "./compiler/composables";
 import type { Guard } from "./compiler/expressions";
 import type { GenericParameters } from "./compiler/generic";
-import type { SourceMapping } from "./compiler/mapping";
+import type { DecodedRegion, SourceMapping } from "./compiler/mapping";
 import type { CompileDiagnostic, SfcSection } from "./compiler/parser/sfc";
-import type { TemplateNode } from "./compiler/parser/template";
+import type { TemplateAttribute, TemplateNode } from "./compiler/parser/template";
+import type { IsLeaf } from "./compiler/transforms/dynamic-tag";
 import type { ScopeCandidate, ScopeTargets } from "./compiler/transforms/scope-targets";
 
-import { analyzeEmits, EmitsError } from "./app/definitions/define-emits";
+import { analyzeEmits, emitNames, EmitsError } from "./app/definitions/define-emits";
 import { analyzeExpose, ExposeError } from "./app/definitions/define-expose";
 import { analyzeModels, ModelError } from "./app/definitions/define-model";
-import { analyzePropsDeclaration, definePropsCall, definePropsInitializer, nonstandardLocalPropsInterface, PropsDefaultsError } from "./app/definitions/define-props";
-import { analyzeSnippets, SnippetsError } from "./app/definitions/define-snippets";
+import { analyzePropsDeclaration, analyzePropsPattern, componentDefaultsType, definePropsCall, definePropsInitializer, nonstandardLocalPropsInterface, propsDefaultLiteralTypes, propsDefaultsConstants, PropsDefaultsError, propsDefaultTexts } from "./app/definitions/define-props";
+import { analyzeSnippets, SnippetsError, snippetTypeParts } from "./app/definitions/define-snippets";
 import { ElementRefError, resolveElementRef, validateElementRefBinding } from "./app/definitions/use-element-ref";
 import { isTagName, isVoidTag } from "./app/runtime/dynamic-tag";
 import { emitPropName } from "./app/runtime/emits";
+import { closedAttributeValues, closedAttributeValuesOf } from "./compiler/attribute-values";
 import { emitComponentChannels } from "./compiler/codegen/channels";
 import { emitComponentProps } from "./compiler/codegen/props";
 import { emitComponentRelease } from "./compiler/codegen/release";
 import { analyzeComposables, ComposableError, conditionalComposable, freeIdentifiers, isExecutableStatement, nodeDepth } from "./compiler/composables";
 import { instrumentNode, instrumentTemplateExpression, trackedRead } from "./compiler/devtools";
+import { doubleBraces, doubleBracesMessage } from "./compiler/double-braces";
 import { isFunctionLiteral, namesOf, narrowed, rewriteLocals, unshadowed, validateExpression } from "./compiler/expressions";
 import { GenericError, genericReference, parseGeneric, sectionAttribute } from "./compiler/generic";
-import { extractSourceMappings, markSource } from "./compiler/mapping";
+import { extractSourceMappings, markSource, remapDecodedRegions } from "./compiler/mapping";
 import { scanInterpolations } from "./compiler/parser/interpolation";
 import { compileError, locate, parseSfc } from "./compiler/parser/sfc";
-import { attributeValueStart, decodeTemplateText, isCustomElementTag, parseTemplate } from "./compiler/parser/template";
-import { importedComponents, isCandidates } from "./compiler/transforms/dynamic-tag";
+import { attributeValueStart, decodeTemplateExpression, decodeTemplateText, expressionSourceOffset, isCustomElementTag, parseTemplate } from "./compiler/parser/template";
+import { branchTakes, importedComponents, isBranchCondition, isCandidates, isComponentName, isLeaves, scriptValueNames } from "./compiler/transforms/dynamic-tag";
 import { templateEventType } from "./compiler/transforms/events";
 import { layoutShiftHints } from "./compiler/transforms/layout-shift";
-import { propsReadsOnce } from "./compiler/transforms/props-reactivity";
+import { PropAliasWriteError, rewritePropAliases } from "./compiler/transforms/prop-aliases";
+import { propAliasReadsOnce, propsReadsOnce } from "./compiler/transforms/props-reactivity";
 import { scopeCss } from "./compiler/transforms/scoped-css";
 import { analyzeServerScript, bindingIdentifiers, checkClientScript } from "./compiler/transforms/server-script";
 import { elementAttributeNames, tagsAccepting } from "./shared/html-attributes";
@@ -77,6 +84,11 @@ interface ConditionBinding {
   id: number;
   expression: string;
   offset: number;
+  /**
+   * The condition built from parts of `expression`, such as the branch of `<component is>` with
+   * names (since 1.8): `map` marks each part at its own offset, as {@link AttributeBinding.build}.
+   */
+  build?: (map: (expression: string, offset: number) => string) => string;
   render: string;
   bindings: TemplateBindings;
 }
@@ -164,6 +176,8 @@ interface TagBinding {
   open: string;
   bindings: TemplateBindings;
   offset: number;
+  /** The branch of HTML tags of an `is` with component names: its tags, the names of the other branches and the tag that stands for them. */
+  branch?: { tags: readonly string[]; names: readonly string[]; fallback: string };
 }
 
 /**
@@ -202,6 +216,8 @@ interface ComponentBinding {
   ref?: RefBinding;
   /** `bind="obj"`: props from an object, before the explicit ones. */
   spread?: { expression: string; offset: number };
+  /** A branch of `<component is>` with names: a prop that the component lacks may be another branch's. */
+  branch?: true;
 }
 
 /** A `<snippet>` (or the loose content) that a parent passes to a component tag. */
@@ -306,6 +322,8 @@ interface TemplateContext {
   shadowedTags: ReadonlySet<string>;
   /** Offset of the first tag of each replaced built-in, for its MEEK106 warning. */
   shadowedUses: Map<string, number>;
+  /** Offset of the first tag of each deprecated built-in, for its MEEK121 warning. */
+  deprecatedUses: Map<string, number>;
   /** Offset of each `each:*` or `if:*` attribute that no directive reads, for its MEEK119 warning. */
   strayDirectives: Map<number, { readonly name: string; readonly directive: "if:when" | "each:of" }>;
   /** `theme` of the project, when the caller knows it; see {@link CompileOptions.theme}. */
@@ -315,8 +333,18 @@ interface TemplateContext {
    * PascalCase names. `<component is>` with one of them compiles as before, without a tag branch.
    */
   knownComponents: ReadonlySet<string>;
+  /**
+   * Names that a string literal of `is` may give (since 1.8): `knownComponents` and the values the
+   * script declares. `complete` when the caller passed the project's autoimports, so any other
+   * name is MEEK132.
+   */
+  componentNames: { readonly names: ReadonlySet<string>; readonly complete: boolean };
+  /** Component tags that are a branch of `<component is>` with names, checked by `branchTag`. */
+  branchComponents: WeakSet<TemplateNode>;
   /** Built-in components of {@link builtinComponentModules} that the template uses. */
   builtinModules: Set<string>;
+  /** Text expressions whose character references change their length; their marks use decoded positions. */
+  decodedRegions: DecodedRegion[];
 }
 
 function emptyBindings(): TemplateBindings {
@@ -367,11 +395,27 @@ export const builtinComponentModules: Readonly<Record<string, BuiltinComponentMo
 };
 
 /**
+ * `<MeekoLink>` as a component of its own (since 1.8), for `resolveComponent("MeekoLink")` and the
+ * component registry. The tag and `'MeekoLink'` in `is` compile inline and never import it.
+ */
+export const linkComponentModule: BuiltinComponentModule = { source: "src/app/components/MeekoLink/MeekoLink.meeko", specifier: "@meekojs/meeko/builtins/link", alias: "__meeko_MeekoLink" };
+
+/**
  * Meeko's own tags (`MeekoLink` and `MeekoOutlet` since 1.2, `MeekoThemeToggle` since 1.4,
  * `MeekoTeleport`, `MeekoAwait`, `MeekoPopover` and `MeekoSelect` since 1.5), which a project may
  * already use as the names of its components.
  */
 const builtinTags: readonly string[] = [linkTag, outletTag, teleportTag, ...Object.keys(builtinComponentModules)];
+
+/**
+ * Meeko's own tags deprecated since 1.8 and their replacement in `@meekojs/ui`, for the MEEK121
+ * warning. They keep working through 1.x and leave the core in 2.0.
+ */
+export const deprecatedBuiltinTags: Readonly<Record<string, string>> = {
+  MeekoPopover: "UIPopover",
+  MeekoSelect: "UISelect",
+  MeekoThemeToggle: "UIThemeToggle",
+};
 
 /** What each built-in tag is, for the MEEK106 warning of a project component with its name. */
 const builtinDescriptions: Readonly<Record<string, string>> = {
@@ -428,6 +472,22 @@ export function shadowedBuiltinTags(script: string, projectComponents: Iterable<
   }
   for (const identifier of declared) if (builtinTags.includes(identifier.text)) shadowed.add(identifier.text);
   return shadowed;
+}
+
+/**
+ * Whether `name` is an `aria-*` or `data-*` attribute that a component tag passes as a prop of
+ * that name (since 1.8), such as `aria-label` or `data-state`. In lowercase, like HTML writes them;
+ * `data-meeko*` is reserved to Meeko (MEEK032).
+ */
+function attributePropName(name: string, offset: number, context: TemplateContext): boolean {
+  if (!/^(?:aria|data)-[a-z0-9][a-z0-9._-]*$/i.test(name)) return false;
+  if (name !== name.toLowerCase()) {
+    throw compileError(context.source, context.filename, "MEEK032", `${name} se escribe en minúsculas, como en HTML: ${name.toLowerCase()}`, offset);
+  }
+  if (name.startsWith("data-meeko")) {
+    throw compileError(context.source, context.filename, "MEEK032", `${name} está reservado a Meeko: usa otro nombre de data-*`, offset);
+  }
+  return true;
 }
 
 /** A source expression of `<MeekoLink>`: `to`, `params`, `search` or `match`, at its offset. */
@@ -599,6 +659,22 @@ export interface CompileOptions {
    * @since 1.4.0
    */
   theme?: boolean;
+  /**
+   * Módulo del que se exporta `css` cuando el CSS del componente pasa por otra herramienta, como
+   * el PostCSS de Vite. Recibe el CSS que genera el compilador, con el ámbito ya aplicado, y
+   * devuelve el especificador de un módulo cuyo export por defecto es ese CSS procesado. Con
+   * `undefined`, o sin CSS, `css` es la cadena del compilador, y también cuando el módulo exporta
+   * una cadena vacía, como en un host que no procesa CSS (Vitest sin `css: true`). El plugin de Vite de Meeko lo usa
+   * en el grafo SSR y en desarrollo, para que el SSR y el prerender incrusten el CSS ya procesado y
+   * la HMR lo vuelva a aplicar; en el build de cliente de producción no lo pasa.
+   *
+   * @example
+   * ```ts
+   * compile(source, "Card.meeko", { styleModule: (css) => `/Card.meeko?style=${hash(css)}&inline&lang.css` })
+   * ```
+   * @since 1.8.0
+   */
+  styleModule?: (css: string) => string | undefined;
 }
 
 function quote(value: string): string {
@@ -618,6 +694,20 @@ function attributeValueOffset(node: TemplateNode, name: string, context: Templat
  */
 // `html` is the raw-HTML directive on elements; on a component it is never a static prop.
 const reservedStaticProps = new Set(["is", "ref", "html"]);
+
+/**
+ * The static `class` and `style` of an element that also has their `bind:` directive, by name:
+ * both write a single attribute that joins the static value and the dynamic one (since 1.8;
+ * before, SSR wrote the attribute twice and hydration failed).
+ */
+function joinedAttributes(node: TemplateNode): Map<string, string> {
+  const joined = new Map<string, string>();
+  for (const name of ["class", "style"]) {
+    const fixed = node.attrs?.find((attribute) => attribute.name === name);
+    if (fixed && node.attrs?.some((attribute) => attribute.name === `bind:${name}`)) joined.set(name, fixed.value);
+  }
+  return joined;
+}
 
 /** Whether an attribute is a `ref:name` directive. */
 function isRefDirective(attribute: { name: string }): boolean {
@@ -660,6 +750,12 @@ function templateRef(node: TemplateNode, context: TemplateContext, target: RefBi
   return ref;
 }
 
+/** Source position of `position`, a decoded position inside a text expression of {@link TemplateContext.decodedRegions}. */
+function decodedSourceOffset(context: TemplateContext, position: number): number {
+  const region = context.decodedRegions.find(({ offset, decoded }) => position >= offset && position <= offset + decoded.text.length);
+  return region ? region.offset + expressionSourceOffset(region.decoded, position - region.offset) : position;
+}
+
 /** `raw` is the source text of a text node, so every offset is a source position. */
 function textParts(raw: string, bindings: TemplateBindings, context: TemplateContext, offset: number): string[] {
   const parts: string[] = [];
@@ -668,10 +764,15 @@ function textParts(raw: string, bindings: TemplateBindings, context: TemplateCon
   for (const segment of scan.segments) {
     const staticPart = decodeTemplateText(raw.slice(cursor, segment.start));
     if (staticPart) parts.push(`__meeko.escapeHtml(${quote(staticPart)})`);
-    const expression = decodeTemplateText(segment.expression);
+    // Entities decode without markup: a `<` of the code (`{a<b&&c}`) never opens a tag.
+    const decoded = decodeTemplateExpression(segment.expression);
+    const expression = decoded.text;
     if (!expression) throw compileError(context.source, context.filename, "MEEK009", "Expresión de plantilla vacía", offset + segment.start);
     const expressionOffset = offset + segment.expressionStart;
-    validateExpression(expression, context.source, context.filename, expressionOffset);
+    // `{{ expr }}` from Vue: the inner braces would read as an object literal.
+    if (doubleBraces(expression)) throw compileError(context.source, context.filename, "MEEK020", doubleBracesMessage, offset + segment.start);
+    validateExpression(expression, context.source, context.filename, expressionOffset, (position) => expressionSourceOffset(decoded, position));
+    if (decoded.pieces.length > 1) context.decodedRegions.push({ offset: expressionOffset, decoded });
     const id = context.nextText++;
     bindings.texts.push({ id, expression, offset: expressionOffset });
     parts.push(`${quote(`<!--meeko:text:${id}-->`)} + __meeko.escapeHtml(${markSource(expression, expressionOffset)}) + ${quote(`<!--/meeko:text:${id}-->`)}`);
@@ -768,6 +869,7 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
   // A component of the project with the name of a built-in tag is that component, as in 1.1.
   const shadowed = node.componentName !== undefined && context.shadowedTags.has(node.componentName);
   if (shadowed && !context.shadowedUses.has(node.componentName!)) context.shadowedUses.set(node.componentName!, node.start);
+  if (!shadowed && node.componentName !== undefined && deprecatedBuiltinTags[node.componentName] && !context.deprecatedUses.has(node.componentName)) context.deprecatedUses.set(node.componentName, node.start);
   // `<MeekoTeleport to="#toolbar">` renders its content in another place of the document.
   if (node.componentName === teleportTag && !shadowed) return teleportRegion(node, bindings, context);
   // `<MeekoLink to="/users/[id]" bind:params="…">` is an `<a>` with a checked href.
@@ -825,6 +927,9 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
       if (!reference.trim()) throw compileError(context.source, context.filename, "MEEK030", "Un componente necesita is=\"expression\"", position);
       referenceOffset = attributeValueOffset(node, "is", context);
       validateExpression(reference, context.source, context.filename, referenceOffset);
+      // Since 1.8 a PascalCase string literal names a component, such as `to ? 'MeekoLink' : 'a'`.
+      const leaves = isLeaves(reference);
+      if (leaves.some((leaf) => leaf.literal !== undefined && isComponentName(leaf.literal))) return renderNamedIs(node, bindings, context, reference, referenceOffset, leaves);
       // `is` may give an HTML tag: an element whose tag can change, or either kind at run time. A
       // result that is a PascalCase name or a `.meeko` import is a component, as before 1.5.
       const candidates = isCandidates(reference);
@@ -866,7 +971,8 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
         if (!/^[a-zA-Z_$][\w$]*$/.test(event)) throw compileError(context.source, context.filename, "MEEK011", `Nombre de evento de componente no válido: ${event}`, attribute.start);
         name = emitPropName(event);
         nameOffset = attribute.start;
-      } else if (rawName.startsWith("bind:") && /^[a-zA-Z_$][\w$]*$/.test(rawName.slice(5))) {
+      } else if (rawName.startsWith("bind:") && (/^[a-zA-Z_$][\w$]*$/.test(rawName.slice(5)) || attributePropName(rawName.slice(5), attribute.start + 5, context))) {
+        // Since 1.8 also `bind:aria-label` and `bind:data-state`: a prop with that name.
         name = rawName.slice(5);
         nameOffset = attribute.start + 5;
       } else if (awaitZone && rawName === "for") {
@@ -874,13 +980,14 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
         name = rawName;
         nameOffset = attribute.start;
         if (!attribute.value.trim()) throw compileError(context.source, context.filename, "MEEK116", "<MeekoAwait> necesita for=\"recurso\": el resultado de useApi o useRpcQuery sin await, o una lista, como for=\"[items, stats]\"", attribute.start);
-      } else if (/^[a-zA-Z_$][\w$]*$/.test(rawName) && !reservedStaticProps.has(rawName)) {
-        // `variant="primary"` passes its text as a string literal prop, as on an HTML element.
+      } else if ((/^[a-zA-Z_$][\w$]*$/.test(rawName) && !reservedStaticProps.has(rawName)) || attributePropName(rawName, attribute.start, context)) {
+        // `variant="primary"` passes its text as a string literal prop, as on an HTML element;
+        // since 1.8 also `aria-label="Cerrar"` and `data-state="open"`.
         name = rawName;
         nameOffset = attribute.start;
         literal = true;
       } else {
-        throw compileError(context.source, context.filename, "MEEK032", "Las props de un componente se pasan con prop=\"texto\", bind:prop=\"expresión\" u on:evento=\"manejador\"; is, ref, html y los nombres con guiones no son props", attribute.start);
+        throw compileError(context.source, context.filename, "MEEK032", "Las props de un componente se pasan con prop=\"texto\", bind:prop=\"expresión\" u on:evento=\"manejador\"; is, ref, html y los nombres con guiones no son props, salvo aria-* y data-*", attribute.start);
       }
       const previous = props.find((prop) => prop.name === name);
       if (previous) {
@@ -917,7 +1024,7 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
     const id = context.nextRegion++;
     const referenceLength = outlet ? outletTag.length : shipped ? node.componentName!.length : reference.length;
     const tagLength = componentTag ? referenceLength + 1 : "<component".length;
-    bindings.components.push({ id, reference, referenceOffset, ...(outlet || shipped ? { referenceLength } : {}), props, models, snippets, offset: position, tagLength, ...(ref ? { ref } : {}), ...(spread ? { spread } : {}) });
+    bindings.components.push({ id, reference, referenceOffset, ...(outlet || shipped ? { referenceLength } : {}), props, models, snippets, offset: position, tagLength, ...(ref ? { ref } : {}), ...(spread ? { spread } : {}), ...(context.branchComponents.has(node) ? { branch: true as const } : {}) });
     const entry = bindings.components.at(-1)!;
     const tagReference = narrowed(markSource(reference, referenceOffset, referenceLength), context.guards);
     const mappedProps = [
@@ -982,6 +1089,12 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
   const explicit: SpreadBinding["explicit"] = {};
   /** Where the spread's attributes go: at `bind` or at the explicit class or style before it. */
   let spreadIndex: number | undefined;
+  // Since 1.8 `meeko check` and the editor check the value of an attribute with closed values in
+  // the HTML data, such as `type` of `<button>`: a string literal outside them is MEEK122, a warning.
+  const htmlTag = !custom && node.namespaceURI !== "http://www.w3.org/2000/svg";
+  const checksValue = (name: string): boolean => context.narrow && htmlTag && closedAttributeValues(tag, name) !== undefined;
+  const checkedValue = (code: string, name: string): string => checksValue(name) ? `__meeko.checkAttributeValue<${quote(tag)}, ${quote(name)}>()(${code})` : code;
+  const joined = spread ? new Map<string, string>() : joinedAttributes(node);
   for (const attr of node.attrs ?? []) {
     if (attr === spreadDirective) spreadIndex ??= attrs.length;
     if (isRefDirective(attr) || attr === modelAttribute || attr === htmlAttribute || attr === spreadDirective) continue;
@@ -1004,21 +1117,42 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
       validateExpression(attr.value, context.source, context.filename, offset);
       bindings.events.push({ id, name, expression: attr.value, offset, tag, svg: node.namespaceURI === "http://www.w3.org/2000/svg" });
     } else if (attr.name.startsWith("bind:")) {
-      const name = attr.name.slice(5);
-      if (!/^[a-z][a-z0-9:.-]*$/.test(name) || name.startsWith("on")) {
-        throw compileError(context.source, context.filename, "MEEK012", `Atributo dinámico no válido: ${name}`, context.templateOffset + (node.sourceCodeLocation?.startOffset ?? 0));
+      const lowercase = attr.name.slice(5);
+      if (!/^[a-z][a-z0-9:.-]*$/.test(lowercase) || lowercase.startsWith("on")) {
+        throw compileError(context.source, context.filename, "MEEK012", `Atributo dinámico no válido: ${lowercase}`, context.templateOffset + (node.sourceCodeLocation?.startOffset ?? 0));
       }
+      // parse5 lowercases every attribute name; in <svg> and <math>, `bind:viewBox` keeps its case, as `viewBox` does.
+      const name = foreignAttributeName(lowercase, node.namespaceURI);
       const offset = attributeValueOffset(node, attr.name, context);
       validateExpression(attr.value, context.source, context.filename, offset);
       const id = mark();
       excluded.add(name);
+      const fixed = joined.get(name);
+      if (fixed !== undefined) {
+        // The static class or style and this directive write one attribute, in SSR as in the browser.
+        const value = attr.value;
+        const build = (map: (expression: string, offset: number) => string): string => `__meeko.joinAttribute(${quote(name)}, ${quote(fixed)}, ${map(value, offset)})`;
+        bindings.attributes.push({ id, name, expression: value, offset, build });
+        attrs.push({ kind: "dynamic", expression: `__meeko.renderAttribute(${quote(name)}, ${build((expression, at) => markSource(expression, at))})` });
+        continue;
+      }
       bindings.attributes.push({ id, name, expression: attr.value, offset });
-      attrs.push({ kind: "dynamic", expression: `__meeko.renderAttribute(${quote(name)}, ${markSource(attr.value, offset)})` });
+      attrs.push({ kind: "dynamic", expression: `__meeko.renderAttribute(${quote(name)}, ${checkedValue(markSource(attr.value, offset), name)})` });
     } else if (attr.name.startsWith(":")) {
       throw compileError(context.source, context.filename, "MEEK012", `Directiva de plantilla no admitida: ${attr.name}`, context.templateOffset + (node.sourceCodeLocation?.startOffset ?? 0));
+    } else if (joined.has(attr.name)) {
+      // Written by its `bind:` directive, joined with the dynamic value.
+      excluded.add(attr.name);
     } else {
       excluded.add(attr.name);
-      attrs.push({ kind: "static", value: ` ${attr.name}="${escapeAttribute(attr.value)}"` });
+      const valueStart = attributeValueStart(context.source, attr);
+      const text = ` ${attr.name}="${escapeAttribute(attr.value)}"`;
+      if (valueStart !== undefined && checksValue(attr.name)) {
+        // Only in the code of the type check: the text stays, and its value is checked (MEEK122).
+        const quoted = /["']/.test(context.source[valueStart - 1] ?? "");
+        const literal = markSource(quote(attr.value), quoted ? valueStart - 1 : valueStart, attr.value.length + (quoted ? 2 : 0));
+        attrs.push({ kind: "dynamic", expression: `(${checkedValue(literal, attr.name)}, ${quote(text)})` });
+      } else attrs.push({ kind: "static", value: text });
     }
   }
   if (spread) {
@@ -1100,7 +1234,7 @@ function isPropName(name: string): boolean {
  * written while the current tag accepts them, according to the HTML data. With a component, the
  * same attributes are its props, events, models and `bind="obj"`.
  */
-function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, context: TemplateContext, reference: string, referenceOffset: number, literals: ReadonlyArray<{ tag: string; offset: number }> | undefined): string {
+function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, context: TemplateContext, reference: string, referenceOffset: number, literals: ReadonlyArray<{ tag: string; offset: number }> | undefined, branch?: TagBinding["branch"]): string {
   const fail = (code: string, message: string, offset: number): never => { throw compileError(context.source, context.filename, code, message, offset); };
   const mixed = literals === undefined;
   // Inside <svg> or <math>, `is` only admits components: an HTML tag would not belong there.
@@ -1117,6 +1251,10 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
   const tags = literals ? [...new Set(literals.map((literal) => literal.tag))] : allTagNames;
   const element = context.nextElement++;
   const tagVariable = `__meeko_tag_${element}`;
+  // Since 1.8, as on an element: the value of an attribute with closed values is checked against
+  // those of the possible tags (MEEK122), only in the code of the type check.
+  const checksTagValue = (name: string): boolean => context.narrow && !foreign && closedAttributeValuesOf(tags, name) !== undefined;
+  const checkedTagValue = (code: string, name: string): string => checksTagValue(name) ? `__meeko.checkAttributeValue<typeof ${tagVariable}, ${quote(name)}>()(${code})` : code;
   /** The element's own bindings, which a new tag hydrates again. */
   const own = emptyBindings();
   /** SSR code of the attributes of the opening tag. */
@@ -1154,6 +1292,8 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
     if (previous) fail(previous.literal || prop.literal ? "MEEK090" : "MEEK048", `${previous.attribute} y ${prop.attribute} pasan los dos la prop ${prop.name}; deja sólo uno`, at);
     props.push(prop);
   };
+  // With a tag only, the static class or style and its `bind:` directive write one attribute, as on an element.
+  const joined = spread || mixed ? new Map<string, string>() : joinedAttributes(node);
   for (const attribute of node.attrs ?? []) {
     if (attribute === spreadDirective || (spread && /^(?:bind:)?(?:class|style)$/.test(attribute.name))) spreadIndex ??= parts.length;
     if (attribute.name === "is" || isRefDirective(attribute) || attribute === spreadDirective) continue;
@@ -1208,8 +1348,17 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
         excluded.add(attributeName);
         const accepts = accepting(attributeName, attribute, rawName.length);
         const value = attribute.value;
-        own.attributes.push({ id: element, name: attributeName, expression: value, offset, ...(accepts ? { build: (map: (expression: string, offset: number) => string) => `${accepts} ? (${map(value, offset)}) : undefined` } : {}) });
-        parts.push(`__meeko.renderAttribute(${quote(attributeName)}, ${accepts ? `${accepts} ? (${markSource(value, offset)}) : undefined` : markSource(value, offset)})`);
+        const fixed = joined.get(attributeName);
+        if (fixed !== undefined) {
+          // `class` and `style` are global: every tag accepts them, so there is no `accepts` check.
+          const build = (map: (expression: string, offset: number) => string): string => `__meeko.joinAttribute(${quote(attributeName)}, ${quote(fixed)}, ${map(value, offset)})`;
+          own.attributes.push({ id: element, name: attributeName, expression: value, offset, build });
+          parts.push(`__meeko.renderAttribute(${quote(attributeName)}, ${build((expression, at) => markSource(expression, at))})`);
+        } else {
+          own.attributes.push({ id: element, name: attributeName, expression: value, offset, ...(accepts ? { build: (map: (expression: string, offset: number) => string) => `${accepts} ? (${map(value, offset)}) : undefined` } : {}) });
+          const checked = checkedTagValue(markSource(value, offset), attributeName);
+          parts.push(`__meeko.renderAttribute(${quote(attributeName)}, ${accepts ? `${accepts} ? (${checked}) : undefined` : checked})`);
+        }
       }
       if (prop) addProp({ name: propName, nameOffset: attribute.start + 5, nameLength: propName.length, attribute: rawName, expression: attribute.value, offset }, attribute.start);
       else only("tag", rawName, attribute, rawName.length);
@@ -1217,10 +1366,16 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
     }
     if (name.startsWith(":")) fail("MEEK012", `Directiva de plantilla no admitida: ${name}`, attribute.start);
     if (spread && (name === "class" || name === "style")) explicit[name] = { code: quote(attribute.value) };
+    else if (joined.has(name)) excluded.add(name);
     else {
       excluded.add(name);
       const accepts = accepting(name, attribute, rawName.length);
-      const text = quote(` ${name}="${escapeAttribute(attribute.value)}"`);
+      let text = quote(` ${name}="${escapeAttribute(attribute.value)}"`);
+      const valueStart = attributeValueStart(context.source, attribute);
+      if (valueStart !== undefined && checksTagValue(name)) {
+        const quoted = /["']/.test(context.source[valueStart - 1] ?? "");
+        text = `(${checkedTagValue(markSource(quote(attribute.value), quoted ? valueStart - 1 : valueStart, attribute.value.length + (quoted ? 2 : 0)), name)}, ${text})`;
+      }
       parts.push(accepts ? `(${accepts} ? ${text} : "")` : text);
     }
     if (!mixed) continue;
@@ -1244,11 +1399,12 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
   }
   const open = [quote("<"), tagVariable, ...parts, quote(">")].join(" + ");
   const close = `__meeko.closeTag(${tagVariable})`;
-  const value = narrowed(markSource(reference, referenceOffset), context.guards);
+  // The tags of a branch need no guard: their type does not depend on it (see `branchValue`).
+  const value = branch && context.narrow ? branchValue(reference, branch, true) : narrowed(branchValue(markSource(reference, referenceOffset), branch, context.narrow), context.guards);
   const htmlContent = html ? [`__meeko.rawHtml(${htmlValue(html, context)}, ${tagVariable})`] : [];
   if (!mixed) {
     const inner = htmlContent.length ? htmlContent : (node.childNodes ?? []).map((child) => renderNode(child, bindings, context));
-    bindings.tags.push({ element, reference, referenceOffset, tagVariable, content, open, bindings: own, offset: node.start });
+    bindings.tags.push({ element, reference, referenceOffset, tagVariable, content, open, bindings: own, offset: node.start, ...(branch ? { branch } : {}) });
     return `__meeko.renderElementTag(${value}, (${tagVariable}) => ${[open, ...inner, close].join(" + ")}, ${content})`;
   }
   // The children are the component's snippets; the element renders the `default` one.
@@ -1269,6 +1425,138 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
     snippets.map((snippet) => conditionalSnippet(`__meeko.snippet(${snippetParameters(snippet)} => ${snippet.render})`, snippet.condition && markSource(snippet.condition.expression, snippet.condition.offset))));
   const elementContent = htmlContent.length ? htmlContent : fallback ? [`__meeko.renderSnippet(${contentRegion}, __meeko.snippet(() => ${fallback.render}), [])`] : [];
   return `__meeko.renderDynamic(${id}, ${value}, (${tagVariable}) => ${[open, ...elementContent, close].join(" + ")}, (${componentVariable}) => __meeko.renderComponent<any>(${id}, ${componentVariable}, ${input}, __meeko_transfer), ${content}, ${foreign})`;
+}
+
+/**
+ * The name of a `bind:` attribute as the HTML parser writes the static one: in SVG and MathML,
+ * with the case of the standard (`viewBox`, `preserveAspectRatio`, `definitionURL`), from the
+ * tables of parse5. Elsewhere, and for any other name, the lowercase name.
+ */
+function foreignAttributeName(name: string, namespace: string | undefined): string {
+  const svg = namespace === "http://www.w3.org/2000/svg";
+  if (!svg && namespace !== "http://www.w3.org/1998/Math/MathML") return name;
+  const token = { attrs: [{ name, value: "" }] } as unknown as Parameters<typeof foreignContent.adjustTokenSVGAttrs>[0];
+  if (svg) foreignContent.adjustTokenSVGAttrs(token);
+  else foreignContent.adjustTokenMathMLAttrs(token);
+  return token.attrs[0]!.name;
+}
+
+/**
+ * The value of `is` in its branch of HTML tags, without the component names of the other branches.
+ * `meeko check` reads the type of its tags instead: behind the condition of the branch, the
+ * conditions of `is` itself would be narrowed against themselves (TS2367), and every other part of
+ * the expression is checked by the conditions of the regions and the literals by the compiler.
+ */
+function branchValue(code: string, branch: TagBinding["branch"], narrow: boolean): string {
+  if (!branch) return code;
+  return narrow ? `(null! as ${branch.tags.map(quote).join(" | ")})` : `__meeko.tagBranch(${code}, ${JSON.stringify(branch.names)}, ${quote(branch.fallback)})`;
+}
+
+/** Meeko's own tags that `is` cannot name: they render no element or component of their own. */
+const unnamedBuiltins = new Set([outletTag, teleportTag]);
+
+/** A branch of `<component is>` with names: `<MeekoLink>`, a component, or the HTML tags of `is`. */
+type IsBranch = { kind: "link" | "component"; name: string; leaves: IsLeaf[] } | { kind: "tags"; leaves: IsLeaf[] };
+
+/**
+ * `<component is>` whose expression gives component names as string literals (since 1.8), such as
+ * `to ? 'MeekoLink' : href ? 'a' : 'button'`. Each name is resolved at compile time, as its tag
+ * would be: one `if:when` region per name, whose condition is the path of `?:` to its literals,
+ * plus one region for the HTML tags, an element whose tag changes. SSR, hydration and updates are
+ * those of `if:when`, and `meeko check` checks each branch behind its condition, which narrows it.
+ *
+ * Each attribute goes to the branches that take it: `to`, `params`, `search` and `match` to
+ * `<MeekoLink>`, with the other attributes of its `<a>` except `href`; the attributes of the HTML
+ * data to the tags that accept them; and every prop to the components, whose check tolerates the
+ * props of other branches. An attribute that no branch takes is MEEK112 in `meeko check`.
+ */
+function renderNamedIs(node: TemplateNode, bindings: TemplateBindings, context: TemplateContext, reference: string, referenceOffset: number, leaves: readonly IsLeaf[]): string {
+  const fail = (code: string, message: string, offset: number): never => { throw compileError(context.source, context.filename, code, message, offset); };
+  const names = new Map<string, IsLeaf[]>();
+  const rest: IsLeaf[] = [];
+  for (const leaf of leaves) {
+    const at = referenceOffset + leaf.offset;
+    const name = leaf.literal;
+    if (name === undefined) {
+      fail("MEEK132", `con nombres de componente entre comillas, cada resultado de is es un literal: una etiqueta HTML en minúscula, como 'a', o un componente en PascalCase, como 'MeekoLink'; ${reference.slice(leaf.offset, leaf.offset + leaf.length).trim()} no lo es`, at);
+      continue;
+    }
+    if (!isComponentName(name)) {
+      rest.push(leaf);
+      continue;
+    }
+    const shadowed = context.shadowedTags.has(name);
+    if (!shadowed && unnamedBuiltins.has(name)) fail("MEEK132", `is no admite '${name}': <${name}> no renderiza un elemento ni un componente propio; los nombres de is son 'MeekoLink' y los componentes importados o autoimportados`, at);
+    const known = (name === linkTag && !shadowed) || (!shadowed && builtinComponentModules[name] !== undefined) || context.componentNames.names.has(name);
+    if (!known && context.componentNames.complete) {
+      fail("MEEK132", `'${name}' no es una etiqueta HTML ni un componente conocido: las etiquetas van en minúscula, como 'button', y los componentes en PascalCase, importados o autoimportados, como 'MeekoLink' o 'UICard'`, at);
+    }
+    names.set(name, [...names.get(name) ?? [], leaf]);
+  }
+  const branches: IsBranch[] = [...names].map(([name, list]) => ({ kind: name === linkTag && !context.shadowedTags.has(name) ? "link" : "component", name, leaves: list }));
+  if (rest.length) branches.push({ kind: "tags", leaves: rest });
+  const tags = [...new Set(rest.map((leaf) => leaf.literal!))];
+  const attrs = (node.attrs ?? []).filter((attribute) => attribute.name !== "is");
+  const ref = attrs.find(isRefDirective);
+  if (ref && branches.length > 1) {
+    fail("MEEK052", "ref: no se admite en <component is> con varios nombres entre comillas: cada rama es un elemento o componente distinto; pon la ref en cada rama con if:when", ref.start);
+  }
+  const rawNameOf = (attribute: TemplateAttribute): string => /^[^\s=]+/.exec(context.source.slice(attribute.start, attribute.end))?.[0] ?? attribute.name;
+  const forElement = (attribute: TemplateAttribute, link: boolean): boolean => branchTakes(attribute, rawNameOf(attribute), link ? { kind: "link" } : { kind: "tags", tags });
+  const forComponent = (attribute: TemplateAttribute): boolean => branchTakes(attribute, rawNameOf(attribute), { kind: "component" });
+  const elementBranches = branches.filter((branch) => branch.kind !== "component");
+  const componentBranches = branches.filter((branch): branch is Extract<IsBranch, { name: string }> => branch.kind === "component");
+  const elementTakes = (attribute: TemplateAttribute): boolean => elementBranches.some((branch) => forElement(attribute, branch.kind === "link"));
+  /** `meeko check`: an attribute that no branch takes, by its prop name, against the components' props. */
+  const checks: string[] = [];
+  const componentsCode = componentBranches.length
+    ? `[${componentBranches.map((branch) => (!context.shadowedTags.has(branch.name) && builtinComponentModules[branch.name]?.alias) || branch.name).join(", ")}][0]!`
+    : "undefined!";
+  for (const attribute of attrs) {
+    const raw = rawNameOf(attribute);
+    if (isRefDirective(attribute) || attribute.name === "bind" || elementTakes(attribute)) continue;
+    if (raw === "model" || raw.startsWith("model:")) {
+      if (!componentBranches.length) fail("MEEK112", "model no se admite en <component is> sin componentes: los modelos son de los componentes; usa un control de formulario con model", attribute.start);
+      continue;
+    }
+    if (attribute.name === "html") fail("MEEK112", "html sólo vale si is es una etiqueta HTML, y este is sólo da componentes", attribute.start);
+    if (raw.startsWith("on:") && !componentBranches.length) fail("MEEK011", `Nombre de evento no válido: ${raw.slice(3)}`, attribute.start);
+    if (!context.narrow) continue;
+    const prop = raw.startsWith("on:") ? emitPropName(raw.slice(3)) : raw.startsWith("bind:") ? raw.slice(5) : raw;
+    checks.push(`(__meeko.checkBranchAttribute(${quote(prop)}, () => ${componentsCode}, ${markSource("true", attribute.start, raw.length)}), "")`);
+  }
+  // Named `<snippet>` blocks are a component's; an element renders the loose content.
+  const elementChildren = (node.childNodes ?? []).filter((child) => child.tagName !== "snippet");
+  const branchNode = (branch: IsBranch): TemplateNode => {
+    if (branch.kind === "tags") return { ...node, attrs: attrs.filter((attribute) => forElement(attribute, false)), childNodes: elementChildren };
+    // The tag starts at the opening quote of the name: its errors and the tag check map to the literal.
+    const own: TemplateNode = { ...node, nodeName: branch.name, tagName: branch.name, componentName: branch.name, start: referenceOffset + branch.leaves[0]!.offset };
+    if (branch.kind === "link") return { ...own, attrs: attrs.filter((attribute) => forElement(attribute, true)), childNodes: elementChildren };
+    const component: TemplateNode = { ...own, attrs: attrs.filter(forComponent) };
+    context.branchComponents.add(component);
+    return component;
+  };
+  const renderBranch = (branch: IsBranch, target: TemplateBindings): string => branch.kind === "tags"
+    ? renderDynamicTag(branchNode(branch), target, context, reference, referenceOffset, branch.leaves.map((leaf) => ({ tag: leaf.literal!, offset: leaf.offset })), { tags, names: [...names.keys()], fallback: tags[0]! })
+    : renderNodeContent(branchNode(branch), target, context);
+  if (branches.length === 1) return [...checks, renderBranch(branches[0]!, bindings)].join(" + ");
+  /** `!!(c1) && !(c2)`: the conditions of `?:` that lead to one of the literals of the branch. */
+  const conditionOf = (list: readonly IsLeaf[]) => (map: (expression: string, offset: number) => string): string =>
+    isBranchCondition(list, (text, offset) => map(text, referenceOffset + offset));
+  const regions = branches.map((branch) => {
+    const build = conditionOf(branch.leaves);
+    const inner = emptyBindings();
+    const outerGuards = context.guards;
+    const guards = context.narrow ? [...outerGuards, { code: build(markSource), names: namesOf(reference) }] : outerGuards;
+    context.guards = guards;
+    let html: string;
+    try { html = narrowed(renderBranch(branch, inner), guards); }
+    finally { context.guards = outerGuards; }
+    const id = context.nextRegion++;
+    bindings.regions.push({ kind: "condition", id, expression: reference, offset: referenceOffset, build, render: html, bindings: inner });
+    return `__meeko.renderIf(${id}, ${markSource(`(${build(markSource)})`, referenceOffset, reference.length)}, () => ${html})`;
+  });
+  return [...checks, ...regions].join(" + ");
 }
 
 /** `bind="obj"` on a tag: the expression of the object, which must be there. */
@@ -1416,7 +1704,7 @@ function componentTagCall(entry: ComponentBinding, reference: string, props: str
   const events = entry.props.filter((prop) => prop.name.startsWith("on")).map((prop) => `${markSource(quote(prop.name), prop.nameOffset, prop.nameLength)}: true`);
   const modelEntries = entry.models.map((model, index) => `${markSource(quote(model.name), model.nameOffset, model.nameLength)}: ${models[index]}`);
   const snippetEntries = entry.snippets.map((snippet, index) => `${markSource(quote(snippet.name), snippet.nameOffset, snippet.nameLength)}: ${snippets[index]}`);
-  return `__meeko.componentTag(() => ${reference})(${props}, ${channel(events)}, ${channel(modelEntries)}, ${channel(snippetEntries)})`;
+  return `__meeko.${entry.branch ? "branchTag" : "componentTag"}(() => ${reference})(${props}, ${channel(events)}, ${channel(modelEntries)}, ${channel(snippetEntries)})`;
 }
 
 /** Parameter list of a snippet's render function, mapped to its `params` attribute. */
@@ -1475,6 +1763,14 @@ function compileSnippet(nodes: readonly TemplateNode[], context: TemplateContext
 }
 
 /**
+ * Valid `name` of a `<snippet>`: an identifier, optionally followed by hyphen-joined segments of
+ * identifier characters (`title`, `cell-email`, `header-created-at`, `cell-2024`). The name is a
+ * property key of the child's snippets, so dynamic names from a mapped type over a generic, such
+ * as `` `cell-${K}` ``, can be filled; a trailing or doubled hyphen is rejected.
+ */
+const snippetNamePattern = /^[A-Za-z_$][\w$]*(?:-[\w$]+)*$/;
+
+/**
  * Children of a component tag: each `<snippet name params>` fills a named snippet and the rest of
  * the content, if it is not only whitespace and comments, fills `default`.
  */
@@ -1492,7 +1788,7 @@ function componentSnippets(node: TemplateNode, context: TemplateContext, default
     }
     const nameAttribute = child.attrs?.find((attribute) => attribute.name === "name");
     const name = nameAttribute?.value.trim() ?? "";
-    if (!nameAttribute || !/^[A-Za-z_$][\w$]*$/.test(name)) fail("<snippet> necesita name=\"identifier\", el snippet del hijo que llena", nameAttribute?.start ?? child.start);
+    if (!nameAttribute || !snippetNamePattern.test(name)) fail("<snippet> necesita name con el nombre del snippet del hijo que llena: un identificador o segmentos unidos por guiones, como name=\"title\" o name=\"cell-email\"", nameAttribute?.start ?? child.start);
     const nameOffset = attributeValueOffset(child, "name", context);
     if (named.some((other) => other.entry.name === name)) fail(`El snippet ${name} ya está lleno`, nameOffset);
     const paramsAttribute = child.attrs?.find((attribute) => attribute.name === "params");
@@ -1592,7 +1888,7 @@ interface ScriptParts {
   declarations: ReadonlyMap<string, number>;
   propsType: string;
   propsTypeOffset: number | undefined;
-  defaults?: { expression: string; offset: number; keys: readonly string[] };
+  defaults?: PropsDefaultsCode;
   emits?: { type: string; offset: number };
   exposed: boolean;
   /** Refs that the script reads with `useElementRef`, by name. */
@@ -1606,8 +1902,12 @@ interface ScriptParts {
   /** The synchronous setup has a data `await` (`await useApi`, `await useRpcQuery`). */
   dataAwait: boolean;
   warnings: CompileDiagnostic[];
-  /** Name of the `defineProps` binding. */
+  /** Name of the `defineProps` binding; `__meeko_props` when the script destructures it. */
   propsName?: string;
+  /** Names of a destructured `defineProps`, by local name, with the prop each one reads. */
+  propAliases?: ReadonlyMap<string, string>;
+  /** Default values of `defineProps` as written, by prop, for `ComponentDefaults`. */
+  defaultTexts?: ReadonlyMap<string, string>;
   /** The setup returns `__meeko_borrowed`: signals of `defineModel` or of a destructuring, which state snapshots skip. */
   borrows: boolean;
 }
@@ -1742,9 +2042,6 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
     let initializer = declaration.initializer;
     while (initializer && (ts.isParenthesizedExpression(initializer) || ts.isAwaitExpression(initializer) || ts.isAsExpression(initializer) || ts.isSatisfiesExpression(initializer) || ts.isNonNullExpression(initializer))) initializer = initializer.expression;
     const callee = initializer && ts.isCallExpression(initializer) && ts.isIdentifier(initializer.expression) ? initializer.expression.text : undefined;
-    if (callee === "defineProps") {
-      throw compileError(source, filename, "MEEK015", "defineProps no admite desestructuración: asígnalo a un nombre simple, como const props = defineProps<{ title: string }>(), y lee props.title", section.contentStart + declaration.name.getStart(file));
-    }
     try {
       validateElementRefBinding(callee, declaration.name);
     } catch (error) {
@@ -1757,7 +2054,11 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
   let propsType: string | undefined;
   let propsTypeOffset: number | undefined;
   let propsInterfaceWarning: CompileDiagnostic | undefined;
-  let defaults: { expression: string; offset: number; keys: readonly string[] } | undefined;
+  let defaults: PropsDefaultsCode | undefined;
+  let propAliases: Map<string, string> | undefined;
+  let defaultTexts: Map<string, string> | undefined;
+  /** The `...rest` of a destructured `defineProps`. */
+  let restName: string | undefined;
   // En desarrollo con `hot`, DevTools registra escrituras `.value` y lecturas de `computed`; producción y SSR sin `hot` no cambian.
   const setupStatement = (statement: ts.Statement): string => {
     const original = statement.getText(file);
@@ -1780,6 +2081,84 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
     const composable = conditionalComposable(statement);
     if (composable) {
       throw compileError(source, filename, "MEEK054", `${composable.expression.getText(file)}() debe llamarse sin condiciones en el nivel superior de <script>, no dentro de if, de un bucle, de try, de switch ni de un bloque`, section.contentStart + composable.expression.getStart(file));
+    }
+  };
+  /** A `defineProps` declaration, `const props = defineProps<Props>()` or a destructuring of it. */
+  const declareProps = (declaration: ts.VariableDeclaration, name: string, pattern: PropsPattern | undefined): void => {
+    if (propsType) throw compileError(source, filename, "MEEK016", "defineProps debe aparecer una sola vez, en su propia declaración", section.contentStart + declaration.getStart(file));
+    const call = definePropsInitializer(declaration)!;
+    const typeArgument = call.typeArguments?.[0];
+    propsType = typeArgument?.getText(file);
+    if (!propsType) throw compileError(source, filename, "MEEK017", "defineProps necesita un argumento de tipo", section.contentStart + declaration.getStart(file));
+    propsTypeOffset = section.contentStart + typeArgument!.getStart(file);
+    const nonstandard = nonstandardLocalPropsInterface(call, file);
+    if (nonstandard) propsInterfaceWarning = {
+      code: "MEEK120", filename, location: locate(source, section.contentStart + nonstandard.getStart(file)), severity: "warning",
+      message: `La interfaz local de defineProps se llama ${nonstandard.text}; usa interface Props para mantener una convención consistente entre componentes`,
+    };
+    propsName = name;
+    defaultTexts = propsDefaultTexts(declaration, file);
+    const at = (node: ts.Node): number => section.contentStart + node.getStart(file);
+    try {
+      const analyzed = analyzePropsDeclaration(call).defaults;
+      const patternDefaults = pattern?.bindings.filter((binding) => binding.initializer !== undefined) ?? [];
+      if (analyzed && patternDefaults.length) {
+        throw new PropsDefaultsError("MEEK124", `Los valores por defecto van en la desestructuración o en el argumento de defineProps, no en los dos: escríbelos en la desestructuración, como ${patternDefaults[0]!.name.text} = …, y quita el argumento`, analyzed.argument);
+      }
+      const values = analyzed
+        ? analyzed.argument.properties.flatMap((property) => ts.isPropertyAssignment(property) && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) ? [{ key: property.name.text, value: property.initializer }] : [])
+        : patternDefaults.map((binding) => ({ key: binding.key, value: binding.initializer! }));
+      // Constants of the script that the defaults read are evaluated again with them, before the setup.
+      const constants = propsDefaultsConstants(file, values).map((constant) => constant.getText(file));
+      // A literal default is optional only in the members of a union that admit it; another one is
+      // checked on its prop's name (MEEK131).
+      const literals = Object.fromEntries(propsDefaultLiteralTypes(declaration, file));
+      const keyNodes = analyzed
+        ? analyzed.argument.properties.flatMap((property) => ts.isPropertyAssignment(property) && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) ? [[property.name.text, property.name] as const] : [])
+        : patternDefaults.map((binding) => [binding.key, binding.keyNode] as const);
+      const keyRanges = Object.fromEntries(keyNodes.map(([key, node]) => [key, [at(node), node.getWidth(file)] as const]));
+      const typing = { literals, keyRanges };
+      if (analyzed) defaults = {
+        expression: analyzed.argument.getText(file),
+        offset: at(analyzed.argument),
+        keys: analyzed.keys,
+        ...(constants.length ? { constants } : {}),
+        ...typing,
+      };
+      else if (patternDefaults.length) defaults = {
+        expression: `{ ${patternDefaults.map((binding) => `${markSource(quote(binding.key), at(binding.keyNode), binding.keyNode.getWidth(file))}: ${markSource(binding.initializer!.getText(file), at(binding.initializer!))}`).join(", ")} }`,
+        offset: at(declaration.name),
+        keys: patternDefaults.map((binding) => binding.key),
+        marked: true,
+        ...(constants.length ? { constants } : {}),
+        ...typing,
+      };
+    } catch (error) {
+      if (!(error instanceof PropsDefaultsError)) throw error;
+      throw compileError(source, filename, error.code, error.message, section.contentStart + error.node.getStart(file));
+    }
+    // Readonly: the props view throws on any write, so an assignment is a type error (TS2540).
+    // An assertion, so that `unknown` props reach their own check (MEEK_PAGE_PROPS…).
+    // Since 1.8 the callbacks of the declared events (`onClick`) are not among its keys: the
+    // type does not declare them, and `const { a, ...rest } = props` must not carry them.
+    const events = emitsDeclaration ? emitNames(emitsDeclaration.typeArgument, file) : undefined;
+    const propsSource = events?.length ? `__meeko.withoutEventProps(__props, ${JSON.stringify(events.map(emitPropName))})` : "__props";
+    // Each destructured prop must exist in every member of the props, as in a TypeScript
+    // destructuring (`TS2344` on its name); the check is `unknown`, so the type stays the same.
+    const keysCheck = pattern?.bindings.length
+      ? ` & __meeko.PropKeysCheck<[${pattern.bindings.map((binding) => `__meeko.PropKey<${propsType}, ${markSource(quote(binding.key), at(binding.keyNode), binding.keyNode.getWidth(file))}>`).join(", ")}]>`
+      : "";
+    setup.push(`const ${name} = ${propsSource} as Readonly<${defaults ? `__MeekoResolvedProps${typeArgs}` : markSource(propsType, propsTypeOffset)}>${keysCheck};`);
+    if (!pattern) return;
+    propAliases = new Map(pattern.bindings.map((binding) => [binding.name.text, binding.key]));
+    names.push(name);
+    if (pattern.rest) {
+      const rest = pattern.rest;
+      restName = rest.text;
+      const keys = pattern.bindings.map((binding) => binding.key);
+      names.push(rest.text);
+      declarations.set(rest.text, at(rest));
+      setup.push(`const ${markSource(rest.text, at(rest))} = __meeko.restProps(${name}, ${JSON.stringify(keys)}) as __meeko.RestProps<typeof ${name}, ${keys.map(quote).join(" | ") || "never"}>;`);
     }
   };
   for (const [index, statement] of file.statements.entries()) {
@@ -1826,6 +2205,18 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
     if (ts.isVariableStatement(statement)) {
       if (statement.declarationList.declarations.length !== 1) throw compileError(source, filename, "MEEK014", "Declara una variable por sentencia en los scripts .meeko", section.contentStart + statement.getStart(file));
       for (const declaration of statement.declarationList.declarations) {
+        if (!ts.isIdentifier(declaration.name) && definePropsInitializer(declaration)) {
+          // `const { label, size = "md", class: className, ...rest } = defineProps<Props>()`: each
+          // name reads its prop wherever it is used (see `rewritePropAliases`), and `rest` is a view.
+          let pattern: PropsPattern;
+          try { pattern = analyzePropsPattern(declaration); }
+          catch (error) {
+            if (!(error instanceof PropsDefaultsError)) throw error;
+            throw compileError(source, filename, error.code, error.message, section.contentStart + error.node.getStart(file));
+          }
+          declareProps(declaration, "__meeko_props", pattern);
+          continue;
+        }
         if (!ts.isIdentifier(declaration.name)) {
           // `const { a, b: c = 1, ...rest } = value` and `const [a, , b] = value`: each name is a
           // setup binding. Its value belongs to whatever returned it, so state snapshots skip it.
@@ -1849,38 +2240,20 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
           setup.push(macroStatement(declaration, `const ${name}: __meeko.Signal<${value}> = __meeko.useModel<${value}>(__props, ${quote(modelDeclaration.name)}, __meeko_borrowed${options});`));
         } else if (declaration === snippetsDeclaration?.declaration) {
           snippets = { type: snippetsDeclaration.typeArgument.getText(file), offset: section.contentStart + snippetsDeclaration.typeArgument.getStart(file) };
-          setup.push(macroStatement(declaration, `const ${name}: __meeko.SnippetMap<__MeekoSnippets${typeArgs}> = __meeko.useSnippets<__MeekoSnippets${typeArgs}>(__props);`));
+          // An intersection with a mapped type is read member by member (see `snippetTypeParts`).
+          const parts = snippetTypeParts(snippetsDeclaration.typeArgument, file);
+          const map = parts
+            ? parts.map((part) => `__meeko.SnippetMap<${markSource(part.getText(file), section.contentStart + part.getStart(file))}>`).join(" & ")
+            : `__meeko.SnippetMap<__MeekoSnippets${typeArgs}>`;
+          // The same object; TypeScript cannot relate the whole map to its members over a type parameter.
+          const value = `__meeko.useSnippets<__MeekoSnippets${typeArgs}>(__props)${parts ? ` as unknown as ${map}` : ""}`;
+          setup.push(macroStatement(declaration, `const ${name}: ${map} = ${value};`));
         } else if (declaration === emitsDeclaration?.declaration) {
           // The statement needs to know whether defineProps exists, which may come later.
           emitIndex = setup.length;
           setup.push("");
         } else if (definePropsInitializer(declaration)) {
-          if (propsType) throw compileError(source, filename, "MEEK016", "defineProps debe aparecer una sola vez, en su propia declaración", section.contentStart + declaration.getStart(file));
-          const call = definePropsInitializer(declaration)!;
-          const typeArgument = call.typeArguments?.[0];
-          propsType = typeArgument?.getText(file);
-          if (!propsType) throw compileError(source, filename, "MEEK017", "defineProps necesita un argumento de tipo", section.contentStart + declaration.getStart(file));
-          propsTypeOffset = section.contentStart + typeArgument!.getStart(file);
-          const nonstandard = nonstandardLocalPropsInterface(call, file);
-          if (nonstandard) propsInterfaceWarning = {
-            code: "MEEK120", filename, location: locate(source, section.contentStart + nonstandard.getStart(file)), severity: "warning",
-            message: `La interfaz local de defineProps se llama ${nonstandard.text}; usa interface Props para mantener una convención consistente entre componentes`,
-          };
-          propsName = name;
-          try {
-            const analyzed = analyzePropsDeclaration(call).defaults;
-            if (analyzed) defaults = {
-              expression: analyzed.argument.getText(file),
-              offset: section.contentStart + analyzed.argument.getStart(file),
-              keys: analyzed.keys,
-            };
-          } catch (error) {
-            if (!(error instanceof PropsDefaultsError)) throw error;
-            throw compileError(source, filename, error.code, error.message, section.contentStart + error.node.getStart(file));
-          }
-          // Readonly: the props view throws on any write, so an assignment is a type error (TS2540).
-          // An assertion, so that `unknown` props reach their own check (MEEK_PAGE_PROPS…).
-          setup.push(`const ${name} = __props as Readonly<${defaults ? `__MeekoResolvedProps${typeArgs}` : markSource(propsType, propsTypeOffset)}>;`);
+          declareProps(declaration, name, undefined);
         } else {
           setup.push(setupStatement(statement));
         }
@@ -1926,13 +2299,14 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
   if (borrows) setup.unshift("const __meeko_borrowed = new Set<unknown>();");
   // MEEK101: with reactive props the child stays mounted, so a read that runs once keeps the first
   // value. A component with a top-level data await is still mounted again, so its reads stay fresh.
-  const warnings: CompileDiagnostic[] = propsName && !dataAwait
-    ? propsReadsOnce(file, propsName).map((read): CompileDiagnostic => ({
-      code: "MEEK101", message: read.message, filename, location: locate(source, section.contentStart + read.start), severity: "warning",
-    }))
-    : [];
+  const reads = !propsName || dataAwait ? []
+    : propAliases ? [...propAliasReadsOnce(file, new Set(propAliases.keys())), ...restName ? propsReadsOnce(file, restName) : []].sort((left, right) => left.start - right.start)
+    : propsReadsOnce(file, propsName);
+  const warnings: CompileDiagnostic[] = reads.map((read): CompileDiagnostic => ({
+    code: "MEEK101", message: read.message, filename, location: locate(source, section.contentStart + read.start), severity: "warning",
+  }));
   if (propsInterfaceWarning) warnings.push(propsInterfaceWarning);
-  return { borrows, imports, types, setup, names, declarations, propsType: propsType ?? "Record<string, never>", propsTypeOffset, ...(defaults ? { defaults } : {}), ...(emits ? { emits } : {}), exposed: exposeDeclaration !== undefined, usedRefs, continuationNames, models, ...(snippets ? { snippets } : {}), dataAwait, ...(propsName ? { propsName } : {}), warnings };
+  return { borrows, imports, types, setup, names, declarations, propsType: propsType ?? "Record<string, never>", propsTypeOffset, ...(defaults ? { defaults } : {}), ...(emits ? { emits } : {}), exposed: exposeDeclaration !== undefined, usedRefs, continuationNames, models, ...(snippets ? { snippets } : {}), dataAwait, ...(propsName ? { propsName } : {}), ...(propAliases ? { propAliases } : {}), ...(defaultTexts?.size ? { defaultTexts } : {}), warnings };
 }
 
 /**
@@ -1968,7 +2342,7 @@ function taggedRefs(bindings: TemplateBindings, narrow: boolean): Map<RefBinding
     for (const region of current.regions) {
       if (region.kind === "list") visit(region.bindings, unshadowed(guards, [region.itemName, region.indexName]));
       else if (region.kind === "teleport") visit(region.bindings, guards);
-      else visit(region.bindings, narrow ? [...guards, { code: markSource(region.expression, region.offset), names: namesOf(region.expression) }] : guards);
+      else visit(region.bindings, narrow ? [...guards, { code: region.build ? region.build(markSource) : markSource(region.expression, region.offset), names: namesOf(region.expression) }] : guards);
     }
   };
   visit(bindings, []);
@@ -2126,9 +2500,9 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
   for (const entry of bindings.tags) {
     const point = locate(context.source, entry.offset);
     const location = `${basename(context.filename)}:${point.line}:${point.column} (component ${entry.reference})`;
-    const value = arrowExpression(entry.reference, entry.referenceOffset);
+    const value = branchValue(arrowExpression(entry.reference, entry.referenceOffset), entry.branch, context.narrow);
     componentStatements.push(`__meeko_cleanups.push(__meeko.bindElementTag(__scope, ${entry.element}, () => ${value}, ${entry.content}, (${entry.tagVariable}) => ${rewriteLocals(entry.open, locals)}, (${entry.tagVariable}, __scope) => { ${hydrationBody(entry.bindings, context, hot, locals, guards)} }, ${quote(location)}));`);
-    if (context.narrow) componentStatements.push(tagCheck(entry, mappedExpression(entry.reference, entry.referenceOffset), false));
+    if (context.narrow) componentStatements.push(tagCheck(entry, branchValue(mappedExpression(entry.reference, entry.referenceOffset), entry.branch, true), false));
   }
   for (const entry of bindings.dynamics) {
     const point = locate(context.source, entry.offset);
@@ -2157,8 +2531,9 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
   statements.unshift(...componentStatements);
   for (const entry of bindings.regions) {
     if (entry.kind === "condition") {
-      const condition = arrowExpression(entry.expression, entry.offset);
-      const inner = context.narrow ? [...guards, { code: plainExpression(entry.expression, entry.offset), names: namesOf(entry.expression) }] : guards;
+      const condition = entry.build ? markSource(`(${entry.build((part, partOffset) => mappedExpression(part, partOffset))})`, entry.offset, entry.expression.length) : arrowExpression(entry.expression, entry.offset);
+      const own = entry.build ? entry.build((part, partOffset) => plainExpression(part, partOffset)) : plainExpression(entry.expression, entry.offset);
+      const inner = context.narrow ? [...guards, { code: own, names: namesOf(entry.expression) }] : guards;
       statements.push(`__meeko_cleanups.push(__meeko.bindIf(__scope, ${entry.id}, () => ${hot ? trackedRead(context, entry.offset, entry.expression, "if", condition) : condition}, () => ${rewriteLocals(entry.render, locals)}, (__scope) => { ${hydrationBody(entry.bindings, context, hot, locals, inner)} }));`);
     } else if (entry.kind === "teleport") {
       // `<MeekoTeleport>`: its content hydrates in this component wherever the document has it.
@@ -2197,7 +2572,7 @@ function hydrationBody(bindings: TemplateBindings, context: TemplateContext, hot
  * `null` when one is chosen at run time: a setup binding, a list item or a snippet parameter. A
  * layout's `<component is="props.outlet">` is left out: the browser checks the page itself.
  */
-function templateChildren(bindings: TemplateBindings, setupNames: ReadonlySet<string>, propsName: string | undefined): string[] | null {
+function templateChildren(bindings: TemplateBindings, setupNames: ReadonlySet<string>, propsName: string | undefined, propAliases: ReadonlyMap<string, string> | undefined): string[] | null {
   // Mapped to the tag, so a name that does not resolve is reported there once more, not elsewhere.
   const children = new Map<string, string>();
   let dynamic = false;
@@ -2205,7 +2580,7 @@ function templateChildren(bindings: TemplateBindings, setupNames: ReadonlySet<st
     const child = (expression: string, offset: number): void => {
       const reference = expression.trim();
       const root = /^([A-Za-z_$][\w$]*)(?:\s*\.\s*[A-Za-z_$][\w$]*)*$/.exec(reference)?.[1];
-      const outlet = reference === outletReference || (propsName !== undefined && reference.replace(/\s+/g, "") === `${propsName}.outlet`);
+      const outlet = reference === outletReference || (propsName !== undefined && reference.replace(/\s+/g, "") === `${propsName}.outlet`) || propAliases?.get(reference.trim()) === "outlet";
       if (outlet) return;
       if (root === undefined || setupNames.has(root) || locals.has(root)) dynamic = true;
       else if (!children.has(reference)) children.set(reference, markSource(expression, offset));
@@ -2237,7 +2612,7 @@ function checkTemplateNames(bindings: TemplateBindings, late: ReadonlyMap<string
       const declared = late.get(identifier.name);
       if (declared === undefined || locals.has(identifier.name)) continue;
       const point = locate(context.source, declared);
-      throw compileError(context.source, context.filename, "MEEK057", `La plantilla no puede usar ${identifier.name}: se declara en la línea ${point.line}, después del primer await de navegador, y sólo existe en el navegador una vez montado el componente. Declara ese nombre antes de ese await`, offset + identifier.offset);
+      throw compileError(context.source, context.filename, "MEEK057", `La plantilla no puede usar ${identifier.name}: se declara en la línea ${point.line}, después del primer await de navegador, y sólo existe en el navegador una vez montado el componente. Declara ese nombre antes de ese await`, decodedSourceOffset(context, offset + identifier.offset));
     }
   };
   const visit = (current: TemplateBindings, locals: ReadonlySet<string>): void => {
@@ -2329,7 +2704,8 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
   const bindingsForTemplate = emptyBindings();
   const projectComponents = [...options.projectComponents ?? []];
   const knownComponents = new Set([...importedComponents(script.content), ...projectComponents.filter((name) => /^[A-Z]/.test(name))]);
-  const context: TemplateContext = { source, filename, templateOffset: template.contentStart, scopeAttribute, scopeTargets: targets, nextText: 0, nextRegion: 0, nextRef: 0, nextHtml: 0, nextElement: 0, listDepth: 0, refs: new Map(), usedRefs: new Set(), nextSnippet: 0, snippetDepth: 0, selectModel: undefined, narrow: options.typeCheck === true, guards: [], shadowedTags: shadowedBuiltinTags(script.content, projectComponents), shadowedUses: new Map(), strayDirectives: new Map(), theme: options.theme, knownComponents, builtinModules: new Set() };
+  const componentNames = { names: new Set([...knownComponents, ...scriptValueNames(script.content)]), complete: options.projectComponents !== undefined };
+  const context: TemplateContext = { componentNames, branchComponents: new WeakSet(), source, filename, templateOffset: template.contentStart, scopeAttribute, scopeTargets: targets, nextText: 0, nextRegion: 0, nextRef: 0, nextHtml: 0, nextElement: 0, listDepth: 0, refs: new Map(), usedRefs: new Set(), nextSnippet: 0, snippetDepth: 0, selectModel: undefined, narrow: options.typeCheck === true, guards: [], shadowedTags: shadowedBuiltinTags(script.content, projectComponents), shadowedUses: new Map(), deprecatedUses: new Map(), strayDirectives: new Map(), theme: options.theme, knownComponents, builtinModules: new Set(), decodedRegions: [] };
   const html = renderNode(parsed, bindingsForTemplate, context);
   const hot = options.hot === true;
   const scriptParts = compileScript(script, source, filename, hot, context.refs, generic);
@@ -2342,8 +2718,14 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
       'type __MeekoRoutes = import("@meekojs/meeko/framework").GeneratedRoutes;',
       "type __MeekoRouteId = keyof __MeekoRoutes extends never ? string : keyof __MeekoRoutes & string;",
       "type __MeekoLinkParams<K extends string> = K extends keyof __MeekoRoutes ? __MeekoRoutes[K] : Record<string, string>;",
-      "type __MeekoLinkOptions<K extends string> = (keyof __MeekoLinkParams<K> extends never ? { params?: never } : { params: __MeekoLinkParams<K> })",
-      "  & { search?: Readonly<Record<string, string | number | boolean | null | undefined>> };",
+      // A union of routes (`bind:to="props.to"`) cannot correlate each route with its params here:
+      // params, if any, must be those of one of the routes, and the caller's own type correlates them.
+      "type __MeekoRouteUnion<K extends string, A extends string = K> = K extends unknown ? ([A] extends [K] ? false : true) : never;",
+      // Without generated routes (RouteId = string) no id says which params it takes: they are optional.
+      "type __MeekoLinkOptions<K extends string> = (keyof __MeekoRoutes extends never ? { params?: Record<string, string> | undefined }",
+      "  : true extends __MeekoRouteUnion<K> ? { params?: __MeekoLinkParams<K> | undefined }",
+      "  : keyof __MeekoLinkParams<K> extends never ? { params?: never } : { params: __MeekoLinkParams<K> })",
+      "  & { search?: Readonly<Record<string, string | number | boolean | null | undefined>> | undefined };",
       "const __meeko_href = __meeko_href_overloads as <K extends __MeekoRouteId>(id: K, options: __MeekoLinkOptions<K>) => string;",
     ].join("\n"));
     scriptParts.setup.unshift("const __meeko_route = __meeko_useRoute();");
@@ -2418,8 +2800,11 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
   const G = generic ? `<${markSource(generic.declaration, generic.offset)}>` : "";
   const A = generic ? `<${generic.names.join(", ")}>` : "";
   const { exposedType, channelsType } = emitComponentChannels(scriptParts, generic);
+  // The default values as written, which the editor shows on a parent's tag (`size?: "sm" | "md" = "md"`).
+  // Only with defaults: a component without them keeps the module it had before 1.8.
+  const defaultsType = scriptParts.defaultTexts ? `export type ComponentDefaults = ${componentDefaultsType(scriptParts.defaultTexts)};\n` : "";
   // Lets a client navigation skip loading data when no component of the new page awaits it.
-  const children = templateChildren(bindingsForTemplate, new Set([...scriptParts.names, ...scriptParts.continuationNames.keys()]), scriptParts.propsName);
+  const children = templateChildren(bindingsForTemplate, new Set([...scriptParts.names, ...scriptParts.continuationNames.keys(), ...scriptParts.propAliases?.keys() ?? []]), scriptParts.propsName, scriptParts.propAliases);
   // `__meekoReactiveProps` tells a parent's binding that this module reads its props reactively,
   // so new props reach a mounted instance in place instead of rebuilding it. A module with a
   // top-level data await is still rebuilt: its requests were built from the props it rendered with,
@@ -2442,12 +2827,33 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
   const outletProps = !generic && scriptParts.propsTypeOffset !== undefined && html.includes(outletReference)
     ? `${propsDeclaration.replace("type __MeekoComponentProps = ", "type __MeekoPropsBesideOutlet = ").replace("export type { __MeekoComponentProps as ComponentProps };", "")}\ntype __MeekoComponentProps = __MeekoPropsBesideOutlet & { outlet: import("@meekojs/meeko").Component<Record<string, unknown>> };\nexport type { __MeekoComponentProps as ComponentProps };`
     : propsDeclaration;
-  const markedCode = `// Generated by Meeko. Edit the .meeko source instead.\nimport * as __meeko from "@meekojs/meeko/internal";\n${scriptParts.imports.join("\n")}\n${scriptParts.types.join("\n")}\n${outletProps}\nfunction __setup${G}(__props: ${setupPropsType}${usesRefs ? ", __meeko_refs: __meeko.ElementRefs" : ""}) {\n${refsType}${scriptParts.setup.join("\n")}\n${refHelpers.join("")}return { ${setupReturn} };\n}\n${exposedType}${channelsType}export const css = ${quote(css)};\n${dataMarks}${hotIdExport}export function renderWithState${G}(__inputProps: __MeekoComponentProps${A}): { html: string; state: __meeko.HotState } {\nreturn __meeko.createRoot((__meeko_dispose) => {\nconst __meeko_transfer = true;\n${refsDeclaration}const __bindings = ${setupCall("null")};\nconst { ${bindings} } = __bindings;\nreturn __meeko.finishWithCleanup(() => {\nconst __meeko_html = ${html};\nconst __meeko_state = __meeko.transferState(__bindings, ${quote(stateLabel(filename))});\nreturn { html: __meeko_html, state: __meeko_state };\n}, __meeko_dispose);\n});\n}\nexport function renderToString${G}(__inputProps: __MeekoComponentProps${A}${stateParam}): string {\nreturn __meeko.createRoot((__meeko_dispose) => {\nconst __meeko_transfer = false;\n${refsDeclaration}${setupCode("null")}\nreturn __meeko.finishWithCleanup(() => ${html}, __meeko_dispose);\n});\n}\nexport function hydrate${G}(root: Element, __inputProps: __MeekoComponentProps${A}${stateParam}): () => void {\nconst __scope: __meeko.DomScope = { root };\nreturn hydrateScope${A}(${scopeForward});\n}\nexport function hydrateScope${G}(__scope: __meeko.DomScope, __inputProps: __MeekoComponentProps${A}${stateParam}${scopeHotRootParam}): __meeko.ComponentRelease<ComponentExposed${A}> {\nreturn __meeko.mountBatch(() => __meeko.createRoot((__meeko_dispose) => {\nconst __meeko_transfer = false;\nconst __mounted: Array<() => __meeko.MountedResult> = [];\n${refsDeclaration}${setupCode("__mounted")}\nconst __release = (() => { ${hydrationBody(bindingsForTemplate, context, hot)} })();\n__meeko.runMounted(__mounted);\n${releaseCode}\n}));\n}\n`;
-  const { code, mappings } = extractSourceMappings(markedCode);
+  // Without a processed module, `css` is the compiler's own string, as before 1.8. A host that
+  // does not process CSS (Vitest without `css: true`) resolves the module as "": the compiler's
+  // string stands in, so `css` is never empty for a component with a <style>.
+  const styleModule = css ? options.styleModule?.(css) : undefined;
+  const cssExport = styleModule === undefined
+    ? `export const css = ${quote(css)};\n`
+    : `import __meeko_css from ${quote(styleModule)};\nexport const css: string = __meeko_css || ${quote(css)};\n`;
+  const markedCode = `// Generated by Meeko. Edit the .meeko source instead.\nimport * as __meeko from "@meekojs/meeko/internal";\n${scriptParts.imports.join("\n")}\n${scriptParts.types.join("\n")}\n${outletProps}\nfunction __setup${G}(__props: ${setupPropsType}${usesRefs ? ", __meeko_refs: __meeko.ElementRefs" : ""}) {\n${refsType}${scriptParts.setup.join("\n")}\n${refHelpers.join("")}return { ${setupReturn} };\n}\n${exposedType}${defaultsType}${channelsType}${cssExport}${dataMarks}${hotIdExport}export function renderWithState${G}(__inputProps: __MeekoComponentProps${A}): { html: string; state: __meeko.HotState } {\nreturn __meeko.createRoot((__meeko_dispose) => {\nconst __meeko_transfer = true;\n${refsDeclaration}const __bindings = ${setupCall("null")};\nconst { ${bindings} } = __bindings;\nreturn __meeko.finishWithCleanup(() => {\nconst __meeko_html = ${html};\nconst __meeko_state = __meeko.transferState(__bindings, ${quote(stateLabel(filename))});\nreturn { html: __meeko_html, state: __meeko_state };\n}, __meeko_dispose);\n});\n}\nexport function renderToString${G}(__inputProps: __MeekoComponentProps${A}${stateParam}): string {\nreturn __meeko.createRoot((__meeko_dispose) => {\nconst __meeko_transfer = false;\n${refsDeclaration}${setupCode("null")}\nreturn __meeko.finishWithCleanup(() => ${html}, __meeko_dispose);\n});\n}\nexport function hydrate${G}(root: Element, __inputProps: __MeekoComponentProps${A}${stateParam}): () => void {\nconst __scope: __meeko.DomScope = { root };\nreturn hydrateScope${A}(${scopeForward});\n}\nexport function hydrateScope${G}(__scope: __meeko.DomScope, __inputProps: __MeekoComponentProps${A}${stateParam}${scopeHotRootParam}): __meeko.ComponentRelease<ComponentExposed${A}> {\nreturn __meeko.mountBatch(() => __meeko.createRoot((__meeko_dispose) => {\nconst __meeko_transfer = false;\nconst __mounted: Array<() => __meeko.MountedResult> = [];\n${refsDeclaration}${setupCode("__mounted")}\nconst __release = (() => { ${hydrationBody(bindingsForTemplate, context, hot)} })();\n__meeko.runMounted(__mounted);\n${releaseCode}\n}));\n}\n`;
+  const extracted = extractSourceMappings(markedCode);
+  let { code } = extracted;
+  let mappings = remapDecodedRegions(code, extracted.mappings, context.decodedRegions);
+  if (scriptParts.propAliases?.size) {
+    try {
+      ({ code, mappings } = rewritePropAliases(code, mappings, scriptParts.propAliases, scriptParts.propsName!));
+    } catch (error) {
+      if (!(error instanceof PropAliasWriteError)) throw error;
+      throw compileError(source, filename, "MEEK125", error.message, error.offset ?? script.contentStart);
+    }
+  }
   // MEEK106: the project's component keeps a built-in tag's name; renaming it adopts the built-in.
   const warnings = [...scriptParts.warnings, ...[...context.shadowedUses].map(([tag, offset]): CompileDiagnostic => ({
     code: "MEEK106", filename, location: locate(source, offset), severity: "warning",
     message: `<${tag}> es el componente ${tag} del proyecto, no la etiqueta propia de Meeko (${builtinDescriptions[tag]}); renombra el componente para usar la de Meeko`,
+  })), ...[...context.deprecatedUses].map(([tag, offset]): CompileDiagnostic => ({
+    // MEEK121: the tag works through 1.x; the component of `@meekojs/ui` has the same contract.
+    code: "MEEK121", filename, location: locate(source, offset), severity: "warning",
+    message: `<${tag}> está obsoleta desde Meeko 1.8 y se retira en 2.0: usa <${deprecatedBuiltinTags[tag]}> de @meekojs/ui, con las mismas props, snippets y marcado`,
   })), ...[...context.strayDirectives].map(([offset, { name, directive }]): CompileDiagnostic => ({
     code: "MEEK119", filename, location: locate(source, offset), severity: "warning",
     message: directive === "each:of"

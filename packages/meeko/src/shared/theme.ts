@@ -399,6 +399,57 @@ export interface ThemeToggleContext {
 }
 
 /**
+ * Lo que devuelve {@link useThemeToggle}: lo que necesita un selector de tema propio para pintar
+ * lo mismo en SSR y en la hidratación y para cambiar el tema sin JavaScript con el formulario de
+ * `POST /_meeko/theme`.
+ *
+ * @since 1.8.0
+ * @example
+ * ```ts
+ * import { useThemeToggle } from "@meekojs/meeko/framework";
+ *
+ * const toggle = useThemeToggle();
+ * const next = computed(() => {
+ *   const index = toggle.choices.indexOf(toggle.theme.theme.value);
+ *   return toggle.choices[(index + 1) % toggle.choices.length];
+ * });
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#selector-de-tema-propio
+ */
+export interface ThemeToggleState<Name extends string = ThemeName, Choice extends string = ThemeChoice> {
+  /** El estado del tema, el mismo que devuelve `useTheme()`. */
+  readonly theme: ThemeState<Name, Choice>;
+  /** Las elecciones de la configuración en orden: los temas y, con el modo sistema, `"system"`. */
+  readonly choices: readonly Choice[];
+  /** Los temas que muestra `"system"` según `prefers-color-scheme`; `undefined` sin modo sistema. */
+  readonly system: ThemeToggleSystem<Name> | undefined;
+  /**
+   * Si este render conoce la elección del usuario: el servidor con la cookie, el navegador al
+   * terminar la hidratación. Mientras vale `false`, nombre la acción sin el tema actual.
+   */
+  readonly known: ReadonlySignal<boolean>;
+  /** Si el selector ya responde en el navegador: `false` en SSR y durante la hidratación. */
+  readonly interactive: ReadonlySignal<boolean>;
+}
+
+/**
+ * Temas que muestra la elección `"system"` en {@link ThemeToggleState}.
+ *
+ * @since 1.8.0
+ * @example
+ * ```ts
+ * const { system } = useThemeToggle();
+ * const icons = system ? [system.light, system.dark] : [];
+ * ```
+ */
+export interface ThemeToggleSystem<Name extends string = ThemeName> {
+  /** Tema con `prefers-color-scheme: light`. */
+  readonly light: Name;
+  /** Tema con `prefers-color-scheme: dark`. */
+  readonly dark: Name;
+}
+
+/**
  * Textos accesibles de `<MeekoThemeToggle>` además de los nombres de los temas (`labels`), para
  * traducirlos. Todos son opcionales; los de por defecto están en español.
  *

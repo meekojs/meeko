@@ -45,6 +45,61 @@ export function extractSourceMappings(markedCode: string): { code: string; mappi
   return { code: parts.join(""), mappings: mappings.sort((a, b) => a.generatedStart - b.generatedStart) };
 }
 
+/**
+ * Expresión de plantilla cuyas referencias de carácter (`{x &amp;&amp; y}`) cambian su longitud.
+ * Sus marcas usan posiciones del texto decodificado a partir de `offset`, su inicio en la fuente.
+ */
+export interface DecodedRegion {
+  offset: number;
+  decoded: DecodedExpression;
+}
+
+/**
+ * Lleva a la fuente las marcas de las `regions`. Un tramo copiado tal cual se parte en los de
+ * `decoded.pieces`, porque una marca no puede ir dentro de `&&` ni de una cadena; uno reescrito
+ * (`(expr)`, locales de un snippet) conserva sus extremos.
+ */
+export function remapDecodedRegions(code: string, mappings: readonly SourceMapping[], regions: readonly DecodedRegion[]): SourceMapping[] {
+  if (regions.length === 0) return [...mappings];
+  const result: SourceMapping[] = [];
+  for (const mapping of mappings) {
+    const region = regions.find(({ offset, decoded }) => mapping.originalStart >= offset && mapping.originalStart + mapping.originalLength <= offset + decoded.text.length);
+    if (!region) {
+      result.push(mapping);
+      continue;
+    }
+    const { offset, decoded } = region;
+    const start = mapping.originalStart - offset;
+    const end = start + mapping.originalLength;
+    if (code.slice(mapping.generatedStart, mapping.generatedEnd) !== decoded.text.slice(start, end)) {
+      const sourceStart = expressionSourceOffset(decoded, start);
+      result.push({ ...mapping, originalStart: offset + sourceStart, originalLength: decodedSourceEnd(decoded, end) - sourceStart });
+      continue;
+    }
+    for (const piece of decoded.pieces) {
+      const from = Math.max(piece.start, start);
+      const to = Math.min(piece.end, end);
+      if (from >= to) continue;
+      const verbatim = piece.end - piece.start === piece.sourceEnd - piece.sourceStart;
+      result.push({
+        generatedStart: mapping.generatedStart + from - start,
+        generatedEnd: mapping.generatedStart + to - start,
+        originalStart: offset + (verbatim ? piece.sourceStart + from - piece.start : piece.sourceStart),
+        originalLength: verbatim ? to - from : piece.sourceEnd - piece.sourceStart,
+      });
+    }
+  }
+  return result.sort((a, b) => a.generatedStart - b.generatedStart);
+}
+
+/** Source end of the decoded text that ends at `position`. */
+function decodedSourceEnd(decoded: DecodedExpression, position: number): number {
+  if (position === 0) return 0;
+  const piece = decoded.pieces.find((candidate) => position > candidate.start && position <= candidate.end);
+  if (!piece) return decoded.pieces.at(-1)?.sourceEnd ?? 0;
+  return piece.end - piece.start === piece.sourceEnd - piece.sourceStart ? piece.sourceStart + position - piece.start : piece.sourceEnd;
+}
+
 /** Convierte un desplazamiento generado en uno del archivo .meeko si existe origen preciso. */
 export function originalOffset(mappings: readonly SourceMapping[], generatedOffset: number): number | undefined {
   const span = mappings
@@ -54,3 +109,7 @@ export function originalOffset(mappings: readonly SourceMapping[], generatedOffs
   return span.originalStart + Math.min(generatedOffset - span.generatedStart, Math.max(0, span.originalLength - 1));
 }
 import { randomUUID } from "node:crypto";
+
+import type { DecodedExpression } from "./parser/template";
+
+import { expressionSourceOffset } from "./parser/template";

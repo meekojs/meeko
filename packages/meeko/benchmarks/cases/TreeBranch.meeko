@@ -9,7 +9,7 @@ const leaves = Array.from({ length: 8 }, (_, index) => index);
 <template>
   <div class="branch">
     <div each:of="leaves" each:as="leaf" each:key="leaf">
-      <component is="Leaf" bind:id="`${props.branch}-${leaf}`"></component>
+      <component is="Leaf" bind:id="`${props.branch}-${leaf}`" />
     </div>
   </div>
 </template>

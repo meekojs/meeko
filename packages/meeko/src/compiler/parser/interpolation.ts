@@ -46,6 +46,15 @@ export function scanInterpolations(text: string): InterpolationScan {
   return { segments };
 }
 
+/**
+ * Posición de la llave que cierra la interpolación abierta en `open`, con las mismas reglas que
+ * `scanInterpolations`; `undefined` si el texto termina antes. El parser de plantillas la usa
+ * para que un `<` de la expresión (`{a < b}`) no abra una etiqueta.
+ */
+export function interpolationClose(text: string, open: number): number | undefined {
+  return scanCode(text, open + 1)?.close;
+}
+
 function segment(text: string, open: number, { close, lineCommentEnd }: CodeEnd): InterpolationSegment {
   const raw = text.slice(open + 1, close);
   const trimmed = raw.trim();

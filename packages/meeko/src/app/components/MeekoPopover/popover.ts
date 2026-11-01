@@ -10,7 +10,7 @@ import type { MeekoPopoverProps, PopoverMode, PopoverPlacement, PopoverRole, Pop
  * hidden by its `popover` attribute from the first byte, and every style is applied through CSSOM
  * in the browser, so a strict CSP without `'unsafe-inline'` is enough.
  */
-import { computed, effect, untrack } from "../../../core/reactivity";
+import { batch, computed, effect, untrack } from "../../../core/reactivity";
 
 /** `position-area` of each placement: the side, and the span that aligns it with an edge. */
 const areas: Readonly<Record<PopoverPlacement, string>> = {
@@ -365,23 +365,44 @@ export function createPopover(props: MeekoPopoverProps, open: Signal<boolean>, i
       hide();
       triggerElement()?.focus();
     };
+    /** The state that the attributes, the model and the `toggle` event last reported. */
     let last = untrack(() => open.value);
-    const synced = (now: boolean): void => {
-      if (open.value !== now) open.value = now;
-      if (now === last) return;
+    /** Changes that `beforetoggle` announced since then: it fires on each one, `toggle` does not. */
+    let started = 0;
+    const apply = (now: boolean): void => {
       last = now;
       if (now) {
         content.setAttribute("data-open", "");
         schedule();
         track();
-        if (untrack(() => mode.value) !== "hint") focusInside();
+        if (untrack(() => mode.value) !== "hint" && popoverOpen(content)) focusInside();
       } else {
         content.removeAttribute("data-open");
         untrackPosition();
       }
       emit(now);
     };
+    const synced = (now: boolean): void => {
+      // The content closed and opened again (or the reverse) before the `toggle` event of the first
+      // change: the browser coalesces both into one event whose state equals the last one reported.
+      // Both changes are applied in order, the model batched so that the effect below does not act
+      // on the intermediate state.
+      const missed = now === last && started > 0;
+      started = 0;
+      if (missed) {
+        batch(() => {
+          open.value = !now;
+          apply(!now);
+          open.value = now;
+          apply(now);
+        });
+        return;
+      }
+      if (open.value !== now) open.value = now;
+      if (now !== last) apply(now);
+    };
     listen(content, "beforetoggle", (event) => {
+      started++;
       // Before the first paint of the open content: the fallback's place, measured in the next frame.
       if ((event as ToggleEvent).newState === "open") schedule();
     });
@@ -480,6 +501,8 @@ export function createPopover(props: MeekoPopoverProps, open: Signal<boolean>, i
     };
     triggerElement();
     if (untrack(() => open.value) && !popoverOpen(content)) show();
+    // A model that starts open shows the content while mounting: not a change to report.
+    started = 0;
     return () => {
       for (const release of releases.splice(0).reverse()) release();
       typeahead.clear();

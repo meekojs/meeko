@@ -50,6 +50,50 @@ export function analyzeEmits(file: ts.SourceFile): EmitsDeclaration | undefined 
   return found;
 }
 
+/** Name of a property of a type literal: an identifier, a string or a number; `undefined` when computed. */
+function memberName(member: ts.TypeElement): string | undefined {
+  const name = member.name;
+  if (!name) return undefined;
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) return name.text;
+  return undefined;
+}
+
+/** The members of a type literal, or of the type literal that a local `interface` or `type` declares. */
+function literalMembers(type: ts.TypeNode, file: ts.SourceFile): readonly ts.TypeElement[] | undefined {
+  if (ts.isParenthesizedTypeNode(type)) return literalMembers(type.type, file);
+  if (ts.isTypeLiteralNode(type)) return type.members;
+  if (!ts.isTypeReferenceNode(type) || !ts.isIdentifier(type.typeName) || type.typeArguments?.length) return undefined;
+  const name = type.typeName.text;
+  for (const statement of file.statements) {
+    if (ts.isInterfaceDeclaration(statement) && statement.name.text === name) {
+      // `extends` brings members from elsewhere: the list would be partial.
+      return statement.heritageClauses?.length || statement.typeParameters?.length ? undefined : statement.members;
+    }
+    if (ts.isTypeAliasDeclaration(statement) && statement.name.text === name) {
+      return statement.typeParameters?.length ? undefined : literalMembers(statement.type, file);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Events of `defineEmits<T>()` when the script itself spells them: `T` is a type literal, or a
+ * local `interface` or `type` that is one. `undefined` when `T` comes from elsewhere (an import, an
+ * `extends`, a mapped or generic type): the compiler then cannot list them.
+ */
+export function emitNames(typeArgument: ts.TypeNode, file: ts.SourceFile): string[] | undefined {
+  const members = literalMembers(typeArgument, file);
+  if (!members) return undefined;
+  const names: string[] = [];
+  for (const member of members) {
+    if (!ts.isPropertySignature(member)) return undefined;
+    const name = memberName(member);
+    if (name === undefined) return undefined;
+    names.push(name);
+  }
+  return names;
+}
+
 import { apiDocs, jsdoc } from "./compiler-docs";
 
 export const defineEmitsDocs = jsdoc(

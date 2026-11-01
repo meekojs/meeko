@@ -20,6 +20,7 @@ import { generateServerContracts } from "../src/framework/contracts-generate.ts"
 import { buildProject } from "../src/framework/project.ts";
 import { previewStatic } from "../src/framework/static-adapter.ts";
 import { startConformanceOutput } from "./conformance/harness.ts";
+import { polymorphicButton } from "./helpers/polymorphic-button.ts";
 import { staticAppConfig, writeStaticApp } from "./helpers/static-app.ts";
 import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
 
@@ -1326,6 +1327,84 @@ function open(): void {
       };
     });
     assert.deepEqual(link, { focused: true, href: "/docs", type: false, text: "Abrir", input: "hola", buttons: 0 });
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser?.close();
+    if (server) await new Promise<void>((done) => server!.close(() => done()));
+    await app?.close();
+    await project.remove();
+  }
+});
+
+test("un botón de una sola plantilla con 'MeekoLink' en is pasa de <button> a ruta y a enlace, y navega en el cliente", { timeout: 240_000 }, async () => {
+  const project = await createTempProject("is-names-e2e");
+  const root = project.root;
+  type ServerModule = typeof framework_server_tsTypes;
+  type NodeModule = typeof node_tsTypes;
+  let server: Server | undefined;
+  let app: Awaited<ReturnType<ServerModule["createServerApp"]>> | undefined;
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  try {
+    const files: Record<string, string> = {
+      "package.json": '{"name":"is-names-app","private":true,"type":"module"}\n',
+      "meeko.config.mjs": "export default {};\n",
+      "app/components/AppButton.meeko": polymorphicButton,
+      "app/pages/about.meeko": '<template><h1 id="about">Acerca</h1></template>\n',
+      "app/pages/index.meeko": `<script lang="ts">
+const mode = signal<"button" | "route" | "link">("button");
+const clicks = signal(0);
+</script>
+<template><main><AppButton bind:to="mode.value === 'route' ? '/about' : undefined" bind:href="mode.value === 'link' ? 'https://example.com/' : undefined" id="action" label="Ir" on:click="(event) => { if (mode.value === 'button') clicks.value++ }" /><p id="clicks">{clicks.value}</p><button type="button" id="to-route" on:click="() => mode.value = 'route'">ruta</button><button type="button" id="to-link" on:click="() => mode.value = 'link'">enlace</button><button type="button" id="to-button" on:click="() => mode.value = 'button'">botón</button></main></template>
+`,
+    };
+    for (const [file, contents] of Object.entries(files)) {
+      await mkdir(dirname(join(root, file)), { recursive: true });
+      await writeFile(join(root, file), contents);
+    }
+    await linkRepositoryPackages(root, ["@meekojs/meeko", "vite"]);
+    const built = await buildProject(root);
+    const { createServerApp } = await import(pathToFileURL(resolve("dist/framework-server.js")).href) as ServerModule;
+    const { createNodeAssetReader, toNodeListener } = await import(pathToFileURL(resolve("dist/node.js")).href) as NodeModule;
+    const output = await import(pathToFileURL(join(built.output, "index.mjs")).href) as Pick<Parameters<ServerModule["createServerApp"]>[0], "load" | "manifest">;
+    app = await createServerApp({
+      manifest: output.manifest, load: output.load, production: false,
+      assets: createNodeAssetReader({ root: join(built.output, "client"), assets: output.manifest.assets ?? {} }),
+    });
+    const running = app;
+    server = createHttpServer(toNodeListener((request) => running.fetch(request)));
+    await new Promise<void>((ready) => server!.listen(0, "127.0.0.1", ready));
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    // The server renders the <button> branch, with its type and without href.
+    const html = (await (await fetch(`${origin}/`)).text()).replace(/<!--[^>]*-->/g, "");
+    assert.match(html, /<button id="action" type="button"[^>]*>\s*Ir\s*<\/button>/);
+    assert.doesNotMatch(html, /id="action"[^>]*href/);
+    browser = await chromium.launch({
+      ...(process.env.MEEKO_CHROME_PATH ? { executablePath: process.env.MEEKO_CHROME_PATH } : { channel: "chrome" as const }),
+      headless: true,
+    });
+    const page = await browser.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+    await page.goto(`${origin}/`);
+    await page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length > 0);
+    await page.evaluate(() => { (window as unknown as { kept: number }).kept = 1; });
+    await page.locator("button#action").click();
+    assert.equal(await page.locator("#clicks").innerText(), "1");
+    // 'MeekoLink': the <a> of the route, with its href and no type.
+    await page.locator("#to-route").click();
+    await page.locator('a#action[href="/about"]').waitFor();
+    assert.equal(await page.locator("a#action").getAttribute("type"), null);
+    // 'a': the external link, with its own href.
+    await page.locator("#to-link").click();
+    await page.locator('a#action[href="https://example.com/"]').waitFor();
+    await page.locator("#to-button").click();
+    await page.locator("button#action").waitFor();
+    assert.equal(await page.locator("button#action").getAttribute("href"), null);
+    await page.locator("#to-route").click();
+    await page.locator('a#action[href="/about"]').click();
+    await page.locator("#about").waitFor();
+    assert.equal(await page.evaluate(() => (window as unknown as { kept?: number }).kept), 1, "the route branch navigated in the client");
     assert.deepEqual(errors, []);
   } finally {
     await browser?.close();

@@ -530,3 +530,86 @@ test("SSR e hidratación coinciden con expresiones de texto anidadas", { timeout
     await server.close();
   }
 });
+
+test("una interpolación de texto admite <, <= y genéricos sin abrir etiquetas", { timeout: 35_000 }, async () => {
+  const fixture = resolve("tests/fixtures/ComparisonInterpolation.meeko");
+  assert.deepEqual(await checkSource(await readFile(fixture, "utf8"), fixture), []);
+  const server = await createServer({ configFile: false, plugins: [meeko()], server: { middlewareMode: true, hmr: false, ws: false } });
+  const browser = new Window();
+  try {
+    const component = await server.ssrLoadModule(fixture) as {
+      renderToString(props: Record<string, never>): string;
+      hydrate(root: Element, props: Record<string, never>): () => void;
+    };
+    const root = browser.document.createElement("main");
+    const html = component.renderToString({});
+    // The strings stay text: `<b>` is escaped, never an element.
+    assert.match(html, /&lt;b&gt;/);
+    root.innerHTML = html;
+    assert.equal(root.querySelector("b, i"), null);
+    const text = (selector: string): string[] => [...root.querySelectorAll(selector)].map((node) => node.textContent);
+    const snapshot = (): string[] => [
+      ...text(".less"), ...text(".tight"), ...text(".less-equal"), ...text(".string"), ...text(".template"), ...text(".generic"), ...text("li"),
+      ...[...root.querySelectorAll("li")].map((node) => node.getAttribute("title") ?? ""),
+    ];
+    assert.deepEqual(snapshot(), ["true", "true", "yes", "<b>2</b>", "<i>true</i>", "2", "before < 1", "after < 2", "after < 3", "before", "after", "after"]);
+    const release = component.hydrate(root as unknown as Element, {});
+    assert.equal(root.innerHTML, html);
+    root.querySelector("button")!.click();
+    assert.deepEqual(snapshot(), ["true", "true", "no", "<b>3</b>", "<i>false</i>", "3", "before < 1", "before < 2", "after < 3", "before", "before", "after"]);
+    release();
+    root.querySelector("button")!.click();
+    assert.deepEqual(text(".generic"), ["3"]);
+  } finally {
+    browser.happyDOM.abort();
+    await server.close();
+  }
+});
+
+test("una interpolación que combina < con & o referencias de carácter llega completa", { timeout: 35_000 }, async () => {
+  const fixture = resolve("tests/fixtures/EntityInterpolation.meeko");
+  assert.deepEqual(await checkSource(await readFile(fixture, "utf8"), fixture), []);
+  const server = await createServer({ configFile: false, plugins: [meeko()], server: { middlewareMode: true, hmr: false, ws: false } });
+  const browser = new Window();
+  try {
+    const component = await server.ssrLoadModule(fixture) as {
+      renderToString(props: Record<string, never>): string;
+      hydrate(root: Element, props: Record<string, never>): () => void;
+    };
+    const root = browser.document.createElement("main");
+    const html = component.renderToString({});
+    assert.match(html, /&lt;b&gt;/);
+    root.innerHTML = html;
+    assert.equal(root.querySelector("b"), null);
+    const snapshot = (): string[] => ["tight", "spaced", "string", "template", "entities", "literal", "numeric"].map((name) => root.querySelector(`.${name}`)!.textContent);
+    // `{a<b&&c}` stayed `a` (1) before; `&amp;` and `&lt;` decode as in an attribute value.
+    assert.deepEqual(snapshot(), ["true", "true", "<b>", "}<b>2", "2", "<2", "true"]);
+    const release = component.hydrate(root as unknown as Element, {});
+    assert.equal(root.innerHTML, html);
+    root.querySelector("button")!.click();
+    assert.deepEqual(snapshot(), ["false", "false", "false", "false", "false", "<3", "true"]);
+    release();
+    root.querySelector("button")!.click();
+    assert.deepEqual(snapshot(), ["false", "false", "false", "false", "false", "<3", "true"]);
+  } finally {
+    browser.happyDOM.abort();
+    await server.close();
+  }
+});
+
+test("un error de sintaxis tras una referencia de carácter apunta a su posición en la fuente", () => {
+  const cases = [
+    { template: "<p>{a &amp;&amp; )}</p>", at: ")" },
+    { template: "<p>{'&lt;' +* b}</p>", at: "*" },
+    { template: "<p>{a<b&&)}</p>", at: ")" },
+  ];
+  for (const { template, at } of cases) {
+    const source = `<script lang="ts">const a = 1; const b = 2;</script>\n<template>${template}</template>`;
+    assert.throws(() => compile(source, "Entities.meeko"), (error: unknown) => {
+      assert.ok(error instanceof MeekoCompileError);
+      assert.equal(error.diagnostic.code, "MEEK020");
+      assert.equal(error.diagnostic.location.offset, source.indexOf(at, source.indexOf("<template>")), template);
+      return true;
+    });
+  }
+});

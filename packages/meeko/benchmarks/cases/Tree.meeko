@@ -7,7 +7,7 @@ const branches = Array.from({ length: 16 }, (_, index) => index);
 <template>
   <section>
     <div each:of="branches" each:as="branch" each:key="branch">
-      <component is="Branch" bind:branch="branch"></component>
+      <component is="Branch" bind:branch="branch" />
     </div>
   </section>
 </template>

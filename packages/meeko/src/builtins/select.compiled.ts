@@ -14,7 +14,7 @@ export type { __MeekoComponentProps as ComponentProps };
 function __setup<T, Multiple extends boolean = false>(__props: __MeekoComponentProps<T, Multiple>, __meeko_refs: __meeko.ElementRefs) {
 type __MeekoRefs = { "root": __meeko.ElementOf<"div", false> };
 const __meeko_borrowed = new Set<unknown>();
-const props = __props as Readonly<MeekoSelectProps<T, Multiple>>;
+const props = __meeko.withoutEventProps(__props, ["onChange"]) as Readonly<MeekoSelectProps<T, Multiple>>;
 const emit: __meeko.Emit<__MeekoEmits<T, Multiple>> = __meeko.createEmit<__MeekoEmits<T, Multiple>, __meeko.NoEmitConflict<__MeekoDeclaredProps<T, Multiple>, __MeekoEmits<T, Multiple>>>(__props);
 const model: __meeko.Signal<__MeekoModels<T, Multiple>["default"]> = __meeko.useModel<__MeekoModels<T, Multiple>["default"]>(__props, "default", __meeko_borrowed, { default: null as unknown as SelectModel<T, Multiple> });
 const snippets: __meeko.SnippetMap<__MeekoSnippets<T, Multiple>> = __meeko.useSnippets<__MeekoSnippets<T, Multiple>>(__props);
@@ -75,11 +75,11 @@ const __release = (() => { const __meeko_cleanups: Array<() => void> = [];
   try {
     __meeko_cleanups.push(__meeko.bindComponent<any>(__scope, 27, () => (__meeko_MeekoPopover), () => (__meeko.componentTag(() => (__meeko_MeekoPopover))({ "mode": "manual", "matchWidth": true, "placement": props.placement ?? 'bottom-start', "offset": props.offset ?? 0, "triggerId": select.triggerId.value, "class": props.listClass }, __meeko.noChannels, { "default": select.open }, { "default": __meeko.snippet(() => "<div" + " role=\"listbox\"" + " data-meeko-select-list=\"\"" + __meeko.renderAttribute("id", select.listboxId) + __meeko.renderAttribute("aria-multiselectable", select.multiple.value ? 'true' : undefined) + __meeko.renderAttribute("aria-label", props.label) + __meeko.renderAttribute("aria-labelledby", props.label === undefined ? select.triggerId.value : undefined) + __meeko.renderAttribute("aria-busy", select.loading.value ? 'true' : undefined) + " data-meeko=\"1\"" + ">" + __meeko.renderFor(8, select.groups.value, (group, index) => (group.key), (group, index) => "<div" + __meeko.renderAttribute("role", group.name === undefined ? 'presentation' : 'group') + __meeko.renderAttribute("aria-labelledby", group.id) + " data-meeko-select-group=\"\"" + " data-meeko=\"2\"" + ">" + __meeko.renderIf(3, group.name !== undefined, () => "<div" + " role=\"presentation\"" + __meeko.renderAttribute("id", group.id) + " data-meeko-select-group-label=\"\"" + " data-meeko=\"3\"" + ">" + __meeko.renderIf(1, snippets.group, () => __meeko.renderSnippet(0, snippets.group, [group.name ?? ''])) + __meeko.renderIf(2, !snippets.group, () => "<!--meeko:text:0-->" + __meeko.escapeHtml(group.name) + "<!--/meeko:text:0-->") + "</div>") + __meeko.renderFor(7, group.entries, (entry, index) => (entry.key), (entry, index) => "<div" + " role=\"option\"" + __meeko.renderAttribute("id", entry.id) + __meeko.renderAttribute("data-index", entry.index) + __meeko.renderAttribute("aria-selected", select.isSelected(entry) ? 'true' : 'false') + __meeko.renderAttribute("aria-disabled", select.isBlocked(entry) ? 'true' : undefined) + __meeko.renderAttribute("data-active", select.active.value === entry.index ? '' : undefined) + __meeko.renderAttribute("data-selected", select.isSelected(entry) ? '' : undefined) + __meeko.renderAttribute("data-disabled", select.isBlocked(entry) ? '' : undefined) + " data-meeko=\"4\"" + ">" + __meeko.renderIf(5, snippets.option, () => __meeko.renderSnippet(4, snippets.option, [entry.option, select.stateOf(entry)])) + __meeko.renderIf(6, !snippets.option, () => "<!--meeko:text:1-->" + __meeko.escapeHtml(entry.label) + "<!--/meeko:text:1-->") + "</div>") + "</div>") + __meeko.renderIf(10, select.loading.value, () => "<div" + " role=\"presentation\"" + " data-meeko-select-loading=\"\"" + ">" + __meeko.renderSnippet(9, snippets.loading, []) + "</div>") + __meeko.renderIf(14, !select.loading.value && !select.entries.value.length, () => "<div" + " role=\"presentation\"" + " data-meeko-select-empty=\"\"" + ">" + __meeko.renderIf(12, snippets.empty, () => __meeko.renderSnippet(11, snippets.empty, [])) + __meeko.renderIf(13, !snippets.empty, () => "<!--meeko:text:2-->" + __meeko.escapeHtml("Sin resultados") + "<!--/meeko:text:2-->") + "</div>") + "</div>", (__meeko_args_0, __scope) => { const __meeko_cleanups: Array<() => void> = [];
   try {
-    __meeko_cleanups.push(__meeko.bindAttribute(__scope, 1, "id", () => (select.listboxId), "MeekoSelect.meeko:27:2739 (attribute id)"));
-__meeko_cleanups.push(__meeko.bindAttribute(__scope, 1, "aria-multiselectable", () => (select.multiple.value ? 'true' : undefined), "MeekoSelect.meeko:27:2784 (attribute aria-multiselectable)"));
-__meeko_cleanups.push(__meeko.bindAttribute(__scope, 1, "aria-label", () => (props.label), "MeekoSelect.meeko:27:2845 (attribute aria-label)"));
-__meeko_cleanups.push(__meeko.bindAttribute(__scope, 1, "aria-labelledby", () => (props.label === undefined ? select.triggerId.value : undefined), "MeekoSelect.meeko:27:2880 (attribute aria-labelledby)"));
-__meeko_cleanups.push(__meeko.bindAttribute(__scope, 1, "aria-busy", () => (select.loading.value ? 'true' : undefined), "MeekoSelect.meeko:27:2960 (attribute aria-busy)"));
+    __meeko_cleanups.push(__meeko.bindAttribute(__scope, 1, "id", () => (select.listboxId), "MeekoSelect.meeko:27:2741 (attribute id)"));
+__meeko_cleanups.push(__meeko.bindAttribute(__scope, 1, "aria-multiselectable", () => (select.multiple.value ? 'true' : undefined), "MeekoSelect.meeko:27:2786 (attribute aria-multiselectable)"));
+__meeko_cleanups.push(__meeko.bindAttribute(__scope, 1, "aria-label", () => (props.label), "MeekoSelect.meeko:27:2847 (attribute aria-label)"));
+__meeko_cleanups.push(__meeko.bindAttribute(__scope, 1, "aria-labelledby", () => (props.label === undefined ? select.triggerId.value : undefined), "MeekoSelect.meeko:27:2882 (attribute aria-labelledby)"));
+__meeko_cleanups.push(__meeko.bindAttribute(__scope, 1, "aria-busy", () => (select.loading.value ? 'true' : undefined), "MeekoSelect.meeko:27:2962 (attribute aria-busy)"));
 {
       __meeko_cleanups.push(__meeko.bindEvent(__scope, 1, "mousedown", (__meeko_event: Event) => {
         return ((__meeko_handler: (event: __meeko.EventOf<"mousedown", false> & { readonly currentTarget: __meeko.ElementOf<"div", false> }) => unknown) => __meeko_handler(__meeko_event as __meeko.EventOf<"mousedown", false> & { readonly currentTarget: __meeko.ElementOf<"div", false> }))(select.keepFocus);
@@ -97,11 +97,11 @@ __meeko_cleanups.push(__meeko.bindAttribute(__scope, 1, "aria-busy", () => (sele
     }
 __meeko_cleanups.push(__meeko.bindFor(__scope, 8, () => (select.groups.value), (group, index) => (group.key), (group, index) => "<div" + __meeko.renderAttribute("role", group.name === undefined ? 'presentation' : 'group') + __meeko.renderAttribute("aria-labelledby", group.id) + " data-meeko-select-group=\"\"" + " data-meeko=\"2\"" + ">" + __meeko.renderIf(3, group.name !== undefined, () => "<div" + " role=\"presentation\"" + __meeko.renderAttribute("id", group.id) + " data-meeko-select-group-label=\"\"" + " data-meeko=\"3\"" + ">" + __meeko.renderIf(1, snippets.group, () => __meeko.renderSnippet(0, snippets.group, [group.name ?? ''])) + __meeko.renderIf(2, !snippets.group, () => "<!--meeko:text:0-->" + __meeko.escapeHtml(group.name) + "<!--/meeko:text:0-->") + "</div>") + __meeko.renderFor(7, group.entries, (entry, index) => (entry.key), (entry, index) => "<div" + " role=\"option\"" + __meeko.renderAttribute("id", entry.id) + __meeko.renderAttribute("data-index", entry.index) + __meeko.renderAttribute("aria-selected", select.isSelected(entry) ? 'true' : 'false') + __meeko.renderAttribute("aria-disabled", select.isBlocked(entry) ? 'true' : undefined) + __meeko.renderAttribute("data-active", select.active.value === entry.index ? '' : undefined) + __meeko.renderAttribute("data-selected", select.isSelected(entry) ? '' : undefined) + __meeko.renderAttribute("data-disabled", select.isBlocked(entry) ? '' : undefined) + " data-meeko=\"4\"" + ">" + __meeko.renderIf(5, snippets.option, () => __meeko.renderSnippet(4, snippets.option, [entry.option, select.stateOf(entry)])) + __meeko.renderIf(6, !snippets.option, () => "<!--meeko:text:1-->" + __meeko.escapeHtml(entry.label) + "<!--/meeko:text:1-->") + "</div>") + "</div>", (__meeko_item_8, __meeko_index_8, __scope) => { const __meeko_cleanups: Array<() => void> = [];
   try {
-    __meeko_cleanups.push(__meeko.bindAttribute(__scope, 2, "role", () => ((__meeko_item_8.value).name === undefined ? 'presentation' : 'group'), "MeekoSelect.meeko:27:3184 (attribute role)"));
-__meeko_cleanups.push(__meeko.bindAttribute(__scope, 2, "aria-labelledby", () => ((__meeko_item_8.value).id), "MeekoSelect.meeko:27:3259 (attribute aria-labelledby)"));
+    __meeko_cleanups.push(__meeko.bindAttribute(__scope, 2, "role", () => ((__meeko_item_8.value).name === undefined ? 'presentation' : 'group'), "MeekoSelect.meeko:27:3186 (attribute role)"));
+__meeko_cleanups.push(__meeko.bindAttribute(__scope, 2, "aria-labelledby", () => ((__meeko_item_8.value).id), "MeekoSelect.meeko:27:3261 (attribute aria-labelledby)"));
 __meeko_cleanups.push(__meeko.bindIf(__scope, 3, () => ((__meeko_item_8.value).name !== undefined), () => "<div" + " role=\"presentation\"" + __meeko.renderAttribute("id", (__meeko_item_8.value).id) + " data-meeko-select-group-label=\"\"" + " data-meeko=\"3\"" + ">" + __meeko.renderIf(1, snippets.group, () => __meeko.renderSnippet(0, snippets.group, [(__meeko_item_8.value).name ?? ''])) + __meeko.renderIf(2, !snippets.group, () => "<!--meeko:text:0-->" + __meeko.escapeHtml((__meeko_item_8.value).name) + "<!--/meeko:text:0-->") + "</div>", (__scope) => { const __meeko_cleanups: Array<() => void> = [];
   try {
-    __meeko_cleanups.push(__meeko.bindAttribute(__scope, 3, "id", () => ((__meeko_item_8.value).id), "MeekoSelect.meeko:27:3362 (attribute id)"));
+    __meeko_cleanups.push(__meeko.bindAttribute(__scope, 3, "id", () => ((__meeko_item_8.value).id), "MeekoSelect.meeko:27:3364 (attribute id)"));
 __meeko_cleanups.push(__meeko.bindIf(__scope, 1, () => (snippets.group), () => __meeko.renderSnippet(0, snippets.group, [(__meeko_item_8.value).name ?? '']), (__scope) => { const __meeko_cleanups: Array<() => void> = [];
   try {
     __meeko_cleanups.push(__meeko.bindSnippet(__scope, 0, () => (snippets.group), () => [(__meeko_item_8.value).name ?? '']));
@@ -109,20 +109,20 @@ __meeko_cleanups.push(__meeko.bindIf(__scope, 1, () => (snippets.group), () => _
   } catch (__meeko_error) { __meeko.releaseAll(__meeko_cleanups, { error: __meeko_error }); } }));
 __meeko_cleanups.push(__meeko.bindIf(__scope, 2, () => (!snippets.group), () => "<!--meeko:text:0-->" + __meeko.escapeHtml((__meeko_item_8.value).name) + "<!--/meeko:text:0-->", (__scope) => { const __meeko_cleanups: Array<() => void> = [];
   try {
-    __meeko_cleanups.push(__meeko.bindText(__scope, 0, () => ((__meeko_item_8.value).name), "MeekoSelect.meeko:27:3523 (text 0)"));
+    __meeko_cleanups.push(__meeko.bindText(__scope, 0, () => ((__meeko_item_8.value).name), "MeekoSelect.meeko:27:3525 (text 0)"));
     return () => __meeko.releaseAll(__meeko_cleanups);
   } catch (__meeko_error) { __meeko.releaseAll(__meeko_cleanups, { error: __meeko_error }); } }));
     return () => __meeko.releaseAll(__meeko_cleanups);
   } catch (__meeko_error) { __meeko.releaseAll(__meeko_cleanups, { error: __meeko_error }); } }));
 __meeko_cleanups.push(__meeko.bindFor(__scope, 7, () => ((__meeko_item_8.value).entries), (entry, index) => (entry.key), (entry, index) => "<div" + " role=\"option\"" + __meeko.renderAttribute("id", entry.id) + __meeko.renderAttribute("data-index", entry.index) + __meeko.renderAttribute("aria-selected", select.isSelected(entry) ? 'true' : 'false') + __meeko.renderAttribute("aria-disabled", select.isBlocked(entry) ? 'true' : undefined) + __meeko.renderAttribute("data-active", select.active.value === entry.index ? '' : undefined) + __meeko.renderAttribute("data-selected", select.isSelected(entry) ? '' : undefined) + __meeko.renderAttribute("data-disabled", select.isBlocked(entry) ? '' : undefined) + " data-meeko=\"4\"" + ">" + __meeko.renderIf(5, snippets.option, () => __meeko.renderSnippet(4, snippets.option, [entry.option, select.stateOf(entry)])) + __meeko.renderIf(6, !snippets.option, () => "<!--meeko:text:1-->" + __meeko.escapeHtml(entry.label) + "<!--/meeko:text:1-->") + "</div>", (__meeko_item_7, __meeko_index_7, __scope) => { const __meeko_cleanups: Array<() => void> = [];
   try {
-    __meeko_cleanups.push(__meeko.bindAttribute(__scope, 4, "id", () => ((__meeko_item_7.value).id), "MeekoSelect.meeko:27:3640 (attribute id)"));
-__meeko_cleanups.push(__meeko.bindAttribute(__scope, 4, "data-index", () => ((__meeko_item_7.value).index), "MeekoSelect.meeko:27:3667 (attribute data-index)"));
-__meeko_cleanups.push(__meeko.bindAttribute(__scope, 4, "aria-selected", () => (select.isSelected((__meeko_item_7.value)) ? 'true' : 'false'), "MeekoSelect.meeko:27:3700 (attribute aria-selected)"));
-__meeko_cleanups.push(__meeko.bindAttribute(__scope, 4, "aria-disabled", () => (select.isBlocked((__meeko_item_7.value)) ? 'true' : undefined), "MeekoSelect.meeko:27:3765 (attribute aria-disabled)"));
-__meeko_cleanups.push(__meeko.bindAttribute(__scope, 4, "data-active", () => (select.active.value === (__meeko_item_7.value).index ? '' : undefined), "MeekoSelect.meeko:27:3829 (attribute data-active)"));
-__meeko_cleanups.push(__meeko.bindAttribute(__scope, 4, "data-selected", () => (select.isSelected((__meeko_item_7.value)) ? '' : undefined), "MeekoSelect.meeko:27:3903 (attribute data-selected)"));
-__meeko_cleanups.push(__meeko.bindAttribute(__scope, 4, "data-disabled", () => (select.isBlocked((__meeko_item_7.value)) ? '' : undefined), "MeekoSelect.meeko:27:3966 (attribute data-disabled)"));
+    __meeko_cleanups.push(__meeko.bindAttribute(__scope, 4, "id", () => ((__meeko_item_7.value).id), "MeekoSelect.meeko:27:3642 (attribute id)"));
+__meeko_cleanups.push(__meeko.bindAttribute(__scope, 4, "data-index", () => ((__meeko_item_7.value).index), "MeekoSelect.meeko:27:3669 (attribute data-index)"));
+__meeko_cleanups.push(__meeko.bindAttribute(__scope, 4, "aria-selected", () => (select.isSelected((__meeko_item_7.value)) ? 'true' : 'false'), "MeekoSelect.meeko:27:3702 (attribute aria-selected)"));
+__meeko_cleanups.push(__meeko.bindAttribute(__scope, 4, "aria-disabled", () => (select.isBlocked((__meeko_item_7.value)) ? 'true' : undefined), "MeekoSelect.meeko:27:3767 (attribute aria-disabled)"));
+__meeko_cleanups.push(__meeko.bindAttribute(__scope, 4, "data-active", () => (select.active.value === (__meeko_item_7.value).index ? '' : undefined), "MeekoSelect.meeko:27:3831 (attribute data-active)"));
+__meeko_cleanups.push(__meeko.bindAttribute(__scope, 4, "data-selected", () => (select.isSelected((__meeko_item_7.value)) ? '' : undefined), "MeekoSelect.meeko:27:3905 (attribute data-selected)"));
+__meeko_cleanups.push(__meeko.bindAttribute(__scope, 4, "data-disabled", () => (select.isBlocked((__meeko_item_7.value)) ? '' : undefined), "MeekoSelect.meeko:27:3968 (attribute data-disabled)"));
 __meeko_cleanups.push(__meeko.bindIf(__scope, 5, () => (snippets.option), () => __meeko.renderSnippet(4, snippets.option, [(__meeko_item_7.value).option, select.stateOf((__meeko_item_7.value))]), (__scope) => { const __meeko_cleanups: Array<() => void> = [];
   try {
     __meeko_cleanups.push(__meeko.bindSnippet(__scope, 4, () => (snippets.option), () => [(__meeko_item_7.value).option, select.stateOf((__meeko_item_7.value))]));
@@ -130,7 +130,7 @@ __meeko_cleanups.push(__meeko.bindIf(__scope, 5, () => (snippets.option), () => 
   } catch (__meeko_error) { __meeko.releaseAll(__meeko_cleanups, { error: __meeko_error }); } }));
 __meeko_cleanups.push(__meeko.bindIf(__scope, 6, () => (!snippets.option), () => "<!--meeko:text:1-->" + __meeko.escapeHtml((__meeko_item_7.value).label) + "<!--/meeko:text:1-->", (__scope) => { const __meeko_cleanups: Array<() => void> = [];
   try {
-    __meeko_cleanups.push(__meeko.bindText(__scope, 1, () => ((__meeko_item_7.value).label), "MeekoSelect.meeko:27:4151 (text 1)"));
+    __meeko_cleanups.push(__meeko.bindText(__scope, 1, () => ((__meeko_item_7.value).label), "MeekoSelect.meeko:27:4153 (text 1)"));
     return () => __meeko.releaseAll(__meeko_cleanups);
   } catch (__meeko_error) { __meeko.releaseAll(__meeko_cleanups, { error: __meeko_error }); } }));
     return () => __meeko.releaseAll(__meeko_cleanups);
@@ -151,7 +151,7 @@ __meeko_cleanups.push(__meeko.bindIf(__scope, 14, () => (!select.loading.value &
   } catch (__meeko_error) { __meeko.releaseAll(__meeko_cleanups, { error: __meeko_error }); } }));
 __meeko_cleanups.push(__meeko.bindIf(__scope, 13, () => (!snippets.empty), () => "<!--meeko:text:2-->" + __meeko.escapeHtml("Sin resultados") + "<!--/meeko:text:2-->", (__scope) => { const __meeko_cleanups: Array<() => void> = [];
   try {
-    __meeko_cleanups.push(__meeko.bindText(__scope, 2, () => ("Sin resultados"), "MeekoSelect.meeko:27:4521 (text 2)"));
+    __meeko_cleanups.push(__meeko.bindText(__scope, 2, () => ("Sin resultados"), "MeekoSelect.meeko:27:4523 (text 2)"));
     return () => __meeko.releaseAll(__meeko_cleanups);
   } catch (__meeko_error) { __meeko.releaseAll(__meeko_cleanups, { error: __meeko_error }); } }));
     return () => __meeko.releaseAll(__meeko_cleanups);
@@ -265,15 +265,15 @@ __meeko_cleanups.push(__meeko.bindAttribute(__scope, 0, "data-loading", () => (s
 __meeko_cleanups.push(__meeko.bindElementRef(__scope, __meeko_refs, 0, 0));
 __meeko_cleanups.push(__meeko.bindFor(__scope, 28, () => (select.hiddenValues.value), __meeko.indexKey, (value, index) => "<input" + " type=\"hidden\"" + __meeko.renderAttribute("name", select.name.value) + __meeko.renderAttribute("value", value) + __meeko.renderAttribute("disabled", props.disabled) + " data-meeko=\"7\"" + ">", (__meeko_item_28, __meeko_index_28, __scope) => { const __meeko_cleanups: Array<() => void> = [];
   try {
-    __meeko_cleanups.push(__meeko.bindAttribute(__scope, 7, "name", () => (select.name.value), "MeekoSelect.meeko:27:4660 (attribute name)"));
-__meeko_cleanups.push(__meeko.bindAttribute(__scope, 7, "value", () => ((__meeko_item_28.value)), "MeekoSelect.meeko:27:4691 (attribute value)"));
-__meeko_cleanups.push(__meeko.bindAttribute(__scope, 7, "disabled", () => (props.disabled), "MeekoSelect.meeko:27:4713 (attribute disabled)"));
+    __meeko_cleanups.push(__meeko.bindAttribute(__scope, 7, "name", () => (select.name.value), "MeekoSelect.meeko:27:4662 (attribute name)"));
+__meeko_cleanups.push(__meeko.bindAttribute(__scope, 7, "value", () => ((__meeko_item_28.value)), "MeekoSelect.meeko:27:4693 (attribute value)"));
+__meeko_cleanups.push(__meeko.bindAttribute(__scope, 7, "disabled", () => (props.disabled), "MeekoSelect.meeko:27:4715 (attribute disabled)"));
     return () => __meeko.releaseAll(__meeko_cleanups);
   } catch (__meeko_error) { __meeko.releaseAll(__meeko_cleanups, { error: __meeko_error }); } }, false));
 __meeko_cleanups.push(__meeko.bindIf(__scope, 29, () => (props.required), () => "<input" + " type=\"text\"" + " hidden=\"\"" + " required=\"\"" + " tabindex=\"-1\"" + " aria-hidden=\"true\"" + " data-meeko-select-validity=\"\"" + __meeko.renderAttribute("value", select.selected.value.length ? 'selected' : '') + __meeko.renderAttribute("disabled", props.disabled) + " data-meeko=\"8\"" + ">", (__scope) => { const __meeko_cleanups: Array<() => void> = [];
   try {
-    __meeko_cleanups.push(__meeko.bindAttribute(__scope, 8, "value", () => (select.selected.value.length ? 'selected' : ''), "MeekoSelect.meeko:27:4861 (attribute value)"));
-__meeko_cleanups.push(__meeko.bindAttribute(__scope, 8, "disabled", () => (props.disabled), "MeekoSelect.meeko:27:4924 (attribute disabled)"));
+    __meeko_cleanups.push(__meeko.bindAttribute(__scope, 8, "value", () => (select.selected.value.length ? 'selected' : ''), "MeekoSelect.meeko:27:4865 (attribute value)"));
+__meeko_cleanups.push(__meeko.bindAttribute(__scope, 8, "disabled", () => (props.disabled), "MeekoSelect.meeko:27:4928 (attribute disabled)"));
 {
       __meeko_cleanups.push(__meeko.bindEvent(__scope, 8, "invalid", (__meeko_event: Event) => {
         return ((__meeko_handler: (event: __meeko.EventOf<"invalid", false> & { readonly currentTarget: __meeko.ElementOf<"input", false> }) => unknown) => __meeko_handler(__meeko_event as __meeko.EventOf<"invalid", false> & { readonly currentTarget: __meeko.ElementOf<"input", false> }))(select.reportInvalid);

@@ -1,5 +1,8 @@
 import { parseFragment } from "parse5";
 
+import { htmlTagNames, voidTagNames } from "../../shared/html-data/tags";
+import { interpolationClose } from "./interpolation";
+
 /** Ubicación de un diagnóstico en el archivo .meeko original. */
 export interface SourceLocation {
   offset: number;
@@ -103,6 +106,14 @@ export interface MaskedHtml {
   readonly selfClosing: ReadonlySet<number>;
   /** Inicio de cada etiqueta de componente, de apertura o de cierre. */
   readonly tags: readonly number[];
+  /** Cada `<` de una interpolación del texto (`{a < b}`), que el parser lee como `_`. */
+  readonly interpolated: readonly number[];
+  /**
+   * Inicio de cada elemento HTML no vacío escrito como `<div />`, que equivale a `<div></div>`.
+   * También está en `selfClosing`.
+   * @since 1.8.0
+   */
+  readonly elements: ReadonlySet<number>;
 }
 
 const rawTextElement = /<(?:script|style|textarea|title|xmp|iframe|noembed|noframes|noscript|plaintext)(?=[\s/>])/iy;
@@ -113,6 +124,41 @@ const formTag = /<(\/?)f[Oo][Rr][Mm](?=[\s/>])/y;
 export const maskedFormTag = "jorm";
 /** Table tags whose structure must survive when supplied through component snippets. */
 export const snippetTableTags: ReadonlySet<string> = new Set(["table", "caption", "colgroup", "col", "thead", "tbody", "tfoot", "tr", "th", "td"]);
+
+/** SVG and MathML elements whose names have a hyphen; the HTML standard reserves them. */
+export const hyphenatedStandardElements: ReadonlySet<string> = new Set(["annotation-xml", "color-profile", "font-face", "font-face-src", "font-face-uri", "font-face-format", "font-face-name", "missing-glyph"]);
+
+/**
+ * HTML elements that keep their end tag when written `<tag />`: the void ones already end in their
+ * start tag, and the sections, raw-text scripts and document structure have no empty form.
+ */
+const keepsEndTag = new Set([...voidTagNames.split(" "), "param", "html", "head", "body", "template", "script", "style"]);
+const selfClosableHtml = new Set(htmlTagNames.split(" ").filter((name) => !keepsEndTag.has(name)));
+/**
+ * Self-closing elements that keep their name for the parser: the table and select insertion modes
+ * would move a renamed one out of its row or list. The next sibling or the end tag closes them.
+ */
+const keepsNameWhenSelfClosing = new Set(["caption", "colgroup", "thead", "tbody", "tfoot", "tr", "th", "td", "option", "optgroup"]);
+
+/**
+ * Indica si `<name />`, en minúsculas, es desde 1.8 un elemento HTML sin contenido equivalente a
+ * `<name></name>`: un elemento HTML no vacío o un elemento personalizado. Los elementos vacíos
+ * (`<input />`), `<template>`, `<script>`, `<style>` y los desconocidos dan `false`; los de SVG y
+ * MathML también, porque el parser HTML ya respeta su `/>`.
+ *
+ * @example
+ * ```ts
+ * isSelfClosableElement("div"); // true
+ * isSelfClosableElement("input"); // false: es un elemento vacío
+ * ```
+ * @since 1.8.0
+ */
+export function isSelfClosableElement(name: string): boolean {
+  return name.includes("-") ? !hyphenatedStandardElements.has(name) : selfClosableHtml.has(name);
+}
+
+/** What a `<` inside a text interpolation becomes for the HTML parser, at the same position. */
+const maskedLessThan = "_";
 
 /** Final `>` of a start tag whose attributes begin at `from`, and whether it ends in `/>`. */
 function startTagEnd(html: string, from: number): { end: number; selfClosing: boolean } | undefined {
@@ -144,19 +190,40 @@ function startTagEnd(html: string, from: number): { end: number; selfClosing: bo
  * `/` de `<AppButton />` pasa a espacio. Quien analiza el árbol recupera el nombre original y
  * devuelve como hermanos los nodos que el parser metió dentro de una etiqueta autocerrada.
  * `blankComponents` borra cada etiqueta de componente cuando sólo interesan las secciones del
- * archivo: la plantilla valida después su cierre con mensajes propios.
+ * archivo: la plantilla valida después su cierre con mensajes propios. Un `{...}` del texto es
+ * una expresión, como en `scanInterpolations`: cada `<` suyo (`{a < b}`, `{"<b>"}`) pasa a `_`
+ * para que no abra una etiqueta; el compilador lee la expresión del texto original.
  */
 export function maskComponentTags(html: string, options: { blankComponents?: boolean; tableSnippets?: boolean } = {}): MaskedHtml {
   const chars = html.split("");
   const lower = html.toLowerCase();
   const selfClosing = new Set<number>();
+  const elements = new Set<number>();
   const tags: number[] = [];
   let changed = false;
   type TableTag = { name: string; at: number; offset: number; end: number; selfClosing: boolean };
   const tables: Array<{ tags: TableTag[]; template: boolean; cells: number; componentDepth: number }> = [];
   const preserve: TableTag[] = [];
   let componentDepth = 0;
-  for (let index = html.indexOf("<"); index >= 0 && index < html.length; index = html.indexOf("<", index)) {
+  const interpolated: number[] = [];
+  let brace = -1;
+  // A `{...}` of the text is an expression: its `<` (`{a < b}`, `{"<b>"}`) never opens a tag.
+  const nextTag = (from: number): number => {
+    for (let at = from; ;) {
+      const tag = html.indexOf("<", at);
+      if (brace < at) brace = html.indexOf("{", at);
+      if (tag < 0 || brace < 0 || tag < brace) return tag;
+      const close = interpolationClose(html, brace);
+      if (close === undefined) return tag;
+      for (let lessThan = html.indexOf("<", brace); lessThan >= 0 && lessThan < close; lessThan = html.indexOf("<", lessThan + 1)) {
+        chars[lessThan] = maskedLessThan;
+        interpolated.push(lessThan);
+        changed = true;
+      }
+      at = close + 1;
+    }
+  };
+  for (let index = nextTag(0); index >= 0 && index < html.length; index = nextTag(index)) {
     if (html.startsWith("<!--", index)) {
       const close = html.indexOf("-->", index + 4);
       if (close < 0) break;
@@ -165,7 +232,8 @@ export function maskComponentTags(html: string, options: { blankComponents?: boo
     }
     rawTextElement.lastIndex = index;
     const raw = /[a-z]/.test(html[index + 1] ?? "") ? rawTextElement.exec(html) : null;
-    if (raw) {
+    // `<textarea />` has no text to skip: it is an empty element like `<div />`.
+    if (raw && !(isSelfClosableElement(raw[0].slice(1).toLowerCase()) && startTagEnd(html, index + raw[0].length)?.selfClosing)) {
       const close = lower.indexOf(`</${raw[0].slice(1).toLowerCase()}`, index + raw[0].length);
       if (close < 0) break;
       index = close + 2;
@@ -185,11 +253,15 @@ export function maskComponentTags(html: string, options: { blankComponents?: boo
       // Skip the attributes of an HTML start tag: a value may contain `<Name`.
       const element = /^<(\/?)([a-z][^\s/>]*)/i.exec(html.slice(index, index + 256));
       const end = element ? startTagEnd(html, index + element[0].length) : undefined;
-      if (options.tableSnippets && element && end) {
+      // Since 1.8 `<div />` is `<div></div>`: an empty element, open and closed at once.
+      const empty = element !== null && end !== undefined && element[1] === "" && end.selfClosing && isSelfClosableElement(element[2]!.toLowerCase());
+      if (options.tableSnippets && element && end && !(empty && options.blankComponents)) {
         const closing = element[1] === "/";
         const name = element[2]!.toLowerCase();
         const token: TableTag = { name, at: index + (closing ? 2 : 1), offset: index, end: end.end, selfClosing: end.selfClosing };
-        if (name === "table" && !closing) tables.push({ tags: [token], template: false, cells: 0, componentDepth });
+        if (name === "table" && empty) {
+          // Renamed below, an empty table has no rows to track.
+        } else if (name === "table" && !closing) tables.push({ tags: [token], template: false, cells: 0, componentDepth });
         else if (name === "table" && closing) {
           const table = tables.pop();
           if (table) { table.tags.push(token); if (table.template) preserve.push(...table.tags); }
@@ -197,7 +269,7 @@ export function maskComponentTags(html: string, options: { blankComponents?: boo
           const table = tables.at(-1);
           if (table && componentDepth <= table.componentDepth) {
             table.tags.push(token);
-            if (name === "th" || name === "td") table.cells = Math.max(0, table.cells + (closing ? -1 : 1));
+            if ((name === "th" || name === "td") && !empty) table.cells = Math.max(0, table.cells + (closing ? -1 : 1));
           }
           else if (componentDepth > 0) preserve.push(token);
         } else if (!closing && (name === "render" || name === "snippet" || name === "component")) {
@@ -211,6 +283,15 @@ export function maskComponentTags(html: string, options: { blankComponents?: boo
         chars[end.end - 1] = " ";
         changed = true;
         selfClosing.add(index);
+        if (options.blankComponents) chars.fill(" ", index, end.end + 1);
+      } else if (empty) {
+        // The parser keeps it open and normalize closes it, as with `<Name />`. Renamed with a `j`,
+        // `<textarea />` reads no raw text and `<table />` moves no sibling out of it.
+        chars[end.end - 1] = " ";
+        if (!keepsNameWhenSelfClosing.has(element[2]!.toLowerCase())) chars[index + 1] = "j";
+        changed = true;
+        selfClosing.add(index);
+        elements.add(index);
         if (options.blankComponents) chars.fill(" ", index, end.end + 1);
       }
       index = element ? (end?.end ?? html.length) + 1 : index + 1;
@@ -245,12 +326,12 @@ export function maskComponentTags(html: string, options: { blankComponents?: boo
       changed = true;
     }
   }
-  return { text: changed ? chars.join("") : html, selfClosing, tags };
+  return { text: changed ? chars.join("") : html, selfClosing, tags, interpolated, elements };
 }
 
 /** Spanish descriptions of the parse5 error codes that a .meeko file can reach. */
 const parseErrorMessages: Readonly<Record<string, string>> = {
-  "non-void-html-element-start-tag-with-trailing-solidus": "sólo los elementos vacíos (<br />, <img />…), las etiquetas de componente y <component>, <render> y <snippet> pueden cerrarse con />; escribe la etiqueta de cierre",
+  "non-void-html-element-start-tag-with-trailing-solidus": "<template>, <script>, <style>, <html>, <head>, <body> y los elementos desconocidos no pueden cerrarse con />; escribe la etiqueta de cierre",
   "end-tag-with-attributes": "una etiqueta de cierre no lleva atributos",
   "end-tag-with-trailing-solidus": "una etiqueta de cierre no termina en />",
   "unexpected-solidus-in-tag": "hay una / suelta dentro de la etiqueta",

@@ -35,13 +35,13 @@ export function unshadowed(guards: readonly Guard[], names: Iterable<string | un
   return guards.filter((guard) => !shadowing.some((name) => guard.names.has(name)));
 }
 
-export function validateExpression(expression: string, source: string, filename: string, offset: number): void {
+export function validateExpression(expression: string, source: string, filename: string, offset: number, sourcePosition: (position: number) => number = (position) => position): void {
   const prefix = "const __check = (";
   const parsed = ts.createSourceFile(filename, `${prefix}${expression});`, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS) as ts.SourceFile & { parseDiagnostics: readonly ts.DiagnosticWithLocation[] };
   const error = parsed.parseDiagnostics[0];
   if (error) {
     const position = Math.max(0, Math.min(expression.length, (error.start ?? prefix.length) - prefix.length));
-    throw compileError(source, filename, "MEEK020", ts.flattenDiagnosticMessageText(error.messageText, "\n"), offset + position);
+    throw compileError(source, filename, "MEEK020", ts.flattenDiagnosticMessageText(error.messageText, "\n"), offset + sourcePosition(position));
   }
 }
 

@@ -156,7 +156,9 @@ test("la sintaxis de composición rechaza referencias, contenido y props no comp
     { template: `<component bind:label="'x'"></component>`, code: "MEEK030" },
     // Since 1.5 children are allowed: a void tag of `is` with content is MEEK031.
     { template: `<component is="'img'"><span>nested</span></component>`, code: "MEEK031" },
-    { template: `<AppChild data-label="x"></AppChild>`, code: "MEEK032" },
+    // Since 1.8 aria-* and data-* are props of a component; other hyphenated names are not.
+    { template: `<AppChild x-label="x"></AppChild>`, code: "MEEK032" },
+    { template: `<AppChild data-meeko-label="x"></AppChild>`, code: "MEEK032" },
   ];
   for (const { template, code } of cases) {
     const source = `${script}\n<template>${template}</template>`;

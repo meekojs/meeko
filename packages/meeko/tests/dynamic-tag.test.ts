@@ -209,6 +209,59 @@ async function checkAll(files: Record<string, string>, names: readonly string[])
   }
 }
 
+// The <a> and <button> branch of the polymorphic button of docs/api.md: `type` always has a value,
+// `props.type ?? 'button'`, and still only the <button> gets it.
+const actionButton = `<script lang="ts">
+import { computed } from "@meekojs/meeko";
+const props = defineProps<{ href?: string; target?: string; type?: "button" | "submit" | "reset"; disabled?: boolean }>();
+const linkRel = computed(() => props.target === "_blank" ? "noopener noreferrer" : undefined);
+</script>
+<template><component is="props.href !== undefined ? 'a' : 'button'" class="action" bind:href="props.href" bind:target="props.target" bind:rel="linkRel.value" bind:type="props.type ?? 'button'" bind:disabled="props.disabled">x</component></template>`;
+
+const actionPage = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+import * as Action from "./Action.meeko";
+const href = signal<string | undefined>("/docs");
+</script>
+<template><main><Action bind:href="href.value" type="submit" bind:disabled="true" target="_blank" /><i class="toggle" on:click="() => href.value = href.value === undefined ? '/docs' : undefined"></i></main></template>`;
+
+test("the <a> of the polymorphic button never gets type or disabled, in SSR or after a tag change", async () => {
+  const { component, cleanup } = await load({ Action: actionButton }, "Action");
+  try {
+    assert.equal(component.renderToString({ href: "/docs", type: "submit", disabled: true }), `<a class="action" href="/docs" data-meeko="0">x</a>`);
+    assert.equal(component.renderToString({ href: "/docs", target: "_blank" }), `<a class="action" href="/docs" target="_blank" rel="noopener noreferrer" data-meeko="0">x</a>`);
+    assert.equal(component.renderToString({}), `<button class="action" type="button" data-meeko="0">x</button>`);
+    assert.equal(component.renderToString({ type: "submit", disabled: true }), `<button class="action" type="submit" disabled="" data-meeko="0">x</button>`);
+  } finally {
+    await cleanup();
+  }
+  const page = await load({ Action: actionButton, Page: actionPage }, "Page");
+  const window = new Window();
+  try {
+    const root = window.document.createElement("main");
+    window.document.body.appendChild(root);
+    const rendered = page.component.renderWithState({});
+    root.innerHTML = rendered.html;
+    const element = (): HTMLElement => root.querySelector(".action") as unknown as HTMLElement;
+    const toggle = (): void => (root.querySelector("i.toggle") as unknown as HTMLElement).click();
+    const attributes = (): string[] => element().getAttributeNames().filter((name) => name !== "data-meeko").sort();
+    assert.equal(element().localName, "a");
+    assert.deepEqual(attributes(), ["class", "href", "rel", "target"]);
+    const release = page.component.hydrate(root as unknown as Element, {}, rendered.state);
+    toggle();
+    assert.equal(element().localName, "button");
+    assert.deepEqual(attributes(), ["class", "disabled", "type"]);
+    assert.equal(element().getAttribute("type"), "submit");
+    toggle();
+    assert.equal(element().localName, "a");
+    assert.deepEqual(attributes(), ["class", "href", "rel", "target"]);
+    release();
+  } finally {
+    window.happyDOM.abort();
+    await page.cleanup();
+  }
+});
+
 test("the button type-checks, with currentTarget typed as the union of its elements", async () => {
   const handlers = `<script lang="ts">
 const props = defineProps<{ href?: string }>();
@@ -347,6 +400,53 @@ test("bind=\"obj\" writes an object's attributes, below the explicit ones, and f
     assert.ok(errors.some((error) => error instanceof TypeError && /^MEEK113: /.test(error.message)), String(errors));
     assert.equal(paragraph.hasAttribute("onclick"), false);
     release();
+  } finally {
+    window.happyDOM.abort();
+    await cleanup();
+  }
+});
+
+const joining = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const on = signal(true);
+const color = signal<string | undefined>("color: red");
+const rows = signal([{ id: "a", active: true }, { id: "b", active: false }]);
+</script>
+<template><div><article class="card" bind:class="on.value ? 'ring-4' : undefined" style="margin: 0;" bind:style="color.value">x</article><p bind:class="on.value && 'late'" class="first">y</p><ul><li each:of="rows.value" each:as="row" each:key="row.id" class="row" bind:class="row.active ? 'on' : ''">{row.id}</li></ul><component is="rows.value.length ? 'span' : 'em'" class="tag" bind:class="on.value ? 'lit' : null">z</component><button on:click="() => { on.value = !on.value; color.value = color.value ? undefined : 'color: blue'; rows.value = rows.value.map((row) => ({ ...row, active: !row.active })); }">t</button></div></template>`;
+
+test("class and style beside bind:class and bind:style write one attribute in SSR, hydration and updates", async () => {
+  // Before 1.8, SSR wrote `class="card" class="ring-4"`: the browser kept the first one, and
+  // hydration failed because the element's class was not the dynamic value.
+  const { component, cleanup } = await load({ Joining: joining }, "Joining");
+  const window = new Window();
+  try {
+    const rendered = component.renderWithState({});
+    assert.equal((rendered.html.match(/ class="/g) ?? []).length, 5, rendered.html);
+    assert.match(rendered.html, /<article class="card ring-4" style="margin: 0; color: red"/);
+    assert.match(rendered.html, /<p class="first late"/);
+    assert.deepEqual([...rendered.html.matchAll(/<li class="([^"]*)"/g)].map((match) => match[1]), ["row on", "row"]);
+    assert.match(rendered.html, /<span class="tag lit"/);
+    assert.doesNotMatch(rendered.html, /style="[^"]*"[^>]*style=/);
+    const root = window.document.createElement("main");
+    root.innerHTML = rendered.html;
+    const release = component.hydrate(root as unknown as Element, {}, rendered.state);
+    const article = root.querySelector("article")!;
+    const button = root.querySelector("button") as unknown as HTMLElement;
+    button.click();
+    // The dynamic value is gone: the static text stays as written.
+    assert.equal(article.getAttribute("class"), "card");
+    assert.equal(article.getAttribute("style"), "margin: 0;");
+    assert.equal(root.querySelector("p")!.getAttribute("class"), "first");
+    assert.deepEqual([...root.querySelectorAll("li")].map((item) => item.getAttribute("class")), ["row", "row on"]);
+    assert.equal(root.querySelector("span")!.getAttribute("class"), "tag");
+    button.click();
+    assert.equal(article.getAttribute("class"), "card ring-4");
+    assert.equal(article.getAttribute("style"), "margin: 0; color: blue");
+    assert.equal(root.querySelector("span")!.getAttribute("class"), "tag lit");
+    release();
+    // Released: the bindings no longer follow the signals.
+    button.click();
+    assert.equal(article.getAttribute("class"), "card ring-4");
   } finally {
     window.happyDOM.abort();
     await cleanup();

@@ -50,6 +50,35 @@ export function analyzeSnippets(file: ts.SourceFile): SnippetsDeclaration | unde
   return found;
 }
 
+/** `node` without the parentheses around it. */
+function unparenthesized(node: ts.TypeNode): ts.TypeNode {
+  return ts.isParenthesizedTypeNode(node) ? unparenthesized(node.type) : node;
+}
+
+/** Whether `node` is a mapped type, written in place or as a type alias of the same script. */
+function isMappedMember(node: ts.TypeNode, file: ts.SourceFile): boolean {
+  const type = unparenthesized(node);
+  if (ts.isMappedTypeNode(type)) return true;
+  if (!ts.isTypeReferenceNode(type) || !ts.isIdentifier(type.typeName)) return false;
+  const name = type.typeName.text;
+  const alias = file.statements.find((statement): statement is ts.TypeAliasDeclaration => ts.isTypeAliasDeclaration(statement) && statement.name.text === name);
+  return alias !== undefined && ts.isMappedTypeNode(unparenthesized(alias.type));
+}
+
+/**
+ * Members of a `defineSnippets` type that the component reads one by one: an intersection with a
+ * mapped type, such as `` { [K in keyof Row & string as `cell-${K}`]?: [row: Row, value: Row[K]] } & { cell?: [] } ``.
+ * Over a type parameter, TypeScript cannot read `cell` from the whole intersection (`T["cell"]`
+ * stays deferred), but it can from the map of each member, so the compiler types the component's
+ * own `snippets` as `SnippetMap<A> & SnippetMap<B>`. `undefined` for any other type, which keeps a
+ * single `SnippetMap<T>`, so `typeof snippets` does not change for it.
+ */
+export function snippetTypeParts(typeArgument: ts.TypeNode, file: ts.SourceFile): readonly ts.TypeNode[] | undefined {
+  const type = unparenthesized(typeArgument);
+  if (!ts.isIntersectionTypeNode(type) || !type.types.some((member) => isMappedMember(member, file))) return undefined;
+  return type.types;
+}
+
 import { jsdoc } from "./compiler-docs";
 
 export const defineSnippetsDocs = jsdoc(
@@ -65,6 +94,11 @@ export const defineSnippetsDocs = jsdoc(
     "Desde `1.4`, el valor de una clave también puede ser un `Snippet<Args>`, que cuenta como",
     "`Args`: así se reutilizan los snippets de otro componente con `Omit`, `Pick` o `&`, por",
     "ejemplo `defineSnippets<Omit<AppCardSnippets, \"footer\"> & { actions?: [close: () => void] }>()`.",
+    "",
+    "Desde `1.8`, un nombre puede llevar guiones (`<snippet name=\"cell-email\">`, `snippets['cell-email']`)",
+    "y las claves pueden salir de un tipo mapeado sobre un genérico, como",
+    "``{ [K in keyof Row & string as `cell-${K}`]?: [row: Row, value: Row[K]] }``: el padre recibe",
+    "`value` con el tipo de cada columna.",
     "",
     "@since 1.1.0",
     "@example",
@@ -99,8 +133,13 @@ import type { Snippet } from "../runtime/snippets";
  */
 type SnippetEntry = readonly unknown[] | Snippet<never>;
 
-/** Constraint of a `defineSnippets` type: every snippet maps to its parameters, as a tuple or a `Snippet`. */
-export type SnippetTypes<T extends { [K in keyof T]: SnippetEntry }> = T;
+/**
+ * Constraint of a `defineSnippets` type: every snippet maps to its parameters, as a tuple or a
+ * `Snippet`. Since 1.8 the index-signature member also accepts mapped types over a type parameter,
+ * such as `` { [K in keyof Row & string as `cell-${K}`]?: [row: Row, value: Row[K]] } ``, whose keys
+ * TypeScript cannot list; the mapped member keeps interfaces valid.
+ */
+export type SnippetTypes<T extends { readonly [name: string]: SnippetEntry | undefined } | { [K in keyof T]: SnippetEntry }> = T;
 
 /**
  * Parameter tuple of a snippet type: the tuple itself or the `Args` of a `Snippet<Args>`.

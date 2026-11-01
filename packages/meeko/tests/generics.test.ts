@@ -128,7 +128,7 @@ test("generic gives the compiled module generic types and functions", () => {
 
   // Defaults keep their helpers' own parameters apart from the component's.
   const defaults = compile(`<script lang="ts" generic="T, K extends string = 'id'">\nconst props = defineProps<{ value: T; key?: K; label?: string }>({ label: "x" });\n</script><template><p>{props.label}{String(props.value)}</p></template>`, "Defaults.meeko").code;
-  assert.ok(defaults.includes("type __MeekoResolvedPropsOf<__P, T, K extends string = 'id'> = __P extends unknown ? Omit<__P, __MeekoDefaultKeys<T, K>> & __MeekoDefaultValues<T, K> : never;"), defaults);
+  assert.ok(defaults.includes("type __MeekoResolvedPropsOf<__P, T, K extends string = 'id'> = __P extends unknown ? Omit<__P, __MeekoDefaultKeys<T, K>> & { [__K in keyof Pick<__P, __MeekoDefaultKeys<T, K> & keyof __P>]-?: Exclude<__P[__K], undefined> } : never;"), defaults);
   assert.ok(defaults.includes("type __MeekoComponentProps<T, K extends string = 'id'> = __MeekoInputPropsOf<__MeekoDeclaredProps<T, K>, T, K>;"));
   assert.ok(defaults.includes("return __meeko.resolveProps(input, __meeko_defaultProps<T, K>()) as __MeekoResolvedProps<T, K>;"), defaults);
 

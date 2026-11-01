@@ -64,6 +64,11 @@ test("generated ComponentProps makes only defaulted fields optional to TypeScrip
     const unionSource = `<script lang="ts">type Props = ({ kind: "a"; a: number } | { kind: "b"; b: string }) & { count: number }; const props = defineProps<Props>({ count: 0 });</script><template>{props.count}</template>`;
     await writeFile(unionFile, unionSource);
     await generateTypes(unionSource, unionFile);
+    // A default of the discriminant: the declaration keeps it optional only in the member that admits it.
+    const discriminantFile = join(root, "src", "Discriminant.meeko");
+    const discriminantSource = `<script lang="ts">type Props = { kind: "a"; a: string } | { kind: "b"; b: string }; const { kind = "a" } = defineProps<Props>();</script><template>{kind}</template>`;
+    await writeFile(discriminantFile, discriminantSource);
+    await generateTypes(discriminantSource, discriminantFile);
     const parent = `<script lang="ts">import * as Card from "./Card.meeko";</script><template><component is="Card" bind:required="'yes'"></component></template>`;
     assert.deepEqual((await checkSource(parent, join(root, "src", "Parent.meeko"))).filter((diagnostic) => diagnostic.severity !== "warning"), []);
     const wrongChild = `<script lang="ts">import * as Card from "./Card.meeko";</script><template><component is="Card" bind:required="'yes'" bind:count="'wrong'"></component></template>`;
@@ -78,6 +83,7 @@ test("generated ComponentProps makes only defaulted fields optional to TypeScrip
       /required/.test(entry.message)), JSON.stringify(missingChildDiagnostics));
     await writeFile(join(root, "src", "consumer.ts"), `import type { ComponentProps } from "./Card.meeko";
 import type { ComponentProps as UnionProps } from "./Union.meeko";
+import type { ComponentProps as DiscriminantProps } from "./Discriminant.meeko";
 const valid: ComponentProps = { required: "yes" };
 const overridden: ComponentProps = { required: "yes", count: 2, label: "Other" };
 const undefinedInput: ComponentProps = { required: "yes", label: undefined };
@@ -93,6 +99,11 @@ const variantB: UnionProps = { kind: "b", b: "yes" };
 const invalidVariant: UnionProps = { kind: "a", b: "yes" };
 void valid; void overridden; void undefinedInput; void missing; void wrong;
 void variantA; void variantB; void invalidVariant;
+const defaultKind: DiscriminantProps = { a: "x" };
+const otherKind: DiscriminantProps = { kind: "b", b: "y" };
+// @ts-expect-error the member that the default does not admit still requires its discriminant
+const omittedKind: DiscriminantProps = { b: "hello" };
+void defaultKind; void otherKind; void omittedKind;
 `);
     await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: {
       target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", strict: true, noEmit: true,

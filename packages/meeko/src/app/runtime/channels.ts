@@ -140,6 +140,22 @@ export type ComponentTag<Module> = 0 extends 1 & Module ? LooseTag : [Module] ex
   : true extends IsUnion<Module> ? ModuleTag<Module>
   : Module extends { readonly __meekoTag: infer Tag } ? Tag : ModuleTag<Module>;
 
+/** Channels of a branch: those of the module, plus any other name, which belongs to another branch. */
+type BranchChannel<Channel> = [Channel] extends [null] ? LooseChannel : Channel & LooseChannel;
+
+/**
+ * Comprobación de la rama de un componente en `<component is>` con nombres (desde 1.8), como
+ * `'UICard'` en `big ? 'UICard' : 'section'`: las props, modelos y snippets del componente conservan
+ * su tipo, pero un nombre que no declara no es una propiedad sobrante, porque puede ser de otra
+ * rama. Que alguna rama lo admita lo comprueba aparte `checkBranchAttribute`.
+ */
+export type BranchTag<Module> = (
+  props: TagProps<PropsOf<Module>> & ExtraProps & LooseChannel,
+  events: LooseChannel,
+  models: NoInfer<BranchChannel<ChannelsOf<Module> extends { readonly models: infer Models } ? Models : null>>,
+  snippets: NoInfer<BranchChannel<ChannelsOf<Module> extends { readonly snippets: infer Snippets } ? Snippets : null>>,
+) => TagInput<ExposedOf<Module>>;
+
 /** Modelos, snippets o nombres de evento vacíos de una etiqueta; entonces la etiqueta no pasa canales. */
 export const noChannels: {} = Object.freeze({});
 
@@ -155,6 +171,12 @@ function tagInput(props: object, _events: object, models: Record<string, unknown
 export function componentTag<Module>(component: () => Module): ComponentTag<Module> {
   void component;
   return tagInput as unknown as ComponentTag<Module>;
+}
+
+/** `componentTag` of a component branch of `<component is>` with names; see {@link BranchTag}. Only for generated code. */
+export function branchTag<Module>(component: () => Module): BranchTag<Module> {
+  void component;
+  return tagInput as unknown as BranchTag<Module>;
 }
 
 /**

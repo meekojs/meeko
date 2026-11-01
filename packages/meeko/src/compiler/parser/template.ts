@@ -2,7 +2,7 @@ import { parseFragment } from "parse5";
 
 import type { SfcSection } from "./sfc";
 
-import { compileError, maskComponentTags, maskedFormTag, parseErrorMessage, snippetTableTags } from "./sfc";
+import { compileError, hyphenatedStandardElements, maskComponentTags, maskedFormTag, parseErrorMessage, snippetTableTags } from "./sfc";
 
 /** Atributo normalizado de una etiqueta de plantilla. */
 export interface TemplateAttribute {
@@ -26,7 +26,11 @@ export interface TemplateNode {
   end: number;
   /** Nombre original de una etiqueta de componente (`AppButton`); `tagName` lo conserva igual. */
   componentName?: string;
-  /** La etiqueta de componente se escribió como `<Name />`. */
+  /**
+   * La etiqueta se escribió autocerrada y no tiene etiqueta de cierre: un componente (`<Name />`),
+   * `<component />`, `<render />`, `<snippet />` o, desde 1.8, un elemento HTML no vacío (`<div />`).
+   * Los elementos vacíos (`<input />`) y los de SVG o MathML no lo llevan.
+   */
   selfClosing?: boolean;
   sourceCodeLocation?: {
     startOffset: number;
@@ -59,6 +63,8 @@ interface NormalizeContext {
   readonly filename: string;
   readonly template: SfcSection;
   readonly selfClosing: ReadonlySet<number>;
+  /** HTML elements written `<div />`, which the parser read with a masked name. */
+  readonly elements: ReadonlySet<number>;
 }
 
 /** Hijos normalizados; los que el parser metió en un `<Name />` vuelven a ser hermanos. */
@@ -120,6 +126,17 @@ function normalize(node: ParsedNode, context: NormalizeContext): TemplateNode {
     const original = /^<([a-z][\w-]*)/.exec(template.content.slice(location.startOffset, location.startOffset + 256))?.[1];
     if (original && snippetTableTags.has(original)) { result.nodeName = original; result.tagName = original; }
   }
+  // An implied `<tbody>` has a null location.
+  const element = location != null && context.elements.has(location.startOffset);
+  if (element) {
+    // `<div />` was read as `<jiv  >`; the source keeps its name.
+    const original = /^<([a-z][^\s/>]*)/i.exec(template.content.slice(location.startOffset, location.startOffset + 256))?.[1]?.toLowerCase();
+    if (original) { result.nodeName = original; result.tagName = original; }
+    // `<td /></td>`: a table or list element keeps its name, so its own end tag would close it.
+    if (location.endTag) {
+      throw compileError(context.source, context.filename, "MEEK008", `HTML de plantilla no válido: <${original} /> ya está cerrada; quita ${template.content.slice(location.endTag.startOffset, location.endTag.endOffset)} o escribe <${original}></${original}>`, template.contentStart + location.endTag.startOffset);
+    }
+  }
   if (node.tagName !== undefined && node.namespaceURI !== undefined) result.namespaceURI = node.namespaceURI;
   const componentName = componentTagName(node, context);
   if (componentName !== undefined) {
@@ -131,8 +148,8 @@ function normalize(node: ParsedNode, context: NormalizeContext): TemplateNode {
   if (node.childNodes !== undefined) result.childNodes = normalizeChildren(node.childNodes, context);
   if (node.content !== undefined) result.content = { childNodes: normalizeChildren(node.content.childNodes ?? [], context) };
   if (location !== undefined) result.sourceCodeLocation = location;
-  if ((componentName !== undefined || node.tagName === "render" || node.tagName === "snippet" || node.tagName === "component" || result.tagName === "col") && location?.startTag && context.selfClosing.has(location.startOffset)) {
-    // The parser kept `<Name />` open; the element ends with its start tag.
+  if ((element || componentName !== undefined || node.tagName === "render" || node.tagName === "snippet" || node.tagName === "component" || result.tagName === "col") && location?.startTag && context.selfClosing.has(location.startOffset)) {
+    // The parser kept `<Name />` or `<div />` open; the element ends with its start tag.
     result.selfClosing = true;
     result.end = template.contentStart + location.startTag.endOffset;
     result.sourceCodeLocation = { ...location, endOffset: location.startTag.endOffset };
@@ -143,12 +160,127 @@ function normalize(node: ParsedNode, context: NormalizeContext): TemplateNode {
 /**
  * Decodifica un tramo crudo de un nodo de texto como lo hace el parser HTML: entidades y saltos
  * CRLF. Compilador y editor analizan el texto crudo para que sus posiciones coincidan con la
- * fuente, y decodifican sólo el contenido de cada parte.
+ * fuente, y decodifican sólo el contenido de cada parte. Un `<` del tramo queda como texto.
  */
 export function decodeTemplateText(raw: string): string {
-  const normalized = raw.replace(/\r\n?/g, "\n");
-  if (!normalized.includes("&")) return normalized;
-  return (parseFragment(normalized).childNodes as Array<{ value?: string }>).map((node) => node.value ?? "").join("");
+  return decodeTemplateExpression(raw.replace(/\r\n?/g, "\n")).text;
+}
+
+/**
+ * Tramo de una expresión decodificada: `text.slice(start, end)` procede de `raw.slice(sourceStart, sourceEnd)`.
+ * Un tramo sin referencias conserva la longitud; el de una referencia (`&lt;`) la cambia.
+ *
+ * @example
+ * ```ts
+ * decodeTemplateExpression("a &amp;&amp; b").pieces[1];
+ * // { start: 2, end: 3, sourceStart: 2, sourceEnd: 7 }
+ * ```
+ */
+export interface DecodedExpressionPiece {
+  /** Inicio en el texto decodificado. */
+  start: number;
+  /** Fin, exclusivo, en el texto decodificado. */
+  end: number;
+  /** Inicio en el texto crudo. */
+  sourceStart: number;
+  /** Fin, exclusivo, en el texto crudo. */
+  sourceEnd: number;
+}
+
+/**
+ * Expresión de plantilla con sus referencias de carácter decodificadas y el mapa de cada tramo al texto crudo.
+ *
+ * @example
+ * ```ts
+ * const { text } = decodeTemplateExpression("a<b&&c");
+ * // text === "a<b&&c"
+ * ```
+ */
+export interface DecodedExpression {
+  /** La expresión que se evalúa. */
+  text: string;
+  /** Los tramos de `text`, en orden y sin huecos. */
+  pieces: DecodedExpressionPiece[];
+}
+
+/** A candidate character reference: `&name;`, `&#123;` or `&#x7b;`, with or without its `;`. */
+const characterReference = /&(?:#[xX][\da-fA-F]*|#\d*|[A-Za-z][\dA-Za-z]*);?/g;
+
+/**
+ * Decodifica las referencias de carácter (`&lt;`, `&amp;`, `&#60;`) de una expresión de plantilla
+ * como lo hace el parser HTML en el texto, pero sin interpretar marcado: `{a<b&&c}` o
+ * `{"<b>" && x}` llegan completos. Los `pieces` permiten situar cada posición del texto
+ * decodificado en la fuente, para diagnósticos y source maps. No normaliza los saltos CRLF.
+ *
+ * @example
+ * ```ts
+ * decodeTemplateExpression("x &amp;&amp; '&lt;'").text; // "x && '<'"
+ * ```
+ */
+export function decodeTemplateExpression(raw: string): DecodedExpression {
+  const pieces: DecodedExpressionPiece[] = [];
+  let text = "";
+  let cursor = 0;
+  const push = (value: string, sourceEnd: number): void => {
+    pieces.push({ start: text.length, end: text.length + value.length, sourceStart: cursor, sourceEnd });
+    text += value;
+    cursor = sourceEnd;
+  };
+  if (raw.includes("&")) {
+    for (const match of raw.matchAll(characterReference)) {
+      const reference = decodeCharacterReference(match[0]);
+      if (!reference) continue;
+      if (match.index > cursor) push(raw.slice(cursor, match.index), match.index);
+      push(reference.value, match.index + reference.length);
+    }
+  }
+  if (cursor < raw.length || pieces.length === 0) push(raw.slice(cursor), raw.length);
+  return { text, pieces };
+}
+
+/**
+ * Posición en el texto crudo de una posición del texto decodificado por `decodeTemplateExpression`.
+ * Dentro de una referencia, apunta a su `&`.
+ *
+ * @example
+ * ```ts
+ * const decoded = decodeTemplateExpression("a &amp;&amp; b");
+ * expressionSourceOffset(decoded, 5); // 13, la `b`
+ * ```
+ */
+export function expressionSourceOffset(decoded: DecodedExpression, position: number): number {
+  for (const piece of decoded.pieces) {
+    if (position >= piece.end) continue;
+    if (position < piece.start) break;
+    return piece.end - piece.start === piece.sourceEnd - piece.sourceStart ? piece.sourceStart + position - piece.start : piece.sourceStart;
+  }
+  return decoded.pieces.at(-1)?.sourceEnd ?? 0;
+}
+
+const referenceCache = new Map<string, { value: string; length: number } | null>();
+
+/**
+ * The value of the reference at the start of `candidate` and the characters it takes, as the HTML
+ * parser reads it in text (`&amp1` takes `&amp`). `undefined` when it is not a reference (`&b`).
+ * The candidate has no `<`, so parsing it cannot open a tag.
+ */
+function decodeCharacterReference(candidate: string): { value: string; length: number } | undefined {
+  const cached = referenceCache.get(candidate);
+  if (cached !== undefined) return cached ?? undefined;
+  const decode = (value: string): string => (parseFragment(value).childNodes as Array<{ value?: string }>).map((node) => node.value ?? "").join("");
+  const whole = decode(candidate);
+  let result: { value: string; length: number } | null = null;
+  if (whole !== candidate) {
+    // The shortest prefix that decodes and leaves the rest as it is: legacy names (`&amp`) need no `;`.
+    for (let length = 2; length <= candidate.length && !result; length++) {
+      const prefix = candidate.slice(0, length);
+      const value = decode(prefix);
+      if (value !== prefix && value + candidate.slice(length) === whole) result = { value, length };
+    }
+  }
+  if (referenceCache.size > 512) referenceCache.clear();
+  referenceCache.set(candidate, result);
+  return result ?? undefined;
 }
 
 /**
@@ -173,9 +305,6 @@ export function attributeValueStart(source: string, attribute: Pick<TemplateAttr
 export function isCustomElementTag(tag: string): boolean {
   return tag.includes("-") && !hyphenatedStandardElements.has(tag);
 }
-
-/** SVG and MathML elements whose names have a hyphen; the HTML standard reserves them. */
-const hyphenatedStandardElements = new Set(["annotation-xml", "color-profile", "font-face", "font-face-src", "font-face-uri", "font-face-format", "font-face-name", "missing-glyph"]);
 
 const impliedEndTag = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr", "p", "li", "dt", "dd", "option", "optgroup", "rb", "rp", "rt", "rtc"]);
 
@@ -233,5 +362,5 @@ export function parseTemplate(source: string, template: SfcSection, filename: st
     const tag = /^<\/[^\s>]*>?/.exec(template.content.slice(stray))?.[0] ?? "</";
     throw compileError(source, filename, "MEEK008", `HTML de plantilla no válido: ${tag} no cierra ninguna etiqueta de componente abierta`, template.contentStart + stray);
   }
-  return normalize(parsed, { source, filename, template, selfClosing: masked.selfClosing });
+  return normalize(parsed, { source, filename, template, selfClosing: masked.selfClosing, elements: masked.elements });
 }

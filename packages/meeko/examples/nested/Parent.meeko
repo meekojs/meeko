@@ -16,15 +16,15 @@ function reverse(): void {
 
 <template>
   <section>
-    <component is="Child" bind:label="label.value"></component>
-    <component is="Child" bind:label="'Fixed'"></component>
+    <component is="Child" bind:label="label.value" />
+    <component is="Child" bind:label="'Fixed'" />
     <p>{label.value}</p>
     <button on:click="() => label.value = 'Updated'">Update</button>
     <button on:click="() => visible.value = !visible.value">Toggle</button>
-    <div if:when="visible.value"><component is="Child" bind:label="'Conditional'"></component></div>
+    <div if:when="visible.value"><component is="Child" bind:label="'Conditional'" /></div>
     <ul>
       <li each:of="items.value" each:as="item" each:key="item.id" bind:data-id="item.id">
-        <component is="Child" bind:label="item.label"></component>
+        <component is="Child" bind:label="item.label" />
       </li>
     </ul>
     <button on:click="reverse">Reverse</button>

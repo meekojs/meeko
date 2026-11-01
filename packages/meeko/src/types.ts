@@ -1,7 +1,7 @@
 import ts from "@typescript/typescript6";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { compileWithAutoImports } from "./autoimports/transform";
 import { aliasCandidates } from "./compiler/aliases";
@@ -12,9 +12,22 @@ import { resolveProjectAliases } from "./framework/aliases";
 /** Stable ownership marker for generated component declarations. */
 export const componentTypeDeclarationMarker = "// @meeko-generated component-declaration v1";
 
-/** Generated declaration of a component, under the project's `.meeko/types`. */
+/**
+ * Generated declaration of a component, under the project's `.meeko/types`. Only for a source of
+ * the project (see `projectComponent`): the path of another one would leave `.meeko/types`.
+ */
 export function componentTypesPath(root: string, filename: string): string {
   return join(root, ".meeko", "types", relative(root, resolve(filename))).replace(/\.meeko$/, ".d.meeko.ts");
+}
+
+/**
+ * Whether a component is a source of the project: inside its root and outside `node_modules`.
+ * Another one, such as a component of a linked or installed module (`packages/ui/dist/…`), ships
+ * its adjacent `.d.meeko.ts` and gets no generated declaration.
+ */
+function projectComponent(root: string, filename: string): boolean {
+  const path = relative(root, resolve(filename));
+  return path !== "" && path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path) && !path.split(sep).includes("node_modules");
 }
 
 /** Options of {@link generateTypes}. */
@@ -50,7 +63,9 @@ export async function generateTypes(source: string, filename: string, options: G
       const aliased = specifier.startsWith(".") ? undefined : aliasCandidates(aliases.aliases, specifier);
       if (!specifier.startsWith(".") && !aliased) continue;
       const child = aliased ? aliased.find((candidate) => existsSync(candidate)) : resolve(dirname(path), specifier);
-      if (!child) continue;
+      // A component of a module outside the project keeps its own declaration: generating one here
+      // wrote it outside `.meeko/types` (`<app>/packages/ui/dist/app/components`).
+      if (!child || !projectComponent(root, child)) continue;
       await collect(options.read?.(child) ?? await readFile(child, "utf8"), child);
     }
   }

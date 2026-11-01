@@ -43,27 +43,38 @@ async function load(source: string): Promise<{ module: Loaded; cleanup: () => Pr
 
 /**
  * The popover API on happy-dom, which lacks it: `showPopover`, `hidePopover`, `:popover-open`,
- * the `beforetoggle` and `toggle` events and the `popovertarget` buttons.
+ * the `beforetoggle` and `toggle` events and the `popovertarget` buttons. With `queued`, the
+ * `toggle` event comes in a later task and coalesces as in browsers: a closing and a reopening
+ * before it fires give a single event, from `oldState` "open" to `newState` "open".
  */
-function polyfillPopover(window: HappyWindow): void {
+function polyfillPopover(window: HappyWindow, { queued = false } = {}): void {
   const proto = window.HTMLElement.prototype as unknown as Record<string, unknown> & HTMLElement;
   const flag = "data-meeko-popover-open";
-  const fire = (element: HTMLElement, type: string, newState: string): void => {
-    const event = new window.Event(type) as unknown as Event & { newState?: string };
+  const fire = (element: HTMLElement, type: string, newState: string, oldState?: string): void => {
+    const event = new window.Event(type) as unknown as Event & { newState?: string; oldState?: string };
     Object.defineProperty(event, "newState", { value: newState });
+    if (oldState !== undefined) Object.defineProperty(event, "oldState", { value: oldState });
     element.dispatchEvent(event);
+  };
+  const tasks = new WeakMap<HTMLElement, { oldState: string; timer: ReturnType<typeof setTimeout> }>();
+  const toggled = (element: HTMLElement, oldState: string, newState: string): void => {
+    if (!queued) return fire(element, "toggle", newState);
+    const previous = tasks.get(element);
+    if (previous) clearTimeout(previous.timer);
+    const from = previous?.oldState ?? oldState;
+    tasks.set(element, { oldState: from, timer: setTimeout(() => { tasks.delete(element); fire(element, "toggle", newState, from); }, 0) });
   };
   proto.showPopover = function (this: HTMLElement): void {
     if (this.hasAttribute(flag)) throw new Error("InvalidStateError: already open");
-    fire(this, "beforetoggle", "open");
+    fire(this, "beforetoggle", "open", "closed");
     this.setAttribute(flag, "");
-    fire(this, "toggle", "open");
+    toggled(this, "closed", "open");
   };
   proto.hidePopover = function (this: HTMLElement): void {
     if (!this.hasAttribute(flag)) throw new Error("InvalidStateError: already closed");
-    fire(this, "beforetoggle", "closed");
+    fire(this, "beforetoggle", "closed", "open");
     this.removeAttribute(flag);
-    fire(this, "toggle", "closed");
+    toggled(this, "open", "closed");
   };
   const matches = proto.matches as (this: Element, selector: string) => boolean;
   proto.matches = function (this: Element, selector: string): boolean {
@@ -116,6 +127,24 @@ test("the compiled component imports <MeekoPopover> and <MeekoSelect> only when 
   assert.doesNotMatch(shadowed.code, /builtins\/select/);
   assert.deepEqual(shadowed.warnings?.map((warning) => warning.code), ["MEEK106"]);
   assert.match(shadowed.warnings![0]!.message, /select accesible/);
+});
+
+test("the deprecated <MeekoPopover>, <MeekoSelect> and <MeekoThemeToggle> warn once each with MEEK121 and keep compiling", () => {
+  const result = compile('<template><MeekoPopover><snippet name="trigger">Más</snippet><p>x</p></MeekoPopover><MeekoSelect model="value" bind:options="list" /><MeekoSelect model="value" bind:options="list" /><MeekoThemeToggle /></template>', "/project/app/components/Old.meeko", { theme: true });
+  assert.match(result.code, /builtins\/popover/);
+  assert.match(result.code, /builtins\/select/);
+  assert.match(result.code, /builtins\/theme-toggle/);
+  const deprecated = (result.warnings ?? []).filter((warning) => warning.code === "MEEK121");
+  assert.deepEqual(deprecated.map((warning) => warning.severity), ["warning", "warning", "warning"]);
+  assert.match(deprecated[0]!.message, /<MeekoPopover> está obsoleta desde Meeko 1\.8.*<UIPopover> de @meekojs\/ui/);
+  assert.match(deprecated[1]!.message, /<UISelect>/);
+  assert.match(deprecated[2]!.message, /<UIThemeToggle>/);
+  // A project component with the same name is not the deprecated tag: only MEEK106.
+  const shadowed = compile("<template><MeekoPopover /></template>", "/project/app/components/Menu.meeko", { projectComponents: ["MeekoPopover"] });
+  assert.deepEqual(shadowed.warnings?.map((warning) => warning.code), ["MEEK106"]);
+  // Other built-in tags are not deprecated.
+  const kept = compile('<template><MeekoLink to="/">Inicio</MeekoLink></template>', "/project/app/components/Nav.meeko");
+  assert.equal(kept.warnings?.some((warning) => warning.code === "MEEK121") ?? false, false);
 });
 
 test("a custom trigger receives the attributes in the anchor snippet, and a tooltip describes its trigger", { timeout: 60_000 }, async () => {
@@ -451,6 +480,54 @@ test("a menu opens on its first item, moves with the arrows and letters, closes 
   }
 });
 
+test("a menu reopened with the arrow before the toggle event of its closing still takes the focus", { timeout: 60_000 }, async () => {
+  const { module, cleanup } = await load(host);
+  const browser = new HappyWindow({ url: "https://example.test/" });
+  // As in browsers: the toggle event fires in a later task, and a closing and a reopening coalesce.
+  polyfillPopover(browser, { queued: true });
+  try {
+    const { html, state } = module.renderWithState({});
+    const root = browser.document.createElement("div");
+    browser.document.body.appendChild(root);
+    root.innerHTML = html;
+    const release = module.hydrate(root as unknown as Element, {}, state);
+    const tick = (): Promise<void> => new Promise((done) => setTimeout(done, 0));
+    const result = (): { picked: string; toggles: string[]; menu: boolean } => JSON.parse(root.querySelector("#state")!.textContent!);
+    const trigger = root.querySelector("[data-meeko-popover-trigger]") as unknown as HTMLButtonElement;
+    const content = browser.document.getElementById(trigger.getAttribute("aria-controls")!)!;
+    const focused = (): string => browser.document.activeElement?.textContent ?? "";
+    trigger.focus();
+    trigger.dispatchEvent(key(browser, "keydown", "ArrowDown"));
+    await tick();
+    assert.equal(focused(), "Renombrar");
+    for (const [arrow, item] of [["ArrowDown", "Renombrar"], ["ArrowUp", "Eliminar"], ["ArrowDown", "Renombrar"]] as const) {
+      // Choosing an item closes the menu in a microtask and gives the focus back to the trigger…
+      (browser.document.activeElement as unknown as HTMLElement).click();
+      await Promise.resolve();
+      assert.equal(content.matches(":popover-open"), false);
+      assert.equal(browser.document.activeElement, trigger);
+      // …and the arrow reopens it before the toggle event of that closing has fired.
+      trigger.dispatchEvent(key(browser, "keydown", arrow));
+      await tick();
+      assert.equal(content.matches(":popover-open"), true);
+      assert.ok(content.hasAttribute("data-open"));
+      assert.equal(trigger.getAttribute("aria-expanded"), "true");
+      assert.equal(result().menu, true);
+      assert.equal(focused(), item, `${arrow} reopens the menu with the focus on ${item}`);
+    }
+    content.dispatchEvent(key(browser, "keydown", "Escape"));
+    await tick();
+    assert.equal(browser.document.activeElement, trigger);
+    assert.equal(result().menu, false);
+    // Each closing and reopening is reported once and in order, although the browser coalesced them.
+    assert.deepEqual(result().toggles, ["true", "false", "true", "false", "true", "false", "true", "false"]);
+    release();
+  } finally {
+    await browser.happyDOM.close();
+    await cleanup();
+  }
+});
+
 test("an async filter shows the loading state, aborts the previous search and shows the results", { timeout: 60_000 }, async () => {
   const source = `<script lang="ts">
 import { signal } from "@meekojs/meeko";
@@ -546,7 +623,8 @@ ${script}
       },
     ];
     for (const item of cases) {
-      const diagnostics = await checkSource(item.source, join(project.root, "app", "components", `${item.name}.meeko`));
+      // MEEK121 (deprecated since 1.8) is covered on its own; these cases check the types.
+      const diagnostics = (await checkSource(item.source, join(project.root, "app", "components", `${item.name}.meeko`))).filter((diagnostic) => diagnostic.code !== "MEEK121");
       const messages = JSON.stringify(diagnostics);
       const codes = new Set(diagnostics.map((diagnostic) => diagnostic.code));
       if (item.codes.length === 0) assert.deepEqual([...codes], [], `${item.name}: ${messages}`);
@@ -590,7 +668,10 @@ test("the editor completes <MeekoPopover> and <MeekoSelect>, their props, and ex
     const diagnostics = await componentDiagnostics(workspace.project, clean, opened.component.filename, () => undefined);
     // Only the template: the test project lacks Node types for the framework sources it imports.
     const template = valid.indexOf("<template>");
-    assert.deepEqual(diagnostics.filter((item) => clean.offsetAt(item.range.start) > template).map((item) => item.message), []);
+    // The deprecated tag is struck through (MEEK121); nothing else is reported.
+    const deprecated = diagnostics.filter((item) => item.code === "MEEK121");
+    assert.ok(deprecated.length > 0 && deprecated.every((item) => item.tags?.includes(2)), JSON.stringify(deprecated));
+    assert.deepEqual(diagnostics.filter((item) => item.code !== "MEEK121" && clean.offsetAt(item.range.start) > template).map((item) => item.message), []);
     // A wrong prop is reported on the tag, with the types of the compiled component.
     const wrong = valid.replace('bind:options="colors"', 'bind:options="colors" bind:max="\'3\'"');
     workspace.project.setDocument(opened.component.filename, wrong);

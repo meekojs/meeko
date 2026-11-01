@@ -4,6 +4,8 @@ export interface ModuleSpecifier {
   value: string;
   start: number;
   end: number;
+  /** `import type` or `export type`: erased from the output, so it never loads the module. */
+  typeOnly?: boolean;
 }
 
 /** Read static ESM edges from TypeScript instead of matching source text. */
@@ -14,7 +16,8 @@ export function moduleSpecifiers(code: string, filename: string): ModuleSpecifie
     if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) continue;
     const literal = statement.moduleSpecifier;
     if (!literal || !ts.isStringLiteral(literal)) continue;
-    result.push({ value: literal.text, start: literal.getStart(file) + 1, end: literal.getEnd() - 1 });
+    const typeOnly = ts.isImportDeclaration(statement) ? statement.importClause?.isTypeOnly === true : statement.isTypeOnly;
+    result.push({ value: literal.text, start: literal.getStart(file) + 1, end: literal.getEnd() - 1, ...(typeOnly ? { typeOnly } : {}) });
   }
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword && node.arguments.length === 1 && ts.isStringLiteral(node.arguments[0]!)) {

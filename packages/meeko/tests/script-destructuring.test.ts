@@ -100,7 +100,8 @@ test("destructured bindings render, hydrate and stay out of state snapshots", as
 
 test("destructuring a macro or an element ref is a clear compile error", () => {
   const cases: Array<{ script: string; code: string; at: string; message: RegExp }> = [
-    { script: "const { title } = defineProps<{ title: string }>();", code: "MEEK015", at: "{ title }", message: /defineProps no admite desestructuración/ },
+    // Since 1.8 a flat destructuring of defineProps is valid (props-destructure.test.ts); a nested one is not.
+    { script: "const { title: { text } } = defineProps<{ title: { text: string } }>();", code: "MEEK015", at: "{ text }", message: /defineProps no admite desestructuración anidada/ },
     { script: "const [first] = defineEmits<{ save: [] }>();", code: "MEEK045", at: "defineEmits", message: /nombre simple/ },
     { script: "const { value } = defineModel<string>();", code: "MEEK063", at: "defineModel", message: /nombre simple/ },
     { script: "const { title } = defineSnippets<{ title: [] }>();", code: "MEEK059", at: "defineSnippets", message: /nombre simple/ },

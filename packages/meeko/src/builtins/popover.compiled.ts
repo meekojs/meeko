@@ -13,7 +13,7 @@ export type { __MeekoComponentProps as ComponentProps };
 function __setup(__props: __MeekoComponentProps, __meeko_refs: __meeko.ElementRefs) {
 type __MeekoRefs = { "content": __meeko.ElementOf<"div", false> };
 const __meeko_borrowed = new Set<unknown>();
-const props = __props as Readonly<MeekoPopoverProps>;
+const props = __meeko.withoutEventProps(__props, ["onToggle"]) as Readonly<MeekoPopoverProps>;
 const emit: __meeko.Emit<__MeekoEmits> = __meeko.createEmit<__MeekoEmits, __meeko.NoEmitConflict<__MeekoDeclaredProps, __MeekoEmits>>(__props);
 const open: __meeko.Signal<__MeekoModels["default"]> = __meeko.useModel<__MeekoModels["default"]>(__props, "default", __meeko_borrowed, { default: false });
 const snippets: __meeko.SnippetMap<__MeekoSnippets> = __meeko.useSnippets<__MeekoSnippets>(__props);

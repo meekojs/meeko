@@ -15,6 +15,6 @@ function toggle(): void {
 <template>
   <div>
     <button on:click="toggle">Update</button>
-    <input bind:value="message.value" bind:disabled="!enabled.value">
+    <input bind:value="message.value" bind:disabled="!enabled.value" />
   </div>
 </template>

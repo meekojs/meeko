@@ -1,3 +1,4 @@
+import type { AttributeLiteralCheck, AttributeValueOf } from "../../shared/html-attribute-values";
 import type { AttributeNameOf, AttributeValue, HtmlTagName, Words } from "../../shared/html-attributes";
 import type { ElementOf } from "./element-refs";
 import type { ExposedOf } from "./expose";
@@ -48,7 +49,9 @@ export type VoidTagName = "area" | "br" | "col" | "hr" | "img" | "input" | "sour
  * Atributos que acepta `bind="obj"` en un elemento `Tag`: los globales (`class`, `id`, `role`,
  * `aria-*`, `data-*`…) y los propios de la etiqueta según los datos HTML de Meeko. Con una unión de
  * etiquetas vale cualquier atributo de alguna de ellas; un valor `null`, `undefined` o `false` no
- * escribe el atributo. No admite claves `on*`: los manejadores no se crean desde datos.
+ * escribe el atributo. No admite claves `on*`: los manejadores no se crean desde datos. Desde `1.8`,
+ * el tipo de cada valor ofrece al completado los valores del estándar (`"submit" | "reset" |
+ * "button"` en `type` de `<button>`) sin dejar de admitir cualquier otro (véase `AttributeValueOf`).
  *
  * @typeParam Tag Etiqueta o unión de etiquetas del elemento.
  * @since 1.5.0
@@ -64,7 +67,17 @@ export type VoidTagName = "area" | "br" | "col" | "hr" | "img" | "input" | "sour
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/api.md#atributos-en-bloque-con-bind
  */
-export type ElementAttributes<Tag extends string = TagName> = { readonly [Name in AttributeNameOf<Tag>]?: AttributeValue };
+export type ElementAttributes<Tag extends string = TagName> = { readonly [Name in AttributeNameOf<Tag>]?: AttributeValueOf<Tag, Name> };
+
+/**
+ * Type check of the value of an HTML attribute, in the code that `meeko check` and the editor read:
+ * a string literal outside the values of the standard is the warning MEEK122 (see
+ * `AttributeLiteralCheck`). Curried, so that TypeScript infers the value with `Tag` and `Name` given:
+ * `checkAttributeValue<"button", "type">()(value)`. Generated code never calls it at run time.
+ */
+export function checkAttributeValue<Tag extends string, Name extends string>(): <const Value>(value: Value & AttributeLiteralCheck<Tag, Name, Value>) => Value {
+  return (value) => value;
+}
 
 const voidTags = new Set(["area", "br", "col", "hr", "img", "input", "source", "track", "wbr"]);
 
@@ -171,6 +184,36 @@ export function tagAttribute<const Tag extends string, const Name extends string
   return (accepted as readonly string[]).includes(tag);
 }
 
+/**
+ * The tag of the branch of HTML tags of `<component is>` with component names among its string
+ * literals (since 1.8), such as `to ? 'MeekoLink' : 'a'`: its type leaves the names out. That
+ * branch only renders while the value is a tag; a name, read before the branch is released,
+ * gives `fallback`, one of its tags, so the element never fails in between.
+ */
+export function tagBranch<const T, const Name extends string>(value: T, names: readonly Name[], fallback: Exclude<T, Name>): Exclude<T, Name> {
+  return (names as readonly unknown[]).includes(value) ? fallback : value as Exclude<T, Name>;
+}
+
+/** Prop names of the components of a union of modules: those of every member. */
+type BranchPropName<M> = M extends { readonly renderToString: (props: infer Props, ...rest: never[]) => unknown } ? (Props extends unknown ? keyof Props : never) : never;
+
+/**
+ * Type text of MEEK112 for an attribute of `<component is>` with component names that no branch
+ * takes: no tag of `is` accepts it and it is no prop of the components `M`.
+ */
+export type BranchAttributeCheck<Name extends string, M> = 0 extends 1 & M ? unknown
+  : Name extends BranchPropName<M> ? unknown : `MEEK112: ${Name} no se aplica a ninguna rama de is: ni a sus etiquetas ni a las props de sus componentes`;
+
+/**
+ * Type-only check of an attribute of `<component is>` with component names that no tag of `is`
+ * accepts: it must be a prop of one of its components. Generated code never calls it at run time.
+ */
+export function checkBranchAttribute<const Name extends string, M>(name: Name, components: () => M, check: BranchAttributeCheck<Name, M>): void {
+  void name;
+  void components;
+  void check;
+}
+
 /** Type text of MEEK112 for a feature of `<component is>` that only a tag, or only a component, has. */
 export type DynamicFeatureCheck<T, Feature extends string, Kind extends "tag" | "component"> = 0 extends 1 & T ? unknown
   : Kind extends "tag"
@@ -226,6 +269,23 @@ const attributeName = /^[a-zA-Z_:][a-zA-Z0-9_:.-]*$/;
 
 function styleText(value: string | null): string {
   return value === null ? "" : value.trim().replace(/;+$/, "").trim();
+}
+
+/**
+ * The single `class` or `style` of an element with the static attribute and its `bind:` directive,
+ * as SSR, hydration and updates write it. `class` adds the dynamic classes after the static ones;
+ * `style` writes the static declarations first, so the dynamic ones win. A dynamic value that is
+ * `undefined`, `null`, `false` or empty leaves the static text as written.
+ */
+export function joinAttribute(name: "class" | "style", fixed: string, value: unknown): string {
+  const dynamic = attributeValue(name, value);
+  if (name === "class") {
+    const classes = dynamic?.trim();
+    return classes ? (fixed.trim() ? `${fixed} ${classes}` : classes) : fixed;
+  }
+  const declarations = styleText(dynamic);
+  if (!declarations) return fixed;
+  return [styleText(fixed), declarations].filter(Boolean).join("; ");
 }
 
 /**

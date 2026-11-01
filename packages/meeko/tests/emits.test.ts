@@ -7,6 +7,7 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 
 import { createEmit } from "../src/app/runtime/emits.ts";
+import { isReactiveProps, reactiveProps, withoutEventProps } from "../src/app/runtime/props.ts";
 import { compileWithAutoImports } from "../src/autoimports/transform.ts";
 import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
@@ -134,6 +135,98 @@ test("defineEmits and component events report MEEK045 to MEEK048", () => {
   assertCompileError(reversed, "MEEK048", reversed.indexOf("on:save"));
   const invalid = component(`on:save-item="f"`);
   assertCompileError(invalid, "MEEK011", invalid.indexOf("on:save-item"));
+});
+
+test("props leave the callbacks of the declared events out of their keys, since 1.8", () => {
+  // The script spells the events: a type literal, a local interface or a local type alias.
+  const wrapped = /const props = __meeko\.withoutEventProps\(__props, \["onSave","onClose"\]\) as Readonly</;
+  assert.match(compile(child, "Child.meeko").code, wrapped);
+  const local = (declaration: string, emits: string): string => `<script lang="ts">
+${declaration}
+const props = defineProps<{ id: number }>();
+const emit = defineEmits<${emits}>();
+</script><template><button on:click="() => emit('save', props.id)">x</button></template>`;
+  assert.match(compile(local("interface Events { save: [id: number]; \"close\": [] }", "Events"), "Local.meeko").code, wrapped);
+  assert.match(compile(local("type Events = { save: [id: number]; close: [] };", "Events"), "Alias.meeko").code, wrapped);
+  // A type from elsewhere cannot be listed: props stay as they were.
+  for (const [declaration, emits] of [["import type { Events } from './events';", "Events"], ["interface Base { close: [] }\ninterface Events extends Base { save: [id: number] }", "Events"], ["", "Record<'save', [id: number]>"]] as const) {
+    assert.match(compile(local(declaration, emits), "Other.meeko").code, /const props = __props as Readonly</, declaration || emits);
+  }
+  // Without defineEmits nothing changes.
+  assert.match(compile(`<script lang="ts">const props = defineProps<{ id: number }>();</script><template>{props.id}</template>`, "Plain.meeko").code, /const props = __props as Readonly</);
+});
+
+test("withoutEventProps hides the callbacks from keys, in and rest, keeps reads and reactive views", () => {
+  const onSave = (): void => {};
+  for (const input of [{ id: 1, "aria-label": "x", onSave }, reactiveProps({ id: 1, "aria-label": "x", onSave }).props]) {
+    const props = withoutEventProps(input, ["onSave", "onClose"]) as Record<string, unknown>;
+    assert.deepEqual(Object.keys(props), ["id", "aria-label"]);
+    assert.equal("onSave" in props, false);
+    const { id, ...rest } = props;
+    assert.equal(id, 1);
+    assert.deepEqual(rest, { "aria-label": "x" });
+    assert.deepEqual({ ...props }, { id: 1, "aria-label": "x" });
+    // A read still reaches the callback, and the view is read-only like the props.
+    assert.equal(props["onSave"], onSave);
+    assert.throws(() => { props["id"] = 2; }, /read-only/);
+    assert.equal(isReactiveProps(props), isReactiveProps(input));
+  }
+  const plain = { id: 1 };
+  assert.equal(withoutEventProps(plain, []), plain);
+});
+
+const forwarding = `<script lang="ts">
+import { computed } from "@meekojs/meeko";
+import type { ElementAttributes } from "@meekojs/meeko";
+const props = defineProps<{ label: string } & ElementAttributes<"button">>();
+const emit = defineEmits<{ press: [label: string] }>();
+const attributes = computed(() => {
+  const { label, ...rest } = props;
+  return rest;
+});
+</script>
+<template><button class="forward" bind="attributes.value" on:click="() => emit('press', props.label)">{props.label}</button></template>`;
+
+const forwardingParent = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+import * as Forward from "./Forward.meeko";
+const busy = signal(false);
+const pressed = signal<string[]>([]);
+</script>
+<template><section><Forward label="Guardar" aria-label="Guardar cambios" data-kind="primary" bind:aria-busy="busy.value" on:press="(label) => { pressed.value = [...pressed.value, label]; busy.value = !busy.value }" /><p class="pressed">{pressed.value.join(",")}</p></section></template>`;
+
+test("aria-* and data-* props and a rest of props reach the element in SSR and hydration, without the event callbacks", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "meeko-emits-forward-"));
+  const window = new Window();
+  try {
+    const runtime = (path: string): string => JSON.stringify(pathToFileURL(resolve(path)).href);
+    for (const [name, source] of [["Forward", forwarding], ["Parent", forwardingParent]] as const) {
+      const code = compile(source, join(directory, `${name}.meeko`)).code
+        .replace(`from "@meekojs/meeko/internal"`, `from ${runtime("src/internal.ts")}`)
+        .replaceAll(`from "@meekojs/meeko"`, `from ${runtime("src/index.ts")}`)
+        .replace(`from "./Forward.meeko"`, `from "./Forward.ts"`);
+      await writeFile(join(directory, `${name}.ts`), code);
+    }
+    const component = await import(pathToFileURL(join(directory, "Parent.ts")).href) as RuntimeModule;
+    const root = window.document.createElement("main");
+    const html = component.renderToString({});
+    // Before 1.8 the rest carried onPress and bind threw MEEK113.
+    assert.match(html, /<button class="forward" aria-label="Guardar cambios" data-kind="primary" data-meeko="\d+"><!--meeko:text:\d+-->Guardar</);
+    root.innerHTML = html;
+    const button = root.querySelector("button.forward")!;
+    const release = component.hydrate(root as unknown as Element, {});
+    assert.equal(root.querySelector("button.forward"), button, "hydration keeps the SSR button");
+    (button as unknown as HTMLButtonElement).click();
+    assert.equal(root.querySelector(".pressed")?.textContent, "Guardar");
+    assert.equal(button.getAttribute("aria-busy"), "true");
+    assert.equal(button.getAttribute("onpress"), null);
+    (button as unknown as HTMLButtonElement).click();
+    assert.equal(button.getAttribute("aria-busy"), null);
+    release();
+  } finally {
+    window.happyDOM.abort();
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("emit calls the current parent callback, propagates errors and ignores a missing one", () => {

@@ -216,7 +216,10 @@ function addFileImports(result: AutoImport[], root: string, directory: string, f
     if ((ts.isClassDeclaration(statement) || ts.isEnumDeclaration(statement)) && statement.name) localValueTypes.add(statement.name.text);
   }
   for (const statement of ast.statements) {
-    const exported = ts.canHaveModifiers(statement) && ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
+    const modifiers = ts.canHaveModifiers(statement) ? ts.getModifiers(statement) : undefined;
+    // `export default function format()` exports `default`, not `format`: only named exports are autoimported.
+    const exported = modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) === true
+      && !modifiers.some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword);
     if (exported && (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement) || ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement) || ts.isEnumDeclaration(statement)) && statement.name) {
       const valueType = ts.isClassDeclaration(statement) || ts.isEnumDeclaration(statement);
       addAutoImport(result, { name: statement.name.text, imported: statement.name.text, file, scope, typeOnly: ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement), component: false, ...(valueType ? { alsoType: true } : {}) });
@@ -228,6 +231,7 @@ function addFileImports(result: AutoImport[], root: string, directory: string, f
     }
     if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
       for (const element of statement.exportClause.elements) {
+        if (element.name.text === "default") continue;
         const typeOnly = statement.isTypeOnly || element.isTypeOnly;
         const valueType = !typeOnly && !statement.moduleSpecifier && localValueTypes.has(element.propertyName?.text ?? element.name.text);
         addAutoImport(result, { name: element.name.text, imported: element.name.text, file, scope, typeOnly, component: false, ...(valueType ? { alsoType: true } : {}) });

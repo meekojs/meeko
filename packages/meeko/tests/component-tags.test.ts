@@ -61,12 +61,13 @@ test("<component is /> closes itself like a PascalCase tag", () => {
   const code = render(`<div><component is="AppButton" bind:label="'a'" /><p>after</p></div><component is="show ? AppButton : Table"/><em>tail</em>`);
   assert.match(code, /"<div" \+ ">" \+ __meeko\.renderComponent<any>\(0, AppButton, __meeko\.componentTag\(\(\) => AppButton\)\(\{ "label": 'a' \}[^]*?\) \+ "<p" \+ ">" \+ __meeko\.escapeHtml\("after"\) \+ "<\/p>" \+ "<\/div>" \+ __meeko\.renderComponent<any>\(1, show \? AppButton : Table[^]*?\) \+ "<em"/);
   assert.doesNotThrow(() => parseSfc(`${script}<template><component is="AppButton" /></template>`, "Tags.meeko"));
-  // Other HTML elements still need their end tag, with a Spanish message that keeps the parser code.
-  const source = `${script}<template><div /></template>`;
+  // Since 1.8 `<div />` is an empty element (see self-closing.test.ts); `<template />` still needs
+  // its end tag, with a Spanish message that keeps the parser code.
+  const source = `${script}<template><template /></template>`;
   assert.throws(() => compile(source, "Tags.meeko"), (error: unknown) => {
     assert.ok(error instanceof MeekoCompileError, String(error));
     assert.equal(error.diagnostic.code, "MEEK001");
-    assert.match(error.diagnostic.message, /^HTML de componente no válido: sólo los elementos vacíos .* \(non-void-html-element-start-tag-with-trailing-solidus\)$/);
+    assert.match(error.diagnostic.message, /^HTML de componente no válido: <template>, <script>, <style>.* no pueden cerrarse con \/>; escribe la etiqueta de cierre \(non-void-html-element-start-tag-with-trailing-solidus\)$/);
     return true;
   });
 });
@@ -96,10 +97,16 @@ test("PascalCase tags report bad closing and unsupported attributes", () => {
   assert.doesNotThrow(() => render(`<div><AppButton><span></span></AppButton></div>`));
   assertCompileError(`<AppButton></Table>`, "MEEK008", "</Table>");
   assertCompileError(`<div><AppButton></div>`, "MEEK008", "<AppButton>");
-  // Since 1.1 a static attribute is a string prop; reserved and hyphenated names are not props.
+  // Since 1.1 a static attribute is a string prop; reserved and hyphenated names are not props,
+  // except aria-* and data-* since 1.8, in lowercase and outside data-meeko*.
   assert.doesNotThrow(() => render(`<AppButton label="x" />`));
   assertCompileError(`<AppButton is="Table" />`, "MEEK032", `is="Table"`);
-  assertCompileError(`<AppButton aria-label="x" />`, "MEEK032", `aria-label="x"`);
+  assert.doesNotThrow(() => render(`<AppButton aria-label="x" />`));
+  assertCompileError(`<AppButton x-label="x" />`, "MEEK032", `x-label="x"`);
+  assertCompileError(`<AppButton Aria-Label="x" />`, "MEEK032", `Aria-Label="x"`);
+  assertCompileError(`<AppButton bind:Data-State="x" />`, "MEEK032", `Data-State="x"`);
+  assertCompileError(`<AppButton data-meeko-id="x" />`, "MEEK032", `data-meeko-id="x"`);
+  assertCompileError(`<AppButton bind:data-meeko="x" />`, "MEEK032", `data-meeko="x"`);
   assertCompileError(`<p>x</p></AppButton>`, "MEEK008", "</AppButton>");
   assertCompileError(`<AppButton>`, "MEEK008", "<AppButton>");
   // An unclosed HTML element in a nested template is still an error next to <Name />.
@@ -194,7 +201,11 @@ test("static attributes on component tags are string props; a bare attribute pas
   assertCompileError(`<AppButton bind:variant="'b'" variant="a" />`, "MEEK090", `variant="a"`);
   assertCompileError(`<component is="AppButton" onSave="x" on:save="() => {}"></component>`, "MEEK090", `on:save=`);
   assertCompileError(`<AppButton ref="x" />`, "MEEK032", `ref="x"`);
-  assertCompileError(`<AppButton data-id="x" />`, "MEEK032", `data-id="x"`);
+  // Since 1.8 aria-* and data-* are props with that name, static or bound, on both forms.
+  const attributes = render(`<AppButton aria-label="Cerrar" data-id="x" bind:aria-busy="busy" bind:data-state="open ? 'on' : 'off'" />`);
+  assert.match(attributes, /__meeko\.componentTag\(\(\) => AppButton\)\(\{ "aria-label": "Cerrar", "data-id": "x", "aria-busy": busy, "data-state": open \? 'on' : 'off' \}/);
+  assert.match(render(`<component is="AppButton" data-id="x"></component>`), /\(\{ "data-id": "x" \}/);
+  assertCompileError(`<AppButton data-id="x" bind:data-id="y" />`, "MEEK090", `bind:data-id="y"`);
 });
 
 /** Temporary project under `.meeko/` whose package imports resolve to src/. */
@@ -218,9 +229,16 @@ const props = defineProps<{ variant: "primary" | "secondary"; disabled?: boolean
 </script>
 <template><span>{props.variant}:{String(props.disabled ?? false)}:{props.label ?? ""}</span></template>`;
 
+// Declares the attributes of a <button> as its props: `aria-*` and `data-*` among them.
+const labelled = `<script lang="ts">
+import type { ElementAttributes } from "@meekojs/meeko";
+const props = defineProps<ElementAttributes<"button">>();
+</script>
+<template><button bind="props">x</button></template>`;
+
 test("meeko check reports unknown and mistyped props on <component is> and PascalCase tags", { timeout: 120_000 }, async () => {
-  const { root, cleanup } = await checkProject({ "AppOverlay.meeko": overlay, "AppBadge.meeko": badge });
-  const head = `<script lang="ts">\nimport * as AppOverlay from "./AppOverlay.meeko";\nimport * as AppBadge from "./AppBadge.meeko";\n</script>\n<template>`;
+  const { root, cleanup } = await checkProject({ "AppOverlay.meeko": overlay, "AppBadge.meeko": badge, "AppLabelled.meeko": labelled });
+  const head = `<script lang="ts">\nimport * as AppOverlay from "./AppOverlay.meeko";\nimport * as AppBadge from "./AppBadge.meeko";\nimport * as AppLabelled from "./AppLabelled.meeko";\n</script>\n<template>`;
   const cases: Array<{ name: string; template: string; code?: string; at?: string }> = [
     { name: "Valid", template: `<AppOverlay bind:dismissible="true" closeOnEscape /><component is="AppBadge" variant="primary" disabled label="x"></component><AppBadge bind:variant="'secondary'" />` },
     { name: "UnknownDynamic", template: `<component is="AppOverlay" bind:label="'x'" bind:value="'y'"></component>`, code: "TS2353", at: "label=" },
@@ -233,6 +251,11 @@ test("meeko check reports unknown and mistyped props on <component is> and Pasca
     { name: "WrongTypeDynamic", template: `<component is="AppOverlay" bind:closeOnEscape="1"></component>`, code: "TS2322", at: "closeOnEscape=" },
     { name: "WrongStaticLiteral", template: `<AppBadge variant="tertiary" />`, code: "TS2322", at: "variant=" },
     { name: "StaticForBoolean", template: `<AppOverlay dismissible="yes" />`, code: "TS2322", at: "dismissible=" },
+    // Since 1.8: aria-* and data-* are props, checked like any other.
+    { name: "AttributeProps", template: `<AppLabelled aria-label="Cerrar" data-state="open" bind:aria-busy="true" bind:data-count="1" />` },
+    { name: "UndeclaredAria", template: `<AppOverlay aria-label="Cerrar" />`, code: "TS2353", at: "aria-label=" },
+    { name: "UndeclaredData", template: `<AppBadge variant="primary" bind:data-state="'x'" />`, code: "TS2353", at: "data-state=" },
+    { name: "WrongAttributeType", template: `<AppLabelled bind:aria-busy="{}" />`, code: "TS2322", at: "aria-busy=" },
   ];
   try {
     for (const item of cases) {

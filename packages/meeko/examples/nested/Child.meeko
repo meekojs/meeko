@@ -10,5 +10,5 @@ const count = signal(0);
 
 <template>
   <button on:click="() => count.value++">{props.label}: {count.value}</button>
-  <component is="Grandchild" bind:label="props.label"></component>
+  <component is="Grandchild" bind:label="props.label" />
 </template>

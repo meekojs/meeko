@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
+import { resolve } from "node:path";
 import test from "node:test";
 
+import { checkSource } from "../src/check.ts";
 import { compile } from "../src/compiler.ts";
+import { doubleBraces, doubleBracesMessage } from "../src/compiler/double-braces.ts";
 import { locate, MeekoCompileError, parseSfc } from "../src/compiler/parser/sfc.ts";
 import { parseTemplate } from "../src/compiler/parser/template.ts";
 
@@ -153,6 +156,33 @@ test("una interpolación sin cerrar se señala en su llave de apertura", () => {
     });
   }
   assert.throws(() => compile(`<script lang="ts">const value = 1;</script><template><p>{}</p></template>`, "Empty.meeko"), /MEEK009/);
+});
+
+test("una interpolación con llaves dobles, al estilo de Vue, dice que Meeko usa una sola", async () => {
+  const script = `<script lang="ts">\nconst props = defineProps<{ label: string }>();\nconst name = "Ada";\n</script>\n`;
+  for (const body of ["{{ props.label }}", "{ {props.label} }", "{{name}}", "{{hola mundo}}"]) {
+    const source = `${script}<template><p>${body}</p></template>`;
+    assert.throws(() => compile(source, "Braces.meeko"), (error: unknown) => {
+      assert.ok(error instanceof MeekoCompileError, String(error));
+      assert.equal(error.diagnostic.code, "MEEK020");
+      assert.equal(error.diagnostic.message, doubleBracesMessage);
+      assert.match(error.diagnostic.message, /Meeko interpola con una sola llave: \{expr\}, no \{\{expr\}\}/);
+      assert.match(error.diagnostic.message, /interpolation\.md#una-llave-sin-cerrar/);
+      // At the outer brace.
+      assert.equal(error.diagnostic.location.offset, source.indexOf(body));
+      return true;
+    });
+    // `meeko check` reports the same.
+    const [found] = await checkSource(source, resolve(".meeko", "Braces.meeko"));
+    assert.deepEqual([found?.code, found?.message, found?.location.offset], ["MEEK020", doubleBracesMessage, source.indexOf(body)]);
+  }
+  // A valid object literal is an expression, without a warning.
+  // So is one with keys, spreads, methods or several properties, even with a shorthand among them.
+  for (const body of ["{{ a: 1 }}", "{ {a: 1} }", "{{ name, b: 2 }}", "{{ ...props, name }}", "{{ name, f() { return 1 } }}", "{{ name, props }}"]) compile(`${script}<template><p>${body}</p></template>`, "Object.meeko");
+  assert.deepEqual(doubleBraces("{ props.label }"), { inner: "props.label", valid: true, interpolation: "{props.label}", text: '{"{ props.label }"}' });
+  assert.deepEqual(doubleBraces("{hola mundo}"), { inner: "hola mundo", valid: false, text: '{"{hola mundo}"}' });
+  assert.deepEqual(doubleBraces("{ name }"), { inner: "name", valid: true, interpolation: "{name}", text: '{"{ name }"}' });
+  for (const object of ["{ a: 1 }", "{ a, b: 2 }", "{ ...props, a }", "{ a, f() {} }", "{ a, b }", "{ get a() { return 1 } }"]) assert.equal(doubleBraces(object), undefined, object);
 });
 
 test("una lista sin each:key compila con el índice como clave", () => {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -128,6 +128,51 @@ void invalid; void wrong;
   await assert.rejects(readFile(badgeDeclaration, "utf8"), /ENOENT/);
 });
 
+test("resolveComponent loads <MeekoLink> and a module's UI component by name, with typed props", { timeout: 180_000 }, async (context) => {
+  const root = await tempProject(context, "component-registry-link");
+  await linkRepositoryPackages(root);
+  await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}\n');
+  // A module that contributes UI-prefixed components, as @meekojs/ui does.
+  await mkdir(join(root, "modules", "kit", "components"), { recursive: true });
+  await writeFile(join(root, "modules", "kit", "index.ts"), 'import { defineMeekoModule } from "@meekojs/meeko/framework";\nexport default defineMeekoModule({ meta: { name: "kit" }, setup(_options, meeko) { meeko.addComponentsDir("./modules/kit/components", { prefix: "UI" }); } });\n');
+  await writeFile(join(root, "modules", "kit", "components", "Card.meeko"), '<script lang="ts">const props = defineProps<{ heading: string }>();</script>\n<template><article>{props.heading}</article></template>\n');
+  await writeFile(join(root, "meeko.config.ts"), 'import kit from "./modules/kit/index.ts";\nexport default { modules: [kit] };\n');
+  await mkdir(join(root, "app", "pages", "users"), { recursive: true });
+  await mkdir(join(root, "app", "utils"), { recursive: true });
+  await writeFile(join(root, "app", "pages", "about.meeko"), "<template><h1>Acerca</h1></template>\n");
+  await writeFile(join(root, "app", "pages", "users", "[id].meeko"), "<template><h1>Usuario</h1></template>\n");
+  await writeFile(join(root, "app", "pages", "index.meeko"), `<script lang="ts">
+const link = signal<ResolvedComponent<"MeekoLink"> | undefined>(undefined);
+async function open(): Promise<void> {
+  link.value = await resolveComponent("MeekoLink", { to: "/users/[id]", params: { id: "7" }, class: "nav" });
+}
+</script>
+<template><main><button type="button" on:click="open">Open</button><component if:when="link.value" is="link.value!">Perfil</component></main></template>
+`);
+  await writeFile(join(root, "app", "utils", "consumer.ts"), `const names: ComponentName[] = ["MeekoLink", "UICard"];
+resolveComponent("MeekoLink", { to: "/about" });
+resolveComponent("UICard", { heading: "Hola" });
+// @ts-expect-error a route that does not exist
+resolveComponent("MeekoLink", { to: "/nowhere" });
+// @ts-expect-error the params of a dynamic route are required
+resolveComponent("MeekoLink", { to: "/users/[id]" });
+// @ts-expect-error <MeekoLink> builds its href
+resolveComponent("MeekoLink", { to: "/about", href: "/x" });
+// @ts-expect-error the heading of the card is required
+resolveComponent("UICard", {});
+void names;
+`);
+  const declaration = await generateComponentRegistryTypes(root);
+  const text = await readFile(declaration, "utf8");
+  assert.match(text, /readonly "MeekoLink": typeof import\("@meekojs\/meeko\/builtins\/link"\)/);
+  assert.match(text, /readonly "UICard": typeof import\(/);
+  assert.deepEqual((await checkFrameworkProject(root)).filter((item) => (item.severity ?? "error") === "error"), []);
+  // A component of the project called MeekoLink takes the name.
+  await mkdir(join(root, "app", "components"), { recursive: true });
+  await writeFile(join(root, "app", "components", "MeekoLink.meeko"), "<template><a>own</a></template>\n");
+  assert.doesNotMatch(await readFile(await generateComponentRegistryTypes(root), "utf8"), /builtins\/link/);
+});
+
 test("a project without registered components still has a valid generated resolver", async (context) => {
   const root = await tempProject(context, "empty-component-registry");
   await linkRepositoryPackages(root);
@@ -237,4 +282,35 @@ void props; void invalid;
   const declaration = await generateComponentRegistryTypes(root);
   assert.match(await readFile(declaration, "utf8"), /VendorExternal/);
   assert.deepEqual((await checkFrameworkProject(root)).filter((item) => (item.severity ?? "error") === "error"), []);
+});
+
+test("a component of a module outside the project keeps its own declaration and nothing is written outside .meeko", { timeout: 120_000 }, async (context) => {
+  // A workspace: the app in apps/meeko imports a component of packages/ui, as a linked module does.
+  const workspace = await tempProject(context, "external-component-declarations");
+  const root = join(workspace, "apps", "meeko");
+  const vendor = join(workspace, "packages", "ui", "dist", "app", "components");
+  await mkdir(join(root, "app", "pages"), { recursive: true });
+  await mkdir(vendor, { recursive: true });
+  await linkRepositoryPackages(root);
+  await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}\n');
+  await writeFile(join(vendor, "Widget.meeko"), "<script lang=\"ts\">const props = defineProps<{ value: \"ready\" | \"idle\" }>();</script><template><p>{props.value}</p></template>\n");
+  const shipped = `export type ComponentProps = { value: "ready" | "idle" };
+export declare function renderToString(props: ComponentProps): string;
+export declare function renderWithState(props: ComponentProps): { html: string; state: Record<string, unknown> };
+export declare function hydrateScope(scope: import("@meekojs/meeko").DomScope, props: ComponentProps): import("@meekojs/meeko").ComponentRelease;
+`;
+  await writeFile(join(vendor, "Widget.d.meeko.ts"), shipped);
+  const page = join(root, "app", "pages", "index.meeko");
+  const source = `<script lang="ts">import * as Widget from "../../../../packages/ui/dist/app/components/Widget.meeko";</script><template><Widget value="ready" /></template>\n`;
+  await writeFile(page, source);
+  const outputs = await generateAppTypes(root);
+  assert.deepEqual(outputs, [join(root, ".meeko", "types", "app", "pages", "index.d.meeko.ts")]);
+  // Before, the declaration of Widget went to apps/meeko/packages/ui/dist/app/components.
+  assert.deepEqual((await readdir(root)).filter((name) => name !== "node_modules").sort(), [".meeko", "app", "package.json"]);
+  assert.equal(await readFile(join(vendor, "Widget.d.meeko.ts"), "utf8"), shipped);
+  // The page is still typed against the declaration the module ships.
+  assert.deepEqual((await checkFrameworkProject(root)).filter((item) => (item.severity ?? "error") === "error"), []);
+  await writeFile(page, source.replace('value="ready"', 'value="other"'));
+  await assert.rejects(checkFrameworkProject(root), /TS2322|other/);
+  assert.deepEqual((await readdir(root)).filter((name) => name !== "node_modules").sort(), [".meeko", "app", "package.json"]);
 });

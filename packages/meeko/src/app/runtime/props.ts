@@ -232,6 +232,72 @@ export function resolveProps(input: object, defaults: object): object {
   return view;
 }
 
+/** State of a view of {@link withoutEventProps}, kept in its proxy target. */
+interface EventsState {
+  readonly props: object;
+  /** Callback props of the events that the component declares, such as `onClick`. */
+  readonly hidden: ReadonlySet<string>;
+}
+
+function hiddenKey(state: EventsState, key: string | symbol): boolean {
+  return typeof key === "string" && state.hidden.has(key);
+}
+
+const eventsTraps: ProxyHandler<EventsState> = {
+  ...readOnlyTraps,
+  // A read still reaches the callback, as before; only the enumeration leaves it out.
+  get: (state, key) => Reflect.get(state.props, key),
+  has: (state, key) => !hiddenKey(state, key) && Reflect.has(state.props, key),
+  ownKeys: (state) => Reflect.ownKeys(state.props).filter((key) => !hiddenKey(state, key)),
+  getOwnPropertyDescriptor: (state, key) => {
+    if (hiddenKey(state, key)) return undefined;
+    const descriptor = Reflect.getOwnPropertyDescriptor(state.props, key);
+    if (!descriptor) return undefined;
+    return { value: Reflect.get(state.props, key), writable: false, enumerable: descriptor.enumerable ?? true, configurable: true };
+  },
+};
+
+/**
+ * The `props` of a component with `defineEmits`: the same props, without the callbacks of its
+ * events (`onClick` for `click`) in `Object.keys`, `in`, `{ ...props }` and a rest
+ * `const { a, ...rest } = props`, so that the object matches the type of `defineProps`, which does
+ * not declare them, and `bind="rest"` does not receive them. `emit` reads them from the original
+ * props. Internal to compiled components.
+ */
+export function withoutEventProps(props: object, names: readonly string[]): object {
+  if (names.length === 0) return props;
+  const view = new Proxy<EventsState>({ props, hidden: new Set(names) }, eventsTraps);
+  if (isReactiveProps(props)) reactiveViews.add(view);
+  return view;
+}
+
+/** `Omit` over each member of a union of props, like the type of an object rest (`...rest`). */
+export type RestProps<Props, Keys extends PropertyKey> = Props extends unknown ? Omit<Props, Keys> : never;
+
+/** A prop that a destructured `defineProps` names: it must be a key of every member of the props. */
+export type PropKey<Props, Key extends keyof Props> = Key;
+
+/** `unknown` once every {@link PropKey} of a destructured `defineProps` is valid: it leaves the props type as it is. */
+export type PropKeysCheck<Keys extends readonly PropertyKey[]> = Keys extends readonly unknown[] ? unknown : never;
+
+const restTraps: ProxyHandler<EventsState> = {
+  ...eventsTraps,
+  // Like an object rest, the destructured props are not there: a read gives `undefined`.
+  get: (state, key) => hiddenKey(state, key) ? undefined : Reflect.get(state.props, key),
+};
+
+/**
+ * The `...rest` of a destructured `defineProps`: a read-only view of the props without the
+ * destructured ones, which follows the parent's props like the props themselves (`bind="rest"`
+ * writes the attributes it has now). The callbacks of the declared events are already out of
+ * `props` (see {@link withoutEventProps}). Internal to compiled components.
+ */
+export function restProps(props: object, names: readonly string[]): object {
+  const view = new Proxy<EventsState>({ props, hidden: new Set(names) }, restTraps);
+  if (isReactiveProps(props)) reactiveViews.add(view);
+  return view;
+}
+
 /** Reads every prop of a reactive view, so the observer that calls it follows any prop change. */
 export function trackProps(props: object): void {
   for (const key of Reflect.ownKeys(props)) if (typeof key === "string") Reflect.get(props, key);

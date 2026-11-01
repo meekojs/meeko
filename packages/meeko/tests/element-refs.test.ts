@@ -214,6 +214,9 @@ test("composable rules: MEEK054 to MEEK058", () => {
   assertCompileError(list, "MEEK056", list.indexOf("\"row\""));
   const late = script(`const field = await useElementRef("field");\nconst label = "late";`, "<p ref:field>{label}</p>");
   assertCompileError(late, "MEEK057", late.lastIndexOf("label"));
+  // After a character reference, the position is the name's in the source, not in the decoded text.
+  const lateAfterEntity = script(`const field = await useElementRef("field");\nconst label = "late";`, "<p ref:field>{'&lt;' &amp;&amp; label}</p>");
+  assertCompileError(lateAfterEntity, "MEEK057", lateAfterEntity.lastIndexOf("label"));
   const lateFunction = script(`const field = await useElementRef("field");\nfunction send() {}`, "<p ref:field><button on:click=\"send\">x</button></p>");
   assertCompileError(lateFunction, "MEEK057", lateFunction.lastIndexOf("send"));
   const lateMacro = script(`const field = await useElementRef("field");\ndefineExpose({ field });`);

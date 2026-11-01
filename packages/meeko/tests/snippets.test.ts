@@ -440,8 +440,14 @@ test("snippets report MEEK059 to MEEK062 and children no longer give MEEK049", (
   assertCompileError(outside, "MEEK061", outside.indexOf("<snippet"));
   const noName = template(`<Child><snippet>a</snippet></Child>`);
   assertCompileError(noName, "MEEK061", noName.indexOf("<snippet"));
-  const badName = template(`<Child><snippet name="a-b">a</snippet></Child>`);
-  assertCompileError(badName, "MEEK061", badName.indexOf(`name="a-b"`));
+  // Since 1.8 a name may join identifier segments with hyphens (`cell-email`); other shapes still fail.
+  for (const name of ["a-", "-a", "a--b", "a.b", "a b", "1a", "a-b!"]) {
+    const badName = template(`<Child><snippet name="${name}">a</snippet></Child>`);
+    assertCompileError(badName, "MEEK061", badName.indexOf(`name="${name}"`));
+  }
+  for (const name of ["a-b", "cell-email", "header-created-at", "cell-2024", "cell-created_at", "$x-y"]) {
+    assert.doesNotThrow(() => compile(template(`<Child><snippet name="${name}">a</snippet></Child>`), "Snippets.meeko"), name);
+  }
   const duplicate = template(`<Child><snippet name="x">a</snippet><snippet name="x">b</snippet></Child>`);
   assertCompileError(duplicate, "MEEK061", duplicate.lastIndexOf(`x">b`));
   const badParams = template(`<Child><snippet name="x" params="a, 1b">a</snippet></Child>`);
@@ -569,6 +575,120 @@ const rows = [{ id: "a" }];
     const required = await checkSource(parentWith(`<AppDialog><snippet name="default" if:when="flag.value">x</snippet></AppDialog>`), join(root, "RequiredMessage.meeko"));
     assert.equal(required.length, 1, JSON.stringify(required));
     assert.match(required[0]!.message, /<snippet name="default">.*declara default como obligatorio.*default\?: \[\.\.\.\]/);
+  } finally {
+    await cleanup();
+  }
+});
+
+/**
+ * A generic grid whose snippet names come from its type parameter: `cell-<key>` with the type of
+ * that column, `header-<key>` and a `cell` fallback, placed with element access by expression.
+ */
+const dynamicGrid = `<script lang="ts" generic="Row extends object">
+import type { Snippet } from "@meekojs/meeko";
+type Column<R extends object> = { key: Extract<keyof R, string>; label: string };
+const props = defineProps<{ rows: readonly Row[]; columns: readonly Column<Row>[] }>();
+const snippets = defineSnippets<
+  { [K in Extract<keyof Row, string> as \`cell-\${K}\`]?: [row: Row, value: Row[K]] } &
+  { [K in Extract<keyof Row, string> as \`header-\${K}\`]?: [column: Column<Row>] } &
+  { cell?: [row: Row, column: Column<Row>, value: unknown] }
+>();
+// Over a type parameter TypeScript cannot read a computed name, so the grid reads it from a view.
+const byName = snippets as { readonly [name: string]: Snippet<never> | undefined };
+function cellOf(column: Column<Row>): Snippet<[row: Row, value: unknown]> | undefined {
+  return byName[\`cell-\${column.key}\`] as Snippet<[row: Row, value: unknown]> | undefined;
+}
+function headerOf(column: Column<Row>): Snippet<[column: Column<Row>]> | undefined {
+  return byName[\`header-\${column.key}\`] as Snippet<[column: Column<Row>]> | undefined;
+}
+</script>
+<template><div class="grid"><p class="head"><span each:of="props.columns" each:as="column" each:key="column.key" class="h"><render if:when="headerOf(column)" snippet="headerOf(column)" args="column" /><b if:when="!headerOf(column)">{column.label}</b></span></p><p each:of="props.rows" each:as="row" each:key="props.rows.indexOf(row)" class="row"><span each:of="props.columns" each:as="column" each:key="column.key" class="c"><render if:when="cellOf(column)" snippet="cellOf(column)" args="row, row[column.key]" /><render if:when="!cellOf(column) && snippets.cell" snippet="snippets.cell" args="row, column, row[column.key]" /><i if:when="!cellOf(column) && !snippets.cell">{String(row[column.key])}</i></span></p></div></template>`;
+
+const dynamicGridPage = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+import * as Grid from "./Grid.meeko";
+type User = { id: number; email: string; active: boolean };
+const users = signal<User[]>([{ id: 1, email: "ada@x.io", active: true }, { id: 2, email: "bob@x.io", active: false }]);
+const all = [{ key: "id", label: "Id" }, { key: "email", label: "Email" }, { key: "active", label: "Active" }] as Array<{ key: keyof User; label: string }>;
+const columns = signal(all);
+const suffix = signal("!");
+</script>
+<template><button type="button" class="swap" on:click="() => columns.value = [all[2]!, all[1]!]">s</button><button type="button" class="suffix" on:click="() => suffix.value = '?'">x</button><button type="button" class="rename" on:click="() => users.value = users.value.map((user) => ({ ...user, email: user.email.toUpperCase() }))">r</button><Grid bind:rows="users.value" bind:columns="columns.value">
+<snippet name="cell-email" params="row, value"><a class="email">{value.toLowerCase() === value ? value : value + "^"}{suffix.value}#{row.id}</a></snippet>
+<snippet name="header-active"><u class="active-head">On</u></snippet>
+<snippet name="cell" params="row, column"><em class="fallback">{column.key}={String(row[column.key])}</em></snippet>
+</Grid></template>`;
+
+test("snippets named after a generic key render in SSR, hydrate and follow column changes", async () => {
+  const { component, cleanup } = await load({ Grid: dynamicGrid, Page: dynamicGridPage }, "Page");
+  const window = new Window();
+  try {
+    const root = window.document.createElement("main");
+    const rendered = component.renderWithState({});
+    root.innerHTML = rendered.html;
+    const texts = (selector: string): string[] => [...root.querySelectorAll(selector)].map((element) => (element.textContent ?? "").trim());
+    assert.deepEqual(texts(".h"), ["Id", "Email", "On"]);
+    assert.deepEqual(texts(".email"), ["ada@x.io!#1", "bob@x.io!#2"]);
+    assert.deepEqual(texts(".fallback"), ["id=1", "active=true", "id=2", "active=false"]);
+    const firstEmail = root.querySelector(".email");
+    const release = component.hydrate(root as unknown as Element, {}, rendered.state);
+    assert.equal(root.querySelector(".email"), firstEmail, "hydration keeps the server's cell");
+    // The parent's state reaches the dynamic snippet content.
+    (root.querySelector("button.suffix") as unknown as HTMLButtonElement).click();
+    assert.deepEqual(texts(".email"), ["ada@x.io?#1", "bob@x.io?#2"]);
+    assert.equal(root.querySelector(".email"), firstEmail);
+    // A new value reaches the `value` parameter without rendering the snippet again.
+    (root.querySelector("button.rename") as unknown as HTMLButtonElement).click();
+    assert.deepEqual(texts(".email"), ["ADA@X.IO^?#1", "BOB@X.IO^?#2"]);
+    // Other columns pick their own snippet, the fallback or the default text.
+    (root.querySelector("button.swap") as unknown as HTMLButtonElement).click();
+    assert.deepEqual(texts(".h"), ["On", "Email"]);
+    assert.deepEqual(texts(".fallback"), ["active=true", "active=false"]);
+    assert.deepEqual(texts(".email"), ["ADA@X.IO^?#1", "BOB@X.IO^?#2"]);
+    release();
+  } finally {
+    window.happyDOM.abort();
+    await cleanup();
+  }
+});
+
+test("meeko check types snippets named after a generic key: name, value type and parameters", { timeout: 120_000 }, async () => {
+  const { root, cleanup } = await typeProject({ "Grid.meeko": dynamicGrid });
+  const parentWith = (template: string): string => `<script lang="ts">
+import * as Grid from "./Grid.meeko";
+type User = { id: number; email: string; active: boolean };
+const users: User[] = [{ id: 1, email: "ada@x.io", active: true }];
+const columns: Array<{ key: keyof User; label: string }> = [{ key: "email", label: "Email" }];
+</script><template>${template}</template>`;
+  const cases = [
+    { name: "ValidGrid", source: dynamicGrid, codes: [] as string[] },
+    { name: "ValidPage", source: dynamicGridPage, codes: [] },
+    // The grid's own fixed snippets keep their parameters next to the mapped ones.
+    { name: "ChildArgs", source: dynamicGrid.replace(`args="row, column, row[column.key]"`, `args="row, column"`), codes: ["TS2345"], at: `row, column" />` },
+    { name: "ChildUnknown", source: dynamicGrid.replace(`snippets.cell" args`, `snippets.cel" args`), codes: ["TS2551"], at: "cel\" args" },
+    { name: "Value", source: parentWith(`<Grid bind:rows="users" bind:columns="columns"><snippet name="cell-email" params="row, value">{value.toUpperCase()}{row.active}</snippet><snippet name="cell-id" params="row, value">{value.toFixed(1)}</snippet><snippet name="header-email" params="column">{column.label}</snippet></Grid>`), codes: [] },
+    { name: "ValueType", source: parentWith(`<Grid bind:rows="users" bind:columns="columns"><snippet name="cell-id" params="row, value">{value.toUpperCase()}</snippet></Grid>`), codes: ["TS2339"], at: "toUpperCase()}" },
+    { name: "UnknownKey", source: parentWith(`<Grid bind:rows="users" bind:columns="columns"><snippet name="cell-nope" params="row, value">{value}</snippet></Grid>`), codes: ["TS2353"], at: `cell-nope"` },
+    { name: "UnknownHeader", source: parentWith(`<Grid bind:rows="users" bind:columns="columns"><snippet name="header-nope">x</snippet></Grid>`), codes: ["TS2353"], at: `header-nope"` },
+    // As with a fixed name, the extra parameter is also reported where it is read.
+    { name: "TooManyParams", source: parentWith(`<Grid bind:rows="users" bind:columns="columns"><snippet name="cell-email" params="row, value, extra">{extra}</snippet></Grid>`), codes: ["TS2345"], at: "row, value, extra", partial: true },
+  ];
+  try {
+    for (const item of cases) {
+      const diagnostics = await checkSource(item.source, join(root, `${item.name}.meeko`));
+      const messages = JSON.stringify(diagnostics);
+      const codes = diagnostics.map((diagnostic) => diagnostic.code);
+      if (item.codes.length === 0) assert.deepEqual(codes, [], `${item.name}: ${messages}`);
+      else if ("partial" in item) for (const code of item.codes) assert.ok(codes.includes(code), `${item.name}: ${messages}`);
+      else assert.deepEqual([...new Set(codes)], item.codes, `${item.name}: ${messages}`);
+      if (item.at) {
+        assert.ok(diagnostics.every((diagnostic) => !diagnostic.message.startsWith("TypeScript generado")), `${item.name}: ${messages}`);
+        assert.ok(diagnostics.some((diagnostic) => diagnostic.location.offset === item.source.indexOf(item.at!)), `${item.name}: ${messages}`);
+      }
+    }
+    await generateTypes(dynamicGridPage, join(root, "Page.meeko"));
+    const declaration = await readFile(join(root, ".meeko", "types", "Grid.d.meeko.ts"), "utf8");
+    assert.match(declaration, /\$\{K\}/);
   } finally {
     await cleanup();
   }

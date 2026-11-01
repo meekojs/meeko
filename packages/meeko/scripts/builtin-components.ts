@@ -8,12 +8,12 @@ import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { builtinComponentModules, compile } from "../src/compiler.ts";
+import { builtinComponentModules, compile, linkComponentModule } from "../src/compiler.ts";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** Each built-in component: its `.meeko` source and the compiled module, relative to the package. */
-export const builtinComponents = Object.values(builtinComponentModules).map(({ source, specifier }) => ({
+export const builtinComponents = [...Object.values(builtinComponentModules), linkComponentModule].map(({ source, specifier }) => ({
   source,
   output: `src/builtins/${specifier.split("/").at(-1)!}.compiled.ts`,
 }));
@@ -37,7 +37,9 @@ export function compileBuiltin(source: string, file: string, output = builtinCom
       const relative = posix.relative(posix.dirname(output), target);
       return `${before}${relative.startsWith(".") ? relative : `./${relative}`}${after}`;
     })
-    .replace(runtime, 'import * as __meeko from "../internal.js";');
+    .replace(runtime, 'import * as __meeko from "../internal.js";')
+    // `<MeekoLink>` builds its href with the framework's href(): the package's own module, not its export.
+    .replaceAll('"@meekojs/meeko/framework"', '"../framework.js"');
   for (const { specifier } of Object.values(builtinComponentModules)) {
     const module = specifier.split("/").at(-1)!;
     compiled = compiled.replace(`from ${JSON.stringify(specifier)};`, `from ${JSON.stringify(`./${module}.compiled.js`)};`);

@@ -1,5 +1,7 @@
 import ts from "@typescript/typescript6";
 
+import { isValueReference, shadowedBelow } from "../../app/definitions/scope";
+
 /** A read of `props` that runs once, so it misses later changes of the parent's props. */
 export interface PropsReadOnce {
   /** Offset in the script content. */
@@ -68,4 +70,46 @@ function readOnceMessage(node: ts.Identifier, propsName: string, scope: "setup" 
   const text = access.getText(file);
   const initial = scope === "setup" ? `. Si sólo quieres el valor inicial, usa signal(${text}) o untrack(() => ${text})` : "";
   return `${text} se lee una sola vez porque ${when}: no se actualizará cuando el padre cambie la prop; ${fix}${initial}`;
+}
+
+/**
+ * Reads of a destructured `defineProps` name (`const { label } = defineProps<Props>()`) that run
+ * once, like {@link propsReadsOnce}: `label` reads `props.label`, so a read in the top-level setup
+ * or directly in `onMounted` keeps the first value. A name that a closer scope declares is another
+ * variable.
+ */
+export function propAliasReadsOnce(file: ts.SourceFile, aliases: ReadonlySet<string>): PropsReadOnce[] {
+  const found: PropsReadOnce[] = [];
+  const visit = (node: ts.Node, scope: "setup" | "mounted" | undefined): void => {
+    if (ts.isFunctionLike(node)) {
+      const call = node.parent;
+      const mounted = scope === "setup" && ts.isCallExpression(call) && call.arguments[0] === node
+        && ts.isIdentifier(call.expression) && call.expression.text === "onMounted";
+      ts.forEachChild(node, (child) => visit(child, mounted ? "mounted" : undefined));
+      return;
+    }
+    if (ts.isTypeNode(node)) return;
+    if (scope && ts.isIdentifier(node) && aliases.has(node.text) && isValueReference(node) && !shadowedBelow(node, file)) {
+      const parent = node.parent;
+      // A call of a function prop, `signal(label)` and its default values are not copies.
+      const called = ts.isCallExpression(parent) && parent.expression === node;
+      const destructuring = ts.isBindingElement(parent) && ts.isObjectBindingPattern(parent.parent) && ts.isVariableDeclaration(parent.parent.parent)
+        && parent.parent.parent.initializer !== undefined && ts.isCallExpression(parent.parent.parent.initializer)
+        && ts.isIdentifier(parent.parent.parent.initializer.expression) && parent.parent.parent.initializer.expression.text === "defineProps";
+      if (!called && !destructuring && !signalInitialValue(node)) {
+        const when = scope === "mounted" ? "onMounted se ejecuta una sola vez" : "el setup se ejecuta una sola vez";
+        const fix = scope === "mounted"
+          ? "léela en un effect(() => …) para reaccionar a sus cambios"
+          : `léela donde se usa: {${node.text}} en la plantilla, computed(() => ${node.text}) o una función`;
+        const initial = scope === "setup" ? `. Si sólo quieres el valor inicial, usa signal(${node.text}) o untrack(() => ${node.text})` : "";
+        found.push({ start: node.getStart(file), message: `${node.text} es una prop de defineProps y aquí se lee una sola vez porque ${when}: no se actualizará cuando el padre cambie la prop; ${fix}${initial}` });
+      }
+    }
+    ts.forEachChild(node, (child) => visit(child, scope));
+  };
+  for (const statement of file.statements) {
+    if (ts.isImportDeclaration(statement) || ts.isTypeAliasDeclaration(statement) || ts.isInterfaceDeclaration(statement)) continue;
+    visit(statement, "setup");
+  }
+  return found;
 }
