@@ -1,0 +1,41 @@
+{
+  "name": "meeko-site",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "assets": "node scripts/assets.mjs",
+    "dev": "node scripts/assets.mjs && meeko dev .",
+    "check": "pnpm -F meeko-docs-content run check && pnpm -F meeko-docs run build && meeko check .",
+    "build": "node scripts/assets.mjs && meeko build .",
+    "db:migrate": "node scripts/migrate-docs.mjs",
+    "docs:import": "node scripts/import-docs.mjs",
+    "docs:sync": "node scripts/sync-docs.mjs",
+    "start": "meeko start .",
+    "preview": "pnpm run build && meeko preview .",
+    "test": "node --test tests/*.test.mjs",
+    "test:e2e": "node --test --test-concurrency=1 tests/*.e2e.mjs"
+  },
+  "dependencies": {
+    "@meekojs/meeko": "workspace:*",
+    "@meekojs/ui": "workspace:*",
+    "meeko-docs": "workspace:*",
+    "meeko-docs-content": "workspace:*",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@meekojs/prettier-plugin": "workspace:*",
+    "@types/node": "^24.0.0",
+    "@types/pg": "8.23.1",
+    "@typescript/typescript6": "6.0.2",
+    "playwright-core": "1.64.1",
+    "prettier": "3.9.10",
+    "prettier-plugin-css-order": "^2.2.0",
+    "sharp": "0.35.5",
+    "typescript": "7.0.2",
+    "vite": "8.3.5"
+  }
+}

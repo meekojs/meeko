@@ -141,7 +141,7 @@ El paquete vive en `packages/meeko` del [repositorio](https://github.com/meekojs
 | `tests` | Pruebas unitarias, E2E y de consumidor externo, y la suite de conformidad de adaptadores (`tests/conformance`). |
 | `packages/vscode` | Extensión de VS Code: resaltado y cliente del servidor de lenguaje. |
 | `packages/devtools` | Extensión Meeko DevTools para Chrome. |
-| `apps/site` | Sitio de documentación, hecho con Meeko a partir de estos Markdown. |
+| `apps/meeko` | Sitio de documentación, hecho con Meeko a partir de estos Markdown. |
 
 ## Desarrollo
 

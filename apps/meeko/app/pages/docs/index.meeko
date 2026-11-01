@@ -1,0 +1,126 @@
+<script server lang="ts">
+	import { definePage } from '@meekojs/meeko/framework'
+
+	import type { NavLink, RenderedDoc } from '../../../shared/types/docs'
+
+	import { readPage } from '../../../server/content/db'
+
+	export const route = definePage({ render: 'ssr' })
+
+	type DocCard = Pick<NavLink, 'featured' | 'href'> & Pick<RenderedDoc, 'title' | 'description'> & { readonly section: string }
+	type IndexPage = { readonly sections: readonly { readonly title: string; readonly docs: readonly DocCard[] }[] }
+	const snapshot = await readPage<IndexPage>('/docs')
+	if (!snapshot) notFound()
+	export const sections = snapshot.sections
+
+	export const head = {
+		title: 'Documentación · Meeko',
+		description: 'Toda la documentación de Meeko: guía del framework, API de componentes, editores, DevTools, estabilidad, arquitectura, migración y cambios.',
+	}
+</script>
+
+<script lang="ts">
+	export interface Props {
+		params: Record<string, string>
+		search: Record<string, string | string[]>
+	}
+</script>
+
+<template>
+	<section
+		class="index"
+		data-pagefind-ignore
+	>
+		<h1>Documentación</h1>
+		<p class="lead">
+			Todo lo que necesitas para escribir componentes
+			<code>.meeko</code>
+			y aplicaciones full-stack con Meeko.
+		</p>
+		<section
+			each:of="sections"
+			each:as="section"
+			each:key="section.title"
+		>
+			<h2>{section.title}</h2>
+			<ul>
+				<li
+					each:of="section.docs"
+					each:as="doc"
+					each:key="doc.href"
+				>
+					<UILinkCard
+						bind:href="doc.href"
+						bind:title="doc.title"
+						bind:description="doc.description"
+					>
+						<UIBadge
+							if:when="doc.featured"
+							tone="accent"
+							class="featured"
+						>
+							Destacado
+						</UIBadge>
+					</UILinkCard>
+				</li>
+			</ul>
+		</section>
+	</section>
+</template>
+
+<style scoped>
+	.index {
+		margin: 0 auto;
+		padding: clamp(3rem, 8vh, 5rem) var(--gutter) 5rem;
+		max-width: var(--container);
+	}
+	h1 {
+		margin: 0;
+		font-weight: var(--weight-display);
+		font-size: clamp(2.2rem, 4.5vw, 3.25rem);
+		line-height: 1.08;
+		letter-spacing: var(--tracking-display);
+	}
+	.lead {
+		margin: 1rem 0 3rem;
+		max-width: 38rem;
+		color: var(--muted);
+		font-size: 1.1rem;
+		line-height: 1.55;
+	}
+	.lead code {
+		color: var(--ink-soft);
+		font-size: 0.9em;
+	}
+	section + section {
+		margin-top: 2.75rem;
+	}
+	h2 {
+		margin: 0 0 1rem;
+		border-bottom: 1px solid var(--line);
+		padding-bottom: 0.75rem;
+		color: var(--ink);
+		font-weight: 500;
+		font-size: 0.95rem;
+		letter-spacing: -0.01em;
+	}
+	ul {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(16.5rem, 1fr));
+		gap: 0.75rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	/* Under the description of a card the dashboard features. */
+	ul :global(.featured) {
+		align-self: flex-start;
+		margin-top: 0.6rem;
+		font-size: 0.72rem;
+	}
+	@media (max-width: 640px) {
+		.index {
+			padding: 2.5rem var(--gutter) 3.5rem;
+		}
+	}
+</style>

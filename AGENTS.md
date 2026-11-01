@@ -8,7 +8,7 @@ Meeko es un monorepo pnpm. Instala dependencias desde la raíz y conserva el ún
 - `packages/ui/src/app/`: componentes `.meeko` y estilos CSS; `packages/i18n/`: internacionalización.
 - `packages/eslint-plugin/` y `packages/prettier-plugin/`: herramientas compartidas.
 - `packages/vscode/` y `packages/devtools/`: extensiones de editor y navegador.
-- `apps/site/`, `apps/ui/`, `apps/i18n/`: webs públicas del framework, UI e i18n; `packages/docs/` es su base documental privada compartida para UI e i18n.
+- `apps/meeko/`, `apps/ui/`, `apps/i18n/`: webs públicas del framework, UI e i18n; `packages/docs/` es su base documental privada compartida para UI e i18n.
 - `docs/`, `assets/brand/`, `scripts/`: documentación, recursos de marca y automatización.
 
 ## Comandos de desarrollo y validación
