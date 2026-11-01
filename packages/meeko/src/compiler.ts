@@ -2776,7 +2776,9 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
       // Without generated routes (RouteId = string) no id says which params it takes: they are optional.
       "type __MeekoLinkOptions<K extends string> = (keyof __MeekoRoutes extends never ? { params?: Record<string, string> | undefined }",
       "  : true extends __MeekoRouteUnion<K> ? { params?: __MeekoLinkParams<K> | undefined }",
-      "  : keyof __MeekoLinkParams<K> extends never ? { params?: never } : { params: __MeekoLinkParams<K> })",
+      // `undefined`, not `never`: a forwarder's `bind:params` is an explicit `undefined`, which
+      // exactOptionalPropertyTypes rejects in `params?: never`, and a static route still takes no params.
+      "  : keyof __MeekoLinkParams<K> extends never ? { params?: undefined } : { params: __MeekoLinkParams<K> })",
       "  & { search?: Readonly<Record<string, string | number | boolean | null | undefined>> | undefined };",
       "const __meeko_href = __meeko_href_overloads as <K extends __MeekoRouteId>(id: K, options: __MeekoLinkOptions<K>) => string;",
     ].join("\n"));

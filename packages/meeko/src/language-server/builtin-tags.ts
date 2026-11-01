@@ -143,7 +143,7 @@ export const builtinTags: readonly BuiltinTag[] = [
         "type __MeekoLinkCheckUnion<K extends string, A extends string = K> = K extends unknown ? ([A] extends [K] ? false : true) : never;",
         "type __MeekoLinkCheckParams<K extends string> = keyof __MeekoLinkCheckRoutes extends never ? unknown",
         "  : true extends __MeekoLinkCheckUnion<K> ? unknown",
-        "  : keyof __MeekoLinkCheckValues<K> extends never ? { params?: never } : { params: __MeekoLinkCheckValues<K> };",
+        "  : keyof __MeekoLinkCheckValues<K> extends never ? { params?: undefined } : { params: __MeekoLinkCheckValues<K> };",
         "",
       ].join("\n"),
     },

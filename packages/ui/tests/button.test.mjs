@@ -15,8 +15,8 @@ test('UIButton and UILink public types correlate routes and params and exclude t
 	execFileSync(process.execPath, [tsc, '--ignoreConfig', '--noEmit', '--strict', '--skipLibCheck', '--module', 'nodenext', '--target', 'es2022', fileURLToPath(new URL('./types/button.ts', import.meta.url))], { stdio: 'pipe' })
 })
 
-/** An application with `@meekojs/ui`, three routes and the given pages. */
-async function createApp(context, pages) {
+/** An application with `@meekojs/ui` and the given pages, by default with the routes of `routes`. */
+async function createApp(context, pages, routes = { 'app/pages/about.meeko': '<template><p>About</p></template>\n', 'app/pages/users/[id].meeko': '<template><p>User</p></template>\n' }) {
 	const parent = join(packageRoot, '.meeko')
 	await mkdir(parent, { recursive: true })
 	const root = await mkdtemp(join(parent, 'button-app-'))
@@ -30,8 +30,7 @@ async function createApp(context, pages) {
 		'package.json': JSON.stringify({ name: 'button-app', private: true, type: 'module' }),
 		'meeko.config.ts': "import { defineMeekoConfig } from '@meekojs/meeko/framework'\nexport default defineMeekoConfig({ modules: ['@meekojs/ui'] })\n",
 		'app/app.meeko': '<template><MeekoOutlet /></template>\n',
-		'app/pages/about.meeko': '<template><p>About</p></template>\n',
-		'app/pages/users/[id].meeko': '<template><p>User</p></template>\n',
+		...routes,
 		...pages,
 	}
 	for (const [file, source] of Object.entries(files)) {
@@ -97,3 +96,20 @@ test('a template checks the routes, params and exclusive props of UIButton and U
 	const lines = new Set(diagnostics.map((item) => item.location.line))
 	invalid.forEach((source, index) => assert.ok(lines.has(index + 2), `${source} must be a type error: ${describe(diagnostics)}`))
 })
+
+// With one route `to` is not a union, so the link branch of each component narrows `params` to
+// `undefined`: what a new application with only its index page checks, under exactOptionalPropertyTypes.
+for (const [name, page] of [
+	['a static route', { 'app/pages/index.meeko': '<template>\n\t<UIButton to="/">Button</UIButton>\n\t<UILink to="/">Link</UILink>\n\t<UILinkCard to="/" title="Card" />\n\t<UILink href="/elsewhere">Href</UILink>\n</template>\n' }],
+	['a dynamic route', { 'app/pages/users/[id].meeko': `<template>\n\t<UIButton to="/users/[id]" bind:params="{ id: '7' }">Button</UIButton>\n\t<UILink to="/users/[id]" bind:params="{ id: '7' }">Link</UILink>\n\t<UILinkCard to="/users/[id]" bind:params="{ id: '7' }" title="Card" />\n</template>\n` }],
+]) {
+	test(`UIButton, UILink and UILinkCard check in an application whose only route is ${name}`, { timeout: 180_000 }, async (context) => {
+		const root = await createApp(context, page, {})
+		await prepareFrameworkTypes(root)
+		const diagnostics = (await checkApp(root)).filter((item) => item.severity !== 'warning')
+		assert.deepEqual(
+			diagnostics.map((item) => `${item.filename}:${item.location.line}: ${item.code} ${item.message.slice(0, 200)}`),
+			[],
+		)
+	})
+}

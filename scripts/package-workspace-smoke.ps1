@@ -85,6 +85,7 @@ export const smoke = { state: signal(1), ui, i18n, useModal, formatting, lint: d
 <template>
   <UICard title="Installed card" variant="soft"><UIButton>Styled package</UIButton></UICard>
   <UILink href="/#packaged">Packaged link defaults</UILink>
+  <UILinkCard to="/" title="Packaged link card" />
   <UITable caption="Installed table" layout="grid" bind:columns="columns" bind:rows="rows" rowKey="id" />
 </template>
 '@ | Set-Content -LiteralPath (Join-Path $consumer 'app/pages/index.meeko') -Encoding utf8

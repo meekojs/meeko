@@ -14,7 +14,7 @@ type __MeekoLinkParams<K extends string> = K extends keyof __MeekoRoutes ? __Mee
 type __MeekoRouteUnion<K extends string, A extends string = K> = K extends unknown ? ([A] extends [K] ? false : true) : never;
 type __MeekoLinkOptions<K extends string> = (keyof __MeekoRoutes extends never ? { params?: Record<string, string> | undefined }
   : true extends __MeekoRouteUnion<K> ? { params?: __MeekoLinkParams<K> | undefined }
-  : keyof __MeekoLinkParams<K> extends never ? { params?: never } : { params: __MeekoLinkParams<K> })
+  : keyof __MeekoLinkParams<K> extends never ? { params?: undefined } : { params: __MeekoLinkParams<K> })
   & { search?: Readonly<Record<string, string | number | boolean | null | undefined>> | undefined };
 const __meeko_href = __meeko_href_overloads as <K extends __MeekoRouteId>(id: K, options: __MeekoLinkOptions<K>) => string;
 type __MeekoEmits = __meeko.Emits<{ click: [event: MouseEvent] }>;

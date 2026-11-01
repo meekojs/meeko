@@ -15,8 +15,8 @@ const props = defineProps<{ to: RouteId; params?: Record<string, string> }>()
 <template><MeekoLink bind:to="props.to" bind:params="props.params">x</MeekoLink></template>
 `
 
-/** Prepares an app with the given pages and `AppLink`, and returns a checker for the template of its index page. */
-async function createApp(name: string, pages: readonly string[]) {
+/** Prepares an app with the given pages and components, and returns a checker for the template of its index page. */
+async function createApp(name: string, pages: readonly string[], components: Readonly<Record<string, string>> = { 'AppLink.meeko': forwarder }) {
 	const project = await createTempProject(name)
 	const root = project.root
 	await writeFile(join(root, 'package.json'), '{"private":true,"type":"module"}\n')
@@ -28,7 +28,7 @@ async function createApp(name: string, pages: readonly string[]) {
 		await mkdir(join(root, 'app', 'pages', page, '..'), { recursive: true })
 		await writeFile(join(root, 'app', 'pages', page), '<template><h1>x</h1></template>\n')
 	}
-	await writeFile(join(root, 'app', 'components', 'AppLink.meeko'), forwarder)
+	for (const [file, source] of Object.entries(components)) await writeFile(join(root, 'app', 'components', file), source)
 	await prepareFrameworkTypeDeclarations(root)
 	const check = async (script: string, uses: string) => {
 		await writeFile(join(root, 'app', 'pages', 'index.meeko'), `<script lang="ts">\n${script}\n</script>\n<template>${uses}</template>\n`)
@@ -79,6 +79,31 @@ test('with generated routes, <MeekoLink> requires params of a dynamic route and 
 				`${uses}: ${JSON.stringify(diagnostics)}`,
 			)
 		}
+	} finally {
+		await project.remove()
+	}
+})
+
+test('with one static route, a forwarder narrows its params to undefined and <MeekoLink> takes them', { timeout: 180_000 }, async () => {
+	// The only route of the app is the index page: `to` is not a union of routes, as in a new application.
+	const { project, check } = await createApp('link-params-single-route', ['index.meeko'], {
+		'Polymorphic.meeko': `<script lang="ts">
+type RouteProps = { to: RouteId; params?: never; search?: Readonly<Record<string, string>>; href?: never }
+type AnchorProps = { href: string; to?: never; params?: never; search?: never }
+const { to, params, search, href } = defineProps<RouteProps | AnchorProps>()
+</script>
+<template><component is="to !== undefined ? 'MeekoLink' : 'a'" bind:to="to" bind:params="params" bind:search="search" bind:href="href">x</component></template>
+`,
+	})
+	try {
+		assert.deepEqual(await check('', '<Polymorphic to="/" /><Polymorphic href="/elsewhere" />'), [])
+		// An explicit `undefined` is the same as no params; real params are still an error.
+		assert.deepEqual(await check('', '<MeekoLink to="/" bind:params="undefined">x</MeekoLink>'), [])
+		const wrong = await check('', '<MeekoLink to="/" bind:params="{ id: \'7\' }">x</MeekoLink>')
+		assert.ok(
+			wrong.some((item) => /^TS2/.test(item)),
+			JSON.stringify(wrong),
+		)
 	} finally {
 		await project.remove()
 	}
