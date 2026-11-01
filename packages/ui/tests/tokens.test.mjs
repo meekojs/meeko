@@ -58,11 +58,30 @@ const tokens = { light: declarations(block(tokensCss, ':root')), dark: declarati
 const color = (theme, scale, step) => palette[theme][`--ui-color-${scale}-${step}`]
 const primary = (step) => color('dark', 'primary', step)
 
-test('form control borders reach 3:1 against their control and page backgrounds', () => {
+test('form control borders reach 3:1 against every background and control state they sit on', () => {
 	for (const theme of ['light', 'dark']) {
 		const step = (tokens[theme]['--ui-color-control-border'] ?? tokens.light['--ui-color-control-border']).match(/surface-(\d+)/)[1]
-		for (const background of [1, 2, 3]) assert.ok(contrast(color(theme, 'surface', step), color(theme, 'surface', background)) >= 3, `${theme}: control border against surface ${background}`)
+		for (const background of [1, 2, 3, 4]) {
+			const ratio = contrast(color(theme, 'surface', step), color(theme, 'surface', background))
+			assert.ok(ratio >= 3, `${theme}: control border on surface ${background} is ${ratio.toFixed(2)}:1`)
+		}
 	}
+})
+
+test('every form control draws its border from --ui-color-control-border, not from a decorative border', async () => {
+	const main = await read('main.css')
+	const forms = await read('forms.css')
+	const rule = (css, selector) => {
+		const start = css.indexOf(`${selector} {`)
+		assert.notEqual(start, -1, `no ${selector} rule`)
+		return css.slice(start, css.indexOf('\n}', start))
+	}
+	// The same rule paints <UIInput>, <UITextarea> and the trigger of <UISelect> and <UICombobox>.
+	assert.match(rule(main.replaceAll('\r\n', '\n'), '.meeko-ui-input,\n[data-meeko-select-trigger]'), /border: var\(--ui-border-width\) solid var\(--ui-color-control-border\)/)
+	assert.match(rule(main, ".meeko-ui-button[data-variant='outline']"), /border-color: var\(--ui-color-control-border\)/)
+	for (const selector of ['.meeko-ui-choice:not(.meeko-ui-switch) input', '.meeko-ui-switch input', ".meeko-ui-radio-group[data-variant='segmented'] .meeko-ui-radio-options"]) assert.match(rule(forms, selector), /solid var\(--ui-color-control-border\)/, selector)
+	assert.match(rule(forms, '.meeko-ui-slider input::-webkit-slider-runnable-track'), /var\(--ui-color-control-border\)/)
+	assert.match(rule(forms, '.meeko-ui-slider input::-moz-range-track'), /var\(--ui-color-control-border\)/)
 })
 
 /** The value of a token that points to a step, in a theme: `--ui-color-text` becomes a hex. */

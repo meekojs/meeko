@@ -39,19 +39,24 @@
 		>
 			{props.error}
 		</p>
-		<p
-			if:when="props.hint"
-			class="meeko-ui-field-description"
-			bind:id="props.id + '-hint'"
+		<div
+			if:when="props.hint || props.counter !== undefined"
+			class="meeko-ui-field-meta"
 		>
-			{props.hint}
-		</p>
-		<p
-			if:when="props.counter !== undefined"
-			class="meeko-ui-field-description meeko-ui-field-counter"
-			bind:id="props.id + '-counter'"
-		>
-			{props.counter}
-		</p>
+			<p
+				if:when="props.hint"
+				class="meeko-ui-field-description"
+				bind:id="props.id + '-hint'"
+			>
+				{props.hint}
+			</p>
+			<p
+				if:when="props.counter !== undefined"
+				class="meeko-ui-field-description meeko-ui-field-counter"
+				bind:id="props.id + '-counter'"
+			>
+				{props.counter}
+			</p>
+		</div>
 	</div>
 </template>

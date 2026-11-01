@@ -1,6 +1,3 @@
-[data-meeko-select] [data-meeko-select-trigger] {
-	border-color: var(--ui-color-control-border);
-}
 /* Firefox keeps its own list, and paints it with these colours. */
 select[data-meeko-select-trigger] {
 	cursor: pointer;

@@ -19,11 +19,13 @@ async function render(context, name, template) {
 			.code.replaceAll('from "@meekojs/meeko/internal"', `from ${runtime('internal.js')}`)
 			.replaceAll('from "@meekojs/meeko"', `from ${runtime('index.js')}`)
 			.replaceAll(`from "./${name}.meeko"`, `from "./${name}.ts"`)
-			.replace(/from ["']\.\.\/utils\/(messages|defaults)["']/g, (_, utility) => `from ${JSON.stringify(new URL(`../dist/app/utils/${utility}.js`, import.meta.url).href)}`)
+			.replace(/from ["']\.\.\/utils\/([\w-]+)["']/g, (_, utility) => `from ${JSON.stringify(new URL(`../dist/app/utils/${utility}.js`, import.meta.url).href)}`)
+			.replace(/from ["']\.\/internal\/Icon\.meeko["']/g, 'from "./Icon.ts"')
 		await writeFile(`${directory}/${file}.ts`, code)
 	}
 	let source = await readFile(new URL(`../src/app/components/${name}.meeko`, import.meta.url), 'utf8')
 	if (name === 'Card' || name === 'Table') source = source.replace('<script lang="ts"', '<script lang="ts"').replace(/(<script[^>]*>)/, '$1\nimport { useId } from "@meekojs/meeko"')
+	if (source.includes('./internal/Icon.meeko')) await write('Icon', await readFile(new URL('../src/app/components/internal/Icon.meeko', import.meta.url), 'utf8'))
 	await write(name, source)
 	await write('Page', `<script lang="ts">import { signal } from "@meekojs/meeko"; import * as Component from "./${name}.meeko"</script><template>${template}</template>`)
 	const page = await import(pathToFileURL(`${directory}/Page.ts`).href)
@@ -48,7 +50,7 @@ const cases = [
 	['Input', '<Component type="datetime-local" autocomplete="off" autocapitalize="none" bind:spellcheck="false" min="2026-01-01T00:00" max="2026-12-31T00:00" bind:step="60" />', [/type="datetime-local"/, /autocomplete="off"/, /autocapitalize="none"/, /spellcheck="false"/, /min="2026-01-01T00:00"/, /max="2026-12-31T00:00"/, /step="60"/]],
 	['Field', '<Component id="comment" label="Comment" hint="Optional" counter="10/200" error="Too long"><snippet name="default" params="id, describedBy"><input bind:id="id" bind:aria-describedby="describedBy" /></snippet></Component>', [/aria-describedby="comment-error comment-hint comment-counter"/, /id="comment-hint"/, /id="comment-counter"/, /10\/200/, /role="alert"/]],
 	['Badge', '<Component tone="warning" bind:dot="true">Pending</Component>', [/data-tone="warning"/, /class="meeko-ui-badge-dot" aria-hidden="true"/, /Pending/]],
-	['Button', '<Component type="submit" name="intent" value="save" form="editor" tone="danger" bind:loading="true" ariaLabel="Save" bind:iconOnly="true">Save</Component>', [/type="submit"/, /name="intent"/, /value="save"/, /form="editor"/, /aria-busy="true"/, /disabled/, /aria-label="Save"/, /data-icon-only/]],
+	['Button', '<Component type="submit" name="intent" value="save" form="editor" tone="danger" bind:loading="true" ariaLabel="Save" bind:iconOnly="true">Save</Component>', [/type="submit"/, /name="intent"/, /value="save"/, /form="editor"/, /aria-busy="true"/, /aria-disabled="true"/, /aria-label="Save"/, /data-icon-only/]],
 	['Card', '<Component title="Summary" density="compact" padding="none">Details</Component>', [/data-density="compact"/, /data-padding="none"/, /Summary/, /Details/]],
 	['Table', '<Component caption="Results" density="compact" rowKey="id" bind:rows="[{ id: 1, name: \'Ana\', count: 5 }]" bind:columns="[{ key: \'name\', label: \'Name\', rowHeader: true }, { key: \'count\', label: \'Count\', numeric: true }]" />', [/data-density="compact"/, /<th[^>]*role="rowheader"[^>]*scope="row"/, /data-numeric/, /Ana/, />5<\/span>/]],
 ]

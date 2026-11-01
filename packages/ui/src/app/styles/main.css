@@ -2,6 +2,7 @@
 @import './tokens.css';
 @import './deprecated.css';
 @import './fonts.css';
+@import './utilities.css';
 @import './container.css';
 @import './modal.css';
 @import './table.css';
@@ -89,7 +90,7 @@
 }
 .meeko-ui-button[data-variant='outline'] {
 	--ui-button-color: var(--ui-color-text);
-	border-color: var(--ui-color-border-strong);
+	border-color: var(--ui-color-control-border);
 	background: transparent;
 }
 .meeko-ui-button[data-variant='secondary'] {
@@ -103,6 +104,72 @@
 .meeko-ui-button:is([data-variant='ghost'], [data-variant='outline'], [data-variant='secondary']):active:not(:disabled) {
 	background: var(--ui-color-control-active);
 }
+/* After the variants: a tone only changes the colours of the variant it is given to. */
+.meeko-ui-button[data-tone='danger'] {
+	--ui-button-color: var(--ui-color-danger-contrast);
+	background: var(--ui-color-danger);
+}
+.meeko-ui-button[data-tone='danger']:is(:hover, :active):not(:disabled) {
+	--ui-button-color: var(--ui-color-danger-contrast-hover);
+	background: var(--ui-color-danger-hover);
+}
+.meeko-ui-button[data-tone='danger']:is([data-variant='ghost'], [data-variant='outline']) {
+	--ui-button-color: var(--ui-color-danger-text);
+	background: transparent;
+}
+.meeko-ui-button[data-tone='danger'][data-variant='outline'] {
+	border-color: var(--ui-color-danger-border);
+}
+.meeko-ui-button[data-tone='danger'][data-variant='secondary'] {
+	--ui-button-color: var(--ui-color-danger-text);
+	border-color: var(--ui-color-danger-border);
+	background: var(--ui-color-danger-soft);
+}
+.meeko-ui-button[data-tone='danger']:is([data-variant='ghost'], [data-variant='outline'], [data-variant='secondary']):is(:hover, :active):not(:disabled) {
+	--ui-button-color: var(--ui-color-danger-text);
+	background: var(--ui-color-danger-soft);
+}
+.meeko-ui-button[data-icon-only] {
+	padding: var(--ui-space-0);
+	min-width: var(--ui-control-height-md);
+}
+.meeko-ui-button[data-icon-only] > svg {
+	flex: none;
+	width: var(--ui-icon-size);
+	height: var(--ui-icon-size);
+}
+.meeko-ui-button[data-icon-only][data-size='sm'] {
+	min-width: var(--ui-control-height-sm);
+}
+.meeko-ui-button[data-icon-only][data-size='lg'] {
+	min-width: var(--ui-control-height-lg);
+}
+/* While busy the action stays focusable, so the keyboard does not lose its place. */
+.meeko-ui-button[aria-busy='true'],
+.meeko-ui-pagination .meeko-ui-button[aria-disabled='true'] {
+	gap: var(--ui-space-1-5);
+	cursor: progress;
+}
+.meeko-ui-button[aria-busy='true']::before,
+.meeko-ui-pagination .meeko-ui-button[aria-disabled='true']::before {
+	flex: none;
+	animation: meeko-ui-spin var(--ui-duration-spin) linear infinite;
+	box-sizing: border-box;
+	border: var(--ui-focus-ring-width) solid currentColor;
+	border-radius: var(--ui-radius-full);
+	border-inline-end-color: transparent;
+	width: var(--ui-icon-size-sm);
+	height: var(--ui-icon-size-sm);
+	content: '';
+}
+.meeko-ui-button[data-icon-only][aria-busy='true'] > * {
+	display: none;
+}
+@keyframes meeko-ui-spin {
+	to {
+		rotate: 1turn;
+	}
+}
 .meeko-ui-button:disabled,
 .meeko-ui-input:disabled,
 [data-meeko-select][data-disabled] {
@@ -114,7 +181,7 @@
 	display: block;
 	transition: background-color var(--ui-duration-fast);
 	box-sizing: border-box;
-	border: var(--ui-border-width) solid var(--ui-color-border-strong);
+	border: var(--ui-border-width) solid var(--ui-color-control-border);
 	border-radius: var(--ui-radius-md);
 	background: var(--ui-color-control);
 	padding: var(--ui-space-1-5) var(--ui-space-3);
@@ -152,6 +219,10 @@
 	.meeko-ui-input,
 	[data-meeko-select-trigger] {
 		transition: none;
+	}
+	.meeko-ui-button[aria-busy='true']::before,
+	.meeko-ui-pagination .meeko-ui-button[aria-disabled='true']::before {
+		animation: none;
 	}
 }
 .meeko-ui-field {

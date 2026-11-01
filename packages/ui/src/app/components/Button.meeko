@@ -16,8 +16,8 @@
 
 	const defaults = uiDefaults().button
 
-	const nativeDisabled = computed(() => (to === undefined && href === undefined ? disabled || loading : undefined))
-	const linkDisabled = computed(() => (loading && (to !== undefined || href !== undefined) ? 'true' : undefined))
+	// A disabled button drops the focus: while busy it stays focusable, and the click handler stops it.
+	const nativeDisabled = computed(() => (to === undefined && href === undefined ? disabled : undefined))
 	const classes = computed(() => ['meeko-ui-button', className].filter(Boolean).join(' '))
 	const linkRel = computed(() => rel ?? (target === '_blank' ? 'noopener noreferrer' : undefined))
 
@@ -43,7 +43,7 @@
 		bind:type="type"
 		bind:disabled="nativeDisabled.value"
 		bind:aria-busy="loading ? 'true' : undefined"
-		bind:aria-disabled="linkDisabled.value"
+		bind:aria-disabled="loading ? 'true' : undefined"
 		bind:aria-label="ariaLabel ?? rest['aria-label']"
 		bind:data-tone="tone"
 		bind:data-icon-only="iconOnly ? '' : undefined"

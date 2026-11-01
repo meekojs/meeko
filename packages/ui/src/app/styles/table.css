@@ -41,7 +41,10 @@
 	& > tbody > tr:hover {
 		background: var(--table-hover);
 	}
-	& > tbody > tr:last-child > td {
+	& > tbody > tr > th {
+		color: var(--ui-color-text);
+	}
+	& > tbody > tr:last-child > :is(th, td) {
 		border-bottom: 0;
 	}
 	& > tfoot > tr:first-child > :is(th, td) {

@@ -49,8 +49,8 @@
 .meeko-ui-alert-icon {
 	display: inline-flex;
 	flex-shrink: 0;
-	width: var(--ui-space-5);
-	height: var(--ui-space-5);
+	width: var(--ui-icon-size);
+	height: calc(var(--ui-font-size-md) * var(--ui-line-height-normal));
 }
 .meeko-ui-alert-icon > svg {
 	width: 100%;
@@ -63,48 +63,9 @@
 	margin-top: var(--ui-space-3);
 }
 .meeko-ui-dismiss {
-	display: inline-flex;
-	flex-shrink: 0;
-	justify-content: center;
-	align-items: center;
-	cursor: pointer;
 	margin-inline-start: auto;
-	border: 0;
-	border-radius: var(--ui-radius-md);
-	background: transparent;
-	padding: var(--ui-space-2);
-	min-width: var(--ui-control-height-md);
-	min-height: var(--ui-control-height-md);
+	margin-block-start: calc((var(--ui-font-size-md) * var(--ui-line-height-normal) - var(--ui-control-height-md)) / 2);
 	color: inherit;
-}
-.meeko-ui-dismiss:hover {
-	background: var(--ui-color-control-hover);
-	color: var(--ui-color-text);
-}
-.meeko-ui-dismiss:focus-visible {
-	outline: var(--ui-focus-ring);
-	outline-offset: var(--ui-focus-ring-offset);
-}
-.meeko-ui-close-icon {
-	display: block;
-	position: relative;
-	transform: rotate(var(--ui-close-rotation));
-	width: var(--ui-space-3);
-	height: var(--ui-space-3);
-}
-.meeko-ui-close-icon::before,
-.meeko-ui-close-icon::after {
-	position: absolute;
-	margin: auto;
-	inset: 0;
-	background: currentColor;
-	content: '';
-}
-.meeko-ui-close-icon::before {
-	width: var(--ui-border-width);
-}
-.meeko-ui-close-icon::after {
-	height: var(--ui-border-width);
 }
 .meeko-ui-empty {
 	display: grid;
@@ -143,7 +104,7 @@
 }
 @keyframes ui-skeleton-pulse {
 	to {
-		opacity: var(--ui-skeleton-opacity);
+		opacity: var(--ui-opacity-subtle);
 	}
 }
 .meeko-ui-stat,
@@ -165,6 +126,10 @@
 .meeko-ui-description-list dd {
 	margin: 0;
 	font-variant-numeric: tabular-nums;
+}
+.meeko-ui-stat {
+	align-content: start;
+	gap: var(--ui-space-1);
 }
 .meeko-ui-stat-value {
 	font-weight: var(--ui-font-weight-semibold);
@@ -196,7 +161,9 @@
 	position: fixed;
 	gap: var(--ui-space-2);
 	margin: 0;
-	inset: auto var(--ui-space-4) var(--ui-space-4) auto;
+	inset: auto;
+	inset-block-end: var(--ui-space-4);
+	inset-inline-end: var(--ui-space-4);
 	border: 0;
 	background: transparent;
 	padding: 0;
@@ -204,34 +171,59 @@
 	max-height: calc(100% - var(--ui-space-8));
 	overflow: auto;
 }
-.meeko-ui-toast-host[popover]:not(:popover-open),
-.meeko-ui-toast-host:empty {
+.meeko-ui-toast-host[popover]:not(:popover-open) {
 	display: none;
+}
+.meeko-ui-toast {
+	position: fixed;
+	transition:
+		opacity var(--ui-duration-slow) var(--ui-ease-out),
+		translate var(--ui-duration-slow) var(--ui-ease-out);
+	margin: 0;
+	inset: auto;
+	inset-block-end: var(--ui-space-4);
+	inset-inline-end: var(--ui-space-4);
+	box-shadow: var(--ui-shadow-md);
+	width: min(var(--ui-toast-width), calc(100% - var(--ui-space-8)));
+}
+.meeko-ui-toast[data-tone='neutral'] {
+	background: var(--ui-color-surface-raised);
 }
 .meeko-ui-toast-host > .meeko-ui-toast {
 	position: static;
 	width: 100%;
 }
-.meeko-ui-toast {
-	position: fixed;
-	transition:
-		opacity var(--ui-duration-base),
-		transform var(--ui-duration-base) var(--ui-ease-out),
-		display var(--ui-duration-base) allow-discrete,
-		overlay var(--ui-duration-base) allow-discrete;
-	margin: 0;
-	inset: auto var(--ui-space-4) var(--ui-space-4) auto;
-	box-shadow: var(--ui-shadow-md);
-	width: min(var(--ui-toast-width), calc(100% - var(--ui-space-8)));
+.meeko-ui-toast-content {
+	flex: 1;
+	min-width: 0;
 }
 .meeko-ui-toast[popover]:not(:popover-open) {
 	display: none;
-	transform: translateY(var(--ui-space-2));
-	opacity: var(--ui-opacity-hidden);
 }
+/* No `display` or `overlay allow-discrete`: the exit is a View Transition, and they would keep the
+   toast in its new capture. */
 @starting-style {
 	.meeko-ui-toast:popover-open,
 	.meeko-ui-toast-host > .meeko-ui-toast {
+		translate: 0 var(--ui-space-2);
+		opacity: var(--ui-opacity-hidden);
+	}
+}
+/* A toast closes by itself at any moment, so its exit must not cost the click that lands on the page. */
+html:active-view-transition-type(ui-toast-close)::view-transition {
+	pointer-events: none;
+}
+html:active-view-transition-type(ui-toast-close) .meeko-ui-toast[data-meeko-ui-toast-state='closing'] {
+	view-transition-name: ui-toast;
+}
+html:active-view-transition-type(ui-toast-close)::view-transition-group(root) {
+	animation-duration: var(--ui-duration-base);
+}
+html:active-view-transition-type(ui-toast-close)::view-transition-old(ui-toast) {
+	animation: ui-toast-out var(--ui-duration-base) var(--ui-ease-in) both;
+}
+@keyframes ui-toast-out {
+	to {
 		transform: translateY(var(--ui-space-2));
 		opacity: var(--ui-opacity-hidden);
 	}

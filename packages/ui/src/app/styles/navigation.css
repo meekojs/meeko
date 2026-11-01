@@ -1,25 +1,3 @@
-.meeko-ui-sr-only {
-	position: absolute;
-	clip-path: inset(50%);
-	margin: calc(var(--ui-border-width) * -1);
-	border: 0;
-	padding: 0;
-	width: var(--ui-border-width);
-	height: var(--ui-border-width);
-	overflow: hidden;
-	white-space: nowrap;
-}
-.meeko-ui-icon {
-	flex: none;
-	fill: none;
-	stroke: currentColor;
-	stroke-linecap: round;
-	stroke-linejoin: round;
-	stroke-width: var(--ui-icon-stroke-width);
-	width: var(--ui-icon-size);
-	height: var(--ui-icon-size);
-}
-
 /* Brand */
 .meeko-ui-brand {
 	display: inline-flex;
@@ -458,7 +436,8 @@ html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-drawer-
 	line-height: var(--ui-line-height-snug);
 	letter-spacing: var(--ui-tracking-tight);
 }
-.meeko-ui-drawer-close {
+.meeko-ui-drawer-close,
+.meeko-ui-dismiss {
 	display: inline-flex;
 	flex: none;
 	justify-content: center;
@@ -471,7 +450,8 @@ html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-drawer-
 	height: var(--ui-control-height-md);
 	color: var(--ui-color-text-soft);
 }
-.meeko-ui-drawer-close:hover {
+.meeko-ui-drawer-close:hover,
+.meeko-ui-dismiss:hover {
 	background: var(--ui-color-control-hover);
 	color: var(--ui-color-text);
 }
@@ -669,25 +649,7 @@ html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-drawer-
 	font-variant-numeric: tabular-nums;
 }
 .meeko-ui-pagination .meeko-ui-button {
-	gap: var(--ui-space-1-5);
 	margin-inline-start: auto;
-}
-.meeko-ui-pagination .meeko-ui-button[aria-disabled='true'] {
-	cursor: progress;
-}
-.meeko-ui-pagination .meeko-ui-button[aria-disabled='true']::before {
-	animation: meeko-ui-spin var(--ui-duration-spin) linear infinite;
-	border: var(--ui-focus-ring-width) solid currentColor;
-	border-radius: var(--ui-radius-full);
-	border-inline-end-color: transparent;
-	width: var(--ui-icon-size-sm);
-	height: var(--ui-icon-size-sm);
-	content: '';
-}
-@keyframes meeko-ui-spin {
-	to {
-		rotate: 1turn;
-	}
 }
 
 /* Table of contents */
@@ -866,6 +828,7 @@ html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-drawer-
 .meeko-ui-header-toggle:focus-visible,
 .meeko-ui-footer a:focus-visible,
 .meeko-ui-drawer-close:focus-visible,
+.meeko-ui-dismiss:focus-visible,
 .meeko-ui-breadcrumb a:focus-visible,
 .meeko-ui-page-nav-link:focus-visible {
 	outline: var(--ui-focus-ring);
@@ -898,8 +861,5 @@ summary.meeko-ui-nav-group-title:focus-visible,
 	.meeko-ui-locale-switcher a,
 	.meeko-ui-locale-suggestion {
 		transition: none;
-	}
-	.meeko-ui-pagination .meeko-ui-button[aria-disabled='true']::before {
-		animation: none;
 	}
 }

@@ -3,7 +3,9 @@
 
 	import type { UIAlertProps } from '../types/feedback'
 
+	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
+	import * as Icon from './internal/Icon.meeko'
 
 	const { tone = 'neutral', title, description, icon, dismiss, closeLabel, role, class: className, ...rest } = defineProps<UIAlertProps>()
 
@@ -74,10 +76,7 @@
 				}
 			"
 		>
-			<span
-				class="meeko-ui-close-icon"
-				aria-hidden="true"
-			/>
+			<Icon bind:path="icons.close" />
 		</button>
 	</section>
 </template>
