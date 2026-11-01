@@ -1,0 +1,669 @@
+<script
+	server
+	lang="ts"
+>
+	import { definePage } from '@meekojs/meeko/framework'
+	import * as v from 'valibot'
+
+	import { attempt } from '../../utils/errors'
+
+	export const route = definePage({ params: v.object({ id: v.pipe(v.string(), v.regex(/^[1-9]\d{0,15}$/)) }), render: 'ssr' })
+
+	const { params } = usePage()
+	export const detail = await attempt(() => rpc.sources.get({ id: Number(params.id) }))
+	if (!detail.ok && detail.failure.code === 'SOURCE_NOT_FOUND') notFound()
+</script>
+
+<script lang="ts">
+	import type { Comparison, Conflict, RevisionRow } from '../../../shared/schemas/dashboard'
+	import type { Failure } from '../../utils/errors'
+
+	import { downloadText } from '../../utils/download'
+	import { describeError } from '../../utils/errors'
+	import { formatDate, plural, shortHash } from '../../utils/format'
+	import { kindLabels, siteLabels, stateDescriptions } from '../../utils/labels'
+
+	export interface Props {
+		params: { id: string }
+		search: Record<string, string | string[]>
+	}
+
+	const props = defineProps<Props>()
+
+	// The page remounts for another id: its initial value is enough.
+	const sourceId = untrack(() => Number(props.params.id))
+
+	const data = signal(detail.ok ? detail.data : null)
+	const notice = signal('')
+	const noticeLink = signal<{ href: string; label: string } | null>(null)
+	const actionFailure = signal<Failure | null>(null)
+
+	async function reload() {
+		try {
+			data.value = await rpc.sources.get({ id: sourceId })
+		} catch (error) {
+			actionFailure.value = describeError(error)
+		}
+	}
+
+	function announce(text: string, link: { href: string; label: string } | null = null) {
+		notice.value = text
+		noticeLink.value = link
+	}
+
+	const revisionStatus = { draft: 'Borrador', published: 'Publicada', archived: 'Archivada' } as const
+	const pending = computed(() => data.value?.revisions.filter((revision) => revision.pending) ?? [])
+	// A published revision after the snapshot, or the snapshot's one archived since (back to Git).
+	const pendingPublished = computed(() => pending.value.filter((revision) => revision.status === 'published'))
+	const pendingTitle = computed(() => {
+		const published = pendingPublished.value
+		if (published.length === 1) return 'La revisión #' + published[0]?.id + ' está publicada'
+		if (published.length > 1) return plural(published.length, 'revisión publicada', 'revisiones publicadas')
+		return 'La revisión #' + pending.value[0]?.id + ' se archivó'
+	})
+	const pendingText = computed(() => (pendingPublished.value.length ? 'pero el snapshot activo aún no la incluye: el site sigue mostrando la versión anterior.' : 'pero el snapshot activo aún la muestra: el site volverá al texto de Git con la próxima publicación.'))
+	const editLabel = computed(() => (data.value?.source.publishedRevisionId ? 'Nuevo borrador' : 'Editar'))
+
+	// Publish and archive: both ask first, because the next snapshot changes what the site shows.
+	type Action = 'publish' | 'archive'
+	const action = signal<{ kind: Action; revision: RevisionRow } | null>(null)
+	const confirming = signal(false)
+	const acting = signal(false)
+	const confirmFailure = signal<Failure | null>(null)
+
+	function ask(kind: Action, revision: RevisionRow) {
+		action.value = { kind, revision }
+		confirmFailure.value = null
+		confirming.value = true
+	}
+
+	async function confirm() {
+		const current = action.value
+		if (!current) return
+		acting.value = true
+		confirmFailure.value = null
+		try {
+			if (current.kind === 'publish') {
+				const revision = await rpc.revisions.publish({ id: current.revision.id })
+				announce(`Revisión #${revision.id} publicada. El site la mostrará cuando publiques la documentación.`, { href: '/snapshots', label: 'Publicar la documentación' })
+			} else {
+				const revision = await rpc.revisions.archive({ id: current.revision.id })
+				announce(current.revision.status === 'published' ? `Revisión #${revision.id} archivada. La próxima publicación vuelve a mostrar Git.` : `Revisión #${revision.id} archivada.`, current.revision.status === 'published' ? { href: '/snapshots', label: 'Publicar la documentación' } : null)
+			}
+			confirming.value = false
+			await reload()
+		} catch (error) {
+			confirmFailure.value = describeError(error)
+		} finally {
+			acting.value = false
+		}
+	}
+
+	async function exportMarkdown(revision: RevisionRow) {
+		actionFailure.value = null
+		try {
+			const file = await rpc.revisions.export({ id: revision.id })
+			downloadText(file.filename, file.markdown)
+			announce(`Descargado ${file.filename} con la revisión #${file.revisionId}. Cópialo a ${file.file} para llevarlo al repositorio.`)
+		} catch (error) {
+			actionFailure.value = describeError(error)
+		}
+	}
+
+	// Comparison of two sides: Git now or any revision.
+	const sideOptions = computed(() => ['git', ...(data.value?.revisions.map((revision) => `r${revision.id}`) ?? [])])
+	const sideLabel = (value: string) => (value === 'git' ? 'Git ahora' : `Revisión #${value.slice(1)} · ${revisionStatus[data.value?.revisions.find((revision) => `r${revision.id}` === value)?.status ?? 'draft'].toLowerCase()}`)
+	const fromSide = signal<string | null>('git')
+	const toSide = signal<string | null>(data.value?.revisions[0] ? `r${data.value.revisions[0].id}` : null)
+	const comparison = signal<Comparison | null>(null)
+	const comparing = signal(false)
+	const compareFailure = signal<Failure | null>(null)
+	const side = (value: string) => (value === 'git' ? ({ kind: 'git' } as const) : ({ kind: 'revision', id: Number(value.slice(1)) } as const))
+
+	async function compareSides() {
+		if (!fromSide.value || !toSide.value) return
+		comparing.value = true
+		try {
+			comparison.value = await rpc.revisions.compare({ sourceId, from: side(fromSide.value), to: side(toSide.value) })
+			compareFailure.value = null
+		} catch (error) {
+			compareFailure.value = describeError(error)
+		} finally {
+			comparing.value = false
+		}
+	}
+
+	// Conflict with Git: the three sides and, when trivial, a new draft with both changes.
+	const conflict = signal<Conflict | null>(null)
+	const conflictFailure = signal<Failure | null>(null)
+	const loadingConflict = signal<number | null>(null)
+	const merging = signal(false)
+	const baseOrigins = { import: 'la última importación', 'working-tree': 'el working tree', commit: 'un commit' } as const
+
+	async function openConflict(revision: RevisionRow) {
+		loadingConflict.value = revision.id
+		try {
+			conflict.value = await rpc.revisions.conflict({ id: revision.id })
+			conflictFailure.value = null
+		} catch (error) {
+			conflictFailure.value = describeError(error)
+		} finally {
+			loadingConflict.value = null
+		}
+	}
+
+	async function merge() {
+		const current = conflict.value
+		if (!current) return
+		merging.value = true
+		try {
+			const draft = await rpc.revisions.merge({ id: current.revisionId })
+			conflict.value = null
+			announce(`Borrador #${draft.id} creado con Git actual y los cambios de la revisión #${current.revisionId}.`, { href: `/sources/${sourceId}/edit?revision=${draft.id}`, label: `Abrir el borrador #${draft.id}` })
+			await reload()
+		} catch (error) {
+			conflictFailure.value = describeError(error)
+		} finally {
+			merging.value = false
+		}
+	}
+
+	const busyRow = computed(() => acting.value || merging.value)
+</script>
+
+<template>
+	<DashPage
+		bind:title="data.value ? data.value.source.title : 'Fuente ' + props.params.id"
+		bind:description="data.value ? siteLabels[data.value.source.site] + ' · ' + kindLabels[data.value.source.kind] + ' · ' + data.value.source.path : 'Detalle de una fuente de la documentación.'"
+	>
+		<snippet name="actions">
+			<UILink
+				href="/sources"
+				variant="ghost"
+			>
+				Todas las fuentes
+			</UILink>
+			<UILink
+				if:when="data.value?.editable"
+				bind:href="'/sources/' + props.params.id + '/edit'"
+			>
+				{editLabel.value}
+			</UILink>
+		</snippet>
+		<DashFailure
+			if:when="!detail.ok"
+			bind:failure="detail.failure"
+		/>
+		<div
+			if:when="data.value"
+			class="dash-stack"
+		>
+			<section
+				class="dash-panel"
+				aria-labelledby="source-heading"
+			>
+				<div class="dash-panel-head">
+					<h2 id="source-heading">Fuente</h2>
+					<DashStateBadge
+						bind:state="data.value?.source.state ?? null"
+						bind:importStale="data.value?.source.importStale ?? false"
+						bind:removed="data.value?.source.removedAt !== null"
+					/>
+				</div>
+				<p
+					if:when="data.value?.source.state"
+					class="dash-section-lead"
+				>
+					{data.value?.source.state ? stateDescriptions[data.value.source.state] : ''}
+				</p>
+				<dl class="dash-facts">
+					<div>
+						<dt>Ruta pública</dt>
+						<dd>
+							<code>{data.value?.source.path}</code>
+						</dd>
+					</div>
+					<div>
+						<dt>Archivo</dt>
+						<dd>
+							<code if:when="data.value?.source.file">{data.value?.source.file}</code>
+							<span
+								if:when="!data.value?.source.file"
+								class="dash-muted"
+							>
+								Página .meeko: su texto vive en el repositorio
+							</span>
+						</dd>
+					</div>
+					<div>
+						<dt>Hash base (importado)</dt>
+						<dd>
+							<code bind:title="data.value?.source.baseHash ?? undefined">{shortHash(data.value?.source.baseHash)}</code>
+						</dd>
+					</div>
+					<div>
+						<dt>Hash en Git ahora</dt>
+						<dd>
+							<code bind:title="data.value?.gitHash ?? undefined">{shortHash(data.value?.gitHash)}</code>
+						</dd>
+					</div>
+					<div>
+						<dt>Importada</dt>
+						<dd>{formatDate(data.value?.source.importedAt)}</dd>
+					</div>
+					<div if:when="data.value?.source.removedAt">
+						<dt>Retirada</dt>
+						<dd>{formatDate(data.value?.source.removedAt)}</dd>
+					</div>
+					<div>
+						<dt>Revisión publicada</dt>
+						<dd>{data.value?.source.publishedRevisionId ? '#' + data.value.source.publishedRevisionId : 'Ninguna: se publica Git'}</dd>
+					</div>
+				</dl>
+			</section>
+
+			<div
+				if:when="pending.value.length"
+				class="dash-callout"
+				role="note"
+			>
+				<p>
+					<strong>{pendingTitle.value}</strong>
+					{pendingText.value}
+				</p>
+				<UILink
+					href="/snapshots"
+					size="sm"
+					variant="outline"
+				>
+					Publicar la documentación
+				</UILink>
+			</div>
+
+			<p
+				class="dash-notice"
+				role="status"
+				aria-live="polite"
+			>
+				{notice.value}
+				<a
+					if:when="notice.value && noticeLink.value"
+					bind:href="noticeLink.value?.href"
+				>
+					{noticeLink.value?.label}
+				</a>
+			</p>
+			<DashFailure
+				if:when="actionFailure.value"
+				title="No se completó la acción"
+				bind:failure="actionFailure.value"
+			/>
+
+			<section
+				id="revisiones"
+				class="dash-panel"
+				aria-labelledby="revisions-heading"
+			>
+				<div class="dash-panel-head">
+					<h2 id="revisions-heading">Revisiones</h2>
+					<span class="dash-muted">{plural(data.value?.revisions.length ?? 0, 'revisión', 'revisiones')}</span>
+				</div>
+				<p
+					if:when="!data.value?.revisions.length"
+					class="dash-empty"
+				>
+					{data.value?.editable ? 'Sin revisiones: el site publica el archivo de Git. Edita la fuente para crear el primer borrador.' : data.value?.source.file ? 'Sin revisiones. Git ya no tiene este archivo, así que no se puede editar.' : 'Las páginas .meeko no tienen revisiones: se cambian en el repositorio.'}
+				</p>
+				<div
+					if:when="data.value?.revisions.length"
+					class="dash-table-scroll"
+				>
+					<table class="dash-table dash-revisions">
+						<caption class="dash-visually-hidden">Revisiones de la fuente, de la más reciente a la más antigua</caption>
+						<thead>
+							<tr>
+								<th scope="col">Revisión</th>
+								<th scope="col">Estado</th>
+								<th scope="col">Autor</th>
+								<th scope="col">Creada</th>
+								<th scope="col">Publicada</th>
+								<th scope="col">Nota</th>
+								<th scope="col">
+									<span class="dash-visually-hidden">Acciones</span>
+								</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr
+								each:of="data.value?.revisions ?? []"
+								each:as="revision"
+								each:key="revision.id"
+							>
+								<th scope="row">
+									#{String(revision.id)}
+									<code
+										class="dash-revision-hash"
+										bind:title="revision.baseHash ? 'Escrita sobre Git ' + revision.baseHash : undefined"
+									>
+										{shortHash(revision.baseHash)}
+									</code>
+								</th>
+								<td>
+									<span class="dash-badges">
+										<UIBadge bind:tone="revision.status === 'published' ? 'accent' : 'neutral'">{revisionStatus[revision.status]}</UIBadge>
+										<span
+											if:when="revision.pending"
+											bind:title="revision.status === 'archived' ? 'Archivada después del snapshot activo, que aún la muestra: el site vuelve a Git con la próxima publicación.' : 'Publicada después del snapshot activo: el site aún no la muestra.'"
+										>
+											<UIBadge tone="accent">Sin snapshot</UIBadge>
+										</span>
+										<span
+											if:when="revision.conflict"
+											title="Git cambió después de escribirla: su base no es el archivo de ahora."
+										>
+											<UIBadge tone="danger">Conflicto con Git</UIBadge>
+										</span>
+									</span>
+								</td>
+								<td>{revision.author}</td>
+								<td class="dash-nowrap">{formatDate(revision.createdAt)}</td>
+								<td class="dash-nowrap">{formatDate(revision.publishedAt)}</td>
+								<td>{revision.note ?? '—'}</td>
+								<td>
+									<span class="dash-row-actions">
+										<UILink
+											if:when="data.value?.editable"
+											size="sm"
+											variant="ghost"
+											bind:href="'/sources/' + props.params.id + '/edit?revision=' + revision.id"
+											bind:ariaLabel="(revision.status === 'draft' ? 'Editar el borrador #' : 'Nuevo borrador desde la revisión #') + revision.id"
+										>
+											{revision.status === 'draft' ? 'Editar' : 'Partir de aquí'}
+										</UILink>
+										<UIButton
+											if:when="revision.status !== 'published'"
+											size="sm"
+											variant="outline"
+											bind:disabled="busyRow.value"
+											on:click="() => ask('publish', revision)"
+										>
+											Publicar
+											<span class="dash-visually-hidden">la revisión #{String(revision.id)}</span>
+										</UIButton>
+										<UIButton
+											if:when="revision.status !== 'archived'"
+											size="sm"
+											variant="ghost"
+											bind:disabled="busyRow.value"
+											on:click="() => ask('archive', revision)"
+										>
+											Archivar
+											<span class="dash-visually-hidden">la revisión #{String(revision.id)}</span>
+										</UIButton>
+										<UIButton
+											size="sm"
+											variant="ghost"
+											on:click="() => exportMarkdown(revision)"
+										>
+											<span class="dash-visually-hidden">Exportar la revisión #{String(revision.id)} a</span>
+											.md
+										</UIButton>
+										<UIButton
+											if:when="revision.conflict"
+											size="sm"
+											variant="outline"
+											bind:disabled="loadingConflict.value !== null"
+											on:click="() => openConflict(revision)"
+										>
+											{loadingConflict.value === revision.id ? 'Cargando…' : 'Ver conflicto'}
+											<span class="dash-visually-hidden">de la revisión #{String(revision.id)}</span>
+										</UIButton>
+									</span>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</section>
+
+			<section
+				if:when="conflict.value || conflictFailure.value"
+				class="dash-panel"
+				aria-labelledby="conflict-heading"
+			>
+				<div class="dash-panel-head">
+					<h2 id="conflict-heading">{conflict.value ? 'Conflicto de la revisión #' + conflict.value.revisionId + ' con Git' : 'Conflicto con Git'}</h2>
+					<UIButton
+						size="sm"
+						variant="ghost"
+						on:click="
+							() => {
+								conflict.value = null
+								conflictFailure.value = null
+							}
+						"
+					>
+						Cerrar
+					</UIButton>
+				</div>
+				<DashFailure
+					if:when="conflictFailure.value"
+					title="No se completó"
+					bind:failure="conflictFailure.value"
+				/>
+				<div
+					if:when="conflict.value"
+					class="dash-stack"
+				>
+					<p class="dash-section-lead">
+						{conflict.value?.state === 'missing' ? 'Git ya no tiene este archivo.' : conflict.value?.baseOrigin ? 'La revisión se escribió sobre una versión de Git (' + shortHash(conflict.value.baseHash) + ', encontrada en ' + baseOrigins[conflict.value.baseOrigin] + (conflict.value.baseCommit ? ' ' + conflict.value.baseCommit.slice(0, 10) : '') + ') que ya no es la de ahora (' + shortHash(conflict.value.gitHash) + ').' : 'No se encuentra el texto de Git sobre el que se escribió (' + shortHash(conflict.value?.baseHash) + '): solo se compara Git de ahora con la revisión, sin fusión.'}
+					</p>
+					<div
+						if:when="conflict.value?.merge"
+						class="dash-callout"
+						bind:data-tone="conflict.value?.merge?.clean ? undefined : 'danger'"
+					>
+						<p if:when="conflict.value?.merge?.clean">
+							<strong>Fusión trivial.</strong>
+							Git y la revisión cambiaron partes distintas: puedes crear un borrador nuevo con Git de ahora y los cambios de la revisión, y revisarlo antes de publicar.
+						</p>
+						<p if:when="!conflict.value?.merge?.clean">
+							<strong>{plural(conflict.value?.merge?.conflicts ?? 0, 'zona cambiada', 'zonas cambiadas')} por los dos lados.</strong>
+							No hay fusión automática: edita un borrador a mano a partir de Git o de la revisión.
+						</p>
+						<form
+							if:when="conflict.value?.merge?.clean"
+							class="dash-inline-form"
+							on:submit="
+								(event) => {
+									event.preventDefault()
+									void merge()
+								}
+							"
+						>
+							<UIButton
+								type="submit"
+								bind:disabled="merging.value"
+							>
+								{merging.value ? 'Creando…' : 'Crear borrador: Git actual + mis cambios'}
+							</UIButton>
+						</form>
+					</div>
+					<div class="dash-three-way">
+						<section aria-labelledby="base-git-heading">
+							<h3 id="base-git-heading">Base → Git ahora</h3>
+							<p class="dash-hint">Lo que cambió en Git desde que se escribió la revisión.</p>
+							<DashDiff
+								label="Diff de la base a Git de ahora"
+								bind:diff="conflict.value?.diffs.baseToGit ?? ''"
+								bind:empty="conflict.value?.baseOrigin ? 'Sin cambios.' : 'Sin base: no se puede mostrar.'"
+							/>
+						</section>
+						<section aria-labelledby="base-revision-heading">
+							<h3 id="base-revision-heading">Base → revisión</h3>
+							<p class="dash-hint">Lo que cambió la revisión.</p>
+							<DashDiff
+								label="Diff de la base a la revisión"
+								bind:diff="conflict.value?.diffs.baseToRevision ?? ''"
+								bind:empty="conflict.value?.baseOrigin ? 'Sin cambios.' : 'Sin base: no se puede mostrar.'"
+							/>
+						</section>
+						<section aria-labelledby="git-revision-heading">
+							<h3 id="git-revision-heading">Git ahora → revisión</h3>
+							<p class="dash-hint">Lo que verá el site si se publica la revisión tal cual.</p>
+							<DashDiff
+								label="Diff de Git de ahora a la revisión"
+								bind:diff="conflict.value?.diffs.gitToRevision ?? ''"
+							/>
+						</section>
+					</div>
+				</div>
+			</section>
+
+			<section
+				if:when="data.value?.source.file && data.value?.revisions.length"
+				class="dash-panel"
+				aria-labelledby="compare-heading"
+			>
+				<div class="dash-panel-head">
+					<h2 id="compare-heading">Comparar</h2>
+					<span
+						if:when="comparison.value && !comparison.value.tooLarge"
+						class="dash-diff-stat"
+					>
+						<span class="dash-add">+{String(comparison.value?.added ?? 0)}</span>
+						<span class="dash-remove">−{String(comparison.value?.removed ?? 0)}</span>
+					</span>
+				</div>
+				<form
+					class="dash-filters"
+					aria-label="Comparar dos versiones"
+					on:submit="
+						(event) => {
+							event.preventDefault()
+							void compareSides()
+						}
+					"
+				>
+					<div class="dash-field">
+						<label for="compare-from">Desde</label>
+						<UISelect
+							id="compare-from"
+							model="fromSide"
+							bind:options="sideOptions.value"
+							bind:labelBy="sideLabel"
+						/>
+					</div>
+					<div class="dash-field">
+						<label for="compare-to">Hasta</label>
+						<UISelect
+							id="compare-to"
+							model="toSide"
+							bind:options="sideOptions.value"
+							bind:labelBy="sideLabel"
+						/>
+					</div>
+					<UIButton
+						type="submit"
+						variant="secondary"
+						bind:disabled="comparing.value || !fromSide.value || !toSide.value"
+					>
+						{comparing.value ? 'Comparando…' : 'Comparar'}
+					</UIButton>
+				</form>
+				<DashFailure
+					if:when="compareFailure.value"
+					title="No se pudo comparar"
+					bind:failure="compareFailure.value"
+				/>
+				<p
+					if:when="comparison.value?.tooLarge"
+					class="dash-empty"
+				>
+					Los textos son demasiado distintos para compararlos línea a línea.
+				</p>
+				<DashDiff
+					if:when="comparison.value && !comparison.value.tooLarge"
+					empty="Las dos versiones son iguales."
+					bind:diff="comparison.value?.diff ?? ''"
+					bind:label="'Diff de ' + (comparison.value?.fromLabel ?? '') + ' a ' + (comparison.value?.toLabel ?? '')"
+				/>
+			</section>
+
+			<section
+				if:when="data.value?.source.file"
+				class="dash-panel"
+				aria-labelledby="diff-heading"
+			>
+				<div class="dash-panel-head">
+					<h2 id="diff-heading">Diff con Git</h2>
+					<span
+						if:when="data.value?.diff"
+						class="dash-diff-stat"
+					>
+						<span class="dash-add">+{String(data.value?.source.added ?? 0)}</span>
+						<span class="dash-remove">−{String(data.value?.source.removed ?? 0)}</span>
+					</span>
+				</div>
+				<DashDiff
+					label="Diff unificado de Git a la revisión publicada"
+					bind:diff="data.value?.diff ?? ''"
+					bind:empty="data.value?.source.publishedRevisionId ? 'La revisión publicada coincide con Git.' : 'No hay revisión publicada: el site muestra exactamente Git.'"
+				/>
+			</section>
+		</div>
+
+		<UIModal
+			model="confirming"
+			bind:title="action.value ? (action.value.kind === 'publish' ? '¿Publicar la revisión #' : '¿Archivar la revisión #') + action.value.revision.id + '?' : ''"
+			bind:description="action.value?.kind === 'publish' ? 'Pasa a ser el texto publicado de esta fuente y archiva la publicada anterior. El site la muestra desde la próxima publicación de la documentación.' : action.value?.revision.status === 'published' ? 'Deja de ser el texto publicado: la próxima publicación de la documentación vuelve a mostrar Git.' : 'Queda en el historial y ya no se puede editar; puedes partir de ella en un borrador nuevo.'"
+		>
+			<dl
+				if:when="action.value"
+				class="dash-facts"
+			>
+				<div>
+					<dt>Autor</dt>
+					<dd>{action.value?.revision.author}</dd>
+				</div>
+				<div>
+					<dt>Estado</dt>
+					<dd>{action.value ? revisionStatus[action.value.revision.status] : ''}</dd>
+				</div>
+				<div if:when="action.value?.kind === 'publish' && data.value?.source.publishedRevisionId">
+					<dt>Sustituye a</dt>
+					<dd>#{String(data.value?.source.publishedRevisionId)}</dd>
+				</div>
+				<div if:when="action.value?.revision.note">
+					<dt>Nota</dt>
+					<dd>{action.value?.revision.note}</dd>
+				</div>
+			</dl>
+			<p
+				if:when="action.value?.kind === 'publish' && action.value?.revision.conflict"
+				class="dash-hint dash-editor-warning"
+			>
+				Esta revisión se escribió sobre otra versión de Git: publicarla descarta lo que cambió en Git desde entonces. Revisa el conflicto antes.
+			</p>
+			<DashFailure
+				if:when="confirmFailure.value"
+				bind:title="action.value?.kind === 'publish' ? 'No se publicó' : 'No se archivó'"
+				bind:failure="confirmFailure.value"
+			/>
+			<snippet name="footer">
+				<UIButton
+					variant="ghost"
+					on:click="() => (confirming.value = false)"
+				>
+					Cancelar
+				</UIButton>
+				<UIButton
+					bind:disabled="acting.value"
+					on:click="confirm"
+				>
+					{acting.value ? 'Un momento…' : action.value?.kind === 'publish' ? 'Publicar revisión' : 'Archivar revisión'}
+				</UIButton>
+			</snippet>
+		</UIModal>
+	</DashPage>
+</template>

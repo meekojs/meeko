@@ -1,0 +1,357 @@
+<script
+	server
+	lang="ts"
+>
+	import { attempt } from '../utils/errors'
+
+	export const health = await attempt(() => rpc.health.get({}))
+</script>
+
+<script lang="ts">
+	import type { TableColumn } from '@meekojs/ui/runtime'
+
+	import type { Health, HealthReport, SourceRow } from '../../shared/schemas/dashboard'
+
+	import { describeError } from '../utils/errors'
+	import { formatDate, formatNumber, plural } from '../utils/format'
+	import { siteLabels } from '../utils/labels'
+
+	type Undocumented = HealthReport['undocumentedExports'][number]
+	type Broken = HealthReport['brokenLinks'][number]
+
+	const empty: Health = { report: null, job: null, pages: [] }
+	const report = signal(health.ok ? health.data.report : null)
+	const pages: readonly SourceRow[] = health.ok ? health.data.pages : empty.pages
+	const failure = signal(health.ok ? null : health.failure)
+
+	const {
+		jobs,
+		failure: jobFailure,
+		starting,
+		start,
+	} = useJobs(
+		{ content: null, health: health.ok ? health.data.job : null },
+		{
+			onFinish: async () => {
+				try {
+					const next = await rpc.health.get({})
+					report.value = next.report
+					failure.value = null
+				} catch (error) {
+					failure.value = describeError(error)
+				}
+			},
+		},
+	)
+
+	const checking = computed(() => jobs.value.health?.status === 'running' || starting.value === 'health')
+
+	// The first visit after the dashboard starts has no report: check right away.
+	onMounted(() => {
+		if (!report.value && !jobs.value.health) void start({ kind: 'health' })
+	})
+
+	const exportKinds = computed(() => ['Todos', ...[...new Set((report.value?.undocumentedExports ?? []).map((item) => item.kindLabel))].sort((a, b) => a.localeCompare(b, 'es'))])
+	const exportKind = signal<string | null>('Todos')
+	const exportQuery = signal('')
+	const exports = computed(() => {
+		const text = exportQuery.value.trim().toLocaleLowerCase('es')
+		return (report.value?.undocumentedExports ?? []).filter((item) => (!exportKind.value || exportKind.value === 'Todos' || item.kindLabel === exportKind.value) && (!text || item.id.toLocaleLowerCase('es').includes(text)))
+	})
+
+	// 243 exports today: the first page, then the rest on request.
+	const pageSize = 25
+	const showAll = signal(false)
+	const shownExports = computed(() => (showAll.value ? exports.value : exports.value.slice(0, pageSize)))
+
+	const reasons = { anchor: 'Ancla inexistente', file: 'Archivo inexistente', page: 'Página inexistente' } as const
+
+	const exportColumns = [
+		{ key: 'name', label: 'Export' },
+		{ key: 'specifier', label: 'Módulo' },
+		{ key: 'kindLabel', label: 'Tipo' },
+	] satisfies TableColumn<Undocumented>[]
+
+	const linkColumns = [
+		{ key: 'file', label: 'Archivo' },
+		{ key: 'href', label: 'Enlace' },
+		{ key: 'target', label: 'Destino' },
+		{ key: 'reason', label: 'Motivo' },
+	] satisfies TableColumn<Broken>[]
+
+	const pageColumns = [
+		{ key: 'title', label: 'Página' },
+		{ key: 'site', label: 'Web' },
+		{ key: 'path', label: 'Ruta' },
+		{ key: 'importedAt', label: 'Importada' },
+	] satisfies TableColumn<SourceRow>[]
+
+	const linkKey = (link: Broken) => `${link.file}:${link.line ?? 0}:${link.href}`
+	const pageCounts = computed(() => ({ ui: pages.filter((page) => page.site === 'ui' && page.removedAt === null).length, i18n: pages.filter((page) => page.site === 'i18n' && page.removedAt === null).length }))
+</script>
+
+<template>
+	<DashPage
+		title="Salud"
+		description="Lo que le falta o tiene roto la documentación en el repositorio: referencias pendientes, exports sin página, enlaces internos y anclas, y el inventario de páginas .meeko."
+	>
+		<snippet name="actions">
+			<UIButton
+				bind:disabled="checking.value"
+				on:click="() => void start({ kind: 'health' })"
+			>
+				{checking.value ? 'Comprobando…' : 'Comprobar de nuevo'}
+			</UIButton>
+		</snippet>
+		<DashFailure
+			if:when="failure.value"
+			bind:failure="failure.value"
+		/>
+		<DashFailure
+			if:when="jobFailure.value"
+			title="No se pudo iniciar la comprobación"
+			bind:failure="jobFailure.value"
+		/>
+		<div class="dash-stack">
+			<p
+				class="dash-count"
+				role="status"
+				aria-live="polite"
+			>
+				<span if:when="checking.value">Comprobando el repositorio en un proceso aparte…</span>
+				<span if:when="!checking.value && report.value">Comprobado {formatDate(report.value?.checkedAt)}: {plural(report.value?.checked.guides ?? 0, 'guía', 'guías')}, {plural(report.value?.checked.references ?? 0, 'página de referencia', 'páginas de referencia')} y {plural(report.value?.checked.links ?? 0, 'enlace', 'enlaces')}.</span>
+				<span if:when="!checking.value && !report.value && jobs.value.health?.status === 'failed'">La última comprobación falló; su salida está al final de la página.</span>
+			</p>
+
+			<div
+				if:when="checking.value && !report.value"
+				class="dash-skeleton"
+				aria-hidden="true"
+			>
+				<span />
+				<span />
+				<span />
+			</div>
+
+			<div
+				if:when="report.value"
+				class="dash-stack"
+			>
+				<section aria-labelledby="pending-heading">
+					<div class="dash-panel-head">
+						<h2
+							id="pending-heading"
+							class="dash-section-title"
+						>
+							Referencias pendientes
+						</h2>
+						<span class="dash-muted">{formatNumber(report.value?.pendingReferences.length ?? 0)}</span>
+					</div>
+					<p
+						if:when="!report.value?.pendingReferences.length"
+						class="dash-empty"
+					>
+						Ninguna: cada entrada de
+						<code>docs/reference/taxonomy.json</code>
+						tiene su página escrita.
+					</p>
+					<ul
+						if:when="report.value?.pendingReferences.length"
+						class="dash-list"
+					>
+						<li
+							each:of="report.value?.pendingReferences ?? []"
+							each:as="item"
+							each:key="item.symbol"
+						>
+							<strong>{item.name}</strong>
+							<span class="dash-muted">{item.groupTitle}</span>
+							<code>{item.symbol}</code>
+						</li>
+					</ul>
+				</section>
+
+				<section aria-labelledby="links-heading">
+					<div class="dash-panel-head">
+						<h2
+							id="links-heading"
+							class="dash-section-title"
+						>
+							Enlaces internos rotos
+						</h2>
+						<UIBadge
+							if:when="report.value?.brokenLinks.length"
+							tone="danger"
+						>
+							{formatNumber(report.value?.brokenLinks.length ?? 0)}
+						</UIBadge>
+					</div>
+					<p class="dash-section-lead">Enlaces de las guías y de las páginas de referencia del site a páginas, anclas o archivos del repositorio que no existen.</p>
+					<div class="dash-table-scroll">
+						<UITable
+							caption="Enlaces internos rotos"
+							emptyText="Ningún enlace roto."
+							bind:columns="linkColumns"
+							bind:rows="report.value?.brokenLinks ?? []"
+							bind:rowKey="linkKey"
+						>
+							<snippet
+								name="cell"
+								params="row, column"
+							>
+								<code if:when="column.key === 'file'">{row.file}{row.line ? ':' + row.line : ''}</code>
+								<code if:when="column.key === 'href'">{row.href}</code>
+								<code if:when="column.key === 'target'">{row.target}</code>
+								<span if:when="column.key === 'reason'">{reasons[row.reason]}</span>
+							</snippet>
+						</UITable>
+					</div>
+				</section>
+
+				<section
+					class="dash-results"
+					aria-labelledby="exports-heading"
+				>
+					<div class="dash-panel-head">
+						<h2
+							id="exports-heading"
+							class="dash-section-title"
+						>
+							Exports sin página de referencia
+						</h2>
+						<span class="dash-muted">{formatNumber(report.value?.undocumentedExports.length ?? 0)}</span>
+					</div>
+					<p class="dash-section-lead">Exports de @meekojs/meeko que no nombra la taxonomía ni ninguna página escrita. Tienen su página generada desde el JSDoc, pero no una guía de referencia.</p>
+					<form
+						class="dash-filters"
+						role="search"
+						aria-label="Filtrar exports"
+						on:submit="(event) => event.preventDefault()"
+					>
+						<div class="dash-field dash-field-grow">
+							<label for="exports-query">Buscar</label>
+							<UIInput
+								id="exports-query"
+								type="search"
+								placeholder="Nombre o módulo…"
+								model="exportQuery"
+							/>
+						</div>
+						<div class="dash-field">
+							<label for="exports-kind">Tipo</label>
+							<UISelect
+								id="exports-kind"
+								placeholder="Todos"
+								model="exportKind"
+								bind:options="exportKinds.value"
+							/>
+						</div>
+					</form>
+					<div class="dash-table-scroll">
+						<UITable
+							caption="Exports sin página de referencia"
+							rowKey="id"
+							emptyText="Ningún export coincide."
+							bind:columns="exportColumns"
+							bind:rows="shownExports.value"
+						>
+							<snippet
+								name="cell"
+								params="row, column"
+							>
+								<span
+									if:when="column.key === 'name'"
+									class="dash-source-cell"
+								>
+									<code>{row.name}</code>
+									<UIBadge
+										if:when="row.deprecated"
+										tone="danger"
+									>
+										Obsoleto
+									</UIBadge>
+								</span>
+								<code if:when="column.key === 'specifier'">{row.specifier}</code>
+								<span if:when="column.key === 'kindLabel'">{row.kindLabel}</span>
+							</snippet>
+						</UITable>
+					</div>
+					<div
+						if:when="exports.value.length > pageSize"
+						class="dash-more"
+					>
+						<span class="dash-muted">{showAll.value ? 'Se muestran los ' + formatNumber(exports.value.length) : 'Se muestran ' + pageSize + ' de ' + formatNumber(exports.value.length)}</span>
+						<UIButton
+							variant="outline"
+							size="sm"
+							on:click="() => (showAll.value = !showAll.value)"
+						>
+							{showAll.value ? 'Mostrar menos' : 'Mostrar todos'}
+						</UIButton>
+					</div>
+				</section>
+			</div>
+
+			<section aria-labelledby="pages-heading">
+				<div class="dash-panel-head">
+					<h2
+						id="pages-heading"
+						class="dash-section-title"
+					>
+						Páginas .meeko de UI e i18n
+					</h2>
+					<span class="dash-muted">UI {formatNumber(pageCounts.value.ui)} · i18n {formatNumber(pageCounts.value.i18n)}</span>
+				</div>
+				<p class="dash-section-lead">Inventario de la última importación, leído de app/utils/navigation.ts de cada web. Se editan en el repositorio.</p>
+				<div class="dash-table-scroll">
+					<UITable
+						caption="Páginas .meeko importadas"
+						rowKey="id"
+						bind:columns="pageColumns"
+						bind:rows="pages"
+						bind:emptyText="health.ok ? 'No hay páginas importadas. Importa desde Git en Snapshots.' : 'No se pudo leer el inventario.'"
+					>
+						<snippet
+							name="cell"
+							params="row, column"
+						>
+							<span
+								if:when="column.key === 'title'"
+								class="dash-source-cell"
+							>
+								<a bind:href="'/sources/' + row.id">{row.title}</a>
+								<UIBadge
+									if:when="row.removedAt"
+									tone="danger"
+								>
+									Retirada
+								</UIBadge>
+							</span>
+							<span if:when="column.key === 'site'">{siteLabels[row.site]}</span>
+							<code if:when="column.key === 'path'">{row.path}</code>
+							<span
+								if:when="column.key === 'importedAt'"
+								class="dash-nowrap"
+							>
+								{formatDate(row.importedAt)}
+							</span>
+						</snippet>
+					</UITable>
+				</div>
+			</section>
+
+			<section aria-labelledby="health-job-heading">
+				<h2
+					id="health-job-heading"
+					class="dash-section-title"
+				>
+					Última comprobación
+				</h2>
+				<DashJob
+					empty="Todavía no se ha comprobado en este arranque del dashboard."
+					bind:job="jobs.value.health"
+				/>
+			</section>
+		</div>
+	</DashPage>
+</template>

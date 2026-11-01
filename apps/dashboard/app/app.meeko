@@ -1,0 +1,114 @@
+<script lang="ts">
+	import { emptyInput } from '../shared/schemas/dashboard'
+
+	const route = useRoute()
+
+	// 16 px icons drawn with the 1.4 px round stroke of the reference's group icons.
+	const sections = [
+		{ href: '/', label: 'Resumen', icon: 'M2.75 2.75h4v4h-4zM9.25 2.75h4v4h-4zM2.75 9.25h4v4h-4zM9.25 9.25h4v4h-4z' },
+		{ href: '/sources', label: 'Fuentes', icon: 'M4 1.75h5L12.25 5v9.25H4zM8.75 1.75V5.25h3.5M6.25 8.25h3.75M6.25 10.75h3.75' },
+		{ href: '/moderation', label: 'Moderación', icon: 'M3.25 14.25V2.25M3.25 2.75h8.5l-1.75 3 1.75 3h-8.5' },
+		{ href: '/metrics', label: 'Métricas', icon: 'M2.25 13.75h11.5M4 11.25V8.5M7 11.25V4.75M10 11.25V7M13 11.25V2.75' },
+		{ href: '/health', label: 'Salud', icon: 'M1.75 8.25h2.75L6.25 4l3.5 8 1.75-3.75h2.75' },
+		{ href: '/snapshots', label: 'Snapshots', icon: 'M8 1.75 14.25 5 8 8.25 1.75 5zM1.75 8 8 11.25 14.25 8M1.75 11 8 14.25 14.25 11' },
+	] as const
+
+	const current = (href: string) => (href === '/' ? route.path.value === '/' : route.path.value === href || route.path.value.startsWith(href + '/'))
+
+	// F5: who is logged in, for the header; `null` on the login page. Logging in and out loads a new
+	// document, so it is read once per document.
+	const session = await useRpcQuery('auth.session')
+	const user = computed(() => session.data.value.user)
+	// The logout is a native POST with the session's CSRF token, so it also works without JavaScript.
+	const logout = useForm({ schema: emptyInput, initial: {}, action: '/api/auth/logout', submit: () => api.auth.logout.post() })
+</script>
+
+<template>
+	<UIApp>
+		<a
+			class="skip-link"
+			href="#contenido"
+		>
+			Saltar al contenido
+		</a>
+		<header class="dash-header">
+			<a
+				class="dash-brand"
+				href="/"
+				aria-label="Meeko Dashboard, resumen"
+			>
+				<img
+					src="/brand/meeko-logo.png"
+					width="26"
+					height="26"
+					alt=""
+				/>
+				<span>
+					Meeko
+					<strong>Dashboard</strong>
+				</span>
+			</a>
+			<nav
+				if:when="user.value"
+				class="dash-nav"
+				aria-label="Secciones"
+			>
+				<a
+					each:of="sections"
+					each:as="section"
+					each:key="section.href"
+					bind:href="section.href"
+					bind:aria-current="current(section.href) ? 'page' : undefined"
+				>
+					<svg
+						viewBox="0 0 16 16"
+						aria-hidden="true"
+					>
+						<path bind:d="section.icon" />
+					</svg>
+					<span>{section.label}</span>
+				</a>
+			</nav>
+			<div
+				if:when="!user.value"
+				class="dash-header-spacer"
+				aria-hidden="true"
+			/>
+			<div class="dash-header-end">
+				<form
+					if:when="user.value"
+					class="dash-account"
+					method="post"
+					action="/api/auth/logout"
+				>
+					<input
+						type="hidden"
+						name="_csrf"
+						bind:value="logout.csrfToken"
+					/>
+					<span
+						class="dash-user"
+						title="Sesión iniciada"
+					>
+						{user.value}
+					</span>
+					<button
+						type="submit"
+						class="dash-logout"
+						bind:title="'Cerrar la sesión de ' + user.value"
+					>
+						Cerrar sesión
+					</button>
+				</form>
+				<UIThemeToggle />
+			</div>
+		</header>
+		<main
+			id="contenido"
+			class="dash-main"
+			tabindex="-1"
+		>
+			<MeekoOutlet />
+		</main>
+	</UIApp>
+</template>

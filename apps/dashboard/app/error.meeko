@@ -1,0 +1,20 @@
+<script lang="ts">
+	const props = defineProps<{ status: number; message: string }>()
+</script>
+
+<template>
+	<DashPage
+		bind:title="props.status === 404 ? 'Esta página no existe' : 'No se pudo cargar la página'"
+		bind:description="props.status === 404 ? 'La dirección no corresponde a ninguna sección del dashboard.' : 'El servidor del dashboard falló al preparar esta página. Revisa su consola.'"
+	>
+		<p class="dash-actions">
+			<UILink href="/">Volver al resumen</UILink>
+			<UILink
+				href="/sources"
+				variant="ghost"
+			>
+				Ver las fuentes
+			</UILink>
+		</p>
+	</DashPage>
+</template>

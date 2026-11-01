@@ -1,0 +1,33 @@
+<script lang="ts">
+	import type { Failure } from '../../utils/errors'
+
+	const props = defineProps<{ failure: Failure; title?: string }>({ title: 'No se pudieron cargar los datos' })
+</script>
+
+<template>
+	<div
+		class="dash-failure"
+		role="alert"
+	>
+		<svg
+			viewBox="0 0 16 16"
+			aria-hidden="true"
+		>
+			<path d="M8 1.75 14.75 13.75H1.25zM8 6.25v3.5M8 11.75v.01" />
+		</svg>
+		<div>
+			<p class="dash-failure-title">{props.title}</p>
+			<p>{props.failure.message}</p>
+			<p
+				if:when="props.failure.detail"
+				class="dash-failure-detail"
+			>
+				{props.failure.detail}
+			</p>
+			<p class="dash-failure-code">
+				Código
+				<code>{props.failure.code}</code>
+			</p>
+		</div>
+	</div>
+</template>

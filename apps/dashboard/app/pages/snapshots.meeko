@@ -1,0 +1,423 @@
+<script
+	server
+	lang="ts"
+>
+	import { attempt } from '../utils/errors'
+
+	export const snapshots = await attempt(() => rpc.snapshots.list({}))
+	export const initialJobs = await attempt(() => rpc.jobs.status({}))
+	export const initialPending = await attempt(() => rpc.revisions.pending({}))
+</script>
+
+<script lang="ts">
+	import type { TableColumn } from '@meekojs/ui/runtime'
+
+	import type { SnapshotRow } from '../../shared/schemas/dashboard'
+	import type { Failure } from '../utils/errors'
+
+	import { describeError } from '../utils/errors'
+	import { formatDate, formatNumber, plural } from '../utils/format'
+
+	const list = signal<readonly SnapshotRow[]>(snapshots.ok ? snapshots.data : [])
+	const listFailure = signal<Failure | null>(snapshots.ok ? null : snapshots.failure)
+	const notice = signal('')
+
+	// Published revisions that the active snapshot does not have yet: what the next publication adds.
+	const pending = signal(initialPending.ok ? initialPending.data : null)
+	const pendingLead = computed(() => {
+		const active = pending.value?.activeSnapshotId
+		if (!active) return 'No hay snapshot activo: el site no muestra ninguna revisión hasta la primera publicación.'
+		if (pending.value?.revisions.some((revision) => revision.change === 'archived')) return 'Cambiaron después del snapshot activo #' + active + ': el site no muestra estos cambios hasta que publiques un snapshot.'
+		return 'Se publicaron después del snapshot activo #' + active + ': el site no las muestra hasta que publiques un snapshot.'
+	})
+
+	/** Reads again what the active snapshot lacks: it depends on which one is active. */
+	async function reloadPending() {
+		try {
+			pending.value = await rpc.revisions.pending({})
+		} catch {
+			// The section says it could not read them; the list or the action shows the failure.
+			pending.value = null
+		}
+	}
+
+	async function reload() {
+		try {
+			list.value = await rpc.snapshots.list({})
+			listFailure.value = null
+		} catch (error) {
+			listFailure.value = describeError(error)
+		}
+		await reloadPending()
+	}
+
+	const {
+		jobs,
+		failure: jobFailure,
+		starting,
+		start,
+	} = useJobs(initialJobs.ok ? initialJobs.data : { content: null, health: null }, {
+		onFinish: (job) => {
+			notice.value = job.status === 'succeeded' ? (job.summary ?? 'Terminado.') : job.conflict ? '' : 'El trabajo falló: revisa su salida.'
+			// A publication, or a conflict with a rollback, changes which snapshot is active.
+			if (job.kind === 'publish') void reload()
+		},
+	})
+
+	const conflict = computed(() => (jobs.value.content?.kind === 'publish' && jobs.value.content.conflict ? jobs.value.content : null))
+
+	const busy = computed(() => jobs.value.content?.status === 'running' || starting.value === 'import' || starting.value === 'publish')
+
+	// Activation (rollback): asks first, because the public site switches on confirm.
+	const target = signal<SnapshotRow | null>(null)
+	const confirming = signal(false)
+	const activating = signal(false)
+	const activateFailure = signal<Failure | null>(null)
+
+	function askActivate(snapshot: SnapshotRow) {
+		target.value = snapshot
+		activateFailure.value = null
+		confirming.value = true
+	}
+
+	async function activate() {
+		const snapshot = target.value
+		if (!snapshot) return
+		activating.value = true
+		try {
+			list.value = await rpc.snapshots.activate({ id: snapshot.id })
+			confirming.value = false
+			notice.value = `El snapshot #${snapshot.id} es ahora el activo: el site lo sirve desde ya.`
+			// A rollback to an older snapshot leaves out what was published after it, and a return
+			// includes it again: the pending revisions are those of the snapshot active now.
+			await reloadPending()
+		} catch (error) {
+			activateFailure.value = describeError(error)
+		} finally {
+			activating.value = false
+		}
+	}
+
+	// Publication: why, stored with the snapshot; who publishes is the user of the session (F5).
+	const publishing = signal(false)
+	const note = signal('')
+
+	function askPublish() {
+		publishing.value = true
+	}
+
+	async function publish() {
+		const started = await start({ kind: 'publish', ...(note.value.trim() ? { note: note.value } : {}) })
+		if (started) {
+			publishing.value = false
+			notice.value = ''
+		}
+	}
+
+	// «Volver a publicar» after a conflict sends the note of the lost publication. The job keeps it,
+	// so it also works after a reload, when the form starts empty.
+	async function retry() {
+		const lost = conflict.value
+		if (lost && !note.value.trim()) note.value = lost.note ?? ''
+		await publish()
+	}
+
+	async function importSources() {
+		notice.value = ''
+		await start({ kind: 'import' })
+	}
+
+	const active = computed(() => list.value.find((snapshot) => snapshot.active) ?? null)
+	const activateLabel = (snapshot: SnapshotRow) => (active.value && snapshot.id < active.value.id ? `Volver al #${snapshot.id}` : `Activar el #${snapshot.id}`)
+
+	const columns = [
+		{ key: 'id', label: 'Snapshot' },
+		{ key: 'publishedAt', label: 'Publicado' },
+		{ key: 'publishedBy', label: 'Por' },
+		{ key: 'pages', label: 'Páginas' },
+		{ key: 'note', label: 'Nota' },
+		{ key: 'active', label: 'Estado' },
+	] satisfies TableColumn<SnapshotRow>[]
+</script>
+
+<template>
+	<DashPage
+		title="Snapshots"
+		description="El site sirve un único snapshot activo. Importa las fuentes desde Git, publica uno nuevo con las revisiones publicadas o vuelve a uno anterior."
+	>
+		<div class="dash-stack">
+			<section
+				class="dash-panel"
+				aria-labelledby="actions-heading"
+			>
+				<div class="dash-panel-head">
+					<h2 id="actions-heading">Acciones</h2>
+					<span class="dash-muted">Se ejecutan en un proceso aparte, de una en una.</span>
+				</div>
+				<div class="dash-actions">
+					<UIButton
+						variant="secondary"
+						bind:disabled="busy.value"
+						on:click="importSources"
+					>
+						{starting.value === 'import' ? 'Iniciando…' : 'Importar desde Git'}
+					</UIButton>
+					<UIButton
+						bind:disabled="busy.value"
+						on:click="askPublish"
+					>
+						Publicar snapshot…
+					</UIButton>
+				</div>
+				<p class="dash-hint">Importar actualiza las fuentes con los archivos del repositorio y nunca toca las revisiones. Publicar renderiza toda la documentación y activa el resultado en el site.</p>
+				<DashFailure
+					if:when="jobFailure.value"
+					title="No se pudo iniciar el trabajo"
+					bind:failure="jobFailure.value"
+				/>
+				<div
+					if:when="conflict.value"
+					class="dash-failure"
+					role="alert"
+				>
+					<div>
+						<p class="dash-failure-title">Otro cambio se publicó mientras tanto</p>
+						<p>{conflict.value?.summary}</p>
+						<p class="dash-actions">
+							<UIButton
+								bind:disabled="busy.value"
+								on:click="retry"
+							>
+								Volver a publicar
+							</UIButton>
+						</p>
+					</div>
+				</div>
+				<p
+					class="dash-notice"
+					role="status"
+					aria-live="polite"
+				>
+					{notice.value}
+				</p>
+				<DashJob
+					empty="Ningún trabajo desde que arrancó el dashboard."
+					bind:job="jobs.value.content"
+				/>
+			</section>
+
+			<section
+				class="dash-panel"
+				aria-labelledby="pending-heading"
+			>
+				<div class="dash-panel-head">
+					<h2 id="pending-heading">Revisiones sin publicar en el site</h2>
+					<span class="dash-muted">{pending.value ? plural(pending.value.revisions.length, 'revisión', 'revisiones') : ''}</span>
+				</div>
+				<p
+					if:when="!pending.value"
+					class="dash-empty"
+				>
+					No se pudieron leer las revisiones publicadas.
+				</p>
+				<p
+					if:when="pending.value && !pending.value.revisions.length"
+					class="dash-empty"
+				>
+					{pending.value?.activeSnapshotId ? 'El snapshot activo #' + pending.value.activeSnapshotId + ' incluye todas las revisiones publicadas.' : 'No hay revisiones publicadas pendientes.'}
+				</p>
+				<div
+					if:when="pending.value && pending.value.revisions.length"
+					class="dash-stack"
+				>
+					<p class="dash-section-lead">
+						{pendingLead.value}
+					</p>
+					<ul class="dash-list">
+						<li
+							each:of="pending.value?.revisions ?? []"
+							each:as="revision"
+							each:key="revision.id"
+						>
+							<a bind:href="'/sources/' + revision.sourceId">{revision.title}</a>
+							<span class="dash-muted">
+								<code>{revision.path}</code>
+								· {revision.change === 'archived' ? 'revisión #' + revision.id + ' archivada: la página vuelve a Git · ' + formatDate(revision.archivedAt ?? revision.publishedAt) : 'revisión #' + revision.id + ' de ' + revision.author + ' · ' + formatDate(revision.publishedAt)}
+							</span>
+						</li>
+					</ul>
+				</div>
+			</section>
+
+			<section aria-labelledby="snapshots-heading">
+				<div class="dash-panel-head">
+					<h2
+						id="snapshots-heading"
+						class="dash-section-title"
+					>
+						Guardados
+					</h2>
+					<span class="dash-muted">Se conservan los 5 últimos y el que estaba activo.</span>
+				</div>
+				<DashFailure
+					if:when="listFailure.value"
+					bind:failure="listFailure.value"
+				/>
+				<div
+					if:when="!listFailure.value"
+					class="dash-table-scroll"
+				>
+					<UITable
+						caption="Snapshots guardados, del más reciente al más antiguo"
+						class="dash-snapshots"
+						rowKey="id"
+						emptyText="No hay snapshots: publica el primero para que el site tenga documentación."
+						bind:columns="columns"
+						bind:rows="list.value"
+					>
+						<snippet
+							name="cell"
+							params="row, column"
+						>
+							<strong if:when="column.key === 'id'">#{String(row.id)}</strong>
+							<span
+								if:when="column.key === 'publishedAt'"
+								class="dash-nowrap"
+							>
+								{formatDate(row.publishedAt)}
+							</span>
+							<span if:when="column.key === 'publishedBy'">{row.publishedBy ?? '—'}</span>
+							<span
+								if:when="column.key === 'pages'"
+								class="dash-num"
+							>
+								{formatNumber(row.pages)}
+							</span>
+							<span if:when="column.key === 'note'">{row.note ?? '—'}</span>
+							<span
+								if:when="column.key === 'active'"
+								class="dash-row-action"
+							>
+								<UIBadge
+									if:when="row.active"
+									tone="accent"
+								>
+									Activo
+								</UIBadge>
+								<UIButton
+									if:when="!row.active"
+									size="sm"
+									variant="outline"
+									bind:disabled="busy.value || activating.value"
+									on:click="() => askActivate(row)"
+								>
+									{activateLabel(row)}
+								</UIButton>
+							</span>
+						</snippet>
+					</UITable>
+				</div>
+			</section>
+		</div>
+
+		<UIModal
+			description="El site público servirá este snapshot en cuanto confirmes. Puedes volver al actual desde esta misma lista."
+			model="confirming"
+			bind:title="'¿Activar el snapshot #' + (target.value?.id ?? '') + '?'"
+		>
+			<dl
+				if:when="target.value"
+				class="dash-facts"
+			>
+				<div>
+					<dt>Publicado</dt>
+					<dd>{formatDate(target.value?.publishedAt)}</dd>
+				</div>
+				<div>
+					<dt>Por</dt>
+					<dd>{target.value?.publishedBy ?? '—'}</dd>
+				</div>
+				<div>
+					<dt>Páginas</dt>
+					<dd>{formatNumber(target.value?.pages ?? 0)}</dd>
+				</div>
+				<div if:when="active.value">
+					<dt>Sustituye a</dt>
+					<dd>#{String(active.value?.id)}</dd>
+				</div>
+			</dl>
+			<DashFailure
+				if:when="activateFailure.value"
+				title="No se activó"
+				bind:failure="activateFailure.value"
+			/>
+			<snippet name="footer">
+				<UIButton
+					variant="ghost"
+					on:click="() => (confirming.value = false)"
+				>
+					Cancelar
+				</UIButton>
+				<UIButton
+					bind:disabled="activating.value"
+					on:click="activate"
+				>
+					{activating.value ? 'Activando…' : 'Activar snapshot'}
+				</UIButton>
+			</snippet>
+		</UIModal>
+
+		<UIModal
+			title="Publicar un snapshot"
+			description="Renderiza las guías, la referencia y las páginas con las revisiones publicadas sobre Git, y lo activa en el site."
+			model="publishing"
+		>
+			<form
+				id="publish-form"
+				class="dash-form"
+				on:submit="
+					(event) => {
+						event.preventDefault()
+						void publish()
+					}
+				"
+			>
+				<UIField
+					id="publish-note"
+					label="Nota"
+					description="Opcional. Qué cambia en esta publicación."
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UIInput
+							model="note"
+							bind:id="id"
+							bind:describedBy="describedBy"
+						/>
+					</snippet>
+				</UIField>
+			</form>
+			<DashFailure
+				if:when="jobFailure.value"
+				title="No se pudo iniciar"
+				bind:failure="jobFailure.value"
+			/>
+			<snippet name="footer">
+				<UIButton
+					variant="ghost"
+					on:click="() => (publishing.value = false)"
+				>
+					Cancelar
+				</UIButton>
+				<UIButton
+					bind:disabled="busy.value"
+					on:click="publish"
+				>
+					{starting.value === 'publish' ? 'Iniciando…' : 'Publicar y activar'}
+				</UIButton>
+			</snippet>
+		</UIModal>
+	</DashPage>
+</template>

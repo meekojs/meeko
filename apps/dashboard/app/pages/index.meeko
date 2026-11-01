@@ -1,0 +1,260 @@
+<script
+	server
+	lang="ts"
+>
+	import { attempt } from '../utils/errors'
+
+	export const overview = await attempt(() => rpc.overview.get({}))
+</script>
+
+<script lang="ts">
+	import type { DivergenceState, SiteSummary } from '../../shared/schemas/dashboard'
+
+	import { formatDate, formatNumber } from '../utils/format'
+	import { jobLabels, siteLabels, stateDescriptions, stateLabels, states } from '../utils/labels'
+
+	const markdown = (summary: SiteSummary) => summary.kinds.guide + summary.kinds.reference
+	const stateHref = (summary: SiteSummary, state: DivergenceState) => `/sources?site=${summary.site}&state=${state}`
+	const staleHref = (summary: SiteSummary) => `/sources?site=${summary.site}&state=importStale`
+	const jobStatus = { running: 'en curso', succeeded: 'terminado', failed: 'falló' } as const
+	const attention = (summary: SiteSummary) => summary.states.edited + summary.states.conflict + summary.states.missing + summary.importStale
+</script>
+
+<template>
+	<DashPage
+		title="Resumen"
+		description="Estado de la documentación pública de las tres webs: fuentes importadas de Git, divergencia de las revisiones y snapshot que sirve el site."
+	>
+		<DashFailure
+			if:when="!overview.ok"
+			bind:failure="overview.failure"
+		/>
+		<div
+			if:when="overview.ok"
+			class="dash-stack"
+		>
+			<section
+				class="dash-strip"
+				aria-label="Publicación"
+			>
+				<div class="dash-strip-item">
+					<h2>Snapshot activo</h2>
+					<p if:when="overview.data.activeSnapshot">
+						<a
+							class="dash-strong-link"
+							href="/snapshots"
+						>
+							#{String(overview.data.activeSnapshot.id)}
+						</a>
+						· {formatNumber(overview.data.activeSnapshot.pages)} páginas · {formatDate(overview.data.activeSnapshot.publishedAt)}
+						<span class="dash-muted">por {overview.data.activeSnapshot.publishedBy ?? 'desconocido'}</span>
+					</p>
+					<p
+						if:when="!overview.data.activeSnapshot"
+						class="dash-muted"
+					>
+						Ninguno: el site no tiene documentación que servir.
+						<a href="/snapshots">Publica el primero</a>
+						.
+					</p>
+				</div>
+				<div class="dash-strip-item">
+					<h2>Último trabajo</h2>
+					<p if:when="overview.data.jobs.content">
+						{jobLabels[overview.data.jobs.content.kind]}:
+						<span>{jobStatus[overview.data.jobs.content.status]}</span>
+						<span class="dash-muted">· {formatDate(overview.data.jobs.content.startedAt)}</span>
+					</p>
+					<p
+						if:when="!overview.data.jobs.content"
+						class="dash-muted"
+					>
+						Ninguno desde que arrancó el dashboard.
+					</p>
+				</div>
+				<div class="dash-strip-item">
+					<h2>Snapshots guardados</h2>
+					<p>{formatNumber(overview.data.snapshots)}</p>
+				</div>
+			</section>
+
+			<section aria-labelledby="sources-heading">
+				<h2
+					id="sources-heading"
+					class="dash-section-title"
+				>
+					Fuentes por web
+				</h2>
+				<div class="dash-table-scroll">
+					<table class="dash-table">
+						<caption class="dash-visually-hidden">Número de fuentes de cada web por tipo y su última importación</caption>
+						<thead>
+							<tr>
+								<th scope="col">Web</th>
+								<th
+									scope="col"
+									class="dash-num"
+								>
+									Guías
+								</th>
+								<th
+									scope="col"
+									class="dash-num"
+								>
+									Referencia
+								</th>
+								<th
+									scope="col"
+									class="dash-num"
+								>
+									Páginas .meeko
+								</th>
+								<th
+									scope="col"
+									class="dash-num"
+								>
+									Total
+								</th>
+								<th
+									scope="col"
+									class="dash-num"
+								>
+									Retiradas
+								</th>
+								<th scope="col">Último cambio importado</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr
+								each:of="overview.data.sites"
+								each:as="summary"
+								each:key="summary.site"
+							>
+								<th scope="row">
+									<a bind:href="'/sources?site=' + summary.site">{siteLabels[summary.site]}</a>
+								</th>
+								<td class="dash-num">{formatNumber(summary.kinds.guide)}</td>
+								<td class="dash-num">{formatNumber(summary.kinds.reference)}</td>
+								<td class="dash-num">{formatNumber(summary.kinds.page)}</td>
+								<td class="dash-num dash-strong">{formatNumber(summary.total)}</td>
+								<td class="dash-num">{summary.removed ? formatNumber(summary.removed) : '—'}</td>
+								<td>{formatDate(summary.lastImportedAt)}</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+				<p
+					if:when="overview.data.sites.every((summary) => summary.total === 0)"
+					class="dash-empty"
+				>
+					No hay fuentes importadas. Ve a
+					<a href="/snapshots">Snapshots</a>
+					y pulsa «Importar desde Git» para leer las guías, la referencia y las páginas de las tres webs.
+				</p>
+			</section>
+
+			<section aria-labelledby="divergence-heading">
+				<h2
+					id="divergence-heading"
+					class="dash-section-title"
+				>
+					Divergencia con Git
+				</h2>
+				<p class="dash-section-lead">Solo las fuentes Markdown del site tienen revisiones; las páginas .meeko de UI e i18n se editan en el repositorio. Cada número abre las fuentes de ese estado.</p>
+				<div class="dash-table-scroll">
+					<table class="dash-table">
+						<caption class="dash-visually-hidden">Fuentes Markdown de cada web por estado de divergencia</caption>
+						<thead>
+							<tr>
+								<th scope="col">Web</th>
+								<th
+									each:of="states"
+									each:as="state"
+									each:key="state"
+									scope="col"
+									class="dash-num"
+									bind:title="stateDescriptions[state]"
+								>
+									{stateLabels[state]}
+								</th>
+								<th
+									scope="col"
+									class="dash-num"
+									title="Git cambió desde la última importación"
+								>
+									Importación desactualizada
+								</th>
+								<th scope="col">Atención</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr
+								each:of="overview.data.sites"
+								each:as="summary"
+								each:key="summary.site"
+							>
+								<th scope="row">{siteLabels[summary.site]}</th>
+								<td
+									each:of="states"
+									each:as="state"
+									each:key="state"
+									class="dash-num"
+									bind:data-state="summary.states[state] ? state : undefined"
+								>
+									<a
+										if:when="markdown(summary) && summary.states[state]"
+										bind:href="stateHref(summary, state)"
+										bind:aria-label="formatNumber(summary.states[state]) + ' fuentes de ' + siteLabels[summary.site] + ': ' + stateLabels[state]"
+									>
+										{formatNumber(summary.states[state])}
+									</a>
+									<span
+										if:when="markdown(summary) && !summary.states[state]"
+										class="dash-zero"
+									>
+										0
+									</span>
+									<span
+										if:when="!markdown(summary)"
+										class="dash-zero"
+										aria-label="No aplica"
+									>
+										—
+									</span>
+								</td>
+								<td class="dash-num">
+									<a
+										if:when="summary.importStale"
+										bind:href="staleHref(summary)"
+									>
+										{formatNumber(summary.importStale)}
+									</a>
+									<span
+										if:when="!summary.importStale"
+										class="dash-zero"
+									>
+										{markdown(summary) ? '0' : '—'}
+									</span>
+								</td>
+								<td>
+									<UIBadge
+										if:when="attention(summary)"
+										tone="accent"
+									>
+										{formatNumber(attention(summary))} por revisar
+									</UIBadge>
+									<span
+										if:when="!attention(summary)"
+										class="dash-muted"
+									>
+										Al día
+									</span>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</section>
+		</div>
+	</DashPage>
+</template>

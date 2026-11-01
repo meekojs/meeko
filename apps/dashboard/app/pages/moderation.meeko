@@ -1,0 +1,827 @@
+<script
+	server
+	lang="ts"
+>
+	import { definePage } from '@meekojs/meeko/framework'
+	import * as v from 'valibot'
+
+	import { attempt } from '../utils/errors'
+
+	export const route = definePage({ search: v.object({ site: v.optional(v.picklist(['site', 'ui', 'i18n'])) }), render: 'ssr' })
+
+	const { search } = usePage()
+	export const initial = await attempt(() => rpc.moderation.get({ site: search.site ?? 'site' }))
+</script>
+
+<script lang="ts">
+	import type { AnnouncementRow, AnnouncementTone, KnownPageRow, ModerationAction, ModerationRuleRow } from '../../shared/schemas/moderation'
+	import type { Failure } from '../utils/errors'
+
+	import { maxMessageLength, maxReasonLength } from '../../shared/schemas/moderation'
+	import { describeError } from '../utils/errors'
+	import { formatDate } from '../utils/format'
+	import { siteLabels, sites } from '../utils/labels'
+	import { actionLabels, announcementStateLabels, announcementStateTones, fromLocalInput, toLocalInput, toneLabels, tones } from '../utils/moderation'
+
+	export interface Props {
+		params: Record<string, string>
+		search: { site?: 'site' | 'ui' | 'i18n' | undefined }
+	}
+
+	const props = defineProps<Props>()
+
+	// The page remounts for another web (a link of the tabs): its initial value is enough.
+	const site = untrack(() => props.search.site ?? 'site')
+	const data = signal(initial.ok ? initial.data : null)
+	const loadFailure = signal<Failure | null>(initial.ok ? null : initial.failure)
+	const notice = signal('')
+
+	async function reload() {
+		try {
+			data.value = await rpc.moderation.get({ site })
+			loadFailure.value = null
+		} catch (error) {
+			loadFailure.value = describeError(error)
+		}
+	}
+
+	/**
+	 * Every write names the version of the row this tab read. When another tab changed the row
+	 * (`409 MODERATION_CONFLICT`) or deleted it (`404 MODERATION_NOT_FOUND`), nothing was written:
+	 * the lists reload with the current state and the failure says so. `true` for those refusals.
+	 */
+	async function reloadIfChanged(failure: Failure): Promise<boolean> {
+		if (failure.code !== 'MODERATION_CONFLICT' && failure.code !== 'MODERATION_NOT_FOUND') return false
+		await reload()
+		return true
+	}
+
+	const tabs = computed(() =>
+		sites.map((name) => ({
+			name,
+			href: name === 'site' ? '/moderation' : `/moderation?site=${name}`,
+			label: siteLabels[name],
+			rules: data.value?.counts[name].rules ?? 0,
+			live: data.value?.counts[name].live ?? 0,
+		})),
+	)
+	const pageCount = computed(() => data.value?.pages.length ?? 0)
+	const delay = 'Las webs lo aplican en menos de 30 s, sin publicar ni reiniciar.'
+
+	// Rules ----------------------------------------------------------------------------------------
+
+	const page = signal<KnownPageRow | null>(null)
+	const action = signal<ModerationAction>('hide')
+	const reason = signal('')
+	const ruleError = signal('')
+	const ruleFailure = signal<Failure | null>(null)
+	const savingRule = signal(false)
+	const pageLabel = (option: KnownPageRow) => `${option.title} · ${option.path}`
+	const pageGroup = (option: KnownPageRow) => (option.origin === 'source' ? 'Fuentes' : 'Solo en el snapshot (referencia generada)')
+	const existing = computed(() => (page.value ? (data.value?.rules.find((rule) => rule.path === page.value?.path) ?? null) : null))
+
+	/**
+	 * The rule the form writes over: the one its page had when the page was chosen or its row was
+	 * edited (id and version, or none). A reload of the list (another action of this tab, such as
+	 * switching an announcement) does not move it, so a change that another tab made meanwhile is a
+	 * conflict instead of being overwritten. It is renewed only when a conflict is shown (saving
+	 * again then replaces the other change on purpose) or when the form is reset.
+	 */
+	const ruleBase = signal<{ readonly path: string; readonly id: number | null; readonly version: number | null } | null>(null)
+
+	/** Pins the rule that `path` has now in the list as the base of the form; `undefined` clears it. */
+	function pinRule(path: string | undefined) {
+		const rule = path === undefined ? undefined : untrack(() => data.value?.rules.find((item) => item.path === path))
+		ruleBase.value = path === undefined ? null : { path, id: rule?.id ?? null, version: rule?.version ?? null }
+	}
+
+	// Choosing another page in the select pins the rule it has; reloading the list does not, because
+	// only the page is tracked.
+	effect(() => {
+		const path = page.value?.path
+		untrack(() => {
+			if (ruleBase.value?.path !== path) pinRule(path)
+		})
+	})
+	const reasonTooLong = computed(() => reason.value.trim().length > maxReasonLength)
+	const ruleSubmit = computed(() => (savingRule.value ? 'Guardando…' : existing.value ? 'Cambiar la regla' : action.value === 'hide' ? 'Ocultar la página…' : 'Destacar la página'))
+
+	function editRule(rule: ModerationRuleRow) {
+		page.value = data.value?.pages.find((option) => option.path === rule.path) ?? { path: rule.path, title: rule.title ?? rule.path, origin: 'source' }
+		ruleBase.value = { path: rule.path, id: rule.id, version: rule.version }
+		action.value = rule.action
+		reason.value = rule.reason ?? ''
+		ruleError.value = ''
+		ruleFailure.value = null
+		document.getElementById('rule-page')?.focus()
+	}
+
+	function resetRule() {
+		page.value = null
+		ruleBase.value = null
+		action.value = 'hide'
+		reason.value = ''
+		ruleError.value = ''
+	}
+
+	/** Checks the form, and asks first when the page would disappear from its web. */
+	function submitRule() {
+		ruleFailure.value = null
+		ruleError.value = !page.value ? 'Elige una página.' : reasonTooLong.value ? `El motivo tiene más de ${maxReasonLength} caracteres.` : ''
+		if (ruleError.value) return
+		if (action.value === 'hide') {
+			const target = page.value!
+			ask({
+				title: `¿Ocultar ${target.title}?`,
+				description: `${target.path} responderá 404 en ${siteLabels[site]} y saldrá de la navegación${site === 'site' ? ', la búsqueda, el sitemap y llms.txt' : ''}. Quitar la regla la devuelve.`,
+				confirm: 'Ocultar la página',
+				run: () => saveRule(true),
+			})
+		} else void saveRule()
+	}
+
+	/** Saves the rule; `rethrow` hands a failure to the confirmation, which shows it. */
+	async function saveRule(rethrow = false) {
+		const target = page.value
+		if (!target) return
+		savingRule.value = true
+		try {
+			// The rule this page had when the edit began (id and version), not the one of the last
+			// reload; none when it had no rule.
+			const base = ruleBase.value?.path === target.path ? ruleBase.value : null
+			const rule = await rpc.moderation.rules.save({ site, path: target.path, action: action.value, reason: reason.value, id: base?.id ?? null, version: base?.version ?? null })
+			resetRule()
+			await reload()
+			notice.value = `${rule.action === 'hide' ? 'Oculta' : 'Destacada'}: ${rule.title ?? rule.path}. ${delay}`
+		} catch (error) {
+			// A conflict closes the confirmation: the form keeps its values and the reloaded table shows the other change.
+			const failure = describeError(error)
+			if (await reloadIfChanged(failure)) {
+				// The conflict is shown and the form keeps its values, now over the rule the page has:
+				// saving again replaces the other change on purpose.
+				pinRule(target.path)
+				ruleFailure.value = failure
+				return
+			}
+			if (rethrow) throw error
+			ruleFailure.value = failure
+		} finally {
+			savingRule.value = false
+		}
+	}
+
+	function askRemoveRule(rule: ModerationRuleRow) {
+		ask({
+			title: `¿Quitar la regla de ${rule.title ?? rule.path}?`,
+			description: rule.action === 'hide' ? `${rule.path} vuelve a existir en ${siteLabels[site]}: su página, la navegación y la búsqueda.` : `${rule.path} deja de mostrarse como destacada.`,
+			confirm: 'Quitar la regla',
+			focus: 'rules-heading',
+			section: 'rules',
+			run: async () => {
+				await rpc.moderation.rules.delete({ id: rule.id, version: rule.version })
+				await reload()
+				notice.value = `Regla quitada: ${rule.title ?? rule.path}. ${delay}`
+			},
+		})
+	}
+
+	const ruleColumns = [
+		{ key: 'path', label: 'Página' },
+		{ key: 'action', label: 'Regla' },
+		{ key: 'reason', label: 'Motivo' },
+		{ key: 'author', label: 'Autor' },
+		{ key: 'createdAt', label: 'Fecha' },
+		{ key: 'id', label: 'Acciones' },
+	] as const
+
+	// Announcements --------------------------------------------------------------------------------
+
+	const editing = signal<number | null>(null)
+	/** The version of the announcement being edited, as the list had it when the edit began. */
+	const editingVersion = signal<number | null>(null)
+	const message = signal('')
+	const tone = signal<AnnouncementTone | null>('info')
+	const startsAt = signal('')
+	const endsAt = signal('')
+	const active = signal(true)
+	const announcementError = signal('')
+	const announcementFailure = signal<Failure | null>(null)
+	const savingAnnouncement = signal(false)
+	const messageLength = computed(() => message.value.trim().length)
+	const messageCounter = computed(() => `${messageLength.value} de ${maxMessageLength} caracteres`)
+	const messageTooLong = computed(() => messageLength.value > maxMessageLength)
+	const preview = computed(() => [{ id: editing.value ?? 0, message: message.value.trim() || 'Escribe el mensaje para ver el aviso.', tone: tone.value ?? 'info' }])
+	const previewNote = computed(() => {
+		if (!active.value) return 'Inactivo: no se mostrará hasta que lo actives.'
+		const start = fromLocalInput(startsAt.value)
+		const end = fromLocalInput(endsAt.value)
+		const now = Date.now()
+		if (end && Date.parse(end) <= now) return 'Su fin ya pasó: no se mostrará.'
+		if (start && Date.parse(start) > now) return `Se mostrará desde ${formatDate(start)}.`
+		return end ? `Se muestra ya, hasta ${formatDate(end)}.` : 'Se muestra ya, sin fecha de fin.'
+	})
+
+	function editAnnouncement(item: AnnouncementRow) {
+		editing.value = item.id
+		editingVersion.value = item.version
+		message.value = item.message
+		tone.value = item.tone
+		startsAt.value = toLocalInput(item.startsAt)
+		endsAt.value = toLocalInput(item.endsAt)
+		active.value = item.active
+		announcementError.value = ''
+		announcementFailure.value = null
+		document.getElementById('announcement-message')?.focus()
+	}
+
+	function resetAnnouncement() {
+		editing.value = null
+		editingVersion.value = null
+		message.value = ''
+		tone.value = 'info'
+		startsAt.value = ''
+		endsAt.value = ''
+		active.value = true
+		announcementError.value = ''
+	}
+
+	function validateAnnouncement(): string {
+		if (!messageLength.value) return 'Escribe el mensaje.'
+		if (messageTooLong.value) return `El mensaje tiene más de ${maxMessageLength} caracteres.`
+		const start = fromLocalInput(startsAt.value)
+		const end = fromLocalInput(endsAt.value)
+		if ((startsAt.value && !start) || (endsAt.value && !end)) return 'Una de las fechas no es válida.'
+		if (start && end && Date.parse(end) <= Date.parse(start)) return 'El fin debe ser posterior al inicio.'
+		return ''
+	}
+
+	async function submitAnnouncement() {
+		announcementFailure.value = null
+		announcementError.value = validateAnnouncement()
+		if (announcementError.value) return
+		savingAnnouncement.value = true
+		try {
+			const item = await rpc.moderation.announcements.save({
+				...(editing.value === null ? {} : { id: editing.value, version: editingVersion.value ?? 1 }),
+				site,
+				message: message.value,
+				tone: tone.value ?? 'info',
+				startsAt: fromLocalInput(startsAt.value),
+				endsAt: fromLocalInput(endsAt.value),
+				active: active.value,
+			})
+			const created = editing.value === null
+			resetAnnouncement()
+			await reload()
+			notice.value = `Aviso #${item.id} ${created ? 'creado' : 'guardado'}: ${announcementStateLabels[item.state].toLowerCase()}. ${delay}`
+		} catch (error) {
+			const failure = describeError(error)
+			if (await reloadIfChanged(failure)) {
+				// The form keeps what this tab wrote, now over the current version: saving again replaces
+				// the other change on purpose, and a deleted announcement is created again.
+				const current = data.value?.announcements.find((row) => row.id === editing.value)
+				if (current) editingVersion.value = current.version
+				else resetEditingTarget()
+			}
+			announcementFailure.value = failure
+		} finally {
+			savingAnnouncement.value = false
+		}
+	}
+
+	/** Turns the edit of a deleted announcement into a new one with the same fields. */
+	function resetEditingTarget() {
+		editing.value = null
+		editingVersion.value = null
+	}
+
+	/**
+	 * Switches an announcement on or off and changes nothing else: an old row of this table cannot
+	 * bring back a message or dates that another tab changed, and a change since it loaded is a conflict.
+	 */
+	async function toggleAnnouncement(item: AnnouncementRow) {
+		announcementFailure.value = null
+		try {
+			const saved = await rpc.moderation.announcements.active({ id: item.id, version: item.version, active: !item.active })
+			await reload()
+			notice.value = `Aviso #${saved.id} ${saved.active ? 'activado' : 'desactivado'}. ${delay}`
+		} catch (error) {
+			const failure = describeError(error)
+			await reloadIfChanged(failure)
+			announcementFailure.value = failure
+		}
+	}
+
+	function askRemoveAnnouncement(item: AnnouncementRow) {
+		ask({
+			title: `¿Borrar el aviso #${item.id}?`,
+			description: 'Desaparece de la web y del historial. Para dejar de mostrarlo sin perderlo, desactívalo.',
+			confirm: 'Borrar el aviso',
+			focus: 'announcements-heading',
+			section: 'announcements',
+			run: async () => {
+				await rpc.moderation.announcements.delete({ id: item.id, version: item.version })
+				if (editing.value === item.id) resetAnnouncement()
+				await reload()
+				notice.value = `Aviso #${item.id} borrado. ${delay}`
+			},
+		})
+	}
+
+	const announcementColumns = [
+		{ key: 'message', label: 'Mensaje' },
+		{ key: 'tone', label: 'Tono' },
+		{ key: 'startsAt', label: 'Vigencia' },
+		{ key: 'state', label: 'Estado' },
+		{ key: 'author', label: 'Autor' },
+		{ key: 'id', label: 'Acciones' },
+	] as const
+	const validity = (item: AnnouncementRow) => (item.startsAt || item.endsAt ? `${item.startsAt ? formatDate(item.startsAt) : 'Ya'} → ${item.endsAt ? formatDate(item.endsAt) : 'sin fin'}` : 'Sin fechas')
+
+	// Confirmation -----------------------------------------------------------------------------------
+
+	interface Question {
+		readonly title: string
+		readonly description: string
+		readonly confirm: string
+		readonly run: () => Promise<void>
+		/** Where the focus goes once the dialog closes, when its trigger may be gone (a deleted row). */
+		readonly focus?: string
+		/** The section that shows a conflict: the dialog closes over the reloaded list. */
+		readonly section?: 'announcements' | 'rules'
+	}
+	const question = signal<Question | null>(null)
+	const confirming = signal(false)
+	const answering = signal(false)
+	const questionFailure = signal<Failure | null>(null)
+
+	function ask(next: Question) {
+		question.value = next
+		questionFailure.value = null
+		confirming.value = true
+	}
+
+	async function answer() {
+		const current = question.value
+		if (!current) return
+		answering.value = true
+		try {
+			await current.run()
+			// The native dialog gives the focus back to its trigger when it closes, after its exit
+			// animation; that trigger may have left with the row, so the focus moves after it.
+			const dialog = document.querySelector('dialog[open]')
+			if (current.focus && dialog) dialog.addEventListener('close', () => requestAnimationFrame(() => document.getElementById(current.focus!)?.focus()), { once: true })
+			confirming.value = false
+		} catch (error) {
+			const failure = describeError(error)
+			if (current.section && (await reloadIfChanged(failure))) {
+				// What the question named changed or left: asking again about it makes no sense.
+				if (current.section === 'rules') ruleFailure.value = failure
+				else announcementFailure.value = failure
+				const dialog = document.querySelector('dialog[open]')
+				if (current.focus && dialog) dialog.addEventListener('close', () => requestAnimationFrame(() => document.getElementById(current.focus!)?.focus()), { once: true })
+				confirming.value = false
+				return
+			}
+			questionFailure.value = failure
+		} finally {
+			answering.value = false
+		}
+	}
+</script>
+
+<template>
+	<DashPage
+		title="Moderación"
+		description="Oculta o destaca páginas de cada web y publica avisos en su cabecera. Se aplica sin publicar un snapshot."
+	>
+		<nav
+			class="dash-tabs"
+			aria-label="Web"
+		>
+			<a
+				each:of="tabs.value"
+				each:as="tab"
+				each:key="tab.name"
+				bind:href="tab.href"
+				bind:aria-current="tab.name === site ? 'page' : undefined"
+			>
+				{tab.label}
+				<span class="dash-tab-count">{tab.rules === 1 ? '1 regla' : tab.rules + ' reglas'}{tab.live ? ' · ' + (tab.live === 1 ? '1 aviso' : tab.live + ' avisos') : ''}</span>
+			</a>
+		</nav>
+		<DashFailure
+			if:when="loadFailure.value"
+			bind:failure="loadFailure.value"
+		/>
+		<p
+			class="dash-notice"
+			role="status"
+			aria-live="polite"
+		>
+			{notice.value}
+		</p>
+		<div
+			if:when="data.value"
+			class="dash-stack"
+		>
+			<section
+				class="dash-panel"
+				aria-labelledby="rules-heading"
+			>
+				<div class="dash-panel-head">
+					<h2
+						id="rules-heading"
+						tabindex="-1"
+					>
+						Páginas
+					</h2>
+					<span class="dash-muted">{pageCount.value} páginas conocidas en {siteLabels[site]}</span>
+				</div>
+				<form
+					class="dash-moderation-form"
+					novalidate
+					on:submit="
+						(event) => {
+							event.preventDefault()
+							submitRule()
+						}
+					"
+				>
+					<div class="dash-field dash-moderation-page">
+						<label for="rule-page">Página</label>
+						<UISelect
+							id="rule-page"
+							searchable
+							by="path"
+							placeholder="Busca por título o ruta…"
+							model="page"
+							bind:options="data.value?.pages ?? []"
+							bind:labelBy="pageLabel"
+							bind:groupBy="site === 'site' ? pageGroup : undefined"
+							bind:invalid="ruleError.value === 'Elige una página.'"
+						/>
+					</div>
+					<fieldset class="dash-segmented">
+						<legend>Regla</legend>
+						<label>
+							<input
+								type="radio"
+								name="rule-action"
+								value="hide"
+								bind:checked="action.value === 'hide'"
+								on:change="() => (action.value = 'hide')"
+							/>
+							Ocultar
+						</label>
+						<label>
+							<input
+								type="radio"
+								name="rule-action"
+								value="feature"
+								bind:checked="action.value === 'feature'"
+								on:change="() => (action.value = 'feature')"
+							/>
+							Destacar
+						</label>
+					</fieldset>
+					<div class="dash-field dash-field-grow">
+						<label for="rule-reason">Motivo</label>
+						<input
+							id="rule-reason"
+							class="meeko-ui-input"
+							placeholder="Opcional: por qué, para el resto del equipo"
+							model="reason"
+							bind:aria-invalid="reasonTooLong.value ? 'true' : undefined"
+						/>
+					</div>
+					<div class="dash-moderation-submit">
+						<UIButton
+							type="submit"
+							bind:disabled="savingRule.value"
+						>
+							{ruleSubmit.value}
+						</UIButton>
+						<UIButton
+							if:when="page.value || reason.value"
+							variant="ghost"
+							on:click="resetRule"
+						>
+							Limpiar
+						</UIButton>
+					</div>
+				</form>
+				<p
+					if:when="existing.value"
+					class="dash-hint"
+				>
+					Esta página ya tiene una regla ({actionLabels[existing.value?.action ?? 'hide'].toLowerCase()}, de {existing.value?.author}): guardar la sustituye.
+				</p>
+				<p
+					if:when="ruleError.value"
+					class="dash-field-error"
+					role="alert"
+				>
+					{ruleError.value}
+				</p>
+				<DashFailure
+					if:when="ruleFailure.value"
+					title="No se guardó la regla"
+					bind:failure="ruleFailure.value"
+				/>
+				<div class="dash-table-scroll">
+					<UITable
+						rowKey="id"
+						emptyText="Ninguna regla: la web muestra todas sus páginas sin destacar ninguna."
+						bind:caption="'Reglas de ' + siteLabels[site]"
+						bind:columns="ruleColumns"
+						bind:rows="data.value?.rules ?? []"
+					>
+						<snippet
+							name="cell"
+							params="row, column"
+						>
+							<span
+								if:when="column.key === 'path'"
+								class="dash-source-cell"
+							>
+								<strong>{row.title ?? 'Página que ya no existe'}</strong>
+								<code>{row.path}</code>
+							</span>
+							<UIBadge
+								if:when="column.key === 'action'"
+								bind:tone="row.action === 'hide' ? 'danger' : 'accent'"
+							>
+								{actionLabels[row.action]}
+							</UIBadge>
+							<span if:when="column.key === 'reason'">{row.reason ?? '—'}</span>
+							<span if:when="column.key === 'author'">{row.author}</span>
+							<span
+								if:when="column.key === 'createdAt'"
+								class="dash-nowrap"
+							>
+								{formatDate(row.createdAt)}
+							</span>
+							<span
+								if:when="column.key === 'id'"
+								class="dash-row-actions"
+							>
+								<UIButton
+									size="sm"
+									variant="outline"
+									on:click="() => editRule(row)"
+								>
+									Cambiar
+									<span class="dash-visually-hidden">la regla de {row.path}</span>
+								</UIButton>
+								<UIButton
+									size="sm"
+									variant="ghost"
+									on:click="() => askRemoveRule(row)"
+								>
+									Quitar
+									<span class="dash-visually-hidden">la regla de {row.path}</span>
+								</UIButton>
+							</span>
+						</snippet>
+					</UITable>
+				</div>
+			</section>
+
+			<section
+				class="dash-panel"
+				aria-labelledby="announcements-heading"
+			>
+				<div class="dash-panel-head">
+					<h2
+						id="announcements-heading"
+						tabindex="-1"
+					>
+						Avisos
+					</h2>
+					<span class="dash-muted">En la cabecera de {siteLabels[site]}; cada lector puede cerrarlos.</span>
+				</div>
+				<div class="dash-announcement-editor">
+					<form
+						id="announcement-form"
+						class="dash-form"
+						novalidate
+						on:submit="
+							(event) => {
+								event.preventDefault()
+								void submitAnnouncement()
+							}
+						"
+					>
+						<p class="dash-announcement-mode">{editing.value === null ? 'Nuevo aviso' : 'Editando el aviso #' + editing.value}</p>
+						<div class="dash-field">
+							<label for="announcement-message">Mensaje</label>
+							<textarea
+								id="announcement-message"
+								class="meeko-ui-input dash-announcement-text"
+								rows="3"
+								aria-describedby="announcement-counter"
+								model="message"
+								bind:aria-invalid="messageTooLong.value || announcementError.value === 'Escribe el mensaje.' ? 'true' : undefined"
+							/>
+							<p
+								id="announcement-counter"
+								class="dash-counter"
+								bind:data-over="messageTooLong.value ? 'true' : undefined"
+							>
+								{messageCounter.value}
+							</p>
+						</div>
+						<div class="dash-announcement-row">
+							<div class="dash-field">
+								<label for="announcement-tone">Tono</label>
+								<UISelect
+									id="announcement-tone"
+									model="tone"
+									bind:options="tones"
+									bind:labelBy="(value) => toneLabels[value]"
+								/>
+							</div>
+							<div class="dash-field">
+								<label for="announcement-start">Inicio</label>
+								<input
+									id="announcement-start"
+									class="meeko-ui-input"
+									type="datetime-local"
+									aria-describedby="announcement-dates"
+									model="startsAt"
+								/>
+							</div>
+							<div class="dash-field">
+								<label for="announcement-end">Fin</label>
+								<input
+									id="announcement-end"
+									class="meeko-ui-input"
+									type="datetime-local"
+									aria-describedby="announcement-dates"
+									model="endsAt"
+								/>
+							</div>
+						</div>
+						<p
+							id="announcement-dates"
+							class="dash-hint"
+						>
+							Opcionales, en tu hora local. Sin inicio se muestra ya; sin fin, hasta que lo desactives.
+						</p>
+						<label class="dash-check">
+							<input
+								type="checkbox"
+								model="active"
+							/>
+							Activo
+						</label>
+						<p
+							if:when="announcementError.value"
+							class="dash-field-error"
+							role="alert"
+						>
+							{announcementError.value}
+						</p>
+						<DashFailure
+							if:when="announcementFailure.value"
+							title="No se guardó el aviso"
+							bind:failure="announcementFailure.value"
+						/>
+						<div class="dash-actions">
+							<UIButton
+								type="submit"
+								bind:disabled="savingAnnouncement.value"
+							>
+								{savingAnnouncement.value ? 'Guardando…' : editing.value === null ? 'Crear aviso' : 'Guardar cambios'}
+							</UIButton>
+							<UIButton
+								if:when="editing.value !== null || message.value"
+								variant="ghost"
+								on:click="resetAnnouncement"
+							>
+								{editing.value === null ? 'Vaciar' : 'Cancelar edición'}
+							</UIButton>
+						</div>
+					</form>
+					<figure class="dash-announcement-preview">
+						<figcaption>
+							Vista previa
+							<span class="dash-muted">{previewNote.value}</span>
+						</figcaption>
+						<div
+							class="dash-announcement-frame"
+							inert
+						>
+							<DocsAnnouncements bind:preview="preview.value" />
+							<div
+								class="dash-announcement-page"
+								aria-hidden="true"
+							>
+								<span />
+								<span />
+								<span />
+							</div>
+						</div>
+					</figure>
+				</div>
+				<div class="dash-table-scroll">
+					<UITable
+						rowKey="id"
+						emptyText="Ningún aviso en esta web."
+						bind:caption="'Avisos de ' + siteLabels[site] + ', del más reciente al más antiguo'"
+						bind:columns="announcementColumns"
+						bind:rows="data.value?.announcements ?? []"
+					>
+						<snippet
+							name="cell"
+							params="row, column"
+						>
+							<span
+								if:when="column.key === 'message'"
+								class="dash-announcement-cell"
+							>
+								{row.message}
+							</span>
+							<span
+								if:when="column.key === 'tone'"
+								class="dash-tone"
+								bind:data-tone="row.tone"
+							>
+								{toneLabels[row.tone]}
+							</span>
+							<span
+								if:when="column.key === 'startsAt'"
+								class="dash-nowrap"
+							>
+								{validity(row)}
+							</span>
+							<UIBadge
+								if:when="column.key === 'state'"
+								bind:tone="announcementStateTones[row.state]"
+							>
+								{announcementStateLabels[row.state]}
+							</UIBadge>
+							<span if:when="column.key === 'author'">{row.author}</span>
+							<span
+								if:when="column.key === 'id'"
+								class="dash-row-actions"
+							>
+								<UIButton
+									size="sm"
+									variant="outline"
+									on:click="() => editAnnouncement(row)"
+								>
+									Editar
+									<span class="dash-visually-hidden">el aviso #{String(row.id)}</span>
+								</UIButton>
+								<UIButton
+									size="sm"
+									variant="ghost"
+									on:click="() => void toggleAnnouncement(row)"
+								>
+									{row.active ? 'Desactivar' : 'Activar'}
+									<span class="dash-visually-hidden">el aviso #{String(row.id)}</span>
+								</UIButton>
+								<UIButton
+									size="sm"
+									variant="ghost"
+									on:click="() => askRemoveAnnouncement(row)"
+								>
+									Borrar
+									<span class="dash-visually-hidden">el aviso #{String(row.id)}</span>
+								</UIButton>
+							</span>
+						</snippet>
+					</UITable>
+				</div>
+			</section>
+		</div>
+
+		<UIModal
+			model="confirming"
+			bind:title="question.value?.title ?? ''"
+			bind:description="question.value?.description ?? ''"
+		>
+			<DashFailure
+				if:when="questionFailure.value"
+				title="No se hizo el cambio"
+				bind:failure="questionFailure.value"
+			/>
+			<snippet name="footer">
+				<UIButton
+					variant="ghost"
+					on:click="() => (confirming.value = false)"
+				>
+					Cancelar
+				</UIButton>
+				<UIButton
+					bind:disabled="answering.value"
+					on:click="answer"
+				>
+					{answering.value ? 'Aplicando…' : (question.value?.confirm ?? 'Confirmar')}
+				</UIButton>
+			</snippet>
+		</UIModal>
+	</DashPage>
+</template>

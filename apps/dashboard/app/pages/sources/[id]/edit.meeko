@@ -1,0 +1,445 @@
+<script
+	server
+	lang="ts"
+>
+	import { definePage } from '@meekojs/meeko/framework'
+	import * as v from 'valibot'
+
+	import { attempt } from '../../../utils/errors'
+
+	export const route = definePage({ params: v.object({ id: v.pipe(v.string(), v.regex(/^[1-9]\d{0,15}$/)) }), render: 'ssr' })
+
+	const { params, search } = usePage()
+	// ?revision=N edits that draft, or starts a new draft from another revision.
+	const revisionParam = typeof search.revision === 'string' && /^[1-9]\d{0,15}$/.test(search.revision) ? Number(search.revision) : undefined
+	export const editor = await attempt(() => rpc.editor.get({ sourceId: Number(params.id), ...(revisionParam ? { revisionId: revisionParam } : {}) }))
+	if (!editor.ok && editor.failure.code === 'SOURCE_NOT_FOUND') notFound()
+</script>
+
+<script lang="ts">
+	import type { Preview, PreviewIssue } from '../../../../shared/schemas/dashboard'
+	import type { Failure } from '../../../utils/errors'
+
+	import { encodedBytes } from '../../../../shared/schemas/dashboard'
+	import { describeError } from '../../../utils/errors'
+	import { formatNumber, plural, shortHash } from '../../../utils/format'
+	import { kindLabels, siteLabels } from '../../../utils/labels'
+	import { previewDocument, readPreviewTokens } from '../../../utils/preview-document'
+	import { setUnsaved } from '../../../utils/unsaved'
+
+	export interface Props {
+		params: { id: string }
+		search: Record<string, string | string[]>
+	}
+
+	const props = defineProps<Props>()
+
+	const data = editor.ok ? editor.data : null
+	// The page remounts for another id: its initial value is enough.
+	const sourceId = untrack(() => Number(props.params.id))
+
+	// The text and what was last saved or loaded: their difference is what a save would store.
+	const text = signal(data?.start.markdown ?? '')
+	const saved = signal(data?.start.markdown ?? '')
+	const draftId = signal<number | null>(data?.revision?.id ?? null)
+	const note = signal(data?.revision?.note ?? '')
+	const savedNote = signal(data?.revision?.note ?? '')
+
+	/** Lines that differ between two texts once their common start and end are set aside: O(n), for every keystroke. */
+	function changedLines(before: string, after: string): number {
+		if (before === after) return 0
+		const a = before.split('\n')
+		const b = after.split('\n')
+		let start = 0
+		while (start < a.length && start < b.length && a[start] === b[start]) start++
+		let endA = a.length
+		let endB = b.length
+		while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) {
+			endA--
+			endB--
+		}
+		return Math.max(endA - start, endB - start, 1)
+	}
+
+	const changed = computed(() => changedLines(saved.value, text.value))
+	const noteChanged = computed(() => draftId.value !== null && note.value.trim() !== savedNote.value.trim())
+	const dirty = computed(() => changed.value > 0 || noteChanged.value)
+	// What the text weighs in the JSON of a save, escapes included: the limit of the RPC body.
+	const bytes = computed(() => encodedBytes(text.value))
+	const maxBytes = data?.maxBytes ?? 900_000
+	const tooLarge = computed(() => bytes.value > maxBytes)
+
+	const status = computed(() => {
+		if (changed.value > 0) return `${plural(changed.value, 'línea cambiada', 'líneas cambiadas')} sin guardar`
+		if (noteChanged.value) return 'La nota tiene cambios sin guardar'
+		return draftId.value === null ? 'Sin cambios todavía' : 'Todo guardado'
+	})
+
+	const origin = computed(() => {
+		if (!data) return ''
+		if (draftId.value !== null) return `Borrador #${draftId.value}`
+		if (data.start.from === 'revision') return `Nuevo borrador a partir de la revisión #${data.start.revisionId}`
+		return `Nuevo borrador a partir de Git (${shortHash(data.start.baseHash)})`
+	})
+
+	// Saving -----------------------------------------------------------------------------------
+
+	const saving = signal(false)
+	const saveFailure = signal<Failure | null>(null)
+	const notice = signal('')
+
+	/** SHA-256 of a text in hexadecimal, as meeko-docs-content hashes it. */
+	async function hash(value: string): Promise<string> {
+		const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value.replace(/\r\n?/g, '\n')))
+		return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+	}
+
+	async function save() {
+		if (!data || saving.value) return
+		notice.value = ''
+		saveFailure.value = null
+		if (tooLarge.value) {
+			saveFailure.value = { code: 'TOO_LARGE', message: `El Markdown ocupa ${formatNumber(Math.round(bytes.value / 1000))} kB y el límite es ${formatNumber(maxBytes / 1000)} kB.` }
+			return
+		}
+		saving.value = true
+		const markdown = text.value
+		try {
+			const revision = await rpc.revisions.save({
+				sourceId,
+				markdown,
+				...(note.value.trim() ? { note: note.value } : {}),
+				...(draftId.value === null ? (data.start.baseHash ? { baseHash: data.start.baseHash } : {}) : { revisionId: draftId.value, expectedHash: await hash(saved.value) }),
+			})
+			const created = draftId.value === null
+			draftId.value = revision.id
+			saved.value = markdown
+			savedNote.value = revision.note ?? ''
+			notice.value = created ? `Borrador #${revision.id} creado.` : `Borrador #${revision.id} guardado.`
+			// A reload keeps editing the same draft.
+			if (created) history.replaceState(history.state, '', `${location.pathname}?revision=${revision.id}`)
+		} catch (error) {
+			saveFailure.value = describeError(error)
+		} finally {
+			saving.value = false
+		}
+	}
+
+	// Preview ----------------------------------------------------------------------------------
+
+	const preview = signal<Preview | null>(null)
+	const previewFailure = signal<Failure | null>(null)
+	const previewing = signal(false)
+	const previewed = signal<string | null>(null)
+	const auto = signal(true)
+	const stale = computed(() => previewed.value !== null && previewed.value !== text.value)
+	let timer: ReturnType<typeof setTimeout> | undefined
+
+	async function refreshPreview() {
+		if (!data || tooLarge.value || !text.value.trim()) return
+		clearTimeout(timer)
+		const markdown = text.value
+		previewing.value = true
+		try {
+			const result = await rpc.preview.render({ sourceId, markdown })
+			preview.value = result
+			previewed.value = markdown
+			previewFailure.value = null
+		} catch (error) {
+			const failure = describeError(error)
+			// A newer request replaced this one: its answer is the one that counts.
+			if (failure.code !== 'PREVIEW_SUPERSEDED') previewFailure.value = failure
+		} finally {
+			previewing.value = false
+		}
+	}
+
+	// While typing, the preview waits for a pause: each render costs about a second.
+	effect(() => {
+		const current = text.value
+		if (!auto.value || typeof window === 'undefined' || current === previewed.value) return
+		clearTimeout(timer)
+		timer = setTimeout(() => void refreshPreview(), 1200)
+	})
+
+	// The HTML of meeko-docs-content's render, the same the site serves, keeps the raw HTML of the
+	// Markdown. It never enters this document: it is the srcdoc of an iframe sandboxed without
+	// allow-scripts or allow-same-origin (utils/preview-document.ts), so a <style> or a script of a
+	// draft cannot reach the controls of the editor. The CSP of the dashboard still applies inside.
+	const theme = signal<'dark' | 'light'>('dark')
+	const previewSource = computed(() => {
+		const current = preview.value
+		if (!current || typeof document === 'undefined') return null
+		return previewDocument({ html: current.html, theme: theme.value, tokens: readPreviewTokens(document.documentElement) })
+	})
+
+	const issueKinds: Record<PreviewIssue['kind'], string> = { frontmatter: 'Bloquea la publicación', render: 'El render fallaría', link: 'Enlace roto' }
+	const blocking = computed(() => preview.value?.issues.filter((issue) => issue.kind !== 'link').length ?? 0)
+
+	// Moves the caret of the editor to a line of the draft. The textarea is inside DashPage's snippet,
+	// where `ref:` is not allowed (MEEK052), so it is found by its id.
+	function goToLine(line: number) {
+		const element = document.getElementById('draft-markdown')
+		if (!(element instanceof HTMLTextAreaElement)) return
+		const lines = element.value.split('\n')
+		const at = lines.slice(0, Math.max(0, line - 1)).reduce((sum, current) => sum + current.length + 1, 0)
+		element.focus()
+		element.setSelectionRange(at, at + (lines[line - 1]?.length ?? 0))
+		const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight) || 20
+		element.scrollTop = Math.max(0, (line - 4) * lineHeight)
+	}
+
+	// Leaving with unsaved changes asks first: a reload or a closed tab here, a navigation of the app in the plugin.
+	const leave = (event: BeforeUnloadEvent) => {
+		if (!dirty.value) return
+		event.preventDefault()
+		event.returnValue = ''
+	}
+	effect(() => setUnsaved(dirty.value ? 'Hay cambios sin guardar en el borrador. ¿Salir y perderlos?' : null))
+	onMounted(() => {
+		window.addEventListener('beforeunload', leave)
+		// The preview follows the theme of the dashboard: its tokens are read again when it changes.
+		const root = document.documentElement
+		const readTheme = () => (theme.value = root.dataset.theme === 'light' ? 'light' : 'dark')
+		readTheme()
+		const observer = new MutationObserver(readTheme)
+		observer.observe(root, { attributes: true, attributeFilter: ['data-theme'] })
+		void refreshPreview()
+		return () => observer.disconnect()
+	})
+	onCleanup(() => {
+		clearTimeout(timer)
+		setUnsaved(null)
+		if (typeof window !== 'undefined') window.removeEventListener('beforeunload', leave)
+	})
+
+	const sizeLabel = computed(() => `${formatNumber(Math.ceil(bytes.value / 1000))} de ${formatNumber(maxBytes / 1000)} kB`)
+</script>
+
+<template>
+	<DashPage
+		bind:title="data ? 'Editar ' + data.source.title : 'Editar la fuente ' + props.params.id"
+		bind:description="data ? siteLabels[data.source.site] + ' · ' + kindLabels[data.source.kind] + ' · ' + (data.source.file ?? data.source.path) : 'Editor del Markdown de una fuente.'"
+	>
+		<snippet name="actions">
+			<UILink
+				variant="ghost"
+				bind:href="'/sources/' + props.params.id"
+			>
+				Volver a la fuente
+			</UILink>
+		</snippet>
+		<DashFailure
+			if:when="!editor.ok"
+			title="No se puede abrir el editor"
+			bind:failure="editor.failure"
+		/>
+		<div
+			if:when="data"
+			class="dash-stack dash-editor"
+		>
+			<form
+				class="dash-panel dash-editor-bar"
+				aria-label="Borrador"
+				on:submit="
+					(event) => {
+						event.preventDefault()
+						void save()
+					}
+				"
+			>
+				<div class="dash-editor-fields">
+					<UIField
+						id="draft-note"
+						label="Nota"
+						description="Opcional. Qué cambia y por qué."
+					>
+						<snippet
+							name="default"
+							params="id, describedBy"
+						>
+							<UIInput
+								model="note"
+								bind:id="id"
+								bind:describedBy="describedBy"
+							/>
+						</snippet>
+					</UIField>
+				</div>
+				<div class="dash-editor-save">
+					<p class="dash-editor-origin">{origin.value}</p>
+					<p
+						class="dash-editor-status"
+						role="status"
+						aria-live="polite"
+						bind:data-dirty="dirty.value ? 'true' : undefined"
+					>
+						<span
+							class="dash-dot"
+							aria-hidden="true"
+						/>
+						{status.value}
+					</p>
+					<UIButton
+						type="submit"
+						bind:disabled="saving.value || !dirty.value || tooLarge.value"
+					>
+						{saving.value ? 'Guardando…' : draftId.value === null ? 'Crear borrador' : 'Guardar borrador'}
+					</UIButton>
+				</div>
+				<p
+					if:when="data.source.importStale"
+					class="dash-hint dash-editor-warning"
+				>
+					Git cambió desde la última importación. El borrador parte del archivo de Git de ahora; importa las fuentes para que el resumen lo refleje.
+				</p>
+				<DashFailure
+					if:when="saveFailure.value"
+					title="No se guardó el borrador"
+					bind:failure="saveFailure.value"
+				/>
+				<p
+					class="dash-notice"
+					role="status"
+					aria-live="polite"
+				>
+					{notice.value}
+					<a
+						if:when="notice.value && draftId.value !== null"
+						bind:href="'/sources/' + props.params.id + '#revisiones'"
+					>
+						Publicarlo desde la fuente
+					</a>
+				</p>
+			</form>
+
+			<div class="dash-editor-panes">
+				<section
+					class="dash-pane"
+					aria-labelledby="markdown-heading"
+				>
+					<div class="dash-pane-head">
+						<h2 id="markdown-heading">Markdown</h2>
+						<span
+							class="dash-editor-size"
+							bind:data-over="tooLarge.value ? 'true' : undefined"
+						>
+							{sizeLabel.value}
+						</span>
+					</div>
+					<label
+						for="draft-markdown"
+						class="dash-visually-hidden"
+					>
+						Markdown de la fuente
+					</label>
+					<textarea
+						id="draft-markdown"
+						class="dash-editor-text"
+						spellcheck="false"
+						autocapitalize="off"
+						aria-describedby="draft-size"
+						model="text"
+					/>
+					<p
+						id="draft-size"
+						class="dash-visually-hidden"
+					>
+						{sizeLabel.value}
+					</p>
+				</section>
+
+				<section
+					class="dash-pane"
+					aria-labelledby="preview-heading"
+					bind:aria-busy="previewing.value ? 'true' : undefined"
+				>
+					<div class="dash-pane-head">
+						<h2 id="preview-heading">Vista previa</h2>
+						<div class="dash-pane-tools">
+							<label class="dash-check">
+								<input
+									type="checkbox"
+									model="auto"
+								/>
+								Al escribir
+							</label>
+							<UIButton
+								size="sm"
+								variant="outline"
+								bind:disabled="previewing.value || tooLarge.value"
+								on:click="refreshPreview"
+							>
+								{previewing.value ? 'Renderizando…' : 'Actualizar'}
+							</UIButton>
+						</div>
+					</div>
+					<p
+						class="dash-preview-state"
+						role="status"
+						aria-live="polite"
+					>
+						<span if:when="previewing.value">Renderizando con el render real del site…</span>
+						<span if:when="!previewing.value && stale.value">La vista previa no incluye los últimos cambios.</span>
+						<span if:when="!previewing.value && !stale.value && preview.value">Render en {formatNumber(preview.value?.durationMs ?? 0)} ms, igual que en el site{preview.value?.complete ? '' : ', salvo las secciones generadas'}.</span>
+					</p>
+					<DashFailure
+						if:when="previewFailure.value"
+						title="Sin vista previa"
+						bind:failure="previewFailure.value"
+					/>
+					<div
+						if:when="preview.value && preview.value.issues.length"
+						class="dash-issues"
+						role="region"
+						aria-label="Avisos de la vista previa"
+					>
+						<p class="dash-issues-title">
+							{plural(preview.value?.issues.length ?? 0, 'aviso', 'avisos')}
+							<span if:when="blocking.value">· {plural(blocking.value, 'impide', 'impiden')} publicar</span>
+						</p>
+						<ul class="dash-issue-list">
+							<li
+								each:of="preview.value?.issues ?? []"
+								each:as="issue"
+								each:index="index"
+								each:key="index"
+								class="dash-issue"
+								bind:data-kind="issue.kind"
+							>
+								<span class="dash-issue-kind">{issueKinds[issue.kind]}</span>
+								<span class="dash-issue-message">{issue.message}</span>
+								<button
+									if:when="issue.line !== null"
+									type="button"
+									class="dash-issue-line"
+									on:click="() => goToLine(issue.line ?? 1)"
+								>
+									Línea {String(issue.line)}
+								</button>
+							</li>
+						</ul>
+					</div>
+					<div
+						if:when="!preview.value && !previewFailure.value"
+						class="dash-skeleton"
+						aria-hidden="true"
+					>
+						<span />
+						<span />
+						<span />
+					</div>
+					<iframe
+						if:when="previewSource.value"
+						class="dash-preview-frame"
+						title="Vista previa del borrador"
+						sandbox=""
+						referrerpolicy="no-referrer"
+						bind:data-stale="stale.value ? 'true' : undefined"
+						bind:srcdoc="previewSource.value"
+					/>
+				</section>
+			</div>
+		</div>
+	</DashPage>
+</template>

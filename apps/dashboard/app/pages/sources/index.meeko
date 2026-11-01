@@ -1,0 +1,211 @@
+<script
+	server
+	lang="ts"
+>
+	import { attempt } from '../../utils/errors'
+
+	const { search } = usePage()
+	const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value) ?? ''
+
+	export const sources = await attempt(() => rpc.sources.list({}))
+	// Filters arrive in the address, such as the links of the Resumen: /sources?site=ui&state=edited.
+	export const initial = { site: first(search.site), kind: first(search.kind), state: first(search.state), q: first(search.q), removed: first(search.removed) === '1' }
+</script>
+
+<script lang="ts">
+	import type { TableColumn } from '@meekojs/ui/runtime'
+
+	import type { DivergenceState, DocsSite, SourceKind, SourceRow } from '../../../shared/schemas/dashboard'
+
+	import { formatDate, formatNumber } from '../../utils/format'
+	import { kindLabels, kinds, siteLabels, sites, stateLabels, states } from '../../utils/labels'
+
+	type StateFilter = DivergenceState | 'importStale' | 'page'
+	const stateFilters: readonly StateFilter[] = [...states, 'importStale', 'page']
+	const stateFilterLabels: Record<StateFilter, string> = { ...stateLabels, importStale: 'Importación desactualizada', page: 'Sin Markdown (.meeko)' }
+
+	type All = 'all'
+	const pick = <T extends string>(value: string, allowed: readonly T[]): T | All => (allowed.includes(value as T) ? (value as T) : 'all')
+
+	// Each select starts with «Todas» or «Todos»: a UISelect keeps a value once chosen.
+	const siteOptions: readonly (DocsSite | All)[] = ['all', ...sites]
+	const kindOptions: readonly (SourceKind | All)[] = ['all', ...kinds]
+	const stateOptions: readonly (StateFilter | All)[] = ['all', ...stateFilters]
+
+	const site = signal<DocsSite | All | null>(pick(initial.site, sites))
+	const kind = signal<SourceKind | All | null>(pick(initial.kind, kinds))
+	const state = signal<StateFilter | All | null>(pick(initial.state, stateFilters))
+	const chosen = <T extends string>(value: T | All | null): T | null => (value === 'all' ? null : value)
+	const query = signal(initial.q)
+	const includeRemoved = signal(initial.removed)
+
+	const all: readonly SourceRow[] = sources.ok ? sources.data : []
+
+	const normalize = (text: string) =>
+		text
+			.normalize('NFD')
+			.replace(/\p{Diacritic}/gu, '')
+			.toLocaleLowerCase('es')
+
+	const matches = (row: SourceRow, filter: StateFilter) => (filter === 'importStale' ? row.importStale : filter === 'page' ? row.state === null : row.state === filter)
+
+	const rows = computed(() => {
+		const text = normalize(query.value.trim())
+		return all.filter((row) => (includeRemoved.value || row.removedAt === null) && (!chosen(site.value) || row.site === site.value) && (!chosen(kind.value) || row.kind === kind.value) && (!chosen(state.value) || matches(row, chosen(state.value)!)) && (!text || normalize(`${row.title} ${row.path} ${row.file ?? ''}`).includes(text)))
+	})
+
+	const filtered = computed(() => Boolean(chosen(site.value) || chosen(kind.value) || chosen(state.value) || query.value.trim() || includeRemoved.value))
+
+	function clear() {
+		site.value = 'all'
+		kind.value = 'all'
+		state.value = 'all'
+		query.value = ''
+		includeRemoved.value = false
+	}
+
+	// The address keeps the filters, so a reload or a shared link opens the same list.
+	effect(() => {
+		const params = new URLSearchParams()
+		const filters = { site: chosen(site.value), kind: chosen(kind.value), state: chosen(state.value) }
+		for (const [key, value] of Object.entries(filters)) if (value) params.set(key, value)
+		if (query.value.trim()) params.set('q', query.value.trim())
+		if (includeRemoved.value) params.set('removed', '1')
+		if (typeof window === 'undefined') return
+		const next = `${location.pathname}${params.size ? `?${params}` : ''}`
+		if (next !== `${location.pathname}${location.search}`) history.replaceState(history.state, '', next)
+	})
+
+	const columns = [
+		{ key: 'title', label: 'Fuente' },
+		{ key: 'site', label: 'Web' },
+		{ key: 'kind', label: 'Tipo' },
+		{ key: 'state', label: 'Estado' },
+		{ key: 'importedAt', label: 'Importada' },
+	] satisfies TableColumn<SourceRow>[]
+</script>
+
+<template>
+	<DashPage
+		title="Fuentes"
+		description="Cada página pública de las tres webs tal como la importó Git, con su estado frente a las revisiones publicadas. La edición llega en F2."
+	>
+		<DashFailure
+			if:when="!sources.ok"
+			bind:failure="sources.failure"
+		/>
+		<div
+			if:when="sources.ok"
+			class="dash-stack"
+		>
+			<form
+				class="dash-filters"
+				role="search"
+				aria-label="Filtrar fuentes"
+				on:submit="(event) => event.preventDefault()"
+			>
+				<div class="dash-field dash-field-grow">
+					<label for="sources-query">Buscar</label>
+					<UIInput
+						id="sources-query"
+						type="search"
+						placeholder="Título, ruta o archivo…"
+						model="query"
+					/>
+				</div>
+				<div class="dash-field">
+					<label for="sources-site">Web</label>
+					<UISelect
+						id="sources-site"
+						placeholder="Todas"
+						model="site"
+						bind:options="siteOptions"
+						bind:labelBy="(value) => (value === 'all' ? 'Todas' : siteLabels[value])"
+					/>
+				</div>
+				<div class="dash-field">
+					<label for="sources-kind">Tipo</label>
+					<UISelect
+						id="sources-kind"
+						placeholder="Todos"
+						model="kind"
+						bind:options="kindOptions"
+						bind:labelBy="(value) => (value === 'all' ? 'Todos' : kindLabels[value])"
+					/>
+				</div>
+				<div class="dash-field">
+					<label for="sources-state">Estado</label>
+					<UISelect
+						id="sources-state"
+						placeholder="Todos"
+						model="state"
+						bind:options="stateOptions"
+						bind:labelBy="(value) => (value === 'all' ? 'Todos' : stateFilterLabels[value])"
+					/>
+				</div>
+				<label class="dash-check">
+					<input
+						type="checkbox"
+						model="includeRemoved"
+					/>
+					Incluir retiradas
+				</label>
+				<UIButton
+					if:when="filtered.value"
+					variant="ghost"
+					on:click="clear"
+				>
+					Quitar filtros
+				</UIButton>
+			</form>
+
+			<div class="dash-results">
+				<p
+					class="dash-count"
+					role="status"
+					aria-live="polite"
+				>
+					{formatNumber(rows.value.length)} de {formatNumber(all.length)} fuentes
+				</p>
+
+				<div class="dash-table-scroll">
+					<UITable
+						caption="Fuentes de la documentación"
+						class="dash-sources"
+						rowKey="id"
+						bind:columns="columns"
+						bind:rows="rows.value"
+						bind:emptyText="all.length ? 'Ninguna fuente coincide con los filtros.' : 'No hay fuentes importadas. Importa desde Git en Snapshots.'"
+					>
+						<snippet
+							name="cell"
+							params="row, column"
+						>
+							<span
+								if:when="column.key === 'title'"
+								class="dash-source-cell"
+							>
+								<a bind:href="'/sources/' + row.id">{row.title}</a>
+								<code>{row.path}</code>
+							</span>
+							<span if:when="column.key === 'site'">{siteLabels[row.site]}</span>
+							<span if:when="column.key === 'kind'">{kindLabels[row.kind]}</span>
+							<DashStateBadge
+								if:when="column.key === 'state'"
+								bind:state="row.state"
+								bind:importStale="row.importStale"
+								bind:removed="row.removedAt !== null"
+							/>
+							<span
+								if:when="column.key === 'importedAt'"
+								class="dash-nowrap"
+							>
+								{formatDate(row.importedAt)}
+							</span>
+						</snippet>
+					</UITable>
+				</div>
+			</div>
+		</div>
+	</DashPage>
+</template>

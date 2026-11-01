@@ -1,0 +1,1358 @@
+/*
+ * The dashboard on the tokens of Meeko's documentation webs (packages/docs/src/app/styles/tokens.css,
+ * loaded with docs.css by the meeko-docs module). Product density: one sans, a tight scale, tabular
+ * numerals, and the accent only for the current section, the primary action and states that need
+ * a decision.
+ */
+:root {
+	--dash-gap: 1.25rem;
+	--dash-row: 2.5rem;
+	scrollbar-color: var(--line-strong) transparent;
+}
+body {
+	background: var(--bg);
+	min-height: 100dvh;
+	font-size: 0.9375rem;
+	line-height: 1.5;
+}
+code,
+pre {
+	font-family: var(--font-mono);
+}
+code {
+	font-size: 0.8125rem;
+}
+::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+::-webkit-scrollbar-thumb {
+	border: 2px solid transparent;
+	border-radius: 999px;
+	background: var(--line-strong) padding-box;
+}
+
+/* Header ------------------------------------------------------------------------------------ */
+
+.dash-header {
+	display: grid;
+	position: sticky;
+	top: 0;
+	grid-template-columns: auto 1fr auto;
+	align-items: center;
+	gap: 1.5rem;
+	z-index: 20;
+	backdrop-filter: saturate(1.4) blur(12px);
+	border-bottom: 1px solid var(--line);
+	background: color-mix(in oklch, var(--bg) 88%, transparent);
+	padding: 0 var(--gutter);
+	min-height: var(--header-height);
+}
+.dash-brand {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.6rem;
+	color: var(--ink);
+	font-weight: 500;
+	text-decoration: none;
+	white-space: nowrap;
+}
+.dash-brand img {
+	border-radius: 7px;
+}
+.dash-brand strong {
+	color: var(--muted);
+	font-weight: 500;
+}
+.dash-nav {
+	display: flex;
+	gap: 0.25rem;
+	min-width: 0;
+}
+.dash-nav a {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	transition:
+		background-color 160ms var(--ease-out),
+		color 160ms var(--ease-out);
+	border-radius: var(--radius-s);
+	padding: 0 0.75rem;
+	height: 2.125rem;
+	color: var(--muted);
+	font-weight: 500;
+	font-size: 0.875rem;
+	text-decoration: none;
+	white-space: nowrap;
+}
+.dash-nav a:hover {
+	background: var(--surface-2);
+	color: var(--ink);
+}
+.dash-nav a[aria-current='page'] {
+	background: var(--surface-3);
+	color: var(--ink);
+}
+.dash-nav a[aria-current='page'] svg {
+	stroke: var(--accent);
+}
+.dash-nav svg,
+.dash-failure svg {
+	flex: none;
+	fill: none;
+	stroke: currentColor;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1.4;
+	width: 16px;
+	height: 16px;
+}
+.dash-header-end {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+/* F5: the account of the session and its logout, a native POST form. */
+.dash-account {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+	margin: 0;
+	min-width: 0;
+}
+.dash-user {
+	padding-inline: 0.25rem;
+	max-width: 12rem;
+	overflow: hidden;
+	color: var(--muted);
+	font-weight: 500;
+	font-size: 0.8125rem;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.dash-logout {
+	transition:
+		background-color 160ms var(--ease-out),
+		color 160ms var(--ease-out);
+	cursor: pointer;
+	border: 1px solid var(--line-strong);
+	border-radius: 999px;
+	background: none;
+	padding: 0 0.75rem;
+	height: 1.875rem;
+	color: var(--ink-soft);
+	font: inherit;
+	font-weight: 500;
+	font-size: 0.8125rem;
+	white-space: nowrap;
+}
+.dash-logout:hover {
+	background: var(--surface-2);
+	color: var(--ink);
+}
+.dash-logout:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+/* F5: the login page. One quiet panel on the page's own background, at the optical center. */
+.dash-login {
+	display: grid;
+	align-content: center;
+	padding-block: 3rem 6rem;
+	min-height: calc(100dvh - var(--header-height));
+}
+.dash-login-panel {
+	justify-self: center;
+	box-shadow: var(--shadow-lg);
+	border: 1px solid var(--line);
+	border-radius: var(--radius-l);
+	background: var(--bg-raised);
+	padding: 2rem;
+	width: min(100%, 25rem);
+}
+.dash-login-mark {
+	display: block;
+	margin-bottom: 1.25rem;
+	border-radius: 11px;
+}
+.dash-login-panel h1 {
+	margin: 0;
+	font-weight: 560;
+	font-size: 1.5rem;
+	line-height: 1.2;
+	letter-spacing: -0.022em;
+}
+.dash-login-lead {
+	margin: 0.5rem 0 1.5rem;
+	color: var(--muted);
+	font-size: 0.875rem;
+	text-wrap: pretty;
+}
+.dash-login-alert {
+	margin: 0 0 1.25rem;
+	border: 1px solid var(--accent-line);
+	border-radius: var(--radius);
+	background: var(--accent-soft);
+	padding: 0.75rem 0.875rem;
+	color: var(--ink);
+	font-size: 0.875rem;
+	text-wrap: pretty;
+}
+.dash-login-alert[data-tone='danger'] {
+	border-color: color-mix(in oklch, var(--danger) 45%, transparent);
+	background: color-mix(in oklch, var(--danger) 9%, var(--surface));
+}
+.dash-login-form {
+	display: grid;
+	gap: 1rem;
+	transition: opacity 160ms var(--ease-out);
+}
+.dash-login-form[aria-busy='true'] {
+	opacity: 0.72;
+}
+.dash-login-form .meeko-ui-input {
+	width: 100%;
+}
+.dash-login-submit {
+	margin-top: 0.5rem;
+	width: 100%;
+}
+.dash-login-note {
+	margin: 1.25rem 0 0;
+	color: var(--muted);
+	font-size: 0.8125rem;
+	text-wrap: pretty;
+}
+@media (max-width: 440px) {
+	.dash-login {
+		align-content: start;
+		padding-block: 1.5rem 3rem;
+	}
+	.dash-login-panel {
+		padding: 1.5rem 1.25rem;
+	}
+}
+@media (max-width: 600px) {
+	/* The logout and the theme fit next to the logo; the link keeps its full name in aria-label. */
+	.dash-user,
+	.dash-brand strong {
+		display: none;
+	}
+	.dash-header-end {
+		gap: 0.5rem;
+	}
+}
+.dash-main:focus {
+	outline: none;
+}
+
+/* Page -------------------------------------------------------------------------------------- */
+
+.dash-page {
+	padding-block: 2rem 4rem;
+}
+.dash-page-header {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: flex-end;
+	gap: 1rem 2rem;
+	margin-bottom: 2rem;
+}
+.dash-page-header h1 {
+	margin: 0;
+	font-weight: 560;
+	font-size: 1.75rem;
+	line-height: 1.2;
+	letter-spacing: -0.022em;
+	text-wrap: balance;
+}
+.dash-page-header p {
+	margin: 0.5rem 0 0;
+	max-width: 72ch;
+	color: var(--muted);
+	text-wrap: pretty;
+}
+.dash-page-actions,
+.dash-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+}
+.dash-stack {
+	display: grid;
+	gap: 2.5rem;
+	min-width: 0;
+}
+.dash-stack > * {
+	min-width: 0;
+}
+.dash-section-title,
+.dash-panel-head h2 {
+	margin: 0;
+	font-weight: 560;
+	font-size: 1.0625rem;
+	letter-spacing: -0.01em;
+}
+.dash-panel-head {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 0.5rem 1rem;
+	margin-bottom: 0.75rem;
+}
+.dash-section-lead,
+.dash-hint {
+	margin: 0 0 1rem;
+	max-width: 72ch;
+	color: var(--muted);
+	font-size: 0.875rem;
+}
+.dash-hint {
+	margin: 0.75rem 0 0;
+}
+.dash-panel {
+	border: 1px solid var(--line);
+	border-radius: var(--radius-l);
+	background: var(--surface);
+	padding: 1.25rem;
+}
+.dash-muted {
+	color: var(--muted);
+}
+.dash-strong {
+	font-weight: 600;
+}
+.dash-nowrap {
+	white-space: nowrap;
+}
+.dash-strong-link {
+	color: var(--accent-ink);
+	font-weight: 600;
+	text-decoration: none;
+}
+.dash-strong-link:hover {
+	text-decoration: underline;
+}
+.dash-visually-hidden {
+	position: absolute;
+	clip-path: inset(50%);
+	margin: -1px;
+	padding: 0;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	white-space: nowrap;
+}
+
+/* The strip of the Resumen: three facts side by side, no cards. */
+.dash-strip {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+	border: 1px solid var(--line);
+	border-radius: var(--radius-l);
+	background: var(--surface);
+	overflow: hidden;
+}
+.dash-strip-item {
+	box-shadow: -1px 0 0 var(--line);
+	padding: 1rem 1.25rem;
+}
+.dash-strip-item h2 {
+	margin: 0 0 0.375rem;
+	color: var(--muted);
+	font-weight: 500;
+	font-size: 0.8125rem;
+}
+.dash-strip-item p {
+	margin: 0;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Tables ------------------------------------------------------------------------------------ */
+
+.dash-table-scroll {
+	border: 1px solid var(--line);
+	border-radius: var(--radius-l);
+	background: var(--surface);
+	max-width: 100%;
+	overflow-x: auto;
+	overscroll-behavior-inline: contain;
+}
+.dash-table-scroll .meeko-ui-table {
+	background: transparent;
+}
+.dash-table-scroll .meeko-ui-table > caption {
+	position: absolute;
+	clip-path: inset(50%);
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+}
+.dash-table {
+	border-collapse: separate;
+	border-spacing: 0;
+	width: 100%;
+	font-size: 0.875rem;
+	font-variant-numeric: tabular-nums;
+	text-align: left;
+}
+.dash-table th,
+.dash-table td {
+	vertical-align: middle;
+	border-bottom: 1px solid var(--line);
+	padding: 0.625rem 1rem;
+}
+.dash-table thead th {
+	background: var(--bg-raised);
+	color: var(--muted);
+	font-weight: 500;
+	white-space: nowrap;
+}
+.dash-table tbody th {
+	font-weight: 560;
+}
+.dash-table tbody tr:last-child > * {
+	border-bottom: 0;
+}
+.dash-table tbody tr:hover {
+	background: color-mix(in oklch, var(--ink) 3%, transparent);
+}
+.dash-table a {
+	color: var(--accent-ink);
+	text-decoration: none;
+}
+.dash-table a:hover {
+	text-decoration: underline;
+}
+.dash-num {
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+.dash-table td.dash-num a {
+	display: inline-block;
+	min-width: 2ch;
+	font-weight: 600;
+}
+.dash-table td[data-state='conflict'] a,
+.dash-table td[data-state='missing'] a {
+	color: var(--danger);
+}
+.dash-zero {
+	color: color-mix(in oklch, var(--muted) 70%, transparent);
+}
+.dash-source-cell {
+	display: inline-flex;
+	flex-direction: column;
+	gap: 0.125rem;
+	min-width: 14rem;
+}
+.dash-source-cell a {
+	color: var(--ink);
+	font-weight: 520;
+	text-decoration: none;
+}
+.dash-source-cell a:hover {
+	color: var(--accent-ink);
+	text-decoration: underline;
+}
+.dash-source-cell code {
+	color: var(--muted);
+	font-size: 0.75rem;
+}
+.meeko-ui-table code {
+	overflow-wrap: anywhere;
+}
+.dash-badges {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.375rem;
+}
+.dash-row-action {
+	display: inline-flex;
+	align-items: center;
+	min-height: 2rem;
+}
+
+/* Filters ----------------------------------------------------------------------------------- */
+
+.dash-filters {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 0.75rem 1rem;
+}
+.dash-field {
+	display: grid;
+	gap: 0.375rem;
+	min-width: 10rem;
+}
+.dash-field-grow {
+	flex: 1 1 16rem;
+}
+.dash-field > label {
+	color: var(--muted);
+	font-weight: 500;
+	font-size: 0.8125rem;
+}
+.dash-check {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	cursor: pointer;
+	min-height: 2.6rem;
+	color: var(--ink-soft);
+	font-size: 0.875rem;
+}
+.dash-check input {
+	width: 1rem;
+	height: 1rem;
+	accent-color: var(--accent);
+}
+.dash-results {
+	display: grid;
+	gap: 0.75rem;
+	min-width: 0;
+}
+.dash-stack > .dash-filters + .dash-results {
+	margin-top: -1.5rem;
+}
+.dash-results > .dash-filters {
+	margin-bottom: 0.25rem;
+}
+.dash-more {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: center;
+	gap: 0.5rem 1rem;
+	font-size: 0.875rem;
+}
+.dash-count {
+	margin: 0;
+	color: var(--muted);
+	font-size: 0.875rem;
+	font-variant-numeric: tabular-nums;
+}
+.dash-count:empty {
+	display: none;
+}
+
+/* States ------------------------------------------------------------------------------------ */
+
+.dash-empty {
+	margin: 0;
+	border: 1px dashed var(--line-strong);
+	border-radius: var(--radius);
+	padding: 1rem 1.25rem;
+	color: var(--muted);
+	font-size: 0.875rem;
+}
+.dash-empty a {
+	color: var(--accent-ink);
+}
+.dash-failure {
+	display: flex;
+	gap: 0.75rem;
+	margin: 0 0 1rem;
+	border: 1px solid color-mix(in oklch, var(--danger) 45%, transparent);
+	border-radius: var(--radius);
+	background: color-mix(in oklch, var(--danger) 9%, var(--surface));
+	padding: 0.875rem 1rem;
+}
+.dash-failure svg {
+	stroke: var(--danger);
+	margin-top: 0.15rem;
+}
+.dash-failure p {
+	margin: 0;
+	max-width: 72ch;
+	color: var(--ink-soft);
+	font-size: 0.875rem;
+}
+.dash-failure .dash-failure-title {
+	margin-bottom: 0.25rem;
+	color: var(--ink);
+	font-weight: 600;
+}
+.dash-failure .dash-failure-code {
+	margin-top: 0.375rem;
+	color: var(--muted);
+	font-size: 0.8125rem;
+}
+.dash-notice {
+	margin: 0.75rem 0 0;
+	color: var(--success);
+	font-size: 0.875rem;
+}
+.dash-notice:empty {
+	display: none;
+}
+.dash-skeleton {
+	display: grid;
+	gap: 0.75rem;
+}
+.dash-skeleton span {
+	animation: dash-pulse 1.4s var(--ease-out) infinite alternate;
+	border-radius: var(--radius);
+	background: var(--surface-2);
+	height: 3rem;
+}
+.dash-skeleton span:nth-child(2) {
+	width: 82%;
+}
+.dash-skeleton span:nth-child(3) {
+	width: 64%;
+}
+@keyframes dash-pulse {
+	to {
+		opacity: 0.45;
+	}
+}
+.dash-list {
+	display: grid;
+	gap: 0.25rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.dash-list li {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.25rem 0.75rem;
+	border-bottom: 1px solid var(--line-soft);
+	padding: 0.5rem 0;
+}
+
+/* Facts ------------------------------------------------------------------------------------- */
+
+.dash-facts {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+	gap: 1rem 1.5rem;
+	margin: 0;
+}
+.dash-facts dt {
+	margin-bottom: 0.25rem;
+	color: var(--muted);
+	font-weight: 500;
+	font-size: 0.8125rem;
+}
+.dash-facts dd {
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+.dash-form {
+	display: grid;
+	gap: 1rem;
+}
+
+/* Jobs -------------------------------------------------------------------------------------- */
+
+.dash-job {
+	margin-top: 1rem;
+}
+.dash-job-body {
+	display: grid;
+	gap: 0.5rem;
+}
+.dash-job-header {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: center;
+	gap: 0.5rem 1rem;
+}
+.dash-job-header h3 {
+	margin: 0;
+	font-weight: 560;
+	font-size: 0.9375rem;
+}
+.dash-job-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	color: var(--ink-soft);
+	font-weight: 500;
+	font-size: 0.875rem;
+}
+.dash-dot {
+	border-radius: 50%;
+	background: var(--muted);
+	width: 0.5rem;
+	height: 0.5rem;
+}
+.dash-job-status[data-status='running'] .dash-dot {
+	animation: dash-pulse 0.9s ease-in-out infinite alternate;
+	background: var(--accent);
+}
+.dash-job-status[data-status='succeeded'] .dash-dot {
+	background: var(--success);
+}
+.dash-job-status[data-status='failed'] {
+	color: var(--danger);
+}
+.dash-job-status[data-status='failed'] .dash-dot {
+	background: var(--danger);
+}
+.dash-job-meta,
+.dash-job-summary {
+	margin: 0;
+	color: var(--muted);
+	font-size: 0.8125rem;
+	font-variant-numeric: tabular-nums;
+}
+.dash-job-summary {
+	color: var(--ink);
+	font-size: 0.875rem;
+}
+.dash-log,
+.dash-diff {
+	margin: 0;
+	border: 1px solid var(--code-line);
+	border-radius: var(--radius);
+	background: var(--code-bg);
+	padding: 0.75rem 1rem;
+	max-height: 20rem;
+	overflow: auto;
+	color: var(--ink-soft);
+	font-size: 0.8125rem;
+	line-height: 1.55;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+.dash-log-dropped {
+	color: var(--muted);
+}
+
+/* Diff -------------------------------------------------------------------------------------- */
+
+.dash-diff {
+	padding: 0.5rem 0;
+	max-height: 36rem;
+	white-space: pre;
+	overflow-wrap: normal;
+}
+.dash-diff-line {
+	display: block;
+	padding: 0 1rem;
+	min-height: 1.55em;
+}
+.dash-diff-line[data-kind='add'] {
+	background: color-mix(in oklch, var(--success) 13%, transparent);
+	color: var(--ink);
+}
+.dash-diff-line[data-kind='remove'] {
+	background: color-mix(in oklch, var(--danger) 14%, transparent);
+	color: var(--ink);
+}
+.dash-diff-line[data-kind='hunk'] {
+	background: var(--accent-soft);
+	color: var(--accent-ink);
+}
+.dash-diff-line[data-kind='file'] {
+	color: var(--muted);
+}
+.dash-diff-stat {
+	display: inline-flex;
+	gap: 0.75rem;
+	font-size: 0.8125rem;
+	font-family: var(--font-mono);
+}
+.dash-add {
+	color: var(--success);
+}
+.dash-remove {
+	color: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.dash-skeleton span,
+	.dash-job-status[data-status='running'] .dash-dot {
+		animation: none;
+	}
+}
+
+/* Narrow screens: the sections move under the brand and scroll sideways. */
+@media (max-width: 760px) {
+	.dash-header {
+		grid-template-columns: 1fr auto;
+		gap: 0.5rem 1rem;
+		padding-top: 0.5rem;
+	}
+	.dash-nav {
+		grid-row: 2;
+		grid-column: 1 / -1;
+		margin: 0 calc(var(--gutter) * -1);
+		padding: 0 var(--gutter) 0.5rem;
+		overflow-x: auto;
+		scrollbar-width: none;
+	}
+	/* The login page has no sections: brand and theme share the first row. */
+	.dash-header-spacer {
+		display: none;
+	}
+	.dash-page {
+		padding-block: 1.5rem 3rem;
+	}
+	.dash-page-header h1 {
+		font-size: 1.5rem;
+	}
+	.dash-field {
+		flex: 1 1 calc(50% - 0.5rem);
+		min-width: 0;
+	}
+	.dash-strip-item {
+		box-shadow: 0 -1px 0 var(--line);
+	}
+}
+@media (max-width: 440px) {
+	.dash-nav svg {
+		display: none;
+	}
+	.dash-nav a {
+		padding: 0 0.625rem;
+	}
+}
+
+/* F2: editor, revisions and conflicts --------------------------------------------------------- */
+
+.dash-failure .dash-failure-detail {
+	margin-top: 0.25rem;
+	border-radius: var(--radius-s);
+	background: color-mix(in oklch, var(--danger) 8%, transparent);
+	padding: 0.375rem 0.5rem;
+	color: var(--ink);
+	font-size: 0.8125rem;
+	font-family: var(--font-mono);
+	overflow-wrap: anywhere;
+}
+
+/* A note that needs an action, such as revisions the active snapshot lacks: inline, not a modal. */
+.dash-callout {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: center;
+	gap: 0.75rem 1.25rem;
+	border: 1px solid var(--accent-line);
+	border-radius: var(--radius);
+	background: var(--accent-soft);
+	padding: 0.75rem 1rem;
+	color: var(--ink-soft);
+}
+.dash-callout[data-tone='danger'] {
+	border-color: color-mix(in oklch, var(--danger) 40%, transparent);
+	background: color-mix(in oklch, var(--danger) 8%, var(--surface));
+}
+.dash-callout p {
+	flex: 1 1 24rem;
+	margin: 0;
+}
+.dash-callout strong {
+	color: var(--ink);
+	font-weight: 560;
+}
+.dash-inline-form {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: end;
+	gap: 0.75rem;
+}
+.dash-row-actions {
+	display: flex;
+	flex-wrap: nowrap;
+	justify-content: flex-end;
+	gap: 0.25rem;
+}
+/* Hidden labels of a table (the actions column, the names of its buttons) stay inside its scroll box. */
+.dash-table-scroll,
+.dash-row-actions > * {
+	position: relative;
+}
+.dash-revisions td:last-child {
+	width: 1%;
+	white-space: nowrap;
+}
+.dash-revision-hash {
+	display: block;
+	color: var(--muted);
+	font-weight: 400;
+	font-size: 0.75rem;
+}
+
+/* Three diffs side by side on wide screens, stacked below. */
+.dash-three-way {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+	gap: 1rem;
+}
+.dash-three-way h3 {
+	margin: 0;
+	color: var(--ink);
+	font-weight: 560;
+	font-size: 0.9375rem;
+}
+.dash-three-way .dash-hint {
+	margin: 0.125rem 0 0.5rem;
+}
+.dash-three-way .dash-diff {
+	max-height: 28rem;
+}
+
+/* The editor: a bar with who and why, then the Markdown and its preview. */
+.dash-editor-bar {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: end;
+	gap: 0.75rem 1.5rem;
+}
+.dash-editor-bar > :is(.dash-hint, .dash-failure, .dash-notice) {
+	grid-column: 1 / -1;
+	margin: 0;
+}
+.dash-editor-fields {
+	display: grid;
+	grid-template-columns: minmax(12rem, 18rem) minmax(14rem, 1fr);
+	gap: 1rem;
+}
+.dash-editor-save {
+	display: grid;
+	justify-items: end;
+	gap: 0.375rem;
+}
+.dash-editor-origin {
+	margin: 0;
+	color: var(--muted);
+	font-size: 0.8125rem;
+}
+.dash-editor-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0;
+	color: var(--ink-soft);
+	font-size: 0.8125rem;
+	font-variant-numeric: tabular-nums;
+}
+.dash-editor-status[data-dirty] {
+	color: var(--ink);
+}
+.dash-editor-status[data-dirty] .dash-dot {
+	background: var(--accent);
+}
+.dash-editor-warning {
+	border: 1px solid color-mix(in oklch, var(--danger) 30%, var(--line));
+	border-radius: var(--radius);
+	background: color-mix(in oklch, var(--danger) 6%, transparent);
+	padding: 0.5rem 0.75rem;
+	color: var(--ink-soft);
+}
+.dash-editor-panes {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	align-items: start;
+	gap: 1rem;
+}
+.dash-pane {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	min-width: 0;
+}
+.dash-pane-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 0.75rem;
+	min-height: 2rem;
+}
+.dash-pane-head h2 {
+	margin: 0;
+	color: var(--ink);
+	font-weight: 560;
+	font-size: 1rem;
+}
+.dash-pane-tools {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+.dash-editor-size {
+	color: var(--muted);
+	font-size: 0.75rem;
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
+}
+.dash-editor-size[data-over] {
+	color: var(--danger);
+	font-weight: 600;
+}
+.dash-editor-text {
+	transition: border-color 160ms var(--ease-out);
+	box-sizing: border-box;
+	border: 1px solid var(--code-line);
+	border-radius: var(--radius);
+	background: var(--code-bg);
+	padding: 0.875rem 1rem;
+	width: 100%;
+	height: calc(100dvh - 18rem);
+	min-height: 28rem;
+	resize: vertical;
+	color: var(--ink);
+	caret-color: var(--accent);
+	/* Cascadia Code, the usual system mono on Windows, is variable: 350 keeps long text from reading bold. */
+	font: 350 0.8125rem/1.65 var(--font-mono);
+	tab-size: 2;
+}
+.dash-editor-text:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+	border-color: transparent;
+}
+.dash-editor-text::selection {
+	background: color-mix(in oklch, var(--accent) 32%, transparent);
+}
+.dash-preview-state {
+	margin: 0;
+	min-height: 1.25rem;
+	color: var(--muted);
+	font-size: 0.8125rem;
+}
+.dash-issues {
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	background: var(--surface);
+	padding: 0.625rem 0.75rem;
+}
+.dash-issues-title {
+	margin: 0 0 0.375rem;
+	color: var(--ink);
+	font-weight: 560;
+	font-size: 0.8125rem;
+}
+.dash-issue-list {
+	display: grid;
+	gap: 0.375rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.dash-issue {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	align-items: baseline;
+	gap: 0.625rem;
+	font-size: 0.8125rem;
+}
+.dash-issue-kind {
+	border-radius: var(--radius-s);
+	background: color-mix(in oklch, var(--danger) 14%, transparent);
+	padding: 0.0625rem 0.375rem;
+	color: var(--danger);
+	font-weight: 560;
+	font-size: 0.75rem;
+	white-space: nowrap;
+}
+.dash-issue[data-kind='link'] .dash-issue-kind {
+	background: var(--accent-soft);
+	color: var(--accent-ink);
+}
+.dash-issue-message {
+	color: var(--ink-soft);
+	font-family: var(--font-mono);
+	overflow-wrap: anywhere;
+}
+.dash-issue-line {
+	cursor: pointer;
+	border: 0;
+	border-radius: var(--radius-s);
+	background: transparent;
+	padding: 0.125rem 0.375rem;
+	color: var(--accent-ink);
+	font: inherit;
+	text-decoration: underline;
+	text-decoration-color: var(--accent-line);
+	text-underline-offset: 0.2em;
+	white-space: nowrap;
+}
+.dash-issue-line:hover {
+	text-decoration-color: currentColor;
+}
+.dash-issue-line:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+
+/* The preview: the render of the site in a sandboxed iframe; its prose rules live in
+ * app/utils/preview-document.ts, inside the iframe's document. */
+.dash-preview-frame {
+	display: block;
+	transition: opacity 200ms var(--ease-out);
+	box-sizing: border-box;
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	background: var(--bg);
+	width: 100%;
+	height: calc(100dvh - 18rem);
+	min-height: 28rem;
+}
+.dash-preview-frame[data-stale] {
+	opacity: 0.72;
+}
+
+@media (max-width: 1100px) {
+	.dash-editor-panes {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.dash-editor-text {
+		height: auto;
+		min-height: 22rem;
+	}
+	.dash-preview-frame {
+		height: 70dvh;
+		min-height: 22rem;
+	}
+}
+@media (max-width: 760px) {
+	.dash-editor-bar {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.dash-editor-fields {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.dash-editor-save {
+		justify-items: start;
+	}
+	.dash-issue {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 0.125rem;
+	}
+	.dash-issue-line {
+		justify-self: start;
+		padding-left: 0;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.dash-preview-frame,
+	.dash-editor-text {
+		transition: none;
+	}
+}
+
+/* F3: moderation ------------------------------------------------------------------------------ */
+
+.dash-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem;
+	margin-bottom: 1.5rem;
+	border-bottom: 1px solid var(--line);
+}
+.dash-tabs a {
+	display: grid;
+	gap: 0.125rem;
+	margin-bottom: -1px;
+	border-bottom: 2px solid transparent;
+	padding: 0.5rem 0.875rem 0.625rem;
+	color: var(--muted);
+	font-weight: 520;
+	font-size: 0.9375rem;
+	text-decoration: none;
+}
+.dash-tabs a:hover {
+	color: var(--ink);
+}
+.dash-tabs a[aria-current='page'] {
+	border-bottom-color: var(--accent);
+	color: var(--ink);
+}
+.dash-tab-count {
+	color: var(--muted);
+	font-weight: 400;
+	font-size: 0.75rem;
+	font-variant-numeric: tabular-nums;
+}
+.dash-moderation-form {
+	display: grid;
+	grid-template-columns: minmax(16rem, 2fr) auto minmax(12rem, 1.5fr) minmax(10rem, 1fr) auto;
+	align-items: end;
+	gap: 0.875rem 1rem;
+	margin-bottom: 1rem;
+}
+.dash-moderation-submit {
+	display: flex;
+	gap: 0.5rem;
+}
+.dash-segmented {
+	display: inline-flex;
+	margin: 0;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--radius);
+	padding: 0.1875rem;
+	min-width: 0;
+}
+.dash-segmented legend {
+	position: absolute;
+	clip-path: inset(50%);
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	white-space: nowrap;
+}
+.dash-segmented label {
+	position: relative;
+	cursor: pointer;
+	border-radius: calc(var(--radius) - 3px);
+	padding: 0.4375rem 0.875rem;
+	color: var(--muted);
+	font-weight: 500;
+	font-size: 0.875rem;
+}
+.dash-segmented input {
+	position: absolute;
+	opacity: 0;
+	cursor: pointer;
+	margin: 0;
+	inset: 0;
+}
+.dash-segmented label:has(input:checked) {
+	background: var(--surface-3);
+	color: var(--ink);
+}
+.dash-segmented label:has(input:focus-visible) {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+.dash-field-error {
+	margin: 0.5rem 0 0;
+	color: var(--danger);
+	font-size: 0.875rem;
+}
+.dash-announcement-editor {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	align-items: start;
+	gap: 1.5rem;
+	margin-bottom: 1.25rem;
+}
+.dash-announcement-mode {
+	margin: 0;
+	color: var(--ink);
+	font-weight: 560;
+}
+.dash-announcement-text {
+	min-height: 5.5rem;
+	resize: vertical;
+	line-height: 1.5;
+}
+.dash-counter {
+	justify-self: end;
+	margin: 0;
+	color: var(--muted);
+	font-size: 0.75rem;
+	font-variant-numeric: tabular-nums;
+}
+.dash-counter[data-over] {
+	color: var(--danger);
+}
+.dash-announcement-row {
+	display: grid;
+	grid-template-columns: minmax(9rem, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
+	gap: 0.875rem;
+}
+.dash-announcement-row .dash-field,
+.dash-announcement-row input {
+	min-width: 0;
+}
+/* Focused only after a row it listed is deleted. */
+.dash-panel-head h2:focus {
+	outline: none;
+}
+.dash-announcement-preview {
+	display: grid;
+	gap: 0.625rem;
+	margin: 0;
+	min-width: 0;
+}
+.dash-announcement-preview figcaption {
+	display: grid;
+	gap: 0.125rem;
+	color: var(--ink);
+	font-weight: 520;
+	font-size: 0.875rem;
+}
+.dash-announcement-frame {
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	background: var(--bg);
+	overflow: hidden;
+}
+/* The rest of a documentation page, drawn as quiet bars under the real banner. */
+.dash-announcement-page {
+	display: grid;
+	gap: 0.625rem;
+	padding: 1.25rem 1.5rem 1.5rem;
+}
+.dash-announcement-page span {
+	border-radius: 999px;
+	background: var(--surface-2);
+	height: 0.5rem;
+}
+.dash-announcement-page span:first-child {
+	width: 45%;
+	height: 0.875rem;
+}
+.dash-announcement-page span:nth-child(2) {
+	width: 85%;
+}
+.dash-announcement-page span:nth-child(3) {
+	width: 70%;
+}
+.dash-announcement-cell {
+	display: block;
+	min-width: 16rem;
+	max-width: 36rem;
+}
+.dash-tone {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.375rem;
+	white-space: nowrap;
+}
+.dash-tone::before {
+	border-radius: 999px;
+	background: var(--accent);
+	width: 0.5rem;
+	height: 0.5rem;
+	content: '';
+}
+.dash-tone[data-tone='success']::before {
+	background: var(--success);
+}
+.dash-tone[data-tone='warning']::before,
+.dash-tone[data-tone='danger']::before {
+	background: var(--danger);
+}
+@media (max-width: 1100px) {
+	.dash-moderation-form {
+		grid-template-columns: minmax(0, 1fr) auto;
+	}
+	.dash-moderation-page {
+		grid-column: 1 / -1;
+	}
+	.dash-announcement-editor {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+@media (max-width: 640px) {
+	.dash-moderation-form,
+	.dash-announcement-row {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}

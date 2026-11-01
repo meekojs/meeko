@@ -1,0 +1,158 @@
+<script
+	server
+	lang="ts"
+>
+	// The only page without a session (app/middleware/10-auth.server.ts lets it through, and sends a
+	// logged-in browser on to `next`). It renders the form for the native submission too.
+	import { safeNext } from '../../server/dashboard/auth'
+
+	const { context, search } = usePage()
+	const { config } = context.services.auth
+	const hours = (ms: number) => (ms % 3_600_000 === 0 ? `${ms / 3_600_000} h` : `${Math.round(ms / 60_000)} min`)
+	export const next = safeNext(typeof search.next === 'string' ? search.next : '/')
+	export const configured = config.admin !== null
+	export const lifetime = `La sesión dura ${hours(config.ttlMs)} y se cierra tras ${hours(config.idleMs)} sin actividad.`
+</script>
+
+<script lang="ts">
+	import { ClientError } from '@meekojs/meeko/framework'
+
+	import { loginInput } from '../../shared/schemas/auth'
+
+	useHead({ title: 'Iniciar sesión · Meeko Dashboard', meta: [{ name: 'description', content: 'Acceso de administración del dashboard de la documentación de Meeko.' }] })
+
+	const messages: Readonly<Record<string, string>> = {
+		INVALID_CREDENTIALS: 'El usuario o la contraseña no son correctos.',
+		RATE_LIMITED: 'Demasiados intentos. Espera unos minutos antes de volver a intentarlo.',
+		LOGIN_NOT_CONFIGURED: 'Este servidor no tiene cuenta de administrador. Define ADMIN_USERNAME y ADMIN_PASSWORD_HASH en apps/dashboard/.env y reinícialo.',
+		INVALID_ORIGIN: 'El servidor rechazó el envío por su origen. Abre el dashboard desde su dirección habitual.',
+	}
+
+	const form = useForm({
+		schema: loginInput,
+		initial: { username: '', password: '', next },
+		action: '/api/auth/login',
+		submit: async (values) => {
+			const result = await api.auth.login.post({ body: values })
+			// A full load: the new session's CSRF token comes with the next document.
+			window.location.assign(result.next)
+			return result
+		},
+		errorMessage: (failure) => (failure instanceof ClientError ? messages[failure.code] : undefined) ?? 'No se pudo iniciar sesión. Vuelve a intentarlo; si sigue fallando, revisa la consola del servidor.',
+	})
+
+	// The native form comes back here after an error, with `next` kept.
+	const back = next === '/' ? '/login' : `/login?next=${encodeURIComponent(next)}`
+</script>
+
+<template>
+	<UIContainer
+		size="sm"
+		class="dash-login"
+	>
+		<section
+			class="dash-login-panel"
+			aria-labelledby="login-title"
+		>
+			<img
+				class="dash-login-mark"
+				src="/brand/meeko-logo.png"
+				width="44"
+				height="44"
+				alt=""
+			/>
+			<h1 id="login-title">Iniciar sesión</h1>
+			<p class="dash-login-lead">Administración de la documentación de Meeko: fuentes, snapshots, moderación y métricas.</p>
+
+			<p
+				if:when="!configured"
+				class="dash-login-alert"
+				role="status"
+			>
+				{messages.LOGIN_NOT_CONFIGURED}
+			</p>
+			<p
+				if:when="form.error.value"
+				class="dash-login-alert"
+				role="alert"
+				data-tone="danger"
+			>
+				{form.error.value}
+			</p>
+
+			<form
+				class="dash-login-form"
+				method="post"
+				action="/api/auth/login"
+				novalidate
+				bind:aria-busy="form.pending.value ? 'true' : undefined"
+				on:submit="form.submit"
+			>
+				<input
+					type="hidden"
+					name="return"
+					bind:value="back"
+				/>
+				<input
+					type="hidden"
+					name="next"
+					bind:value="form.fields.next.value"
+				/>
+				<UIField
+					id="login-username"
+					label="Usuario"
+					bind:error="form.errors.value.username"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<input
+							class="meeko-ui-input"
+							name="username"
+							type="text"
+							autocomplete="username"
+							autocapitalize="none"
+							spellcheck="false"
+							required
+							model="form.fields.username"
+							bind:id="id"
+							bind:aria-describedby="describedBy"
+							bind:aria-invalid="form.errors.value.username ? 'true' : undefined"
+						/>
+					</snippet>
+				</UIField>
+				<UIField
+					id="login-password"
+					label="Contraseña"
+					bind:error="form.errors.value.password"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<input
+							class="meeko-ui-input"
+							name="password"
+							type="password"
+							autocomplete="current-password"
+							required
+							model="form.fields.password"
+							bind:id="id"
+							bind:aria-describedby="describedBy"
+							bind:aria-invalid="form.errors.value.password ? 'true' : undefined"
+						/>
+					</snippet>
+				</UIField>
+				<UIButton
+					type="submit"
+					class="dash-login-submit"
+					bind:disabled="form.pending.value"
+				>
+					{form.pending.value ? 'Entrando…' : 'Entrar'}
+				</UIButton>
+			</form>
+			<p class="dash-login-note">{lifetime}</p>
+		</section>
+	</UIContainer>
+</template>

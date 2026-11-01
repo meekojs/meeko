@@ -1,0 +1,28 @@
+<script lang="ts">
+	const props = defineProps<{ title: string; description: string }>()
+
+	const snippets = defineSnippets<{ default: []; actions?: [] }>()
+
+	useHead(() => ({ title: props.title + ' · Meeko Dashboard', meta: [{ name: 'description', content: props.description }] }))
+</script>
+
+<template>
+	<UIContainer
+		size="2xl"
+		class="dash-page"
+	>
+		<header class="dash-page-header">
+			<div>
+				<h1>{props.title}</h1>
+				<p>{props.description}</p>
+			</div>
+			<div
+				if:when="snippets.actions"
+				class="dash-page-actions"
+			>
+				<render snippet="snippets.actions" />
+			</div>
+		</header>
+		<render snippet="snippets.default" />
+	</UIContainer>
+</template>
