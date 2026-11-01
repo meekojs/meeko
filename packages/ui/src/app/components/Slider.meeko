@@ -1,0 +1,20 @@
+<script lang="ts">
+	import type { UISliderProps } from '../types/forms'
+
+	const { label, class: className, ...rest } = defineProps<UISliderProps>()
+
+	const value = defineModel<number>({ default: 50 })
+	/* eslint-disable meeko/attributes-order */
+</script>
+
+<template>
+	<label bind:class="['meeko-ui-slider', className].filter(Boolean).join(' ')">
+		<span>{label}</span>
+		<input
+			bind="rest"
+			type="range"
+			bind:value="value.value"
+			on:input="(event) => (value.value = event.currentTarget.valueAsNumber)"
+		/>
+	</label>
+</template>

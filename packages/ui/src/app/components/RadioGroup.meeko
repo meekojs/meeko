@@ -1,0 +1,42 @@
+<script lang="ts">
+	import { useId } from '@meekojs/meeko'
+
+	import type { UIRadioGroupProps } from '../types/forms'
+
+	const { legend, options, name, required, variant = 'default', class: className, ...rest } = defineProps<UIRadioGroupProps>()
+
+	const value = defineModel<string>({ default: '' })
+
+	const id = useId()
+	/* eslint-disable meeko/attributes-order */
+</script>
+
+<template>
+	<fieldset
+		bind="rest"
+		bind:class="['meeko-ui-radio-group', className].filter(Boolean).join(' ')"
+		bind:data-variant="variant"
+	>
+		<legend>{legend}</legend>
+		<div class="meeko-ui-radio-options">
+			<label
+				each:of="options"
+				each:as="option"
+				each:key="option.value"
+				class="meeko-ui-choice"
+			>
+				<input
+					type="radio"
+					bind:name="name ?? id"
+					bind:form="rest.form"
+					bind:value="option.value"
+					bind:disabled="option.disabled"
+					bind:required="required"
+					bind:checked="value.value === option.value"
+					on:change="() => (value.value = option.value)"
+				/>
+				<span>{option.label}</span>
+			</label>
+		</div>
+	</fieldset>
+</template>

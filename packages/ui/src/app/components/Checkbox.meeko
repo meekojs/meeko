@@ -1,0 +1,35 @@
+<script lang="ts">
+	import { useId } from '@meekojs/meeko'
+
+	import type { UICheckboxProps } from '../types/forms'
+
+	const { label, description, invalid, describedBy, class: className, ...rest } = defineProps<UICheckboxProps>()
+
+	const checked = defineModel<boolean>({ default: false })
+
+	const id = useId()
+	/* eslint-disable meeko/attributes-order */
+</script>
+
+<template>
+	<label bind:class="['meeko-ui-choice', className].filter(Boolean).join(' ')">
+		<input
+			bind="rest"
+			type="checkbox"
+			bind:checked="checked.value"
+			bind:aria-invalid="invalid ? 'true' : undefined"
+			bind:aria-describedby="[describedBy ?? rest['aria-describedby'], description ? id + '-description' : undefined].filter(Boolean).join(' ') || undefined"
+			on:change="(event) => (checked.value = event.currentTarget.checked)"
+		/>
+		<span class="meeko-ui-choice-content">
+			<span>{label}</span>
+			<span
+				if:when="description"
+				class="meeko-ui-choice-description"
+				bind:id="id + '-description'"
+			>
+				{description}
+			</span>
+		</span>
+	</label>
+</template>
