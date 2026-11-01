@@ -169,12 +169,19 @@ export const builtinTags: readonly BuiltinTag[] = [
           + "(`/dashboard` cubre `/dashboard/stats`), con `aria-current=\"true\"`. `to=\"/\"` sólo coincide exacta.",
         insert: "match=\"${1|exact,prefix|}\"", detail: "\"exact\" (por defecto), sólo su ruta, o \"prefix\", también las rutas por debajo",
       },
+      {
+        name: "resolve", attributes: ["bind:resolve"], type: "boolean", optional: true,
+        documentation: "Si el `href` pasa por los resolvedores de enlaces de la aplicación (`app.resolveLink`, como el prefijo de idioma de `@meekojs/i18n`). "
+          + "`true` por defecto; `bind:resolve=\"false\"` deja el `href` de `href()`.",
+        insert: "bind:resolve=\"false\"", detail: "false: el href sin resolvedores de enlaces, como el prefijo de idioma",
+      },
     ],
     snippets: [{ name: "default", parameters: "", optional: true, documentation: "El contenido del enlace, dentro del `<a>`." }],
     element: "a",
-    rejected: ["href", "bind:href", "params", "search"],
+    rejected: ["href", "bind:href", "params", "search", "resolve"],
     summary: "Enlace a una página de la aplicación: renderiza un `<a>` cuyo `href` construye `href()` con `to`, `bind:params` y `bind:search`, "
-      + "y añade `aria-current=\"page\"` en la ruta activa; con `match=\"prefix\"`, también `aria-current=\"true\"` en las rutas por debajo. El resto de atributos (`class`, `target`, `aria-*`, `on:click`…) y el contenido pasan al `<a>`.",
+      + "y añade `aria-current=\"page\"` en la ruta activa; con `match=\"prefix\"`, también `aria-current=\"true\"` en las rutas por debajo. El `href` pasa por los resolvedores de enlaces de la aplicación "
+      + "(como el prefijo de idioma de `@meekojs/i18n`), salvo con `bind:resolve=\"false\"`. El resto de atributos (`class`, `target`, `hreflang`, `aria-*`, `on:click`…) y el contenido pasan al `<a>`.",
     guide,
     completion: "Enlace a una ruta tipada: <MeekoLink to=\"/users/[id]\" bind:params=\"{ id }\">",
   },

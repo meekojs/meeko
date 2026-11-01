@@ -154,6 +154,60 @@ export interface MeekoHooks {
    * URL debe corresponder a una ruta de la aplicación.
    */
   "prerender:routes"(context: { readonly urls: string[] }): void | Promise<void>;
+  /**
+   * URL que `meeko build` va a escribir en `sitemap.xml` (con la opción `sitemap`), ya ordenadas.
+   * Un módulo puede sustituir, añadir o quitar entradas; por ejemplo, añadir `alternates` para que
+   * cada URL declare sus versiones en otros idiomas.
+   * @since 1.8.0
+   */
+  "sitemap:resolved"(context: { readonly urls: SitemapResolvedUrl[] }): void | Promise<void>;
+}
+
+/**
+ * Versión de una URL del sitemap en otro idioma: `meeko build` la escribe como
+ * `<xhtml:link rel="alternate" hreflang="…" href="…">`, con el origen del sitio.
+ *
+ * @since 1.8.0
+ * @example
+ * ```ts
+ * import type { SitemapAlternate } from "@meekojs/meeko/framework";
+ *
+ * const english: SitemapAlternate = { hreflang: "en", pathname: "/en/guide" };
+ * ```
+ */
+export interface SitemapAlternate {
+  /** Código de idioma BCP 47 (`"en"`, `"es-MX"`) o `"x-default"`. */
+  readonly hreflang: string;
+  /** Ruta (`pathname`) de esa versión; empieza por `/`. */
+  readonly pathname: string;
+}
+
+/**
+ * URL de `sitemap.xml` que reciben los módulos en el hook `sitemap:resolved`: su ruta, los campos
+ * opcionales de sitemaps.org y sus versiones en otros idiomas.
+ *
+ * @since 1.8.0
+ * @example
+ * ```ts
+ * import type { SitemapResolvedUrl } from "@meekojs/meeko/framework";
+ *
+ * const url: SitemapResolvedUrl = {
+ *   pathname: "/guide",
+ *   alternates: [{ hreflang: "es", pathname: "/guide" }, { hreflang: "en", pathname: "/en/guide" }],
+ * };
+ * ```
+ */
+export interface SitemapResolvedUrl {
+  /** Ruta (`pathname`) de la URL; empieza por `/`. */
+  readonly pathname: string;
+  /** `<lastmod>` en formato W3C Datetime. */
+  readonly lastmod?: string;
+  /** `<changefreq>`. */
+  readonly changefreq?: "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never";
+  /** `<priority>`, de 0 a 1. */
+  readonly priority?: number;
+  /** Versiones de la URL en otros idiomas, incluida ella misma, como recomiendan los buscadores. */
+  readonly alternates?: readonly SitemapAlternate[];
 }
 
 /**
@@ -230,6 +284,25 @@ export interface MeekoModuleContext {
    * ```
    */
   addLayout(name: string, file: string | URL): void;
+  /**
+   * Transforma el manifiesto de rutas descubierto (aplicación, layers y módulos) antes de que lo
+   * usen el servidor, el navegador, el prerender, el sitemap y los tipos. La función recibe las
+   * rutas y devuelve la lista completa: puede añadir rutas que reutilizan el archivo de una página
+   * (por ejemplo, `/en/guide` con el archivo de `/guide`), cambiarlas o quitarlas. Las funciones se
+   * aplican en el orden de los módulos y el resultado se valida como un manifiesto: dos rutas con
+   * la misma forma de URL son un error.
+   *
+   * @param extend Recibe las rutas actuales y devuelve las nuevas.
+   * @since 1.8.0
+   * @example
+   * ```ts
+   * meeko.extendRoutes((routes) => [
+   *   ...routes,
+   *   ...routes.map((route) => ({ ...route, id: route.id === "/" ? "/en" : `/en${route.id}` })),
+   * ]);
+   * ```
+   */
+  extendRoutes(extend: (routes: readonly RouteRecord[]) => readonly RouteRecord[]): void;
   /** Añade autoimports de un paquete o archivo. */
   addAutoImports(entries: ModuleAutoImport | readonly ModuleAutoImport[]): void;
   /**

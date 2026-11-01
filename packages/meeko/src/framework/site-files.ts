@@ -3,10 +3,13 @@ import { join } from "node:path";
 
 import type { RouteRecord } from "../app/runtime/router";
 import type { MeekoConfig, RobotsConfig, SitemapConfig, SitemapEntriesContext, SitemapEntry } from "../modules/define-meeko-config";
+import type { SitemapAlternate } from "../modules/define-meeko-module";
 import type { PrerenderIndex } from "./prerender";
 
 import { href, matchRoute } from "../app/runtime/router";
 import { routeBlockFile } from "../compiler/transforms/route-block";
+
+export { sitemapXml } from "./sitemap-xml";
 
 /** `sitemap` and `robots` of the configuration with their defaults; absent when off. */
 export interface SiteFilesOptions {
@@ -46,9 +49,10 @@ export interface SitemapUrlFields {
   readonly priority?: number;
 }
 
-/** A URL of `sitemap.xml`: its pathname and optional fields. */
+/** A URL of `sitemap.xml`: its pathname, optional fields and, since 1.8, its language versions. */
 export interface SitemapUrl extends SitemapUrlFields {
   readonly pathname: string;
+  readonly alternates?: readonly SitemapAlternate[];
 }
 
 /** A URL that `sitemapEntries` of a route declared, with the route that declared it. */
@@ -186,28 +190,6 @@ export async function sitemapUrls(options: {
 /** The pathnames of `sitemap.xml`; see {@link sitemapUrls}, which also returns their fields. */
 export async function sitemapPathnames(options: Parameters<typeof sitemapUrls>[0]): Promise<string[]> {
   return (await sitemapUrls(options)).map((url) => url.pathname);
-}
-
-function xmlText(value: string): string {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-}
-
-/**
- * A sitemap of absolute URLs (`origin` + pathname), as the sitemaps.org protocol 0.9 describes,
- * with `<lastmod>`, `<changefreq>` and `<priority>` when a URL has them.
- */
-export function sitemapXml(origin: string, urls: readonly (string | SitemapUrl)[]): string {
-  const lines = urls.map((value) => {
-    const url: SitemapUrl = typeof value === "string" ? { pathname: value } : value;
-    const fields = [
-      `<loc>${xmlText(new URL(url.pathname, origin).href)}</loc>`,
-      ...url.lastmod === undefined ? [] : [`<lastmod>${xmlText(url.lastmod)}</lastmod>`],
-      ...url.changefreq === undefined ? [] : [`<changefreq>${url.changefreq}</changefreq>`],
-      ...url.priority === undefined ? [] : [`<priority>${url.priority}</priority>`],
-    ];
-    return `  <url>${fields.join("")}</url>`;
-  });
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${lines.join("\n")}${lines.length ? "\n" : ""}</urlset>\n`;
 }
 
 /** `robots.txt` for every user agent, with the sitemap's absolute URL when there is one. */

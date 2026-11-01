@@ -4,7 +4,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { replaceModuleSpecifiers } from "../import-graph";
 import { MeekoCompileError } from "../parser/sfc";
 import { routeBlockFile, routeBlockSource } from "../transforms/route-block";
-import { readServerScript, serverScriptTypes } from "./server-script";
+import { pageRouteId, readServerScript, serverScriptTypes } from "./server-script";
 
 /** Directory, relative to `.meeko`, that mirrors `<script server>` blocks as TypeScript. */
 export const routeBlockTypesDirectory = "routes";
@@ -29,7 +29,11 @@ function routeBlockPages(projectRoot: string, routes: readonly { readonly sideca
   const files = new Map<string, { page: string; id: string }>();
   for (const route of routes) {
     const page = route.sidecar ? routeBlockFile(route.sidecar) : undefined;
-    if (page) files.set(routeBlockTypeFile(root, page), { page, id: route.id });
+    if (!page) continue;
+    // Routes added by extendRoutes share the page: usePage() keeps the id of its own path,
+    // as `meeko check` of one file and the editor type it, whatever the route order.
+    const output = routeBlockTypeFile(root, page);
+    if (files.get(output)?.id !== pageRouteId(page)) files.set(output, { page, id: route.id });
   }
   return files;
 }

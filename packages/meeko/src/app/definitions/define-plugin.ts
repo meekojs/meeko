@@ -1,9 +1,11 @@
 import type { ContextKey } from "../../core/reactivity";
 import type { HeadInput } from "../../shared/head";
+import type { LinkResolver } from "../../shared/link";
 import type { ErrorSource } from "../runtime/component-errors";
 import type { RouteState } from "../runtime/navigation";
 
 import { provide } from "../../core/reactivity";
+import { linkResolverKey } from "../../shared/link";
 import { useHead } from "../composables/use-head";
 
 /** Brand of the objects `definePlugin` returns; `Symbol.for` so two copies of Meeko agree. */
@@ -91,6 +93,18 @@ export interface PluginApp {
   addHead(input: () => HeadInput): void;
   /** Runs before a client navigation; return false after taking over navigation. */
   beforeNavigate(handler: (url: URL, routeId: string | null) => boolean | void | Promise<boolean | void>): void;
+  /**
+   * Registra un resolvedor del `href` de cada `<MeekoLink>` de la aplicación (desde 1.8.0), por
+   * ejemplo para añadir el prefijo del idioma. Varios resolvedores se encadenan en el orden de
+   * registro: cada uno recibe el `href` del anterior. Un enlace con `bind:resolve="false"` no pasa
+   * por ellos. Véase {@link LinkResolver}.
+   *
+   * @example
+   * ```ts
+   * app.resolveLink(({ href, hreflang }) => hreflang === "en" ? `/en${href}` : href);
+   * ```
+   */
+  resolveLink(resolver: LinkResolver): void;
   /**
    * Registra un observador de errores de la aplicación. En el navegador recibe lo mismo que
    * `mountClientApp({ onError })`; en el servidor, los fallos del render de esta petición, además
@@ -203,6 +217,7 @@ export async function runPlugins(
   const headInputs: Array<() => HeadInput> = [];
   const navigationHandlers: Array<(url: URL, routeId: string | null) => boolean | void | Promise<boolean | void>> = [];
   const errorHandlers: PluginErrorHandler[] = [];
+  const linkResolvers: LinkResolver[] = [];
   for (const [index, registration] of registrations.entries()) {
     const name = registration.name ?? `plugin ${index + 1}`;
     if (!isPlugin(registration.plugin)) throw new TypeError(`${name} must default-export definePlugin(...)`);
@@ -219,6 +234,10 @@ export async function runPlugins(
         if (typeof handler !== "function") throw new TypeError(`${name}: beforeNavigate requires a function`);
         navigationHandlers.push(handler);
       },
+      resolveLink(resolver: LinkResolver): void {
+        if (typeof resolver !== "function") throw new TypeError(`${name}: resolveLink requires a function`);
+        linkResolvers.push(resolver);
+      },
       onError(handler: PluginErrorHandler): void {
         if (typeof handler !== "function") throw new TypeError(`${name}: onError requires a function`);
         errorHandlers.push(handler);
@@ -226,9 +245,14 @@ export async function runPlugins(
     });
     await registration.plugin.setup(app, registration.options);
   }
+  // One function for every link: each resolver gets the href of the one before it.
+  const resolveLink: LinkResolver | undefined = linkResolvers.length === 0 ? undefined
+    : linkResolvers.length === 1 ? linkResolvers[0]
+    : (link) => linkResolvers.reduce((href, resolver) => resolver({ ...link, href }), link.href);
   return {
     apply() {
       for (const [key, value] of provided) provide(key, value);
+      if (resolveLink) provide(linkResolverKey, resolveLink);
       for (const input of headInputs) useHead(input);
     },
     async beforeNavigate(url, routeId) {

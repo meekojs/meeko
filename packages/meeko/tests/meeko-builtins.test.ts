@@ -55,9 +55,10 @@ test("<MeekoLink> is an <a> with a typed href, aria-current and every other attr
   assert.equal(errorCode("<template><MeekoLink>x</MeekoLink></template>", layout), "MEEK105");
 });
 
-test("a static <MeekoLink> keeps its href in the HTML and binds only aria-current", () => {
+test("a static <MeekoLink> renders its resolved href and binds only aria-current", () => {
   const { code } = compile("<template><MeekoLink to=\"/docs\">Docs</MeekoLink></template>", layout);
-  assert.match(code, / href=\\"\/docs\\"/);
+  // Since 1.8 the fixed href goes through the application's link resolver, once per render.
+  assert.match(code, /renderAttribute\("href", __meeko\.linkHref\(__meeko_links, "\/docs", "\/docs"\)\)/);
   assert.match(code, /__meeko\.linkCurrent\(__meeko_route, /);
   assert.doesNotMatch(code, /bindAttribute\(__scope, \d+, "href"/, "a fixed href needs no binding");
   // A route with parameters still goes through the typed href().
@@ -142,12 +143,12 @@ test("useRoute().isActive has the rule of <MeekoLink>, with typed params and pre
 
 test("a <MeekoLink> passes match=\"prefix\" or bind:match to aria-current, and rejects any other value", () => {
   const prefix = compile("<template><MeekoLink to=\"/docs\" match=\"prefix\">Docs</MeekoLink></template>", layout).code;
-  assert.match(prefix, /__meeko\.linkCurrent\(__meeko_route, "\/docs", "prefix"\)/);
+  assert.match(prefix, /__meeko\.linkCurrent\(__meeko_route, __meeko\.linkHref\(__meeko_links, "\/docs", "\/docs"\), "prefix"\)/);
   assert.doesNotMatch(prefix, /match=/, "match is not an attribute of the <a>");
   const exact = compile("<template><MeekoLink to=\"/docs\" match=\"exact\">Docs</MeekoLink></template>", layout).code;
-  assert.match(exact, /__meeko\.linkCurrent\(__meeko_route, "\/docs"\)/);
+  assert.match(exact, /__meeko\.linkCurrent\(__meeko_route, __meeko\.linkHref\(__meeko_links, "\/docs", "\/docs"\)\)/);
   const bound = compile("<script lang=\"ts\">\nconst mode = signal<\"exact\" | \"prefix\">(\"prefix\");\n</script>\n<template><MeekoLink to=\"/users/[id]\" bind:params=\"{ id: '7' }\" bind:match=\"mode.value\">x</MeekoLink></template>", layout).code;
-  assert.match(bound, /__meeko\.linkCurrent\(__meeko_route, __meeko_href\([^\n]*\), mode\.value\)/);
+  assert.match(bound, /__meeko\.linkCurrent\(__meeko_route, __meeko\.linkHref\(__meeko_links, "\/users\/\[id\]", __meeko_href\([^\n]*\)\), mode\.value\)/);
   assert.match(bound, /bindAttribute\(__scope, 0, "aria-current", \(\) => \(__meeko\.linkCurrent\(__meeko_route, [^\n]*mode\.value\)\)/);
   assert.equal(errorCode("<template><MeekoLink to=\"/\" match=\"partial\">x</MeekoLink></template>", layout), "MEEK105");
   assert.equal(errorCode("<template><MeekoLink to=\"/\" match>x</MeekoLink></template>", layout), "MEEK105");
@@ -156,8 +157,8 @@ test("a <MeekoLink> passes match=\"prefix\" or bind:match to aria-current, and r
 
 test("a static <MeekoLink> with a non-ASCII path is encoded like href() and matches the route's path", () => {
   const { code } = compile("<template><MeekoLink to=\"/categorías/menú\">Categorías</MeekoLink></template>", layout);
-  assert.match(code, / href=\\"\/categor%C3%ADas\/men%C3%BA\\"/, "the HTML href is the encoded path");
-  assert.match(code, /__meeko\.linkCurrent\(__meeko_route, "\/categor%C3%ADas\/men%C3%BA"\)/);
+  assert.match(code, /renderAttribute\("href", __meeko\.linkHref\(__meeko_links, "[^"]+", "\/categor%C3%ADas\/men%C3%BA"\)\)/, "the HTML href is the encoded path");
+  assert.match(code, /__meeko\.linkCurrent\(__meeko_route, __meeko\.linkHref\(__meeko_links, "[^"]+", "\/categor%C3%ADas\/men%C3%BA"\)\)/);
   // useRoute().path is url.pathname: always encoded.
   const route = { path: { value: new URL("https://x.test/categorías/menú").pathname } };
   assert.equal(route.path.value, "/categor%C3%ADas/men%C3%BA");

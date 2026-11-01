@@ -10,6 +10,7 @@ import type { MeekoConfig } from "../modules/define-meeko-config";
 import type { ContentSecurityPolicy } from "../server/runtime/csp";
 import type { ResolvedModules } from "./module-loader";
 
+import { createRouteManifest } from "../app/runtime/router";
 import { isMeekoModule } from "../modules/define-meeko-module";
 import { contentSecurityPolicy } from "../server/runtime/csp";
 import { normalizeDocumentConfig, siteOrigin } from "../shared/head";
@@ -608,11 +609,28 @@ export async function discoverConfiguredRoutes(projectRoot: string): Promise<rea
   const config = await loadMeekoConfig(projectRoot);
   const sources = await resolveConfigSources(projectRoot, config);
   const layouts = await configuredModuleLayouts(projectRoot, config);
-  return composeFrameworkRoutes({
+  const routes = await composeFrameworkRoutes({
     projectRoot,
     layers: sources.slice(1).map(({ name, root }) => ({ name, root })),
     ...(Object.keys(layouts).length ? { layouts } : {}),
   });
+  if (!executedConfigs.has(config)) return routes;
+  return extendModuleRoutes(routes, (await resolveMeekoModules(resolve(projectRoot), config)).routeExtenders);
+}
+
+/**
+ * Applies the `extendRoutes` transforms of the modules in order; each result is validated as a
+ * manifest (collisions, IDs) and sorted again, naming the module that produced it.
+ */
+export function extendModuleRoutes(routes: readonly RouteRecord[], extenders: ResolvedModules["routeExtenders"]): readonly RouteRecord[] {
+  let current = routes;
+  for (const { module, extend } of extenders) {
+    const next = extend(current);
+    if (!Array.isArray(next)) throw new TypeError(`Módulo de Meeko ${module}: extendRoutes debe devolver la lista de rutas`);
+    try { current = createRouteManifest(next as readonly RouteRecord[]); }
+    catch (error) { throw new Error(`Módulo de Meeko ${module}: extendRoutes: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
+  }
+  return current;
 }
 
 /**

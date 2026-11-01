@@ -12,9 +12,11 @@ export { createNavigator, createRouteManifest, matchRoute } from "./app/runtime/
 export { defineMeekoConfig } from "./modules/define-meeko-config";
 export type { MeekoConfig, MeekoDevtoolsConfig, RobotsConfig,ServerHeaders, ServerResponseConfig, SitemapConfig, SitemapEntriesContext, SitemapEntry, StaticHeaderFile } from "./modules/define-meeko-config";
 export { defineMeekoModule } from "./modules/define-meeko-module";
-export type { MeekoHookable, MeekoHooks, MeekoModule, MeekoModuleContext, MeekoModuleDefinition, MeekoModuleEntry, MeekoModuleMeta, MeekoModuleName, MeekoModuleNames, ModuleAutoImport, ModulePlugin, ModuleServerHandler } from "./modules/define-meeko-module";
+export type { MeekoHookable, MeekoHooks, MeekoModule, MeekoModuleContext, MeekoModuleDefinition, MeekoModuleEntry, MeekoModuleMeta, MeekoModuleName, MeekoModuleNames, ModuleAutoImport, ModulePlugin, ModuleServerHandler, SitemapAlternate, SitemapResolvedUrl } from "./modules/define-meeko-module";
+export { sitemapXml } from "./framework/sitemap-xml";
 export { definePlugin } from "./app/definitions/define-plugin";
 export type { MeekoPlugin, PluginApp, PluginErrorHandler, PluginErrorInfo, PluginRegistration } from "./app/definitions/define-plugin";
+export type { LinkResolveInput, LinkResolver } from "./shared/link";
 export type { ErrorPageRecord, NamedLayoutRecord, NavigationContext, Navigator, RouteMatch, RouteRecord } from "./app/runtime/router";
 export { defineGroup } from "./shared/definitions/define-group";
 export { useLayout } from "./app/composables/useLayout";
@@ -274,6 +276,21 @@ export interface MeekoLinkProps<K extends RouteId = RouteId> {
    * ```
    */
   readonly match?: "exact" | "prefix";
+  /**
+   * Si el `href` pasa por los resolvedores de enlaces de la aplicación (`app.resolveLink` de un
+   * plugin o módulo, como el prefijo de idioma de `@meekojs/i18n`). `true` por defecto;
+   * `bind:resolve="false"` deja el `href` tal como lo construye `href()`. El atributo `hreflang`
+   * del enlace llega al resolvedor, que puede usarlo para elegir otro idioma.
+   *
+   * @since 1.8.0
+   * @example
+   * ```html
+   * <MeekoLink to="/guide">Guía</MeekoLink>
+   * <MeekoLink to="/guide" hreflang="en">Guide (English)</MeekoLink>
+   * <MeekoLink to="/admin" bind:resolve="false">Administración</MeekoLink>
+   * ```
+   */
+  readonly resolve?: boolean;
 }
 
 /**

@@ -82,6 +82,7 @@ El objeto `meeko` de `setup`:
 | `addLayer(dir)` | Añade un layer. |
 | `addComponentsDir(dir, { prefix })` | Autoimporta los `.meeko` de la carpeta con un prefijo. |
 | `addLayout(name, file)` | Desde `1.5`, un layout con nombre. |
+| `extendRoutes(fn)` | Desde `1.8`, transforma el manifiesto de rutas: `fn(routes)` devuelve la lista completa, validada como manifiesto. |
 | `addAutoImports(entries)` / `addAutoImportsDir(dir, { scope })` | Autoimports de un paquete, un archivo o una carpeta, con su ámbito (`"app"`, `"client"`, `"server"`, `"shared"`). En `addAutoImports`, `componentOnly: true` restringe una entrada `app` al código de componentes y módulos de `app/` que también pueden ejecutarse en el navegador; la excluye de `<script server>` y `server/`. |
 | `addPlugin({ src, mode?, options? })` | Un plugin de aplicación (`definePlugin`). |
 | `addServerMiddleware(file)` / `addServerHandler({ route, handler })` | Middleware de servidor (antes que el del proyecto) y un handler para una ruta exacta. |
@@ -89,7 +90,7 @@ El objeto `meeko` de `setup`:
 | `addTypeTemplate(filename, contents)` | Una declaración `.d.ts` generada, retirada cuando se desactiva el módulo. |
 | `addHead(input)` | Entradas de `document.head`. |
 | `addVitePlugin(plugin)` / `extendViteConfig(fn)` | Plugins y configuración de Vite en `meeko dev` y `meeko build`. |
-| `hooks.hook(name, fn)` | `ready`, `routes:resolved`, `build:before`, `prerender:routes`, `build:done`. |
+| `hooks.hook(name, fn)` | `ready`, `routes:resolved`, `build:before`, `prerender:routes`, `sitemap:resolved` (desde `1.8`), `build:done`. |
 | `warn(message)` | Un aviso con el nombre del módulo. |
 
 ## Ejemplos

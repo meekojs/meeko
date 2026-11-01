@@ -91,7 +91,7 @@ test("a name in is compiles each branch on its own: <MeekoLink> builds its href,
   assert.match(code, /__meeko\.renderIf\(\d+, \(\(!!\(props\.to !== undefined\)\)\), \(\) => "<a"/);
   assert.match(code, /__meeko\.renderIf\(\d+, \(\(!\(props\.to !== undefined\) && !!\(props\.href !== undefined\)\) \|\| \(!\(props\.to !== undefined\) && !\(props\.href !== undefined\)\)\)/);
   // The link builds its href with the typed href() and never receives href nor type.
-  assert.match(code, /__meeko\.renderAttribute\("href", __meeko_href\(props\.to, \{ {2}\}\)\)/);
+  assert.match(code, /__meeko\.renderAttribute\("href", __meeko\.linkHref\(__meeko_links, \(props\.to\), __meeko_href\(props\.to, \{ {2}\}\)\)\)/);
   assert.doesNotMatch(code, /"<a"[^]*?renderAttribute\("href", props\.href\)/);
   // The branch of tags leaves the names out of the value of is.
   assert.match(code, /__meeko\.tagBranch\(props\.to !== undefined \? 'MeekoLink' : props\.href !== undefined \? 'a' : 'button', \["MeekoLink"\], "a"\)/);
@@ -248,7 +248,7 @@ test("a component of the project in the union of is gets its props; the tag, its
 test("a single name is that tag, and a value next to names, an unknown name or a ref on several branches are compile errors", () => {
   // `'MeekoLink'` alone is <MeekoLink>.
   const single = compile('<template><component is="\'MeekoLink\'" to="/about">Acerca</component></template>', "Single.meeko");
-  assert.match(single.code, / href=\\"\/about\\"/);
+  assert.match(single.code, /renderAttribute\("href", __meeko\.linkHref\(__meeko_links, "\/about", "\/about"\)\)/);
   assert.doesNotMatch(single.code, /renderIf/);
   // A name the project does not have: MEEK132 on its literal, with the rule of the case.
   const unknown = '<template><component is="x ? \'UIMissing\' : \'a\'">x</component></template>';

@@ -345,6 +345,8 @@ export async function buildProject(projectRoot: string, options: BuildProjectOpt
       index, prerenderDirectory: resolve(root, prerenderStaging), routes: await discoverConfiguredRoutes(root), declared,
       ...(siteFiles.sitemap.exclude ? { exclude: siteFiles.sitemap.exclude } : {}),
     });
+    // Modules may change the URLs or annotate them, such as with the language versions of i18n.
+    await modules.callHook("sitemap:resolved", { urls });
     await writeFile(join(clientDirectory, "sitemap.xml"), sitemapXml(origin, urls), "utf8");
     await writeData();
     if (adapter === "node") await buildNodeServer(nodeOutput);

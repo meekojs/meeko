@@ -107,8 +107,8 @@ export function isComponentName(literal: string): boolean {
   return /^[A-Z][\w$]*$/.test(literal);
 }
 
-/** Attributes of `<MeekoLink>` that build its href: only its branch of `is` takes them. */
-const linkAttributes = new Set(["to", "bind:to", "bind:params", "bind:search", "match", "bind:match"]);
+/** Attributes of `<MeekoLink>` that build its href: only its branch of `is` takes them. `resolve` since 1.8. */
+const linkAttributes = new Set(["to", "bind:to", "bind:params", "bind:search", "match", "bind:match", "resolve", "bind:resolve"]);
 
 /** A branch of `<component is>` with names: the `<a>` of `<MeekoLink>`, some HTML tags, or a component. */
 export type IsBranchTarget = { readonly kind: "link" } | { readonly kind: "tags"; readonly tags: readonly string[] } | { readonly kind: "component" };

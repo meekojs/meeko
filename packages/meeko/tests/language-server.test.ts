@@ -1164,7 +1164,7 @@ describe("Meeko language server built-in tags, component hover and completion", 
       };
       const link = await hoverAt("<MeekoLink", 3);
       assert.equal(link.range, "MeekoLink");
-      assert.match(link.value, /^```ts\n<MeekoLink\n {2}to: "\/users\/\[id\]"\n {2}bind:params\?: [^\n]+\n {2}bind:search\?: Readonly<Record<string, [^\n]+>>\n {2}match\?: "exact" \| "prefix"\n>\n {2}default\?\(\)\n<\/MeekoLink>\n```/);
+      assert.match(link.value, /^```ts\n<MeekoLink\n {2}to: "\/users\/\[id\]"\n {2}bind:params\?: [^\n]+\n {2}bind:search\?: Readonly<Record<string, [^\n]+>>\n {2}match\?: "exact" \| "prefix"\n {2}bind:resolve\?: boolean\n>\n {2}default\?\(\)\n<\/MeekoLink>\n```/);
       assert.doesNotMatch(link.value, /\bany\b/);
       assert.match(link.value, /props: \[`MeekoLinkProps`\]\(file:\/\/\/[^)]+framework\.d\.ts#L\d+,\d+\)/);
       assert.match(link.value, /- `bind:params`: Parámetros de una ruta dinámica/);

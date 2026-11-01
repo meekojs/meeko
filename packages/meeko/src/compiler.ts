@@ -498,12 +498,18 @@ interface LinkPart {
   literal?: string;
 }
 
-/** The parts of `<MeekoLink>` that build its `href`, and `match`, which sets when it is current. */
+/**
+ * The parts of `<MeekoLink>` that build its `href`, and `match`, which sets when it is current.
+ * `resolve` (since 1.8) skips the application's link resolvers; `hreflang` stays an attribute of
+ * the `<a>` and is also passed to them.
+ */
 interface LinkParts {
   to: LinkPart;
   params?: LinkPart;
   search?: LinkPart;
   match?: LinkPart;
+  resolve?: LinkPart;
+  hreflang?: LinkPart;
 }
 
 /**
@@ -521,12 +527,27 @@ function linkElement(node: TemplateNode, context: TemplateContext): { node: Temp
       : rawName === "bind:params" ? "params"
       : rawName === "bind:search" ? "search"
       : rawName === "match" || rawName === "bind:match" ? "match"
+      : rawName === "bind:resolve" ? "resolve"
       : undefined;
     if (rawName === "href" || rawName === "bind:href") {
       throw compileError(context.source, context.filename, "MEEK105", "<MeekoLink> construye su href: indica la ruta con to=\"/users/[id]\" y sus parámetros con bind:params", attribute.start);
     }
     if (rawName === "params" || rawName === "search") {
       throw compileError(context.source, context.filename, "MEEK105", `${rawName} de <MeekoLink> es un objeto: escríbelo como bind:${rawName}="{ … }"`, attribute.start);
+    }
+    if (rawName === "resolve") {
+      throw compileError(context.source, context.filename, "MEEK105", "resolve de <MeekoLink> es un booleano: escríbelo como bind:resolve=\"false\"", attribute.start);
+    }
+    if (rawName === "hreflang" || rawName === "bind:hreflang") {
+      // An attribute of the `<a>` that the application's link resolvers also read.
+      if (rawName === "hreflang") parts.hreflang = { expression: quote(attribute.value), offset: attribute.start, literal: attribute.value };
+      else {
+        const offset = attributeValueOffset(node, attribute.name, context);
+        validateExpression(attribute.value, context.source, context.filename, offset);
+        parts.hreflang = { expression: attribute.value, offset };
+      }
+      rest.push(attribute);
+      continue;
     }
     if (!key) { rest.push(attribute); continue; }
     if (parts[key]) throw compileError(context.source, context.filename, "MEEK105", `<MeekoLink> recibe ${key} dos veces; deja uno`, attribute.start);
@@ -1174,13 +1195,29 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
     const fixed = !context.narrow && link.to.literal !== undefined && !link.to.literal.includes("[") && !link.params && !link.search
       ? staticRouteHref(link.to.literal)
       : undefined;
-    if (fixed !== undefined) attrs.push({ kind: "static", value: ` href="${escapeAttribute(fixed)}"` });
+    // Since 1.8 the href goes through the application's link resolvers (`app.resolveLink`), with the
+    // link's `to`, its hreflang (written, bound or a key of the spread) and `bind:resolve`. The type
+    // check only needs `bind:resolve`: `to` and `hreflang` are checked where they already are.
+    const resolved = (map: (expression: string, offset: number) => string): string => {
+      const built = fixed === undefined ? target(map) : quote(fixed);
+      const resolve = link.resolve ? `, ${map(link.resolve.expression, link.resolve.offset)}` : "";
+      if (context.narrow) return `__meeko.linkHref(__meeko_links, "", ${built}${resolve ? `, undefined${resolve}` : ""})`;
+      const hreflang = link.hreflang
+        ? link.hreflang.literal === undefined ? `(${map(link.hreflang.expression, link.hreflang.offset)})` : link.hreflang.expression
+        : spread ? `__meeko.linkHreflang(${map(spread.expression, spread.offset)})` : undefined;
+      return `__meeko.linkHref(__meeko_links, ${link.to.literal === undefined ? `(${map(link.to.expression, link.to.offset)})` : link.to.expression}, ${built}${hreflang || resolve ? `, ${hreflang ?? "undefined"}` : ""}${resolve})`;
+    };
+    // A static route with a fixed hreflang resolves to the same href for the whole document: SSR
+    // and every render write it, with no binding to keep.
+    const constant = fixed !== undefined && !link.resolve && !spread && (link.hreflang === undefined || link.hreflang.literal !== undefined);
+    if (constant) attrs.push({ kind: "dynamic", expression: `__meeko.renderAttribute("href", ${resolved((expression, offset) => markSource(expression, offset))})` });
     // `match="prefix"` passes its value; the default, `"exact"`, passes nothing.
     const match = link.match?.literal === "exact" ? undefined : link.match;
+    // aria-current compares the resolved href, so `/guide` is current at `/en/guide` in English.
     const current = (map: (expression: string, offset: number) => string): string =>
-      `__meeko.linkCurrent(__meeko_route, ${fixed === undefined ? target(map) : quote(fixed)}${match ? `, ${match.literal === undefined ? map(match.expression, match.offset) : match.expression}` : ""})`;
+      `__meeko.linkCurrent(__meeko_route, ${resolved(map)}${match ? `, ${match.literal === undefined ? map(match.expression, match.offset) : match.expression}` : ""})`;
     const marked = (expression: string, offset: number): string => markSource(expression, offset);
-    const dynamic = fixed === undefined ? [["href", target], ["aria-current", current]] as const : [["aria-current", current]] as const;
+    const dynamic = constant ? [["aria-current", current]] as const : [["href", resolved], ["aria-current", current]] as const;
     for (const [name, build] of dynamic) {
       const id = mark();
       bindings.attributes.push({ id, name, expression: link.to.expression, offset: link.to.offset, build });
@@ -1827,9 +1864,24 @@ function componentSnippets(node: TemplateNode, context: TemplateContext, default
   }
   for (const item of named) {
     const entry = item.entry.name === "default" && defaultNarrowing.length ? { ...item.entry, narrowing: defaultNarrowing } : item.entry;
-    result.push(compileSnippet(item.node.childNodes ?? [], context, entry));
+    result.push(compileSnippet(withoutFormattingEdges(item.node.childNodes ?? []), context, entry));
   }
   return result;
+}
+
+/**
+ * The content of a `<snippet>` without the whitespace with a line break at its edges: a formatter
+ * puts it on its own lines, and that text would reach wherever the child renders the snippet, such
+ * as the middle of a sentence (`<code>.meeko</code>.`). A space on the same line is content, and so
+ * is a non-breaking space, which `\s` would match: only ASCII whitespace is formatting.
+ */
+function withoutFormattingEdges(nodes: readonly TemplateNode[]): readonly TemplateNode[] {
+  const formatting = (node: TemplateNode): boolean => node.nodeName === "#text" && /^[ \t\r\n\f]*\n[ \t\r\n\f]*$/.test(node.value ?? "");
+  let start = 0;
+  let end = nodes.length;
+  while (start < end && formatting(nodes[start]!)) start++;
+  while (end > start && formatting(nodes[end - 1]!)) end--;
+  return nodes.slice(start, end);
 }
 
 /** `<render snippet="expression" args="a, b" />`: places a snippet that this component received. */
@@ -2728,8 +2780,9 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
       "  & { search?: Readonly<Record<string, string | number | boolean | null | undefined>> | undefined };",
       "const __meeko_href = __meeko_href_overloads as <K extends __MeekoRouteId>(id: K, options: __MeekoLinkOptions<K>) => string;",
     ].join("\n"));
-    scriptParts.setup.unshift("const __meeko_route = __meeko_useRoute();");
-    scriptParts.names.unshift("__meeko_route");
+    // Since 1.8 the links also read, once, the link resolver that the plugins published.
+    scriptParts.setup.unshift("const __meeko_route = __meeko_useRoute();", "const __meeko_links = __meeko.linkResolver();");
+    scriptParts.names.unshift("__meeko_route", "__meeko_links");
   }
   if (html.includes(outletReference)) {
     // `<MeekoOutlet />` reads the outlet that Meeko passes, whether or not the script declares props.

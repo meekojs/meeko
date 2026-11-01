@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import type { RouteRecord } from "../app/runtime/router";
 import type { MeekoConfig } from "../modules/define-meeko-config";
 import type { MeekoHooks, MeekoModule, MeekoModuleContext, ModuleAutoImport, ModulePlugin } from "../modules/define-meeko-module";
 import type { DocumentConfig, DocumentHead, HeadInput } from "../shared/head";
@@ -287,6 +288,8 @@ export interface ResolvedModules {
   readonly componentsDirs: readonly { readonly dir: string; readonly prefix: string; readonly exclude?: readonly string[] }[];
   /** Named layouts of `addLayout`, in the order the modules add them. */
   readonly layouts: readonly { readonly name: string; readonly file: string; readonly module: string }[];
+  /** Route manifest transforms of `extendRoutes`, in the order the modules add them. */
+  readonly routeExtenders: readonly { readonly module: string; readonly extend: (routes: readonly RouteRecord[]) => readonly RouteRecord[] }[];
   readonly autoImports: readonly ResolvedModuleAutoImport[];
   readonly autoImportsDirs: readonly { readonly dir: string; readonly scope: "app" | "server" | "shared" }[];
   readonly plugins: readonly ResolvedModulePlugin[];
@@ -305,7 +308,7 @@ export interface ResolvedModules {
 }
 
 const emptyModules: ResolvedModules = Object.freeze({
-  names: [], entryFiles: [], layers: [], componentsDirs: [], layouts: [], autoImports: [], autoImportsDirs: [], plugins: [],
+  names: [], entryFiles: [], layers: [], componentsDirs: [], layouts: [], routeExtenders: [], autoImports: [], autoImportsDirs: [], plugins: [],
   serverMiddleware: [], serverHandlers: [], publicFiles: new Map(), stylesheets: [], typeTemplates: new Map(), head: undefined, vitePlugins: [], viteExtenders: [], ownedDirectories: [],
   callHook: async () => {},
 });
@@ -506,6 +509,7 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
   const layers: string[] = [];
   const componentsDirs: Array<{ dir: string; prefix: string; exclude?: readonly string[] }> = [];
   const layouts: Array<{ name: string; file: string; module: string }> = [];
+  const routeExtenders: Array<ResolvedModules["routeExtenders"][number]> = [];
   const autoImports: ResolvedModuleAutoImport[] = [];
   const autoImportsDirs: Array<{ dir: string; scope: "app" | "server" | "shared" }> = [];
   const plugins: ResolvedModulePlugin[] = [];
@@ -595,6 +599,10 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
         if (previous) throw new Error(`Módulo de Meeko ${name}: el layout ${layoutName} ya lo añade ${previous.module}`);
         layouts.push({ name: layoutName, file: layoutFile, module: name });
       },
+      extendRoutes(extend) {
+        if (typeof extend !== "function") throw new TypeError(`Módulo de Meeko ${name}: extendRoutes necesita una función`);
+        routeExtenders.push({ module: name, extend });
+      },
       addAutoImports(entries: ModuleAutoImport | readonly ModuleAutoImport[]) {
         for (const item of (Array.isArray(entries) ? entries : [entries]) as readonly ModuleAutoImport[]) {
           if (!item || typeof item.name !== "string" || !/^[A-Za-z_$][\w$]*$/.test(item.name)) throw new TypeError(`Módulo de Meeko ${name}: nombre de autoimport no válido ${String(item?.name)}`);
@@ -660,7 +668,7 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
     catch (error) { throw new Error(`El módulo de Meeko ${name} falló en setup: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
   }
   const resolved: ResolvedModules = {
-    names, entryFiles, layers, componentsDirs, layouts, autoImports, autoImportsDirs, plugins, serverMiddleware, serverHandlers,
+    names, entryFiles, layers, componentsDirs, layouts, routeExtenders, autoImports, autoImportsDirs, plugins, serverMiddleware, serverHandlers,
     publicFiles, stylesheets, typeTemplates, head, vitePlugins, viteExtenders, ownedDirectories: [...ownedDirectories],
     async callHook(hookName, ...args) {
       for (const handler of [...hooks.get(hookName) ?? []]) await (handler as (...values: unknown[]) => unknown)(...args);

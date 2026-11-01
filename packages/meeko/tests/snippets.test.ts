@@ -110,6 +110,85 @@ const show = signal(true);
   <snippet name="actions" params="close, label"><button type="button" class="action" on:click="() => { clicks.value++; close(); }">{label} {clicks.value}</button></snippet>
 </AppDialog></template><button type="button" class="change" on:click="() => message.value = 'Bye'">c</button><button type="button" class="hide" on:click="() => show.value = !show.value">h</button><span class="clicks">{clicks.value}</span></main></template>`;
 
+test("the line breaks that format a <snippet> are not content: it can sit in the middle of a sentence", async () => {
+  const child = `<script lang="ts">const snippets = defineSnippets<{ code: [text: string]; spaced: []; loose?: [] }>();</script>
+<template><p id="sentence">con <render snippet="snippets.code" args="'.meeko'" />.</p><p id="spaced">a<render snippet="snippets.spaced" />b</p></template>`;
+  const page = `<script lang="ts">import { signal } from "@meekojs/meeko"; import * as Child from "./Child.meeko"; const label = signal("uno");</script>
+<template><button type="button" id="update" on:click="() => label.value = 'dos'">Update</button><Child>
+  <snippet
+    name="code"
+    params="text"
+  >
+    <!-- A comment is not an edge of text. -->
+    <code bind:title="label.value">{text}</code>
+
+  </snippet>
+  <snippet name="spaced"> <i>{label.value}</i> </snippet>
+</Child></template>`;
+  const { component, cleanup } = await load({ Child: child, Page: page }, "Page");
+  const window = new Window();
+  try {
+    const root = window.document.createElement("main");
+    const rendered = component.renderWithState({});
+    root.innerHTML = rendered.html;
+    const sentence = (): string => root.querySelector("#sentence")!.textContent!;
+    // The comment keeps the first line break inside the snippet; the one after the element is gone.
+    assert.equal(sentence().replace(/^con \s*/, "con "), "con .meeko.");
+    assert.equal(root.querySelector("#spaced")!.textContent, "a uno b", "a space on the same line is content");
+    const code = root.querySelector("code");
+    const release = component.hydrate(root as unknown as Element, {}, rendered.state);
+    assert.equal(root.querySelector("code"), code, "hydration finds the same nodes");
+    (root.querySelector("#update") as unknown as HTMLButtonElement).click();
+    assert.equal(root.querySelector("code")!.getAttribute("title"), "dos");
+    assert.equal(root.querySelector("#spaced")!.textContent, "a dos b");
+    release();
+  } finally { await window.happyDOM.close(); await cleanup(); }
+  const compact = (source: string): string => compile(`<script lang="ts">import * as Child from "./Child.meeko";</script><template><Child>${source}</Child></template>`, "/project/Page.meeko").code;
+  assert.doesNotMatch(compact('<snippet name="a">\n\t<b>x</b>\n</snippet>'), /escapeHtml\("\\n\\t"\)/);
+  assert.doesNotMatch(compact('<snippet name="a">\r\n\t<b>x</b>\r\n</snippet>'), /\\r\\n/);
+  assert.match(compact('<snippet name="a"> <b>x</b> </snippet>'), /escapeHtml\(" "\)/);
+});
+
+test("removing the formatting edges of a <snippet> leaves <pre>, spaces, &nbsp; and loose content exact", async () => {
+  const child = `<script lang="ts">const snippets = defineSnippets<{ code: []; nested: []; padded: []; spaced: []; nbsp: [] }>();</script>
+<template><div id="code"><render snippet="snippets.code" /></div><div id="nested"><render snippet="snippets.nested" /></div><div id="padded">a<render snippet="snippets.padded" />b</div><div id="spaced">a<render snippet="snippets.spaced" />b</div><div id="nbsp">a<render snippet="snippets.nbsp" />b</div></template>`;
+  const page = `<script lang="ts">import { signal } from "@meekojs/meeko"; import * as Child from "./Child.meeko"; const label = signal("uno");</script>
+<template><button type="button" id="update" on:click="() => label.value = 'dos'">Update</button><Child>
+  <snippet name="code"><pre>  a
+
+    {label.value}  </pre></snippet>
+  <snippet name="nested"><div><pre>  x
+</pre></div></snippet>
+  <snippet name="padded">
+    <pre>  y  </pre>
+  </snippet>
+  <snippet name="spaced"> <i>s</i>	</snippet>
+  <snippet name="nbsp">&nbsp;
+<i>n</i>
+&nbsp;</snippet>
+</Child></template>`;
+  const { component, cleanup } = await load({ Child: child, Page: page }, "Page");
+  const window = new Window();
+  try {
+    const root = window.document.createElement("main");
+    const rendered = component.renderWithState({});
+    root.innerHTML = rendered.html;
+    const text = (selector: string): string => root.querySelector(selector)!.textContent!;
+    assert.equal(text("#code pre"), "  a\n\n    uno  ", "a <pre> keeps every space and line break");
+    assert.equal(text("#nested pre"), "  x\n", "also inside another element");
+    assert.equal(text("#padded"), "a  y  b", "only the formatting around the <pre> leaves");
+    assert.equal(text("#spaced"), "a s\tb", "whitespace without a line break is content");
+    assert.equal(text("#nbsp"), "a\u00a0\nn\n\u00a0b", "a non-breaking space is content, also next to a line break");
+    const release = component.hydrate(root as unknown as Element, {}, rendered.state);
+    (root.querySelector("#update") as unknown as HTMLButtonElement).click();
+    assert.equal(text("#code pre"), "  a\n\n    dos  ", "the <pre> updates in place after hydration");
+    release();
+  } finally { await window.happyDOM.close(); await cleanup(); }
+  const compact = (source: string): string => compile(`<script lang="ts">import * as Child from "./Child.meeko";</script><template><Child>${source}</Child></template>`, "/project/Page.meeko").code;
+  assert.match(compact('<snippet name="a"><pre>\n\n\n</pre></snippet>'), /"<pre" \+ ">" \+ __meeko\.escapeHtml\("\\n\\n\\n"\) \+ "<\/pre>"/, "a <pre> with line breaks alone keeps them");
+  assert.match(compact("\n  <b>x</b>\n"), /"default": __meeko\.snippet\(\(\) => __meeko\.escapeHtml\("\\n  "\) \+ "<b" \+ ">" \+ __meeko\.escapeHtml\("x"\) \+ "<\/b>" \+ __meeko\.escapeHtml\("\\n"\)\)/, "loose content keeps its whitespace");
+});
+
 test("snippets compile into the child channel and <render> regions", () => {
   const child = compile(dialog, "AppDialog.meeko").code;
   assert.match(child, /const snippets: __meeko\.SnippetMap<__MeekoSnippets> = __meeko\.useSnippets<__MeekoSnippets>\(__props\);/);

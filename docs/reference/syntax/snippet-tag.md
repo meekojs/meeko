@@ -240,5 +240,6 @@ El contenido suelto no admite condición. Para condicionarlo, escríbelo en `<sn
 - **Ámbito.** El contenido ve el ámbito del padre, no el del hijo: para usar un valor del hijo, el hijo debe pasarlo en `args` y el padre nombrarlo en `params`.
 - **SSR e hidratación.** El servidor pinta el snippet dentro del HTML del hijo, entre marcas `<!--meeko:snippet:N-->`, y el navegador lo hidrata en el mismo sitio. Se libera cuando se libera el padre o el hijo.
 - **Reactividad.** Un cambio en las señales del padre o en los argumentos actualiza sólo los enlaces del snippet; no se reconstruye cuando cambian otras props del hijo.
+- **Espacios.** Desde `1.8`, el texto de los extremos de un `<snippet>` que sólo tiene espacios y algún salto de línea no se pinta: es el formato del archivo, y el snippet puede acabar dentro de una frase. Un espacio en la misma línea (`<snippet name="a"> <b>x</b> </snippet>`) sí es contenido.
 - **Restricciones.** Un `<snippet>` admite sólo `name`, `params` e `if:when` (`MEEK061`), no puede repetirse y puede cerrarse solo (`<snippet name="x" />`, un snippet vacío). Una `ref:` dentro de su contenido da `MEEK052`, porque el hijo puede pintarlo varias veces.
 - **`<component is>`.** Desde `1.5`, su contenido también son snippets del componente, como en su etiqueta.

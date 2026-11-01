@@ -157,8 +157,10 @@ export async function generatePageContracts(projectRoot: string): Promise<string
     if (pageOptions.layout === undefined && routeModule) {
       const routeType = body ? (body.route ? `typeof import(${JSON.stringify(importPath(output, routeModule))})["route"]` : undefined)
         : `__RouteOf<typeof import(${JSON.stringify(importPath(output, routeModule))})>`;
-      if (routeType) {
-        layoutChecks.add(`${route.file}\0page`);
+      // Routes added by extendRoutes share the page file: its layoutProps are checked once per file.
+      const key = `${route.file}\0page`;
+      if (routeType && !layoutChecks.has(key)) {
+        layoutChecks.add(key);
         lines.push(`type __layoutprops${layoutChecks.size} = __RequireTrue<__CheckLayoutProps<__WrittenLayoutProps<${routeType}>, ${layoutProps}, ${page}, ${name}>>;`);
       }
     }

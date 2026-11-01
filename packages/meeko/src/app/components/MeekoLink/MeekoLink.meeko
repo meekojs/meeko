@@ -17,11 +17,11 @@ type LinkTarget = {
 /** Props de `<MeekoLink>` como componente: las de la etiqueta y los atributos de su `<a>`, salvo `href`. */
 type Props = LinkTarget & Omit<ElementAttributes<"a">, "href" | "aria-current">;
 
-const { to, params, search, match, ...rest } = defineProps<Props>();
+const { to, params, search, match, resolve, ...rest } = defineProps<Props>();
 
 const emit = defineEmits<{ click: [event: MouseEvent] }>();
 
 const snippets = defineSnippets<{ default?: [] }>();
 </script>
 
-<template><MeekoLink bind:to="to" bind:params="params" bind:search="search" bind:match="match ?? 'exact'" bind="rest" on:click="(event) => emit('click', event)"><render snippet="snippets.default" /></MeekoLink></template>
+<template><MeekoLink bind:to="to" bind:params="params" bind:search="search" bind:match="match ?? 'exact'" bind:resolve="resolve" bind="rest" on:click="(event) => emit('click', event)"><render snippet="snippets.default" /></MeekoLink></template>
