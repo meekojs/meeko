@@ -2,6 +2,7 @@
   "name": "@meekojs/eslint-plugin",
   "version": "0.1.0",
   "description": "ESLint parser and template rules for Meeko components.",
+  "homepage": "https://meekojs.com/docs/tooling",
   "type": "module",
   "license": "MIT",
   "files": ["dist/", "README.md"],

@@ -13,11 +13,11 @@ pnpm add -D eslint jiti @meekojs/eslint-plugin
 import { defineEslint } from '@meekojs/eslint-plugin'
 
 export default defineEslint({
-  ignores: ['**/coverage/**'],
-  rules: {
-    'meeko/button-has-type': 'error',
-    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-  },
+	ignores: ['**/coverage/**'],
+	rules: {
+		'meeko/button-has-type': 'error',
+		'@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+	},
 })
 ```
 
@@ -27,15 +27,15 @@ En Node, ESLint carga `eslint.config.ts` con `jiti` 2.2 o superior instalado en 
 
 Las tres opciones de lenguaje están activadas por defecto:
 
-| Opción | Efecto |
-| --- | --- |
-| `javascript` | Activa el preset recomendado de ESLint para `.js`, `.mjs` y `.cjs`. |
-| `typescript` | Activa el preset recomendado de TypeScript-ESLint, sin tipos, para `.ts`, `.tsx`, `.mts` y `.cts`. |
-| `meeko` | Activa el parser y las reglas recomendadas del plugin para `.meeko`. Es independiente de `typescript`. |
-| `perfectionist` | Optativo, por defecto `false`. Ordena imports y sus miembros nombrados con orden natural ascendente. |
-| `unusedImports` | Optativo, por defecto `false`. Elimina imports sin uso y centraliza el aviso de variables sin uso. |
-| `ignores` | Añade patrones globales de exclusión. |
-| `rules` | Personaliza reglas conocidas del núcleo, TypeScript-ESLint y Meeko con opciones tipadas. |
+| Opción          | Efecto                                                                                                     |
+| --------------- | ---------------------------------------------------------------------------------------------------------- |
+| `javascript`    | Activa el preset recomendado de ESLint para `.js`, `.mjs` y `.cjs`.                                        |
+| `typescript`    | Activa el preset recomendado de TypeScript-ESLint, sin tipos, para `.ts`, `.tsx`, `.mts` y `.cts`.         |
+| `meeko`         | Activa el parser y las reglas recomendadas del plugin para `.meeko`. Es independiente de `typescript`.     |
+| `perfectionist` | Por defecto `true`. Ordena imports y miembros con orden natural ascendente; `warn` en 1.x, `error` en 2.0. |
+| `unusedImports` | Optativo, por defecto `false`. Elimina imports sin uso y centraliza el aviso de variables sin uso.         |
+| `ignores`       | Añade patrones globales de exclusión.                                                                      |
+| `rules`         | Personaliza reglas conocidas del núcleo, TypeScript-ESLint y Meeko con opciones tipadas.                   |
 
 La base recomendada de JavaScript también se aplica a los scripts de los lenguajes habilitados: por ejemplo, detecta `debugger` dentro de `.meeko`. Después se aplican las excepciones de cada lenguaje. Los globals de Node o navegador se configuran explícitamente en los overrides; el helper no presupone el runtime de la aplicación.
 
@@ -48,10 +48,7 @@ Los nombres y las opciones de reglas están tipados: una regla desconocida, un n
 Los argumentos posteriores a las opciones son overrides Flat Config normales y ganan al final:
 
 ```ts
-export default defineEslint(
-  { rules: { 'meeko/button-has-type': 'error' } },
-  { files: ['tests/**/*.ts'], rules: { '@typescript-eslint/no-explicit-any': 'off' } },
-)
+export default defineEslint({ rules: { 'meeko/button-has-type': 'error' } }, { files: ['tests/**/*.ts'], rules: { '@typescript-eslint/no-explicit-any': 'off' } })
 ```
 
 Configura plugins adicionales y sus reglas dentro de esos overrides, donde se conserva la API Flat Config completa. El helper rechaza activar desde `options.rules` reglas TypeScript-ESLint que necesiten información de tipos, como `no-floating-promises`; sí permite desactivarlas con `off` o `0`. Los overrides de TS pueden configurar su propio análisis tipado y sus reglas. El parser de `.meeko` sigue siendo sintáctico y rechaza `project`, `projectService` y `programs`.
@@ -64,20 +61,36 @@ Los dos plugins vienen como dependencias del helper y se activan explícitamente
 import { defineEslint } from '@meekojs/eslint-plugin'
 
 export default defineEslint({
-  perfectionist: true,
-  unusedImports: true,
-  rules: {
-    'unused-imports/no-unused-vars': ['error', {
-      vars: 'all',
-      varsIgnorePattern: '^_',
-      args: 'after-used',
-      argsIgnorePattern: '^_',
-    }],
-  },
+	perfectionist: true,
+	unusedImports: true,
+	rules: {
+		'unused-imports/no-unused-vars': [
+			'error',
+			{
+				vars: 'all',
+				varsIgnorePattern: '^_',
+				args: 'after-used',
+				argsIgnorePattern: '^_',
+			},
+		],
+	},
 })
 ```
 
-`perfectionist: true` activa únicamente `perfectionist/sort-imports` y `perfectionist/sort-named-imports`, como errores, con `type: 'natural'` y `order: 'asc'`. No activa el preset completo ni ordena arrays, objetos o clases. En declaraciones de import se fija `sortSideEffects: false` y se desactiva la detección experimental de dependencias. No se activa resolución de tsconfig. Los imports de efectos secundarios sin bindings se conservan en su orden; los imports con bindings sí pueden cambiar de posición por el orden elegido. Para personalizar un orden utiliza las opciones públicas de las reglas: como en Flat Config, sustituir una regla sustituye sus opciones, no las combina en profundidad.
+`perfectionist: true` activa únicamente `perfectionist/sort-imports` y `perfectionist/sort-named-imports`, como avisos (`warn`) en 1.x, con `type: 'natural'` y `order: 'asc'`. El preset fija además `settings.perfectionist` con `{ type: 'natural', order: 'asc' }`, de modo que otras reglas `perfectionist/*` que añadas heredan el mismo orden. No activa el preset completo ni ordena arrays, objetos o clases. En declaraciones de import se fija `sortSideEffects: false` y se desactiva la detección experimental de dependencias. No se activa resolución de tsconfig. Los imports de efectos secundarios sin bindings se conservan en su orden; los imports con bindings sí pueden cambiar de posición por el orden elegido. Para personalizar un orden utiliza las opciones públicas de las reglas: como en Flat Config, sustituir una regla sustituye sus opciones, no las combina en profundidad.
+
+Para desactivar el ordenamiento usa `defineEslint({ perfectionist: false })`. Para exigirlo como error antes de 2.0, sobrescribe sólo la severidad; así se conservan las opciones naturales del preset:
+
+```ts
+export default defineEslint({
+	rules: {
+		'perfectionist/sort-imports': 'error',
+		'perfectionist/sort-named-imports': 'error',
+	},
+})
+```
+
+El monorepo mantiene `perfectionist: true` explícito y adopta el nivel `warn` de 1.x. Por ejemplo, el orden natural coloca `item2` antes que `item10`. `eslint --fix` corrige estos avisos; una ejecución con `--max-warnings 0` también falla si quedan avisos.
 
 `unusedImports: true` activa `unused-imports/no-unused-imports: 'error'` y `unused-imports/no-unused-vars: 'error'`. La segunda permite variables y argumentos con prefijo `_`. Los avisos originales `no-unused-vars` y `@typescript-eslint/no-unused-vars` quedan desactivados para evitar duplicados. Reactivarlos en `options.rules` produce un error explícito que indica usar `unused-imports/no-unused-vars`; los overrides finales siguen conservando el control normal de Flat Config.
 
@@ -89,22 +102,32 @@ Las reglas de estilo de componentes son optativas y tienen opciones tipadas en `
 
 ```ts
 export default defineEslint({
-  perfectionist: true,
-  unusedImports: true,
-  rules: {
-    'meeko/order-macros': ['error', {
-      order: ['defineProps', 'defineEmits', 'defineModel', 'defineSnippets', 'useElementRef', 'defineExpose'],
-    }],
-    'meeko/padding-line-between-macros': 'error',
-    'meeko/order-sections': ['error', {
-      order: ['server', 'script', 'template', 'style'],
-    }],
-    'meeko/prefer-static-bindings': 'warn',
-    '@typescript-eslint/consistent-type-imports': ['error', {
-      prefer: 'type-imports',
-      fixStyle: 'separate-type-imports',
-    }],
-  },
+	perfectionist: true,
+	unusedImports: true,
+	rules: {
+		'meeko/order-macros': [
+			'error',
+			{
+				order: ['defineProps', 'defineEmits', 'defineModel', 'defineSnippets', 'useElementRef', 'defineExpose'],
+			},
+		],
+		'meeko/padding-line-between-macros': 'error',
+		'meeko/order-sections': [
+			'error',
+			{
+				order: ['server', 'script', 'template', 'style'],
+			},
+		],
+		'meeko/prefer-static-bindings': 'warn',
+		'meeko/attributes-order': ['warn', { alphabetical: false }],
+		'@typescript-eslint/consistent-type-imports': [
+			'error',
+			{
+				prefer: 'type-imports',
+				fixStyle: 'separate-type-imports',
+			},
+		],
+	},
 })
 ```
 
@@ -123,6 +146,10 @@ pnpm exec eslint app/components/Example.meeko --fix
 ```
 
 ## Uso directo del plugin
+
+La regla optativa [`meeko/attributes-order`](docs/rules/attributes-order.md) ordena por grupos: `ref:`, `each:*`, condicionales, definición, atributos planos, modelos, `bind:`, spread, eventos y contenido. Admite `order` y `alphabetical`; su autofix conserva el orden de expresiones y evita colisiones y spreads combinados con `class`/`style`. No se activa por defecto en `defineEslint` ni en `recommended`.
+
+La regla optativa [`meeko/html-self-closing`](docs/rules/html-self-closing.md) cierra con `/>` los elementos y componentes sin ningún nodo hijo (`<div></div>` pasa a `<div />`), con opciones `'always'`, `'never'` o `'any'` para `html.normal`, `html.void`, `component`, `svg` y `math`, e `ignoreWhitespace` para tratar como vacío el contenido de sólo saltos de línea y sangría. Con Meeko `1.7`, que no admite `<div />`, no comprueba los elementos HTML no vacíos. Tampoco se activa en `recommended` en `1.x`, para no generar diffs en proyectos existentes.
 
 La exportación por defecto y las configuraciones existentes continúan disponibles:
 
@@ -156,13 +183,14 @@ Los imports y locales del bloque servidor permanecen en su ámbito. Una referenc
 
 ## Reglas propias
 
-| Regla | Nivel recomendado | Corrección |
-| --- | --- | --- |
-| [`meeko/button-has-type`](docs/rules/button-has-type.md) | warning | Suggestions para elegir `button` o `submit`. |
-| [`meeko/no-autofocus`](docs/rules/no-autofocus.md) | warning | Suggestion para quitar el atributo. |
-| [`meeko/order-macros`](docs/rules/order-macros.md) | optativo | Autofix conservador de macros consecutivas. |
-| [`meeko/order-sections`](docs/rules/order-sections.md) | optativo | Orden de secciones del componente. |
-| [`meeko/prefer-static-bindings`](docs/rules/prefer-static-bindings.md) | optativo | Simplifica bindings literales equivalentes. |
+| Regla                                                                  | Nivel recomendado | Corrección                                   |
+| ---------------------------------------------------------------------- | ----------------- | -------------------------------------------- |
+| [`meeko/button-has-type`](docs/rules/button-has-type.md)               | warning           | Suggestions para elegir `button` o `submit`. |
+| [`meeko/html-self-closing`](docs/rules/html-self-closing.md)           | optativo          | Autofix de `<div></div>` a `<div />`.        |
+| [`meeko/no-autofocus`](docs/rules/no-autofocus.md)                     | warning           | Suggestion para quitar el atributo.          |
+| [`meeko/order-macros`](docs/rules/order-macros.md)                     | optativo          | Autofix conservador de macros consecutivas.  |
+| [`meeko/order-sections`](docs/rules/order-sections.md)                 | optativo          | Orden de secciones del componente.           |
+| [`meeko/prefer-static-bindings`](docs/rules/prefer-static-bindings.md) | optativo          | Simplifica bindings literales equivalentes.  |
 
 Las suggestions de `button-has-type` y `no-autofocus` requieren una elección explícita: no cambian el comportamiento de un formulario o el foco mediante `eslint --fix`.
 
@@ -171,10 +199,12 @@ Las suggestions de `button-has-type` y `no-autofocus` requieren una elección ex
 ```js
 import parser from '@meekojs/eslint-plugin/parser'
 
-export default [{
-  files: ['**/*.meeko'],
-  languageOptions: { parser },
-}]
+export default [
+	{
+		files: ['**/*.meeko'],
+		languageOptions: { parser },
+	},
+]
 ```
 
 El parser devuelve un AST TypeScript-ESLint con nodos `MeekoScope` para los ámbitos de plantilla. Estos nodos se recorren mediante `visitorKeys.children`; sus expresiones conservan nodos y referencias TypeScript. Los tokens corresponden exclusivamente a texto del archivo original, incluidos tokens `MeekoScriptBoundary` para las etiquetas de apertura/cierre de cada script. Estos límites permiten que reglas que utilizan `getTokenAfter` o `getTokensBetween` distingan los bloques del SFC. `context.sourceCode.parserServices` ofrece `isMeeko: true` y `templateBody`, el AST de plantilla de la API pública `@meekojs/meeko/parse`. También conserva los servicios sintácticos de TypeScript-ESLint, sin un programa de tipos; esto permite usar `consistent-type-imports` sin activar análisis tipado.

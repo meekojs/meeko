@@ -13,6 +13,8 @@ export class Source {
   readonly template: TemplateNode;
   readonly scripts: readonly SfcSection[];
   serverRange?: [number, number];
+  /** Value exports of the server block: the compiler reads them, no JavaScript in the file does. */
+  readonly serverExports: string[] = [];
   constructor(readonly text: string, readonly filename: string) {
     const document = parseSfc(text, filename);
     this.scripts = [document.script, ...document.server ? [document.server] : []].filter((section) => !section.implicit);
@@ -82,7 +84,7 @@ export class Source {
         // The outer parser maps generated syntax errors; this one already refers to source text.
         const offset = server.contentStart + error.index;
         const before = this.text.slice(0, offset).split(/\r\n|\r|\n/);
-        Object.assign(error, { index: offset, lineNumber: before.length, column: (before.at(-1)?.length ?? 0) + 1 });
+        throw relocate(error, offset, before.length, (before.at(-1)?.length ?? 0) + 1);
       }
       throw error;
     }
@@ -114,6 +116,7 @@ export class Source {
     for (const [index, entry] of exported.entries()) this.synthetic(entry.type ? `type __meeko_export_${index} = ${entry.name};\n` : `void ${entry.name};\n`, server.end);
     this.synthetic("}\n", server.end);
     this.serverRange = [start, this.code.length];
+    for (const entry of exported) if (!entry.type) this.serverExports.push(entry.name);
     for (const entry of exported) if (!entry.type && entry.name !== "route") this.synthetic(`declare const ${entry.name}: unknown;\n`, server.end);
   }
   private node(node: TemplateNode): void {
@@ -158,7 +161,7 @@ export class Source {
       const text = this.text.slice(node.start, node.end);
       for (const segment of scanInterpolations(text).segments) {
         this.synthetic("void (", node.start + segment.start);
-        this.copy(node.start + segment.expressionStart, node.start + segment.expressionStart + segment.expression.length);
+        this.copy(node.start + segment.expressionStart, node.start + segment.expressionStart + segment.expression.length, true);
         this.synthetic(");\n", node.start + segment.end);
       }
     }
@@ -193,6 +196,15 @@ export class Source {
     }
     return -1;
   }
+}
+
+/**
+ * Copy a parser error with ESLint's location fields. The TypeScript parser's errors expose `index`
+ * as a read-only getter, so assigning over them throws; a fresh error accepts the fields.
+ */
+export function relocate(error: object, index: number, lineNumber: number, column: number): SyntaxError {
+  const message = error instanceof Error ? error.message : String(error);
+  return Object.assign(new SyntaxError(message), { index, lineNumber, column, cause: error });
 }
 
 function bindingNames(node: TSESTree.Node): string[] {

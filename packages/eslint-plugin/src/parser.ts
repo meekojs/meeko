@@ -5,7 +5,7 @@ import type { TSESTree } from "@typescript-eslint/utils";
 import { locate, MeekoCompileError } from "@meekojs/meeko/parse";
 import { parseForESLint as parseTypeScript } from "@typescript-eslint/parser";
 
-import { Source } from "./source";
+import { relocate, Source } from "./source";
 
 interface Point { line: number; column: number }
 interface Node {
@@ -48,7 +48,7 @@ export function parseForESLint(text: string, options: ParserOptions = {}): Omit<
     if (typeof error === "object" && error !== null && "index" in error && typeof error.index === "number") {
       const index = source.offset(error.index);
       const point = locate(text, index);
-      Object.assign(error, { index, lineNumber: point.line, column: point.column });
+      throw relocate(error, index, point.line, point.column);
     }
     throw error;
   }
@@ -67,6 +67,12 @@ export function parseForESLint(text: string, options: ParserOptions = {}): Omit<
       reference.resolved = null;
       if (!manager.globalScope.through.includes(reference)) manager.globalScope.through.push(reference);
     }
+  }
+  // The compiler consumes the server block exports (`route`, loaded data). Their reads are synthetic and
+  // leave the AST, so flow rules such as no-useless-assignment would see an assignment nobody reads.
+  if (source.serverExports.length) for (const scope of manager.scopes) {
+    if (scope.type !== "function" || (scope.block as { id?: { name?: string } | null }).id?.name !== "__meeko_server") continue;
+    for (const variable of scope.variables) if (source.serverExports.includes(variable.name)) variable.eslintUsed = true;
   }
   // Scope scaffolding introduces internal names and default list indexes, not user variables.
   for (const scope of manager.scopes) for (const variable of scope.variables) {

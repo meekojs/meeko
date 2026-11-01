@@ -1,5 +1,6 @@
 import { Linter } from "eslint";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import plugin from "../dist/index.js";
@@ -117,4 +118,27 @@ test("typed lint is rejected explicitly; malformed SFC reports original location
   const [message] = lint('<template><Card></Wrong></template>');
   assert.equal(message.fatal, true);
   assert.equal(message.line, 1);
+});
+
+test("server exports read by the compiler are not useless assignments", () => {
+  const rules = { "no-useless-assignment": "warn" };
+  const server = `<script server lang="ts">export const route = definePage({});\nexport const data = 1; if (!data) fail()\nlet local = 1; local = 2; console.log(local); local = 3;</script><template><p>{data}</p></template>`;
+  const messages = lint(server, rules).filter((message) => message.ruleId === "no-useless-assignment");
+  assert.deepEqual(messages.map((message) => message.message.match(/'(\w+)'/)?.[1]), ["local", "local"]);
+  assert.deepEqual(lint(`<script server lang="ts">export const route = definePage({});</script><template></template>`, rules), []);
+});
+
+test("entity references in interpolations are decoded like the compiler does", () => {
+  const source = readFileSync(new URL("../../meeko/tests/fixtures/EntityInterpolation.meeko", import.meta.url), "utf8");
+  const messages = new Linter().verify(source, [...plugin.configs.base, { files: ["**/*.meeko"], rules: {} }], { filename: "EntityInterpolation.meeko" });
+  assert.deepEqual(messages.filter((message) => message.fatal), []);
+});
+
+test("parse errors keep their location when the TypeScript error exposes a read-only index", () => {
+  const source = `<script lang="ts">const a = 1;</script>\n<template><p>{a +}</p></template>`;
+  const [message] = new Linter().verify(source, [...plugin.configs.base, { files: ["**/*.meeko"], rules: {} }], { filename: "Broken.meeko" });
+  assert.equal(message.fatal, true);
+  assert.equal(message.line, 2);
+  assert.ok(message.column > 1);
+  assert.doesNotMatch(message.message, /only a getter/);
 });
