@@ -224,7 +224,9 @@ export type RouteId = RouteKey;
  * Props de la etiqueta propia `<MeekoLink>`, que renderiza un `<a>` cuyo `href` construye
  * {@link href}. `to` es el ID de la ruta; `params` y `search` se escriben con `bind:`; `match`
  * elige si el enlace está activo sólo en su ruta o también por debajo (desde 1.5.0). El resto de
- * atributos (`class`, `target`, `aria-*`, `on:click`…) y el contenido pasan al `<a>`. El editor
+ * atributos (`class`, `target`, `aria-*`, `on:click`…) y el contenido pasan al `<a>`; un
+ * `aria-current` propio gana a la ruta, `false` lo quita y `null` o `undefined` dejan decidir a la
+ * ruta (desde 1.8.0). El editor
  * muestra estas props en el hover de la etiqueta y lleva aquí con «Ir a definición». Sólo es un
  * tipo: sirve, por ejemplo, para un componente que envuelve `<MeekoLink>`. Se autoimporta en `app/`
  * y en los componentes, como `AppCardProps`; un tipo propio del proyecto con el mismo nombre tiene

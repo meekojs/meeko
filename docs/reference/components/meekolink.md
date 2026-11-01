@@ -60,6 +60,16 @@ Un `<a>` con el `href` construido. `aria-current` dice dónde está el usuario:
 
 `aria-current="true"` significa «el elemento actual de un conjunto»: la sección en la que está la página. `to="/"` sólo coincide exacta, también con `match="prefix"`, porque si no marcaría todas las páginas. La comparación se hace sobre las rutas codificadas como las escribe `href()`, así que `/categorías` y `/categor%C3%ADas` son la misma.
 
+Desde `1.8`, un `aria-current` propio gana a la ruta, en el servidor, en la hidratación y en cada actualización, tanto escrito como con `bind:aria-current` o en `bind`:
+
+| Valor propio | Resultado |
+| --- | --- |
+| Un texto, como `aria-current="step"` | Ese valor, sea cual sea la ruta |
+| `false` | Sin atributo, aunque sea la ruta activa |
+| `null` o `undefined` | Decide la ruta, como sin atributo |
+
+`aria-current` y `bind:aria-current` ganan a la clave `aria-current` de `bind`. Escribir los dos en el mismo enlace es `MEEK105`.
+
 ## Ejemplos
 
 ### Un menú de secciones
@@ -255,7 +265,7 @@ Un componente de `app/components/MeekoLink.meeko` (o importado con ese nombre) t
 ## Notas
 
 - **Navegación del cliente.** El `<a>` es un enlace normal, que funciona también antes de hidratar y sin JavaScript. Con la aplicación hidratada, `mountClientApp` convierte el clic en una navegación del cliente, como cualquier enlace del mismo origen a una ruta de la aplicación; un enlace a un fragmento de la página actual sólo desplaza la página.
-- **SSR e hidratación.** El servidor escribe `href` y `aria-current` en el HTML; la hidratación no los cambia y cada navegación actualiza `aria-current`, también en los layouts que el navegador conserva.
+- **SSR e hidratación.** El servidor escribe `href` y `aria-current` en el HTML; la hidratación no los cambia y cada navegación actualiza `aria-current`, también en los layouts que el navegador conserva. Un `aria-current` propio y la ruta escriben un solo atributo, con la misma regla en los dos lados.
 - **Tipos de las rutas.** `RouteId` es la unión de las rutas que declara `.meeko/types/routes.d.ts`, que generan `meeko check`, `meeko dev` y `meeko routes`; sin esas declaraciones es `string` y la comprobación de `to` no ocurre. Una página nueva necesita uno de esos comandos para que su ruta sea válida.
 - **Editor.** `to="` sugiere las rutas del proyecto y Ctrl+clic lleva a su página.
 - **No es un valor de `is`.** `<MeekoLink>` es una etiqueta del compilador: `<component is="x ? MeekoLink : 'button'">` da `TS2304`. Use dos ramas con `if:when`.

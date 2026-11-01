@@ -1453,6 +1453,69 @@ async function withServedApp(name: string, files: Record<string, string>, run: (
   }
 }
 
+test("un aria-current propio en <MeekoLink> gana a la ruta en SSR, hidratación y actualizaciones, sin Hydration mismatch", { timeout: 240_000 }, async () => {
+  await withServedApp("link-current-e2e", {
+    "package.json": '{"name":"link-current-app","private":true,"type":"module"}\n',
+    "meeko.config.mjs": "export default {};\n",
+    "app/layouts/default.meeko": `<script lang="ts">
+// The module that resolveComponent("MeekoLink") loads, here on the server as well; in lowercase, a value of is decided at run time.
+import * as linkComponent from "@meekojs/meeko/builtins/link";
+const values = ["step", false, undefined] as const;
+const index = signal(0);
+const value = computed(() => values[index.value]);
+const attrs = computed(() => ({ "aria-current": value.value }));
+const route = useRoute();
+</script>
+<template><nav>
+<MeekoLink id="plain" to="/about">Plain</MeekoLink>
+<MeekoLink id="written" to="/about" aria-current="date">Written</MeekoLink>
+<MeekoLink id="bound" to="/about" bind:aria-current="value.value">Bound</MeekoLink>
+<MeekoLink id="spread" to="/about" bind="attrs.value">Spread</MeekoLink>
+<component id="named" is="'MeekoLink'" to="/about" bind:aria-current="value.value">Named</component>
+<component id="resolved" is="linkComponent" to="/about" bind:aria-current="value.value">Resolved</component>
+<MeekoLink id="home" to="/">Home</MeekoLink>
+<button type="button" id="next" on:click="() => index.value = (index.value + 1) % values.length">next</button>
+<output id="path">{route.path.value}</output>
+</nav><main><MeekoOutlet /></main></template>
+`,
+    "app/pages/index.meeko": '<template><h1 id="index">Inicio</h1></template>\n',
+    "app/pages/about.meeko": '<template><h1 id="about">Acerca</h1></template>\n',
+  }, async (origin, browser) => {
+    const html = (await (await fetch(`${origin}/about`)).text()).replace(/<!--[^>]*-->/g, "");
+    const opening = (id: string): string => new RegExp(`<a [^>]*id="${id}"[^>]*>|<a id="${id}"[^>]*>`).exec(html)?.[0] ?? "";
+    assert.match(opening("plain"), /aria-current="page"/);
+    assert.match(opening("written"), /aria-current="date"/);
+    for (const id of ["bound", "spread", "named", "resolved"]) {
+      assert.match(opening(id), /aria-current="step"/, id);
+      assert.doesNotMatch(opening(id), /aria-current="[^"]*"[^>]*aria-current=/, id);
+    }
+
+    const page = await browser.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+    await page.goto(`${origin}/about`);
+    await page.waitForFunction(() => performance.getEntriesByName("meeko-hydration").length > 0);
+    await page.evaluate(() => { (window as unknown as { kept: number }).kept = 1; });
+    const read = () => page.evaluate(() => Object.fromEntries(["plain", "written", "bound", "spread", "named", "resolved", "home"].map((id) => [id, document.querySelector(`#${id}`)!.getAttribute("aria-current")])));
+    const forced = (value: string | null) => ({ bound: value, spread: value, named: value, resolved: value });
+    // At /about: the signal gives "step", then false, then undefined, which leaves it to the route.
+    assert.deepEqual(await read(), { plain: "page", written: "date", home: null, ...forced("step") });
+    await page.locator("#next").click();
+    assert.deepEqual(await read(), { plain: "page", written: "date", home: null, ...forced(null) });
+    await page.locator("#next").click();
+    assert.deepEqual(await read(), { plain: "page", written: "date", home: null, ...forced("page") });
+    // The value leaves it to the route, so a client navigation moves it; the written one stays.
+    await page.locator("#home").click();
+    await page.locator("#index").waitFor();
+    assert.deepEqual(await read(), { plain: null, written: "date", home: "page", ...forced(null) });
+    await page.locator("#next").click();
+    assert.deepEqual(await read(), { plain: null, written: "date", home: "page", ...forced("step") });
+    assert.equal(await page.evaluate(() => (window as unknown as { kept?: number }).kept), 1, "the navigation stayed in the client");
+    assert.deepEqual(errors, []);
+  });
+});
+
 const richSelectPage = `<script lang="ts">
 const value = signal("b");
 const label = signal("Beta");

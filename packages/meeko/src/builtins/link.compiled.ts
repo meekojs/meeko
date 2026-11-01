@@ -7,7 +7,7 @@ type RouteParamsOf<K extends RouteId> = NonNullable<MeekoLinkProps<K>["params"]>
 type LinkTarget = {
   [K in RouteId]: Omit<MeekoLinkProps<K>, "params"> & (keyof RouteParamsOf<K> extends never ? { readonly params?: RouteParamsOf<K> } : { readonly params: RouteParamsOf<K> })
 }[RouteId];
-type Props = LinkTarget & Omit<ElementAttributes<"a">, "href" | "aria-current">;
+type Props = LinkTarget & Omit<ElementAttributes<"a">, "href">;
 type __MeekoRoutes = import("../framework.js").GeneratedRoutes;
 type __MeekoRouteId = keyof __MeekoRoutes extends never ? string : keyof __MeekoRoutes & string;
 type __MeekoLinkParams<K extends string> = K extends keyof __MeekoRoutes ? __MeekoRoutes[K] : Record<string, string>;
@@ -48,7 +48,7 @@ const __meeko_transfer = true;
 const __bindings = __meeko.collectMounted(null, () => __setup(__inputProps));
 const { __meeko_route, __meeko_links, __meeko_props, rest, emit, snippets } = __bindings;
 return __meeko.finishWithCleanup(() => {
-const __meeko_html = "<a" + __meeko.renderSpread(__meeko.spreadEntries("a", rest, ["href","aria-current"])) + __meeko.renderAttribute("href", __meeko.linkHref(__meeko_links, (__meeko_props.to), __meeko_href(__meeko_props.to, { params: __meeko_props.params, search: __meeko_props.search }), __meeko.linkHreflang(rest), __meeko_props.resolve)) + __meeko.renderAttribute("aria-current", __meeko.linkCurrent(__meeko_route, __meeko.linkHref(__meeko_links, (__meeko_props.to), __meeko_href(__meeko_props.to, { params: __meeko_props.params, search: __meeko_props.search }), __meeko.linkHreflang(rest), __meeko_props.resolve), __meeko_props.match ?? 'exact')) + " data-meeko=\"0\"" + ">" + __meeko.renderSnippet(0, snippets.default, []) + "</a>";
+const __meeko_html = "<a" + __meeko.renderSpread(__meeko.spreadEntries("a", rest, ["href","aria-current"])) + __meeko.renderAttribute("href", __meeko.linkHref(__meeko_links, (__meeko_props.to), __meeko_href(__meeko_props.to, { params: __meeko_props.params, search: __meeko_props.search }), __meeko.linkHreflang(rest), __meeko_props.resolve)) + __meeko.renderAttribute("aria-current", __meeko.linkCurrent(__meeko_route, __meeko.linkHref(__meeko_links, (__meeko_props.to), __meeko_href(__meeko_props.to, { params: __meeko_props.params, search: __meeko_props.search }), __meeko.linkHreflang(rest), __meeko_props.resolve), __meeko_props.match ?? 'exact', __meeko.linkSpreadCurrent(rest))) + " data-meeko=\"0\"" + ">" + __meeko.renderSnippet(0, snippets.default, []) + "</a>";
 const __meeko_state = __meeko.transferState(__bindings, "app/components/MeekoLink/MeekoLink.meeko");
 return { html: __meeko_html, state: __meeko_state };
 }, __meeko_dispose);
@@ -60,7 +60,7 @@ const __meeko_transfer = false;
 const __bindings = __meeko.collectMounted(null, () => __setup(__inputProps));
 __meeko.restoreSignals(__bindings, __state);
 const { __meeko_route, __meeko_links, __meeko_props, rest, emit, snippets } = __bindings;
-return __meeko.finishWithCleanup(() => "<a" + __meeko.renderSpread(__meeko.spreadEntries("a", rest, ["href","aria-current"])) + __meeko.renderAttribute("href", __meeko.linkHref(__meeko_links, (__meeko_props.to), __meeko_href(__meeko_props.to, { params: __meeko_props.params, search: __meeko_props.search }), __meeko.linkHreflang(rest), __meeko_props.resolve)) + __meeko.renderAttribute("aria-current", __meeko.linkCurrent(__meeko_route, __meeko.linkHref(__meeko_links, (__meeko_props.to), __meeko_href(__meeko_props.to, { params: __meeko_props.params, search: __meeko_props.search }), __meeko.linkHreflang(rest), __meeko_props.resolve), __meeko_props.match ?? 'exact')) + " data-meeko=\"0\"" + ">" + __meeko.renderSnippet(0, snippets.default, []) + "</a>", __meeko_dispose);
+return __meeko.finishWithCleanup(() => "<a" + __meeko.renderSpread(__meeko.spreadEntries("a", rest, ["href","aria-current"])) + __meeko.renderAttribute("href", __meeko.linkHref(__meeko_links, (__meeko_props.to), __meeko_href(__meeko_props.to, { params: __meeko_props.params, search: __meeko_props.search }), __meeko.linkHreflang(rest), __meeko_props.resolve)) + __meeko.renderAttribute("aria-current", __meeko.linkCurrent(__meeko_route, __meeko.linkHref(__meeko_links, (__meeko_props.to), __meeko_href(__meeko_props.to, { params: __meeko_props.params, search: __meeko_props.search }), __meeko.linkHreflang(rest), __meeko_props.resolve), __meeko_props.match ?? 'exact', __meeko.linkSpreadCurrent(rest))) + " data-meeko=\"0\"" + ">" + __meeko.renderSnippet(0, snippets.default, []) + "</a>", __meeko_dispose);
 });
 }
 export function hydrate(root: Element, __inputProps: __MeekoComponentProps, __state?: __meeko.HotState): () => void {
@@ -77,7 +77,7 @@ const { __meeko_route, __meeko_links, __meeko_props, rest, emit, snippets } = __
 const __release = (() => { const __meeko_cleanups: Array<() => void> = [];
   try {
     __meeko_cleanups.push(__meeko.bindAttribute(__scope, 0, "href", () => (__meeko.linkHref(__meeko_links, (__meeko_props.to), __meeko_href(__meeko_props.to, { params: __meeko_props.params, search: __meeko_props.search }), __meeko.linkHreflang(rest), __meeko_props.resolve)), "MeekoLink.meeko:27:31 (attribute href)"));
-__meeko_cleanups.push(__meeko.bindAttribute(__scope, 0, "aria-current", () => (__meeko.linkCurrent(__meeko_route, __meeko.linkHref(__meeko_links, (__meeko_props.to), __meeko_href(__meeko_props.to, { params: __meeko_props.params, search: __meeko_props.search }), __meeko.linkHreflang(rest), __meeko_props.resolve), __meeko_props.match ?? 'exact')), "MeekoLink.meeko:27:31 (attribute aria-current)"));
+__meeko_cleanups.push(__meeko.bindAttribute(__scope, 0, "aria-current", () => (__meeko.linkCurrent(__meeko_route, __meeko.linkHref(__meeko_links, (__meeko_props.to), __meeko_href(__meeko_props.to, { params: __meeko_props.params, search: __meeko_props.search }), __meeko.linkHreflang(rest), __meeko_props.resolve), __meeko_props.match ?? 'exact', __meeko.linkSpreadCurrent(rest))), "MeekoLink.meeko:27:31 (attribute aria-current)"));
 __meeko_cleanups.push(__meeko.bindSpread(__scope, 0, () => __meeko.spreadEntries("a", rest, ["href","aria-current"]), "MeekoLink.meeko:27:136 (bind)"));
 {
       __meeko_cleanups.push(__meeko.bindEvent(__scope, 0, "click", (__meeko_event: Event) => {

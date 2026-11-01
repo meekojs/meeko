@@ -15,7 +15,7 @@ type LinkTarget = {
 }[RouteId];
 
 /** Props de `<MeekoLink>` como componente: las de la etiqueta y los atributos de su `<a>`, salvo `href`. */
-type Props = LinkTarget & Omit<ElementAttributes<"a">, "href" | "aria-current">;
+type Props = LinkTarget & Omit<ElementAttributes<"a">, "href">;
 
 const { to, params, search, match, resolve, ...rest } = defineProps<Props>();
 

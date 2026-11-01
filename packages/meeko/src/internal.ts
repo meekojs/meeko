@@ -17,7 +17,7 @@ export { enableHotModule, registerHotInstance, registerHotScope, replaceHotModul
 export { registerStyleModule } from "./app/runtime/style-modules";
 export type { HotComponent, HotState } from "./app/runtime/hmr";
 export { devtoolsUpdate, devtoolsWrite, registerDevtoolsInstance } from "./app/runtime/devtools";
-export { linkCurrent, linkHref, linkHreflang, linkResolver } from "./shared/link";
+export { linkCurrent, linkHref, linkHreflang, linkResolver, linkSpreadCurrent } from "./shared/link";
 export { connectLiveBridge } from "./app/runtime/devtools-live";
 export { checkComponentEvents, createEmit } from "./app/runtime/emits";
 export type { Emit, EmitArgs, EmitMap, EmitProps, Emits, NoEmitConflict } from "./app/runtime/emits";

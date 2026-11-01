@@ -490,6 +490,14 @@ function attributePropName(name: string, offset: number, context: TemplateContex
   return true;
 }
 
+/**
+ * Whether `<component is>` with a value decided at run time also passes this attribute as a prop to
+ * a component, as its tag does: an `aria-*` or `data-*`, in lowercase and not reserved to Meeko.
+ */
+function isAttributeProp(name: string): boolean {
+  return /^(?:aria|data)-[a-z0-9][a-z0-9._-]*$/.test(name) && !name.startsWith("data-meeko");
+}
+
 /** A source expression of `<MeekoLink>`: `to`, `params`, `search` or `match`, at its offset. */
 interface LinkPart {
   expression: string;
@@ -501,7 +509,8 @@ interface LinkPart {
 /**
  * The parts of `<MeekoLink>` that build its `href`, and `match`, which sets when it is current.
  * `resolve` (since 1.8) skips the application's link resolvers; `hreflang` stays an attribute of
- * the `<a>` and is also passed to them.
+ * the `<a>` and is also passed to them. `current` is an `aria-current` of its own, which wins over
+ * the route: `aria-current` always has one writer, or SSR and hydration disagree.
  */
 interface LinkParts {
   to: LinkPart;
@@ -510,6 +519,7 @@ interface LinkParts {
   match?: LinkPart;
   resolve?: LinkPart;
   hreflang?: LinkPart;
+  current?: LinkPart;
 }
 
 /**
@@ -545,6 +555,18 @@ function linkElement(node: TemplateNode, context: TemplateContext): { node: Temp
         const offset = attributeValueOffset(node, attribute.name, context);
         validateExpression(attribute.value, context.source, context.filename, offset);
         parts.hreflang = { expression: attribute.value, offset };
+      }
+      rest.push(attribute);
+      continue;
+    }
+    if (attribute.name === "aria-current" || attribute.name === "bind:aria-current") {
+      // An attribute of the `<a>` that replaces the route's: it stays visible to scoped styles.
+      if (parts.current) throw compileError(context.source, context.filename, "MEEK105", "<MeekoLink> recibe aria-current dos veces; deja uno", attribute.start);
+      if (attribute.name === "aria-current") parts.current = { expression: quote(attribute.value), offset: attribute.start, literal: attribute.value };
+      else {
+        const offset = attributeValueOffset(node, attribute.name, context);
+        validateExpression(attribute.value, context.source, context.filename, offset);
+        parts.current = { expression: attribute.value, offset };
       }
       rest.push(attribute);
       continue;
@@ -1144,6 +1166,8 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
       }
       // parse5 lowercases every attribute name; in <svg> and <math>, `bind:viewBox` keeps its case, as `viewBox` does.
       const name = foreignAttributeName(lowercase, node.namespaceURI);
+      // On a <MeekoLink>, its one binding below combines this value with the route.
+      if (link && name === "aria-current") continue;
       const offset = attributeValueOffset(node, attr.name, context);
       validateExpression(attr.value, context.source, context.filename, offset);
       const id = mark();
@@ -1213,12 +1237,23 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
     if (constant) attrs.push({ kind: "dynamic", expression: `__meeko.renderAttribute("href", ${resolved((expression, offset) => markSource(expression, offset))})` });
     // `match="prefix"` passes its value; the default, `"exact"`, passes nothing.
     const match = link.match?.literal === "exact" ? undefined : link.match;
+    // An aria-current of its own wins: `aria-current` or `bind:aria-current`, then the key of the
+    // spread. The type check reads the spread where it is written, and the value of the attribute here.
+    const own = (map: (expression: string, offset: number) => string): string | undefined => {
+      if (link.current) return link.current.literal === undefined ? checkedValue(map(link.current.expression, link.current.offset), "aria-current") : link.current.expression;
+      return spread && !context.narrow ? `__meeko.linkSpreadCurrent(${map(spread.expression, spread.offset)})` : undefined;
+    };
     // aria-current compares the resolved href, so `/guide` is current at `/en/guide` in English.
-    const current = (map: (expression: string, offset: number) => string): string =>
-      `__meeko.linkCurrent(__meeko_route, ${resolved(map)}${match ? `, ${match.literal === undefined ? map(match.expression, match.offset) : match.expression}` : ""})`;
+    const current = (map: (expression: string, offset: number) => string): string => {
+      const explicit = own(map);
+      const mode = match ? (match.literal === undefined ? map(match.expression, match.offset) : match.expression) : undefined;
+      return `__meeko.linkCurrent(__meeko_route, ${resolved(map)}${mode || explicit ? `, ${mode ?? "undefined"}` : ""}${explicit ? `, ${explicit}` : ""})`;
+    };
     const marked = (expression: string, offset: number): string => markSource(expression, offset);
-    const dynamic = constant ? [["aria-current", current]] as const : [["href", resolved], ["aria-current", current]] as const;
-    for (const [name, build] of dynamic) {
+    // A written `aria-current="page"` is plain text, with no binding; the type check still reads `match`.
+    const fixedCurrent = link.current?.literal !== undefined && !context.narrow;
+    const written = [...(constant ? [] : [["href", resolved]] as const), ...(fixedCurrent ? [] : [["aria-current", current]] as const)];
+    for (const [name, build] of written) {
       const id = mark();
       bindings.attributes.push({ id, name, expression: link.to.expression, offset: link.to.offset, build });
       attrs.push({ kind: "dynamic", expression: `__meeko.renderAttribute(${quote(name)}, ${build(marked)})` });
@@ -1375,7 +1410,7 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
       const attributeName = name.slice(5);
       const propName = rawName.slice(5);
       const domAttribute = /^[a-z][a-z0-9:.-]*$/.test(attributeName) && !attributeName.startsWith("on");
-      const prop = mixed && isPropName(propName);
+      const prop = mixed && (isPropName(propName) || isAttributeProp(propName));
       if (!domAttribute && !prop) fail("MEEK012", `Atributo dinámico no válido: ${attributeName}`, attribute.start);
       const offset = attributeValueOffset(node, attribute.name, context);
       validateExpression(attribute.value, context.source, context.filename, offset);
@@ -1416,7 +1451,7 @@ function renderDynamicTag(node: TemplateNode, bindings: TemplateBindings, contex
       parts.push(accepts ? `(${accepts} ? ${text} : "")` : text);
     }
     if (!mixed) continue;
-    if (isPropName(rawName) && !reservedStaticProps.has(rawName)) {
+    if ((isPropName(rawName) && !reservedStaticProps.has(rawName)) || isAttributeProp(rawName)) {
       const valueStart = attributeValueStart(context.source, attribute);
       if (valueStart === undefined) addProp({ name: rawName, nameOffset: attribute.start, nameLength: rawName.length, attribute: rawName, expression: "true", offset: attribute.start, literal: true }, attribute.start);
       else {
@@ -2761,7 +2796,8 @@ export function compile(source: string, filename = "anonymous.meeko", options: C
   const html = renderNode(parsed, bindingsForTemplate, context);
   const hot = options.hot === true;
   const scriptParts = compileScript(script, source, filename, hot, context.refs, generic);
-  if (html.includes("__meeko_route")) {
+  // Every <MeekoLink> reads `__meeko_links`; one with a written aria-current never reads the route.
+  if (html.includes("__meeko_links")) {
     // `<MeekoLink>` builds its href with the typed `href()` and reads the committed route for aria-current.
     scriptParts.imports.push('import { href as __meeko_href_overloads, useRoute as __meeko_useRoute } from "@meekojs/meeko/framework";');
     // The same rule as href() in one signature: an unknown route or missing params reports what is

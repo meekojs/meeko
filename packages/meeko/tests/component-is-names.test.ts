@@ -204,6 +204,116 @@ test("the component of resolveComponent(\"MeekoLink\") renders and hydrates the 
   }
 });
 
+/** A page at `/docs` that provides the route, as the framework does, around the links of `Links`. */
+const currentPage = `<script lang="ts">
+import { fixedRoute, provideRoute, routeSnapshot } from "@meekojs/meeko/navigation";
+import * as Links from "./Links.meeko";
+const props = defineProps<{ initial: number }>();
+provideRoute(fixedRoute(routeSnapshot(new URL("https://meeko.test/docs"), "/docs", {}, {}, false)));
+</script>
+<template><main><Links bind:initial="props.initial" /></main></template>`;
+
+/** Every way to give a link its own aria-current, all with the value of one signal. */
+const currentLinks = `<script lang="ts">
+import { computed, signal } from "@meekojs/meeko";
+import * as MeekoLinkComponent from "@meekojs/meeko/builtins/link";
+const props = defineProps<{ initial: number }>();
+// What resolveComponent("MeekoLink") gives: in lowercase, a value of \`is\` decided at run time.
+const resolvedLink = MeekoLinkComponent;
+const values = ["step", false, undefined, null, "location"] as const;
+const index = signal(props.initial);
+const value = computed(() => values[index.value]);
+const attrs = computed(() => ({ "aria-current": value.value }));
+const isLink = signal(true);
+</script>
+<template><nav>
+<MeekoLink to="/docs" class="plain">Sin propio</MeekoLink>
+<MeekoLink to="/about" class="other">Otra ruta</MeekoLink>
+<MeekoLink to="/docs" aria-current="date" class="written">Escrito</MeekoLink>
+<MeekoLink to="/docs" class="bound" bind:aria-current="value.value">Bind</MeekoLink>
+<MeekoLink to="/about" class="bound-other" bind:aria-current="value.value">Bind, otra ruta</MeekoLink>
+<MeekoLink to="/docs" class="spread" bind="attrs.value">Spread</MeekoLink>
+<MeekoLink to="/docs" class="both" bind="{ 'aria-current': 'date' }" bind:aria-current="value.value">Los dos</MeekoLink>
+<component is="'MeekoLink'" to="/docs" class="is-bound" bind:aria-current="value.value">is</component>
+<component is="'MeekoLink'" to="/docs" class="is-spread" bind="attrs.value">is, spread</component>
+<component is="isLink.value ? 'MeekoLink' : 'a'" bind:to="isLink.value ? '/docs' : undefined" bind:href="isLink.value ? undefined : '/x'" class="branch" bind:aria-current="value.value">Rama</component>
+<component is="MeekoLinkComponent" to="/docs" class="resolved" bind:aria-current="value.value">Componente</component>
+<component is="MeekoLinkComponent" to="/docs" class="resolved-plain">Componente sin propio</component>
+<component is="MeekoLinkComponent" to="/docs" aria-current="date" class="resolved-written">Componente escrito</component>
+<component is="resolvedLink" to="/docs" class="runtime" bind:aria-current="value.value" data-kind="enlace">Valor</component>
+<component is="resolvedLink" to="/docs" class="runtime-plain">Valor sin propio</component>
+<component is="resolvedLink" to="/docs" class="runtime-written" aria-current="date">Valor escrito</component>
+<component is="resolvedLink" to="/docs" class="runtime-spread" bind="attrs.value">Valor en spread</component>
+<i class="next" on:click="() => index.value = (index.value + 1) % values.length"></i>
+<i class="to-a" on:click="() => isLink.value = false"></i>
+</nav></template>`;
+
+/** What each link of `currentPage` must show for each value of the signal. */
+function expectedCurrent(value: string | false | null | undefined): Record<string, string | null> {
+  const own = (route: string | null): string | null => value === false ? null : value ?? route;
+  return {
+    plain: "page",
+    other: null,
+    written: "date",
+    bound: own("page"),
+    "bound-other": own(null),
+    spread: own("page"),
+    both: own("page"),
+    "is-bound": own("page"),
+    "is-spread": own("page"),
+    branch: own("page"),
+    resolved: own("page"),
+    "resolved-plain": "page",
+    "resolved-written": "date",
+    runtime: own("page"),
+    "runtime-plain": "page",
+    "runtime-written": "date",
+    "runtime-spread": own("page"),
+  };
+}
+
+test("an aria-current of its own wins over the route in SSR, hydration and updates, in every form of the link", async () => {
+  const { component, cleanup } = await load({ Page: currentPage, Links: currentLinks }, "Page");
+  const window = new Window({ url: "https://meeko.test/docs" });
+  const manifest = activateRouteManifest(createRouteManifest([{ id: "/docs", file: "docs.meeko", layouts: [] }, { id: "/about", file: "about.meeko", layouts: [] }]));
+  const values = ["step", false, undefined, null, "location"] as const;
+  try {
+    for (let initial = 0; initial < values.length; initial++) {
+      const rendered = component.renderWithState({ initial });
+      assert.doesNotMatch(rendered.html, /<a [^>]*aria-current="[^"]*"[^>]*aria-current=/, "one attribute per link");
+      const root = window.document.createElement("div");
+      window.document.body.appendChild(root);
+      root.innerHTML = rendered.html;
+      const check = (index: number, moment: string): void => {
+        for (const [name, current] of Object.entries(expectedCurrent(values[index % values.length]))) {
+          assert.equal(root.querySelector(`.${name}`)!.getAttribute("aria-current"), current, `${name}, ${moment}, initial ${String(values[initial])}`);
+        }
+      };
+      check(initial, "SSR");
+      assert.equal(root.querySelector(".runtime")!.getAttribute("data-kind"), "enlace", "any aria-* or data-* reaches a component value, as on its tag");
+      const anchors = [...root.querySelectorAll("a")];
+      // A mismatch throws here: both sides must agree for every value.
+      const release = component.hydrate(root as unknown as Element, { initial }, rendered.state);
+      assert.deepEqual([...root.querySelectorAll("a")], anchors, "hydration keeps the server's links");
+      check(initial, "hydrated");
+      for (let step = 1; step <= values.length; step++) {
+        (root.querySelector(".next") as unknown as HTMLElement).click();
+        check(initial + step, `update ${step}`);
+      }
+      // The <a> branch of is writes the attribute with no route.
+      (root.querySelector(".to-a") as unknown as HTMLElement).click();
+      assert.equal(root.querySelector(".branch")!.getAttribute("href"), "/x");
+      assert.equal(root.querySelector(".branch")!.getAttribute("aria-current"), values[initial] || null);
+      release();
+      root.remove();
+    }
+  } finally {
+    manifest();
+    await window.happyDOM.close();
+    await cleanup();
+  }
+});
+
 const cardHost = `<script lang="ts">
 import { signal } from "@meekojs/meeko";
 import * as Card from "./Card.meeko";
@@ -364,6 +474,23 @@ test("meeko check types the polymorphic button with one template: the route and 
     assert.ok(href.some((item) => /^MEEK112: href no se aplica a ninguna rama de is/.test(item)), JSON.stringify(href));
     // An autoimported component in the union, by its name, with its props.
     assert.deepEqual(await check('<component is="busy.value ? \'AppButton\' : \'section\'" to="/about" id="x">x</component>'), []);
+    // An aria-current of its own, in every form of the link: a value, false or undefined.
+    const current = (value: string): string => `<MeekoLink to="/about" bind:aria-current="${value}">a</MeekoLink>`
+      + `<MeekoLink to="/about" bind="{ 'aria-current': ${value} }">b</MeekoLink>`
+      + `<component is="busy.value ? 'MeekoLink' : 'a'" to="/about" bind:aria-current="${value}">c</component>`
+      + `<component is="MeekoLinkComponent" to="/about" bind:aria-current="${value}">d</component>`;
+    const componentImport = 'import * as MeekoLinkComponent from "@meekojs/meeko/builtins/link";';
+    for (const value of ["'page'", "false", "undefined", "busy.value ? 'step' : false"]) {
+      assert.deepEqual(await check(`<MeekoLink to="/about" aria-current="step">w</MeekoLink>${current(value)}`, componentImport), [], value);
+    }
+    // The value of the standard is still checked on the link (MEEK122), as on any <a>.
+    const wrongValue = await check('<MeekoLink to="/about" bind:aria-current="\'nope\'">x</MeekoLink>');
+    assert.ok(wrongValue.some((item) => /^MEEK122:.*nope/.test(item)), JSON.stringify(wrongValue));
+    const wrongWritten = await check('<MeekoLink to="/about" aria-current="nope">x</MeekoLink>');
+    assert.ok(wrongWritten.some((item) => /^MEEK122:.*nope/.test(item)), JSON.stringify(wrongWritten));
+    // A written aria-current does not hide a wrong match or route from the type check.
+    const wrongMatch = await check('<MeekoLink to="/about" aria-current="step" bind:match="\'other\'">x</MeekoLink>');
+    assert.ok(wrongMatch.some((item) => /^TS2345:.*other/.test(item)), JSON.stringify(wrongMatch));
   } finally {
     await project.remove();
   }

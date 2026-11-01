@@ -626,16 +626,28 @@ const props = defineProps<{ title: string }>();
 const view = Panel;
 </script>
 <template><component is="view" bind:title="props.title">x</component></template>`,
+    "LabelledPanel.meeko": `<script lang="ts">
+const props = defineProps<{ title: string; "aria-label"?: string; "data-id"?: number }>();
+</script>
+<template><aside bind:aria-label="props['aria-label']" bind:data-id="props['data-id']">{props.title}</aside></template>`,
+    // Since 1.8 aria-* and data-* are props here too, as on the tag: the component must declare them.
+    "Declared.meeko": `<script lang="ts">
+import * as LabelledPanel from "./LabelledPanel.meeko";
+const props = defineProps<{ link: boolean }>();
+const view = (): "section" | typeof LabelledPanel => props.link ? "section" : LabelledPanel;
+</script>
+<template><component is="view()" bind:title="'x'" aria-label="x" bind:data-id="1" /></template>`,
   };
-  const result = await checkAll(files, ["Mixed", "Tags", "Components"]);
+  const result = await checkAll(files, ["Mixed", "Tags", "Components", "Declared"]);
   const mixed = files["Mixed.meeko"];
   assert.deepEqual(result["Mixed"]!.map((item) => item.replace(/^(\S+)@(\d+)/, (_, code: string, at: string) => `${code}@${mixed.slice(Number(at), Number(at) + 10)}`)).sort(), [
-    "MEEK112@aria-label aria-label sólo vale si is es una etiqueta HTML",
+    "TS2353@aria-label Object literal may only specify known properties, and '\"aria-label\"' does not exist in type '{ title: string; colspan?: number | undefined; } & ExtraProps'.",
     "MEEK112@footer\">f< <snippet> sólo vale si is es un componente",
     "MEEK112@bind:colsp colspan no se aplica a ninguna etiqueta posible de is: Meeko no lo escribiría nunca; quítalo o añade a is una etiqueta que lo admita",
   ].sort());
   assert.deepEqual(result["Tags"], []);
   assert.deepEqual(result["Components"], []);
+  assert.deepEqual(result["Declared"], []);
 });
 
 test("<component is> with a component accepts children as its snippets", async () => {

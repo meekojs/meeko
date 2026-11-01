@@ -12,7 +12,7 @@ import { compile, shadowedBuiltinTags } from "../src/compiler.ts";
 import { MeekoCompileError } from "../src/compiler/parser/sfc.ts";
 import { directiveNameCompletion } from "../src/language-server/features.ts";
 import { linkRouteCompletion } from "../src/language-server/nav.ts";
-import { linkCurrent, routeCurrent } from "../src/shared/link.ts";
+import { linkCurrent, linkSpreadCurrent, routeCurrent } from "../src/shared/link.ts";
 
 const layout = "/project/app/layouts/default.meeko";
 
@@ -64,6 +64,54 @@ test("a static <MeekoLink> renders its resolved href and binds only aria-current
   // A route with parameters still goes through the typed href().
   const dynamic = compile("<template><MeekoLink to=\"/users/[id]\" bind:params=\"{ id: '7' }\">x</MeekoLink></template>", layout).code;
   assert.match(dynamic, /bindAttribute\(__scope, 0, "href"/);
+});
+
+test("an aria-current of its own is the only writer of the attribute on a <MeekoLink>", () => {
+  const compiled = (attributes: string, script = ""): string => compile(`<script lang="ts">\nconst on = signal("page");\nconst attrs = { "aria-current": "step" };\n${script}</script>\n<template><MeekoLink to="/docs" ${attributes}>Docs</MeekoLink></template>`, layout).code;
+  const bindings = (code: string): number => code.match(/bindAttribute\(__scope, \d+, "aria-current"/g)?.length ?? 0;
+
+  // Written: plain text, with no binding, and the route is not read for it.
+  const written = compiled('aria-current="step"');
+  assert.match(written, /aria-current=\\"step\\"/);
+  assert.equal(bindings(written), 0);
+  assert.doesNotMatch(written, /linkCurrent/);
+  assert.match(written, /const __meeko_links = /, "its href still goes through the resolvers");
+
+  // Bound: one binding, with the match of the link and the expression as the value that wins.
+  const bound = compiled('bind:aria-current="on.value" match="prefix"');
+  assert.equal(bindings(bound), 1);
+  assert.match(bound, /bindAttribute\(__scope, 0, "aria-current", \(\) => \(__meeko\.linkCurrent\(__meeko_route, __meeko\.linkHref\(__meeko_links, "\/docs", "\/docs"\), "prefix", on\.value\)\)/);
+  assert.equal(bound.match(/renderAttribute\("aria-current"/g)?.length, 2, "SSR and every later render, once each");
+  assert.match(compiled('bind:aria-current="on.value"'), /"\/docs", "\/docs"\), undefined, on\.value\)/);
+
+  // In a spread: the key goes through the same binding, and the spread leaves it out.
+  const spread = compiled('bind="attrs"');
+  assert.equal(bindings(spread), 1);
+  assert.match(spread, /undefined, __meeko\.linkSpreadCurrent\(attrs\)\)/);
+  assert.match(spread, /spreadEntries\("a", attrs, \["href","aria-current"\]\)/);
+
+  // What the element writes wins over the spread.
+  const both = compiled('bind="attrs" bind:aria-current="on.value"');
+  assert.equal(bindings(both), 1);
+  assert.doesNotMatch(both, /linkSpreadCurrent/);
+
+  assert.equal(errorCode('<template><MeekoLink to="/" aria-current="page" bind:aria-current="\'step\'">x</MeekoLink></template>', layout), "MEEK105");
+  assert.equal(errorCode('<template><MeekoLink to="/" bind:aria-current="(">x</MeekoLink></template>', layout), "MEEK020");
+});
+
+test("an explicit aria-current wins over the route: false removes it, null and undefined leave it to the route", () => {
+  const route = { path: { value: "/docs" } };
+  assert.equal(linkCurrent(route, "/other", undefined, "step"), "step");
+  assert.equal(linkCurrent(route, "/docs", undefined, false), false);
+  assert.equal(linkCurrent(route, "/docs", undefined, undefined), "page");
+  assert.equal(linkCurrent(route, "/docs", undefined, null), "page");
+  assert.equal(linkCurrent(route, "/other", undefined, null), undefined);
+  assert.equal(linkCurrent({ path: { value: "/docs/a" } }, "/docs", "prefix", undefined), "true");
+  assert.equal(linkSpreadCurrent({ "aria-current": "step" }), "step");
+  assert.equal(linkSpreadCurrent({ "ARIA-Current": false }), false, "an attribute name has no case");
+  assert.equal(linkSpreadCurrent({ id: "x" }), undefined);
+  assert.equal(linkSpreadCurrent(undefined), undefined);
+  assert.equal(linkSpreadCurrent("x"), undefined);
 });
 
 test("an element with several bindings carries a single data-meeko marker", () => {

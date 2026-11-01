@@ -94,10 +94,21 @@ export function routeCurrent(path: string, href: string, prefix: boolean): "page
 }
 
 /**
- * @internal `aria-current` of a `<MeekoLink>`: `"page"` when the path of its href is the path of
- * the committed route and, with `match="prefix"`, `"true"` when the route is below it (see
- * {@link routeCurrent}); no attribute otherwise.
+ * @internal The `aria-current` key of a `bind` spread on a `<MeekoLink>`, whatever its case, as the
+ * spread writes attributes: the link's only binding of this attribute reads it through {@link linkCurrent}.
  */
-export function linkCurrent(route: { readonly path: { readonly value: string } }, href: string, match?: "exact" | "prefix"): "page" | "true" | undefined {
-  return routeCurrent(route.path.value, href, match === "prefix") || undefined;
+export function linkSpreadCurrent(spread: unknown): unknown {
+  if (typeof spread !== "object" || spread === null) return undefined;
+  const key = Object.keys(spread).find((candidate) => candidate.toLowerCase() === "aria-current");
+  return key === undefined ? undefined : (spread as Record<string, unknown>)[key];
+}
+
+/**
+ * @internal `aria-current` of a `<MeekoLink>`: a value of its own (`explicit`) wins, and `false`
+ * writes no attribute. With `null` or `undefined`, the route decides: `"page"` when the path of its
+ * href is the path of the committed route and, with `match="prefix"`, `"true"` when the route is
+ * below it (see {@link routeCurrent}); no attribute otherwise.
+ */
+export function linkCurrent(route: { readonly path: { readonly value: string } }, href: string, match?: "exact" | "prefix", explicit?: unknown): unknown {
+  return explicit ?? (routeCurrent(route.path.value, href, match === "prefix") || undefined);
 }
