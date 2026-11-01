@@ -77,11 +77,11 @@ describe('metrics without a database', () => {
 		const view = viewHandler({ site: 'i18n', knownPath, writer })
 		for (const path of ['/%62uttons', '//buttons/', '/en//playground', '/%65n/playground', '/%70layground']) await view({ body: { path }, context: { request: request() } })
 		assert.deepEqual(writer.calls, [
-			['view', 'i18n', '/buttons'],
-			['view', 'i18n', '/buttons'],
-			['view', 'i18n', '/playground'],
-			['view', 'i18n', '/playground'],
-			['view', 'i18n', '/playground'],
+			['view', 'i18n', '/buttons', 'es'],
+			['view', 'i18n', '/buttons', 'es'],
+			['view', 'i18n', '/playground', 'es'],
+			['view', 'i18n', '/playground', 'es'],
+			['view', 'i18n', '/playground', 'es'],
 		])
 		writer.calls.length = 0
 		const feedback = feedbackHandler({ site: 'i18n', knownPath, writer })
@@ -89,8 +89,8 @@ describe('metrics without a database', () => {
 		assert.deepEqual(await feedback({ body: { path: '/en//playground', helpful: false, comment: 'x' }, context: { request: request() } }), { saved: true })
 		assert.deepEqual(await feedback({ body: { path: '/%2Fbuttons', helpful: true, comment: '' }, context: { request: request() } }), { saved: false })
 		assert.deepEqual(writer.calls, [
-			['feedback', 'i18n', { path: '/buttons', helpful: true, comment: '' }],
-			['feedback', 'i18n', { path: '/playground', helpful: false, comment: 'x' }],
+			['feedback', 'i18n', { path: '/buttons', locale: 'es', helpful: true, comment: '' }],
+			['feedback', 'i18n', { path: '/playground', locale: 'es', helpful: false, comment: 'x' }],
 		])
 	})
 
@@ -146,7 +146,7 @@ describe('metrics without a database', () => {
 		assert.equal(await direct.search('site', 'Define Model', 2), true)
 		assert.deepEqual(
 			queries.map(([, values]) => values),
-			[['site', 'define model', 2]],
+			[['site', 'define model', 2, 'es']],
 		)
 	})
 
@@ -184,7 +184,7 @@ describe('metrics without a database', () => {
 		await view({ body: { path: '/docs/signal' }, context: { request: request({ 'sec-purpose': 'prefetch' }) } })
 		// A predicate that fails counts as an unknown page.
 		await viewHandler({ site: 'site', knownPath: () => Promise.reject(new Error('down')), writer })({ body: { path: '/docs/signal' }, context: { request: request() } })
-		assert.deepEqual(writer.calls, [['view', 'site', '/docs/signal']])
+		assert.deepEqual(writer.calls, [['view', 'site', '/docs/signal', 'es']])
 
 		writer.calls.length = 0
 		await searchHandler({ site: 'site', writer, count: async (query) => (query === 'nada' ? 0 : 3) })({ body: { q: 'nada', results: 99 }, context: { request: request() } })
@@ -192,8 +192,8 @@ describe('metrics without a database', () => {
 		await searchHandler({ site: 'ui', writer })({ body: { q: 'sin cuenta' }, context: { request: request() } })
 		await searchHandler({ site: 'ui', writer: fakeWriter(false) })({ body: { q: 'apagado', results: 1 }, context: { request: request() } })
 		assert.deepEqual(writer.calls, [
-			['search', 'site', 'nada', 0],
-			['search', 'ui', 'Botón', 2],
+			['search', 'site', 'nada', 0, 'es'],
+			['search', 'ui', 'Botón', 2, 'es'],
 		])
 
 		writer.calls.length = 0
@@ -201,7 +201,7 @@ describe('metrics without a database', () => {
 		assert.deepEqual(await feedback({ body: { path: '/plurals', helpful: false, comment: 'Falta un ejemplo' }, context: { request: request() } }), { saved: true })
 		assert.deepEqual(await feedback({ body: { path: '/otra', helpful: true, comment: '' }, context: { request: request() } }), { saved: false })
 		assert.deepEqual(await feedback({ body: { path: '/plurals', helpful: true, comment: '' }, context: { request: request({ 'user-agent': '' }) } }), { saved: false })
-		assert.deepEqual(writer.calls, [['feedback', 'i18n', { path: '/plurals', helpful: false, comment: 'Falta un ejemplo' }]])
+		assert.deepEqual(writer.calls, [['feedback', 'i18n', { path: '/plurals', locale: 'es', helpful: false, comment: 'Falta un ejemplo' }]])
 	})
 
 	test('without a database, disabled or with one that refuses, the writer stores nothing and never throws', async () => {
@@ -313,8 +313,8 @@ describe('metrics in the database', { skip: url ? false : 'DATABASE_URL is not s
 		])
 		assert.deepEqual(summary.totals, { views: 11, searches: 5, emptySearches: 3, helpful: 2, unhelpful: 2 })
 		assert.deepEqual(summary.topPages, [
-			{ path: '/docs/signal', views: 7 },
-			{ path: '/docs/api', views: 4 },
+			{ path: '/docs/signal', locale: 'es', views: 7 },
+			{ path: '/docs/api', locale: 'es', views: 4 },
 		])
 		assert.deepEqual(summary.topSearches, [
 			{ query: 'nada', count: 2, results: 0 },
@@ -326,8 +326,8 @@ describe('metrics in the database', { skip: url ? false : 'DATABASE_URL is not s
 			{ query: 'otra', count: 1 },
 		])
 		assert.deepEqual(summary.feedback, [
-			{ path: '/docs/signal', helpful: 1, unhelpful: 2, ratio: 1 / 3, comments: 1 },
-			{ path: '/docs/api', helpful: 1, unhelpful: 0, ratio: 1, comments: 1 },
+			{ path: '/docs/signal', locale: 'es', helpful: 1, unhelpful: 2, ratio: 1 / 3, comments: 1 },
+			{ path: '/docs/api', locale: 'es', helpful: 1, unhelpful: 0, ratio: 1, comments: 1 },
 		])
 		const empty = await readMetricsSummary(db, { site: 'i18n', from: '2026-10-01', to: '2026-10-02' })
 		assert.deepEqual([empty.totals.views, empty.daily.length, empty.topPages.length, empty.feedback.length], [0, 2, 0, 0])

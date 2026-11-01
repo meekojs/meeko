@@ -7,8 +7,9 @@ import GithubSlugger from 'github-slugger'
 import type { TocEntry } from './types/docs'
 
 import { catalog } from './content/catalog'
+import { originalFile, readTranslation } from './content/i18n'
 import { documentHeadings, renderMarkdown, renderSource } from './content/markdown'
-import { pageSections, parseFrontmatter, parseWrittenPage, referencePage } from './content/reference'
+import { englishPageSections, pageSections, parseFrontmatter, parseWrittenPage, referencePage } from './content/reference'
 import { createSourceContext, readRepositoryFile, repositoryPath, withSourceContext } from './content/repository'
 import { maxRevisionLength } from './db/revisions'
 import { documentBrokenLinks, repositoryLinkTargets } from './health'
@@ -19,7 +20,10 @@ export type PreviewKind = 'guide' | 'reference'
 
 /** Input of {@link renderSourcePreview}. */
 export interface PreviewInput {
-	/** Path of the source's file from the repository root, such as `docs/api.md`. */
+	/**
+	 * Path of the source's file from the repository root, such as `docs/api.md`, or of a translation,
+	 * such as `docs/en/api.md`: then the page renders in English, as the site shows it under `/en/`.
+	 */
 	readonly file: string
 	readonly kind: PreviewKind
 	/** The draft's Markdown, rendered instead of the file. */
@@ -62,10 +66,7 @@ export interface SourcePreview {
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
 /** The anchor ids of the sections of a written page, such as `tipo`, which the render may add. */
-const generatedIds: ReadonlySet<string> = (() => {
-	const slugger = new GithubSlugger()
-	return new Set(pageSections.flatMap((section) => section.titles.map((title) => slugger.slug(title))))
-})()
+const generatedIds: ReadonlySet<string> = new Set([...pageSections, ...englishPageSections].flatMap((section) => section.titles.map((title) => new GithubSlugger().slug(title))))
 
 /**
  * Renders one guide or written reference page of the site with `markdown` as its text, in a new
@@ -79,8 +80,11 @@ export async function renderSourcePreview(input: PreviewInput): Promise<SourcePr
 	const file = normalizeSourcePath(input.file)
 	const markdown = normalizeText(input.markdown)
 	if (markdown.length > maxRevisionLength) throw new RangeError(`A preview holds at most ${maxRevisionLength} characters`)
-	const context = createSourceContext(createOverlay([{ file, markdown }]))
-	const result = await withSourceContext(context, () => (input.kind === 'guide' ? previewGuide(file) : previewReference(file, markdown)))
+	// A translation renders its original's page in English, with the draft as the translation.
+	const original = originalFile(file)
+	const context = createSourceContext(createOverlay([{ file, markdown }]), original === null ? 'es' : 'en')
+	const text = original === null ? markdown : readTranslation(markdown).text
+	const result = await withSourceContext(context, () => (input.kind === 'guide' ? previewGuide(original ?? file) : previewReference(original ?? file, text)))
 	return { ...result, durationMs: Math.round(performance.now() - started) }
 }
 

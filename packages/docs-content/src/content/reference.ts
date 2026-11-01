@@ -4,6 +4,7 @@ import { trustHtml } from '@meekojs/meeko'
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
+import type { DocsLocale } from '../locale'
 import type { NavLink, NavSection, Pager } from '../types/docs'
 import type { ReferenceIndexEntry, ReferenceIndexGroup, ReferencePage, ReferenceRelated } from '../types/reference'
 import type { ApiSymbolInfo, ApiTypeBlock } from './api'
@@ -12,9 +13,10 @@ import type { TaxonomyEntry, TaxonomyGroup } from './reference-taxonomy'
 import { apiCodeLinks, apiConfigBlock, apiConfigKeys, apiHref, apiSlugSet, apiSymbolInfo, apiSymbolMarkdown, apiTypeBlocks } from './api'
 import { apiGroups, exportsHref, groupHref, referenceHref } from './api-groups'
 import { createHighlight } from './highlight'
-import { codeBlockHtml, documentHeadings, escapeHtml, renderInline, renderMarkdown, rewriteHref } from './markdown'
+import { codeBlockHtml, documentHeadings, escapeHtml, localizedAnchor, renderInline, renderMarkdown, rewriteHref } from './markdown'
+import { messages } from './messages'
 import { groupIcons, referenceFolder, taxonomy, taxonomyPath } from './reference-taxonomy'
-import { githubUrl, packageFolder, readRepositoryFile, repositoryRoot, repositoryUrl, sourceCache } from './repository'
+import { currentLocale, effectiveFile, githubUrl, packageFolder, readRepositoryFile, repositoryRoot, repositoryUrl, sourceCache } from './repository'
 
 /*
  * The written pages of the API reference and how they merge with what the sources generate.
@@ -39,6 +41,26 @@ export const pageSections = [
 	{ titles: ['Notas'] },
 	{ titles: ['Relacionado'], generated: true },
 ] as const
+
+/**
+ * The `##` sections of a written page in English, in the order of {@link pageSections}: a
+ * translation (`docs/en/reference/…`) uses these titles. The render also accepts the Spanish ones.
+ */
+export const englishPageSections = [
+	{ titles: ['Usage'] },
+	{ titles: ['Type'], generated: true },
+	{ titles: ['Parameters', 'Props', 'Options', 'Attributes'] },
+	{ titles: ['Return value', 'Result'] },
+	{ titles: ['Examples'] },
+	{ titles: ['Common mistakes'] },
+	{ titles: ['Notes'] },
+	{ titles: ['Related'], generated: true },
+] as const
+
+/** The `##` sections of a written page in `locale`. */
+export function localizedPageSections(locale: DocsLocale): typeof pageSections | typeof englishPageSections {
+	return locale === 'es' ? pageSections : englishPageSections
+}
 
 /** The kind of a symbol id: see {@link TaxonomyEntry.symbols}. */
 export type SymbolKind = 'export' | 'syntax' | 'autoimport' | 'cli' | 'config'
@@ -133,7 +155,8 @@ export function parseFrontmatter(text: string, file: string): { data: Map<string
 	return { data, body: text.slice(match[0].length) }
 }
 
-const frontmatterKeys = new Set(['title', 'group', 'since', 'description', 'symbols', 'types', 'related', 'signature'])
+// `source-hash` is the hash of the Spanish original of a translation; the render ignores it.
+const frontmatterKeys = new Set(['title', 'group', 'since', 'description', 'symbols', 'types', 'related', 'signature', 'source-hash'])
 
 /**
  * Checks the text of a page of the reference as the site renders it and returns the page: a
@@ -340,17 +363,18 @@ export async function referenceEntryAt(href: string): Promise<ResolvedEntry | un
  */
 export async function referenceNavigation(): Promise<NavSection[]> {
 	const { groups } = await resolvedTaxonomy()
+	const text = messages()
 	const sections: NavSection[] = [
-		{ title: 'Referencia de la API', links: [{ href: referenceHref, label: 'Índice de la API' }] },
+		{ title: text.reference, links: [{ href: referenceHref, label: text.referenceIndex }] },
 		...groups.map(({ group, entries }) => ({
 			title: group.title,
 			icon: groupIcons[group.icon]!,
 			links: entries.map((entry): NavLink => ({ href: entry.href, label: entry.entry.name, code: true })),
 		})),
 		{
-			title: 'Todos los exports',
+			title: text.allExports,
 			icon: groupIcons.exports!,
-			links: [{ href: exportsHref, label: 'Índice por módulo' }, ...apiGroups().map((group) => ({ href: groupHref(group), label: group.specifier ?? group.title, code: group.specifier !== null }))],
+			links: [{ href: exportsHref, label: text.exportsByModule }, ...apiGroups().map((group) => ({ href: groupHref(group), label: group.specifier ?? group.title, code: group.specifier !== null }))],
 		},
 	]
 	return sections
@@ -397,8 +421,12 @@ export async function referenceIndex(): Promise<ReferenceIndexGroup[]> {
 const typeMarker = '<!--meeko:type-->'
 const relatedMarker = '<!--meeko:related-->'
 
-/** The body with the generated sections: "Tipo" after "Uso" and "Relacionado" at the end. */
+/** The titles of «Uso» in every language: the generated «Tipo» follows it. */
+const usageTitles: ReadonlySet<string> = new Set([...pageSections[0].titles, ...englishPageSections[0].titles])
+
+/** The body with the generated sections: "Tipo" after "Uso" and "Relacionado" at the end, in the language of the render. */
 function withGeneratedSections(body: string): string {
+	const text = messages()
 	const lines = body.replace(/\s+$/, '').split('\n')
 	let fenced = false
 	let inUsage = false
@@ -410,10 +438,10 @@ function withGeneratedSections(body: string): string {
 			at = index
 			break
 		}
-		inUsage = line.trim() === '## Uso'
+		inUsage = usageTitles.has(line.trim().slice(3).trim())
 	}
-	lines.splice(at, 0, '## Tipo', '', typeMarker, '')
-	return `${lines.join('\n')}\n\n## Relacionado\n\n${relatedMarker}\n`
+	lines.splice(at, 0, `## ${text.type}`, '', typeMarker, '')
+	return `${lines.join('\n')}\n\n## ${text.related}\n\n${relatedMarker}\n`
 }
 
 /** The declarations of the "Tipo" section of a page. */
@@ -462,9 +490,11 @@ async function relatedLinks(page: WrittenPage): Promise<ReferenceRelated[]> {
 	for (const item of page.related) {
 		const guide = /^([\w./-]+\.md)(?:#(.+))?$/.exec(item)
 		if (guide) {
-			const [, path, anchor] = guide
+			const [, path, named] = guide
+			const anchor = named ? await localizedAnchor(path!, named) : undefined
 			const heading = anchor ? (await documentHeadings(path!)).get(anchor) : undefined
-			if (anchor && !heading) throw new Error(`${page.file}: related ${item} is not a heading of ${path}`)
+			// A translation links to the guide without the anchor that it cannot place; the original checks it.
+			if (named && !heading && currentLocale() === 'es') throw new Error(`${page.file}: related ${item} is not a heading of ${path}`)
 			// From the repository root, as GitHub URLs are: `docs/framework.md#…` → `/docs/framework#…`.
 			const href = rewriteHref(`${repositoryUrl}/blob/main/${path}${anchor ? `#${anchor}` : ''}`, page.file)
 			const title = readRepositoryFile(path!).match(/^# (.+)$/m)?.[1] ?? path!
@@ -526,7 +556,7 @@ export async function referencePage(slug: string): Promise<ReferencePage | undef
 		body: trustHtml(body),
 		toc: doc.toc,
 		editUrl: githubUrl(page.file, 'edit'),
-		editPath: page.file,
+		editPath: effectiveFile(page.file),
 	}
 }
 
@@ -543,21 +573,22 @@ async function pageMarkdown(page: WrittenPage, origin: string): Promise<string> 
 /** Text of `/llms.txt`: the site and every page of the guides and the reference, with one line each. */
 export async function llmsIndex(origin: string, guides: ReadonlyArray<{ title: string; href: string; description: string }>): Promise<string> {
 	const { groups } = await resolvedTaxonomy()
+	const text = messages()
 	const lines = [
 		'# Meeko',
 		'',
-		'> Meeko es un motor de componentes `.meeko` tipados con SSR, hidratación y señales, y un framework full-stack (rutas, API y RPC tipados, sesiones, WebSocket) para Node, Bun, Deno y Cloudflare Workers. Documentación en español.',
+		`> ${text.llmsSummary}`,
 		'',
-		`Cada página de la referencia explica un símbolo con su tipo exacto, generado desde el código fuente, sus parámetros, ejemplos y errores comunes. [${origin}/llms-full.txt](${origin}/llms-full.txt) reúne en un solo archivo las guías y la referencia en Markdown.`,
+		text.llmsIntro(`${origin}/llms-full.txt`),
 		'',
-		'## Guías',
+		`## ${text.llmsGuides}`,
 		'',
 		...guides.map((guide) => `- [${guide.title}](${origin}${guide.href})${guide.description ? `: ${guide.description}` : ''}`),
 	]
 	for (const { group, entries } of groups) {
-		lines.push('', `## Referencia: ${group.title}`, '', ...entries.map((entry) => `- [${entry.entry.name}](${origin}${entry.href})${entry.description ? `: ${entry.description.replace(/\s+/g, ' ')}` : ''}`))
+		lines.push('', `## ${text.llmsReference(group.title)}`, '', ...entries.map((entry) => `- [${entry.entry.name}](${origin}${entry.href})${entry.description ? `: ${entry.description.replace(/\s+/g, ' ')}` : ''}`))
 	}
-	lines.push('', '## Optional', '', `- [Todos los exports](${origin}${exportsHref}): índice de cada export de cada módulo de @meekojs/meeko, generado desde su JSDoc.`)
+	lines.push('', '## Optional', '', `- [${text.allExports}](${origin}${exportsHref}): ${text.llmsExports}`)
 	return `${lines.join('\n')}\n`
 }
 
@@ -567,7 +598,8 @@ export async function llmsIndex(origin: string, guides: ReadonlyArray<{ title: s
  */
 export async function llmsFull(origin: string, guides: ReadonlyArray<{ title: string; href: string; markdown: string }>): Promise<string> {
 	const { groups } = await resolvedTaxonomy()
-	const parts = ['# Meeko: guías y referencia de la API', '', `Fuente: ${origin}. Cada sección empieza con la URL de su página.`]
+	const text = messages()
+	const parts = [text.llmsFullTitle, '', text.llmsFullSource(origin)]
 	for (const guide of guides) parts.push('', '---', '', `<!-- ${origin}${guide.href} -->`, '', guide.markdown.trim())
 	for (const { group, entries } of groups) {
 		for (const entry of entries) {

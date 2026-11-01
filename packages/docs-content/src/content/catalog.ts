@@ -1,7 +1,10 @@
+import type { DocsLocale } from '../locale'
 import type { NavLink, NavSection, Pager } from '../types/docs'
 
 import { exportsHref, referenceHref } from './api-groups'
+import { messages } from './messages'
 import { taxonomy } from './reference-taxonomy'
+import { currentLocale } from './repository'
 
 /** A page of the site and the Markdown file of the repository it renders. */
 export interface CatalogEntry {
@@ -30,7 +33,8 @@ export const catalog: readonly CatalogEntry[] = [
 		source: 'README.md',
 		label: 'Inicio rápido',
 		section: 'Empezar',
-		transform: (text) => text.replace(/^# Meeko\n+<p align="center">[\s\S]*?<\/p>\n+/, '# Inicio rápido\n\n'),
+		// The title comes from the messages of the language being rendered, so the English page does not get the Spanish one.
+		transform: (text) => text.replace(/^# Meeko\n+<p align="center">[\s\S]*?<\/p>\n+/, () => `# ${messages().quickStart}\n\n`),
 	},
 	{ slug: 'primeros-pasos', href: '/docs/primeros-pasos', source: 'docs/primeros-pasos.md', label: 'Primera aplicación', section: 'Empezar' },
 	{ slug: 'documentacion', href: '/docs/documentacion', source: 'docs/README.md', label: 'Mapa de documentación', section: 'Empezar' },
@@ -61,6 +65,52 @@ export const catalog: readonly CatalogEntry[] = [
 	{ slug: 'changelog', href: '/docs/changelog', source: 'CHANGELOG.md', label: 'Cambios', section: 'Proyecto' },
 ]
 
+/** The sidebar labels of the guides in English, by slug; a guide without one keeps its Spanish label. */
+const englishLabels: Readonly<Record<string, string>> = {
+	'inicio-rapido': 'Quick start',
+	'primeros-pasos': 'First application',
+	documentacion: 'Documentation map',
+	'como-elegir': 'How to choose',
+	framework: 'Full-stack framework',
+	api: 'Components and API',
+	ui: 'Meeko UI',
+	i18n: 'Internationalization',
+	doctor: 'Doctor',
+	editors: 'Editors',
+	tooling: 'ESLint and Prettier',
+	devtools: 'DevTools',
+	testing: 'Testing and CI',
+	stability: 'Stability 1.x',
+	architecture: 'Architecture',
+	'migration-1.0': 'Migrate to 1.0',
+	benchmarks: 'Performance',
+	performance: 'Performance budgets',
+	roadmap: 'Roadmap',
+	changelog: 'Changes',
+}
+
+/** The sections of the sidebar in English, by their Spanish title. */
+const englishSections: Readonly<Record<string, string>> = {
+	Empezar: 'Get started',
+	Framework: 'Framework',
+	'Componentes y módulos': 'Components and modules',
+	Herramientas: 'Tools',
+	Referencia: 'Reference',
+	Proyecto: 'Project',
+}
+
+/** The sidebar label of a guide in `locale`: «Actualizar a 1.x» is «Upgrade to 1.x» in English. */
+export function catalogLabel(entry: CatalogEntry, locale: DocsLocale = currentLocale()): string {
+	if (locale === 'es') return entry.label
+	const upgrade = /^Actualizar a (\S+)$/.exec(entry.label)
+	return englishLabels[entry.slug] ?? (upgrade ? `Upgrade to ${upgrade[1]}` : entry.label)
+}
+
+/** The title of a section of the sidebar in `locale`. */
+export function catalogSection(title: string, locale: DocsLocale = currentLocale()): string {
+	return locale === 'es' ? title : (englishSections[title] ?? title)
+}
+
 /** Slugs of the `/docs/[slug]` pages, for `prerenderEntries`. */
 export const docSlugs: readonly string[] = catalog.map((entry) => entry.slug)
 
@@ -80,25 +130,26 @@ export function navigation(): NavSection[] {
 	for (const entry of catalog) {
 		let section = sections.find((candidate) => candidate.title === entry.section)
 		if (!section) sections.push((section = { title: entry.section, links: [] }))
-		section.links.push({ href: entry.href, label: entry.label })
+		section.links.push({ href: entry.href, label: catalogLabel(entry) })
 	}
 	// The groups of the taxonomy, each at its place in the index; the reference has its own sidebar.
+	const text = messages()
 	const reference = {
-		title: 'Referencia de la API',
+		title: text.reference,
 		links: [
-			{ href: referenceHref, label: 'Índice de la API' },
+			{ href: referenceHref, label: text.referenceIndex },
 			...taxonomy().map((group) => ({ href: `${referenceHref}#${group.anchor}`, label: group.title })),
-			{ href: exportsHref, label: 'Todos los exports' },
+			{ href: exportsHref, label: text.allExports },
 		],
 	}
 	const guides = sections.findIndex((section) => section.title === 'Componentes y módulos')
 	sections.splice(guides < 0 ? sections.length : guides + 1, 0, reference)
-	return sections
+	return sections.map((section) => (section === reference ? section : { ...section, title: catalogSection(section.title) }))
 }
 
 /** Previous and next pages of `href` in reading order. */
 export function pager(href: string): Pager {
 	const index = catalog.findIndex((entry) => entry.href === href)
-	const link = (entry: CatalogEntry | undefined): NavLink | null => (entry ? { href: entry.href, label: entry.label } : null)
+	const link = (entry: CatalogEntry | undefined): NavLink | null => (entry ? { href: entry.href, label: catalogLabel(entry) } : null)
 	return { previous: link(catalog[index - 1]), next: link(catalog[index + 1]) }
 }

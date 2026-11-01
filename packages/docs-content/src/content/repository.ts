@@ -3,9 +3,12 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import type { DocsLocale, PageLocale, TranslationStatus } from '../locale'
 import type { SourceOverlay } from '../sources/overlay'
 
-import { emptyOverlay, normalizeText } from '../sources/overlay'
+import { defaultLocale, translationStatus } from '../locale'
+import { contentHash, emptyOverlay, normalizeText } from '../sources/overlay'
+import { readTranslation, translationFile } from './i18n'
 
 /** The public repository whose files the site renders and links to. */
 export const repositoryUrl = 'https://github.com/meekojs/meeko'
@@ -77,37 +80,80 @@ export function gitFileExists(path: string): boolean {
 	return existsSync(join(repositoryRoot(), ...repositoryPath(path).split('/')))
 }
 
+/** The translation a context read for an original, by {@link SourceContext.translation}. */
+export interface ReadTranslation {
+	/** The translation file from the repository root, such as `docs/en/api.md`. */
+	readonly file: string
+	/** The `source-hash` it declares, or `null`. */
+	readonly sourceHash: string | null
+	/** Against the original in Git now: `translated` or `outdated`. */
+	readonly status: Exclude<TranslationStatus, 'missing'>
+}
+
 /**
  * What one render reads: the published revisions over the working tree, and the caches derived
- * from them. Each publication renders in its own context, so neither its overlay nor its caches
- * reach another render or a reader outside it, and a later render reads the repository again.
+ * from them, in one language. Each publication renders each language in its own context, so
+ * neither its overlay nor its caches reach another render or a reader outside it, and a later
+ * render reads the repository again.
+ *
+ * In English, a Markdown original (`docs/api.md`) is read from its translation (`docs/en/api.md`,
+ * from the overlay or Git) without its `source-hash`, and from the Spanish original when there is
+ * none: the page is then a fallback.
  */
 export interface SourceContext {
 	/** The published revisions this context reads instead of Git. */
 	readonly overlay: SourceOverlay
+	/** The language it renders. */
+	readonly locale: DocsLocale
 	/**
-	 * Text of a file as {@link readRepositoryFile} returns it in this context. Each file is read
-	 * once, so a render sees one version of the working tree even if it changes meanwhile.
+	 * Text of a file as {@link readRepositoryFile} returns it in this context: the translation of a
+	 * Markdown original in a translated language. Each file is read once, so a render sees one
+	 * version of the working tree even if it changes meanwhile.
 	 */
 	read(path: string): string
+	/** Text of a file in the original language: the overlay or the working tree, never a translation. */
+	readOriginal(path: string): string
+	/** The translation that {@link read} uses for an original, or `null` when it reads the original. */
+	translation(path: string): ReadTranslation | null
 	/** The value of `key` in this context, created by `create` the first time. */
 	memo<T>(key: string, create: () => T): T
 }
 
-/** A new context that reads `overlay` over the working tree, with empty caches. */
-export function createSourceContext(overlay: SourceOverlay = emptyOverlay): SourceContext {
-	const files = new Map<string, string>()
+type Translated = { readonly text: string; readonly translation: ReadTranslation } | null
+
+/** A new context that reads `overlay` over the working tree in `locale`, with empty caches. */
+export function createSourceContext(overlay: SourceOverlay = emptyOverlay, locale: DocsLocale = defaultLocale): SourceContext {
+	const originals = new Map<string, string>()
+	const translations = new Map<string, Translated>()
+	const readOriginal = (path: string): string => {
+		const file = repositoryPath(path)
+		let text = originals.get(file)
+		if (text === undefined) {
+			text = overlay.get(file) ?? readGitFile(file)
+			originals.set(file, text)
+		}
+		return text
+	}
+	const translated = (path: string): Translated => {
+		const original = repositoryPath(path)
+		if (translations.has(original)) return translations.get(original)!
+		const file = original.endsWith('.md') ? translationFile(original, locale) : null
+		let found: Translated = null
+		if (file !== null && (overlay.has(file) || gitFileExists(file))) {
+			const { text, sourceHash } = readTranslation(overlay.get(file) ?? readGitFile(file))
+			const originalHash = gitFileExists(original) ? contentHash(readGitFile(original)) : null
+			const status = translationStatus({ sourceHash }, originalHash) === 'translated' ? 'translated' : 'outdated'
+			found = { text, translation: { file, sourceHash, status } }
+		}
+		translations.set(original, found)
+		return found
+	}
 	return {
 		overlay,
-		read(path) {
-			const file = repositoryPath(path)
-			let text = files.get(file)
-			if (text === undefined) {
-				text = overlay.get(file) ?? readGitFile(file)
-				files.set(file, text)
-			}
-			return text
-		},
+		locale,
+		read: (path) => translated(path)?.text ?? readOriginal(path),
+		readOriginal,
+		translation: (path) => translated(path)?.translation ?? null,
 		memo: memoizer(),
 	}
 }
@@ -158,11 +204,12 @@ export function withSourceContext<T>(context: SourceContext, task: () => T): T {
 }
 
 /**
- * Runs `task` in a new context that reads `overlay` over the working tree. Concurrent calls do not
- * see each other's overlay or caches, and code outside `task` never sees `overlay`.
+ * Runs `task` in a new context that reads `overlay` over the working tree, in `locale` (Spanish by
+ * default). Concurrent calls do not see each other's overlay or caches, and code outside `task`
+ * never sees `overlay`.
  */
-export function withSourceOverlay<T>(overlay: SourceOverlay, task: () => Promise<T>): Promise<T> {
-	return withSourceContext(createSourceContext(overlay), task)
+export function withSourceOverlay<T>(overlay: SourceOverlay, task: () => Promise<T>, locale: DocsLocale = defaultLocale): Promise<T> {
+	return withSourceContext(createSourceContext(overlay, locale), task)
 }
 
 /** The overlay that {@link readRepositoryFile} applies now: the context's, or none outside a render. */
@@ -188,7 +235,44 @@ export function readRepositoryFile(path: string): string {
 	return contexts.getStore()?.read(path) ?? readGitFile(path)
 }
 
-/** GitHub URL of a file or folder of the repository, by the same paths as {@link readRepositoryFile}. */
+/**
+ * Text of a file in the original language, by the same paths as {@link readRepositoryFile}: the
+ * published revision of the current context or the working tree, never a translation.
+ */
+export function readOriginalFile(path: string): string {
+	return contexts.getStore()?.readOriginal(path) ?? readGitFile(path)
+}
+
+/** The language of the current context: the one of its render, or Spanish outside one. */
+export function currentLocale(): DocsLocale {
+	return contexts.getStore()?.locale ?? defaultLocale
+}
+
+/**
+ * The file that {@link readRepositoryFile} reads for `path` in the current context, from the
+ * repository root: its translation when it reads one (`docs/en/api.md`), or the original.
+ */
+export function effectiveFile(path: string): string {
+	return contexts.getStore()?.translation(path)?.file ?? repositoryPath(path)
+}
+
+/**
+ * The language of a page rendered from `original` in the current context: in Spanish the original;
+ * in a translated language, its translation's status, or `missing` and a fallback without one.
+ * `original` `null` is a page whose content is never translated, such as a page generated from the
+ * JSDoc: in a translated language it is a fallback too.
+ */
+export function pageLocale(original: string | null): PageLocale {
+	const locale = currentLocale()
+	if (locale === defaultLocale) return { locale, status: null, fallback: false }
+	const found = original === null ? null : (contexts.getStore()?.translation(original) ?? null)
+	return found ? { locale, status: found.status, fallback: false } : { locale, status: 'missing', fallback: true }
+}
+
+/**
+ * GitHub URL of a file or folder of the repository, by the same paths as {@link readRepositoryFile}:
+ * in a translated language, the translation that the context reads.
+ */
 export function githubUrl(path: string, kind: 'blob' | 'edit' | 'tree' = 'blob'): string {
-	return `${repositoryUrl}/${kind}/main/${repositoryPath(path)}`
+	return `${repositoryUrl}/${kind}/main/${effectiveFile(path)}`
 }

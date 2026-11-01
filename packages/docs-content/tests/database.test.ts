@@ -117,7 +117,10 @@ describe('documentation database', { skip: url ? false : 'DATABASE_URL is not se
 		assert.match(page!.doc.html, /Segunda versión/)
 		const llms = await readPage<{ text: string }>('/llms-full.txt', db)
 		assert.match(llms!.text, /Segunda versión/)
-		assert.equal((await listPages(db)).length, result.pages)
+		assert.equal((await listPages(db)).length, result.locales.es.pages, 'listPages reads Spanish by default')
+		assert.equal((await listPages({ db, locale: 'en' })).length, result.locales.en.pages)
+		assert.equal(result.pages, result.locales.es.pages + result.locales.en.pages, 'one snapshot holds both languages')
+		assert.equal(result.locales.es.pages, result.locales.en.pages, 'English has every page, translated or as a fallback')
 
 		// Archiving the published revision brings Git back in the next snapshot.
 		const guide = (await getSource(db, { site: 'site', path: '/docs/doctor' }))!
@@ -382,13 +385,13 @@ describe('documentation database', { skip: url ? false : 'DATABASE_URL is not se
 
 	test('the metric and moderation tables enforce their rules', async () => {
 		await db.query("INSERT INTO docs_moderation (site, path, action, author) VALUES ('site', '/docs/doctor', 'hide', 'ana')")
-		await assert.rejects(db.query("INSERT INTO docs_moderation (site, path, action, author) VALUES ('site', '/docs/doctor', 'feature', 'ana')"), /docs_moderation_site_path/)
+		await assert.rejects(db.query("INSERT INTO docs_moderation (site, path, action, author) VALUES ('site', '/docs/doctor', 'feature', 'ana')"), /docs_moderation_site_locale_path/)
 		await assert.rejects(db.query("INSERT INTO docs_announcements (site, message, tone, author) VALUES ('ui', 'Aviso', 'loud', 'ana')"), /check constraint/)
 		await assert.rejects(db.query("INSERT INTO docs_announcements (site, message, author, starts_at, ends_at) VALUES ('ui', 'Aviso', 'ana', now(), now() - interval '1 day')"), /docs_announcements_window/)
 		await db.query("INSERT INTO docs_feedback (site, path, helpful, comment) VALUES ('i18n', '/plurals', true, NULL)")
 		await assert.rejects(db.query("INSERT INTO docs_feedback (site, path, helpful) VALUES ('blog', '/x', true)"), /check constraint/)
-		await db.query("INSERT INTO docs_page_views (site, path, day, views) VALUES ('site', '/docs', current_date, 1) ON CONFLICT (site, path, day) DO UPDATE SET views = docs_page_views.views + 1")
-		await db.query("INSERT INTO docs_page_views (site, path, day, views) VALUES ('site', '/docs', current_date, 1) ON CONFLICT (site, path, day) DO UPDATE SET views = docs_page_views.views + 1")
+		await db.query("INSERT INTO docs_page_views (site, path, day, views) VALUES ('site', '/docs', current_date, 1) ON CONFLICT (site, locale, path, day) DO UPDATE SET views = docs_page_views.views + 1")
+		await db.query("INSERT INTO docs_page_views (site, path, day, views) VALUES ('site', '/docs', current_date, 1) ON CONFLICT (site, locale, path, day) DO UPDATE SET views = docs_page_views.views + 1")
 		assert.equal((await db.query<{ views: string }>("SELECT views FROM docs_page_views WHERE site = 'site' AND path = '/docs'")).rows[0]?.views, '2')
 		await assert.rejects(db.query("INSERT INTO docs_searches (site, query, results) VALUES ('site', 'x', -1)"), /check constraint/)
 	})

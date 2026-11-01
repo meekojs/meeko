@@ -33,12 +33,13 @@ test('the navigation of a .meeko site is read from its syntax', async () => {
 
 test('the repository has Markdown sources for the site and pages for ui and i18n', async () => {
 	const sources = await collectRepositorySources()
-	const guide = sources.find((source) => source.site === 'site' && source.path === '/docs/inicio-rapido')
+	const originals = sources.filter((source) => (source.locale ?? 'es') === 'es')
+	const guide = originals.find((source) => source.site === 'site' && source.path === '/docs/inicio-rapido')
 	assert.equal(guide?.kind, 'guide')
 	assert.equal(guide?.file, 'packages/meeko/README.md')
 	assert.equal(guide?.title, 'Inicio rápido', 'the title is the heading the site shows')
 	assert.equal(guide?.markdown, readGitFile('README.md'))
-	const reference = sources.filter((source) => source.kind === 'reference')
+	const reference = originals.filter((source) => source.kind === 'reference')
 	assert.equal(reference.length, writtenPages().length)
 	assert.ok(reference.every((source) => source.path.startsWith('/docs/reference/') && source.file?.startsWith('docs/reference/')))
 	for (const site of ['ui', 'i18n'] as const) {

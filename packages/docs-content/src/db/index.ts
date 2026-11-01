@@ -14,6 +14,9 @@ export type { DraftUpdate, ExportedRevision, NewRevision, Revision, RevisionErro
 export type { DashboardSessionOptions } from './sessions'
 export type { ActiveSnapshot, PublishSnapshotOptions, SearchResult, SnapshotPage, SnapshotSummary } from './snapshots'
 export type { ImportResult, SourceDetail, SourceFilter, SourceRecord } from './sources'
+export type { TranslationCounts, TranslationDetail, TranslationEntry, TranslationFilter } from './translations'
+export type { DocsLocale, PageLocale, TranslationStatus } from '../locale'
+export type { SnapshotReadOptions } from './snapshots'
 
 export { publishDocumentation } from '../publish'
 export { collectRepositorySources } from '../sources/discover'
@@ -27,3 +30,6 @@ export { archiveRevision, assertPublishable, createRevision, exportRevision, get
 export { activateSnapshot, activeSnapshot, activeSnapshotId, listPages, listSnapshots, publishSnapshot, readPage, searchPages, SnapshotConflictError } from './snapshots'
 export { dashboardSessionDriver, pruneDashboardSessions } from './sessions'
 export { getSource, importRepositorySources, importSources, listSources } from './sources'
+export { countTranslations, listTranslations, translationDetail } from './translations'
+export { checkLocale, defaultLocale, docsLocales, localizedPath, splitLocalePath, translationStatus } from '../locale'
+export { translationSources } from '../sources/discover'

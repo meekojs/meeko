@@ -1,14 +1,44 @@
+import type { DocsLocale, TranslationStatus } from '../locale'
 import type { Database, Queryable } from './pool'
 
+import { checkLocale, docsLocales, localizedPath, translationStatuses } from '../locale'
 import { database, lockKeys, transaction } from './pool'
 
-/** A page of a snapshot: its URL path and the data its route renders. */
+/**
+ * A page of a snapshot: its URL path without the language prefix, its language and the data its
+ * route renders. In a translated language, its payload has the prefix in its links and an `i18n`
+ * field ({@link PageLocale}).
+ */
 export interface SnapshotPage {
 	readonly path: string
 	readonly payload: unknown
+	/** Its language; Spanish by default. */
+	readonly locale?: DocsLocale
+	/** In a translated language, how it was made ({@link TranslationStatus}); `null` or absent otherwise. */
+	readonly translation?: TranslationStatus | null
 }
 
-/** A result of {@link searchPages}. Excerpts are plain text for the client to escape. */
+/**
+ * Where and in which language a read of the snapshot looks: Spanish and the shared pool of
+ * `DATABASE_URL` by default. The functions that read also take the {@link Queryable} itself, as
+ * they always did.
+ */
+export interface SnapshotReadOptions {
+	readonly locale?: DocsLocale
+	readonly db?: Queryable
+}
+
+/** The options of a read, from the `Queryable` or the options it was given. */
+function readOptions(value: Queryable | SnapshotReadOptions | undefined): { readonly locale: DocsLocale; readonly db: Queryable } {
+	if (value && typeof (value as Partial<Queryable>).query === 'function') return { locale: 'es', db: value as Queryable }
+	const options = (value ?? {}) as SnapshotReadOptions
+	return { locale: checkLocale(options.locale), db: options.db ?? database() }
+}
+
+/**
+ * A result of {@link searchPages}. `url` is the public URL, with the prefix of its language
+ * (`/en/docs/api`). Excerpts are plain text for the client to escape.
+ */
 export interface SearchResult {
 	readonly url: string
 	readonly title: string
@@ -21,7 +51,10 @@ export interface SnapshotSummary {
 	readonly id: number
 	readonly publishedAt: Date
 	readonly active: boolean
+	/** Its pages in every language. */
 	readonly pages: number
+	/** Its pages per language. */
+	readonly pagesByLocale: Readonly<Record<DocsLocale, number>>
 	readonly publishedBy: string | null
 	readonly note: string | null
 }
@@ -169,13 +202,16 @@ export async function publishSnapshot(pages: readonly SnapshotPage[], options: P
 	if (!Number.isSafeInteger(keep) || keep < 2) throw new RangeError('A documentation database keeps at least 2 snapshots')
 
 	const seen = new Set<string>()
-	const serialized = pages.map(({ path, payload }) => {
+	const serialized = pages.map(({ path, payload, locale: language, translation = null }) => {
 		validatePath(path)
-		if (seen.has(path)) throw new TypeError(`Duplicate documentation URL path: ${path}`)
-		seen.add(path)
-		const json: string | undefined = JSON.stringify(payload)
+		const locale = checkLocale(language)
+		if (seen.has(`${locale}\0${path}`)) throw new TypeError(`Duplicate documentation URL path: ${locale} ${path}`)
+		seen.add(`${locale}\0${path}`)
+		if (translation !== null && (locale === 'es' || !translationStatuses.includes(translation))) throw new TypeError(`Invalid translation status of ${locale} ${path}: ${translation}`)
+		// jsonb cannot hold U+0000: a NUL that slipped into a document becomes U+FFFD instead of failing the publication.
+		const json: string | undefined = JSON.stringify(payload, (_key, value: unknown) => (typeof value === 'string' && value.includes('\0') ? value.replaceAll('\0', '\uFFFD') : value))
 		if (json === undefined) throw new TypeError(`Page payload is not JSON serializable: ${path}`)
-		return { path, json, text: searchableText(path, JSON.parse(json) as unknown) }
+		return { path, locale, translation, json, text: searchableText(path, JSON.parse(json) as unknown) }
 	})
 
 	return transaction(options.db ?? database(), async (client) => {
@@ -190,7 +226,7 @@ export async function publishSnapshot(pages: readonly SnapshotPage[], options: P
 		if (snapshotId === undefined) throw new Error('Failed to create documentation snapshot')
 
 		for (const page of serialized) {
-			await client.query('INSERT INTO docs_pages (snapshot_id, path, payload, searchable_text) VALUES ($1, $2, $3::jsonb, $4)', [snapshotId, page.path, page.json, page.text])
+			await client.query('INSERT INTO docs_pages (snapshot_id, locale, path, payload, searchable_text, translation) VALUES ($1, $2, $3, $4::jsonb, $5, $6)', [snapshotId, page.locale, page.path, page.json, page.text, page.translation])
 		}
 
 		await client.query('UPDATE docs_snapshots SET active = false WHERE active')
@@ -205,20 +241,25 @@ export async function publishSnapshot(pages: readonly SnapshotPage[], options: P
 	})
 }
 
-/** The stored snapshots, newest first, with their number of pages. */
+/** The stored snapshots, newest first, with their number of pages, in all and per language. */
 export async function listSnapshots(db: Queryable = database()): Promise<SnapshotSummary[]> {
-	const result = await db.query<{ id: string; published_at: Date; active: boolean; pages: string; published_by: string | null; note: string | null }>(
-		`SELECT s.id, s.published_at, s.active, s.published_by, s.note, (SELECT count(*) FROM docs_pages AS p WHERE p.snapshot_id = s.id) AS pages
+	const result = await db.query<{ id: string; published_at: Date; active: boolean; locales: Record<string, number> | null; published_by: string | null; note: string | null }>(
+		`SELECT s.id, s.published_at, s.active, s.published_by, s.note,
+			(SELECT jsonb_object_agg(c.locale, c.pages) FROM (SELECT p.locale, count(*) AS pages FROM docs_pages AS p WHERE p.snapshot_id = s.id GROUP BY p.locale) AS c) AS locales
 		FROM docs_snapshots AS s ORDER BY s.id DESC`,
 	)
-	return result.rows.map((row) => ({
-		id: Number(row.id),
-		publishedAt: row.published_at,
-		active: row.active,
-		pages: Number(row.pages),
-		publishedBy: row.published_by,
-		note: row.note,
-	}))
+	return result.rows.map((row) => {
+		const pagesByLocale = Object.fromEntries(docsLocales.map((locale) => [locale, Number(row.locales?.[locale] ?? 0)])) as Record<DocsLocale, number>
+		return {
+			id: Number(row.id),
+			publishedAt: row.published_at,
+			active: row.active,
+			pages: Object.values(pagesByLocale).reduce((sum, pages) => sum + pages, 0),
+			pagesByLocale,
+			publishedBy: row.published_by,
+			note: row.note,
+		}
+	})
 }
 
 /**
@@ -238,44 +279,70 @@ export async function activateSnapshot(id: number, db: Database = database()): P
 	})
 }
 
-/** Return a page from the active snapshot, or null when that URL is absent. */
-export async function readPage<T>(path: string, db: Queryable = database()): Promise<T | null> {
+/**
+ * A page of the active snapshot in a language (Spanish by default), by its path without the
+ * language prefix; `null` when that language has no such page. The second argument is the options
+ * or, as before, the database.
+ *
+ * @example
+ * ```ts
+ * const page = await readPage<GuidePayload>('/docs/api', { locale: 'en' })
+ * if (page?.i18n.fallback) showUntranslatedNotice()
+ * ```
+ */
+export async function readPage<T>(path: string, options?: Queryable | SnapshotReadOptions): Promise<T | null> {
 	validatePath(path)
-	const result = await db.query<{ payload: T }>('SELECT p.payload FROM docs_pages AS p JOIN docs_snapshots AS s ON s.id = p.snapshot_id WHERE s.active AND p.path = $1', [path])
+	const { locale, db } = readOptions(options)
+	const result = await db.query<{ payload: T }>('SELECT p.payload FROM docs_pages AS p JOIN docs_snapshots AS s ON s.id = p.snapshot_id WHERE s.active AND p.locale = $2 AND p.path = $1', [path, locale])
 	return result.rows[0]?.payload ?? null
 }
 
-/** List the active snapshot in URL order. */
-export async function listPages<T = unknown>(db: Queryable = database()): Promise<readonly { path: string; payload: T }[]> {
-	const result = await db.query<{ path: string; payload: T }>('SELECT p.path, p.payload FROM docs_pages AS p JOIN docs_snapshots AS s ON s.id = p.snapshot_id WHERE s.active ORDER BY p.path')
+/** The pages of the active snapshot in a language (Spanish by default), in URL order, by their path without prefix. */
+export async function listPages<T = unknown>(options?: Queryable | SnapshotReadOptions): Promise<readonly { path: string; payload: T }[]> {
+	const { locale, db } = readOptions(options)
+	const result = await db.query<{ path: string; payload: T }>('SELECT p.path, p.payload FROM docs_pages AS p JOIN docs_snapshots AS s ON s.id = p.snapshot_id WHERE s.active AND p.locale = $1 ORDER BY p.path', [locale])
 	return result.rows
 }
 
-/** Search only published documentation pages. Excerpts are plain text for the client to escape. */
-export async function searchPages(query: string, limit: number, db: Queryable = database()): Promise<readonly SearchResult[]> {
+/** The text search configuration of each language. */
+const searchConfigs: Readonly<Record<DocsLocale, string>> = { es: 'spanish', en: 'english' }
+
+/**
+ * Searches the published documentation pages of a language (Spanish by default). A page matches
+ * the words of the query in the configuration of its language (`spanish` or `english`, which find
+ * «señales» for «señal») or exactly (`simple`, as before); the exact matches rank first. URLs are
+ * public, with the prefix of the language. Excerpts are plain text for the client to escape.
+ */
+export async function searchPages(query: string, limit: number, options?: Queryable | SnapshotReadOptions): Promise<readonly SearchResult[]> {
 	const term = query.trim()
 	if (!Number.isSafeInteger(limit) || limit < 1) throw new RangeError('Search limit must be a positive integer')
 	if (term.length === 0) return []
 	if (term.length > 200) throw new RangeError('Search query is too long')
+	const { locale, db } = readOptions(options)
+	// Literals, from a closed list, so the partial index of the language applies.
+	const config = searchConfigs[locale]
+	const vector = `to_tsvector('${config}', p.searchable_text)`
 	const result = await db.query<{ url: string; title: string; excerpt: string; payload: unknown }>(
 		`SELECT p.path AS url,
 			p.payload,
 			COALESCE(p.payload #>> '{head,title}', p.payload #>> '{doc,title}', p.payload #>> '{written,title}', p.payload #>> '{page,name}',
-				CASE WHEN p.path = '/docs' THEN 'Documentación' ELSE p.path END) AS title,
+				CASE WHEN p.path = '/docs' THEN $3 ELSE p.path END) AS title,
 			substring(p.searchable_text FROM greatest(1, strpos(lower(p.searchable_text), lower(split_part($1, ' ', 1))) - 80) FOR 240) AS excerpt
 		FROM docs_pages AS p
 		JOIN docs_snapshots AS s ON s.id = p.snapshot_id
-		WHERE s.active AND (p.path = '/docs' OR p.path LIKE '/docs/%')
-			AND to_tsvector('simple', p.searchable_text) @@ plainto_tsquery('simple', $1)
+		WHERE s.active AND p.locale = '${locale}' AND (p.path = '/docs' OR p.path LIKE '/docs/%')
+			AND (${vector} @@ plainto_tsquery('${config}', $1) OR to_tsvector('simple', p.searchable_text) @@ plainto_tsquery('simple', $1))
 		ORDER BY CASE
 			WHEN lower(p.path) = '/docs/reference/' || lower($1) THEN 0
 			WHEN lower(p.path) LIKE '%' || lower($1) || '%' THEN 1
 			ELSE 2 END,
-			ts_rank(to_tsvector('simple', p.searchable_text), plainto_tsquery('simple', $1)) DESC, p.path
+			ts_rank(to_tsvector('simple', p.searchable_text), plainto_tsquery('simple', $1)) DESC,
+			ts_rank(${vector}, plainto_tsquery('${config}', $1)) DESC, p.path
 		LIMIT $2`,
-		[term, Math.min(limit, 50)],
+		[term, Math.min(limit, 50), locale === 'es' ? 'Documentación' : 'Documentation'],
 	)
-	return result.rows.map(({ url, title, excerpt, payload }) => {
+	return result.rows.map(({ url: path, title, excerpt, payload }) => {
+		const url = localizedPath(path, locale)
 		const toc = payload && typeof payload === 'object' && 'toc' in payload && Array.isArray(payload.toc) ? (payload.toc as unknown[]) : []
 		const sections = toc
 			.filter((item): item is { id: string; text: string } => !!item && typeof item === 'object' && 'id' in item && 'text' in item && typeof item.id === 'string' && typeof item.text === 'string')

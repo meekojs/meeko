@@ -1,8 +1,11 @@
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
+import type { DocsLocale } from '../locale'
+
 import { apiHref } from '../content/api'
-import { catalog } from '../content/catalog'
+import { catalog, catalogLabel } from '../content/catalog'
+import { readTranslation, translationFile } from '../content/i18n'
 import { parseFrontmatter } from '../content/reference'
 import { referenceFolder } from '../content/reference-taxonomy'
 import { gitFileExists, readGitFile, repositoryPath, repositoryRoot } from '../content/repository'
@@ -25,6 +28,13 @@ export interface SourceEntry {
 	readonly file: string | null
 	/** The Markdown of Git, or `null` for a `.meeko` page. */
 	readonly markdown: string | null
+	/** Its language: Spanish (the original) by default. */
+	readonly locale?: DocsLocale
+	/**
+	 * For a translation, the `source-hash` of its frontmatter: the hash of the Spanish original it
+	 * was made from, or `null` when it does not declare one. Absent for an original.
+	 */
+	readonly sourceHash?: string | null
 }
 
 /** The navigation modules of the sites made of `.meeko` pages. */
@@ -77,6 +87,33 @@ export function referenceSources(): SourceEntry[] {
 	return sources
 }
 
+/**
+ * The translations in `locale` of the Markdown sources `originals` that exist in Git
+ * (`docs/en/**`): same site, path and kind, the translation's file and Markdown as Git has them,
+ * and the `source-hash` they declare. The title is the one of the translation: its first heading
+ * (a guide) or its `title` (a reference page), else the original's.
+ */
+export function translationSources(originals: readonly SourceEntry[], locale: DocsLocale): SourceEntry[] {
+	const sources: SourceEntry[] = []
+	for (const original of originals) {
+		if (original.file === null || (original.locale ?? 'es') !== 'es') continue
+		const file = translationFile(original.file, locale)
+		if (file === null || !gitFileExists(file)) continue
+		const markdown = readGitFile(file)
+		const { text, sourceHash } = readTranslation(markdown)
+		let title: string | undefined
+		if (original.kind === 'reference') {
+			const value = parseFrontmatter(text, file).data.get('title')
+			title = typeof value === 'string' && value ? value : undefined
+		} else {
+			const entry = catalog.find((candidate) => candidate.href === original.path)
+			title = firstHeading(entry?.transform ? entry.transform(text) : text) ?? (entry ? catalogLabel(entry, locale) : undefined)
+		}
+		sources.push({ ...original, locale, title: title ?? original.title, file, markdown, sourceHash })
+	}
+	return sources
+}
+
 /** The `.meeko` pages of `apps/ui` or `apps/i18n`, from their navigation. */
 export async function pageSources(site: Exclude<DocsSite, 'site'>): Promise<SourceEntry[]> {
 	const file = navigationFiles[site]
@@ -87,17 +124,21 @@ export async function pageSources(site: Exclude<DocsSite, 'site'>): Promise<Sour
 
 /**
  * Every public page of the three sites as Git has them: guides and reference pages of `site` with
- * their Markdown, and the pages of `ui` and `i18n` without it. Published revisions are ignored.
+ * their Markdown, in Spanish and in each translation of `docs/en/**`, and the pages of `ui` and
+ * `i18n` without it. Published revisions are ignored.
  */
 export async function collectRepositorySources(sites: readonly DocsSite[] = ['site', 'ui', 'i18n']): Promise<SourceEntry[]> {
 	const sources: SourceEntry[] = []
-	if (sites.includes('site')) sources.push(...guideSources(), ...referenceSources())
+	if (sites.includes('site')) {
+		const originals = [...guideSources(), ...referenceSources()]
+		sources.push(...originals, ...translationSources(originals, 'en'))
+	}
 	if (sites.includes('ui')) sources.push(...(await pageSources('ui')))
 	if (sites.includes('i18n')) sources.push(...(await pageSources('i18n')))
 	const seen = new Set<string>()
 	for (const source of sources) {
-		const key = `${source.site}:${source.path}`
-		if (seen.has(key)) throw new Error(`Two sources for ${source.site} ${source.path}`)
+		const key = `${source.site}:${source.locale ?? 'es'}:${source.path}`
+		if (seen.has(key)) throw new Error(`Two sources for ${source.site} ${source.locale ?? 'es'} ${source.path}`)
 		seen.add(key)
 	}
 	return sources

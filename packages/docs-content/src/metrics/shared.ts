@@ -3,6 +3,9 @@
 // collection endpoints. It depends on Valibot only, so the browser imports it too.
 import * as v from 'valibot'
 
+import type { DocsLocale } from '../locale'
+
+import { docsLocales, splitLocalePath } from '../locale'
 import { routePath } from '../moderation/shared'
 
 /** A public site whose metrics are collected. */
@@ -173,17 +176,32 @@ export function isBotRequest(headers: { get(name: string): string | null }): boo
 	return /prefetch|prerender/.test(purpose)
 }
 
+/**
+ * The page that `href` reaches and its language: with `localized`, a public URL under `/en/` is
+ * English and its path loses the prefix (`/en/docs/api` → `en`, `/docs/api`); otherwise, and for any
+ * other URL, it is Spanish. The path is normalized as {@link metricPath} does; `null` when it is not
+ * a path of the site.
+ */
+export function metricLocalePath(href: string, localized = false): { readonly locale: DocsLocale; readonly path: string } | null {
+	const path = metricPath(href)
+	if (path === null) return null
+	if (!localized) return { locale: 'es', path }
+	return splitLocalePath(path)
+}
+
 const path = v.pipe(v.string(), v.maxLength(metricsLimits.path * 2), v.startsWith('/'))
 
 /** Body of `POST /api/docs/views`: the page shown. */
 export const viewInput = v.object({ path })
 
 /**
- * Body of `POST /api/docs/search`: the query and, for the local filter of ui and i18n, how many
- * pages it matched. The site counts the results of its own search and ignores `results`.
+ * Body of `POST /api/docs/search`: the query, the language of the page (Spanish by default) and,
+ * for the local filter of ui and i18n, how many pages it matched. The site counts the results of its own search and ignores `results`.
  */
 export const searchInput = v.object({
 	q: v.pipe(v.string(), v.maxLength(1000)),
+	/** The language of the page that searched; Spanish when absent. */
+	locale: v.optional(v.picklist(docsLocales)),
 	results: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(metricsLimits.results))),
 })
 

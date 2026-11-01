@@ -2,16 +2,17 @@
 // and nothing of the render, like `./snapshots`; the readings of the dashboard live in
 // `meeko-docs-content/db`. Each site declares its three endpoints with `defineApiRoute` and these
 // handlers, so Meeko checks their Origin, their rate limit and their body.
+import type { DocsLocale } from '../locale'
 import type { FeedbackInput, MetricsSite, SearchInput, ViewInput } from './shared'
 import type { MetricsWriter } from './write'
 
-import { isBotRequest, isSensitiveQuery, metricPath } from './shared'
+import { isBotRequest, isSensitiveQuery, metricLocalePath, metricPath } from './shared'
 import { metricsWriter } from './write'
 
 export type { FeedbackInput, FeedbackSaved, MetricsSite, SearchInput, ViewInput } from './shared'
 export type { FeedbackRecord, MetricsWriter, MetricsWriterOptions } from './write'
 
-export { feedbackInput, feedbackSaved, isBotRequest, isSensitiveQuery, metricPath, metricsEnabled, metricsLimits, metricsSites, normalizeQuery, searchInput, storedQuery, viewInput } from './shared'
+export { feedbackInput, feedbackSaved, isBotRequest, isSensitiveQuery, metricLocalePath, metricPath, metricsEnabled, metricsLimits, metricsSites, normalizeQuery, searchInput, storedQuery, viewInput } from './shared'
 export { createMetricsWriter, metricsWriter } from './write'
 
 /**
@@ -29,12 +30,19 @@ export const metricsRateLimits = Object.freeze({
 export interface CollectOptions {
 	readonly site: MetricsSite
 	/**
+	 * Whether the site has its pages in several languages, with the English ones under `/en/`:
+	 * then a path under `/en/` counts as English, without the prefix. `false` by default, as
+	 * before: every path is Spanish as it arrives.
+	 */
+	readonly localized?: boolean
+	/**
 	 * Whether `path` is a page of the site, so a request cannot fill the tables with made-up paths:
 	 * `true`, or the path of the page it is an alias of (`/en/playground` → `/playground`), which is
 	 * the one counted. It receives the path as the router reads it ({@link metricPath}: `/%62uttons`
-	 * and `//buttons` arrive as `/buttons`). A failure counts as unknown.
+	 * and `//buttons` arrive as `/buttons`) and, with `localized`, without the language prefix and
+	 * with its language. A failure counts as unknown.
 	 */
-	readonly knownPath: (path: string) => boolean | string | Promise<boolean | string>
+	readonly knownPath: (path: string, locale: DocsLocale) => boolean | string | Promise<boolean | string>
 	/** The writer; the one of the process ({@link metricsWriter}) by default. */
 	readonly writer?: MetricsWriter
 }
@@ -44,12 +52,14 @@ interface HandlerArgs<Body> {
 	readonly context: { readonly request: Request }
 }
 
-async function known(options: CollectOptions, href: string): Promise<string | null> {
-	const path = metricPath(href)
-	if (path === null) return null
+async function known(options: CollectOptions, href: string): Promise<{ readonly locale: DocsLocale; readonly path: string } | null> {
+	const page = metricLocalePath(href, options.localized)
+	if (page === null) return null
 	try {
-		const answer = await options.knownPath(path)
-		return answer === true ? path : typeof answer === 'string' ? metricPath(answer) : null
+		const answer = await options.knownPath(page.path, page.locale)
+		if (answer === true) return page
+		const alias = typeof answer === 'string' ? metricPath(answer) : null
+		return alias === null ? null : { locale: page.locale, path: alias }
 	} catch {
 		return null
 	}
@@ -68,31 +78,32 @@ async function known(options: CollectOptions, href: string): Promise<string | nu
 export function viewHandler(options: CollectOptions): (args: HandlerArgs<ViewInput>) => Promise<void> {
 	return async ({ body, context }) => {
 		if (isBotRequest(context.request.headers)) return
-		const path = await known(options, body.path)
-		if (path !== null) await (options.writer ?? metricsWriter()).view(options.site, path)
+		const page = await known(options, body.path)
+		if (page !== null) await (options.writer ?? metricsWriter()).view(options.site, page.path, page.locale)
 	}
 }
 
 /**
- * Handler of `POST /api/docs/search`: one confirmed search. `count` gives the results of the site's
- * own search; without it, the `results` the browser counted in its local filter are stored. A query
+ * Handler of `POST /api/docs/search`: one confirmed search, in the language of `body.locale`
+ * (Spanish by default). `count` gives the results of the site's own search in that language; without it, the `results` the browser counted in its local filter are stored. A query
  * that looks like personal data or a secret ({@link isSensitiveQuery}) is dropped here, before it is
  * cut, searched or stored, and nothing about it is logged.
  */
-export function searchHandler(options: Omit<CollectOptions, 'knownPath'> & { readonly count?: (query: string) => Promise<number> }): (args: HandlerArgs<SearchInput>) => Promise<void> {
+export function searchHandler(options: Omit<CollectOptions, 'knownPath' | 'localized'> & { readonly count?: (query: string, locale: DocsLocale) => Promise<number> }): (args: HandlerArgs<SearchInput>) => Promise<void> {
 	return async ({ body, context }) => {
 		if (isBotRequest(context.request.headers) || isSensitiveQuery(body.q)) return
 		const writer = options.writer ?? metricsWriter()
 		if (!writer.enabled) return
+		const locale = body.locale ?? 'es'
 		let results = body.results
 		if (options.count) {
 			try {
-				results = await options.count(body.q)
+				results = await options.count(body.q, locale)
 			} catch {
 				return
 			}
 		}
-		if (results !== undefined) await writer.search(options.site, body.q, results)
+		if (results !== undefined) await writer.search(options.site, body.q, results, locale)
 	}
 }
 
@@ -104,8 +115,8 @@ export function searchHandler(options: Omit<CollectOptions, 'knownPath'> & { rea
 export function feedbackHandler(options: CollectOptions): (args: HandlerArgs<FeedbackInput>) => Promise<{ saved: boolean }> {
 	return async ({ body, context }) => {
 		if (isBotRequest(context.request.headers)) return { saved: false }
-		const path = await known(options, body.path)
-		if (path === null) return { saved: false }
-		return { saved: await (options.writer ?? metricsWriter()).feedback(options.site, { path, helpful: body.helpful, comment: body.comment }) }
+		const page = await known(options, body.path)
+		if (page === null) return { saved: false }
+		return { saved: await (options.writer ?? metricsWriter()).feedback(options.site, { path: page.path, locale: page.locale, helpful: body.helpful, comment: body.comment }) }
 	}
 }

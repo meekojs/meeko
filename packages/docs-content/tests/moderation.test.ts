@@ -274,7 +274,7 @@ describe('moderation rules applied to pages', () => {
 		visit(join(here, '../src/moderation/index.ts'))
 		assert.deepEqual([...external].sort(), ['node:crypto', 'pg'])
 		const shared = readFileSync(join(here, '../src/moderation/shared.ts'), 'utf8')
-		assert.doesNotMatch(shared, /^import /m, 'the module the browser loads imports nothing')
+		assert.doesNotMatch(shared, /^import (?!type )/m, 'the module the browser loads imports nothing but types')
 	})
 })
 

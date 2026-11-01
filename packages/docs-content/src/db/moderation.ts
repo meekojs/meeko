@@ -1,13 +1,18 @@
+import type { DocsLocale } from '../locale'
 import type { AnnouncementTone, ModerationAction, ModerationSite } from '../moderation/shared'
 import type { Queryable } from './pool'
 
+import { isDocsLocale } from '../locale'
 import { announcementTones, moderationActions, moderationSites, pagePath } from '../moderation/shared'
 import { database } from './pool'
 
-/** A rule of `docs_moderation`: one per page of a site. */
+/** A rule of `docs_moderation`: one per page of a site and language. */
 export interface ModerationRule {
 	readonly id: number
 	readonly site: ModerationSite
+	/** The language it applies to, or `null` for every language. */
+	readonly locale: DocsLocale | null
+	/** The path of the page without the language prefix. */
 	readonly path: string
 	readonly action: ModerationAction
 	readonly reason: string | null
@@ -21,6 +26,9 @@ export interface ModerationRule {
 /** A rule to create, or the new state of the rule of that page. */
 export interface ModerationRuleInput {
 	readonly site: ModerationSite
+	/** The language it applies to, `null` for every language; Spanish when absent, as before. */
+	readonly locale?: DocsLocale | null
+	/** The path of the page without the language prefix (`/docs/api`, also for English). */
 	readonly path: string
 	readonly action: ModerationAction
 	readonly reason?: string | null
@@ -31,6 +39,8 @@ export interface ModerationRuleInput {
 export interface Announcement {
 	readonly id: number
 	readonly site: ModerationSite
+	/** The language whose pages show it, or `null` for every language. */
+	readonly locale: DocsLocale | null
 	readonly message: string
 	readonly tone: AnnouncementTone
 	readonly startsAt: Date | null
@@ -65,6 +75,11 @@ export interface RuleWriteOptions extends WriteOptions {
 /** An announcement to create, or the new state of one. */
 export interface AnnouncementInput {
 	readonly site: ModerationSite
+	/**
+	 * The language whose pages show it, `null` for every language. When absent, a new one is
+	 * Spanish, as before, and a change keeps the language it had.
+	 */
+	readonly locale?: DocsLocale | null
 	readonly message: string
 	readonly tone: AnnouncementTone
 	readonly startsAt?: Date | null
@@ -104,6 +119,7 @@ export const moderationLimits = { path: 512, reason: 2000, author: 200, message:
 interface RuleRow {
 	readonly id: string
 	readonly site: ModerationSite
+	readonly locale: DocsLocale | null
 	readonly path: string
 	readonly action: ModerationAction
 	readonly reason: string | null
@@ -115,6 +131,7 @@ interface RuleRow {
 interface AnnouncementRow {
 	readonly id: string
 	readonly site: ModerationSite
+	readonly locale: DocsLocale | null
 	readonly message: string
 	readonly tone: AnnouncementTone
 	readonly starts_at: Date | null
@@ -125,13 +142,14 @@ interface AnnouncementRow {
 	readonly version: number
 }
 
-const rule = (row: RuleRow): ModerationRule => ({ id: Number(row.id), site: row.site, path: row.path, action: row.action, reason: row.reason, author: row.author, createdAt: row.created_at, version: row.version })
+const rule = (row: RuleRow): ModerationRule => ({ id: Number(row.id), site: row.site, locale: row.locale, path: row.path, action: row.action, reason: row.reason, author: row.author, createdAt: row.created_at, version: row.version })
 
-const ruleColumns = 'id, site, path, action, reason, author, created_at, version'
+const ruleColumns = 'id, site, locale, path, action, reason, author, created_at, version'
 
 const announcement = (row: AnnouncementRow): Announcement => ({
 	id: Number(row.id),
 	site: row.site,
+	locale: row.locale,
 	message: row.message,
 	tone: row.tone,
 	startsAt: row.starts_at,
@@ -149,6 +167,21 @@ function invalid(message: string): never {
 function checkSite(site: string): ModerationSite {
 	if (!(moderationSites as readonly string[]).includes(site)) invalid(`Unknown site: ${site}`)
 	return site as ModerationSite
+}
+
+/** A language of a rule or an announcement: `undefined` is Spanish and `null` every language. */
+function checkLocaleOrAll(locale: DocsLocale | null | undefined): DocsLocale | null {
+	if (locale === undefined) return 'es'
+	if (locale !== null && !isDocsLocale(locale)) invalid(`Unknown locale: ${String(locale)}`)
+	return locale
+}
+
+/** A filter by language: `undefined` matches every row, `null` only the rules of every language. */
+type LocaleFilter = { readonly locale?: DocsLocale | null }
+
+function filterValues(filter: LocaleFilter): [boolean, DocsLocale | null] {
+	if (filter.locale === undefined) return [false, null]
+	return [true, checkLocaleOrAll(filter.locale)]
 }
 
 function checkAuthor(author: string): string {
@@ -185,33 +218,46 @@ async function refuse(db: Queryable, table: 'docs_announcements' | 'docs_moderat
 /**
  * The pages of `site` a rule can name: its sources that Git still has and, for `site`, the pages
  * of the active snapshot (the reference pages generated from the JSDoc have no source), without
- * `/llms.txt` and `/llms-full.txt`. Sorted by path.
+ * `/llms.txt` and `/llms-full.txt`, with their titles in `locale` (Spanish by default). Their paths
+ * have no language prefix. Sorted by path.
  */
-export async function listKnownPages(db: Queryable = database(), site: ModerationSite): Promise<KnownPage[]> {
+export async function listKnownPages(db: Queryable = database(), site: ModerationSite, options: { readonly locale?: DocsLocale } = {}): Promise<KnownPage[]> {
 	checkSite(site)
-	const sources = await db.query<{ path: string; title: string }>('SELECT path, title FROM docs_sources WHERE site = $1 AND removed_at IS NULL', [site])
+	// Every language has the pages of Spanish, translated or as a fallback; the titles are the language's.
+	const locale = checkLocaleOrAll(options.locale) ?? 'es'
+	const sources = await db.query<{ path: string; title: string }>(`SELECT DISTINCT ON (path) path, title FROM docs_sources WHERE site = $1 AND removed_at IS NULL AND locale IN ('es', $2) ORDER BY path, locale = $2 DESC`, [site, locale])
 	const pages = new Map<string, KnownPage>()
 	for (const row of sources.rows) pages.set(row.path, { path: row.path, title: row.title, origin: 'source' })
 	if (site === 'site') {
 		const snapshot = await db.query<{ path: string; title: string | null }>(
 			`SELECT p.path, COALESCE(p.payload #>> '{written,title}', p.payload #>> '{page,name}', p.payload #>> '{doc,title}', p.payload #>> '{head,title}') AS title
 			FROM docs_pages AS p JOIN docs_snapshots AS s ON s.id = p.snapshot_id
-			WHERE s.active AND p.path NOT IN ('/llms.txt', '/llms-full.txt')`,
+			WHERE s.active AND p.locale = $1 AND p.path NOT IN ('/llms.txt', '/llms-full.txt')`,
+			[locale],
 		)
 		for (const row of snapshot.rows) if (!pages.has(row.path)) pages.set(row.path, { path: row.path, title: row.title ?? row.path, origin: 'snapshot' })
 	}
 	return [...pages.values()].sort((a, b) => a.path.localeCompare(b.path))
 }
 
-/** The rules of `site`, or of every site, by site and path. */
-export async function listModerationRules(db: Queryable = database(), site?: ModerationSite): Promise<ModerationRule[]> {
+/**
+ * The rules of `site`, or of every site, by site, path and language. `locale` keeps the rules of
+ * that language and the global ones; `null`, only the global ones.
+ */
+export async function listModerationRules(db: Queryable = database(), site?: ModerationSite, filter: LocaleFilter = {}): Promise<ModerationRule[]> {
 	if (site !== undefined) checkSite(site)
-	const result = await db.query<RuleRow>(`SELECT ${ruleColumns} FROM docs_moderation WHERE ($1::text IS NULL OR site = $1) ORDER BY site, path`, [site ?? null])
+	const [filtered, locale] = filterValues(filter)
+	const result = await db.query<RuleRow>(
+		`SELECT ${ruleColumns} FROM docs_moderation
+		WHERE ($1::text IS NULL OR site = $1) AND (NOT $2 OR locale IS NULL OR locale = $3::text)
+		ORDER BY site, path, locale NULLS FIRST`,
+		[site ?? null, filtered, locale],
+	)
 	return result.rows.map(rule)
 }
 
 /**
- * Hides or features a page: creates the rule of `(site, path)` or replaces the one it has, with
+ * Hides or features a page: creates the rule of `(site, locale, path)` or replaces the one it has, with
  * the new author and date, and adds one to its version. The path must be a page that
  * {@link listKnownPages} lists, unless `allowUnknown`, and the home page (`/`) cannot be hidden.
  * With `expectedVersion` (see {@link RuleWriteOptions}), `null` creates the rule only if the page
@@ -222,6 +268,7 @@ export async function listModerationRules(db: Queryable = database(), site?: Mod
  */
 export async function saveModerationRule(db: Queryable = database(), input: ModerationRuleInput, options: RuleWriteOptions & { readonly allowUnknown?: boolean } = {}): Promise<ModerationRule> {
 	const site = checkSite(input.site)
+	const locale = checkLocaleOrAll(input.locale)
 	const path = pagePath(input.path.trim())
 	if (!/^\/[^?#\s]*$/.test(path) || path.length > moderationLimits.path) invalid(`Invalid page path: ${input.path}`)
 	if (!(moderationActions as readonly string[]).includes(input.action)) invalid(`Unknown action: ${input.action}`)
@@ -232,23 +279,24 @@ export async function saveModerationRule(db: Queryable = database(), input: Mode
 	const expected = checkVersion(options.expectedVersion)
 	const expectedId = options.expectedId === undefined ? undefined : checkId(options.expectedId)
 	if (typeof expected === 'number' && expectedId === undefined) invalid('A rule written from the version it had names its id too')
-	if (!options.allowUnknown && !(await listKnownPages(db, site)).some((page) => page.path === path)) throw new ModerationError('unknown-page', `${site} has no page ${path}`)
-	const values = [site, path, input.action, reason, author]
+	if (!options.allowUnknown && !(await listKnownPages(db, site, locale === null ? {} : { locale })).some((page) => page.path === path)) throw new ModerationError('unknown-page', `${site} has no page ${path}`)
+	const values = [site, path, input.action, reason, author, locale]
+	const name = `The rule of ${site} ${locale ?? 'all'} ${path}`
 	if (expected === null) {
-		const created = await db.query<RuleRow>(`INSERT INTO docs_moderation (site, path, action, reason, author) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (site, path) DO NOTHING RETURNING ${ruleColumns}`, values)
-		return created.rows[0] ? rule(created.rows[0]) : conflict(`The rule of ${site} ${path}`)
+		const created = await db.query<RuleRow>(`INSERT INTO docs_moderation (site, path, action, reason, author, locale) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT ON CONSTRAINT docs_moderation_site_locale_path DO NOTHING RETURNING ${ruleColumns}`, values)
+		return created.rows[0] ? rule(created.rows[0]) : conflict(name)
 	}
 	if (expected !== undefined) {
 		const updated = await db.query<RuleRow>(
 			`UPDATE docs_moderation SET action = $3, reason = $4, author = $5, created_at = now(), version = version + 1
-			WHERE site = $1 AND path = $2 AND version = $6 AND id = $7 RETURNING ${ruleColumns}`,
+			WHERE site = $1 AND path = $2 AND locale IS NOT DISTINCT FROM $6::text AND version = $7 AND id = $8 RETURNING ${ruleColumns}`,
 			[...values, expected, expectedId],
 		)
-		return updated.rows[0] ? rule(updated.rows[0]) : conflict(`The rule of ${site} ${path}`)
+		return updated.rows[0] ? rule(updated.rows[0]) : conflict(name)
 	}
 	const result = await db.query<RuleRow>(
-		`INSERT INTO docs_moderation (site, path, action, reason, author) VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (site, path) DO UPDATE SET action = EXCLUDED.action, reason = EXCLUDED.reason, author = EXCLUDED.author, created_at = now(), version = docs_moderation.version + 1
+		`INSERT INTO docs_moderation (site, path, action, reason, author, locale) VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT ON CONSTRAINT docs_moderation_site_locale_path DO UPDATE SET action = EXCLUDED.action, reason = EXCLUDED.reason, author = EXCLUDED.author, created_at = now(), version = docs_moderation.version + 1
 		RETURNING ${ruleColumns}`,
 		values,
 	)
@@ -270,6 +318,7 @@ export async function deleteModerationRule(db: Queryable = database(), id: numbe
 
 function announcementValues(input: AnnouncementInput): unknown[] {
 	const site = checkSite(input.site)
+	if (input.locale !== undefined) checkLocaleOrAll(input.locale)
 	const message = input.message.trim()
 	if (!message) invalid('The message is required')
 	if (message.length > moderationLimits.message) invalid(`The message is longer than ${moderationLimits.message} characters`)
@@ -281,12 +330,21 @@ function announcementValues(input: AnnouncementInput): unknown[] {
 	return [site, message, input.tone, startsAt, endsAt, input.active, checkAuthor(input.author)]
 }
 
-const announcementColumns = 'id, site, message, tone, starts_at, ends_at, active, author, created_at, version'
+const announcementColumns = 'id, site, locale, message, tone, starts_at, ends_at, active, author, created_at, version'
 
-/** The announcements of `site`, or of every site, newest first. */
-export async function listAnnouncements(db: Queryable = database(), site?: ModerationSite): Promise<Announcement[]> {
+/**
+ * The announcements of `site`, or of every site, newest first. `locale` keeps those its pages show
+ * (that language and every language); `null`, only those of every language.
+ */
+export async function listAnnouncements(db: Queryable = database(), site?: ModerationSite, filter: LocaleFilter = {}): Promise<Announcement[]> {
 	if (site !== undefined) checkSite(site)
-	const result = await db.query<AnnouncementRow>(`SELECT ${announcementColumns} FROM docs_announcements WHERE ($1::text IS NULL OR site = $1) ORDER BY created_at DESC, id DESC`, [site ?? null])
+	const [filtered, locale] = filterValues(filter)
+	const result = await db.query<AnnouncementRow>(
+		`SELECT ${announcementColumns} FROM docs_announcements
+		WHERE ($1::text IS NULL OR site = $1) AND (NOT $2 OR locale IS NULL OR locale = $3::text)
+		ORDER BY created_at DESC, id DESC`,
+		[site ?? null, filtered, locale],
+	)
 	return result.rows.map(announcement)
 }
 
@@ -296,7 +354,7 @@ export async function listAnnouncements(db: Queryable = database(), site?: Moder
  * @throws {ModerationError} `invalid` for an empty or long message, an unknown tone or an end that is not after the start.
  */
 export async function createAnnouncement(db: Queryable = database(), input: AnnouncementInput): Promise<Announcement> {
-	const result = await db.query<AnnouncementRow>(`INSERT INTO docs_announcements (site, message, tone, starts_at, ends_at, active, author) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ${announcementColumns}`, announcementValues(input))
+	const result = await db.query<AnnouncementRow>(`INSERT INTO docs_announcements (site, message, tone, starts_at, ends_at, active, author, locale) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING ${announcementColumns}`, [...announcementValues(input), checkLocaleOrAll(input.locale)])
 	return announcement(result.rows[0]!)
 }
 
@@ -310,9 +368,10 @@ export async function createAnnouncement(db: Queryable = database(), input: Anno
 export async function updateAnnouncement(db: Queryable = database(), id: number, input: AnnouncementInput, options: WriteOptions = {}): Promise<Announcement> {
 	const expected = checkVersion(options.expectedVersion)
 	const result = await db.query<AnnouncementRow>(
-		`UPDATE docs_announcements SET site = $2, message = $3, tone = $4, starts_at = $5, ends_at = $6, active = $7, author = $8, version = version + 1
+		`UPDATE docs_announcements SET site = $2, message = $3, tone = $4, starts_at = $5, ends_at = $6, active = $7, author = $8, version = version + 1,
+			locale = CASE WHEN $10 THEN $11::text ELSE locale END
 		WHERE id = $1 AND ($9::integer IS NULL OR version = $9) RETURNING ${announcementColumns}`,
-		[checkId(id), ...announcementValues(input), expected ?? null],
+		[checkId(id), ...announcementValues(input), expected ?? null, input.locale !== undefined, input.locale ?? null],
 	)
 	const row = result.rows[0]
 	return row ? announcement(row) : refuse(db, 'docs_announcements', id, `Announcement ${id}`)

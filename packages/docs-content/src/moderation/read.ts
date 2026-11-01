@@ -1,8 +1,10 @@
 import pg from 'pg'
 
 import type { Queryable } from '../db/pool'
+import type { DocsLocale } from '../locale'
 import type { AnnouncementTone, ModerationSite, PublicAnnouncement, SiteModeration } from './shared'
 
+import { checkLocale, localizedPath } from '../locale'
 import { emptyModeration } from './shared'
 
 /** Options of {@link createModerationReader}. */
@@ -25,11 +27,14 @@ export interface ModerationReaderOptions {
 /** Reads the moderation of the public sites through a short in-memory cache. */
 export interface ModerationReader {
 	/**
-	 * The moderation of `site`: never throws. Without a database, or when it fails, it is
-	 * {@link emptyModeration} and the failure is logged, so the site keeps serving its pages.
+	 * The moderation of `site` in `locale` (Spanish by default): its own rules and announcements and
+	 * those of every language (`locale` `NULL`); a rule of the language wins over a global one for
+	 * the same page. Its paths are the public URLs of the language. Never throws: without a
+	 * database, or when it fails, it is {@link emptyModeration} and the failure is logged, so the
+	 * site keeps serving its pages.
 	 */
-	read(site: ModerationSite): Promise<SiteModeration>
-	/** Forgets the cached moderation of `site`, or of every site, so the next read queries again. */
+	read(site: ModerationSite, locale?: DocsLocale): Promise<SiteModeration>
+	/** Forgets the cached moderation of `site` in every language, or of every site, so the next read queries again. */
 	invalidate(site?: ModerationSite): void
 	/** Closes the pool this reader opened, if any. */
 	close(): Promise<void>
@@ -97,8 +102,9 @@ export function createModerationReader(options: ModerationReaderOptions = {}): M
 	const retry = options.retryMs ?? 10_000
 	const now = options.now ?? Date.now
 	const log = options.log ?? ((message: string) => console.warn(message))
-	const cache = new Map<ModerationSite, Cached>()
-	const pending = new Map<ModerationSite, Promise<Cached>>()
+	// By site and language: `site:es`.
+	const cache = new Map<string, Cached>()
+	const pending = new Map<string, Promise<Cached>>()
 	let pool: pg.Pool | undefined
 	let failing = false
 	let warnedMissing = false
@@ -110,7 +116,7 @@ export function createModerationReader(options: ModerationReaderOptions = {}): M
 		return (pool ??= sitePool(connectionString, log))
 	}
 
-	const query = async (site: ModerationSite): Promise<Cached> => {
+	const query = async (site: ModerationSite, locale: DocsLocale): Promise<Cached> => {
 		const db = database()
 		if (!db) {
 			if (!warnedMissing) log('[docs-moderation] DATABASE_URL is not set: serving the pages without moderation or announcements')
@@ -120,27 +126,33 @@ export function createModerationReader(options: ModerationReaderOptions = {}): M
 		try {
 			// The limit applies to the announcements in force and, apart, to the scheduled ones, after
 			// their dates: a limit before them let twenty scheduled announcements hide one in force.
+			// The rule of the language first: it wins over the global rule of the same page.
 			const [rules, live, scheduled] = await Promise.all([
-				db.query<{ path: string; action: 'feature' | 'hide' }>('SELECT path, action FROM docs_moderation WHERE site = $1 ORDER BY path', [site]),
-				db.query<AnnouncementRow>(
-					`SELECT id, message, tone, starts_at, ends_at, created_at FROM docs_announcements
-					WHERE site = $1 AND active AND (starts_at IS NULL OR starts_at <= now()) AND (ends_at IS NULL OR ends_at > now())
-					ORDER BY created_at DESC, id DESC LIMIT $2`,
-					[site, announcementRows],
+				db.query<{ path: string; action: 'feature' | 'hide' }>(
+					`SELECT DISTINCT ON (path) path, action FROM docs_moderation
+					WHERE site = $1 AND (locale IS NULL OR locale = $2) ORDER BY path, locale IS NULL`,
+					[site, locale],
 				),
 				db.query<AnnouncementRow>(
 					`SELECT id, message, tone, starts_at, ends_at, created_at FROM docs_announcements
-					WHERE site = $1 AND active AND starts_at > now()
+					WHERE site = $1 AND (locale IS NULL OR locale = $3) AND active AND (starts_at IS NULL OR starts_at <= now()) AND (ends_at IS NULL OR ends_at > now())
+					ORDER BY created_at DESC, id DESC LIMIT $2`,
+					[site, announcementRows, locale],
+				),
+				db.query<AnnouncementRow>(
+					`SELECT id, message, tone, starts_at, ends_at, created_at FROM docs_announcements
+					WHERE site = $1 AND (locale IS NULL OR locale = $3) AND active AND starts_at > now()
 					ORDER BY starts_at, id LIMIT $2`,
-					[site, announcementRows],
+					[site, announcementRows, locale],
 				),
 			])
 			if (failing) log('[docs-moderation] the database answers again')
 			failing = false
+			const paths = (action: 'feature' | 'hide'): string[] => rules.rows.filter((row) => row.action === action).map((row) => localizedPath(row.path, locale))
 			return {
 				expires: now() + ttl,
-				hidden: rules.rows.filter((row) => row.action === 'hide').map((row) => row.path),
-				featured: rules.rows.filter((row) => row.action === 'feature').map((row) => row.path),
+				hidden: paths('hide'),
+				featured: paths('feature'),
 				announcements: [...live.rows, ...scheduled.rows],
 			}
 		} catch (error) {
@@ -151,23 +163,25 @@ export function createModerationReader(options: ModerationReaderOptions = {}): M
 	}
 
 	return {
-		async read(site) {
-			let entry = cache.get(site)
+		async read(site, language) {
+			const locale = checkLocale(language)
+			const key = `${site}:${locale}`
+			let entry = cache.get(key)
 			if (!entry || entry.expires <= now()) {
-				let running = pending.get(site)
+				let running = pending.get(key)
 				if (!running) {
-					running = query(site).finally(() => pending.delete(site))
-					pending.set(site, running)
+					running = query(site, locale).finally(() => pending.delete(key))
+					pending.set(key, running)
 				}
 				entry = await running
-				cache.set(site, entry)
+				cache.set(key, entry)
 			}
 			if (!entry.hidden.length && !entry.featured.length && !entry.announcements.length) return emptyModeration
 			return { hidden: entry.hidden, featured: entry.featured, announcements: inForce(entry.announcements, now()) }
 		},
 		invalidate(site) {
-			if (site) cache.delete(site)
-			else cache.clear()
+			if (!site) cache.clear()
+			else for (const key of [...cache.keys()]) if (key.startsWith(`${site}:`)) cache.delete(key)
 		},
 		async close() {
 			cache.clear()
@@ -205,17 +219,19 @@ function reader(): ModerationReader {
 }
 
 /**
- * The moderation of `site` from `DATABASE_URL`, cached for 30 s: the rules and the announcements
- * in force. Never throws: without a database it returns {@link emptyModeration} and logs once.
+ * The moderation of `site` in a language (Spanish by default) from `DATABASE_URL`, cached for 30 s:
+ * the rules and the announcements in force, those of the language and the global ones. Its paths
+ * are the public URLs of the language (`/en/docs/api`). Never throws: without a database it returns
+ * {@link emptyModeration} and logs once.
  *
  * @example
  * ```ts
- * const moderation = await readSiteModeration('site')
+ * const moderation = await readSiteModeration('site', { locale: 'en' })
  * if (isHiddenPath(moderation, url.pathname)) notFound()
  * ```
  */
-export function readSiteModeration(site: ModerationSite): Promise<SiteModeration> {
-	return reader().read(site)
+export function readSiteModeration(site: ModerationSite, options: { readonly locale?: DocsLocale } = {}): Promise<SiteModeration> {
+	return reader().read(site, options.locale)
 }
 
 /** Forgets the cached moderation of `site`, or of every site, in this process. */

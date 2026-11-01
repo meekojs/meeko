@@ -7,6 +7,7 @@
 		"./db": "./src/db/index.ts",
 		"./render": "./src/snapshot.ts",
 		"./diff": "./src/diff.ts",
+		"./locale": "./src/locale.ts",
 		"./health": "./src/health.ts",
 		"./liveness": "./src/liveness.ts",
 		"./status": "./src/db/status.ts",
@@ -20,7 +21,8 @@
 	},
 	"scripts": {
 		"check": "tsc -p tsconfig.json --noEmit",
-		"test": "tsx --test --test-concurrency=1 tests/*.test.ts"
+		"test": "tsx --test --test-concurrency=1 tests/*.test.ts",
+		"translations": "tsx scripts/translations.ts"
 	},
 	"dependencies": {
 		"@meekojs/meeko": "workspace:*",

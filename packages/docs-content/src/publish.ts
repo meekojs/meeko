@@ -1,8 +1,10 @@
 import type { Database } from './db/pool'
+import type { DocsLocale, TranslationStatus } from './locale'
 
 import { contentLockKey, database, lockKeys } from './db/pool'
 import { publishedOverlay } from './db/revisions'
 import { activeSnapshot, publishSnapshot } from './db/snapshots'
+import { docsLocales } from './locale'
 import { buildSnapshotPages } from './snapshot'
 
 /** Options of {@link publishDocumentation}. */
@@ -23,7 +25,13 @@ export interface PublishDocumentationOptions {
 /** What {@link publishDocumentation} published. */
 export interface PublishedDocumentation {
 	readonly snapshotId: number
+	/** Its pages in every language. */
 	readonly pages: number
+	/**
+	 * Its pages per language, and how many pages of each translated language are translated,
+	 * outdated or a Spanish fallback (`missing`).
+	 */
+	readonly locales: Readonly<Record<DocsLocale, { readonly pages: number; readonly translation: Readonly<Record<TranslationStatus, number>> }>>
 	/** Files rendered from a published revision instead of Git, from the repository root. */
 	readonly revisions: readonly string[]
 }
@@ -58,8 +66,9 @@ export async function withContentLock<T>(db: Database, task: () => Promise<T>): 
 }
 
 /**
- * Renders every page of the site with the published revisions over the files of Git and activates
- * the result as a new snapshot. Until it commits, readers see the previous snapshot; when the
+ * Renders every page of the site in every language with the published revisions over the files of
+ * Git and activates the result as a new snapshot: one snapshot holds both languages, so publishing
+ * and a rollback switch them at once. Until it commits, readers see the previous snapshot; when the
  * render fails nothing is stored.
  *
  * From before it reads the revisions until the snapshot commits it holds the content lock
@@ -86,6 +95,13 @@ export async function publishDocumentation(db: Database = database(), options: P
 			...(options.note === undefined ? {} : { note: options.note }),
 			...(options.keep === undefined ? {} : { keep: options.keep }),
 		})
-		return { snapshotId, pages: pages.length, revisions: [...overlay.keys()] }
+		const locales = Object.fromEntries(
+			docsLocales.map((locale) => {
+				const own = pages.filter((page) => (page.locale ?? 'es') === locale)
+				const count = (status: TranslationStatus): number => own.filter((page) => page.translation === status).length
+				return [locale, { pages: own.length, translation: { translated: count('translated'), outdated: count('outdated'), missing: count('missing') } }]
+			}),
+		) as PublishedDocumentation['locales']
+		return { snapshotId, pages: pages.length, locales, revisions: [...overlay.keys()] }
 	})
 }

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 
+import type { DocsLocale } from '../locale'
 import type { ModerationSite } from './shared'
 
 import { readSiteModeration } from './read'
@@ -25,8 +26,8 @@ export function revalidatedDocument(request: Request, body: string, contentType:
 }
 
 /**
- * The answer of the moderation endpoint of a site ({@link moderationEndpoint}): its moderation as
- * JSON, without the announcements that the cookie of `request` closed, never stored by a cache. The
+ * The answer of the moderation endpoint of a site in a language ({@link moderationEndpoint}; Spanish
+ * by default): its moderation as JSON, without the announcements that the cookie of `request` closed, never stored by a cache. The
  * browser asks for it after every navigation, so a long session sees the rules and announcements of
  * the dashboard within the 30 s of the reader. Never throws: without a database it is the empty
  * moderation.
@@ -36,7 +37,7 @@ export function revalidatedDocument(request: Request, body: string, contentType:
  * if (url.pathname === moderationEndpoint('site')) return moderationResponse('site', request)
  * ```
  */
-export async function moderationResponse(site: ModerationSite, request: Request): Promise<Response> {
-	const moderation = withoutDismissed(await readSiteModeration(site), request.headers.get('cookie'))
+export async function moderationResponse(site: ModerationSite, request: Request, options: { readonly locale?: DocsLocale } = {}): Promise<Response> {
+	const moderation = withoutDismissed(await readSiteModeration(site, options), request.headers.get('cookie'))
 	return Response.json(moderation, { headers: { 'cache-control': 'no-store' } })
 }

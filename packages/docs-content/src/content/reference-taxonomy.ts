@@ -1,6 +1,7 @@
 import GithubSlugger from 'github-slugger'
 
-import { readRepositoryFile, sourceCache } from './repository'
+import { translationFile } from './i18n'
+import { currentLocale, gitFileExists, readOriginalFile, readRepositoryFile, sourceCache } from './repository'
 
 /*
  * The taxonomy of the API reference: `docs/reference/taxonomy.json`, the groups of the sidebar
@@ -98,8 +99,36 @@ export function taxonomy(): readonly TaxonomyGroup[] {
 	return sourceCache('reference:taxonomy-groups', readTaxonomy)
 }
 
+/** The texts of a translation of the taxonomy (`docs/en/reference/taxonomy.json`), by group id and by first symbol. */
+interface TaxonomyTexts {
+	readonly groups: ReadonlyMap<string, { readonly title?: string; readonly label?: string; readonly description?: string }>
+	readonly entries: ReadonlyMap<string, { readonly description?: string }>
+}
+
+/** A record of strings of a translation of the taxonomy: only its non-empty string values. */
+function strings(value: unknown): Record<string, string> {
+	const result: Record<string, string> = {}
+	if (value && typeof value === 'object' && !Array.isArray(value)) for (const [key, item] of Object.entries(value)) if (typeof item === 'string' && item.trim()) result[key] = item
+	return result
+}
+
+/**
+ * The texts of the taxonomy in the language of the current render, or `null` in Spanish and without
+ * a translation. A translation holds only texts: `{ "source-hash", "groups": { "<id>": { title,
+ * label, description } }, "entries": { "<first symbol>": { description } } }`; the structure stays
+ * the original's, and what it lacks stays in Spanish.
+ */
+function translatedTexts(): TaxonomyTexts | null {
+	const file = translationFile(taxonomyPath, currentLocale())
+	if (!file || !gitFileExists(file)) return null
+	const raw = JSON.parse(readOriginalFile(file)) as { groups?: unknown; entries?: unknown }
+	const map = (value: unknown): Map<string, Record<string, string>> => new Map(value && typeof value === 'object' && !Array.isArray(value) ? Object.entries(value).map(([key, item]) => [key, strings(item)]) : [])
+	return { groups: map(raw.groups), entries: map(raw.entries) }
+}
+
 function readTaxonomy(): readonly TaxonomyGroup[] {
 	const raw = JSON.parse(readRepositoryFile(taxonomyPath)) as { groups?: unknown }
+	const texts = translatedTexts()
 	if (!Array.isArray(raw.groups)) throw new Error(`${taxonomyPath}: "groups" must be an array`)
 	const slugger = new GithubSlugger()
 	return raw.groups.map((value: Record<string, unknown>, index: number): TaxonomyGroup => {
@@ -107,13 +136,15 @@ function readTaxonomy(): readonly TaxonomyGroup[] {
 		const icon = text(value.icon, `${where}.icon`)
 		if (!groupIcons[icon]) throw new Error(`${taxonomyPath}: ${where}.icon "${icon}" is not one of ${Object.keys(groupIcons).join(', ')}`)
 		if (!Array.isArray(value.entries)) throw new Error(`${taxonomyPath}: ${where}.entries must be an array`)
-		const title = text(value.title, `${where}.title`)
+		const id = text(value.id, `${where}.id`)
+		const translated = texts?.groups.get(id)
+		const title = translated?.title ?? text(value.title, `${where}.title`)
 		return {
-			id: text(value.id, `${where}.id`),
+			id,
 			title,
-			label: text(value.label, `${where}.label`),
+			label: translated?.label ?? text(value.label, `${where}.label`),
 			icon,
-			description: text(value.description, `${where}.description`),
+			description: translated?.description ?? text(value.description, `${where}.description`),
 			anchor: slugger.slug(title),
 			entries: value.entries.map((entry: Record<string, unknown>, position: number): TaxonomyEntry => {
 				const at = `${where}.entries[${position}]`
@@ -121,13 +152,15 @@ function readTaxonomy(): readonly TaxonomyGroup[] {
 				const known = new Set(['name', 'symbols', 'pending', 'slug', 'fallback', 'description'])
 				const unknown = Object.keys(entry).filter((key) => !known.has(key))
 				if (unknown.length) throw new Error(`${taxonomyPath}: ${at} has unknown keys: ${unknown.join(', ')}`)
+				const symbols = entry.symbols.map((symbol: unknown, item: number) => text(symbol, `${at}.symbols[${item}]`))
+				const description = texts?.entries.get(symbols[0]!)?.description ?? entry.description
 				return {
 					name: text(entry.name, `${at}.name`),
-					symbols: entry.symbols.map((symbol: unknown, item: number) => text(symbol, `${at}.symbols[${item}]`)),
+					symbols,
 					...(entry.pending === true ? { pending: true } : {}),
 					...(entry.slug === undefined ? {} : { slug: text(entry.slug, `${at}.slug`) }),
 					...(entry.fallback === undefined ? {} : { fallback: text(entry.fallback, `${at}.fallback`) }),
-					...(entry.description === undefined ? {} : { description: text(entry.description, `${at}.description`) }),
+					...(description === undefined ? {} : { description: text(description, `${at}.description`) }),
 				}
 			}),
 		}

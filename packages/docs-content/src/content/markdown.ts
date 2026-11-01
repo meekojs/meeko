@@ -11,7 +11,9 @@ import type { RenderedDoc, TocEntry } from '../types/docs'
 
 import { pageOfSource } from './catalog'
 import { blockLanguage, createHighlight } from './highlight'
-import { githubUrl, readRepositoryFile, repositoryPath, repositoryRoot, repositoryUrl, sitePath, sourceCache } from './repository'
+import { originalFile } from './i18n'
+import { messages } from './messages'
+import { currentSourceContext, effectiveFile, githubUrl, readOriginalFile, readRepositoryFile, repositoryRoot, repositoryUrl, sitePath, sourceCache } from './repository'
 
 const blobPrefix = `${repositoryUrl}/blob/main/`
 const treePrefix = `${repositoryUrl}/tree/main/`
@@ -36,18 +38,21 @@ export function rewriteHref(href: string, from: string): string {
 	} else if (/^[a-z][a-z\d+.-]*:/i.test(href) || href.startsWith('//') || href.startsWith('/')) {
 		return href
 	} else {
-		path = posix.normalize(posix.join(posix.dirname(repositoryPath(from)), href))
+		// From where the file read really is: a translation's links are relative to `docs/en/`.
+		path = posix.normalize(posix.join(posix.dirname(effectiveFile(from)), href))
 		if (path.startsWith('../')) return href
 	}
 	const hashAt = path.indexOf('#')
 	const hash = hashAt < 0 ? '' : path.slice(hashAt)
 	// `file` is a path from the repository root, as GitHub URLs and resolved relative links are.
-	const file = decodeURI(hashAt < 0 ? path : path.slice(0, hashAt)).replace(/\/$/, '')
+	const linked = decodeURI(hashAt < 0 ? path : path.slice(0, hashAt)).replace(/\/$/, '')
+	// A link to a translation (`docs/en/api.md`) is a link to the page of its original.
+	const file = originalFile(linked) ?? linked
 	const page = pageOfSource(sitePath(file))
 	if (page) return `${page}${hash}`
-	const absolute = join(repositoryRoot(), ...file.split('/'))
+	const absolute = join(repositoryRoot(), ...linked.split('/'))
 	const folder = existsSync(absolute) && statSync(absolute).isDirectory()
-	return `${repositoryUrl}/${folder ? 'tree' : 'blob'}/main/${file}${hash}`
+	return `${repositoryUrl}/${folder ? 'tree' : 'blob'}/main/${linked}${hash}`
 }
 
 /** Shortens text to about `limit` characters, at a word boundary. */
@@ -70,9 +75,9 @@ export function escapeHtml(text: string): string {
 export type CodeVerdict = 'good' | 'bad'
 
 /** Label and stroke icon of each verdict, in the code block header. */
-const verdicts: Readonly<Record<CodeVerdict, { readonly label: string; readonly icon: string }>> = {
-	good: { label: 'Correcto', icon: '<path d="m3.5 8.5 3 3 6-7" />' },
-	bad: { label: 'Incorrecto', icon: '<path d="m4.5 4.5 7 7M11.5 4.5l-7 7" />' },
+const verdicts: Readonly<Record<CodeVerdict, { readonly label: 'bad' | 'good'; readonly icon: string }>> = {
+	good: { label: 'good', icon: '<path d="m3.5 8.5 3 3 6-7" />' },
+	bad: { label: 'bad', icon: '<path d="m4.5 4.5 7 7M11.5 4.5l-7 7" />' },
 }
 
 /**
@@ -80,10 +85,11 @@ const verdicts: Readonly<Record<CodeVerdict, { readonly label: string; readonly 
  * in the reference, whether it is the correct or the incorrect way.
  */
 export function codeBlockHtml(label: string, pre: TrustedHtml, verdict?: CodeVerdict): TrustedHtml {
+	const text = messages()
 	const name = escapeHtml(label)
-	const mark = verdict ? `<span class="code-verdict"><svg viewBox="0 0 16 16" aria-hidden="true">${verdicts[verdict].icon}</svg>${verdicts[verdict].label}</span>` : ''
+	const mark = verdict ? `<span class="code-verdict"><svg viewBox="0 0 16 16" aria-hidden="true">${verdicts[verdict].icon}</svg>${text[verdicts[verdict].label]}</span>` : ''
 	const attribute = verdict ? ` data-verdict="${verdict}"` : ''
-	return trustHtml(`<div class="code-block" data-lang="${name}"${attribute}><div class="code-head" data-pagefind-ignore>${mark}<span class="code-lang">${name}</span><button type="button" class="code-copy" data-copy>Copiar</button></div>${pre}</div>\n`)
+	return trustHtml(`<div class="code-block" data-lang="${name}"${attribute}><div class="code-head" data-pagefind-ignore>${mark}<span class="code-lang">${name}</span><button type="button" class="code-copy" data-copy>${text.copy}</button></div>${pre}</div>\n`)
 }
 
 /** The verdict word of a fence's info string, after the language: ```` ```ts bad ````. */
@@ -93,12 +99,12 @@ function fenceVerdict(info: string): CodeVerdict | undefined {
 }
 
 /** Callouts in the GitHub syntax (`> [!NOTE]`) and their label. */
-const callouts: Readonly<Record<string, { readonly label: string; readonly icon: string }>> = {
-	NOTE: { label: 'Nota', icon: '<circle cx="8" cy="8" r="6" /><path d="M8 7.25v3.5M8 5.1v.01" />' },
-	TIP: { label: 'Consejo', icon: '<path d="M6 12.5h4M6.6 14.5h2.8M8 1.75a4.25 4.25 0 0 0-2.5 7.7c.4.3.6.7.6 1.15v.4h3.8v-.4c0-.45.2-.85.6-1.15A4.25 4.25 0 0 0 8 1.75Z" />' },
-	IMPORTANT: { label: 'Importante', icon: '<path d="M2.5 3.5h11v7.5H8l-3 2.5V11H2.5Z" /><path d="M8 5.5v2.5M8 9.6v.01" />' },
-	WARNING: { label: 'Advertencia', icon: '<path d="M8 2.25 14.25 13H1.75Z" /><path d="M8 6.5v2.75M8 11.1v.01" />' },
-	CAUTION: { label: 'Cuidado', icon: '<path d="M5.4 1.75h5.2l3.65 3.65v5.2l-3.65 3.65H5.4l-3.65-3.65V5.4Z" /><path d="M8 5v3.5M8 10.85v.01" />' },
+const callouts: Readonly<Record<string, { readonly label: 'caution' | 'important' | 'note' | 'tip' | 'warning'; readonly icon: string }>> = {
+	NOTE: { label: 'note', icon: '<circle cx="8" cy="8" r="6" /><path d="M8 7.25v3.5M8 5.1v.01" />' },
+	TIP: { label: 'tip', icon: '<path d="M6 12.5h4M6.6 14.5h2.8M8 1.75a4.25 4.25 0 0 0-2.5 7.7c.4.3.6.7.6 1.15v.4h3.8v-.4c0-.45.2-.85.6-1.15A4.25 4.25 0 0 0 8 1.75Z" />' },
+	IMPORTANT: { label: 'important', icon: '<path d="M2.5 3.5h11v7.5H8l-3 2.5V11H2.5Z" /><path d="M8 5.5v2.5M8 9.6v.01" />' },
+	WARNING: { label: 'warning', icon: '<path d="M8 2.25 14.25 13H1.75Z" /><path d="M8 6.5v2.75M8 11.1v.01" />' },
+	CAUTION: { label: 'caution', icon: '<path d="M5.4 1.75h5.2l3.65 3.65v5.2l-3.65 3.65H5.4l-3.65-3.65V5.4Z" /><path d="M8 5v3.5M8 10.85v.01" />' },
 }
 
 /**
@@ -135,7 +141,7 @@ function calloutRule(md: MarkdownIt): void {
 			open.attrSet('class', `callout callout-${kind.toLowerCase()}`)
 			open.attrSet('role', 'note')
 			const title = new state.Token('html_block', '', 0)
-			title.content = `<p class="callout-title"><svg viewBox="0 0 16 16" aria-hidden="true">${callout.icon}</svg>${callout.label}</p>\n`
+			title.content = `<p class="callout-title"><svg viewBox="0 0 16 16" aria-hidden="true">${callout.icon}</svg>${messages()[callout.label]}</p>\n`
 			tokens.splice(index + 1, 0, title)
 			// An empty first paragraph (the marker alone on its line) is dropped.
 			if (!inline.content.trim() && !children.length) tokens.splice(index + 2, 3)
@@ -169,7 +175,7 @@ function markdown(html = true): Promise<MarkdownIt> {
 		md.renderer.rules.heading_close = (tokens, index, options, _env, self) => {
 			const open = tokens[index - 2]
 			const id = open?.attrGet('id')
-			const anchor = id && open?.tag !== 'h1' ? `<a class="heading-anchor" href="#${md.utils.escapeHtml(encodeURIComponent(id))}" aria-label="Enlace a esta sección" data-pagefind-ignore>#</a>` : ''
+			const anchor = id && open?.tag !== 'h1' ? `<a class="heading-anchor" href="#${md.utils.escapeHtml(encodeURIComponent(id))}" aria-label="${messages().headingAnchor}" data-pagefind-ignore>#</a>` : ''
 			return anchor + self.renderToken(tokens, index, options)
 		}
 		return md
@@ -243,34 +249,56 @@ export async function renderMarkdown(text: string, source: string, options: Rend
 
 /** Text of every heading of a document by its id, the same ids as {@link renderSource} writes. */
 export function documentHeadings(source: string): Promise<ReadonlyMap<string, string>> {
-	return sourceCache(`markdown:headings:${source}`, () =>
-		markdown().then((md) => {
-			const tokens = md.parse(readRepositoryFile(source), {})
-			const slugger = new GithubSlugger()
-			const found = new Map<string, string>()
-			for (const [index, token] of tokens.entries()) {
-				if (token.type === 'heading_open') {
-					const content = inlineText(tokens[index + 1])
-					found.set(slugger.slug(content), content)
-				}
-				// An explicit `<a id="…">` is an anchor too; its label is the start of the text it opens.
-				const html = token.type === 'html_block' ? [token.content] : token.type === 'inline' ? (token.children ?? []).filter((child) => child.type === 'html_inline').map((child) => child.content) : []
-				for (const fragment of html) {
-					for (const match of fragment.matchAll(/<a\s[^>]*\bid="([^"]+)"/g)) {
-						const label =
-							token.type === 'inline'
-								? inlineText(token)
-										.trim()
-										.split(/(?<=\.)\s/)[0]!
-										.replace(/\.$/, '')
-								: match[1]!
-						if (!found.has(match[1]!)) found.set(match[1]!, label || match[1]!)
-					}
-				}
+	return sourceCache(`markdown:headings:${source}`, () => textHeadings(readRepositoryFile(source)))
+}
+
+/**
+ * The anchor of the document `path` in the language of the render for `anchor`, an anchor of its
+ * original: a page of the reference keeps `related: docs/framework.md#señales` as its original names
+ * it, and the JSDoc links to the Spanish guides. The same anchor when the document read has it, or
+ * else the heading at the same position of the translation as `anchor` has in the original, when
+ * both have as many headings. `undefined` when neither exists.
+ */
+export async function localizedAnchor(path: string, anchor: string): Promise<string | undefined> {
+	const headings = await documentHeadings(path)
+	if (headings.has(anchor)) return anchor
+	const context = currentSourceContext()
+	if (!context || context.locale === 'es' || !context.translation(path)) return undefined
+	const original = await sourceCache(`markdown:original-headings:${path}`, () => textHeadings(readOriginalFile(path)))
+	const position = [...original.keys()].indexOf(anchor)
+	return position < 0 || original.size !== headings.size ? undefined : [...headings.keys()][position]
+}
+
+/**
+ * Text of every heading of a Markdown text by its id, in document order, as
+ * {@link documentHeadings} finds them: the headings and the explicit `<a id="…">` anchors.
+ */
+export async function textHeadings(text: string): Promise<ReadonlyMap<string, string>> {
+	const md = await markdown()
+	const tokens = md.parse(text, {})
+	const slugger = new GithubSlugger()
+	const found = new Map<string, string>()
+	for (const [index, token] of tokens.entries()) {
+		if (token.type === 'heading_open') {
+			const content = inlineText(tokens[index + 1])
+			found.set(slugger.slug(content), content)
+		}
+		// An explicit `<a id="…">` is an anchor too; its label is the start of the text it opens.
+		const html = token.type === 'html_block' ? [token.content] : token.type === 'inline' ? (token.children ?? []).filter((child) => child.type === 'html_inline').map((child) => child.content) : []
+		for (const fragment of html) {
+			for (const match of fragment.matchAll(/<a\s[^>]*\bid="([^"]+)"/g)) {
+				const label =
+					token.type === 'inline'
+						? inlineText(token)
+								.trim()
+								.split(/(?<=\.)\s/)[0]!
+								.replace(/\.$/, '')
+						: match[1]!
+				if (!found.has(match[1]!)) found.set(match[1]!, label || match[1]!)
 			}
-			return found
-		}),
-	)
+		}
+	}
+	return found
 }
 
 /**

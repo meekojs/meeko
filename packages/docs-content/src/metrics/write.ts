@@ -1,8 +1,10 @@
 import pg from 'pg'
 
 import type { Queryable } from '../db/pool'
+import type { DocsLocale } from '../locale'
 import type { MetricsSite } from './shared'
 
+import { isDocsLocale } from '../locale'
 import { metricPath, metricsEnabled, metricsLimits, storedQuery } from './shared'
 
 /** Options of {@link createMetricsWriter}. */
@@ -20,7 +22,10 @@ export interface MetricsWriterOptions {
 
 /** A feedback answer to store. */
 export interface FeedbackRecord {
+	/** The path of the page without the language prefix. */
 	readonly path: string
+	/** The language of the page; Spanish by default. */
+	readonly locale?: DocsLocale | undefined
 	readonly helpful: boolean
 	/** Optional; trimmed, and an empty one is not stored. */
 	readonly comment?: string | undefined
@@ -34,13 +39,17 @@ export interface FeedbackRecord {
 export interface MetricsWriter {
 	/** Whether the writer stores anything: metrics enabled and a database configured. */
 	readonly enabled: boolean
-	/** Adds one view of `path` today (UTC) to its aggregated row of `docs_page_views`. */
-	view(site: MetricsSite, path: string): Promise<boolean>
+	/**
+	 * Adds one view of `path` (without the language prefix) in `locale` (Spanish by default) today
+	 * (UTC) to its aggregated row of `docs_page_views`.
+	 */
+	view(site: MetricsSite, path: string, locale?: DocsLocale): Promise<boolean>
 	/**
 	 * Stores a search with its normalized query and how many results it had. An empty query, or one
 	 * that looks like personal data or a secret (`isSensitiveQuery`), is skipped without a trace.
+	 * `locale` is the language of the page that searched (Spanish by default).
 	 */
-	search(site: MetricsSite, query: string, results: number): Promise<boolean>
+	search(site: MetricsSite, query: string, results: number, locale?: DocsLocale): Promise<boolean>
 	/** Stores a «¿Te sirvió?» answer. */
 	feedback(site: MetricsSite, record: FeedbackRecord): Promise<boolean>
 	/** Closes the pool this writer opened, if any. */
@@ -111,26 +120,27 @@ export function createMetricsWriter(options: MetricsWriterOptions = {}): Metrics
 		get enabled() {
 			return enabled && (options.db ? options.db() !== undefined : Boolean(process.env.DATABASE_URL?.trim()))
 		},
-		view(site, href) {
+		view(site, href, locale = 'es') {
 			const path = metricPath(href)
-			if (path === null) return Promise.resolve(false)
+			if (path === null || !isDocsLocale(locale)) return Promise.resolve(false)
 			return write(
 				site,
-				`INSERT INTO docs_page_views (site, path, day, views) VALUES ($1, $2, (now() AT TIME ZONE 'UTC')::date, 1)
-				ON CONFLICT (site, path, day) DO UPDATE SET views = docs_page_views.views + 1`,
-				[path],
+				`INSERT INTO docs_page_views (site, path, day, views, locale) VALUES ($1, $2, (now() AT TIME ZONE 'UTC')::date, 1, $3)
+				ON CONFLICT (site, locale, path, day) DO UPDATE SET views = docs_page_views.views + 1`,
+				[path, locale],
 			)
 		},
-		search(site, text, results) {
+		search(site, text, results, locale = 'es') {
 			const query = storedQuery(text)
-			if (!query || !Number.isSafeInteger(results) || results < 0) return Promise.resolve(false)
-			return write(site, 'INSERT INTO docs_searches (site, query, results) VALUES ($1, $2, $3)', [query, Math.min(results, metricsLimits.results)])
+			if (!query || !Number.isSafeInteger(results) || results < 0 || !isDocsLocale(locale)) return Promise.resolve(false)
+			return write(site, 'INSERT INTO docs_searches (site, query, results, locale) VALUES ($1, $2, $3, $4)', [query, Math.min(results, metricsLimits.results), locale])
 		},
 		feedback(site, record) {
 			const path = metricPath(record.path)
+			const locale = record.locale ?? 'es'
 			const comment = record.comment?.trim() || null
-			if (path === null || typeof record.helpful !== 'boolean' || (comment !== null && comment.length > metricsLimits.comment)) return Promise.resolve(false)
-			return write(site, 'INSERT INTO docs_feedback (site, path, helpful, comment) VALUES ($1, $2, $3, $4)', [path, record.helpful, comment])
+			if (path === null || !isDocsLocale(locale) || typeof record.helpful !== 'boolean' || (comment !== null && comment.length > metricsLimits.comment)) return Promise.resolve(false)
+			return write(site, 'INSERT INTO docs_feedback (site, path, helpful, comment, locale) VALUES ($1, $2, $3, $4, $5)', [path, record.helpful, comment, locale])
 		},
 		async close() {
 			const current = pool

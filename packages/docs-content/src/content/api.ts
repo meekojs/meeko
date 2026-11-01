@@ -14,8 +14,8 @@ import { builtins } from './api-builtins'
 import { apiGroups, groupHref, referenceHref } from './api-groups'
 import { catalog } from './catalog'
 import { blockLanguage, createTokenizer } from './highlight'
-import { codeBlockHtml, documentHeadings, escapeHtml, renderFragment, renderInline, rewriteHref } from './markdown'
-import { githubUrl, packageFolder, readRepositoryFile, repositoryRoot, repositoryUrl, sitePath, sourceCache } from './repository'
+import { codeBlockHtml, documentHeadings, escapeHtml, localizedAnchor, renderFragment, renderInline, rewriteHref } from './markdown'
+import { currentLocale, githubUrl, packageFolder, readRepositoryFile, repositoryRoot, repositoryUrl, sitePath, sourceCache } from './repository'
 
 /*
  * The API reference, generated from the sources of `@meekojs/meeko`. For each export of each
@@ -1031,16 +1031,20 @@ async function seeEntry(see: string, source: string): Promise<TrustedHtml> {
 	const documentLink = /^(?:https:\/\/github\.com\/meekojs\/meeko\/blob\/main\/)?([\w./-]+\.md)(?:#(.+))?$/.exec(url)
 	if (documentLink) {
 		const path = documentLink[1]!
-		const anchor = documentLink[2] ? decodeURIComponent(documentLink[2]) : undefined
-		const href = rewriteHref(`${repositoryUrl}/blob/main/${path}${anchor ? `#${anchor}` : ''}`, source)
-		const page = catalog.find((entry) => entry.source === sitePath(path))
+		const named = documentLink[2] ? decodeURIComponent(documentLink[2]) : undefined
+		let anchor: string | undefined
 		let heading: string | undefined
 		try {
+			// In a translated language, the anchor of the translation (the JSDoc names the Spanish one).
+			anchor = named ? ((await localizedAnchor(path, named)) ?? (currentLocale() === 'es' ? named : undefined)) : undefined
 			heading = anchor ? (await documentHeadings(path)).get(anchor) : undefined
 		} catch {
+			anchor = named
 			heading = undefined
 		}
-		if (anchor && !heading) console.warn(`[api] ${source}: ${path}#${anchor} is not a heading of the document`)
+		const href = rewriteHref(`${repositoryUrl}/blob/main/${path}${anchor ? `#${anchor}` : ''}`, source)
+		const page = catalog.find((entry) => entry.source === sitePath(path))
+		if (named && !heading && currentLocale() === 'es') console.warn(`[api] ${source}: ${path}#${named} is not a heading of the document`)
 		const title = page?.label ?? sitePath(path)
 		return trustHtml(`<a href="${escapeHtml(href)}">${escapeHtml(heading ?? title)}</a>${heading ? ` <span class="api-see-source">${escapeHtml(title)}</span>` : ''}`)
 	}

@@ -1,6 +1,9 @@
 // What the public sites need of the moderation, without any dependency: the browser imports it too
 // (the documentation shell and the dismissal of announcements), so it must stay free of `pg`, Node
 // and the render.
+// Node loads it as it is from the configuration of the sites (`packages/docs`), where a relative
+// import without extension does not resolve: only type imports, which are erased.
+import type { DocsLocale } from '../locale'
 
 /** A public site whose pages the dashboard moderates. */
 export type ModerationSite = 'i18n' | 'site' | 'ui'
@@ -24,9 +27,10 @@ export interface PublicAnnouncement {
 }
 
 /**
- * The moderation of one site as its pages apply it: the URL paths of the hidden and of the
- * featured pages, and the announcements in force, newest first. It is plain JSON, so a server can
- * hand it to the browser.
+ * The moderation of one site in one language as its pages apply it: the public URL paths of the
+ * hidden and of the featured pages (with the prefix of the language: `/en/docs/api` in English),
+ * and the announcements in force, newest first. It is plain JSON, so a server can hand it to the
+ * browser.
  */
 export interface SiteModeration {
 	readonly hidden: readonly string[]
@@ -138,11 +142,13 @@ export function isFeaturedPath(moderation: SiteModeration, href: string): boolea
 }
 
 /**
- * The path where a public site answers its moderation as JSON, never cached: the browser asks for
- * it after each navigation, so the rules and announcements do not stay as the first page had them.
+ * The path where a public site answers its moderation in a language as JSON, never cached: the
+ * browser asks for it after each navigation, so the rules and announcements do not stay as the
+ * first page had them. Spanish keeps `/_meeko-docs/moderation/<site>`; English is
+ * `/_meeko-docs/moderation/<site>/en`.
  */
-export function moderationEndpoint(site: ModerationSite): string {
-	return `/_meeko-docs/moderation/${site}`
+export function moderationEndpoint(site: ModerationSite, locale: DocsLocale = 'es'): string {
+	return `/_meeko-docs/moderation/${site}${locale === 'en' ? '/en' : ''}`
 }
 
 /**
