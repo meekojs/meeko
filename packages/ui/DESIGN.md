@@ -24,7 +24,8 @@ Pasos de cada escala: 1-2 fondos, 3-5 controles, 6-8 bordes, 9-10 sólidos, 11-1
 | Popover, modal, card elevada      | `--ui-color-surface-raised`                                             | 1 claro, 3 oscuro     |
 | Fondo de control                  | `--ui-color-control`, `-hover`, `-active`                               | surface 3, 4, 5       |
 | Separador, borde de card          | `--ui-color-border`                                                     | surface 6             |
-| Borde de input, botón `outline`   | `--ui-color-border-strong`                                              | surface 8             |
+| Borde de control de formulario    | `--ui-color-control-border`, con 3:1 o más                              | surface 9, 10 oscuro  |
+| Borde discreto de un panel        | `--ui-color-border-strong`                                              | surface 8             |
 | Borde de un control de formulario | `--ui-color-control-border` (3:1 o más)                                 | surface 9, 10 oscuro  |
 | Texto                             | `--ui-color-text`                                                       | surface 12            |
 | Texto suave y placeholder         | `--ui-color-text-soft`                                                  | surface 11            |
@@ -72,7 +73,7 @@ Pasos de cada escala: 1-2 fondos, 3-5 controles, 6-8 bordes, 9-10 sólidos, 11-1
 
 ## Espacio y forma
 
-- **Espacio:** `--ui-space-<n>`, en pasos de 0,25rem: `0-5`, `1`, `1-5`, `2`, `3`, `4`, `5`, `6`, `8`, `10`, `12`, `16`, `20`, `24`. Junta lo relacionado (`1-5`, `2`) y separa los grupos (`5` en adelante).
+- **Espacio:** `--ui-space-<n>`, en pasos de 0,25rem: `0`, `0-5`, `1`, `1-5`, `2`, `3`, `4`, `5`, `6`, `8`, `10`, `12`, `16`, `20`, `24`. Junta lo relacionado (`1-5`, `2`) y separa los grupos (`5` en adelante).
 - **Radios:** `--ui-radius-xs` 3px, `-sm` 4px (opción de una lista), `-md` 6px (controles), `-lg` 8px (cards, popovers), `-xl` 12px (modales), `-full` (badges, `pill`).
 - **Bordes:** `--ui-border-width` (1px). No uses bordes de color gruesos en un lateral.
 - **Sombras:** `--ui-shadow-sm`, `-md` (popover, card elevada), `-lg` (modal). En oscuro un panel se eleva con `--ui-color-surface-raised`; la sombra sólo separa lo que se solapa.
@@ -115,10 +116,13 @@ Con `pointer: coarse` los altos crecen solos, y los inputs usan `--ui-input-font
 | ---------------- | ----------------------------------------------- | ------------------------------------------------------------------------ |
 | `ui-modal-close` | `ui-modal`, `ui-drawer-left`, `ui-drawer-right` | Salida de `UIModal`, `UICommandPalette` y `UIDrawer`.                    |
 | `ui-tab`         | `ui-tabs-indicator`                             | Indicador de `UITabs`, sólo el grupo que cambia (`data-ui-tabs-active`). |
+| `ui-toast-close` | `ui-toast`                                      | Salida de `UIToast`. No retiene los clics, porque cierra sola.           |
 | `ui-theme`       | Ninguno: el fundido de la raíz                  | `UIThemeToggle`.                                                         |
 | `meeko-route`    | `ui-navigation-tabs-indicator`                  | Indicador de `UINavigationTabs`, sólo en la fila con un enlace actual.   |
 
 **Sólo Chromium:** la salida de `UIPopover`, `UICombobox` y la lista de `UISelect` usa `allow-discrete`. Firefox y WebKit las cierran de golpe, porque cerrar con un clic fuera no se puede interceptar para envolverlo en una transición.
+
+**`UIToast` no corta otra transición:** si al cerrarse hay una en curso, desaparece sin animar. `clear()` y `remove()` tampoco animan: varios avisos a la vez repetirían el nombre.
 
 **Dos filas de `UINavigationTabs` con enlace actual en la misma página** duplican el nombre: esa navegación funciona, pero sin animación.
 

@@ -1119,7 +1119,7 @@ Los controles nuevos conservan el HTML nativo, el teclado y el envío de formula
 
 Los tipos de props, `UIDensity`, `UITone` y `UIToastContext` se exportan desde `@meekojs/ui/runtime`. Los textos predeterminados se configuran en `ui.messages.<locale>.feedback` (`close`, `empty`, `loading`); hay español e inglés.
 
-`UIButton` añade `tone="danger"`, `loading`, `iconOnly` y `ariaLabel`. Al usar sólo un icono, proporciona siempre `ariaLabel` o `aria-label`. `loading` conserva el texto, anuncia `aria-busy` e impide activar la acción. El botón de envío conserva `name`, `value` y `form`.
+`UIButton` añade `tone="danger"`, `loading`, `iconOnly` y `ariaLabel`. Al usar sólo un icono, proporciona siempre `ariaLabel` o `aria-label`. `loading` conserva el texto y añade el spinner; anuncia `aria-busy` y `aria-disabled`, e impide activar la acción sin quitarle el foco. Con `iconOnly`, el icono mide `--ui-icon-size`. El botón de envío conserva `name`, `value` y `form`.
 
 `UIBadge` añade tonos `info`, `success`, `warning` y `dot`. `UIInput` admite `date`, `datetime-local` y atributos nativos como `autocomplete`, `autocapitalize`, `spellcheck`, `min`, `max` y `step`. `UIField` añade `hint` y `counter` (string o número); los IDs de ambos se incluyen en el `describedBy` que recibe su snippet.
 
@@ -1139,4 +1139,6 @@ El módulo instala un proveedor por aplicación; `<UIApp>` aloja las notificacio
 </template>
 ```
 
-`add` devuelve un ID para `remove(id)`; `clear()` cierra todos. `duration: 0` conserva el aviso hasta cerrarlo. La cuenta se pausa con el cursor o el foco dentro del aviso; los temporizadores se liberan al desmontar. El host apila avisos sin solaparlos y desaparecen al desmontar UIApp. También puede usarse `UIToast` declarativamente con el snippet `actions`.
+`useToast` se autoimporta como `useModal`. `add` devuelve un ID para `remove(id)`; `clear()` cierra todos. `duration: 0` conserva el aviso hasta cerrarlo. La cuenta se pausa con el cursor o el foco dentro del aviso; los temporizadores se liberan al desmontar. El host apila avisos sin solaparlos y desaparecen al desmontar UIApp. También puede usarse `UIToast` declarativamente con el snippet `actions`.
+
+Entra con `@starting-style` y sale con una View Transition de tipo `ui-toast-close`. Si se añade con un `UIModal` o un `UIDrawer` abierto, el host vuelve a la cima de la capa superior para que se vea, pero sigue inerte como el resto de la página: no recibe clics hasta cerrar el modal, y un aviso con `duration` se cierra solo.
