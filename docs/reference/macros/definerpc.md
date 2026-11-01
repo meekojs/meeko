@@ -53,12 +53,12 @@ En la aplicación, `await rpc.orders.create({ item: "té", qty: 2 })` devuelve `
 
 | Opción | Tipo | Por defecto | Descripción |
 | --- | --- | --- | --- |
-| `input` | Standard Schema de `shared/` | obligatorio | La entrada. Una que no lo supera responde `400 INVALID_INPUT` con `issues`. |
-| `output` | Standard Schema de `shared/` | obligatorio | El resultado del handler. Uno que no lo supera responde `500` sin detalle. |
+| `input` | Standard Schema de `shared/` o composición simple de ellos | obligatorio | La entrada. Una que no lo supera responde `400 INVALID_INPUT` con `issues`. |
+| `output` | Standard Schema de `shared/` o composición simple de ellos (`v.array(itemSchema)`, desde 1.8) | obligatorio | El resultado del handler. Uno que no lo supera responde `500` sin detalle. |
 | `auth` | `"required" \| "optional"` | `"optional"` | Con `"required"`, una llamada sin sesión responde `401`. |
 | `authorize` | `(context) => boolean \| Promise<boolean>` | ninguno | Con `false`, `403 FORBIDDEN`. |
-| `origin` | `"required" \| "none"` | según la sesión | `"required"` exige un `Origin` permitido aunque no haya sesión. |
-| `rateLimit` | `{ limit, window, key? }` | ninguno | Desde `1.2`. Límite de llamadas por ventana; por encima, `429` con `Retry-After`. |
+| `origin` | `"required" \| "none"` | `Origin` obligatorio (desde `1.8`) | Desde `1.8`, toda llamada exige un `Origin` permitido, haya o no sesión; `"required"` lo deja explícito. `"none"` (**inseguro**) lo desactiva en las llamadas sin sesión, para un servicio o una app sin `Origin`; con sesión siguen `Origin` y CSRF. |
+| `rateLimit` | `{ limit, window, key? }` | ninguno | Desde `1.2`. Límite de llamadas por ventana; por encima, `429` con `Retry-After`. Sin `key`, cuenta por IP del cliente (`context.clientAddress`; tras Cloudflare Tunnel, `MEEKO_TRUST_PROXY=cloudflare`). |
 | `locals` | `(context) => L \| Promise<L>` | ninguno | Desde `1.2`. Un valor por llamada que el handler recibe tipado. Decláralo antes de `handler`. |
 | `handler` | `({ input, context, locals }) => output` | obligatorio | La lógica. `context` es el `RequestContext`. |
 
@@ -70,7 +70,7 @@ La misma definición, con sus tipos inferidos. Las respuestas siguen las de la A
 
 ### Un inicio de sesión
 
-`origin: "required"` protege el formulario aunque todavía no haya sesión, y `rateLimit` frena los intentos:
+Desde `1.8`, toda llamada exige un `Origin` permitido aunque todavía no haya sesión; `origin: "required"` lo deja explícito en el inicio de sesión, y `rateLimit` frena los intentos:
 
 <!-- no-check -->
 ```ts
@@ -188,8 +188,8 @@ server/rpc/orders/create.ts   ← rpc.orders.create(…)
 
 ## Notas
 
-- **Seguridad.** Con sesión, cada llamada exige el `Origin` permitido y el token CSRF, que el cliente generado envía solo; sin sesión, sólo con `origin: "required"`. El middleware de ruta no protege el RPC: usa `auth`, `authorize` y `locals`.
-- **Orden.** `Origin` con `origin: "required"`, `Origin` y CSRF de la sesión, `rateLimit`, `auth`, `authorize`, `input`, `locals`, `handler` y `output`.
+- **Seguridad.** Cada llamada exige el `Origin` permitido (desde `1.8`, también sin sesión; `origin: "none"` lo desactiva sólo sin sesión) y, con sesión, el token CSRF; el cliente generado envía ambos solo. Una llamada con `fetch` de Node o `curl` sin `Origin` responde `403 INVALID_ORIGIN`. El middleware de ruta no protege el RPC: usa `auth`, `authorize` y `locals`.
+- **Orden.** `Origin` (desde `1.8`, en toda llamada salvo con `origin: "none"`), `Origin` y CSRF de la sesión, `rateLimit`, `auth`, `authorize`, `input`, `locals`, `handler` y `output`.
 - **SSR.** En el servidor, `rpc.*` despacha localmente con la sesión de la petición original, sin salir a la red. `await useRpcQuery(…)` carga los datos en el SSR; sin `await`, la lista sale vacía en el HTML y `meeko check` avisa con `MEEK117` del salto de diseño.
 - **Errores.** Escribe los mensajes en el schema de `input`: viajan en `issues` y `useForm` los reparte por campo. Un error que no es `ApiError` nunca expone su mensaje.
-- **Nombres.** El nombre del procedimiento sale de la ruta del archivo (`orders/create.ts` es `orders.create`); los schemas deben estar en `shared/` y ser tipos concretos (ni `any` ni `unknown`).
+- **Nombres.** El nombre del procedimiento sale de la ruta del archivo (`orders/create.ts` es `orders.create`); los schemas deben estar en `shared/`, o ser desde 1.8 una composición simple de ellos con funciones de un paquete, como `v.array(itemSchema)`, y tener tipos concretos (ni `any` ni `unknown`). Véase [Schemas públicos](../../framework.md#schemas-públicos).

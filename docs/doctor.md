@@ -4,8 +4,8 @@
 
 ```sh
 pnpm exec meeko doctor
-pnpm exec meeko doctor apps/site
-pnpm exec meeko doctor apps/site --json
+pnpm exec meeko doctor apps/meeko
+pnpm exec meeko doctor apps/meeko --json
 ```
 
 ## Qué comprueba

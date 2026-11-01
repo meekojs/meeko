@@ -18,7 +18,7 @@ related:
   - docs/framework.md#hooks
 ---
 
-`defineMeekoModule` declara un módulo: código que configura el proyecto, como los módulos de Nuxt. Su `setup` añade componentes, autoimports, layouts, plugins de aplicación, middleware y handlers de servidor, entradas de `<head>`, archivos públicos y plugins de Vite, y reacciona a los hooks del build. El proyecto lo lista en `modules` de `meeko.config.ts`.
+`defineMeekoModule` declara un módulo: código que configura el proyecto, como los módulos de Nuxt. Su `setup` añade componentes, autoimports, layouts, plugins de aplicación, middleware y handlers de servidor, entradas de `<head>`, archivos públicos y plugins de Vite, y reacciona a los hooks del build. El proyecto lo registra por su nombre en `modules` de `meeko.config.ts` (`modules: ["@acme/hello"]` o `["./modules/hello"]`) y le pasa opciones en la clave de su `meta.configKey`. Un paquete lo exporta por defecto en su subpath `./module` o en su raíz, y declara `"keywords": ["meeko-module"]` en su `package.json` para que el editor complete su nombre.
 
 `setup` se ejecuta en Node al cargar la configuración (en `meeko dev`, `meeko build`, `meeko check` y el servidor de lenguaje de un workspace de confianza), una vez por configuración y proceso. Nunca llega al navegador.
 
@@ -29,6 +29,11 @@ related:
 import { defineMeekoModule } from "@meekojs/meeko/framework";
 
 export interface HelloOptions { greeting: string }
+
+// Tipa la clave `hello` de meeko.config.ts; Meeko carga esta ampliación sola.
+declare module "@meekojs/meeko/framework" {
+  interface MeekoConfig { readonly hello?: Partial<HelloOptions> }
+}
 
 export default defineMeekoModule<HelloOptions>({
   meta: { name: "hello", configKey: "hello", compatibility: { meeko: ">=1.2" } },
@@ -56,12 +61,14 @@ export default defineMeekoConfig({
 | Opción | Tipo | Por defecto | Descripción |
 | --- | --- | --- | --- |
 | `meta.name` | `string` | obligatorio | Nombre único del módulo; dos módulos con el mismo nombre son un error. |
-| `meta.configKey` | `string` | ninguno | Clave de `meeko.config.ts` con las opciones del módulo. |
+| `meta.configKey` | `string` | ninguno | Clave de `meeko.config.ts` con las opciones del módulo; desde `1.8`, la única forma documentada de pasárselas. No puede ser una opción de Meeko ni repetirse entre módulos. |
 | `meta.compatibility.meeko` | rango de npm | cualquiera | Como `">=1.2"`. La carga falla si la versión de Meeko queda fuera. |
 | `defaults` | `Partial<Options>` | `{}` | Valores por defecto de las opciones. |
 | `setup` | `(options, meeko) => void \| Promise<void>` | obligatorio | Recibe las opciones combinadas y el objeto `meeko`. Puede ser asíncrona. |
 
-Las opciones se combinan en este orden: `defaults`, después `config[meta.configKey]` y por último las de `[módulo, opciones]` en `modules`. Los objetos planos se combinan en profundidad; los arrays se sustituyen.
+Las opciones se combinan en este orden: `defaults` y después `config[meta.configKey]`. Los objetos planos se combinan en profundidad; los arrays se sustituyen.
+
+**Tipos de la clave.** Para que `meeko.config.ts` tipe la clave sin importar el módulo, el módulo amplía `MeekoConfig` (`declare module "@meekojs/meeko/framework" { interface MeekoConfig { readonly hello?: … } }`) en el archivo de su export por defecto o en uno que éste importe. Meeko escribe `.meeko/types/config.d.ts`, que importa los tipos de cada módulo de `modules`, y así la ampliación se carga sola en el editor y en `meeko check`.
 
 ## Valor devuelto
 

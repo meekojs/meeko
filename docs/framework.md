@@ -52,16 +52,16 @@ Meeko ya no carga `server/session.ts`. Si el archivo existe, `meeko check`, `mee
 ```ts
 // Antes: server/session.ts
 export function createSessionManager(production: boolean) {
-  return new SessionManager({ store: createStore(production), production });
+	return new SessionManager({ store: createStore(production), production })
 }
 
 // Después: server/runtime.ts
-import { defineServerRuntime, SessionManager } from "@meekojs/meeko/server";
+import { defineServerRuntime, SessionManager } from '@meekojs/meeko/server'
 
 export default defineServerRuntime(({ production, prerendering }) => ({
-  sessions: new SessionManager({ store: createStore(production && !prerendering), production: production && !prerendering }),
-  services: (request) => ({ /* servicios por petición */ }),
-}));
+	sessions: new SessionManager({ store: createStore(production && !prerendering), production: production && !prerendering }),
+	services: (request) => ({/* servicios por petición */}),
+}))
 ```
 
 `meeko build` crea el runtime con `prerendering: true` para renderizar las rutas `render: "prerender"`; durante esa fase no se sirve tráfico de clientes, por lo que la aplicación puede usar un store en memoria en lugar de abrir la base de producción. Las aplicaciones que importaban herramientas de build desde `@meekojs/meeko/server` deben importarlas desde `@meekojs/meeko/build` (`discoverRoutes`, `discoverServerManifest`, `loadMeekoConfig`, `prerenderProject`…), y `toNodeListener`, `attachNodeWebSocketServer` y `createNodeSocketUpgradeHandler` desde `@meekojs/meeko/node`. `createServerDispatcher`, `createLocalCalls`, `generateOpenApi` y `loadSocketChannels` exigen ahora un cargador explícito, por ejemplo `(file) => import(pathToFileURL(file).href)` en Node.
@@ -72,63 +72,113 @@ export default defineServerRuntime(({ production, prerendering }) => ({
 
 ```js
 // postcss.config.mjs
-export default { plugins: { "@tailwindcss/postcss": {} } };
+export default { plugins: { '@tailwindcss/postcss': {} } }
 ```
 
 ```css
 /* app/styles/main.css */
-@import "tailwindcss";
+@import 'tailwindcss';
 ```
 
-En un `<style scoped>`, `@apply` necesita `@reference "tailwindcss";` (o la ruta de la hoja con su tema) al principio del bloque. Desde `1.2`, el CSS de cada componente es el módulo `Componente.meeko?meeko-style=…&lang.css`, junto a su archivo, así que los plugins de PostCSS resuelven `@reference` y los `@import` relativos desde la carpeta del componente.
+En un `<style scoped>`, `@apply` necesita `@reference "tailwindcss";` (o la ruta de la hoja con su tema) al principio del bloque. Desde `1.2`, el CSS de cada componente es el módulo `Componente.meeko?meeko-style=…&lang.css`, junto a su archivo, así que los plugins de PostCSS resuelven `@reference` y los `@import` relativos desde la carpeta del componente. El selector ya lleva el atributo de ámbito cuando Tailwind expande `@apply`, así que las declaraciones heredan el scope:
+
+```html
+<!-- app/components/Card.meeko -->
+<style scoped>
+	@reference '../styles/main.css'; /* con el @theme del proyecto */
+
+	.card {
+		@apply rounded-lg bg-brand p-4;
+	}
+</style>
+```
+
+Tailwind genera también las clases que sólo aparecen en literales de `bind:class` (`bind:class="open.value ? 'ring-4' : undefined"`), porque lee el texto de los `.meeko`. `meekoUtilities()` convive con Tailwind si va antes en la lista de plugins (`plugins: [meekoUtilities(), tailwindcss()]`, con `import tailwindcss from '@tailwindcss/postcss'`): Tailwind recibe ya las reglas generadas en lugar de `@utilities`.
+
+`@tailwindcss/postcss` detecta las fuentes desde el directorio de trabajo (`process.cwd()`), no desde la raíz del proyecto. Los comandos de la CLI que reciben el proyecto (`dev`, `build`, `start`, `preview`, `check`, `routes`, `prerender` y `check-app`) cambian el directorio de trabajo a esa raíz antes de cargar la configuración y PostCSS, así que `meeko dev ../app` funciona desde cualquier carpeta; las rutas relativas del argumento se resuelven antes, contra la carpeta de lanzamiento. Las APIs programáticas (`buildProject`, `startProject`…) no tocan el cwd del proceso: llámelas con el cwd en la raíz o fije el origen con `@import 'tailwindcss' source('../..');` (relativo a la hoja) o con la opción `base` del plugin. Desde una carpeta mayor, Tailwind recorre todo su contenido; desde la raíz de un disco puede agotar la memoria.
+
+Durante el SSR y el prerender, Meeko incrusta en el documento el CSS de los `<style>` de los componentes ya procesado por PostCSS y los plugins CSS de Vite (desde `1.8`; antes llegaba sin procesar), así que un `@apply` con ámbito o un `@utilities` dentro de un componente se aplican desde el primer pintado, sin esperar al JavaScript. Es el mismo CSS que el asset del componente; los `<style>` en línea conservan el nonce o los hashes de la CSP, la deduplicación y el orden del árbol (layouts, página e hijos). Van al final del `<head>`, después de `app/styles/main.css`, de las hojas de los módulos y del `head` de `document`, que es donde el cliente añade después el CSS de los componentes: una regla con ámbito y una global de igual especificidad se resuelven igual en el primer pintado que tras hidratar (desde `1.8`; antes la global ganaba sólo hasta que cargaba el JavaScript). En `meeko dev`, el cliente de Vite adopta esos `<style>` en lugar de añadir una copia, y la HMR los sustituye: una regla que se borra del `<style>` deja de aplicarse sin recargar. La página de error de un fallo del servidor, que no se hidrata, también incrusta su CSS.
+
+**`@tailwindcss/vite`.** Meeko no lee `vite.config.*`, pero un [módulo](#módulos) puede registrar el plugin de Vite de Tailwind con `addVitePlugin`. Sustituye a `@tailwindcss/postcss` (no declare los dos); `meeko dev` y `meeko build` lo aplican a `app/styles/main.css` y a los `<style>` de los componentes, con `@theme`, `@apply` con ámbito y las clases de `bind:class`. A diferencia del plugin de PostCSS, detecta las fuentes desde la raíz de Vite, que es la del proyecto:
+
+```js
+// modules/tailwind.mjs
+import { defineMeekoModule } from '@meekojs/meeko/framework'
+import tailwindcss from '@tailwindcss/vite'
+
+export default defineMeekoModule({
+	meta: { name: 'tailwind' },
+	setup(_options, meeko) {
+		meeko.addVitePlugin(tailwindcss())
+	},
+})
+```
+
+```js
+// meeko.config.mjs
+export default { modules: ['./modules/tailwind.mjs'] }
+```
+
+Un host de Vite propio que sólo usa el plugin `meeko()` no recibe los `addVitePlugin`; ahí se añade `tailwindcss()` a su `plugins`. Con `@tailwindcss/vite`, `meekoSortClasses: "stylesheet"` no ve las utilidades (procesa la hoja sin los plugins de Vite de los módulos); use `"tailwind"`.
+
+**Orden de las clases con Prettier.** Con `meekoSortClasses: "tailwind"` (desde `1.8`), el plugin de Prettier (`@meekojs/prettier-plugin` o `@meekojs/meeko/prettier`) ordena las clases de cada `class="…"` estático con el orden oficial de Tailwind CSS 4, el de `prettier-plugin-tailwindcss` (que no reconoce el parser `meeko`). Carga el design system de `app/styles/main.css`, o de la hoja que indique `meekoTailwindStylesheet` (relativa a la raíz del proyecto), con sus `@import`, `@theme`, `@plugin` y `@utility`, usando el `tailwindcss` instalado en el proyecto; funciona igual con `@tailwindcss/postcss` que con `@tailwindcss/vite`. Las clases que Tailwind no conoce, como las de `meekoUtilities()` o las del `<style>` del componente, van primero y en su orden. No toca `bind:class` ni el `class` de una etiqueta de componente.
+
+```json
+{ "plugins": ["@meekojs/prettier-plugin"], "meekoSortClasses": "tailwind", "meekoTailwindStylesheet": "app/styles/main.css" }
+```
+
+```html
+<!-- antes -->
+<div class="text-white custom p-4 bg-brand flex hover:bg-brand/80"></div>
+<!-- después -->
+<div class="custom flex bg-brand p-4 text-white hover:bg-brand/80"></div>
+```
+
+Si `tailwindcss` 4 no está instalado, la hoja no existe o Tailwind la rechaza, las clases no se ordenan (sólo se normalizan) y se avisa una vez. El design system se reutiliza mientras no cambien la hoja ni lo que importa. En un workspace no confiable del editor, `"tailwind"` se comporta como `"off"`, igual que `"stylesheet"`, porque ejecutaría los `@plugin` del proyecto.
 
 <a id="utilidades-generadas-con-typescript"></a>**Utilidades generadas con TypeScript.** Desde `1.2`, el plugin de PostCSS `meekoUtilities()` de `@meekojs/meeko/postcss` genera reglas con una función de TypeScript en lugar de repetirlas a mano. La at-rule `@utilities "<ruta>" [layer(<nombre>)];` se sustituye por las reglas que devuelve el export por defecto del módulo:
 
 ```ts
 // postcss.config.ts
-import { meekoUtilities } from "@meekojs/meeko/postcss";
+import { meekoUtilities } from '@meekojs/meeko/postcss'
 
-export default { plugins: [meekoUtilities()] };
+export default { plugins: [meekoUtilities()] }
 // O, con la forma de objeto: { plugins: { "@meekojs/meeko/postcss": {} } }
 ```
 
 ```css
 /* app/styles/main.css */
 @layer tokens, utilities;
-@import "./tokens/colors.css" layer(tokens);
+@import './tokens/colors.css' layer(tokens);
 @utilities "./utilities/color.ts" layer(utilities);
 ```
 
 ```ts
 // app/styles/utilities/palette.ts
-export const colors = ["gray", "blue", "red"] as const;
-export const steps = Array.from({ length: 12 }, (_, i) => i + 1);
+export const colors = ['gray', 'blue', 'red'] as const
+export const steps = Array.from({ length: 12 }, (_, i) => i + 1)
 ```
 
 ```ts
 // app/styles/utilities/color.ts
-import { defineUtilities } from "@meekojs/meeko/postcss";
-import { colors, steps } from "./palette";
+import { defineUtilities } from '@meekojs/meeko/postcss'
+import { colors, steps } from './palette'
 
 export default defineUtilities(({ rule, atRule }) => [
-  colors.map((name) =>
-    rule(`.color[data-color='${name}']`, Object.fromEntries(steps.map((step) => [`--color-${step}`, `var(--${name}-${step})`])))),
-  rule(".color", { color: "var(--color-11)" },
-    rule("&:hover", { backgroundColor: "var(--color-3)" }),
-    atRule("media", "(prefers-contrast: more)", { color: "var(--color-12)" })),
-]);
+	colors.map((name) => rule(`.color[data-color='${name}']`, Object.fromEntries(steps.map((step) => [`--color-${step}`, `var(--${name}-${step})`])))),
+	rule('.color', { color: 'var(--color-11)' }, rule('&:hover', { backgroundColor: 'var(--color-3)' }), atRule('media', '(prefers-contrast: more)', { color: 'var(--color-12)' })),
+])
 ```
 
 Genera `@layer utilities { .color[data-color='gray'] { --color-1: var(--gray-1); … } … .color { color: var(--color-11); &:hover { … } @media (prefers-contrast: more) { … } } }`. Un bucle de preprocesador, como `@each $size in sm, md, lg` de `postcss-each` (que no forma parte de PostCSS: sin ese plugin, la regla llega al navegador tal cual y no hace nada), se escribe como un `map` de TypeScript:
 
 ```ts
 // app/styles/utilities/button-sizes.ts
-import { defineUtilities } from "@meekojs/meeko/postcss";
+import { defineUtilities } from '@meekojs/meeko/postcss'
 
-const sizes = { sm: "0.25rem 0.5rem", md: "0.5rem 1rem", lg: "0.75rem 1.5rem" };
+const sizes = { sm: '0.25rem 0.5rem', md: '0.5rem 1rem', lg: '0.75rem 1.5rem' }
 
-export default defineUtilities(({ rule }) =>
-  Object.entries(sizes).map(([size, padding]) => rule(`.button[data-size='${size}']`, { padding })));
+export default defineUtilities(({ rule }) => Object.entries(sizes).map(([size, padding]) => rule(`.button[data-size='${size}']`, { padding })))
 ```
 
 La at-rule:
@@ -141,11 +191,11 @@ La at-rule:
 
 El módulo exporta por defecto `defineUtilities(fn)` o una función sin envolver. `fn` recibe los helpers, puede ser `async` y devuelve un nodo, un array de salidas (anidado a cualquier profundidad, se aplana en orden) o `null`, `false` y `undefined`, que se omiten, para escribir `condición && rule(…)`.
 
-| Helper | Genera |
-| --- | --- |
-| `rule(selector, declaraciones?, ...hijas)` | Una regla. Las hijas (otras `rule` con `&`, `atRule`, `css` o arrays) se anidan dentro con anidamiento CSS nativo, como si las escribiera a mano. Si el segundo argumento no es un objeto de declaraciones, es la primera hija. |
+| Helper                                             | Genera                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rule(selector, declaraciones?, ...hijas)`         | Una regla. Las hijas (otras `rule` con `&`, `atRule`, `css` o arrays) se anidan dentro con anidamiento CSS nativo, como si las escribiera a mano. Si el segundo argumento no es un objeto de declaraciones, es la primera hija.                                                                                           |
 | `atRule(nombre, params, declaraciones?, ...hijas)` | Una at-rule, sin `@` en el nombre: `atRule("media", "(min-width: 48rem)", …)`, `atRule("supports", "(display: grid)", …)`, `atRule("property", "--angle", { syntax: "'<angle>'", inherits: "false", initialValue: "0deg" })`. Con sólo `nombre` y `params` es una sentencia: `atRule("layer", "a, b")` da `@layer a, b;`. |
-| `` css`…` `` o `css("…")` | CSS literal, que se analiza con PostCSS, para lo que no cabe en los helpers (`@keyframes`, varias reglas copiadas). Conserva las barras invertidas (`content: "\201C"`). |
+| `` css`…` `` o `css("…")`                          | CSS literal, que se analiza con PostCSS, para lo que no cabe en los helpers (`@keyframes`, varias reglas copiadas). Conserva las barras invertidas (`content: "\201C"`).                                                                                                                                                  |
 
 Las declaraciones son un objeto: las claves en camelCase pasan a kebab-case (`borderRadius` → `border-radius`, `WebkitAppearance` → `-webkit-appearance`, `msFlex` → `-ms-flex`); las claves en kebab-case (`"border-radius"`) y las propiedades personalizadas `--*` se escriben tal cual. Un valor es una cadena, que puede terminar en `!important`, o un número, que se escribe sin unidades (`opacity: 0.5`, `zIndex: 10`). `undefined` omite la declaración y un array escribe una declaración por valor, para los valores de respaldo (`display: ["-webkit-box", "flex"]`, también un array `as const`).
 
@@ -159,8 +209,8 @@ Los errores detienen la hoja con el archivo CSS y la línea del `@utilities`, qu
 
 **Autoimports.** Desde `1.4`, el módulo de `@utilities` y los módulos locales en TypeScript que importa reciben los mismos autoimports de valores que el resto del proyecto: el plugin aplica, dentro del bundle de rolldown, el registro y la transformación del plugin de Vite, así que un `app/styles/utilities/color.ts` puede usar sin import la constante `THEME_COLORS` de `app/theme/constants.ts` si `meeko.config.ts` declara `imports: { appDirs: ["app/theme"] }`, igual que un componente. Como en el editor y en `meeko check`, cada módulo recibe los de su ámbito según su carpeta (`app/`, `shared/` o `server/` de la aplicación o de un layer); un módulo fuera de esas carpetas no recibe ninguno. Los módulos de `@utilities` se ejecutan en Node mientras se genera el CSS, así que el registro se limita a lo que tiene sentido ahí:
 
-| Llegan | No llegan |
-| --- | --- |
+| Llegan                                                                                                                                                                                                                                                                                                                       | No llegan                                                                                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Los exports de valores de `app/composables`, `app/utils`, `app/stores`, `app/types` e `imports.appDirs`; los de `shared/*` e `imports.sharedDirs` (también los `.shared.ts`); los de las mismas carpetas de los layers, y los que añaden los módulos con `addAutoImportsDir` y `addAutoImports` con ámbito `app` o `shared`. | Los de `server/utils`, `imports.serverDirs` y los `.server.ts`; los `.client.ts`; los componentes `.meeko`; los clientes generados (`api`, `rpc`, `socket`, `useApi`…), y las API del framework para componentes y la aplicación en marcha (`signal`, `computed`, `useState`, `href`, `useRoute`, `defineApiRoute`…). |
 
 Usar uno de la segunda columna no da un `ReferenceError` opaco: el nombre se sustituye por un valor que, al usarse (leerlo, llamarlo, convertirlo en texto), lanza un error con el autoimport, su origen y el motivo, que el plugin muestra en la línea del `@utilities`: `"./utilities/color.ts" lanzó un error al generar las utilidades: app/styles/utilities/color.ts usa el autoimport SECRET, que no está disponible al generar el CSS de @utilities: viene de server/utils/secret.ts, que sólo existe en el servidor. …`. Como el error sólo aparece si el valor se usa, un archivo de autoimports que el módulo importa y que además exporta, por ejemplo, un composable con `signal` sigue sirviendo para leer sus constantes. `defineUtilities` no es un autoimport: impórtelo de `@meekojs/meeko/postcss`, porque declararlo global lo ofrecería también a los componentes y llevaría PostCSS al bundle del navegador. Los tipos son los de `app/` (`.meeko/tsconfig.app.json`), así que `meeko check` y el editor dan `TS2304` al usar en `app/styles/` un export de `server/utils`, como en el resto de `app/`; en cambio aceptan los nombres del navegador y del framework de la tabla, que fallan al generar la hoja con el error anterior.
@@ -173,10 +223,10 @@ Las reglas generadas en un `<style scoped>` no reciben el atributo de ámbito: M
 
 ```ts
 // postcss.config.ts
-import tailwindcss from "@tailwindcss/postcss";
-import { meekoUtilities } from "@meekojs/meeko/postcss";
+import tailwindcss from '@tailwindcss/postcss'
+import { meekoUtilities } from '@meekojs/meeko/postcss'
 
-export default { plugins: [meekoUtilities(), tailwindcss()] };
+export default { plugins: [meekoUtilities(), tailwindcss()] }
 ```
 
 En ese orden, Tailwind recibe las reglas generadas como el resto de la hoja y procesa, por ejemplo, el `@apply` de un `` css`…` ``; con `layer(utilities)` quedan en la misma capa `utilities` que las de Tailwind. En el orden inverso, Tailwind compila primero cada hoja que importa `tailwindcss` y elimina las at-rules que no conoce, `@utilities` incluida, sin error; el plugin lo advierte una vez por proceso. En una hoja sin `@import "tailwindcss"`, como el `<style>` de un componente, el orden no importa.
@@ -202,17 +252,19 @@ En desarrollo, Vite abre un WebSocket HMR en un puerto derivado del puerto HTTP 
 
 <a id="variables-de-entorno-y-env"></a>**Variables de entorno y `.env`.** Desde `1.2`, `meeko dev`, `build`, `start`, `preview` y `check` cargan el `.env` de la raíz del proyecto en `process.env`, como Vite y Nuxt en desarrollo. Una variable que el entorno ya define tiene prioridad, así que el entorno real de un despliegue nunca se sustituye. La salida de `meeko build` ejecutada directamente (`node .meeko/output/node/index.mjs`, un contenedor) no lee `.env`: en producción las variables llegan del entorno. Cambiar `.env` exige reiniciar `meeko dev`. Meeko lee estas variables:
 
-| Variable | Comandos | Efecto |
-| --- | --- | --- |
-| `MEEKO_PORT`, `MEEKO_HOST` | `dev`, `start`, `preview` y la salida de Node, Bun y Deno | Puerto y dirección; sustituyen a `server.port` y `server.host`. Por defecto, `127.0.0.1:4173`. Sin `MEEKO_PORT` se lee `PORT`, que inyectan plataformas como Coolify, Railway o Cloud Run. |
-| `MEEKO_PUBLIC_ORIGIN` | `dev`, `start`, `preview` y la salida de Node, Bun, Deno y Workers; desde `1.3`, también `build` | Origen público tras un proxy HTTPS, para las comprobaciones de `Origin` de HTTP y Socket. En `build`, y sólo si falta `site` en `meeko.config.ts`, el origen de las URL absolutas de `sitemap.xml`, `robots.txt` y `document.seo`; el build sólo la lee cuando escribe alguna. Como en el servidor, cuenta sólo el origen de la URL: `https://example.com/app` vale `https://example.com`. |
-| `MEEKO_REDIS_URL` | La salida de Node, Bun y Deno | Redis de las sesiones en producción cuando `server/runtime.ts` no declara `sessions`; véase [Sesiones sin configuración](#sesiones-sin-configuración). |
-| `MEEKO_REDIS_PREFIX` | Ídem | Prefijo de sus claves; por defecto, `meeko:<name de package.json>:prod:`. |
-| `MEEKO_SESSION_TTL`, `MEEKO_SESSION_SAMESITE` | `dev` y producción | Duración (`12h`, `7d`…; 7 días por defecto) y `SameSite` (`Lax` por defecto, o `Strict`) de esas sesiones. |
-| `MEEKO_TRUST_PROXY` | `dev` y producción | Proxies de confianza delante del servidor (un número, o `true` para todos), cuyas entradas de `X-Forwarded-For` dan la IP del cliente de `context.clientAddress`, `clientAddress(request)` y `rateLimit`; véase [IP del cliente tras un proxy](#ip-del-cliente-tras-un-proxy). Sin ella, `X-Forwarded-For` nunca se lee. |
-| `MEEKO_HMR_PORT` | `dev` | Puerto del WebSocket de HMR; sin él, se deriva del puerto HTTP. |
-| `MEEKO_EDITOR_BRIDGE=0` | `dev` | Desactiva el puente con el editor (valores en vivo). |
-| `MEEKO_LINK_WATCH=0` | `dev` | No reinicia `meeko dev` al reconstruir un `@meekojs/meeko` enlazado; avisa en la terminal de que hay que reiniciarlo. |
+| Variable                                      | Comandos                                                                                         | Efecto                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MEEKO_PORT`, `MEEKO_HOST`                    | `dev`, `start`, `preview` y la salida de Node, Bun y Deno                                        | Puerto y dirección; sustituyen a `server.port` y `server.host`. Por defecto, `127.0.0.1:4173`. Sin `MEEKO_PORT` se lee `PORT`, que inyectan plataformas como Coolify, Railway o Cloud Run.                                                                                                                                                                                                        |
+| `MEEKO_PUBLIC_ORIGIN`                         | `dev`, `start`, `preview` y la salida de Node, Bun, Deno y Workers; desde `1.3`, también `build` | Origen público tras un proxy HTTPS, para las comprobaciones de `Origin` de HTTP y Socket. En `build`, y sólo si falta `site` en `meeko.config.ts`, el origen de las URL absolutas de `sitemap.xml`, `robots.txt` y `document.seo`; el build sólo la lee cuando escribe alguna. Como en el servidor, cuenta sólo el origen de la URL: `https://example.com/app` vale `https://example.com`.        |
+| `MEEKO_REDIS_URL`                             | La salida de Node, Bun y Deno                                                                    | Redis de las sesiones en producción cuando `server/runtime.ts` no declara `sessions`; véase [Sesiones sin configuración](#sesiones-sin-configuración).                                                                                                                                                                                                                                            |
+| `MEEKO_REDIS_PREFIX`                          | Ídem                                                                                             | Prefijo de sus claves; por defecto, `meeko:<name de package.json>:prod:`.                                                                                                                                                                                                                                                                                                                         |
+| `MEEKO_ROOT`                                  | La salida de Node, Bun y Deno (desde `1.8`)                                                      | Raíz del proyecto que recibe `server/runtime.ts` como `root`, absoluta o relativa al directorio de trabajo, cuando la salida se despliega fuera de su sitio; véase [Runtime de servidor](#runtime-de-servidor).                                                                                                                                                                                   |
+| `MEEKO_SESSION_TTL`, `MEEKO_SESSION_SAMESITE` | `dev` y producción                                                                               | Duración (`12h`, `7d`…; 7 días por defecto) y `SameSite` (`Lax` por defecto, o `Strict`) de esas sesiones.                                                                                                                                                                                                                                                                                        |
+| `MEEKO_TRUST_PROXY`                           | `dev` y producción                                                                               | Proxies de confianza delante del servidor (un número, o `true` para todos), cuyas entradas de `X-Forwarded-For` dan la IP del cliente de `context.clientAddress`, `clientAddress(request)` y `rateLimit`; desde `1.8`, `cloudflare` lee `CF-Connecting-IP` tras Cloudflare Tunnel. Véase [IP del cliente tras un proxy](#ip-del-cliente-tras-un-proxy). Sin ella, `X-Forwarded-For` nunca se lee. |
+| `MEEKO_TRUSTED_PROXIES`                       | `dev` y producción                                                                               | Desde `1.8`, con `MEEKO_TRUST_PROXY=cloudflare`: redes (CIDR o IP) de `cloudflared` y los proxies; por defecto, loopback y redes privadas. Véase [Cloudflare Tunnel y Traefik](#cloudflare-tunnel-y-traefik).                                                                                                                                                                                     |
+| `MEEKO_HMR_PORT`                              | `dev`                                                                                            | Puerto del WebSocket de HMR; sin él, se deriva del puerto HTTP.                                                                                                                                                                                                                                                                                                                                   |
+| `MEEKO_EDITOR_BRIDGE=0`                       | `dev`                                                                                            | Desactiva el puente con el editor (valores en vivo).                                                                                                                                                                                                                                                                                                                                              |
+| `MEEKO_LINK_WATCH=0`                          | `dev`                                                                                            | No reinicia `meeko dev` al reconstruir un `@meekojs/meeko` enlazado; avisa en la terminal de que hay que reiniciarlo.                                                                                                                                                                                                                                                                             |
 
 Desde `1.2`, todas las variables que lee Meeko empiezan por `MEEKO_`; el prefijo queda reservado para Meeko, así que las variables propias de la aplicación deben usar otro nombre. `HOST` y `PUBLIC_ORIGIN`, los nombres anteriores, siguen funcionando durante 1.x cuando falta la variable nueva, con un aviso por proceso que nombra su reemplazo, y dejarán de leerse en `2.0`. `PORT` no está obsoleta: es el respaldo permanente de `MEEKO_PORT`.
 
@@ -233,25 +285,25 @@ El SSR de desarrollo carga `@meekojs/meeko` desde Node, fuera del module runner 
 
 ```ts
 // meeko.config.ts
-import { defineMeekoConfig } from "@meekojs/meeko/framework";
-import seo from "@acme/meeko-seo";
+import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
 export default defineMeekoConfig({
-  layers: ["./layers/base"],
-  modules: [[seo, { siteUrl: "https://example.com" }], "./modules/hello"],
-  imports: {
-    appDirs: ["app/services"],
-    sharedDirs: ["shared/validators"],
-    serverDirs: ["server/services", "server/repositories"],
-  },
-  document: { lang: "es", head: { meta: [{ name: "theme-color", content: "#0f172a" }] } },
-});
+	layers: ['./layers/base'],
+	modules: ['@acme/meeko-seo', './modules/hello'],
+	seo: { siteUrl: 'https://example.com' },
+	imports: {
+		appDirs: ['app/services'],
+		sharedDirs: ['shared/validators'],
+		serverDirs: ['server/services', 'server/repositories'],
+	},
+	document: { lang: 'es', head: { meta: [{ name: 'theme-color', content: '#0f172a' }] } },
+})
 ```
 
 `meeko.config.ts` (o `.mts`, `.js`, `.mjs`) se carga con Node y exporta un objeto creado con `defineMeekoConfig`:
 
 - `layers` (desde `1.2`): carpetas que aportan páginas, componentes, autoimports y plugins; véase [Layers](#layers). `extends`, el nombre anterior, sigue funcionando como alias.
-- `modules`: módulos creados con `defineMeekoModule`, que configuran el proyecto desde código; véase [Módulos](#módulos).
+- `modules`: nombres de los módulos creados con `defineMeekoModule` (paquetes o rutas), que configuran el proyecto desde código; sus opciones van en la clave de cada uno, como `seo`. Véase [Módulos](#módulos).
 - `imports`: carpetas de autoimports además de las de por defecto, con el ámbito de la carpeta que las contiene; véase [Autoimports y TypeScript](#carpetas-de-autoimports).
   - `imports.appDirs` (desde `1.3`): carpetas dentro de `app/` (`"app/services"`), con el ámbito de `app/`: navegador y SSR, no `shared/` ni `server/`.
   - `imports.sharedDirs` (desde `1.3`): carpetas dentro de `shared/` (`"shared/validators"`), con el ámbito de `shared/`: aplicación y servidor.
@@ -259,6 +311,7 @@ export default defineMeekoConfig({
 - `server`: el adaptador de `meeko build`; véase [Build, despliegue y verificación](#build-despliegue-y-verificación).
 - `document` (desde `1.2`): `lang` y las entradas de `<head>` de todos los documentos. Los módulos añaden las suyas con `meeko.addHead`; las de `document.head` se aplican después, así que el `title` del proyecto gana. Desde `1.3`, `document.seo` añade la URL canónica y Open Graph de cada página; véase [Canónica y Open Graph por página](#canónica-y-open-graph-por-página). Desde `1.5`, `document.idPrefix` es el prefijo de los IDs de [`useId`](api.md#ids-estables-useid) y de `form.field` (`m` por defecto).
 - `dev` (desde `1.3`): opciones de `meeko dev`. `serverLogs: false` desactiva los [logs del servidor en la consola del navegador](#logs-del-servidor-en-la-consola-del-navegador).
+- `devtools` (desde `1.8`): `true` hace que `meeko dev` monte el [panel de Meeko DevTools](devtools.md#panel-dentro-de-la-página) en la página, sin código de la aplicación; `{ position: "bottom-left" }` elige su esquina. Por defecto, `false`. Nunca llega a `meeko build` ni a `meeko start`.
 - `site` (desde `1.3`): la URL pública del sitio (`"https://example.com"`, sólo el origen). Es el origen de las URL absolutas que escribe Meeko: `sitemap.xml`, `robots.txt` y `document.seo`. Sin `site`, el build usa `MEEKO_PUBLIC_ORIGIN`. No cambia las comprobaciones de `Origin`, que siguen leyendo `MEEKO_PUBLIC_ORIGIN` o `publicOrigin` de `server/runtime.ts` al ejecutarse.
 - `sitemap` y `robots` (desde `1.3`): `sitemap.xml` y `robots.txt` generados en el build; véase [`sitemap.xml` y `robots.txt`](#sitemapxml-y-robotstxt).
 - `theme` (desde `1.4`): el tema claro/oscuro, y temas propios, sin parpadeo, con `useTheme()`; véase [Tema claro/oscuro sin parpadeo](#tema-clarooscuro-sin-parpadeo).
@@ -298,15 +351,15 @@ Desde `1.3`, en `meeko dev`, lo que el código de servidor escribe con `console.
 - **Cómo se ve.** Cada petición es un grupo de la consola con la insignia `server`, el método, la ruta y el principio del `requestId` (el de la cabecera `x-request-id`), y cada log lleva la misma insignia y su nivel (`console.warn` es un aviso, `console.error` un error). Los objetos se pueden desplegar como en el servidor: `Map`, `Set`, fechas, `bigint`, referencias circulares y nombres de clase. Un `Error` muestra la traza del servidor, con sus archivos y líneas, y su `cause`. Las funciones, los símbolos y los datos binarios se muestran por su nombre o su descripción. Los getters no se ejecutan y los proxies no se atraviesan. Un valor más profundo de 8 niveles, una colección de más de 100 elementos o un texto de más de 10 000 caracteres se recortan; una petición con más de 500 logs, o con más de 1 MB de ellos, avisa de cuántos quedaron sólo en la terminal.
 - **Sin duplicados.** Cada log llega una sola vez al navegador, por un único camino. El informe de un error de petición que Meeko ya escribe (`[meeko] request error <id>` y el error con su traza) llega también por este camino y una sola vez. Con `server.forwardConsole` de Vite, que copia la consola del navegador en la terminal, los logs del servidor no vuelven a la terminal.
 - **Sólo en desarrollo.** Ni la captura de `console` ni el código del navegador existen en `meeko build`, `meeko start` o `meeko preview`: el HTML, los payloads y los bundles de producción no los incluyen.
-- **Sólo para el navegador del desarrollador.** Las respuestas sólo llevan los logs si la petición llega desde loopback (`127.0.0.0/8` o `::1`), con una cabecera `Host` de loopback (`localhost`, un subdominio de `.localhost`, `127.x.x.x` o `[::1]`) y sin cabeceras de proxy (`Forwarded`, `Via`, `X-Forwarded-*`, `X-Real-IP`, `CF-Connecting-IP`, `True-Client-IP` y similares). El host de `MEEKO_PUBLIC_ORIGIN` no cuenta como propio: un túnel o un proxy local (ngrok, cloudflared, los *dev tunnels* de VS Code, Tailscale) conecta desde loopback y publica justamente ese nombre, así que sus visitantes no reciben los logs aunque el túnel reescriba `Host` a `localhost`, porque añade cabeceras de reenvío. Con `MEEKO_HOST=0.0.0.0` (para probar desde un móvil, por ejemplo), o tras un túnel, un navegador de otra máquina no recibe logs en sus respuestas: los de sus peticiones se imprimen en las pestañas del propio equipo, porque el WebSocket de HMR de Meeko sólo escucha en `127.0.0.1`. Ese puerto (`MEEKO_HMR_PORT`) no debe publicarse por un túnel: quien se conecte a él recibe los logs de todas las peticiones, como una pestaña local.
+- **Sólo para el navegador del desarrollador.** Las respuestas sólo llevan los logs si la petición llega desde loopback (`127.0.0.0/8` o `::1`), con una cabecera `Host` de loopback (`localhost`, un subdominio de `.localhost`, `127.x.x.x` o `[::1]`) y sin cabeceras de proxy (`Forwarded`, `Via`, `X-Forwarded-*`, `X-Real-IP`, `CF-Connecting-IP`, `True-Client-IP` y similares). El host de `MEEKO_PUBLIC_ORIGIN` no cuenta como propio: un túnel o un proxy local (ngrok, cloudflared, los _dev tunnels_ de VS Code, Tailscale) conecta desde loopback y publica justamente ese nombre, así que sus visitantes no reciben los logs aunque el túnel reescriba `Host` a `localhost`, porque añade cabeceras de reenvío. Con `MEEKO_HOST=0.0.0.0` (para probar desde un móvil, por ejemplo), o tras un túnel, un navegador de otra máquina no recibe logs en sus respuestas: los de sus peticiones se imprimen en las pestañas del propio equipo, porque el WebSocket de HMR de Meeko sólo escucha en `127.0.0.1`. Ese puerto (`MEEKO_HMR_PORT`) no debe publicarse por un túnel: quien se conecte a él recibe los logs de todas las peticiones, como una pestaña local.
 
 Para desactivarlo:
 
 ```ts
 // meeko.config.ts
-import { defineMeekoConfig } from "@meekojs/meeko/framework";
+import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
-export default defineMeekoConfig({ dev: { serverLogs: false } });
+export default defineMeekoConfig({ dev: { serverLogs: false } })
 ```
 
 El `href` tipado no admite `params` en rutas sin parámetros. Para rutas dinámicas exige las claves declaradas en el manifiesto; el runtime comprueba además sus valores y rechaza claves extra.
@@ -314,7 +367,7 @@ El `href` tipado no admite `params` en rutas sin parámetros. Para rutas dinámi
 `href` tiene dos formas con los mismos tipos. `href(id, options)` usa el manifiesto de la aplicación en ejecución: en el servidor, el de la petición en curso (SSR, loaders, `head`, prerender, API, RPC y middleware de servidor); en el navegador, el que recibió `mountClientApp`, desde la hidratación hasta `dispose()`. Es la forma habitual en páginas y layouts:
 
 ```ts
-const link = href("/users/[id]", { params: { id: user.id }, search: { tab: "profile" } });
+const link = href('/users/[id]', { params: { id: user.id }, search: { tab: 'profile' } })
 ```
 
 Fuera de una aplicación (por ejemplo, en una prueba unitaria sin app) la forma corta lanza un error; ahí se pasa el manifiesto con `href(routes, id, options)`, que se mantiene igual.
@@ -325,8 +378,8 @@ Un layer es una carpeta del proyecto con la misma estructura que la aplicación:
 
 ```ts
 export default defineMeekoConfig({
-  layers: ["./layers/base", "./layers/admin"],
-});
+	layers: ['./layers/base', './layers/admin'],
+})
 ```
 
 El orden de las fuentes es: la aplicación, `extends`, `layers`, las carpetas de layer que quedan en `modules` (véase más abajo) y los layers que añaden los módulos con `meeko.addLayer`. Cada layer necesita su carpeta `app/pages` y un nombre de carpeta en minúsculas, dígitos y guiones que no se repita; aparece con ese nombre en los diagnósticos. Las rutas de `layers` y `extends` deben vivir dentro del proyecto, también después de resolver los enlaces.
@@ -349,24 +402,46 @@ Para migrar, mueva la cadena de `modules` a `layers`. Una carpeta de layer no ad
 
 ## Módulos
 
-Un módulo configura el proyecto desde código, como los módulos de Nuxt: añade componentes, autoimports, plugins, middleware y handlers de servidor, entradas de `<head>`, archivos públicos y plugins de Vite, y reacciona a los hooks del build. Se crea con `defineMeekoModule` y se lista en `modules`:
+Un módulo configura el proyecto desde código, como los módulos de Nuxt: añade componentes, autoimports, plugins, middleware y handlers de servidor, entradas de `<head>`, archivos públicos y plugins de Vite, y reacciona a los hooks del build. Se crea con `defineMeekoModule`, se registra en `modules` con su nombre y recibe sus opciones en su propia clave de `meeko.config.ts`, la que declara su `meta.configKey`:
 
 ```ts
 // meeko.config.ts
-import { defineMeekoConfig } from "@meekojs/meeko/framework";
-import hello from "./modules/hello/index.ts";
+import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
 export default defineMeekoConfig({
-  modules: [
-    hello,                                  // un módulo importado
-    "@acme/meeko-seo",                      // un paquete, resuelto desde el proyecto
-    ["./modules/accent", { initial: "teal" }], // una ruta y opciones en línea
-  ],
-  hello: { greeting: "Hola" },              // opciones en la clave del módulo (meta.configKey)
-});
+	modules: ['@meekojs/i18n', '@meekojs/ui', './modules/accent'],
+	i18n: { defaultLocale: 'es', catalogs: { es: 'app/locales/es.json', en: 'app/locales/en.json' } },
+	ui: { defaults: { button: { shape: 'pill' } } },
+	accent: { initial: 'teal' },
+})
 ```
 
-Una cadena es un nombre de paquete (con o sin subruta) o una ruta relativa al proyecto: un archivo, o una carpeta con `package.json` (su export `import`/`default`) o con `index.ts`, `index.mts`, `index.js` o `index.mjs`. El export por defecto debe ser el resultado de `defineMeekoModule`. Las opciones se combinan así: `defaults` del módulo, después `config[meta.configKey]` y por último las de `[módulo, opciones]`; los objetos planos se combinan en profundidad y los arrays se sustituyen. Dos módulos con el mismo `meta.name` son un error. Con `meta.compatibility.meeko` (un rango de npm, como `">=1.2"` o `"^1.2.0"`), la carga falla si la versión de Meeko queda fuera.
+No se importa nada: `meeko.config.ts` sólo nombra los módulos. Una cadena es un nombre de paquete instalado o una ruta relativa al proyecto:
+
+- **Un paquete** (`'@meekojs/i18n'`, con o sin subruta) se resuelve desde el proyecto. Si el paquete exporta el subpath `./module` (como `@meekojs/i18n`, cuya raíz es su runtime), el módulo es el export por defecto de `<paquete>/module`; si no, el export por defecto de la raíz (como `@meekojs/ui`).
+- **Una ruta** (`'./modules/accent'`) es un archivo o una carpeta con `package.json` (su export `import`/`default`) o con `index.ts`, `index.mts`, `index.js` o `index.mjs`.
+
+El export por defecto debe ser el resultado de `defineMeekoModule`. Las opciones se combinan así: `defaults` del módulo y después `config[meta.configKey]`; los objetos planos se combinan en profundidad y los arrays se sustituyen. Los módulos se ejecutan en el orden de `modules`, uno tras otro (Meeko espera cada `setup`), y después el hook `ready`; ese orden decide el de sus plugins, middleware, entradas de `<head>` y hojas de estilos. Dos módulos con el mismo `meta.name` o la misma `meta.configKey` son un error. Con `meta.compatibility.meeko` (un rango de npm, como `">=1.2"` o `"^1.2.0"`), la carga falla si la versión de Meeko queda fuera.
+
+Los errores dicen qué falta:
+
+- Una cadena que no resuelve: `No se encuentra el módulo de Meeko @meekojs/i18m: no es un paquete instalado ni una ruta del proyecto. ¿Quisiste decir "@meekojs/i18n"?` (o, sin parecido, cómo instalarlo).
+- Un paquete sin módulo: `El paquete x no es un módulo de Meeko: … debe exportar por defecto defineMeekoModule(...), en su subpath ./module o en su raíz`.
+- La clave de un módulo instalado que no está en `modules`, como `i18n: { … }` sin `'@meekojs/i18n'`, es el aviso `MEEK127`, que indica la entrada que falta: `[meeko] Aviso MEEK127: meeko.config.ts tiene la clave "i18n", que es la configKey del módulo @meekojs/i18n, pero @meekojs/i18n no está en modules, así que Meeko ignora sus opciones. Añádalo: modules: ["@meekojs/i18n"].` Es un aviso y no un error durante `1.x`, porque esa configuración cargaba (ignorando la clave) hasta `1.7`. Cualquier otra clave desconocida da el aviso de siempre, con la clave conocida más parecida.
+
+#### Tipos de las opciones sin imports
+
+La clave de cada módulo está tipada aunque `meeko.config.ts` no importe nada, como hace Nuxt con `.nuxt/nuxt.d.ts`. El módulo amplía `MeekoConfig` con su clave (`declare module '@meekojs/meeko/framework' { interface MeekoConfig { readonly i18n?: I18nModuleOptions } }`) y Meeko escribe `.meeko/types/config.d.ts`, que importa los tipos de cada módulo de `modules`, así que esa ampliación se carga sola. Lo generan `meeko dev`, `meeko check`, `meeko build` y `meeko routes`, y también el servidor de lenguaje de un workspace de confianza al abrir el proyecto, antes de la primera generación (sólo lee las cadenas de `modules`, sin ejecutar nada).
+
+- **`meeko check`** comprueba `meeko.config.ts` con esos tipos (desde `1.8`; antes sólo cuando la carga fallaba): `i18n: { defaultLocale: 1 }` es `TS2322` con su línea y columna. También `meeko build`, que ejecuta las mismas comprobaciones.
+- **El editor** tipa el archivo con `.meeko/tsconfig.config.json`, al que apunta el `tsconfig.json` que crea `meeko init`. En un proyecto anterior a `1.8`, añada `{ "path": "./.meeko/tsconfig.config.json" }` a `references`. Con él, el editor completa y documenta la clave (`i18n`, `ui`) y marca una opción mal tipada.
+- **Completado de nombres.** Dentro de `modules: ['…']`, el editor ofrece los paquetes instalados que son módulos: las dependencias del `package.json` del proyecto con la palabra clave `meeko-module` en el suyo (`"keywords": ["meeko-module"]`), además de los ya listados. Un módulo publicado debe declararla. Cualquier otra cadena sigue siendo válida.
+
+- **Tipos que genera el módulo.** Las declaraciones que un módulo escribe con `meeko.addTypeTemplate` (en `.meeko/types/modules/`, enlazadas por `.meeko/types/modules.d.ts`) también tipan `meeko.config.ts`, en `meeko check` y en el editor. Así un módulo puede tipar sus opciones con lo que descubre al ejecutarse: `@meekojs/icon` genera la unión de los nombres de icono disponibles y `icon: { include: ['lucide:chek'] }` es `TS2820` con la sugerencia `"lucide:check"`. `meeko check` ejecuta los módulos antes de comprobar la configuración, así que la unión está al día.
+
+Los módulos oficiales `@meekojs/ui`, `@meekojs/i18n` y `@meekojs/icon` (iconos de Iconify resueltos al compilar, con `<UIIcon>`; véase [su guía](https://ui.meekojs.com/icons)) se registran de esta forma.
+
+Las formas de registro anteriores a `1.8` siguen funcionando durante `1.x` con el aviso `MEEK126`, que indica la cadena y la clave que las sustituyen; véase [Actualizar de 1.7 a 1.8](migration-1.8.md#módulos-por-su-nombre).
 
 ### Escribir un módulo
 
@@ -376,122 +451,129 @@ Un módulo de color de acento, que el usuario elige y que se aplica antes de pin
 
 ```ts
 // modules/accent/index.ts
-import { defineMeekoModule } from "@meekojs/meeko/framework";
+import { defineMeekoModule } from '@meekojs/meeko/framework'
 
-export type Accent = "teal" | "violet" | "amber";
+export type Accent = 'teal' | 'violet' | 'amber'
 
 export interface AccentOptions {
-  initial: Accent;
-  storageKey: string;
+	initial: Accent
+	storageKey: string
 }
 
 // Tipa la clave `accent` de meeko.config.ts.
-declare module "@meekojs/meeko/framework" {
-  interface MeekoConfig {
-    readonly accent?: Partial<AccentOptions>;
-  }
+declare module '@meekojs/meeko/framework' {
+	interface MeekoConfig {
+		readonly accent?: Partial<AccentOptions>
+	}
 }
 
 export default defineMeekoModule<AccentOptions>({
-  meta: { name: "@acme/meeko-accent", configKey: "accent", compatibility: { meeko: ">=1.2" } },
-  defaults: { initial: "teal", storageKey: "accent" },
-  setup(options, meeko) {
-    const here = (path: string) => new URL(path, import.meta.url);
-    // <AccentPicker /> en cualquier componente, sin import.
-    meeko.addComponentsDir(here("./components"), { prefix: "Accent" });
-    // useAccent() sin import, en componentes y en app/.
-    meeko.addAutoImports({ name: "useAccent", from: here("./runtime/use-accent.ts") });
-    // Publica la señal del acento antes de hidratar; las opciones llegan al plugin.
-    meeko.addPlugin({ src: here("./runtime/accent.plugin.ts"), options: { initial: options.initial, storageKey: options.storageKey } });
-    // Aplica el acento guardado antes de pintar, sin parpadeo.
-    meeko.addHead({
-      script: [{ key: "accent", children: `document.documentElement.dataset.accent = localStorage.getItem(${JSON.stringify(options.storageKey)}) ?? ${JSON.stringify(options.initial)};` }],
-    });
-  },
-});
+	meta: { name: '@acme/meeko-accent', configKey: 'accent', compatibility: { meeko: '>=1.2' } },
+	defaults: { initial: 'teal', storageKey: 'accent' },
+	setup(options, meeko) {
+		const here = (path: string) => new URL(path, import.meta.url)
+		// <AccentPicker /> en cualquier componente, sin import.
+		meeko.addComponentsDir(here('./components'), { prefix: 'Accent' })
+		// useAccent() sin import, en componentes y en app/.
+		meeko.addAutoImports({ name: 'useAccent', from: here('./runtime/use-accent.ts') })
+		// Publica la señal del acento antes de hidratar; las opciones llegan al plugin.
+		meeko.addPlugin({ src: here('./runtime/accent.plugin.ts'), options: { initial: options.initial, storageKey: options.storageKey } })
+		// Aplica el acento guardado antes de pintar, sin parpadeo.
+		meeko.addHead({
+			script: [{ key: 'accent', children: `document.documentElement.dataset.accent = localStorage.getItem(${JSON.stringify(options.storageKey)}) ?? ${JSON.stringify(options.initial)};` }],
+		})
+	},
+})
 ```
 
 ```ts
 // modules/accent/runtime/use-accent.ts
-import { createContext, inject } from "@meekojs/meeko";
-import type { Signal } from "@meekojs/meeko";
-import type { Accent } from "../index.ts";
+import { createContext, inject } from '@meekojs/meeko'
+import type { Signal } from '@meekojs/meeko'
+import type { Accent } from '../index.ts'
 
-export const accentKey = createContext<Signal<Accent>>("accent");
+export const accentKey = createContext<Signal<Accent>>('accent')
 
 export function useAccent(): Signal<Accent> {
-  return inject(accentKey);
+	return inject(accentKey)
 }
 ```
 
 ```ts
 // modules/accent/runtime/accent.plugin.ts
-import { effect, signal } from "@meekojs/meeko";
-import { definePlugin } from "@meekojs/meeko/framework";
-import type { Accent } from "../index.ts";
-import { accentKey } from "./use-accent.ts";
+import { effect, signal } from '@meekojs/meeko'
+import { definePlugin } from '@meekojs/meeko/framework'
+import type { Accent } from '../index.ts'
+import { accentKey } from './use-accent.ts'
 
 export default definePlugin<{ initial: Accent; storageKey: string }>((app, options) => {
-  // El mismo valor inicial en el servidor y en el navegador, para que la hidratación coincida.
-  const accent = signal(options.initial);
-  app.provide(accentKey, accent);
-  if (app.side === "client") {
-    let first = true;
-    effect(() => {
-      const value = accent.value;
-      // El script de <head> ya aplicó el acento guardado; después, cada cambio se aplica y se guarda.
-      if (first) { first = false; return; }
-      document.documentElement.dataset.accent = value;
-      localStorage.setItem(options.storageKey, value);
-    });
-  }
-});
+	// El mismo valor inicial en el servidor y en el navegador, para que la hidratación coincida.
+	const accent = signal(options.initial)
+	app.provide(accentKey, accent)
+	if (app.side === 'client') {
+		let first = true
+		effect(() => {
+			const value = accent.value
+			// El script de <head> ya aplicó el acento guardado; después, cada cambio se aplica y se guarda.
+			if (first) {
+				first = false
+				return
+			}
+			document.documentElement.dataset.accent = value
+			localStorage.setItem(options.storageKey, value)
+		})
+	}
+})
 ```
 
 Un módulo de SEO genera `sitemap.xml` a partir de las rutas y `robots.txt`:
 
 ```ts
-import { defineMeekoModule } from "@meekojs/meeko/framework";
+import { defineMeekoModule } from '@meekojs/meeko/framework'
 
 export default defineMeekoModule<{ siteUrl: string }>({
-  meta: { name: "@acme/meeko-seo", configKey: "seo" },
-  setup(options, meeko) {
-    let routes: readonly { id: string }[] = [];
-    meeko.hooks.hook("routes:resolved", (context) => { routes = context.routes; });
-    meeko.addPublicFile("robots.txt", `User-agent: *\nAllow: /\nSitemap: ${options.siteUrl}/sitemap.xml\n`);
-    // Una función se evalúa al escribir el build (y en cada petición en dev), con las rutas ya descubiertas.
-    meeko.addPublicFile("sitemap.xml", () => [
-      '<?xml version="1.0" encoding="UTF-8"?>',
-      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-      ...routes.filter((route) => !route.id.includes("[")).map((route) => `<url><loc>${options.siteUrl}${route.id}</loc></url>`),
-      "</urlset>",
-    ].join("\n"));
-  },
-});
+	meta: { name: '@acme/meeko-seo', configKey: 'seo' },
+	setup(options, meeko) {
+		let routes: readonly { id: string }[] = []
+		meeko.hooks.hook('routes:resolved', (context) => {
+			routes = context.routes
+		})
+		meeko.addPublicFile('robots.txt', `User-agent: *\nAllow: /\nSitemap: ${options.siteUrl}/sitemap.xml\n`)
+		// Una función se evalúa al escribir el build (y en cada petición en dev), con las rutas ya descubiertas.
+		meeko.addPublicFile('sitemap.xml', () =>
+			[
+				'<?xml version="1.0" encoding="UTF-8"?>',
+				'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+				...routes.filter((route) => !route.id.includes('[')).map((route) => `<url><loc>${options.siteUrl}${route.id}</loc></url>`),
+				'</urlset>',
+			].join('\n'),
+		)
+	},
+})
 ```
 
 Los archivos de runtime de un módulo (plugins, componentes, autoimports, middleware y handlers) los procesa Vite como los del proyecto, pero fuera de las carpetas de la aplicación no reciben autoimports: impórtelos de forma explícita. Los componentes `.meeko` de `addComponentsDir` sí reciben los autoimports del proyecto.
 
 ### El objeto `meeko`
 
-| Miembro | Qué hace |
-| --- | --- |
-| `rootDir`, `dev`, `config` | Carpeta del proyecto, `true` en `meeko dev` y la configuración cargada. |
-| `addLayer(dir)` | Añade un layer, después de los de `layers`. Debe tener `app/pages` y estar dentro del proyecto; un paquete instalado en `node_modules` lo está, también con pnpm. |
+| Miembro                                        | Qué hace                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rootDir`, `dev`, `config`                     | Carpeta del proyecto, `true` en `meeko dev` y la configuración cargada.                                                                                                                                                                                                                                                                                                                                                          |
+| `addLayer(dir)`                                | Añade un layer, después de los de `layers`. Debe tener `app/pages` y estar dentro del proyecto; un paquete instalado en `node_modules` lo está, también con pnpm.                                                                                                                                                                                                                                                                |
 | `addComponentsDir(dir, { prefix?, exclude? })` | Autoimporta los `.meeko` de la carpeta y sus subcarpetas, con el nombre en PascalCase tras el prefijo (`components/picker.meeko` con `prefix: "Accent"` es `AccentPicker`). `exclude` admite globs relativos a esa carpeta, como `['internal/**', '**/*.private.meeko']`: los archivos excluidos no entran en `ComponentName`, los loaders ni los tipos globales generados, pero siguen disponibles mediante imports explícitos. |
-| `addLayout(name, file)` | Desde `1.5`, añade un [layout con nombre](#layouts-con-nombre), como un archivo de `app/layouts`: `meeko.addLayout("docs", here("./docs-layout.meeko"))`. El archivo debe estar dentro del proyecto. Un layout del proyecto o de un layer con el mismo nombre gana; dos módulos con el mismo nombre son un error. |
-| `addAutoImports(entries)` | Autoimporta exports de un paquete o archivo: `{ name, as?, from, type?, scope?, componentOnly? }`; `scope` es `"app"` por defecto (componentes y `app/`, en el navegador y en SSR), `"client"`, `"server"` o `"shared"`. Con `componentOnly: true` y `scope: "app"`, el nombre se ofrece en componentes y módulos de `app/` que pueden ejecutarse en el navegador, pero no en `<script server>` ni en `server/`. |
-| `addAutoImportsDir(dir, { scope })` | Autoimporta los exports de los `.ts` de una carpeta, con ámbito `"app"`, `"server"` o `"shared"`; los sufijos `.client.ts`, `.server.ts` y `.shared.ts` mandan. |
-| `addPlugin({ src, mode?, options? })` | Añade un [plugin de aplicación](#plugins-de-aplicación). `mode` sale del sufijo del archivo o es `"universal"`. `options` debe ser JSON y llega al navegador si el plugin se ejecuta allí. |
-| `addServerMiddleware(file)` | Añade un middleware como los de `server/middleware`; los de los módulos van antes que los del proyecto. |
-| `addServerHandler({ route, handler })` | Atiende una ruta exacta con el export por defecto de `handler`, `(request) => Response`, después del middleware de servidor. |
-| `addPublicFile(path, contents)` | Añade un archivo público. `meeko build` lo escribe en la salida del cliente, antes de calcular el manifiesto de assets; `meeko dev` lo sirve. Choca con un archivo de `public/` del mismo nombre. |
-| `addStylesheet(file)` | Registra un archivo `.css` procesado por Vite y el PostCSS del proyecto. Acepta una ruta relativa a `rootDir` o una URL de archivo del módulo. Las hojas se deduplican por archivo real y conservan el orden de registro; `app/styles/main.css` se carga al final. Incluye HMR, resolución de imports y assets, CSS en el HTML de SSR y assets con hash en producción. |
-| `addHead(input)` | Añade entradas a `document.head`: `meta`, `link`, `script` y `style` se concatenan en el orden de los módulos; `title`, `titleTemplate`, `htmlAttrs` y `bodyAttrs` se quedan con el último valor; `document.head` del proyecto se aplica al final. Recibe un `DocumentHead`: `titleTemplate` es una cadena y `title` es el título del sitio, sin plantilla. |
-| `addVitePlugin(plugin)` | Añade un plugin de Vite a `meeko dev` y a cada build de `meeko build`, después del de Meeko. |
-| `extendViteConfig(fn)` | Modifica la configuración inline de Vite de cada paso; `fn(config, { command, ssr })` cambia el objeto o devuelve otro. |
-| `hooks.hook(name, fn)` | Registra un [hook](#hooks). |
-| `warn(message)` | Escribe un aviso con el nombre del módulo. |
+| `addLayout(name, file)`                        | Desde `1.5`, añade un [layout con nombre](#layouts-con-nombre), como un archivo de `app/layouts`: `meeko.addLayout("docs", here("./docs-layout.meeko"))`. El archivo debe estar dentro del proyecto. Un layout del proyecto o de un layer con el mismo nombre gana; dos módulos con el mismo nombre son un error.                                                                                                                |
+| `addAutoImports(entries)`                      | Autoimporta exports de un paquete o archivo: `{ name, así, from, type?, scope?, componentOnly? }`; `scope` es `"app"` por defecto (componentes y `app/`, en el navegador y en SSR), `"client"`, `"server"` o `"shared"`. Con `componentOnly: true` y `scope: "app"`, el nombre se ofrece en componentes y módulos de `app/` que pueden ejecutarse en el navegador, pero no en `<script server>` ni en `server/`.                 |
+| `addAutoImportsDir(dir, { scope })`            | Autoimporta los exports de los `.ts` de una carpeta, con ámbito `"app"`, `"server"` o `"shared"`; los sufijos `.client.ts`, `.server.ts` y `.shared.ts` mandan.                                                                                                                                                                                                                                                                  |
+| `addPlugin({ src, mode?, options? })`          | Añade un [plugin de aplicación](#plugins-de-aplicación). `mode` sale del sufijo del archivo o es `"universal"`. `options` debe ser JSON y llega al navegador si el plugin se ejecuta allí.                                                                                                                                                                                                                                       |
+| `addServerMiddleware(file)`                    | Añade un middleware como los de `server/middleware`; los de los módulos van antes que los del proyecto.                                                                                                                                                                                                                                                                                                                          |
+| `addServerHandler({ route, handler })`         | Atiende una ruta exacta con el export por defecto de `handler`, `(request) => Response`, después del middleware de servidor.                                                                                                                                                                                                                                                                                                     |
+| `addPublicFile(path, contents)`                | Añade un archivo público. `meeko build` lo escribe en la salida del cliente, antes de calcular el manifiesto de assets; `meeko dev` lo sirve. Choca con un archivo de `public/` del mismo nombre.                                                                                                                                                                                                                                |
+| `addStylesheet(file)`                          | Registra un archivo `.css` procesado por Vite y el PostCSS del proyecto. Acepta una ruta relativa a `rootDir` o una URL de archivo del módulo. Las hojas se deduplican por archivo real y conservan el orden de registro; `app/styles/main.css` se carga al final. Incluye HMR, resolución de imports y assets, CSS en el HTML de SSR y assets con hash en producción.                                                           |
+| `addHead(input)`                               | Añade entradas a `document.head`: `meta`, `link`, `script` y `style` se concatenan en el orden de los módulos; `title`, `titleTemplate`, `htmlAttrs` y `bodyAttrs` se quedan con el último valor; `document.head` del proyecto se aplica al final. Recibe un `DocumentHead`: `titleTemplate` es una cadena y `title` es el título del sitio, sin plantilla.                                                                      |
+| `addVitePlugin(plugin)`                        | Añade un plugin de Vite a `meeko dev` y a cada build de `meeko build`, después del de Meeko.                                                                                                                                                                                                                                                                                                                                     |
+| `extendViteConfig(fn)`                         | Modifica la configuración inline de Vite de cada paso; `fn(config, { command, ssr })` cambia el objeto o devuelve otro.                                                                                                                                                                                                                                                                                                          |
+| `hooks.hook(name, fn)`                         | Registra un [hook](#hooks).                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `warn(message)`                                | Escribe un aviso con el nombre del módulo.                                                                                                                                                                                                                                                                                                                                                                                       |
 
 Un host de Vite propio que sólo usa el plugin `meeko()` recibe los autoimports, componentes, layers y plugins de aplicación de los módulos, pero no sus `addVitePlugin`, `extendViteConfig`, archivos públicos ni hooks: esos los aplican `meeko dev` y `meeko build`.
 
@@ -499,13 +581,13 @@ Meeko no tiene un `runtimeConfig` aparte: un módulo pasa valores a su runtime c
 
 ### Hooks
 
-| Hook | Cuándo | Contexto |
-| --- | --- | --- |
-| `ready` | Todos los módulos terminaron su `setup`. | — |
-| `routes:resolved` | Antes del build del cliente en `meeko build`; al arrancar y en cada redescubrimiento en `meeko dev`. | `{ routes }`, el manifiesto con rutas de archivo absolutas. |
-| `build:before` | Al empezar `meeko build`. | `{ adapter, output }`, la carpeta absoluta del adaptador. |
-| `prerender:routes` | Antes de prerenderizar, en `meeko build` y `meeko prerender`. | `{ urls }`: los `pathname` que se van a prerenderizar; el hook puede añadir o quitar entradas, que deben corresponder a una ruta. |
-| `build:done` | Al terminar `meeko build`, prerender incluido. | `{ adapter, output }`; el módulo puede escribir más archivos en `output`. |
+| Hook               | Cuándo                                                                                               | Contexto                                                                                                                          |
+| ------------------ | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `ready`            | Todos los módulos terminaron su `setup`.                                                             | —                                                                                                                                 |
+| `routes:resolved`  | Antes del build del cliente en `meeko build`; al arrancar y en cada redescubrimiento en `meeko dev`. | `{ routes }`, el manifiesto con rutas de archivo absolutas.                                                                       |
+| `build:before`     | Al empezar `meeko build`.                                                                            | `{ adapter, output }`, la carpeta absoluta del adaptador.                                                                         |
+| `prerender:routes` | Antes de prerenderizar, en `meeko build` y `meeko prerender`.                                        | `{ urls }`: los `pathname` que se van a prerenderizar; el hook puede añadir o quitar entradas, que deben corresponder a una ruta. |
+| `build:done`       | Al terminar `meeko build`, prerender incluido.                                                       | `{ adapter, output }`; el módulo puede escribir más archivos en `output`.                                                         |
 
 Los hooks se ejecutan en el orden en que se registraron y Meeko espera a cada uno. `hook()` devuelve una función que lo quita.
 
@@ -515,12 +597,12 @@ Los archivos de `app/plugins` (de la aplicación y de sus layers) y los que aña
 
 ```ts
 // app/plugins/analytics.client.ts
-import { definePlugin } from "@meekojs/meeko/framework";
+import { definePlugin } from '@meekojs/meeko/framework'
 
 export default definePlugin((app) => {
-  effect(() => navigator.sendBeacon("/api/visits", app.route.path.value));
-  app.onError((error, info) => console.error("[app]", info.side, error));
-});
+	effect(() => navigator.sendBeacon('/api/visits', app.route.path.value))
+	app.onError((error, info) => console.error('[app]', info.side, error))
+})
 ```
 
 - **Dónde.** `*.client.ts` sólo en el navegador, una vez, antes de la hidratación. `*.server.ts` sólo en el servidor, una vez por petición de página, antes del render (también al prerenderizar; no en las páginas ya prerenderizadas, ni en API, RPC o handlers). Un `.ts` sin sufijo, en los dos. Sólo cuentan los archivos que están directamente en `app/plugins`; las subcarpetas pueden guardar sus auxiliares. Se excluyen `*.test.ts`, `*.spec.ts` y `*.d.ts`.
@@ -550,13 +632,13 @@ Las dos existen también sólo de servidor, en `app/middleware/*.server.ts` con 
 ```ts
 // app/middleware/10-locale.ts: global, en todas las rutas
 export default defineRouteMiddleware(({ url, match }) => {
-  if (match.route.id !== "/dashboard") return;
-  if (!url.searchParams.has("locale")) {
-    const target = new URL(url);
-    target.searchParams.set("locale", "es");
-    return Response.redirect(target);
-  }
-});
+	if (match.route.id !== '/dashboard') return
+	if (!url.searchParams.has('locale')) {
+		const target = new URL(url)
+		target.searchParams.set('locale', 'es')
+		return Response.redirect(target)
+	}
+})
 ```
 
 ### Middleware con nombre
@@ -565,26 +647,32 @@ Un guard que sólo afecta a una parte de la aplicación se declara con nombre y 
 
 ```ts
 // app/middleware/auth.ts
-export default defineRouteMiddleware(({ url, phase, request }) => {
-  // Una cookie pública que indica la sesión: la cookie de sesión de Meeko es HttpOnly.
-  const cookies = phase === "server" ? request?.headers.get("cookie") ?? "" : document.cookie;
-  if (!cookies.includes("signed-in=1")) {
-    const login = new URL("/login", url);
-    login.searchParams.set("next", url.pathname);
-    return Response.redirect(login);
-  }
-}, { global: false });
+export default defineRouteMiddleware(
+	({ url, phase, request }) => {
+		// Una cookie pública que indica la sesión: la cookie de sesión de Meeko es HttpOnly.
+		const cookies = phase === 'server' ? (requestá.headers.get('cookie') ?? '') : document.cookie
+		if (!cookies.includes('signed-in=1')) {
+			const login = new URL('/login', url)
+			login.searchParams.set('next', url.pathname)
+			return Response.redirect(login)
+		}
+	},
+	{ global: false },
+)
 ```
 
 ```ts
 // app/pages/(dashboard)/+group.ts: todas las páginas del grupo
-export default defineGroup({ layout: "dashboard", middleware: ["auth"] });
+export default defineGroup({ layout: 'dashboard', middleware: ['auth'] })
 ```
 
 ```html
 <!-- app/pages/(dashboard)/admin/users.meeko: la página añade el suyo -->
-<script server lang="ts">
-export const route = definePage({ middleware: ["admin"] });
+<script
+	server
+	lang="ts"
+>
+	export const route = definePage({ middleware: ['admin'] })
 </script>
 <template><h1>Usuarios</h1></template>
 ```
@@ -608,16 +696,19 @@ Desde `1.6`, un archivo `app/middleware/*.server.ts` es middleware de ruta **só
 
 ```ts
 // app/middleware/auth.server.ts
-import { redirect } from "@meekojs/meeko/framework";
+import { redirect } from '@meekojs/meeko/framework'
 
-export default defineServerRouteMiddleware(({ session, url }) => {
-  if (!session.current) redirect(`/login?next=${encodeURIComponent(url.pathname)}`);
-}, { global: false });
+export default defineServerRouteMiddleware(
+	({ session, url }) => {
+		if (!session.current) redirect(`/login?next=${encodeURIComponent(url.pathname)}`)
+	},
+	{ global: false },
+)
 ```
 
 ```ts
 // app/pages/(dashboard)/+group.ts: todas las páginas del grupo exigen sesión
-export default defineGroup({ layout: "dashboard", middleware: ["auth"] });
+export default defineGroup({ layout: 'dashboard', middleware: ['auth'] })
 ```
 
 - **Global o con nombre.** La misma regla que el isomórfico: sin opciones es global y se ejecuta en todas las rutas; con `{ global: false }` (leído sin ejecutar el archivo) es un middleware con nombre, y `auth.server.ts` (o `10-auth.server.ts`) es `"auth"`. `middleware: ["auth"]` en `definePage` o en un `+group.ts` resuelve a `auth.ts` o a `auth.server.ts`, con la misma herencia y `middleware: false`; si los dos existen y alguno es con nombre, el nombre está duplicado y el descubrimiento se detiene. El export por defecto de un `*.server.ts` debe ser una llamada a `defineServerRouteMiddleware(...)`, directa o a través de una constante del archivo (`as const` incluido), de un import con alias o de `export { auth as default }`. Hasta `1.5` esos archivos se ignoraban, así que un helper que viviera allí, sin export por defecto o con otro (`export default function parseCookies…`), detiene el descubrimiento con `un middleware de ruta de servidor debe exportar por defecto defineServerRouteMiddleware(...)… mueve los helpers a server/utils` en lugar de ejecutarse en cada petición como middleware global. Cada clase de archivo usa su definición: `defineRouteMiddleware` en un `*.server.ts`, o `defineServerRouteMiddleware` en un `*.ts`, es un error con el archivo.
@@ -639,22 +730,22 @@ Cuándo usar cada uno:
 
 ### Middleware de servidor
 
-Para interceptar HTTP en el servidor antes del handler de página o API/RPC, coloque middleware en `server/middleware/*.ts` y use `defineServerMiddleware` desde `@meekojs/meeko/server`. Recibe `Request` y `next(request?)`; debe devolver un `Response`. Puede continuar, modificar una respuesta o cortocircuitar. Meeko ejecuta los archivos por nombre, de fuera hacia dentro; `next()` sólo se puede llamar una vez. El middleware se ejecuta antes de crear el contexto de sesión de la petición, también para las páginas prerenderizadas; los archivos públicos del build se sirven antes del middleware. Los controles integrados de autenticación, autorización, contratos y CSRF de API/RPC siguen ejecutándose dentro del handler.
+Para interceptar HTTP en el servidor antes del handler de página o API/RPC, coloque middleware en `server/middleware/*.ts` y use `defineServerMiddleware` desde `@meekojs/meeko/server`. Recibe `Request` y `next(requestá)`; debe devolver un `Response`. Puede continuar, modificar una respuesta o cortocircuitar. Meeko ejecuta los archivos por nombre, de fuera hacia dentro; `next()` sólo se puede llamar una vez. El middleware se ejecuta antes de crear el contexto de sesión de la petición, también para las páginas prerenderizadas; los archivos públicos del build se sirven antes del middleware. Los controles integrados de autenticación, autorización, contratos y CSRF de API/RPC siguen ejecutándose dentro del handler.
 
 ```ts
 // server/middleware/10-request-header.ts
-import { defineServerMiddleware } from "@meekojs/meeko/server";
+import { defineServerMiddleware } from '@meekojs/meeko/server'
 
 export default defineServerMiddleware(async (request, next) => {
-  const response = await next();
-  const headers = new Headers(response.headers);
-  headers.set("x-content-type-options", "nosniff");
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-  });
-});
+	const response = await next()
+	const headers = new Headers(response.headers)
+	headers.set('x-content-type-options', 'nosniff')
+	return new Response(response.body, {
+		status: response.status,
+		statusText: response.statusText,
+		headers,
+	})
+})
 ```
 
 El middleware de servidor no tiene `RequestContext`: para la IP del cliente use `clientAddress(request)` (desde `1.7`), que aplica `MEEKO_TRUST_PROXY` como `context.clientAddress` y `rateLimit`; nunca lea `X-Forwarded-For` a mano (véase [IP del cliente tras un proxy](#ip-del-cliente-tras-un-proxy)).
@@ -685,25 +776,37 @@ Desde `1.2`, dos etiquetas propias de Meeko sustituyen a esos patrones. No se im
 ```html
 <!-- app/components/NavLink.meeko -->
 <script lang="ts">
-const props = defineProps<{ href: MeekoLinkProps["to"]; label: string }>();
+	const props = defineProps<{ href: MeekoLinkProps['to']; label: string }>()
 </script>
 <template><a bind:href="href(props.href)">{props.label}</a></template>
 ```
 
-  `MeekoLinkProps["to"]` y `RouteId` son el mismo tipo: la unión de las rutas que declara `.meeko/types/routes.d.ts` (`meeko check`, `meeko dev`), o `string` sin esas declaraciones. `<NavLink href="/nowhere">` es un error de tipos en el padre. Un tipo del proyecto con uno de esos nombres (por ejemplo, en `app/types`) tiene prioridad.
+`MeekoLinkProps["to"]` y `RouteId` son el mismo tipo: la unión de las rutas que declara `.meeko/types/routes.d.ts` (`meeko check`, `meeko dev`), o `string` sin esas declaraciones. `<NavLink href="/nowhere">` es un error de tipos en el padre. Un tipo del proyecto con uno de esos nombres (por ejemplo, en `app/types`) tiene prioridad.
 
 ```html
 <!-- app/layouts/default.meeko -->
 <template>
-  <header>
-    <MeekoLink to="/" class="brand">Inicio</MeekoLink>
-    <MeekoLink to="/users/[id]" bind:params="{ id: session.userId }">Mi perfil</MeekoLink>
-  </header>
-  <main><MeekoOutlet /></main>
+	<header>
+		<MeekoLink
+			to="/"
+			class="brand"
+		>
+			Inicio
+		</MeekoLink>
+		<MeekoLink
+			to="/users/[id]"
+			bind:params="{ id: session.userId }"
+		>
+			Mi perfil
+		</MeekoLink>
+	</header>
+	<main><MeekoOutlet /></main>
 </template>
 
 <style scoped>
-a[aria-current="page"] { font-weight: 700; }
+	a[aria-current='page'] {
+		font-weight: 700;
+	}
 </style>
 ```
 
@@ -712,20 +815,45 @@ Un menú de secciones marca la sección en todas sus páginas y, de forma distin
 ```html
 <!-- app/layouts/default.meeko -->
 <template>
-  <nav aria-label="Secciones">
-    <MeekoLink to="/" match="prefix">Inicio</MeekoLink>
-    <MeekoLink to="/dashboard" match="prefix">Panel</MeekoLink>
-    <MeekoLink to="/users" match="prefix">Usuarios</MeekoLink>
-    <MeekoLink to="/settings" match="prefix">Ajustes</MeekoLink>
-  </nav>
-  <main><MeekoOutlet /></main>
+	<nav aria-label="Secciones">
+		<MeekoLink
+			to="/"
+			match="prefix"
+		>
+			Inicio
+		</MeekoLink>
+		<MeekoLink
+			to="/dashboard"
+			match="prefix"
+		>
+			Panel
+		</MeekoLink>
+		<MeekoLink
+			to="/users"
+			match="prefix"
+		>
+			Usuarios
+		</MeekoLink>
+		<MeekoLink
+			to="/settings"
+			match="prefix"
+		>
+			Ajustes
+		</MeekoLink>
+	</nav>
+	<main><MeekoOutlet /></main>
 </template>
 
 <style scoped>
-/* La sección de la página actual: /dashboard/stats marca «Panel». */
-nav a[aria-current="true"] { border-bottom: 2px solid currentColor; }
-/* La página exacta: /dashboard marca «Panel» con más peso. */
-nav a[aria-current="page"] { border-bottom: 2px solid currentColor; font-weight: 700; }
+	/* La sección de la página actual: /dashboard/stats marca «Panel». */
+	nav a[aria-current='true'] {
+		border-bottom: 2px solid currentColor;
+	}
+	/* La página exacta: /dashboard marca «Panel» con más peso. */
+	nav a[aria-current='page'] {
+		border-bottom: 2px solid currentColor;
+		font-weight: 700;
+	}
 </style>
 ```
 
@@ -742,23 +870,28 @@ Desde `1.5`, `<MeekoTeleport to="…">` pinta su contenido en otro lugar del doc
 ```html
 <!-- app/layouts/default.meeko -->
 <template>
-  <header class="bar">
-    <MeekoLink to="/">Inicio</MeekoLink>
-    <div id="toolbar"></div>
-  </header>
-  <main><MeekoOutlet /></main>
+	<header class="bar">
+		<MeekoLink to="/">Inicio</MeekoLink>
+		<div id="toolbar"></div>
+	</header>
+	<main><MeekoOutlet /></main>
 </template>
 
 <!-- app/pages/notes/[id].meeko -->
 <script lang="ts">
-const isMobile = signal(false);
-async function save(): Promise<void> { /* … */ }
+	const isMobile = signal(false)
+	async function save(): Promise<void> {
+		/* … */
+	}
 </script>
 <template>
-  <MeekoTeleport to="#toolbar" bind:disabled="isMobile.value">
-    <AppButton on:click="save">Guardar</AppButton>
-  </MeekoTeleport>
-  <article>…</article>
+	<MeekoTeleport
+		to="#toolbar"
+		bind:disabled="isMobile.value"
+	>
+		<AppButton on:click="save">Guardar</AppButton>
+	</MeekoTeleport>
+	<article>…</article>
 </template>
 ```
 
@@ -769,7 +902,7 @@ async function save(): Promise<void> { /* … */ }
 - **`disabled`.** Con `disabled` (o mientras `bind:disabled` es verdadero) el contenido se pinta en su sitio. Cambiarlo mueve los mismos nodos entre el destino y su sitio, sin volver a renderizarlos, así que conservan su estado; el elemento que tenía el foco lo pierde, como en cualquier movimiento del DOM.
 - **Navegador.** Lo que el navegador renderiza (una navegación, un `if:when` que aparece, una fila nueva o un hijo diferido) se pinta primero en su sitio y pasa a su destino al terminar ese montaje, antes del siguiente pintado, y se añade al final del destino. El destino debe vivir al menos tanto como el teleport: un elemento del layout o de `app/app.meeko` para una página, o del propio componente.
 
-Para modales, menús y tooltips no hace falta teleport: `<dialog>` con `showModal()` y el atributo `popover` ya los muestran en la *top layer* del navegador, por encima de todo y sin problemas de `z-index` u `overflow`, con el foco y `Escape` resueltos. Use `<MeekoTeleport>` cuando el contenido deba vivir en otro sitio del layout, como una barra de acciones, unas migas de pan o un aviso al final de `<body>`.
+Para modales, menús y tooltips no hace falta teleport: `<dialog>` con `showModal()` y el atributo `popover` ya los muestran en la _top layer_ del navegador, por encima de todo y sin problemas de `z-index` u `overflow`, con el foco y `Escape` resueltos. Use `<MeekoTeleport>` cuando el contenido deba vivir en otro sitio del layout, como una barra de acciones, unas migas de pan o un aviso al final de `<body>`.
 
 Las páginas, los layouts, `app/app.meeko` y `app/error.meeko` no pueden ser [componentes genéricos](api.md#componentes-genéricos-generic): Meeko les pasa sus props y no puede elegir sus parámetros de tipo, así que `generic` en su `<script>` da `MEEK100`. Lleve el contenido genérico a un componente de `app/components` y úselo desde la página.
 
@@ -783,8 +916,11 @@ La página elige su layout en sus opciones de ruta, en `<script server>` o en el
 
 ```html
 <!-- app/pages/connections.meeko -->
-<script server lang="ts">
-export const route = definePage({ layout: "dashboard" });
+<script
+	server
+	lang="ts"
+>
+	export const route = definePage({ layout: 'dashboard' })
 </script>
 <template><h1>Conexiones</h1></template>
 ```
@@ -811,7 +947,7 @@ Para no repetir `layout` en cada página, un `+group.ts` en cualquier carpeta de
 
 ```ts
 // app/pages/(dashboard)/+group.ts
-export default defineGroup({ layout: "dashboard", layoutProps: { showAlert: false } });
+export default defineGroup({ layout: 'dashboard', layoutProps: { showAlert: false } })
 ```
 
 - **Herencia en cascada.** Los `+group.ts` se aplican del exterior al interior y después la página. `layout` de la página, o del grupo más interior que lo declara, gana.
@@ -834,13 +970,16 @@ El layout declara props normales. La página se las pasa tipadas contra las `Pro
 ```html
 <!-- app/layouts/dashboard.meeko -->
 <script lang="ts">
-export interface Props { title?: string; showAlert?: boolean }
-const props = defineProps<Props>({ showAlert: false });
+	export interface Props {
+		title?: string
+		showAlert?: boolean
+	}
+	const props = defineProps<Props>({ showAlert: false })
 </script>
 <template>
-  <header>{props.title}</header>
-  <AppAlert if:when="props.showAlert" />
-  <main><MeekoOutlet /></main>
+	<header>{props.title}</header>
+	<AppAlert if:when="props.showAlert" />
+	<main><MeekoOutlet /></main>
 </template>
 ```
 
@@ -850,15 +989,15 @@ Como Meeko renderiza el layout sin las props que una página no le pasa, las de 
 
 ```ts
 // app/pages/connections.route.ts (o export const route en <script server>)
-export const route = definePage({ layout: "dashboard", layoutProps: { title: "Conexiones", showAlert: true } });
+export const route = definePage({ layout: 'dashboard', layoutProps: { title: 'Conexiones', showAlert: true } })
 ```
 
 ```ts
 export const route = definePage({
-  layout: "dashboard",
-  load: async ({ context }) => ({ user: await users.current(context) }),
-  layoutProps: ({ data }) => ({ title: data.user.name }),
-});
+	layout: 'dashboard',
+	load: async ({ context }) => ({ user: await users.current(context) }),
+	layoutProps: ({ data }) => ({ title: data.user.name }),
+})
 ```
 
 La función recibe el mismo contexto que `head` (`params`, `search`, `request`, `context`, `signal`, `state` y `data`); con código de nivel superior en `<script server>`, `data` son sus exports. Se combinan con las de los `+group.ts`, y ganan. Viajan en el payload (`layoutProps`), así que deben poder serializarse en JSON: una prop con `undefined` (`{ title: data.user?.name }` sin usuario, o `layout.set({ title: undefined })`) deja la prop sin valor, así que el layout usa su valor por defecto, en el servidor y en el navegador; un valor que JSON no representa (una fecha, un `Map`, una instancia) hace fallar la página con un error que nombra la página, el layout y la prop. En una página `render: "client"`, el objeto ya llega al HTML del servidor y la función se ejecuta en el navegador después de `load`. `export const layoutProps` en `<script server>` no es una opción: sería un dato más de la página.
@@ -868,13 +1007,13 @@ La función recibe el mismo contexto que `head` (`params`, `search`, `request`, 
 ```html
 <!-- app/pages/connections.meeko -->
 <script lang="ts">
-const layout = useLayout();                 // LayoutHandle de "dashboard"
-const failing = signal(false);
-effect(() => layout.set({ showAlert: failing.value }));
+	const layout = useLayout() // LayoutHandle de "dashboard"
+	const failing = signal(false)
+	effect(() => layout.set({ showAlert: failing.value }))
 </script>
 <template>
-  <p>Título actual: {layout.props.title}</p>
-  <button on:click="() => failing.value = !failing.value">Probar conexión</button>
+	<p>Título actual: {layout.props.title}</p>
+	<button on:click="() => failing.value = !failing.value">Probar conexión</button>
 </template>
 ```
 
@@ -910,25 +1049,31 @@ Una página declara su código de servidor en un bloque `<script server lang="ts
 
 ```html
 <!-- app/pages/users/[id].meeko -->
-<script server lang="ts">
-import { definePage } from "@meekojs/meeko/framework";
-import * as v from "valibot";
+<script
+	server
+	lang="ts"
+>
+	import { definePage } from '@meekojs/meeko/framework'
+	import * as v from 'valibot'
 
-export const route = definePage({ params: v.object({ id: v.string() }) });
+	export const route = definePage({ params: v.object({ id: v.string() }) })
 
-const { params, context } = usePage();                 // la petición en curso, tipada por route.params
-if (!context.session.current) redirect("/login");
-const row = await db.users.findById(params.id);        // db: un autoimport de server/utils; row no sale del servidor
-if (!row) notFound();
-export const user = { id: row.id, name: row.name };    // se envía a la página
-export const head = { title: `Perfil de ${user.name}` };
+	const { params, context } = usePage() // la petición en curso, tipada por route.params
+	if (!context.session.current) redirect('/login')
+	const row = await db.users.findById(params.id) // db: un autoimport de server/utils; row no sale del servidor
+	if (!row) notFound()
+	export const user = { id: row.id, name: row.name } // se envía a la página
+	export const head = { title: `Perfil de ${user.name}` }
 </script>
 
 <script lang="ts">
-const name = signal(user.name);                        // `user` está en ámbito y tipado
+	const name = signal(user.name) // `user` está en ámbito y tipado
 </script>
 
-<template><h1>{user.name}</h1><input model="name"></template>
+<template>
+	<h1>{user.name}</h1>
+	<input model="name" />
+</template>
 ```
 
 - **Cuándo se ejecuta.** Las sentencias del bloque que no son imports, tipos ni `export const route` se ejecutan en cada petición: en SSR y en la petición de datos de cada navegación cliente, después del middleware y de validar `params` y `search` con `route`, igual que `load`. Admiten `await` de nivel superior. Los imports, los tipos y las opciones de ruta se evalúan una vez por módulo.
@@ -941,15 +1086,15 @@ const name = signal(user.name);                        // `user` está en ámbit
 
 Meeko considera que un bloque tiene código de nivel superior si exporta con `export const` o `export let` un nombre distinto de `route` (incluido `head`), o si usa `usePage`, `redirect` o `notFound` (desde `1.2`, también `useHead` o `useSeoMeta`) fuera de cualquier función y fuera de las opciones de ruta. Un bloque sin ninguna de las dos cosas mantiene el comportamiento de `1.0`: se evalúa una vez como módulo y admite `export default`, `export function` o una constante privada usada por `load`. Con código de nivel superior se aplican estas reglas:
 
-| Código | Causa |
-| --- | --- |
-| `MEEK070` | Código de nivel superior y `route.load` a la vez: los exports son los datos de la página. Elija uno. |
-| `MEEK071` | `export function`, `export class`, `export enum`, `export default`, `export { ... }` o `export const route` junto a otras declaraciones en la misma sentencia. |
-| `MEEK072` | `export const head` y `route.head` a la vez. |
+| Código    | Causa                                                                                                                                                                                                                                                                             |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MEEK070` | Código de nivel superior y `route.load` a la vez: los exports son los datos de la página. Elija uno.                                                                                                                                                                              |
+| `MEEK071` | `export function`, `export class`, `export enum`, `export default`, `export { ... }` o `export const route` junto a otras declaraciones en la misma sentencia.                                                                                                                    |
+| `MEEK072` | `export const head` y `route.head` a la vez.                                                                                                                                                                                                                                      |
 | `MEEK073` | `usePage`, `redirect` o `notFound` donde no hay página en curso: en las opciones de ruta, en un bloque sin código de nivel superior, en el `<script>` y la plantilla del componente y, desde `1.7`, en `export const head = () => …` o en la función de `useHead` y `useSeoMeta`. |
-| `MEEK074` | Código de nivel superior en una página `render: "client"`, cuyo bloque se ejecuta en el navegador. Use `useApi` o `useRpcQuery`, o renderice en el servidor. |
-| `MEEK075` | Un nombre exportado por el bloque se declara también en el `<script>`. |
-| `MEEK076` | Las opciones de ruta leen un nombre declarado por el código de nivel superior, que se ejecuta después y en cada petición. Mueva el valor compartido a un módulo importado. |
+| `MEEK074` | Código de nivel superior en una página `render: "client"`, cuyo bloque se ejecuta en el navegador. Use `useApi` o `useRpcQuery`, o renderice en el servidor.                                                                                                                      |
+| `MEEK075` | Un nombre exportado por el bloque se declara también en el `<script>`.                                                                                                                                                                                                            |
+| `MEEK076` | Las opciones de ruta leen un nombre declarado por el código de nivel superior, que se ejecuta después y en cada petición. Mueva el valor compartido a un módulo importado.                                                                                                        |
 
 El editor da a los exports su tipo en el `<script>` y en la plantilla, y «ir a definición» sobre `user` lleva al `export` del bloque.
 
@@ -957,20 +1102,27 @@ El editor da a los exports su tipo en el `<script>` y en la plantilla, y «ir a 
 
 ```html
 <!-- app/pages/users/[id].meeko -->
-<script server lang="ts">
-import { definePage } from "@meekojs/meeko/framework";
-import * as v from "valibot";
+<script
+	server
+	lang="ts"
+>
+	import { definePage } from '@meekojs/meeko/framework'
+	import * as v from 'valibot'
 
-export const route = definePage({
-  params: v.object({ id: v.string() }),
-  load: async ({ params, signal }) => ({ id: params.id, signalAborted: signal.aborted }),
-  head: ({ data }) => ({ title: data.id }),
-});
+	export const route = definePage({
+		params: v.object({ id: v.string() }),
+		load: async ({ params, signal }) => ({ id: params.id, signalAborted: signal.aborted }),
+		head: ({ data }) => ({ title: data.id }),
+	})
 </script>
 
 <script lang="ts">
-export interface Props { params: { id: string }; search: Record<string, string | string[]>; data: { id: string; signalAborted: boolean } }
-const props = defineProps<Props>();
+	export interface Props {
+		params: { id: string }
+		search: Record<string, string | string[]>
+		data: { id: string; signalAborted: boolean }
+	}
+	const props = defineProps<Props>()
 </script>
 
 <template><h1>{props.data.id}</h1></template>
@@ -996,16 +1148,16 @@ La comprobación del loader cubre tanto `definePage({ load() { /* ... */ } })` c
 
 El `<script>` y la plantilla de un componente se ejecutan en SSR y también en el navegador; `<script server>` y los sidecars `*.route.ts` se ejecutan en el servidor, fuera del componente. Desde `1.3`, `meeko check`, `meeko build` y el editor señalan cada API en el lugar donde no existe, con un mensaje que dice dónde se usa, y el autocompletado del `<script>` y de la plantilla deja de ofrecer las de servidor:
 
-| API | `<script server>` | `<script>` y plantilla | Sidecar `*.route.ts` | `server/` |
-| --- | --- | --- | --- | --- |
-| `definePage` | Sí: `export const route` | No tiene efecto: aviso `MEEK109`, error en `2.0` | Sí | No tiene efecto |
-| `usePage`, `redirect`, `notFound` | Sí, en el nivel superior; fuera de él, `MEEK073` | No: `MEEK073` | No: lanzan `MEEK073` | No: lanzan `MEEK073` |
-| `defineApiRoute`, `defineRpc`, `defineServerMiddleware`, `defineSocketChannel`, `defineServerRuntime`, `ApiError` | Sí, sin import | No: `MEEK108`. En el navegador, un error de API llega como `ClientError` | Sí | Sí, cada una en su carpeta |
-| Autoimports de `server/utils`, de `imports.serverDirs` y de los `*.server.ts` de cualquier carpeta de autoimports (también las de `imports.appDirs`) | Sí | No: `MEEK108`. Pida los datos con `useApi` o `useRpcQuery` | Sí | Sí |
-| Imports de `server/` y de módulos `*.server.*` | Sí | No: `MEEK108`; `import type` sí | Sí | Sí |
-| Imports de valores de `@meekojs/meeko/server` y `/cloudflare` | Sí | No: `MEEK108`; `import type` sí | Sí | Sí |
-| Imports de valores de `@meekojs/meeko/node`, `/bun`, `/deno`, `/password` y `/build` | Sí | Aviso `MEEK109`, error en `2.0`; `import type` sí | Sí | Sí |
-| `defineProps`, `defineEmits`, `defineExpose`, `defineModel`, `defineSnippets`, `useElementRef`, `onMounted` | No: `MEEK108` | Sí | No | No |
+| API                                                                                                                                                  | `<script server>`                                | `<script>` y plantilla                                                   | Sidecar `*.route.ts` | `server/`                  |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------ | -------------------- | -------------------------- |
+| `definePage`                                                                                                                                         | Sí: `export const route`                         | No tiene efecto: aviso `MEEK109`, error en `2.0`                         | Sí                   | No tiene efecto            |
+| `usePage`, `redirect`, `notFound`                                                                                                                    | Sí, en el nivel superior; fuera de él, `MEEK073` | No: `MEEK073`                                                            | No: lanzan `MEEK073` | No: lanzan `MEEK073`       |
+| `defineApiRoute`, `defineRpc`, `defineServerMiddleware`, `defineSocketChannel`, `defineServerRuntime`, `ApiError`                                    | Sí, sin import                                   | No: `MEEK108`. En el navegador, un error de API llega como `ClientError` | Sí                   | Sí, cada una en su carpeta |
+| Autoimports de `server/utils`, de `imports.serverDirs` y de los `*.server.ts` de cualquier carpeta de autoimports (también las de `imports.appDirs`) | Sí                                               | No: `MEEK108`. Pida los datos con `useApi` o `useRpcQuery`               | Sí                   | Sí                         |
+| Imports de `server/` y de módulos `*.server.*`                                                                                                       | Sí                                               | No: `MEEK108`; `import type` sí                                          | Sí                   | Sí                         |
+| Imports de valores de `@meekojs/meeko/server` y `/cloudflare`                                                                                        | Sí                                               | No: `MEEK108`; `import type` sí                                          | Sí                   | Sí                         |
+| Imports de valores de `@meekojs/meeko/node`, `/bun`, `/deno`, `/password` y `/build`                                                                 | Sí                                               | Aviso `MEEK109`, error en `2.0`; `import type` sí                        | Sí                   | Sí                         |
+| `defineProps`, `defineEmits`, `defineExpose`, `defineModel`, `defineSnippets`, `useElementRef`, `onMounted`                                          | No: `MEEK108`                                    | Sí                                                                       | No                   | No                         |
 
 Desde `1.6`, un [middleware de ruta de servidor](#middleware-de-ruta-de-servidor) (`app/middleware/*.server.ts`) es código de servidor como `server/`: usa `redirect()` y `notFound()` mientras se ejecuta, como el nivel superior de `<script server>`, y `defineServerRouteMiddleware` se autoimporta allí; en el `<script>` o la plantilla de un componente es `MEEK108`.
 
@@ -1017,25 +1169,28 @@ Con `render: "client"`, el bloque o el sidecar se ejecutan en el navegador (véa
 
 `render` del sidecar elige cómo llega cada página al navegador:
 
-| Modo | HTML del servidor | Loader y `head` | Uso |
-| --- | --- | --- | --- |
-| `"ssr"` (por defecto) | Página completa en cada petición | Servidor | Contenido indexable o personalizado |
-| `"stream"` | Página sin los valores `defer`, que llegan después por la misma respuesta | Servidor | Páginas con datos lentos y secundarios |
-| `"prerender"` | Página completa generada en `meeko build` | Servidor, durante el build | Contenido estático |
-| `"client"` | Sólo los layouts, con el outlet vacío | Navegador | Paneles y vistas interactivas sin requisitos de SEO |
+| Modo                  | HTML del servidor                                                         | Loader y `head`            | Uso                                                 |
+| --------------------- | ------------------------------------------------------------------------- | -------------------------- | --------------------------------------------------- |
+| `"ssr"` (por defecto) | Página completa en cada petición                                          | Servidor                   | Contenido indexable o personalizado                 |
+| `"stream"`            | Página sin los valores `defer`, que llegan después por la misma respuesta | Servidor                   | Páginas con datos lentos y secundarios              |
+| `"prerender"`         | Página completa generada en `meeko build`                                 | Servidor, durante el build | Contenido estático                                  |
+| `"client"`            | Sólo los layouts, con el outlet vacío                                     | Navegador                  | Paneles y vistas interactivas sin requisitos de SEO |
 
 El código de nivel superior de `<script server>` sigue el modo como un loader: con `"ssr"` y `"stream"` se ejecuta en cada petición y con `"prerender"` una vez por entrada durante `meeko build`. En `"stream"`, un export creado con `defer(...)` llega después de la página, como un valor diferido del loader (véase [Streaming SSR](#streaming-ssr-render-stream)). Con `"client"` no se admite (`MEEK074`), porque el bloque se ejecuta en el navegador.
 
 ```html
 <!-- app/pages/notes/index.meeko: el bloque se ejecuta en el navegador -->
-<script server lang="ts">
-import { definePage } from "@meekojs/meeko/framework";
+<script
+	server
+	lang="ts"
+>
+	import { definePage } from '@meekojs/meeko/framework'
 
-export const route = definePage({
-  render: "client",
-  load: async ({ url, params, search, signal, state }) => api.notes.list({ signal }),
-  head: ({ data }) => ({ title: `${data.length} notas` }),
-});
+	export const route = definePage({
+		render: 'client',
+		load: async ({ url, params, search, signal, state }) => api.notes.list({ signal }),
+		head: ({ data }) => ({ title: `${data.length} notas` }),
+	})
 </script>
 ```
 
@@ -1060,21 +1215,23 @@ Con una fábrica, Meeko la invoca cuando el loader devuelve y le pasa un `AbortS
 
 ```ts
 // app/pages/posts/[id].route.ts
-import { defer, definePage } from "@meekojs/meeko/framework";
+import { defer, definePage } from '@meekojs/meeko/framework'
 
 export const route = definePage({
-  render: "stream",
-  load: async ({ params }) => ({
-    post: await api.posts.get({ params }),          // crítico: entra en el HTML inicial
-    comments: defer((signal) => api.comments.list({ params, signal }), { timeoutMs: 5_000 }),
-  }),
-  head: ({ data }) => ({ title: data.post.title }),
-});
+	render: 'stream',
+	load: async ({ params }) => ({
+		post: await api.posts.get({ params }), // crítico: entra en el HTML inicial
+		comments: defer((signal) => api.comments.list({ params, signal }), { timeoutMs: 5_000 }),
+	}),
+	head: ({ data }) => ({ title: data.post.title }),
+})
 ```
 
 ```html
 <p if:when="props.data.comments.status === 'pending'">Cargando comentarios…</p>
-<ul if:when="props.data.comments.status === 'resolved'">…</ul>
+<ul if:when="props.data.comments.status === 'resolved'">
+	…
+</ul>
 <p if:when="props.data.comments.status === 'rejected'">No se pudieron cargar ({props.data.comments.error?.code}).</p>
 ```
 
@@ -1102,19 +1259,22 @@ Desde `1.7`, `cache` de `definePage` permite revalidar y cachear una página `"s
 
 ```html
 <!-- app/pages/docs/[...slug].meeko -->
-<script server lang="ts">
-import { definePage } from "@meekojs/meeko/framework";
+<script
+	server
+	lang="ts"
+>
+	import { definePage } from '@meekojs/meeko/framework'
 
-export const route = definePage({
-  cache: {
-    // Barato: una consulta de la fecha de modificación, no del documento.
-    etag: async ({ params }) => (await docs.updatedAt(params.slug))?.toISOString(),
-    maxAge: 60,
-    staleWhileRevalidate: 600,
-    memory: { maxEntries: 500 },
-  },
-  load: ({ params }) => docs.get(params.slug),
-});
+	export const route = definePage({
+		cache: {
+			// Barato: una consulta de la fecha de modificación, no del documento.
+			etag: async ({ params }) => (await docs.updatedAt(params.slug))?.toISOString(),
+			maxAge: 60,
+			staleWhileRevalidate: 600,
+			memory: { maxEntries: 500 },
+		},
+		load: ({ params }) => docs.get(params.slug),
+	})
 </script>
 ```
 
@@ -1153,7 +1313,7 @@ Activa las transiciones de navegación cliente en `meeko.config.ts`:
 
 ```ts
 export default defineMeekoConfig({
-  viewTransitions: true,
+	viewTransitions: true,
 })
 ```
 
@@ -1163,12 +1323,12 @@ El navegador proporciona una transición básica; personaliza la animación desd
 
 ```css
 .project-surface {
-  view-transition-name: project-surface;
+	view-transition-name: project-surface;
 }
 
 ::view-transition-group(project-surface) {
-  animation-duration: 280ms;
-  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+	animation-duration: 280ms;
+	animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 ```
 
@@ -1177,7 +1337,12 @@ Usa el mismo `view-transition-name` en el elemento de origen y destino. Cada nom
 Para desactivar o activar una navegación concreta, usa `app.navigate('/projects', { viewTransition: false })` en un host que dispone del `ClientApp` devuelto por `mountClientApp`. Los enlaces admiten un atributo HTML estándar, tanto en `<MeekoLink>` como en `<a>`:
 
 ```html
-<MeekoLink to="/projects" data-meeko-view-transition="false">Abrir sin transición</MeekoLink>
+<MeekoLink
+	to="/projects"
+	data-meeko-view-transition="false"
+>
+	Abrir sin transición
+</MeekoLink>
 ```
 
 `data-meeko-view-transition="true"` activa ese enlace aunque la opción global esté desactivada; movimiento reducido sigue teniendo prioridad. La promesa de navegación espera al cambio de DOM, sin esperar al final de la animación. Una navegación posterior o desmontar la aplicación omite la animación anterior; una actualización abortada no puede sustituir la página nueva. Los fallos de animación no se convierten en fallos de navegación; los errores del render siguen propagándose como antes.
@@ -1189,9 +1354,9 @@ Esta opción controla cambios dentro del mismo documento. Las navegaciones a doc
 `useNavigation()` devuelve `{ pending }`, una señal de sólo lectura que vale `true` desde que empieza una navegación hasta que su página se confirma, falla o se cancela, incluida la primera carga de una página `"client"` y la carga de los `await useApi`/`await useRpcQuery` de la página nueva (véase [Navegación y `render: "client"`](#navegación-y-render-client)). En SSR y fuera de `mountClientApp` vale siempre `false`. Desde `1.7` se autoimporta, como `useRoute` (un export propio con ese nombre tiene prioridad).
 
 ```ts
-import { useNavigation } from "@meekojs/meeko/framework";
+import { useNavigation } from '@meekojs/meeko/framework'
 
-const nav = useNavigation();
+const nav = useNavigation()
 // <p if:when="nav.pending.value">Cargando…</p>
 ```
 
@@ -1199,13 +1364,13 @@ const nav = useNavigation();
 
 Desde `1.2`, `useRoute()` devuelve la ruta confirmada que renderiza el componente, con una señal de sólo lectura por valor (tipo `RouteState`):
 
-| Campo | Valor |
-| --- | --- |
-| `url` | URL relativa al origen, como cadena: `pathname`, `search` y, en el navegador, el fragmento (`/users/42?tab=a#bio`). No lleva el origen, así que coincide en un HTML prerenderizado en otro dominio. |
-| `path` | `pathname`, codificado como en `location.pathname` (`/users/42`). |
-| `id` | ID de la ruta en el manifiesto (`"/users/[id]"`), o `null` en la página `404` de `app/error.meeko` para una URL sin ruta. |
-| `params` | Parámetros de la ruta, con la misma forma que recibe la página (validados por su schema). |
-| `search` | Parámetros de búsqueda, con la misma forma que recibe la página; en la página `404`, la query string con las claves repetidas en arrays. |
+| Campo                                | Valor                                                                                                                                                                                                                 |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`                                | URL relativa al origen, como cadena: `pathname`, `search` y, en el navegador, el fragmento (`/users/42?tab=a#bio`). No lleva el origen, así que coincide en un HTML prerenderizado en otro dominio.                   |
+| `path`                               | `pathname`, codificado como en `location.pathname` (`/users/42`).                                                                                                                                                     |
+| `id`                                 | ID de la ruta en el manifiesto (`"/users/[id]"`), o `null` en la página `404` de `app/error.meeko` para una URL sin ruta.                                                                                             |
+| `params`                             | Parámetros de la ruta, con la misma forma que recibe la página (validados por su schema).                                                                                                                             |
+| `search`                             | Parámetros de búsqueda, con la misma forma que recibe la página; en la página `404`, la query string con las claves repetidas en arrays.                                                                              |
 | `isActive(to, { params?, prefix? })` | Desde `1.5`, una función, no una señal: si la ruta `to` está activa, con la regla de `<MeekoLink match>`. Devuelve `"page"` en la ruta exacta y, con `prefix: true`, `"true"` en una ruta por debajo; si no, `false`. |
 
 Se autoimporta en las aplicaciones (un export propio llamado `useRoute` en `app/composables` u otra carpeta de autoimports tiene prioridad sobre el del framework) y, como `useNavigation`, puede llamarse también desde código anidado que se ejecuta con el componente (un composable, un `computed`, un `effect` u `onMounted`), pero no desde un manejador de eventos, un temporizador ni el callback de una promesa, donde no hay raíz activa: ahí lanza (`useNavigation` devuelve un estado fijo con `pending` en `false`); pídela en el script y úsala en el manejador. Funciona en páginas, layouts, `app/app.meeko`, `app/error.meeko` y sus componentes:
@@ -1222,23 +1387,31 @@ Un layout con barra lateral marca así la sección activa, igual en el HTML del 
 ```html
 <!-- app/layouts/default.meeko -->
 <script lang="ts">
-const route = useRoute();
-const links = [
-  { to: "/", label: "Inicio" },
-  { to: "/users", label: "Usuarios" },
-  { to: "/settings", label: "Ajustes" },
-] as const;
-const inSettings = computed(() => route.isActive("/settings", { prefix: true }) !== false);
+	const route = useRoute()
+	const links = [
+		{ to: '/', label: 'Inicio' },
+		{ to: '/users', label: 'Usuarios' },
+		{ to: '/settings', label: 'Ajustes' },
+	] as const
+	const inSettings = computed(() => route.isActive('/settings', { prefix: true }) !== false)
 </script>
 
 <template>
-  <aside>
-    <nav>
-      <a each:of="links" each:as="link" each:key="link.to" bind:href="href(link.to)" bind:aria-current="route.isActive(link.to, { prefix: true })">{link.label}</a>
-    </nav>
-    <p if:when="inSettings.value">Los cambios se guardan al salir.</p>
-  </aside>
-  <main><MeekoOutlet /></main>
+	<aside>
+		<nav>
+			<a
+				each:of="links"
+				each:as="link"
+				each:key="link.to"
+				bind:href="href(link.to)"
+				bind:aria-current="route.isActive(link.to, { prefix: true })"
+			>
+				{link.label}
+			</a>
+		</nav>
+		<p if:when="inSettings.value">Los cambios se guardan al salir.</p>
+	</aside>
+	<main><MeekoOutlet /></main>
 </template>
 ```
 
@@ -1254,41 +1427,44 @@ Desde `1.2`, Meeko gestiona el `<head>` de cada documento y los atributos de `<h
 
 ```ts
 // meeko.config.ts
-import { defineMeekoConfig } from "@meekojs/meeko/framework";
+import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
 export default defineMeekoConfig({
-  document: {
-    lang: "es",
-    head: {
-      // «Zapatillas · Mi tienda» en una página titulada; «Mi tienda» en una sin título.
-      title: "Mi tienda",
-      titleTemplate: "%s · Mi tienda",
-      link: [{ rel: "icon", href: "/favicon.svg", type: "image/svg+xml" }],
-      // Se ejecuta mientras el navegador lee <head>, antes de pintar; la hidratación no lo repite.
-      // (Para un tema claro/oscuro, use theme: Meeko trae el script, la cookie y useTheme().)
-      script: [{ children: 'document.documentElement.dataset.theme = localStorage.getItem("theme") ?? "light"' }],
-    },
-  },
-});
+	document: {
+		lang: 'es',
+		head: {
+			// «Zapatillas · Mi tienda» en una página titulada; «Mi tienda» en una sin título.
+			title: 'Mi tienda',
+			titleTemplate: '%s · Mi tienda',
+			link: [{ rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' }],
+			// Se ejecuta mientras el navegador lee <head>, antes de pintar; la hidratación no lo repite.
+			// (Para un tema claro/oscuro, use theme: Meeko trae el script, la cookie y useTheme().)
+			script: [{ children: 'document.documentElement.dataset.theme = localStorage.getItem("theme") ?? "light"' }],
+		},
+	},
+})
 ```
 
 ```html
 <!-- app/pages/products/[id].meeko -->
-<script server lang="ts">
-const { params } = usePage();
-export const product = await findProduct(params.id);
+<script
+	server
+	lang="ts"
+>
+	const { params } = usePage()
+	export const product = await findProduct(params.id)
 </script>
 
 <script lang="ts">
-const quantity = signal(1);
-useSeoMeta({
-  title: product.name,
-  description: product.summary,
-  ogImage: product.image,
-  twitterCard: "summary_large_image",
-  canonical: `https://tienda.example/products/${product.id}`,
-});
-useHead(() => ({ title: `${product.name} (${quantity.value})` }));
+	const quantity = signal(1)
+	useSeoMeta({
+		title: product.name,
+		description: product.summary,
+		ogImage: product.image,
+		twitterCard: 'summary_large_image',
+		canonical: `https://tienda.example/products/${product.id}`,
+	})
+	useHead(() => ({ title: `${product.name} (${quantity.value})` }))
 </script>
 ```
 
@@ -1298,11 +1474,11 @@ useHead(() => ({ title: `${product.name} (${quantity.value})` }));
 
 **Título.** `titleTemplate` es el de la entrada de más prioridad que lo declara, y se aplica al título de más prioridad de `app/app.meeko`, los layouts, la página y el `head` de la ruta, también al de las páginas de error (`"Error"`). El `title` de `document.head` (o el que añade un módulo con `meeko.addHead`) es distinto: es el título del sitio y nunca pasa por la plantilla. Una página sin título propio muestra ese título tal cual, y lo mismo una cuyo título ganador es una cadena vacía, en lugar de una plantilla alrededor de nada. Sin título del sitio, una página sin título no tiene `<title>` gestionado (queda el del host, si lo hay) y un título vacío se escribe vacío. La regla es la misma en el SSR, al hidratar y al navegar en el cliente. Con la configuración del ejemplo:
 
-| Título de la página | `<title>` |
-| --- | --- |
-| `"Zapatillas"` | `Zapatillas · Mi tienda` |
-| ninguno | `Mi tienda` |
-| `""` | `Mi tienda` |
+| Título de la página | `<title>`                |
+| ------------------- | ------------------------ |
+| `"Zapatillas"`      | `Zapatillas · Mi tienda` |
+| ninguno             | `Mi tienda`              |
+| `""`                | `Mi tienda`              |
 
 **Deduplicación.** Cada etiqueta tiene una clave: `key` si la declara o, si no, su clave natural. En `meta`, `name` (sin distinguir mayúsculas), `property` o `httpEquiv`, junto con su `media` si lo tiene (dos `theme-color` para claro y oscuro conviven); en `link`, `rel` y `href`, salvo `rel: "canonical"` y `rel: "icon"`, que son únicos aunque cambie `href`; en `script`, `src` o el código; en `style`, el CSS. Con la misma clave sólo queda la etiqueta de más prioridad, en el lugar donde apareció la primera. Así, un `icon` de `document` sustituye al `<link rel="icon" href="data:,">` que Meeko escribe por defecto, y un `meta name="viewport"` sustituye al viewport por defecto.
 
@@ -1318,19 +1494,19 @@ Desde `1.3`, `document.seo` añade a cada documento las etiquetas que dependen d
 
 ```ts
 // meeko.config.ts
-import { defineMeekoConfig } from "@meekojs/meeko/framework";
+import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
 export default defineMeekoConfig({
-  site: "https://example.com",
-  document: { seo: true, head: { titleTemplate: "%s · Mi sitio" } },
-});
+	site: 'https://example.com',
+	document: { seo: true, head: { titleTemplate: '%s · Mi sitio' } },
+})
 ```
 
-| Opción | Etiqueta | Valor |
-| --- | --- | --- |
-| `canonical` | `<link rel="canonical">` | El origen y la ruta de la página, sin la query string: `https://example.com/docs/api`. |
-| `ogUrl` | `<meta property="og:url">` | La misma URL. |
-| `ogTitle` | `<meta property="og:title">` | El título final, con `titleTemplate` aplicado. |
+| Opción          | Etiqueta                           | Valor                                                                                     |
+| --------------- | ---------------------------------- | ----------------------------------------------------------------------------------------- |
+| `canonical`     | `<link rel="canonical">`           | El origen y la ruta de la página, sin la query string: `https://example.com/docs/api`.    |
+| `ogUrl`         | `<meta property="og:url">`         | La misma URL.                                                                             |
+| `ogTitle`       | `<meta property="og:title">`       | El título final, con `titleTemplate` aplicado.                                            |
 | `ogDescription` | `<meta property="og:description">` | La `description` de la página (la del `head` de la ruta, `useSeoMeta` o `document.head`). |
 
 `seo: true` las activa todas; un objeto desactiva las que valen `false` (`seo: { ogDescription: false }`). El origen es `site` o, sin él, `MEEKO_PUBLIC_ORIGIN` del entorno del build; con `canonical` u `ogUrl` activos y sin ninguno de los dos, `meeko build` falla con un mensaje que lo pide. Se fija en el build (`seo.origin` del manifiesto), así que una página renderizada con SSR usa el mismo origen que una prerenderizada. En `meeko dev` sin origen esas dos etiquetas no se escriben.
@@ -1343,36 +1519,48 @@ Desde `1.4`, Meeko trae el tema claro/oscuro (y temas propios): la elección se 
 
 ```ts
 // meeko.config.ts
-import { defineMeekoConfig } from "@meekojs/meeko/framework";
+import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
 export default defineMeekoConfig({
-  theme: true, // light y dark, "system" por defecto, data-theme y la cookie meeko-theme
-});
+	theme: true, // light y dark, "system" por defecto, data-theme y la cookie meeko-theme
+})
 ```
 
 ```css
 /* app/styles/main.css: los colores de cada tema, con color-scheme también sin JavaScript. */
-:root { color-scheme: light; --bg: #fff; --ink: #111; }
-:root[data-theme="dark"] { color-scheme: dark; --bg: #111; --ink: #eee; }
+:root {
+	color-scheme: light;
+	--bg: #fff;
+	--ink: #111;
+}
+:root[data-theme='dark'] {
+	color-scheme: dark;
+	--bg: #111;
+	--ink: #eee;
+}
 /* Sin atributo (modo "system" que el servidor no pudo resolver y sin JavaScript), manda el sistema. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) { color-scheme: dark; --bg: #111; --ink: #eee; }
+	:root:not([data-theme]) {
+		color-scheme: dark;
+		--bg: #111;
+		--ink: #eee;
+	}
 }
 ```
 
 Sin `theme`, nada cambia: no hay script ni estilo en `<head>`, ni cookie, ni cabeceras, ni `POST /_meeko/theme`. `theme` acepta `true` o un objeto:
 
-| Opción | Por defecto | Qué hace |
-| --- | --- | --- |
-| `themes` | `["light", "dark"]` | Los temas. Cada nombre usa letras, dígitos, `-` o `_` y no puede ser `"system"`. |
-| `default` | `"system"` | La elección de quien no eligió: `"system"` o un tema (el primero si `system: false`). |
-| `system` | `true` | El modo `"system"`, que sigue a `prefers-color-scheme`. `true` usa `light` y `dark`; `{ light: "day", dark: "night" }` elige otros temas; `false` lo desactiva. |
-| `darkThemes` | el oscuro de `system` (o `dark`) | Los temas que reciben `color-scheme: dark`. |
-| `attribute` | `"data-theme"` | Dónde va el tema en `<html>`: un atributo `data-*` o `"class"` (añade el nombre del tema a las clases y quita el de otro tema). |
-| `colorScheme` | `true` | Aplica `color-scheme` a `<html>` por CSSOM (`style.colorScheme`). |
-| `cookie` | `"meeko-theme"` | La cookie de la elección. |
-| `storageKey` | el valor de `cookie` | La clave de `localStorage`, que avisa a las otras pestañas: por defecto, el nombre de la cookie (`"meeko-theme"` si no cambia `cookie`); `false` usa sólo la cookie. |
-| `clientHints` | `true` | Pide y lee `Sec-CH-Prefers-Color-Scheme` para resolver `"system"` en el servidor. |
+| Opción        | Por defecto                      | Qué hace                                                                                                                                                             |
+| ------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `themes`      | `["light", "dark"]`              | Los temas. Cada nombre usa letras, dígitos, `-` o `_` y no puede ser `"system"`.                                                                                     |
+| `default`     | `"system"`                       | La elección de quien no eligió: `"system"` o un tema (el primero si `system: false`).                                                                                |
+| `system`      | `true`                           | El modo `"system"`, que sigue a `prefers-color-scheme`. `true` usa `light` y `dark`; `{ light: "day", dark: "night" }` elige otros temas; `false` lo desactiva.      |
+| `darkThemes`  | el oscuro de `system` (o `dark`) | Los temas que reciben `color-scheme: dark`.                                                                                                                          |
+| `attribute`   | `"data-theme"`                   | Dónde va el tema en `<html>`: un atributo `data-*` o `"class"` (añade el nombre del tema a las clases y quita el de otro tema).                                      |
+| `colorScheme` | `true`                           | Aplica `color-scheme` a `<html>` por CSSOM (`style.colorScheme`).                                                                                                    |
+| `cookie`      | `"meeko-theme"`                  | La cookie de la elección.                                                                                                                                            |
+| `storageKey`  | el valor de `cookie`             | La clave de `localStorage`, que avisa a las otras pestañas: por defecto, el nombre de la cookie (`"meeko-theme"` si no cambia `cookie`); `false` usa sólo la cookie. |
+| `clientHints` | `true`                           | Pide y lee `Sec-CH-Prefers-Color-Scheme` para resolver `"system"` en el servidor.                                                                                    |
 
 Las cookies son por host, no por puerto: en desarrollo, todas las aplicaciones Meeko de `localhost` (o `127.0.0.1`), en cualquier puerto, comparten la cookie `meeko-theme`, así que elegir tema en una lo cambia en las demás al recargar (`localStorage` sí es por puerto). Para separarlas, dé a cada aplicación su propio nombre con `cookie`, por ejemplo `theme: { cookie: "mi-app-theme" }`.
 
@@ -1399,21 +1587,49 @@ La forma más corta es [`<MeekoThemeToggle>`](#meekothemetoggle), que ya hace lo
 ```html
 <!-- app/components/ThemeToggle.meeko -->
 <script lang="ts">
-const { resolved, set } = useTheme();
-const toggle = (): void => set(resolved.value === "dark" ? "light" : "dark");
+	const { resolved, set } = useTheme()
+	const toggle = (): void => set(resolved.value === 'dark' ? 'light' : 'dark')
 </script>
 
 <template>
-  <button type="button" class="theme-toggle" aria-label="Tema oscuro" bind:aria-pressed="String(resolved.value === 'dark')" on:click="toggle">
-    <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" /></svg>
-    <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" /></svg>
-  </button>
+	<button
+		type="button"
+		class="theme-toggle"
+		aria-label="Tema oscuro"
+		bind:aria-pressed="String(resolved.value === 'dark')"
+		on:click="toggle"
+	>
+		<svg
+			class="sun"
+			viewBox="0 0 24 24"
+			aria-hidden="true"
+		>
+			<circle
+				cx="12"
+				cy="12"
+				r="5"
+			/>
+		</svg>
+		<svg
+			class="moon"
+			viewBox="0 0 24 24"
+			aria-hidden="true"
+		>
+			<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" />
+		</svg>
+	</button>
 </template>
 
 <style>
-.theme-toggle .moon { display: none; }
-:root[data-theme="dark"] .theme-toggle .sun { display: none; }
-:root[data-theme="dark"] .theme-toggle .moon { display: inline; }
+	.theme-toggle .moon {
+		display: none;
+	}
+	:root[data-theme='dark'] .theme-toggle .sun {
+		display: none;
+	}
+	:root[data-theme='dark'] .theme-toggle .moon {
+		display: inline;
+	}
 </style>
 ```
 
@@ -1421,49 +1637,113 @@ const toggle = (): void => set(resolved.value === "dark" ? "light" : "dark");
 
 ```html
 <script lang="ts">
-const { theme } = useTheme();
+	const { theme } = useTheme()
 </script>
 <template>
-  <select aria-label="Tema" model="theme">
-    <option value="system">Sistema</option>
-    <option value="light">Claro</option>
-    <option value="dark">Oscuro</option>
-  </select>
+	<select
+		aria-label="Tema"
+		model="theme"
+	>
+		<option value="system">Sistema</option>
+		<option value="light">Claro</option>
+		<option value="dark">Oscuro</option>
+	</select>
 </template>
 ```
 
 <a id="data-theme-choice"></a>**`data-theme-choice`.** Desde `1.4`, `<html>` lleva además la elección, `"system"` incluido: `data-theme-choice="system"` mientras `data-theme` dice el tema efectivo (`dark`). La escribe siempre el script de `<head>`, antes del primer pintado, y el servidor cuando la conoce por la cookie; el runtime la actualiza con cada cambio. Sirve para el CSS propio, use o no `<MeekoThemeToggle>`: un icono de «sistema» que no salta, o el radio marcado de un selector.
 
 ```css
-.theme-toggle .icon { display: none; }
-:root[data-theme-choice="light"] .theme-toggle .sun,
-:root[data-theme-choice="dark"] .theme-toggle .moon,
-:root[data-theme-choice="system"] .theme-toggle .monitor { display: inline; }
+.theme-toggle .icon {
+	display: none;
+}
+:root[data-theme-choice='light'] .theme-toggle .sun,
+:root[data-theme-choice='dark'] .theme-toggle .moon,
+:root[data-theme-choice='system'] .theme-toggle .monitor {
+	display: inline;
+}
 ```
 
 Sin cookie, el HTML del servidor no la lleva (no sabe si `localStorage` guarda otra elección, y una página prerenderizada es la misma para todos); el script la escribe antes de pintar. Sin JavaScript, un selector `:root:not([data-theme-choice])` corresponde a `default`.
 
+#### Selector de tema propio
+
+Desde `1.8`, `useThemeToggle()` de `@meekojs/meeko/framework` es la API pública para construir un selector. Llámalo en el script de un componente con `theme` activo en `meeko.config.ts`; sin esa configuración o fuera de una aplicación, lanza `MEEK111`. No recibe parámetros y devuelve un `ThemeToggleState`, compartido por toda la aplicación:
+
+| Miembro       | Descripción                                                                                                                                                                                                                                                       |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `theme`       | El mismo `ThemeState` de `useTheme()`: `theme`, `resolved`, `themes` y `set(choice)`.                                                                                                                                                                             |
+| `choices`     | Lista de elecciones de la configuración, en orden, con `"system"` si está activo. Sólo lectura.                                                                                                                                                                   |
+| `system`      | `ThemeToggleSystem`: `{ light, dark }`, los nombres de temas de `"system"`; `undefined` sin modo sistema.                                                                                                                                                         |
+| `known`       | `ReadonlySignal<boolean>`: el servidor conoce la elección si recibió la cookie; en el navegador pasa a `true` al terminar la hidratación. Mientras vale `false`, usa un nombre accesible neutro, como «Cambiar tema», sin anunciar una elección que no se conoce. |
+| `interactive` | `ReadonlySignal<boolean>`: `false` durante SSR e hidratación; `true` cuando los handlers del navegador ya responden. Usa el formulario nativo mientras vale `false`.                                                                                              |
+
+El formulario envía `POST /_meeko/theme` con `theme` (la elección válida) y `return` (la URL actual). El endpoint valida el tema y el `Origin`, guarda la cookie y devuelve `303` a una ruta del mismo origen. En el adaptador `static` no hay endpoint: el cambio necesita JavaScript. Este ejemplo usa botones de envío nativos, con nombre accesible propio, sin implementar un grupo de radios:
+
+```html
+<script lang="ts">
+	import { useRoute, useThemeToggle } from '@meekojs/meeko/framework'
+
+	const toggle = useThemeToggle()
+	const route = useRoute()
+</script>
+
+<template>
+	<form
+		method="post"
+		action="/_meeko/theme"
+	>
+		<input
+			type="hidden"
+			name="return"
+			bind:value="route.url.value"
+		/>
+		<button
+			each:of="toggle.choices"
+			each:as="choice"
+			each:key="choice"
+			type="submit"
+			name="theme"
+			bind:value="choice"
+			on:click="(event) => { if (toggle.interactive.value) { event.preventDefault(); toggle.theme.set(choice); } }"
+		>
+			Usar {choice}
+		</button>
+	</form>
+</template>
+```
+
+Para un botón cíclico con iconos, pinta todos los iconos y marca cada uno con `data-meeko-theme-icon="light"`, `"dark"`, `"system"` o el nombre de un tema propio. La regla que `theme` añade a `<head>` muestra el de la elección de `<html>` desde el primer frame: no elijas un único icono con un condicional sobre `resolved`. Si el selector omite `"system"`, añade el token `system-light` o `system-dark` al icono del tema correspondiente (por ejemplo, `data-meeko-theme-icon="light system-light"`); `toggle.system` indica esos temas. Estos iconos decorativos llevan `aria-hidden="true"`; el botón necesita texto o `aria-label`.
+
+La configuración `theme`, la cookie, el script de `<head>`, esta regla de iconos y `POST /_meeko/theme` permanecen en core. Para un control completo con teclado y accesibilidad usa `UIThemeToggle` de `@meekojs/ui` 0.2. Véase la [referencia de useThemeToggle](reference/composables/usethemetoggle.md).
+
 #### `<MeekoThemeToggle>`
+
+> **Obsoleto desde 1.8; retirada en 2.0.** Usa `<UIThemeToggle>` del módulo `@meekojs/ui` 0.2 con las mismas props, snippets y marcado. En 1.x sigue funcionando y emite `MEEK121`. Véase [Migración a 1.8](migration-1.8.md).
 
 Desde `1.4`, con `theme` en `meeko.config.ts`, Meeko trae su propio selector de tema: una etiqueta integrada, como `<MeekoLink>`, sin import.
 
 ```html
 <MeekoThemeToggle>
-  <snippet name="light"><IconSun /></snippet>
-  <snippet name="dark"><IconMoon /></snippet>
-  <snippet name="system"><IconMonitor /></snippet>
+	<snippet name="light"><IconSun /></snippet>
+	<snippet name="dark"><IconMoon /></snippet>
+	<snippet name="system"><IconMonitor /></snippet>
 </MeekoThemeToggle>
 <MeekoThemeToggle mode="select" />
-<MeekoThemeToggle bind:themes="['light', 'dark']" bind:labels="{ light: 'Claro', dark: 'Oscuro', system: 'Sistema' }" class="toggle" />
+<MeekoThemeToggle
+	bind:themes="['light', 'dark']"
+	bind:labels="{ light: 'Claro', dark: 'Oscuro', system: 'Sistema' }"
+	class="toggle"
+/>
 ```
 
-| Prop | Por defecto | Qué hace |
-| --- | --- | --- |
-| `mode` | `"cycle"` | `"cycle"`: un botón que pasa a la elección siguiente de la lista. `"select"`: un grupo de radios. |
-| `themes` | los temas y `"system"` | Las elecciones y su orden (`bind:themes="['light', 'dark']"`). |
-| `labels` | «Claro», «Oscuro», «Sistema» | El nombre de cada elección; un tema propio, sin etiqueta, se llama como el tema. |
-| `messages` | en español | Los textos accesibles: `cycle(current, next)` (el `aria-label` del botón), `unknown` («Cambiar tema») y `group` («Tema»), para traducirlos. Tipo `ThemeToggleMessages`. |
-| `class`, `id` | — | Del `<form>` raíz. Otros atributos no pasan: envuelva la etiqueta si los necesita. |
+| Prop          | Por defecto                  | Qué hace                                                                                                                                                                |
+| ------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`        | `"cycle"`                    | `"cycle"`: un botón que pasa a la elección siguiente de la lista. `"select"`: un grupo de radios.                                                                       |
+| `themes`      | los temas y `"system"`       | Las elecciones y su orden (`bind:themes="['light', 'dark']"`).                                                                                                          |
+| `labels`      | «Claro», «Oscuro», «Sistema» | El nombre de cada elección; un tema propio, sin etiqueta, se llama como el tema.                                                                                        |
+| `messages`    | en español                   | Los textos accesibles: `cycle(current, next)` (el `aria-label` del botón), `unknown` («Cambiar tema») y `group` («Tema»), para traducirlos. Tipo `ThemeToggleMessages`. |
+| `class`, `id` | —                            | Del `<form>` raíz. Otros atributos no pasan: envuelva la etiqueta si los necesita.                                                                                      |
 
 Cada snippet (`light`, `dark`, `system` o el nombre de un tema propio) es el icono de esa elección; sin snippet se pinta su etiqueta. `meeko check` y el editor tipan los snippets, `themes` y `labels` con los temas de `meeko.config.ts` (`system` sólo si está activo) y `mode` como `"cycle" | "select"`; el editor completa la etiqueta, sus props y sus snippets, y su hover muestra la ficha de la etiqueta. El tipo de sus props es `MeekoThemeToggleProps`, autoimportado como `MeekoLinkProps`. No tiene estilos visuales propios: el botón y los radios son elementos nativos que estiliza la aplicación (`.toggle button`, `[role="radio"][aria-checked="true"]`, `[data-meeko-theme-option="dark"]`). Para marcar el radio elegido también antes de hidratar, cuando la elección no se conoce y no hay `aria-checked`, use `data-theme-choice`, como los iconos: `[data-theme-choice="dark"] [data-meeko-theme-option="dark"]`.
 
@@ -1476,7 +1756,7 @@ Cada snippet (`light`, `dark`, `system` o el nombre de un tema propio) es el ico
 - `POST /_meeko/theme` existe sólo con `theme` activo (en los demás métodos responde `405`).
 - Acepta sólo `application/x-www-form-urlencoded` de hasta 2 KB; `theme` debe ser un tema de `themes` o `"system"` (con el modo sistema activo); si no, `400 INVALID_THEME`, sin escribir nada.
 - Escribe la cookie como el runtime del navegador (`Path=/`, un año, `SameSite=Lax`, `Secure` en HTTPS) y responde `303` a `return`, que debe ser una ruta de este origen (`/docs?tab=a`). Una URL absoluta, `//otro.sitio`, una barra invertida o caracteres de control vuelven a `/`: nunca hay una redirección abierta. El siguiente documento SSR ya trae el tema nuevo.
-- **CSRF.** No usa la sesión ni el token CSRF (`x-meeko-csrf`, que sólo existe con JavaScript): sólo cambia la cookie del tema. Como `origin: "required"` de una ruta de API, exige un `Origin` igual al de la petición, que tras `createServerApp` es el `publicOrigin` configurado; un `Origin` ausente, `null` o de otro sitio responde `403 INVALID_ORIGIN` antes de leer el cuerpo. Los navegadores envían `Origin` en todo `POST`; una página con `Referrer-Policy: no-referrer` lo envía como `null`, así que ahí el formulario sin JavaScript no funciona (con JavaScript sí). Detrás de un proxy, configure el origen público, como para las mutaciones con sesión.
+- **CSRF.** No usa la sesión ni el token CSRF (`x-meeko-csrf`, que sólo existe con JavaScript): sólo cambia la cookie del tema. Como una mutación de API, exige un `Origin` igual al de la petición, que tras `createServerApp` es el `publicOrigin` configurado; un `Origin` ausente, `null` o de otro sitio responde `403 INVALID_ORIGIN` antes de leer el cuerpo. Los navegadores envían `Origin` en todo `POST`; una página con `Referrer-Policy: no-referrer` lo envía como `null`, así que ahí el formulario sin JavaScript no funciona (con JavaScript sí). Detrás de un proxy, configure el origen público, como para las mutaciones con sesión.
 - **Prerender con Node.** El endpoint existe también en el servidor de una aplicación cuyas páginas son prerenderizadas, y escribe la cookie; pero el HTML prerenderizado es el mismo para todos y, sin JavaScript, no aplica la cookie (lo hace el script de `<head>`), así que la página sigue mostrando el tema por defecto. Sin JavaScript, el cambio sólo se ve en las páginas SSR.
 - **Adaptador `static`.** No hay servidor: el formulario se renderiza igual (el HTML es el que generó el prerender, común a todos los adaptadores) y con JavaScript funciona, pero sin él el `POST` llega al hosting, que lo rechaza. Es una limitación documentada; en un sitio estático, el selector necesita JavaScript.
 
@@ -1484,12 +1764,12 @@ Usar `<MeekoThemeToggle>` sin `theme` es el error `MEEK111`. `meeko dev` y `meek
 
 #### Cómo se evita el parpadeo en cada caso
 
-| Caso | Quién pone el tema en `<html>` | `useTheme()` en el HTML del servidor |
-| --- | --- | --- |
-| SSR con la cookie (`light`, `dark`, un tema propio) | El servidor, desde el primer byte. | El tema de la cookie. Hidratar no cambia nada. |
-| SSR en `"system"` con `Sec-CH-Prefers-Color-Scheme` | El servidor, con el client hint. | El tema del sistema. Hidratar no cambia nada. |
+| Caso                                                   | Quién pone el tema en `<html>`                                                                                                                       | `useTheme()` en el HTML del servidor                                                   |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| SSR con la cookie (`light`, `dark`, un tema propio)    | El servidor, desde el primer byte.                                                                                                                   | El tema de la cookie. Hidratar no cambia nada.                                         |
+| SSR en `"system"` con `Sec-CH-Prefers-Color-Scheme`    | El servidor, con el client hint.                                                                                                                     | El tema del sistema. Hidratar no cambia nada.                                          |
 | SSR en `"system"` sin el client hint (Firefox, Safari) | El script de `<head>`, antes del primer pintado; el HTML no lleva atributo, así que el CSS de `prefers-color-scheme` también acierta sin JavaScript. | `resolved` vale el tema claro de `system`; cambia al hidratar si el sistema es oscuro. |
-| Página prerenderizada o adaptador `static` | El script de `<head>`, con la cookie o `localStorage`. | El valor por defecto del build; cambia al hidratar si el usuario eligió otro. |
+| Página prerenderizada o adaptador `static`             | El script de `<head>`, con la cookie o `localStorage`.                                                                                               | El valor por defecto del build; cambia al hidratar si el usuario eligió otro.          |
 
 El script lee la cookie, después `localStorage` (así una elección guardada sólo allí, como la de un sitio que antes usaba `localStorage`, sigue valiendo y vuelve a la cookie) y por último `default`; en `"system"` consulta `prefers-color-scheme`. Escribe el tema y [`data-theme-choice`](#data-theme-choice). Una cookie que escribió el servidor (el formulario de `<MeekoThemeToggle>` sin JavaScript) pasa a `localStorage` y a las otras pestañas en la siguiente carga con JavaScript. Se ejecuta siempre y es idempotente: donde el servidor ya escribió el tema, escribe el mismo. Va entre las etiquetas gestionadas de `<head>`, justo después de las `meta` (así también le aplica una CSP en `<meta http-equiv>`) y antes de todas las hojas de estilo enlazadas, las de `document.head` y `useHead` y las del build, así que no espera a ninguna.
 
@@ -1518,27 +1798,27 @@ Los componentes `.meeko` de directorios configurados también forman un [registr
 
 **Imports sin extensión.** Desde `1.2`, Meeko comprueba los tipos con `"module": "ESNext"` y `"moduleResolution": "Bundler"`, como Vite y Nuxt: un import relativo no necesita extensión (`import { format } from "../utils/format"`), porque Vite resuelve y empaqueta todo el código en `meeko dev` y en `meeko build`, y Node nunca ejecuta un `.ts` directamente. Los imports con `.js` siguen funcionando. `meeko init-framework` genera el `tsconfig.json` con esos valores; un proyecto anterior puede cambiar sus dos líneas `"module": "NodeNext"` y `"moduleResolution": "NodeNext"` para que el editor también acepte los imports sin extensión en sus `.ts`.
 
-Meeko analiza exports AST de `app/{components,composables,utils,stores,types}` (`app/types` desde `1.2`), `shared/{types,schemas,utils,constants,enums}` y `server/utils`. Los tipos que sólo usa la aplicación van en `app/types`; los que comparten la aplicación y el servidor, en `shared/types`. Un `type` o una `interface` autoimportados llegan con `import type`. Los símbolos de `app/` están disponibles en cliente y SSR, pero no desde `shared/`; los sufijos `.client.ts` y `.server.ts` restringen un módulo a su entorno. `imports.serverDirs` añade directorios privados exclusivos del servidor y, desde `1.3`, `imports.appDirs` e `imports.sharedDirs` añaden carpetas de `app/` y de `shared/` (véase [Carpetas de autoimports](#carpetas-de-autoimports)). Los símbolos del framework `api`, `rpc`, `socket`, `useSocket`, `useApi`, `useRpcQuery`, `useRpcMutation`, `useState`, `href` y `useRoute`, desde `1.2` `useForm`, `useStorage`, `useApiMutation`, `useHead`, `useSeoMeta`, `definePage`, `defineRouteMiddleware` y `definePlugin`, desde `1.4` `useTheme` (`definePage` sólo tiene efecto en `<script server>` y en los sidecars: en el `<script>` de un componente da el aviso `MEEK109`), y en el código de servidor (`server/` y `<script server>`) `defineApiRoute`, `defineRpc`, `defineServerMiddleware`, `defineSocketChannel`, `defineServerRuntime` y `ApiError` (y, desde `1.6`, `defineServerRouteMiddleware`, que también se autoimporta en los `*.server.ts`; desde `1.7`, `defer`, también en los sidecars `*.route.ts` y dentro de las opciones de ruta), y de la raíz `signal`, `computed`, `effect`, `batch`, `untrack` (desde `1.2`), `onCleanup`, `onMounted`, `provide`, `inject`, `createContext` y `provideErrorHandler`, también figuran en el registro, con `useNavigation` y `createRoot` desde `1.7`; un export propio llamado `useRoute`, `useForm`, `useStorage`, `useApiMutation`, `useHead`, `useSeoMeta`, `useTheme` o, desde `1.6`, `defineServerRouteMiddleware` y, desde `1.7`, `useNavigation`, `createRoot` o `defer` tiene prioridad sobre el del framework. `redirect` y `notFound` no se autoimportan fuera de `<script server>`, tampoco en `app/middleware/*.server.ts`: sus tipos serían globales en todo el proyecto `server`, incluidas las API, donde fallarían en ejecución con `MEEK073`. Los imports explícitos prevalecen. Una colisión produce error; nunca se elige por orden de archivos. Un `enum` o una clase autoimportados sirven también como tipo, con sus miembros (`Scope.App`); si un archivo sólo los usa como tipo, Meeko inserta `import type`. Los schemas de `shared/schemas` pueden llegar por autoimport a los contratos de API, RPC y Socket. `meeko check` comprueba los `.ts` que importa un `.meeko` con los autoimports de su ámbito y con las rutas generadas, igual que los proyectos `tsconfig.*`.
+Meeko analiza exports AST de `app/{components,composables,utils,stores,types}` (`app/types` desde `1.2`), `shared/{types,schemas,utils,constants,enums}` y `server/utils`: sus exports nombrados, nunca un `export default` (`export default function formatPrice()` no se autoimporta; escriba `export function formatPrice()`). Los tipos que sólo usa la aplicación van en `app/types`; los que comparten la aplicación y el servidor, en `shared/types`. Un `type` o una `interface` autoimportados llegan con `import type`. Los símbolos de `app/` están disponibles en cliente y SSR, pero no desde `shared/`; los sufijos `.client.ts` y `.server.ts` restringen un módulo a su entorno. `imports.serverDirs` añade directorios privados exclusivos del servidor y, desde `1.3`, `imports.appDirs` e `imports.sharedDirs` añaden carpetas de `app/` y de `shared/` (véase [Carpetas de autoimports](#carpetas-de-autoimports)). Los símbolos del framework `api`, `rpc`, `socket`, `useSocket`, `useApi`, `useRpcQuery`, `useRpcMutation`, `useState`, `href` y `useRoute`, desde `1.2` `useForm`, `useStorage`, `useApiMutation`, `useHead`, `useSeoMeta`, `definePage`, `defineRouteMiddleware` y `definePlugin`, desde `1.4` `useTheme` (`definePage` sólo tiene efecto en `<script server>` y en los sidecars: en el `<script>` de un componente da el aviso `MEEK109`), y en el código de servidor (`server/` y `<script server>`) `defineApiRoute`, `defineRpc`, `defineServerMiddleware`, `defineSocketChannel`, `defineServerRuntime` y `ApiError` (y, desde `1.6`, `defineServerRouteMiddleware`, que también se autoimporta en los `*.server.ts`; desde `1.7`, `defer`, también en los sidecars `*.route.ts` y dentro de las opciones de ruta), y de la raíz `signal`, `computed`, `effect`, `batch`, `untrack` (desde `1.2`), `onCleanup`, `onMounted`, `provide`, `inject`, `createContext` y `provideErrorHandler`, también figuran en el registro, con `useNavigation` y `createRoot` desde `1.7`; un export propio llamado `useRoute`, `useForm`, `useStorage`, `useApiMutation`, `useHead`, `useSeoMeta`, `useTheme` o, desde `1.6`, `defineServerRouteMiddleware` y, desde `1.7`, `useNavigation`, `createRoot` o `defer` tiene prioridad sobre el del framework. `redirect` y `notFound` no se autoimportan fuera de `<script server>`, tampoco en `app/middleware/*.server.ts`: sus tipos serían globales en todo el proyecto `server`, incluidas las API, donde fallarían en ejecución con `MEEK073`. Los imports explícitos prevalecen. Una colisión produce error; nunca se elige por orden de archivos. Un `enum` o una clase autoimportados sirven también como tipo, con sus miembros (`Scope.App`); si un archivo sólo los usa como tipo, Meeko inserta `import type`. Los schemas de `shared/schemas` pueden llegar por autoimport a los contratos de API, RPC y Socket. `meeko check` comprueba los `.ts` que importa un `.meeko` con los autoimports de su ámbito y con las rutas generadas, igual que los proyectos `tsconfig.*`.
 
 <a id="carpetas-de-autoimports"></a>**Carpetas de autoimports.** Cada carpeta se lee de forma recursiva, en el proyecto y en cada layer; sólo sus `.ts` aportan exports (sin `*.test.ts`, `*.spec.ts` ni `*.d.ts`), y los `.meeko` sólo son componentes en `app/components` y en las carpetas de componentes de los módulos. Un archivo sin sufijo toma el ámbito de la carpeta raíz que lo contiene; `.client.ts`, `.server.ts` y `.shared.ts` mandan sobre él:
 
-| Carpeta | Ámbito | Disponible en |
-| --- | --- | --- |
-| `app/components`, `app/composables`, `app/utils`, `app/stores`, `app/types` | `app/` | Componentes y `.ts` de `app/`, en el navegador y en SSR; también en `server/` y `<script server>`. No en `shared/` |
-| `imports.appDirs` (desde `1.3`), p. ej. `"app/services"` | `app/` | Igual que las carpetas de `app/` anteriores |
-| `shared/types`, `shared/schemas`, `shared/utils`, `shared/constants`, `shared/enums` | `shared/` | Todo el proyecto |
-| `imports.sharedDirs` (desde `1.3`), p. ej. `"shared/validators"` | `shared/` | Todo el proyecto |
-| `server/utils` e `imports.serverDirs`, p. ej. `"server/services"` | `server/` | `server/`, `<script server>` y sidecars; en un componente, `MEEK108` |
+| Carpeta                                                                              | Ámbito    | Disponible en                                                                                                      |
+| ------------------------------------------------------------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------ |
+| `app/components`, `app/composables`, `app/utils`, `app/stores`, `app/types`          | `app/`    | Componentes y `.ts` de `app/`, en el navegador y en SSR; también en `server/` y `<script server>`. No en `shared/` |
+| `imports.appDirs` (desde `1.3`), p. ej. `"app/services"`                             | `app/`    | Igual que las carpetas de `app/` anteriores                                                                        |
+| `shared/types`, `shared/schemas`, `shared/utils`, `shared/constants`, `shared/enums` | `shared/` | Todo el proyecto                                                                                                   |
+| `imports.sharedDirs` (desde `1.3`), p. ej. `"shared/validators"`                     | `shared/` | Todo el proyecto                                                                                                   |
+| `server/utils` e `imports.serverDirs`, p. ej. `"server/services"`                    | `server/` | `server/`, `<script server>` y sidecars; en un componente, `MEEK108`                                               |
 
 Cada opción sólo admite rutas relativas dentro de su carpeta (`appDirs` dentro de `app/`, `sharedDirs` dentro de `shared/`, `serverDirs` dentro de `server/`), con `/` o `\` y sin `.` ni `..`: otra ruta detiene `meeko dev`, `meeko build` y `meeko check` con un error de `meeko.config.ts` que nombra la entrada (`imports.appDirs[1] debe ser una ruta relativa dentro de app/: …`) y que el editor, en un workspace de confianza, marca en ella (`MEEK_CONFIG`). Una carpeta que ya es de autoimports (`"app/composables"`) o que está dentro de otra de la lista no se lee dos veces. Los exports de estas carpetas siguen las mismas reglas que los de las carpetas por defecto: `import type` para `type` e `interface`, prioridad sobre los autoimports del framework y error si dos archivos exportan el mismo nombre en un ámbito. Un `*.server.ts` de una carpeta de `appDirs` es de servidor, y un componente que lo usa da `MEEK108`.
 
 <a id="tipos-de-cada-componente"></a>**Tipos de cada componente.** Desde `1.4`, cada componente autoimportado (los `.meeko` de `app/components` del proyecto y de sus layers, y los de las carpetas de componentes de los módulos) aporta además cuatro tipos con el nombre de su etiqueta, sin import: el nombre del componente, con la misma regla que la etiqueta y el prefijo del módulo incluido, seguido de `Props`, `Snippets`, `Models` o `Exposed`.
 
-| Componente | Etiqueta | Tipos |
-| --- | --- | --- |
-| `app/components/App/Card.meeko` | `<AppCard>` | `AppCardProps`, `AppCardSnippets`, `AppCardModels`, `AppCardExposed` |
-| `app/components/user-menu.meeko` | `<UserMenu>` | `UserMenuProps`, `UserMenuSnippets`, `UserMenuModels`, `UserMenuExposed` |
-| `components/picker.meeko` de un módulo con `prefix: "Accent"` | `<AccentPicker>` | `AccentPickerProps`, `AccentPickerSnippets`, … |
+| Componente                                                    | Etiqueta         | Tipos                                                                    |
+| ------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------ |
+| `app/components/App/Card.meeko`                               | `<AppCard>`      | `AppCardProps`, `AppCardSnippets`, `AppCardModels`, `AppCardExposed`     |
+| `app/components/user-menu.meeko`                              | `<UserMenu>`     | `UserMenuProps`, `UserMenuSnippets`, `UserMenuModels`, `UserMenuExposed` |
+| `components/picker.meeko` de un módulo con `prefix: "Accent"` | `<AccentPicker>` | `AccentPickerProps`, `AccentPickerSnippets`, …                           |
 
 - **Qué son.** Exactamente el `ComponentProps`, `ComponentSnippets`, `ComponentModels` y `ComponentExposed` del módulo del componente (véase [Módulo generado](api.md#módulo-generado)), con sus parámetros de tipo en un componente genérico (`DataTableProps<User>`). Un componente sin `defineSnippets`, `defineModel` o `defineExpose` da `null` en el tipo correspondiente, como su módulo: el alias no se convierte en `{}` para que el nombre con etiqueta y el genérico nunca difieran y `null` siga distinguiendo un componente que no declara el canal. Con `null`, `Omit<PlainSnippets, "x">` es `{}`, pero `PlainSnippets & { … }` es `never`: reutilice los snippets de un componente que los declara.
 - **Dónde.** Con el mismo ámbito que el componente: en el `<script>` y la plantilla de los `.meeko` y en los `.ts` de `app/` (y, como los componentes, en `server/` y `<script server>`), nunca en `shared/`, donde son `TS2304` como cualquier símbolo de `app/`. Llegan como `import type` desde el `.meeko`, así que no añaden código al bundle.
@@ -1554,9 +1834,9 @@ Los `.ts` normales de `app/` (composables, utils, stores) se ejecutan en SSR y e
 
 ```ts
 async function exportCsv(): Promise<void> {
-  if (import.meta.env.SSR) return;
-  const { downloadCsv } = await import("../utils/download.client.js");
-  downloadCsv(rows.value);
+	if (import.meta.env.SSR) return
+	const { downloadCsv } = await import('../utils/download.client.js')
+	downloadCsv(rows.value)
 }
 ```
 
@@ -1567,9 +1847,11 @@ Un `.client.ts` sí puede importarse normalmente desde otros `.client.ts`.
 ```ts
 // app/stores/cart.ts
 export function useCart() {
-  const items = useState("cart:items", (): string[] => []);
-  const add = (id: string): void => { items.value = [...items.value, id]; };
-  return { items, add };
+	const items = useState('cart:items', (): string[] => [])
+	const add = (id: string): void => {
+		items.value = [...items.value, id]
+	}
+	return { items, add }
 }
 ```
 
@@ -1581,28 +1863,28 @@ Al migrar código que no usaba esas opciones estrictas, cambie imports usados s�
 
 Desde `1.5`, Meeko define cuatro aliases de ruta, sin configuración. Funcionan igual en Vite (`meeko dev` y `meeko build`, en el navegador y en SSR, con todos los adaptadores: `node`, `bun`, `deno`, `cloudflare` y `static`), en los `tsconfig` que genera Meeko (`.meeko/tsconfig.app.json`, `server` y `shared`, que usan `meeko check` y el editor) y en los módulos de [`@utilities`](#utilidades-generadas-con-typescript) y lo que importan (salvo con `meekoUtilities({ autoImports: false })`, que no lee la configuración):
 
-| Alias | Apunta a | Dónde se puede usar |
-| --- | --- | --- |
-| `~/` | La raíz del proyecto | Todo el proyecto |
-| `@/` | `app/` | `app/` (componentes, páginas y `.ts`, que se ejecutan en el navegador y en SSR) y el código de servidor; no en `shared/` |
-| `#shared/` | `shared/` | Todo el proyecto |
-| `#server/` | `server/` | Sólo el código de servidor: `server/`, los `*.server.ts`, los sidecars `*.route.ts` y `<script server>` |
+| Alias      | Apunta a             | Dónde se puede usar                                                                                                      |
+| ---------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `~/`       | La raíz del proyecto | Todo el proyecto                                                                                                         |
+| `@/`       | `app/`               | `app/` (componentes, páginas y `.ts`, que se ejecutan en el navegador y en SSR) y el código de servidor; no en `shared/` |
+| `#shared/` | `shared/`            | Todo el proyecto                                                                                                         |
+| `#server/` | `server/`            | Sólo el código de servidor: `server/`, los `*.server.ts`, los sidecars `*.route.ts` y `<script server>`                  |
 
 `~/` es la raíz y `@/` es `app/`: al revés que en Nuxt, a propósito. `~/app/utils/price` y `@/utils/price` son el mismo módulo.
 
 ```ts
 // app/pages/products/[id].route.ts
-import { findProduct } from "#server/products";
-import { productSchema } from "#shared/schemas/product";
+import { findProduct } from '#server/products'
+import { productSchema } from '#shared/schemas/product'
 
-export const route = definePage({ load: ({ params }) => productSchema.parse(findProduct(params.id)) });
+export const route = definePage({ load: ({ params }) => productSchema.parse(findProduct(params.id)) })
 ```
 
 ```html
 <!-- app/pages/products/[id].meeko -->
 <script lang="ts">
-import { formatPrice } from "@/utils/price";
-import * as ProductCard from "@/components/catalog/ProductCard.meeko";
+	import { formatPrice } from '@/utils/price'
+	import * as ProductCard from '@/components/catalog/ProductCard.meeko'
 </script>
 ```
 
@@ -1627,15 +1909,15 @@ En el editor, los aliases completan las carpetas y archivos tras `~/`, `@/`, `#s
 
 ```ts
 // meeko.config.ts
-import { defineMeekoConfig } from "@meekojs/meeko/framework";
+import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
 export default defineMeekoConfig({
-  alias: {
-    "ui/": "app/components/ui/",
-    "db/": "server/db/",
-    "#server/": false,
-  },
-});
+	alias: {
+		'ui/': 'app/components/ui/',
+		'db/': 'server/db/',
+		'#server/': false,
+	},
+})
 ```
 
 - **Ámbito.** El de la carpeta a la que apunta, con la misma regla que los aliases de Meeko: dentro de `server/`, sólo en el código de servidor (`db/` en un componente da `MEEK108`); dentro de `app/`, en `app/` y en el servidor, no en `shared/` (`MEEK118`); en cualquier otra carpeta (`shared/`, la raíz, `lib/`), en todo el proyecto.
@@ -1655,12 +1937,12 @@ No se resuelven contra el `app/` del layer que importa porque los `paths` de Typ
 
 - **`paths` del `tsconfig.json` del proyecto.** Un patrón propio con el prefijo de un alias de Meeko que apunta a otra carpeta (`"@/*": ["./src/*"]`) gana y desactiva ese alias de Meeko en todo el proyecto: en el editor, en `meeko check`, en los `tsconfig` generados (que desde `1.5` copian también los `paths` del proyecto), en `meeko dev` y `meeko build` y en las comprobaciones de ámbito (`MEEK108` y `MEEK118`), así que importar `@/utils` desde `shared/` ya no es un error. `meeko dev`, `meeko build` y `meeko check` lo avisan una vez por proceso. Un patrón con las mismas carpetas que el de Meeko no lo desactiva. Vite no lee esos `paths`: para que el build resuelva ese prefijo, defínalo también con `alias` (`alias: { "@/": "src/" }`, que con la misma carpeta no cuenta como redefinición) o con un `resolve.alias`.
 - **`resolve.alias` de Vite.** El `resolve.alias` de un módulo de Meeko (`meeko.extendViteConfig`) o de un host de Vite propio se aplica antes que los aliases de Meeko. Si cubre todo un prefijo de Meeko (`{ find: "@", replacement: … }` o una expresión regular como `/^@\//`), desactiva también el alias de Meeko de ese prefijo y sus comprobaciones de ámbito, con el mismo aviso; uno que sólo cubre algunos especificadores (`/^@\/lib\/label$/`) gana para ellos y deja el de Meeko para los demás. El editor, que no ejecuta los módulos, no ve el `resolve.alias` de un módulo: para que coincida, desactive el alias con `alias: { "@/": false }`.
-- **`imports` de `package.json`.** Los aliases de Meeko que empiezan por `#` no chocan con los [*subpath imports*](https://nodejs.org/api/packages.html#subpath-imports) de Node mientras el proyecto no los declare. Si su `package.json` tiene en `"imports"` una entrada que empieza por `#shared/` o `#server/` (o un patrón como `"#*"`), gana la suya: Meeko no define ese alias en ninguna parte (ni en Vite ni en los `tsconfig`) y avisa una vez por proceso. Para quitar el aviso, desactive el alias con `alias: { "#shared/": false }`.
+- **`imports` de `package.json`.** Los aliases de Meeko que empiezan por `#` no chocan con los [_subpath imports_](https://nodejs.org/api/packages.html#subpath-imports) de Node mientras el proyecto no los declare. Si su `package.json` tiene en `"imports"` una entrada que empieza por `#shared/` o `#server/` (o un patrón como `"#*"`), gana la suya: Meeko no define ese alias en ninguna parte (ni en Vite ni en los `tsconfig`) y avisa una vez por proceso. Para quitar el aviso, desactive el alias con `alias: { "#shared/": false }`.
 - **Paquetes.** Los módulos de `node_modules` nunca reciben los aliases del proyecto: un `#…` de un paquete es suyo.
 
 ## API y RPC
 
-Los archivos `server/api/users/index.get.ts`, `index.post.ts` y `[id].get.ts` crean `/api/users` y `/api/users/:id`. Los procedimientos bajo `server/rpc/users/get.ts` crean `/_meeko/rpc/users/get`. Los schemas públicos residen en `shared/`. Los handlers usan `defineApiRoute` y `defineRpc`, y el servidor valida entrada, salida, sesión, autorización y CSRF.
+Los archivos `server/api/users/index.get.ts`, `index.post.ts` y `[id].get.ts` crean `/api/users` y `/api/users/:id`. Los procedimientos bajo `server/rpc/users/get.ts` crean `/_meeko/rpc/users/get`. Los schemas públicos residen en `shared/`. Los handlers usan `defineApiRoute` y `defineRpc`, y el servidor valida entrada, salida, sesión, autorización, CSRF y, desde `1.8`, el `Origin` de toda mutación (véase [Origin en mutaciones anónimas](#origin-en-mutaciones-anónimas)).
 
 **Validador: Standard Schema, Valibot por defecto.** Meeko valida con cualquier biblioteca que implemente [Standard Schema](https://standardschema.dev), como Valibot, Zod o ArkType, en API, RPC, Socket, rutas, `useForm` y `useStorage`. Los ejemplos de esta documentación usan Valibot (`import * as v from "valibot"`, desde la versión 1), el validador recomendado: es pequeño y modular, así que el bundle del navegador sólo incluye las funciones que usan los schemas de `shared/` que comparten servidor y cliente. Elegir otra biblioteca no cambia ninguna API de Meeko; sólo la exportación OpenAPI necesita el conversor a JSON Schema de esa biblioteca (para Valibot, `@valibot/to-json-schema`).
 
@@ -1670,55 +1952,55 @@ npm install valibot
 
 ```ts
 // shared/schemas/user.ts
-import * as v from "valibot";
-export const userParams = v.object({ id: v.string() });
-export const userSchema = v.object({ id: v.string(), name: v.string() });
-export const usersSchema = v.array(userSchema);
+import * as v from 'valibot'
+export const userParams = v.object({ id: v.string() })
+export const userSchema = v.object({ id: v.string(), name: v.string() })
+export const usersSchema = v.array(userSchema)
 ```
 
 ```ts
 // server/api/users/index.get.ts
-import { defineApiRoute } from "@meekojs/meeko/server";
-import { usersSchema } from "../../../shared/schemas/user.js";
+import { defineApiRoute } from '@meekojs/meeko/server'
+import { usersSchema } from '../../../shared/schemas/user.js'
 
 export default defineApiRoute({
-  response: usersSchema,
-  handler: () => [{ id: "123", name: "Ada" }],
-});
+	response: usersSchema,
+	handler: () => [{ id: '123', name: 'Ada' }],
+})
 ```
 
 ```ts
 // server/api/users/[id].get.ts
-import { defineApiRoute } from "@meekojs/meeko/server";
-import { userParams, userSchema } from "../../../shared/schemas/user.js";
+import { defineApiRoute } from '@meekojs/meeko/server'
+import { userParams, userSchema } from '../../../shared/schemas/user.js'
 
 export default defineApiRoute({
-  params: userParams,
-  response: userSchema,
-  handler: ({ params }) => ({ id: params.id, name: "Ada" }),
-});
+	params: userParams,
+	response: userSchema,
+	handler: ({ params }) => ({ id: params.id, name: 'Ada' }),
+})
 ```
 
 ```ts
 // server/rpc/users/get.ts
-import { defineRpc } from "@meekojs/meeko/server";
-import { userParams, userSchema } from "../../../shared/schemas/user.js";
+import { defineRpc } from '@meekojs/meeko/server'
+import { userParams, userSchema } from '../../../shared/schemas/user.js'
 
 export default defineRpc({
-  input: userParams,
-  output: userSchema,
-  handler: ({ input }) => ({ id: input.id, name: "Ada" }),
-});
+	input: userParams,
+	output: userSchema,
+	handler: ({ input }) => ({ id: input.id, name: 'Ada' }),
+})
 ```
 
 ```ts
 // app/pages/users/index.meeko, sin imports manuales
 const loadUsers = async () => {
-  const users = await api.users.get();
-  const user = await api.users({ id: "123" }).get();
-  const result = await rpc.users.get({ id: "123" });
-  return { users, user, result };
-};
+	const users = await api.users.get()
+	const user = await api.users({ id: '123' }).get()
+	const result = await rpc.users.get({ id: '123' })
+	return { users, user, result }
+}
 ```
 
 Esos símbolos también funcionan en `.ts` según el ámbito. `meeko routes .` genera `.meeko/generated/clients.client.ts` y `clients.server.ts` con descriptores públicos y tipos inferidos; no importan handlers privados. En SSR, los clientes consultan el contexto actual en cada llamada y despachan localmente por el mismo pipeline HTTP si el host suministra `createLocalServerFetch`. El starter ya lo conecta. Credenciales, sesión, servicios, estado y `requestId` quedan ligados a la petición original. Fuera de un contexto SSR, una llamada al cliente servidor falla con un error claro. En navegador se usa `fetch` same-origin y se lee el token CSRF de la meta `meeko-csrf-token`, que se actualiza tras respuestas y navegación. `createApiClient` y `createRpcClient` siguen disponibles para clientes explícitos o externos. Las respuestas no JSON requieren `contentType: "response"`.
@@ -1733,6 +2015,26 @@ Los schemas públicos de API, RPC y Socket deben exponer tipos Standard Schema c
 
 Los errores de API y RPC se normalizan en el servidor: un `ApiError` conserva `code` y `status`, la respuesta añade `requestId` y `x-request-id`, y un fallo desconocido se devuelve como `INTERNAL_ERROR` sin exponer su mensaje. La misma normalización se aplica al despacho local SSR y al transporte Node, incluso cuando Vite carga módulos en grafos distintos. La navegación que solicita `application/meeko+json` recibe el mismo formato; una página HTML de error conserva el estado HTTP y `x-request-id` sin incluir detalles privados. El servidor generado observa los fallos 5xx: en producción registra tipo e ID, y en desarrollo muestra también el error original. Las respuestas 4xx esperadas no se registran como fallos internos.
 
+### Schemas públicos
+
+Los schemas de un contrato (`input` y `output` de `defineRpc`; `params`, `query`, `body` y `response` de `defineApiRoute`) son públicos: con ellos se generan los tipos de los clientes `api` y `rpc`. El generador (`meeko routes`, `meeko check`, `meeko dev` y `meeko build`) no ejecuta ni importa el handler, que puede llevar código privado del servidor: lee el contrato como código y nombra cada schema por su módulo, de modo que `.meeko/types/server-contracts.d.ts` contiene `typeof import("../../shared/schemas/user.js")["userSchema"]`. Por eso un schema público vive en `shared/`, que no contiene código de servidor y que el navegador puede importar; sus dependencias tampoco pueden salir de `shared/` (salvo paquetes de `node_modules`), y un schema local del handler o de `server/` da `output debe venir de shared/`.
+
+Desde `1.8`, el contrato admite además una **composición simple** de esos schemas con funciones de paquetes, como `v.array(snapshotSchema)` o `v.optional(filterSchema)`: llamadas, lecturas de propiedades, literales, arrays y objetos literales cuyos nombres son imports de `shared/` o de un paquete (`valibot`, `zod`…). El generador copia la expresión, con esos imports, a un módulo de `.meeko/types/contract-schemas/` (`rpc.snapshots.list.output.ts`) del que sólo se lee el tipo: nunca se ejecuta ni llega al bundle.
+
+```ts
+// server/rpc/snapshots/list.ts
+import * as v from 'valibot'
+import { snapshotSchema } from '../../../shared/schemas/snapshot.js'
+
+export default defineRpc({
+	input: v.object({}),
+	output: v.array(snapshotSchema),
+	handler: () => listSnapshots(),
+})
+```
+
+Una expresión con otra cosa (una función como la de `v.transform`, un operador, una variable local o un argumento de tipo) se rechaza con el motivo: `output debe ser un schema importado de shared/ o una composición simple de ellos (…); esta expresión contiene una función`. Defina ese schema en `shared/`, expórtelo e impórtelo en el contrato. Los schemas de [WebSocket](#websocket) no admiten composiciones: el navegador importa cada uno para validar los mensajes, así que deben ser un export de `shared/`.
+
 ### Segmentos dinámicos en `api.*`
 
 Cada carpeta o archivo de `server/api` es un nivel de `api.*`, y cada archivo aporta el método de su sufijo. Desde `1.2`, un segmento dinámico se llama con sus parámetros: `node({ nombre: valor })` devuelve el cliente de ese segmento, y los métodos que se alcanzan así ya no reciben `params`. `query`, `body` y `signal` siguen igual, y la URL se construye y se codifica como con `params`.
@@ -1742,10 +2044,13 @@ Cada carpeta o archivo de `server/api` es un nivel de `api.*`, y cada archivo ap
 // server/api/menu/categories/[id].patch.ts        → api.menu.categories({ id }).patch({ body })
 // server/api/menu/categories/[id]/archive.post.ts → api.menu.categories({ id }).archive.post()
 // server/api/orgs/[org]/users/[id].get.ts         → api.orgs({ org }).users({ id }).get()
-const list = await api.menu.categories.get();
-await api.menu.categories({ id }).patch({ body: { name } });
-await api.menu.categories({ id }).archive.post();
-const user = await api.orgs({ org }).users({ id }).get({ query: { tab: "profile" } });
+const list = await api.menu.categories.get()
+await api.menu.categories({ id }).patch({ body: { name } })
+await api.menu.categories({ id }).archive.post()
+const user = await api
+	.orgs({ org })
+	.users({ id })
+	.get({ query: { tab: 'profile' } })
 ```
 
 - La llamada recibe un objeto con el único parámetro de su segmento, como cadena: TypeScript rechaza que falte, una clave de más, un valor que no es texto y `params` en los métodos que siguen a la llamada. Un objeto sin el parámetro o con otro lanza un `TypeError` al llamar; un valor vacío, `.`, `..` o con `/` rechaza la petición igual que con `params`.
@@ -1764,11 +2069,11 @@ Desde `1.2`, cuando `params`, `query`, `body` o el `input` de un RPC no superan 
 
 ```ts
 // shared/schemas/auth.ts
-import * as v from "valibot";
+import * as v from 'valibot'
 export const loginInput = v.object({
-  email: v.pipe(v.string(), v.email("Escribe un correo válido.")),
-  password: v.pipe(v.string(), v.minLength(1, "Escribe tu contraseña.")),
-});
+	email: v.pipe(v.string(), v.email('Escribe un correo válido.')),
+	password: v.pipe(v.string(), v.minLength(1, 'Escribe tu contraseña.')),
+})
 ```
 
 ```json
@@ -1778,13 +2083,13 @@ export const loginInput = v.object({
 En el cliente, `ClientError.issues` es esa lista de sólo lectura (tipo `ValidationIssue`), o `undefined` si la respuesta no la trae. Llega igual desde `api.*`, `rpc.*` y el `error` de `useApi`, `useRpcQuery` y `useRpcMutation`:
 
 ```ts
-import { ClientError } from "@meekojs/meeko/framework";
+import { ClientError } from '@meekojs/meeko/framework'
 
-const login = useRpcMutation("auth.login");
+const login = useRpcMutation('auth.login')
 const fieldError = (path: string) => {
-  const error = login.error.value;
-  return error instanceof ClientError ? error.issues?.find((issue) => issue.path === path)?.message : undefined;
-};
+	const error = login.error.value
+	return error instanceof ClientError ? error.issues?.find((issue) => issue.path === path)?.message : undefined
+}
 ```
 
 Escriba mensajes propios en el schema: algunos mensajes por defecto de Valibot citan el valor recibido.
@@ -1796,10 +2101,10 @@ Escriba mensajes propios en el schema: algunos mensajes por defecto de Valibot c
 Desde `1.5`, un error que no es de validación pero pertenece a un campo, como un correo que ya tiene cuenta, lleva `issues` con el tercer argumento de `ApiError`, que acepta `{ message, issues }` además del mensaje interno de siempre:
 
 ```ts
-throw new ApiError("EMAIL_TAKEN", 409, {
-    message: `duplicate key for ${body.email}`, // interno: nunca se envía
-    issues: [{ path: "email", message: "Ese correo ya tiene una cuenta." }],
-});
+throw new ApiError('EMAIL_TAKEN', 409, {
+	message: `duplicate key for ${body.email}`, // interno: nunca se envía
+	issues: [{ path: 'email', message: 'Ese correo ya tiene una cuenta.' }],
+})
 ```
 
 ```json
@@ -1815,25 +2120,25 @@ throw new ApiError("EMAIL_TAKEN", 409, {
 
 Desde `1.2`, `defineApiRoute` y `defineRpc` aceptan `locals(context)`, que calcula un valor por petición (por ejemplo, el usuario actual) y se lo entrega al handler como `locals`, con el tipo inferido de lo que devuelve. Sin `locals`, el handler recibe `locals: undefined`. `authorize` no cambia y sigue devolviendo un booleano.
 
-El orden de cada petición es: Origin con `origin: "required"`, Origin y CSRF de la sesión, `rateLimit` (desde `1.2`), `auth`, `authorize`, validación de la entrada (`params`, `query` y `body`, o `input`), `locals`, handler y validación de la respuesta. Así, `locals` sólo se ejecuta con una entrada válida y una petición ya autorizada. Si lanza un `ApiError`, ese error es la respuesta (por ejemplo, `401` si el usuario de la sesión ya no existe o `403` si perdió el acceso); cualquier otro error es `500`.
+El orden de cada petición es: Origin (desde `1.8`, en toda mutación salvo con `origin: "none"`), Origin y CSRF de la sesión, `rateLimit` (desde `1.2`), `auth`, `authorize`, validación de la entrada (`params`, `query` y `body`, o `input`), `locals`, handler y validación de la respuesta. Así, `locals` sólo se ejecuta con una entrada válida y una petición ya autorizada. Si lanza un `ApiError`, ese error es la respuesta (por ejemplo, `401` si el usuario de la sesión ya no existe o `403` si perdió el acceso); cualquier otro error es `500`.
 
 ```ts
 // server/rpc/orders/create.ts
-import { ApiError, defineRpc } from "@meekojs/meeko/server";
-import { newOrder, orderSchema } from "../../../shared/schemas/order.js";
-import { createOrder, findUser } from "../../utils/store.js";
+import { ApiError, defineRpc } from '@meekojs/meeko/server'
+import { newOrder, orderSchema } from '../../../shared/schemas/order.js'
+import { createOrder, findUser } from '../../utils/store.js'
 
 export default defineRpc({
-  input: newOrder,
-  output: orderSchema,
-  auth: "required",
-  locals: async ({ session }) => {
-    const user = await findUser((session.current!.data as { userId: string }).userId);
-    if (!user) throw new ApiError("UNAUTHENTICATED", 401);
-    return { user };
-  },
-  handler: ({ input, locals }) => createOrder(locals.user, input),
-});
+	input: newOrder,
+	output: orderSchema,
+	auth: 'required',
+	locals: async ({ session }) => {
+		const user = await findUser((session.current!.data as { userId: string }).userId)
+		if (!user) throw new ApiError('UNAUTHENTICATED', 401)
+		return { user }
+	},
+	handler: ({ input, locals }) => createOrder(locals.user, input),
+})
 ```
 
 Declare `locals` antes de `handler` en el objeto: si `locals` usa su parámetro, TypeScript sólo infiere su tipo para el handler cuando aparece antes. Con la sesión tipada mediante [`MeekoSession`](#tipos-de-la-sesión-meekosession), `session.current!.data.userId` no necesita `as`.
@@ -1842,38 +2147,40 @@ Declare `locals` antes de `handler` en el objeto: si `locals` usa su parámetro,
 
 Desde `1.2`, `defineApiRoute` acepta `status` para elegir el estado de una respuesta correcta sin renunciar a JSON, a la validación con `response` ni al tipo del cliente generado:
 
-| `status` | Respuesta | `api.*` resuelve |
-| --- | --- | --- |
-| `200` (por defecto) | JSON validado con `response` | el valor de `response` |
-| `201` | JSON validado con `response` (`201 Created`) | el valor de `response` |
-| `202` | JSON validado con `response` (`202 Accepted`) | el valor de `response` |
-| `204` | sin cuerpo ni `content-type` (`204 No Content`) | `undefined` |
+| `status`            | Respuesta                                       | `api.*` resuelve       |
+| ------------------- | ----------------------------------------------- | ---------------------- |
+| `200` (por defecto) | JSON validado con `response`                    | el valor de `response` |
+| `201`               | JSON validado con `response` (`201 Created`)    | el valor de `response` |
+| `202`               | JSON validado con `response` (`202 Accepted`)   | el valor de `response` |
+| `204`               | sin cuerpo ni `content-type` (`204 No Content`) | `undefined`            |
 
 ```ts
 // server/api/orders/index.post.ts
-import { defineApiRoute } from "@meekojs/meeko/server";
-import { newOrder, orderSchema } from "../../../shared/schemas/order.js";
-import { createOrder } from "../../utils/store.js";
+import { defineApiRoute } from '@meekojs/meeko/server'
+import { newOrder, orderSchema } from '../../../shared/schemas/order.js'
+import { createOrder } from '../../utils/store.js'
 
 export default defineApiRoute({
-  body: newOrder,
-  response: orderSchema,
-  status: 201,
-  handler: ({ body }) => createOrder(body),
-});
+	body: newOrder,
+	response: orderSchema,
+	status: 201,
+	handler: ({ body }) => createOrder(body),
+})
 ```
 
 ```ts
 // server/api/orders/[id].delete.ts
-import { defineApiRoute } from "@meekojs/meeko/server";
-import { orderParams } from "../../../shared/schemas/order.js";
-import { deleteOrder } from "../../utils/store.js";
+import { defineApiRoute } from '@meekojs/meeko/server'
+import { orderParams } from '../../../shared/schemas/order.js'
+import { deleteOrder } from '../../utils/store.js'
 
 export default defineApiRoute({
-  params: orderParams,
-  status: 204,
-  handler: async ({ params }) => { await deleteOrder(params.id); },
-});
+	params: orderParams,
+	status: 204,
+	handler: async ({ params }) => {
+		await deleteOrder(params.id)
+	},
+})
 ```
 
 - `status` debe ser un literal (`status: 201`): el generador lo lee sin ejecutar el handler y rechaza otro valor. Una constante o una expresión no sirven.
@@ -1891,53 +2198,90 @@ Desde `1.7`, un endpoint de API puede atender también un `<form method="post">`
 
 ```ts
 // shared/schemas/feedback.ts
-import * as v from "valibot";
+import * as v from 'valibot'
 export const feedbackInput = v.object({
-  page: v.pipe(v.string(), v.startsWith("/")),
-  helpful: v.boolean("Elige sí o no."),
-  comment: v.optional(v.pipe(v.string(), v.maxLength(500, "Usa como mucho 500 caracteres.")), ""),
-});
-export const feedbackSaved = v.object({ id: v.string() });
+	page: v.pipe(v.string(), v.startsWith('/')),
+	helpful: v.boolean('Elige sí o no.'),
+	comment: v.optional(v.pipe(v.string(), v.maxLength(500, 'Usa como mucho 500 caracteres.')), ''),
+})
+export const feedbackSaved = v.object({ id: v.string() })
 ```
 
 ```ts
 // server/api/feedback.post.ts
-import { defineApiRoute } from "@meekojs/meeko/server";
-import { feedbackInput, feedbackSaved } from "../../shared/schemas/feedback.js";
-import { saveFeedback } from "../utils/feedback.js";
+import { defineApiRoute } from '@meekojs/meeko/server'
+import { feedbackInput, feedbackSaved } from '../../shared/schemas/feedback.js'
+import { saveFeedback } from '../utils/feedback.js'
 
 export default defineApiRoute({
-  body: feedbackInput,
-  response: feedbackSaved,
-  // O { redirect: (saved) => `/gracias?id=${saved.id}` }. `echo` devuelve tras un error el texto de esos campos.
-  form: { echo: ["comment"] },
-  handler: ({ body }) => saveFeedback(body),
-});
+	body: feedbackInput,
+	response: feedbackSaved,
+	// O { redirect: (saved) => `/graciasíid=${saved.id}` }. `echo` devuelve tras un error el texto de esos campos.
+	form: { echo: ['comment'] },
+	handler: ({ body }) => saveFeedback(body),
+})
 ```
 
 ```html
 <!-- app/components/Feedback.meeko -->
 <script lang="ts">
-const route = useRoute();
-const form = useForm({
-    schema: feedbackInput,
-    initial: { page: route.path.value, helpful: false, comment: "" },
-    action: "/api/feedback",
-    submit: (values) => api.feedback.post({ body: values }),
-});
+	const route = useRoute()
+	const form = useForm({
+		schema: feedbackInput,
+		initial: { page: route.path.value, helpful: false, comment: '' },
+		action: '/api/feedback',
+		submit: (values) => api.feedback.post({ body: values }),
+	})
 </script>
 <template>
-    <form method="post" action="/api/feedback" on:submit="form.submit" novalidate>
-        <input type="hidden" name="return" bind:value="route.url.value">
-        <input type="hidden" name="_csrf" bind:value="form.csrfToken">
-        <input type="hidden" name="page" bind:value="form.fields.page.value">
-        <p if:when="form.submitted.value">¡Gracias!</p>
-        <p if:when="form.error.value" role="alert">{form.error.value}</p>
-        <button name="helpful" value="true" on:click="() => { form.fields.helpful.value = true; }">Sí</button>
-        <button name="helpful" value="false" on:click="() => { form.fields.helpful.value = false; }">No</button>
-        <textarea name="comment" model="form.fields.comment"></textarea>
-        <p if:when="form.errors.value.comment">{form.errors.value.comment}</p>
-    </form>
+	<form
+		method="post"
+		action="/api/feedback"
+		on:submit="form.submit"
+		novalidate
+	>
+		<input
+			type="hidden"
+			name="return"
+			bind:value="route.url.value"
+		/>
+		<input
+			type="hidden"
+			name="_csrf"
+			bind:value="form.csrfToken"
+		/>
+		<input
+			type="hidden"
+			name="page"
+			bind:value="form.fields.page.value"
+		/>
+		<p if:when="form.submitted.value">¡Gracias!</p>
+		<p
+			if:when="form.error.value"
+			role="alert"
+		>
+			{form.error.value}
+		</p>
+		<button
+			name="helpful"
+			value="true"
+			on:click="() => { form.fields.helpful.value = true; }"
+		>
+			Sí
+		</button>
+		<button
+			name="helpful"
+			value="false"
+			on:click="() => { form.fields.helpful.value = false; }"
+		>
+			No
+		</button>
+		<textarea
+			name="comment"
+			model="form.fields.comment"
+		></textarea>
+		<p if:when="form.errors.value.comment">{form.errors.value.comment}</p>
+	</form>
 </template>
 ```
 
@@ -1962,7 +2306,7 @@ Por qué una cookie: una query firmada dejaría los valores, a veces personales,
 
 **Seguridad.**
 
-- Un formulario no necesita *preflight*, así que cualquier sitio puede enviar uno. Por eso todo envío nativo exige un `Origin` permitido (el de la aplicación o uno de `SessionManager.allowedOrigins`), como si declarara `origin: "required"`, también con `origin: "none"`: sin él responde `403 INVALID_ORIGIN` antes de leer el cuerpo. Los navegadores envían `Origin` en cada `POST`; una página servida con `Referrer-Policy: no-referrer` lo envía como `null` y no puede usar formularios nativos.
+- Un formulario no necesita _preflight_, así que cualquier sitio puede enviar uno. Por eso todo envío nativo exige un `Origin` permitido (el de la aplicación o uno de `SessionManager.allowedOrigins`), como cualquier mutación desde `1.8`: sin él responde `403 INVALID_ORIGIN` antes de leer el cuerpo. Desde `1.8`, `origin: "none"` lo exime sólo sin sesión, para un webhook que envía `application/x-www-form-urlencoded` sin `Origin`; con sesión, el envío sigue necesitando `Origin` y `_csrf`. Los navegadores envían `Origin` en cada `POST`; una página servida con `Referrer-Policy: no-referrer` lo envía como `null` y no puede usar formularios nativos.
 - Con una sesión, el token CSRF que JavaScript envía en `x-meeko-csrf` llega en el campo oculto `_csrf`: `form.csrfToken` lo da en el SSR y en el navegador. Sin él, `403 INVALID_CSRF`. Estos dos `403` responden con el JSON de error y sin `303`: la petición no es de este sitio. Lo demás (`auth`, `authorize`, `rateLimit`, `locals`) funciona igual que con JSON, salvo el orden de `rateLimit`: desde `1.7`, en un envío nativo se cuenta tras `Origin` y **antes de leer el cuerpo**, así que un aluvión de envíos se corta sin analizar cada uno; el token CSRF va en el cuerpo, de modo que un envío con un token no válido también cuenta. Un `429` vuelve a `Referer` o a `/`, porque el campo `return` está en el cuerpo sin leer.
 - El cuerpo tiene el límite de 1 MiB del JSON, que `form.maxBytes` cambia; por encima, `BODY_TOO_LARGE`.
 - Un `multipart/form-data` no admite archivos salvo con `form.files: true`: llegan al schema de `body` como `File` (por ejemplo, `v.instance(File)` o `v.file()`), y un archivo en un endpoint sin `files` es `400 FILES_NOT_ALLOWED`. Un `<input type="file">` vacío no cuenta. Suba `maxBytes` según el tamaño que acepte.
@@ -1978,11 +2322,11 @@ Por qué una cookie: una query firmada dejaría los valores, a veces personales,
 
 Desde `1.1`, un componente puede pedir sus propios datos con composables autoimportados desde los clientes generados. Usan los mismos contratos, tipos, sesión y CSRF que `api.*` y `rpc.*`:
 
-| Composable | Uso | Devuelve |
-| --- | --- | --- |
-| `useApi(ruta, opciones?, recarga?)` | Lectura de un endpoint `GET` | `{ data, error, pending, refreshing, refresh }` |
-| `useRpcQuery(procedimiento, input, recarga?)` | Lectura mediante un procedimiento RPC | `{ data, error, pending, refreshing, refresh }` |
-| `useRpcMutation(procedimiento, opciones?)` | Escritura bajo demanda mediante RPC | `{ mutate(input), data, error, pending }` |
+| Composable                                              | Uso                                                                     | Devuelve                                                    |
+| ------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `useApi(ruta, opciones?, recarga?)`                     | Lectura de un endpoint `GET`                                            | `{ data, error, pending, refreshing, refresh }`             |
+| `useRpcQuery(procedimiento, input, recarga?)`           | Lectura mediante un procedimiento RPC                                   | `{ data, error, pending, refreshing, refresh }`             |
+| `useRpcMutation(procedimiento, opciones?)`              | Escritura bajo demanda mediante RPC                                     | `{ mutate(input), data, error, pending }`                   |
 | `useApiMutation(ruta, método, opciones?)` (desde `1.2`) | Escritura bajo demanda en un endpoint `POST`, `PUT`, `PATCH` o `DELETE` | `{ mutate({ params, query, body }), data, error, pending }` |
 
 `ruta` es la ruta del endpoint tal como la describe `server/api`, con los segmentos dinámicos entre corchetes: `"/api/users"` o `"/api/users/[id]"`. Sólo se admiten endpoints `GET`. `procedimiento` es el ID del procedimiento con puntos: `server/rpc/users/get.ts` es `"users.get"`. El editor completa rutas y procedimientos, y TypeScript comprueba `params`, `query` e `input` contra el contrato. `data`, `error` y `pending` son señales de sólo lectura; `error` es un `Error` o `null`.
@@ -1990,17 +2334,20 @@ Desde `1.1`, un componente puede pedir sus propios datos con composables autoimp
 ```html
 <!-- app/pages/users/[id].meeko -->
 <script lang="ts">
-const props = defineProps<{ params: { id: string }; search: Record<string, string | string[]> }>();
-const tab = signal("profile");
-const user = await useApi("/api/users/[id]", { params: { id: props.params.id } });
-const activity = await useRpcQuery("users.activity", () => ({ id: props.params.id, tab: tab.value }));
-const rename = useRpcMutation("users.rename");
-async function save(name: string): Promise<void> {
-    await rename.mutate({ id: props.params.id, name });
-    await user.refresh();
-}
+	const props = defineProps<{ params: { id: string }; search: Record<string, string | string[]> }>()
+	const tab = signal('profile')
+	const user = await useApi('/api/users/[id]', { params: { id: props.params.id } })
+	const activity = await useRpcQuery('users.activity', () => ({ id: props.params.id, tab: tab.value }))
+	const rename = useRpcMutation('users.rename')
+	async function save(name: string): Promise<void> {
+		await rename.mutate({ id: props.params.id, name })
+		await user.refresh()
+	}
 </script>
-<template><h1>{user.data.value.name}</h1><p>{activity.data.value.length} eventos</p></template>
+<template>
+	<h1>{user.data.value.name}</h1>
+	<p>{activity.data.value.length} eventos</p>
+</template>
 ```
 
 #### Con y sin `await`
@@ -2010,12 +2357,20 @@ async function save(name: string): Promise<void> {
 
 ```html
 <script lang="ts">
-const users = useApi("/api/users");
+	const users = useApi('/api/users')
 </script>
 <template>
-    <p if:when="users.pending.value">Cargando…</p>
-    <p if:when="users.error.value">No se pudieron cargar los usuarios.</p>
-    <ul if:when="users.data.value"><li each:of="users.data.value ?? []" each:as="user" each:key="user.id">{user.name}</li></ul>
+	<p if:when="users.pending.value">Cargando…</p>
+	<p if:when="users.error.value">No se pudieron cargar los usuarios.</p>
+	<ul if:when="users.data.value">
+		<li
+			each:of="users.data.value ?? []"
+			each:as="user"
+			each:key="user.id"
+		>
+			{user.name}
+		</li>
+	</ul>
 </template>
 ```
 
@@ -2024,9 +2379,9 @@ Las opciones de `useApi` y el `input` de `useRpcQuery` pueden contener señales 
 Las opciones son opcionales cuando el contrato no exige nada. `useApi(ruta)` admite omitirlas si el endpoint no tiene `params` y su `query` no existe o sólo tiene campos opcionales. `useRpcQuery(procedimiento)` admite omitir el `input` si el schema acepta `{}`, y entonces envía `{}`. Lo mismo vale para los clientes generados: `api.users.get()` se llama sin argumentos cuando el endpoint no tiene `params`, ni `query` obligatoria, ni cuerpo. La firma de `rpc.x(input)` no cambia.
 
 ```ts
-const stats = await useRpcQuery("stats.summary");          // input opcional: envía {}
-const users = await useApi("/api/users");                  // query opcional
-const page = await api.users.get({ query: { page: "2" } }); // la query sigue disponible
+const stats = await useRpcQuery('stats.summary') // input opcional: envía {}
+const users = await useApi('/api/users') // query opcional
+const page = await api.users.get({ query: { page: '2' } }) // la query sigue disponible
 ```
 
 #### SSR e hidratación
@@ -2070,26 +2425,35 @@ Desde `1.1`, una recarga no vacía `data`: tanto `refresh()` como un cambio de l
 
 ```html
 <script lang="ts">
-const props = defineProps<{ params: { id: string }; search: Record<string, string | string[]> }>();
-const page = signal("1");
-// Por defecto: la página anterior sigue en pantalla mientras llega la siguiente.
-const orders = useApi("/api/orders", { query: { page } });
-// Otro usuario: mejor el esqueleto que la ficha del anterior.
-const user = useApi("/api/users/[id]", () => ({ params: { id: props.params.id } }), { keepPrevious: false });
+	const props = defineProps<{ params: { id: string }; search: Record<string, string | string[]> }>()
+	const page = signal('1')
+	// Por defecto: la página anterior sigue en pantalla mientras llega la siguiente.
+	const orders = useApi('/api/orders', { query: { page } })
+	// Otro usuario: mejor el esqueleto que la ficha del anterior.
+	const user = useApi('/api/users/[id]', () => ({ params: { id: props.params.id } }), { keepPrevious: false })
 </script>
 <template>
-    <ul bind:class="orders.refreshing.value ? 'dimmed' : undefined" bind:aria-busy="orders.pending.value ? 'true' : undefined">
-        <li each:of="orders.data.value ?? []" each:as="order" each:key="order.id">{order.total}</li>
-    </ul>
+	<ul
+		bind:class="orders.refreshing.value ? 'dimmed' : undefined"
+		bind:aria-busy="orders.pending.value ? 'true' : undefined"
+	>
+		<li
+			each:of="orders.data.value ?? []"
+			each:as="order"
+			each:key="order.id"
+		>
+			{order.total}
+		</li>
+	</ul>
 </template>
 ```
 
-| Situación | `data` | `pending` | `refreshing` |
-| --- | --- | --- | --- |
-| Primera carga | `null` | `true` | `false` |
-| `refresh()` | La anterior | `true` | `true` |
-| Cambio de la entrada | La anterior (con `keepPrevious: false`, `null`) | `true` | `true` (con `keepPrevious: false`, `false`) |
-| Recarga fallida | La anterior; `error` dice por qué | `false` | `false` |
+| Situación            | `data`                                          | `pending` | `refreshing`                                |
+| -------------------- | ----------------------------------------------- | --------- | ------------------------------------------- |
+| Primera carga        | `null`                                          | `true`    | `false`                                     |
+| `refresh()`          | La anterior                                     | `true`    | `true`                                      |
+| Cambio de la entrada | La anterior (con `keepPrevious: false`, `null`) | `true`    | `true` (con `keepPrevious: false`, `false`) |
+| Recarga fallida      | La anterior; `error` dice por qué               | `false`   | `false`                                     |
 
 `<MeekoAwait>` se apoya en este comportamiento: durante una recarga sigue mostrando su contenido y marca la zona con `data-meeko-refreshing` y `aria-busy`.
 
@@ -2099,17 +2463,30 @@ Desde `1.7`, las opciones del último argumento de `useApi` y `useRpcQuery` incl
 
 ```html
 <script lang="ts">
-const query = signal("");
-const results = useRpcQuery("docs.search", () => ({ q: query.value.trim() }), {
-    debounceMs: 200,
-    enabled: () => query.value.trim().length >= 2,
-});
+	const query = signal('')
+	const results = useRpcQuery('docs.search', () => ({ q: query.value.trim() }), {
+		debounceMs: 200,
+		enabled: () => query.value.trim().length >= 2,
+	})
 </script>
 <template>
-    <input type="search" model="query" aria-controls="results">
-    <ul id="results" bind:aria-busy="results.pending.value ? 'true' : undefined">
-        <li each:of="results.data.value?.hits ?? []" each:as="hit" each:key="hit.url"><a bind:href="hit.url">{hit.title}</a></li>
-    </ul>
+	<input
+		type="search"
+		model="query"
+		aria-controls="results"
+	/>
+	<ul
+		id="results"
+		bind:aria-busy="results.pending.value ? 'true' : undefined"
+	>
+		<li
+			each:of="results.data.value?.hits ?? []"
+			each:as="hit"
+			each:key="hit.url"
+		>
+			<a bind:href="hit.url">{hit.title}</a>
+		</li>
+	</ul>
 </template>
 ```
 
@@ -2124,17 +2501,28 @@ Desde `1.5`, `<MeekoAwait>` es una etiqueta propia de Meeko, como `<MeekoLink>`:
 ```html
 <!-- app/components/ItemsCard.meeko -->
 <script lang="ts">
-const items = useApi("/api/items");
+	const items = useApi('/api/items')
 </script>
 <template>
-    <section class="card">
-        <h2>Items</h2>
-        <MeekoAwait for="items" reserve>
-            <snippet name="pending"><ItemsSkeleton /></snippet>
-            <snippet name="error" params="error, retry"><p role="alert">No se pudo cargar. <button on:click="retry">Reintentar</button></p></snippet>
-            <ItemsList bind:items="items.data.value" />
-        </MeekoAwait>
-    </section>
+	<section class="card">
+		<h2>Items</h2>
+		<MeekoAwait
+			for="items"
+			reserve
+		>
+			<snippet name="pending"><ItemsSkeleton /></snippet>
+			<snippet
+				name="error"
+				params="error, retry"
+			>
+				<p role="alert">
+					No se pudo cargar.
+					<button on:click="retry">Reintentar</button>
+				</p>
+			</snippet>
+			<ItemsList bind:items="items.data.value" />
+		</MeekoAwait>
+	</section>
 </template>
 ```
 
@@ -2158,13 +2546,13 @@ Con `reserve`, mientras la zona espera ocupa la altura que tuvo con datos la úl
 
 Qué pasa en cada caso:
 
-| Situación | Primer pintado | Al llegar los datos |
-| --- | --- | --- |
-| Primera visita de la pestaña (sin memoria) | El esqueleto, con su altura natural (o el mínimo de `reserve="320px"`) | La zona crece una vez hasta el contenido: el mismo salto que sin `reserve`, que sólo evita un esqueleto de la misma altura |
-| Carga completa de una página ya visitada en la pestaña (recarga, abrir un enlace) | El esqueleto con la altura recordada: un script en línea de `<head>`, que se ejecuta antes del primer pintado, lee `sessionStorage` y adopta las reglas | Sin salto si el contenido mide lo mismo |
-| Navegación en el cliente a una página ya visitada | La zona se inserta con la altura recordada: el componente adopta las reglas antes de insertarla | Sin salto |
-| Zona que se monta más tarde (un `if:`, una pestaña) | Igual que la navegación | Sin salto |
-| Recarga de datos | El contenido sigue en pantalla | Sin salto, salvo que el contenido nuevo mida distinto |
+| Situación                                                                         | Primer pintado                                                                                                                                          | Al llegar los datos                                                                                                        |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Primera visita de la pestaña (sin memoria)                                        | El esqueleto, con su altura natural (o el mínimo de `reserve="320px"`)                                                                                  | La zona crece una vez hasta el contenido: el mismo salto que sin `reserve`, que sólo evita un esqueleto de la misma altura |
+| Carga completa de una página ya visitada en la pestaña (recarga, abrir un enlace) | El esqueleto con la altura recordada: un script en línea de `<head>`, que se ejecuta antes del primer pintado, lee `sessionStorage` y adopta las reglas | Sin salto si el contenido mide lo mismo                                                                                    |
+| Navegación en el cliente a una página ya visitada                                 | La zona se inserta con la altura recordada: el componente adopta las reglas antes de insertarla                                                         | Sin salto                                                                                                                  |
+| Zona que se monta más tarde (un `if:`, una pestaña)                               | Igual que la navegación                                                                                                                                 | Sin salto                                                                                                                  |
+| Recarga de datos                                                                  | El contenido sigue en pantalla                                                                                                                          | Sin salto, salvo que el contenido nuevo mida distinto                                                                      |
 
 El script de `<head>` es siempre el mismo texto, así que tiene un único hash para la CSP; lleva el nonce de la petición y un sitio estático lo permite con los hashes de `inlineScriptHashes`. Sólo toca el CSSOM, nunca el DOM, así que la hidratación encuentra el HTML del servidor. Meeko lo añade sólo a las páginas con `<MeekoAwait reserve>` (con `useHead`, en una ruta `render: "stream"` también en el primer envío). Sin hojas de estilos construidas (navegadores anteriores a 2023) la zona usa su altura natural.
 
@@ -2176,10 +2564,10 @@ La altura depende del ancho: si la ventana cambia mucho entre visitas, la memori
 
 ```css
 @media (prefers-reduced-motion: no-preference) {
-    [data-meeko-await] {
-        interpolate-size: allow-keywords;
-        transition: min-block-size 200ms ease-out;
-    }
+	[data-meeko-await] {
+		interpolate-size: allow-keywords;
+		transition: min-block-size 200ms ease-out;
+	}
 }
 ```
 
@@ -2194,13 +2582,21 @@ Una card cuyos datos llegan después del primer pintado sale vacía en el HTML y
    ```html
    <!-- app/components/ItemsCard.meeko -->
    <script lang="ts">
-   const items = await useApi("/api/items");
+   	const items = await useApi('/api/items')
    </script>
    <template>
-       <section class="card">
-           <h2>Items</h2>
-           <ul><li each:of="items.data.value" each:as="item" each:key="item.id">{item.name}</li></ul>
-       </section>
+   	<section class="card">
+   		<h2>Items</h2>
+   		<ul>
+   			<li
+   				each:of="items.data.value"
+   				each:as="item"
+   				each:key="item.id"
+   			>
+   				{item.name}
+   			</li>
+   		</ul>
+   	</section>
    </template>
    ```
 
@@ -2208,16 +2604,34 @@ Una card cuyos datos llegan después del primer pintado sale vacía en el HTML y
 
    ```html
    <script lang="ts">
-   const items = useApi("/api/items");
+   	const items = useApi('/api/items')
    </script>
    <template>
-       <section class="card">
-           <h2>Items</h2>
-           <MeekoAwait for="items" reserve>
-               <snippet name="pending"><ul class="skeleton"><li each:of="[1, 2, 3, 4]" each:as="row"></li></ul></snippet>
-               <ul><li each:of="items.data.value" each:as="item" each:key="item.id">{item.name}</li></ul>
-           </MeekoAwait>
-       </section>
+   	<section class="card">
+   		<h2>Items</h2>
+   		<MeekoAwait
+   			for="items"
+   			reserve
+   		>
+   			<snippet name="pending">
+   				<ul class="skeleton">
+   					<li
+   						each:of="[1, 2, 3, 4]"
+   						each:as="row"
+   					></li>
+   				</ul>
+   			</snippet>
+   			<ul>
+   				<li
+   					each:of="items.data.value"
+   					each:as="item"
+   					each:key="item.id"
+   				>
+   					{item.name}
+   				</li>
+   			</ul>
+   		</MeekoAwait>
+   	</section>
    </template>
    ```
 
@@ -2238,18 +2652,23 @@ Desde `1.2`, `useApiMutation(ruta, método)` hace lo mismo con un endpoint de AP
 
 ```html
 <script lang="ts">
-const props = defineProps<{ params: { id: string }; search: Record<string, string | string[]> }>();
-const note = await useApi("/api/notes/[id]", { params: { id: props.params.id } });
-const save = useApiMutation("/api/notes/[id]", "PUT");
-const remove = useApiMutation("/api/notes/[id]", "DELETE");
-async function rename(text: string): Promise<void> {
-    await save.mutate({ params: { id: props.params.id }, body: { text } });
-    await note.refresh();
-}
+	const props = defineProps<{ params: { id: string }; search: Record<string, string | string[]> }>()
+	const note = await useApi('/api/notes/[id]', { params: { id: props.params.id } })
+	const save = useApiMutation('/api/notes/[id]', 'PUT')
+	const remove = useApiMutation('/api/notes/[id]', 'DELETE')
+	async function rename(text: string): Promise<void> {
+		await save.mutate({ params: { id: props.params.id }, body: { text } })
+		await note.refresh()
+	}
 </script>
 <template>
-    <p if:when="save.error.value">No se pudo guardar.</p>
-    <button bind:disabled="remove.pending.value" on:click="() => remove.mutate({ params: { id: props.params.id } })">Borrar</button>
+	<p if:when="save.error.value">No se pudo guardar.</p>
+	<button
+		bind:disabled="remove.pending.value"
+		on:click="() => remove.mutate({ params: { id: props.params.id } })"
+	>
+		Borrar
+	</button>
 </template>
 ```
 
@@ -2260,8 +2679,8 @@ Igual que `useRpcMutation`, se llama mientras se ejecuta el script del component
 Una escritura que se queda sin respuesta (se cae la red, el servidor responde `5xx` o el proceso muere) puede haberse aplicado o no. Reintentarla a ciegas puede cobrar dos veces; descartarla puede perder una venta. Desde `1.2`, `useRpcMutation` y `useApiMutation` aceptan la opción `retrySafe`, que resuelve ese caso en el cliente y deja la deduplicación al servidor:
 
 ```ts
-const charge = useRpcMutation("sales.checkout", { retrySafe: { key: "pos:sale" } });
-const step = useApiMutation("/api/kitchen/items/[id]/steps", "POST", { retrySafe: { key: "kitchen:step", storage: "session" } });
+const charge = useRpcMutation('sales.checkout', { retrySafe: { key: 'pos:sale' } })
+const step = useApiMutation('/api/kitchen/items/[id]/steps', 'POST', { retrySafe: { key: 'kitchen:step', storage: 'session' } })
 ```
 
 - **Intención con clave.** `mutate(input)` crea un UUID nuevo (la clave de idempotencia), guarda la intención (la entrada, la clave y la hora) en el almacenamiento del navegador bajo `retrySafe.key` y después la envía con la cabecera `Idempotency-Key: "<uuid>"`, con el formato de cadena de Structured Fields que define el borrador del IETF. Si la página se cierra a mitad de la petición, la intención sigue guardada.
@@ -2275,29 +2694,37 @@ Use una clave de almacenamiento por mutación, que incluya lo que la distinga en
 
 ```html
 <script lang="ts">
-const charge = useRpcMutation("sales.checkout", { retrySafe: { key: "pos:sale" } });
-const failure = signal("");
-async function pay(input: SaleInput): Promise<void> {
-    failure.value = "";
-    try {
-        const receipt = await charge.mutate(input);
-        notify(`Venta #${receipt.number} cobrada.`);
-    } catch (error) {
-        // Sin respuesta: queda en verificación y se reintentará con la misma clave.
-        if (!charge.uncertain.value) failure.value = errorMessage(error);
-    }
-}
-function discard(): void {
-    if (window.confirm("Descarta esta venta sólo si comprobaste que no se registró.")) charge.discard();
-}
+	const charge = useRpcMutation('sales.checkout', { retrySafe: { key: 'pos:sale' } })
+	const failure = signal('')
+	async function pay(input: SaleInput): Promise<void> {
+		failure.value = ''
+		try {
+			const receipt = await charge.mutate(input)
+			notify(`Venta #${receipt.number} cobrada.`)
+		} catch (error) {
+			// Sin respuesta: queda en verificación y se reintentará con la misma clave.
+			if (!charge.uncertain.value) failure.value = errorMessage(error)
+		}
+	}
+	function discard(): void {
+		if (window.confirm('Descarta esta venta sólo si comprobaste que no se registró.')) charge.discard()
+	}
 </script>
 <template>
-    <div role="alert" if:when="charge.uncertain.value">
-        <p>Venta en verificación: no tuvo respuesta. Se reintentará con la misma clave, así que no se cobrará dos veces.</p>
-        <button bind:disabled="charge.pending.value" on:click="() => charge.retry().catch(() => {})">Reintentar ahora</button>
-        <button on:click="discard">Descartar</button>
-    </div>
-    <p if:when="failure.value">{failure.value}</p>
+	<div
+		role="alert"
+		if:when="charge.uncertain.value"
+	>
+		<p>Venta en verificación: no tuvo respuesta. Se reintentará con la misma clave, así que no se cobrará dos veces.</p>
+		<button
+			bind:disabled="charge.pending.value"
+			on:click="() => charge.retry().catch(() => {})"
+		>
+			Reintentar ahora
+		</button>
+		<button on:click="discard">Descartar</button>
+	</div>
+	<p if:when="failure.value">{failure.value}</p>
 </template>
 ```
 
@@ -2306,18 +2733,18 @@ function discard(): void {
 Un reintento automático (al volver la conexión o al montarse el componente) no tiene una promesa a la que esperar. Desde `1.2`, las opciones `onSuccess` y `onError` de `useRpcMutation` y `useApiMutation`, con o sin `retrySafe`, se llaman una vez por cada intento que termina, lo haya enviado quien sea, después de actualizar `data`, `error`, `pending` y `uncertain`:
 
 ```ts
-const charge = useRpcMutation("sales.checkout", {
-    retrySafe: { key: "pos:sale" },
-    onSuccess(receipt, attempt) {
-        // También tras un reintento en segundo plano: la venta en verificación se confirmó.
-        if (attempt.trigger !== "mutate") notify(`Venta #${receipt.number} cobrada.`);
-        ticket.clear();
-    },
-    onError(error, attempt) {
-        // Sólo los rechazos con respuesta: sin respuesta, la venta sigue en verificación.
-        if (!attempt.uncertain) notify(`La venta no se registró: ${errorMessage(error)}`);
-    },
-});
+const charge = useRpcMutation('sales.checkout', {
+	retrySafe: { key: 'pos:sale' },
+	onSuccess(receipt, attempt) {
+		// También tras un reintento en segundo plano: la venta en verificación se confirmó.
+		if (attempt.trigger !== 'mutate') notify(`Venta #${receipt.number} cobrada.`)
+		ticket.clear()
+	},
+	onError(error, attempt) {
+		// Sólo los rechazos con respuesta: sin respuesta, la venta sigue en verificación.
+		if (!attempt.uncertain) notify(`La venta no se registró: ${errorMessage(error)}`)
+	},
+})
 ```
 
 - **`intento`.** Lleva la entrada enviada (`input`), su clave (`idempotencyKey`, `null` sin `retrySafe`) y quién lo envió (`trigger`): `"mutate"`, `"retry"` (una llamada a `retry()`) o `"resume"` (el reintento automático). En `onError`, `uncertain` es `true` cuando no hubo respuesta y la intención se conserva para reintentarla; sin `retrySafe` siempre es `false`.
@@ -2334,21 +2761,21 @@ CREATE UNIQUE INDEX sales_idempotency_key ON sales (restaurant_id, idempotency_k
 ```ts
 // server/rpc/sales/checkout.ts
 export default defineRpc({
-    input: saleInput,
-    output: saleReceipt,
-    auth: "required",
-    handler: async ({ input, context }) => {
-        const key = context.idempotencyKey;
-        if (!key) throw new ApiError("IDEMPOTENCY_KEY_REQUIRED", 400);
-        const { db, restaurantId } = context.services;
-        // Un reintento de una venta ya registrada devuelve el mismo recibo, sin cobrar otra vez.
-        const existing = await db.sales.findByKey(restaurantId, key);
-        if (existing) return existing.receipt;
-        // La restricción única cubre también dos reintentos simultáneos: el segundo INSERT falla
-        // y vuelve a leer la venta del primero.
-        return db.sales.insertOrGet(restaurantId, key, input);
-    },
-});
+	input: saleInput,
+	output: saleReceipt,
+	auth: 'required',
+	handler: async ({ input, context }) => {
+		const key = context.idempotencyKey
+		if (!key) throw new ApiError('IDEMPOTENCY_KEY_REQUIRED', 400)
+		const { db, restaurantId } = context.services
+		// Un reintento de una venta ya registrada devuelve el mismo recibo, sin cobrar otra vez.
+		const existing = await db.sales.findByKey(restaurantId, key)
+		if (existing) return existing.receipt
+		// La restricción única cubre también dos reintentos simultáneos: el segundo INSERT falla
+		// y vuelve a leer la venta del primero.
+		return db.sales.insertOrGet(restaurantId, key, input)
+	},
+})
 ```
 
 Acote la clave al usuario o a la cuenta, como en el índice, y, si quiere seguir el borrador del IETF al pie de la letra, responda `422` cuando la misma clave llega con otra entrada. La cabecera no cambia la seguridad: la petición sigue necesitando la sesión, el token CSRF y el `Origin` de siempre. En una petición del mismo origen el navegador la envía sin más; si un cliente de otro origen llama a la API con CORS, añada `Idempotency-Key` a `Access-Control-Allow-Headers` en su proxy o middleware.
@@ -2358,32 +2785,32 @@ Acote la clave al usuario o a la cuenta, como en el índice, y, si quiere seguir
 Desde `1.2`, una llamada de los clientes generados acepta `idempotencyKey`, un UUID que viaja en la misma cabecera `Idempotency-Key`. Va junto a `params`, `query`, `body` y `signal` en `api.*`, y en las opciones de `rpc.*`:
 
 ```ts
-const key = crypto.randomUUID();
-await api.sales.post({ body: sale, idempotencyKey: key });
-await rpc.sales.checkout(sale, { idempotencyKey: key, signal: AbortSignal.timeout(10_000) });
+const key = crypto.randomUUID()
+await api.sales.post({ body: sale, idempotencyKey: key })
+await rpc.sales.checkout(sale, { idempotencyKey: key, signal: AbortSignal.timeout(10_000) })
 ```
 
 Un valor que no es un UUID rechaza con `TypeError` sin enviar la petición. La clave no se guarda ni se reintenta: es la misma cabecera, y la deduplicación sigue siendo del servidor.
 
-| Situación | Use |
-| --- | --- |
-| Una escritura desde un componente que debe sobrevivir a una caída de red o a una recarga, con aviso de «en verificación» | `useRpcMutation` / `useApiMutation` con `retrySafe`: Meeko crea la clave, guarda la intención y la reintenta |
-| Código que no es un componente (un script, una cola propia, un service worker) o una clave que ya existe fuera de Meeko, como el id de un pedido sin conexión | `api.*` / `rpc.*` con `idempotencyKey`: usted guarda la clave y repite la llamada con ella |
-| Pruebas de la deduplicación del servidor | `api.*` / `rpc.*` con `idempotencyKey`, sin escribir la cabecera a mano |
+| Situación                                                                                                                                                     | Use                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Una escritura desde un componente que debe sobrevivir a una caída de red o a una recarga, con aviso de «en verificación»                                      | `useRpcMutation` / `useApiMutation` con `retrySafe`: Meeko crea la clave, guarda la intención y la reintenta |
+| Código que no es un componente (un script, una cola propia, un service worker) o una clave que ya existe fuera de Meeko, como el id de un pedido sin conexión | `api.*` / `rpc.*` con `idempotencyKey`: usted guarda la clave y repite la llamada con ella                   |
+| Pruebas de la deduplicación del servidor                                                                                                                      | `api.*` / `rpc.*` con `idempotencyKey`, sin escribir la cabecera a mano                                      |
 
 #### `load` o composables
 
-| Necesidad | Use |
-| --- | --- |
-| Datos de la página que determinan `head`, una redirección, la sesión o el estado HTTP | Código de nivel superior de `<script server>` (o `load`) |
-| Datos lentos y secundarios en una ruta `"stream"` | Un export, o un campo de `load`, con `defer` |
-| Datos que pertenecen a un componente reutilizable o a un layout | `await useApi` / `await useRpcQuery` |
-| Datos que dependen de señales del componente y se recargan al cambiar | `useApi` / `useRpcQuery`, con o sin `await` |
-| Datos que pueden llegar después del primer pintado, con un indicador de carga | `useApi` / `useRpcQuery` sin `await`, con [`<MeekoAwait>`](#meekoawait) para no saltar |
-| Escrituras | `useRpcMutation` / `useApiMutation`, o `api.*`/`rpc.*` en un handler |
-| Escrituras que no deben aplicarse dos veces si se pierde la respuesta (cobros, pasos de cocina) | `useRpcMutation` / `useApiMutation` con `retrySafe` |
-| Estado del navegador que debe sobrevivir a una recarga (un ticket abierto, la caja elegida) | [`useStorage`](#estado-persistente-usestorage) |
-| Formularios que envían datos, con validación y errores por campo | `useForm` con `api.*`/`rpc.*` en su `submit` |
+| Necesidad                                                                                       | Use                                                                                    |
+| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Datos de la página que determinan `head`, una redirección, la sesión o el estado HTTP           | Código de nivel superior de `<script server>` (o `load`)                               |
+| Datos lentos y secundarios en una ruta `"stream"`                                               | Un export, o un campo de `load`, con `defer`                                           |
+| Datos que pertenecen a un componente reutilizable o a un layout                                 | `await useApi` / `await useRpcQuery`                                                   |
+| Datos que dependen de señales del componente y se recargan al cambiar                           | `useApi` / `useRpcQuery`, con o sin `await`                                            |
+| Datos que pueden llegar después del primer pintado, con un indicador de carga                   | `useApi` / `useRpcQuery` sin `await`, con [`<MeekoAwait>`](#meekoawait) para no saltar |
+| Escrituras                                                                                      | `useRpcMutation` / `useApiMutation`, o `api.*`/`rpc.*` en un handler                   |
+| Escrituras que no deben aplicarse dos veces si se pierde la respuesta (cobros, pasos de cocina) | `useRpcMutation` / `useApiMutation` con `retrySafe`                                    |
+| Estado del navegador que debe sobrevivir a una recarga (un ticket abierto, la caja elegida)     | [`useStorage`](#estado-persistente-usestorage)                                         |
+| Formularios que envían datos, con validación y errores por campo                                | `useForm` con `api.*`/`rpc.*` en su `submit`                                           |
 
 Las reglas de nivel superior de estos composables (`MEEK054`, `MEEK055`) se describen en [api.md](api.md#composables-de-nivel-superior-y-await). Un host propio puede crearlos con `createUseApi(manifest, options)`, `createUseRpcQuery(manifest, options)`, `createUseRpcMutation(manifest, options)` y, desde `1.2`, `createUseApiMutation(manifest, options)` de `@meekojs/meeko/framework`, que es lo que hacen los clientes generados; los tipos `DataResource`, `LoadedResource`, `RpcMutation`, `UseApi`, `UseRpcQuery`, `UseRpcMutation`, `ApiQueryContract`, `ApiQueryOptions` y `Reactive`, desde `1.2` `ApiMutation`, `ApiMutationInput`, `ApiMutationContract`, `UseApiMutation`, `MutationOptions`, `RetrySafeOptions`, `RetrySafeMutation` y `UncertainMutation`, y desde `1.5` `DataResourceOptions`, describen su forma.
 
@@ -2393,9 +2820,11 @@ Desde `1.2`, `useStorage(clave, inicial, opciones?)` devuelve una señal editabl
 
 ```html
 <script lang="ts">
-const lines = useStorage("pos:ticket", [] as TicketLine[]);
-const registerId = useStorage("pos:register", "");
-const add = (line: TicketLine): void => { lines.value = [...lines.value, line]; };
+	const lines = useStorage('pos:ticket', [] as TicketLine[])
+	const registerId = useStorage('pos:register', '')
+	const add = (line: TicketLine): void => {
+		lines.value = [...lines.value, line]
+	}
 </script>
 <template><p>{lines.value.length} productos en el ticket</p></template>
 ```
@@ -2405,19 +2834,19 @@ const add = (line: TicketLine): void => { lines.value = [...lines.value, line]; 
 - **Lecturas inválidas.** Un valor que no es JSON o que no cumple `schema` se ignora y la señal vale `inicial`. `schema` es un Standard Schema síncrono (Valibot, Zod…); con él, el tipo de la señal sale del schema:
 
   ```ts
-  import * as v from "valibot";
-  const theme = useStorage("theme", "light", { schema: v.picklist(["light", "dark"]) });
+  import * as v from 'valibot'
+  const theme = useStorage('theme', 'light', { schema: v.picklist(['light', 'dark']) })
   ```
 
 - **Almacenamiento bloqueado.** En modo privado, sin permiso o con la cuota llena, nunca lanza: la señal sigue funcionando en memoria. Sólo un fallo inesperado, como un valor que JSON no puede representar (`BigInt`, ciclos) o un `schema` que lanza o es asíncrono, llega al `provideErrorHandler` más cercano o al `onError` de la aplicación.
 - **Otras pestañas.** Mientras algún componente usa la clave, el evento `storage` de otra pestaña actualiza la señal (con la misma validación); un `localStorage.clear()` la devuelve a `inicial`. El listener se libera con el último componente que la usa.
 - **Una señal por clave.** Dos componentes que usan la misma clave y el mismo almacenamiento comparten una sola señal; el primero que la crea fija `inicial` y `schema`. Cuando ya ningún componente la usa, el siguiente vuelve a leer el almacenamiento.
 
-| Necesidad | Use |
-| --- | --- |
-| Estado compartido de la aplicación, igual en SSR y en el navegador | `useState` |
-| Estado del navegador que sobrevive a una recarga o se comparte entre pestañas | `useStorage` |
-| Datos que pertenecen al servidor | `useApi` / `useRpcQuery` |
+| Necesidad                                                                     | Use                      |
+| ----------------------------------------------------------------------------- | ------------------------ |
+| Estado compartido de la aplicación, igual en SSR y en el navegador            | `useState`               |
+| Estado del navegador que sobrevive a una recarga o se comparte entre pestañas | `useStorage`             |
+| Datos que pertenecen al servidor                                              | `useApi` / `useRpcQuery` |
 
 No guarde secretos ni tokens: el almacenamiento es legible por cualquier script de la página. Incluya en la clave lo que distinga a usuarios o cuentas que comparten navegador (`` `pos:ticket:${restaurant.slug}` ``).
 
@@ -2427,101 +2856,134 @@ Desde `1.2`, `useForm` reúne lo que repite cada formulario: una señal por camp
 
 ```ts
 // shared/schemas/menu.ts
-import * as v from "valibot";
+import * as v from 'valibot'
 
 export const categoryInput = v.object({
-  name: v.pipe(v.string(), v.trim(), v.minLength(1, "Escribe un nombre."), v.maxLength(60, "Usa como mucho 60 caracteres.")),
-  description: v.pipe(v.string(), v.trim(), v.maxLength(200, "Usa como mucho 200 caracteres.")),
-});
-export const categorySchema = v.object({ id: v.string(), name: v.string(), description: v.string() });
+	name: v.pipe(v.string(), v.trim(), v.minLength(1, 'Escribe un nombre.'), v.maxLength(60, 'Usa como mucho 60 caracteres.')),
+	description: v.pipe(v.string(), v.trim(), v.maxLength(200, 'Usa como mucho 200 caracteres.')),
+})
+export const categorySchema = v.object({ id: v.string(), name: v.string(), description: v.string() })
 ```
 
 ```ts
 // server/api/menu/categories/index.post.ts
-import { ApiError, defineApiRoute } from "@meekojs/meeko/server";
-import { categoryInput, categorySchema } from "../../../../shared/schemas/menu.js";
-import { createCategory } from "../../../utils/menu.js";
+import { ApiError, defineApiRoute } from '@meekojs/meeko/server'
+import { categoryInput, categorySchema } from '../../../../shared/schemas/menu.js'
+import { createCategory } from '../../../utils/menu.js'
 
 export default defineApiRoute({
-  body: categoryInput,
-  response: categorySchema,
-  status: 201,
-  handler: async ({ body }) => {
-    const category = await createCategory(body);
-    if (!category) throw new ApiError("CATEGORY_EXISTS", 409);
-    return category;
-  },
-});
+	body: categoryInput,
+	response: categorySchema,
+	status: 201,
+	handler: async ({ body }) => {
+		const category = await createCategory(body)
+		if (!category) throw new ApiError('CATEGORY_EXISTS', 409)
+		return category
+	},
+})
 ```
 
 ```html
 <!-- app/components/TextField.meeko -->
 <script lang="ts">
-const props = defineProps<{ label: string; error?: string | undefined }>();
-const value = defineModel<string>("value");
+	const props = defineProps<{ label: string; error?: string | undefined }>()
+	const value = defineModel<string>('value')
 </script>
 <template>
-    <label>{props.label} <input model="value" bind:aria-invalid="props.error ? 'true' : null"></label>
-    <p class="field-error" if:when="props.error">{props.error}</p>
+	<label>
+		{props.label}
+		<input
+			model="value"
+			bind:aria-invalid="props.error ? 'true' : null"
+		/>
+	</label>
+	<p
+		class="field-error"
+		if:when="props.error"
+	>
+		{props.error}
+	</p>
 </template>
 ```
 
 ```html
 <!-- app/pages/menu/categories/new.meeko -->
 <script lang="ts">
-import { ClientError } from "@meekojs/meeko/framework";
+	import { ClientError } from '@meekojs/meeko/framework'
 
-const form = useForm({
-    schema: categoryInput,
-    initial: { name: "", description: "" },
-    submit: (values) => api.menu.categories.post({ body: values }),
-    errorMessage: (failure) => failure instanceof ClientError && failure.code === "CATEGORY_EXISTS"
-        ? "Ya existe una categoría con ese nombre."
-        : "No se pudo guardar. Revisa la conexión e inténtalo de nuevo.",
-});
+	const form = useForm({
+		schema: categoryInput,
+		initial: { name: '', description: '' },
+		submit: (values) => api.menu.categories.post({ body: values }),
+		errorMessage: (failure) => (failure instanceof ClientError && failure.code === 'CATEGORY_EXISTS' ? 'Ya existe una categoría con ese nombre.' : 'No se pudo guardar. Revisa la conexión e inténtalo de nuevo.'),
+	})
 </script>
 <template>
-    <form on:submit="form.submit" novalidate>
-        <p class="alert" role="alert" if:when="form.error.value">{form.error.value}</p>
-        <label>Nombre <input model="form.fields.name" bind:aria-invalid="form.errors.value.name ? 'true' : null"></label>
-        <p class="field-error" if:when="form.errors.value.name">{form.errors.value.name}</p>
-        <TextField label="Descripción" model:value="form.fields.description" bind:error="form.errors.value.description" />
-        <button bind:disabled="form.pending.value">{form.pending.value ? "Guardando…" : "Guardar"}</button>
-        <p if:when="form.submitted.value">Categoría guardada.</p>
-    </form>
+	<form
+		on:submit="form.submit"
+		novalidate
+	>
+		<p
+			class="alert"
+			role="alert"
+			if:when="form.error.value"
+		>
+			{form.error.value}
+		</p>
+		<label>
+			Nombre
+			<input
+				model="form.fields.name"
+				bind:aria-invalid="form.errors.value.name ? 'true' : null"
+			/>
+		</label>
+		<p
+			class="field-error"
+			if:when="form.errors.value.name"
+		>
+			{form.errors.value.name}
+		</p>
+		<TextField
+			label="Descripción"
+			model:value="form.fields.description"
+			bind:error="form.errors.value.description"
+		/>
+		<button bind:disabled="form.pending.value">{form.pending.value ? "Guardando…" : "Guardar"}</button>
+		<p if:when="form.submitted.value">Categoría guardada.</p>
+	</form>
 </template>
 ```
 
 `useForm(options)` recibe:
 
-| Opción | Uso |
-| --- | --- |
-| `schema` | Opcional. Standard Schema que valida los campos al enviar. |
-| `initial` | Valor inicial de cada campo. Con `schema`, uno por cada clave de su entrada, también las opcionales (`undefined` si no hay valor). |
-| `submit(values)` | Envía los datos: recibe la salida del schema (o los valores de los campos, sin schema) y devuelve el resultado, o rechaza. |
-| `errorMessage(failure)` | Opcional. Texto de `error` para un fallo sin `issues`; por defecto, `failure.message`, que en un `ClientError` es su `code`. |
-| `onSuccess(result, form)` | Opcional, desde `1.5`. Se ejecuta tras un envío correcto, con `submitted` ya en `true`: por ejemplo, `(saved, form) => form.commit({ name: saved.name })`. |
-| `focusInvalid` | Opcional, desde `1.5`. Con `true`, tras un envío con errores en los campos mueve el foco al primer control inválido (véase [Foco en el primer error](#foco-en-el-primer-error)). |
-| `action` | Opcional, desde `1.7`. Ruta del endpoint con `form` al que se envía el `<form method="post">` sin JavaScript, como `"/api/feedback"`: al volver de ese envío, el SSR pinta su resultado (véase [Formularios sin JavaScript](#formularios-sin-javascript-form)). |
+| Opción                    | Uso                                                                                                                                                                                                                                                             |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schema`                  | Opcional. Standard Schema que valida los campos al enviar.                                                                                                                                                                                                      |
+| `initial`                 | Valor inicial de cada campo. Con `schema`, uno por cada clave de su entrada, también las opcionales (`undefined` si no hay valor).                                                                                                                              |
+| `submit(values)`          | Envía los datos: recibe la salida del schema (o los valores de los campos, sin schema) y devuelve el resultado, o rechaza.                                                                                                                                      |
+| `errorMessage(failure)`   | Opcional. Texto de `error` para un fallo sin `issues`; por defecto, `failure.message`, que en un `ClientError` es su `code`.                                                                                                                                    |
+| `onSuccess(result, form)` | Opcional, desde `1.5`. Se ejecuta tras un envío correcto, con `submitted` ya en `true`: por ejemplo, `(saved, form) => form.commit({ name: saved.name })`.                                                                                                      |
+| `focusInvalid`            | Opcional, desde `1.5`. Con `true`, tras un envío con errores en los campos mueve el foco al primer control inválido (véase [Foco en el primer error](#foco-en-el-primer-error)).                                                                                |
+| `action`                  | Opcional, desde `1.7`. Ruta del endpoint con `form` al que se envía el `<form method="post">` sin JavaScript, como `"/api/feedback"`: al volver de ese envío, el SSR pinta su resultado (véase [Formularios sin JavaScript](#formularios-sin-javascript-form)). |
 
 y devuelve un `Form`:
 
-| Propiedad | Valor |
-| --- | --- |
-| `fields` | Una `Signal` escribible por campo, para `model` en un `<input>`, `<textarea>` o `<select>` y `model:nombre` en un componente. |
-| `errors` | Señal con el primer mensaje de cada ruta con error (`errors.value.name`, `errors.value["items.0.name"]`); un campo sin error no tiene clave. |
-| `error` | Señal con el mensaje del formulario completo, o `null`. |
-| `failure` | Señal con el error original del último envío fallido (también el `ClientError` de un `400`), o `null`. |
-| `pending` | `true` mientras se valida de forma asíncrona o se ejecuta `submit`. |
-| `submitted` | `true` cuando el último envío terminó bien. |
-| `dirty` | `true` si algún campo difiere de los valores iniciales (los arrays y objetos se comparan por contenido). |
-| `submit(event?)` | Envía el formulario; resuelve con lo que devuelve `submit`, o con `undefined`. Nunca rechaza. |
-| `trySubmit(event?)` | Desde `1.5`. Envía igual que `submit`, pero resuelve con un `FormSubmission` que dice cómo terminó. Nunca rechaza. |
-| `reset(values?)` | Vuelve a `initial`, o a `initial` combinado con `values`; también acepta el evento `reset` de un `<form>`. |
-| `load(values)` | Llena los campos con un registro para editar. Las claves omitidas conservan su valor actual; lo cargado es la referencia de `dirty`. |
-| `commit(values?)` | Desde `1.5`. Escribe `values` y toma los valores de los campos como nueva referencia de `dirty`, sin borrar `submitted`. |
-| `field(name)` | Desde `1.5`. Las piezas de un campo para un componente propio: su señal, su mensaje e IDs estables (véase [Componentes de campo](#componentes-de-campo-formfield)). |
-| `csrfToken` | Desde `1.7`. El token CSRF de la sesión para el campo oculto `_csrf` de un formulario nativo, o `undefined` sin sesión. No es una señal. |
+| Propiedad           | Valor                                                                                                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fields`            | Una `Signal` escribible por campo, para `model` en un `<input>`, `<textarea>` o `<select>` y `model:nombre` en un componente.                                       |
+| `errors`            | Señal con el primer mensaje de cada ruta con error (`errors.value.name`, `errors.value["items.0.name"]`); un campo sin error no tiene clave.                        |
+| `error`             | Señal con el mensaje del formulario completo, o `null`.                                                                                                             |
+| `failure`           | Señal con el error original del último envío fallido (también el `ClientError` de un `400`), o `null`.                                                              |
+| `pending`           | `true` mientras se valida de forma asíncrona o se ejecuta `submit`.                                                                                                 |
+| `submitted`         | `true` cuando el último envío terminó bien.                                                                                                                         |
+| `dirty`             | `true` si algún campo difiere de los valores iniciales (los arrays y objetos se comparan por contenido).                                                            |
+| `submit(event?)`    | Envía el formulario; resuelve con lo que devuelve `submit`, o con `undefined`. Nunca rechaza.                                                                       |
+| `trySubmit(event?)` | Desde `1.5`. Envía igual que `submit`, pero resuelve con un `FormSubmission` que dice cómo terminó. Nunca rechaza.                                                  |
+| `reset(values?)`    | Vuelve a `initial`, o a `initial` combinado con `values`; también acepta el evento `reset` de un `<form>`.                                                          |
+| `load(values)`      | Llena los campos con un registro para editar. Las claves omitidas conservan su valor actual; lo cargado es la referencia de `dirty`.                                |
+| `commit(values?)`   | Desde `1.5`. Escribe `values` y toma los valores de los campos como nueva referencia de `dirty`, sin borrar `submitted`.                                            |
+| `field(name)`       | Desde `1.5`. Las piezas de un campo para un componente propio: su señal, su mensaje e IDs estables (véase [Componentes de campo](#componentes-de-campo-formfield)). |
+| `csrfToken`         | Desde `1.7`. El token CSRF de la sesión para el campo oculto `_csrf` de un formulario nativo, o `undefined` sin sesión. No es una señal.                            |
 
 Todas las señales salvo `fields` son de sólo lectura (`csrfToken` es un texto, no una señal).
 
@@ -2529,25 +2991,25 @@ Todas las señales salvo `fields` son de sólo lectura (`csrfToken` es un texto,
 
 ```ts
 async function save(event: SubmitEvent): Promise<void> {
-    const category = await form.submit(event);
-    if (category) form.reset();
+	const category = await form.submit(event)
+	if (category) form.reset()
 }
 ```
 
 **Resultado del envío.** `submit` resuelve `undefined` tanto si los datos no son válidos como si falla la red o si `submit` devuelve `undefined`. Desde `1.5`, `form.trySubmit(event)` envía igual, pero resuelve con un `FormSubmission<Result>` discriminado por `ok` y `reason`:
 
-| Resultado | Cuándo |
-| --- | --- |
-| `{ ok: true, result }` | `submit` terminó bien y devolvió `result`. |
+| Resultado                                                  | Cuándo                                                                                                                                                                                                    |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{ ok: true, result }`                                     | `submit` terminó bien y devolvió `result`.                                                                                                                                                                |
 | `{ ok: false, reason: "invalid", errors, error, failure }` | Los datos no superaron el schema del navegador (`failure` es `null`) o el servidor respondió con `issues` (`failure` es el `ClientError`). `errors` y `error` son los mensajes que muestra el formulario. |
-| `{ ok: false, reason: "error", error, failure }` | El envío falló sin `issues`, como un `409` o un fallo de red. `error` es el texto de `errorMessage`, o `null` si un `reset` lo descartó. |
-| `{ ok: false, reason: "skipped" }` | No se envió nada: ya había un envío en curso, el script se ejecuta sólo para producir HTML (SSR) o un `reset` descartó los valores mientras el schema validaba. |
+| `{ ok: false, reason: "error", error, failure }`           | El envío falló sin `issues`, como un `409` o un fallo de red. `error` es el texto de `errorMessage`, o `null` si un `reset` lo descartó.                                                                  |
+| `{ ok: false, reason: "skipped" }`                         | No se envió nada: ya había un envío en curso, el script se ejecuta sólo para producir HTML (SSR) o un `reset` descartó los valores mientras el schema validaba.                                           |
 
 ```ts
 async function send(event: SubmitEvent): Promise<void> {
-    const outcome = await form.trySubmit(event);
-    if (outcome.ok) created.value = outcome.result.username;
-    else if (outcome.reason === "error") console.warn(outcome.failure);
+	const outcome = await form.trySubmit(event)
+	if (outcome.ok) created.value = outcome.result.username
+	else if (outcome.reason === 'error') console.warn(outcome.failure)
 }
 ```
 
@@ -2558,7 +3020,7 @@ async function send(event: SubmitEvent): Promise<void> {
 Con `focusInvalid: true`, un envío que termina con errores en los campos, del schema o de los `issues` del servidor, mueve el foco al primer control inválido una vez que los mensajes se han pintado (en el siguiente `requestAnimationFrame`). Busca, en el orden del documento dentro del `<form>` del evento (su `currentTarget`, o el formulario del botón que lo envió), un control cuyo `name` o cuyo `id` de `form.field` sea el de un campo con error, o que tenga `aria-invalid="true"`. Sin evento, busca en todo el documento. Un fallo sin `issues`, como un `409` sin ellos o un fallo de red, no mueve el foco.
 
 ```ts
-const form = useForm({ schema: signupInput, initial: { email: "", password: "" }, submit: (values) => api.signup.post({ body: values }), focusInvalid: true });
+const form = useForm({ schema: signupInput, initial: { email: '', password: '' }, submit: (values) => api.signup.post({ body: values }), focusInvalid: true })
 ```
 
 **Validación.** El schema se ejecuta al enviar, no mientras se escribe. Cada issue va a `errors` con su ruta unida con `.`, como los `issues` del servidor: `"name"`, o `"items.0.name"` en un campo anidado. Si una ruta tiene varios, se conserva el primero. Un issue con ruta `""` (de una regla sobre el objeto completo) o de una clave que el formulario no tiene va a `error`. Tras un error, el campo se vuelve a validar cada vez que cambia: su mensaje se actualiza o desaparece en cuanto es válido, sin esperar al siguiente envío. Un campo sin error no se valida hasta el envío. Si el schema es asíncrono, `pending` vale `true` mientras valida.
@@ -2570,16 +3032,22 @@ const form = useForm({ schema: signupInput, initial: { email: "", password: "" }
 ```ts
 // app/pages/ingresar.meeko: sin schema, valida sólo el servidor
 const form = useForm({
-    initial: { email: "", password: "" },
-    submit: (values) => api.session.post({ body: values }),
-    errorMessage: (failure) => failure instanceof ClientError && failure.code === "INVALID_CREDENTIALS"
-        ? "Los datos no coinciden con ninguna cuenta."
-        : "No se pudo conectar con el servidor.",
-});
+	initial: { email: '', password: '' },
+	submit: (values) => api.session.post({ body: values }),
+	errorMessage: (failure) => (failure instanceof ClientError && failure.code === 'INVALID_CREDENTIALS' ? 'Los datos no coinciden con ninguna cuenta.' : 'No se pudo conectar con el servidor.'),
+})
 ```
 
 ```json
-{ "code": "INVALID_BODY", "status": 400, "requestId": "…", "issues": [{ "path": "email", "message": "Escribe un correo válido." }, { "path": "password", "message": "Escribe tu contraseña." }] }
+{
+	"code": "INVALID_BODY",
+	"status": 400,
+	"requestId": "…",
+	"issues": [
+		{ "path": "email", "message": "Escribe un correo válido." },
+		{ "path": "password", "message": "Escribe tu contraseña." }
+	]
+}
 ```
 
 Con esa respuesta, `form.errors.value` vale `{ email: "Escribe un correo válido.", password: "Escribe tu contraseña." }`, `form.error.value` vale `null` y `form.failure.value` es el `ClientError`. Un `401` `INVALID_CREDENTIALS` deja `errors` vacío y `error` con el texto de `errorMessage`. Para marcar un campo desde el propio `submit` (por ejemplo, tras comprobar algo en el navegador), lance un `ClientError` con `issues`: `throw new ClientError("EMAIL_TAKEN", 409, undefined, [{ path: "email", message: "Ese correo ya tiene cuenta." }])`.
@@ -2589,14 +3057,14 @@ Desde `1.5`, el servidor también puede atribuir a un campo un error que no es d
 ```ts
 // server/api/signup.post.ts
 export default defineApiRoute({
-    body: signupInput,
-    response: signupResult,
-    status: 201,
-    handler: async ({ body }) => {
-        if (await emailTaken(body.email)) throw new ApiError("EMAIL_TAKEN", 409, { issues: [{ path: "email", message: "Ese correo ya tiene una cuenta." }] });
-        return createUser(body);
-    },
-});
+	body: signupInput,
+	response: signupResult,
+	status: 201,
+	handler: async ({ body }) => {
+		if (await emailTaken(body.email)) throw new ApiError('EMAIL_TAKEN', 409, { issues: [{ path: 'email', message: 'Ese correo ya tiene una cuenta.' }] })
+		return createUser(body)
+	},
+})
 ```
 
 `ClientError` e `isClientError` se autoimportan desde `1.5` en los componentes y en los módulos de `app/` (no en `server/`, donde se lanza `ApiError`), como `useForm`: `errorMessage: (failure) => isClientError(failure, "INVALID_CREDENTIALS") ? "…" : "…"` no necesita import.
@@ -2609,11 +3077,11 @@ export default defineApiRoute({
 
 ```ts
 const profile = useForm({
-    schema: profileInput,
-    initial: { name: data.name, bio: data.bio },
-    submit: (values) => api.profile.put({ body: values }),
-    onSuccess: (saved, form) => form.commit({ name: saved.name, bio: saved.bio }),
-});
+	schema: profileInput,
+	initial: { name: data.name, bio: data.bio },
+	submit: (values) => api.profile.put({ body: values }),
+	onSuccess: (saved, form) => form.commit({ name: saved.name, bio: saved.bio }),
+})
 ```
 
 ```html
@@ -2626,37 +3094,64 @@ const profile = useForm({
 
 Desde `1.5`, `form.field(name)` devuelve lo que un componente de campo necesita, sin recibir el formulario entero: un `FormField<Value>` tipado por la clave del campo (`form.field("nmae")` es un error de tipos). Devuelve siempre el mismo objeto para el mismo campo, así que se puede pasar como prop en la plantilla.
 
-| Propiedad | Valor |
-| --- | --- |
-| `value` | La misma `Signal` que `form.fields[name]`, para `model`. |
-| `name` | El nombre del campo, para el atributo `name` (y para `focusInvalid`). |
+| Propiedad                 | Valor                                                                                                                                                                                                     |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `value`                   | La misma `Signal` que `form.fields[name]`, para `model`.                                                                                                                                                  |
+| `name`                    | El nombre del campo, para el atributo `name` (y para `focusInvalid`).                                                                                                                                     |
 | `id`, `errorId`, `hintId` | IDs del control, de su mensaje (`${id}-error`) y de un texto de ayuda (`${id}-hint`). Salen de [`useId`](api.md#ids-estables-useid): coinciden entre SSR e hidratación y no se repiten entre formularios. |
-| `error` | Señal con el primer mensaje del campo (o de una ruta anidada, como `items.0.name`), o `undefined`. |
-| `invalid` | Señal: `true` si el campo tiene algún error. |
-| `describedBy` | Señal: `errorId` mientras hay error, o `undefined`; el valor de `aria-describedby`. |
+| `error`                   | Señal con el primer mensaje del campo (o de una ruta anidada, como `items.0.name`), o `undefined`.                                                                                                        |
+| `invalid`                 | Señal: `true` si el campo tiene algún error.                                                                                                                                                              |
+| `describedBy`             | Señal: `errorId` mientras hay error, o `undefined`; el valor de `aria-describedby`.                                                                                                                       |
 
 ```html
 <!-- app/components/AppField.meeko -->
 <script lang="ts">
-import type { FormField } from "@meekojs/meeko/framework";
-const props = defineProps<{ field: FormField<string>; label: string; hint?: string }>();
-const describedBy = computed(() => [props.hint ? props.field.hintId : "", props.field.describedBy.value ?? ""].filter(Boolean).join(" ") || null);
+	import type { FormField } from '@meekojs/meeko/framework'
+	const props = defineProps<{ field: FormField<string>; label: string; hint?: string }>()
+	const describedBy = computed(() => [props.hint ? props.field.hintId : '', props.field.describedBy.value ?? ''].filter(Boolean).join(' ') || null)
 </script>
 <template>
-    <div class="field">
-        <label bind:for="props.field.id">{props.label}</label>
-        <input bind:id="props.field.id" bind:name="props.field.name" model="props.field.value"
-            bind:aria-invalid="props.field.invalid.value ? 'true' : null" bind:aria-describedby="describedBy.value">
-        <p if:when="props.hint" class="field-hint" bind:id="props.field.hintId">{props.hint}</p>
-        <p if:when="props.field.error.value" class="field-error" bind:id="props.field.errorId">{props.field.error.value}</p>
-    </div>
+	<div class="field">
+		<label bind:for="props.field.id">{props.label}</label>
+		<input
+			bind:id="props.field.id"
+			bind:name="props.field.name"
+			model="props.field.value"
+			bind:aria-invalid="props.field.invalid.value ? 'true' : null"
+			bind:aria-describedby="describedBy.value"
+		/>
+		<p
+			if:when="props.hint"
+			class="field-hint"
+			bind:id="props.field.hintId"
+		>
+			{props.hint}
+		</p>
+		<p
+			if:when="props.field.error.value"
+			class="field-error"
+			bind:id="props.field.errorId"
+		>
+			{props.field.error.value}
+		</p>
+	</div>
 </template>
 ```
 
 ```html
-<form on:submit="form.submit" novalidate>
-    <AppField bind:field="form.field('email')" label="Correo" />
-    <AppField bind:field="form.field('password')" label="Contraseña" hint="Al menos 10 caracteres." />
+<form
+	on:submit="form.submit"
+	novalidate
+>
+	<AppField
+		bind:field="form.field('email')"
+		label="Correo"
+	/>
+	<AppField
+		bind:field="form.field('password')"
+		label="Contraseña"
+		hint="Al menos 10 caracteres."
+	/>
 </form>
 ```
 
@@ -2665,34 +3160,61 @@ const describedBy = computed(() => [props.hint ? props.field.hintId : "", props.
 ```html
 <!-- app/components/AppTextField.meeko -->
 <script lang="ts">
-import type { FormField } from "@meekojs/meeko/framework";
-const props = defineProps<{ field?: FormField<string>; label: string; hint?: string; error?: string }>();
-// Sin field, el valor es el modelo: la señal del padre (model="señal") o una propia.
-const model = defineModel<string>({ default: "" });
-const ownId = useId();
-const id = computed(() => props.field?.id ?? ownId);
-const hintId = computed(() => `${id.value}-hint`);
-const errorId = computed(() => `${id.value}-error`);
-const value = computed(() => props.field?.value ?? model);
-const error = computed(() => props.field ? props.field.error.value : props.error);
-const describedBy = computed(() => [props.hint ? hintId.value : "", error.value ? errorId.value : ""].filter(Boolean).join(" ") || null);
+	import type { FormField } from '@meekojs/meeko/framework'
+	const props = defineProps<{ field?: FormField<string>; label: string; hint?: string; error?: string }>()
+	// Sin field, el valor es el modelo: la señal del padre (model="señal") o una propia.
+	const model = defineModel<string>({ default: '' })
+	const ownId = useId()
+	const id = computed(() => props.field?.id ?? ownId)
+	const hintId = computed(() => `${id.value}-hint`)
+	const errorId = computed(() => `${id.value}-error`)
+	const value = computed(() => props.field?.value ?? model)
+	const error = computed(() => (props.field ? props.field.error.value : props.error))
+	const describedBy = computed(() => [props.hint ? hintId.value : '', error.value ? errorId.value : ''].filter(Boolean).join(' ') || null)
 </script>
 <template>
-    <div class="field">
-        <label bind:for="id.value">{props.label}</label>
-        <input bind:id="id.value" bind:name="props.field?.name" model="value.value"
-            bind:aria-invalid="error.value ? 'true' : null" bind:aria-describedby="describedBy.value">
-        <p if:when="props.hint" class="field-hint" bind:id="hintId.value">{props.hint}</p>
-        <p if:when="error.value" class="field-error" bind:id="errorId.value">{error.value}</p>
-    </div>
+	<div class="field">
+		<label bind:for="id.value">{props.label}</label>
+		<input
+			bind:id="id.value"
+			bind:name="props.field?.name"
+			model="value.value"
+			bind:aria-invalid="error.value ? 'true' : null"
+			bind:aria-describedby="describedBy.value"
+		/>
+		<p
+			if:when="props.hint"
+			class="field-hint"
+			bind:id="hintId.value"
+		>
+			{props.hint}
+		</p>
+		<p
+			if:when="error.value"
+			class="field-error"
+			bind:id="errorId.value"
+		>
+			{error.value}
+		</p>
+	</div>
 </template>
 ```
 
 ```html
-<form on:submit="form.submit" novalidate>
-    <AppTextField bind:field="form.field('email')" label="Correo" />
+<form
+	on:submit="form.submit"
+	novalidate
+>
+	<AppTextField
+		bind:field="form.field('email')"
+		label="Correo"
+	/>
 </form>
-<AppTextField model="query" label="Buscar" hint="Por nombre o correo." />
+<AppTextField
+	model="query"
+	label="Buscar"
+	hint="Por nombre o correo."
+/>
 <AppTextField label="Notas" />
 ```
 
@@ -2710,34 +3232,43 @@ Llame a `useForm` en el nivel superior del `<script>`, como cualquier estado del
 
 ```ts
 // server/socket/chat.ts
-import { defineSocketChannel } from "@meekojs/meeko/server";
-import { chatInput, chatMessage } from "../../shared/schemas/chat.js";
+import { defineSocketChannel } from '@meekojs/meeko/server'
+import { chatInput, chatMessage } from '../../shared/schemas/chat.js'
 
 export default defineSocketChannel({
-  clientToServer: { message: chatInput },
-  serverToClient: { message: chatMessage },
-  auth: "required",
-  authorize: ({ context, roomId }) => !!context.session.current && roomId === "general",
-  handlers: { message: async ({ payload, emit }) => emit("message", payload) },
-});
+	clientToServer: { message: chatInput },
+	serverToClient: { message: chatMessage },
+	auth: 'required',
+	authorize: ({ context, roomId }) => !!context.session.current && roomId === 'general',
+	handlers: { message: async ({ payload, emit }) => emit('message', payload) },
+})
 ```
 
 ```ts
 // Dentro de <script lang="ts"> de app/pages/chat/index.meeko
-const chat = typeof window === "undefined" ? undefined : useSocket("chat", { roomId: "general" });
-const unsubscribe = chat?.on("message", (message) => console.log(message.text));
-const send = async () => chat?.emit("message", { text: "Hola", roomId: "general" });
+const chat = typeof window === 'undefined' ? undefined : useSocket('chat', { roomId: 'general' })
+const unsubscribe = chat?.on('message', (message) => console.log(message.text))
+const send = async () => chat?.emit('message', { text: 'Hola', roomId: 'general' })
 ```
 
 Hasta `1.6`, `useSocket` sin `await` sólo podía llamarse en el navegador (en SSR lanzaba un error), de ahí la comprobación de `window`; desde `1.7`, en SSR devuelve un cliente inerte que se queda en `"connecting"` (su `on` no registra nada y su `emit` rechaza), y la comprobación ya no hace falta. Desde `1.1`, `await useSocket(...)` en el nivel superior va más allá: el setup se divide en ese punto y el resto se ejecuta sólo en el navegador, tras montar el componente y con el socket ya abierto (estado `"open"`). La plantilla sólo puede usar los nombres declarados antes del `await` (`MEEK057`), y si el socket no llega a abrirse, la continuación sigue esperando (véase [api.md](api.md#composables-de-nivel-superior-y-await)):
 
 ```html
 <script lang="ts">
-const messages = signal<string[]>([]);
-const chat = await useSocket("chat", { roomId: "general" });
-chat.on("message", (message) => { messages.value = [...messages.value, message.text]; });
+	const messages = signal<string[]>([])
+	const chat = await useSocket('chat', { roomId: 'general' })
+	chat.on('message', (message) => {
+		messages.value = [...messages.value, message.text]
+	})
 </script>
-<template><p each:of="messages.value" each:as="text">{text}</p></template>
+<template>
+	<p
+		each:of="messages.value"
+		each:as="text"
+	>
+		{text}
+	</p>
+</template>
 ```
 
 La firma y el contrato de `useSocket` sin `await` no cambian. `socket.chat.on(...)` y `socket.chat.emit(...)` ofrecen un registro tipado alternativo. El registro abre conexiones sólo al acceder al canal en navegador. Dentro de `mountClientApp`, cada aplicación conserva su propia conexión por canal y la cierra al desmontarse; los listeners registrados durante el setup se desuscriben al liberar su raíz. Fuera de una aplicación montada, el registro conserva su cliente compartido y el llamador debe liberar sus listeners. `useSocket` requiere una raíz de componente y libera su conexión al desmontar. Durante SSR no se abre ninguna conexión. En el navegador tampoco la abren el render que produce el HTML de un componente antes de montarlo (bajo un `if:` o al confirmar una navegación) ni las pasadas en seco: ahí `useSocket` y `socket.x` devuelven un cliente que se queda en `"connecting"`, cuyo `emit` rechaza, y la conexión la abre el montaje, una sola vez. El cliente usa WebSocket nativo, reconexión con retroceso configurable y entrega a lo sumo una vez: `emit` rechaza si está desconectado, sin cola ni reenvío. Los mensajes entrantes inválidos cierran el canal; un error del transporte se informa una vez por conexión activa y los errores de conexiones reemplazadas se ignoran. Un listener u observador de `state` que falle se informa sin impedir la ejecución de los demás listeners ni salir del callback del transporte. El cliente de bajo nivel acepta `onError(error)` para observar estos fallos; sin callback de aplicación o componente, los registra en la consola.
@@ -2759,11 +3290,11 @@ El autoimport `useSocket("canal", opciones)` cubre los canales de la propia apli
 - `createSocketClient` crea un cliente independiente, también fuera de un componente; el llamador lo cierra con `close()`.
 
 ```ts
-import { useSocketClient } from "@meekojs/meeko/framework";
+import { useSocketClient } from '@meekojs/meeko/framework'
 
 // Dentro de <script lang="ts"> de un componente
-const feed = await useSocketClient("wss://feed.example.com/_meeko/socket/prices", pricesContract);
-feed.on("price", (price) => console.log(price.symbol, price.value));
+const feed = await useSocketClient('wss://feed.example.com/_meeko/socket/prices', pricesContract)
+feed.on('price', (price) => console.log(price.symbol, price.value))
 ```
 
 Hasta `1.0` esta función se exportaba como `useSocket` desde `@meekojs/meeko/framework`, con el mismo nombre que el autoimport generado y otra firma. Ese export sigue disponible como alias obsoleto de `useSocketClient` (es la misma función) durante toda la serie 1.x y se retirará en `2.0`. El autoimport `useSocket("canal")` de los clientes generados no está obsoleto. En un proyecto sin clientes generados, el autoimport `useSocket` resuelve a `useSocketClient`.
@@ -2774,30 +3305,30 @@ Desde `1.2`, el autoimport `socket` del código de servidor (API, RPC, `<script 
 
 ```ts
 // server/socket/operations.ts
-import { defineSocketChannel } from "@meekojs/meeko/server";
-import { kitchenChanged, subscribe } from "../../shared/schemas/operations.js";
+import { defineSocketChannel } from '@meekojs/meeko/server'
+import { kitchenChanged, subscribe } from '../../shared/schemas/operations.js'
 
 export default defineSocketChannel({
-  clientToServer: { subscribe },
-  serverToClient: { kitchenChanged },
-});
+	clientToServer: { subscribe },
+	serverToClient: { kitchenChanged },
+})
 ```
 
 ```ts
 // server/api/orders/[id]/ready.post.ts
-import { defineApiRoute } from "@meekojs/meeko/server";
-import { orderParams, orderSchema } from "../../../../shared/schemas/order.js";
-import { markReady } from "../../../utils/orders.js";
+import { defineApiRoute } from '@meekojs/meeko/server'
+import { orderParams, orderSchema } from '../../../../shared/schemas/order.js'
+import { markReady } from '../../../utils/orders.js'
 
 export default defineApiRoute({
-  params: orderParams,
-  response: orderSchema,
-  handler: async ({ params }) => {
-    const order = await markReady(params.id);
-    await socket.operations.broadcast(order.storeId, "kitchenChanged", { orderId: order.id, status: "ready" });
-    return order;
-  },
-});
+	params: orderParams,
+	response: orderSchema,
+	handler: async ({ params }) => {
+		const order = await markReady(params.id)
+		await socket.operations.broadcast(order.storeId, 'kitchenChanged', { orderId: order.id, status: 'ready' })
+		return order
+	},
+})
 ```
 
 - **Mismas comprobaciones que `hub.broadcast`.** El hub valida con la definición del canal: un evento que no está en `serverToClient` rechaza con `UNKNOWN_SOCKET_EVENT` (404), un payload que no cumple su schema con `INVALID_SOCKET_PAYLOAD` (400) y un mensaje serializado mayor que `socket.maxMessageBytes` con `SOCKET_LIMIT_EXCEEDED` (413), siempre antes de publicar. Se resuelve cuando el broker acepta el mensaje; véase [Broadcast y varias instancias](#broadcast-y-varias-instancias). Dentro de un handler de API o RPC, un rechazo no capturado es la respuesta de error, con ese código y estado.
@@ -2822,20 +3353,23 @@ export default defineApiRoute({
 
 ```ts
 // server/runtime.ts
-import { createClient } from "redis";
-import { defineServerRuntime, RedisSessionStore, RedisSocketPubSub, SessionManager } from "@meekojs/meeko/server";
+import { createClient } from 'redis'
+import { defineServerRuntime, RedisSessionStore, RedisSocketPubSub, SessionManager } from '@meekojs/meeko/server'
 
 export default defineServerRuntime(async ({ env, production, prerendering }) => {
-  const redis = createClient({ url: env.MEEKO_REDIS_URL });
-  await redis.connect();
-  const subscriber = redis.duplicate(); // conexión dedicada en modo suscriptor
-  await subscriber.connect();
-  return {
-    sessions: new SessionManager({ store: new RedisSessionStore(redis, { prefix: "app:prod:session:", subscriber }), production: production && !prerendering }),
-    socket: { pubsub: new RedisSocketPubSub({ publisher: redis, subscriber, prefix: "app:prod:" }) },
-    close: async () => { await subscriber.quit(); await redis.quit(); },
-  };
-});
+	const redis = createClient({ url: env.MEEKO_REDIS_URL })
+	await redis.connect()
+	const subscriber = redis.duplicate() // conexión dedicada en modo suscriptor
+	await subscriber.connect()
+	return {
+		sessions: new SessionManager({ store: new RedisSessionStore(redis, { prefix: 'app:prod:session:', subscriber }), production: production && !prerendering }),
+		socket: { pubsub: new RedisSocketPubSub({ publisher: redis, subscriber, prefix: 'app:prod:' }) },
+		close: async () => {
+			await subscriber.quit()
+			await redis.quit()
+		},
+	}
+})
 ```
 
 - **Clientes.** `publisher` y `subscriber` siguen la interfaz de node-redis 4 o posterior (`publish`, `subscribe(channel, listener)`, `unsubscribe(channel, listener)`); el suscriptor necesita su propia conexión. La aplicación abre y cierra ambos clientes.
@@ -2851,23 +3385,23 @@ Una implementación propia de `SocketPubSub` debe cumplir el mismo contrato:
 
 ## Runtime de servidor
 
-`server/runtime.ts` exporta por defecto `defineServerRuntime(factory)`. Meeko llama a la fábrica una vez por proceso con `{ env, production, platform, prerendering }` y espera los recursos de la aplicación:
+`server/runtime.ts` exporta por defecto `defineServerRuntime(factory)`. Meeko llama a la fábrica una vez por proceso con `{ env, production, platform, prerendering, root }` y espera los recursos de la aplicación:
 
 ```ts
-import { defineServerRuntime, SessionManager } from "@meekojs/meeko/server";
-import { createDatabase } from "./utils/database.js";
+import { defineServerRuntime, SessionManager } from '@meekojs/meeko/server'
+import { createDatabase } from './utils/database.js'
 
 export default defineServerRuntime(async ({ env, production, prerendering }) => {
-  const db = await createDatabase(env.DATABASE_URL);
-  return {
-    sessions: new SessionManager({ store: db.sessionStore(), production: production && !prerendering }),
-    services: (request, { platform }) => ({ db, region: platform.env.REGION }),
-    socket: { allowedOrigins: [], maxMessageBytes: 64 * 1024 },
-    publicOrigin: env.MEEKO_PUBLIC_ORIGIN,
-    onError: (error, requestId) => console.error("request failed", requestId, error),
-    close: () => db.close(),
-  };
-});
+	const db = await createDatabase(env.DATABASE_URL)
+	return {
+		sessions: new SessionManager({ store: db.sessionStore(), production: production && !prerendering }),
+		services: (request, { platform }) => ({ db, region: platform.env.REGION }),
+		socket: { allowedOrigins: [], maxMessageBytes: 64 * 1024 },
+		publicOrigin: env.MEEKO_PUBLIC_ORIGIN,
+		onError: (error, requestId) => console.error('request failed', requestId, error),
+		close: () => db.close(),
+	}
+})
 ```
 
 - `sessions` es opcional desde `1.2`. Sin `server/runtime.ts`, o si no devuelve `sessions`, Meeko las crea: en memoria en desarrollo y en Redis con `MEEKO_REDIS_URL` en producción (véase [Sesiones sin configuración](#sesiones-sin-configuración)). Unas `sessions` explícitas siempre ganan.
@@ -2878,6 +3412,7 @@ export default defineServerRuntime(async ({ env, production, prerendering }) => 
 - `processErrors` (desde `1.3`) decide qué pasa con esos fallos del proceso; sin declararlo, un rechazo se informa y el servidor sigue atendiendo, y una excepción se informa y el servidor se cierra de forma ordenada con código 1 (véase [Fallos fuera de una petición](#fallos-fuera-de-una-petición)).
 - `socket.pubsub` elige el broker de broadcast; `socket.maxPendingDeliveries` y `socket.sessionRefreshMs` limitan la cola de cada peer y la frecuencia con que sus entregas releen la sesión. Véase [Broadcast y varias instancias](#broadcast-y-varias-instancias).
 - `close` se ejecuta después de cerrar las sesiones, al detener el servidor.
+- `root` (desde `1.8`) es la ruta absoluta de la raíz del proyecto, para leer sus archivos desde el servidor (contenido, plantillas, un repositorio de Git). No use `import.meta.url` para eso, porque el build mueve el código de servidor a `.meeko/output/…`, ni `process.cwd()`, que sólo es la raíz cuando la CLI lanza el proceso. En `meeko dev` es la raíz del proyecto; en las salidas de Node, Bun y Deno (también con `meeko start`, con `node .meeko/output/node/index.mjs` desde cualquier carpeta y durante el prerender) es la carpeta tres niveles por encima de la salida. Si despliega la salida fuera del proyecto, `MEEKO_ROOT` (absoluta o relativa al directorio de trabajo) indica dónde está; sin ella, la ruta apuntaría a la carpeta tres niveles por encima de la nueva ubicación. En Cloudflare Workers, sin sistema de archivos, y en un `createServerApp` propio que no pasa la opción `root`, es `undefined`. Pásela a los servicios: `defineServerRuntime(({ root }) => ({ services: { docs: join(root!, "docs") } }))`.
 
 `createServerApp({ manifest, load, runtime, production })` de `@meekojs/meeko/server` crea la misma aplicación a partir de un manifiesto y un cargador de módulos, y expone `fetch(request, platform?)`, `socket`, `publicOrigin`, `reportError` y `close()`. El entry generado por `meeko build` la usa; un host propio puede servirla con `serveNode(app, { host, port, publicOrigin, handleSignals, shutdownTimeout })` de `@meekojs/meeko/node`. Si el servidor arranca pero falla la conexión de Socket, `serveNode` libera el puerto y cierra la aplicación antes de propagar el error.
 
@@ -2888,13 +3423,13 @@ Desde `1.7`, `context.services` tiene el tipo de lo que devuelve `server/runtime
 ```ts
 // server/runtime.ts
 export default defineServerRuntime(async ({ env }) => {
-  const db = await createDatabase(env.DATABASE_URL);
-  return { services: { db, search: createSearch(db) }, close: () => db.close() };
-});
+	const db = await createDatabase(env.DATABASE_URL)
+	return { services: { db, search: createSearch(db) }, close: () => db.close() }
+})
 
 // server/utils/docs.ts
-import type { RequestContext } from "@meekojs/meeko/server";
-export const findDoc = (context: RequestContext, slug: string) => context.services.db.docs.find(slug); // tipado
+import type { RequestContext } from '@meekojs/meeko/server'
+export const findDoc = (context: RequestContext, slug: string) => context.services.db.docs.find(slug) // tipado
 ```
 
 - **Dónde.** En `usePage().context` del `<script server>`, en los handlers, `authorize`, `locals` y `rateLimit.key` de `defineApiRoute` y `defineRpc`, en `defineSocketChannel`, en `defineServerRouteMiddleware` (`services` y `context.services`) y en cualquier `RequestContext` escrito sin argumento. `defineServerMiddleware` no recibe contexto: se ejecuta antes de que exista. El `context` opcional del `load` de `definePage` sigue siendo el tipo `C` de sus argumentos de tipo.
@@ -2908,27 +3443,27 @@ export const findDoc = (context: RequestContext, slug: string) => context.servic
 
 Ningún fallo se pierde sin pasar por un observador de Meeko: cada nivel tiene el suyo, y lo que un nivel no atiende sube al siguiente o, sin observador, a la consola, como sin Meeko.
 
-| Nivel | Qué captura | Observador | Política |
-| --- | --- | --- | --- |
-| Componente | Handlers `on:`, `effect`, limpiezas, `onMounted`, la continuación de un setup con `await`, formularios, mutaciones y `useStorage` de ese componente y sus hijos. | `provideErrorHandler((error, source) => …)` en el `<script>`; el más cercano gana ([Middleware de rutas y servidor](#middleware-de-rutas-y-servidor), [api.md](api.md#componentes-meeko)). | Observa sin cambiar la interfaz. Sin proveedor, sube a la aplicación. |
-| Aplicación (navegador) | Lo anterior sin un proveedor más cercano, la navegación, los clientes Socket y, desde `1.3`, las excepciones no capturadas (`"uncaught"`) y las promesas rechazadas sin manejar (`"rejection"`) de la página. | `mountClientApp({ onError })` y `app.onError` de los plugins ([Plugins de aplicación](#plugins-de-aplicación)); `onNavigationError` tiene prioridad para la navegación. | Sin ninguno, la navegación, Socket y los fallos globales van al primer `provideErrorHandler` activo; sin él, a la consola. |
-| Página (SSR) | Un fallo del loader, de `<script server>`, del render (también `render: "stream"` antes del primer byte) o de un `await` de datos. | `+error.meeko` más cercano o `app/error.meeko` ([Página de error de la aplicación](#página-de-error-de-la-aplicación-apperrormeeko)), y el `onError` del runtime y de los plugins con el `requestId` de la respuesta. | El HTML muestra el estado y un mensaje público; un `5xx` se informa con su error privado. Un diferido rechazado de un stream se envía como `{ code, status }` y su causa llega a los mismos observadores ([Streaming SSR](#streaming-ssr-render-stream)). |
-| API y RPC | Lo que lanzan los handlers, `auth`, `authorize`, `locals` y las validaciones. | Respuesta normalizada: `ApiError` conserva `code` y `status`, todo lo demás es `INTERNAL_ERROR`, con `requestId` y `x-request-id` ([API y RPC](#api-y-rpc)). En el cliente, `ClientError` (`isClientError(error, "CODIGO")` desde `1.3`). | Sólo los `5xx` llegan a `onError` del runtime; los `4xx` son respuestas previstas. |
-| Runtime del servidor | Los `5xx` de páginas, API, RPC, Socket, `waitUntil` y el transporte, y desde `1.3` los fallos del proceso. | `onError` de `server/runtime.ts` ([Runtime de servidor](#runtime-de-servidor)). | Nunca cambia la respuesta; un observador que falla se registra sin detalles privados. |
-| Proceso (desde `1.3`) | Promesas rechazadas sin manejar y excepciones no capturadas fuera del flujo de una petición. | `onError` del runtime, con `{ kind, inRequest }` como tercer argumento. | `processErrors`; véase [Fallos fuera de una petición](#fallos-fuera-de-una-petición). |
+| Nivel                  | Qué captura                                                                                                                                                                                                   | Observador                                                                                                                                                                                                                                | Política                                                                                                                                                                                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Componente             | Handlers `on:`, `effect`, limpiezas, `onMounted`, la continuación de un setup con `await`, formularios, mutaciones y `useStorage` de ese componente y sus hijos.                                              | `provideErrorHandler((error, source) => …)` en el `<script>`; el más cercano gana ([Middleware de rutas y servidor](#middleware-de-rutas-y-servidor), [api.md](api.md#componentes-meeko)).                                                | Observa sin cambiar la interfaz. Sin proveedor, sube a la aplicación.                                                                                                                                                                                     |
+| Aplicación (navegador) | Lo anterior sin un proveedor más cercano, la navegación, los clientes Socket y, desde `1.3`, las excepciones no capturadas (`"uncaught"`) y las promesas rechazadas sin manejar (`"rejection"`) de la página. | `mountClientApp({ onError })` y `app.onError` de los plugins ([Plugins de aplicación](#plugins-de-aplicación)); `onNavigationError` tiene prioridad para la navegación.                                                                   | Sin ninguno, la navegación, Socket y los fallos globales van al primer `provideErrorHandler` activo; sin él, a la consola.                                                                                                                                |
+| Página (SSR)           | Un fallo del loader, de `<script server>`, del render (también `render: "stream"` antes del primer byte) o de un `await` de datos.                                                                            | `+error.meeko` más cercano o `app/error.meeko` ([Página de error de la aplicación](#página-de-error-de-la-aplicación-apperrormeeko)), y el `onError` del runtime y de los plugins con el `requestId` de la respuesta.                     | El HTML muestra el estado y un mensaje público; un `5xx` se informa con su error privado. Un diferido rechazado de un stream se envía como `{ code, status }` y su causa llega a los mismos observadores ([Streaming SSR](#streaming-ssr-render-stream)). |
+| API y RPC              | Lo que lanzan los handlers, `auth`, `authorize`, `locals` y las validaciones.                                                                                                                                 | Respuesta normalizada: `ApiError` conserva `code` y `status`, todo lo demás es `INTERNAL_ERROR`, con `requestId` y `x-request-id` ([API y RPC](#api-y-rpc)). En el cliente, `ClientError` (`isClientError(error, "CODIGO")` desde `1.3`). | Sólo los `5xx` llegan a `onError` del runtime; los `4xx` son respuestas previstas.                                                                                                                                                                        |
+| Runtime del servidor   | Los `5xx` de páginas, API, RPC, Socket, `waitUntil` y el transporte, y desde `1.3` los fallos del proceso.                                                                                                    | `onError` de `server/runtime.ts` ([Runtime de servidor](#runtime-de-servidor)).                                                                                                                                                           | Nunca cambia la respuesta; un observador que falla se registra sin detalles privados.                                                                                                                                                                     |
+| Proceso (desde `1.3`)  | Promesas rechazadas sin manejar y excepciones no capturadas fuera del flujo de una petición.                                                                                                                  | `onError` del runtime, con `{ kind, inRequest }` como tercer argumento.                                                                                                                                                                   | `processErrors`; véase [Fallos fuera de una petición](#fallos-fuera-de-una-petición).                                                                                                                                                                     |
 
 `ErrorSource`, el segundo argumento de los observadores del navegador, gana `"uncaught"` y `"rejection"` en `1.3`. Es una unión que Meeko entrega a la aplicación, así que, según la [política de estabilidad](stability.md#api-pública), un `switch` exhaustivo sobre ella necesita una rama por defecto.
 
 ```ts
-import { isClientError, mountClientApp } from "@meekojs/meeko/framework";
+import { isClientError, mountClientApp } from '@meekojs/meeko/framework'
 
 await mountClientApp({
-  ...options,
-  onError(error, source) {
-    if (isClientError(error, "UNAUTHENTICATED")) return location.assign("/login");
-    navigator.sendBeacon("/api/client-errors", JSON.stringify({ source, message: String(error) }));
-  },
-});
+	...options,
+	onError(error, source) {
+		if (isClientError(error, 'UNAUTHENTICATED')) return location.assign('/login')
+		navigator.sendBeacon('/api/client-errors', JSON.stringify({ source, message: String(error) }))
+	},
+})
 ```
 
 ### Fallos globales del navegador
@@ -2944,20 +3479,20 @@ Mientras una aplicación está montada, `mountClientApp` escucha `error` y `unha
 
 En el servidor, una promesa que nadie espera dentro de un handler, un `setTimeout` que lanza o el callback de una librería quedan fuera del `try` de la petición. Sin una política, Node 15+, Bun y Deno terminan el proceso con el primer rechazo sin manejar o la primera excepción no capturada, sin pasar por `onError` ni cerrar el servidor de forma ordenada. Desde `1.3`, `meeko dev`, las salidas de `meeko build` (Node, Bun, Deno y Cloudflare Workers) y `serveNode` y `serveDeno` con `handleSignals` aplican la política `processErrors` de `server/runtime.ts`:
 
-| Fallo | Por defecto | Otras opciones |
-| --- | --- | --- |
-| `unhandledRejection` | `"report"`: llega a `onError` y el servidor sigue atendiendo. | `"shutdown"`: además, cierre ordenado con código 1. `"off"`: el runtime decide (en Node, el rechazo pasa a ser una excepción no capturada). |
-| `uncaughtException` | `"shutdown"`: llega a `onError`, el servidor deja de aceptar conexiones, espera las respuestas abiertas y las tareas de `waitUntil`, cierra la aplicación y sale con código 1, porque el estado del proceso ya no es fiable. | `"off"`: el runtime decide. |
+| Fallo                | Por defecto                                                                                                                                                                                                                  | Otras opciones                                                                                                                              |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `unhandledRejection` | `"report"`: llega a `onError` y el servidor sigue atendiendo.                                                                                                                                                                | `"shutdown"`: además, cierre ordenado con código 1. `"off"`: el runtime decide (en Node, el rechazo pasa a ser una excepción no capturada). |
+| `uncaughtException`  | `"shutdown"`: llega a `onError`, el servidor deja de aceptar conexiones, espera las respuestas abiertas y las tareas de `waitUntil`, cierra la aplicación y sale con código 1, porque el estado del proceso ya no es fiable. | `"off"`: el runtime decide.                                                                                                                 |
 
 ```ts
 // server/runtime.ts
 export default defineServerRuntime(() => ({
-  processErrors: { unhandledRejection: "shutdown" },
-  onError(error, requestId, info) {
-    if (info) logger.fatal({ kind: info.kind, inRequest: info.inRequest, requestId }, error);
-    else logger.error({ requestId }, error);
-  },
-}));
+	processErrors: { unhandledRejection: 'shutdown' },
+	onError(error, requestId, info) {
+		if (info) logger.fatal({ kind: info.kind, inRequest: info.inRequest, requestId }, error)
+		else logger.error({ requestId }, error)
+	},
+}))
 ```
 
 - **Observador.** El `onError` del runtime recibe el error, un ID y `{ kind, inRequest }` (tipo `ServerErrorInfo`); los fallos de una petición no llevan ese tercer argumento. Sin `onError`, Meeko escribe en la consola el error completo, como haría el runtime. `processErrors: false` desactiva los dos casos.
@@ -2986,9 +3521,12 @@ Las dos últimas son de la aplicación, sin el prefijo `MEEKO_`, que queda reser
 
 ```ts
 // server/types/session.d.ts
-import type {} from "@meekojs/meeko/server";
-declare module "@meekojs/meeko/server" {
-  interface MeekoSession { user: string; role: "owner" }
+import type {} from '@meekojs/meeko/server'
+declare module '@meekojs/meeko/server' {
+	interface MeekoSession {
+		user: string
+		role: 'owner'
+	}
 }
 ```
 
@@ -2996,30 +3534,32 @@ declare module "@meekojs/meeko/server" {
 
 ```ts
 // server/api/auth/login.post.ts
-import { verifyPassword } from "@meekojs/meeko/password";
-import { loginInput, okResult } from "../../../shared/schemas/auth.js";
+import { verifyPassword } from '@meekojs/meeko/password'
+import { loginInput, okResult } from '../../../shared/schemas/auth.js'
 
 export default defineApiRoute({
-  body: loginInput,
-  response: okResult,
-  origin: "required",
-  rateLimit: { limit: 5, window: "5m" },
-  handler: async ({ body, context }) => {
-    const valid = await verifyPassword(body.password, process.env.ADMIN_PASSWORD_HASH ?? "");
-    if (!valid || body.username !== process.env.ADMIN_USERNAME) throw new ApiError("INVALID_CREDENTIALS", 401);
-    await context.session.create({ user: body.username, role: "owner" });
-    return { ok: true as const };
-  },
-});
+	body: loginInput,
+	response: okResult,
+	origin: 'required',
+	rateLimit: { limit: 5, window: '5m' },
+	handler: async ({ body, context }) => {
+		const valid = await verifyPassword(body.password, process.env.ADMIN_PASSWORD_HASH ?? '')
+		if (!valid || body.username !== process.env.ADMIN_USERNAME) throw new ApiError('INVALID_CREDENTIALS', 401)
+		await context.session.create({ user: body.username, role: 'owner' })
+		return { ok: true as const }
+	},
+})
 ```
 
 ```ts
 // server/api/auth/logout.post.ts
 export default defineApiRoute({
-  auth: "required",
-  status: 204,
-  handler: async ({ context }) => { await context.session.revoke(); },
-});
+	auth: 'required',
+	status: 204,
+	handler: async ({ context }) => {
+		await context.session.revoke()
+	},
+})
 ```
 
 `verifyPassword` se ejecuta siempre, también con un usuario incorrecto, para que el tiempo de respuesta no revele cuál de los dos falló. `defineApiRoute` y `ApiError` se autoimportan en `server/`. Desde el navegador, `await api.auth.login.post({ body })` y `await api.auth.logout.post()`: el cliente envía Origin y el token CSRF.
@@ -3028,22 +3568,25 @@ export default defineApiRoute({
 
 ```html
 <!-- app/pages/dashboard.meeko -->
-<script server lang="ts">
-const { context } = usePage();
-const session = context.session.current;
-if (session?.data.role !== "owner") redirect("/login");
-export const user = session.data.user;
+<script
+	server
+	lang="ts"
+>
+	const { context } = usePage()
+	const session = context.session.current
+	if (session?.data.role !== 'owner') redirect('/login')
+	export const user = session.data.user
 </script>
 
 <template>
-  <h1>Hola, {user}</h1>
+	<h1>Hola, {user}</h1>
 </template>
 ```
 
 Lo que hace Meeko por usted en este ejemplo:
 
 - La cookie `__Host-meeko.sid` es opaca, `HttpOnly`, `Secure`, `SameSite=Lax` y host-only; `MEEKO_SESSION_TTL` y `MEEKO_SESSION_SAMESITE` la ajustan. El ID cambia al iniciar sesión y la familia completa se revoca al cerrarla, también en las demás instancias.
-- `origin: "required"` y, aunque falte, el propio `session.create()` impiden el *login CSRF* (véase [Origin en mutaciones anónimas](#origin-en-mutaciones-anónimas)); `auth: "required"` y el token CSRF protegen el cierre de sesión.
+- La comprobación de `Origin` de toda mutación (desde `1.8`; `origin: "required"` la deja explícita) y el propio `session.create()` impiden el _login CSRF_ (véase [Origin en mutaciones anónimas](#origin-en-mutaciones-anónimas)); `auth: "required"` y el token CSRF protegen el cierre de sesión.
 - `rateLimit` cuenta los intentos por IP en Redis (o, sin Redis, en SQL; véase [Rate limit en SQL](#rate-limit-en-sql)), y `MEEKO_TRUST_PROXY` hace que la IP sea la del cliente y no la del proxy.
 - `verifyPassword` compara en tiempo constante y acepta los hashes que ya tenga con el mismo formato.
 
@@ -3078,18 +3621,20 @@ Desde `1.2`, `defineApiRoute` y `defineRpc` aceptan `rateLimit: { limit, window,
 
 ```ts
 export default defineApiRoute({
-  body: loginInput,
-  response: okResult,
-  origin: "required",
-  rateLimit: { limit: 5, window: "5m" },
-  handler: async ({ body, context }) => { /* … */ },
-});
+	body: loginInput,
+	response: okResult,
+	origin: 'required',
+	rateLimit: { limit: 5, window: '5m' },
+	handler: async ({ body, context }) => {
+		/* … */
+	},
+})
 ```
 
 - **Clave.** Sin `key`, cada IP de cliente tiene su contador por ruta (las IPv6 por su red /64, porque un cliente dispone de toda una /64). La IP es `context.clientAddress`: la de la conexión que entrega el adaptador (Node, Bun, Deno; en Workers, `CF-Connecting-IP`, que fija Cloudflare). Si Meeko no la conoce, todos los clientes comparten el contador de la ruta. `key: (context) => string` cuenta por otro sujeto, como el usuario de la sesión; se ejecuta antes de validar la entrada, así que no recibe el cuerpo. Una ruta dinámica (`/api/users/[id]`) tiene un solo contador para todos sus valores.
 - **Proxies.** `X-Forwarded-For` nunca se lee salvo con `MEEKO_TRUST_PROXY`, porque cualquier cliente puede enviarlo. Con un número `n`, la IP es la entrada que añadió el proxy de confianza más externo, la `n`-ésima desde la derecha: con un único proxy (Traefik en Coolify, Caddy, nginx) use `MEEKO_TRUST_PROXY=1`, y las entradas que el cliente falsificó a la izquierda se ignoran. `true` toma la entrada de la izquierda: sólo es seguro si el proxy de entrada sustituye la cabecera en lugar de añadirse. Una entrada con puerto, como la que escribe Azure Application Gateway (`203.0.113.7:5678` o `[2001:db8::1]:5678`), cuenta por su IP; si la entrada elegida no es una IP, la petición cuenta con la IP de la conexión (la del proxy), nunca con el contador compartido de los clientes desconocidos. Sin la variable, tras un proxy todos los clientes comparten el contador del proxy. Un valor no válido detiene el arranque.
 - **Middleware y llamadas locales.** Un middleware de servidor que pasa a `next()` una petición nueva (`next(new Request(request, { headers }))`) conserva la IP de la conexión. `createLocalCalls` usa el contador de la ruta que usa el despachador HTTP y la IP del `context` que recibe, así que una llamada local no esquiva el límite de la ruta. Un host propio que crea sus `Request` sin un adaptador de Meeko (`serveNode`, `toNodeListener`, `createBunServer`, `serveDeno` o `createWorker`) no tiene IP de conexión: sus clientes comparten el contador de la ruta, salvo que declare `key`.
-- **Almacenamiento.** Los contadores viven en el store de sesiones: en memoria con `MemorySessionStore` y, con `RedisSessionStore` (también el de [Sesiones sin configuración](#sesiones-sin-configuración)), en `<prefix>ratelimit:<resumen>`, con un script Lua que hace `INCR` y `PEXPIRE` de forma atómica para todas las instancias. La clave guarda un resumen SHA-256 de la ruta y el sujeto, nunca la IP ni la clave en claro. Si Redis falla, la petición se rechaza con `500` (*fail closed*) y el error llega a `onError`.
+- **Almacenamiento.** Los contadores viven en el store de sesiones: en memoria con `MemorySessionStore` y, con `RedisSessionStore` (también el de [Sesiones sin configuración](#sesiones-sin-configuración)), en `<prefix>ratelimit:<resumen>`, con un script Lua que hace `INCR` y `PEXPIRE` de forma atómica para todas las instancias. La clave guarda un resumen SHA-256 de la ruta y el sujeto, nunca la IP ni la clave en claro. Si Redis falla, la petición se rechaza con `500` (_fail closed_) y el error llega a `onError`.
 - **Store propio.** Un `SessionStore` puede implementar `rateLimit(key, windowMs)`, que cuenta una petición en la ventana fija `key` y resuelve `{ count, resetInMs }` (tipo `RateLimitHit`); debe ser atómico entre instancias y rechazar si falla. Desde `1.7`, `SqlSessionStore` lo implementa cuando su driver ofrece `rateLimit` (véase [Rate limit en SQL](#rate-limit-en-sql)); sin él, los contadores viven en la memoria de cada instancia o aislado, y Meeko lo avisa una vez en producción.
 - Un `limit` que no es un entero positivo, una `window` no válida o una `key` vacía responden `500 INVALID_RATE_LIMIT`.
 
@@ -3097,7 +3642,7 @@ export default defineApiRoute({
 
 Desde `1.7`, una aplicación sin Redis comparte los contadores de `rateLimit` entre instancias con su base de datos: `SqlSessionDriver.rateLimit(key, windowMs, now)` es opcional y, si el driver lo implementa, `SqlSessionStore` delega en él. Sin él todo sigue como hasta `1.6`: contadores en la memoria de cada instancia y un aviso en producción.
 
-La semántica es la de Redis y la memoria: una **ventana fija** por clave. La primera petición abre la ventana (`count = 1`, `window_ends_at = now + windowMs`); las siguientes suman uno y conservan su final; la primera tras el final la reinicia. Una ruta que cambia `window` no acorta ni alarga una ventana ya abierta. El driver devuelve la fila resultante, `{ count, windowEndsAt }` (tipo `SqlRateLimitRow`; `Number()` acepta un `bigint` devuelto como texto); Meeko calcula `resetInMs = windowEndsAt - now` y, por encima del límite, responde `429` con `Retry-After` en segundos redondeados hacia arriba (como mínimo, 1). `now` es el reloj de la instancia, como en `replace`. Si la sentencia falla, la petición se rechaza con `500` (*fail closed*).
+La semántica es la de Redis y la memoria: una **ventana fija** por clave. La primera petición abre la ventana (`count = 1`, `window_ends_at = now + windowMs`); las siguientes suman uno y conservan su final; la primera tras el final la reinicia. Una ruta que cambia `window` no acorta ni alarga una ventana ya abierta. El driver devuelve la fila resultante, `{ count, windowEndsAt }` (tipo `SqlRateLimitRow`; `Number()` acepta un `bigint` devuelto como texto); Meeko calcula `resetInMs = windowEndsAt - now` y, por encima del límite, responde `429` con `Retry-After` en segundos redondeados hacia arriba (como mínimo, 1). `now` es el reloj de la instancia, como en `replace`. Si la sentencia falla, la petición se rechaza con `500` (_fail closed_).
 
 `key` llega como los 32 bytes del SHA-256 de la clave del contador, que Meeko ya calcula como un resumen SHA-256 de la ruta y el sujeto: la tabla nunca guarda una IP ni una clave en claro (tampoco las de `SessionManager.rateLimit` llamado a mano) y la columna tiene ancho fijo. La sentencia debe ser atómica frente a peticiones concurrentes de todas las instancias; en PostgreSQL basta un único `INSERT … ON CONFLICT DO UPDATE … RETURNING`:
 
@@ -3126,20 +3671,20 @@ Las dos asignaciones del `UPDATE` leen la fila anterior, así que el reinicio de
 
 ```ts
 // server/runtime.ts (fragmento)
-import pg from "pg";
-import type { SqlSessionDriver } from "@meekojs/meeko/server";
+import pg from 'pg'
+import type { SqlSessionDriver } from '@meekojs/meeko/server'
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-const rateLimitSql = `INSERT INTO meeko_rate_limits AS r …`; // la sentencia de arriba
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
+const rateLimitSql = `INSERT INTO meeko_rate_limits AS r …` // la sentencia de arriba
 
 const driver: SqlSessionDriver = {
-  // read, write, remove, replace y revokeFamily, como siempre.
-  ...sessionStatements(pool),
-  async rateLimit(key, windowMs, now) {
-    const { rows } = await pool.query<{ count: number; window_ends_at: string }>(rateLimitSql, [Buffer.from(key), now, windowMs]);
-    return { count: rows[0]!.count, windowEndsAt: Number(rows[0]!.window_ends_at) };
-  },
-};
+	// read, write, remove, replace y revokeFamily, como siempre.
+	...sessionStatements(pool),
+	async rateLimit(key, windowMs, now) {
+		const { rows } = await pool.query<{ count: number; window_ends_at: string }>(rateLimitSql, [Buffer.from(key), now, windowMs])
+		return { count: rows[0]!.count, windowEndsAt: Number(rows[0]!.window_ends_at) }
+	},
+}
 ```
 
 En Cloudflare D1, `D1SessionDriver` lo implementa con la opción `rateLimitTable` (véase [Sesiones en D1](#sesiones-en-d1)).
@@ -3153,28 +3698,47 @@ La IP del cliente tiene dos vías, con la misma política que `rateLimit`:
 
 ```ts
 // server/middleware/10-access-log.ts
-import { clientAddress, defineServerMiddleware } from "@meekojs/meeko/server";
+import { clientAddress, defineServerMiddleware } from '@meekojs/meeko/server'
 
 export default defineServerMiddleware(async (request, next) => {
-  // Tras Traefik con MEEKO_TRUST_PROXY=1, la del visitante y no la del proxy.
-  const ip = clientAddress(request) ?? "desconocida";
-  const response = await next();
-  console.log(`${request.method} ${new URL(request.url).pathname} ${response.status} ${ip}`);
-  return response;
-});
+	// Tras Traefik con MEEKO_TRUST_PROXY=1, la del visitante y no la del proxy.
+	const ip = clientAddress(request) ?? 'desconocida'
+	const response = await next()
+	console.log(`${request.method} ${new URL(request.url).pathname} ${response.status} ${ip}`)
+	return response
+})
 ```
 
 La política es siempre la misma:
 
 - **Sin `MEEKO_TRUST_PROXY`**, la IP es la de la conexión que entrega el adaptador: el socket remoto en Node (`serveNode`, `toNodeListener`), `server.requestIP()` en Bun, `remoteAddr` en Deno y `CF-Connecting-IP` en Workers, una cabecera que fija el borde de Cloudflare y que sustituye la que envíe el cliente. `X-Forwarded-For` nunca se lee: tras un proxy, todos los clientes tienen la IP del proxy.
 - **Con `MEEKO_TRUST_PROXY=n`**, la IP es la `n`-ésima entrada de `X-Forwarded-For` desde la derecha, la que añadió el proxy de confianza más externo, sin su puerto. Lo que el cliente escribió a su izquierda se ignora. Con Traefik (Coolify), Caddy o nginx como único proxy, `MEEKO_TRUST_PROXY=1`; con un CDN delante de Traefik que añade su entrada, `2`. `true` toma la entrada de la izquierda y sólo es seguro si el proxy de entrada sustituye la cabecera. Si la entrada elegida no es una IP, vale la de la conexión.
+- **Con `MEEKO_TRUST_PROXY=cloudflare`** (desde `1.8`), la IP es la de `CF-Connecting-IP` (o, si falta, la de `True-Client-IP`), pero sólo si la conexión y cada salto de `X-Forwarded-For` vienen de las redes de `MEEKO_TRUSTED_PROXIES`; véase [Cloudflare Tunnel y Traefik](#cloudflare-tunnel-y-traefik). En Workers no cambia nada: la IP de la conexión ya es `CF-Connecting-IP`.
 - La IP sale normalizada: IPv6 en minúsculas y sin zona, e IPv4 mapeada en IPv6 (`::ffff:192.0.2.1`) como IPv4. `undefined` si no se conoce, como en un host propio que crea sus `Request` sin un adaptador de Meeko.
 
-Sin `env`, `clientAddress` aplica el `MEEKO_TRUST_PROXY` del entorno de la aplicación que atiende la petición (el `platform.env` que recibe `ServerApp.fetch`), también en la petición nueva que un middleware pasa a `next()`. Con una petición que no atiende un `ServerApp`, sólo usa la IP de la conexión, salvo que reciba el entorno: `clientAddress(request, process.env)`. Un `MEEKO_TRUST_PROXY` no válido lanza `TypeError` (y detiene el arranque de la aplicación).
+Sin `env`, `clientAddress` aplica el `MEEKO_TRUST_PROXY` del entorno de la aplicación que atiende la petición (el `platform.env` que recibe `ServerApp.fetch`), también en la petición nueva que un middleware pasa a `next()`. Con una petición que no atiende un `ServerApp`, sólo usa la IP de la conexión, salvo que reciba el entorno: `clientAddress(request, process.env)`. Un `MEEKO_TRUST_PROXY` no válido lanza `TypeError` (y detiene el arranque de la aplicación); con `cloudflare`, también un `MEEKO_TRUSTED_PROXIES` no válido.
+
+#### Cloudflare Tunnel y Traefik
+
+Con Cloudflare Tunnel, la petición llega así: Cloudflare → `cloudflared` → un proxy como Traefik (Coolify) → el servidor. Traefik sin `trustedIPs` sustituye `X-Forwarded-For` por la IP de su par, `cloudflared`, así que con `MEEKO_TRUST_PROXY=1` todos los visitantes compartirían la IP de `cloudflared` y el `rateLimit` por cliente sería global. Cloudflare sí envía la IP del visitante en `CF-Connecting-IP`, y la sustituye si el cliente la manda:
+
+```dotenv
+MEEKO_TRUST_PROXY=cloudflare
+# Opcional. Por defecto, loopback y redes privadas:
+# MEEKO_TRUSTED_PROXIES=127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, ::1/128, fc00::/7
+```
+
+La cabecera sólo vale cuando la petición pasó únicamente por la infraestructura propia:
+
+- **La conexión** debe venir de una red de `MEEKO_TRUSTED_PROXIES`, donde viven `cloudflared` y Traefik: una lista de CIDR o IP separadas por comas o espacios que sustituye a la de por defecto (redes RFC 1918, loopback y ULA `fc00::/7`). Si viene de fuera, o el adaptador no la conoce, la cabecera se ignora y vale la IP de la conexión.
+- **Cada salto de `X-Forwarded-For`**, de derecha a izquierda, también debe venir de esas redes. El primero que no lo hace es el cliente que vio un proxy de confianza: si alguien llega directamente a la entrada pública de Traefik con un `CF-Connecting-IP` inventado, Traefik escribe su IP en `X-Forwarded-For` y Meeko usa esa. Un salto que no es una IP devuelve la IP de la conexión.
+- **El valor** debe ser una única IPv4 o IPv6, sin puerto ni corchetes. Una lista o un texto cualquiera devuelven la IP de la conexión; `True-Client-IP` sólo se lee si `CF-Connecting-IP` falta.
+
+Si el servidor comparte red privada con clientes en los que no confía, limita `MEEKO_TRUSTED_PROXIES` a las IP o subredes de `cloudflared` y del proxy, como la red Docker de Coolify (`MEEKO_TRUSTED_PROXIES=10.0.1.0/24, 172.17.0.1`). Incluye la dirección con la que `cloudflared` llega al proxy, que este escribe en `X-Forwarded-For`: si queda fuera, Meeko la toma por el cliente y todos los visitantes vuelven a compartir IP. Las redes por defecto no incluyen CGNAT (`100.64.0.0/10`, la de Tailscale) ni link-local: añádelas si `cloudflared` llega por ahí. `MEEKO_TRUSTED_PROXIES` sólo se lee en el modo `cloudflare`.
 
 ## Sesiones y seguridad
 
-Las sesiones usan IDs opacos aleatorios en cookies `HttpOnly`, host-only, `Secure` por defecto y `SameSite=Lax` por defecto. Cada sesión nueva recibe también un `familyId` opaco que permanece al rotar su ID. `SessionHandle` permite crear, rotar y revocar; la rotación y la revocación de toda la familia requieren operaciones atómicas en el store. Así, un logout iniciado con un handle anterior invalida el ID activo aunque otra petición ya lo haya rotado. Las mutaciones autenticadas con cookie verifican Origin y `x-meeko-csrf`. Las respuestas SSR y API entregan el token CSRF por meta o cabecera same-origin. La aplicación debe definir verificación de identidad y reglas de autorización; Meeko no guarda secretos de autenticación en el navegador.
+Las sesiones usan IDs opacos aleatorios en cookies `HttpOnly`, host-only, `Secure` por defecto y `SameSite=Lax` por defecto. Cada sesión nueva recibe también un `familyId` opaco que permanece al rotar su ID. `SessionHandle` permite crear, rotar y revocar; la rotación y la revocación de toda la familia requieren operaciones atómicas en el store. Así, un logout iniciado con un handle anterior invalida el ID activo aunque otra petición ya lo haya rotado. Las mutaciones autenticadas con cookie verifican Origin y `x-meeko-csrf`; desde `1.8`, las anónimas verifican Origin (véase [Origin en mutaciones anónimas](#origin-en-mutaciones-anónimas)). Las respuestas SSR y API entregan el token CSRF por meta o cabecera same-origin. La aplicación debe definir verificación de identidad y reglas de autorización; Meeko no guarda secretos de autenticación en el navegador.
 
 `MemorySessionStore` sirve sólo en desarrollo. `SessionManager({ production: true, store })` exige `persistent: true`, `replace` atómico y `revokeFamily`; una aplicación sin `MEEKO_REDIS_URL` ni `sessions` propias no arranca en producción. `RedisSessionStore` acepta un cliente compatible con `get`, `set` con `PX`, `del` y `eval`; usa un índice de familia con el TTL de la sesión activa. Use un prefijo propio por aplicación y entorno. Los registros Redis anteriores sin `familyId` siguen siendo legibles y adquieren una familia en la primera rotación. `SqlSessionStore` acepta un `SqlSessionDriver` con `read`, `write`, `remove`, `replace` transaccional, `revokeFamily`, `close` opcional y, desde `1.7`, `rateLimit` opcional (véase [Rate limit en SQL](#rate-limit-en-sql)). El ejemplo ejecutable en `tests/fixtures/fullstack-consumer/server/runtime.ts` usa SQLite real; el framework no depende de una librería SQL ni de un motor de base de datos concreto. `SessionManager.close()` libera el store cuando el host es propietario del recurso.
 
@@ -3189,7 +3753,7 @@ Sin `server/runtime.ts`, Meeko hace todo esto por usted con `MEEKO_REDIS_URL` (v
 Desde `1.2`, una aplicación no necesita `server/runtime.ts` para tener sesiones seguras. Si el archivo no existe, o su fábrica no devuelve `sessions`, `createServerApp` las crea:
 
 - **Desarrollo** (`meeko dev`) y el prerender de `meeko build`: `MemorySessionStore`.
-- **Producción** en Node, Bun y Deno: con `MEEKO_REDIS_URL` (`redis://` o `rediss://`), Meeko importa el paquete `redis` del proyecto, conecta un cliente y un suscriptor dedicado (`client.duplicate()`) **antes de servir tráfico**, crea un `RedisSessionStore` con revocación entre instancias y cierra ambas conexiones al detenerse, después del `close` de la aplicación. Instale el paquete con `npm install redis`: el build sólo lo incluye si está instalado, y sin él el arranque falla con un mensaje que lo pide. Si la primera conexión falla, el arranque falla; si se corta después, el cliente reconecta y, mientras tanto, las peticiones que leen la sesión fallan en el acto en lugar de esperar (*fail closed*). Los mensajes nunca incluyen la URL, que lleva la contraseña.
+- **Producción** en Node, Bun y Deno: con `MEEKO_REDIS_URL` (`redis://` o `rediss://`), Meeko importa el paquete `redis` del proyecto, conecta un cliente y un suscriptor dedicado (`client.duplicate()`) **antes de servir tráfico**, crea un `RedisSessionStore` con revocación entre instancias y cierra ambas conexiones al detenerse, después del `close` de la aplicación. Instale el paquete con `npm install redis`: el build sólo lo incluye si está instalado, y sin él el arranque falla con un mensaje que lo pide. Si la primera conexión falla, el arranque falla; si se corta después, el cliente reconecta y, mientras tanto, las peticiones que leen la sesión fallan en el acto en lugar de esperar (_fail closed_). Los mensajes nunca incluyen la URL, que lleva la contraseña.
 - **Producción sin `MEEKO_REDIS_URL`**: la aplicación no arranca, como hasta ahora. En Workers no hay TCP, así que `MEEKO_REDIS_URL` también detiene el arranque: declare un `SessionManager` con D1 o con Upstash (véase [Cloudflare Workers](#cloudflare-workers)).
 
 Las claves usan el prefijo de `MEEKO_REDIS_PREFIX` o, por defecto, `meeko:<name de package.json>:prod:`. `MEEKO_SESSION_TTL` (`30m`, `12h`, `7d`…; 7 días por defecto) y `MEEKO_SESSION_SAMESITE` (`Lax` por defecto, o `Strict`) ajustan esas sesiones, también en desarrollo; un valor no válido detiene el arranque. La cookie conserva los valores seguros: `__Host-meeko.sid`, `Secure`, `HttpOnly`, `Path=/` y sin `Domain` (host-only). Con unas `sessions` propias en `server/runtime.ts`, esas variables no se aplican y Meeko lo avisa una vez.
@@ -3199,35 +3763,64 @@ Las claves usan el prefijo de `MEEKO_REDIS_PREFIX` o, por defecto, `meeko:<name 
 `SessionManager({ ttlMs })` fija la duración por defecto (7 días). Desde `1.2`, `context.session.create(data, { ttlMs })` da a una sesión su propia duración, un entero positivo de milisegundos; por ejemplo, 30 días para los propietarios y 12 horas para el personal. Un valor no válido rechaza con `RangeError` sin tocar el store. Esa duración fija el `Max-Age` de la cookie y la caducidad en el store (`expiresAt`, que Redis aplica con `PX` y SQL y D1 guardan en `expires_at`), se guarda en `SessionRecord.ttlMs` y `rotate()` la conserva: cada rotación cuenta de nuevo esa duración desde el momento de rotar.
 
 ```ts
-const ttlMs = user.role === "staff" ? 12 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
-await context.session.create({ userId: user.id }, { ttlMs });
+const ttlMs = user.role === 'staff' ? 12 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000
+await context.session.create({ userId: user.id }, { ttlMs })
 ```
 
 Las sesiones creadas sin `ttlMs`, y los registros escritos antes de `1.2`, usan la duración del gestor también al rotar. `SqlSessionStore` no necesita una columna nueva: deduce la duración de cada fila como `expiresAt - createdAt`, así que una fila anterior conserva al rotar la duración con la que se creó. Un `SessionStore` propio debe conservar el campo `ttlMs` del registro si quiere que la duración sobreviva a la rotación; si lo pierde, la sesión rota con la duración del gestor.
 
 ### Origin en mutaciones anónimas
 
-Origin y `x-meeko-csrf` se comprueban sólo en las mutaciones que llegan con una cookie de sesión. Un endpoint que crea la sesión, como el inicio de sesión, se llama sin ella y queda expuesto al *login CSRF*: otra web podría iniciar sesión en el navegador de la víctima con una cuenta del atacante. Desde `1.2`, `origin: "required"` en `defineApiRoute` o `defineRpc` exige un `Origin` permitido aunque no haya sesión:
+Desde `1.8`, **toda mutación comprueba `Origin` por defecto**, haya o no cookie de sesión: los `POST`, `PUT`, `PATCH` y `DELETE` de `defineApiRoute`, todas las llamadas de `defineRpc` (siempre son `POST`) y los formularios nativos. Hasta `1.7`, una mutación sin sesión sólo lo comprobaba con `origin: "required"`, de modo que cualquier ruta anónima que aceptara JSON enviado como `text/plain`, o un formulario, quedaba expuesta al CSRF; y un endpoint que crea la sesión, como el inicio de sesión, al _login CSRF_: otra web podía iniciar sesión en el navegador de la víctima con una cuenta del atacante.
+
+La regla es la de las mutaciones autenticadas:
+
+- Se acepta el origen de la petición, que tras `createServerApp` es el `publicOrigin` configurado (o `MEEKO_PUBLIC_ORIGIN`), y los de `SessionManager({ allowedOrigins })`. `MEEKO_TRUST_PROXY` sólo decide qué dirección de `X-Forwarded-For` es la del cliente: ni `X-Forwarded-Host` ni `X-Forwarded-Proto` cambian el origen propio. Detrás de un proxy que termina TLS, configure `MEEKO_PUBLIC_ORIGIN`.
+- Un `Origin` ausente, `null` o de otro origen (otro esquema, host o puerto) responde `403 INVALID_ORIGIN` antes de leer o validar la entrada, de `rateLimit` y del handler. `Sec-Fetch-Site` y `Referer` no sustituyen a `Origin`: los navegadores envían `Origin` en toda petición `POST`, `PUT`, `PATCH` y `DELETE`, también en las de su propio origen, así que `Sec-Fetch-Site: same-origin` sin `Origin` también es `403`, como con sesión. Al revés, un origen de `allowedOrigins` pasa aunque el navegador lo marque como `cross-site`.
+- `GET`, `HEAD` y `OPTIONS` no se comprueban, porque una navegación no lleva `Origin`, y un callback de OAuth o un enlace mágico llegan desde otro sitio. Esos flujos deben validar su propio `state` o token de un solo uso.
+- Las llamadas de los clientes `api.*` y `rpc.*` durante el SSR envían el origen de la petición en curso, así que el despacho local sigue funcionando. `createLocalCalls` hace lo mismo desde `1.8`: envía el origen de la aplicación en lugar del `Origin` de la petición original, así que una mutación local funciona aunque la página se pidiera con `GET` (sin `Origin`); con sesión sigue necesitando el token CSRF de la petición original.
+- Una llamada desde fuera del navegador (un script, una prueba, una app nativa o un servicio) debe enviar una cabecera `Origin` permitida, o la ruta declarar `origin: "none"`.
+
+`origin: "required"` (desde `1.2`) equivale al valor por defecto y sigue siendo válido para dejarlo explícito, por ejemplo en un inicio de sesión:
 
 ```ts
 // server/rpc/auth/login.ts
 export default defineRpc({
-  input: loginInput,
-  output: loginOutput,
-  origin: "required",
-  handler: async ({ input, context }) => { /* … */ },
-});
+	input: loginInput,
+	output: loginOutput,
+	origin: 'required',
+	handler: async ({ input, context }) => {
+		/* … */
+	},
+})
 ```
 
-En un endpoint de API se comprueban los métodos `POST`, `PUT`, `PATCH` y `DELETE` (un `GET` no lleva `Origin` al navegar); en un RPC, todas las llamadas. Se acepta el origen de la petición, que tras `createServerApp` es el `publicOrigin` configurado, y los de `SessionManager({ allowedOrigins })`: la misma regla que en las mutaciones autenticadas. Un `Origin` ausente, `null` u otro distinto responde `403 INVALID_ORIGIN` antes de leer o validar la entrada y de ejecutar el handler. Las llamadas de los clientes `api.*` y `rpc.*` durante el SSR envían el origen de la petición en curso, así que el despacho local sigue funcionando. Una llamada desde fuera del navegador (una app nativa o un script) debe enviar una cabecera `Origin` permitida.
+**`origin: "none"` desactiva la comprobación en una ruta.** Es la salida para webhooks, APIs públicas y clientes que no envían `Origin`. Es **inseguro** frente al CSRF y al _login CSRF_: úselo sólo con otra prueba de que la petición no viene de otra web, como la firma de un webhook, un token de API en `authorization` o un secreto de la app que el navegador no tiene. Con `"none"`:
 
-**`session.create()` protege el inicio de sesión aunque falte `origin: "required"`.** Desde `1.2`, en una petición `POST`, `PUT`, `PATCH` o `DELETE`, `context.session.create()` sólo crea la sesión si el `Origin` de esa petición ya se comprobó (con `origin: "required"`, o en una mutación autenticada que superó Origin y CSRF) o si está permitido en ese momento; si no, rechaza con `403 INVALID_ORIGIN` sin tocar el store ni enviar la cookie. Los navegadores envían `Origin` en toda petición `POST`, también en las de su propio origen, así que un inicio de sesión desde la propia aplicación sigue funcionando sin cambios. Lo que cambia:
+- una petición sin cookie de sesión se atiende con cualquier `Origin`, o sin él, y `session.create()` puede crear la sesión;
+- una petición con sesión sigue exigiendo `Origin` y el token CSRF;
+- un formulario nativo (`form`) sin sesión tampoco necesita `Origin`, para los webhooks que envían `application/x-www-form-urlencoded` (Twilio, Slack…); con sesión, sigue exigiendo `Origin` y `_csrf`.
 
-- Un script, una prueba o una app nativa que inicia sesión sin cabecera `Origin` recibe `403`. Envíe el `Origin` de la aplicación o declare `origin: "none"` en esa ruta. `"none"` es **inseguro**: desactiva esta comprobación y deja la ruta expuesta al *login CSRF*, así que úselo sólo con otra prueba de que la petición no viene de otra web (por ejemplo, un secreto de la app que el navegador no tiene). En desarrollo, el primer rechazo escribe un aviso con estas dos salidas.
-- `GET`, `HEAD` y `OPTIONS` no se comprueban, porque un callback de OAuth o un enlace mágico llegan como navegación desde otro sitio, sin `Origin`. Esos flujos deben validar su propio `state` o token de un solo uso.
-- Un `SessionHandle` que no cargó `SessionManager.load` (un host propio que lo construye a mano) no conoce su petición y crea la sesión como antes.
+```ts
+// server/api/webhooks/payments.post.ts
+export default defineApiRoute({
+	origin: 'none',
+	contentType: 'response',
+	handler: async ({ context }) => {
+		const payload = await context.request.text()
+		if (!(await verifySignature(payload, context.request.headers.get('x-signature')))) throw new ApiError('INVALID_SIGNATURE', 401)
+		return new Response(null, { status: 204 })
+	},
+})
+```
 
-Es un cambio incompatible publicado en un minor como corrección de seguridad, según la [política de estabilidad](stability.md#excepciones-aprobadas): sin él, cualquier ruta de inicio de sesión sin `origin: "required"` que acepte formularios o `text/plain` era vulnerable por defecto.
+Un webhook que envía `application/x-www-form-urlencoded` (Twilio, Slack) funciona igual: sin `form`, el handler con `contentType: "response"` lee el cuerpo con `context.request.formData()`; con `form` y `origin: "none"`, el envío sin sesión tampoco necesita `Origin` y el cuerpo se valida con `body` (añada `contentType: "response"` para que la respuesta sea la del handler y no un `303`).
+
+Una API pública que otros orígenes llaman con `fetch` y CORS necesita, además de `origin: "none"`, las cabeceras CORS en su middleware o proxy; Meeko no las añade. Sin cookie de sesión (un token en `authorization`), el navegador del visitante no aporta credenciales que otra web pueda aprovechar.
+
+**`session.create()` protege el inicio de sesión también fuera de las guardas.** Desde `1.2`, en una petición `POST`, `PUT`, `PATCH` o `DELETE`, `context.session.create()` sólo crea la sesión si el `Origin` de esa petición ya se comprobó (por la guarda de la ruta o en una mutación autenticada que superó Origin y CSRF) o si está permitido en ese momento; si no, rechaza con `403 INVALID_ORIGIN` sin tocar el store ni enviar la cookie. Desde `1.8`, la guarda de la ruta rechaza antes esas peticiones, así que esta comprobación cubre sobre todo a un host propio que llama a `SessionManager.load` sin pasar por `executeApiRoute` o `executeRpc`; en desarrollo, su primer rechazo escribe un aviso. Un `SessionHandle` que no cargó `SessionManager.load` (construido a mano) no conoce su petición y crea la sesión como antes.
+
+Ambos son cambios incompatibles publicados en un minor como corrección de seguridad, según la [política de estabilidad](stability.md#excepciones-aprobadas): el de `1.2` para `session.create()` y el de `1.8` para todas las mutaciones. La [guía de `1.8`](migration-1.8.md#origin-en-todas-las-mutaciones) explica qué hacer con webhooks, APIs públicas y clientes de otros orígenes.
 
 ### Revocación durante una petición
 
@@ -3252,11 +3845,11 @@ Un almacenamiento caído propaga error y no concede acceso. No se debe usar un s
 
 `meeko clean [directorio]` borra todo lo que genera Meeko para dejar el proyecto limpio:
 
-| Comando | Borra | Conserva |
-| --- | --- | --- |
-| `meeko clean` | `.meeko/` (tipos, entradas, manifiestos, builds, `tsconfig.*` generados) y la caché de Vite `node_modules/.vite` | El resto de `node_modules` y todos los archivos de la aplicación |
-| `meeko clean --all` | Lo anterior y `node_modules` | Lockfiles, `.env`, `package.json` y el código |
-| `meeko clean --dry-run` | Nada: muestra qué borraría, con el número de archivos y el tamaño | Todo |
+| Comando                 | Borra                                                                                                            | Conserva                                                         |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `meeko clean`           | `.meeko/` (tipos, entradas, manifiestos, builds, `tsconfig.*` generados) y la caché de Vite `node_modules/.vite` | El resto de `node_modules` y todos los archivos de la aplicación |
+| `meeko clean --all`     | Lo anterior y `node_modules`                                                                                     | Lockfiles, `.env`, `package.json` y el código                    |
+| `meeko clean --dry-run` | Nada: muestra qué borraría, con el número de archivos y el tamaño                                                | Todo                                                             |
 
 El comando sólo actúa sobre un proyecto Meeko (con `meeko.config.*` o con `@meekojs/meeko` en `dependencies`/`devDependencies`) y rechaza la raíz de una unidad y el directorio del usuario. Borra únicamente esa lista fija de rutas dentro del proyecto y **nunca sigue enlaces**: un symlink o una junction se elimina como enlace sin entrar en su destino, así que es seguro con `link:` de pnpm, donde `node_modules/@meekojs/meeko` apunta a otro repositorio. Si `node_modules` es un enlace, la caché de Vite se omite con un aviso. Un archivo bloqueado se reintenta; si el error persiste, se informa, se sigue con el resto y el comando termina con código 1. Para reinstalar desde cero: `meeko clean --all` y después `pnpm install`.
 
@@ -3302,31 +3895,34 @@ Todas las páginas deben usar `render: "prerender"`, con `prerenderEntries` en l
 
 ```ts
 // meeko.config.ts
-import { defineMeekoConfig } from "@meekojs/meeko/framework";
+import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
 export default defineMeekoConfig({
-  site: "https://example.com",
-  sitemap: true,
-  robots: true,
-  document: { seo: true },
-  server: {
-    adapter: "static",
-    headerFiles: ["_headers", "nginx"],
-    contentSecurityPolicy: {
-      "default-src": ["'self'"],
-      "script-src": ["'self'"],
-      "style-src": ["'self'", "'unsafe-inline'"],
-      "object-src": ["'none'"],
-      "base-uri": ["'none'"],
-    },
-    headers: { "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin" },
-  },
-});
+	site: 'https://example.com',
+	sitemap: true,
+	robots: true,
+	document: { seo: true },
+	server: {
+		adapter: 'static',
+		headerFiles: ['_headers', 'nginx'],
+		contentSecurityPolicy: {
+			'default-src': ["'self'"],
+			// data: para el <link rel="icon" href="data:,"> que Meeko pone si la aplicación no tiene icono.
+			'img-src': ["'self'", 'data:'],
+			'script-src': ["'self'"],
+			'style-src': ["'self'", "'unsafe-inline'"],
+			'object-src': ["'none'"],
+			'base-uri': ["'none'"],
+		},
+		headers: { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin' },
+	},
+})
 ```
 
 - `contentSecurityPolicy`: la `Content-Security-Policy` de todas las páginas, por directiva. El build le añade los hashes de los scripts en línea; véase [CSP con hashes](#csp-con-hashes).
 - `headers`: otras cabeceras de todas las respuestas. `Content-Security-Policy` no se admite aquí, porque perdería los hashes.
 - `headerFiles`: dónde se escriben esas cabeceras. Por defecto, en ningún sitio: un hosting estático no las lee de la configuración de Meeko, así que cada formato es opcional y explícito.
+- `img-src` con `data:`: un documento sin icono propio lleva `<link rel="icon" href="data:,">`, para que el navegador no pida `/favicon.ico`. Con `default-src 'self'` y sin `data:` en `img-src`, el navegador bloquea ese icono y registra una violación de CSP en la consola de cada página; no rompe nada más. Basta con añadir `data:` a `img-src`, como en el ejemplo, o declarar un icono propio (`document.head.link: [{ rel: 'icon', href: '/favicon.svg' }]`), que sustituye al de Meeko.
   - `"_headers"` escribe `/_headers`, el formato de Netlify y Cloudflare Pages, con un bloque `/*` para todas las rutas. Esos hostings lo leen y no lo publican.
   - `"nginx"` escribe `/_meeko/headers.conf`, una línea `add_header … always;` por cabecera, para incluirlo en cada `location` (un `add_header` dentro de una `location` anula los del `server`). El archivo está dentro de la raíz web, así que la configuración debe ocultar `/_meeko/`:
 
@@ -3348,10 +3944,10 @@ Esas opciones sólo se leen cuando `server.adapter` es `"static"`; con `meeko bu
 
 ```ts
 export default defineMeekoConfig({
-  site: "https://example.com",
-  sitemap: { exclude: ["/admin", "/admin/*"] },   // o sitemap: true
-  robots: { disallow: ["/admin/"] },              // o robots: true
-});
+	site: 'https://example.com',
+	sitemap: { exclude: ['/admin', '/admin/*'] }, // o sitemap: true
+	robots: { disallow: ['/admin/'] }, // o robots: true
+})
 ```
 
 Desde `1.3`, `sitemap` escribe `sitemap.xml` (protocolo sitemaps.org 0.9) con la URL absoluta de cada página prerenderizada y de cada ruta sin parámetros, sea `"ssr"`, `"stream"` o `"client"`; las rutas dinámicas sin prerender no se conocen en el build salvo que declaren [`sitemapEntries`](#rutas-dinámicas-en-el-sitemap-sitemapentries) (desde `1.7`). Se omiten las páginas prerenderizadas que piden `<meta name="robots" content="noindex">` (o `none`) y las rutas de `exclude`, donde `*` sustituye a cualquier secuencia de caracteres, `/` incluida. `robots` escribe `robots.txt` con `User-agent: *`, sus `allow` y `disallow` (`Allow: /` sin ninguno) y, con `sitemap`, la línea `Sitemap:` con su URL absoluta.
@@ -3364,14 +3960,12 @@ Desde `1.7`, una página con render en el servidor declara sus URL del sitemap c
 
 ```ts
 // app/pages/docs/[slug].route.ts (o el <script server> de la página)
-import { definePage } from "@meekojs/meeko/framework";
-import { docs } from "../../../server/content/bundle.js";
+import { definePage } from '@meekojs/meeko/framework'
+import { docs } from '../../../server/content/bundle.js'
 
 export const route = definePage({
-  sitemapEntries: ({ env }) => docs
-    .filter((doc) => env.DOCS_DRAFTS === "1" || !doc.draft)
-    .map((doc) => ({ params: { slug: doc.slug }, lastmod: doc.updatedAt, changefreq: "weekly" })),
-});
+	sitemapEntries: ({ env }) => docs.filter((doc) => env.DOCS_DRAFTS === '1' || !doc.draft).map((doc) => ({ params: { slug: doc.slug }, lastmod: doc.updatedAt, changefreq: 'weekly' })),
+})
 ```
 
 - **Cuándo y con qué.** `meeko build` la evalúa una vez, después de prerenderizar, en el servidor de Node intermedio con el que prerenderiza: el runtime de `server/runtime.ts` ya existe con `prerendering: true`, pero no hay petición, sesión ni `services` por petición. La función recibe `SitemapEntriesContext`: `env` (el `process.env` del build) y `prerendering` (siempre `true`). Lea los datos de lo que el build tiene a mano, como un bundle de contenido; si consulta una base de datos, debe estar accesible durante el build. Sólo se ejecuta con `sitemap` en `meeko.config.ts`, y Meeko sólo carga las opciones de las rutas que la nombran: escríbala en las opciones, no a través de un spread.
@@ -3395,13 +3989,13 @@ El adaptador `static` hace todo eso con `server.contentSecurityPolicy`: calcula 
 
 ```ts
 // Un host propio que sirve el build de Node con CSP para sus páginas prerenderizadas.
-import { readFile } from "node:fs/promises";
-import { contentSecurityPolicy } from "@meekojs/meeko/server";
-import type { PrerenderIndex } from "@meekojs/meeko/build";
+import { readFile } from 'node:fs/promises'
+import { contentSecurityPolicy } from '@meekojs/meeko/server'
+import type { PrerenderIndex } from '@meekojs/meeko/build'
 
-const index = JSON.parse(await readFile(".meeko/output/node/prerender/manifest.json", "utf8")) as PrerenderIndex;
-const hashes = [...new Set(Object.values(index.pages).flatMap((page) => page.scriptHashes ?? []))];
-const header = contentSecurityPolicy({ "default-src": ["'self'"], "object-src": ["'none'"] }, hashes);
+const index = JSON.parse(await readFile('.meeko/output/node/prerender/manifest.json', 'utf8')) as PrerenderIndex
+const hashes = [...new Set(Object.values(index.pages).flatMap((page) => page.scriptHashes ?? []))]
+const header = contentSecurityPolicy({ 'default-src': ["'self'"], 'img-src': ["'self'", 'data:'], 'object-src': ["'none'"] }, hashes)
 ```
 
 Desde `1.7`, los adaptadores con servidor ponen la cabecera ellos mismos con `server.contentSecurityPolicy` (véase la sección siguiente). Sin esa opción, `meeko start` no añade ninguna CSP: un host propio usa el nonce de `DocumentOptions.nonce`, que Meeko pone en sus `<script>` y `<style>`, y entonces una página prerenderizada no se sirve desde el archivo, porque el nonce cambia en cada respuesta.
@@ -3412,38 +4006,40 @@ Desde `1.7`, `server.contentSecurityPolicy` y `server.headers` también existen 
 
 ```ts
 // meeko.config.ts
-import { defineMeekoConfig } from "@meekojs/meeko/framework";
+import { defineMeekoConfig } from '@meekojs/meeko/framework'
 
 export default defineMeekoConfig({
-  server: {
-    adapter: "node",
-    contentSecurityPolicy: {
-      "default-src": ["'self'"],
-      "script-src": ["'self'"],
-      // Shiki y otros resaltadores escriben atributos style="…": esta directiva se queda como está.
-      "style-src": ["'self'", "'unsafe-inline'"],
-      "object-src": ["'none'"],
-      "base-uri": ["'none'"],
-      "frame-ancestors": ["'none'"],
-    },
-    headers: {
-      "X-Content-Type-Options": "nosniff",
-      "Referrer-Policy": "strict-origin-when-cross-origin",
-      "/admin/*": { "X-Robots-Tag": "noindex" },
-    },
-  },
-});
+	server: {
+		adapter: 'node',
+		contentSecurityPolicy: {
+			'default-src': ["'self'"],
+			// data: para el <link rel="icon" href="data:,"> que Meeko pone si la aplicación no tiene icono.
+			'img-src': ["'self'", 'data:'],
+			'script-src': ["'self'"],
+			// Shiki y otros resaltadores escriben atributos style="…": esta directiva se queda como está.
+			'style-src': ["'self'", "'unsafe-inline'"],
+			'object-src': ["'none'"],
+			'base-uri': ["'none'"],
+			'frame-ancestors': ["'none'"],
+		},
+		headers: {
+			'X-Content-Type-Options': 'nosniff',
+			'Referrer-Policy': 'strict-origin-when-cross-origin',
+			'/admin/*': { 'X-Robots-Tag': 'noindex' },
+		},
+	},
+})
 ```
 
 **La CSP según la respuesta.** Meeko completa la política de cada respuesta con lo que su cuerpo necesita:
 
-| Respuesta | `Content-Security-Policy` |
-| --- | --- |
-| Página prerenderizada | La política con los hashes de los scripts y `<style>` en línea que escribe Meeko (`scriptHashes` y `styleHashes` del índice de prerender, como el adaptador `static`). La página se sigue sirviendo desde su archivo, con su `ETag` y su `304`. |
-| Página SSR, `"stream"`, página de error y 404 | La política con un nonce nuevo en cada respuesta en `script-src` (en `script-src-elem` si la política la tiene, o en una copia de `default-src`), que Meeko pone en sus `<script>`, sus `<style>`, la entrada del cliente, el script del tema y los de `useHead` y `document`. |
-| Página SSR con [`cache`](#caché-de-páginas-ssr) | La política con los hashes de los scripts y `<style>` en línea que escribe Meeko, sin nonce: el documento es el mismo para todos y en cada revalidación, y un nonce no sobrevive a un `304`. |
-| JSON de API, RPC y payload de navegación | `default-src 'none'; frame-ancestors 'none'`: el JSON no ejecuta ni carga nada. Se aplica a toda respuesta de `server/api` y del RPC, también a la de un endpoint con `contentType: "response"`. |
-| Cualquier otra (archivos públicos, handlers de módulos, 404 sin página de error) | La política tal cual. |
+| Respuesta                                                                        | `Content-Security-Policy`                                                                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Página prerenderizada                                                            | La política con los hashes de los scripts y `<style>` en línea que escribe Meeko (`scriptHashes` y `styleHashes` del índice de prerender, como el adaptador `static`). La página se sigue sirviendo desde su archivo, con su `ETag` y su `304`.                                |
+| Página SSR, `"stream"`, página de error y 404                                    | La política con un nonce nuevo en cada respuesta en `script-src` (en `script-src-elem` si la política la tiene, o en una copia de `default-src`), que Meeko pone en sus `<script>`, sus `<style>`, la entrada del cliente, el script del tema y los de `useHead` y `document`. |
+| Página SSR con [`cache`](#caché-de-páginas-ssr)                                  | La política con los hashes de los scripts y `<style>` en línea que escribe Meeko, sin nonce: el documento es el mismo para todos y en cada revalidación, y un nonce no sobrevive a un `304`.                                                                                   |
+| JSON de API, RPC y payload de navegación                                         | `default-src 'none'; frame-ancestors 'none'`: el JSON no ejecuta ni carga nada. Se aplica a toda respuesta de `server/api` y del RPC, también a la de un endpoint con `contentType: "response"`.                                                                               |
+| Cualquier otra (archivos públicos, handlers de módulos, 404 sin página de error) | La política tal cual.                                                                                                                                                                                                                                                          |
 
 **Qué autorizan los hashes.** Sólo el código en línea que escribe Meeko fuera de la página: el `<head>` (el script y el estilo del tema, la reserva de `<MeekoAwait>`, `useHead`, `document.head` y los `<style>` de los componentes), el payload si no es un bloque de datos, la entrada del cliente y `document.bodyEnd`. Un `<script>` o un `<style>` dentro de `#app` o de un teleport (de `html="…"`, de contenido de usuario mal saneado o escrito en la plantilla) nunca recibe hash, así que el navegador lo bloquea, igual que con nonce. Un `<script>` o `<style>` en la plantilla de una página con `cache` o prerenderizada debe ir en `useHead` o en un archivo.
 
@@ -3515,17 +4111,18 @@ La configuración se declara en `meeko.config.ts`:
 
 ```ts
 export default defineMeekoConfig({
-  server: {
-    adapter: "cloudflare",
-    name: "mi-app",                     // por defecto, el nombre del package.json
-    socketClassName: "MeekoSocketRoom", // clase Durable Object de las salas
-    compatibilityDate: "2026-10-19",    // por defecto, la fecha con la que Meeko se prueba
-    wrangler: {                         // campos adicionales de wrangler.jsonc
-      d1_databases: [{ binding: "DB", database_name: "mi-app", database_id: "<id>" }],
-      vars: { MEEKO_PUBLIC_ORIGIN: "https://mi-app.example" },
-    },
-  },
-});
+	server: {
+		adapter: 'cloudflare',
+		name: 'mi-app', // por defecto, el nombre del package.json
+		socketClassName: 'MeekoSocketRoom', // clase Durable Object de las salas
+		compatibilityDate: '2026-10-19', // por defecto, la fecha con la que Meeko se prueba
+		wrangler: {
+			// campos adicionales de wrangler.jsonc
+			d1_databases: [{ binding: 'DB', database_name: 'mi-app', database_id: '<id>' }],
+			vars: { MEEKO_PUBLIC_ORIGIN: 'https://mi-app.example' },
+		},
+	},
+})
 ```
 
 El `wrangler.jsonc` generado contiene:
@@ -3545,23 +4142,26 @@ En Workers, `env` de `server/runtime.ts` es el objeto de bindings del Worker y `
 
 ```ts
 // server/runtime.ts
-import { D1SessionDriver, DurableObjectSocketPubSub } from "@meekojs/meeko/cloudflare";
-import type { D1DatabaseLike, DurableObjectNamespaceLike } from "@meekojs/meeko/cloudflare";
-import { defineServerRuntime, MemorySessionStore, SessionManager, SqlSessionStore } from "@meekojs/meeko/server";
+import { D1SessionDriver, DurableObjectSocketPubSub } from '@meekojs/meeko/cloudflare'
+import type { D1DatabaseLike, DurableObjectNamespaceLike } from '@meekojs/meeko/cloudflare'
+import { defineServerRuntime, MemorySessionStore, SessionManager, SqlSessionStore } from '@meekojs/meeko/server'
 
-interface Env { readonly DB?: D1DatabaseLike; readonly MEEKO_SOCKET?: DurableObjectNamespaceLike }
+interface Env {
+	readonly DB?: D1DatabaseLike
+	readonly MEEKO_SOCKET?: DurableObjectNamespaceLike
+}
 
 export default defineServerRuntime<Env>(({ env, production, prerendering }) => {
-  const store = prerendering || !env.DB ? new MemorySessionStore() : new SqlSessionStore(new D1SessionDriver(env.DB));
-  const pubsub = env.MEEKO_SOCKET ? new DurableObjectSocketPubSub(env.MEEKO_SOCKET) : undefined;
-  return {
-    sessions: new SessionManager({ production: production && !prerendering, store }),
-    services: { pubsub },
-    // Sin pubsub, el Worker usa DurableObjectSocketPubSub(env.MEEKO_SOCKET) por defecto;
-    // cualquier otro broker se rechaza al crear la aplicación.
-    socket: { maxMessageBytes: 16 * 1024 },
-  };
-});
+	const store = prerendering || !env.DB ? new MemorySessionStore() : new SqlSessionStore(new D1SessionDriver(env.DB))
+	const pubsub = env.MEEKO_SOCKET ? new DurableObjectSocketPubSub(env.MEEKO_SOCKET) : undefined
+	return {
+		sessions: new SessionManager({ production: production && !prerendering, store }),
+		services: { pubsub },
+		// Sin pubsub, el Worker usa DurableObjectSocketPubSub(env.MEEKO_SOCKET) por defecto;
+		// cualquier otro broker se rechaza al crear la aplicación.
+		socket: { maxMessageBytes: 16 * 1024 },
+	}
+})
 ```
 
 #### Sesiones en D1
@@ -3600,31 +4200,31 @@ La clave es el SHA-256 en base64url (43 caracteres), y cada petición limitada e
 Workers no abre conexiones TCP de Redis con el cliente `redis`. `RedisSessionStore` sólo necesita `get`, `set` con `PX`, `del` y `eval`, de modo que un adaptador sobre la API REST de Upstash basta. Guarde la URL y el token como secretos del Worker:
 
 ```ts
-import { RedisSessionStore } from "@meekojs/meeko/server";
-import type { RedisSessionClient } from "@meekojs/meeko/server";
+import { RedisSessionStore } from '@meekojs/meeko/server'
+import type { RedisSessionClient } from '@meekojs/meeko/server'
 
 /** Cliente mínimo de la API REST de Upstash para RedisSessionStore. */
 function upstashClient(url: string, token: string): RedisSessionClient {
-  const command = async (...args: Array<string | number>): Promise<unknown> => {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify(args),
-    });
-    const body = await response.json() as { result?: unknown; error?: string };
-    if (!response.ok || body.error) throw new Error(`Upstash ${String(args[0])} failed: ${body.error ?? response.status}`);
-    return body.result;
-  };
-  return {
-    get: async (key) => (await command("GET", key)) as string | null,
-    set: (key, value, { PX }) => command("SET", key, value, "PX", PX),
-    del: (key) => command("DEL", key),
-    eval: (script, { keys, arguments: args }) => command("EVAL", script, keys.length, ...keys, ...args),
-  };
+	const command = async (...args: Array<string | number>): Promise<unknown> => {
+		const response = await fetch(url, {
+			method: 'POST',
+			headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+			body: JSON.stringify(args),
+		})
+		const body = (await response.json()) as { result?: unknown; error?: string }
+		if (!response.ok || body.error) throw new Error(`Upstash ${String(args[0])} failed: ${body.error ?? response.status}`)
+		return body.result
+	}
+	return {
+		get: async (key) => (await command('GET', key)) as string | null,
+		set: (key, value, { PX }) => command('SET', key, value, 'PX', PX),
+		del: (key) => command('DEL', key),
+		eval: (script, { keys, arguments: args }) => command('EVAL', script, keys.length, ...keys, ...args),
+	}
 }
 
 // En la fábrica de server/runtime.ts:
-const store = new RedisSessionStore(upstashClient(env.UPSTASH_REDIS_REST_URL, env.UPSTASH_REDIS_REST_TOKEN), { prefix: "mi-app:prod:" });
+const store = new RedisSessionStore(upstashClient(env.UPSTASH_REDIS_REST_URL, env.UPSTASH_REDIS_REST_TOKEN), { prefix: 'mi-app:prod:' })
 ```
 
 La API REST no mantiene una suscripción, así que no pase `subscriber`: las revocaciones se detectan al releer la sesión, como con D1.
@@ -3664,7 +4264,7 @@ Para un Worker propio, `@meekojs/meeko/cloudflare` exporta las piezas que usa el
 
 `packages/meeko/tests/conformance/` construye la misma aplicación de prueba (`tests/fixtures/conformance-app/`) con cada adaptador. Antes de arrancar la salida en su runtime real, retira las fuentes; para Bun, Deno y workerd retira también `node_modules`. La variante `workerd` construye con el adaptador `cloudflare` y ejecuta la salida con el mismo runtime local que `wrangler dev` (workerd tras el proxy de Wrangler, mediante `createTestHarness`), con D1 y Durable Objects en memoria. Las mismas aserciones cubren:
 
-- SSR con loader y plataforma, API, RPC, CSRF y Origin;
+- SSR con loader y plataforma, API, RPC, CSRF y Origin, también el `Origin` por defecto de las mutaciones anónimas (desde `1.8`) y `origin: "none"`;
 - `404`, `405` con `Allow`, y `HEAD`, incluida la `404` de una página sin ruta con `app/error.meeko` dentro de los layouts;
 - assets con `ETag`/`304` y política de caché, e intentos de traversal (`..`, `%2e%2e`, `%2f`, `%5c`) y de leer archivos del build;
 - páginas prerenderizadas con la meta CSRF de la sesión;
@@ -3712,19 +4312,19 @@ La prueba Redis requiere que `MEEKO_REDIS_URL` apunte a un servidor de pruebas a
 
 La entrada cliente generada registra `meeko-hydration` en el navegador. El benchmark actual mide navegación desde el clic de un enlace hasta que aparece la nueva ruta; el baseline histórico medía una llamada directa a `mountClientApp.navigate`. Por ese cambio de método, no compare las cifras de navegación entre ambas ejecuciones como si fueran una regresión del runtime. El JSON histórico permanece intacto.
 
-| Métrica | Mediana o tamaño | p10–p90 |
-| --- | ---: | ---: |
-| Compilación fría | 9.40 ms | 9.08–9.45 ms |
-| Compilación tras edición | 0.87 ms | 0.53–1.14 ms |
-| HMR visible | 28.63 ms | 27.19–29.11 ms |
-| SSR por petición | 0.040 ms | 0.032–0.060 ms |
-| Hidratación | 11.10 ms | 10.70–11.20 ms |
-| Navegación cliente | 1.90 ms | 1.80–2.10 ms |
-| Dispatcher API | 0.019 ms | 0.017–0.019 ms |
-| Dispatcher RPC | 0.049 ms | 0.044–0.054 ms |
-| Bundle motor | 19,134 B; gzip 7,222 B | — |
-| Bundle mínimo | 21,314 B; gzip 6,438 B | — |
-| Bundle full-stack | 36,063 B; gzip 14,897 B | — |
+| Métrica                  |        Mediana o tamaño |        p10–p90 |
+| ------------------------ | ----------------------: | -------------: |
+| Compilación fría         |                 9.40 ms |   9.08–9.45 ms |
+| Compilación tras edición |                 0.87 ms |   0.53–1.14 ms |
+| HMR visible              |                28.63 ms | 27.19–29.11 ms |
+| SSR por petición         |                0.040 ms | 0.032–0.060 ms |
+| Hidratación              |                11.10 ms | 10.70–11.20 ms |
+| Navegación cliente       |                 1.90 ms |   1.80–2.10 ms |
+| Dispatcher API           |                0.019 ms | 0.017–0.019 ms |
+| Dispatcher RPC           |                0.049 ms | 0.044–0.054 ms |
+| Bundle motor             |  19,134 B; gzip 7,222 B |              — |
+| Bundle mínimo            |  21,314 B; gzip 6,438 B |              — |
+| Bundle full-stack        | 36,063 B; gzip 14,897 B |              — |
 
 Tras 500 renders SSR, el heap pasó de 87,276,056 a 87,012,304 bytes después de GC; RSS máximo observado: 224,952,320 bytes. Esta muestra no prueba ausencia de fugas y debe compararse sólo bajo condiciones equivalentes.
 

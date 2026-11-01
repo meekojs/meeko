@@ -42,7 +42,8 @@ El starter lo declara como `"start": "meeko start ."`, así que en el servidor b
 | `MEEKO_PUBLIC_ORIGIN` | origen | ninguno | Origen público HTTPS tras un proxy, para las comprobaciones de `Origin` de HTTP y Socket. |
 | `MEEKO_REDIS_URL` | URL | ninguna | Redis de las sesiones si `server/runtime.ts` no declara `sessions`. Necesita el paquete `redis` instalado. |
 | `MEEKO_SESSION_TTL`, `MEEKO_SESSION_SAMESITE` | texto | `7d`, `Lax` | Duración y `SameSite` de las sesiones por defecto. |
-| `MEEKO_TRUST_PROXY` | número o `true` | ninguno | Proxies de confianza para `X-Forwarded-For` (rate limit, `clientAddress`). |
+| `MEEKO_TRUST_PROXY` | número, `true` o `cloudflare` | ninguno | Proxies de confianza para `X-Forwarded-For` (rate limit, `clientAddress`). Desde `1.8`, `cloudflare` lee `CF-Connecting-IP` tras Cloudflare Tunnel. |
+| `MEEKO_TRUSTED_PROXIES` | CIDR o IP, separados por comas | loopback y redes privadas | Desde `1.8`, con `MEEKO_TRUST_PROXY=cloudflare`: redes de `cloudflared` y los proxies, las únicas cuyo `CF-Connecting-IP` se lee. |
 
 `start` no admite banderas ni más argumentos: `meeko start . extra` termina con `Argumento de más para start: extra`.
 

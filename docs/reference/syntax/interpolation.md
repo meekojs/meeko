@@ -45,6 +45,8 @@ Qué admite la expresión:
 
 - Cualquier expresión TypeScript: llamadas, ternarios, operadores, plantillas literales (`` {`${count.value} €`} ``), `as` y `!`.
 - Llaves propias de JavaScript: un objeto literal (`{ { total: count.value }.total }`), una plantilla con `${…}`, cadenas con `{` o `}`, comentarios y expresiones regulares. La interpolación termina en la llave que equilibra la de apertura.
+- `<`, `&&` y cadenas con etiquetas se escriben tal cual: `{a<b&&c}`, `{ok && "<b>"}`. El `<` de una expresión nunca abre una etiqueta.
+- Las referencias de carácter HTML (`&lt;`, `&amp;`, `&#60;`) se decodifican antes de evaluar, como en el valor de un atributo y en Vue: `{x &amp;&amp; y}` es `x && y`, y `{'&lt;'}` pinta `<`. Para conservar una referencia literal, escribe su `&` desde JavaScript: `{"\x26lt;"}` pinta `&lt;`. Los diagnósticos y los source maps señalan la posición en la fuente, después de la referencia.
 - No admite sentencias (`if`, `const`, `;`): calcula el valor en el script o con un `computed`.
 
 ## Resultado

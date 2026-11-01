@@ -115,10 +115,10 @@ Sin él, las mutaciones (`POST` de API y RPC) y los sockets que llegan con `Orig
 ### Otro proyecto del monorepo
 
 ```sh
-meeko dev apps/site
+meeko dev apps/meeko
 ```
 
-La ruta es la raíz del proyecto, no un archivo: el `.env`, `meeko.config.ts`, `app/` y `.meeko/` se leen y escriben dentro de `apps/site`.
+La ruta es la raíz del proyecto, no un archivo: el `.env`, `meeko.config.ts`, `app/` y `.meeko/` se leen y escriben dentro de `apps/meeko`.
 
 ## Errores comunes
 
@@ -158,14 +158,14 @@ meeko dev
 ### Ejecutarlo fuera de la raíz del proyecto
 
 ```sh bad
-cd apps/site/app
+cd apps/meeko/app
 meeko dev
 ```
 
-`meeko dev` busca `app/pages` dentro del directorio que recibe y falla con `ENOENT: no such file or directory, scandir '…\apps\site\app\app\pages'`. Tampoco leería el `.env` correcto.
+`meeko dev` busca `app/pages` dentro del directorio que recibe y falla con `ENOENT: no such file or directory, scandir '…\apps\meeko\app\app\pages'`. Tampoco leería el `.env` correcto.
 
 ```sh good
-meeko dev apps/site
+meeko dev apps/meeko
 ```
 
 ### `MEEKO_LINK_WATCH=0` y un Meeko enlazado que cambia

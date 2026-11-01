@@ -119,7 +119,7 @@ MEEKO_PUBLIC_ORIGIN=https://app.example.com
 curl -X POST https://app.example.com/api/auth/login -d '{…}'
 ```
 
-Una ruta con `origin: "required"`, o `session.create()` en esa ruta, responde `403 INVALID_ORIGIN`. Envíe el origen de la aplicación.
+Desde `1.8`, toda mutación sin `Origin` responde `403 INVALID_ORIGIN`, también sin sesión (antes, sólo con `origin: "required"` o en `session.create()`). Envíe el origen de la aplicación, o declare `origin: "none"` en una ruta que no puede recibirlo y verifique otra prueba, como una firma.
 
 ```sh good
 curl -X POST https://app.example.com/api/auth/login -H 'origin: https://app.example.com' -H 'content-type: application/json' -d '{…}'
@@ -127,7 +127,7 @@ curl -X POST https://app.example.com/api/auth/login -H 'origin: https://app.exam
 
 ## Notas
 
-- **Qué protege.** Origin y CSRF son la defensa frente a una web ajena que envía formularios o `fetch` con la cookie del usuario. Una petición sin cookie no tiene token: para el inicio de sesión, use `origin: "required"`.
+- **Qué protege.** Origin y CSRF son la defensa frente a una web ajena que envía formularios o `fetch` con la cookie del usuario. Una petición sin cookie no tiene token, así que desde `1.8` sólo se comprueba su `Origin`, en toda mutación salvo con `origin: "none"`.
 - **Métodos.** `GET`, `HEAD` y `OPTIONS` no se comprueban: no deben cambiar datos.
 - **Socket.** Un upgrade con un `Origin` ajeno responde `403 INVALID_ORIGIN` por HTTP y nunca llega a la sesión.
 - **Respuesta prevista.** Un `403` no llega a `onError` del runtime.

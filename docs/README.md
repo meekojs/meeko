@@ -44,4 +44,4 @@ La documentación se organiza por tareas. Las guías existentes mantienen sus ru
 - [Publicaciones](releasing.md).
 - [Historial de cambios](../packages/meeko/CHANGELOG.md).
 
-La web pública publica estas categorías desde `apps/site/server/content/catalog.ts`; la referencia detallada tiene su propia taxonomía. Al añadir una guía, actualiza este índice y su entrada del catálogo cuando deba ser pública.
+La web pública publica estas categorías desde `packages/docs-content/src/content/catalog.ts`; la referencia detallada tiene su propia taxonomía. Al añadir una guía, actualiza este índice y su entrada del catálogo cuando deba ser pública.

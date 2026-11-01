@@ -18,7 +18,7 @@ related:
   - docs/framework.md#sesiones-sin-configuración
 ---
 
-`defineServerRuntime(factory)` es el export por defecto de `server/runtime.ts`: declara los recursos de la aplicación que viven lo que vive el proceso. Meeko llama a la fábrica **una vez por proceso** con `{ env, production, platform, prerendering }` y usa lo que devuelve: las sesiones, los servicios que llegan a cada petición como `context.services`, la política de Socket, el origen público, el observador de errores y el cierre.
+`defineServerRuntime(factory)` es el export por defecto de `server/runtime.ts`: declara los recursos de la aplicación que viven lo que vive el proceso. Meeko llama a la fábrica **una vez por proceso** con `{ env, production, platform, prerendering, root }` y usa lo que devuelve: las sesiones, los servicios que llegan a cada petición como `context.services`, la política de Socket, el origen público, el observador de errores y el cierre.
 
 Desde `1.7`, el tipo de `services` se infiere de este archivo: `context.services.db` está tipado en páginas, API, RPC, Socket y middleware de servidor sin conversiones.
 
@@ -51,7 +51,7 @@ export default defineServerRuntime(async ({ env, production, prerendering }) => 
 
 | Parámetro | Tipo | Por defecto | Descripción |
 | --- | --- | --- | --- |
-| `factory` | `(context) => ServerRuntime \| Promise<ServerRuntime>` | obligatorio | Crea los recursos. Recibe `env` (las variables de entorno), `production`, `platform` (`{ name, env, waitUntil }`) y `prerendering`, `true` cuando `meeko build` prerenderiza sin tráfico de clientes. |
+| `factory` | `(context) => ServerRuntime \| Promise<ServerRuntime>` | obligatorio | Crea los recursos. Recibe `env` (las variables de entorno), `production`, `platform` (`{ name, env, waitUntil }`) `prerendering`, `true` cuando `meeko build` prerenderiza sin tráfico de clientes, y, desde `1.8`, `root`, la ruta absoluta de la raíz del proyecto (`undefined` en Workers). |
 
 Lo que devuelve la fábrica:
 
@@ -112,6 +112,23 @@ export default defineServerRuntime(async ({ env, production, prerendering }) => 
 ```
 
 Con `prerendering`, el build no sirve tráfico: basta un store en memoria, que es el que crea Meeko sin `sessions`.
+
+### Archivos del proyecto con `root`
+
+Desde `1.8`, `root` dice dónde está el proyecto en `meeko dev`, en `meeko start` y en la salida de Node, Bun o Deno, que el build deja en `.meeko/output/…`, donde `import.meta.url` ya no apunta a `server/`. Si la salida se despliega fuera del proyecto, indíquelo con `MEEKO_ROOT`.
+
+```ts
+// server/runtime.ts
+import { join } from 'node:path'
+import { defineServerRuntime } from '@meekojs/meeko/server'
+
+export default defineServerRuntime(({ root }) => {
+	if (!root) throw new Error('Este servidor necesita el sistema de archivos del proyecto')
+	return { services: { content: join(root, 'content') } }
+})
+```
+
+Véase [Runtime de servidor](../../framework.md#runtime-de-servidor).
 
 ### Un servicio que usa una página
 

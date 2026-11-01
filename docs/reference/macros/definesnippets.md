@@ -52,7 +52,7 @@ function close(): void {
 
 | Parámetro | Tipo | Por defecto | Descripción |
 | --- | --- | --- | --- |
-| `T` (argumento de tipo) | `{ [nombre]: [...params] \| Snippet<Args> }` | obligatorio | Cada clave es un snippet y su valor, la tupla de parámetros (`[]` sin parámetros). Desde `1.4`, el valor también puede ser un `Snippet<Args>`, que cuenta como `Args`. Una clave opcional (`title?:`) hace opcional el snippet. Sin argumento de tipo es `MEEK060`. |
+| `T` (argumento de tipo) | `{ [nombre]: [...params] \| Snippet<Args> }` | obligatorio | Cada clave es un snippet y su valor, la tupla de parámetros (`[]` sin parámetros). Desde `1.4`, el valor también puede ser un `Snippet<Args>`, que cuenta como `Args`. Desde `1.8`, las claves pueden salir de un tipo mapeado sobre un genérico (`` `cell-${K}` ``). Una clave opcional (`title?:`) hace opcional el snippet. Sin argumento de tipo es `MEEK060`. |
 
 No admite argumentos en ejecución (`MEEK060`).
 
@@ -114,6 +114,47 @@ function close(): void {
 ```
 
 `AppCardSnippets` se autoimporta con el nombre de la etiqueta. Cada snippet conserva sus parámetros y su `?`.
+
+### Snippets por columna, con nombres que salen de un genérico
+
+Desde `1.8`, las claves de `T` pueden salir de un parámetro de tipo con un tipo mapeado y un template literal. Una rejilla genérica declara `cell-<clave>`, con el valor del tipo de esa columna, `header-<clave>` y un `cell` de respaldo:
+
+```html
+<!-- app/components/AppGrid.meeko -->
+<script lang="ts" generic="Row extends object">
+import type { Snippet } from "@meekojs/meeko";
+type Column<R extends object> = { key: Extract<keyof R, string>; label: string };
+const props = defineProps<{ rows: readonly Row[]; columns: readonly Column<Row>[] }>();
+const snippets = defineSnippets<
+  { [K in Extract<keyof Row, string> as `cell-${K}`]?: [row: Row, value: Row[K]] } &
+  { [K in Extract<keyof Row, string> as `header-${K}`]?: [column: Column<Row>] } &
+  { cell?: [row: Row, column: Column<Row>, value: unknown] }
+>();
+// Sobre Row, TypeScript no lee un nombre calculado: el hijo lo lee de una vista.
+const byName = snippets as { readonly [name: string]: Snippet<never> | undefined };
+function cellOf(column: Column<Row>): Snippet<[row: Row, value: unknown]> | undefined {
+  return byName[`cell-${column.key}`] as Snippet<[row: Row, value: unknown]> | undefined;
+}
+</script>
+
+<template>
+  <p each:of="props.rows" each:as="row">
+    <span each:of="props.columns" each:as="column">
+      <render if:when="cellOf(column)" snippet="cellOf(column)" args="row, row[column.key]" />
+      <render if:when="!cellOf(column)" snippet="snippets.cell" args="row, column, row[column.key]" />
+    </span>
+  </p>
+</template>
+```
+
+```html
+<AppGrid bind:rows="users.value" bind:columns="columns">
+  <snippet name="cell-email" params="row, value"><a bind:href="'mailto:' + value">{value}</a></snippet>
+  <snippet name="header-email">Correo</snippet>
+</AppGrid>
+```
+
+`value` es `string`, el tipo de `User["email"]`; `name="cell-nope"` da `TS2353` y unos `params` de más, `TS2345`. El editor completa los nombres posibles y muestra su firma. Dentro del hijo, `snippets.cell` conserva su tupla (el compilador lee la intersección miembro a miembro), pero un nombre calculado necesita la vista con conversión.
 
 ### Un snippet con varias acciones
 
@@ -206,3 +247,4 @@ const snippets = defineSnippets<{ default: [] }>();
 - **Copias en el setup.** Como con las props, `const hasFooter = Boolean(snippets.footer)` conserva el valor inicial: léelo en la plantilla o en un `computed`, porque el padre puede empezar o dejar de pasarlo con `<snippet if:when>`.
 - **Dónde va.** Una sola vez, en su propia declaración `const` de nivel superior con un nombre simple (`MEEK059`), antes del primer `await` de navegador (`MEEK058`).
 - **Tipos.** Un valor que no es una tupla ni un `Snippet` es `TS2344`. Las tuplas con nombre (`[close: () => void]`) dan nombres a los parámetros en el editor.
+- **Nombres.** Una clave es un identificador o, desde `1.8`, segmentos unidos por guiones (`cell-email`); el hijo la lee como `snippets['cell-email']`.

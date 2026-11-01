@@ -8,7 +8,9 @@ symbols:
 types:
   - "@meekojs/meeko/devtools-ui#DevtoolsPanelOptions"
   - "@meekojs/meeko/devtools-ui#DevtoolsPanel"
+  - "@meekojs/meeko/devtools-ui#DevtoolsPanelPosition"
 related:
+  - "config:devtools"
   - "@meekojs/meeko/vite#meeko"
   - "@meekojs/meeko/framework#definePlugin"
   - docs/devtools.md#panel-dentro-de-la-página
@@ -17,6 +19,8 @@ related:
 ---
 
 `mountDevtoolsPanel` añade a la página el panel de Meeko DevTools: un árbol con las instancias de componentes vivas, el detalle de sus props y señales (con un editor para cambiarlas), una línea de tiempo filtrable de lecturas y escrituras con su archivo y su línea, el resaltado del elemento de cada instancia en la página y un punto de parada por instancia. Vive en un Shadow DOM, así que no hereda ni altera los estilos de la aplicación.
+
+Desde `1.8`, en una aplicación de `meeko dev` basta con [`devtools: true`](../config/config-devtools.md) en `meeko.config.ts`: el framework lo monta sin este código. `mountDevtoolsPanel` sigue sirviendo para un host de Vite propio o un contenedor propio.
 
 Lee el hook `window.__MEEKO_DEVTOOLS__`, que instala el código de desarrollo de los componentes al hidratarse con Vite en desarrollo. Si todavía no existe, el panel lo dice y se conecta solo en cuanto aparece.
 
@@ -40,7 +44,10 @@ El plugin `.client.ts` se ejecuta sólo en el navegador, antes de hidratar; el p
 
 | Opción | Tipo | Por defecto | Descripción |
 | --- | --- | --- | --- |
-| `container` | `Element` | `document.body` | Elemento que recibe el host del Shadow DOM. El panel se coloca fijo en la esquina inferior derecha. |
+| `container` | `Element` | `document.body` | Elemento que recibe el host del Shadow DOM. |
+| `position` | `"bottom-right" \| "bottom-left" \| "top-right" \| "top-left"` | `"bottom-right"` | Desde `1.8`, esquina de la ventana en la que se fija el panel. Otro valor lanza `TypeError`. |
+
+Desde `1.8`, el panel se minimiza a una pastilla con el número de eventos nuevos (su botón o `Alt+Mayús+M`) y se lleva a otra esquina con su asa (arrastrando o con las flechas). Recuerda el estado plegado y la esquina en `localStorage` (`meeko:devtools-panel`); una `position` distinta en la llamada manda sobre la esquina recordada. Véase [Aspecto, minimizar y mover](../../devtools.md#aspecto-minimizar-y-mover).
 
 ## Valor devuelto
 
@@ -51,7 +58,7 @@ Un `DevtoolsPanel`:
 | `refresh()` | Vuelve a buscar el hook y actualiza los datos. Es lo que hace el botón «Actualizar». |
 | `unmount()` | Quita el panel y libera sus suscripciones, sus eventos y el resaltado. El botón de cerrar hace lo mismo. |
 
-Lanza `Error: Meeko DevTools requires a browser document` si el contenedor no pertenece a un documento con ventana.
+Lanza `Error: Meeko DevTools requires a browser document` si el contenedor no pertenece a un documento con ventana, y `TypeError: Meeko DevTools: position must be one of bottom-right, bottom-left, top-right, top-left` con otra `position`.
 
 ## Ejemplos
 
@@ -156,5 +163,5 @@ if (import.meta.env.DEV) {
 - **Sólo en desarrollo.** El hook existe sólo con los componentes compilados por Vite en modo desarrollo; `meeko build` no lo incluye.
 - **Versión.** El panel comprueba la versión del protocolo del hook: con otro `@meekojs/meeko` en la página, muestra `Versión de protocolo DevTools no compatible` y pide usar el mismo paquete para el panel y la aplicación.
 - **Seguridad.** El panel puede leer y cambiar las señales de la página: no lo montes donde lo vea un usuario final.
-- **Estilos.** El panel está aislado en su Shadow DOM, con `all: initial` en su host y su propio esquema de color oscuro, y se dibuja por encima de todo (`z-index` máximo). Cada llamada crea un panel nuevo: no hay comprobación de uno ya montado.
+- **Estilos.** El panel está aislado en su Shadow DOM, con `all: initial` en su host y, desde `1.8`, los colores de Meeko en claro u oscuro (el del sistema o el `data-theme` de `<html>`), y se dibuja por encima de todo (`z-index` máximo). Cada llamada crea un panel nuevo: no hay comprobación de uno ya montado (la opción `devtools` sí respeta un panel que la aplicación ya montó).
 - **Chrome.** La extensión Meeko DevTools ofrece el mismo panel dentro de Chrome DevTools, sin tocar el código de la aplicación.

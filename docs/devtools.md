@@ -4,22 +4,35 @@ DevTools permite examinar y editar cada instancia hidratada durante el desarroll
 
 ## Panel dentro de la página
 
-El ejemplo Vite lo monta automáticamente en modo desarrollo:
+Desde `1.8`, la forma recomendada es activarlo en `meeko.config.ts`, como `devtools: true` en Nuxt:
 
-```powershell
-pnpm run build
-pnpm run vite:dev
+```ts
+// meeko.config.ts
+import { defineMeekoConfig } from "@meekojs/meeko/framework";
+
+export default defineMeekoConfig({ devtools: true });
 ```
 
-Una aplicación puede montar el panel explícitamente:
+Con esa opción, `meeko dev` monta el panel en todas las páginas sin código de la aplicación. Nunca lo añade `meeko build`, `meeko start`, `meeko preview` ni una página prerenderizada: el bundle de producción no contiene `@meekojs/meeko/devtools-ui`. Por defecto es `false` en `1.x`, para que quien actualiza no vea un panel nuevo sin pedirlo. `{ position: "bottom-left" }` lo fija en otra esquina (`"bottom-right"`, la de por defecto, `"bottom-left"`, `"top-right"` o `"top-left"`), y `{ panel: false }` lo desactiva sin borrar las opciones. Un valor que no es válido detiene `meeko dev`, `build` y `check` con un mensaje que nombra la opción; véase la [referencia de `devtools`](reference/config/config-devtools.md). La [extensión de Chrome](#panel-de-chrome-devtools) y el [puente del editor](#puente-del-editor) funcionan con o sin la opción, porque leen el mismo hook.
+
+Como alternativa, una aplicación puede montarlo por su cuenta, por ejemplo en otro contenedor; no combine las dos formas, o puede haber dos paneles:
 
 ```ts
 if (import.meta.env.DEV) {
   const { mountDevtoolsPanel } = await import("@meekojs/meeko/devtools-ui");
-  const panel = mountDevtoolsPanel();
+  const panel = mountDevtoolsPanel({ position: "top-right" });
   // panel.unmount() libera la interfaz cuando deje de usarse.
 }
 ```
+
+El ejemplo Vite del repositorio lo monta así en modo desarrollo (`pnpm run build` y `pnpm run vite:dev`).
+
+### Aspecto, minimizar y mover
+
+- **Colores de Meeko.** El panel usa los tokens del sitio de Meeko (acento azul, superficies neutras e Inter si la página la tiene, con `system-ui` de respaldo). Es oscuro o claro según el sistema; si `<html>` tiene `data-theme="light"` o `"dark"` (la opción [`theme`](framework.md#tema-clarooscuro-sin-parpadeo)), sigue a la página y cambia con ella. Los tokens viven dentro de su Shadow DOM: ni el CSS de la aplicación lo altera ni el panel altera la aplicación.
+- **Minimizar.** El botón **Minimizar** (o `Alt+Mayús+M` en cualquier parte de la página) pliega el panel a una pastilla con el logo y, en rosa, el número de eventos nuevos desde que se plegó. Un clic en la pastilla o el mismo atajo lo restauran. El foco pasa a la pastilla o al botón, y los lectores de pantalla oyen «Restaurar Meeko DevTools · N eventos nuevos».
+- **Mover.** El asa de la cabecera (los seis puntos) lleva el panel a la esquina más cercana al soltarla; con el asa enfocada, las flechas lo mueven de esquina. La pastilla también se arrastra.
+- **Memoria.** El estado plegado y la esquina elegida se guardan en `localStorage` (`meeko:devtools-panel`) del origen de la aplicación y sobreviven a las recargas. Si cambia `position` en la configuración, manda la nueva. Sin `localStorage` (modo privado, almacenamiento bloqueado) el panel funciona igual, sin memoria.
 
 El panel ofrece:
 
@@ -58,7 +71,7 @@ Estos eventos no incluyen la URL resuelta, query, fragmento, parámetros, cabece
    - usa **Resaltar** para ubicar la instancia en la página;
    - activa el punto de parada y provoca una actualización de su señal.
 
-La extensión consulta el hook de la página inspeccionada. No necesita cuenta, servicio remoto, permisos de host ni scripts de contenido. Su versión (`1.0.0`) es independiente de la del paquete npm; la instalación, el empaquetado y las pruebas se describen en [`packages/devtools/README.md`](../packages/devtools/README.md).
+La extensión consulta el hook de la página inspeccionada. No necesita cuenta, servicio remoto, permisos de host ni scripts de contenido. Usa los mismos colores que el panel dentro de la página y sigue el tema claro u oscuro de Chrome DevTools. Su versión (`1.0.0`) es independiente de la del paquete npm; la instalación, el empaquetado y las pruebas se describen en [`packages/devtools/README.md`](../packages/devtools/README.md).
 
 ## Protocolo
 

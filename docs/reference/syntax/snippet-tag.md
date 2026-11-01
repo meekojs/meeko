@@ -44,7 +44,7 @@ const message = signal("¿Borrar la cuenta?");
 
 | Atributo | Tipo | Por defecto | Descripción |
 | --- | --- | --- | --- |
-| `name` | identificador | obligatorio | El snippet que llena, una clave del `defineSnippets` del hijo. |
+| `name` | identificador o segmentos con guion | obligatorio | El snippet que llena, una clave del `defineSnippets` del hijo. Desde `1.8` admite segmentos unidos por guiones (`cell-email`, `header-created-at`), sin guion final ni doble: `/^[A-Za-z_$][\w$]*(?:-[\w$]+)*$/`. |
 | `params` | lista de identificadores | sin parámetros | Nombres de los argumentos, separados por comas, con los tipos de la tupla del hijo: `params="item, index"`. |
 | `if:when` | expresión | siempre | Desde `1.4`. Pasa el snippet sólo mientras la expresión es verdadera; el hijo debe declararlo opcional. |
 
@@ -90,6 +90,19 @@ const users = signal([{ id: "1", email: "ana@example.com" }]);
 ```
 
 `user` es `{ id: string; email: string }`, inferido de `rows`.
+
+### Una celda por columna (`cell-<clave>`)
+
+Desde `1.8`, un hijo genérico puede declarar snippets cuyo nombre sale de las claves de sus filas (véase [`defineSnippets`](/docs/reference/definesnippets)). `UITable` declara `cell-<clave>` y `header-<clave>`:
+
+```html
+<UITable bind:rows="users.value" bind:columns="columns" rowKey="id">
+  <snippet name="cell-email" params="row, value"><a bind:href="'mailto:' + value">{value}</a></snippet>
+  <snippet name="header-status">Estado</snippet>
+</UITable>
+```
+
+`value` tiene el tipo de la columna (`string` para `email`). Una clave que la fila no tiene, como `name="cell-nope"`, da `TS2353` en `meeko check` y en el editor, que también completa los nombres posibles.
 
 ### Reenviar un snippet opcional con `if:when`
 
@@ -142,6 +155,22 @@ El contenido suelto no admite condición. Para condicionarlo, escríbelo en `<sn
 <AppDialog>
   <snippet name="title">Confirmar</snippet>
 </AppDialog>
+```
+
+### Un nombre que no es un identificador ni segmentos con guion
+
+```html bad
+<UITable bind:rows="users.value" bind:columns="columns" rowKey="id">
+  <snippet name="cell-">…</snippet>
+</UITable>
+```
+
+`MEEK061: <snippet> necesita name con el nombre del snippet del hijo que llena: un identificador o segmentos unidos por guiones, como name="title" o name="cell-email"`.
+
+```html good
+<UITable bind:rows="users.value" bind:columns="columns" rowKey="id">
+  <snippet name="cell-email" params="row, value">{value}</snippet>
+</UITable>
 ```
 
 ### Un snippet que el hijo no declara, o que falta

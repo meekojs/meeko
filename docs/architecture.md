@@ -16,16 +16,16 @@ El ejemplo de `examples/counter` ejercita el contrato en un servidor HTTP. Cada 
 
 ## Límites de responsabilidad
 
-| Parte | Responsabilidad |
-| --- | --- |
-| Parser | Analizar secciones, plantilla y expresiones conservando posiciones originales. |
-| Compilador | Validar la sintaxis y producir módulos tipados para SSR e hidratación. |
-| Runtime reactivo | Registrar dependencias, agrupar actualizaciones y liberar observadores por instancia. |
-| Runtime de navegador | Reclamar nodos existentes, conectar eventos y aplicar cambios precisos. |
-| Integración de herramientas | Mostrar diagnósticos en `.meeko`, transformar archivos en Vite y mantener HMR. |
-| Framework | Rutas, páginas, modos de render, navegación y clientes API/RPC/Socket (`src/framework`). |
-| Núcleo de servidor | Aplicación portable sobre Web APIs: runtime, contratos, sesiones, middleware y Socket (`src/framework-server`). |
-| Adaptadores | Conectar el núcleo con Node, Bun, Deno y Cloudflare Workers (`src/node.ts`, `src/bun.ts`, `src/deno.ts`, `src/cloudflare.ts`). |
+| Parte                       | Responsabilidad                                                                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Parser                      | Analizar secciones, plantilla y expresiones conservando posiciones originales.                                                 |
+| Compilador                  | Validar la sintaxis y producir módulos tipados para SSR e hidratación.                                                         |
+| Runtime reactivo            | Registrar dependencias, agrupar actualizaciones y liberar observadores por instancia.                                          |
+| Runtime de navegador        | Reclamar nodos existentes, conectar eventos y aplicar cambios precisos.                                                        |
+| Integración de herramientas | Mostrar diagnósticos en `.meeko`, transformar archivos en Vite y mantener HMR.                                                 |
+| Framework                   | Rutas, páginas, modos de render, navegación y clientes API/RPC/Socket (`src/framework`).                                       |
+| Núcleo de servidor          | Aplicación portable sobre Web APIs: runtime, contratos, sesiones, middleware y Socket (`src/framework-server`).                |
+| Adaptadores                 | Conectar el núcleo con Node, Bun, Deno y Cloudflare Workers (`src/node.ts`, `src/bun.ts`, `src/deno.ts`, `src/cloudflare.ts`). |
 
 La [guía del framework](framework.md) describe el framework, el servidor y los adaptadores.
 
@@ -57,6 +57,8 @@ El runtime de `src/dom.ts` usa comentarios como límites de condiciones, listas 
 El plugin `src/vite.ts` usa el mismo compilador para cliente y SSR y expone el CSS como módulo virtual. En desarrollo, cada componente acepta sus propias actualizaciones HMR: `src/hmr.ts` captura las señales editables por instancia, renderiza la nueva versión, hidrata su raíz o rango existente y actualiza los estilos. Una actualización del runtime recarga la página.
 
 Los módulos generados importan el runtime desde `@meekojs/meeko/internal`. Esta ruta agrupa las funciones de DOM, SSR, HMR y DevTools que el compilador necesita y se versiona junto con él. Desde `1.5`, un componente que usa `<MeekoThemeToggle>`, `<MeekoAwait>`, `<MeekoPopover>` o `<MeekoSelect>` importa además su módulo compilado (`@meekojs/meeko/builtins/theme-toggle`, `/await`, `/popover` o `/select`), y sólo ese componente: la tabla `builtinComponentModules` del compilador asocia cada etiqueta a su módulo, y `scripts/builtin-components.ts` compila su `.meeko` dentro del paquete. Una etiqueta integrada nueva sigue ese patrón para no crecer el runtime de todas las aplicaciones. En desarrollo, `src/devtools.ts` registra las instancias hidratadas y expone un hook de lectura que comparten el panel integrado y la extensión de Chrome. Ni SSR ni el build de producción registran instancias en ese hook.
+
+Desde core `1.8`, `<MeekoPopover>`, `<MeekoSelect>` y `<MeekoThemeToggle>` están obsoletos: el compilador emite `MEEK121` y el editor tacha la etiqueta y explica el reemplazo en el hover. Siguen funcionando en `1.x` y se retiran en `2.0`. Usa `UIPopover`, `UISelect` y `UIThemeToggle` del módulo `@meekojs/ui` 0.2; el sistema de temas permanece en core. Véase [Migración a 1.8](migration-1.8.md).
 
 ## Reglas para SSR
 

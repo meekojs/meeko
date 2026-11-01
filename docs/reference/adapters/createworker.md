@@ -186,7 +186,7 @@ createWorker(createCloudflareApp, { publicOrigin: "https://mi-app.example" });
 
 - **Una aplicación por aislado.** La fábrica se ejecuta en el primer evento y se reutiliza; `server/runtime.ts` recibe como `env` el objeto de bindings y `platform` vale `"cloudflare"`.
 - **Assets.** `wrangler.jsonc` declara `run_worker_first: true`: todas las peticiones llegan al Worker, que sólo sirve los archivos del manifiesto, con el `ETag` y la caché de los demás adaptadores. Las páginas prerenderizadas viven en `assets/_meeko/prerender/` y nunca se sirven como archivos.
-- **IP.** `CF-Connecting-IP`, que el borde de Cloudflare fija y sustituye: un cliente no puede falsificarla. `MEEKO_TRUST_PROXY` sólo hace falta si hay otro proxy delante.
+- **IP.** `CF-Connecting-IP`, que el borde de Cloudflare fija y sustituye: un cliente no puede falsificarla. `MEEKO_TRUST_PROXY` sólo hace falta si hay otro proxy delante; `cloudflare` no cambia nada, porque la conexión ya es `CF-Connecting-IP`, una IP pública.
 - **Fallos del proceso.** No hay proceso que cerrar: los rechazos sin manejar del aislado llegan a `onError`, y una excepción sólo hace fallar su petición o su tarea de `waitUntil`.
 - **CSP y cabeceras (desde 1.7).** `server.contentSecurityPolicy` y `server.headers` se aplican igual que en Node; los hashes y el nonce usan Web Crypto.
 - **Sin TCP.** Ni Redis por TCP ni `@meekojs/meeko/password` (scrypt agota la memoria del aislado): sesiones en D1 o Upstash, y la verificación de contraseñas en un servicio externo.

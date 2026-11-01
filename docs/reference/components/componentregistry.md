@@ -157,6 +157,12 @@ Los valores asociados se capturan cuando termina la carga. Para valores que deba
 
 La forma de un argumento conserva el comportamiento anterior: `await resolveComponent("FormUserCreate")` devuelve el módulo original, y sus props siguen siendo obligatorias al renderizarlo mediante `bind:` o `bind="objeto"`.
 
+### Un literal en `is` o `resolveComponent`
+
+Desde `1.8`, `<component is>` acepta el nombre de un componente como literal de texto en PascalCase (`is="big ? 'UICard' : 'section'"`), también `'MeekoLink'`. Ese nombre se conoce al escribir la plantilla: el compilador lo importa como su etiqueta, sin promesa, y sale en el HTML de SSR (véase [Nombres de componente en `is`](../../api.md#nombres-de-componente-en-is)). `resolveComponent` es para el nombre que sólo se conoce **en ejecución** (de una URL, de datos, de una tabla) o para cargar el componente en diferido, en su propio chunk.
+
+Los dos usan los mismos nombres: los componentes de `app/components`, los de los directorios configurados, los de módulos como los `UI*` de `@meekojs/ui` y, desde `1.8`, `"MeekoLink"`. `resolveComponent("MeekoLink", { to: "/users/[id]", params: { id: "7" } })` carga `<MeekoLink>` como componente, con una variante de props por ruta: `meeko check` exige los `params` de una ruta dinámica y rechaza una ruta que no existe o un `href`. Si el proyecto tiene un componente propio llamado `MeekoLink`, el nombre es el suyo.
+
 ## Ejemplos
 
 Al crear o eliminar un `.meeko` en los directorios registrados, el plugin de Vite vuelve a descubrir el catálogo, regenera el loader y las declaraciones y recarga la página. Una edición de un componente registrado regenera su declaración y las de sus imports `.meeko` si cambiaron, sin recorrer todos los componentes; el HMR del compilador actualiza el módulo. Un cambio de nombre equivale a eliminar la entrada anterior y crear la nueva. Los cambios de configuración pueden requerir un descubrimiento completo. `meeko check` prepara las declaraciones del proyecto antes de comprobar los componentes. Si el editor muestra nombres antiguos, compruebe que terminó la regeneración y vuelva a ejecutar `meeko check` para ver el diagnóstico concreto.

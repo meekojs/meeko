@@ -116,4 +116,4 @@ await fetch("https://api.otro.example/users", { signal: context.signal });
 
 - **Seguridad.** La comparación de origen y credenciales evita que el despacho local se use como proxy con la sesión de otro.
 - **`requestId`.** La llamada comparte el de la petición original: los logs y `onError` agrupan el render y sus llamadas.
-- **Origin.** Los clientes `api.*` y `rpc.*` del SSR envían el origen de la petición en curso, así que `origin: "required"` funciona también en local.
+- **Origin.** Los clientes `api.*` y `rpc.*` del SSR envían el origen de la petición en curso, así que la comprobación de `Origin` de las mutaciones (por defecto desde `1.8`) funciona también en local.

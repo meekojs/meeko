@@ -128,7 +128,7 @@ docker run -p 3000:3000 -e MEEKO_HOST=0.0.0.0 -e MEEKO_PORT=3000 tienda
 MEEKO_TRUST_PROXY=yes node .meeko/output/node/index.mjs
 ```
 
-El arranque se detiene con `TypeError: MEEKO_TRUST_PROXY must be true, false or the number of trusted proxies (1-99), not "yes"`: `serveNode` comprueba la variable antes de escuchar, no en cada petición.
+El arranque se detiene con `TypeError: MEEKO_TRUST_PROXY must be true, false or the number of trusted proxies (1-99), or cloudflare, not "yes"`: `serveNode` comprueba la variable antes de escuchar, no en cada petición.
 
 ```sh good
 MEEKO_TRUST_PROXY=1 node .meeko/output/node/index.mjs
@@ -154,7 +154,7 @@ await serveNode(app, { port: Number(process.env.MEEKO_PORT ?? 4173) });
 node .meeko/output/node/index.mjs
 ```
 
-Las mutaciones autenticadas y `origin: "required"` responden `403 INVALID_ORIGIN`, y los upgrades de Socket del navegador, `403`: la aplicación compara `Origin` con su propia dirección, no con la pública.
+Las mutaciones de API y RPC (desde `1.8`, también sin sesión) responden `403 INVALID_ORIGIN`, y los upgrades de Socket del navegador, `403`: la aplicación compara `Origin` con su propia dirección, no con la pública.
 
 ```sh good
 MEEKO_PUBLIC_ORIGIN=https://tienda.example.com node .meeko/output/node/index.mjs
@@ -165,6 +165,6 @@ MEEKO_PUBLIC_ORIGIN=https://tienda.example.com node .meeko/output/node/index.mjs
 - **Node 24.** El adaptador usa `node:http` y Web Streams; las cabeceras `Set-Cookie` se envían por separado.
 - **Socket.** Usa el paquete `ws` (se carga sólo si la aplicación tiene canales), con frames de hasta `socket.maxMessageBytes` (64 KiB por defecto), sin compresión y con heartbeat de 30 s. Los mensajes binarios se cierran con `1003`.
 - **Assets.** Los sirve la aplicación desde su manifiesto (`createNodeAssetReader`): nunca lee del disco una ruta que no esté en él.
-- **IP del cliente.** `context.clientAddress` y `clientAddress(request)` son el socket remoto; tras un proxy, `MEEKO_TRUST_PROXY=1` toma la entrada que añadió el proxy en `X-Forwarded-For`.
+- **IP del cliente.** `context.clientAddress` y `clientAddress(request)` son el socket remoto; tras un proxy, `MEEKO_TRUST_PROXY=1` toma la entrada que añadió el proxy en `X-Forwarded-For`, y tras Cloudflare Tunnel (desde `1.8`), `MEEKO_TRUST_PROXY=cloudflare` toma `CF-Connecting-IP` si la conexión viene de las redes de `MEEKO_TRUSTED_PROXIES`.
 - **CSP y cabeceras (desde 1.7).** `server.contentSecurityPolicy` y `server.headers` de `meeko.config.ts` se aplican a cada respuesta en producción, con un nonce por respuesta SSR y hashes en las prerenderizadas.
 - **Request-target.** Una ruta que empieza por `//` es siempre del origen propio, nunca otro host.

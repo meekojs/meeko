@@ -20,6 +20,7 @@ related:
   - docs/framework.md#formularios-sin-javascript-form
   - docs/framework.md#estado-de-la-respuesta-status
   - docs/framework.md#valores-por-petición-locals
+  - docs/framework.md#origin-en-mutaciones-anónimas
 ---
 
 `defineApiRoute` declara un endpoint HTTP: el export por defecto de `server/api/<ruta>.<método>.ts`. `server/api/users/[id].get.ts` atiende `GET /api/users/:id`. El servidor valida la entrada con los schemas (`params`, `query`, `body`), la sesión, la autorización, el `Origin` y el token CSRF, ejecuta el handler y valida su resultado con `response`.
@@ -67,14 +68,14 @@ En la aplicación, `await api.users({ id: "7" }).get()` devuelve `{ id: string; 
 | `status` | `200 \| 201 \| 202 \| 204` | `200` | Desde `1.2`. Estado de una respuesta correcta. Con `204` no hay cuerpo ni `response`. **Debe ser un literal.** |
 | `auth` | `"required" \| "optional"` | `"optional"` | Con `"required"`, una petición sin sesión responde `401`. |
 | `authorize` | `(context) => boolean \| Promise<boolean>` | ninguno | Con `false`, `403 FORBIDDEN`. |
-| `origin` | `"required" \| "none"` | según la sesión | `"required"` exige un `Origin` permitido aunque no haya sesión (un inicio de sesión, un registro). |
-| `rateLimit` | `{ limit, window, key? }` | ninguno | Desde `1.2`. Límite de peticiones por ventana; por encima, `429` con `Retry-After`. |
+| `origin` | `"required" \| "none"` | `Origin` obligatorio en `POST`, `PUT`, `PATCH` y `DELETE` (desde `1.8`) | Desde `1.8`, toda mutación exige un `Origin` permitido, haya o no sesión; `"required"` lo deja explícito. `"none"` (**inseguro**) lo desactiva en las peticiones sin sesión, también en los formularios nativos, para un webhook (JSON o form-encoded) o una API pública; con sesión siguen `Origin` y CSRF. |
+| `rateLimit` | `{ limit, window, key? }` | ninguno | Desde `1.2`. Límite de peticiones por ventana; por encima, `429` con `Retry-After`. Sin `key`, cuenta por IP del cliente (`context.clientAddress`; tras Cloudflare Tunnel, `MEEKO_TRUST_PROXY=cloudflare`). |
 | `locals` | `(context) => L \| Promise<L>` | ninguno | Desde `1.2`. Un valor por petición (el usuario actual) que el handler recibe tipado en `locals`. Decláralo antes de `handler`. |
 | `contentType` | `"json" \| "response"` | `"json"` | Con `"response"`, el handler devuelve su propio `Response` (un archivo, un CSV, un stream). |
 | `form` | `true` o `{ redirect?, maxBytes?, files?, echo? }` | sin formularios | Desde `1.7`. Acepta `application/x-www-form-urlencoded` y `multipart/form-data`, validados con `body`, y responde `303` a la página. `echo` lista los campos cuyo valor vuelve a la página tras un error; por defecto, ninguno. Véase abajo. |
 | `handler` | `({ params, query, body, context, locals }) => resultado` | obligatorio | La lógica. `context` es el `RequestContext`: `session`, `services`, `platform`, `requestId`, `clientAddress`, `signal`. |
 
-El orden de cada petición es: `Origin` con `origin: "required"`, `Origin` y CSRF de la sesión, `rateLimit`, `auth`, `authorize`, validación de la entrada, `locals`, `handler` y validación de la respuesta. Un formulario nativo cuenta `rateLimit` antes, tras `Origin` y antes de leer el cuerpo, porque el token CSRF viaja en él.
+El orden de cada petición es: `Origin` (desde `1.8`, en toda mutación salvo con `origin: "none"`), `Origin` y CSRF de la sesión, `rateLimit`, `auth`, `authorize`, validación de la entrada, `locals`, `handler` y validación de la respuesta. Un formulario nativo cuenta `rateLimit` antes, tras `Origin` y antes de leer el cuerpo, porque el token CSRF viaja en él.
 
 ## Valor devuelto
 
@@ -222,11 +223,47 @@ export default defineApiRoute({
 });
 ```
 
+### Un webhook firmado con `origin: "none"`
+
+Un webhook llega de otro servidor sin `Origin`, y desde `1.8` una mutación sin `Origin` responde `403 INVALID_ORIGIN`. `origin: "none"` desactiva esa comprobación en la ruta, así que el handler debe probar de otra forma que la petición es legítima, como con la firma del proveedor:
+
+<!-- no-check -->
+```ts
+// server/api/webhooks/payments.post.ts
+import { ApiError, defineApiRoute } from "@meekojs/meeko/server";
+
+export default defineApiRoute({
+  origin: "none",
+  contentType: "response",
+  handler: async ({ context }) => {
+    const payload = await context.request.text();
+    if (!(await verifySignature(payload, context.request.headers.get("x-signature")))) throw new ApiError("INVALID_SIGNATURE", 401);
+    await recordPayment(JSON.parse(payload));
+    return new Response(null, { status: 204 });
+  },
+});
+```
+
 ## Errores comunes
+
+### `403 INVALID_ORIGIN` en un webhook, un script o una prueba
+
+Desde `1.8`, un `POST`, `PUT`, `PATCH` o `DELETE` sin `Origin`, con `Origin: null` o con el de otra web responde `403 INVALID_ORIGIN`, también sin sesión. El navegador y los clientes `api.*` envían el `Origin` solos; `fetch` de Node o `curl`, no.
+
+```ts bad
+await fetch("http://localhost:4173/api/orders", { method: "POST", headers: { "content-type": "application/json" }, body });
+```
+
+<!-- no-check -->
+```ts good
+await fetch("http://localhost:4173/api/orders", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:4173" }, body });
+```
+
+Para un webhook o una API pública que no puede enviarlo, declara `origin: "none"` en la ruta y verifica una firma o un token (véase el ejemplo de arriba). Un cliente de otro origen conocido va en `SessionManager({ allowedOrigins })`. Véase [Origin en mutaciones anónimas](../../framework.md#origin-en-mutaciones-anónimas).
 
 ### Un schema fuera de `shared/`, o sin `response`
 
-El cliente se genera desde los schemas públicos, que deben poder importarse en el navegador.
+El cliente se genera desde los schemas públicos sin ejecutar el handler, así que cada uno debe venir de `shared/`, que el navegador puede importar. Desde 1.8 se admite una composición simple de ellos con funciones de un paquete, como `v.array(item)` con `item` importado de `shared/`, pero no un schema local del handler.
 
 ```ts bad
 // server/api/items.get.ts
@@ -234,7 +271,7 @@ const item = v.object({ id: v.string() });
 export default defineApiRoute({ response: v.array(item), handler: () => [] });
 ```
 
-`meeko check` se detiene con `server/api/items.get.ts: response debe referenciar un schema importado de shared/`. Sin `response`: `la API requiere un schema público response`.
+`meeko check` se detiene con `server/api/items.get.ts: response debe venir de shared/: item no se importa de shared/ ni de un paquete, …`. Sin `response`: `la API requiere un schema público response`. Véase [Schemas públicos](../../framework.md#schemas-públicos).
 
 <!-- no-check -->
 ```ts good
@@ -302,7 +339,7 @@ const users = useApi("/api/users");
 ## Notas
 
 - **Seguridad.** Valida siempre con schemas: la entrada nunca llega al handler sin pasar por ellos. `auth`, `authorize` y `locals` son las guardas del endpoint: el middleware de ruta no protege `server/api`, aunque sólo lo llamen páginas protegidas. Un error que no es `ApiError` nunca expone su mensaje.
-- **CSRF y Origin.** Con sesión, cada mutación exige el `Origin` permitido y el token CSRF (`x-meeko-csrf`, que el cliente generado envía solo). Un formulario nativo (`form`) exige siempre `Origin` y, con sesión, el campo `_csrf` (`form.csrfToken` de `useForm`); esos dos fallos responden `403` con JSON, sin `303`.
+- **CSRF y Origin.** Con sesión, cada mutación exige el `Origin` permitido y el token CSRF (`x-meeko-csrf`, que el cliente generado envía solo). Un formulario nativo (`form`) exige `Origin` (desde `1.8`, salvo sin sesión con `origin: "none"`) y, con sesión, el campo `_csrf` (`form.csrfToken` de `useForm`); esos dos fallos responden `403` con JSON, sin `303`.
 - **SSR.** En el servidor, `api.*` despacha localmente por el mismo pipeline, con la sesión y los servicios de la petición original, sin salir a la red.
 - **Formularios (`1.7`).** Un nombre repetido o terminado en `[]` es una lista; `return` y `_csrf` no llegan al schema; una casilla sin marcar no envía nada (decláralo con `v.optional(v.boolean(), false)`). Los archivos necesitan `form.files: true` (si no, `400 FILES_NOT_ALLOWED`). La cookie sólo guarda los valores de `form.echo` (por defecto ninguno), nunca archivos ni campos cuyo nombre contiene `password`, `passcode`, `secret`, `token`, `cvc` o `cvv`: no pongas en `echo` números de tarjeta, PIN ni otros datos sensibles, porque vuelven en la cookie y en el HTML. Una página prerenderizada no lleva el token CSRF en su HTML: un usuario con sesión que la envía sin JavaScript recibe `403 INVALID_CSRF`, así que un formulario para usuarios con sesión va en una página `"ssr"`. Sin `form`, un formulario recibe `415 UNSUPPORTED_MEDIA_TYPE`. Con `form` y sin `body`, el handler recibe `body: undefined` y los campos del formulario se descartan sin aviso: sirve para un formulario de sólo un botón (cerrar sesión, borrar lo que dicen los `params`), así que no es un error; si el formulario tiene campos, declara su schema en `body`.
 - **Rendimiento.** `rateLimit` cuenta en memoria por instancia salvo que el store de sesiones lo comparta (Redis o, desde `1.7`, SQL con `rateLimit` en el driver).

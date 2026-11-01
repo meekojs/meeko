@@ -151,7 +151,7 @@ handleProcessErrors(app, { close: async () => { await server.stop(); await app.c
 MEEKO_TRUST_PROXY=on bun .meeko/output/bun/index.js
 ```
 
-El arranque se detiene con `TypeError: MEEKO_TRUST_PROXY must be true, false or the number of trusted proxies (1-99), not "on"`: `createBunServer` comprueba la variable al crearse.
+El arranque se detiene con `TypeError: MEEKO_TRUST_PROXY must be true, false or the number of trusted proxies (1-99), or cloudflare, not "on"`: `createBunServer` comprueba la variable al crearse.
 
 ```sh good
 MEEKO_TRUST_PROXY=1 bun .meeko/output/bun/index.js

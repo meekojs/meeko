@@ -117,7 +117,7 @@ export default defineMeekoConfig({ site: "https://example.com" });
 site: "https://example.com" y la aplicación tras un proxy TLS, sin MEEKO_PUBLIC_ORIGIN al ejecutarse
 ```
 
-Las mutaciones autenticadas responden `403 INVALID_ORIGIN`: `site` sólo se usa en el build. El origen de las comprobaciones de seguridad se fija al ejecutarse.
+Las mutaciones (con sesión y, desde `1.8`, también sin ella) responden `403 INVALID_ORIGIN`: `site` sólo se usa en el build. El origen de las comprobaciones de seguridad se fija al ejecutarse.
 
 ```text good
 MEEKO_PUBLIC_ORIGIN=https://example.com al arrancar el servidor

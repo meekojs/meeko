@@ -169,6 +169,6 @@ meeko init-framework .
 
 - **`.meeko/` no se versiona.** El `.gitignore` del starter lo excluye, igual que `.env`. Los tipos y entradas se regeneran con `meeko dev` o `meeko check`.
 - **Sin servidor que configurar.** Las sesiones funcionan sin `server/runtime.ts`: en memoria en desarrollo y, en producción, en Redis con `MEEKO_REDIS_URL`. Añade `server/runtime.ts` con `defineServerRuntime` cuando necesites servicios, tu propio almacén o la política de Socket.
-- **`.env.example`.** Documenta `MEEKO_PORT`, `MEEKO_HOST`, `MEEKO_PUBLIC_ORIGIN`, `MEEKO_REDIS_URL`, `MEEKO_SESSION_TTL`, `MEEKO_SESSION_SAMESITE` y `MEEKO_TRUST_PROXY`. Cópialo a `.env`: `dev`, `build`, `start`, `preview` y `check` lo leen.
+- **`.env.example`.** Documenta `MEEKO_PORT`, `MEEKO_HOST`, `MEEKO_PUBLIC_ORIGIN`, `MEEKO_REDIS_URL`, `MEEKO_SESSION_TTL`, `MEEKO_SESSION_SAMESITE`, `MEEKO_TRUST_PROXY` y, desde `1.8`, `MEEKO_TRUSTED_PROXIES` (comentadas). Cópialo a `.env`: `dev`, `build`, `start`, `preview` y `check` lo leen.
 - **Versión exacta.** El proyecto fija la versión de `@meekojs/meeko` con la que se creó; actualízala a mano con el gestor de paquetes.
 - **Windows y POSIX.** El mensaje usa `&&`, que funciona en PowerShell 7, `cmd` y POSIX.

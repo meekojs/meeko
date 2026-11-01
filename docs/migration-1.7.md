@@ -226,7 +226,7 @@ Si tenía un `setTimeout` propio o un `if` alrededor de la consulta, puede quita
 
 ## La referencia de la API
 
-El sitio tiene una referencia nueva en [`/docs/reference`](https://meeko.diegootayza.com/docs/reference): una página por símbolo (componentes, macros, composables, reactividad, utilidades, sintaxis, servidor, adaptadores, comandos y configuración), con su tipo exacto tomado del código, ejemplos y los errores comunes con su mensaje real, y la lista de todos los exports por módulo en [`/docs/reference/exports`](https://meeko.diegootayza.com/docs/reference/exports). Sus fuentes están en [`docs/reference`](reference/README.md).
+El sitio tiene una referencia nueva en [`/docs/reference`](https://meekojs.com/docs/reference): una página por símbolo (componentes, macros, composables, reactividad, utilidades, sintaxis, servidor, adaptadores, comandos y configuración), con su tipo exacto tomado del código, ejemplos y los errores comunes con su mensaje real, y la lista de todos los exports por módulo en [`/docs/reference/exports`](https://meekojs.com/docs/reference/exports). Sus fuentes están en [`docs/reference`](reference/README.md).
 
 ## Editor
 

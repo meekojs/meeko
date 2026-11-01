@@ -60,7 +60,7 @@ export default defineServerRuntime(async ({ env, production, prerendering }) => 
 | `secure` | `boolean` | `true` | Atributo `Secure` de la cookie. Sin él, el nombre por defecto pasa a `meeko.sid`. |
 | `sameSite` | `"Lax" \| "Strict" \| "None"` | `"Lax"` | Atributo `SameSite`. `"None"` exige `secure`. |
 | `cookieName` | `string` | `"__Host-meeko.sid"`, o `"meeko.sid"` sin `secure` | Nombre de la cookie: letras, dígitos, `_`, `.` y `-`. Un nombre `__Host-…` exige `secure`. |
-| `allowedOrigins` | `readonly string[]` | `[]` | Orígenes, además del propio, aceptados en las mutaciones autenticadas, en `origin: "required"` y en `session.create()`. |
+| `allowedOrigins` | `readonly string[]` | `[]` | Orígenes, además del propio, aceptados en las mutaciones de API y RPC (desde `1.8`, también sin sesión), en los formularios nativos y en `session.create()`. |
 
 ## Valor devuelto
 
@@ -146,6 +146,7 @@ export async function handle(request: Request): Promise<Response> {
 MEEKO_PUBLIC_ORIGIN=https://tienda.example.com   # el origen que ve el navegador
 MEEKO_REDIS_URL=rediss://default:…@redis.example.com:6380
 MEEKO_TRUST_PROXY=1                              # Traefik, Caddy o nginx delante
+# MEEKO_TRUST_PROXY=cloudflare                   # desde 1.8, tras Cloudflare Tunnel: CF-Connecting-IP
 ```
 
 El navegador envía `Origin: https://tienda.example.com`; `createServerApp` construye la URL de la petición con `MEEKO_PUBLIC_ORIGIN`, así que `assertMutationAllowed` la acepta aunque el proxy hable HTTP con la aplicación.
@@ -206,7 +207,7 @@ new SessionManager({ store, ttlMs: 36 * 60 * 60 * 1000 });
 ## Notas
 
 - **Sólo servidor.** Se importa de `@meekojs/meeko/server` y vive en `server/runtime.ts`; la cookie es `HttpOnly`, así que el navegador nunca ve el ID. El token CSRF llega por la meta `meeko-csrf-token` y la cabecera `x-meeko-csrf-token`, y los clientes `api.*` y `rpc.*` lo envían solos.
-- **CSRF y Origin.** Las mutaciones (`POST`, `PUT`, `PATCH`, `DELETE`) con cookie exigen un `Origin` permitido y `x-meeko-csrf`; un fallo responde `403 INVALID_ORIGIN` o `403 INVALID_CSRF`. Sin sesión no hay token que comprobar: protege el inicio de sesión con `origin: "required"` (y, aunque falte, `session.create()` ya rechaza un `Origin` ajeno desde `1.2`).
+- **CSRF y Origin.** Las mutaciones (`POST`, `PUT`, `PATCH`, `DELETE`) con cookie exigen un `Origin` permitido y `x-meeko-csrf`; un fallo responde `403 INVALID_ORIGIN` o `403 INVALID_CSRF`. Sin sesión no hay token que comprobar, pero desde `1.8` toda mutación exige igualmente un `Origin` permitido, salvo una ruta con `origin: "none"`; `session.create()` ya rechazaba un `Origin` ajeno desde `1.2`.
 - **Proxies.** El origen propio sale de `publicOrigin` o `MEEKO_PUBLIC_ORIGIN`, nunca de la cabecera `Host`. Si no lo configura tras un proxy que termina TLS, las mutaciones de un navegador fallan con `INVALID_ORIGIN`.
 - **Variables de entorno.** `MEEKO_SESSION_TTL` y `MEEKO_SESSION_SAMESITE` sólo ajustan las sesiones que Meeko crea sin configuración; con un `SessionManager` propio no se aplican y Meeko lo avisa una vez.
 - **Revocación entre instancias.** Con un store que implementa `subscribeRevocations` (`RedisSessionStore` con `subscriber`), revocar una familia aborta las peticiones y cierra los sockets de esa familia en todas las instancias. `SqlSessionStore` y D1 no notifican: las demás instancias lo detectan al releer la sesión.

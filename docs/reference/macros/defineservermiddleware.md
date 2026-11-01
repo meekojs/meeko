@@ -70,7 +70,7 @@ export default defineServerMiddleware((request, next) => {
 
 ### La IP del cliente, con `clientAddress`
 
-Desde `1.7`, `clientAddress(request)` da la IP con la misma política que `context.clientAddress` y `rateLimit`: la de la conexión o, con `MEEKO_TRUST_PROXY`, la que añadió el proxy de confianza.
+Desde `1.7`, `clientAddress(request)` da la IP con la misma política que `context.clientAddress` y `rateLimit`: la de la conexión o, con `MEEKO_TRUST_PROXY`, la que añadió el proxy de confianza. Desde `1.8`, tras Cloudflare Tunnel, `MEEKO_TRUST_PROXY=cloudflare` toma la de `CF-Connecting-IP` si la petición llegó desde las redes de `MEEKO_TRUSTED_PROXIES` (véase [Cloudflare Tunnel y Traefik](../../framework.md#cloudflare-tunnel-y-traefik)).
 
 ```ts
 // server/middleware/20-blocklist.ts

@@ -236,6 +236,7 @@
 						"@meekojs/meeko/framework#useTheme"
 					]
 				},
+				{ "name": "useThemeToggle", "symbols": ["@meekojs/meeko/framework#useThemeToggle"] },
 				{
 					"name": "useLayout",
 					"symbols": [
@@ -1025,6 +1026,13 @@
 						"config:dev"
 					],
 					"slug": "config-dev"
+				},
+				{
+					"name": "devtools",
+					"symbols": [
+						"config:devtools"
+					],
+					"slug": "config-devtools"
 				},
 				{
 					"name": "site",

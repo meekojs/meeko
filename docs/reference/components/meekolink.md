@@ -40,8 +40,8 @@ Con `/users/[id]` y `id: "7"`, el segundo enlace es `<a href="/users/7">`; en `/
 
 | Atributo | Tipo | Por defecto | Descripción |
 | --- | --- | --- | --- |
-| `to` o `bind:to` | `RouteId` | obligatorio | ID de la ruta de destino, como `to="/users/[id]"`: la ruta de su archivo en `app/pages`, sin query ni fragmento. `bind:to` admite una expresión cuyo tipo sea una ruta o una unión de rutas. |
-| `bind:params` | `RouteParams<K>` | ninguno | Los segmentos dinámicos de la ruta, como `bind:params="{ id: user.id }"`. Obligatorio en una ruta con segmentos dinámicos y prohibido en las demás. Los valores son `string`. |
+| `to` o `bind:to` | `RouteId` | obligatorio | ID de la ruta de destino, como `to="/users/[id]"`: la ruta de su archivo en `app/pages`, sin query ni fragmento. `bind:to` admite una expresión cuyo tipo sea una ruta o una unión de rutas; con una unión, `bind:params` acepta los parámetros de alguna de ellas (desde `1.8`). |
+| `bind:params` | `RouteParams<K>` | ninguno | Los segmentos dinámicos de la ruta, como `bind:params="{ id: user.id }"`. Obligatorio en una ruta con segmentos dinámicos y prohibido en las demás. Los valores son `string`. Sin rutas generadas (`RouteId` es `string`: una librería como `@meekojs/ui` o un proyecto antes de `meeko check`), ninguna ruta dice qué parámetros tiene: `bind:params` es opcional y acepta `Record<string, string>` o `undefined` (desde `1.8`; antes exigía `params ?? {}`). |
 | `bind:search` | `Readonly<Record<string, string \| number \| boolean \| null \| undefined>>` | ninguno | Query string, como `bind:search="{ tab: 'perfil' }"`. Omite las claves con `null` o `undefined`. |
 | `match` o `bind:match` | `"exact" \| "prefix"` | `"exact"` | Desde `1.5`. `"exact"` marca el enlace sólo en su ruta; `"prefix"` también en las rutas que están por debajo. |
 | cualquier otro | atributos de `<a>` | | `class`, `target`, `rel`, `aria-*`, `data-*`, `on:click` y los hijos pasan al `<a>` tal cual. |
@@ -132,6 +132,38 @@ const props = defineProps<{ to: MeekoLinkProps["to"]; label: string }>();
 ```
 
 Para un enlace propio, `useRoute().isActive(to, { params, prefix })` aplica la misma regla que `match`.
+
+### Un componente que recibe cualquier ruta con sus parámetros
+
+`MeekoLinkProps["params"]` no relaciona los parámetros con la ruta. Para que el padre pase cualquier ruta y `meeko check` exija los `params` de la que elige, cree una variante por ruta:
+
+```html
+<!-- app/components/NavLink.meeko -->
+<script lang="ts">
+type RouteParamsOf<K extends RouteId> = NonNullable<MeekoLinkProps<K>["params"]>;
+type LinkTarget = {
+  [K in RouteId]: { to: K; search?: MeekoLinkProps["search"] }
+    & (keyof RouteParamsOf<K> extends never ? { params?: never } : { params: RouteParamsOf<K> })
+}[RouteId];
+const props = defineProps<LinkTarget & { label: string }>();
+</script>
+
+<template>
+  <MeekoLink bind:to="props.to" bind:params="props.params" bind:search="props.search">{props.label}</MeekoLink>
+</template>
+```
+
+`<NavLink to="/users/[id]" label="Perfil" />` sin `bind:params` es `TS2345`; `bind:params="{ userId: '1' }"`, `TS2353`; y `params` en `/about`, `TS2345`. Desde `1.8`, `<MeekoLink>` acepta `bind:to` con una unión de rutas y unos `params` de alguna de ellas; antes, `bind:params="props.params"` daba `TS2412`. Para un botón que además puede ser un enlace externo o un `<button>`, véase [Un botón que es ruta, enlace o botón](../../api.md#un-botón-que-es-ruta-enlace-o-botón).
+
+### `'MeekoLink'` en `<component is>` (desde 1.8)
+
+`<MeekoLink>` no es un valor del script, pero `is` lo nombra con un literal, junto a etiquetas HTML y otros componentes:
+
+```html
+<component is="props.to !== undefined ? 'MeekoLink' : 'button'" bind:to="props.to" bind:params="props.params" type="button">Abrir</component>
+```
+
+La rama de `'MeekoLink'` es esta etiqueta: recibe `to`, `params`, `search` y `match` y los demás atributos de su `<a>`, pero no `href`, y `meeko check` comprueba la ruta y sus parámetros tras la condición de `?:`, que estrecha `props.to`. Véase [Nombres de componente en `is`](../../api.md#nombres-de-componente-en-is).
 
 ## Errores comunes
 
@@ -226,4 +258,5 @@ Un componente de `app/components/MeekoLink.meeko` (o importado con ese nombre) t
 - **SSR e hidratación.** El servidor escribe `href` y `aria-current` en el HTML; la hidratación no los cambia y cada navegación actualiza `aria-current`, también en los layouts que el navegador conserva.
 - **Tipos de las rutas.** `RouteId` es la unión de las rutas que declara `.meeko/types/routes.d.ts`, que generan `meeko check`, `meeko dev` y `meeko routes`; sin esas declaraciones es `string` y la comprobación de `to` no ocurre. Una página nueva necesita uno de esos comandos para que su ruta sea válida.
 - **Editor.** `to="` sugiere las rutas del proyecto y Ctrl+clic lleva a su página.
+- **No es un valor de `is`.** `<MeekoLink>` es una etiqueta del compilador: `<component is="x ? MeekoLink : 'button'">` da `TS2304`. Use dos ramas con `if:when`.
 - **Estilos.** Los estilos con ámbito de un componente se aplican al `<a>`, que es un elemento de su plantilla: `a[aria-current="page"]` en `<style scoped>` funciona.

@@ -18,7 +18,7 @@ related:
   - docs/framework.md#límite-de-peticiones-ratelimit
 ---
 
-`createLocalCalls(options)` devuelve dos funciones, `api` y `rpc`, que atienden un endpoint o un procedimiento de la aplicación sin salir del proceso: construyen un `Request` en memoria con las cabeceras de credenciales de la petición original (`cookie`, `origin`, `x-meeko-csrf` y `authorization`) y lo pasan por `dispatchApiRoute` o `dispatchRpc`. La respuesta es la misma que por HTTP: Origin, CSRF, `rateLimit`, `auth`, `authorize`, schemas, `locals` y la normalización de errores.
+`createLocalCalls(options)` devuelve dos funciones, `api` y `rpc`, que atienden un endpoint o un procedimiento de la aplicación sin salir del proceso: construyen un `Request` en memoria con las cabeceras de credenciales de la petición original (`cookie`, `x-meeko-csrf` y `authorization`) y, como `Origin`, el origen de la aplicación (desde `1.8`; antes reenviaba el `Origin` original) y lo pasan por `dispatchApiRoute` o `dispatchRpc`. La respuesta es la misma que por HTTP: Origin, CSRF, `rateLimit`, `auth`, `authorize`, schemas, `locals` y la normalización de errores.
 
 En una aplicación del framework no hace falta: los clientes `api.*` y `rpc.*` ya despachan en local durante el SSR. Es para un host propio, una tarea o una prueba que tiene un `RequestContext` y quiere reutilizar un endpoint sin red.
 
@@ -136,7 +136,7 @@ createLocalCalls({ manifest, context, sessions, load: (file) => import(pathToFil
 
 ## Notas
 
-- **Mismas guardas.** Una llamada local no es una puerta trasera: pasa por Origin y CSRF con las cabeceras de la petición original, y por `auth`, `authorize` y los schemas.
+- **Mismas guardas.** Una llamada local no es una puerta trasera: pasa por CSRF con el token de la petición original, y por `auth`, `authorize` y los schemas. Como `Origin` lleva el de la aplicación, igual que los clientes del SSR: es una llamada del propio servidor, así que una mutación local funciona desde una página pedida con `GET`, que no trae `Origin`.
 - **`rateLimit`.** Usa el contador de la ruta del despachador HTTP y la IP de `context`, así que una llamada local no esquiva el límite.
 - **Cancelación.** El `Request` interno lleva `context.signal`: si el cliente se va o la sesión se revoca, la llamada se aborta.
 - **Cookies.** La respuesta trae su `Set-Cookie` si el endpoint cambia la sesión; un host propio debe reenviarla si quiere que llegue al navegador.
