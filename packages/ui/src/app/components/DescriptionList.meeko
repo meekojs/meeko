@@ -1,0 +1,27 @@
+<script lang="ts">
+	import type { UIDescriptionListProps } from '../types/feedback'
+
+	const props = defineProps<UIDescriptionListProps>()
+</script>
+
+<template>
+	<dl
+		bind:class="['meeko-ui-description-list', props.class].filter(Boolean).join(' ')"
+		bind:data-columns="props.columns ?? 1"
+	>
+		<div
+			each:of="props.items"
+			each:as="item"
+			each:key="item.label"
+		>
+			<dt>{item.label}</dt>
+			<dd>{item.value}</dd>
+			<dd
+				if:when="item.detail"
+				class="meeko-ui-stat-detail"
+			>
+				{item.detail}
+			</dd>
+		</div>
+	</dl>
+</template>

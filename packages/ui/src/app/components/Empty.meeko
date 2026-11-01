@@ -1,0 +1,36 @@
+<script lang="ts">
+	import type { UIEmptyProps } from '../types/feedback'
+
+	import { uiMessages } from '../utils/messages'
+
+	const props = defineProps<UIEmptyProps>()
+
+	const snippets = defineSnippets<{ default?: []; actions?: [] }>()
+
+	const text = uiMessages().feedback
+</script>
+
+<template>
+	<div
+		bind:class="['meeko-ui-empty', props.class].filter(Boolean).join(' ')"
+		bind:data-variant="props.variant ?? 'inline'"
+	>
+		<p class="meeko-ui-empty-title">{props.title ?? text.empty}</p>
+		<p
+			if:when="props.description"
+			class="meeko-ui-empty-description"
+		>
+			{props.description}
+		</p>
+		<render
+			if:when="snippets.default"
+			snippet="snippets.default"
+		/>
+		<div
+			if:when="snippets.actions"
+			class="meeko-ui-feedback-actions"
+		>
+			<render snippet="snippets.actions" />
+		</div>
+	</div>
+</template>

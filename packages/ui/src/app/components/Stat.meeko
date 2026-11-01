@@ -1,0 +1,18 @@
+<script lang="ts">
+	import type { UIStatProps } from '../types/feedback'
+
+	const props = defineProps<UIStatProps>()
+</script>
+
+<template>
+	<dl bind:class="['meeko-ui-stat', props.class].filter(Boolean).join(' ')">
+		<dt>{props.label}</dt>
+		<dd class="meeko-ui-stat-value">{props.value}</dd>
+		<dd
+			if:when="props.detail"
+			class="meeko-ui-stat-detail"
+		>
+			{props.detail}
+		</dd>
+	</dl>
+</template>

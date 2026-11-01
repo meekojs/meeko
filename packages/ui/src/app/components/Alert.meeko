@@ -1,0 +1,83 @@
+<script lang="ts">
+	import { signal } from '@meekojs/meeko'
+
+	import type { UIAlertProps } from '../types/feedback'
+
+	import { uiMessages } from '../utils/messages'
+
+	const { tone = 'neutral', title, description, icon, dismiss, closeLabel, role, class: className, ...rest } = defineProps<UIAlertProps>()
+
+	const emit = defineEmits<{ dismiss: [] }>()
+
+	const snippets = defineSnippets<{ default?: []; icon?: []; actions?: [] }>()
+
+	const visible = signal(true)
+	const text = uiMessages().feedback
+	/* eslint-disable meeko/attributes-order */
+</script>
+
+<template>
+	<section
+		if:when="visible.value"
+		bind="rest"
+		bind:class="['meeko-ui-alert', className].filter(Boolean).join(' ')"
+		bind:data-tone="tone"
+		bind:role="role ?? (tone === 'danger' ? 'alert' : 'note')"
+	>
+		<span
+			if:when="icon || snippets.icon"
+			class="meeko-ui-alert-icon"
+			aria-hidden="true"
+		>
+			<render
+				if:when="snippets.icon"
+				snippet="snippets.icon"
+			/>
+			<render
+				if:when="!snippets.icon && icon"
+				snippet="icon"
+			/>
+		</span>
+		<div class="meeko-ui-alert-content">
+			<p
+				if:when="title"
+				class="meeko-ui-alert-title"
+			>
+				{title}
+			</p>
+			<p
+				if:when="description"
+				class="meeko-ui-alert-description"
+			>
+				{description}
+			</p>
+			<render
+				if:when="snippets.default"
+				snippet="snippets.default"
+			/>
+			<div
+				if:when="snippets.actions"
+				class="meeko-ui-feedback-actions"
+			>
+				<render snippet="snippets.actions" />
+			</div>
+		</div>
+		<button
+			if:when="dismiss"
+			type="button"
+			class="meeko-ui-dismiss"
+			bind:aria-label="closeLabel ?? text.close"
+			on:click="
+				() => {
+					visible.value = false
+					emit('dismiss')
+				}
+			"
+		>
+			<span
+				class="meeko-ui-close-icon"
+				aria-hidden="true"
+			/>
+		</button>
+	</section>
+</template>
