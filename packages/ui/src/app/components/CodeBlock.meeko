@@ -1,0 +1,118 @@
+<script lang="ts">
+	// <UICodeBlock>: the copy button is the only script, and it stays hidden until it can work, in a header
+	// whose height does not change, so hydration moves nothing.
+	import { computed, signal } from '@meekojs/meeko'
+
+	import type { UICodeBlockProps } from '../types/navigation'
+
+	import { copyFeedbackTime, copyText } from '../utils/clipboard'
+	import { icons } from '../utils/icons'
+	import { uiMessages } from '../utils/messages'
+	import * as Icon from './internal/Icon.meeko'
+
+	const props = defineProps<UICodeBlockProps>({ mode: 'code' })
+
+	const snippets = defineSnippets<{ default?: [] }>()
+
+	const text = uiMessages().code
+	const root = useElementRef('root')
+
+	const ready = signal(false)
+	const state = signal<'idle' | 'done' | 'error'>('idle')
+	let timer: ReturnType<typeof setTimeout> | undefined
+
+	const showsCopy = computed(() => props.copy ?? props.mode !== 'log')
+	const showsHead = computed(() => showsCopy.value || props.label !== undefined || props.lang !== undefined || props.verdict !== undefined)
+	const name = computed(() => props.label ?? props.lang ?? (props.mode === 'log' ? text.log : text.label))
+	const verdictText = computed(() => props.verdictLabel ?? (props.verdict === 'good' ? text.good : text.bad))
+	const copyState = computed(() => (state.value === 'done' ? (props.copiedLabel ?? text.copied) : state.value === 'error' ? (props.copyFailedLabel ?? text.copyFailed) : (props.copyLabel ?? text.copy)))
+
+	async function copy(): Promise<void> {
+		const source = props.code ?? root.value?.querySelector('pre')?.textContent ?? ''
+		if (timer) clearTimeout(timer)
+		try {
+			await copyText(source)
+			state.value = 'done'
+		} catch {
+			state.value = 'error'
+		}
+		timer = setTimeout(() => (state.value = 'idle'), copyFeedbackTime)
+	}
+
+	onMounted(() => {
+		ready.value = true
+		return () => {
+			if (timer) clearTimeout(timer)
+		}
+	})
+</script>
+
+<template>
+	<figure
+		ref:root
+		bind:class="['meeko-ui-code-block', props.class].filter(Boolean).join(' ')"
+		bind:data-mode="props.mode"
+		bind:data-verdict="props.verdict"
+	>
+		<figcaption
+			if:when="showsHead.value"
+			class="meeko-ui-code-head"
+			data-pagefind-ignore
+		>
+			<span
+				if:when="props.verdict"
+				class="meeko-ui-code-verdict"
+			>
+				<Icon bind:path="props.verdict === 'good' ? icons.check : icons.close" />
+				{verdictText.value}
+			</span>
+			<span
+				if:when="props.label"
+				class="meeko-ui-code-label"
+			>
+				{props.label}
+			</span>
+			<span
+				if:when="props.lang"
+				class="meeko-ui-code-lang"
+			>
+				{props.lang}
+			</span>
+			<button
+				if:when="showsCopy.value"
+				type="button"
+				class="meeko-ui-code-copy"
+				bind:data-ready="ready.value ? '' : undefined"
+				bind:data-state="state.value === 'idle' ? undefined : state.value"
+				on:click="copy"
+			>
+				{copyState.value}
+			</button>
+			<span
+				if:when="showsCopy.value"
+				class="meeko-ui-sr-only"
+				role="status"
+			>
+				{state.value === 'idle' ? '' : copyState.value}
+			</span>
+		</figcaption>
+		<div
+			if:when="props.html"
+			class="meeko-ui-code-content"
+			html="props.html"
+		/>
+		<div
+			if:when="!props.html && snippets.default"
+			class="meeko-ui-code-content"
+		>
+			<render snippet="snippets.default" />
+		</div>
+		<pre
+			if:when="!props.html && !snippets.default"
+			class="meeko-ui-code-content"
+			tabindex="0"
+			bind:role="props.mode === 'log' ? 'log' : undefined"
+			bind:aria-label="name.value"
+		><code>{props.code ?? ''}</code></pre>
+	</figure>
+</template>
