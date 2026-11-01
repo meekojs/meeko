@@ -77,6 +77,18 @@
 			},
 			"line": "Línea {line}",
 			"frame": "Vista previa del borrador"
+		},
+		"frontmatter": {
+			"title": "Frontmatter",
+			"asText": "Tiene algo que los campos no conservarían: se edita como texto.",
+			"asTextShort": "como texto",
+			"count": {
+				"plural": "count",
+				"forms": {
+					"one": "{count} campo",
+					"other": "{count} campos"
+				}
+			}
 		}
 	}
 }

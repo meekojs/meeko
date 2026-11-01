@@ -13,7 +13,7 @@ function catalogs(locale: 'en' | 'es'): Record<string, string> {
 export default defineMeekoConfig({
 	// The identity of Meeko's documentation webs: the tokens of packages/docs and the same themes.
 	theme: { default: 'dark' },
-	modules: ['@meekojs/ui', 'meeko-docs', '@meekojs/i18n'],
+	modules: ['@meekojs/ui', '@meekojs/ui/editor', 'meeko-docs', '@meekojs/i18n'],
 	ui: docsTheme,
 	// Bilingual interface: Spanish without a prefix (the usual URLs) and English under /en/…, from
 	// the same pages. `shell` is the catalog of meeko-docs, whose components the moderation preview

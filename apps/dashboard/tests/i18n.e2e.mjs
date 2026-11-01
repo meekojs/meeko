@@ -250,7 +250,7 @@ ${server.logs().slice(-2000)}`,
 	await hydrated()
 	await page.getByRole('button', { name: 'Mark as translated' }).click()
 	const original = `${gitText('docs/testing.md')}\nNuevo parrafo del original.\n`
-	await page.waitForFunction((expected) => globalThis.document.querySelector('#draft-markdown')?.value.includes(`source-hash: ${expected}`), hash(original), { timeout: 30_000 })
+	await page.waitForFunction((expected) => globalThis.document.querySelector('#frontmatter-source-hash')?.value === expected, hash(original), { timeout: 30_000 })
 	await page.getByRole('button', { name: 'Create draft' }).click()
 	await page
 		.locator('.dash-notice')

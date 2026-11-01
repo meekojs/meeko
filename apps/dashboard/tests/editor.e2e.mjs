@@ -1,4 +1,5 @@
-// The editor in Chrome against a temporary schema: edit a guide, see the real preview in its
+// The editor in Chrome against a temporary schema: edit a guide in Crepe with real keys (its menus,
+// and a file that stays as it was without an edit) and in code mode, see the real preview in its
 // sandboxed iframe (hostile markup included), save the draft, fail a save and retry it, and publish
 // the revision from a modal driven by the keyboard; a reference page whose frontmatter the site
 // would reject; the export; a conflict with Git merged into a new draft; a publication that loses to
@@ -136,7 +137,25 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 				throw new Error([error.message, page.url(), ...errors].join('\n'))
 			})
 	const status = (text) => page.getByRole('status').filter({ hasText: text }).waitFor({ timeout: 60_000 })
+	// The two faces of UIMarkdownEditor: Crepe, and the text area of the code mode.
+	const crepe = page.locator('.ui-markdown-editor .ProseMirror')
 	const editor = page.locator('#draft-markdown')
+	const modes = page.getByRole('group', { name: 'Modo de edición' })
+	const codeMode = async () => {
+		await modes.getByRole('button', { name: 'Código' }).click()
+		await editor.waitFor()
+	}
+	const visualMode = async () => {
+		await modes.getByRole('button', { name: 'Visual' }).click()
+		await crepe.waitFor({ timeout: 60_000 })
+	}
+	/** Puts the caret at the end of the first element of a kind, with a real click and a real key. */
+	const caretAtEndOf = async (locator) => {
+		await locator.scrollIntoViewIfNeeded()
+		await locator.click()
+		// `End` stops at the end of the visual line, and an Enter there would split a wrapped paragraph.
+		await locator.evaluate((element) => globalThis.getSelection().collapse(element, element.childNodes.length))
+	}
 	// The preview is the document of a sandboxed iframe: its content is read through the frame.
 	const previewFrame = page.locator('iframe.dash-preview-frame')
 	const preview = page.frameLocator('iframe.dash-preview-frame').locator('body')
@@ -156,8 +175,59 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 	await hydrated()
 	await preview.getByRole('heading', { level: 1, name: 'Diagnóstico del proyecto' }).waitFor({ timeout: 60_000 })
 	assert.equal(await page.getByLabel('Autor').count(), 0, 'the author is the user of the session (F5), not a field')
+
+	// Crepe opens by itself, in the browser, and opening it is not an edit.
+	await crepe.waitFor({ timeout: 60_000 })
+	assert.equal(await crepe.getAttribute('role'), 'textbox')
+	assert.equal(await page.getByRole('textbox', { name: 'Markdown de la fuente' }).count(), 1, 'the editor is named')
+	await status('Sin cambios todavía')
+	assert.equal(await page.getByRole('button', { name: 'Crear borrador' }).isDisabled(), true, 'nothing to save without an edit')
+
+	// Real keys in Crepe: one line changes, and undoing them leaves nothing to save.
+	await caretAtEndOf(crepe.locator('p').first())
+	await page.keyboard.type(' Escrito con el teclado.')
+	await status('1 línea cambiada sin guardar')
+	await page.keyboard.press('Control+z')
+	await status('Sin cambios todavía')
+	// Empty paragraphs are not an edit either.
+	await caretAtEndOf(crepe.locator('p').first())
+	await page.keyboard.press('Enter')
+	await page.keyboard.press('Enter')
+	await page.getByRole('button', { name: 'Actualizar', exact: true }).focus()
+	await status('Sin cambios todavía')
+	assert.equal(await page.getByRole('button', { name: 'Crear borrador' }).isDisabled(), true, 'two Enter do not make a draft')
+
+	// The menus of Crepe, in the language of the dashboard: a heading and a table from the slash menu,
+	// and a mark from the floating toolbar. In code mode they are Markdown, next to the bytes of the rest.
+	await page.reload({ waitUntil: 'networkidle' })
+	await hydrated()
+	await crepe.waitFor({ timeout: 60_000 })
+	await caretAtEndOf(crepe.locator('p').first())
+	await page.keyboard.press('Enter')
+	await page.keyboard.type('/tabla')
+	const slash = page.locator('.milkdown-slash-menu[data-show="true"]')
+	await slash.getByText('Tabla', { exact: true }).waitFor()
+	await page.keyboard.press('Enter')
+	await crepe.locator('.milkdown-table-block').waitFor()
+	await page.keyboard.type('Columna')
+	await page.keyboard.press('Shift+Home')
+	const toolbar = page.locator('.milkdown-toolbar[data-show="true"]')
+	await toolbar.getByRole('button', { name: 'Negrita' }).click()
+	await status(/líneas cambiadas sin guardar/)
+	await codeMode()
+	const withTable = await editor.inputValue()
+	assert.match(withTable, /\*\*Columna\*\*/, 'the mark of the toolbar')
+	assert.match(withTable, /^\| \*\*Columna\*\* +\|/m, 'the table of the menu')
+	const without = withTable.replace(/\n\| \*\*Columna[\s\S]*?\n\n/, '\n')
+	assert.equal(without, doctor, 'the rest of the file keeps its bytes')
+
+	// The code mode shows the same text, and what is written there reaches Crepe.
 	await editor.fill(`${doctor}\nLínea escrita en la prueba e2e.\n`)
 	await status('2 líneas cambiadas sin guardar')
+	await visualMode()
+	await crepe.getByText('Línea escrita en la prueba e2e.').waitFor()
+	await codeMode()
+	assert.equal(await editor.inputValue(), `${doctor}\nLínea escrita en la prueba e2e.\n`)
 	await page.getByRole('button', { name: 'Actualizar', exact: true }).click()
 	await preview.getByText('Línea escrita en la prueba e2e.').waitFor({ timeout: 60_000 })
 	assert.equal(await previewFrame.getAttribute('sandbox'), '', 'sandboxed without any allow-* token')
@@ -182,6 +252,13 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 	assert.equal(await page.title(), title)
 	assert.equal(await page.evaluate(() => globalThis.__pwned), undefined, 'nothing ran in the dashboard')
 	assert.equal(await preview.getAttribute('data-ran'), null, 'nothing ran in the preview either')
+	// Nor in Crepe, which shows the raw HTML of a document as data.
+	await visualMode()
+	await crepe.getByText('Marcado hostil').waitFor()
+	assert.equal(await page.evaluate(() => globalThis.__pwned), undefined, 'nothing ran in Crepe')
+	assert.equal(await page.title(), title)
+	assert.equal(await crepe.locator('script, iframe, style, details').count(), 0, 'the HTML is not markup in Crepe')
+	await codeMode()
 	await editor.fill(`${doctor}\nLínea escrita en la prueba e2e.\n`)
 	await page.getByRole('button', { name: 'Actualizar', exact: true }).click()
 	await preview.getByText('Línea escrita en la prueba e2e.').waitFor({ timeout: 60_000 })
@@ -262,11 +339,73 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 	for await (const chunk of await download.createReadStream()) chunks.push(chunk)
 	assert.match(Buffer.concat(chunks).toString('utf8'), /Línea escrita en la prueba e2e\.\n$/)
 
-	// A reference page without `since`: a warning in the preview, a draft, and a clear refusal on publish.
+	// A reference page, whose frontmatter is edited as fields and never reaches Crepe.
 	await page.goto(`${origin}/sources/${ids.signal}/edit`, { waitUntil: 'networkidle' })
 	await hydrated()
 	await page.locator('.dash-preview-state').filter({ hasText: 'Render en' }).waitFor({ timeout: 60_000 })
-	await editor.fill((await editor.inputValue()).replace(/^since:.*\n/m, ''))
+	await crepe.waitFor({ timeout: 60_000 })
+	assert.equal(await crepe.getByText('source-hash').count(), 0)
+	assert.equal(await crepe.locator('hr').first().count(), 0, 'its delimiters are not a rule of the editor')
+	const reference = (await load('meeko-docs-content/content/repository')).readGitFile('docs/reference/reactivity/signal.md')
+	const [, referenceHead, referenceBody] = /^(---\n[\s\S]*?\n---\n\s*)([\s\S]*)$/.exec(reference)
+	await page.locator('#draft-frontmatter summary').click()
+	assert.equal(await page.getByLabel('title', { exact: true }).inputValue(), 'signal')
+	assert.equal(await page.getByLabel('since', { exact: true }).inputValue(), '1.0.0')
+	assert.match(await page.getByLabel('symbols', { exact: true }).inputValue(), /^@meekojs\/meeko#signal$/m)
+	await status('Sin cambios todavía')
+
+	// A key in a block of a real page saved right after typing: the text of the draft is this file with
+	// one line changed, and that line is this paragraph, whatever Crepe would do to the rest.
+	await caretAtEndOf(crepe.locator('p').first())
+	await page.keyboard.type(' Con Crepe.')
+	await page.getByLabel('Nota').fill('Desde Crepe')
+	await page.getByRole('button', { name: 'Crear borrador' }).click()
+	await status(/Borrador #\d+ creado\./)
+	const fromCrepe = Number(/revision=(\d+)/.exec(page.url())?.[1])
+	const { getRevision } = await load('meeko-docs-content/db')
+	const reader = createDatabase({ connectionString: url, searchPath: schema })
+	try {
+		const stored = (await getRevision(reader, fromCrepe)).markdown
+		assert.equal(stored.startsWith(referenceHead), true, 'the frontmatter is the same')
+		const before = reference.split('\n')
+		const after = stored.split('\n')
+		assert.equal(after.length, before.length)
+		const changedLines = after.filter((line, index) => line !== before[index])
+		assert.equal(changedLines.length, 1, changedLines.join('\n'))
+		assert.ok(changedLines[0].endsWith(' Con Crepe.'))
+	} finally {
+		await reader.end()
+	}
+	await page.goto(`${origin}/sources/${ids.signal}`, { waitUntil: 'networkidle' })
+	await hydrated()
+	await page.getByRole('button', { name: `Archivar la revisión #${fromCrepe}` }).click()
+	await page.getByRole('dialog').getByRole('button', { name: 'Archivar revisión' }).click()
+	await status(`Revisión #${fromCrepe} archivada.`)
+
+	// A broken link: its warning opens the code mode with the caret on its line of the file, past the
+	// frontmatter, which the code mode does not show.
+	await page.goto(`${origin}/sources/${ids.signal}/edit`, { waitUntil: 'networkidle' })
+	await hydrated()
+	await crepe.waitFor({ timeout: 60_000 })
+	await codeMode()
+	const broken = '[enlace roto](/docs/esta-pagina-no-existe)'
+	await editor.fill(`${broken}\n\n${referenceBody}`)
+	await page.getByRole('button', { name: 'Actualizar', exact: true }).click()
+	const warnings = page.getByRole('region', { name: 'Avisos de la vista previa' })
+	const brokenWarning = warnings.getByRole('listitem').filter({ hasText: 'esta-pagina-no-existe' })
+	await brokenWarning.waitFor({ timeout: 60_000 })
+	await visualMode()
+	await brokenWarning.getByRole('button', { name: /^Línea \d+$/ }).click()
+	await editor.waitFor()
+	assert.equal(await editor.evaluate((element) => element === globalThis.document.activeElement), true, 'the caret goes to the code')
+	assert.equal(await editor.evaluate((element) => element.value.slice(element.selectionStart, element.selectionEnd)), broken)
+	await editor.fill(referenceBody)
+	await status('Sin cambios todavía')
+
+	// A reference page without `since`: a warning in the preview, a draft, and a clear refusal on publish.
+	await page.locator('#draft-frontmatter summary').click()
+	await page.getByLabel('since', { exact: true }).fill('')
+	await status('1 línea cambiada sin guardar')
 	await page.getByRole('button', { name: 'Actualizar', exact: true }).click()
 	await page.getByRole('region', { name: 'Avisos de la vista previa' }).getByText('Bloquea la publicación').waitFor({ timeout: 60_000 })
 	await page.getByRole('button', { name: 'Crear borrador' }).click()
@@ -372,10 +511,36 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 		.click()
 	await page.getByText(`El snapshot activo #${latest} incluye todas las revisiones publicadas.`).waitFor({ timeout: 30_000 })
 
+	// The first paint is the same box as the editor: without JavaScript the marker takes its place.
+	await page.goto(`${origin}/sources/${ids.doctor}/edit?revision=${draft}`, { waitUntil: 'networkidle' })
+	await hydrated()
+	await crepe.waitFor({ timeout: 60_000 })
+	const box = async (target) => target.locator('.ui-markdown-editor-surface').boundingBox()
+	const hydratedBox = await box(page)
+	const noScript = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 1440, height: 900 }, storageState: await page.context().storageState() })
+	const firstPaint = await noScript.newPage()
+	await firstPaint.goto(`${origin}/sources/${ids.doctor}/edit?revision=${draft}`)
+	await firstPaint.locator('.ui-markdown-editor-marker').getByText('Cargando el editor…').waitFor()
+	assert.equal(await firstPaint.locator('.milkdown').count(), 0, 'the server does not render Crepe')
+	assert.deepEqual(await box(firstPaint), hydratedBox, 'nothing moves when the editor arrives')
+	await noScript.close()
+
+	// In the light theme too it follows the tokens, without a rule per theme or a second instance.
+	const dark = await crepe.evaluate((element) => globalThis.getComputedStyle(element).color)
+	await page.evaluate(() => (globalThis.document.documentElement.dataset.theme = 'light'))
+	assert.notEqual(await crepe.evaluate((element) => globalThis.getComputedStyle(element).color), dark)
+	await page.evaluate(() => (globalThis.document.documentElement.dataset.theme = 'dark'))
+
+	// Leaving the page releases Crepe.
+	await page.getByRole('navigation', { name: 'Secciones' }).getByRole('link', { name: 'Fuentes' }).click()
+	await page.waitForURL(/\/sources$/)
+	await page.locator('.milkdown').waitFor({ state: 'detached' })
+
 	// Narrow screens: the editor and the detail do not overflow sideways.
 	await page.setViewportSize({ width: 390, height: 844 })
 	for (const path of [`/sources/${ids.doctor}/edit?revision=${draft}`, `/sources/${ids.testing}`]) {
 		await page.goto(origin + path, { waitUntil: 'networkidle' })
+		if (path.includes('/edit')) await crepe.waitFor({ timeout: 60_000 })
 		assert.equal(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.document.documentElement.clientWidth), true, `${path} overflows at 390 px`)
 	}
 
@@ -424,6 +589,8 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 	// The editor counts the same bytes: such a text is too large before it is sent.
 	await page.goto(`${origin}/sources/${ids.doctor}/edit?revision=${draft}`, { waitUntil: 'networkidle' })
 	await hydrated()
+	await crepe.waitFor({ timeout: 60_000 })
+	await codeMode()
 	// Typing 900 kB through fill() takes longer than the test allows: set it as one input.
 	await editor.evaluate((element, value) => {
 		element.value = value

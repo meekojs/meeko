@@ -17,12 +17,18 @@
 </script>
 
 <script lang="ts">
+	import type { UIMarkdownEditorMode } from '@meekojs/ui/editor'
+
+	import { splitMarkdownSource } from '@meekojs/ui/editor'
+
 	import type { Preview, PreviewIssue } from '../../../../shared/schemas/dashboard'
 	import type { Failure } from '../../../utils/errors'
+	import type { FrontmatterField } from '../../../utils/frontmatter'
 
 	import { encodedBytes } from '../../../../shared/schemas/dashboard'
 	import { describeError } from '../../../utils/errors'
 	import { shortHash } from '../../../utils/format'
+	import { frontmatterKeys, headLineCount, lineRange, readFrontmatter, writeFrontmatter } from '../../../utils/frontmatter'
 	import { siteLabels } from '../../../utils/labels'
 	import { previewDocument, readPreviewTokens } from '../../../utils/preview-document'
 	import { setUnsaved } from '../../../utils/unsaved'
@@ -43,9 +49,16 @@
 	// The page remounts for another id: its initial value is enough.
 	const sourceId = untrack(() => Number(props.params.id))
 
-	// The text and what was last saved or loaded: their difference is what a save would store.
-	const text = signal(data?.start.markdown ?? '')
-	const saved = signal(data?.start.markdown ?? '')
+	// The frontmatter is edited as fields and the body in UIMarkdownEditor: Crepe never sees the first.
+	// `text` is the file they make, and it is the loaded one, byte by byte, until one of them changes.
+	const loaded = data?.start.markdown ?? ''
+	const parts = splitMarkdownSource(loaded)
+	const head = signal(parts.head)
+	const body = signal(parts.body)
+	const text = computed(() => (head.value === parts.head && body.value === parts.body ? loaded : head.value + body.value))
+	const mode = signal<UIMarkdownEditorMode>('visual')
+	// Its difference with the text is what a save would store.
+	const saved = signal(loaded)
 	const draftId = signal<number | null>(data?.revision?.id ?? null)
 	const note = signal(data?.revision?.note ?? '')
 	const savedNote = signal(data?.revision?.note ?? '')
@@ -181,17 +194,54 @@
 	const issueKind = (kind: PreviewIssue['kind']) => t(`editor.issues.${kind}`)
 	const blocking = computed(() => preview.value?.issues.filter((issue) => issue.kind !== 'link').length ?? 0)
 
-	// Moves the caret of the editor to a line of the draft. The textarea is inside DashPage's snippet,
-	// where `ref:` is not allowed (MEEK052), so it is found by its id.
-	function goToLine(line: number) {
-		const element = document.getElementById('draft-markdown')
-		if (!(element instanceof HTMLTextAreaElement)) return
-		const lines = element.value.split('\n')
-		const at = lines.slice(0, Math.max(0, line - 1)).reduce((sum, current) => sum + current.length + 1, 0)
+	// The fields of the frontmatter. Which ones there are is decided on opening, so that a row does not
+	// disappear when its value is emptied; a head with something the fields could not write back as
+	// it was is edited as text.
+	const fields = computed(() => readFrontmatter(head.value))
+	const asText = readFrontmatter(parts.head) === null
+	const rows: readonly Pick<FrontmatterField, 'key' | 'kind'>[] = (() => {
+		const present = readFrontmatter(parts.head) ?? []
+		// A translation always has its `source-hash`, which «mark as translated» writes.
+		const known = frontmatterKeys.filter(({ key }) => present.some((field) => field.key === key) || (key === 'source-hash' ? data?.original : data?.source.kind === 'reference'))
+		return [...known, ...present.filter((field) => !frontmatterKeys.some(({ key }) => key === field.key))]
+	})()
+	const hasFrontmatter = asText || rows.length > 0
+	const fieldValue = (key: string) => fields.value?.find((field) => field.key === key)?.value ?? ''
+	const fieldId = (key: string) => `frontmatter-${key}`
+	function setField(row: Pick<FrontmatterField, 'key' | 'kind'>, value: string) {
+		if (fields.value) head.value = writeFrontmatter(head.value, row.key, row.kind, value)
+	}
+
+	/** The text area of the code mode: it appears when the mode changes, in the next frames. */
+	async function codeArea(): Promise<HTMLTextAreaElement | null> {
+		for (let frame = 0; frame < 10; frame++) {
+			const element = document.getElementById('draft-markdown')
+			if (element instanceof HTMLTextAreaElement) return element
+			await new Promise((resolve) => requestAnimationFrame(resolve))
+		}
+		return null
+	}
+
+	// Moves the caret to a line of the file: a field of the frontmatter, or that line in code mode.
+	// Everything here is inside DashPage's snippet, where `ref:` is not allowed (MEEK052), so the
+	// elements are found by their ids.
+	async function goToLine(line: number) {
+		const offset = headLineCount(head.value)
+		if (line <= offset) {
+			const details = document.getElementById('draft-frontmatter')
+			if (details instanceof HTMLDetailsElement) details.open = true
+			const field = fields.value?.filter((candidate) => candidate.line <= line).at(-1)
+			document.getElementById(field ? fieldId(field.key) : 'frontmatter-text')?.focus()
+			return
+		}
+		mode.value = 'code'
+		const element = await codeArea()
+		if (!element) return
+		const [start, end] = lineRange(element.value, line - offset)
 		element.focus()
-		element.setSelectionRange(at, at + (lines[line - 1]?.length ?? 0))
+		element.setSelectionRange(start, end)
 		const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight) || 20
-		element.scrollTop = Math.max(0, (line - 4) * lineHeight)
+		element.scrollTop = Math.max(0, (line - offset - 4) * lineHeight)
 	}
 
 	// Leaving with unsaved changes asks first: a reload or a closed tab here, a navigation of the app in the plugin.
@@ -232,7 +282,9 @@
 		stampFailure.value = null
 		try {
 			const stamped = await rpc.translations.stamp({ sourceId, markdown: text.value })
-			text.value = stamped.markdown
+			const next = splitMarkdownSource(stamped.markdown)
+			head.value = next.head
+			body.value = next.body
 			notice.value = t('editor.stamped', { hash: shortHash(stamped.sourceHash) })
 		} catch (error) {
 			stampFailure.value = describeError(error)
@@ -369,34 +421,90 @@
 				</p>
 			</form>
 
+			<details
+				if:when="hasFrontmatter"
+				id="draft-frontmatter"
+				class="dash-panel dash-frontmatter"
+			>
+				<summary>
+					{t('editor.frontmatter.title')}
+					<span class="dash-frontmatter-count">{asText ? t('editor.frontmatter.asTextShort') : t('editor.frontmatter.count', { count: fields.value?.length ?? 0 })}</span>
+				</summary>
+				<div
+					if:when="asText"
+					class="dash-frontmatter-text"
+				>
+					<label for="frontmatter-text">{t('editor.frontmatter.asText')}</label>
+					<textarea
+						id="frontmatter-text"
+						class="meeko-ui-input"
+						rows="8"
+						spellcheck="false"
+						model="head"
+					/>
+				</div>
+				<div
+					if:when="!asText"
+					class="dash-frontmatter-fields"
+				>
+					<div
+						each:of="rows"
+						each:as="row"
+						each:key="row.key"
+						class="dash-frontmatter-field"
+						bind:data-key="row.key"
+					>
+						<label bind:for="fieldId(row.key)">{row.key}</label>
+						<textarea
+							if:when="row.kind === 'list'"
+							class="meeko-ui-input"
+							rows="4"
+							spellcheck="false"
+							bind:id="fieldId(row.key)"
+							bind:value="fieldValue(row.key)"
+							on:input="(event) => setField(row, event.currentTarget.value)"
+						/>
+						<input
+							if:when="row.kind === 'text'"
+							class="meeko-ui-input"
+							spellcheck="false"
+							bind:id="fieldId(row.key)"
+							bind:readonly="row.key === 'source-hash'"
+							bind:value="fieldValue(row.key)"
+							on:input="(event) => setField(row, event.currentTarget.value)"
+						/>
+					</div>
+				</div>
+			</details>
+
 			<div class="dash-editor-panes">
 				<section
 					class="dash-pane"
 					aria-labelledby="markdown-heading"
 				>
-					<div class="dash-pane-head">
-						<h2 id="markdown-heading">Markdown</h2>
-						<span
-							class="dash-editor-size"
-							bind:data-over="tooLarge.value ? 'true' : undefined"
-						>
-							{sizeLabel.value}
-						</span>
-					</div>
-					<label
-						for="draft-markdown"
+					<h2
+						id="markdown-heading"
 						class="dash-visually-hidden"
 					>
-						{t('editor.markdownLabel')}
-					</label>
-					<textarea
+						Markdown
+					</h2>
+					<UIMarkdownEditor
 						id="draft-markdown"
-						class="dash-editor-text"
-						spellcheck="false"
-						autocapitalize="off"
-						aria-describedby="draft-size"
-						model="text"
-					/>
+						class="dash-editor-markdown"
+						describedBy="draft-size"
+						model="body"
+						model:mode="mode"
+						bind:label="t('editor.markdownLabel')"
+					>
+						<snippet name="tools">
+							<span
+								class="dash-editor-size"
+								bind:data-over="tooLarge.value ? 'true' : undefined"
+							>
+								{sizeLabel.value}
+							</span>
+						</snippet>
+					</UIMarkdownEditor>
 					<p
 						id="draft-size"
 						class="dash-visually-hidden"
@@ -474,7 +582,7 @@
 									if:when="issue.line !== null"
 									type="button"
 									class="dash-issue-line"
-									on:click="() => goToLine(issue.line ?? 1)"
+									on:click="() => void goToLine(issue.line ?? 1)"
 								>
 									{t('editor.preview.line', { line: String(issue.line) })}
 								</button>

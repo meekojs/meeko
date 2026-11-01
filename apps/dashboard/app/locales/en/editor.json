@@ -77,6 +77,18 @@
 			},
 			"line": "Line {line}",
 			"frame": "Preview of the draft"
+		},
+		"frontmatter": {
+			"title": "Frontmatter",
+			"asText": "It has something the fields would not keep, so it is edited as text.",
+			"asTextShort": "as text",
+			"count": {
+				"plural": "count",
+				"forms": {
+					"one": "{count} field",
+					"other": "{count} fields"
+				}
+			}
 		}
 	}
 }
