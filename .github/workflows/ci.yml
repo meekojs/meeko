@@ -26,7 +26,7 @@ jobs:
       - run: pnpm lint
       - name: Check every public package and application
         run: pnpm run check && pnpm run check:apps
-      - name: Test UI, i18n, ESLint and Prettier
+      - name: Test UI, i18n, icon, ESLint and Prettier
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force .meeko/ci-logs | Out-Null
@@ -34,6 +34,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Test public documentation site
         run: pnpm -F meeko-site run test
+      - name: Test documentation content package
+        run: pnpm -F meeko-docs-content run test
+      # Without DATABASE_URL the integration tests and the browser E2E of the dashboard are skipped.
+      - name: Check and test the documentation dashboard
+        run: pnpm -F meeko-dashboard run check && pnpm -F meeko-dashboard run test
       - name: Verify package and DevTools
         shell: pwsh
         run: |
@@ -52,7 +57,7 @@ jobs:
           $env:MEEKO_CHROME_PATH = node -p "require('./packages/ui/node_modules/playwright-core').chromium.executablePath()"
           pnpm -F meeko-ui-site run build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node --test --test-concurrency=1 packages/ui/tests/*.e2e.mjs 2>&1 | Tee-Object -FilePath .meeko/ci-logs/ui-e2e.log
+          node --test --test-concurrency=1 packages/ui/tests/*.e2e.mjs packages/icon/tests/*.e2e.mjs 2>&1 | Tee-Object -FilePath .meeko/ci-logs/ui-e2e.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: i18n public site E2E
         shell: pwsh

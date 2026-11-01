@@ -1,0 +1,24 @@
+# Contexto de deploy/Dockerfile (la raíz del repositorio). Fuera: Git, dependencias y salidas locales,
+# que la imagen vuelve a generar, cachés y archivos de agentes, y cualquier .env con secretos.
+.git
+**/node_modules
+**/.meeko
+**/dist
+**/dist-static
+**/coverage
+**/.vite
+**/*.tsbuildinfo
+.pnpm-store
+.claude
+.codex
+.serena
+.impeccable
+.hc-reports
+.worktrees
+.vscode
+**/.vscode-test
+**/.env
+**/.env.*
+!**/.env.example
+apps/meeko/public/brand
+packages/vscode/*.vsix
