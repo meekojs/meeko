@@ -1576,7 +1576,7 @@ Un disparador que no es un `<button>` (sin `popovertarget`) abre el contenido co
 
 ### Select: `<MeekoSelect>`
 
-> **Obsoleto desde 1.8; retirada en 2.0.** `<MeekoSelect>` sigue funcionando en 1.x y emite `MEEK121`. Usa `<UISelect>` de `@meekojs/ui` 0.2 con su módulo activo. Conserva props, snippets y marcado `data-meeko-*`. Véase [Migración a 1.8](migration-1.8.md).
+> **Obsoleto desde 1.8; retirada en 2.0.** `<MeekoSelect>` sigue funcionando en 1.x y emite `MEEK121`. Usa `<UICombobox>` de `@meekojs/ui` 0.2 con su módulo activo, que conserva props, snippets y marcado `data-meeko-*`, o `<UISelect>`, un `<select>` nativo, si no necesitas `multiple`, `searchable`, `filter` ni `max`. Véase [Migración a 1.8](migration-1.8.md).
 
 Un select accesible construido sobre `<MeekoPopover>`. `model` es el valor y su tipo sale de `options`:
 

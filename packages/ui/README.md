@@ -715,7 +715,42 @@ Tipos públicos de `@meekojs/ui/runtime`.
 
 ## UISelect
 
-Un select tipado. Sin `multiple`, `searchable` ni `filter` es un `<select>` nativo con `appearance: base-select`, que trae su lista, su teclado y su valor de formulario; Firefox y los navegadores antiguos muestran su lista propia. Con esas props, la plataforma no llega y es una lista propia sobre `<UIPopover>`. Las dos formas tienen la misma API. `model` es el valor y su tipo sale de `options`:
+Un `<select>` nativo con `appearance: base-select`: el navegador trae la lista, el teclado y el valor de formulario. Para buscar, filtrar en un servidor o elegir varias opciones, usa [`UICombobox`](#uicombobox); `multiple`, `searchable`, `filter` y `max` en `UISelect` son un error de tipos que lo indica.
+
+```html
+<UISelect
+	id="owner"
+	name="owner"
+	by="id"
+	labelBy="name"
+	groupBy="team"
+	placeholder="Asigna una persona"
+	clearable
+	model="owner"
+	bind:options="members"
+>
+	<snippet
+		name="option"
+		params="member, state"
+	>
+		{member.name}
+		<em if:when="state.selected">(elegida)</em>
+	</snippet>
+</UISelect>
+```
+
+Acepta `options`, `by`, `labelBy`, `disabledBy`, `groupBy`, `placeholder`, `name`, `required`, `disabled`, `clearable`, `clearLabel`, `field`, `id`, `label`, `describedBy`, `invalid`, `class`, `listClass`, `placement` y `offset`; emite `change`. Los snippets son `option` (`[option, state]`, con `selected` y `disabled`), `value` y `group`.
+
+- **Navegadores.** Chrome, Edge y Safari 27 pintan la lista con los tokens de UI, con entrada animada. Firefox y los navegadores antiguos muestran su lista propia, y en ellos `value`, `group` y el contenido rico de `option` quedan en su texto.
+- **Disparador.** Usa `<selectedcontent>`. Con el snippet `option`, muestra `value` o la etiqueta, porque `<selectedcontent>` copiaría toda la opción. No pongas `id` dentro de `option`, porque la copia lo duplicaría.
+- **Teclado.** Es el del navegador. `Intro` o `Espacio` abren la lista, y las flechas y las letras se mueven por ella. Con la lista cerrada varía según el motor: en WebKit, las flechas no abren.
+- **Sin elegir.** Una opción oculta al principio representa el `placeholder`, o un valor que ya no está en `options`: el modelo lo conserva y el formulario lo sigue enviando.
+- **`required`.** Un formulario sin valor no se envía: el `<select>` recibe el foco y `aria-invalid="true"`, sin el aviso del navegador.
+- **`listClass`.** Va en el `<select>`: dale estilo con `.mi-clase::picker(select)`.
+
+## UICombobox
+
+Lo que el `<select>` nativo de `UISelect` no cubre: buscar, filtrar en un servidor y elegir varias opciones. Es una lista propia sobre `<UIPopover>`, con más JavaScript: úsalo sólo si necesitas `searchable`, `filter`, `multiple` o `max`. `model` es el valor y su tipo sale de `options`:
 
 ```html
 <script lang="ts">
@@ -732,7 +767,7 @@ Un select tipado. Sin `multiple`, `searchable` ni `filter` es un `<select>` nati
 </script>
 <template>
 	<label for="color">Color</label>
-	<UISelect
+	<UICombobox
 		id="color"
 		model="color"
 		bind:options="colors"
@@ -740,7 +775,7 @@ Un select tipado. Sin `multiple`, `searchable` ni `filter` es un `<select>` nati
 		name="color"
 	/>
 
-	<UISelect
+	<UICombobox
 		model="user"
 		bind:options="users.value"
 		by="id"
@@ -759,9 +794,9 @@ Un select tipado. Sin `multiple`, `searchable` ni `filter` es un `<select>` nati
 		>
 			{user.name}
 		</snippet>
-	</UISelect>
+	</UICombobox>
 
-	<UISelect
+	<UICombobox
 		model="tags"
 		multiple
 		searchable
@@ -791,9 +826,7 @@ Un select tipado. Sin `multiple`, `searchable` ni `filter` es un `<select>` nati
 
 `on:change` emite el valor nuevo con cada elección del usuario. Los snippets son `option` (`[option, state]`, con `state.selected`, `state.active` y `state.disabled`), `value` (cómo se ve cada valor elegido en el disparador; sin él, las etiquetas separadas por comas), `group` (el encabezado de un grupo), `empty` (sin opciones; por defecto, `select.empty` de [los textos](#textos-e-idiomas)) y `loading` (mientras carga una búsqueda asíncrona).
 
-**Tipos.** `meeko check` y el editor infieren de la etiqueta el tipo de las opciones (`T`) y si es múltiple: el modelo de un select simple es una `Signal<T | null>` y el de uno múltiple, `Signal<T[]>`; `by`, `labelBy` y `groupBy` sólo admiten claves de `T`, y los parámetros de los snippets tienen el tipo `T`. El tipo `SelectModel<T, Multiple>` describe el valor.
-
-**El select nativo.** El `id` y `data-meeko-select-trigger` van en el `<select>`, que el navegador expone como `combobox`, y los grupos son `<optgroup>`. El navegador se encarga del teclado: `Intro` o `Espacio` abren la lista, las flechas y las letras se mueven por ella. Con la lista cerrada varía según el motor: en WebKit, las flechas no abren. La opción oculta del principio representa «sin elegir» y un valor que ya no está en `options`, que el modelo conserva y el formulario sigue enviando. El disparador usa `<selectedcontent>`; con el snippet `option`, muestra `value` o la etiqueta, porque `<selectedcontent>` copiaría toda la opción. No pongas `id` dentro de `option`. `listClass` va en el `<select>` (`.mi-clase::picker(select)`) y `state.active` siempre es `false`. Lo que sigue en este apartado, salvo `clearable`, describe la lista propia.
+**Tipos.** `meeko check` y el editor infieren de la etiqueta el tipo de las opciones (`T`) y si es múltiple: el modelo de un select simple es una `Signal<T | null>` y el de uno múltiple, `Signal<T[]>`; `by`, `labelBy` y `groupBy` sólo admiten claves de `T`, y los parámetros de los snippets tienen el tipo `T`. El tipo `ComboboxModel<T, Multiple>` describe el valor.
 
 **ARIA y teclado.** El disparador es un `role="combobox"` (un `<button>` o, con `searchable`, un `<input>` con `aria-autocomplete="list"`) con `aria-expanded`, `aria-controls`, `aria-haspopup="listbox"` y `aria-activedescendant`: el foco nunca sale de él. La lista es un `role="listbox"` (con `aria-multiselectable` en un select múltiple) de `role="option"` con `aria-selected` y `aria-disabled`, agrupadas en `role="group"` con `groupBy`. Un `<label for>` externo nombra el disparador por su `id`. El patrón ARIA del combobox no define cómo vaciar la selección, así que `clearable` añade, fuera del combobox, un `<button type="button">` con `aria-label` («Quitar selección»): entra en el orden de tabulación justo después del disparador, sólo existe mientras hay algo elegido y al activarlo cierra la lista, emite `change` con `null` (o `[]`) y devuelve el foco al disparador.
 
@@ -831,7 +864,7 @@ Con `max`, en cuanto hay `max` opciones elegidas las demás quedan `aria-disable
 	const search = (query: string, { signal }: { signal: AbortSignal }): Promise<City[]> => fetch(`/api/cities?q=${encodeURIComponent(query)}`, { signal }).then((response) => response.json())
 </script>
 <template>
-	<UISelect
+	<UICombobox
 		model="city"
 		bind:options="[]"
 		by="code"
@@ -841,7 +874,7 @@ Con `max`, en cuanto hay `max` opciones elegidas las demás quedan `aria-disable
 	>
 		<snippet name="loading">Buscando…</snippet>
 		<snippet name="empty">Ninguna ciudad con ese nombre</snippet>
-	</UISelect>
+	</UICombobox>
 </template>
 ```
 
@@ -853,7 +886,7 @@ Con `max`, en cuanto hay `max` opciones elegidas las demás quedan `aria-disable
 	novalidate
 >
 	<label bind:for="form.field('country').id">País</label>
-	<UISelect
+	<UICombobox
 		bind:field="form.field('country')"
 		bind:options="countries"
 		placeholder="Elige un país"
@@ -868,7 +901,7 @@ Con `max`, en cuanto hay `max` opciones elegidas las demás quedan `aria-disable
 </form>
 ```
 
-**Listas largas.** `<UISelect>` pinta todas las opciones (en el HTML del servidor también). Para miles de opciones, use `searchable` con un `filter` que devuelva sólo las primeras coincidencias; una lista virtual que sólo pinte las visibles (`virtual`) no está disponible en UI `0.2`.
+**Listas largas.** `<UICombobox>` pinta todas las opciones (en el HTML del servidor también). Para miles de opciones, use `searchable` con un `filter` que devuelva sólo las primeras coincidencias; una lista virtual que sólo pinte las visibles (`virtual`) no está disponible en UI `0.2`.
 
 **Alternativa nativa.** Para un caso simple, sin búsqueda ni opciones con contenido propio, un `<select>` nativo con `model` sigue siendo la opción más ligera. En los navegadores que lo admiten, `appearance: base-select` permite estilizarlo por completo y conserva el teclado, la accesibilidad y el envío del formulario del navegador:
 
@@ -879,7 +912,7 @@ select,
 }
 ```
 
-### Props de UISelect
+### Props de UICombobox
 
 Tipos públicos de `@meekojs/ui/runtime`.
 
@@ -896,9 +929,9 @@ Tipos públicos de `@meekojs/ui/runtime`.
 | `required`    | `boolean`                                              | Exige un valor al enviar el `<form>`.                                                                                    |
 | `disabled`    | `boolean`                                              | Deshabilita el disparador; los `<input type="hidden">` no se envían.                                                     |
 | `searchable`  | `boolean`                                              | Convierte el disparador en un combobox con `<input>` que filtra las opciones.                                            |
-| `filter`      | `SelectFilter<T>`                                      | Búsqueda propia, síncrona o asíncrona; por defecto, la etiqueta contiene el texto, sin distinguir acentos ni mayúsculas. |
+| `filter`      | `ComboboxFilter<T>`                                    | Búsqueda propia, síncrona o asíncrona; por defecto, la etiqueta contiene el texto, sin distinguir acentos ni mayúsculas. |
 | `max`         | `number`                                               | Con `multiple`, cuántas opciones se pueden elegir como mucho.                                                            |
-| `field`       | `SelectField<SelectModel<T, Multiple>>`                | El campo de `useForm` (`form.field('x')`): su `id`, su `name`, su valor, `aria-invalid` y `aria-describedby`.            |
+| `field`       | `SelectField<ComboboxModel<T, Multiple>>`              | El campo de `useForm` (`form.field('x')`): su `id`, su `name`, su valor, `aria-invalid` y `aria-describedby`.            |
 | `id`          | `string`                                               | `id` del disparador, para un `<label for>`; por defecto, el del campo o uno de `useId`.                                  |
 | `label`       | `string`                                               | `aria-label` del disparador y de la lista, sin `<label>`.                                                                |
 | `describedBy` | `string`                                               | `aria-describedby` del disparador.                                                                                       |
@@ -1017,7 +1050,7 @@ Todo enlace de una lista acepta `href` (cualquier URL) o `to` (una ruta con `par
 
 - **`UIPage`** pinta un único `<main>` enfocable y el enlace para saltar a él, y coloca `sidebar` y `aside` en columnas fijas al desplazarse. A 75rem oculta `aside` y a 54rem oculta `sidebar` y muestra `bar`, donde va el `UIDrawer`. Con un `UIHeader` fijo, los anclajes dejan libre su altura.
 - **`UIHeader`** tiene una altura fija, `--ui-header-height`. En pantallas estrechas sus enlaces pasan a un menú con `popover`, que flota y no mueve la página. Una imagen de `brand` declara `width` y `height` para reservar su espacio.
-- **`UIDrawer`** es un `<dialog>` modal con `command`, `commandfor` y `closedby`: abre, cierra y devuelve el foco sin JavaScript en los navegadores que los admiten; donde no, lo hace al hidratar.
+- **`UIDrawer`** es un `<dialog>` modal con `command`, `commandfor` y `closedby`: abre, cierra y devuelve el foco sin JavaScript en los navegadores que los admiten; donde no, lo hace al hidratar. Ya hidratado, sale con la misma View Transition que `UIModal`, por su propio lado; al seguir un enlace se cierra al instante, porque la navegación ya es la transición.
 - **`UINavigationTabs`** son enlaces, no un `tablist`. El indicador sigue al actual con posicionamiento por ancla; sin él, el enlace se marca solo. Para paneles en la misma página, no sirve este componente.
 - **`UITableOfContents`** pinta la entrada activa con `scroll-target-group`, sin script, donde existe. Un `IntersectionObserver` mínimo mantiene `aria-current="location"` en todos los navegadores, y es lo que se pinta donde no existe esa propiedad. `active` entrega el control a la aplicación. Usa `variant="aside"` en la columna y `variant="collapsible"` en el contenido: `UIPage` muestra cada uno sólo cuando corresponde.
 - **`UILocaleSwitcher` y `UILocaleSuggestion`** son presentación: reciben los destinos ya calculados y no leen rutas ni cookies. Con menos de dos idiomas, el selector no pinta nada. La sugerencia va escrita en el idioma que ofrece y el botón `stay`, en el actual; la aplicación decide cuándo mostrarla, tras montar, y qué guarda.
@@ -1027,7 +1060,7 @@ Todo enlace de una lista acepta `href` (cualquier URL) o `to` (una ruta con `par
 
 ## Plataforma y View Transitions
 
-`UIModal`, `UIPopover`, `UITabs`, `UIThemeToggle` y el `UISelect` simple usan `<dialog>`, `popover`, anclaje CSS, `appearance: base-select`, `@starting-style` y View Transitions. Los navegadores antiguos funcionan sin animación y con el `<select>` más básico, igual que Firefox, que aún muestra su lista nativa. `searchable`, `filter` y `multiple` conservan la lista propia sobre `UIPopover`.
+`UIModal`, `UIDrawer`, `UIPopover`, `UITabs`, `UIThemeToggle` y `UISelect` usan `<dialog>`, `popover`, anclaje CSS, `appearance: base-select`, `@starting-style` y View Transitions. Los navegadores antiguos funcionan sin animación y con el `<select>` más básico, igual que Firefox, que aún muestra su lista nativa. Lo que la plataforma no cubre está en `UICombobox`, sobre `UIPopover`.
 
 Para tus propias transiciones, usa `withViewTransition()`:
 

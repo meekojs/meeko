@@ -33,7 +33,7 @@ Conserva el resto de tu configuración. `theme` sólo es necesario para el selec
 | Hasta 1.7            | Desde core 1.8 con UI 0.2 |
 | -------------------- | ------------------------- |
 | `<MeekoPopover>`     | `<UIPopover>`             |
-| `<MeekoSelect>`      | `<UISelect>`              |
+| `<MeekoSelect>`      | `<UICombobox>`            |
 | `<MeekoThemeToggle>` | `<UIThemeToggle>`         |
 
 ```html
@@ -41,7 +41,7 @@ Conserva el resto de tu configuración. `theme` sólo es necesario para el selec
 	<snippet name="trigger">Acciones</snippet>
 	<button role="menuitem">Editar</button>
 </UIPopover>
-<UISelect
+<UICombobox
 	model="color"
 	bind:options="colors"
 	name="color"
@@ -49,7 +49,9 @@ Conserva el resto de tu configuración. `theme` sólo es necesario para el selec
 <UIThemeToggle mode="select" />
 ```
 
-Renombra también las etiquetas de cierre. Props, modelos, snippets, eventos, teclado, accesibilidad y marcado `data-meeko-*` conservan su contrato: los selectores CSS existentes siguen encontrando los mismos atributos. `UISelect<T, Multiple>` infiere sus tipos de `options` y `multiple` como antes.
+`UICombobox` es la misma lista propia que `<MeekoSelect>`. Un select sin `multiple`, `searchable`, `filter` ni `max` puede pasar además a `UISelect`, un `<select>` nativo con mucho menos JavaScript y con menos marcado propio: véase [su documentación](../packages/ui/README.md#uiselect).
+
+Renombra también las etiquetas de cierre. Props, modelos, snippets, eventos, teclado, accesibilidad y marcado `data-meeko-*` conservan su contrato: los selectores CSS existentes siguen encontrando los mismos atributos. `UICombobox<T, Multiple>` infiere sus tipos de `options` y `multiple` como antes.
 
 ## Imports de tipos
 
@@ -60,10 +62,10 @@ Los tres tipos de props cambian de paquete y de prefijo:
 import type { MeekoPopoverProps, MeekoSelectProps, MeekoThemeToggleProps, PopoverPlacement, SelectModel } from '@meekojs/meeko/framework'
 
 // Después
-import type { UIPopoverProps, UISelectProps, UIThemeToggleProps, PopoverPlacement, SelectModel } from '@meekojs/ui/runtime'
+import type { UIPopoverProps, UIComboboxProps, UIThemeToggleProps, PopoverPlacement, ComboboxModel } from '@meekojs/ui/runtime'
 ```
 
-Los auxiliares de popover/select (`PopoverMode`, `PopoverRole`, `PopoverTrigger`, `PopoverToggleEvent`, `PopoverSnippets`, `PopoverExposed`, `SelectOptionState`, `SelectFilter`, `SelectFilterContext`, `SelectSnippets` y `SelectField`) conservan su nombre y se importan desde `@meekojs/ui/runtime`. Los tipos del sistema de temas (`ThemeChoice`, `ThemeToggleMessages` y `ThemeToggleSnippets`, además de los nuevos `ThemeToggleState` y `ThemeToggleSystem`) permanecen en `@meekojs/meeko/framework`. Los exports antiguos del core siguen disponibles durante 1.x.
+Los auxiliares de popover/select (`PopoverMode`, `PopoverRole`, `PopoverTrigger`, `PopoverToggleEvent`, `PopoverSnippets`, `PopoverExposed`, `SelectOptionState`, `ComboboxFilter`, `ComboboxFilterContext`, `SelectSnippets` y `SelectField`) conservan su nombre y se importan desde `@meekojs/ui/runtime`. Los tipos del sistema de temas (`ThemeChoice`, `ThemeToggleMessages` y `ThemeToggleSnippets`, además de los nuevos `ThemeToggleState` y `ThemeToggleSystem`) permanecen en `@meekojs/meeko/framework`. Los exports antiguos del core siguen disponibles durante 1.x.
 
 ## Aviso MEEK121
 

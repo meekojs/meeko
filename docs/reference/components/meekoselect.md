@@ -18,7 +18,7 @@ related:
   - docs/api.md#componentes-integrados
 ---
 
-> **Obsoleto desde 1.8; retirada en 2.0.** `<MeekoSelect>` sigue funcionando en 1.x y emite `MEEK121`. Usa `<UISelect>` de `@meekojs/ui` 0.2 con su módulo activo. Conserva props, snippets y marcado `data-meeko-*`. Véase [Migración a 1.8](../../migration-1.8.md).
+> **Obsoleto desde 1.8; retirada en 2.0.** `<MeekoSelect>` sigue funcionando en 1.x y emite `MEEK121`. Usa `<UICombobox>` de `@meekojs/ui` 0.2 con su módulo activo, que conserva props, snippets y marcado `data-meeko-*`, o `<UISelect>`, un `<select>` nativo, si no necesitas `multiple`, `searchable`, `filter` ni `max`. Véase [Migración a 1.8](../../migration-1.8.md).
 
 Un `<select>` nativo no admite opciones con contenido propio, búsqueda ni grupos con estilo. `<MeekoSelect>` es un select construido sobre [`<MeekoPopover>`](/docs/reference/meekopopover) con el patrón ARIA de _combobox_ y _listbox_: el foco se queda en el disparador y `aria-activedescendant` marca la opción activa. `model` es el valor y su tipo sale de `options`, que pueden ser primitivos u objetos.
 

@@ -111,14 +111,16 @@ Con `pointer: coarse` los altos crecen solos, y los inputs usan `--ui-input-font
 2. Dura 250 ms o menos: los clics durante una transición se pierden.
 3. No abras un modal ni un `<select>` con View Transition: en WebKit el modal no se pinta hasta el final y el `<select>` no abre.
 
-| Tipo             | Nombre                         | Quién                                                                          |
-| ---------------- | ------------------------------ | ------------------------------------------------------------------------------ |
-| `ui-modal-close` | `ui-modal`                     | Salida de `UIModal` y `UICommandPalette`.                                      |
-| `ui-tab`         | `ui-tabs-indicator`            | Indicador de `UITabs`, sólo el grupo que cambia (`data-ui-tabs-active`).       |
-| `ui-theme`       | Ninguno: el fundido de la raíz | `UIThemeToggle`.                                                               |
-| `meeko-route`    | `ui-navigation-tabs-indicator` | Reservado al indicador de `UINavigationTabs`, si se anima en las navegaciones. |
+| Tipo             | Nombre                                          | Quién                                                                    |
+| ---------------- | ----------------------------------------------- | ------------------------------------------------------------------------ |
+| `ui-modal-close` | `ui-modal`, `ui-drawer-left`, `ui-drawer-right` | Salida de `UIModal`, `UICommandPalette` y `UIDrawer`.                    |
+| `ui-tab`         | `ui-tabs-indicator`                             | Indicador de `UITabs`, sólo el grupo que cambia (`data-ui-tabs-active`). |
+| `ui-theme`       | Ninguno: el fundido de la raíz                  | `UIThemeToggle`.                                                         |
+| `meeko-route`    | `ui-navigation-tabs-indicator`                  | Indicador de `UINavigationTabs`, sólo en la fila con un enlace actual.   |
 
-**Sólo Chromium:** la salida de `UIPopover` y de la lista de `UISelect` usa `allow-discrete`. Firefox y WebKit las cierran de golpe, porque cerrar con un clic fuera no se puede interceptar para envolverlo en una transición.
+**Sólo Chromium:** la salida de `UIPopover`, `UICombobox` y la lista de `UISelect` usa `allow-discrete`. Firefox y WebKit las cierran de golpe, porque cerrar con un clic fuera no se puede interceptar para envolverlo en una transición.
+
+**Dos filas de `UINavigationTabs` con enlace actual en la misma página** duplican el nombre: esa navegación funciona, pero sin animación.
 
 ## Carga
 
