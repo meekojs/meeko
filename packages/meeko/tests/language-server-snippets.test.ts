@@ -181,6 +181,70 @@ const user = signal<{ name: string } | null>(null);
     open("Page.meeko", valid);
   });
 
+  test("snippets named after a generic key: the editor types the child, the value of each column and unknown names", { timeout: 120_000 }, async () => {
+    const grid = `<script lang="ts" generic="Row extends object">
+import type { Snippet } from "@meekojs/meeko";
+type Column<R extends object> = { key: Extract<keyof R, string>; label: string };
+const props = defineProps<{ rows: readonly Row[]; columns: readonly Column<Row>[] }>();
+const snippets = defineSnippets<
+  { [K in Extract<keyof Row, string> as \`cell-\${K}\`]?: [row: Row, value: Row[K]] } &
+  { [K in Extract<keyof Row, string> as \`header-\${K}\`]?: [column: Column<Row>] } &
+  { cell?: [row: Row, column: Column<Row>, value: unknown] }
+>();
+const byName = snippets as { readonly [name: string]: Snippet<never> | undefined };
+function cellOf(column: Column<Row>): Snippet<[row: Row, value: unknown]> | undefined {
+  return byName[\`cell-\${column.key}\`] as Snippet<[row: Row, value: unknown]> | undefined;
+}
+</script>
+<template><p each:of="props.rows" each:as="row"><span each:of="props.columns" each:as="column"><render if:when="cellOf(column)" snippet="cellOf(column)" args="row, row[column.key]" /><render if:when="!cellOf(column)" snippet="snippets.cell" args="row, column, row[column.key]" /></span></p></template>`;
+    await writeFile(join(root, "Grid.meeko"), grid);
+    const child = open("Grid.meeko", grid);
+    assert.deepEqual(virtualErrors(child), []);
+    const parent = (template: string): string => `<script lang="ts">
+import * as Grid from "./Grid.meeko";
+type User = { id: number; email: string };
+const users: User[] = [{ id: 1, email: "ada@x.io" }];
+const columns: Array<{ key: keyof User; label: string }> = [{ key: "email", label: "Email" }];
+</script>
+<template>${template}</template>`;
+    const valid = open("GridPage.meeko", parent(`<Grid bind:rows="users" bind:columns="columns"><snippet name="cell-email" params="row, value">{value.toUpperCase()}{row.id}</snippet><snippet name="header-id" params="column">{column.label}</snippet></Grid>`));
+    assert.deepEqual(virtualErrors(valid), []);
+    assert.match(hoverText(valid, valid.at("value.toUpperCase", 1)), /\(parameter\) value: string/);
+    assert.match(hoverText(valid, valid.at("cell-email\"", 2)), /\(snippet\) cell-email\?\(row: User, value: string\)/);
+    assert.match(hoverText(valid, valid.at("header-id\"", 2)), /\(snippet\) header-id\?\(column: Column<User>\)/);
+    // With the rows known, the names complete with each column's key; the whole name is replaced.
+    const names = completion(valid, valid.at("cell-email\"", 5)) ?? [];
+    assert.deepEqual(names.map((item) => item.label).sort(), ["cell", "cell-email", "cell-id", "header-email", "header-id"]);
+    assert.equal(valid.document.getText((names.find((item) => item.label === "cell-id")!.textEdit as TextEdit).range), "cell-email");
+    const typing = open("GridPage.meeko", parent(`<Grid bind:rows="users" bind:columns="columns"><snippet name="cell-">x</snippet></Grid>`));
+    assert.ok((completion(typing, typing.at("cell-\"", 5)) ?? []).some((item) => item.label === "cell-email"));
+    // With rows of any key, a mapped name completes as its prefix.
+    const loose = open("GridLoose.meeko", `<script lang="ts">
+import * as Grid from "./Grid.meeko";
+const rows: Array<Record<string, number>> = [];
+const columns = [{ key: "a", label: "A" }];
+</script>
+<template><Grid bind:rows="rows" bind:columns="columns"><snippet name="c">x</snippet></Grid></template>`);
+    const patterns = completion(loose, loose.at("c\">", 1)) ?? [];
+    const cellPattern = patterns.find((item) => item.label === "cell-…");
+    assert.ok(cellPattern, JSON.stringify(patterns.map((item) => item.label)));
+    assert.equal((cellPattern.textEdit as TextEdit).newText, "cell-$1");
+    assert.ok(patterns.some((item) => item.label === "header-…"));
+    assert.ok(patterns.some((item) => item.label === "cell"));
+    const cases: Array<{ template: string; code: string; text: string }> = [
+      { template: `<Grid bind:rows="users" bind:columns="columns"><snippet name="cell-nope">x</snippet></Grid>`, code: "TS2353", text: "cell-nope" },
+      { template: `<Grid bind:rows="users" bind:columns="columns"><snippet name="cell-id" params="row, value">{value.toUpperCase()}</snippet></Grid>`, code: "TS2339", text: "toUpperCase" },
+    ];
+    const filename = join(root, "GridPage.meeko");
+    for (const item of cases) {
+      const context = open("GridPage.meeko", parent(item.template));
+      const diagnostics = await componentDiagnostics(project, context.document, filename, () => undefined);
+      const found = diagnostics.find((diagnostic) => diagnostic.code === item.code);
+      assert.ok(found, `${item.template}: ${JSON.stringify(diagnostics)}`);
+      assert.equal(context.document.getText(found.range), item.text, item.template);
+    }
+  });
+
   test("a checkbox model accepts a boolean | undefined signal, as the field of v.optional(v.boolean(), false)", () => {
     const source = `<script lang="ts">
 import { signal } from "@meekojs/meeko";

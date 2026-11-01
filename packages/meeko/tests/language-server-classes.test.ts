@@ -8,7 +8,7 @@ import { describe, test } from "node:test";
 import { pathToFileURL } from "node:url";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
-  CompletionRequest, CompletionResolveRequest, createConnection, createProtocolConnection, DefinitionRequest, DidChangeTextDocumentNotification,
+  CompletionRequest, CompletionResolveRequest, createConnection, createProtocolConnection, DefinitionRequest, DidChangeConfigurationNotification, DidChangeTextDocumentNotification,
   DidChangeWatchedFilesNotification, DidOpenTextDocumentNotification, FileChangeType, HoverRequest, InitializedNotification, InitializeRequest,
   PublishDiagnosticsNotification, RegistrationRequest, ShutdownRequest, StreamMessageReader, StreamMessageWriter,
 } from "vscode-languageserver/node";
@@ -274,6 +274,32 @@ describe("CSS classes in the language server", () => {
       const definition = await client.sendRequest(DefinitionRequest.type, { textDocument: { uri }, position }) as Location[];
       assert.equal(definition[0]!.uri, pathToFileURL(join(root, ".meeko", "styles", "main.css")).href);
       assert.equal(definition[0]!.range.start.line, 7);
+
+      // Configuration changes are applied without restarting the server.
+      const configure = async (completion: "auto" | "on" | "off", tailwindActive: boolean): Promise<void> => {
+        await client.sendNotification(DidChangeConfigurationNotification.type, { settings: { meeko: { classes: { completion, tailwindActive } } } });
+      };
+      await configure("off", true);
+      const off = await client.sendRequest(CompletionRequest.type, { textDocument: { uri }, position });
+      assert.ok(!JSON.stringify(off).includes('"meekoClass"'));
+      assert.equal(await client.sendRequest(HoverRequest.type, { textDocument: { uri }, position }), null);
+      await configure("auto", true);
+      assert.ok(labels((await complete('button u-7"', "button ".length)).items).includes("u-1"), "without Tailwind the snapshot remains available");
+      await writeFile(join(root, "package.json"), '{"dependencies":{"tailwindcss":"4"}}');
+      for (const [mode, active, generated] of [
+        ["auto", true, false],
+        ["auto", false, true],
+        ["on", true, true],
+      ] as const) {
+        await configure(mode, active);
+        const names = labels((await complete('button u-7"', "button ".length)).items);
+        assert.equal(names.includes("u-1"), generated, `${mode}, Tailwind active=${active}`);
+        assert.ok(names.includes("page0"), "component classes remain available");
+        const dynamicNames = labels((await complete("'is-'", "'is-".length)).items);
+        assert.equal(dynamicNames.includes("u-1"), generated);
+        const hover = await client.sendRequest(HoverRequest.type, { textDocument: { uri }, position });
+        assert.equal(hover !== null, generated);
+      }
 
       // `meeko dev` writes the processed stylesheet again: the watcher reports it under .meeko/.
       assert.ok(watchers.includes("**/*.css"), JSON.stringify(watchers));

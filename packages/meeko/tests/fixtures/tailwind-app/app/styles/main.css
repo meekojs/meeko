@@ -1,0 +1,8 @@
+@import 'tailwindcss';
+
+@theme {
+	--color-brand: #0a7c66;
+	--spacing-gutter: 1.375rem;
+}
+
+@utilities './utilities/probe.ts';

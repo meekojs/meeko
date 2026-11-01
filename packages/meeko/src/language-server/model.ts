@@ -5,7 +5,8 @@ import { basename, dirname, join, resolve } from "node:path";
 import type { AutoImport } from "../autoimports/registry";
 import type { GenericParameters } from "../compiler/generic";
 import type { SfcSection } from "../compiler/parser/sfc";
-import type { TemplateNode } from "../compiler/parser/template";
+import type { DecodedExpressionPiece, TemplateNode } from "../compiler/parser/template";
+import type { IsLeaf } from "../compiler/transforms/dynamic-tag";
 import type { ServerScript } from "../compiler/transforms/server-script";
 import type { ProjectAliases } from "../framework/aliases";
 import type { BuiltinTag } from "./builtin-tags";
@@ -15,22 +16,23 @@ import { defineEmitsDocs } from "../app/definitions/define-emits";
 import { defineExposeDocs } from "../app/definitions/define-expose";
 import { defineModelDocs } from "../app/definitions/define-model";
 import { definePropsDocs } from "../app/definitions/define-props";
-import { analyzePropsDefaults, PropsDefaultsError } from "../app/definitions/define-props";
+import { analyzePropsDefaults, componentDefaultsType, propsDefaultLiteralTypes, PropsDefaultsError, propsDefaultTexts } from "../app/definitions/define-props";
 import { defineSnippetsDocs } from "../app/definitions/define-snippets";
 import { useElementRefDocs, useElementRefEditorDeclaration, useElementRefUnexposedEditorType } from "../app/definitions/use-element-ref";
 import { discoverAutoImportsSync } from "../autoimports/registry";
 import { applyAutoImports, autoImportedValues } from "../autoimports/transform";
 import { awaitForReferences, shadowedBuiltinTags } from "../compiler";
 import { aliasCandidates, aliasTsconfigPaths } from "../compiler/aliases";
+import { defaultLiteralType } from "../compiler/codegen/props";
 import { pageRouteId, serverScriptTypes } from "../compiler/codegen/server-script";
 import { freeIdentifiers } from "../compiler/composables";
 import { GenericError, parseGeneric, sectionAttribute } from "../compiler/generic";
 import { scanInterpolations } from "../compiler/parser/interpolation";
 import { MeekoCompileError, parseSfc } from "../compiler/parser/sfc";
-import { attributeValueStart, decodeTemplateText, isCustomElementTag, parseTemplate } from "../compiler/parser/template";
+import { attributeValueStart, decodeTemplateExpression, isCustomElementTag, parseTemplate } from "../compiler/parser/template";
 import { generatedServicesDeclaration, projectDeclarationFiles } from "../compiler/project-declarations";
 import { projectRoot } from "../compiler/project-root";
-import { isCandidates } from "../compiler/transforms/dynamic-tag";
+import { branchTakes, isBranchCondition, isCandidates, isComponentName, isLeaves, scriptValueNames } from "../compiler/transforms/dynamic-tag";
 import { templateEventDeclaration, templateEventType } from "../compiler/transforms/events";
 import { analyzeServerScript } from "../compiler/transforms/server-script";
 import { aliasesForScope, resolveProjectAliasesSync } from "../framework/aliases";
@@ -336,7 +338,8 @@ const reservedTagAttributes = new Set(["is", "ref", "html", "model", "bind"]);
 
 /** Helpers of `<component is>` with an HTML tag and of `bind="obj"`, declared where the template has them. */
 const dynamicTagDeclarations = [
-  "declare function __meeko_tag_name(value: import(\"@meekojs/meeko\").TagName): void;",
+  // Since 1.8 `is` also names `'MeekoLink'` and the project's components (`__MeekoIsName`), which completion offers.
+  "declare function __meeko_tag_name(value: import(\"@meekojs/meeko\").TagName | __MeekoIsName): void;",
   "declare function __meeko_tag_of<const T extends string>(value: T): T;",
   "declare function __meeko_dynamic(value: import(\"@meekojs/meeko\").TagName | import(\"@meekojs/meeko\").Component<never>): void;",
   "declare function __meeko_component_part<T>(value: T): Exclude<T, string>;",
@@ -374,6 +377,10 @@ export function createVirtualComponent(source: string, filename: string, options
   const exposeCall = scriptFile.statements.map((statement) => ts.isExpressionStatement(statement) ? statement.expression : undefined)
     .find((call): call is ts.CallExpression => call !== undefined && ts.isCallExpression(call) && ts.isIdentifier(call.expression) && call.expression.text === "defineExpose");
   let defaultKeys: readonly string[] = [];
+  /** Default values as written, from the argument or the destructuring of `defineProps` (since 1.8). */
+  let defaultTexts = new Map<string, string>();
+  /** Literal type of each default that is a literal (`kind = "a"`), as the compiler writes it. */
+  let defaultLiterals = new Map<string, string>();
   let propsTypeText: string | undefined;
   let emitsTypeText: string | undefined;
   let snippetsTypeText: string | undefined;
@@ -398,6 +405,10 @@ export function createVirtualComponent(source: string, filename: string, options
       propsTypeText ??= call.typeArguments?.[0]?.getText(scriptFile);
       try { defaultKeys = analyzePropsDefaults(call)?.keys ?? []; }
       catch (error) { if (!(error instanceof PropsDefaultsError)) throw error; }
+      defaultTexts = propsDefaultTexts(declaration, scriptFile);
+      defaultLiterals = propsDefaultLiteralTypes(declaration, scriptFile);
+      // The defaults of a destructuring (`size = "md"`) make the prop optional for the parent too.
+      defaultKeys = [...new Set([...defaultKeys, ...defaultTexts.keys()])];
     }
   }
   if (generic) {
@@ -444,7 +455,7 @@ export function createVirtualComponent(source: string, filename: string, options
     // tuple without `undefined`.
     code += "type __MeekoSnippetParameters<A> = A extends readonly unknown[] ? A : A extends import(\"@meekojs/meeko\").Snippet<infer P extends readonly unknown[]> ? P : never;\n";
     code += "type __MeekoSnippetMap<T> = { [K in keyof T]: import(\"@meekojs/meeko\").Snippet<__MeekoSnippetParameters<T[K]>> };\n";
-    code += `${macroDocs.defineSnippets}\ndeclare function defineSnippets<T extends { [K in keyof T]: readonly unknown[] | import("@meekojs/meeko").Snippet<never> }>(): __MeekoSnippetMap<T>;\n`;
+    code += `${macroDocs.defineSnippets}\ndeclare function defineSnippets<T extends { readonly [name: string]: readonly unknown[] | import("@meekojs/meeko").Snippet<never> | undefined } | { [K in keyof T]: readonly unknown[] | import("@meekojs/meeko").Snippet<never> }>(): __MeekoSnippetMap<T>;\n`;
   }
   // An unmapped copy of the defineExpose call names the exposed type; the script stays verbatim.
   if (exposeCall) code += `const __meeko_exposed = ${exposeCall.getText(scriptFile)};\n`;
@@ -463,6 +474,10 @@ export function createVirtualComponent(source: string, filename: string, options
   // Meeko's own tags, unless a component of the project takes their name (MEEK106), as the compiler does.
   const registry = options.registry ?? discoverAutoImportsSync(projectRoot(filename));
   const shadowedTags = shadowedBuiltinTags(document.script.content, autoImportedValues(registry));
+  /** Names that a string literal of `is` may give, as the compiler resolves them: `'MeekoLink'` and the PascalCase values in scope. */
+  const isNames = (): Set<string> => new Set(["MeekoLink", ...[...autoImportedValues(registry), ...scriptValueNames(document.script.content)].filter(isComponentName)]);
+  /** Branches of `<component is>` with names (1.8), visited as their own tags; the branch of tags, with its tags. */
+  const branchNodes = new WeakMap<TemplateNode, { readonly tags?: readonly string[] }>();
   /** Props types of each built-in tag of the template and the checks of their props, declared after it. */
   const builtinDeclarations: string[] = [];
   const builtinChecks = new Map<string, string>();
@@ -553,6 +568,7 @@ export function createVirtualComponent(source: string, filename: string, options
     });
     if (!tag.props.length) return;
     const check = `__meeko_builtin_${tag.name}`;
+    if (tag.check?.declarations) builtinChecks.set(`${check}:types`, tag.check.declarations);
     builtinChecks.set(check, `declare function ${check}${tag.check?.parameters ?? ""}(props: ${tag.check?.props ?? `import("@meekojs/meeko/framework").${tag.propsType}`}): void;\n`);
     code += `${check}({ `;
     for (const attribute of attrs) {
@@ -577,12 +593,59 @@ export function createVirtualComponent(source: string, filename: string, options
     code += "});\n";
   };
 
-  /** Agrega una expresión conservando su posición original. */
-  const expression = (value: string, sourceStart: number): void => {
+  /**
+   * `<component is>` with component names (1.8), as the compiler splits it: each name is its own
+   * tag, whose name maps to its literal (hover and definition of `'UICard'`), and the HTML tags one
+   * element; each one behind the condition of `?:` that leads to it, with the attributes it takes.
+   */
+  const visitNamedIs = (node: TemplateNode, leaves: readonly IsLeaf[]): void => {
+    const own = (node.attrs ?? []).filter((attribute) => !/^(?:if|each):/.test(attribute.name) && !attribute.name.startsWith("ref:"));
+    const reference = own.find((attribute) => attribute.name === "is");
+    const referenceStart = reference ? attributeValueStart(source, reference) : undefined;
+    if (referenceStart === undefined) return;
+    const names = new Map<string, IsLeaf[]>();
+    const rest: IsLeaf[] = [];
+    for (const leaf of leaves) {
+      if (leaf.literal === undefined) continue;
+      if (isComponentName(leaf.literal)) names.set(leaf.literal, [...names.get(leaf.literal) ?? [], leaf]);
+      else rest.push(leaf);
+    }
+    const tags = [...new Set(rest.map((leaf) => leaf.literal!))];
+    const elementChildren = (node.childNodes ?? []).filter((child) => child.tagName !== "snippet");
+    const branch = (list: readonly IsLeaf[], target: TemplateNode, mark: { readonly tags?: readonly string[] }): void => {
+      const text = isBranchCondition(list, (part) => part);
+      code += `if (${text}) {\n`;
+      guards.push({ text, names: new Set(freeIdentifiers(text).map(({ name }) => name)) });
+      branchNodes.set(target, mark);
+      visit(target);
+      guards.pop();
+      code += "}\n";
+    };
+    for (const [name, list] of names) {
+      const link = name === "MeekoLink" && !shadowedTags.has(name);
+      const attrs = own.filter((attribute) => attribute !== reference && branchTakes(attribute, rawNameOf(attribute), link ? { kind: "link" } : { kind: "component" }));
+      // The tag starts at the opening quote: its name is the literal; it has no closing tag of its own.
+      branch(list, { ...node, nodeName: name, tagName: name, componentName: name, start: referenceStart + list[0]!.offset, selfClosing: true, attrs, ...(link ? { childNodes: elementChildren } : {}) }, {});
+    }
+    if (rest.length) {
+      const attrs = own.filter((attribute) => attribute === reference || branchTakes(attribute, rawNameOf(attribute), { kind: "tags", tags }));
+      branch(rest, { ...node, attrs, childNodes: elementChildren }, { tags });
+    }
+  };
+
+  /**
+   * Agrega una expresión conservando su posición original. Con `pieces`, los de una interpolación
+   * con referencias de carácter (`{x &amp;&amp; y}`), cada tramo tiene su span.
+   */
+  const expression = (value: string, sourceStart: number, pieces?: readonly DecodedExpressionPiece[]): void => {
     code += "void (";
     const generatedStart = code.length;
     code += value;
-    spans.push({ sourceStart, sourceEnd: sourceStart + value.length, generatedStart, generatedEnd: code.length });
+    if (pieces) {
+      for (const piece of pieces) {
+        spans.push({ sourceStart: sourceStart + piece.sourceStart, sourceEnd: sourceStart + piece.sourceEnd, generatedStart: generatedStart + piece.start, generatedEnd: generatedStart + piece.end });
+      }
+    } else spans.push({ sourceStart, sourceEnd: sourceStart + value.length, generatedStart, generatedEnd: code.length });
     code += ");\n";
   };
 
@@ -590,6 +653,17 @@ export function createVirtualComponent(source: string, filename: string, options
     const generatedStart = code.length;
     code += value;
     spans.push({ sourceStart, sourceEnd: sourceStart + value.length, generatedStart, generatedEnd: code.length });
+  };
+
+  /**
+   * The empty value of an expression attribute (`bind:item=""`, `on:save=""`, `model=""`):
+   * `undefined`, with the opening of its quotes mapped before it, so completion inside the quotes
+   * offers the expressions that the prop's type expects.
+   */
+  const emptyValue = (attribute: NonNullable<TemplateNode["attrs"]>[number]): void => {
+    const start = attributeValueStart(source, attribute);
+    if (start !== undefined) mapped("", start);
+    code += " undefined";
   };
 
   const root = parseTemplate(source, document.template, filename);
@@ -666,20 +740,35 @@ export function createVirtualComponent(source: string, filename: string, options
     // events and refs see the union of those elements, like the compiler's.
     let tagType: string | undefined;
     const referenceStart = reference ? attributeValueStart(source, reference) : undefined;
-    if (reference && referenceStart !== undefined && reference.value.trim()) {
+    // Since 1.8 `is` may name components (`to ? 'MeekoLink' : 'a'`): each branch is its own tag.
+    const branchTags = branchNodes.get(node)?.tags;
+    const leaves = reference && referenceStart !== undefined && reference.value.trim() && !branchTags ? isLeaves(reference.value) : [];
+    const named = leaves.some((leaf) => leaf.literal !== undefined && isComponentName(leaf.literal));
+    if (named) {
+      visitNamedIs(node, leaves);
+      childrenVisited = true;
+      reference = undefined;
+    } else if (reference && referenceStart !== undefined && reference.value.trim()) {
       const candidates = isCandidates(reference.value);
       if (candidates.others.length === 0) {
         // The mapped copy completes the tags that `is` admits; the other one keeps their literal types.
+        // In the branch of tags of an `is` with names, the type is that of its tags.
         const variable = `__meeko_tag_${tagVariables++}`;
         code += "__meeko_tag_name((";
         mapped(reference.value, referenceStart);
-        code += `));\nconst ${variable} = __meeko_tag_of((${reference.value}));\n`;
+        code += `));\nconst ${variable} = ${branchTags ? `null! as ${branchTags.map((tag) => JSON.stringify(tag)).join(" | ")}` : `__meeko_tag_of((${reference.value}))`};\n`;
         tagType = `typeof ${variable}`;
         dynamicTags = true;
         reference = undefined;
       }
     }
     if (componentName !== undefined || reference) {
+      // An empty `if:when=""` still completes expressions, as on an element.
+      if (condition && !narrows && conditionStart !== undefined) {
+        code += "void (";
+        emptyValue(condition);
+        code += ");\n";
+      }
       const value = componentName ?? reference!.value;
       const valueStart = componentName !== undefined ? node.start + 1 : attributeValueStart(source, reference!) ?? reference!.start;
       if (componentName !== undefined) {
@@ -739,7 +828,7 @@ export function createVirtualComponent(source: string, filename: string, options
         } else continue;
         code += ": ";
         if (attribute.value.trim()) mapped(attribute.value, attributeValueStart(source, attribute) ?? attribute.start);
-        else code += "undefined";
+        else emptyValue(attribute);
         code += ", ";
       }
       // The names that start with `on`, as `on:event` sets them: one the child does not declare is
@@ -805,8 +894,13 @@ export function createVirtualComponent(source: string, filename: string, options
         const argsStart = args ? attributeValueStart(source, args) : undefined;
         if (args?.value.trim() && argsStart !== undefined) mapped(args.value, argsStart);
         code += "]);\n";
+      } else if (snippet && snippetStart !== undefined) {
+        // `snippet=""` being written: completion inside the quotes offers the snippets.
+        code += "__meeko_render((";
+        emptyValue(snippet);
+        code += "), []);\n";
       }
-    } else if (!builtin || builtin.element) {
+    } else if (!named && (!builtin || builtin.element)) {
       // A built-in tag's other attributes go to the element it renders, as in the compiler.
       const element: TemplateNode = builtin ? { ...node, tagName: builtin.element!, attrs: attrs.filter((attr) => !builtinTagProp(builtin, rawNameOf(attr))) } : node;
       const elementAttrs = element.attrs ?? [];
@@ -823,6 +917,11 @@ export function createVirtualComponent(source: string, filename: string, options
         code += "));\n__meeko_writable(";
         mapped(model.value, modelStart);
         code += ");\n";
+      } else if (model && modelStart !== undefined && kind) {
+        // `model=""` being written: the control's type stands for completion inside the quotes.
+        code += `void ((): { value: __MeekoNativeModels[${JSON.stringify(kind)}] } => (`;
+        emptyValue(model);
+        code += "));\n";
       }
       // `html="expression"`: unescaped HTML, typed `string | null | undefined`.
       const html = directives ? elementAttrs.find((attr) => attr.name === "html") : undefined;
@@ -867,7 +966,16 @@ export function createVirtualComponent(source: string, filename: string, options
     if (node.nodeName === "#text") {
       // El CLI informa de interpolaciones vacías o sin cerrar; aquí sólo se modelan las válidas.
       for (const segment of scanInterpolations(source.slice(node.start, node.end)).segments) {
-        if (segment.expression) expression(decodeTemplateText(segment.expression), node.start + segment.expressionStart);
+        if (!segment.expression) {
+          // `{}` being written: `undefined` stands for it, so completion inside the braces works.
+          code += "void (";
+          mapped("", node.start + segment.expressionStart);
+          code += " undefined);\n";
+          continue;
+        }
+        // Entities decode without markup: a `<` of the code (`{a<b&&c}`) never opens a tag.
+        const decoded = decodeTemplateExpression(segment.expression);
+        expression(decoded.text, node.start + segment.expressionStart, decoded.pieces);
       }
     }
     if (!childrenVisited) for (const child of node.childNodes ?? []) visit(child);
@@ -899,7 +1007,7 @@ export function createVirtualComponent(source: string, filename: string, options
       }
       code += ": ";
       if (attribute.value.trim()) mapped(attribute.value, attributeValueStart(source, attribute) ?? attribute.start);
-      else code += "undefined";
+      else emptyValue(attribute);
       code += ", ";
     }
     code += "}";
@@ -937,7 +1045,11 @@ export function createVirtualComponent(source: string, filename: string, options
       const paramsStart = paramsAttribute ? attributeValueStart(source, paramsAttribute) : undefined;
       // The name is a key of the snippets argument, mapped for completion and hover.
       if (nameStart !== undefined && validIdentifier(name)) mapped(name, nameStart);
-      else if (nameStart !== undefined && !name) {
+      else if (nameStart !== undefined && /^[A-Za-z_$][\w$-]*$/.test(name)) {
+        // A hyphenated name (`cell-email`, since 1.8) is a quoted key, mapped with the attribute's
+        // quotes; one still being typed (`cell-`) too, so it completes. The compiler checks its form.
+        mapped(JSON.stringify(name), nameStart - 1);
+      } else if (nameStart !== undefined && !name) {
         mapped("", nameStart);
         code += "__meeko_snippet_name";
       } else code += JSON.stringify(name);
@@ -988,7 +1100,7 @@ export function createVirtualComponent(source: string, filename: string, options
   code += channelDeclarations;
   if (code.includes("__meeko_snippet(") || code.includes("__meeko_render(")) code += snippetDeclarations;
   if (code.includes("__meeko_html(")) code += htmlDeclaration;
-  if (dynamicTags) code += dynamicTagDeclarations;
+  if (dynamicTags) code += `type __MeekoIsName = ${[...isNames()].map((name) => JSON.stringify(name)).join(" | ")};\n${dynamicTagDeclarations}`;
   if (spreads) code += spreadDeclarations;
   // `<MeekoThemeToggle>`, `<MeekoAwait>`, `<MeekoPopover>` and `<MeekoSelect>` are the compiled modules that the component imports.
   for (const [tag, module] of shippedTags) code += `${shippedTagDeclaration(tag)}\ndeclare const ${tag}: typeof import(${JSON.stringify(module)});\n`;
@@ -1009,9 +1121,22 @@ export function createVirtualComponent(source: string, filename: string, options
   const G = generic ? `<${generic.declaration}>` : "";
   const A = generic ? `<${generic.names.join(", ")}>` : "";
   const K = generic ? "__K" : "K";
+  // Each member of a union of props on its own, as the compiler does: a default of a prop that a
+  // member declares `never` does not let the parent pass it in that member.
   const inputProps = defaultKeysType
-    ? `__MeekoDeclaredProps${A} extends unknown ? Omit<__MeekoDeclaredProps${A}, Extract<${defaultKeysType}, keyof __MeekoDeclaredProps${A}>> & { [${K} in Extract<${defaultKeysType}, keyof __MeekoDeclaredProps${A}>]?: __MeekoDeclaredProps${A}[${K}] | undefined } : never`
+    ? `__MeekoInputPropsOf<__MeekoDeclaredProps${A}>`
     : `__MeekoDeclaredProps${A}`;
+  // A literal default makes its prop optional only in the members whose type admits it (`kind = "a"`
+  // does not let the parent omit `kind: "b"`), as the compiler does; another default, in every
+  // member that declares its prop (the compiled check reports `MEEK131` if one cannot take it).
+  if (defaultKeysType) {
+    code += defaultLiterals.size
+      ? `${defaultLiteralType(Object.fromEntries(defaultLiterals))}\ntype __MeekoFittingDefaultKeys<__P> = { [${K} in (${defaultKeysType}) & keyof __P]: ${K} extends ${[...defaultLiterals.keys()].map((key) => JSON.stringify(key)).join(" | ")} ? Exclude<__P[${K}], undefined> extends infer __V ? [__MeekoDefaultLiteral<__P, ${K}>] extends [__V] ? ${K} : never : never : ${K} }[(${defaultKeysType}) & keyof __P];\n`
+      : `type __MeekoFittingDefaultKeys<__P> = (${defaultKeysType}) & keyof __P;\n`;
+    code += `type __MeekoInputPropsOf<__P> = __P extends unknown ? Omit<__P, __MeekoFittingDefaultKeys<__P>> & { [${K} in keyof Pick<__P, __MeekoFittingDefaultKeys<__P>>]?: __P[${K}] | undefined } : never;\n`;
+  }
+  // The default values as written, for the hover and the completion of a parent's tag.
+  code += `export type ComponentDefaults = ${componentDefaultsType(defaultTexts)};\n`;
   code += `type __MeekoDeclaredProps${G} = ${declaredProps};\n`;
   // Named so the editor can list the events of this component on a parent's tag.
   if (emitsTypeText) code += `type __MeekoEmits${G} = ${emitsTypeText};\n`;
@@ -1043,7 +1168,7 @@ export function createVirtualComponent(source: string, filename: string, options
   // The check of a parent's tag, like the compiled component's: the parameters come from the props
   // alone. Its result lets the editor show the child with them resolved.
   const typeArguments = generic ? generic.names.map((name) => `${name}: ${name}`).join("; ") : "";
-  code += `export declare const __meekoTag: ${G}(props: __MeekoTagProps<__MeekoComponentProps${A}> & __MeekoExtraProps, events: NoInfer<__MeekoEventNames<__MeekoComponentProps${A}>>, models: NoInfer<__MeekoTagModels<ComponentModels${A}>>, snippets: NoInfer<__MeekoTagSnippets<ComponentSnippets${A}>>) => { readonly typeArguments: { ${typeArguments} }; readonly props: __MeekoComponentProps${A}; readonly events: ${emitsTypeText ? `__MeekoEmits${A}` : "{}"}; readonly models: ComponentModels${A}; readonly snippets: ComponentSnippets${A}; readonly exposed: ComponentExposed${A} };\n`;
+  code += `export declare const __meekoTag: ${G}(props: __MeekoTagProps<__MeekoComponentProps${A}> & __MeekoExtraProps, events: NoInfer<__MeekoEventNames<__MeekoComponentProps${A}>>, models: NoInfer<__MeekoTagModels<ComponentModels${A}>>, snippets: NoInfer<__MeekoTagSnippets<ComponentSnippets${A}>>) => { readonly typeArguments: { ${typeArguments} }; readonly props: __MeekoComponentProps${A}; readonly events: ${emitsTypeText ? `__MeekoEmits${A}` : "{}"}; readonly models: ComponentModels${A}; readonly snippets: ComponentSnippets${A}; readonly exposed: ComponentExposed${A}; readonly defaults: ComponentDefaults };\n`;
   code += `export declare function hydrateScope${G}(scope: object, props: __MeekoComponentProps${A}, state?: Record<string, unknown>): { (): void; readonly exposed?: ComponentExposed${A} };\n`;
   code += `export declare function hydrate${G}(root: object, props: __MeekoComponentProps${A}, state?: Record<string, unknown>): () => void;\n`;
   code += "export declare const css: string;\n";
@@ -1141,7 +1266,11 @@ function finishVirtual(
       const from = direction === "source" ? span.sourceStart : span.generatedStart;
       const to = direction === "source" ? span.generatedStart : span.sourceStart;
       const end = direction === "source" ? span.sourceEnd : span.generatedEnd;
-      if (offset >= from && offset <= end) return to + offset - from;
+      if (offset < from || offset > end) continue;
+      const toEnd = direction === "source" ? span.generatedEnd : span.sourceEnd;
+      // A character reference (`&lt;` → `<`) changes the length: its inner offsets go to an end.
+      if (end - from !== toEnd - to) return offset === from ? to : toEnd;
+      return to + offset - from;
     }
     return undefined;
   };

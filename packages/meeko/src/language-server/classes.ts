@@ -207,6 +207,56 @@ export class ClassIndex {
   }
 }
 
+/** Ajustes del proveedor de clases y estado de Tailwind comunicado por el editor. */
+export interface ClassSettings {
+  readonly completion?: "auto" | "on" | "off";
+  readonly tailwindActive?: boolean;
+}
+
+/** Whether each project's package.json declares tailwindcss, by its `mtimeMs:size` stamp. */
+const tailwindManifests = new Map<string, { readonly stamp: string; readonly tailwind: boolean }>();
+
+/**
+ * Whether the project's package.json declares `tailwindcss` in any dependency field. Completion
+ * and hover ask on every request: the manifest is only read again when its stamp changes.
+ */
+function declaresTailwind(root: string): boolean {
+  const file = join(root, "package.json");
+  let stamp: string;
+  try {
+    const stat = statSync(file, { throwIfNoEntry: false });
+    // A project without a manifest may still import Tailwind from its CSS.
+    if (!stat?.isFile()) { tailwindManifests.delete(root); return false; }
+    stamp = `${stat.mtimeMs}:${stat.size}`;
+  } catch { return false; }
+  const cached = tailwindManifests.get(root);
+  if (cached?.stamp === stamp) return cached.tailwind;
+  let tailwind = false;
+  try {
+    const manifest = JSON.parse(readFileSync(file, "utf8")) as Record<string, Record<string, unknown> | undefined>;
+    tailwind = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"].some((key) => manifest[key]?.tailwindcss !== undefined);
+  } catch {
+    /* An unreadable or invalid manifest declares nothing until it changes. */
+  }
+  tailwindManifests.set(root, { stamp, tailwind });
+  return tailwind;
+}
+
+/** Filtra la hoja generada cuando Tailwind aporta sus propias sugerencias. */
+export function configuredClassView(view: ClassView, settings: ClassSettings = {}): ClassView {
+  if (settings.completion === "off") return { ...view, own: undefined, global: new Map(), sources: [] };
+  if (settings.completion === "on" || !settings.tailwindActive) return view;
+  let tailwind = view.sources.some((source) => source.origin !== "snapshot" && cssImports(source.text).some((target) => target === "tailwindcss" || target.startsWith("tailwindcss/")));
+  if (!tailwind && view.root) tailwind = declaresTailwind(view.root);
+  if (!tailwind) return view;
+  const global = new Map<string, readonly ClassSource[]>();
+  for (const [name, sources] of view.global) {
+    const written = sources.filter((source) => source.origin !== "snapshot");
+    if (written.length) global.set(name, written);
+  }
+  return { ...view, global, sources: view.sources.filter((source) => source.origin !== "snapshot") };
+}
+
 /** The classes of the component alone, for callers without a project. */
 function ownView(text: string): ClassView {
   const own = componentSource("own", undefined, text, undefined);
@@ -343,12 +393,12 @@ export function classView(document: TextDocument, filename?: string, index?: Cla
  * each and without those already written. `undefined` elsewhere; in `bind:class`, also when
  * there are none, so that TypeScript answers.
  */
-export function classCompletion(document: TextDocument, position: Position, filename?: string, index?: ClassIndex, components?: readonly ComponentText[]): CompletionItem[] | undefined {
+export function classCompletion(document: TextDocument, position: Position, filename?: string, index?: ClassIndex, components?: readonly ComponentText[], settings?: ClassSettings): CompletionItem[] | undefined {
   const source = document.getText();
   const offset = document.offsetAt(position);
   const token = classTokenAt(source, offset);
   if (!token) return undefined;
-  const view = classView(document, filename, index, components);
+  const view = configuredClassView(classView(document, filename, index, components), settings);
   const start = document.positionAt(token.start);
   const items: CompletionItem[] = [];
   const add = (name: string, source: ClassSource): void => {
@@ -386,11 +436,11 @@ export function resolveClassCompletion(item: CompletionItem, view: ClassView): C
 }
 
 /** Hover of a class in `class="…"` or `bind:class`: where it is defined and its rule. */
-export function classHover(document: TextDocument, position: Position, filename?: string, index?: ClassIndex, components?: readonly ComponentText[]): Hover | undefined {
+export function classHover(document: TextDocument, position: Position, filename?: string, index?: ClassIndex, components?: readonly ComponentText[], settings?: ClassSettings): Hover | undefined {
   const source = document.getText();
   const token = classTokenAt(source, document.offsetAt(position));
   if (!token || token.start === token.end) return undefined;
-  const contents = classMarkdown(classView(document, filename, index, components), source.slice(token.start, token.end));
+  const contents = classMarkdown(configuredClassView(classView(document, filename, index, components), settings), source.slice(token.start, token.end));
   return contents && { contents, range: { start: document.positionAt(token.start), end: document.positionAt(token.end) } };
 }
 

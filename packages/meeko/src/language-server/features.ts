@@ -11,7 +11,7 @@ import { getCSSLanguageService } from "vscode-css-languageservice";
 import { getLanguageService as getHtmlLanguageService } from "vscode-html-languageservice";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
-  CodeActionKind, CompletionItemKind, FoldingRangeKind, InsertTextFormat, MarkupKind, SemanticTokensBuilder, SymbolKind,
+  CodeActionKind, CompletionItemKind, CompletionItemTag, FoldingRangeKind, InsertTextFormat, MarkupKind, SemanticTokensBuilder, SymbolKind,
 } from "vscode-languageserver/node";
 
 import type { AutoImport } from "../autoimports/registry";
@@ -19,24 +19,27 @@ import type { SfcSection } from "../compiler/parser/sfc";
 import type * as PrettierEditor from "../formatters/prettier/editor";
 import type { EditCapabilities } from "./actions";
 import type { AppIndex } from "./app-index";
+import type { ComponentSummary } from "./components";
+import type { TagContext } from "./embedded";
 import type { HoverSection } from "./insights";
 import type { ComponentTag, SnippetTag, VirtualComponent } from "./model";
 import type { MeekoProject } from "./project";
 
 import { autoImportedValues } from "../autoimports/transform";
-import { shadowedBuiltinTags } from "../compiler";
+import { deprecatedBuiltinTags, shadowedBuiltinTags } from "../compiler";
 import { parseSfc } from "../compiler/parser/sfc";
 import { serverOnlyCompletion } from "../compiler/transforms/client-boundary";
 import { eachKeyActions, sidecarActions } from "./actions";
 import { builtinTag, builtinTags } from "./builtin-tags";
 import { builtinTagDefinition, builtinTagHover } from "./builtins";
-import { componentSummaryMarkdown, documentationMarkdown, memberDocumentation, tagSummary } from "./components";
+import { componentSummary, componentSummaryMarkdown, documentationMarkdown, memberDocumentation, propSignature, tagSummary } from "./components";
 import { bindAttributeCompletion, domEventCompletion, dynamicTagAttributeCompletion, dynamicTagHover, dynamicTags, htmlAttributeCompletion, specialTemplateDocumentation, tagAt } from "./embedded";
 import { appTargetDefinition, appTargetHover, componentFile, componentMarkdown, componentModuleAt, componentTagName, componentTypeAt, reactiveHover } from "./insights";
 import { locationOf, sourceRange, toRange } from "./locations";
 import { componentFiles, htmlDirectiveDocs } from "./model";
-import { meekoAutoImport, packageCompletion } from "./project";
+import { meekoAutoImport, packageCompletion, pathKey } from "./project";
 import { analyzeReactivity } from "./reactivity";
+import { refNameCompletion, typedValueCompletion, valueSiteAt } from "./template-values";
 
 export { documentationMarkdown } from "./components";
 
@@ -73,7 +76,6 @@ const htmlLanguageService = getHtmlLanguageService();
 const cssLanguageService = getCSSLanguageService();
 const userPreferences: ts.UserPreferences = {
   quotePreference: "double",
-  importModuleSpecifierEnding: "js",
   importModuleSpecifierPreference: "relative",
   includeCompletionsForModuleExports: true,
   includeCompletionsWithInsertText: true,
@@ -86,6 +88,25 @@ const userPreferences: ts.UserPreferences = {
   // outside node_modules once resolved; its relative paths are filtered in completionList.
   autoImportSpecifierExcludeRegexes: ["^@meekojs/meeko/(?:internal|dist|src)(?:/|$)"],
 };
+/**
+ * Whether the project resolves modules like Node (`node16`, `nodenext`, also implied by such a
+ * `module`), where a relative import of an ES module needs its extension (`./context.js`).
+ */
+function nodeModuleResolution(options: ts.CompilerOptions): boolean {
+  const resolution = options.moduleResolution;
+  if (resolution !== undefined) return resolution === ts.ModuleResolutionKind.Node16 || resolution === ts.ModuleResolutionKind.NodeNext;
+  return options.module !== undefined && options.module >= ts.ModuleKind.Node16 && options.module <= ts.ModuleKind.NodeNext;
+}
+
+/**
+ * Preferences of the TypeScript service for the imports it writes (auto-import completion, "Add
+ * import"): a relative import without extension (`./settings/context`), which Vite and the
+ * `Bundler` resolution of Meeko's tsconfig accept, unless the project's tsconfig resolves modules
+ * like Node and requires `./settings/context.js`.
+ */
+function editorPreferences(options: ts.CompilerOptions): ts.UserPreferences {
+  return { ...userPreferences, importModuleSpecifierEnding: nodeModuleResolution(options) ? "js" : "minimal" };
+}
 // Renaming an imported symbol renames its declaration and every importer, across .meeko and
 // .ts files, instead of introducing a local `import { a as b }` alias.
 /** Trigger characters that TypeScript understands; `:` and others are Meeko's own. */
@@ -196,8 +217,15 @@ function nodeOnlyGlobals(program: ts.Program, file: ts.SourceFile): ReadonlySet<
   return names;
 }
 
-/** `SortText.GlobalsOrKeywords` of TypeScript: a global of the libraries or a keyword. */
-const globalSortText = "15";
+/**
+ * Whether TypeScript lists `entry` as a global of the libraries or a keyword. TypeScript's public
+ * API has no such flag: it sorts them with its internal `SortText.GlobalsOrKeywords` ("15"). Any
+ * reading of that value lives here; `tests/language-server-autoimport-completion.test.ts` fails
+ * if a TypeScript version changes it.
+ */
+export function isGlobalOrKeyword(entry: Pick<ts.CompletionEntry, "sortText">): boolean {
+  return entry.sortText === "15";
+}
 
 /**
  * Whether a completion of a component's `<script>` or template, which also run in the browser,
@@ -205,7 +233,7 @@ const globalSortText = "15";
  * module of Node (`os`, `node:fs`…), as `@types/node` declares them.
  */
 function nodeOnlyCompletion(entry: ts.CompletionEntry, globals: ReadonlySet<string>): boolean {
-  if (entry.sortText === globalSortText && entry.source === undefined && !entry.hasAction) return globals.has(entry.name);
+  if (isGlobalOrKeyword(entry) && entry.source === undefined && !entry.hasAction) return globals.has(entry.name);
   const module = entry.data?.ambientModuleName;
   return module !== undefined && isBuiltin(module);
 }
@@ -265,6 +293,11 @@ export interface CompletionData {
    * TypeScript would write a path into a linked package.
    */
   readonly publicImport?: string;
+  /**
+   * A name the project autoimports (`formatPrice` of `app/utils/price.ts`): completed without an
+   * import, which the build adds. `file` and `imported` locate its export for the detail.
+   */
+  readonly autoImport?: { readonly file: string; readonly imported: string };
 }
 
 /** Etiqueta PascalCase cuyo nombre, de apertura o de cierre, contiene `offset`. */
@@ -277,7 +310,7 @@ function componentTagAt(component: VirtualComponent, offset: number): ComponentT
 function componentEventCompletion(context: FeatureContext, span: { start: number; end: number }, sourceOffset: number): CompletionItem[] | undefined {
   const offset = context.component.toGenerated(sourceOffset);
   if (offset === undefined) return undefined;
-  const result = context.project.service.getCompletionsAtPosition(context.component.virtualFilename, offset, userPreferences);
+  const result = context.project.service.getCompletionsAtPosition(context.component.virtualFilename, offset, editorPreferences(context.project.compilerOptions));
   return result?.entries.filter((entry) => /^on[A-Z]/.test(entry.name)).map((entry): CompletionItem => {
     const event = `${entry.name.charAt(2).toLowerCase()}${entry.name.slice(3)}`;
     const data: CompletionData = { uri: context.document.uri, offset, name: entry.name };
@@ -295,8 +328,9 @@ function componentEventCompletion(context: FeatureContext, span: { start: number
 function componentModelCompletion(context: FeatureContext, span: { start: number; end: number }, sourceOffset: number): CompletionItem[] | undefined {
   const offset = context.component.toGenerated(sourceOffset);
   if (offset === undefined) return undefined;
-  const result = context.project.service.getCompletionsAtPosition(context.component.virtualFilename, offset, userPreferences);
-  return result?.entries.filter((entry) => entry.kind === ts.ScriptElementKind.memberVariableElement && /^[A-Za-z_$][\w$]*$/.test(entry.name))
+  const result = context.project.service.getCompletionsAtPosition(context.component.virtualFilename, offset, editorPreferences(context.project.compilerOptions));
+  // `default` is the model of `model="…"`, never `model:default`.
+  return result?.entries.filter((entry) => entry.kind === ts.ScriptElementKind.memberVariableElement && /^[A-Za-z_$][\w$]*$/.test(entry.name) && entry.name !== "default")
     .map((entry): CompletionItem => ({
       label: entry.name,
       kind: CompletionItemKind.Property,
@@ -348,11 +382,32 @@ function snippetCall(context: FeatureContext, tag: SnippetTag): { call: ts.CallE
 
 /** Snippets que declara el defineSnippets del hijo, o `undefined` si no declara ninguno. */
 function childSnippets(property: ts.PropertyAssignment, checker: ts.TypeChecker): ts.Symbol[] | undefined {
-  // The snippets argument of the tag check, typed with the child's type parameters resolved.
+  const type = snippetsArgumentType(property, checker);
+  const snippets = type ? checker.getPropertiesOfType(type) : [];
+  return snippets.length ? snippets : undefined;
+}
+
+/** The snippets argument of the tag check, typed with the child's type parameters resolved. */
+function snippetsArgumentType(property: ts.PropertyAssignment, checker: ts.TypeChecker): ts.Type | undefined {
   const object = property.parent;
   const type = ts.isObjectLiteralExpression(object) ? checker.getContextualType(object) : undefined;
-  const snippets = type && !(type.flags & ts.TypeFlags.Null) ? checker.getPropertiesOfType(type) : [];
-  return snippets.length ? snippets : undefined;
+  return type && !(type.flags & ts.TypeFlags.Null) ? type : undefined;
+}
+
+/**
+ * Snippet names that only a pattern tells: the `` `cell-${string}` `` keys of a child whose mapped
+ * snippets (`cell-<key>`) do not resolve to concrete keys, as when its rows are typed as `object`
+ * or `Record<string, unknown>`. Each gives its prefix and the parameters of its snippets.
+ */
+function snippetNamePatterns(property: ts.PropertyAssignment, checker: ts.TypeChecker): Array<{ prefix: string; type: ts.Type }> {
+  const type = snippetsArgumentType(property, checker);
+  if (!type) return [];
+  return checker.getIndexInfosOfType(type).flatMap((info) => {
+    const key = info.keyType;
+    if (!(key.flags & ts.TypeFlags.TemplateLiteral)) return [];
+    const { texts, types } = key as ts.TemplateLiteralType;
+    return texts[0] && types.length === 1 && types[0]!.flags & ts.TypeFlags.String && texts[1] === "" ? [{ prefix: texts[0], type: info.type }] : [];
+  });
 }
 
 /**
@@ -403,6 +458,19 @@ export function snippetParameters(context: FeatureContext, tag: SnippetTag): { o
 function snippetNameCompletion(context: FeatureContext, tag: SnippetTag): CompletionItem[] | undefined {
   const located = snippetCall(context, tag);
   const snippets = located && childSnippets(located.property, located.checker);
+  const range = toRange(context.document, tag.nameStart, tag.nameEnd);
+  // Mapped names (`cell-<key>`, since 1.8) whose keys are not known: their prefix, as a snippet.
+  const patterns = located ? snippetNamePatterns(located.property, located.checker)
+    .filter((pattern) => !snippets?.some((symbol) => symbol.name.startsWith(pattern.prefix)))
+    .map((pattern): CompletionItem => ({
+      label: `${pattern.prefix}…`,
+      kind: CompletionItemKind.Field,
+      detail: `${pattern.prefix}\${string}: ${located.checker.typeToString(pattern.type, located.call)}`,
+      filterText: pattern.prefix,
+      insertTextFormat: InsertTextFormat.Snippet,
+      textEdit: { range, newText: `${pattern.prefix}$1` },
+    })) : [];
+  if (!snippets && patterns.length) return patterns;
   if (!snippets) {
     // `<MeekoThemeToggle>` while its snippets are an index signature (a `theme` that only running
     // meeko.config.* tells): the choices of `theme: true`, as its hover lists them.
@@ -417,12 +485,12 @@ function snippetNameCompletion(context: FeatureContext, tag: SnippetTag): Comple
       textEdit: { range: toRange(context.document, tag.nameStart, tag.nameEnd), newText: snippet.name },
     })) : undefined;
   }
-  return snippets.map((symbol): CompletionItem => ({
+  return [...snippets.map((symbol): CompletionItem => ({
     label: symbol.name,
     kind: CompletionItemKind.Field,
     detail: `${symbol.name}${symbol.flags & ts.SymbolFlags.Optional ? "?" : ""}: ${located!.checker.typeToString(located!.checker.getTypeOfSymbolAtLocation(symbol, located!.call))}`,
-    textEdit: { range: toRange(context.document, tag.nameStart, tag.nameEnd), newText: symbol.name },
-  }));
+    textEdit: { range, newText: symbol.name },
+  })), ...patterns];
 }
 
 /** Nombres de parámetro en `params` de un `<snippet>`, según los que le da el hijo. */
@@ -488,9 +556,132 @@ export function componentNameCompletion(project: MeekoProject, document: TextDoc
       label: builtin.name,
       kind: CompletionItemKind.Class,
       detail: builtin.detail,
+      ...(deprecatedBuiltinTags[builtin.name] ? { tags: [CompletionItemTag.Deprecated] } : {}),
       textEdit: { range: { start, end: position }, newText: builtin.name },
     })),
   ];
+}
+
+/**
+ * The attributes of `items` without their value (`on:click` instead of `on:click="$1"`) when the
+ * name being edited already has one: `valued`, an `=` right after it.
+ */
+function nameOnly(items: CompletionItem[], valued: boolean): CompletionItem[] {
+  if (!valued) return items;
+  return items.map((item) => item.textEdit && "range" in item.textEdit
+    ? { ...item, textEdit: { ...item.textEdit, newText: item.textEdit.newText.replace(/=(["'])[^"']*\1$/, "") } }
+    : item);
+}
+
+/** `onSelect` as the event `select` of `on:select`, or `undefined` for another name. */
+function callbackEvent(name: string): string | undefined {
+  return /^on[A-Z]/.test(name) ? `${name.charAt(2).toLowerCase()}${name.slice(3)}` : undefined;
+}
+
+/** A prop, event or model of a component tag: its JSDoc under its signature. */
+function memberDocumentationOf(signature: string, documentation: string | undefined): { kind: "markdown"; value: string } {
+  return { kind: MarkupKind.Markdown, value: ["```ts", signature, "```", ...(documentation ? ["", documentation] : [])].join("\n") };
+}
+
+/**
+ * Props, eventos y modelos de una etiqueta de componente, como ofrece los atributos el editor de
+ * HTML o de Vue: se insertan como snippet con su valor (`title="$1"`, `bind:item="$1"`,
+ * `on:save="$1"`, `model:open="$1"`) y el cursor entre las comillas, o sólo el nombre si le sigue
+ * un `=`. Una prop de texto va como texto; una booleana, sin valor y con `bind:`; una que admite
+ * texto y otros tipos, de las dos formas, y las demás con `bind:`. Las obligatorias van primero y
+ * se omiten las ya escritas. Tras `bind:`, `on:` o `model:`, sólo ese canal.
+ *
+ * @example
+ * componentMemberCompletion(summary, "it", new Set(), range, false)
+ * // [{ label: "bind:item", textEdit: { newText: 'bind:item="$1"' } }, { label: "title", … }, …]
+ */
+export function componentMemberCompletion(summary: ComponentSummary, word: string, present: ReadonlySet<string>, range: Range, valued: boolean): CompletionItem[] {
+  const prefix = /^(bind|on|model):/.exec(word)?.[1];
+  const item = (label: string, kind: CompletionItemKind, sortText: string, detail: string, documentation: string | undefined, value: "bare" | "quoted" | "values"): CompletionItem => ({
+    label,
+    kind,
+    detail,
+    documentation: memberDocumentationOf(detail, documentation),
+    sortText,
+    filterText: label,
+    insertTextFormat: InsertTextFormat.Snippet,
+    textEdit: { range, newText: valued || value === "bare" ? label : `${label}="$1"` },
+    // A literal union offers its values inside the quotes.
+    ...(value === "values" && !valued ? { command: { title: "Valores", command: "editor.action.triggerSuggest" } } : {}),
+  });
+  const events = new Map(summary.events.map((event) => [event.name, `on:${event.name}(${event.type.replace(/^\[(.*)\]$/, "$1")})`]));
+  const documented = new Map(summary.events.map((event) => [event.name, event.documentation]));
+  const items: CompletionItem[] = [];
+  for (const prop of summary.props) {
+    const event = callbackEvent(prop.name);
+    // A callback prop is an event of the tag: `onSelect` is `on:select`.
+    if (event !== undefined) {
+      if (!events.has(event)) {
+        events.set(event, `on:${event}: ${prop.type}`);
+        documented.set(event, prop.documentation);
+      }
+      continue;
+    }
+    if (present.has(prop.name) || present.has(`bind:${prop.name}`)) continue;
+    const order = prop.optional ? "1" : "0";
+    const signature = propSignature(prop);
+    const attribute = prop.attribute ?? "expression";
+    // `is`, `ref`, `html`, `bind` and names with `-` are not static props (MEEK032).
+    const reserved = ["is", "ref", "html", "bind"].includes(prop.name) || prop.name.includes("-");
+    if (prefix === undefined && !reserved && attribute !== "expression") {
+      items.push(item(prop.name, CompletionItemKind.Property, `0${order}${prop.name}`, signature, prop.documentation, attribute === "flag" ? "bare" : prop.values?.length ? "values" : "quoted"));
+    }
+    // After `bind:`, every prop: a text prop may also take an expression (`bind:title="todo.title"`);
+    // without a prefix, a text prop's `bind:` goes after the other members, for `bind` to find it.
+    if (prefix === "bind" || (prefix === undefined && (attribute !== "text" || reserved))) {
+      items.push(item(`bind:${prop.name}`, CompletionItemKind.Property, `0${order}${prop.name}~`, signature, prop.documentation, "quoted"));
+    } else if (prefix === undefined) {
+      items.push(item(`bind:${prop.name}`, CompletionItemKind.Property, `04${prop.name}`, signature, prop.documentation, "quoted"));
+    }
+  }
+  if (prefix === undefined || prefix === "on") {
+    for (const [event, signature] of events) {
+      if (present.has(`on:${event}`) || present.has(`bind:on${event.charAt(0).toUpperCase()}${event.slice(1)}`)) continue;
+      items.push(item(`on:${event}`, CompletionItemKind.Event, `02${event}`, signature, documented.get(event), "quoted"));
+    }
+  }
+  if (prefix === undefined || prefix === "model") {
+    for (const model of summary.models) {
+      const label = model.name === "default" ? "model" : `model:${model.name}`;
+      // `model:` completes the named models; `model` is the default one.
+      if (present.has(label) || (prefix === "model" && model.name === "default")) continue;
+      items.push(item(label, CompletionItemKind.Field, `03${model.name === "default" ? "" : model.name}`, `${label}${model.optional ? "?" : ""}: Signal<${model.type}>`, model.documentation, "quoted"));
+    }
+  }
+  return items;
+}
+
+/**
+ * Lo que declara la etiqueta de un componente del proyecto que rodea `position` (props, eventos y
+ * modelos): de su comprobación en el código virtual, con los parámetros de tipo que infieren sus
+ * props, o del módulo del hijo si falta. `undefined` fuera del nombre de un atributo de una
+ * etiqueta de componente y en las etiquetas propias de Meeko, que tienen sus props en su tabla.
+ *
+ * @example
+ * componentTagMembers(context, position)?.props.map((prop) => prop.name) // ["item", "title"]
+ */
+export function componentTagMembers(context: FeatureContext, position: Position): ComponentSummary | undefined {
+  const source = context.document.getText();
+  const offset = context.document.offsetAt(position);
+  const tag = tagAt(source, offset);
+  if (!tag || tag.value || !tag.component) return undefined;
+  const found = context.component.componentTags?.find((candidate) => candidate.start === tag.tagStart + 1 && !candidate.builtin);
+  if (!found) return undefined;
+  const program = context.project.service.getProgram();
+  if (!program) return undefined;
+  let node: ts.Node | undefined = virtualNodeAt(context, found.start)?.node;
+  while (node && !(ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "__meeko_tag")) node = node.parent;
+  const check = node?.parent;
+  const summary = node && check && ts.isCallExpression(check) && check.expression === node ? tagSummary(program.getTypeChecker(), check) : undefined;
+  if (summary) return summary;
+  const generated = context.component.toGenerated(found.start);
+  const child = generated === undefined ? undefined : componentModuleAt(context, generated);
+  return child ? componentSummary(program, child.component) : undefined;
 }
 
 /** Una directiva de la plantilla: su nombre, lo que inserta y en qué etiquetas vale. */
@@ -531,44 +722,50 @@ const templateDirectives: readonly TemplateDirective[] = [
  * `if:when`, `bind:`…), también en las etiquetas de componente. Lee el texto, como
  * {@link componentNameCompletion}: la etiqueta suele estar a medio escribir.
  */
-export function directiveNameCompletion(document: TextDocument, position: Position, shadowed: ReadonlySet<string> = new Set()): CompletionItem[] | undefined {
+export function directiveNameCompletion(document: TextDocument, position: Position, shadowed: ReadonlySet<string> = new Set(), members?: ComponentSummary): CompletionItem[] | undefined {
   const source = document.getText();
   const offset = document.offsetAt(position);
   const context = tagAt(source, offset);
   if (!context || context.value) return undefined;
   const word = /[\w:.-]*$/.exec(source.slice(context.tagStart, offset))![0];
   if (!/\s/.test(source[offset - word.length - 1] ?? "")) return undefined;
+  // The attribute being edited, whole: `bind:ty|pe="x"` replaces `bind:type` and keeps its value,
+  // and it is no duplicate of itself.
+  const nameEnd = offset + (/^[\w:.-]*/.exec(source.slice(offset))?.[0].length ?? 0);
+  const valued = source[nameEnd] === "=";
+  const start = document.positionAt(offset - word.length);
+  const end = document.positionAt(nameEnd);
+  const present = writtenAttributes(source, context, offset - word.length);
+  // Items whose range ends at the cursor (`bindAttributeCompletion`…) replace the whole name.
+  const whole = (items: CompletionItem[]): CompletionItem[] => nameEnd === offset ? items : items.map((item) => item.textEdit && "range" in item.textEdit && document.offsetAt(item.textEdit.range.end) === offset
+    ? { ...item, textEdit: { ...item.textEdit, range: { start: item.textEdit.range.start, end } } }
+    : item);
   if (context.tag === "render") {
-    const written = new Set([...source.slice(context.tagStart, context.tagEnd).matchAll(/\s([^\s=/>"']+)/g)].map((match) => match[1]!));
-    written.delete(word);
     return [
       { name: "snippet", detail: "Snippet que se va a renderizar", insert: 'snippet="$1"' },
       { name: "args", detail: "Argumentos del snippet, separados por comas", insert: 'args="$1"' },
       { name: "if:when", detail: "Renderiza sólo si la expresión es verdadera", insert: 'if:when="$1"' },
-    ].filter((attribute) => !written.has(attribute.name)).map((attribute, index): CompletionItem => ({
+    ].filter((attribute) => !present.has(attribute.name)).map((attribute, index): CompletionItem => ({
       label: attribute.name,
       kind: CompletionItemKind.Property,
       detail: attribute.detail,
       documentation: { kind: MarkupKind.Markdown, value: specialTemplateDocumentation("render", attribute.name)! },
       sortText: `0${index}`,
       insertTextFormat: InsertTextFormat.Snippet,
-      textEdit: { range: { start: document.positionAt(offset - word.length), end: position }, newText: attribute.insert },
+      textEdit: { range: { start, end }, newText: valued ? attribute.name : attribute.insert },
     }));
   }
   // `<snippet>` only admits name, params and if:when (MEEK061).
   if (context.tag === "snippet") {
-    const written = new Set([...source.slice(context.tagStart, context.tagEnd).matchAll(/\s([^\s=/>"']+)/g)].map((match) => match[1]!));
-    written.delete(word);
-    const range = { start: document.positionAt(offset - word.length), end: position };
-    return snippetAttributes.filter((attribute) => !written.has(attribute.name)).map((attribute, index): CompletionItem => ({
+    return snippetAttributes.filter((attribute) => !present.has(attribute.name)).map((attribute, index): CompletionItem => ({
       label: attribute.name,
       kind: attribute.name === "if:when" ? CompletionItemKind.Keyword : CompletionItemKind.Property,
       detail: attribute.detail,
       documentation: { kind: MarkupKind.Markdown, value: specialTemplateDocumentation("snippet", attribute.name)! },
       sortText: `0${String(index).padStart(2, "0")}`,
       insertTextFormat: InsertTextFormat.Snippet,
-      textEdit: { range, newText: attribute.insert },
-      ...(attribute.name === "name" ? { command: { title: "Snippets", command: "editor.action.triggerSuggest" } } : {}),
+      textEdit: { range: { start, end }, newText: valued ? attribute.name : attribute.insert },
+      ...(attribute.name === "name" && !valued ? { command: { title: "Snippets", command: "editor.action.triggerSuggest" } } : {}),
     }));
   }
   // A built-in tag (`<MeekoLink>` renders an `<a>`): its own props, plus the directives and the
@@ -579,22 +776,26 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
   // `<component is="href ? 'a' : 'button'">` is an element: the attributes of its tags.
   const tags = builtin ? undefined : dynamicTags(source, context);
   const component = context.component && (!builtin || builtin.component === true) && !tags;
-  const start = document.positionAt(offset - word.length);
-  const present = new Set([...source.slice(context.tagStart, context.tagEnd).matchAll(/\s([^\s=/>"']+)/g)].map((match) => match[1]!));
-  present.delete(word);
   const ownProps = builtin ? builtin.props.filter((prop) => !prop.attributes.some((attribute) => present.has(attribute))).map((prop, index): CompletionItem => ({
     label: prop.attributes[0]!,
     kind: CompletionItemKind.Property,
     detail: prop.detail,
     sortText: `.${index}`,
     insertTextFormat: InsertTextFormat.Snippet,
-    textEdit: { range: { start, end: position }, newText: prop.insert },
-    ...(prop.suggest ? { command: { title: "Valores", command: "editor.action.triggerSuggest" } } : {}),
+    textEdit: { range: { start, end }, newText: valued ? prop.attributes[0]! : prop.insert },
+    ...(prop.suggest && !valued ? { command: { title: "Valores", command: "editor.action.triggerSuggest" } } : {}),
   })) : [];
   // `<MeekoOutlet />` admits nothing else.
   if (builtin && !builtin.element && !builtin.component) return /^(?:on|model|bind|ref):./.test(word) ? undefined : ownProps;
+  // `ref:nombre`: the names that the script reads with useElementRef, those without a tag first.
+  if (/^ref:/.test(word)) return refNameCompletion(source, { start, end }, present);
+  // A component of the project: the props, events and models that its tag check declares.
+  const memberItems = component && !builtin && members
+    ? componentMemberCompletion(members, word, present, { start, end }, valued)
+    : undefined;
+  if (memberItems && /^(?:on|bind|model):/.test(word)) return memberItems;
   // DOM events of an element after `on:`; a component's come from its props.
-  if (/^on:/.test(word)) return component ? undefined : domEventCompletion(document, position, context, word, builtin?.element);
+  if (/^on:/.test(word)) return component ? undefined : whole(nameOnly(domEventCompletion(document, position, context, word, builtin?.element), valued));
   if (/^bind:/.test(word) && !component) {
     const builtinProps = builtin?.props.flatMap((prop, index): CompletionItem[] => prop.attributes
       .filter((attribute) => attribute.startsWith("bind:") && !present.has(attribute))
@@ -605,12 +806,12 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
         documentation: { kind: MarkupKind.Markdown, value: prop.documentation },
         sortText: `0${String(index).padStart(2, "0")}`,
         insertTextFormat: InsertTextFormat.Snippet,
-        textEdit: { range: { start, end: position }, newText: prop.insert.startsWith("bind:") ? prop.insert : `${attribute}="$1"` },
+        textEdit: { range: { start, end }, newText: prop.insert.startsWith("bind:") ? prop.insert : `${attribute}="$1"` },
       }))) ?? [];
     const rejected = new Set(builtin?.rejected ?? []);
-    const html = bindAttributeCompletion(document, position, word, tags ?? [builtin?.element ?? context.tag], present)
+    const html = bindAttributeCompletion(document, position, word, tags ?? [builtin?.element ?? context.tag], present, "1")
       .filter((item) => !rejected.has(item.label.slice(5)) && !builtinProps.some((prop) => prop.label === item.label));
-    return [...builtinProps, ...html];
+    return whole(nameOnly([...builtinProps, ...html], valued));
   }
   // `model:va`, `ref:ti`: the name after the prefix has its own completion.
   if (/^(?:model|ref):./.test(word) || (component && /^bind:./.test(word))) return undefined;
@@ -618,21 +819,40 @@ export function directiveNameCompletion(document: TextDocument, position: Positi
     .filter((directive) => directive.on === "all" || directive.on === (component ? "component" : "element"))
     .filter((directive) => !directive.elements || directive.elements.includes((builtin?.element ?? context.tag).toLowerCase()))
     .filter((directive) => directive.name.endsWith(":") || !present.has(directive.name))
+    // The child's own models replace the generic `model:`.
+    .filter((directive) => !(memberItems && directive.name === "model:"))
     .map((directive, index): CompletionItem => ({
       label: directive.name,
       kind: CompletionItemKind.Keyword,
       detail: directive.detail,
-      sortText: `0${String(index).padStart(2, "0")}`,
+      // After the props of a component, which go first.
+      sortText: `${memberItems ? "1" : "0"}${String(index).padStart(2, "0")}`,
       insertTextFormat: InsertTextFormat.Snippet,
-      textEdit: { range: { start, end: position }, newText: directive.insert },
+      textEdit: { range: { start, end }, newText: valued && !directive.name.endsWith(":") ? directive.name : directive.insert },
       ...(directive.name.endsWith(":") ? { command: { title: "Completar", command: "editor.action.triggerSuggest" } } : {}),
     }));
+  // The refs that the script declares and no tag has yet, after the directives.
+  const refs = refNameCompletion(source, { start, end }, present).filter((item) => item.sortText?.startsWith("0"))
+    .map((item) => ({ ...item, sortText: `0z${item.sortText}` }));
   // The HTML attributes of an element (`type`, `href`, `aria-*`…) after Meeko's directives.
-  if (component) return [...ownProps, ...directives];
+  if (component) return [...ownProps, ...memberItems ?? [], ...directives, ...refs];
   const rejected = new Set(builtin?.rejected ?? []);
-  const html = tags ? dynamicTagAttributeCompletion(document, position, word, tags, present)
+  const html = tags ? whole(nameOnly(dynamicTagAttributeCompletion(document, position, word, tags, present), valued))
     : htmlAttributeCompletion(document, position, present, builtin?.element).filter((item) => !rejected.has(item.label));
-  return [...ownProps, ...directives, ...html];
+  // Then each attribute with `bind:` (`bind:class`, `bind:type`…), which `bind` filters to.
+  const builtinBound = new Set(builtin?.props.flatMap((prop) => prop.attributes) ?? []);
+  const bound = bindAttributeCompletion(document, position, word, tags ?? [builtin?.element ?? context.tag], present, "2")
+    .filter((item) => !rejected.has(item.label.slice(5)) && !builtinBound.has(item.label) && !builtinBound.has(item.label.slice(5)));
+  return [...ownProps, ...directives, ...refs, ...html, ...whole(nameOnly(bound, valued))];
+}
+
+/** The attribute names written in the tag of `context`, without the one that starts at `nameStart`. */
+function writtenAttributes(source: string, context: TagContext, nameStart: number): Set<string> {
+  const names = new Set<string>();
+  for (const match of source.slice(context.tagStart, context.tagEnd).matchAll(/\s([^\s=/>"']+)/g)) {
+    if (context.tagStart + match.index + 1 !== nameStart) names.add(match[1]!);
+  }
+  return names;
 }
 
 export function completion(base: FeatureContext, position: Position): CompletionItem[] | undefined {
@@ -656,11 +876,17 @@ export function completionList(base: FeatureContext, position: Position, trigger
   if (offset === undefined) return undefined;
   // TypeScript answers a trigger character only where it means something: "/" in an import path,
   // a quote in a string with known values (href("/…")), "<" in a type argument.
-  const trigger = triggerCharacter && (typescriptTriggers as readonly string[]).includes(triggerCharacter)
+  // The opening quote of an attribute's value (`bind:item="`) starts an expression: a request
+  // without trigger, as if invoked, completes it; TypeScript would only complete a string there.
+  const source = base.document.getText();
+  const opening = (triggerCharacter === '"' || triggerCharacter === "'") && source[sourceOffset - 1] === triggerCharacter && source[sourceOffset - 2] === "=";
+  const trigger = triggerCharacter && !opening && (typescriptTriggers as readonly string[]).includes(triggerCharacter)
     ? { triggerCharacter: triggerCharacter as ts.CompletionsTriggerCharacter, triggerKind: ts.CompletionTriggerKind.TriggerCharacter }
     : {};
-  if (triggerCharacter && !("triggerCharacter" in trigger)) return undefined;
-  const result = context.project.service.getCompletionsAtPosition(context.component.virtualFilename, offset, { ...userPreferences, ...trigger });
+  if (triggerCharacter && !opening && !("triggerCharacter" in trigger)) return undefined;
+  // Inside a string of `bind:attr="'…'"` TypeScript may have nothing to say: the HTML values still apply.
+  const result = context.project.service.getCompletionsAtPosition(context.component.virtualFilename, offset, { ...editorPreferences(context.project.compilerOptions), ...trigger })
+    ?? (context.component === base.component && valueSiteAt(source, sourceOffset)?.attribute?.startsWith("bind:") ? noCompletions : undefined);
   if (!result) return undefined;
   // The script and template of a component outside server/ also run in the browser: no server
   // APIs and no route options there (MEEK108, MEEK073, MEEK109). `<script server>` keeps them all.
@@ -673,9 +899,12 @@ export function completionList(base: FeatureContext, position: Position, trigger
   // public entry exports; one that a public entry exports is imported from it, never by its path.
   const publicImports = new Map<ts.CompletionEntry, string>();
   const offered = new Set<string>();
+  // `<script server>` and a component under server/ (an email template) run only on the server:
+  // the virtual code and the SSR graph resolve their autoimports with the server target.
+  const serverTarget = !browser;
   // A type the project autoimports (`MeekoLinkProps`) needs no import: its own item stands for it.
-  const serverBlock = context.component !== base.component;
-  const autoTypes = new Set(context.project.autoImports().filter((entry) => autoImportedType(entry) && !(serverBlock && entry.browserCode)).map((entry) => entry.name));
+  const autoTypes = new Set(context.project.autoImports().filter((entry) => autoImportedType(entry) && !(serverTarget && entry.browserCode)).map((entry) => entry.name));
+  const browserCodeNames = new Set(context.project.autoImports().filter((entry) => entry.browserCode).map((entry) => entry.name));
   const program = context.project.service.getProgram();
   const file = program?.getSourceFile(context.component.virtualFilename);
   const generated = file ? generatedExports(context.component, file) : new Set<string>();
@@ -686,7 +915,7 @@ export function completionList(base: FeatureContext, position: Position, trigger
     if (entry.source === undefined && !entry.hasAction && generated.has(entry.name)) return false;
     const meeko = meekoAutoImport(context.project, entry, publicExports);
     if (meeko && "hidden" in meeko) return false;
-    if (serverBlock && entry.hasAction && context.project.autoImports().some((item) => item.name === entry.name && item.browserCode)) return false;
+    if (serverTarget && entry.hasAction && browserCodeNames.has(entry.name)) return false;
     if (meeko) publicImports.set(entry, meeko.specifier);
     const module = meeko?.specifier ?? entry.data?.moduleSpecifier;
     if (!entry.hasAction || module === undefined) return true;
@@ -702,13 +931,36 @@ export function completionList(base: FeatureContext, position: Position, trigger
       && ![entry.source, entry.data?.moduleSpecifier, entry.data?.fileName].some((module) => serverOnlyCompletion(entry.name, module, serverDirectories)))
     : visible;
   const componentTypes = context.component === base.component ? componentTypeCompletion(context, result) : [];
-  return list([...componentTypes, ...entries.map((entry) => {
+  // The project's own autoimports need no import, as in the build: TypeScript offers them as an
+  // import of their file, or not at all when its program lacks the file or a global with the same
+  // name (`navigation` of the DOM) hides it. Only where TypeScript lists the globals: any name may go.
+  const autoImports = result.isMemberCompletion || !result.entries.some(isGlobalOrKeyword)
+    ? new Map<string, AutoImport>() : projectAutoImports(context.project.autoImports(), serverTarget ? "server" : "client");
+  const autoImportOf = (entry: ts.CompletionEntry): AutoImport | undefined => {
+    const candidate = autoImports.get(entry.name);
+    const file = entry.data?.fileName;
+    return candidate && entry.hasAction && file && pathKey(file) === pathKey(candidate.file) && (entry.data?.exportName ?? entry.name) === candidate.imported ? candidate : undefined;
+  };
+  // A global that the autoimport replaces in the build, as `navigation` replaces the DOM's.
+  const completed = entries.filter((entry) => !(autoImports.has(entry.name) && !entry.hasAction && isGlobalOrKeyword(entry)));
+  const listed = new Set(completed.filter((entry) => !entry.hasAction || autoImportOf(entry)).map((entry) => entry.name));
+  const types = result.entries.some((entry) => entry.kind === ts.ScriptElementKind.interfaceElement || entry.kind === ts.ScriptElementKind.typeElement);
+  const values = result.entries.some((entry) => valueKinds.has(entry.kind));
+  const missing = [...autoImports.values()].filter((entry) => !listed.has(entry.name) && (entry.typeOnly ? types : values || (entry.alsoType === true && types)));
+  const items = [...componentTypes, ...missing.map((entry) => autoImportCompletion(context, entry, offset, base)), ...completed.flatMap((entry): CompletionItem[] => {
+    const autoImport = autoImportOf(entry);
+    if (autoImport) return [{ ...autoImportCompletion(context, autoImport, offset, base, entry), kind: completionKind(entry.kind), sortText: entry.sortText }];
+    // Another import of a name that the project autoimports, or of one that a local name already takes.
+    if (entry.hasAction && autoImports.has(entry.name)) return [];
     // A package's exports after the local names and the project's own auto-imports.
     const item: CompletionItem = { label: entry.name, kind: completionKind(entry.kind), sortText: packageCompletion(context.project, entry) ? `${entry.sortText}~` : entry.sortText };
     if (entry.insertText !== undefined) item.insertText = entry.insertText;
     if (entry.filterText !== undefined) item.filterText = entry.filterText;
-    if (entry.replacementSpan) {
-      const range = sourceRange(context.component, entry.replacementSpan.start, entry.replacementSpan.length);
+    // The identifier being written, as TypeScript tells it: the editor's word may be another
+    // (`active:na` with `:` in the word), and the insertion must replace exactly that name.
+    const span = entry.replacementSpan ?? result.optionalReplacementSpan;
+    if (span) {
+      const range = sourceRange(context.component, span.start, span.length);
       if (range) item.textEdit = { range: toRange(context.document, range[0], range[1]), newText: entry.insertText ?? entry.name };
     }
     const publicImport = publicImports.get(entry);
@@ -724,8 +976,99 @@ export function completionList(base: FeatureContext, position: Position, trigger
       ...(publicImport === undefined ? {} : { publicImport }),
     };
     item.data = data;
-    return item;
-  })], result.isIncomplete === true);
+    return [item];
+  })];
+  // In a value of the template (`on:click="…"`, `if:when="…"`, `{…}`): what fits the directive first.
+  const site = context.component === base.component && !result.isMemberCompletion && program && file ? valueSiteAt(source, sourceOffset) : undefined;
+  if (!site || !program || !file) return list(items, result.isIncomplete === true);
+  // The whole identifier around the cursor (`ch|ecked`), with the members already written after it
+  // (`checked|.value`) unless they are called: a path (`checked.value`) replaces the reference.
+  const written = /[\w$]*$/.exec(source.slice(0, sourceOffset))![0];
+  const rest = source.slice(sourceOffset);
+  const identifier = /^[\w$]*/.exec(rest)![0];
+  const members = /^(?:\.[\w$]+)*/.exec(rest.slice(identifier.length))![0];
+  const called = /^\s*\(/.test(rest.slice(identifier.length + members.length));
+  const range = { start: base.document.positionAt(sourceOffset - written.length), end: base.document.positionAt(sourceOffset + identifier.length + (called ? 0 : members.length)) };
+  const mapped = (start: number, end: number): Range | undefined => {
+    const span = sourceRange(context.component, start, end - start);
+    return span && toRange(context.document, span[0], span[1]);
+  };
+  const local = (item: CompletionItem): boolean => {
+    const data = item.data as CompletionData | undefined;
+    return data !== undefined && data.source === undefined && data.data === undefined;
+  };
+  return list(typedValueCompletion({ program, file, offset, site, range, sourceRange: mapped, items, local }), result.isIncomplete === true);
+}
+
+const noCompletions: ts.CompletionInfo = { isGlobalCompletion: false, isMemberCompletion: false, isNewIdentifierLocation: false, entries: [] };
+
+const valueKinds: ReadonlySet<string> = new Set([
+  ts.ScriptElementKind.variableElement, ts.ScriptElementKind.constElement, ts.ScriptElementKind.letElement,
+  ts.ScriptElementKind.functionElement, ts.ScriptElementKind.localFunctionElement,
+]);
+
+/**
+ * The autoimports of the project's own files (the folders of `app/`, `shared/` and `server/` of the
+ * project, its layers and modules), by name, that a component's script (`client`) or its
+ * `<script server>` block (`server`) resolves as the build does. Package exports such as `useHead`
+ * keep TypeScript's import from their public entry; components are tags, and the quick fix of an
+ * ambiguous name imports one of its files.
+ */
+function projectAutoImports(registry: readonly AutoImport[], target: "client" | "server"): Map<string, AutoImport> {
+  const available = registry.filter((entry) => (entry.scope === "shared" || entry.scope === "app" || entry.scope === target)
+    && !(entry.browserCode && target === "server"));
+  // An ambiguous name (two files export it) completes through TypeScript's import, never alone.
+  const counts = new Map<string, number>();
+  for (const entry of available) counts.set(entry.name, (counts.get(entry.name) ?? 0) + 1);
+  const result = new Map<string, AutoImport>();
+  for (const entry of available) {
+    if (entry.specifier !== undefined || entry.component || entry.componentType) continue;
+    if (counts.get(entry.name) === 1) result.set(entry.name, entry);
+  }
+  return result;
+}
+
+/**
+ * An autoimported name, completed without an import. With TypeScript's `entry`, its details come from
+ * TypeScript without the import; without it, from the export in the program.
+ */
+function autoImportCompletion(context: FeatureContext, autoImport: AutoImport, offset: number, base: FeatureContext, entry?: ts.CompletionEntry): CompletionItem {
+  const data: CompletionData = {
+    uri: context.document.uri,
+    offset,
+    ...(context.component === base.component ? {} : { server: true }),
+    name: autoImport.name,
+    ...(entry?.source === undefined ? {} : { source: entry.source }),
+    ...(entry?.data === undefined ? {} : { data: entry.data }),
+    autoImport: { file: autoImport.file, imported: autoImport.imported },
+  };
+  return {
+    label: autoImport.name,
+    kind: autoImport.typeOnly ? CompletionItemKind.Interface : autoImport.alsoType ? CompletionItemKind.Class : CompletionItemKind.Variable,
+    sortText: "16",
+    labelDetails: { description: relative(context.project.root, autoImport.file).replaceAll("\\", "/") },
+    data,
+  };
+}
+
+/** The type of an autoimported export, when its file is in the program. */
+function autoImportDetail(program: ts.Program | undefined, name: string, autoImport: { readonly file: string; readonly imported: string }): string | undefined {
+  const source = program?.getSourceFile(autoImport.file);
+  if (!program || !source) return undefined;
+  const checker = program.getTypeChecker();
+  const module = checker.getSymbolAtLocation(source);
+  let symbol = module && checker.getExportsOfModule(module).find((candidate) => candidate.name === autoImport.imported);
+  if (!symbol) return undefined;
+  if (symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
+  if (!(symbol.flags & ts.SymbolFlags.Value)) {
+    return `type ${name} = ${checker.typeToString(checker.getDeclaredTypeOfSymbol(symbol), undefined, ts.TypeFormatFlags.InTypeAlias)}`;
+  }
+  return `${name}: ${checker.typeToString(checker.getTypeOfSymbolAtLocation(symbol, source))}`;
+}
+
+/** Note of an autoimported name in its completion. */
+function autoImportNote(project: MeekoProject, file: string): string {
+  return `Autoimportado de \`${relative(project.root, file).replaceAll("\\", "/")}\`: no necesita import.`;
 }
 
 /**
@@ -763,14 +1106,26 @@ export function resolveCompletion(base: FeatureContext, item: CompletionItem): C
   const server = data.server ? base.component.server : undefined;
   if (data.server && !server) return item;
   const context = server ? { ...base, component: server } : base;
+  if (data.autoImport && !data.data) {
+    const detail = autoImportDetail(context.project.service.getProgram(), data.name, data.autoImport);
+    if (detail) item.detail = detail;
+    item.documentation = { kind: MarkupKind.Markdown, value: autoImportNote(context.project, data.autoImport.file) };
+    return item;
+  }
   const details = context.project.service.getCompletionEntryDetails(
     context.component.virtualFilename, data.offset, data.name, formatSettings({ tabSize: 2, insertSpaces: true }),
-    data.source, userPreferences, data.data,
+    data.source, editorPreferences(context.project.compilerOptions), data.data,
   );
   if (!details) return item;
   const detail = publicTypeText(context.project.service.getProgram(), ts.displayPartsToString(details.displayParts));
   if (detail) item.detail = detail;
   const documentation = documentationMarkdown(details.documentation);
+  if (data.autoImport) {
+    // The build adds the import; TypeScript's code action would write it into the component.
+    const note = autoImportNote(context.project, data.autoImport.file);
+    item.documentation = { kind: MarkupKind.Markdown, value: documentation ? `${documentation}\n\n${note}` : note };
+    return item;
+  }
   if (documentation) item.documentation = { kind: MarkupKind.Markdown, value: documentation };
   // A name of `@meekojs/meeko` that TypeScript would import by its path comes from its public entry.
   const typeOnly = details.kind === ts.ScriptElementKind.interfaceElement || details.kind === ts.ScriptElementKind.typeElement;
@@ -855,7 +1210,13 @@ export function hover(base: FeatureContext, position: Position): Hover | undefin
   const parts: string[] = [];
   let range: readonly [number, number] | undefined;
   if (info) {
-    const signature = publicTypeText(context.project.service.getProgram(), ts.displayPartsToString(info.displayParts ?? []));
+    let signature = publicTypeText(context.project.service.getProgram(), ts.displayPartsToString(info.displayParts ?? []));
+    // A prop on a component tag shows its default value: `(property) size?: "sm" | "md" = "md"`.
+    if (info.kind === ts.ScriptElementKind.memberVariableElement && context.component === base.component) {
+      const name = context.component.code.slice(info.textSpan.start, info.textSpan.start + info.textSpan.length).replace(/^["']|["']$/g, "");
+      const prop = componentTagMembers(base, position)?.props.find((member) => member.name === name);
+      if (prop?.default !== undefined) signature = `${signature} = ${prop.default}`;
+    }
     const documentation = documentationMarkdown(info.documentation);
     const tags = (info.tags ?? []).map((tag) => `*@${tag.name}*${tag.text ? ` — ${documentationMarkdown(tag.text)}` : ""}`);
     parts.push(["```typescript", signature, "```", ...(documentation ? ["", documentation] : []), ...(tags.length ? ["", tags.join("\n\n")] : [])].join("\n"));
@@ -929,6 +1290,25 @@ export function references(base: FeatureContext, position: Position, includeDecl
   return dedupeLocations(locations);
 }
 
+/** Span of the destructuring of `defineProps` in the `<script>` (`{ label, size = "md" }`), if any. */
+function definePropsPatternSpan(source: string, filename: string): { start: number; end: number } | undefined {
+  let script: SfcSection;
+  try { script = parseSfc(source, filename).script; }
+  catch { return undefined; }
+  if (!script.content.includes("defineProps")) return undefined;
+  const file = ts.createSourceFile(filename, script.content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  for (const statement of file.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      const call = declaration.initializer;
+      if (ts.isObjectBindingPattern(declaration.name) && call && ts.isCallExpression(call) && ts.isIdentifier(call.expression) && call.expression.text === "defineProps") {
+        return { start: script.contentStart + declaration.name.getStart(file), end: script.contentStart + declaration.name.getEnd() };
+      }
+    }
+  }
+  return undefined;
+}
+
 export function prepareRename(base: FeatureContext, position: Position): { range: Range; placeholder: string } | undefined {
   const context = contextAtPosition(base, position);
   const offset = generatedOffset(context, position);
@@ -945,7 +1325,20 @@ export function rename(base: FeatureContext, position: Position, newName: string
   if (offset === undefined) return undefined;
   const info = context.project.service.getRenameInfo(context.component.virtualFilename, offset, renamePreferences);
   if (!info.canRename) return undefined;
-  const locations = context.project.service.findRenameLocations(context.component.virtualFilename, offset, false, false, renamePreferences) ?? [];
+  let locations = context.project.service.findRenameLocations(context.component.virtualFilename, offset, false, false, renamePreferences) ?? [];
+  // A destructured name of `defineProps` is a local name: renaming it keeps the prop
+  // (`{ label }` → `{ label: title }`), as in a JavaScript destructuring; the prop itself is
+  // renamed from its declaration in the type.
+  const pattern = context === base ? definePropsPatternSpan(base.component.source, base.component.filename) : undefined;
+  if (pattern) {
+    const local = context.project.service.findRenameLocations(context.component.virtualFilename, offset, false, false, { ...userPreferences, providePrefixAndSuffixTextForRename: true }) ?? [];
+    const keeps = local.some((location) => {
+      if (location.fileName !== context.component.virtualFilename || !location.prefixText) return false;
+      const start = context.component.toSource(location.textSpan.start);
+      return start !== undefined && start >= pattern.start && start < pattern.end;
+    });
+    if (keeps) locations = local;
+  }
   const changes: Record<string, TextEdit[]> = {};
   const seen = new Set<string>();
   for (const location of locations) {
@@ -1251,7 +1644,8 @@ export interface FormattingEnvironment {
  * Formatea el documento completo con Prettier y el plugin `@meekojs/meeko/prettier`: el Prettier
  * del proyecto con su configuración si el workspace es confiable y lo tiene, o el incluido con las
  * opciones del editor. El formateador anterior sólo se usa si no hay ningún Prettier disponible.
- * Un archivo que no compila no se formatea. No admite formateo de rango.
+ * Un archivo que no compila no se formatea, ni uno que `.prettierignore` o `.gitignore` excluyen
+ * (como en la CLI de Prettier; tampoco cae al formateador anterior). No admite formateo de rango.
  */
 export async function formatting(
   context: FeatureContext, options: FormattingOptions, settings: MeekoFormatSettings = {}, environment: FormattingEnvironment = {},
@@ -1272,6 +1666,7 @@ export async function formatting(
         ...(settings.indentSections !== undefined ? { indentSections: settings.indentSections } : {}),
         trusted: environment.trusted !== false,
       });
+      if (result?.ignored) return [];
       if (result) return result.text === source ? [] : [{ range: toRange(document, 0, source.length), newText: result.text }];
       environment.log?.("Prettier no está instalado; se usa el formateador incluido");
     } catch (error) {
@@ -1427,7 +1822,7 @@ export function codeActions(
     const end = component.toGenerated(document.offsetAt(diagnostic.range.end));
     if (start === undefined || end === undefined) continue;
     let fixes: readonly ts.CodeFixAction[];
-    try { fixes = service.getCodeFixesAtPosition(component.virtualFilename, start, Math.max(start, end), [code], formatSettings({ tabSize: 2, insertSpaces: true }), userPreferences); }
+    try { fixes = service.getCodeFixesAtPosition(component.virtualFilename, start, Math.max(start, end), [code], formatSettings({ tabSize: 2, insertSpaces: true }), editorPreferences(context.project.compilerOptions)); }
     catch { continue; }
     for (const fix of fixes) {
       const changes = mapFileChanges(scoped, fix.changes);
@@ -1453,10 +1848,12 @@ export function codeActions(
   return actions.filter((action) => action.kind !== undefined && only.some((kind) => action.kind === kind || action.kind!.startsWith(`${kind}.`)));
 }
 
-function importStatement(component: VirtualComponent, entry: AutoImport): string {
+function importStatement(context: FeatureContext, entry: AutoImport): string {
+  const component = context.component;
   let specifier = entry.specifier ?? relative(dirname(component.filename), entry.file).replaceAll("\\", "/");
   if (!entry.specifier && !specifier.startsWith(".")) specifier = `./${specifier}`;
-  if (!entry.component && !entry.specifier) specifier = specifier.replace(/\.[cm]?ts$/, ".js");
+  // With the extension only where the project's tsconfig requires it, like TypeScript's own imports.
+  if (!entry.component && !entry.specifier) specifier = specifier.replace(/\.[cm]?ts$/, nodeModuleResolution(context.project.compilerOptions) ? ".js" : "");
   return entry.component
     ? `import * as ${entry.name} from ${JSON.stringify(specifier)};`
     : `import ${entry.typeOnly ? "type " : ""}{ ${entry.imported === entry.name ? entry.name : `${entry.imported} as ${entry.name}`} } from ${JSON.stringify(specifier)};`;
@@ -1481,7 +1878,7 @@ function autoImportActions(context: FeatureContext, range: Range, diagnostics: r
     const related = occurrence ? reported.filter((item) => overlaps(item.range, occurrence)) : reported;
     if (!related.length && !(occurrence && overlaps(occurrence, range))) continue;
     for (const candidate of problem.candidates) {
-      const statement = importStatement(context.component, candidate);
+      const statement = importStatement(context, candidate);
       const newline = context.document.getText().includes("\r\n") ? "\r\n" : "\n";
       actions.push({
         title: `Importar ${problem.name} desde ${candidate.specifier ?? relative(dirname(context.component.filename), candidate.file).replaceAll("\\", "/")}`,

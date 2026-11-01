@@ -7,6 +7,7 @@ import type { ComponentMember, ComponentSummary } from "./components";
 import type { FeatureContext } from "./features";
 import type { ComponentTag } from "./model";
 
+import { deprecatedBuiltinTags } from "../compiler";
 import { builtinTag } from "./builtin-tags";
 import { componentMemberDocs, componentSignature, memberDocumentation, typeFormat } from "./components";
 import { positionLink } from "./insights";
@@ -91,6 +92,7 @@ export function builtinTagHover(context: FeatureContext, tag: ComponentTag): str
   return [
     ["```ts", componentSignature(summary, builtin.name), "```"].join("\n"),
     location ? `${kind} · props: [\`${builtin.propsType}\`](${positionLink(location.uri, location.range.start.line, location.range.start.character)})` : kind,
+    ...(deprecatedBuiltinTags[builtin.name] ? [`**Obsoleta desde Meeko 1.8** (MEEK121): se retira en 2.0. Usa \`<${deprecatedBuiltinTags[builtin.name]}>\` de \`@meekojs/ui\`, con las mismas props, snippets y marcado.`] : []),
     builtin.summary,
     ...componentMemberDocs(summary),
     `[Guía de \`<${builtin.name}>\`](${builtin.guide})`,

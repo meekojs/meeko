@@ -4,15 +4,18 @@ import type { CodeAction, Diagnostic } from "vscode-languageserver/node";
 import ts from "@typescript/typescript6";
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { CodeActionKind } from "vscode-languageserver/node";
 
 import type { SfcSection } from "../compiler/parser/sfc";
 import type { EditCapabilities } from "./actions";
 import type { FeatureContext } from "./features";
 
+import { doubleBraces } from "../compiler/double-braces";
+import { interpolationClose, scanInterpolations } from "../compiler/parser/interpolation";
 import { parseSfc } from "../compiler/parser/sfc";
-import { tagAt } from "./embedded";
+import { cleanupFixes } from "./cleanup";
+import { tagAt, templateRegion } from "./embedded";
 import { usageEdits } from "./features";
 import { nodeAt } from "./reactivity";
 
@@ -138,6 +141,106 @@ export function listItemActions(document: TextDocument, diagnostics: readonly Di
       isPreferred: true,
       edit: { changes: { [document.uri]: [{ range: { start: at, end: at }, newText: ` each:as="${item}"` }] } },
     });
+  }
+  return actions;
+}
+
+/** A `{{ expr }}` of the template's text: its span and its fixes. */
+interface DoubleBraceSpan {
+  readonly start: number;
+  readonly end: number;
+  readonly fix: NonNullable<ReturnType<typeof doubleBraces>>;
+}
+
+/**
+ * The double-brace interpolations (`{{ expr }}`, `{ {expr} }`) of the template's text, outside
+ * tags and comments: the same ones that the compiler reports, one at a time, as MEEK020.
+ */
+export function doubleBraceSpans(source: string): DoubleBraceSpan[] {
+  const template = templateRegion(source);
+  if (!template) return [];
+  const spans: DoubleBraceSpan[] = [];
+  let index = template.contentStart;
+  while (index < template.contentEnd) {
+    if (source.startsWith("<!--", index)) {
+      const close = source.indexOf("-->", index + 4);
+      index = close < 0 ? template.contentEnd : close + 3;
+    } else if (source[index] === "<") {
+      // A tag: up to its `>`, skipping quoted values.
+      let quote: string | undefined;
+      for (index++; index < template.contentEnd; index++) {
+        const char = source[index];
+        if (quote) { if (char === quote) quote = undefined; }
+        else if (char === '"' || char === "'") quote = char;
+        else if (char === ">") break;
+      }
+      index++;
+    } else if (source[index] === "{") {
+      const close = interpolationClose(source, index);
+      if (close === undefined || close >= template.contentEnd) break;
+      const segment = scanInterpolations(source.slice(index, close + 1)).segments[0];
+      const fix = segment && doubleBraces(segment.expression);
+      if (fix) spans.push({ start: index, end: close + 1, fix });
+      index = close + 1;
+    } else index++;
+  }
+  return spans;
+}
+
+/**
+ * MEEK020 on `{{ expr }}`: converts it to Meeko's `{expr}` when the inside is an expression, shows
+ * the braces as text (`{"{hola}"}`), or fixes every double-brace interpolation of the file.
+ */
+export function doubleBraceActions(document: TextDocument, diagnostics: readonly Diagnostic[]): CodeAction[] {
+  const source = document.getText();
+  const actions: CodeAction[] = [];
+  let spans: DoubleBraceSpan[] | undefined;
+  const edit = (span: DoubleBraceSpan, newText: string) => ({ range: { start: document.positionAt(span.start), end: document.positionAt(span.end) }, newText });
+  for (const diagnostic of diagnostics) {
+    if (diagnostic.code !== "MEEK020" || typeof diagnostic.message !== "string" || !diagnostic.message.includes("{{expr}}")) continue;
+    spans ??= doubleBraceSpans(source);
+    const start = document.offsetAt(diagnostic.range.start);
+    const span = spans.find((candidate) => candidate.start === start);
+    if (!span) continue;
+    if (span.fix.interpolation) {
+      actions.push({ title: `Convertir a ${span.fix.interpolation}`, kind: CodeActionKind.QuickFix, diagnostics: [diagnostic], isPreferred: true, edit: { changes: { [document.uri]: [edit(span, span.fix.interpolation)] } } });
+    }
+    actions.push({ title: "Mostrar las llaves como texto", kind: CodeActionKind.QuickFix, diagnostics: [diagnostic], edit: { changes: { [document.uri]: [edit(span, span.fix.text)] } } });
+    if (spans.length > 1) {
+      actions.push({
+        title: "Corregir todas las del archivo",
+        kind: CodeActionKind.QuickFix,
+        diagnostics: [diagnostic],
+        edit: { changes: { [document.uri]: spans.map((each) => edit(each, each.fix.interpolation ?? each.fix.text)) } },
+      });
+    }
+  }
+  return actions;
+}
+
+/**
+ * MEEK128, an `onCleanup` that also runs during SSR and uses browser APIs: «Mover a `onMounted`»
+ * wraps it in `onMounted(() => { … })`, or moves it into the existing `onMounted`, when the move is
+ * safe (see {@link cleanupFixes}). Otherwise the warning only explains.
+ */
+export function cleanupActions(document: TextDocument, diagnostics: readonly Diagnostic[]): CodeAction[] {
+  const relevant = diagnostics.filter((diagnostic) => diagnostic.code === "MEEK128");
+  if (!relevant.length) return [];
+  let filename: string;
+  try { filename = fileURLToPath(document.uri); }
+  catch { filename = document.uri; }
+  const source = document.getText();
+  const actions: CodeAction[] = [];
+  for (const diagnostic of relevant) {
+    for (const [index, fix] of cleanupFixes(source, filename, document.offsetAt(diagnostic.range.start)).entries()) {
+      actions.push({
+        title: fix.title,
+        kind: CodeActionKind.QuickFix,
+        diagnostics: [diagnostic],
+        ...(index === 0 ? { isPreferred: true } : {}),
+        edit: { changes: { [document.uri]: fix.edits.map((edit) => ({ range: { start: document.positionAt(edit.start), end: document.positionAt(edit.end) }, newText: edit.text })) } },
+      });
+    }
   }
   return actions;
 }

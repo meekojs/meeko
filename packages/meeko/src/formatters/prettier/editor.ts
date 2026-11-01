@@ -1,6 +1,8 @@
 import type { Options, Plugin } from "prettier";
 
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import plugin from "./plugin";
@@ -26,11 +28,17 @@ export interface EditorFormatResult {
   /** `project` si se cargó el Prettier resoluble desde el archivo; `bundled` si es el de Meeko. */
   readonly prettier: "project" | "bundled";
   readonly version: string;
+  /**
+   * `true` si `.prettierignore` o `.gitignore` excluyen el archivo, como en la CLI de Prettier:
+   * `text` es entonces el original y el editor no debe aplicar ediciones.
+   */
+  readonly ignored?: boolean;
 }
 
 interface PrettierApi {
   readonly version: string;
   format(source: string, options: Options): Promise<string>;
+  getFileInfo(file: string, options: { ignorePath?: string[]; resolveConfig?: boolean }): Promise<{ ignored: boolean }>;
   resolveConfig(file: string, options: { useCache?: boolean; editorconfig?: boolean }): Promise<Options | null>;
 }
 
@@ -74,9 +82,43 @@ function configPlugins(plugins: Options["plugins"], filename: string): Array<str
 }
 
 /**
+ * `.prettierignore` y `.gitignore` que afectan a `filename`: los de su carpeta y los de cada carpeta
+ * superior hasta la raíz del repositorio (la que contiene `.git`) o del disco. Prettier interpreta
+ * los patrones de cada archivo relativos a su carpeta, de modo que sirve tanto el de la raíz del
+ * workspace como el de un subproyecto. Sólo se leen datos; no se ejecuta código del proyecto.
+ */
+function ignoreFiles(filename: string): string[] {
+  const found: string[] = [];
+  let dir = dirname(filename);
+  for (;;) {
+    for (const name of [".prettierignore", ".gitignore"]) {
+      const candidate = join(dir, name);
+      if (existsSync(candidate)) found.push(candidate);
+    }
+    const parent = dirname(dir);
+    if (parent === dir || existsSync(join(dir, ".git"))) return found;
+    dir = parent;
+  }
+}
+
+/** Si los archivos de exclusión del proyecto ignoran `filename`; un error al leerlos no lo ignora. */
+async function isIgnored(prettier: PrettierApi, filename: string): Promise<boolean> {
+  const ignorePath = ignoreFiles(filename);
+  if (!ignorePath.length) return false;
+  try {
+    // `resolveConfig` stays off: it would load the project's plugins, and the ignore patterns do not need them.
+    return (await prettier.getFileInfo(filename, { ignorePath, resolveConfig: false })).ignored;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Formatea con el Prettier del proyecto (workspace confiable con `prettier` resoluble desde el
  * archivo) y su configuración, o con el incluido. `undefined` si no hay ningún Prettier disponible.
- * Un archivo que no compila rechaza la promesa con el error de sintaxis de Prettier.
+ * Un archivo que `.prettierignore` o `.gitignore` excluyen, como en la CLI de Prettier, se devuelve
+ * sin cambios con `ignored: true`; también en un workspace no confiable, porque sólo se leen esos
+ * archivos. Un archivo que no compila rechaza la promesa con el error de sintaxis de Prettier.
  */
 export async function formatWithPrettier(request: EditorFormatRequest): Promise<EditorFormatResult | undefined> {
   const projectPath = request.trusted ? resolveFrom(request.filename, "prettier") : undefined;
@@ -84,6 +126,7 @@ export async function formatWithPrettier(request: EditorFormatRequest): Promise<
   const source: EditorFormatResult["prettier"] = prettier ? "project" : "bundled";
   prettier ??= await bundledPrettier();
   if (!prettier) return undefined;
+  if (await isIgnored(prettier, request.filename)) return { text: request.text, prettier: source, version: prettier.version, ignored: true };
 
   const config = request.trusted ? await prettier.resolveConfig(request.filename, { useCache: false, editorconfig: true }) : null;
   const { plugins, ...projectOptions } = config ?? {};
@@ -94,7 +137,7 @@ export async function formatWithPrettier(request: EditorFormatRequest): Promise<
     endOfLine: "auto",
     meekoIndentSections: request.indentSections === true,
     ...projectOptions,
-    // Sorting by the stylesheet runs the project's PostCSS configuration and `@utilities` modules.
+    // Sorting by the stylesheet or Tailwind runs the project's PostCSS configuration, `@utilities` modules and Tailwind plugins.
     ...(request.trusted ? {} : { meekoSortClasses: "off" }),
     filepath: request.filename,
     parser: "meeko",

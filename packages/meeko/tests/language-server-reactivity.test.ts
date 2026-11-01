@@ -50,12 +50,20 @@ let draft = "";
 <input on:input="(event) => { draft = event.currentTarget.value; }" /></template>
 `;
 
+const comparison = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const count = signal(0);
+const limit = 3;
+</script>
+<template><p>{count.value<limit}</p><p>{"<b>" + count.value}</p></template>
+`;
+
 describe("language server: reactive declarations", () => {
   let workspace: LanguageProject;
   let component: OpenedComponent;
 
   before(async () => {
-    workspace = await languageProject("lsp-reactivity-", { "Counter.meeko": counter, "Later.meeko": continuation, "Plain.meeko": plainValues });
+    workspace = await languageProject("lsp-reactivity-", { "Comparison.meeko": comparison, "Counter.meeko": counter, "Later.meeko": continuation, "Plain.meeko": plainValues });
     component = await workspace.open("Counter.meeko");
   });
 
@@ -107,6 +115,19 @@ describe("language server: reactive declarations", () => {
     assert.ok(tokenAt(component.offset("model=\"name\"") + 7).modifiers.includes("signal"));
     const label = tokenAt(component.offset("{label}") + 1);
     assert.ok(!label.modifiers.includes("reactive") && !label.modifiers.includes("signal"), JSON.stringify(label));
+  });
+
+  test("semantic tokens cover the names on both sides of a < inside a text interpolation", async () => {
+    const opened = await workspace.open("Comparison.meeko");
+    const tokens = decodeTokens(semanticTokens(opened).data, semanticTokensLegend);
+    const tokenAt = (offset: number) => {
+      const position = opened.document.positionAt(offset);
+      return tokens.find((item) => item.line === position.line && item.character <= position.character && position.character < item.character + item.length);
+    };
+    const count = tokenAt(opened.offset("{count.value<") + 1);
+    assert.deepEqual([count?.type, count?.modifiers.includes("signal"), count?.modifiers.includes("reactive")], ["variable", true, true]);
+    assert.equal(tokenAt(opened.offset("limit}"))?.type, "variable");
+    assert.ok(tokenAt(opened.offset("count.value}", 0, "\"<b>\""))?.modifiers.includes("signal"));
   });
 
   test("the hover of a signal lists its type, reads and writes with links and how it crosses to the client", () => {

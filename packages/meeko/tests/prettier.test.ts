@@ -136,6 +136,17 @@ describe("Prettier plugin for .meeko", () => {
     assert.match(formatted, /\/>\s*<p>after<\/p>\s*<\/div>/);
   });
 
+  test("keeps self-closing HTML elements, and their end tags, as written (since 1.8)", async () => {
+    const formatted = templateOf(await formatStable(component(
+      '<section><div class="a"   bind:title="String(count.value)" /><span/><textarea name="t" /><p>after</p></section><table><tr><td /><td>x</td></tr></table><div></div>',
+    ), { singleAttributePerLine: true, useTabs: true }));
+    assert.match(formatted, /<div\n\t+class="a"\n\t+bind:title="String\(count\.value\)"\n\t+\/>/);
+    assert.match(formatted, /<span \/><textarea name="t" \/>/);
+    assert.match(formatted, /<td \/>\s*<td>x<\/td>/);
+    assert.match(formatted, /<div><\/div>/);
+    assert.match(formatted, /<p>after<\/p>\s*<\/section>/);
+  });
+
   test("formats {expr} interpolations, nested braces and strings", async () => {
     const formatted = templateOf(await formatStable(component(
       '<p>Total:{count.value+1}items, { {a:"}"}.a } and {`x ${ {b:1}.b }`}</p>\n<p>{count.value>1?"Una cadena bastante larga para partir la línea":"Otra cadena también bastante larga"}</p>',
@@ -149,6 +160,34 @@ describe("Prettier plugin for .meeko", () => {
       '      : "Otra cadena también bastante larga"',
       "  }",
       "</p>",
+    ].join("\n"));
+  });
+
+  test("formats a < inside {expr} as part of the expression, never as a tag", async () => {
+    const formatted = templateOf(await formatStable(component(
+      '<p>{count.value<2}</p>\n<p>{ count.value <= 2?"<b>yes</b>":`<i>${count.value}</i>` }</p>\n<p>{ identity<number>(count.value) } &lt; {count.value}</p>',
+      "const count = signal(0);\nconst identity = <T,>(value: T): T => value;\n",
+    )));
+    assert.equal(formatted, [
+      "<p>{count.value < 2}</p>",
+      '<p>{count.value <= 2 ? "<b>yes</b>" : `<i>${count.value}</i>`}</p>',
+      "<p>{identity<number>(count.value)} &lt; {count.value}</p>",
+    ].join("\n"));
+  });
+
+  test("keeps a < combined with & and the character references of {expr} as they are", async () => {
+    const formatted = templateOf(await formatStable(component(
+      '<p>{a<b&&c}</p>\n<p>{a < b && c}</p>\n<p>{true && "<b>"}</p>\n<p>{true && `}<b>`}</p>\n<p>{a &amp;&amp; b}</p>\n<p>{\'&lt;\'}</p>',
+      "const a = 1;\nconst b = 2;\nconst c = true;\n",
+    )));
+    // The formatted text compiles to the same expressions (`formatStable`); the references stay written.
+    assert.equal(formatted, [
+      "<p>{a < b && c}</p>",
+      "<p>{a < b && c}</p>",
+      '<p>{true && "<b>"}</p>',
+      "<p>{true && `}<b>`}</p>",
+      "<p>{a &amp;&amp; b}</p>",
+      '<p>{"&lt;"}</p>',
     ].join("\n"));
   });
 
@@ -367,7 +406,12 @@ describe("meekoPreserveArrayBreaks", () => {
 
 describe("Prettier in the language server", () => {
   const roots: string[] = [];
-  after(async () => { await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true }))); });
+  // Inside the package, so that `prettier` resolves from the file; not under `.meeko/`, which the repository's `.prettierignore` excludes.
+  const workspaces = resolve("tests/.prettier-workspaces");
+  after(async () => {
+    await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true })));
+    await rm(workspaces, { recursive: true, force: true });
+  });
 
   const source = component('<p   class="x" bind:title="count.value?\'a\':\'b\'">{count.value}</p>', 'const count = signal("x");\n');
 
@@ -382,7 +426,9 @@ describe("Prettier in the language server", () => {
     return root;
   }
 
-  async function lspFormat(root: string, text: string, options: LanguageServerInitializationOptions = {}): Promise<string> {
+  async function lspFormat(
+    root: string, text: string, options: LanguageServerInitializationOptions = {}, file = join(root, "Component.meeko"),
+  ): Promise<string> {
     const toServer = new PassThrough();
     const toClient = new PassThrough();
     const server = createConnection(new StreamMessageReader(toServer), new StreamMessageWriter(toClient));
@@ -399,7 +445,7 @@ describe("Prettier in the language server", () => {
         initializationOptions: { projectContracts: false, diagnosticsDelay: 0, ...options },
       });
       await client.sendNotification(InitializedNotification.type, {});
-      const uri = pathToFileURL(join(root, "Component.meeko")).href;
+      const uri = pathToFileURL(file).href;
       await client.sendNotification(DidOpenTextDocumentNotification.type, { textDocument: { uri, languageId: "meeko", version: 1, text } });
       const edits = await client.sendRequest(DocumentFormattingRequest.type, { textDocument: { uri }, options: { tabSize: 4, insertSpaces: true } }) ?? [];
       return TextDocument.applyEdits(TextDocument.create(uri, "meeko", 1, text), edits);
@@ -412,7 +458,7 @@ describe("Prettier in the language server", () => {
 
   test("uses the project's Prettier and its .prettierrc, which prevails over the editor options", async () => {
     // Inside the repository `prettier` resolves from the file, as in a project that installs it.
-    const root = await workspace(resolve(".meeko"), { ".prettierrc": '{ "singleQuote": true, "tabWidth": 3 }\n' });
+    const root = await workspace(workspaces, { ".prettierrc": '{ "singleQuote": true, "tabWidth": 3 }\n' });
     const filename = join(root, "Component.meeko");
     const direct = await formatWithPrettier({ text: source, filename, tabSize: 4, insertSpaces: true, trusted: true });
     assert.equal(direct?.prettier, "project");
@@ -434,7 +480,7 @@ describe("Prettier in the language server", () => {
   });
 
   test("an untrusted workspace ignores the project's Prettier and configuration", async () => {
-    const root = await workspace(resolve(".meeko"), { ".prettierrc": '{ "singleQuote": true }\n' });
+    const root = await workspace(workspaces, { ".prettierrc": '{ "singleQuote": true }\n' });
     const filename = join(root, "Component.meeko");
     const direct = await formatWithPrettier({ text: source, filename, tabSize: 2, insertSpaces: true, trusted: false });
     assert.equal(direct?.prettier, "bundled");
@@ -443,8 +489,64 @@ describe("Prettier in the language server", () => {
     assert.ok(formatted.includes('const count = signal("x");'), formatted);
   });
 
+  describe("respects .prettierignore", () => {
+    const messy = component('<p   class="x">\n    {count.value}\n</p>', 'const count = signal("x");\n');
+
+    /** A workspace that stops the search for ignore files at its own root, like a repository. */
+    async function isolated(files: Record<string, string>): Promise<string> {
+      const root = await workspace(tmpdir(), files);
+      await mkdir(join(root, ".git"));
+      return root;
+    }
+
+    test("an ignored file gets no edits and a file that is not ignored does", async () => {
+      const root = await isolated({ ".prettierignore": "Ignored.meeko\n" });
+      const ignored = join(root, "Ignored.meeko");
+      const direct = await formatWithPrettier({ text: messy, filename: ignored, tabSize: 2, insertSpaces: true, trusted: true });
+      assert.equal(direct?.ignored, true);
+      assert.equal(direct?.text, messy);
+      assert.equal(await lspFormat(root, messy, {}, ignored), messy, "the whole document stays as written");
+      const other = join(root, "Other.meeko");
+      assert.equal((await formatWithPrettier({ text: messy, filename: other, tabSize: 2, insertSpaces: true, trusted: true }))?.ignored, undefined);
+      assert.notEqual(await lspFormat(root, messy, {}, other), messy);
+    });
+
+    test("also in an untrusted workspace, which reads only the ignore patterns", async () => {
+      const root = await isolated({ ".prettierignore": "*.meeko\n" });
+      const filename = join(root, "Component.meeko");
+      assert.equal((await formatWithPrettier({ text: messy, filename, tabSize: 2, insertSpaces: true, trusted: false }))?.ignored, true);
+      assert.equal(await lspFormat(root, messy, { trusted: false }), messy);
+    });
+
+    test("uses the .prettierignore of the root and of a subproject, each relative to its folder", async () => {
+      const root = await isolated({ ".prettierignore": "legacy/\n" });
+      await mkdir(join(root, "legacy"));
+      await mkdir(join(root, "packages", "app", "src"), { recursive: true });
+      await writeFile(join(root, "packages", "app", ".prettierignore"), "src/Frozen.meeko\n");
+      const ignored = async (file: string) => (await formatWithPrettier({ text: messy, filename: file, tabSize: 2, insertSpaces: true, trusted: true }))?.ignored === true;
+      assert.equal(await ignored(join(root, "legacy", "A.meeko")), true, "pattern of the root");
+      assert.equal(await ignored(join(root, "packages", "app", "src", "Frozen.meeko")), true, "pattern of the subproject");
+      assert.equal(await ignored(join(root, "packages", "app", "src", "Free.meeko")), false);
+      assert.equal(await ignored(join(root, "Frozen.meeko")), false, "a subproject pattern does not reach the root");
+      assert.equal(await lspFormat(root, messy, {}, join(root, "packages", "app", "src", "Frozen.meeko")), messy);
+    });
+
+    test("the single-line templates of Popover, Select and ThemeToggle are not reformatted", async () => {
+      const components = resolve("../ui/src/app/components");
+      for (const name of ["Popover", "Select", "ThemeToggle"]) {
+        const filename = join(components, `${name}.meeko`);
+        const text = await readFile(filename, "utf8");
+        const direct = await formatWithPrettier({ text, filename, tabSize: 4, insertSpaces: false, trusted: true });
+        assert.equal(direct?.ignored, true, `${name}.meeko must stay in .prettierignore`);
+        assert.equal(await lspFormat(resolve("../.."), text, {}, filename), text, `${name}.meeko must keep its template on one line`);
+      }
+      const regular = join(components, "Card.meeko");
+      assert.equal((await formatWithPrettier({ text: await readFile(regular, "utf8"), filename: regular, tabSize: 4, insertSpaces: false, trusted: true }))?.ignored, undefined);
+    });
+  });
+
   test("a component that does not compile gets no edits", async () => {
-    const root = await workspace(resolve(".meeko"), {});
+    const root = await workspace(workspaces, {});
     const broken = component('<p if:when="count.value" each:of="[]">x</p>');
     assert.equal(await lspFormat(root, broken), broken);
   });

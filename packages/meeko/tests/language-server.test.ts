@@ -14,7 +14,7 @@ import { pathToFileURL } from "node:url";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
   CodeActionRequest, CompletionRequest, CompletionResolveRequest, ConfigurationRequest, createConnection, createProtocolConnection, DefinitionRequest,
-  DidChangeTextDocumentNotification, DidChangeWatchedFilesNotification, DidCloseTextDocumentNotification, DidOpenTextDocumentNotification, DidSaveTextDocumentNotification,
+  DidChangeConfigurationNotification, DidChangeTextDocumentNotification, DidChangeWatchedFilesNotification, DidCloseTextDocumentNotification, DidOpenTextDocumentNotification, DidSaveTextDocumentNotification,
   DocumentFormattingRequest, DocumentSymbolRequest, ExitNotification, FileChangeType, FoldingRangeRequest, HoverRequest,
   InitializedNotification, InitializeRequest, PrepareRenameRequest, PublishDiagnosticsNotification, ReferencesRequest,
   RegistrationRequest, RenameRequest, SemanticTokensRefreshRequest, SemanticTokensRequest, ShutdownRequest, SignatureHelpRequest,
@@ -25,6 +25,8 @@ import type { CompletionData } from "../src/language-server/features.ts";
 import type { LanguageServerInitializationOptions } from "../src/language-server/server.ts";
 
 import { checkSource } from "../src/check.ts";
+import { checkApp } from "../src/framework/check-app.ts";
+import { prepareFrameworkTypes } from "../src/framework/check-project.ts";
 import { startLanguageServer } from "../src/language-server/server.ts";
 import { createTempProject, linkRepositoryPackages, repositoryRoot } from "./helpers/temp-project.ts";
 
@@ -33,6 +35,8 @@ class Client {
   readonly diagnostics = new Map<string, Diagnostic[]>();
   readonly documents = new Map<string, TextDocument>();
   registrations = 0;
+  /** Methods the server registered dynamically. */
+  readonly registered: string[] = [];
   result: InitializeResult | undefined;
   private waiters: Array<() => void> = [];
 
@@ -41,13 +45,16 @@ class Client {
       this.diagnostics.set(params.uri, params.diagnostics);
       for (const waiter of this.waiters.splice(0)) waiter();
     });
-    connection.onRequest(RegistrationRequest.type, () => { this.registrations++; });
+    connection.onRequest(RegistrationRequest.type, (params) => {
+      this.registrations++;
+      this.registered.push(...params.registrations.map((registration) => registration.method));
+    });
     connection.onRequest(SemanticTokensRefreshRequest.type, () => undefined);
     connection.onNotification("window/logMessage", () => undefined);
     connection.listen();
   }
 
-  async initialize(root: string, initializationOptions: LanguageServerInitializationOptions = {}, workspace: { configuration?: boolean } = {}): Promise<InitializeResult> {
+  async initialize(root: string, initializationOptions: LanguageServerInitializationOptions = {}, workspace: { configuration?: boolean; didChangeConfiguration?: { dynamicRegistration?: boolean } } = {}): Promise<InitializeResult> {
     const result = await this.connection.sendRequest(InitializeRequest.type, {
       processId: null,
       rootUri: pathToFileURL(root).href,
@@ -111,7 +118,7 @@ class Client {
   }
 }
 
-async function inProcess(root: string, options: LanguageServerInitializationOptions = {}, workspace: { configuration?: boolean } = {}): Promise<Client> {
+async function inProcess(root: string, options: LanguageServerInitializationOptions = {}, workspace: Parameters<Client["initialize"]>[2] = {}): Promise<Client> {
   const toServer = new PassThrough();
   const toClient = new PassThrough();
   const server = createConnection(new StreamMessageReader(toServer), new StreamMessageWriter(toClient));
@@ -1049,11 +1056,12 @@ ${body}
     await client.change(uri, partial);
     const events = await client.connection.sendRequest(CompletionRequest.type, { textDocument: { uri }, position: client.position(uri, "on:s=", 4) });
     const eventItems = Array.isArray(events) ? events : events?.items ?? [];
-    assert.deepEqual(eventItems.map((item) => item.label).sort(), ["close", "save"], JSON.stringify(eventItems));
-    const save = eventItems.find((item) => item.label === "save")!;
+    // The child's events, replacing the whole name; the value is already there.
+    assert.deepEqual(eventItems.map((item) => item.label).sort(), ["on:close", "on:save"], JSON.stringify(eventItems));
+    const save = eventItems.find((item) => item.label === "on:save")!;
     assert.equal(applyEdits(partial, [save.textEdit as TextEdit]), valid);
     const resolved = await client.connection.sendRequest(CompletionResolveRequest.type, save) as CompletionItem;
-    assert.match(resolved.detail ?? "", /onSave\?: \(\(id: number\) => void\) \| undefined/);
+    assert.equal(resolved.detail, "on:save(id: number)");
     await client.change(uri, valid);
 
     const childUri = await client.open(file("app/components/save-button.meeko"));
@@ -1188,6 +1196,60 @@ describe("Meeko language server built-in tags, component hover and completion", 
       const attributes = itemsOf(await client.connection.sendRequest(CompletionRequest.type, { textDocument: { uri }, position: client.position(uri, ' class="brand"', 1) })).map((item) => item.label);
       assert.ok(attributes.includes("bind:search") && attributes.includes("match") && attributes.includes("target") && attributes.includes("on:"), JSON.stringify(attributes));
       assert.ok(!attributes.includes("href") && !attributes.includes("to") && !attributes.includes("bind:params"), JSON.stringify(attributes));
+    } finally {
+      await client.close();
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    }
+  });
+
+  /** The line and column (1-based) of a diagnostic, and its text in the document. */
+  const placeOf = (document: TextDocument, diagnostic: Diagnostic): string =>
+    `${diagnostic.range.start.line + 1}:${diagnostic.range.start.character + 1} ${document.getText(diagnostic.range)}`;
+
+  test("<MeekoLink> and <component is=\"'MeekoLink'\"> require params in a dynamic route and forbid them in a static one, as meeko check", async () => {
+    const page = [
+      '<script lang="ts">',
+      "const props = defineProps<{ internal?: boolean }>();",
+      "</script>",
+      "<template>",
+      '  <MeekoLink to="/users/[id]">missing</MeekoLink>',
+      "  <MeekoLink to=\"/\" bind:params=\"{ id: '1' }\">extra</MeekoLink>",
+      "  <MeekoLink to=\"/users/[id]\" bind:params=\"{ id: '1' }\">ok</MeekoLink>",
+      '  <MeekoLink to="/">ok</MeekoLink>',
+      "  <component is=\"props.internal ? 'MeekoLink' : 'a'\" bind:to=\"'/users/[id]'\" href=\"/x\">missing in is</component>",
+      "  <component is=\"props.internal ? 'MeekoLink' : 'a'\" bind:to=\"'/users/[id]'\" bind:params=\"{ id: '1' }\" href=\"/x\">ok in is</component>",
+      "</template>",
+      "",
+    ].join("\n");
+    const root = await project("lsp-link-params-", { ...files, "app/pages/links.meeko": page });
+    // The project's generated route types (`meeko types`), as in an editor session after `meeko dev`.
+    await prepareFrameworkTypes(root);
+    const client = await inProcess(root, { projectContracts: false });
+    try {
+      const uri = await client.open(join(root, "app", "pages", "links.meeko"));
+      const diagnostics = await client.waitForDiagnostics(uri, (items) => items.length >= 3);
+      const document = client.document(uri);
+      const editor = diagnostics.filter((item) => /^TS2\d+$/.test(String(item.code))).map((item) => placeOf(document, item)).sort();
+      // meeko check reports the same lines for the same file.
+      const checked = await checkApp(root);
+      const lines = [...new Set(editor.map((place) => Number(place.split(":")[0])))].sort((a, b) => a - b);
+      assert.deepEqual(lines, [5, 6, 9], JSON.stringify(editor));
+      const checkedLines = [...new Set(checked.filter((item) => item.filename.endsWith("links.meeko")).map((item) => item.location.line))].sort((a, b) => a - b);
+      assert.deepEqual(checkedLines, lines, JSON.stringify(checked));
+    } finally {
+      await client.close();
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    }
+  });
+
+  test("<MeekoLink> keeps params optional without generated routes", async () => {
+    const page = "<script lang=\"ts\"></script><template><MeekoLink to=\"/users/[id]\">a</MeekoLink><MeekoLink to=\"/x\" bind:params=\"{ id: '1' }\">b</MeekoLink></template>\n";
+    const root = await project("lsp-link-params-none-", { "app/pages/index.meeko": page });
+    const client = await inProcess(root, { projectContracts: false });
+    try {
+      const uri = await client.open(join(root, "app", "pages", "index.meeko"));
+      const diagnostics = await client.waitForDiagnostics(uri, () => true);
+      assert.deepEqual(diagnostics.filter((item) => String(item.code).startsWith("TS2")).map((item) => `${String(item.code)} ${item.message}`), []);
     } finally {
       await client.close();
       await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
@@ -1337,4 +1399,42 @@ describe("Meeko language server project check", () => {
       await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     }
   });
+});
+
+test("meeko.classes settings are asked once per document, until a configuration change or a close", async () => {
+  const root = await project("lsp-class-settings-", {
+    "app/styles/main.css": ".alpha { color: red; }\n",
+    "app/pages/index.meeko": '<template><p class="alpha">x</p></template>\n',
+  }, false);
+  const client = await inProcess(root, { projectContracts: false }, { configuration: true, didChangeConfiguration: { dynamicRegistration: true } });
+  let asked = 0;
+  client.connection.onRequest(ConfigurationRequest.type, (params) => params.items.map((item) => {
+    if (item.section !== "meeko.classes") return null;
+    asked++;
+    return { completion: "on", tailwindActive: true };
+  }));
+  try {
+    const file = join(root, "app/pages/index.meeko");
+    let uri = await client.open(file);
+    const hover = async (): Promise<void> => {
+      const result = await client.connection.sendRequest(HoverRequest.type, { textDocument: { uri }, position: client.position(uri, "alpha", 1) });
+      assert.match((result!.contents as MarkupContent).value, /\.alpha/);
+    };
+    await hover();
+    await hover();
+    await client.connection.sendRequest(CompletionRequest.type, { textDocument: { uri }, position: client.position(uri, "alpha", 1) });
+    assert.equal(asked, 1, "one workspace/configuration request for every completion and hover");
+    // A pull-model client (VS Code) only notifies changes of a registered section.
+    assert.ok(client.registered.includes(DidChangeConfigurationNotification.method), client.registered.join(", "));
+    await client.connection.sendNotification(DidChangeConfigurationNotification.type, { settings: null });
+    await hover();
+    assert.equal(asked, 2, "a configuration change asks again");
+    await client.connection.sendNotification(DidCloseTextDocumentNotification.type, { textDocument: { uri } });
+    uri = await client.open(file);
+    await hover();
+    assert.equal(asked, 3, "a reopened document asks again");
+  } finally {
+    await client.close();
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  }
 });

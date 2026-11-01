@@ -14,9 +14,12 @@ import type { MeekoProject } from "./project";
 
 import { discoverAutoImportsSync } from "../autoimports/registry";
 import { checkSource } from "../check";
+import { doubleBracesMessage } from "../compiler/double-braces";
+import { interpolationClose } from "../compiler/parser/interpolation";
 import { MeekoCompileError, parseSfc } from "../compiler/parser/sfc";
 import { projectRoot } from "../compiler/project-root";
 import { assertRouteBlockPlacement } from "../compiler/transforms/route-block";
+import { configWarnings } from "./config-diagnostics";
 import { documentationMarkdown, identifierRange, virtualDocuments } from "./features";
 import { sourceRange } from "./locations";
 import { pathKey } from "./project";
@@ -62,6 +65,21 @@ function openingTagRange(source: string, offset: number): [number, number] | und
   const match = /<script\b[^>]*>/y;
   match.lastIndex = offset;
   return match.exec(source) ? [offset, match.lastIndex] : undefined;
+}
+
+/**
+ * The span of the attribute `name` (as written, any case) in the opening tag that starts at
+ * `offset`: `bind:` in `<div bind: class="x">`. Values in quotes are skipped.
+ */
+function attributeInTag(source: string, offset: number, name: string): [number, number] | undefined {
+  const lower = name.toLowerCase();
+  const attribute = /\s([^\s=>"'/]+)|"[^"]*"|'[^']*'|(\/?>)/g;
+  attribute.lastIndex = offset + 1;
+  for (let match = attribute.exec(source); match; match = attribute.exec(source)) {
+    if (match[2]) return undefined;
+    if (match[1]?.toLowerCase() === lower) return [match.index + 1, match.index + 1 + match[1].length];
+  }
+  return undefined;
 }
 
 /**
@@ -285,10 +303,11 @@ export async function componentDiagnostics(
     const placed = placement ? [compileDiagnostic(document, placement)] : [];
     const config = configDiagnostic(message, locate);
     if (config && reportConfig) {
-      reportConfig(config.filename, [config.diagnostic]);
+      const target = locate(config.filename);
+      reportConfig(config.filename, [config.diagnostic, ...(target ? configWarnings(target.document, config.filename) : [])]);
       return [...placed, ...blockDiagnostics];
     }
-    if (!config) clearConfig(project, reportConfig);
+    if (!config) clearConfig(project, reportConfig, locate);
     const autoImport = /^(?:Autoimport ambiguo (\S+?):|El autoimport (\S+) no está disponible)/.exec(message);
     const name = autoImport?.[1] ?? autoImport?.[2];
     const range = (name && component && component.source === source && identifierRange({ component, document }, name))
@@ -302,7 +321,7 @@ export async function componentDiagnostics(
       ...blockDiagnostics,
     ];
   }
-  clearConfig(project, reportConfig);
+  clearConfig(project, reportConfig, locate);
   if (placement) found = [placement, ...found];
   const typescript = current ? semanticDiagnostics(project, current) : [];
   const own = resolve(filename);
@@ -316,6 +335,8 @@ export async function componentDiagnostics(
   });
   return found.map((item): Diagnostic => {
     const diagnostic: Diagnostic = { range: toRange(document, 0, 0), message: item.message, code: item.code, source: "Meeko", severity: item.severity === "warning" ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error };
+    // MEEK121: a deprecated built-in tag, which the editor strikes through.
+    if (item.code === "MEEK121") diagnostic.tags = [DiagnosticTag.Deprecated];
     if (pathKey(item.filename) !== pathKey(own)) {
       // Errors in imported modules are reported where the component starts, with a link to their file.
       const target = locate(item.filename);
@@ -331,6 +352,32 @@ export async function componentDiagnostics(
       return diagnostic;
     }
     const offset = item.location.offset;
+    // `bind` without a value is usually `bind:attr` being written: name both forms.
+    if (item.code === "MEEK113" && /^bind(?![\w$:.-])\s*(?!=)/.test(source.slice(offset, offset + 64))) {
+      diagnostic.message = "`bind` sin valor: escribe `bind:atributo=\"expresión\"` para un atributo o una prop, o `bind=\"obj\"` para pasar un objeto";
+    }
+    // `{{ expr }}`: the whole interpolation, both pairs of braces.
+    if (item.code === "MEEK020" && item.message === doubleBracesMessage && source[offset] === "{") {
+      const close = interpolationClose(source, offset);
+      if (close !== undefined) {
+        diagnostic.range = toRange(document, offset, close + 1);
+        return diagnostic;
+      }
+    }
+    // A directive without its value yet (`bind:class`): what it needs, instead of TypeScript's words.
+    const unvalued = item.code === "MEEK020" ? /^((?:bind|on|model|if|each):[\w$.:-]+)(?![\w$.:-]|\s*=)/.exec(source.slice(offset, offset + 128)) : null;
+    if (unvalued) diagnostic.message = `${unvalued[1]} necesita un valor: ${unvalued[1]}="expresión"`;
+    // MEEK012 is reported at the tag: mark the attribute itself (`bind:` while it is written).
+    const invalid = item.code === "MEEK012" ? /^(?:Atributo dinámico no válido: (.*)|Directiva de plantilla no admitida: (.*))$/.exec(item.message) : null;
+    if (invalid && source[offset] === "<") {
+      const name = invalid[1] === undefined ? invalid[2]! : `bind:${invalid[1]}`;
+      const range = attributeInTag(source, offset, name);
+      if (range) {
+        if (name === "bind:") diagnostic.message = "`bind:` necesita el nombre de un atributo o una prop: bind:class=\"expresión\"";
+        diagnostic.range = toRange(document, range[0], range[1]);
+        return diagnostic;
+      }
+    }
     const tag = item.code === "MEEK043" || item.code === "MEEK044" ? openingTagRange(source, offset) : undefined;
     if (tag) {
       diagnostic.range = toRange(document, tag[0], tag[1]);
@@ -342,6 +389,8 @@ export async function componentDiagnostics(
         if (`TS${candidate.code}` !== item.code || candidate.start === undefined || candidate.length === undefined) continue;
         const range = sourceRange(component, candidate.start, candidate.length);
         if (range?.[0] === offset && range[1] > offset) { end = range[1]; break; }
+        // A quoted key, such as a hyphenated snippet name (`name="cell-email"`): the value inside the quotes.
+        if (range?.[0] === offset - 1 && (source[offset - 1] === "\"" || source[offset - 1] === "'") && range[1] - 1 > offset) { end = range[1] - 1; break; }
       }
     }
     // MEEK107 marks the whole value of `html="..."`, up to its closing quote, and so do MEEK112,
@@ -362,11 +411,16 @@ export async function componentDiagnostics(
   }).concat(blockDiagnostics);
 }
 
-/** The configuration loaded (it runs before the component compiles): its earlier failure is gone. */
-function clearConfig(project: MeekoProject, reportConfig: ConfigDiagnosticsReporter | undefined): void {
-  if (!reportConfig || !project.trusted) return;
+/**
+ * The configuration loaded (it runs before the component compiles): its earlier failure is gone,
+ * and only the deprecated entries of `modules` (MEEK126, read from the text) remain.
+ */
+function clearConfig(project: MeekoProject, reportConfig: ConfigDiagnosticsReporter | undefined, locate: (filename: string) => LocatedDocument | undefined): void {
+  if (!reportConfig) return;
   const file = projectConfigFile(project.root);
-  if (file) reportConfig(file, []);
+  const target = file ? locate(file) : undefined;
+  const warnings = file && target ? configWarnings(target.document, file) : [];
+  if (file && (project.trusted || warnings.length)) reportConfig(file, warnings);
 }
 
 function compileDiagnostic(document: TextDocument, item: CompileDiagnostic): Diagnostic {

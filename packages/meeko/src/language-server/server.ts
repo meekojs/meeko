@@ -8,30 +8,31 @@ import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
-  CodeActionKind, CodeLensRefreshRequest, createConnection, DiagnosticSeverity, DidChangeWatchedFilesNotification, RequestType, TextDocuments, TextDocumentSyncKind,
+  CodeActionKind, CodeLensRefreshRequest, createConnection, DiagnosticSeverity, DidChangeConfigurationNotification, DidChangeWatchedFilesNotification, RequestType, TextDocuments, TextDocumentSyncKind,
   WatchKind,
 } from "vscode-languageserver/node";
 
+import type { ClassSettings } from "./classes";
 import type { CompletionData, FeatureContext, LocatedDocument, MeekoFormatSettings } from "./features";
 import type { ExecutionZoneKind, ExecutionZoneReason } from "./zones";
 
 import { MeekoCompileError } from "../compiler/parser/sfc";
 import { projectRoot } from "../compiler/project-root";
 import { checkFrameworkPageContracts } from "../framework/page-contracts-check";
-import { classCompletion, classDefinition, classHover, ClassIndex, classView, isClassCompletionData, resolveClassCompletion, withItemDefaults } from "./classes";
+import { classCompletion, classDefinition, classHover, ClassIndex, classView, configuredClassView, isClassCompletionData, resolveClassCompletion, withItemDefaults } from "./classes";
 import { cssVariableCompletion, cssVariableDefinition, cssVariableHover, isCssVariableCompletionData, resolveCssVariableCompletion } from "./css-variables";
 import { componentDiagnostics, contractRange, frameworkContractRoot, projectCheckRoot, tokenEnd } from "./diagnostics";
 import {
   colorPresentations, cssCompletion, cssHover, documentColors, htmlCompletion, htmlHover, linkedEditingRanges, specialTemplateHover, styleDiagnostics, tagCompletion,
 } from "./embedded";
 import {
-  codeActions, completionList, componentNameCompletion, definition, directiveNameCompletion, documentSymbols, foldingRanges, formatting, hover, prepareRename, references,
+  codeActions, completionList, componentNameCompletion, componentTagMembers, definition, directiveNameCompletion, documentSymbols, foldingRanges, formatting, hover, prepareRename, references,
   rename, resolveCompletion, semanticTokens, semanticTokensLegend, shadowedTagsOf, signatureHelp,
 } from "./features";
 import { codeLenses } from "./lenses";
 import { documentLinks, inlayHints, linkRouteCompletion, workspaceSymbols } from "./nav";
 import { MeekoProject, MeekoWorkspace, pathKey } from "./project";
-import { createComponentActions, listItemActions, propsReadActions } from "./quick-fixes";
+import { cleanupActions, createComponentActions, doubleBraceActions, listItemActions, propsReadActions } from "./quick-fixes";
 import { teleportCompletion, teleportHover } from "./teleport";
 import { executionZones } from "./zones";
 
@@ -73,6 +74,8 @@ export interface LanguageServerInitializationOptions {
    * prevalece su sección `meeko.format`.
    */
   readonly format?: MeekoFormatSettings;
+  /** Ajustes de clases para clientes sin workspace/configuration. */
+  readonly classes?: ClassSettings;
 }
 
 /** Normaliza la sección `meeko.format`; `undefined` si el cliente no la define. */
@@ -83,6 +86,8 @@ function formatSettingsOf(value: unknown): MeekoFormatSettings | undefined {
 }
 
 const transports = ["--stdio", "--node-ipc"];
+/** How long `meeko.classes` settings with `tailwindActive: false` stay cached for a document. */
+const classSettingsRecheckMs = 10_000;
 
 function packageVersion(): string | undefined {
   let directory = dirname(fileURLToPath(import.meta.url));
@@ -161,12 +166,14 @@ export function startLanguageServer(connection: Connection): void {
   let semanticRefresh = false;
   let watchedRegistration = false;
   let configurationSupport = false;
+  let configurationRegistration = false;
   let codeLensRefresh = false;
   let deleteFiles = false;
   let createFiles = false;
   /** The client reads `editRange` and `data` from `itemDefaults` of a completion list (LSP 3.17). */
   let completionDefaults = false;
   let formatFallback: MeekoFormatSettings = {};
+  let classesFallback: ClassSettings = {};
   /** Workspace folders of the client, the reference of {@link ignoredChange}. */
   let folders: string[] = [];
   /** After `shutdown` nothing reaches the client: late results of running work are dropped. */
@@ -378,11 +385,13 @@ export function startLanguageServer(connection: Connection): void {
     semanticRefresh = params.capabilities.workspace?.semanticTokens?.refreshSupport === true;
     watchedRegistration = params.capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration === true;
     configurationSupport = params.capabilities.workspace?.configuration === true;
+    configurationRegistration = params.capabilities.workspace?.didChangeConfiguration?.dynamicRegistration === true;
     codeLensRefresh = params.capabilities.workspace?.codeLens?.refreshSupport === true;
     const workspaceEdit = params.capabilities.workspace?.workspaceEdit;
     deleteFiles = workspaceEdit?.documentChanges === true && (workspaceEdit.resourceOperations ?? []).includes("delete");
     createFiles = workspaceEdit?.documentChanges === true && (workspaceEdit.resourceOperations ?? []).includes("create");
     formatFallback = formatSettingsOf(options.format) ?? {};
+    classesFallback = options.classes ?? {};
     const defaults = params.capabilities.textDocument?.completion?.completionList?.itemDefaults ?? [];
     completionDefaults = defaults.includes("editRange") && defaults.includes("data");
     const version = packageVersion();
@@ -412,6 +421,9 @@ export function startLanguageServer(connection: Connection): void {
   });
 
   connection.onInitialized(() => {
+    // A pull-model client (VS Code) only notifies setting changes for a registered section; the
+    // notification clears the cached meeko.classes settings of each document.
+    if (configurationSupport && configurationRegistration) void connection.client.register(DidChangeConfigurationNotification.type, { section: "meeko" });
     if (!watchedRegistration) return;
     void connection.client.register(DidChangeWatchedFilesNotification.type, {
       watchers: [
@@ -451,6 +463,7 @@ export function startLanguageServer(connection: Connection): void {
   });
 
   documents.onDidClose(({ document }) => {
+    classSettingsCache.delete(document.uri);
     clearTimeout(timers.get(document.uri));
     timers.delete(document.uri);
     const edited = openVersions.get(document.uri) !== document.version;
@@ -505,6 +518,8 @@ export function startLanguageServer(connection: Connection): void {
   connection.onDidChangeConfiguration(({ settings }) => {
     const pushed = formatSettingsOf((settings as { meeko?: { format?: unknown } } | null | undefined)?.meeko?.format);
     if (pushed) formatFallback = pushed;
+    classesFallback = (settings as { meeko?: { classes?: ClassSettings } } | undefined)?.meeko?.classes ?? classesFallback;
+    classSettingsCache.clear();
   });
 
   /** Opciones `meeko.format` vigentes para un documento, pedidas al cliente en cada formateo. */
@@ -517,6 +532,25 @@ export function startLanguageServer(connection: Connection): void {
       log(`${uri}: no se pudo leer meeko.format: ${error instanceof Error ? error.message : String(error)}`);
       return formatFallback;
     }
+  };
+
+  /**
+   * `meeko.classes` settings per document, asked once and kept until `didChangeConfiguration` or
+   * until the document closes, instead of a `workspace/configuration` request on every completion
+   * or hover. `tailwindActive: false` is kept only briefly: the Tailwind CSS extension may activate
+   * later, and that sends no notification.
+   */
+  const classSettingsCache = new Map<string, { readonly settings: Promise<ClassSettings>; readonly until: number }>();
+  const classSettingsFor = async (uri: string): Promise<ClassSettings> => {
+    if (!configurationSupport) return classesFallback;
+    const cached = classSettingsCache.get(uri);
+    if (cached && Date.now() < cached.until) return cached.settings;
+    const settings = Promise.resolve(connection.workspace.getConfiguration({ scopeUri: uri, section: "meeko.classes" }) as Promise<ClassSettings | null | undefined>)
+      .then((value) => value ?? classesFallback, () => classesFallback);
+    classSettingsCache.set(uri, { settings, until: Number.POSITIVE_INFINITY });
+    const resolved = await settings;
+    if (!resolved.tailwindActive && classSettingsCache.get(uri)?.settings === settings) classSettingsCache.set(uri, { settings, until: Date.now() + classSettingsRecheckMs });
+    return resolved;
   };
 
   connection.onCompletion(async ({ textDocument, position, context: request }) => {
@@ -540,11 +574,13 @@ export function startLanguageServer(connection: Connection): void {
       // `<MeekoTeleport>`: its attributes and the targets of to="…".
       const teleport = teleportCompletion(document, position, shadowed, project.root);
       if (teleport) return teleport;
-      const directives = directiveNameCompletion(document, position, shadowed);
+      // A component tag of the project also offers its props, events and models, from its check.
+      const members = await withContext(textDocument.uri, (context) => componentTagMembers(context, position));
+      const directives = directiveNameCompletion(document, position, shadowed, members ?? undefined);
       if (directives) return directives;
       const variables = cssVariableCompletion(document, position, () => classView(document, filename, classesOf(project), project.componentSources()));
       if (variables) return completionDefaults ? withItemDefaults(variables) : variables;
-      const classes = classCompletion(document, position, filename, classesOf(project), project.componentSources());
+      const classes = classCompletion(document, position, filename, classesOf(project), project.componentSources(), await classSettingsFor(textDocument.uri));
       if (classes) return completionDefaults ? withItemDefaults(classes) : classes;
       const routes = linkRouteCompletion(document, position, await project.appIndex(), project.root, shadowed);
       if (routes) return routes;
@@ -562,7 +598,7 @@ export function startLanguageServer(connection: Connection): void {
     if (isClassCompletionData(item.data)) {
       const open = await componentOf(item.data.meekoClass);
       if (!open) return item;
-      return resolveClassCompletion(item, classView(open.document, open.filename, classesOf(open.project), open.project.componentSources()));
+      return resolveClassCompletion(item, configuredClassView(classView(open.document, open.filename, classesOf(open.project), open.project.componentSources()), await classSettingsFor(item.data.meekoClass)));
     }
     const data = item.data as CompletionData | undefined;
     if (!data?.uri) return item;
@@ -572,7 +608,7 @@ export function startLanguageServer(connection: Connection): void {
     const open = await componentOf(textDocument.uri);
     const variables = open && cssVariableHover(open.document, position, () => classView(open.document, open.filename, classesOf(open.project), open.project.componentSources()));
     if (variables) return variables;
-    const classes = open && classHover(open.document, position, open.filename, classesOf(open.project), open.project.componentSources());
+    const classes = open && classHover(open.document, position, open.filename, classesOf(open.project), open.project.componentSources(), await classSettingsFor(textDocument.uri));
     if (classes) return classes;
     const teleport = open && teleportHover(open.document, position, shadowedTagsOf(open.project, open.document.getText()));
     if (teleport) return teleport;
@@ -636,9 +672,9 @@ export function startLanguageServer(connection: Connection): void {
       ...propsReadActions(context, request.diagnostics),
       ...createComponentActions(context, request.diagnostics, { createFiles }),
     ]);
-    // A list without `each:as` does not compile: its fix works on the text.
+    // A list without `each:as` and `{{ expr }}` do not compile: their fixes work on the text.
     const document = documents.get(textDocument.uri);
-    const actions = [...compiled ?? [], ...document ? listItemActions(document, request.diagnostics) : []];
+    const actions = [...compiled ?? [], ...document ? [...listItemActions(document, request.diagnostics), ...doubleBraceActions(document, request.diagnostics), ...cleanupActions(document, request.diagnostics)] : []];
     const only = request.only;
     return only?.length ? actions.filter((action) => action.kind !== undefined && only.some((kind) => action.kind === kind || action.kind!.startsWith(`${kind}.`))) : actions;
   });

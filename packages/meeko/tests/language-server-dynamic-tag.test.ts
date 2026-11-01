@@ -106,3 +106,52 @@ const props = defineProps<{ href?: string; as: "div" | "iframe" }>();
     assert.deepEqual(shown, ["MEEK112 bind:colspan", "MEEK112 props.as", "MEEK113 onclick"]);
   });
 });
+
+const named = `<script lang="ts">
+import * as Card from "./Card.meeko";
+const props = defineProps<{ to?: string; card?: boolean }>();
+</script>
+<template><component is="props.card ? 'Card' : props.to !== undefined ? 'MeekoLink' : 'button'" title="x" bind:to="props.to ?? '/'" type="button">y</component></template>
+`;
+
+describe("language server: <component is> with component names (1.8)", () => {
+  let workspace: LanguageProject;
+
+  before(async () => {
+    workspace = await languageProject("lsp-is-names-", { "Card.meeko": card, "Named.meeko": named });
+  });
+
+  after(async () => {
+    await workspace?.dispose();
+  });
+
+  test("hovering a name in is shows that component or <MeekoLink>", async () => {
+    const context = await workspace.open("Named.meeko");
+    const component = (hover(context, context.at("'Card'", 2))?.contents as MarkupContent | undefined)?.value ?? "";
+    assert.match(component, /Card/);
+    assert.match(component, /title/, component);
+    const link = (hover(context, context.at("'MeekoLink'", 3))?.contents as MarkupContent | undefined)?.value ?? "";
+    assert.match(link, /MeekoLink/, link);
+  });
+
+  test("is completes the tags and the names it may give", async () => {
+    const typing = await workspace.open("Named.meeko", named.replace(": 'button'", ": 'bu'"));
+    const tags = (completion(typing, typing.at("'bu'", 3)) ?? []).map((item) => item.label);
+    assert.ok(tags.includes("button"), tags.join(","));
+    assert.ok(tags.includes("MeekoLink"), tags.join(","));
+    assert.ok(tags.includes("Card"), tags.join(","));
+  });
+
+  test("the editor reports an attribute that no branch takes and an unknown name, and nothing for a valid is", async () => {
+    const shown = async (source: string): Promise<string[]> => {
+      const opened = await workspace.open("Named.meeko", source);
+      const diagnostics = await componentDiagnostics(workspace.project, opened.document, workspace.file("Named.meeko"), opened.locate);
+      return diagnostics.filter((item) => String(item.code).startsWith("MEEK")).map((item) => `${String(item.code)} ${opened.document.getText(item.range)}`).sort();
+    };
+    assert.deepEqual(await shown(named), []);
+    assert.deepEqual(await shown(named.replace('title="x"', 'title="x" colour="red"')), ["MEEK112 colour"]);
+    const unknown = await shown(named.replace("'Card'", "'Missing'"));
+    assert.equal(unknown.length, 1, JSON.stringify(unknown));
+    assert.match(unknown[0]!, /^MEEK132 /);
+  });
+});

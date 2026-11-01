@@ -9,6 +9,36 @@ export interface ComponentMember {
   readonly optional: boolean;
   /** JSDoc of the member as Markdown, if it has one. */
   readonly documentation?: string;
+  /** Props: cómo la pasa la etiqueta, según su tipo (véase {@link PropAttribute}). */
+  readonly attribute?: PropAttribute;
+  /** Props: los valores de texto de una unión literal (`"primary" | "secondary"`), que admite `variant="…"`. */
+  readonly values?: readonly string[];
+  /** Props: el valor por defecto tal como se escribe en `defineProps` (`"md"`), si lo tiene. */
+  readonly default?: string;
+}
+
+/**
+ * Cómo pasa una prop la etiqueta del padre, según su tipo: `text`, sólo como texto
+ * (`variant="primary"`); `flag`, booleana, sin valor (`disabled`) o con `bind:`; `both`, como texto
+ * o con `bind:` (`string | number`, `unknown`); `expression`, sólo con `bind:` (`item: Item`).
+ *
+ * @example
+ * const attribute: PropAttribute = "flag" // disabled?: boolean
+ */
+export type PropAttribute = "both" | "expression" | "flag" | "text";
+
+/** {@link PropAttribute} and the text literals of a prop's type, without `undefined`. */
+function propAttribute(checker: ts.TypeChecker, type: ts.Type): { attribute: PropAttribute; values: string[] } {
+  if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return { attribute: "both", values: [] };
+  const parts = type.isUnion() ? type.types : [type];
+  const text = ts.TypeFlags.String | ts.TypeFlags.StringLiteral | ts.TypeFlags.TemplateLiteral | ts.TypeFlags.StringMapping;
+  const values = parts.flatMap((part) => part.isStringLiteral() ? [part.value] : []);
+  const texts = parts.filter((part) => part.flags & text).length;
+  if (texts === parts.length) return { attribute: "text", values };
+  if (texts > 0) return { attribute: "both", values };
+  // A bare attribute passes `true`: `boolean`, or a union with `true`.
+  const flag = parts.some((part) => (part.flags & ts.TypeFlags.BooleanLiteral) !== 0 && checker.typeToString(part) === "true");
+  return { attribute: flag ? "flag" : "expression", values };
 }
 
 /** What a parent can pass to and receive from a component, read from its virtual module. */
@@ -99,7 +129,7 @@ function declaredType(checker: ts.TypeChecker, symbol: ts.Symbol, resolved: ts.T
 }
 
 /** Cada canal de un componente como tipo: de los alias de su módulo o de la comprobación de una etiqueta del padre. */
-type ChannelTypes = (name: "props" | "events" | "models" | "snippets" | "exposed") => { type: ts.Type; at: ts.Node } | undefined;
+type ChannelTypes = (name: "props" | "events" | "models" | "snippets" | "exposed" | "defaults") => { type: ts.Type; at: ts.Node } | undefined;
 
 function summarize(checker: ts.TypeChecker, channel: ChannelTypes, typeParameters: readonly string[] | undefined, declared: boolean): ComponentSummary {
   const members = (name: Parameters<ChannelTypes>[0], value?: (type: ts.Type, at: ts.Node) => ts.Type): ComponentMember[] | undefined => {
@@ -112,12 +142,23 @@ function summarize(checker: ts.TypeChecker, channel: ChannelTypes, typeParameter
       if (value) type = value(type, found.at);
       else if (declared && name === "props") type = declaredType(checker, symbol, type) ?? type;
       const documentation = memberDocumentation(checker, symbol);
-      return { name: symbol.name, type: short(checker.typeToString(type, found.at, typeFormat)), optional, ...(documentation ? { documentation } : {}) };
+      const member = { name: symbol.name, type: short(checker.typeToString(type, found.at, typeFormat)), optional, ...(documentation ? { documentation } : {}) };
+      if (name !== "props") return member;
+      const { attribute, values } = propAttribute(checker, type);
+      return { ...member, attribute, ...(values.length ? { values } : {}) };
     });
   };
   const events = members("events") ?? [];
   const callbacks = new Set(events.map((event) => `on${event.name.charAt(0).toUpperCase()}${event.name.slice(1)}`));
-  const props = (members("props") ?? []).filter((prop) => !callbacks.has(prop.name));
+  // `ComponentDefaults`: each default as written, as a string literal type.
+  const defaults = new Map<string, string>();
+  const defaultsType = channel("defaults")?.type;
+  for (const symbol of defaultsType ? checker.getPropertiesOfType(defaultsType) : []) {
+    const type = checker.getTypeOfSymbol(symbol);
+    if (type.isStringLiteral()) defaults.set(symbol.name, type.value);
+  }
+  const props = (members("props") ?? []).filter((prop) => !callbacks.has(prop.name))
+    .map((prop) => defaults.has(prop.name) ? { ...prop, default: defaults.get(prop.name)! } : prop);
   // A model is a Signal<T>: the parent binds a signal of T.
   const models = members("models", (type, at) => {
     const value = type.getProperty("value");
@@ -144,7 +185,7 @@ export function componentSummary(program: ts.Program, component: VirtualComponen
   const checker = program.getTypeChecker();
   const aliases = new Map<string, ts.TypeAliasDeclaration>();
   for (const statement of file.statements) if (ts.isTypeAliasDeclaration(statement)) aliases.set(statement.name.text, statement);
-  const names = { props: "__MeekoComponentProps", events: "__MeekoEmits", models: "ComponentModels", snippets: "ComponentSnippets", exposed: "ComponentExposed" } as const;
+  const names = { props: "__MeekoComponentProps", events: "__MeekoEmits", models: "ComponentModels", snippets: "ComponentSnippets", exposed: "ComponentExposed", defaults: "ComponentDefaults" } as const;
   const props = aliases.get("__MeekoComponentProps") ?? aliases.get("ComponentProps");
   const typeParameters = props?.typeParameters?.map((parameter) => parameter.getText(file));
   return summarize(checker, (name) => {
@@ -173,6 +214,16 @@ export function tagSummary(checker: ts.TypeChecker, call: ts.CallExpression): Co
   }, typeParameters, false);
 }
 
+/**
+ * Una prop como en la firma de su etiqueta, con su valor por defecto si lo tiene.
+ *
+ * @example
+ * propSignature({ name: "size", type: '"sm" | "md"', optional: true, default: '"md"' }) // 'size?: "sm" | "md" = "md"'
+ */
+export function propSignature(prop: ComponentMember): string {
+  return `${prop.name}${prop.optional ? "?" : ""}: ${prop.type}${prop.default !== undefined ? ` = ${prop.default}` : ""}`;
+}
+
 /** `[id: number]` as `id: number`, the parameters of an event or a snippet. */
 function parameters(tuple: string): string {
   return tuple.startsWith("[") && tuple.endsWith("]") ? tuple.slice(1, -1) : tuple;
@@ -186,7 +237,7 @@ function parameters(tuple: string): string {
 export function componentSignature(summary: ComponentSummary, name: string): string {
   const optional = (member: ComponentMember): string => member.optional ? "?" : "";
   const attributes = [
-    ...summary.props.map((prop) => `${prop.name}${optional(prop)}: ${prop.type}`),
+    ...summary.props.map(propSignature),
     ...summary.events.map((event) => `on:${event.name}(${parameters(event.type)})`),
     ...summary.models.map((model) => `${model.name === "default" ? "model" : `model:${model.name}`}${optional(model)}: ${model.type}`),
   ];

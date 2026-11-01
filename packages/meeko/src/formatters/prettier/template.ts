@@ -2,9 +2,10 @@ import type { AstPath, Doc, Options, Parser, ParserOptions, Plugin, Printer } fr
 
 import { builders, utils } from "prettier/doc";
 
-import type { ClassSortMode } from "./classes";
+import type { ClassOrder, ClassSortMode } from "./classes";
 
 import { scanInterpolations } from "../../compiler/parser/interpolation";
+import { maskComponentTags } from "../../compiler/parser/sfc";
 import { isCustomElementTag } from "../../compiler/parser/template";
 import { classOrderOption, classTokens, sortClassTokens } from "./classes";
 
@@ -104,7 +105,8 @@ const templateParser: Parser<HtmlNode> = {
   async parse(text, options) {
     const html = await hostHtml(options);
     (options as HostOptions)[hostKey] = html;
-    const root = await html.parser.parse(text, options);
+    const root = await html.parser.parse(maskInterpolatedLessThan(text), options);
+    restoreInterpolatedLessThan(root);
     const template = root.children?.find((child) => child.kind === "element" && child.name === "template");
     if (!template) throw new Error("The template wrapper was not parsed");
     // The template's children become the root's: they are printed without the wrapper.
@@ -114,6 +116,29 @@ const templateParser: Parser<HtmlNode> = {
   locStart: (node) => node.sourceSpan.start.offset,
   locEnd: (node) => node.sourceSpan.end.offset,
 };
+
+/** Lo que lee el parser HTML en lugar de un `<` de una interpolación; nunca está en la fuente. */
+const interpolatedLessThan = "";
+
+/**
+ * Oculta al parser HTML cada `<` de una interpolación del texto (`{a < b}`, `{"<b>"}`) con las
+ * mismas posiciones que el compilador, para que no abra una etiqueta.
+ */
+function maskInterpolatedLessThan(text: string): string {
+  if (text.includes(interpolatedLessThan)) return text;
+  const { interpolated } = maskComponentTags(text);
+  if (!interpolated.length) return text;
+  const chars = text.split("");
+  for (const offset of interpolated) chars[offset] = interpolatedLessThan;
+  return chars.join("");
+}
+
+/** Devuelve su `<` a los textos que leyó el parser HTML. */
+function restoreInterpolatedLessThan(ast: HtmlNode): void {
+  ast.walk((node) => {
+    if (node.kind === "text" && node.value?.includes(interpolatedLessThan)) node.setProperty("value", node.value.replaceAll(interpolatedLessThan, "<"));
+  });
+}
 
 /** Convierte cada `{expr}` de los textos en un nodo `interpolation`, como `{{ }}` en Vue. */
 function extractInterpolations(ast: HtmlNode): void {
@@ -208,7 +233,7 @@ function isElementClass(node: HtmlNode, element: HtmlNode | undefined): boolean 
 function classValue(value: string, options: Options): string | undefined {
   if (value.includes("&") || value.includes('"')) return undefined;
   const mode = (options as { meekoSortClasses?: ClassSortMode }).meekoSortClasses;
-  const order = (options as Record<string, unknown>)[classOrderOption] as ReadonlyMap<string, number> | undefined;
+  const order = (options as Record<string, unknown>)[classOrderOption] as ClassOrder | undefined;
   return sortClassTokens(classTokens(value), mode, order).join(" ");
 }
 

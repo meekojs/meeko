@@ -77,7 +77,7 @@ describe("static class attributes", () => {
   test("the option is a stable choice, off by default", () => {
     const option = plugin.options?.meekoSortClasses as { type?: string; default?: unknown; choices?: Array<{ value: unknown }> } | undefined;
     assert.deepEqual({ type: option?.type, default: option?.default, choices: option?.choices?.map((choice) => choice.value) }, {
-      type: "choice", default: "off", choices: ["off", "stylesheet", "alphabetical"],
+      type: "choice", default: "off", choices: ["off", "stylesheet", "tailwind", "alphabetical"],
     });
   });
 });

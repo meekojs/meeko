@@ -53,7 +53,7 @@ export interface BuiltinTag {
    * Generic parameters of the virtual check `declare function __meeko_builtin_X<…>(props: …)`,
    * whose argument then infers them from the tag's props; `props` is its parameter type.
    */
-  readonly check?: { readonly parameters: string; readonly props: string };
+  readonly check?: { readonly parameters: string; readonly props: string; readonly declarations?: string };
   readonly props: readonly BuiltinTagProp[];
   readonly snippets: readonly BuiltinTagSnippet[];
   /**
@@ -130,9 +130,22 @@ export const builtinTags: readonly BuiltinTag[] = [
       const to = attributes.get("to");
       return to === undefined ? undefined : `<${JSON.stringify(to)}>`;
     },
+    // The same rule as `meeko check` (`__MeekoLinkOptions` in compiler.ts) without hardening
+    // `MeekoLinkProps.params`, which stays optional for `NonNullable<MeekoLinkProps<K>["params"]>`:
+    // with generated routes a dynamic route requires its params and a static one forbids them; a union of
+    // routes or no generated routes leave them optional.
     check: {
       parameters: `<K extends ${framework}.MeekoLinkProps["to"]>`,
-      props: `${framework}.MeekoLinkProps<K>`,
+      props: `${framework}.MeekoLinkProps<K> & __MeekoLinkCheckParams<K>`,
+      declarations: [
+        `type __MeekoLinkCheckRoutes = ${framework}.GeneratedRoutes;`,
+        "type __MeekoLinkCheckValues<K extends string> = K extends keyof __MeekoLinkCheckRoutes ? __MeekoLinkCheckRoutes[K] : Record<string, string>;",
+        "type __MeekoLinkCheckUnion<K extends string, A extends string = K> = K extends unknown ? ([A] extends [K] ? false : true) : never;",
+        "type __MeekoLinkCheckParams<K extends string> = keyof __MeekoLinkCheckRoutes extends never ? unknown",
+        "  : true extends __MeekoLinkCheckUnion<K> ? unknown",
+        "  : keyof __MeekoLinkCheckValues<K> extends never ? { params?: never } : { params: __MeekoLinkCheckValues<K> };",
+        "",
+      ].join("\n"),
     },
     props: [
       {

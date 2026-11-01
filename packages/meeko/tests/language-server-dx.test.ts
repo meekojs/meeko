@@ -97,11 +97,12 @@ describe("language server: component props and optional scripts", () => {
     const errors = own(await componentDiagnostics(workspace.project, fixable.document, workspace.file("Fix.meeko"), () => undefined));
     const unknown = errors.find((item) => item.code === "TS2304");
     assert.ok(unknown, JSON.stringify(errors));
-    const fix = codeActions(fixable, unknown.range, [unknown]).find((action) => /helper.js/.test(action.title) && /import/i.test(action.title));
+    // With the Bundler resolution of this project, the import has no extension.
+    const fix = codeActions(fixable, unknown.range, [unknown]).find((action) => /"\.\/helper"/.test(action.title) && /import/i.test(action.title));
     assert.ok(fix, JSON.stringify(codeActions(fixable, unknown.range, [unknown]).map((action) => action.title)));
     const edits = Object.values(fix.edit?.changes ?? {})[0] as TextEdit[];
     assert.equal(edits.length, 1);
     assert.deepEqual(edits[0]!.range.start, { line: 0, character: 0 });
-    assert.match(edits[0]!.newText, /^<script lang="ts">\n.*import \{ shout \} from "\.\/helper\.js";\n<\/script>\n\n$/s);
+    assert.match(edits[0]!.newText, /^<script lang="ts">\n.*import \{ shout \} from "\.\/helper";\n<\/script>\n\n$/s);
   });
 });

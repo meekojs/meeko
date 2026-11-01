@@ -1,23 +1,71 @@
 import type { Color, ColorInformation, ColorPresentation } from "vscode-css-languageservice";
+import type { IAttributeData, IHTMLDataProvider, IValueData } from "vscode-html-languageservice";
 import type { CompletionItem, CompletionList, Diagnostic, Hover, MarkupContent, Position, Range } from "vscode-languageserver/node";
 
 import { getCSSLanguageService } from "vscode-css-languageservice";
 import { getDefaultHTMLDataProvider, getLanguageService as getHtmlLanguageService } from "vscode-html-languageservice";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import { CompletionItemKind, DiagnosticSeverity, DiagnosticTag, InsertTextFormat, MarkupKind } from "vscode-languageserver/node";
+import { CompletionItemKind, CompletionItemTag, DiagnosticSeverity, DiagnosticTag, InsertTextFormat, MarkupKind } from "vscode-languageserver/node";
+
+import type { HtmlAttributeInfo } from "./html-data-source";
 
 import { isCandidates } from "../compiler/transforms/dynamic-tag";
 import { elementAccepts } from "../shared/html-attributes";
+import { ariaRoles } from "../shared/html-data/aria";
 import { builtinTag } from "./builtin-tags";
 import { cssClassRules } from "./class-rules";
+import { attributeValueType, htmlAttributeSource } from "./html-data-source";
 
 // HTML of the template and CSS of `<style>`, outside the TypeScript model: what the editor offers
 // while writing markup and styles. Every function reads the text, so it works while a tag or a
 // rule is still being typed and the component does not compile.
 
-const htmlService = getHtmlLanguageService();
-const cssService = getCSSLanguageService();
 const htmlData = getDefaultHTMLDataProvider();
+const cssService = getCSSLanguageService();
+
+const markup = (description: string | MarkupContent | undefined): string | undefined =>
+  typeof description === "string" ? description : description?.value;
+
+/**
+ * The HTML data of the template's markup service, from {@link htmlAttributeSource}: the attribute
+ * names that Meeko writes on each element (the compiler's table, as `bind:` offers them), with the
+ * MDN description, references and browser status of VS Code's data where it has them, and the
+ * standard's link and status otherwise. Tags stay those of VS Code's data.
+ */
+const meekoHtmlData: IHTMLDataProvider = {
+  getId: () => "meeko",
+  isApplicable: () => true,
+  provideTags: () => htmlData.provideTags(),
+  provideAttributes(tag) {
+    const known = new Map(htmlData.provideAttributes(tag.toLowerCase()).map((attribute) => [attribute.name, attribute]));
+    return htmlAttributeSource().attributes(tag).map((info): IAttributeData => {
+      const mdn = known.get(info.name);
+      const status = [info.deprecated ? "**Obsoleto.**" : undefined, info.experimental ? "**Experimental.**" : undefined].filter(Boolean).join(" ");
+      const description = [status, markup(mdn?.description) ?? info.description, info.spec && `[Especificación](${info.spec})`].filter(Boolean).join("\n\n");
+      return {
+        name: info.name,
+        ...(description ? { description: { kind: MarkupKind.Markdown, value: description } } : {}),
+        ...(info.boolean ? { valueSet: "v" } : info.values?.length ? { valueSet: "meeko" } : {}),
+        ...(mdn?.references ? { references: mdn.references } : {}),
+        ...(mdn?.browsers ? { browsers: mdn.browsers } : {}),
+        ...(mdn?.status ? { status: mdn.status } : {}),
+      };
+    });
+  },
+  provideValues(tag, attribute) {
+    const info = htmlAttributeSource().attributes(tag).find((candidate) => candidate.name === attribute.toLowerCase());
+    const known = new Map(htmlData.provideValues(tag.toLowerCase(), attribute.toLowerCase()).map((value) => [value.name, value]));
+    return (info?.values ?? []).filter((value) => value !== "").map((name): IValueData => known.get(name) ?? { name });
+  },
+};
+
+const htmlService = getHtmlLanguageService({ useDefaultDataProvider: false, customDataProviders: [meekoHtmlData] });
+
+/** The deprecated attributes of `tag` struck through, as `bind:` marks them. */
+function markDeprecated(items: CompletionItem[], tag: string): CompletionItem[] {
+  const deprecated = new Set(htmlAttributeSource().attributes(tag).filter((info) => info.deprecated).map((info) => info.name));
+  return items.map((item) => (deprecated.has(item.label) ? { ...item, tags: [CompletionItemTag.Deprecated] } : item));
+}
 // `@layer` and nesting are standard; an unknown at-rule (a PostCSS plugin's) is not an error here.
 cssService.configure({ validate: true, lint: { unknownAtRules: "ignore" } });
 
@@ -189,7 +237,7 @@ export function dynamicTagAttributeCompletion(document: TextDocument, position: 
   const start = document.positionAt(document.offsetAt(position) - word.length);
   const seen = new Map<string, { tags: string[]; description?: string | MarkupContent }>();
   for (const tag of tags) {
-    for (const attribute of htmlData.provideAttributes(tag)) {
+    for (const attribute of meekoHtmlData.provideAttributes(tag)) {
       if (/^on[a-z]/.test(attribute.name) || present.has(attribute.name) || seen.has(attribute.name)) continue;
       // Which tags write it, by the same data as the compiler (no `type` on `<a>`, for example).
       const accepting = tags.filter((candidate) => elementAccepts(candidate, attribute.name));
@@ -208,14 +256,69 @@ export function dynamicTagAttributeCompletion(document: TextDocument, position: 
   }));
 }
 
-/** Propone atributos HTML tras `bind:` con los mismos datos y restricciones que los atributos normales. */
-export function bindAttributeCompletion(document: TextDocument, position: Position, word: string, tags: readonly string[], present: ReadonlySet<string>): CompletionItem[] {
-  return dynamicTagAttributeCompletion(document, position, word, tags, new Set()).filter((item) => !present.has(`bind:${item.label}`))
-    .map((item) => ({
-      ...item,
-      label: `bind:${item.label}`,
-      textEdit: { range: { start: document.positionAt(document.offsetAt(position) - word.length), end: position }, newText: `bind:${item.label}="$1"` },
-    }));
+/** Global attributes that a template binds most often: right after the element's own ones. */
+const commonGlobalAttributes: ReadonlySet<string> = new Set(["class", "style", "id", "title", "hidden", "role", "tabindex", "lang", "dir", "inert", "popover"]);
+
+/**
+ * `bind:attr` for the HTML attributes of `tags` (the element, or the tags of `<component is>`), from
+ * {@link htmlAttributeSource}: `bind:attr="$1"` with the cursor inside the quotes, the type that the
+ * expression should have in `detail` and the MDN description. The element's own attributes go first,
+ * then the usual global ones (`class`, `style`, `id`…), the other global ones and `aria-*`; last,
+ * `bind:data-*`. `order` goes before each `sortText`, to place the list among other items.
+ */
+export function bindAttributeCompletion(document: TextDocument, position: Position, word: string, tags: readonly string[], present: ReadonlySet<string>, order = ""): CompletionItem[] {
+  const range = { start: document.positionAt(document.offsetAt(position) - word.length), end: position };
+  const seen = new Map<string, { info: HtmlAttributeInfo; tags: string[] }>();
+  for (const tag of tags) {
+    for (const info of htmlAttributeSource().attributes(tag)) {
+      const entry = seen.get(info.name);
+      if (entry) entry.tags.push(tag);
+      else seen.set(info.name, { info, tags: [tag] });
+    }
+  }
+  const items = [...seen.values()].filter(({ info }) => !present.has(`bind:${info.name}`)).map(({ info, tags: accepting }): CompletionItem => {
+    const label = `bind:${info.name}`;
+    const signature = `${label}: ${attributeValueType(info)}`;
+    const description = info.description;
+    const only = accepting.length < tags.length ? `Sólo en ${accepting.map((tag) => `<${tag}>`).join(", ")}.` : undefined;
+    // Values that the type does not list: many, suggestions only (`autocomplete`) or a token list (`role`).
+    const listed = info.values?.length && (info.values.length > 8 || info.freeform || info.tokens)
+      ? `${info.tokens ? "Valores, separados por espacios" : info.freeform ? "Valores sugeridos" : "Valores"}: ${info.values.map((value) => `\`${value}\``).join(", ")}.`
+      : undefined;
+    const status = [info.deprecated ? "**Obsoleto.**" : undefined, info.experimental ? "**Experimental.**" : undefined].filter(Boolean).join(" ") || undefined;
+    const rank = !info.global ? 0 : commonGlobalAttributes.has(info.name) ? 1 : info.name.startsWith("aria-") ? 3 : 2;
+    return {
+      label,
+      kind: CompletionItemKind.Property,
+      detail: signature,
+      documentation: { kind: MarkupKind.Markdown, value: bindDocumentation(signature, [status, only, description, listed, info.spec && `[Especificación](${info.spec})`]) },
+      ...(info.deprecated ? { tags: [CompletionItemTag.Deprecated] } : {}),
+      sortText: `${order}${rank}${info.name}`,
+      filterText: label,
+      insertTextFormat: InsertTextFormat.Snippet,
+      textEdit: { range, newText: `${label}="$1"` },
+      // Enumerated values open inside the quotes, before the expressions.
+      ...(info.values?.length ? { command: { title: "Valores", command: "editor.action.triggerSuggest" } } : {}),
+    };
+  });
+  if (!present.has("bind:data-")) {
+    items.push({
+      label: "bind:data-",
+      kind: CompletionItemKind.Property,
+      detail: "bind:data-*: string",
+      documentation: { kind: MarkupKind.Markdown, value: bindDocumentation("bind:data-*: string", ["Atributo `data-*` propio, que se lee con `dataset`."]) },
+      sortText: `${order}4data-`,
+      filterText: "bind:data-",
+      insertTextFormat: InsertTextFormat.Snippet,
+      textEdit: { range, newText: 'bind:data-$1="$2"' },
+    });
+  }
+  return items;
+}
+
+/** The documentation of `bind:attr`: its signature, notes and the rule of empty values. */
+function bindDocumentation(signature: string, notes: ReadonlyArray<string | undefined>): string {
+  return ["```ts", signature, "```", ...notes.filter((note): note is string => Boolean(note)).flatMap((note) => ["", note]), "", "`null`, `undefined` o `false` no escriben el atributo."].join("\n");
 }
 
 /**
@@ -269,8 +372,9 @@ export function htmlAttributeCompletion(document: TextDocument, position: Positi
     html = TextDocument.create(html.uri, "html", html.version, `${text.slice(0, tagStart + 1)}${element.padEnd(tag.length)}${text.slice(tagStart + 1 + tag.length)}`);
   }
   const list = htmlService.doComplete(html, position, htmlService.parseHTMLDocument(html));
-  return list.items.filter((item) => item.kind !== CompletionItemKind.Snippet && !/^on[a-z]/.test(item.label) && !present.has(item.label))
+  const items = list.items.filter((item) => item.kind !== CompletionItemKind.Snippet && !/^on[a-z]/.test(item.label) && !present.has(item.label))
     .map((item) => ({ ...item, sortText: `1${item.sortText ?? item.label}` }));
+  return markDeprecated(items, element ?? /^<([A-Za-z][\w$.-]*)/.exec(html.getText().slice(tagStart))?.[1] ?? "");
 }
 
 /**
@@ -289,11 +393,14 @@ export function htmlCompletion(document: TextDocument, position: Position): Comp
   if (context?.value && /^(?:bind|on|if|each|model|ref|html)\b/.test(context.value.attribute)) return undefined;
   const open = source.lastIndexOf("{", offset - 1);
   if (!context && open > source.lastIndexOf("}", offset - 1) && open >= template.contentStart) return undefined;
+  // `type="…"`, `role="…"`, `aria-pressed="…"`: the values of Meeko's HTML data.
+  const values = context?.value ? staticValueCompletion(document, position, context) : undefined;
+  if (values?.length) return { isIncomplete: false, items: values };
   const html = masked(document, template, "html");
   const parsed = htmlService.parseHTMLDocument(html);
   const list = htmlService.doComplete(html, position, parsed);
   // A lowercase tag only: components come from their own completion.
-  const items = list.items.filter((item) => item.kind !== CompletionItemKind.Snippet && !/^on[a-z]/.test(item.label));
+  const items = markDeprecated(list.items.filter((item) => item.kind !== CompletionItemKind.Snippet && !/^on[a-z]/.test(item.label)), context?.tag ?? "");
   const snippet = snippetTagCompletion(document, position, parsed);
   if (snippet) items.unshift(snippet);
   const typed = /<([a-z]*)$/.exec(source.slice(Math.max(0, offset - 64), offset));
@@ -310,6 +417,38 @@ export function htmlCompletion(document: TextDocument, position: Position): Comp
     });
   }
   return items.length ? { isIncomplete: list.isIncomplete, items } : undefined;
+}
+
+/**
+ * The values of a static attribute of an element from {@link htmlAttributeSource}: the whole value
+ * is replaced, or only the current token in a list (`role="button |"`, `rel`). Deprecated values
+ * of `role` are marked.
+ */
+function staticValueCompletion(document: TextDocument, position: Position, context: TagContext): CompletionItem[] | undefined {
+  const value = context.value!;
+  const info = htmlAttributeSource().attributes(context.tag).find((attribute) => attribute.name === value.attribute.toLowerCase());
+  if (!info?.values?.length) return undefined;
+  const source = document.getText();
+  const offset = document.offsetAt(position);
+  const quote = source[value.start - 1];
+  const close = quote === '"' || quote === "'" ? source.indexOf(quote, offset) : -1;
+  const end = close < 0 ? offset : close;
+  const token = info.tokens ? /\S*$/.exec(source.slice(value.start, offset))![0] : source.slice(value.start, offset);
+  const tokenEnd = info.tokens ? offset + /^\S*/.exec(source.slice(offset, end))![0].length : end;
+  const range = { start: document.positionAt(offset - token.length), end: document.positionAt(tokenEnd) };
+  const type = attributeValueType(info);
+  return info.values.filter((candidate) => candidate !== "").map((candidate, index): CompletionItem => {
+    const role = info.name === "role" ? (ariaRoles as Readonly<Record<string, { readonly description: string; readonly deprecated?: true }>>)[candidate] : undefined;
+    return {
+      label: candidate,
+      kind: CompletionItemKind.EnumMember,
+      detail: `${info.name}: ${type}`,
+      ...(role?.description ? { documentation: role.description } : {}),
+      ...(role?.deprecated ? { tags: [CompletionItemTag.Deprecated] } : {}),
+      sortText: String(index).padStart(3, "0"),
+      textEdit: { range, newText: candidate },
+    };
+  });
 }
 
 /**
@@ -458,6 +597,7 @@ export function styleClasses(source: string): StyleClass[] {
   const style = styleRegion(source);
   if (!style) return [];
   return (cssClassRules(source.slice(style.contentStart, style.contentEnd), style.contentStart) ?? [])
+    .filter((rule) => source[rule.start] === "." && !rule.context.some((context) => context.startsWith("@utility ")))
     .map((rule) => ({ name: rule.name, start: rule.start, end: rule.end, global: rule.global }));
 }
 

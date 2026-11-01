@@ -145,22 +145,20 @@ function ownsLines(source: string, start: number, end: number, before = /^\s*$/,
   return before.test(source.slice(lineStart, start)) && after.test(source.slice(end, next < 0 ? source.length : next));
 }
 
+/** The use analysis of the setup functions: each function and the virtual file it was found in. */
+interface SetupFunctionAnalysis {
+  readonly all: readonly SetupFunction[];
+  readonly file: ts.SourceFile;
+  readonly templateSpans: VirtualComponent["spans"];
+}
+
 /**
- * Browser-only ranges of the setup and the template:
- *
- * - functions declared at the top level of the setup (`function f() {}`, `const f = () => {}`)
- *   whose every use runs in the browser: an `on:*` handler of the template (also on a component),
- *   the body of `onMounted`, the browser continuation or another browser function, to a fixed
- *   point. A call at the top level of the setup, a use inside `effect`/`computed`, a rendering
- *   template expression, `defineExpose`, a prop or model of a child or any use the analysis cannot
- *   classify keeps a function shared;
- * - inline functions of `on:*` attributes that sit on their own lines of the template.
- *
- * It is syntactic, over the component's virtual TypeScript, and only marks whole lines.
+ * Functions declared at the top level of the setup, before the browser continuation, with
+ * `browser` set when every use runs in the browser (see {@link browserRanges}).
  */
-function browserRanges(component: VirtualComponent, document: SfcDocument, split: number | undefined): BrowserRange[] {
+function analyzeSetupFunctions(component: VirtualComponent, document: SfcDocument, split: number | undefined): SetupFunctionAnalysis | undefined {
   const script = component.spans[0];
-  if (!script) return [];
+  if (!script) return undefined;
   const source = component.source;
   const file = ts.createSourceFile(component.virtualFilename, component.code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const template = document.template;
@@ -277,7 +275,27 @@ function browserRanges(component: VirtualComponent, document: SfcDocument, split
     }
   }
   for (const fn of all) fn.browser = anchored.has(fn);
+  return { all, file, templateSpans };
+}
 
+/**
+ * Browser-only ranges of the setup and the template:
+ *
+ * - functions declared at the top level of the setup (`function f() {}`, `const f = () => {}`)
+ *   whose every use runs in the browser: an `on:*` handler of the template (also on a component),
+ *   the body of `onMounted`, the browser continuation or another browser function, to a fixed
+ *   point. A call at the top level of the setup, a use inside `effect`/`computed`, a rendering
+ *   template expression, `defineExpose`, a prop or model of a child or any use the analysis cannot
+ *   classify keeps a function shared;
+ * - inline functions of `on:*` attributes that sit on their own lines of the template.
+ *
+ * It is syntactic, over the component's virtual TypeScript, and only marks whole lines.
+ */
+function browserRanges(component: VirtualComponent, document: SfcDocument, split: number | undefined): BrowserRange[] {
+  const analysis = analyzeSetupFunctions(component, document, split);
+  if (!analysis) return [];
+  const { all, file, templateSpans } = analysis;
+  const source = component.source;
   const ranges: BrowserRange[] = [];
   for (const fn of all) {
     if (fn.browser && ownsLines(source, fn.start, fn.end)) ranges.push({ start: fn.start, end: fn.end, reason: "browser-function", detail: browserFunctionDetail(fn) });
@@ -386,6 +404,26 @@ export function executionZones(component: VirtualComponent, sourceRoots: readonl
     }
     const kind = reasonKind(reason);
     zones.push({ kind, reason, startLine: line, endLine: line, label: labels[kind], detail });
+  }
+  return zones;
+}
+
+/** Where a function declared at the top level of the setup runs, from its uses. */
+export type SetupFunctionZone = "browser" | "shared" | "unused";
+
+/**
+ * Zone of each function declared at the top level of the setup, before the browser continuation,
+ * by name: `browser` when every use runs in the browser (the `browser-function` zones), `shared`
+ * when some use runs during SSR or cannot be classified, `unused` without uses. A name declared
+ * twice is `shared`. The same use analysis as {@link executionZones}; best effort.
+ */
+export function setupFunctionZones(component: VirtualComponent): ReadonlyMap<string, SetupFunctionZone> {
+  const zones = new Map<string, SetupFunctionZone>();
+  let analysis: SetupFunctionAnalysis | undefined;
+  try { analysis = analyzeSetupFunctions(component, parseSfc(component.source, component.filename), continuationStart(component)); }
+  catch { return zones; }
+  for (const fn of analysis?.all ?? []) {
+    zones.set(fn.name, fn.browser ? "browser" : fn.shared || fn.browserUses.size > 0 || fn.callers.size > 0 ? "shared" : "unused");
   }
   return zones;
 }

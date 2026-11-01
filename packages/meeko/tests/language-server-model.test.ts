@@ -404,6 +404,29 @@ test("editor and CLI agree on text interpolations after entities and CRLF", asyn
   assert.deepEqual([...new Set(cli.map((item) => `${item.code}:${item.location.offset}`))], [`TS2304:${first}`, `TS2304:${second}`]);
 });
 
+test("editor and CLI keep < with & and character references inside a text interpolation", async () => {
+  const component = '<script lang="ts">const a = 1; const b = 2;</script><template><p>{a<b&&missingTight}</p><p>{true && "<b>" + missingString}</p><p>{true && `}<b>${missingTemplate}`}</p><p>{a &amp;&amp; missingAfterAmp}</p><p>{\'&lt;\' + missingAfterLt}</p><ul><li each:of="[a]" each:as="item">{item &amp;&amp; missingInRow}</li></ul><p if:when="a">{a &amp;&amp; missingGuarded}</p></template>';
+  const names = ["missingTight", "missingString", "missingTemplate", "missingAfterAmp", "missingAfterLt", "missingInRow", "missingGuarded"];
+  const model = createEditorModel(component, filename);
+  try {
+    assert.deepEqual(model.service.getSyntacticDiagnostics(model.virtualFilename).map((item) => String(item.messageText)), []);
+    const diagnostics = model.service.getSemanticDiagnostics(model.virtualFilename);
+    // Both ends of each diagnostic land on the name, after `&amp;&amp;` and `&lt;` too.
+    assert.deepEqual(
+      diagnostics.map((item) => [item.code, model.toSource(item.start ?? -1), model.toSource((item.start ?? -1) + (item.length ?? 0))]),
+      names.map((name) => [2304, component.indexOf(name), component.indexOf(name) + name.length]),
+    );
+    for (const [raw, decoded] of [["a<b&&missingTight", "a<b&&missingTight"], ["a &amp;&amp; missingAfterAmp", "a && missingAfterAmp"]] as const) {
+      const generated = model.toGenerated(component.indexOf(raw));
+      assert.notEqual(generated, undefined, raw);
+      assert.equal(model.code.slice(generated!, generated! + decoded.length), decoded);
+      assert.equal(model.toSource(generated! + decoded.length), component.indexOf(raw) + raw.length);
+    }
+  } finally { model.dispose(); }
+  const cli = await checkSource(component, filename);
+  assert.deepEqual([...new Set(cli.map((item) => `${item.code}:${item.location.offset}`))], names.map((name) => `TS2304:${component.indexOf(name)}`));
+});
+
 test("editor maps unquoted directive values like the compiler", async () => {
   const component = '<script lang="ts">const items = [1, 2]; const run = (event: KeyboardEvent): void => { void event.key; };</script><template><ul><li each:of=items each:as="item" each:key=item bind:title=missingTitle>{item}</li></ul><button on:click=run>Run</button></template>';
   const model = createEditorModel(component, filename);
@@ -452,4 +475,22 @@ function bad(id: string): void { void id; }
       ["Child", parent.indexOf("<Child", parent.indexOf("on:save")) + 1, parent.indexOf("</Child>") + 2],
     ]);
   } finally { editor.dispose(); }
+});
+
+test("editor and CLI read a < inside a text interpolation as part of the expression", async () => {
+  const component = '<script lang="ts">import { signal } from "@meekojs/meeko"; const a = signal(1); const b = 2;</script><template><p>{a.value<b}</p><p>{a.value < missingRight}</p><p>{"<b>" + missingInString}</p></template>';
+  const missing = component.indexOf("missingRight");
+  const inString = component.indexOf("missingInString");
+  const model = createEditorModel(component, filename);
+  try {
+    assert.deepEqual(model.service.getSyntacticDiagnostics(model.virtualFilename).map((item) => String(item.messageText)), []);
+    const diagnostics = model.service.getSemanticDiagnostics(model.virtualFilename);
+    assert.deepEqual(diagnostics.map((item) => [item.code, model.toSource(item.start ?? -1)]), [[2304, missing], [2304, inString]]);
+    const value = "a.value<b";
+    const generated = model.toGenerated(component.indexOf(value));
+    assert.notEqual(generated, undefined);
+    assert.equal(model.code.slice(generated!, generated! + value.length), value);
+  } finally { model.dispose(); }
+  const cli = await checkSource(component, filename);
+  assert.deepEqual([...new Set(cli.map((item) => `${item.code}:${item.location.offset}`))], [`TS2304:${missing}`, `TS2304:${inString}`]);
 });

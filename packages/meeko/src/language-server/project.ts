@@ -12,6 +12,7 @@ import { generatedServicesDeclaration, projectDeclarationFiles } from "../compil
 import { projectRoot } from "../compiler/project-root";
 import { resolveProjectAliases, resolveProjectAliasesSync } from "../framework/aliases";
 import { readMeekoConfigSync, readThemeOptionSync, resolveConfigSources } from "../framework/config";
+import { writeConfigTypesSync } from "../framework/config-types";
 import { generatedThemeLines } from "../framework/generate";
 import { resolveThemeConfig } from "../shared/theme";
 import { emptyAppIndex, loadAppIndex } from "./app-index";
@@ -421,7 +422,8 @@ export class MeekoProject {
       affected = true;
       const name = basename(path);
       if (/^tsconfig.*\.json$/.test(name) || /^meeko\.config\.[cm]?[jt]s$/.test(name)) configuration = true;
-      if (/\.(?:meeko|[cm]?ts)$/.test(name) && !/[\\/]\.meeko[\\/]/.test(path)) sources = true;
+      // Not the generated files of a `.meeko/` inside the project; the folders above it do not count.
+      if (/\.(?:meeko|[cm]?ts)$/.test(name) && !relative(this.root, path).split(/[\\/]/).slice(0, -1).includes(".meeko")) sources = true;
       if (name.endsWith(".meeko")) {
         const entry = this.entries.get(pathKey(path));
         if (entry && !entry.open) this.reloadFromDisk(entry);
@@ -556,6 +558,7 @@ export class MeekoProject {
   private async reloadRegistry(): Promise<void> {
     let registry: readonly AutoImport[] = [];
     this.configError = undefined;
+    if (this.options.trusted) this.writeConfigTypes();
     if (this.options.trusted) {
       try { registry = await discoverAutoImports(this.root); }
       catch (error) {
@@ -587,6 +590,17 @@ export class MeekoProject {
     this.moduleCache = this.createModuleCache();
     this.specifierCache?.clear();
     this.invalidatedFiles = new Set(this.resolvedFiles);
+  }
+
+  /**
+   * `.meeko/types/config.d.ts` and `.meeko/tsconfig.config.json` from the strings of `modules`,
+   * read without running anything: TypeScript types the keys of the modules in `meeko.config.ts`
+   * also before the first `meeko dev` or `meeko check`. Only in a trusted workspace, the one
+   * whose modules already write under `.meeko/`.
+   */
+  private writeConfigTypes(): void {
+    try { writeConfigTypesSync(this.root, readMeekoConfigSync(this.root)); }
+    catch (error) { this.options.log?.(`${this.root}: no se pudieron escribir los tipos de meeko.config: ${error instanceof Error ? error.message : String(error)}`); }
   }
 
   /** Como `meeko check`: la configuración se ejecuta sólo en un workspace de confianza. */
