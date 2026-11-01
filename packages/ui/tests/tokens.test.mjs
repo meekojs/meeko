@@ -178,7 +178,7 @@ test('only the deprecated block mentions --meeko-ui-*', async () => {
 test('every --ui-* variable a component sheet reads is declared', async () => {
 	const declared = new Set([...Object.keys(palette.light), ...Object.keys(palette.dark), ...Object.keys(declarations(tokensCss))])
 	// Hooks a consumer can set: they always go with a fallback in the sheets.
-	const local = new Set(['--ui-button-color', '--ui-container-size', '--ui-container-padding', '--ui-container-max-width', '--ui-container-gutter', '--ui-card-shadow', '--ui-link-card-padding', '--ui-modal-depth'])
+	const local = new Set(['--ui-button-color', '--ui-container-size', '--ui-container-padding', '--ui-container-max-width', '--ui-container-gutter', '--ui-card-shadow', '--ui-link-card-padding', '--ui-modal-depth', '--ui-markdown-editor-height'])
 	for (const [name, css] of await componentSheets()) for (const [, variable] of css.matchAll(/var\((--ui-[\w-]+)/g)) assert.ok(declared.has(variable) || local.has(variable), `${name} reads ${variable}, which nothing declares`)
 })
 

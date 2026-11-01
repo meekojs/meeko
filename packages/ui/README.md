@@ -498,6 +498,61 @@ Los estilos se procesan con el PostCSS de Meeko. El contenedor admite foco y des
 
 El snippet `header` sustituye por completo `title` y `description`; proporciona un encabezado con el nivel adecuado para tu página si lo usas. El pie aparece sólo al suministrar `footer`. Sin título, descripción ni snippet de cabecera, no se genera el `<header>`. El contenedor conserva su semántica de sección y no añade comportamiento de botón: utiliza enlaces y botones en su contenido para las acciones. La guía `/cards` muestra las variantes y la composición.
 
+## Editor de Markdown
+
+`<UIMarkdownEditor>` edita Markdown con [Crepe](https://milkdown.dev) y un modo código. Va en su propio módulo, `@meekojs/ui/editor`, porque Crepe pesa 347 KB de JS en gzip: el registro de componentes de Meeko genera un `import()` por cada componente, y dentro del módulo principal sería un chunk de cualquier web.
+
+```sh
+pnpm add @milkdown/crepe @milkdown/kit @codemirror/language @codemirror/view @codemirror/lang-javascript @codemirror/lang-html @codemirror/lang-css @codemirror/lang-json @lezer/highlight
+```
+
+```ts
+// meeko.config.ts
+export default defineMeekoConfig({
+	modules: ['@meekojs/ui', '@meekojs/ui/editor'],
+})
+```
+
+```html
+<UIMarkdownEditor
+	label="Contenido"
+	model="markdown"
+	model:mode="mode"
+/>
+```
+
+Son dependencias opcionales de `@meekojs/ui`: una aplicación sin el módulo no las instala. El JavaScript de Crepe se carga con `import()` en el navegador, al montar el componente, y nunca entra en el bundle del servidor. Hasta entonces, el HTML del servidor pinta un marcador con la altura definitiva.
+
+| Prop          | Tipo      | Para qué                                                        |
+| ------------- | --------- | --------------------------------------------------------------- |
+| `label`       | `string`  | Etiqueta visible y nombre accesible. Obligatoria.               |
+| `id`          | `string`  | `id` del área de texto del modo código.                         |
+| `readonly`    | `boolean` | Se puede leer y seleccionar, pero no cambiar.                   |
+| `disabled`    | `boolean` | Como `readonly`, y además se ve deshabilitado.                  |
+| `describedBy` | `string`  | `id` del texto que lo describe.                                 |
+| `placeholder` | `string`  | Texto del documento vacío, si no se quiere el de `ui.messages`. |
+| `class`       | `string`  | Clase de la raíz.                                               |
+
+- **Modelos:** `model` es el texto y `model:mode`, `'visual'` o `'code'`. Si el padre escribe otro texto, el editor vuelve a empezar con él.
+- **Snippet:** `tools` va en la barra, entre la etiqueta y el conmutador.
+- **Altura:** `--ui-markdown-editor-height`. El contenido se desplaza dentro.
+- **Textos:** `ui.messages.<idioma>.markdownEditor`, también los de los menús de Crepe.
+
+### Guardado por bloques
+
+Crepe serializa un documento en su propio formato, así que guardar su salida reescribiría tablas y líneas en blanco que nadie tocó. Por eso el modelo sólo cambia con una edición real, y entonces conserva los bytes del original fuera de los bloques editados:
+
+- Sin editar, `model` sigue siendo el texto recibido, byte a byte. Escribir y deshacer, o pulsar Intro sin escribir, también.
+- Un bloque editado sale de Crepe. Una lista es un solo bloque: cambiar una palabra en una lista larga la reescribe entera.
+- Los saltos CRLF pasan a LF sólo si se edita el documento.
+- El frontmatter nunca llega a Crepe: se conserva tal cual.
+- El evento espera a una pausa al escribir, y se adelanta al salir del editor, antes de que un clic en «guardar» lea el modelo.
+- Si un documento no casa bloque a bloque con su serialización, se abre en modo código con un aviso. Ningún documento de `docs/` lo necesita.
+
+Los bloques de código conservan su `meta` (` ```ts bad `), también al copiarlos. Las imágenes pegadas se ignoran: sin destino, se guardarían como una dirección `blob:` de la pestaña. No hay LaTeX ni bloque de imagen.
+
+`splitMarkdownSource` y `createMarkdownSplicer` se exportan de `@meekojs/ui/editor`, sin Crepe, para quien los necesite aparte.
+
 ## Desarrollo
 
 Desde la raíz del monorepo:

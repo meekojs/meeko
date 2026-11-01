@@ -112,6 +112,14 @@ El módulo lo hace todo con `modules: ['@meekojs/ui']`:
 
 Una app no debe escribir su propio reset ni su `body`: borra los suyos al migrar.
 
+## Editor de Markdown
+
+`<UIMarkdownEditor>`, de `@meekojs/ui/editor`, pinta Crepe con los tokens. `src/app/styles/markdown-editor.css` asigna cada `--crepe-*` a un token de uso y sustituye a `classic.css` y `classic-dark.css`: `data-theme` cambia los colores sin reglas por tema, también en el CodeMirror de los bloques de código. No importes esos temas ni `theme/common/style.css`, que arrastra KaTeX y sus fuentes.
+
+- **Títulos:** los tamaños de esta guía, no los de Crepe, que son de una página entera.
+- **Lo que flota** (barra de formato, menú `/`, enlaces, lenguajes): `--ui-color-surface-raised`, con borde `--ui-color-border`.
+- **Altura:** fija desde el primer pintado, con `--ui-markdown-editor-height`, para que no salte nada al llegar Crepe.
+
 ## Personalizar
 
 Para una marca propia, `ui.tokens` o una hoja de la app:

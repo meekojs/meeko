@@ -1,0 +1,264 @@
+/*
+ * <UIMarkdownEditor>: its shell and the theme of Crepe, in the sheet of `@meekojs/ui/editor`. Crepe's
+ * own sheets arrive later, with its chunk, so a rule here that must win over one of them is more
+ * specific. Theme by tokens only: data-theme changes them, without classic.css or classic-dark.css.
+ */
+.ui-markdown-editor {
+	--crepe-color-background: var(--ui-color-bg);
+	--crepe-color-on-background: var(--ui-color-text);
+	--crepe-color-surface: var(--ui-color-surface-raised);
+	--crepe-color-surface-low: var(--ui-color-control);
+	--crepe-color-on-surface: var(--ui-color-text);
+	--crepe-color-on-surface-variant: var(--ui-color-text-soft);
+	/* Crepe paints text and icons with it, so it needs the contrast of the soft text. */
+	--crepe-color-outline: var(--ui-color-text-soft);
+	--crepe-color-primary: var(--ui-color-primary-text);
+	--crepe-color-secondary: var(--ui-color-primary-soft);
+	--crepe-color-on-secondary: var(--ui-color-primary-text);
+	--crepe-color-inverse: var(--ui-color-text);
+	--crepe-color-on-inverse: var(--ui-color-bg);
+	--crepe-color-inline-code: var(--ui-color-primary-text);
+	--crepe-color-error: var(--ui-color-danger-text);
+	--crepe-color-hover: var(--ui-color-control-hover);
+	--crepe-color-selected: var(--ui-color-selection);
+	--crepe-color-inline-area: var(--ui-color-control-hover);
+	--crepe-base-font-size: var(--ui-font-size-lg);
+	--crepe-font-title: var(--ui-font-sans);
+	--crepe-font-default: var(--ui-font-sans);
+	--crepe-font-code: var(--ui-font-mono);
+	--crepe-shadow-1: var(--ui-shadow-sm);
+	--crepe-shadow-2: var(--ui-shadow-md);
+	display: flex;
+	flex-direction: column;
+	gap: var(--ui-space-2);
+	min-width: 0;
+	color: var(--ui-color-text);
+	font-family: var(--ui-font-sans);
+}
+.ui-markdown-editor[data-disabled] {
+	opacity: var(--ui-opacity-disabled);
+}
+.ui-markdown-editor[data-disabled] .ui-markdown-editor-surface {
+	cursor: not-allowed;
+}
+
+.ui-markdown-editor-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--ui-space-2) var(--ui-space-3);
+	min-height: var(--ui-control-height-sm);
+}
+.ui-markdown-editor-label {
+	font-weight: var(--ui-font-weight-medium);
+	font-size: var(--ui-font-size-md);
+	line-height: var(--ui-line-height-snug);
+}
+.ui-markdown-editor-tools {
+	display: flex;
+	align-items: center;
+	gap: var(--ui-space-2);
+	color: var(--ui-color-text-soft);
+	font-size: var(--ui-font-size-xs);
+}
+.ui-markdown-editor-modes {
+	display: inline-flex;
+	gap: var(--ui-space-0-5);
+	margin-inline-start: auto;
+	border-radius: var(--ui-radius-md);
+	background: var(--ui-color-control);
+	padding: var(--ui-space-0-5);
+}
+.ui-markdown-editor-modes button {
+	transition:
+		background-color var(--ui-duration-fast),
+		color var(--ui-duration-fast);
+	cursor: pointer;
+	border: 0;
+	border-radius: var(--ui-radius-sm);
+	background: transparent;
+	padding: 0 var(--ui-space-2);
+	min-height: calc(var(--ui-control-height-sm) - var(--ui-space-1));
+	color: var(--ui-color-text-soft);
+	font-weight: var(--ui-font-weight-medium);
+	font-size: var(--ui-font-size-xs);
+	font-family: inherit;
+}
+.ui-markdown-editor-modes button:hover {
+	color: var(--ui-color-text);
+}
+.ui-markdown-editor-modes button[aria-pressed='true'] {
+	background: var(--ui-color-bg);
+	color: var(--ui-color-text);
+}
+.ui-markdown-editor-modes button:focus-visible {
+	outline: var(--ui-focus-ring);
+	outline-offset: var(--ui-focus-ring-offset);
+}
+.ui-markdown-editor-notice {
+	margin: 0;
+	border-radius: var(--ui-radius-md);
+	background: var(--ui-color-warning-soft);
+	padding: var(--ui-space-2) var(--ui-space-3);
+	color: var(--ui-color-warning-text);
+	font-size: var(--ui-font-size-sm);
+}
+
+/* The height is set from the first paint: the marker, Crepe and the text area scroll inside it. */
+.ui-markdown-editor-surface {
+	position: relative;
+	box-sizing: border-box;
+	border: var(--ui-border-width) solid var(--ui-color-border-strong);
+	border-radius: var(--ui-radius-lg);
+	background: var(--ui-color-bg);
+	height: var(--ui-markdown-editor-height, calc(var(--ui-space-24) * 5));
+	overflow: hidden;
+}
+.ui-markdown-editor-surface:focus-within {
+	outline: var(--ui-focus-ring);
+	outline-offset: var(--ui-focus-ring-offset);
+}
+.ui-markdown-editor-marker {
+	display: grid;
+	align-content: start;
+	gap: var(--ui-space-3);
+	padding: var(--ui-space-6);
+}
+.ui-markdown-editor-marker-text {
+	color: var(--ui-color-text-soft);
+	font-size: var(--ui-font-size-sm);
+}
+.ui-markdown-editor-marker-line {
+	border-radius: var(--ui-radius-xs);
+	background: var(--ui-color-control);
+	height: var(--ui-space-3);
+}
+.ui-markdown-editor-marker-line:nth-of-type(3) {
+	width: 80%;
+}
+.ui-markdown-editor-marker-line:nth-of-type(4) {
+	width: 60%;
+}
+.ui-markdown-editor-host {
+	height: 100%;
+	overflow: auto;
+	overscroll-behavior: contain;
+}
+.ui-markdown-editor-host[hidden] {
+	display: none;
+}
+.ui-markdown-editor-code {
+	display: block;
+	box-sizing: border-box;
+	outline: 0;
+	border: 0;
+	background: var(--ui-color-bg);
+	padding: var(--ui-space-4);
+	width: 100%;
+	height: 100%;
+	resize: none;
+	color: var(--ui-color-text);
+	font-size: var(--ui-font-size-sm);
+	line-height: var(--ui-line-height-relaxed);
+	font-family: var(--ui-font-mono);
+	font-variant-ligatures: none;
+	tab-size: 2;
+}
+
+/* Crepe -------------------------------------------------------------------------------------- */
+
+/* Its 120px of side padding are for a whole page; the block handle lives in the one on the left. A
+   click under the last block still lands in the editor. */
+.ui-markdown-editor .milkdown {
+	display: flex;
+	flex-direction: column;
+	min-height: 100%;
+}
+.ui-markdown-editor .milkdown .ProseMirror {
+	flex: 1;
+	padding: var(--ui-space-6) var(--ui-space-6) var(--ui-space-8) var(--ui-space-12);
+}
+/* Crepe's headings are for a page of its own, in a regular weight: these are the sizes of the design. */
+.ui-markdown-editor .milkdown .ProseMirror :is(h1, h2, h3, h4, h5, h6) {
+	margin-bottom: var(--ui-space-1);
+	font-weight: var(--ui-font-weight-semibold);
+	line-height: var(--ui-line-height-snug);
+	letter-spacing: var(--ui-tracking-tight);
+}
+.ui-markdown-editor .milkdown .ProseMirror h1 {
+	margin-top: var(--ui-space-6);
+	font-size: var(--ui-font-size-3xl);
+	line-height: var(--ui-line-height-tight);
+}
+.ui-markdown-editor .milkdown .ProseMirror h2 {
+	margin-top: var(--ui-space-6);
+	font-size: var(--ui-font-size-2xl);
+}
+.ui-markdown-editor .milkdown .ProseMirror h3 {
+	margin-top: var(--ui-space-5);
+	font-size: var(--ui-font-size-xl);
+}
+.ui-markdown-editor .milkdown .ProseMirror h4 {
+	margin-top: var(--ui-space-4);
+	font-size: var(--ui-font-size-lg);
+}
+.ui-markdown-editor .milkdown .ProseMirror :is(h5, h6) {
+	margin-top: var(--ui-space-3);
+	font-size: var(--ui-font-size-md);
+}
+/* The band above a block of code says its language, as in the published page, instead of staying
+   empty until the pointer passes over it. */
+.ui-markdown-editor .milkdown .milkdown-code-block {
+	margin-block: var(--ui-space-3);
+	border: var(--ui-border-width) solid var(--ui-color-border);
+	border-radius: var(--ui-radius-md);
+	padding: var(--ui-space-1) var(--ui-space-3) var(--ui-space-3);
+}
+.ui-markdown-editor .milkdown .milkdown-code-block .tools .language-button {
+	opacity: initial;
+	background: transparent;
+	color: var(--ui-color-text-soft);
+	font-size: var(--ui-font-size-xs);
+}
+/* What floats over the text has the edge of a popover: in dark a shadow alone does not separate it. */
+.ui-markdown-editor .milkdown :is(.milkdown-toolbar, .milkdown-slash-menu, .milkdown-link-preview > .link-preview, .milkdown-link-edit > .link-edit, .language-picker > .list-wrapper) {
+	outline: var(--ui-border-width) solid var(--ui-color-border);
+	outline-offset: calc(var(--ui-border-width) * -1);
+}
+/* Crepe uses inline-block: a long inline code breaks the paragraph as if it were a block. */
+.ui-markdown-editor .milkdown .ProseMirror code {
+	display: inline;
+	box-decoration-break: clone;
+	-webkit-box-decoration-break: clone;
+}
+.ui-markdown-editor .milkdown .ProseMirror pre code,
+.ui-markdown-editor .milkdown .cm-editor code {
+	display: block;
+}
+/* The HTML of a document is shown as data, not as the text of the author. */
+.ui-markdown-editor .milkdown span[data-type='html'] {
+	color: var(--ui-color-text-soft);
+	font-size: var(--ui-font-size-sm);
+	font-family: var(--crepe-font-code);
+}
+/* A wide table scrolls inside the editor. */
+.ui-markdown-editor .milkdown .milkdown-table-block {
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+@media (max-width: 40rem) {
+	.ui-markdown-editor .milkdown .ProseMirror {
+		padding: var(--ui-space-4);
+	}
+	/* Crepe's fixed layout splits the width in equal parts and cuts the words of each column. */
+	.ui-markdown-editor .milkdown .milkdown-table-block table {
+		min-width: calc(var(--ui-space-24) * 6);
+		table-layout: auto;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.ui-markdown-editor-modes button {
+		transition: none;
+	}
+}

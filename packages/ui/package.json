@@ -17,6 +17,14 @@
 		"./runtime": {
 			"types": "./dist/runtime.d.ts",
 			"default": "./dist/runtime.js"
+		},
+		"./editor": {
+			"types": "./dist/editor/index.d.ts",
+			"default": "./dist/editor/index.js"
+		},
+		"./editor/module": {
+			"types": "./dist/editor/module.d.ts",
+			"default": "./dist/editor/module.js"
 		}
 	},
 	"files": [
@@ -32,9 +40,18 @@
 		"test:e2e": "pnpm run build && pnpm -F meeko-ui-site build && node --test --test-concurrency=1 tests/*.e2e.mjs"
 	},
 	"devDependencies": {
+		"@codemirror/lang-css": "^6.3.1",
+		"@codemirror/lang-html": "^6.4.12",
+		"@codemirror/lang-javascript": "^6.2.5",
+		"@codemirror/lang-json": "^6.0.2",
+		"@codemirror/language": "^6.13.1",
+		"@codemirror/view": "^6.43.15",
+		"@lezer/highlight": "^1.2.5",
 		"@meekojs/eslint-plugin": "workspace:*",
 		"@meekojs/meeko": "workspace:*",
 		"@meekojs/prettier-plugin": "workspace:*",
+		"@milkdown/crepe": "7.23.0",
+		"@milkdown/kit": "7.23.0",
 		"@types/node": "^24.0.0",
 		"eslint": "10.13.0",
 		"jiti": "2.7.0",
@@ -42,9 +59,51 @@
 		"prettier": "^3.9.10",
 		"prettier-plugin-css-order": "^2.2.0",
 		"prettier-plugin-packagejson": "^3.0.3",
-		"typescript": "7.0.2"
+		"remark-gfm": "^4.0.1",
+		"remark-parse": "^11.0.0",
+		"remark-stringify": "^11.0.0",
+		"typescript": "7.0.2",
+		"unified": "^11.0.5"
 	},
 	"peerDependencies": {
-		"@meekojs/meeko": ">=1.7 <2"
+		"@codemirror/lang-css": "^6.3.1",
+		"@codemirror/lang-html": "^6.4.12",
+		"@codemirror/lang-javascript": "^6.2.5",
+		"@codemirror/lang-json": "^6.0.2",
+		"@codemirror/language": "^6.13.1",
+		"@codemirror/view": "^6.43.15",
+		"@lezer/highlight": "^1.2.5",
+		"@meekojs/meeko": ">=1.7 <2",
+		"@milkdown/crepe": "^7.23.0",
+		"@milkdown/kit": "^7.23.0"
+	},
+	"peerDependenciesMeta": {
+		"@codemirror/lang-css": {
+			"optional": true
+		},
+		"@codemirror/lang-html": {
+			"optional": true
+		},
+		"@codemirror/lang-javascript": {
+			"optional": true
+		},
+		"@codemirror/lang-json": {
+			"optional": true
+		},
+		"@codemirror/language": {
+			"optional": true
+		},
+		"@codemirror/view": {
+			"optional": true
+		},
+		"@lezer/highlight": {
+			"optional": true
+		},
+		"@milkdown/crepe": {
+			"optional": true
+		},
+		"@milkdown/kit": {
+			"optional": true
+		}
 	}
 }

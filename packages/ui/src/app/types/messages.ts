@@ -150,6 +150,43 @@ export interface UIMessages {
 		/** Texto para lectores de pantalla ante una línea eliminada, si no se pasa `lineLabels.remove`. */
 		readonly removed: string
 	}
+	/** `<UIMarkdownEditor>`, de `@meekojs/ui/editor`, con los menús de Crepe. */
+	readonly markdownEditor: {
+		/** Mientras llega el editor, en el marcador del primer pintado. */
+		readonly loading: string
+		/** `aria-label` del conmutador. */
+		readonly mode: string
+		readonly visual: string
+		readonly code: string
+		/** Documento que el modo visual no podría guardar sin reescribir bloques ajenos. */
+		readonly unsafe: string
+		/** El chunk del editor no se pudo cargar. */
+		readonly failed: string
+		/** Documento vacío, si no se pasa `placeholder`. */
+		readonly placeholder: string
+		readonly groupText: string
+		readonly text: string
+		/** Título de cada nivel del menú: se le añade el número. */
+		readonly heading: string
+		readonly quote: string
+		readonly divider: string
+		readonly groupList: string
+		readonly bulletList: string
+		readonly orderedList: string
+		readonly taskList: string
+		readonly groupAdvanced: string
+		readonly codeBlock: string
+		readonly table: string
+		readonly bold: string
+		readonly italic: string
+		readonly strikethrough: string
+		readonly inlineCode: string
+		readonly link: string
+		readonly linkPlaceholder: string
+		readonly languageSearch: string
+		readonly languageEmpty: string
+		readonly copy: string
+	}
 }
 
 /**
