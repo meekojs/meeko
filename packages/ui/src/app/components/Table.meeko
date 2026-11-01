@@ -1,22 +1,10 @@
 <script lang="ts" generic="T extends object">
 	import type { Snippet } from '@meekojs/meeko'
-	import type { TableCellValue, TableColumn, TableRowKey } from '@meekojs/ui/runtime'
+	import type { TableCellValue, TableColumn, UITableProps } from '@meekojs/ui/runtime'
 
 	import { uiMessages } from '../utils/messages'
 
-	interface Props<T extends object> {
-		rows: readonly T[]
-		columns: readonly TableColumn<T>[]
-		rowKey: TableRowKey<T>
-		layout?: 'grid' | 'native'
-		gridColumns?: string
-		caption?: string
-		hideHeader?: boolean
-		emptyText?: string
-		class?: string
-	}
-
-	const props = defineProps<Props<T>>({ layout: 'native', hideHeader: false })
+	const props = defineProps<UITableProps<T>>({ layout: 'native', hideHeader: false })
 
 	// `cell-<clave>` y `header-<clave>` salen de las claves de T: `value` tiene el tipo de esa columna.
 	const snippets = defineSnippets<
@@ -72,6 +60,7 @@
 			role="table"
 			bind:class="['meeko-ui-table', props.class].filter(Boolean).join(' ')"
 			bind:data-layout="props.layout"
+			bind:data-density="props.density ?? 'normal'"
 			bind:style="'--table-columns: ' + (props.gridColumns ?? 'repeat(' + Math.max(1, props.columns.length) + ', minmax(var(--ui-table-column-min), 1fr))')"
 		>
 			<caption
@@ -91,6 +80,7 @@
 						each:key="column.key"
 						role="columnheader"
 						scope="col"
+						bind:data-numeric="column.numeric ? '' : undefined"
 					>
 						<render
 							if:when="columnHeader(column)"
@@ -114,11 +104,14 @@
 					each:key="keyOf(row)"
 					role="row"
 				>
-					<td
+					<component
 						each:of="props.columns"
 						each:as="column"
 						each:key="column.key"
-						role="cell"
+						is="column.rowHeader ? 'th' : 'td'"
+						bind:role="column.rowHeader ? 'rowheader' : 'cell'"
+						bind:scope="column.rowHeader ? 'row' : undefined"
+						bind:data-numeric="column.numeric ? '' : undefined"
 					>
 						<render
 							if:when="columnCell(column)"
@@ -131,7 +124,7 @@
 							args="row, column, row[column.key], _index"
 						/>
 						<span if:when="!columnCell(column) && !snippets.cell">{cellText(row, column)}</span>
-					</td>
+					</component>
 				</tr>
 				<tr
 					if:when="props.rows.length === 0"

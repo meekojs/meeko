@@ -1,32 +1,20 @@
 <script lang="ts">
-	interface Props {
-		id?: string
-		name?: string
-		type?: 'text' | 'email' | 'password' | 'search' | 'url' | 'tel'
-		placeholder?: string
-		required?: boolean
-		disabled?: boolean
-		invalid?: boolean
-		describedBy?: string
-		class?: string
-	}
+	import type { UIInputProps } from '../types/forms'
 
-	const props = defineProps<Props>()
+	const { invalid, describedBy, spellcheck, class: className, type = 'text', ...rest } = defineProps<UIInputProps>()
 
 	const value = defineModel<string>({ default: '' })
+	/* eslint-disable meeko/attributes-order */
 </script>
 
 <template>
 	<input
-		bind:id="props.id"
-		bind:name="props.name"
-		bind:type="props.type ?? 'text'"
-		bind:placeholder="props.placeholder"
-		bind:required="props.required"
-		bind:disabled="props.disabled"
-		bind:aria-invalid="props.invalid ? 'true' : undefined"
-		bind:aria-describedby="props.describedBy"
-		bind:class="['meeko-ui-input', props.class].filter(Boolean).join(' ')"
+		bind="rest"
+		bind:spellcheck="spellcheck === undefined ? undefined : String(spellcheck)"
+		bind:type="type"
+		bind:aria-invalid="invalid ? 'true' : undefined"
+		bind:aria-describedby="describedBy ?? rest['aria-describedby']"
+		bind:class="['meeko-ui-input', className].filter(Boolean).join(' ')"
 		bind:value="value.value"
 		on:input="(event) => (value.value = event.currentTarget.value)"
 	/>

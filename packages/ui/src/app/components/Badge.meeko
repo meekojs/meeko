@@ -1,10 +1,7 @@
 <script lang="ts">
-	interface Props {
-		tone?: 'neutral' | 'accent' | 'danger'
-		class?: string
-	}
+	import type { UIBadgeProps } from '../types/forms'
 
-	const props = defineProps<Props>({ tone: 'neutral' })
+	const props = defineProps<UIBadgeProps>({ tone: 'neutral' })
 
 	const snippets = defineSnippets<{ default: [] }>()
 </script>
@@ -14,6 +11,11 @@
 		bind:class="['meeko-ui-badge', props.class].filter(Boolean).join(' ')"
 		bind:data-tone="props.tone"
 	>
+		<span
+			if:when="props.dot"
+			class="meeko-ui-badge-dot"
+			aria-hidden="true"
+		/>
 		<render snippet="snippets.default" />
 	</span>
 </template>

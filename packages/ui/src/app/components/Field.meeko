@@ -1,14 +1,7 @@
 <script lang="ts">
-	interface Props {
-		id: string
-		label: string
-		description?: string
-		error?: string
-		required?: boolean
-		class?: string
-	}
+	import type { UIFieldProps } from '../types/forms'
 
-	const props = defineProps<Props>()
+	const props = defineProps<UIFieldProps>()
 
 	const snippets = defineSnippets<{ default: [id: string, describedBy: string | undefined] }>()
 </script>
@@ -29,7 +22,7 @@
 		</label>
 		<render
 			snippet="snippets.default"
-			args="props.id, props.error ? props.id + '-error' : props.description ? props.id + '-description' : undefined"
+			args="props.id, [props.error ? props.id + '-error' : props.description ? props.id + '-description' : undefined, props.hint ? props.id + '-hint' : undefined, props.counter !== undefined ? props.id + '-counter' : undefined].filter(Boolean).join(' ') || undefined"
 		/>
 		<p
 			if:when="props.description && !props.error"
@@ -45,6 +38,20 @@
 			bind:id="props.id + '-error'"
 		>
 			{props.error}
+		</p>
+		<p
+			if:when="props.hint"
+			class="meeko-ui-field-description"
+			bind:id="props.id + '-hint'"
+		>
+			{props.hint}
+		</p>
+		<p
+			if:when="props.counter !== undefined"
+			class="meeko-ui-field-description meeko-ui-field-counter"
+			bind:id="props.id + '-counter'"
+		>
+			{props.counter}
 		</p>
 	</div>
 </template>

@@ -86,3 +86,9 @@ link({ href: 'https://example.com/en', hreflang: 'en', referrerpolicy: 'no-refer
 link({ href: '/', resolve: false })
 // @ts-expect-error Not an attribute of <a>.
 link({ to: '/', autocomplete: 'off' })
+
+button({ type: 'submit', name: 'intent', value: 'save', form: 'editor', loading: true, tone: 'danger' })
+button({ iconOnly: true, ariaLabel: 'Close' })
+button({ iconOnly: true, 'aria-label': 'Close' })
+// @ts-expect-error An icon-only action requires an accessible name.
+button({ iconOnly: true })

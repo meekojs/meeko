@@ -124,6 +124,12 @@ interface UIButtonAnchorProps extends UILinkTargetProps, UIAnchorAttributes {
 
 /** `<UIButton>` sin `to` ni `href`: un `<button>` nativo. */
 interface UIButtonNativeProps extends NoAnchorAttributes {
+	/** Nombre del submitter enviado por el formulario. */
+	readonly name?: string
+	/** Valor del submitter. */
+	readonly value?: string
+	/** ID del formulario asociado. */
+	readonly form?: string
 	/** Comportamiento en un formulario; `"button"` por defecto, así que nunca envía sin pedirlo. */
 	readonly type?: 'button' | 'submit' | 'reset'
 	/** Desactiva el botón nativo: no recibe foco ni clics. */
@@ -157,7 +163,18 @@ interface UIButtonNativeProps extends NoAnchorAttributes {
  * <UIButton type="submit" bind:disabled="saving.value" on:click="save">Guardar</UIButton>
  * ```
  */
-export type UIButtonProps = (UIButtonAnchorProps | UIButtonNativeProps | UIButtonRouteProps) & UIActionAppearance & UIForwardedAttributes
+export type UIButtonProps = (UIButtonAnchorProps | UIButtonNativeProps | UIButtonRouteProps) &
+	UIActionAppearance &
+	UIForwardedAttributes & {
+		/** Estado semántico de una acción destructiva. */
+		readonly tone?: 'neutral' | 'danger'
+		/** Ocupado: anuncia el estado y bloquea la activación. Conserva el texto visible. */
+		readonly loading?: boolean
+		/** Contenido sólo de icono: requiere un nombre accesible. */
+		readonly iconOnly?: boolean
+		/** Nombre accesible, necesario para iconOnly. */
+		readonly ariaLabel?: string
+	} & ({ readonly iconOnly?: false; readonly ariaLabel?: string } | { readonly iconOnly?: boolean; readonly ariaLabel: string } | { readonly iconOnly?: boolean; readonly 'aria-label': string; readonly ariaLabel?: string })
 
 /** `<UILink to>`: navega a una ruta de la aplicación con `<MeekoLink>`. */
 type UILinkRouteProps = UIRouteTarget &
