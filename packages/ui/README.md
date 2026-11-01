@@ -71,7 +71,9 @@ export default defineMeekoConfig({
 
 `UIOptions`, `UITokens` y `UIDefaults` se exportan como tipos de `@meekojs/ui`. Los defaults son por aplicación y petición SSR; no hay estado mutable global. Las props explícitas ganan sobre `ui.defaults`, y éstos sobre los valores de base. Los defaults disponibles son `button` y `link` (`variant`, `size`, `shape`), y `card` (`variant`). Sin opciones se conserva la configuración original y no se instala el plugin de defaults.
 
-`tokens` admite `accent`, `accentHover`, `onAccent`, `primary`, `primaryHover`, `onPrimary`, `accentSoft`, `accentText`, `surface`, `surfaceHover`, `text`, `textSoft`, `muted`, `border`, `borderStrong`, `danger`, `focus`, `radius`, `font`, `controlHeight`, `controlPadding`, `controlWeight` y `controlFontSize`. Cada clave se convierte a `--meeko-ui-*` con guiones. `primary` controla las acciones; `accent` puede seguir teniendo otro color para foco y estados. Si no se configura `primary`, utiliza el acento como antes. Las referencias `var(...)` siguen los temas de la aplicación sin duplicar sus colores.
+`tokens` admite `accent`, `accentHover`, `onAccent`, `primary`, `primaryHover`, `onPrimary`, `accentSoft`, `accentText`, `surface`, `surfaceHover`, `text`, `textSoft`, `muted`, `border`, `borderStrong`, `danger`, `focus`, `radius`, `font`, `controlHeight`, `controlPadding`, `controlWeight` y `controlFontSize`. Cada clave asigna tokens `--ui-*`: `primary` es `--ui-color-primary`, `text` es `--ui-color-text`, y `surface`, a la vez, las superficies y los controles. `accent`, `accentHover` y `onAccent` están deprecados: sólo llegan a sus alias `--meeko-ui-*`. Las referencias `var(...)` siguen los temas de la aplicación sin duplicar sus colores.
+
+`base: false` omite la base global de UI (véase [Personalización](#personalización)).
 
 Las opciones se validan al cargar el módulo. Los tokens se añaden a la hoja CSS de UI antes de pasar por PostCSS; no se generan estilos inline ni archivos en `node_modules`. Las hojas de la aplicación se cargan después y pueden sobrescribirlos.
 
@@ -190,7 +192,7 @@ Los tipos `UIMessages` y `UIMessageOverrides` se exportan desde `@meekojs/ui`. U
 
 Con una raíz de 16px, `4k` admite hasta 3840px CSS. Siempre respeta el ancho del padre y se centra en pantallas mayores; `full` permite ocupar todo el espacio disponible. Para lectura o formularios usa un límite menor, o anida un contenedor con `gutter="none"`. El componente no recorta el contenido ni evita el scroll de sus hijos.
 
-Puedes sobrescribir `--meeko-ui-container-max-width` y `--meeko-ui-container-gutter` desde una clase. Los tipos `UIContainerSize`, `UIContainerGutter` y `UIContainerTag` se exportan desde `@meekojs/ui`. La web pública usa Container en su estructura y documenta su API en `/container`.
+Puedes sobrescribir `--ui-container-max-width` y `--ui-container-gutter` desde una clase del propio contenedor. Los tipos `UIContainerSize`, `UIContainerGutter` y `UIContainerTag` se exportan desde `@meekojs/ui`. La web pública usa Container en su estructura y documenta su API en `/container`.
 
 ### Controles básicos
 
@@ -267,22 +269,24 @@ Desde UI 0.2, `UIPopover`, `UISelect` y `UIThemeToggle` son componentes del mód
 
 ## Personalización
 
-Las hojas del módulo se cargan antes de `app/styles/main.css`. Sobrescribe las variables CSS desde esa hoja de la aplicación:
+[`DESIGN.md`](DESIGN.md) es el contrato visual: qué token usar para cada cosa, tamaños, tipografía y estados. Las hojas del módulo se cargan antes de `app/styles/main.css`. Sobrescribe las variables CSS desde esa hoja de la aplicación:
 
 ```css
 :root {
-	--meeko-ui-accent: #6750a4;
-	--meeko-ui-accent-hover: #503d85;
-	--meeko-ui-radius: 0.75rem;
+	--ui-color-primary-9: #6750a4;
+	--ui-color-primary-10: #503d85;
+	--ui-radius-md: 0.75rem;
 }
 
 :root[data-theme='dark'] {
-	--meeko-ui-accent: #d0bcff;
-	--meeko-ui-accent-hover: #e2d3ff;
+	--ui-color-primary-9: #7c5cff;
+	--ui-color-primary-10: #8a6eff;
 }
 ```
 
-Los tokens disponibles usan el prefijo `--meeko-ui-`: `accent`, `accent-hover`, `on-accent`, `surface`, `surface-hover`, `text`, `muted`, `border`, `danger`, `focus`, `radius` y `font`. El tema oscuro usa `data-theme="dark"` en el elemento raíz. La aplicación define su layout y su tipografía general.
+El tema oscuro usa `data-theme="dark"` en el elemento raíz. Las variables `--meeko-ui-*` están deprecadas: se pueden leer, pero asignarlas ya no llega a los componentes.
+
+El módulo carga además la base global en la capa `ui-base`: reset, `body` con fondo, texto y fuente, `color-scheme`, `::selection`, barras de desplazamiento y foco. Sirve también Inter en `/_meeko-ui/fonts/`, con su `preload`, de modo que la aplicación no necesita copiar la fuente. Cualquier regla de la aplicación gana a esa capa; `ui: { base: false }` la omite por completo.
 
 ## Modales
 
@@ -401,7 +405,7 @@ El snippet `default` es obligatorio y `footer` opcional. El evento `dismiss` rec
 | `columns`     | Array de `TableColumn<T>`, obligatorio. Cada columna define `key`, `label`, y opcionalmente `format(value, row)` y `footer`.                              |
 | `rowKey`      | Propiedad de la fila cuyo valor sea `string` o `number`, o función `(row) => string \| number`. Obligatoria y única por fila para preservar su identidad. |
 | `layout`      | `native` por defecto; `grid` usa CSS subgrid y conserva el modo nativo si no está disponible.                                                             |
-| `gridColumns` | Definición CSS de columnas para grid; por defecto genera una columna `minmax(160px, 1fr)` por cada entrada de `columns`.                                  |
+| `gridColumns` | Definición CSS de columnas para grid; por defecto genera una columna `minmax(var(--ui-table-column-min), 1fr)` por cada entrada de `columns`.             |
 | `caption`     | Título visible y nombre de la región desplazable, opcional.                                                                                               |
 | `hideHeader`  | Oculta la cabecera; `false` por defecto.                                                                                                                  |
 | `emptyText`   | Mensaje cuando `rows` está vacío; por defecto, `table.empty` de [los textos](#textos-e-idiomas).                                                          |
@@ -464,7 +468,7 @@ El snippet genérico `cell` sigue sirviendo para todas las columnas a la vez:
 
 El snippet `cell` sustituye el formateador y recibe el valor original. Su valor es la unión de los tipos de campo de la fila; para un valor con el tipo de su columna usa `cell-<clave>`, `row.age` o el `format` de esa columna. Los snippets por columna requieren `@meekojs/meeko` `1.8` o posterior. No escribas `<tr>` ni `<td>` en estos snippets.
 
-Los estilos se procesan con el PostCSS de Meeko. El contenedor admite foco y desplazamiento horizontal con teclado. Puedes personalizar `--table-border`, `--table-background` y `--table-hover` mediante una clase; define las columnas con `gridColumns`. Los colores admiten `--color-border`, `--color-surface`, `--color-text` y `--color-text-muted`, con respaldo en los tokens de UI. La guía `/tables` muestra ambos layouts, formateadores, pies calculados, celdas personalizadas y estado vacío.
+Los estilos se procesan con el PostCSS de Meeko. El contenedor admite foco y desplazamiento horizontal con teclado. Puedes personalizar `--table-border`, `--table-background` y `--table-hover` mediante una clase; define las columnas con `gridColumns`. La guía `/tables` muestra ambos layouts, formateadores, pies calculados, celdas personalizadas y estado vacío.
 
 ## Cards
 
@@ -490,7 +494,7 @@ Los estilos se procesan con el PostCSS de Meeko. El contenedor admite foco y des
 | `description` | Texto opcional bajo el título.                                             |
 | `class`       | Clases adicionales sobre la sección.                                       |
 
-`outline` usa superficie y borde; `soft`, un fondo tenue sin borde visible; `solid`, el color de acento y su texto de contraste; `elevated`, superficie con sombra sin borde visible. Todas responden a los tokens y al tema de UI. `--card-padding` permite ajustar el espacio interno mediante una clase; `--meeko-ui-card-shadow` personaliza la sombra.
+`outline` usa superficie y borde; `soft`, un fondo tenue sin borde visible; `solid`, el color de acento y su texto de contraste; `elevated`, superficie con sombra sin borde visible. Todas responden a los tokens y al tema de UI. `--card-padding` permite ajustar el espacio interno mediante una clase; `--ui-card-shadow` personaliza la sombra.
 
 El snippet `header` sustituye por completo `title` y `description`; proporciona un encabezado con el nivel adecuado para tu página si lo usas. El pie aparece sólo al suministrar `footer`. Sin título, descripción ni snippet de cabecera, no se genera el `<header>`. El contenedor conserva su semántica de sección y no añade comportamiento de botón: utiliza enlaces y botones en su contenido para las acciones. La guía `/cards` muestra las variantes y la composición.
 
