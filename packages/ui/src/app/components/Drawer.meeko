@@ -1,13 +1,12 @@
 <script lang="ts">
 	// <UIDrawer>: a native modal <dialog>. `command` and `commandfor` open and close it without JavaScript
-	// where the browser has them; the handlers do the same elsewhere and keep the model in step. The
-	// platform traps the focus, closes on Escape and gives the focus back.
-	import { effect } from '@meekojs/meeko'
-
+	// where the browser has them. Once hydrated it closes as <UIModal> does, with a View Transition, so its
+	// handlers take over from the native close. The platform traps the focus and gives the focus back.
 	import type { UIDrawerProps } from '../types/navigation'
 
 	import { icons } from '../utils/icons'
 	import { uiMessages } from '../utils/messages'
+	import { mountModalDialog } from '../utils/modal-dialog'
 	import { followsLink } from '../utils/navigation'
 	import * as Icon from './internal/Icon.meeko'
 
@@ -25,11 +24,26 @@
 
 	const dialogId = (): string => props.id ?? generated
 
+	/** Through the model, which plays the exit; a `snippets.trigger` may have opened it without the model. */
+	function close(): void {
+		if (open.value) open.value = false
+		else dialog.value?.close()
+	}
+
+	function onCloseClick(event: MouseEvent): void {
+		// The native `command="close"` would close it at once, without its exit.
+		event.preventDefault()
+		close()
+	}
+
+	let controller: ReturnType<typeof mountModalDialog> | undefined
+
 	function onDialogClick(event: MouseEvent): void {
-		// The dialog has no padding: only the backdrop targets the element itself. `closedby` does this
-		// natively; this line is for the browsers that do not have it yet.
-		if (event.target === dialog.value && props.closedBy === 'any') open.value = false
-		else if (props.closeOnNavigate && followsLink(event)) open.value = false
+		if (!props.closeOnNavigate || !followsLink(event)) return
+		// At once: the navigation is the transition, and the scroll lock of the page has to leave before it
+		// starts, because changing the overflow of the root inside a View Transition crashes WebKit 27.2.
+		controller?.closeNow()
+		open.value = false
 	}
 
 	function onClose(): void {
@@ -37,14 +51,20 @@
 		emit('close')
 	}
 
-	onMounted(() =>
-		effect(() => {
-			const element = dialog.value
-			if (!element) return
-			if (open.value && !element.open) element.showModal()
-			else if (!open.value && element.open) element.close()
-		}),
-	)
+	onMounted(() => {
+		if (!dialog.value) return
+		// `closedby` closes it natively; the controller keeps its exit, and does it where the browser has no `closedby`.
+		const options = {
+			get closeOnEscape() {
+				return props.closedBy !== 'none'
+			},
+			get closeOnBackdrop() {
+				return props.closedBy === 'any'
+			},
+		}
+		controller = mountModalDialog(dialog.value, open, options, () => (open.value = false))
+		return controller.dispose
+	})
 </script>
 
 <template>
@@ -86,7 +106,7 @@
 					class="meeko-ui-drawer-close"
 					bind:commandfor="dialogId()"
 					bind:aria-label="props.closeLabel ?? text.close"
-					on:click="() => (open.value = false)"
+					on:click="onCloseClick"
 				>
 					<Icon bind:path="icons.close" />
 				</button>

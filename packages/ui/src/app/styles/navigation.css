@@ -348,10 +348,7 @@ details[open] > summary > .meeko-ui-nav-chevron {
 .meeko-ui-drawer {
 	position: fixed;
 	translate: -100% 0;
-	transition:
-		translate var(--ui-duration-slow) var(--ui-ease-out),
-		display var(--ui-duration-slow) allow-discrete,
-		overlay var(--ui-duration-slow) allow-discrete;
+	transition: translate var(--ui-duration-slow) var(--ui-ease-out);
 	margin: 0;
 	inset-block: 0;
 	inset-inline: 0 auto;
@@ -398,10 +395,7 @@ details[open] > summary > .meeko-ui-nav-chevron {
 	}
 }
 .meeko-ui-drawer::backdrop {
-	transition:
-		background-color var(--ui-duration-slow) var(--ui-ease-out),
-		display var(--ui-duration-slow) allow-discrete,
-		overlay var(--ui-duration-slow) allow-discrete;
+	transition: background-color var(--ui-duration-slow) var(--ui-ease-out);
 	background: transparent;
 }
 .meeko-ui-drawer[open]::backdrop {
@@ -412,7 +406,34 @@ details[open] > summary > .meeko-ui-nav-chevron {
 		background: transparent;
 	}
 }
-:root:has(.meeko-ui-drawer[open]) {
+/* The exit is the View Transition of <UIModal>: the panel leaves by its own edge, and the name exists only
+   during this type. No `display` or `overlay allow-discrete`: they would keep it in the new capture. */
+html:active-view-transition-type(ui-modal-close) .meeko-ui-drawer[data-side='start'][data-meeko-ui-modal-state='closing'],
+html:active-view-transition-type(ui-modal-close) .meeko-ui-drawer[data-side='end'][data-meeko-ui-modal-state='closing']:dir(rtl) {
+	view-transition-name: ui-drawer-left;
+}
+html:active-view-transition-type(ui-modal-close) .meeko-ui-drawer[data-side='end'][data-meeko-ui-modal-state='closing'],
+html:active-view-transition-type(ui-modal-close) .meeko-ui-drawer[data-side='start'][data-meeko-ui-modal-state='closing']:dir(rtl) {
+	view-transition-name: ui-drawer-right;
+}
+html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-drawer-left) {
+	animation: ui-drawer-out-left var(--ui-duration-base) var(--ui-ease-in) both;
+}
+html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-drawer-right) {
+	animation: ui-drawer-out-right var(--ui-duration-base) var(--ui-ease-in) both;
+}
+@keyframes ui-drawer-out-left {
+	to {
+		transform: translateX(-100%);
+	}
+}
+@keyframes ui-drawer-out-right {
+	to {
+		transform: translateX(100%);
+	}
+}
+/* Until the exit ends: changing the overflow of the root inside a View Transition crashes WebKit 27.2. */
+:root:has(.meeko-ui-drawer:is([open], [data-meeko-ui-modal-state='closing'])) {
 	overflow: hidden;
 	scrollbar-gutter: stable;
 }
@@ -523,6 +544,17 @@ details[open] > summary > .meeko-ui-nav-chevron {
 		width: anchor-size(width);
 		height: var(--ui-tabs-indicator-height);
 		pointer-events: none;
+	}
+	/* A navigation moves it with its View Transition, also when each page mounts its own tabs. The `left`
+	   transition would still be at the old place when the new page is captured. A row without a current
+	   link paints no indicator, so it has no name to duplicate. */
+	html:active-view-transition-type(meeko-route) .meeko-ui-nav-tabs:has(a[aria-current]) .meeko-ui-nav-tabs-indicator {
+		view-transition-name: ui-navigation-tabs-indicator;
+		transition: none;
+	}
+	html:active-view-transition-type(meeko-route)::view-transition-group(ui-navigation-tabs-indicator) {
+		animation-duration: var(--ui-duration-slow);
+		animation-timing-function: var(--ui-ease-out);
 	}
 }
 

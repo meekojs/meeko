@@ -53,6 +53,8 @@ const showcase = `<script lang="ts">
 	const rich = [{ id: 1, name: 'Ana', color: 'violeta' }, { id: 2, name: 'Bea', color: 'cian', disabled: true }, { id: 3, name: 'Carla', color: 'rosa' }]
 	const person = signal<(typeof rich)[number] | null>(rich[2]!)
 	const selectOpen = signal(false)
+	const drawer = signal(false)
+	const drawerCloses = signal(0)
 </script>
 
 <template>
@@ -102,6 +104,12 @@ const showcase = `<script lang="ts">
 			<button id="open-actions" type="button" on:click="() => (selectOpen.value = true)">Acciones</button>
 			<p id="palette-out">{chosen.value}|{events.value.join()}|{active.value}</p>
 		</section>
+		<section id="drawers">
+			<UIDrawer title="Panel" triggerLabel="Abrir panel" model="drawer" on:close="() => (drawerCloses.value += 1)"><p>Contenido</p><MeekoLink id="drawer-link" to="/route-a">A otra ruta</MeekoLink></UIDrawer>
+			<UIDrawer title="Panel derecho" side="end" triggerLabel="Abrir el derecho" closedBy="none"><p>Contenido</p></UIDrawer>
+			<p id="drawer-out">{String(drawer.value)}|{drawerCloses.value}</p>
+			<MeekoLink id="to-tabs" to="/route-a">Pestañas por ruta</MeekoLink>
+		</section>
 		<section id="selects" style="display: grid; gap: 12px;">
 			<label for="plain">Plan</label>
 			<UISelect id="plain" name="plain" placeholder="Elige" clearable model="plan" bind:options="late.value" />
@@ -133,7 +141,7 @@ export async function createNativeApp(context) {
 		for (const link of linkPaths) await unlink(link).catch(() => undefined)
 		await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 	})
-	const config = { modules: ['@meekojs/ui'], theme: true, server: { adapter: 'static' } }
+	const config = { modules: ['@meekojs/ui'], theme: true, viewTransitions: true, server: { adapter: 'static' } }
 	const files = {
 		'package.json': JSON.stringify({ name: 'native-fixture', private: true, type: 'module' }),
 		'meeko.config.mjs': `export default ${JSON.stringify(config)}\n`,
@@ -142,6 +150,11 @@ export async function createNativeApp(context) {
 		'app/pages/index.route.ts': route,
 		'app/pages/other.meeko': '<template><main><h1 id="other">Otra página</h1><MeekoLink id="back" to="/">Volver</MeekoLink></main></template>\n',
 		'app/pages/other.route.ts': route,
+		// Each page mounts its own tabs: the indicator can only move with the transition of the navigation.
+		'app/pages/route-a.meeko': `<template><main><UINavigationTabs label="Rutas" bind:items="[{ label: 'Primera pestaña', to: '/route-a' }, { label: 'Segunda', to: '/route-b' }]" /><h1 id="route-a">A</h1></main></template>\n`,
+		'app/pages/route-a.route.ts': route,
+		'app/pages/route-b.meeko': `<template><main><UINavigationTabs label="Rutas" bind:items="[{ label: 'Primera pestaña', to: '/route-a' }, { label: 'Segunda', to: '/route-b' }]" /><h1 id="route-b">B</h1></main></template>\n`,
+		'app/pages/route-b.route.ts': route,
 	}
 	for (const [file, source] of Object.entries(files)) {
 		await mkdir(dirname(join(root, file)), { recursive: true })

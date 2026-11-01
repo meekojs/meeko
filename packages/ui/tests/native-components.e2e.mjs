@@ -307,6 +307,111 @@ for (const [name, start] of engines) {
 			await page.close()
 		})
 
+		await t.test('UIDrawer: leaves with a View Transition, by every way out, and gives the focus back', async () => {
+			const { page, errors } = await open(browser, origin)
+			const trigger = page.getByRole('button', { name: 'Abrir panel', exact: true })
+			const dialog = page.locator('dialog.meeko-ui-drawer[data-side=start]')
+			const opened = async () => {
+				// With the keyboard: WebKit does not focus a button that is clicked, and there would be no focus to give back.
+				await trigger.focus()
+				await page.keyboard.press('Enter')
+				await dialog.and(page.locator('[open]')).waitFor()
+				await page.waitForFunction(() => globalThis.document.querySelector('#drawer-out').textContent.startsWith('true'))
+				await dialog.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)))
+			}
+			const left = async (closes) => {
+				await page.locator('#drawer-out', { hasText: `false|${closes}` }).waitFor()
+				await finished(page)
+				assert.equal(await dialog.evaluate((element) => [element.open, element.hasAttribute('data-meeko-ui-modal-state'), element.hasAttribute('data-meeko-ui-modal-order')].join()), 'false,false,false')
+				assert.equal(await trigger.evaluate((element) => element === element.ownerDocument.activeElement), true, 'the focus comes back')
+			}
+			await opened()
+			await page.keyboard.press('Escape')
+			await left(1)
+			await opened()
+			// What the exit looks like: the panel, on its own, with an animation of the old image.
+			const exit = await page.evaluate(async () => {
+				const dialog = globalThis.document.querySelector('dialog.meeko-ui-drawer[data-side=start]')
+				dialog.querySelector('.meeko-ui-drawer-close').click()
+				const entry = globalThis.meekoTransitions.at(-1)
+				const name = globalThis.getComputedStyle(dialog).viewTransitionName
+				await entry.transition.ready
+				return {
+					types: entry.types,
+					name,
+					animations: globalThis.document
+						.getAnimations()
+						.map((animation) => animation.effect?.pseudoElement)
+						.filter((pseudo) => pseudo?.includes('ui-drawer')),
+				}
+			})
+			assert.deepEqual(exit.types, ['ui-modal-close'])
+			assert.equal(exit.name, 'ui-drawer-left')
+			assert.ok(exit.animations.includes('::view-transition-old(ui-drawer-left)'), JSON.stringify(exit.animations))
+			await left(2)
+			await opened()
+			await page.mouse.click(1200, 400)
+			await left(3)
+			// `closedBy="none"`, opened by the native command when the browser has it: only its button closes it.
+			const right = page.locator('dialog.meeko-ui-drawer[data-side=end]')
+			await page.getByRole('button', { name: 'Abrir el derecho', exact: true }).click()
+			await right.and(page.locator('[open]')).waitFor()
+			await page.keyboard.press('Escape')
+			assert.equal(await right.evaluate((element) => element.open), true, 'Escape does not close it')
+			await right.locator('.meeko-ui-drawer-close').click()
+			await page.waitForFunction(() => !globalThis.document.querySelector('dialog.meeko-ui-drawer[data-side=end]').open)
+			// A link closes it at once and navigates: the scroll lock leaves before the transition of the route,
+			// because changing the overflow of the root inside a View Transition crashes WebKit 27.2.
+			await opened()
+			const crashed = []
+			page.on('crash', () => crashed.push(true))
+			await page.locator('#drawer-link').click()
+			await page.locator('#route-a').waitFor()
+			await finished(page)
+			assert.deepEqual(crashed, [])
+			assert.equal(await page.evaluate(() => globalThis.getComputedStyle(globalThis.document.documentElement).overflowY), 'visible', 'the page scrolls again')
+			assert.deepEqual(errors, [])
+			await page.close()
+		})
+
+		await t.test('UINavigationTabs: the indicator moves with the transition of the navigation', async () => {
+			const { page, errors } = await open(browser, origin)
+			await page.locator('#to-tabs').click()
+			await page.locator('#route-a').waitFor()
+			await finished(page)
+			const nav = page.getByRole('navigation', { name: 'Rutas', exact: true })
+			assert.equal(await nav.locator('a[aria-current]').innerText(), 'Primera pestaña')
+			const before = await nav.locator('.meeko-ui-nav-tabs-indicator').boundingBox()
+			const during = await page.evaluate(async () => {
+				const indicator = () => globalThis.document.querySelector('.meeko-ui-nav-tabs-indicator')
+				const already = globalThis.meekoTransitions.length
+				const name = globalThis.getComputedStyle(indicator()).viewTransitionName
+				;[...globalThis.document.querySelectorAll('.meeko-ui-nav-tabs a')].find((link) => link.textContent.trim() === 'Segunda').click()
+				const started = Date.now()
+				while (globalThis.meekoTransitions.length === already) {
+					if (Date.now() - started > 5000) throw new Error('the navigation started no View Transition')
+					await new Promise((done) => globalThis.setTimeout(done, 5))
+				}
+				const entry = globalThis.meekoTransitions.at(-1)
+				await entry.transition.ready
+				const group = globalThis.document.getAnimations().find((animation) => animation.effect?.pseudoElement === '::view-transition-group(ui-navigation-tabs-indicator)')
+				const frames = group?.effect.getKeyframes().map((frame) => frame.transform) ?? []
+				return { outside: name, types: entry.types, inside: globalThis.getComputedStyle(indicator()).viewTransitionName, duration: group?.effect.getTiming().duration, first: frames[0], last: frames.at(-1) }
+			})
+			assert.equal(during.outside, 'none', 'no name outside a navigation')
+			assert.deepEqual(during.types, ['meeko-route'])
+			assert.equal(during.inside, 'ui-navigation-tabs-indicator')
+			assert.ok(during.first && during.last && during.first !== during.last, `the group moves: ${JSON.stringify(during)}`)
+			await finished(page)
+			await page.locator('#route-b').waitFor()
+			assert.equal(await nav.locator('a[aria-current]').innerText(), 'Segunda')
+			const after = await nav.locator('.meeko-ui-nav-tabs-indicator').boundingBox()
+			const link = await nav.locator('a[aria-current]').boundingBox()
+			assert.ok(after.x > before.x && Math.abs(after.x - link.x) < 1 && Math.abs(after.width - link.width) < 1, JSON.stringify({ before, after, link }))
+			assert.deepEqual(errors, [])
+			await page.close()
+		})
+
 		await t.test('UIThemeToggle: the theme is on <html> inside the transition', async () => {
 			const { page, errors } = await open(browser, origin)
 			await page.getByRole('radio', { name: 'Oscuro', exact: true }).click()

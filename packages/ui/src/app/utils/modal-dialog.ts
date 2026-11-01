@@ -45,7 +45,7 @@ function releaseBackdrop(element: HTMLDialogElement): void {
  * `closedby` el cierre con Esc o clic fuera y `modal.css` la entrada; aquí quedan el modelo, la salida
  * con View Transition, el motivo de `dismiss`, el clic fuera donde `closedby` no llega y el fondo apilado.
  */
-export function mountModalDialog(element: HTMLDialogElement, open: Signal<boolean>, options: ModalDialogOptions, dismiss: (reason: ModalDismissReason) => void): { close(): Promise<void>; dispose(): void } {
+export function mountModalDialog(element: HTMLDialogElement, open: Signal<boolean>, options: ModalDialogOptions, dismiss: (reason: ModalDismissReason) => void): { close(): Promise<void>; closeNow(): void; dispose(): void } {
 	let pointerOutside = false
 	let closing: Promise<void> | undefined
 	let version = 0
@@ -83,6 +83,8 @@ export function mountModalDialog(element: HTMLDialogElement, open: Signal<boolea
 	}
 	// `closedby` no distingue Esc de un clic fuera: el motivo sale del último `pointerdown`.
 	const cancel = (event: Event) => {
+		// Opened without the model, by a `commandfor` of the application: there is no model to close it with.
+		if (!open.value) return
 		event.preventDefault()
 		const reason = pointerOutside ? 'backdrop' : 'escape'
 		pointerOutside = false
@@ -127,17 +129,23 @@ export function mountModalDialog(element: HTMLDialogElement, open: Signal<boolea
 			void exit()
 		}
 	})
+	/** Without an exit: a navigation is about to start its own transition. */
+	const closeNow = () => {
+		version++
+		closing = undefined
+		closeElement()
+		element.removeAttribute(stateAttribute)
+	}
 	return {
 		close: exit,
+		closeNow,
 		dispose() {
-			version++
 			stop()
 			element.removeEventListener('cancel', cancel)
 			element.removeEventListener('close', close)
 			element.removeEventListener('pointerdown', pointerdown)
 			element.removeEventListener('click', click)
-			closeElement()
-			element.removeAttribute(stateAttribute)
+			closeNow()
 		},
 	}
 }
