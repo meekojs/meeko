@@ -4,7 +4,7 @@ import { scanInterpolations } from "@meekojs/meeko/parse";
 import { isCustomElementTag } from "@meekojs/meeko/parse";
 import { builders, utils } from "prettier/doc";
 
-import type { ClassSortMode } from "./classes";
+import type { ClassOrder, ClassSortMode } from "./classes";
 
 import { classOrderOption, classTokens, sortClassTokens } from "./classes";
 
@@ -208,7 +208,7 @@ function isElementClass(node: HtmlNode, element: HtmlNode | undefined): boolean 
 function classValue(value: string, options: Options): string | undefined {
   if (value.includes("&") || value.includes('"')) return undefined;
   const mode = (options as { meekoSortClasses?: ClassSortMode }).meekoSortClasses;
-  const order = (options as Record<string, unknown>)[classOrderOption] as ReadonlyMap<string, number> | undefined;
+  const order = (options as Record<string, unknown>)[classOrderOption] as ClassOrder | undefined;
   return sortClassTokens(classTokens(value), mode, order).join(" ");
 }
 

@@ -1,6 +1,7 @@
 {
   "name": "@meekojs/prettier-plugin",
   "version": "0.1.0",
+  "homepage": "https://meekojs.com/docs/tooling",
   "type": "module",
   "license": "MIT",
   "files": [
@@ -20,7 +21,13 @@
   },
   "peerDependencies": {
     "@meekojs/meeko": ">=1.7 <2",
-    "prettier": "^3.9.10"
+    "prettier": "^3.9.10",
+    "tailwindcss": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "tailwindcss": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@typescript/typescript6": "6.0.2",
