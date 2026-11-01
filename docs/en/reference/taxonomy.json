@@ -1,0 +1,131 @@
+{
+	"source-hash": "9e6d684b0061ca34174a2e1c2b11135f5b63f504cea2a8a04b3e1514f9d4a353",
+	"groups": {
+		"components": {
+			"title": "Components",
+			"label": "component",
+			"description": "Meeko's built-in tags: you use them in the template without importing them, and the compiler checks their attributes."
+		},
+		"macros": {
+			"title": "Macros",
+			"label": "macro",
+			"description": "The macros the compiler reads in the component script and the `define*` functions that declare pages, middleware, plugins, modules, the configuration and the server."
+		},
+		"composables": {
+			"title": "Composables",
+			"label": "composable",
+			"description": "`use*` functions that a component script calls at its top level: the route, the page, forms, the head, the theme, state and server data."
+		},
+		"reactivity": {
+			"title": "Reactivity",
+			"label": "reactivity",
+			"description": "Signals, computed values, effects, lifecycle, context and error observers: the core, without a virtual DOM."
+		},
+		"utils": {
+			"title": "Utilities",
+			"label": "utility",
+			"description": "Typed routes, redirects, API errors, generated clients, serialization, trusted HTML and passwords."
+		},
+		"syntax": {
+			"title": ".meeko syntax",
+			"label": "syntax",
+			"description": "What the compiler recognizes in a `.meeko` file: interpolation, directives, snippets and the component blocks."
+		},
+		"server": {
+			"title": "Server",
+			"label": "server",
+			"description": "Sessions and their stores, security headers, OpenAPI, local calls, cross-instance Socket and process errors."
+		},
+		"adapters": {
+			"title": "Adapters",
+			"label": "adapter",
+			"description": "How the built application runs on Node, Bun, Deno and Cloudflare Workers."
+		},
+		"commands": {
+			"title": "Commands",
+			"label": "command",
+			"description": "The `meeko` CLI: development, checking, build, production server, new projects and tools."
+		},
+		"config": {
+			"title": "Configuration",
+			"label": "configuration",
+			"description": "The keys of `meeko.config.ts`, which is declared with `defineMeekoConfig`."
+		},
+		"advanced": {
+			"title": "Advanced",
+			"label": "advanced API",
+			"description": "The pieces beneath the framework, for custom hosts, tools and tailored builds."
+		}
+	},
+	"entries": {
+		"autoimport:useApi": {
+			"description": "Reads an API endpoint from a component, with SSR, hydration and contract types."
+		},
+		"autoimport:useApiMutation": {
+			"description": "Sends a mutation to an API endpoint, with its pending state and its errors."
+		},
+		"autoimport:useRpcQuery": {
+			"description": "Reads an RPC procedure from a component, with SSR and hydration."
+		},
+		"autoimport:useRpcMutation": {
+			"description": "Calls an RPC procedure that changes data, with its pending state and its errors."
+		},
+		"autoimport:useSocket": {
+			"description": "Connects a component to a server Socket channel with its typed events."
+		},
+		"autoimport:api": {
+			"description": "Generated client for the `server/api` endpoints, typed by their contracts."
+		},
+		"autoimport:rpc": {
+			"description": "Generated client for the `server/rpc` procedures, typed by their contracts."
+		},
+		"autoimport:socket": {
+			"description": "Generated client for the `server/socket` channels."
+		},
+		"cli:dev": {
+			"description": "Development server: prepares the types and starts the application with Vite and HMR."
+		},
+		"cli:build": {
+			"description": "Checks the project and generates the production output for its adapter."
+		},
+		"cli:start": {
+			"description": "Starts the production server from the build."
+		},
+		"cli:preview": {
+			"description": "Runs the build output in its runtime: Node, Bun, Deno or `wrangler dev`."
+		},
+		"cli:check": {
+			"description": "Checks a project or a `.meeko` component with TypeScript and Meeko's diagnostics."
+		},
+		"cli:clean": {
+			"description": "Deletes what Meeko generates: `.meeko/` and the Vite cache; with `--all`, also `node_modules`."
+		},
+		"cli:init": {
+			"description": "Creates a standalone SSR project with a `.meeko` component."
+		},
+		"cli:init-framework": {
+			"description": "Creates a full-stack application with pages, layouts, server and types."
+		},
+		"cli:auth hash": {
+			"description": "Prompts for a password without showing it, or reads it from stdin, and prints its hash."
+		},
+		"cli:routes": {
+			"description": "Discovers routes, contracts and auto-imports and writes the manifests and types in `.meeko/`."
+		},
+		"cli:prerender": {
+			"description": "Prerenders the `render: \"prerender\"` routes on top of an existing build."
+		},
+		"cli:compile": {
+			"description": "Compiles a `.meeko` component to a TypeScript module."
+		},
+		"cli:types": {
+			"description": "Generates the type declarations of a `.meeko` component."
+		},
+		"cli:check-app": {
+			"description": "Checks every component of the application."
+		},
+		"cli:lsp": {
+			"description": "Language server for `.meeko` over stdio, the one editors use."
+		}
+	}
+}
