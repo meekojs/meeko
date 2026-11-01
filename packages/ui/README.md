@@ -895,3 +895,75 @@ Cada snippet (`light`, `dark`, `system` o el nombre de un tema propio) es el ico
 Usar `<UIThemeToggle>` sin `theme` produce `MEEK111` al renderizarse, a través de `useThemeToggle()`. Los conflictos con componentes propios llamados `UIThemeToggle` se resuelven como los de los demás componentes registrados por módulos.
 
 **Eventos.** No declara eventos de componente; el cambio actualiza el estado compartido de `useTheme()`. Los snippets se nombran por elección (`light`, `dark`, `system` o un tema propio). `ThemeToggleMessages` y `ThemeToggleSnippets` permanecen en `@meekojs/meeko/framework`.
+
+## Estructura y navegación
+
+Componentes para el armazón de una web y su navegación, con HTML nativo y CSS: los enlaces, los menús, el panel lateral y el índice funcionan sin hidratar. Sus textos por defecto están en `ui.messages`, en español e inglés. Los tipos se importan de `@meekojs/ui/runtime`.
+
+Todo enlace de una lista acepta `href` (cualquier URL) o `to` (una ruta con `params` y `search` tipados), además de `target`, `rel`, `download`, `hreflang`, `lang` y `title`. Con `to` navega con `<MeekoLink>`, pasa por los resolvedores de enlaces (con `@meekojs/i18n` apunta al idioma del documento o al de `hreflang`) y `aria-current` lo decide la ruta activa; `match: 'prefix'` marca también sus rutas hijas y `resolve: false` deja el `href` tal cual. Con `href`, el enlace es el actual si `current` es `true` o si coincide con la prop `current` del componente.
+
+```html
+<UIPage layout="docs">
+	<snippet name="header">
+		<UIHeader
+			bind:brand="brand"
+			bind:items="items"
+		>
+			<snippet name="actions"><UILocaleSwitcher bind:items="locales" /></snippet>
+		</UIHeader>
+	</snippet>
+	<snippet name="bar">
+		<UIDrawer
+			title="Contenidos"
+			triggerLabel="Contenidos"
+		>
+			<UINavigationTree bind:groups="groups" />
+		</UIDrawer>
+	</snippet>
+	<snippet name="sidebar"><UINavigationTree bind:groups="groups" /></snippet>
+	<snippet name="aside"><UITableOfContents bind:entries="toc" /></snippet>
+	<UITableOfContents
+		bind:entries="toc"
+		variant="collapsible"
+	/>
+	<UIPageHeader
+		title="Instalación"
+		description="Añade el paquete a tu aplicación."
+	/>
+	<UIProse
+		as="article"
+		bind:html="doc.html"
+	/>
+	<UIPageNavigation bind:next="{ label: 'Rutas', to: '/routes' }" />
+	<snippet name="footer"><UIFooter bind:brand="brand" /></snippet>
+</UIPage>
+```
+
+| Componente           | Props                                                                                                                                                                            | Snippets y eventos                                                  |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `UIPage`             | `layout` (`docs`, `dashboard`, `landing`), `mainId` (`contenido`), `mainLang`, `skipLabel`, `class` y atributos como `lang` o `dir`                                              | `default`, `header`, `notices`, `bar`, `sidebar`, `aside`, `footer` |
+| `UIPageHeader`       | `title`, `description`, `layout`, `class`                                                                                                                                        | `breadcrumb`, `actions`, `default`                                  |
+| `UIHeader`           | `brand`, `items`, `current`, `label`, `menuLabel`, `sticky` (`true`), `size` (`xl`), `class`                                                                                     | `brand`, `nav`, `actions`, `menu`                                   |
+| `UIFooter`           | `brand`, `description`, `groups`, `items`, `label`, `size` (`xl`), `class`                                                                                                       | `brand`, `about`, `actions`, `legal`                                |
+| `UINavigationTree`   | `groups` (`title`, `icon`, `open`, `items` con `icon`, `code`, `featured`, `aliases`), `current`, `label`, `collapsible` (`true`), `featuredLabel`, `emptyText`, `class`         | `item(item, current)`, `icon(entry)`, `empty`                       |
+| `UIDrawer`           | `title`, `id`, `side` (`start`, `end`), `triggerLabel`, `closeLabel`, `closedBy` (`any`, `closerequest`, `none`), `closeOnNavigate` (`true`), `class`; modelo `open` con `model` | `default`, `footer`, `trigger(id)`; evento `close`                  |
+| `UINavigationTabs`   | `items`, `current`, `label`, `class`                                                                                                                                             |                                                                     |
+| `UIBreadcrumb`       | `items` (el último es la página actual; sin destino es texto), `label`, `class`                                                                                                  |                                                                     |
+| `UIPageNavigation`   | `previous`, `next`, `label`, `previousLabel`, `nextLabel`, `class`                                                                                                               |                                                                     |
+| `UIPagination`       | `shown`, `total`, `countText`, `hasMore`, `busy`, `moreLink`, `loadMoreLabel`, `loadingLabel`, `label`, `class`                                                                  | `default`; evento `loadMore`                                        |
+| `UITableOfContents`  | `entries` (`id`, `text`, `level`), `active`, `variant` (`aside`, `collapsible`), `label`, `class`                                                                                |                                                                     |
+| `UILocaleSwitcher`   | `items` (`code`, `label`, `href` o `to`, `current`), `label`, `class`                                                                                                            |                                                                     |
+| `UILocaleSuggestion` | `items`, `suggested`, `label`, `message`, `goLabel`, `stayLabel`, `class`                                                                                                        | evento `stay`                                                       |
+| `UICodeBlock`        | `code`, `html`, `label`, `lang`, `verdict` (`good`, `bad`), `verdictLabel`, `mode` (`code`, `log`), `copy`, `copyLabel`, `copiedLabel`, `copyFailedLabel`, `class`               | `default`                                                           |
+| `UIProse`            | `as` (`div`, `article`, `section`), `html`, `class` y atributos                                                                                                                  | `default`                                                           |
+| `UIDiff`             | `diff`, `label`, `emptyText`, `lineLabels`, `class`                                                                                                                              |                                                                     |
+
+- **`UIPage`** pinta un único `<main>` enfocable y el enlace para saltar a él, y coloca `sidebar` y `aside` en columnas fijas al desplazarse. A 75rem oculta `aside` y a 54rem oculta `sidebar` y muestra `bar`, donde va el `UIDrawer`. Con un `UIHeader` fijo, los anclajes dejan libre su altura.
+- **`UIHeader`** tiene una altura fija, `--ui-header-height`. En pantallas estrechas sus enlaces pasan a un menú con `popover`, que flota y no mueve la página. Una imagen de `brand` declara `width` y `height` para reservar su espacio.
+- **`UIDrawer`** es un `<dialog>` modal con `command`, `commandfor` y `closedby`: abre, cierra y devuelve el foco sin JavaScript en los navegadores que los admiten; donde no, lo hace al hidratar.
+- **`UINavigationTabs`** son enlaces, no un `tablist`. El indicador sigue al actual con posicionamiento por ancla; sin él, el enlace se marca solo. Para paneles en la misma página, no sirve este componente.
+- **`UITableOfContents`** pinta la entrada activa con `scroll-target-group`, sin script, donde existe. Un `IntersectionObserver` mínimo mantiene `aria-current="location"` en todos los navegadores, y es lo que se pinta donde no existe esa propiedad. `active` entrega el control a la aplicación. Usa `variant="aside"` en la columna y `variant="collapsible"` en el contenido: `UIPage` muestra cada uno sólo cuando corresponde.
+- **`UILocaleSwitcher` y `UILocaleSuggestion`** son presentación: reciben los destinos ya calculados y no leen rutas ni cookies. Con menos de dos idiomas, el selector no pinta nada. La sugerencia va escrita en el idioma que ofrece y el botón `stay`, en el actual; la aplicación decide cuándo mostrarla, tras montar, y qué guarda.
+- **`UICodeBlock`** recibe en `html` un `<pre>` ya resaltado (Shiki con `--shiki-light` y `--shiki-dark`) y en `code` lo que se copia. El botón de copiar es el único script y queda oculto hasta hidratar. `mode="log"` usa `role="log"`, parte las líneas y no muestra el botón salvo con `copy`.
+- **`UIProse`** viste Markdown renderizado. La clase `meeko-ui-prose` también sirve en cualquier elemento, y dentro de ella se visten `.heading-anchor`, `.table-wrap`, `.callout`, `.code-block` y `.shiki`, las clases de un snapshot. El componente atiende los botones `button[data-copy]` de ese HTML.
+- **`UIDiff`** recibe un diff unificado y marca cada línea con `data-kind` (`add`, `remove`, `hunk`, `file`, `context`) y un texto para lectores de pantalla.
