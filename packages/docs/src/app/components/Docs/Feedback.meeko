@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { useI18n } from '@meekojs/i18n'
+
 	import { feedbackInput, metricsLimits, useDocsMetrics } from '../../../metrics/state'
 
 	// «¿Te sirvió?» al final de una página: sí o no y un comentario opcional. Con JavaScript se envía
@@ -7,6 +9,7 @@
 	const props = defineProps<{ path: string }>()
 
 	const metrics = useDocsMetrics()
+	const { t } = useI18n()
 	const route = useRoute()
 	const action = '/api/docs/feedback'
 	const form = useForm({
@@ -18,12 +21,14 @@
 			if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status })
 			return (await response.json()) as { saved: boolean }
 		},
-		errorMessage: (failure) => ((failure as { status?: number }).status === 429 ? 'Has enviado varias respuestas seguidas. Vuelve a intentarlo en unos minutos.' : 'No se pudo enviar tu respuesta. Comprueba la conexión y vuelve a intentarlo.'),
+		errorMessage: (failure) => ((failure as { status?: number }).status === 429 ? t('shell.feedback.rateLimited') : t('shell.feedback.failed')),
 	})
 	const returnTo = computed(() => String(route.url.value).split('#')[0] + '#docs-feedback')
 	const length = computed(() => form.fields.comment.value?.length ?? 0)
 	const over = computed(() => length.value > metricsLimits.comment)
 	const answered = computed(() => form.submitted.value)
+	// The schema's messages are Spanish: the widget shows its own text for each field in error.
+	const fieldError = computed(() => (form.errors.value.comment ? t('shell.feedback.commentTooLong', { max: metricsLimits.comment }) : form.errors.value.helpful ? t('shell.feedback.helpfulRequired') : undefined))
 </script>
 
 <template>
@@ -33,12 +38,13 @@
 		class="docs-feedback"
 		aria-labelledby="docs-feedback-title"
 		data-pagefind-ignore
+		bind:lang="t('shell.meta.lang')"
 	>
 		<p
 			class="thanks"
 			role="status"
 		>
-			{answered.value ? 'Gracias por tu respuesta: nos ayuda a mejorar la documentación.' : ''}
+			{answered.value ? t('shell.feedback.thanks') : ''}
 		</p>
 		<form
 			if:when="!answered.value"
@@ -58,7 +64,7 @@
 				bind:value="form.fields.path.value"
 			/>
 			<div class="question">
-				<h2 id="docs-feedback-title">¿Te sirvió esta página?</h2>
+				<h2 id="docs-feedback-title">{t('shell.feedback.title')}</h2>
 				<div
 					class="answers"
 					role="group"
@@ -77,7 +83,7 @@
 						>
 							<path d="m3.25 8.5 3 3 6.5-7" />
 						</svg>
-						Sí
+						{t('shell.feedback.yes')}
 					</button>
 					<button
 						type="submit"
@@ -92,7 +98,7 @@
 						>
 							<path d="m4 4 8 8M12 4l-8 8" />
 						</svg>
-						No
+						{t('shell.feedback.no')}
 					</button>
 				</div>
 			</div>
@@ -100,8 +106,8 @@
 				class="comment"
 				bind:open="Boolean(form.fields.comment.value) || Boolean(form.errors.value.comment)"
 			>
-				<summary>Añadir un comentario</summary>
-				<label for="docs-feedback-comment">Comentario opcional: qué falta, qué no se entiende o qué sobra</label>
+				<summary>{t('shell.feedback.addComment')}</summary>
+				<label for="docs-feedback-comment">{t('shell.feedback.commentLabel')}</label>
 				<textarea
 					id="docs-feedback-comment"
 					name="comment"
@@ -116,21 +122,21 @@
 					class="counter"
 					bind:data-over="over.value ? 'true' : undefined"
 				>
-					{length.value} de {metricsLimits.comment} caracteres
+					{t('shell.feedback.counter', { length: length.value, max: metricsLimits.comment })}
 				</p>
 				<p
 					id="docs-feedback-hint"
 					class="hint"
 				>
-					Se envía al elegir «Sí» o «No». Solo se guardan la página, tu respuesta y el comentario: ni cookies ni datos tuyos.
+					{t('shell.feedback.hint')}
 				</p>
 			</details>
 			<p
-				if:when="form.errors.value.comment || form.errors.value.helpful"
+				if:when="fieldError.value"
 				class="error"
 				role="alert"
 			>
-				{form.errors.value.comment ?? form.errors.value.helpful}
+				{fieldError.value}
 			</p>
 			<p
 				if:when="form.error.value"

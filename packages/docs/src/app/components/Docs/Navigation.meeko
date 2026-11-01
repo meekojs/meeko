@@ -1,11 +1,14 @@
 <script lang="ts">
+	import { useI18n } from '@meekojs/i18n'
+
 	const props = defineProps<{ groups: readonly { title: string; items: readonly { href: string; label: string; aliases?: readonly string[]; featured?: boolean }[] }[]; product?: string }>({ product: 'UI' })
 
 	const route = useRoute()
+	const { t } = useI18n()
 </script>
 
 <template>
-	<nav bind:aria-label="'Documentación de ' + props.product">
+	<nav bind:aria-label="t('shell.nav.docsOf', { product: props.product })">
 		<section
 			each:of="props.groups"
 			each:as="group"
@@ -26,7 +29,7 @@
 					tone="accent"
 					class="nav-featured"
 				>
-					Destacado
+					{t('shell.nav.featured')}
 				</UIBadge>
 			</a>
 		</section>
@@ -35,7 +38,7 @@
 			class="nav-empty"
 			role="status"
 		>
-			No hay coincidencias. Prueba con otro nombre.
+			{t('shell.nav.empty')}
 		</p>
 	</nav>
 </template>

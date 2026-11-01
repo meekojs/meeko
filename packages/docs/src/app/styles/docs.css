@@ -282,6 +282,154 @@ button {
 	width: 14px;
 	height: 14px;
 }
+/* Texto sólo para lectores de pantalla. */
+.sr-only {
+	position: absolute;
+	clip-path: inset(50%);
+	margin: -1px;
+	padding: 0;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	white-space: nowrap;
+}
+/* Selector de idioma: un control segmentado de enlaces reales, de la altura del selector de tema.
+   Las etiquetas tienen ancho fijo, así que el idioma activo no mueve nada. */
+.locale-switch {
+	display: inline-flex;
+	flex: none;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--radius-s);
+	background: var(--surface);
+	padding: 3px;
+	height: 2.5rem;
+}
+.locale-switch a {
+	display: grid;
+	place-items: center;
+	transition:
+		color 0.15s,
+		background-color 0.15s;
+	border-radius: 4px;
+	min-width: 2.25rem;
+	color: var(--muted);
+	font: 560 0.72rem/1 var(--font-ui);
+	letter-spacing: 0.06em;
+	text-decoration: none;
+	text-transform: uppercase;
+}
+.locale-switch a:hover {
+	color: var(--ink);
+}
+.locale-switch a[aria-current='true'] {
+	box-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
+	background: var(--surface-3);
+	color: var(--ink);
+}
+/* Sugerencia de idioma: flota sobre la página para no desplazar el contenido al aparecer después de
+   hidratar; nunca redirige. */
+.locale-suggestion {
+	display: flex;
+	position: fixed;
+	right: clamp(1rem, 3vw, 2rem);
+	bottom: clamp(1rem, 3vw, 2rem);
+	align-items: center;
+	gap: 0.75rem;
+	z-index: 15;
+	animation: locale-suggestion-in 0.32s var(--ease-out) both;
+	box-shadow: var(--shadow-lg);
+	border: 1px solid var(--line-strong);
+	border-radius: var(--radius);
+	background: var(--bg-raised);
+	padding: 0.5rem 0.5rem 0.5rem 0.9rem;
+	max-width: calc(100vw - 2rem);
+	font-size: 0.875rem;
+}
+.locale-suggestion svg {
+	flex: none;
+	fill: none;
+	stroke: var(--accent-ink);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1.3;
+	width: 16px;
+	height: 16px;
+}
+.locale-suggestion a {
+	color: var(--ink);
+	font-weight: 540;
+	text-decoration: underline;
+	text-decoration-color: var(--accent-line);
+	text-underline-offset: 0.2em;
+}
+.locale-suggestion a:hover {
+	text-decoration-color: var(--accent-ink);
+}
+.locale-suggestion button {
+	flex: none;
+	transition:
+		color 0.15s,
+		background-color 0.15s;
+	border: 0;
+	border-radius: var(--radius-s);
+	background: transparent;
+	padding: 0.45rem 0.7rem;
+	color: var(--muted);
+	font: inherit;
+}
+.locale-suggestion button:hover {
+	background: var(--surface-2);
+	color: var(--ink);
+}
+@keyframes locale-suggestion-in {
+	from {
+		transform: translateY(0.5rem);
+		opacity: 0;
+	}
+}
+/* Página sin traducir: se muestra el original con una nota discreta en el tono de acento. */
+.doc-untranslated {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.75rem;
+	margin: 0 0 2rem;
+	border: 1px solid var(--accent-line);
+	border-radius: var(--radius);
+	background: var(--accent-soft);
+	padding: 0.85rem 1.1rem;
+	max-width: 72ch;
+}
+.doc-untranslated svg {
+	flex: none;
+	fill: none;
+	stroke: var(--accent-ink);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1.3;
+	margin-top: 0.2rem;
+	width: 16px;
+	height: 16px;
+}
+.doc-page .doc-untranslated p {
+	margin: 0;
+	color: var(--ink-soft);
+	font-size: 0.875rem;
+	line-height: 1.6;
+	text-wrap: pretty;
+}
+.doc-untranslated strong {
+	margin-right: 0.35rem;
+	color: var(--ink);
+	font-weight: 560;
+}
+.doc-untranslated span {
+	margin-right: 0.35rem;
+}
+.doc-page .doc-untranslated a {
+	color: var(--accent-ink);
+	font-weight: 520;
+	white-space: nowrap;
+}
 .sidebar-package {
 	display: flex;
 	flex-direction: column;
@@ -713,6 +861,18 @@ button {
 	.mobile-menu {
 		display: block;
 	}
+	.locale-switch a {
+		min-width: 1.9rem;
+	}
+	.locale-suggestion {
+		right: 1rem;
+		left: 1rem;
+		flex-wrap: wrap;
+	}
+	.locale-suggestion a {
+		flex: 1;
+		min-width: 0;
+	}
 	.site-layout {
 		display: block;
 	}
@@ -756,8 +916,25 @@ button {
 		font-size: 0.78rem;
 	}
 }
+/* Un móvil estrecho con el selector de idioma: el logo y el producto bastan (el nombre accesible del
+   enlace conserva «Meeko»). */
+@media (max-width: 480px) {
+	.brand-word {
+		display: none;
+	}
+	.brand strong {
+		margin-left: 0;
+	}
+	.site-header,
+	.header-actions {
+		gap: 0.5rem;
+	}
+}
 @media (prefers-reduced-motion: reduce) {
 	html {
 		scroll-behavior: auto;
+	}
+	.locale-suggestion {
+		animation: none;
 	}
 }

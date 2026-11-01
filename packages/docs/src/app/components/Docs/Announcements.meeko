@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { useI18n } from '@meekojs/i18n'
+
 	import type { AnnouncementTone, PublicAnnouncement } from '../../../runtime/state'
 
 	import { announcementRole, dismissCookie, useDocsModeration } from '../../../runtime/state'
@@ -8,6 +10,7 @@
 
 	// Los avisos llegan en el HTML del servidor y el navegador hidrata la misma lista: sin parpadeo.
 	const moderation = useDocsModeration()
+	const { t } = useI18n()
 	const items = computed(() => props.preview ?? moderation.value.announcements)
 
 	// Iconos de trazo de 16 px, como los avisos de las guías.
@@ -56,7 +59,7 @@
 			<button
 				type="button"
 				class="docs-announcement-close"
-				aria-label="Cerrar aviso"
+				bind:aria-label="t('shell.announcements.close')"
 				on:click="() => close(item.id)"
 			>
 				<svg

@@ -3,6 +3,7 @@ import type { ModerationSite, SiteModeration } from 'meeko-docs-content/moderati
 
 import { createContext, effect, inject, onMounted } from '@meekojs/meeko'
 import { useRoute, useState } from '@meekojs/meeko/framework'
+import { splitLocalePath } from 'meeko-docs-content/locale'
 import { emptyModeration, fetchSiteModeration, isFeaturedPath, isHiddenPath, moderationEndpoint } from 'meeko-docs-content/moderation/shared'
 
 export type { AnnouncementTone, ModerationSite, PublicAnnouncement, SiteModeration } from 'meeko-docs-content/moderation/shared'
@@ -66,8 +67,9 @@ export function refreshOnNavigation<T>(target: Signal<T>, endpoint: () => string
 }
 
 /**
- * Señal con la moderación de la web: páginas ocultas y destacadas desde el dashboard, y avisos
- * vigentes que el lector no cerró. En SSR la escribe el plugin de servidor y viaja en el estado,
+ * Señal con la moderación de la web en el idioma de la página (`/en/…` es inglés): páginas ocultas
+ * y destacadas desde el dashboard, y avisos vigentes que el lector no cerró. Las rutas ocultas y
+ * destacadas de la moderación inglesa llevan el prefijo `/en`. En SSR la escribe el plugin de servidor y viaja en el estado,
  * así que el navegador hidrata la misma; después de cada navegación confirmada se pide otra vez al
  * servidor ({@link refreshOnNavigation}), así que una regla o un aviso nuevos llegan sin recargar.
  * Sin base de datos está vacía. Se llama en el `<script>` de un componente.
@@ -84,9 +86,10 @@ export function refreshOnNavigation<T>(target: Signal<T>, endpoint: () => string
 export function useDocsModeration() {
 	const moderation = useState<SiteModeration>('meeko-docs:moderation', () => provided(docsModerationKey, emptyModeration))
 	const site = useState<ModerationSite | null>('meeko-docs:site', () => provided<ModerationSite | null>(docsSiteKey as ContextKey<ModerationSite | null>, null))
+	const route = useRoute()
 	refreshOnNavigation(
 		moderation,
-		() => (site.value === null ? null : moderationEndpoint(site.value)),
+		() => (site.value === null ? null : moderationEndpoint(site.value, splitLocalePath(route.path.value).locale)),
 		(fresh) => fresh,
 	)
 	return moderation

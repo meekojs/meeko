@@ -20,6 +20,7 @@
 		"build": "node scripts/build.mjs"
 	},
 	"dependencies": {
+		"@meekojs/i18n": "workspace:*",
 		"@meekojs/meeko": "workspace:*",
 		"@meekojs/ui": "workspace:*",
 		"meeko-docs-content": "workspace:*"

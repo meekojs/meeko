@@ -1,11 +1,21 @@
 <script lang="ts">
+	import { useI18n } from '@meekojs/i18n'
+
 	import * as DocsFeedback from './Feedback.meeko'
 
-	const props = defineProps<{ title: string; description: string; landing?: boolean; product?: string }>({ product: 'Meeko UI' })
+	// `locale`: the language the page's prose is written in. A page without it is in the default
+	// locale (Spanish), so under /en/… it is an untranslated page: the shell shows the notice and marks
+	// its content with lang. A translated page (app/pages/en/…) declares `locale="en"`.
+	const props = defineProps<{ title: string; description: string; landing?: boolean; product?: string; locale?: string }>({ product: 'Meeko UI' })
 
 	const snippets = defineSnippets<{ default: [] }>()
 
 	const route = useRoute()
+	const i18n = useI18n()
+	const shellLocale = i18n.t('shell.meta.lang')
+	const prose = computed(() => props.locale ?? i18n.defaultLocale)
+	// The notice is for a locale the shell speaks (es, en); a demo locale (ar) shows the original as is.
+	const untranslated = computed(() => prose.value !== i18n.locale && shellLocale === i18n.locale)
 
 	useHead(() => ({ title: props.title + ' · ' + props.product, meta: [{ name: 'description', content: props.description }] }))
 </script>
@@ -15,7 +25,32 @@
 		id="contenido"
 		tabindex="-1"
 		bind:class="props.landing ? 'doc-page landing-page' : 'doc-page'"
+		bind:lang="prose.value === i18n.locale ? undefined : prose.value"
 	>
+		<div
+			if:when="untranslated.value"
+			class="doc-untranslated"
+			role="note"
+			aria-labelledby="doc-untranslated-title"
+			bind:lang="shellLocale"
+		>
+			<svg
+				viewBox="0 0 16 16"
+				aria-hidden="true"
+			>
+				<path d="M2 3.25h6.5M5.25 1.75v1.5M7.25 3.25C6.6 6.1 4.9 8.2 2.25 9.5M3.9 5.6c.8 1.5 2 2.7 3.6 3.4M8.25 14.25l2.75-6.5 2.75 6.5M9.15 12.1h3.7" />
+			</svg>
+			<p>
+				<strong id="doc-untranslated-title">{i18n.t('shell.untranslated.title')}</strong>
+				<span>{i18n.t('shell.untranslated.message')}</span>
+				<a
+					bind:href="i18n.switchLocalePath(prose.value)"
+					bind:hreflang="prose.value"
+				>
+					{i18n.t('shell.untranslated.original')}
+				</a>
+			</p>
+		</div>
 		<header class="doc-heading">
 			<h1>{props.title}</h1>
 			<p>{props.description}</p>

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { useI18n } from '@meekojs/i18n'
+
 	import { metricsActive, normalizeQuery, sendMetric, storedQuery } from '../../../metrics/state'
 	import { moderateNavigation, useDocsModeration } from '../../../runtime/state'
 	import * as DocsAnnouncements from './Announcements.meeko'
@@ -13,14 +15,37 @@
 
 	const snippets = defineSnippets<{ default: [] }>()
 
-	// Páginas ocultas y destacadas desde el dashboard (vacío sin base de datos).
+	const i18n = useI18n()
+	const { t } = i18n
+	// The shell speaks the language of its catalog (`shell.meta.lang`): the document's in es and en,
+	// Spanish in a demo locale such as ar, which declares the Spanish catalog. Its links point to the
+	// pages of that language, so a partial locale never links to pages it does not have.
+	const shellLocale = t('shell.meta.lang')
+	const linkLocale = i18n.locales.includes(shellLocale) ? shellLocale : i18n.defaultLocale
+	const framework = 'https://meekojs.com' + (linkLocale === i18n.defaultLocale ? '' : '/' + linkLocale)
+	// Páginas ocultas y destacadas desde el dashboard (vacío sin base de datos). La moderación de un
+	// idioma usa sus URL públicas (`/en/…`), así que se aplica a los enlaces ya localizados.
 	const moderation = useDocsModeration()
 	const query = signal('')
+	const localized = computed(() => props.navigation.map((group) => ({ title: group.title, items: group.items.map((item) => ({ ...item, href: i18n.localePath(item.href, linkLocale) })) })))
 	const groups = computed(() =>
-		moderateNavigation(props.navigation, moderation.value)
-			.map((group) => ({ ...group, items: group.items.filter((item) => (item.label + ' ' + item.description).toLocaleLowerCase('es').includes(query.value.trim().toLocaleLowerCase('es'))) }))
+		moderateNavigation(localized.value, moderation.value)
+			.map((group) => ({ ...group, items: group.items.filter((item) => (item.label + ' ' + item.description).toLocaleLowerCase(shellLocale).includes(query.value.trim().toLocaleLowerCase(shellLocale))) }))
 			.filter((group) => group.items.length),
 	)
+
+	// The reader's language as a suggestion, never a redirect: computed in the browser after
+	// hydration (cookie, then navigator.languages) and only for a version this page has. Staying
+	// keeps the current language in the cookie, so it is not offered again.
+	const suggestion = signal<string | undefined>(undefined)
+	onMounted(() => {
+		const preferred = i18n.suggestedLocale()
+		suggestion.value = preferred !== undefined && i18n.pageLocales().includes(preferred) ? preferred : undefined
+	})
+	function stay(): void {
+		i18n.rememberLocale(i18n.locale)
+		suggestion.value = undefined
+	}
 
 	// The filter is a search of the guide: once the reader stops typing for 1.5 s (never per key), its
 	// normalized query and the pages it matched are counted, once per query. A query that looks like
@@ -33,7 +58,7 @@
 		const text = storedQuery(query.value)
 		if (text.length < 2 || text === recorded || !metricsActive()) return
 		recorded = text
-		sendMetric('/api/docs/search', { q: text, results: groups.value.reduce((count, group) => count + group.items.length, 0) })
+		sendMetric('/api/docs/search', { q: text, locale: linkLocale === 'en' ? 'en' : 'es', results: groups.value.reduce((count, group) => count + group.items.length, 0) })
 	}
 	onMounted(() => {
 		effect(() => {
@@ -53,21 +78,21 @@
 
 <template>
 	<div
-		lang="es"
 		dir="ltr"
+		bind:lang="shellLocale"
 	>
 		<UIApp>
 			<a
 				class="skip-link"
 				href="#contenido"
 			>
-				Saltar al contenido
+				{t('shell.skip')}
 			</a>
 			<header class="site-header">
 				<a
 					class="brand"
-					href="/"
-					bind:aria-label="'Meeko ' + props.name + ', inicio'"
+					bind:href="i18n.localePath('/', linkLocale)"
+					bind:aria-label="t('shell.brand.home', { name: props.name })"
 				>
 					<img
 						src="/brand/meeko-logo.png"
@@ -76,22 +101,40 @@
 						alt=""
 					/>
 					<span>
-						Meeko
+						<span class="brand-word">Meeko</span>
 						<strong>{props.name}</strong>
 					</span>
 				</a>
 				<nav
 					class="top-nav"
-					aria-label="Ecosistema"
+					bind:aria-label="t('shell.nav.ecosystem')"
 				>
-					<a href="/installation">Documentación</a>
-					<a href="https://meekojs.com">Framework</a>
+					<a bind:href="i18n.localePath('/installation', linkLocale)">{t('shell.nav.docs')}</a>
+					<a bind:href="framework">{t('shell.nav.framework')}</a>
 					<a bind:href="props.repository">GitHub</a>
 				</nav>
 				<div class="header-actions">
+					<nav
+						if:when="i18n.pageLocales().length > 1"
+						class="locale-switch"
+						bind:aria-label="t('shell.locale.label')"
+					>
+						<a
+							each:of="i18n.pageLocales()"
+							each:as="code"
+							each:key="code"
+							bind:href="i18n.switchLocalePath(code)"
+							bind:hreflang="code"
+							bind:lang="code"
+							bind:aria-current="code === i18n.locale ? 'true' : undefined"
+						>
+							<span aria-hidden="true">{code}</span>
+							<span class="sr-only">{i18n.localeName(code)}</span>
+						</a>
+					</nav>
 					<UIThemeToggle />
 					<details class="mobile-menu">
-						<summary>Menú</summary>
+						<summary>{t('shell.nav.menu')}</summary>
 						<div
 							class="mobile-panel"
 							on:click="closeMenu"
@@ -100,13 +143,13 @@
 								class="search-label"
 								for="mobile-docs-search"
 							>
-								Buscar en la guía
+								{t('shell.search.label')}
 							</label>
 							<UIInput
 								id="mobile-docs-search"
 								type="search"
-								placeholder="Filtrar documentación…"
 								model="query"
+								bind:placeholder="t('shell.search.placeholder')"
 							/>
 							<DocsNavigation
 								bind:groups="groups.value"
@@ -130,13 +173,13 @@
 						class="search-label"
 						for="docs-search"
 					>
-						Buscar en la guía
+						{t('shell.search.label')}
 					</label>
 					<UIInput
 						id="docs-search"
 						type="search"
-						placeholder="Filtrar documentación…"
 						model="query"
+						bind:placeholder="t('shell.search.placeholder')"
 					/>
 					<DocsNavigation
 						bind:groups="groups.value"
@@ -147,17 +190,43 @@
 						bind:href="'https://www.npmjs.com/package/' + props.packageName"
 					>
 						<code>{props.packageName}</code>
-						<span>Paquete de Meeko</span>
+						<span>{t('shell.package')}</span>
 					</a>
 				</aside>
 				<div class="page-content">
 					<render snippet="snippets.default" />
 					<footer class="site-footer">
-						<span>Meeko {props.name} · Documentación del ecosistema Meeko.</span>
-						<a href="https://github.com/meekojs/meeko/blob/main/LICENSE">Licencia MIT</a>
+						<span>{t('shell.footer.tagline', { name: props.name })}</span>
+						<a href="https://github.com/meekojs/meeko/blob/main/LICENSE">{t('shell.footer.license')}</a>
 					</footer>
 				</div>
 			</UIContainer>
+			<div
+				if:when="suggestion.value"
+				class="locale-suggestion"
+				role="status"
+				bind:aria-label="t('shell.locale.suggestion')"
+			>
+				<svg
+					viewBox="0 0 16 16"
+					aria-hidden="true"
+				>
+					<path d="M8 14.25A6.25 6.25 0 1 0 8 1.75a6.25 6.25 0 0 0 0 12.5ZM1.75 8h12.5M8 1.75c1.6 1.7 2.4 3.8 2.4 6.25S9.6 12.55 8 14.25C6.4 12.55 5.6 10.45 5.6 8S6.4 3.45 8 1.75Z" />
+				</svg>
+				<a
+					bind:href="i18n.switchLocalePath(suggestion.value!)"
+					bind:hreflang="suggestion.value"
+					bind:lang="suggestion.value"
+				>
+					{t('shell.locale.offer', { locale: suggestion.value!, language: i18n.localeName(suggestion.value!) })}
+				</a>
+				<button
+					type="button"
+					on:click="stay"
+				>
+					{t('shell.locale.stay', { language: i18n.localeName(i18n.locale) })}
+				</button>
+			</div>
 		</UIApp>
 	</div>
 </template>

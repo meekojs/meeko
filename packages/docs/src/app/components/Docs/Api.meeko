@@ -1,5 +1,9 @@
 <script lang="ts">
+	import { useI18n } from '@meekojs/i18n'
+
 	const props = defineProps<{ rows: readonly { name: string; type: string; description: string; default?: string }[]; caption?: string }>()
+
+	const { t } = useI18n()
 </script>
 
 <template>
@@ -7,15 +11,15 @@
 		class="api-scroll"
 		tabindex="0"
 		role="region"
-		bind:aria-label="props.caption ?? 'Propiedades'"
+		bind:aria-label="props.caption ?? t('shell.api.caption')"
 	>
 		<table class="api-table">
-			<caption>{props.caption ?? 'Propiedades'}</caption>
-			<thead>
+			<caption bind:lang="props.caption === undefined ? t('shell.meta.lang') : undefined">{props.caption ?? t('shell.api.caption')}</caption>
+			<thead bind:lang="t('shell.meta.lang')">
 				<tr>
-					<th scope="col">Nombre</th>
-					<th scope="col">Tipo / valor inicial</th>
-					<th scope="col">Descripción</th>
+					<th scope="col">{t('shell.api.name')}</th>
+					<th scope="col">{t('shell.api.type')}</th>
+					<th scope="col">{t('shell.api.description')}</th>
 				</tr>
 			</thead>
 			<tbody>

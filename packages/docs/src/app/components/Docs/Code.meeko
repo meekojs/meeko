@@ -1,13 +1,17 @@
 <script lang="ts">
+	import { useI18n } from '@meekojs/i18n'
+
 	const props = defineProps<{ code: string; label?: string }>()
+
+	const { t } = useI18n()
 
 	const status = signal('')
 	async function copy() {
 		try {
 			await navigator.clipboard.writeText(props.code)
-			status.value = 'Copiado'
+			status.value = t('shell.code.copied')
 		} catch {
-			status.value = 'Selecciona el código para copiarlo.'
+			status.value = t('shell.code.copyFailed')
 		}
 	}
 </script>
@@ -15,19 +19,21 @@
 <template>
 	<figure class="code-block">
 		<figcaption>
-			<span>{props.label ?? 'Ejemplo .meeko'}</span>
+			<span bind:lang="props.label === undefined ? t('shell.meta.lang') : undefined">{props.label ?? t('shell.code.label')}</span>
 			<button
 				type="button"
-				aria-label="Copiar código"
+				bind:lang="t('shell.meta.lang')"
+				bind:aria-label="t('shell.code.copyLabel')"
 				on:click="copy"
 			>
-				Copiar
+				{t('shell.code.copy')}
 			</button>
 		</figcaption>
 		<pre tabindex="0"><code>{props.code}</code></pre>
 		<span
 			class="code-status"
 			role="status"
+			bind:lang="t('shell.meta.lang')"
 		>
 			{status.value}
 		</span>

@@ -1,0 +1,85 @@
+{
+	"shell": {
+		"meta": {
+			"lang": "en"
+		},
+		"skip": "Skip to content",
+		"brand": {
+			"home": "Meeko {name}, home"
+		},
+		"nav": {
+			"ecosystem": "Ecosystem",
+			"docs": "Documentation",
+			"framework": "Framework",
+			"docsOf": "{product} documentation",
+			"featured": "Featured",
+			"empty": "No matches. Try another name.",
+			"menu": "Menu"
+		},
+		"search": {
+			"label": "Search the guide",
+			"placeholder": "Filter documentation…"
+		},
+		"package": "Meeko package",
+		"footer": {
+			"tagline": "Meeko {name} · Documentation of the Meeko ecosystem.",
+			"license": "MIT License"
+		},
+		"locale": {
+			"label": "Language",
+			"offer": {
+				"select": "locale",
+				"forms": {
+					"es": "Leer esta página en español",
+					"en": "Read this page in English",
+					"other": "{language}"
+				}
+			},
+			"stay": "Stay in {language}",
+			"suggestion": "Language suggestion"
+		},
+		"untranslated": {
+			"title": "Not translated yet",
+			"message": "This page has not been translated into English yet, so it is shown in Spanish.",
+			"original": "Open the Spanish original"
+		},
+		"announcements": {
+			"close": "Close notice"
+		},
+		"api": {
+			"caption": "Props",
+			"name": "Name",
+			"type": "Type / default",
+			"description": "Description"
+		},
+		"code": {
+			"label": ".meeko example",
+			"copy": "Copy",
+			"copyLabel": "Copy code",
+			"copied": "Copied",
+			"copyFailed": "Select the code to copy it."
+		},
+		"feedback": {
+			"title": "Was this page helpful?",
+			"yes": "Yes",
+			"no": "No",
+			"thanks": "Thanks for your answer: it helps us improve the documentation.",
+			"addComment": "Add a comment",
+			"commentLabel": "Optional comment: what is missing, unclear or unnecessary",
+			"counter": "{length} of {max} characters",
+			"hint": "It is sent when you choose “Yes” or “No”. Only the page, your answer and the comment are stored: no cookies and no personal data.",
+			"helpfulRequired": "Choose “Yes” or “No”.",
+			"commentTooLong": "Use at most {max} characters.",
+			"rateLimited": "You have sent several answers in a row. Try again in a few minutes.",
+			"failed": "Your answer could not be sent. Check your connection and try again."
+		},
+		"theme": {
+			"light": "Light",
+			"dark": "Dark",
+			"system": "System",
+			"unknown": "Change theme",
+			"cycle": "Theme: {current}. Switch to {next}",
+			"group": "Theme"
+		}
+	}
+}

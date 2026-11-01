@@ -408,6 +408,9 @@ importers:
 
   packages/docs:
     dependencies:
+      '@meekojs/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@meekojs/meeko':
         specifier: workspace:*
         version: link:../meeko
