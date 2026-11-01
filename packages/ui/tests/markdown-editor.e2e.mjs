@@ -140,6 +140,20 @@ test('Crepe with the recipe: documents without an edit, real keys in the hard bl
 	const row = result.after.split('\n').find((line) => line.includes(' Xq'))
 	assert.match(row ?? '', /\\\|/, 'the pipe keeps its escape')
 
+	// A click in a cell puts the caret there. Milkdown then selects the whole cell, in a next frame and
+	// with no visible mark, so that the next key would erase what the cell had.
+	result = await edited('docs/reference/advanced/buildproject.md', async () => {
+		const cell = editor.locator('td').filter({ hasText: '|' }).first()
+		await cell.scrollIntoViewIfNeeded()
+		await cell.click()
+		await page.waitForTimeout(150)
+		assert.equal(await page.evaluate(() => globalThis.document.querySelector('#host .ProseMirror-selectednode')), null, 'nothing is selected by a click')
+		await page.keyboard.type('Xq')
+	})
+	assertOneBlockChanged(result.source, result.after, 'buildproject.md, a click in a cell')
+	const clicked = result.after.split('\n').find((line) => line.includes('Xq'))
+	for (const value of ['"node"', '"bun"', '"deno"', '"cloudflare"', '"static"']) assert.ok(clicked?.includes(value), `the cell keeps ${value}: ${clicked}`)
+
 	// A code block with its meta: the line is added, and the fence stays.
 	const withMeta = documents().find(({ source }) => /^```ts bad$/m.test(source))
 	assert.ok(withMeta, 'a document with a meta')
@@ -189,6 +203,23 @@ test('Crepe with the recipe: documents without an edit, real keys in the hard bl
 	})
 	assert.match(result.after, /^\| Columna +\|/m, 'the key goes to the first cell')
 	assert.ok(result.after.includes('```sh\npnpm exec meeko doctor\n'), 'and not into the code block after the table')
+
+	// The rest of a table by hand: a click in an empty cell, a new row and the handle of a column.
+	const table = editor.locator('.milkdown-table-block').first()
+	await table.locator('tbody tr').nth(1).locator('td').nth(1).click()
+	await page.waitForTimeout(150)
+	await page.keyboard.type('Vacía')
+	assert.match(await flush(), /^\| +\| Vacía +\| +\|$/m, 'an empty cell takes the key')
+	const rows = await table.locator('tr').count()
+	// The button to add a row appears near the line between two rows.
+	const line = await table.locator('tr').nth(1).boundingBox()
+	await page.mouse.move(line.x + 40, line.y + line.height - 1)
+	await table.locator('[data-role="x-line-drag-handle"][data-show="true"] .add-button').click({ timeout: 5000 })
+	assert.equal(await table.locator('tr').count(), rows + 1, 'the button adds a row')
+	await table.locator('th').nth(1).hover()
+	await table.locator('[data-role="col-drag-handle"][data-show="true"]').click({ timeout: 5000 })
+	await table.locator('.selectedCell').first().waitFor({ timeout: 5000 })
+	assert.equal(await table.locator('.selectedCell').count(), rows + 1, 'the handle still selects the whole column')
 
 	// Copying a code block keeps its meta in the HTML of the clipboard, and pasting it brings it back.
 	const clipboard = await page.evaluate(async () => {

@@ -27,7 +27,7 @@ import { toolbar } from '@milkdown/crepe/feature/toolbar'
 import { editorViewOptionsCtx, remarkCtx, remarkStringifyOptionsCtx } from '@milkdown/kit/core'
 import { uploadConfig } from '@milkdown/kit/plugin/upload'
 import { codeBlockSchema, remarkPreserveEmptyLinePlugin } from '@milkdown/kit/preset/commonmark'
-import { Plugin } from '@milkdown/kit/prose/state'
+import { NodeSelection, Plugin } from '@milkdown/kit/prose/state'
 import { $prose } from '@milkdown/kit/utils'
 
 import type { UIMessages } from '../app/types/messages'
@@ -133,6 +133,22 @@ const focusFollowsSelection = $prose(
 		}),
 )
 
+/**
+ * A click in a table cell puts the caret there, and Milkdown then selects the whole paragraph of the
+ * cell, in the next frame. Crepe paints that selection as transparent, so the next key would erase
+ * the cell with nothing to warn of it. The caret stays; the handles of a row or a column still select.
+ */
+const clickKeepsTheCaret = $prose(
+	() =>
+		new Plugin({
+			filterTransaction(transaction) {
+				const { selection } = transaction
+				if (!transaction.selectionSet || transaction.docChanged || !(selection instanceof NodeSelection)) return true
+				return !(selection.node.type.name === 'paragraph' && ['table_cell', 'table_header'].includes(selection.$from.parent.type.name))
+			},
+		}),
+)
+
 export interface MarkdownEditorOptions {
 	readonly readonly: boolean
 	readonly labelledBy?: string | undefined
@@ -198,7 +214,7 @@ export async function createMarkdownEditor(root: HTMLElement, source: string, op
 		// Without an image block a pasted image would be saved as a `blob:` address of this tab.
 		ctx.update(uploadConfig.key, (previous) => ({ ...previous, uploader: () => Promise.resolve([]) }))
 	})
-	crepe.editor.use(codeBlockWithMeta).use(focusFollowsSelection)
+	crepe.editor.use(codeBlockWithMeta).use(focusFollowsSelection).use(clickKeepsTheCaret)
 	// With it, each empty paragraph is saved as a literal `<br />`.
 	await crepe.editor.remove(remarkPreserveEmptyLinePlugin)
 	crepe.setReadonly(options.readonly)
