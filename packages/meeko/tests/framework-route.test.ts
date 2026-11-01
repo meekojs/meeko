@@ -553,3 +553,147 @@ test("meeko check types match of <MeekoLink> and the route and params of isActiv
     await project.remove();
   }
 });
+
+// The polymorphic button of docs/api.md: a route (MeekoLink), an external href (<a>) or a <button>.
+const polymorphicButton = `<script lang="ts">
+import { computed } from '@meekojs/meeko'
+import type { ElementAttributes } from '@meekojs/meeko'
+
+/** Los params de la ruta K: \`{ id: string }\` en \`/users/[id]\`, \`{}\` en una ruta estática. */
+type RouteParamsOf<K extends RouteId> = NonNullable<MeekoLinkProps<K>['params']>
+/** Una ruta con sus params correlacionados: obligatorios si la ruta los tiene, prohibidos si no. */
+type LinkTarget = {
+	[K in RouteId]: { to: K; search?: MeekoLinkProps['search'] } & (keyof RouteParamsOf<K> extends never ? { params?: never } : { params: RouteParamsOf<K> })
+}[RouteId]
+type LinkProps = LinkTarget & { href?: never; target?: never; rel?: never; download?: never; type?: never; disabled?: never }
+type AnchorProps = {
+	href: string
+	target?: '_self' | '_blank' | '_parent' | '_top'
+	rel?: string
+	download?: string | boolean
+	to?: never
+	params?: never
+	search?: never
+	type?: never
+	disabled?: never
+}
+type ButtonProps = {
+	type?: 'button' | 'submit' | 'reset'
+	disabled?: boolean
+	to?: never
+	params?: never
+	search?: never
+	href?: never
+	target?: never
+	rel?: never
+	download?: never
+}
+/** Atributos que se reenvían tal cual, comunes a \`<a>\` y \`<button>\`: \`id\`, \`title\`, \`aria-*\`, \`data-*\`… */
+type SharedAttributes = Pick<ElementAttributes<'a'>, keyof ElementAttributes<'a'> & keyof ElementAttributes<'button'>>
+type ForwardedAttributes = Omit<SharedAttributes, 'class' | 'type'>
+
+const props = defineProps<(LinkProps | AnchorProps | ButtonProps) & ForwardedAttributes & { label?: string; class?: string }>()
+const emit = defineEmits<{ click: [event: MouseEvent] }>()
+const snippets = defineSnippets<{ default?: [] }>()
+
+const linkRel = computed(() => props.rel ?? (props.target === '_blank' ? 'noopener noreferrer' : undefined))
+/** Las props propias van a su rama; el resto (\`id\`, \`title\`, \`aria-*\`, \`data-*\`…) se reenvía con \`bind\`. */
+const attributes = computed((): ForwardedAttributes => {
+	const { to, params, search, href, target, rel, download, type, disabled, label, class: className, ...rest } = props
+	return rest
+})
+</script>
+<template>
+	<MeekoLink
+		if:when="props.to !== undefined"
+		bind:to="props.to"
+		bind:params="props.params"
+		bind:search="props.search"
+		bind:class="props.class"
+		bind="attributes.value"
+		on:click="(event) => emit('click', event)"
+	>
+		<render snippet="snippets.default" />{props.label ?? ''}
+	</MeekoLink>
+	<component
+		if:when="props.to === undefined"
+		is="props.href !== undefined ? 'a' : 'button'"
+		bind:class="props.class"
+		bind="attributes.value"
+		bind:href="props.href"
+		bind:target="props.target"
+		bind:rel="linkRel.value"
+		bind:download="props.download"
+		bind:type="props.type ?? 'button'"
+		bind:disabled="props.disabled"
+		on:click="(event) => emit('click', event)"
+	>
+		<render snippet="snippets.default" />{props.label ?? ''}
+	</component>
+</template>
+`;
+
+// The same button with destructured props (1.8): defaults in the pattern, a renamed prop and a rest view.
+const destructuredButton = polymorphicButton
+  .replace("const props = defineProps<", "const { to, params, search, href, target, rel, download, type = 'button', disabled = false, label = '', class: className, ...rest } = defineProps<")
+  .replace(/const linkRel = [\s\S]*?\n\}\)\n/, "const linkRel = computed(() => rel ?? (target === '_blank' ? 'noopener noreferrer' : undefined))\n")
+  .replaceAll("props.to", "to").replaceAll("props.params", "params").replaceAll("props.search", "search").replaceAll("props.class", "className")
+  .replaceAll("props.href", "href").replaceAll("props.target", "target").replaceAll("props.download", "download")
+  .replaceAll("props.type ?? 'button'", "type").replaceAll("props.disabled", "disabled").replaceAll("props.label ?? ''", "label")
+  .replaceAll("attributes.value", "rest");
+
+test("meeko check types a button that is a MeekoLink with a union of routes, an <a> or a <button>", { timeout: 180_000 }, async () => {
+  const project = await createTempProject("route-polymorphic-check");
+  const root = project.root;
+  try {
+    await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}\n');
+    await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
+    await symlink(resolve("."), join(root, "node_modules", "@meekojs", "meeko"), "junction");
+    await mkdir(join(root, "app", "components"), { recursive: true });
+    await mkdir(join(root, "app", "pages", "users"), { recursive: true });
+    await writeFile(join(root, "app", "pages", "about.meeko"), "<template><h1>Acerca</h1></template>\n");
+    await writeFile(join(root, "app", "pages", "users", "[id].meeko"), "<template><h1>Usuario</h1></template>\n");
+    await writeFile(join(root, "app", "components", "AppButton.meeko"), polymorphicButton);
+    await writeFile(join(root, "app", "components", "DestructuredButton.meeko"), destructuredButton);
+    const page = join(root, "app", "pages", "index.meeko");
+    const check = async (uses: string) => {
+      await writeFile(page, `<script lang="ts">\nconst id = signal("7");\nconst busy = signal(false);\n</script>\n<template>${uses}</template>\n`);
+      return (await checkApp(root)).map((item) => `${item.code}: ${item.message}`);
+    };
+    await prepareFrameworkTypeDeclarations(root);
+    // Before 1.8, bind:params="props.params" with a union of routes was TS2412 inside the component,
+    // and aria-* and data-* on <AppButton> were MEEK032.
+    const valid = '<AppButton to="/about" label="Acerca" title="Ir" data-kind="internal" />'
+      + '<AppButton bind:to="\'/users/[id]\'" bind:params="{ id: id.value }" bind:search="{ tab: \'x\' }" aria-label="Perfil">Perfil</AppButton>'
+      + '<AppButton href="https://example.com" target="_blank" label="Externo" id="ext" />'
+      + '<AppButton href="/file.pdf" download="file.pdf" label="Bajar" />'
+      + '<AppButton type="submit" label="Enviar" bind:aria-busy="busy.value" />'
+      + '<AppButton bind:disabled="true" on:click="(event) => console.log(event.button)">Off</AppButton>';
+    assert.deepEqual(await check(valid), []);
+    const wrong: Array<[string, RegExp]> = [
+      ['<AppButton to="/nowhere" />', /^TS2322:.*\/nowhere/],
+      ['<AppButton bind:to="\'/users/[id]\'" />', /^TS2345:/],
+      ['<AppButton bind:to="\'/users/[id]\'" bind:params="{ nope: \'1\' }" />', /^TS2353:.*nope/],
+      ['<AppButton to="/about" bind:params="{ id: \'1\' }" />', /^TS2345:/],
+      ['<AppButton to="/about" href="/x" />', /^TS2345:/],
+      ['<AppButton to="/about" type="submit" />', /^TS2322:/],
+      ['<AppButton href="/x" type="submit" />', /^TS2322:/],
+      ['<AppButton href="/x" bind:disabled="true" />', /^TS2345:/],
+      ['<AppButton type="submit" target="_blank" />', /^TS2345:|^TS2322:/],
+    ];
+    for (const [uses, message] of wrong) {
+      const diagnostics = await check(uses);
+      assert.ok(diagnostics.some((item) => message.test(item)), `${uses}: ${JSON.stringify(diagnostics)}`);
+    }
+    // Destructured, the union still narrows (to !== undefined correlates params) and the defaults
+    // of the pattern keep each branch exclusive for the parent.
+    assert.doesNotMatch(destructuredButton, /props\./);
+    assert.deepEqual(await check(valid.replaceAll("AppButton", "DestructuredButton")), []);
+    for (const [uses, message] of wrong) {
+      const diagnostics = await check(uses.replaceAll("AppButton", "DestructuredButton"));
+      assert.ok(diagnostics.some((item) => message.test(item)), `destructured ${uses}: ${JSON.stringify(diagnostics)}`);
+    }
+  } finally {
+    await project.remove();
+  }
+});

@@ -8,6 +8,7 @@ import { createNavigator, createRouteManifest, href, matchRoute } from "../src/a
 import { ApiError, createRequestContext, MemorySessionStore, SessionManager, useRequestState } from "../src/framework-server.ts";
 import { discoverRoutes } from "../src/framework/routes-discovery.ts";
 import { createFrameworkHandler } from "../src/server/runtime/framework-render.ts";
+import { inlineSources } from "../src/server/runtime/inline-sources.ts";
 import { currentRequest } from "../src/server/runtime/request-context.ts";
 
 test("file routes discover groups, layouts, errors, sidecars, and resolve specificity", async () => {
@@ -114,9 +115,33 @@ test("compiled layout outlet composes page SSR without leaking its module in pay
   const html = await (await handler(new Request("https://example.test/"))).text();
   assert.match(html, /<main><p>Page<\/p><\/main>/);
   assert.match(html, /<style>main\{display:block\}<\/style><style>p\{color:red\}/);
-  assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/);
+  // `</style` in the CSS cannot close the element: it becomes `<\/style`, and the rest stays
+  // text of the <style> (raw text, where `<script>` is not a tag). Parsed as a browser does, the
+  // document has no inline script beyond the payload, and the style keeps the whole text.
+  assert.doesNotMatch(html, /<\/style><script>alert/i);
+  const parsed = inlineSources(html);
+  assert.deepEqual(parsed.scripts, []);
+  assert.ok(parsed.styles.includes("p{color:red} <\\/style><script>alert(1)</script>"), JSON.stringify(parsed.styles));
   assert.doesNotMatch(html, /renderWithState/);
 });
+
+/**
+ * Quita del documento los valores aleatorios por petición (el token CSRF de la meta), que pueden
+ * contener por azar un nombre como `bob`, para buscar fugas en el resto del HTML.
+ */
+function withoutRandomTokens(html: string): string {
+  return html.replace(/(<meta name="meeko-csrf-token" content=")[^"]*"/g, '$1"');
+}
+
+/** Usuario que aparece en cada lugar del documento donde la página lo pinta. */
+function renderedUsers(html: string): { body: string | undefined; data: string | undefined; title: string | undefined } {
+  const payload = /<script id="meeko-payload" type="application\/json">(.*?)<\/script>/s.exec(html)?.[1];
+  return {
+    body: /<div id="app"><p>(.*?)<\/p><\/div>/.exec(html)?.[1],
+    data: payload ? (JSON.parse(payload) as { props: { data: { user: string } } }).props.data.user : undefined,
+    title: /<title>([^:<]*):/.exec(html)?.[1],
+  };
+}
 
 test("request context keeps concurrent loader state and sessions isolated", async () => {
   const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
@@ -150,10 +175,10 @@ test("request context keeps concurrent loader state and sessions isolated", asyn
     handler(new Request("https://example.test/", { headers: { cookie: `meeko.sid=${bobRecord.id}` } })),
   ]);
   const [aliceHtml, bobHtml] = await Promise.all([aliceResponse.text(), bobResponse.text()]);
-  assert.match(aliceHtml, /<p>alice<\/p>/);
-  assert.doesNotMatch(aliceHtml, /bob/);
-  assert.match(bobHtml, /<p>bob<\/p>/);
-  assert.doesNotMatch(bobHtml, /alice/);
+  assert.deepEqual(renderedUsers(aliceHtml), { body: "alice", data: "alice", title: "alice" });
+  assert.deepEqual(renderedUsers(bobHtml), { body: "bob", data: "bob", title: "bob" });
+  assert.doesNotMatch(withoutRandomTokens(aliceHtml), /bob/);
+  assert.doesNotMatch(withoutRandomTokens(bobHtml), /alice/);
   assert.ok(aliceResponse.headers.get("set-cookie")?.includes("meeko.sid="));
   assert.equal(bobResponse.headers.get("set-cookie"), null);
   assert.notEqual(aliceResponse.headers.get("x-request-id"), bobResponse.headers.get("x-request-id"));
@@ -217,8 +242,8 @@ test("error route keeps each SSR request context and correlation ID", async () =
   const bobHtml = await bobResponse.text();
   assert.match(aliceHtml, new RegExp(`alice:${aliceResponse.headers.get("x-request-id")}`));
   assert.match(bobHtml, new RegExp(`bob:${bobResponse.headers.get("x-request-id")}`));
-  assert.doesNotMatch(aliceHtml, /bob|private render failure/);
-  assert.doesNotMatch(bobHtml, /alice|private render failure/);
+  assert.doesNotMatch(withoutRandomTokens(aliceHtml), /bob|private render failure/);
+  assert.doesNotMatch(withoutRandomTokens(bobHtml), /alice|private render failure/);
   assert.deepEqual(new Set(observed.map(({ requestId }) => requestId)),
     new Set([aliceResponse.headers.get("x-request-id"), bobResponse.headers.get("x-request-id")]));
   assert.equal(observed.length, 2);

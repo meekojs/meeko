@@ -10,8 +10,8 @@ import { ApiError, reportServerError } from "../errors";
 
 /**
  * Ejecuta un procedimiento RPC con sus guardas y validaciones y devuelve su salida validada. Es la
- * pieza de bajo nivel de {@link dispatchRpc}. El orden es: Origin (`origin: "required"`), Origin y
- * CSRF de la sesión, `rateLimit`, `auth`, `authorize`, `input`, `locals`, handler y `output`.
+ * pieza de bajo nivel de {@link dispatchRpc}. El orden es: Origin (desde `1.8`, en toda llamada
+ * salvo con `origin: "none"`), Origin y CSRF de la sesión, `rateLimit`, `auth`, `authorize`, `input`, `locals`, handler y `output`.
  *
  * @param definition Procedimiento declarado con `defineRpc`.
  * @param rawInput Entrada sin validar.

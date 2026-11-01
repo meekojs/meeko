@@ -249,7 +249,16 @@ export async function checkApp(projectRoot: string): Promise<CompileDiagnostic[]
   diagnostics.push(...await strayGroupFiles(sourceRoots));
   // `#server/` in app/ or shared/ and `@/` in shared/: TypeScript alone would only say the module does not exist.
   const aliases = await resolveProjectAliases(projectRoot);
-  diagnostics.push(...await checkAliasScopes(aliases, await sourceTypeScriptFiles(sourceRoots), (file) => readFile(file, "utf8")));
+  const modules = await sourceTypeScriptFiles(sourceRoots);
+  diagnostics.push(...await checkAliasScopes(aliases, modules, (file) => readFile(file, "utf8")));
+  // MEEK130 and MEEK129: `onCleanup` while a module is evaluated, or after an `await`.
+  let moduleCleanup: ((text: string, filename: string) => CompileDiagnostic[]) | undefined;
+  for (const file of modules) {
+    const text = await readFile(file, "utf8");
+    if (!text.includes("onCleanup")) continue;
+    moduleCleanup ??= (await import("../language-server/cleanup")).moduleCleanupDiagnostics;
+    diagnostics.push(...moduleCleanup(text, file));
+  }
   return diagnostics;
 }
 

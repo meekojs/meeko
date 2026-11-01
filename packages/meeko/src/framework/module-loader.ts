@@ -20,7 +20,8 @@ import { normalizeComponentExcludes } from "./component-exclusions";
 
 /** How a string entry of `modules` resolves, without executing it. */
 export type ModuleEntryTarget =
-  | { readonly kind: "module"; readonly file: string }
+  /** `specifier` is the package specifier that resolved, `<package>/module` when the package exports it. */
+  | { readonly kind: "module"; readonly file: string; readonly specifier?: string }
   /** A folder with `app/pages` and no module entry: a layer kept for 1.x compatibility. */
   | { readonly kind: "layer"; readonly dir: string }
   | { readonly kind: "missing"; readonly path: string };
@@ -65,18 +66,73 @@ function packageEntry(directory: string, subpath = "."): string | undefined {
   return target ? resolve(directory, target) : undefined;
 }
 
+/** The package name and the subpath (`""` for the root) of a bare specifier. */
+function splitSpecifier(specifier: string): { readonly name: string; readonly subpath: string } {
+  const parts = specifier.split("/");
+  const scoped = specifier.startsWith("@");
+  return { name: (scoped ? parts.slice(0, 2) : parts.slice(0, 1)).join("/"), subpath: parts.slice(scoped ? 2 : 1).join("/") };
+}
+
+/** The folder of the package `name` installed for `root`, searching `node_modules` upwards. */
+function installedPackageDirectory(root: string, name: string): string | undefined {
+  for (let directory = resolve(root); ; directory = dirname(directory)) {
+    const candidate = join(directory, "node_modules", ...name.split("/"));
+    if (isDirectory(candidate)) return candidate;
+    if (dirname(directory) === directory) return undefined;
+  }
+}
+
+function readManifest(directory: string): Record<string, unknown> | undefined {
+  try {
+    const value = JSON.parse(readFileSync(join(directory, "package.json"), "utf8")) as unknown;
+    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+  } catch { return undefined; }
+}
+
 /** Resolves a package specifier from the project, also for packages that only export `import`. */
 function resolvePackage(root: string, specifier: string): string | undefined {
   try { return createRequire(join(root, "package.json")).resolve(specifier); }
   catch { /* ESM-only exports are resolved below. */ }
-  const parts = specifier.split("/");
-  const name = specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0]!;
-  const subpath = parts.slice(specifier.startsWith("@") ? 2 : 1).join("/");
-  for (let directory = resolve(root); ; directory = dirname(directory)) {
-    const candidate = join(directory, "node_modules", ...name.split("/"));
-    if (isDirectory(candidate)) return packageEntry(candidate, subpath ? `./${subpath}` : ".");
-    if (dirname(directory) === directory) return undefined;
+  const { name, subpath } = splitSpecifier(specifier);
+  const directory = installedPackageDirectory(root, name);
+  return directory ? packageEntry(directory, subpath ? `./${subpath}` : ".") : undefined;
+}
+
+/**
+ * The specifier of the module of a package entry: `<specifier>/module` when the package exports
+ * that subpath in `exports` (as `@meekojs/i18n`, whose root is its runtime, and
+ * `@meekojs/meeko/i18n`), or the specifier itself, whose default export is then the module.
+ */
+export function moduleSpecifierOf(projectRoot: string, specifier: string): string {
+  const { name, subpath } = splitSpecifier(specifier);
+  const directory = installedPackageDirectory(projectRoot, name);
+  const exports = directory ? readManifest(directory)?.exports : undefined;
+  if (!exports || typeof exports !== "object" || Array.isArray(exports)) return specifier;
+  const key = subpath ? `./${subpath}/module` : "./module";
+  return Object.hasOwn(exports, key) ? `${specifier}/module` : specifier;
+}
+
+/** Keyword of `package.json` that marks a package as a Meeko module, for the editor and the messages. */
+export const moduleKeyword = "meeko-module";
+
+/**
+ * The dependencies of the project's `package.json` (all of its dependency fields) that are
+ * installed and have the keyword `meeko-module`, sorted. Nothing is executed.
+ */
+export function installedModulePackageNames(projectRoot: string): string[] {
+  const root = resolve(projectRoot);
+  const manifest = readManifest(root);
+  if (!manifest) return [];
+  const names = new Set<string>();
+  for (const field of ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"]) {
+    const value = manifest[field];
+    if (value && typeof value === "object" && !Array.isArray(value)) for (const name of Object.keys(value)) names.add(name);
   }
+  return [...names].filter((name) => {
+    const directory = installedPackageDirectory(root, name);
+    const keywords = directory ? readManifest(directory)?.keywords : undefined;
+    return Array.isArray(keywords) && keywords.includes(moduleKeyword);
+  }).sort();
 }
 
 function moduleFileIn(directory: string): string | undefined {
@@ -93,8 +149,9 @@ function moduleFileIn(directory: string): string | undefined {
 export function classifyModuleEntry(projectRoot: string, entry: string): ModuleEntryTarget {
   const root = resolve(projectRoot);
   if (!isPathEntry(entry)) {
-    const file = resolvePackage(root, entry);
-    if (file) return { kind: "module", file };
+    const specifier = moduleSpecifierOf(root, entry);
+    const file = resolvePackage(root, specifier);
+    if (file) return { kind: "module", file, specifier };
     // Before 1.2 every entry was a path from the project root, also without "./" ("modules/auth").
     if (!isDirectory(resolve(root, entry))) return { kind: "missing", path: entry };
   }
@@ -121,6 +178,11 @@ export function legacyLayerEntries(projectRoot: string, config: MeekoConfig): st
 }
 
 const warnedLegacyEntries = new Set<string>();
+
+/** The name of the project's configuration file, for the messages. */
+function configFileName(projectRoot: string): string {
+  return basename(["meeko.config.ts", "meeko.config.mts", "meeko.config.js", "meeko.config.mjs"].map((name) => join(resolve(projectRoot), name)).find(isFile) ?? "meeko.config.ts");
+}
 
 /**
  * Prints, once per process and entry, the deprecation of a layer folder listed in `modules`.
@@ -256,10 +318,13 @@ const emptyModules: ResolvedModules = Object.freeze({
 const ownConfigKeys = Object.keys({
   layers: true, extends: true, modules: true, imports: true, components: true, server: true, css: true, document: true,
   dev: true, site: true, sitemap: true, robots: true, theme: true, alias: true, viewTransitions: true,
+  devtools: true,
 } satisfies Record<keyof MeekoConfig, true>);
 
 /** Version of Meeko that added each key of `ownConfigKeys` after 1.2, for the message. */
-const ownConfigKeySince: Readonly<Record<string, string>> = { dev: "1.3", site: "1.3", sitemap: "1.3", robots: "1.3", theme: "1.4", alias: "1.5", viewTransitions: "1.7" };
+const ownConfigKeySince: Readonly<Record<string, string>> = {
+  dev: "1.3", site: "1.3", sitemap: "1.3", robots: "1.3", theme: "1.4", alias: "1.5", viewTransitions: "1.7", devtools: "1.8",
+};
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
@@ -332,30 +397,110 @@ function normalizePublicPath(path: string, module: string): string {
 
 type ModuleEntry = NonNullable<MeekoConfig["modules"]>[number];
 
-async function loadModule(root: string, entry: ModuleEntry): Promise<{ module: MeekoModule<object>; inline: unknown; file?: string } | undefined> {
-  const [reference, inline] = Array.isArray(entry) ? entry as readonly [unknown, unknown] : [entry, undefined];
-  if (isMeekoModule(reference)) return { module: reference, inline };
-  if (typeof reference !== "string") throw new TypeError("Cada entrada de modules debe ser un módulo creado con defineMeekoModule, un nombre de paquete o una ruta, o [módulo, opciones]");
+/** The closest name of `candidates` to `value` when it looks like a typo, as for the keys of the configuration. */
+function closestName(value: string, candidates: readonly string[]): string | undefined {
+  let suggestion: string | undefined;
+  let best = (value.length <= 3 ? 1 : Math.max(2, Math.floor(value.length / 3))) + 1;
+  for (const candidate of candidates) {
+    const distance = candidate.toLowerCase() === value.toLowerCase() ? 0 : editDistance(value, candidate);
+    if (distance < best) { best = distance; suggestion = candidate; }
+  }
+  return suggestion;
+}
+
+/** Imports the module of a resolved entry; `reference` names it in the errors. */
+async function importModule(file: string, reference: string, isPackage: boolean): Promise<MeekoModule<object>> {
+  let loaded: unknown;
+  try { loaded = (await import(pathToFileURL(file).href) as { default?: unknown }).default; }
+  catch (error) { throw new Error(`No se puede cargar el módulo de Meeko ${reference}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
+  if (!isMeekoModule(loaded)) {
+    throw new TypeError(isPackage
+      ? `El paquete ${reference} no es un módulo de Meeko: ${file} debe exportar por defecto defineMeekoModule(...), en su subpath ./module o en su raíz`
+      : `${file} debe exportar por defecto defineMeekoModule(...)`);
+  }
+  return loaded;
+}
+
+interface LoadedModule {
+  readonly module: MeekoModule<object>;
+  readonly inline: unknown;
+  readonly file?: string;
+  /** The string of `modules` that named the module, if it was not imported. */
+  readonly reference?: string;
+  /** `object` for an imported module, `tuple` for `[module, options]`. */
+  readonly deprecated?: "object" | "tuple";
+}
+
+async function loadModule(root: string, entry: ModuleEntry): Promise<LoadedModule | undefined> {
+  const tuple = Array.isArray(entry);
+  const [reference, inline] = tuple ? entry as readonly [unknown, unknown] : [entry, undefined];
+  if (isMeekoModule(reference)) return { module: reference, inline, deprecated: tuple ? "tuple" : "object" };
+  if (typeof reference !== "string") throw new TypeError("Cada entrada de modules debe ser el nombre de un paquete o la ruta de un módulo creado con defineMeekoModule");
   const target = classifyModuleEntry(root, reference);
   if (target.kind === "layer") {
     // A layer folder in `modules` stays a layer during 1.x; `[folder, options]` has no module to receive the options.
     if (inline !== undefined) throw new TypeError(`La entrada ${reference} de modules es una carpeta de layer, que no admite opciones; muévala a layers`);
     return undefined;
   }
-  if (target.kind === "missing") throw new Error(`No se encuentra el módulo de Meeko ${reference}: ${target.path}`);
-  let loaded: unknown;
-  try { loaded = (await import(pathToFileURL(target.file).href) as { default?: unknown }).default; }
-  catch (error) { throw new Error(`No se puede cargar el módulo de Meeko ${reference}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
-  if (!isMeekoModule(loaded)) throw new TypeError(`${target.file} debe exportar por defecto defineMeekoModule(...)`);
-  return { module: loaded, inline, file: target.file };
+  if (target.kind === "missing") {
+    if (isPathEntry(reference)) throw new Error(`No se encuentra el módulo de Meeko ${reference}: ${target.path} no existe`);
+    const suggestion = closestName(reference, installedModulePackageNames(root));
+    throw new Error(`No se encuentra el módulo de Meeko ${reference}: no es un paquete instalado ni una ruta del proyecto. ${suggestion === undefined
+      ? `Instale el paquete (pnpm add ${reference}) o escriba la ruta de un módulo con ./`
+      : `¿Quisiste decir ${JSON.stringify(suggestion)}?`}`);
+  }
+  const module = await importModule(target.file, reference, target.specifier !== undefined);
+  return { module, inline, file: target.file, reference, ...(tuple ? { deprecated: "tuple" as const } : {}) };
+}
+
+const warnedDeprecatedEntries = new Set<string>();
+
+/**
+ * The deprecation (`MEEK126`) of an imported module or a `[module, options]` entry: the message
+ * names the string to write in `modules` and the key of the options. `null` for the entries in
+ * the documented form.
+ */
+export function deprecatedModuleEntryMessage(projectRoot: string, loaded: Pick<LoadedModule, "module" | "inline" | "reference" | "deprecated">, index: number): string | null {
+  if (!loaded.deprecated) return null;
+  const { name, configKey } = loaded.module.meta;
+  // An imported module is named by its package when that name resolves; otherwise by its path.
+  const reference = loaded.reference
+    ?? (!isPathEntry(name) && classifyModuleEntry(projectRoot, name).kind === "module" ? name : undefined);
+  const entry = reference === undefined ? "<ruta del módulo, como ./modules/hello>" : reference;
+  const form = loaded.deprecated === "tuple" ? `[módulo, opciones] con el módulo ${name}` : `el módulo importado ${name}`;
+  const hasOptions = loaded.inline !== undefined && Object.keys(loaded.inline as object).length > 0;
+  const target = configKey === undefined
+    ? `modules: [${JSON.stringify(entry)}]${hasOptions ? ". El módulo no declara meta.configKey, así que sus opciones sólo caben en [módulo, opciones] durante 1.x: pida a su autor una configKey" : ""}`
+    : `modules: [${JSON.stringify(entry)}] y sus opciones en ${configKey}: { … }`;
+  return `[meeko] Aviso MEEK126: modules[${index}] de ${configFileName(projectRoot)} usa ${form}, obsoleto desde 1.8. Escríbalo por su nombre: ${target}. `
+    + "Los módulos importados y [módulo, opciones] siguen funcionando en 1.x y dejarán de hacerlo en Meeko 2.0.\n";
+}
+
+/**
+ * Finds, among the installed module packages that are not in `modules`, the one whose
+ * `meta.configKey` is `key`. It imports their modules (never runs a setup); a package that fails
+ * to load is skipped.
+ */
+async function unlistedModuleForKey(root: string, key: string, listed: readonly string[]): Promise<string | undefined> {
+  for (const name of installedModulePackageNames(root)) {
+    if (listed.includes(name)) continue;
+    const target = classifyModuleEntry(root, name);
+    if (target.kind !== "module") continue;
+    try {
+      const module = await importModule(target.file, name, true);
+      if (module.meta.configKey === key && !listed.includes(module.meta.name)) return name;
+    } catch { /* Not a loadable module: it cannot own the key. */ }
+  }
+  return undefined;
 }
 
 async function runModules(root: string, config: MeekoConfig, dev: boolean): Promise<ResolvedModules> {
   if (!config.modules?.length) {
-    warnUnknownConfigKeys(root, config, []);
+    await warnConfigKeys(root, config, [], []);
     return emptyModules;
   }
   const configKeys: string[] = [];
+  const configKeyOwners = new Map<string, string>();
   const names: string[] = [];
   const entryFiles: string[] = [];
   const layers: string[] = [];
@@ -375,13 +520,19 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
   const ownedDirectories = new Set<string>();
   const hooks = new Map<keyof MeekoHooks, Array<(...args: never[]) => unknown>>();
   const version = meekoVersion();
-  for (const entry of config.modules) {
+  for (const [index, entry] of config.modules.entries()) {
     const loaded = await loadModule(root, entry);
     if (!loaded) continue;
     const { module, inline, file } = loaded;
     const name = module.meta.name;
     if (names.includes(name)) throw new Error(`El módulo de Meeko ${name} aparece más de una vez`);
     names.push(name);
+    const deprecation = deprecatedModuleEntryMessage(root, loaded, index);
+    const warningKey = `${root}\0${index}\0${name}`;
+    if (deprecation && !warnedDeprecatedEntries.has(warningKey)) {
+      warnedDeprecatedEntries.add(warningKey);
+      process.stderr.write(deprecation);
+    }
     if (file) { entryFiles.push(file); ownedDirectories.add(dirname(file)); }
     const range = module.meta.compatibility?.meeko;
     if (range !== undefined && !satisfiesVersion(version, range)) {
@@ -392,7 +543,12 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
       const since = ownConfigKeySince[configKey];
       throw new Error(`El módulo de Meeko ${name} usa meta.configKey ${JSON.stringify(configKey)}, que es una opción del propio Meeko${since ? ` desde ${since}` : ""}: dé al módulo otra configKey y mueva sus opciones de meeko.config.* a esa clave (véase docs/migration-1.4.md)`);
     }
-    if (configKey !== undefined) configKeys.push(configKey);
+    if (configKey !== undefined) {
+      const owner = configKeyOwners.get(configKey);
+      if (owner !== undefined) throw new Error(`Los módulos de Meeko ${owner} y ${name} usan la misma meta.configKey ${JSON.stringify(configKey)}: quite uno de modules`);
+      configKeyOwners.set(configKey, name);
+      configKeys.push(configKey);
+    }
     const configured = configKey === undefined ? undefined : (config as Record<string, unknown>)[configKey];
     const options = mergeModuleOptions(module.defaults, configured, inline);
     const path = (value: string | URL, what: string): string => toPath(root, value, what, name);
@@ -511,7 +667,7 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
     },
   };
   await resolved.callHook("ready");
-  warnUnknownConfigKeys(root, config, configKeys);
+  await warnConfigKeys(root, config, configKeys, names);
   return resolved;
 }
 
@@ -540,12 +696,7 @@ export function unknownConfigKeys(config: MeekoConfig, moduleKeys: readonly stri
   const result: Array<{ key: string; suggestion?: string }> = [];
   for (const key of Object.keys(config)) {
     if (known.includes(key)) continue;
-    let suggestion: string | undefined;
-    let best = (key.length <= 3 ? 1 : Math.max(2, Math.floor(key.length / 3))) + 1;
-    for (const candidate of known) {
-      const distance = candidate.toLowerCase() === key.toLowerCase() ? 0 : editDistance(key, candidate);
-      if (distance < best) { best = distance; suggestion = candidate; }
-    }
+    const suggestion = closestName(key, known);
     result.push(suggestion === undefined ? { key } : { key, suggestion });
   }
   return result;
@@ -559,15 +710,72 @@ export function unknownConfigKeys(config: MeekoConfig, moduleKeys: readonly stri
 export function warnUnknownConfigKeys(projectRoot: string, config: MeekoConfig, moduleKeys: readonly string[], write: (text: string) => void = (text) => process.stderr.write(text)): void {
   if (reportedConfigs.has(config)) return;
   reportedConfigs.add(config);
-  const file = basename(["meeko.config.ts", "meeko.config.mts", "meeko.config.js", "meeko.config.mjs"].map((name) => join(resolve(projectRoot), name)).find(isFile) ?? "meeko.config.ts");
+  const file = configFileName(projectRoot);
+  for (const { key, suggestion } of unknownConfigKeys(config, moduleKeys)) write(unknownKeyMessage(file, key, suggestion));
+}
+
+function unknownKeyMessage(file: string, key: string, suggestion: string | undefined): string {
+  return `[meeko] Aviso: ${file} tiene la clave desconocida ${JSON.stringify(key)}, que Meeko ignora. ${suggestion === undefined
+    ? "Si son las opciones de un módulo, añádalo a modules: su meta.configKey la declara."
+    : `¿Quisiste decir ${JSON.stringify(suggestion)}?`}\n`;
+}
+
+/**
+ * Like {@link warnUnknownConfigKeys}, once per configuration, but a key that is the
+ * `meta.configKey` of an installed module package missing from `modules` (`i18n: { … }` without
+ * `"@meekojs/i18n"`) is `MEEK127`, which names the entry to add. A warning in 1.x: the key is
+ * ignored, as before 1.8.
+ */
+async function warnConfigKeys(projectRoot: string, config: MeekoConfig, moduleKeys: readonly string[], listed: readonly string[], write: (text: string) => void = (text) => process.stderr.write(text)): Promise<void> {
+  if (reportedConfigs.has(config)) return;
+  reportedConfigs.add(config);
+  const file = configFileName(projectRoot);
+  const listedNames = [...listed, ...(config.modules ?? []).filter((entry): entry is string => typeof entry === "string")];
   for (const { key, suggestion } of unknownConfigKeys(config, moduleKeys)) {
-    write(`[meeko] Aviso: ${file} tiene la clave desconocida ${JSON.stringify(key)}, que Meeko ignora. ${suggestion === undefined
-      ? "Si son las opciones de un módulo, añádalo a modules: su meta.configKey la declara."
-      : `¿Quisiste decir ${JSON.stringify(suggestion)}?`}\n`);
+    const owner = await unlistedModuleForKey(resolve(projectRoot), key, listedNames);
+    write(owner === undefined ? unknownKeyMessage(file, key, suggestion)
+      : `[meeko] Aviso MEEK127: ${file} tiene la clave ${JSON.stringify(key)}, que es la configKey del módulo ${owner}, pero ${owner} no está en modules, así que Meeko ignora sus opciones. Añádalo: modules: [${JSON.stringify(owner)}].\n`);
   }
 }
 
 let developmentMode = false;
+
+/** Name of the nearest `package.json` above `directory` that has one, without leaving its `node_modules` folder. */
+function owningPackageName(directory: string): string | undefined {
+  for (let current = directory; basename(current) !== "node_modules";) {
+    const manifest = join(current, "package.json");
+    if (isFile(manifest)) {
+      let name: unknown;
+      try { name = (JSON.parse(readFileSync(manifest, "utf8")) as { name?: unknown }).name; } catch { name = undefined; }
+      // A nested manifest without a name (`{ "type": "module" }` in `dist/`) is not the package.
+      if (typeof name === "string" && name) return name;
+    }
+    const parent = dirname(current);
+    if (parent === current) return undefined;
+    current = parent;
+  }
+  return undefined;
+}
+
+/**
+ * Installed packages (their real path is under `node_modules`) that hold files of the modules:
+ * the module entry, plugins, components, layouts, autoimports. A module's runtime code reaches Vite
+ * by two paths: the package name of an autoimport (`@meekojs/ui/runtime`), and the files its setup
+ * registers by path, which import their neighbours relatively. Vite's dependency optimizer (the dev
+ * client) and the SSR externalization (the server build) treat only the first as a dependency, so
+ * the same file ran twice: a context key from `createContext` provided by a plugin was not the one a
+ * page read, and any other state of the module was split in two. Meeko compiles these packages as
+ * source instead, as a linked package already is. `@meekojs/meeko` stays a single external copy.
+ */
+export function installedModulePackages(directories: readonly string[]): string[] {
+  const names = new Set<string>();
+  for (const directory of directories) {
+    if (!directory.replaceAll("\\", "/").split("/").includes("node_modules")) continue;
+    const name = owningPackageName(directory);
+    if (name && name !== "@meekojs/meeko") names.add(name);
+  }
+  return [...names];
+}
 
 /** `meeko dev` sets this before loading anything, so every resolution in the process sees `dev: true`. */
 export function setModuleDevelopmentMode(dev: boolean): void {

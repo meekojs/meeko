@@ -372,6 +372,41 @@ test("SSR paints every icon and the CSS shows the choice: data-theme-choice with
   }
 });
 
+test("useThemeToggle() gives a custom toggle the state, the ordered choices, system and whether the render knows the choice", { timeout: 30_000 }, async () => {
+  const project = await createTempProject("theme-toggle-public");
+  try {
+    const directory = project.root;
+    await writeFile(join(directory, "package.json"), '{"private":true,"type":"module"}\n');
+    const source = `<script lang="ts">
+import { useThemeToggle } from "@meekojs/meeko/framework";
+const toggle = useThemeToggle();
+</script>
+<template><output>{JSON.stringify({ choice: toggle.theme.theme.value, resolved: toggle.theme.resolved.value, choices: toggle.choices, system: toggle.system ?? null, known: toggle.known.value, interactive: toggle.interactive.value, frozen: Object.isFrozen(toggle) && Object.isFrozen(toggle.choices) })}</output></template>`;
+    const runtimePath = (path: string): string => JSON.stringify(pathToFileURL(resolve(path)).href);
+    const code = compile(source, join(directory, "state.meeko"), { theme: true }).code
+      .replaceAll(`from "@meekojs/meeko/internal"`, `from ${runtimePath("src/internal.ts")}`)
+      .replaceAll(`from "@meekojs/meeko/framework"`, `from ${runtimePath("src/framework.ts")}`)
+      .replaceAll(`from "@meekojs/meeko"`, `from ${runtimePath("src/index.ts")}`);
+    await writeFile(join(directory, "state.ts"), code);
+    const module = await import(pathToFileURL(join(directory, "state.ts")).href) as ClientComponent;
+    const { createFrameworkHandler } = await runtime();
+    const render = async (config: ResolvedThemeConfig, cookie?: string): Promise<unknown> => {
+      const handler = createFrameworkHandler({ routes: createRouteManifest([{ id: "/", file: "state.meeko", layouts: [] }]), loadPage: async () => module, onError: (error) => { throw error; }, document: { config: { theme: config } } });
+      const html = await (await handler(page("https://example.test/", cookie ? { cookie } : {}))).text();
+      return JSON.parse(bare(html).match(/<output[^>]*>(.*?)<\/output>/)![1]!.replaceAll("&quot;", '"'));
+    };
+    assert.deepEqual(await render(resolved(), "meeko-theme=dark"), {
+      choice: "dark", resolved: "dark", choices: ["light", "dark", "system"], system: { light: "light", dark: "dark" }, known: true, interactive: false, frozen: true,
+    });
+    // Without the cookie the server does not know the choice; without system there is no "system".
+    assert.deepEqual(await render(resolved({ themes: ["light", "dark", "sepia"], system: false })), {
+      choice: "light", resolved: "light", choices: ["light", "dark", "sepia"], system: null, known: false, interactive: false, frozen: true,
+    });
+  } finally {
+    await project.remove();
+  }
+});
+
 test("the page handler serves POST /_meeko/theme only with theme, and the next document has the new theme", { timeout: 30_000 }, async () => {
   const { modules, cleanup } = await loadModules();
   try {
@@ -579,7 +614,8 @@ test("meeko check types the snippets, mode, themes and labels of <MeekoThemeTogg
     const file = join(root, "app", "pages", "index.meeko");
     const check = async (template: string) => {
       await writeFile(file, typedPage(template));
-      return (await checkApp(root)).map((item) => `${item.code}: ${item.message}`);
+      // MEEK121 (deprecated since 1.8) is covered on its own; this test checks the types.
+      return (await checkApp(root)).filter((item) => item.code !== "MEEK121").map((item) => `${item.code}: ${item.message}`);
     };
     await prepareFrameworkTypeDeclarations(root);
     assert.deepEqual(await check(`<MeekoThemeToggle mode="select" bind:themes="['sepia', 'system']" bind:labels="{ sepia: 'Sepia' }" class="t"><snippet name="sepia">S</snippet><snippet name="system">PC</snippet></MeekoThemeToggle>`), []);
@@ -619,8 +655,12 @@ test("the editor completes <MeekoThemeToggle>, its props and its snippets, and e
     // `<Meek` while it is typed: the tag is offered with MeekoLink.
     const typing = TextDocument.create(opened.document.uri, "meeko", 2, `<script lang="ts"></script>\n<template><Meek</template>`);
     const typed = typing.positionAt(typing.getText().indexOf("<Meek") + 5);
-    const names = componentNameCompletion(workspace.project, typing, opened.component.filename, typed)!.map((item) => item.label);
+    const offered = componentNameCompletion(workspace.project, typing, opened.component.filename, typed)!;
+    const names = offered.map((item) => item.label);
     assert.ok(names.includes("MeekoThemeToggle") && names.includes("MeekoLink"), JSON.stringify(names));
+    // Deprecated since 1.8 (MEEK121): struck through in the completion, MeekoLink is not.
+    assert.deepEqual(offered.find((item) => item.label === "MeekoThemeToggle")?.tags, [1]);
+    assert.equal(offered.find((item) => item.label === "MeekoLink")?.tags, undefined);
     const items = directiveNameCompletion(opened.document, opened.at("MeekoThemeToggle m", 18))!;
     const attributes = items.map((item) => item.label);
     // `mode` offers its two values.
@@ -637,6 +677,7 @@ test("the editor completes <MeekoThemeToggle>, its props and its snippets, and e
     assert.match(docs, /\n {2}light\?\(\)\n {2}dark\?\(\)\n {2}system\?\(\)\n<\/MeekoThemeToggle>\n```/);
     assert.match(docs, /Etiqueta de Meeko · componente · props: \[`MeekoThemeToggleProps`\]/);
     assert.match(docs, /data-theme-choice/);
+    assert.match(docs, /\*\*Obsoleta desde Meeko 1\.8\*\* \(MEEK121\).*`<UIThemeToggle>` de `@meekojs\/ui`/);
     assert.match(docs, /\[Guía de `<MeekoThemeToggle>`\]\([^)]+#meekothemetoggle\)/);
     const [target] = definition(opened, opened.at("MeekoThemeToggle", 3)) ?? [];
     assert.ok(target, "go to definition opens MeekoThemeToggleProps");

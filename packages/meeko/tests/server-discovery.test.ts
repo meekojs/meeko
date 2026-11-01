@@ -41,7 +41,7 @@ test("discovers API methods and RPC procedures and dispatches path parameters", 
   assert.equal(await (await dispatcher(new Request("http://localhost/api/users"))).json(), "list");
   assert.equal(await (await dispatcher(new Request("http://localhost/api/users/a%20b"))).json(), "a b");
   assert.equal((await dispatcher(new Request("http://localhost/api/users", { method: "DELETE" }))).headers.get("allow"), "GET, POST");
-  assert.equal(await (await dispatcher(new Request("http://localhost/_meeko/rpc/users/get", { method: "POST", headers: { "content-type": "application/json" }, body: '{"value":"rpc"}' }))).json(), "rpc");
+  assert.equal(await (await dispatcher(new Request("http://localhost/_meeko/rpc/users/get", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost" }, body: '{"value":"rpc"}' }))).json(), "rpc");
   const rpcGet = await dispatcher(new Request("http://localhost/_meeko/rpc/users/get"));
   assert.equal(rpcGet.status, 405);
   assert.equal(rpcGet.headers.get("allow"), "POST", "a procedure only accepts POST");
@@ -121,7 +121,7 @@ test("HTTP dispatcher reports internal API and RPC failures with their public re
   });
   const api = await dispatcher(new Request("http://localhost/api/broken"));
   const rpc = await dispatcher(new Request("http://localhost/_meeko/rpc/broken", {
-    method: "POST", headers: { "content-type": "application/json" }, body: '"hello"',
+    method: "POST", headers: { "content-type": "application/json", origin: "http://localhost" }, body: '"hello"',
   }));
   for (const [index, response] of [api, rpc].entries()) {
     assert.equal(response.status, 500);

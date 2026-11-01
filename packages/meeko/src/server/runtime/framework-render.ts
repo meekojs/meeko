@@ -30,6 +30,7 @@ import { fixedRoute, provideRoute, routeSnapshot } from "../../app/runtime/navig
 import { collectStyles } from "../../app/runtime/renderer";
 import { matchRoute, provideServerRouteManifest } from "../../app/runtime/router";
 import { StateStore, withStateStore } from "../../app/runtime/state";
+import { styleModuleId } from "../../app/runtime/style-modules";
 import { renderWithSuspense } from "../../app/runtime/suspense";
 import { collectTeleports, TeleportCollector } from "../../app/runtime/teleport";
 import { escapeHtml, serializeJson } from "../../core/server";
@@ -582,6 +583,26 @@ function documentBody(html: string, teleports: readonly TeleportEntry[], product
   return { app: placed.html, body: placed.body };
 }
 
+/**
+ * The `<style>` tags of the rendered components. Only the sequence that would close the element
+ * (`</style`, in any case) is escaped: `\/` is a valid escape inside a CSS string or a comment
+ * keeps it as text, and the sequence cannot appear elsewhere in valid CSS. Every other `<`, such as
+ * the one of a range media query (`@media (width < 40rem)`), reaches the browser as written.
+ *
+ * The document places them last in `<head>`, after the global stylesheets: the client bundle adds
+ * the components' CSS there too (Vite's `<style>` in development, the CSS of the route chunks in
+ * production), so the hydrated page keeps the cascade of the first paint. In development each tag
+ * also names its Vite module (`data-vite-dev-id`), and Vite's client adopts it instead of adding a
+ * copy; see {@link styleModuleId}.
+ */
+function documentStyleTags(styles: readonly string[], nonceAttribute: string): string {
+  return [...new Set(styles)].map((css) => {
+    const moduleId = styleModuleId(css);
+    const viteAttribute = moduleId === undefined ? "" : ` data-vite-dev-id="${escapeHtml(moduleId)}"`;
+    return `<style${viteAttribute}${nonceAttribute}>${css.replace(/<\/(style)/gi, "<\\/$1")}</style>`;
+  }).join("");
+}
+
 /** Props of the application error page for a URL without a route. */
 const notFoundProps = { status: 404, message: "NOT_FOUND" } as const;
 
@@ -1038,14 +1059,14 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
           }));
         }
         const host = documentParts(options.document, request, requestNonce());
-        const styleTags = [...new Set(styles)].map((css) => `<style${host.nonceAttribute}>${css.replaceAll("<", "\\3C ")}</style>`).join("");
+        const styleTags = documentStyleTags(styles, host.nonceAttribute);
         const script = options.clientEntry ? `<script type="module"${host.nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
         const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
         // Titled like the error document of a matched route; the payload head carries the same
         // title, so hydration still finds the host <title> after the managed head.
         const head = headDocument(options.document, host.nonce, collected, routeHeadInput({}, ERROR_PAGE_TITLE), undefined, theme);
         const placed = documentBody(rendered.html, teleports, options.production ?? true);
-        const document = `${head.prefix}${csrfMeta}${styleTags}${head.head}${host.head}</head>${head.bodyOpen}<div id="app">${placed.app}</div>${placed.body}<script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
+        const document = `${head.prefix}${csrfMeta}${head.head}${host.head}${styleTags}</head>${head.bodyOpen}<div id="app">${placed.app}</div>${placed.body}<script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
         return finish(new Response(headRequest ? null : document, {
           status: 404, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
         }), true, noncePolicy());
@@ -1246,7 +1267,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     };
     const nonceAttribute = host.nonceAttribute;
     const documentHead = (): HeadDocument => headDocument(options.document, host.nonce, collected, routeHeadInput(head), url.pathname, theme);
-    const styleTags = [...new Set(styles)].map((css) => `<style${nonceAttribute}>${css.replaceAll("<", "\\3C ")}</style>`).join("");
+    const styleTags = documentStyleTags(styles, nonceAttribute);
     const headRequest = request.method === "HEAD";
     if (streaming) {
       const sentCookie = requestContext?.session.cookieHeader;
@@ -1286,7 +1307,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       const script = options.clientEntry ? `<script type="module" async${nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
       const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
       const parts = documentHead();
-      const shellStart = `${parts.prefix}${csrfMeta}${styleTags}${parts.head}${host.head}</head>${parts.bodyOpen}<div id="app">`;
+      const shellStart = `${parts.prefix}${csrfMeta}${parts.head}${host.head}${styleTags}</head>${parts.bodyOpen}<div id="app">`;
       const shellEnd = `<script id="meeko-payload" type="application/json">${payload}</script>${script}`;
       const opening = `${shellStart}${placed.app}</div>${placed.body}${shellEnd}`;
       const closing = `${host.bodyEnd}</body></html>`;
@@ -1305,7 +1326,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     const script = options.clientEntry ? `<script type="module"${nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
     const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
     const parts = documentHead();
-    const shellStart = `${parts.prefix}${csrfMeta}${styleTags}${parts.head}${host.head}</head>${parts.bodyOpen}<div id="app">`;
+    const shellStart = `${parts.prefix}${csrfMeta}${parts.head}${host.head}${styleTags}</head>${parts.bodyOpen}<div id="app">`;
     const shellEnd = `<script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
     const document = `${shellStart}${placed.app}</div>${placed.body}${shellEnd}`;
     // The page and its teleports may carry user content: only what Meeko writes around them is hashed.
@@ -1339,7 +1360,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
           const renderError = async (): Promise<Response> => {
             const errorPage = await options.loadPage(errorFile);
             // A failure after the render sealed the page state still renders its error page.
-            const { rendered: errorRendered, head: collected, teleports } = await renderPageTree(withLayoutWriter(withHeadLevel(errorPage, 0), serverLayoutWriter(undefined, {})), {
+            const { rendered: errorRendered, head: collected, teleports, styles: errorStyles } = await renderPageTree(withLayoutWriter(withHeadLevel(errorPage, 0), serverLayoutWriter(undefined, {})), {
               status: known.status, message: known.status >= 500 ? "Internal Server Error" : known.code,
             }, pageStore.sealed ? new StateStore() : pageStore, route!,
             // Plugins that failed (perhaps the failure shown here) leave the error page without their values.
@@ -1348,7 +1369,9 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
             const head = headDocument(options.document, host.nonce, collected, routeHeadInput({}, ERROR_PAGE_TITLE), undefined, theme);
             // The error page is not hydrated, so a missing target only keeps its teleport in place.
             const placed = documentBody(errorRendered.html, teleports, true);
-            const document = `${head.prefix}${head.head}${host.head}</head>${head.bodyOpen}<div id="app">${placed.app}</div>${placed.body}${host.bodyEnd}</body></html>`;
+            // Nor does its CSS arrive later: the document inlines it, as for a page.
+            const styleTags = documentStyleTags([...errorPage.css ? [errorPage.css] : [], ...errorStyles], host.nonceAttribute);
+            const document = `${head.prefix}${head.head}${host.head}${styleTags}</head>${head.bodyOpen}<div id="app">${placed.app}</div>${placed.body}${host.bodyEnd}</body></html>`;
             return finish(new Response(request.method === "HEAD" ? null : document, {
               status: known.status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
             }), true, noncePolicy());

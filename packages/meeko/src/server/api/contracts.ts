@@ -113,15 +113,17 @@ export interface ApiRouteDefinition<P extends Schema | undefined, Q extends Sche
   /** `"required"` responde `401 UNAUTHENTICATED` sin sesión. */
   auth?: "required" | "optional";
   /**
-   * `"required"` (desde `1.2`) responde `403 INVALID_ORIGIN` a las peticiones `POST`, `PUT`,
-   * `PATCH` y `DELETE` cuyo `Origin` falta o no es el de la aplicación ni uno de
-   * `SessionManager.allowedOrigins`, aunque no haya sesión; por ejemplo, un inicio de sesión.
-   * Sin él, Origin se comprueba en las mutaciones autenticadas con cookie y, desde `1.2`, cuando el
-   * handler llama a `context.session.create()`.
+   * Comprobación de `Origin` en las peticiones `POST`, `PUT`, `PATCH` y `DELETE`. Desde `1.8`, por
+   * defecto (sin `origin`) responden `403 INVALID_ORIGIN` si su `Origin` falta, es `null` o no es
+   * el de la aplicación ni uno de `SessionManager.allowedOrigins`, haya o no sesión. `"required"`
+   * (desde `1.2`) equivale al valor por defecto y lo deja explícito.
    *
-   * `"none"` (desde `1.2`, **inseguro**) permite que `session.create()` cree una sesión sin un
-   * `Origin` permitido, para clientes que no lo envían, como una app nativa. Expone esa ruta al
-   * *login CSRF*: úsela sólo con otra prueba de que la petición no viene de otra web.
+   * `"none"` (desde `1.2`, **inseguro**) desactiva la comprobación en las peticiones sin sesión,
+   * también en un formulario nativo (`form`), para webhooks (incluidos los que envían
+   * `application/x-www-form-urlencoded`), APIs públicas y clientes que no envían `Origin`, y
+   * permite que `session.create()` cree una sesión sin un `Origin` permitido. Expone la ruta al
+   * CSRF y al *login CSRF*: úsela sólo con otra prueba de que la petición no viene de otra web,
+   * como una firma o un token. Una petición con sesión sigue exigiendo `Origin` y el token CSRF.
    */
   origin?: "required" | "none";
   /**

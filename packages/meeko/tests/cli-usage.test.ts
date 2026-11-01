@@ -98,6 +98,7 @@ test("meeko routes prepares .meeko like check: tsconfigs, services.d.ts and the 
     join(root, ".meeko", "types", "services.d.ts"), join(root, ".meeko", "tsconfig.app.json"),
     join(root, ".meeko", "tsconfig.server.json"), join(root, ".meeko", "tsconfig.shared.json"),
     join(root, ".meeko", "types", "autoimports", "server.d.ts"),
+    join(root, ".meeko", "types", "config.d.ts"), join(root, ".meeko", "tsconfig.config.json"),
   ]) {
     assert.ok(listed.includes(file), `${file} in ${result.stdout}`);
     assert.ok(existsSync(file), file);

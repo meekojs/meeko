@@ -22,7 +22,8 @@ const resolvedManifest = "\0meeko-i18n:manifest";
 const catalogPrefix = "\0meeko-i18n:catalog:";
 
 export default defineMeekoModule<I18nModuleOptions>({
-  meta: { name: "@meekojs/meeko/i18n", compatibility: { meeko: ">=1.7 <2" } },
+  // Listed as modules: ["@meekojs/meeko/i18n"] (its ./module subpath), with the options in i18n: { … }.
+  meta: { name: "@meekojs/meeko/i18n", configKey: "i18n", compatibility: { meeko: ">=1.7 <2" } },
   setup(options, meeko) {
     if (!options.catalogs || typeof options.catalogs !== "object" || Array.isArray(options.catalogs)) throw new TypeError("i18n: catalogs must be an object");
     const locales = Object.keys(options.catalogs);

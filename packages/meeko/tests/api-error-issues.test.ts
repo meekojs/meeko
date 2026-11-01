@@ -20,7 +20,7 @@ test("an ApiError with issues sends them like the issues of a 400, and keeps its
       throw new ApiError("EMAIL_TAKEN", 409, { message: `duplicate key ${body.email}`, issues: [{ path: "email", message: "Ese correo ya tiene una cuenta." }] });
     },
   });
-  const request = new Request("http://localhost/api/signup", { method: "POST", headers: { "content-type": "application/json" }, body: '{"email":"ada@example.com"}' });
+  const request = new Request("http://localhost/api/signup", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost" }, body: '{"email":"ada@example.com"}' });
   const context = createRequestContext(request, {}, await sessions.load(request));
   const response = await dispatchApiRoute(route, context, sessions);
   assert.equal(response.status, 409);
@@ -29,7 +29,7 @@ test("an ApiError with issues sends them like the issues of a 400, and keeps its
   assert.doesNotMatch(JSON.stringify(payload), /duplicate key|ada@example/);
 
   const rpc = defineRpc({ input: anything, output: text, handler: () => { throw new ApiError("EMAIL_TAKEN", 409, { issues: [{ path: "email", message: "Ya existe." }] }); } });
-  const call = new Request("http://localhost/_meeko/rpc/users/create", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+  const call = new Request("http://localhost/_meeko/rpc/users/create", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost" }, body: "{}" });
   const rpcPayload = await (await dispatchRpc(rpc, createRequestContext(call, {}, await sessions.load(call)), sessions)).json() as { issues?: unknown };
   assert.deepEqual(rpcPayload.issues, [{ path: "email", message: "Ya existe." }]);
 });
@@ -91,6 +91,8 @@ test("the issues of a 409 reach ClientError and useForm puts them on the field",
   });
   const rpc = createRpcClient<{ "users.signup": RpcOperation<{ email: string }, string> }>({ rpc: [{ id: "users.signup", pathname: "/_meeko/rpc/users.signup" }] }, {
     baseUrl: "http://localhost",
+    // A browser sends its Origin itself; Node's fetch does not.
+    headers: { origin: "http://localhost" },
     fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = new Request(input, init);
       return dispatchRpc(signup, createRequestContext(request, {}, await sessions.load(request)), sessions);

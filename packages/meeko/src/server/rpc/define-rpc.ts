@@ -3,8 +3,8 @@ import type { RpcDefinition } from "./contracts";
 
 /**
  * Declara un procedimiento RPC, el export por defecto de `server/rpc/<ruta>.ts`, que se llama con
- * `POST /_meeko/rpc/<ruta>` y desde `rpc.*`. Comprueba Origin y CSRF en las llamadas con sesión, y
- * Origin en todas con `origin: "required"`.
+ * `POST /_meeko/rpc/<ruta>` y desde `rpc.*`. Comprueba Origin y CSRF en las llamadas con sesión y,
+ * desde `1.8`, Origin en todas salvo con `origin: "none"`.
  *
  * @param definition Schemas, guardas y handler.
  * @returns La misma definición, con sus tipos inferidos.

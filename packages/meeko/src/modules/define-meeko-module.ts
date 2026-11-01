@@ -20,7 +20,12 @@ export const moduleBrand: unique symbol = Symbol.for("meeko.module") as never;
 export interface MeekoModuleMeta {
   /** Nombre único del módulo, como el de su paquete. Dos módulos con el mismo nombre son un error. */
   readonly name: string;
-  /** Campo de `meeko.config.ts` con las opciones del módulo, como `"seo"` para `seo: { … }`. */
+  /**
+   * Campo de `meeko.config.ts` con las opciones del módulo, como `"seo"` para `seo: { … }`. Es la
+   * única forma documentada de pasarle opciones desde `1.8`; para tiparla, el módulo amplía
+   * `MeekoConfig` (`declare module "@meekojs/meeko/framework" { interface MeekoConfig { … } }`) y
+   * Meeko carga esa ampliación sola en `.meeko/types/config.d.ts`. Dos módulos no pueden compartirla.
+   */
   readonly configKey?: string;
   /**
    * Rango de versiones de Meeko que admite, con la sintaxis de npm (`">=1.2"`, `"^1.2.0"`,
@@ -292,24 +297,24 @@ export interface MeekoModuleContext {
 export interface MeekoModuleDefinition<Options extends object> {
   /** Nombre, clave de configuración y compatibilidad. */
   readonly meta: MeekoModuleMeta;
-  /** Valores por defecto de las opciones; `config[configKey]` y las opciones de `[module, options]` los sustituyen. */
+  /** Valores por defecto de las opciones; `config[configKey]` (y las de `[module, options]`, obsoleto) los sustituyen. */
   readonly defaults?: Partial<Options>;
   /** Configura el proyecto en Node con las opciones combinadas. Puede ser asíncrona. */
   setup(options: Options, meeko: MeekoModuleContext): void | Promise<void>;
 }
 
 /**
- * Módulo de Meeko creado con {@link defineMeekoModule}: el export por defecto de un paquete o un
- * archivo que se lista en `modules` de `meeko.config.ts`.
+ * Módulo de Meeko creado con {@link defineMeekoModule}: el export por defecto de un paquete (o de
+ * su subpath `./module`) o de un archivo, que se lista por su nombre en `modules` de
+ * `meeko.config.ts`.
  *
  * @typeParam Options Opciones del módulo.
  * @since 1.2.0
  * @example
  * ```ts
  * import { defineMeekoConfig } from "@meekojs/meeko/framework";
- * import hello from "./modules/hello/index.ts";
  *
- * export default defineMeekoConfig({ modules: [hello, [hello, { greeting: "Hi" }]] });
+ * export default defineMeekoConfig({ modules: ["./modules/hello"], hello: { greeting: "Hi" } });
  * ```
  */
 export interface MeekoModule<Options extends object = Record<string, unknown>> extends MeekoModuleDefinition<Options> {
@@ -318,26 +323,64 @@ export interface MeekoModule<Options extends object = Record<string, unknown>> e
 }
 
 /**
- * Una entrada de `modules` en `meeko.config.ts`: un módulo importado, un nombre de paquete o una ruta
- * a un módulo, o `[módulo, opciones]`. Una ruta a una carpeta con `app/pages` y sin `index.ts` ni
- * `package.json` sigue funcionando como layer en `1.x`, con un aviso: muévala a `layers`.
+ * Nombres de los módulos de Meeko instalados en el proyecto, como claves. Meeko lo amplía en
+ * `.meeko/types/config.d.ts` (lo generan `meeko dev`, `meeko check`, `meeko build` y el editor de
+ * un workspace de confianza) con los paquetes de las dependencias que tienen la palabra clave
+ * `meeko-module` en su `package.json` y con los módulos de `modules`, para que el editor complete
+ * sus nombres dentro de `modules: ['…']`.
+ *
+ * @since 1.8.0
+ * @example
+ * ```ts
+ * declare module "@meekojs/meeko/framework" {
+ *   interface MeekoModuleNames {
+ *     "@acme/seo": true;
+ *   }
+ * }
+ * ```
+ */
+export interface MeekoModuleNames {}
+
+/**
+ * Nombre de un módulo en `modules`: un paquete instalado (`"@meekojs/i18n"`) o una ruta a un módulo
+ * del proyecto (`"./modules/hello"`). Los nombres de {@link MeekoModuleNames} se completan en el
+ * editor; cualquier otra cadena sigue siendo válida.
+ *
+ * @since 1.8.0
+ * @example
+ * ```ts
+ * import type { MeekoModuleName } from "@meekojs/meeko/framework";
+ *
+ * const names: MeekoModuleName[] = ["@meekojs/i18n", "./modules/hello"];
+ * ```
+ */
+export type MeekoModuleName = Extract<keyof MeekoModuleNames, string> | (string & {});
+
+/**
+ * Una entrada de `modules` en `meeko.config.ts`. Desde `1.8`, la forma documentada es el nombre del
+ * paquete o la ruta del módulo (`"@meekojs/i18n"`, `"./modules/hello"`), con sus opciones en la clave
+ * de `meeko.config.ts` que declara su `meta.configKey`. Un módulo importado y `[módulo, opciones]`
+ * están obsoletos desde `1.8` (aviso `MEEK126`): siguen funcionando en `1.x` y se retirarán en `2.0`.
+ * Una ruta a una carpeta con `app/pages` y sin `index.ts` ni `package.json` sigue funcionando como
+ * layer en `1.x`, con un aviso: muévala a `layers`.
  *
  * @since 1.2.0
  * @example
  * ```ts
  * import type { MeekoModuleEntry } from "@meekojs/meeko/framework";
  *
- * const modules: MeekoModuleEntry[] = ["@acme/seo", ["./modules/hello", { greeting: "Hi" }]];
+ * const modules: MeekoModuleEntry[] = ["@meekojs/i18n", "./modules/hello"];
  * ```
  */
-export type MeekoModuleEntry = string | MeekoModule<any> | readonly [string | MeekoModule<any>, object?];
+export type MeekoModuleEntry = MeekoModuleName | MeekoModule<any> | readonly [MeekoModuleName | MeekoModule<any>, object?];
 
 /**
  * Declara un módulo de Meeko. El `setup` se ejecuta en Node al cargar la configuración (en
  * `meeko dev`, `meeko build`, `meeko check` y el servidor de lenguaje de confianza), nunca en el
- * navegador, y recibe las opciones combinadas: `defaults`, después `config[configKey]` y por último
- * las de `[module, options]` (los objetos planos se combinan en profundidad; los arrays se
- * sustituyen).
+ * navegador, y recibe las opciones combinadas: `defaults` y después `config[configKey]` (y por
+ * último las de `[module, options]`, obsoleto desde `1.8`; los objetos planos se combinan en
+ * profundidad y los arrays se sustituyen). Un paquete lo exporta por defecto en su subpath
+ * `./module` o en su raíz; el proyecto lo registra con `modules: ["paquete"]`.
  *
  * @param definition `meta`, `defaults` y `setup`.
  * @returns El módulo, para exportarlo por defecto.
@@ -349,6 +392,10 @@ export type MeekoModuleEntry = string | MeekoModule<any> | readonly [string | Me
  * import { defineMeekoModule } from "@meekojs/meeko/framework";
  *
  * export interface HelloOptions { greeting: string }
+ *
+ * declare module "@meekojs/meeko/framework" {
+ *   interface MeekoConfig { readonly hello?: Partial<HelloOptions> }
+ * }
  *
  * export default defineMeekoModule<HelloOptions>({
  *   meta: { name: "hello", configKey: "hello", compatibility: { meeko: ">=1.2" } },

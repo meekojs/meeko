@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 
 /**
@@ -22,4 +22,22 @@ export function loadProjectEnv(root: string, env: NodeJS.ProcessEnv = process.en
     loaded.push(name);
   }
   return loaded;
+}
+
+/**
+ * The Node options of this process with every `--env-file` and `--env-file-if-exists` path resolved
+ * against `origin`, the working directory they were written for. Node accepts both `--env-file=.env`
+ * and `--env-file .env`; a child that inherits another working directory would otherwise read a
+ * different file or fail with "not found".
+ */
+export function resolveEnvFileArguments(execArgv: readonly string[], origin: string): string[] {
+  const resolved = [...execArgv];
+  resolved.forEach((argument, position) => {
+    const joined = /^(--env-file(?:-if-exists)?)=(.+)$/.exec(argument);
+    if (joined) resolved[position] = `${joined[1]}=${resolve(origin, joined[2]!)}`;
+    else if ((argument === "--env-file" || argument === "--env-file-if-exists") && position + 1 < resolved.length) {
+      resolved[position + 1] = resolve(origin, resolved[position + 1]!);
+    }
+  });
+  return resolved;
 }

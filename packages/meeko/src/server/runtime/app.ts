@@ -204,6 +204,12 @@ export interface ServerAppOptions<Env = Readonly<Record<string, string | undefin
   readonly publicOrigin?: string;
   /** Lo activa `meeko build` mientras prerenderiza páginas. */
   readonly prerendering?: boolean;
+  /**
+   * Raíz absoluta del proyecto, que recibe la fábrica del runtime como `ServerRuntimeContext.root`.
+   * Las entradas que genera Meeko la pasan en `meeko dev` y en las salidas de Node, Bun y Deno.
+   * @since 1.8.0
+   */
+  readonly root?: string | undefined;
   /** Broker de Socket si el runtime no declara ninguno, como el de Durable Objects en Cloudflare. */
   readonly defaultSocketPubSub?: SocketPubSub;
   /**
@@ -317,7 +323,7 @@ async function createRuntime<Env>(options: ServerAppOptions<Env>, platform: Serv
   if (options.runtime !== undefined && typeof options.runtime !== "function") throw new TypeError("server/runtime.ts must default-export defineServerRuntime(...)");
   const runtime: ServerRuntime<unknown, Env> = options.runtime === undefined
     ? {}
-    : await options.runtime({ env: platform.env, production: options.production, platform: platform.name, prerendering });
+    : await options.runtime({ env: platform.env, production: options.production, platform: platform.name, prerendering, ...(options.root === undefined ? {} : { root: options.root }) });
   if (!runtime || typeof runtime !== "object") throw new TypeError("server/runtime.ts must return an object, such as { services } or { sessions: SessionManager }");
   const sessions = runtime.sessions as Partial<SessionManager> | undefined;
   if (sessions !== undefined) {

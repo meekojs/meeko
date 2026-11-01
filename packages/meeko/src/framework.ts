@@ -10,9 +10,9 @@ import { activeRouteManifest, href as runtimeHref } from "./app/runtime/router";
 
 export { createNavigator, createRouteManifest, matchRoute } from "./app/runtime/router";
 export { defineMeekoConfig } from "./modules/define-meeko-config";
-export type { MeekoConfig, RobotsConfig, ServerHeaders, ServerResponseConfig, SitemapConfig, SitemapEntriesContext, SitemapEntry, StaticHeaderFile } from "./modules/define-meeko-config";
+export type { MeekoConfig, MeekoDevtoolsConfig, RobotsConfig,ServerHeaders, ServerResponseConfig, SitemapConfig, SitemapEntriesContext, SitemapEntry, StaticHeaderFile } from "./modules/define-meeko-config";
 export { defineMeekoModule } from "./modules/define-meeko-module";
-export type { MeekoHookable, MeekoHooks, MeekoModule, MeekoModuleContext, MeekoModuleDefinition, MeekoModuleEntry, MeekoModuleMeta, ModuleAutoImport, ModulePlugin, ModuleServerHandler } from "./modules/define-meeko-module";
+export type { MeekoHookable, MeekoHooks, MeekoModule, MeekoModuleContext, MeekoModuleDefinition, MeekoModuleEntry, MeekoModuleMeta, MeekoModuleName, MeekoModuleNames, ModuleAutoImport, ModulePlugin, ModuleServerHandler } from "./modules/define-meeko-module";
 export { definePlugin } from "./app/definitions/define-plugin";
 export type { MeekoPlugin, PluginApp, PluginErrorHandler, PluginErrorInfo, PluginRegistration } from "./app/definitions/define-plugin";
 export type { ErrorPageRecord, NamedLayoutRecord, NavigationContext, Navigator, RouteMatch, RouteRecord } from "./app/runtime/router";
@@ -41,7 +41,8 @@ export { useSeoMeta } from "./app/composables/use-seo-meta";
 export type { DocumentConfig, DocumentHead, DocumentSeo, HeadInput, HeadLink, HeadMeta, HeadScript, HeadStyle, SeoMetaInput } from "./shared/head";
 export type { StorageArea, StorageOptions } from "./app/composables/useStorage";
 export { useTheme } from "./app/composables/use-theme";
-export type { ThemeChoice, ThemeConfig, ThemeName, ThemeState, ThemeToggleMessages, ThemeToggleSnippets } from "./shared/theme";
+export { useThemeToggle } from "./app/composables/use-theme-toggle";
+export type { ThemeChoice, ThemeConfig, ThemeName, ThemeState, ThemeToggleMessages, ThemeToggleSnippets, ThemeToggleState, ThemeToggleSystem } from "./shared/theme";
 // Types only: the code of <MeekoPopover> and <MeekoSelect> reaches a bundle only through the tags.
 export type { PopoverExposed, PopoverMode, PopoverPlacement, PopoverRole, PopoverSnippets, PopoverToggleEvent, PopoverTrigger } from "./app/components/MeekoPopover/types";
 export type { SelectField, SelectFilter, SelectFilterContext, SelectModel, SelectOptionState, SelectSnippets } from "./app/components/MeekoSelect/types";
@@ -186,9 +187,11 @@ export type LayoutProps<L extends string | false = NamedLayoutName> = NamedLayou
 
 type RouteKey = keyof GeneratedRoutes extends never ? string : keyof GeneratedRoutes & string;
 type RouteParams<K extends string> = K extends keyof GeneratedRoutes ? GeneratedRoutes[K] : Record<string, string>;
-type HrefOptions<K extends string> = (keyof RouteParams<K> extends never
-  ? { params?: never }
-  : { params: RouteParams<K> }) & {
+type HrefOptions<K extends string> = (keyof GeneratedRoutes extends never
+  ? { params?: Record<string, string> }
+  : keyof RouteParams<K> extends never
+    ? { params?: never }
+    : { params: RouteParams<K> }) & {
   search?: Readonly<Record<string, string | number | boolean | null | undefined>>;
 };
 type HrefArguments<K extends string> = K extends keyof GeneratedRoutes

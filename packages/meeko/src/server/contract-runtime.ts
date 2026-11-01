@@ -93,13 +93,15 @@ function withCsrfHeader(request: Request, token: string | undefined): Request {
 
 export async function guard<S>(definition: Guarded<S>, context: RequestContext<S>, sessions: SessionManager, mutating?: boolean, formCsrf?: string, rateLimited = false): Promise<void> {
   const request = context.request;
-  // Anonymous mutations such as a sign-in opt in to the session's allowed-origin rule. SSR
-  // clients send the request's own origin, so local dispatch passes.
-  if (definition.origin === "required" && (mutating ?? !["GET", "HEAD", "OPTIONS"].includes(request.method))) {
+  // Since 1.8 every mutation, with or without a session, needs an allowed Origin (the
+  // session's rule): a missing, `null` or foreign one is 403. SSR clients send the request's
+  // own origin, so local dispatch passes. `origin: "required"` is the same as the default.
+  if (definition.origin !== "none" && (mutating ?? !["GET", "HEAD", "OPTIONS"].includes(request.method))) {
     if (!isAllowedOrigin(request, sessions.allowedOrigins ?? [])) throw new ApiError("INVALID_ORIGIN", 403);
     context.session[settleSessionOrigin]?.("verified");
   }
-  // An explicit, documented opt-out: session.create() then skips its login CSRF check.
+  // An explicit, documented opt-out for webhooks and public APIs: no anonymous Origin check, and
+  // session.create() skips its login CSRF check. A request with a session still needs Origin and CSRF.
   if (definition.origin === "none") context.session[settleSessionOrigin]?.("exempt");
   sessions.assertMutationAllowed(withCsrfHeader(request, formCsrf), context.session, mutating);
   // Before auth and authorize: a flood of anonymous requests is limited too. A native form counted

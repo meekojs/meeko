@@ -509,6 +509,53 @@ test("meeko dev makes a file added to an imports.appDirs folder available", { ti
   assert.match(result.html, /price-3 true/);
 });
 
+test("meeko dev gives app/app.meeko, the layout and the page an export added to app/utils", { timeout: 60_000 }, async (context) => {
+  let child: ChildProcess | undefined;
+  const root = await tempProject(context, "dev-app-utils", () => stopChild(child));
+  await initFrameworkProject(root);
+  await mkdir(join(root, "app", "utils"), { recursive: true });
+  await writeFile(join(root, "app", "utils", "labels.ts"), 'export const SITE = "site";\n');
+  await writeFile(join(root, "app", "app.meeko"), '<template>\n  <div class="site-root"><span id="shell">{shellLabel(SITE)}</span><MeekoOutlet /></div>\n</template>\n');
+  await writeFile(join(root, "app", "layouts", "default.meeko"), '<script lang="ts">\nconst label = shellLabel("layout");\n</script>\n<template><section id="layout">{label}<MeekoOutlet /></section></template>\n');
+  await writeFile(join(root, "app", "pages", "index.meeko"), '<script lang="ts">\nconst label = shellLabel("page");\n</script>\n<template><p id="page">{label}</p></template>\n');
+  await mkdir(join(root, "node_modules", "@meekojs"), { recursive: true });
+  await symlink(repositoryRoot, join(root, "node_modules", "@meekojs", "meeko"), "junction");
+  await symlink(join(repositoryRoot, "node_modules", "vite"), join(root, "node_modules", "vite"), "junction");
+  const port = await freePort();
+  const hmrPort = await freePort();
+  const running = spawn(process.execPath, [join(repositoryRoot, "dist", "cli.js"), "dev", root], {
+    cwd: root, env: { ...process.env, PORT: String(port), MEEKO_HMR_PORT: String(hmrPort), MEEKO_EDITOR_BRIDGE: "0" }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
+  });
+  child = running;
+  let logs = "";
+  running.stdout?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
+  running.stderr?.on("data", (chunk: Buffer) => { logs += chunk.toString(); });
+  const listening = Date.now();
+  while (!logs.includes(`http://localhost:${port}\n`)) {
+    if (running.exitCode !== null || Date.now() - listening > 30_000) throw new Error(`meeko dev did not listen: ${logs}`);
+    await new Promise((done) => setTimeout(done, 25));
+  }
+  const get = async (): Promise<{ status: number; html: string }> => {
+    const response = await fetch(`http://127.0.0.1:${port}/`, { headers: { accept: "text/html" } });
+    return { status: response.status, html: await response.text() };
+  };
+  // `shellLabel` is not exported yet: no autoimport, and the shell fails to render.
+  assert.notEqual((await get()).status, 200, logs);
+  // A new export of a file that the registry already reads, with the server running.
+  await writeFile(join(root, "app", "utils", "labels.ts"), 'export const SITE = "site";\nexport function shellLabel(value: string): string { return `label-${value}`; }\n');
+  const start = Date.now();
+  let result = await get();
+  while (result.status !== 200 && Date.now() - start < 20_000) {
+    await new Promise((done) => setTimeout(done, 100));
+    result = await get();
+  }
+  assert.equal(result.status, 200, logs);
+  const text = result.html.replace(/<!--[^>]*-->/g, "");
+  assert.match(text, /<span id="shell">label-site<\/span>/);
+  assert.match(text, /<section id="layout">label-layout/);
+  assert.match(text, /<p id="page">label-page<\/p>/);
+});
+
 // Vite replaces its watcher when it restarts (a changed `.env`, `server.restart()`):
 // the discovery listeners must follow the new one, once.
 test("meeko dev serves a page added after Vite restarts", { timeout: 60_000 }, async (context) => {

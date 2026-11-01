@@ -22,7 +22,7 @@ import { resolveProjectAliases, resolveProjectAliasesSync } from "./framework/al
 import { clientMiddlewareSource, clientPluginsSource, clientRoutesSource, clientSidecarsSource, readBuildAppData, serverAppSource } from "./framework/app-manifest";
 import { generateAppTypeForFile, generateAppTypes } from "./framework/check-app";
 import { componentDirectories, discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./framework/config";
-import { builtinOptimizeInclude, devScanIgnored, isComponentSource, isDevWatchIgnored, isDiscoverySource } from "./framework/dev-watch";
+import { builtinOptimizeInclude, devScanIgnored, invalidateDevModules, isComponentSource, isDevWatchIgnored, isDiscoverySource, isModuleScript } from "./framework/dev-watch";
 import { editorBridgeDirectory } from "./framework/editor-bridge";
 import { extractRouteRender } from "./framework/routes-discovery";
 import { frameworkStylesheets, globalStylesheetFile, globalStylesheetsModule, stylesheetUrl } from "./framework/styles";
@@ -31,9 +31,10 @@ import { generateComponentRegistryTypes } from "./framework/type-declarations";
 /**
  * A component's CSS is the module `Card.meeko?meeko-style=<hash>&lang.css`: a real path, as Vue
  * names its style blocks, so PostCSS plugins resolve files (Tailwind's `@reference`, a relative
- * `@import`) from the component's folder. The hash changes with the CSS, for hot updates.
+ * `@import`) from the component's folder. The hash changes with the CSS, for hot updates. The same
+ * module with `&inline` is the processed CSS as a string: the component's `css` export.
  */
-const styleQuery = /[?&]meeko-style=([0-9a-f]{64})&lang\.css$/;
+const styleQuery = /[?&]meeko-style=([0-9a-f]{64})(?:&inline)?&lang\.css$/;
 const clientPagesModule = "virtual:meeko-client-pages";
 const clientRoutesModule = "virtual:meeko-manifest/client";
 const clientSidecarsModule = "virtual:meeko-client-routes";
@@ -140,6 +141,8 @@ export function meeko(): Plugin {
   const styles = new Map<string, string>();
   const fileStyles = new Map<string, string[]>();
   let activeComponentDirectories: string[] = [];
+  /** Folders of the modules' files outside the project, for {@link isModuleScript}. */
+  let activeModuleDirectories: string[] = [];
   let registeredComponentFiles = new Set<string>();
   const projectOwnedComponent = (file: string): boolean => {
     const path = relative(root, resolve(file));
@@ -344,7 +347,9 @@ export function meeko(): Plugin {
       const checkBoundary = async (code: string, original?: string): Promise<void> => {
         if (!clientModule) return;
         const autoimported = original === undefined ? new Map<string, string[]>() : autoimportedSpecifiers(code.slice(0, code.length - original.length));
-        for (const { value } of moduleSpecifiers(code, id)) {
+        for (const { value, typeOnly } of moduleSpecifiers(code, id)) {
+          // A type-only import (`import type { UIOptions } from "@meekojs/ui"`) is erased: it loads nothing.
+          if (typeOnly) continue;
           // `skipSelf` also skips this plugin's aliases: resolve them here.
           const dependency = await resolveAlias(this, value, id, false) ?? await this.resolve(value, id, { skipSelf: true });
           if (dependency && serverOnly(normalizePath(dependency.id))) {
@@ -388,16 +393,29 @@ export function meeko(): Plugin {
       const registry = await discoverAutoImports(root);
       // `<MeekoThemeToggle>` exists only with `theme` (MEEK111).
       const theme = config ? config.theme !== undefined && config.theme !== false : undefined;
-      const result = compile(source, filename, { hot: isDev, projectComponents: autoImportedValues(registry), ...(scopeAttribute ? { scopeAttribute } : {}), ...(theme === undefined ? {} : { theme }) });
+      const styleHashOf = (css: string): string => createHash("sha256").update(filename).update("\0").update(css).digest("hex");
+      // In the SSR graph and in dev, `css` is the stylesheet after PostCSS, as Vite inlines it: the
+      // SSR document embeds it before the client bundle loads (Tailwind's @apply, @utilities) and
+      // hot updates reapply it. The production client bundle reads `css` nowhere, since the CSS
+      // asset that Vite bundles styles the page: it keeps the compiler's string, without a second
+      // PostCSS pass per component nor the processed copy as dead weight in the page chunks.
+      const styleModule = serverTransform || isDev
+        ? (css: string): string => `${filename}?meeko-style=${styleHashOf(css)}&inline&lang.css`
+        : undefined;
+      const result = compile(source, filename, { hot: isDev, projectComponents: autoImportedValues(registry), ...(styleModule ? { styleModule } : {}), ...(scopeAttribute ? { scopeAttribute } : {}), ...(theme === undefined ? {} : { theme }) });
       // A component outside server/ may run in the browser: the browser graph stops at MEEK108. The SSR
       // graph does not, so a component that only server code imports (an email template in
       // app/emails/ rendered by an API route) keeps compiling there, as in 1.2.
       if (!serverTransform && !serverDirectories.some((directory) => filename.startsWith(directory))) {
         checkComponentBoundary(source, filename, result, registry, serverDirectories, (await projectAliases()).aliases);
       }
-      const styleHash = createHash("sha256").update(filename).update("\0").update(result.css).digest("hex");
+      const styleHash = styleHashOf(result.css);
       if (result.css) keepStyle(filename, styleHash, result.css);
-      const cssImport = result.css ? `\nimport ${JSON.stringify(`${filename}?meeko-style=${styleHash}&lang.css`)};` : "";
+      const cssModule = `${filename}?meeko-style=${styleHash}&lang.css`;
+      const cssImport = result.css ? `\nimport ${JSON.stringify(cssModule)};` : "";
+      // The SSR document gives the inline <style> of this CSS the id of the client's module, so
+      // Vite's client adopts it in place instead of appending a copy (see style-modules.ts).
+      const styleRegistration = serverTransform && isDev && result.css ? `\n__meeko.registerStyleModule(css, ${JSON.stringify(cssModule)});` : "";
       const hotCode = isDev ? `\nif (import.meta.hot) {\n  __meeko.enableHotModule(__hotId);\n  __meeko.connectLiveBridge(import.meta.hot);\n  import.meta.hot.accept((next) => { if (next) __meeko.replaceHotModule(__hotId, next); });\n}\n` : "";
       const code = transformAutoImports(source, filename, result.code, registry, serverTransform ? "server" : "client");
       await checkBoundary(code, result.code);
@@ -407,7 +425,7 @@ export function meeko(): Plugin {
         generatedStart: mapping.generatedStart + shifted,
         generatedEnd: mapping.generatedEnd + shifted,
       }));
-      const generated = `${code}${cssImport}${hotCode}`;
+      const generated = `${code}${cssImport}${styleRegistration}${hotCode}`;
       // The map embeds its source text; leave the server-only route options out of it.
       return transformWithOxc(generated, `${filename}.ts`, { lang: "ts" }, sourceMapForCompiled(generated, withoutRouteBlock(source, filename), filename, mappings));
     },
@@ -445,14 +463,19 @@ export function meeko(): Plugin {
     async configureServer(server) {
       const directories = await componentWatchDirectories();
       activeComponentDirectories = directories;
+      // The folders of the modules' files, except the project's own: a module file at its root.
+      const moduleScriptDirectories = async (): Promise<string[]> => (await loadConfiguredModules(root)).modules.ownedDirectories
+        .filter((directory) => { const path = relative(directory, root); return path.startsWith("..") || isAbsolute(path); });
+      activeModuleDirectories = await moduleScriptDirectories();
       const configSource = (file: string): boolean => normalizePath(file).startsWith(`${normalizePath(root)}/meeko.config.`);
       const onConfigChange = async (): Promise<void> => {
         aliasState = undefined;
         const updated = await componentWatchDirectories();
         activeComponentDirectories = updated;
+        activeModuleDirectories = await moduleScriptDirectories();
         server.watcher.add(updated);
         await refreshComponentRegistry();
-        server.moduleGraph.invalidateAll();
+        invalidateDevModules(server);
         server.ws.send({ type: "full-reload" });
       };
       // A new or removed page, layout or server module changes discovery; Vite's
@@ -461,7 +484,7 @@ export function meeko(): Plugin {
         void (async () => {
           if (configSource(file)) { await onConfigChange(); return; }
           if (normalizePath(resolve(file)) === normalizePath(resolve(root, globalStylesheetFile))) {
-            server.moduleGraph.invalidateAll();
+            invalidateDevModules(server);
             server.ws.send({ type: "full-reload" });
             return;
           }
@@ -469,7 +492,7 @@ export function meeko(): Plugin {
           const changed = component || await watchedSource(file, true);
           if (!changed) return;
           if (component) await refreshComponentRegistry();
-          server.moduleGraph.invalidateAll();
+          invalidateDevModules(server);
           server.ws.send({ type: "full-reload" });
         })().catch((error: unknown) => server.config.logger.error(String(error)));
       };
@@ -509,8 +532,12 @@ export function meeko(): Plugin {
         // Keep the compiler's own component HMR and CSS update path for an edit.
         return;
       }
-      if (!normalized.startsWith(runtimeDirectory) && !configFile && !await watchedSource(file)) return;
-      server.moduleGraph.invalidateAll();
+      // A script of a module that the browser imported reloads it, as Meeko's own runtime does (see
+      // isModuleScript). A file only watched for a stylesheet (its @utilities) has no module id.
+      const moduleScript = isModuleScript(file, activeModuleDirectories)
+        && [...server.environments?.client.moduleGraph.getModulesByFile(normalized) ?? []].some((node) => node.id !== null);
+      if (!normalized.startsWith(runtimeDirectory) && !moduleScript && !await watchedSource(file)) return;
+      invalidateDevModules(server);
       server.ws.send({ type: "full-reload" });
       return [];
     },

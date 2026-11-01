@@ -189,6 +189,30 @@ export function conformanceSuite(adapter: ConformanceAdapter, extra?: (suite: Co
       assert.equal(rpc.status, 403);
     });
 
+    it("requires an allowed Origin on anonymous mutations by default, and a route can opt out", async () => {
+      const body = JSON.stringify({ text: "anonymous" });
+      const json = { "content-type": "application/json" };
+      // Since 1.8, without a session too: missing, `null`, foreign, or only Sec-Fetch-Site.
+      for (const headers of [{}, { origin: "null" }, { origin: "http://evil.test" }, { "sec-fetch-site": "same-origin" }]) {
+        const api = await fetch(`${origin}/api/echo`, { method: "POST", headers: { ...json, ...headers }, body });
+        assert.equal(api.status, 403, JSON.stringify(headers));
+        assert.equal(((await api.json()) as { code: string }).code, "INVALID_ORIGIN");
+        const rpc = await fetch(`${origin}/_meeko/rpc/math/add`, { method: "POST", headers: { ...json, ...headers }, body: JSON.stringify({ a: 1, b: 2 }) });
+        assert.equal(rpc.status, 403, JSON.stringify(headers));
+        assert.equal(((await rpc.json()) as { code: string }).code, "INVALID_ORIGIN");
+      }
+      // origin: "none" is the documented way out for webhooks and public APIs.
+      for (const headers of [{}, { origin: "http://evil.test" }]) {
+        const hook = await fetch(`${origin}/api/webhooks/ping`, { method: "POST", headers: { ...json, ...headers }, body });
+        assert.equal(hook.status, 200, JSON.stringify(headers));
+        assert.deepEqual(await hook.json(), { text: "anonymous", platform });
+      }
+      // The opt-out covers anonymous requests only: a session cookie still needs Origin and CSRF.
+      const withSession = await fetch(`${origin}/api/webhooks/ping`, { method: "POST", headers: { ...json, cookie, origin: "http://evil.test", "x-meeko-csrf": csrf }, body });
+      assert.equal(withSession.status, 403);
+      assert.equal(((await withSession.json()) as { code: string }).code, "INVALID_ORIGIN");
+    });
+
     it("answers 404 and 405 with the documented status and Allow header", async () => {
       const page = await fetch(`${origin}/missing-page`);
       assert.equal(page.status, 404);

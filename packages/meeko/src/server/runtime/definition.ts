@@ -28,6 +28,27 @@ export interface ServerRuntimeContext<Env = Readonly<Record<string, string | und
   readonly platform: PlatformName;
   /** `true` mientras `meeko build` prerenderiza páginas; no se sirve tráfico de clientes. */
   readonly prerendering: boolean;
+  /**
+   * Ruta absoluta de la raíz del proyecto, para leer sus archivos desde el servidor sin depender de
+   * `import.meta.url`, que el build mueve a `.meeko/output/…`, ni de `process.cwd()`. En `meeko dev`
+   * es la raíz del proyecto; en las salidas de Node, Bun y Deno (también en `meeko start` y en el
+   * prerender), la carpeta tres niveles por encima de la salida, o `MEEKO_ROOT` si está definida
+   * (relativa al directorio de trabajo), para una salida que se despliega fuera del proyecto. En
+   * Cloudflare Workers, sin sistema de archivos, es `undefined`, como en un `createServerApp`
+   * propio que no la pasa.
+   *
+   * @since 1.8.0
+   * @example
+   * ```ts
+   * import { join } from "node:path";
+   * import { defineServerRuntime } from "@meekojs/meeko/server";
+   *
+   * export default defineServerRuntime(({ root }) => ({
+   *   services: { docs: join(root ?? process.cwd(), "docs") },
+   * }));
+   * ```
+   */
+  readonly root?: string | undefined;
 }
 
 /**

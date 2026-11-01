@@ -1,5 +1,5 @@
 import ts from "@typescript/typescript6";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import type { ApiEndpoint, RpcEndpoint } from "../server/runtime/discovery";
@@ -27,7 +27,14 @@ async function writeIfChanged(file: string, source: string): Promise<void> {
 
 type Kind = "api" | "rpc";
 type Imports = Map<string, { file: string; exported: string }>;
+/** Imports of packages (`valibot`, `zod`…) by their local name: a composed schema can use them. */
+type PackageImports = Map<string, { specifier: string; exported: string }>;
 type ReadSource = (file: string) => string | undefined;
+
+/** Folder of `.meeko/types` with the modules of the schemas composed inline in a contract. */
+const composedSchemasDirectory = "contract-schemas";
+/** Where the rule and the composed schemas are documented; contract errors point to it. */
+const publicSchemasGuide = "véase docs/framework.md#schemas-públicos";
 
 function inside(parent: string, child: string): boolean {
   const path = relative(parent, child);
@@ -64,6 +71,90 @@ function importMap(file: ts.SourceFile, sharedRoot: string, options: ts.Compiler
   return imports;
 }
 
+/** Value imports of packages, outside the project or in its `node_modules`, by local name. */
+function packageImportMap(file: ts.SourceFile, root: string, options: ts.CompilerOptions): PackageImports {
+  const imports: PackageImports = new Map();
+  for (const statement of file.statements) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
+    const clause = statement.importClause;
+    if (!clause || clause.isTypeOnly) continue;
+    const specifier = statement.moduleSpecifier.text;
+    if (specifier.startsWith(".")) continue;
+    const target = resolvedImport(specifier, file.fileName, options);
+    if (!target || (inside(root, target) && !relative(root, target).split(sep).includes("node_modules"))) continue;
+    if (clause.name) imports.set(clause.name.text, { specifier, exported: "default" });
+    if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+      for (const element of clause.namedBindings.elements) {
+        if (!element.isTypeOnly) imports.set(element.name.text, { specifier, exported: element.propertyName?.text ?? element.name.text });
+      }
+    }
+    if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings)) imports.set(clause.namedBindings.name.text, { specifier, exported: "*" });
+  }
+  return imports;
+}
+
+/** Specifier of `file` from a generated module in `fromDir`, with the extension that ESM resolves. */
+function generatedSpecifier(fromDir: string, file: string): string {
+  const target = relative(fromDir, file).replaceAll("\\", "/").replace(/\.(?:ts|mts|cts)$/, (suffix) => suffix === ".mts" ? ".mjs" : suffix === ".cts" ? ".cjs" : ".js");
+  return target.startsWith(".") ? target : `./${target}`;
+}
+
+/** Import statement that gives `local` the same binding as in the handler. */
+function importLine(local: string, exported: string, specifier: string): string {
+  const from = JSON.stringify(specifier);
+  if (exported === "*") return `import * as ${local} from ${from};`;
+  if (exported === "default") return `import ${local} from ${from};`;
+  return `import { ${exported === local ? local : `${exported} as ${local}`} } from ${from};`;
+}
+
+const literalKinds = new Set([ts.SyntaxKind.StringLiteral, ts.SyntaxKind.NumericLiteral, ts.SyntaxKind.BigIntLiteral, ts.SyntaxKind.NoSubstitutionTemplateLiteral, ts.SyntaxKind.RegularExpressionLiteral, ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.NullKeyword]);
+
+/**
+ * Names that a composed schema reads (`v` and `itemSchema` in `v.array(itemSchema)`), or why it
+ * is not a simple composition: only calls, member reads, literals, arrays and object literals, so
+ * that the expression means the same in a module of its own.
+ */
+function composedNames(expression: ts.Expression): { names: Set<string> } | { reason: string } {
+  const names = new Set<string>();
+  let reason: string | undefined;
+  const fail = (text: string): void => { reason ??= text; };
+  const visit = (node: ts.Expression): void => {
+    if (reason) return;
+    if (ts.isIdentifier(node)) {
+      if (node.text !== "undefined") names.add(node.text);
+    } else if (ts.isPropertyAccessExpression(node)) {
+      if (node.questionDotToken) fail("usa ?.");
+      visit(node.expression);
+    } else if (ts.isCallExpression(node)) {
+      if (node.typeArguments?.length) fail("pasa argumentos de tipo a una llamada");
+      if (node.questionDotToken) fail("usa ?.");
+      visit(node.expression);
+      for (const argument of node.arguments) visit(ts.isSpreadElement(argument) ? argument.expression : argument);
+    } else if (ts.isParenthesizedExpression(node)) {
+      visit(node.expression);
+    } else if (ts.isAsExpression(node)) {
+      if (!ts.isTypeReferenceNode(node.type) || !ts.isIdentifier(node.type.typeName) || node.type.typeName.text !== "const") fail("usa una aserción de tipo distinta de as const");
+      visit(node.expression);
+    } else if (ts.isArrayLiteralExpression(node)) {
+      for (const element of node.elements) visit(ts.isSpreadElement(element) ? element.expression : element);
+    } else if (ts.isObjectLiteralExpression(node)) {
+      for (const property of node.properties) {
+        if (ts.isPropertyAssignment(property) && !ts.isComputedPropertyName(property.name)) visit(property.initializer);
+        else if (ts.isShorthandPropertyAssignment(property)) visit(property.name);
+        else if (ts.isSpreadAssignment(property)) visit(property.expression);
+        else fail("contiene un método o una propiedad calculada");
+      }
+    } else if (ts.isPrefixUnaryExpression(node) && (node.operator === ts.SyntaxKind.MinusToken || node.operator === ts.SyntaxKind.PlusToken)) {
+      // `v.minValue(-1)`: a signed number.
+      if (!ts.isNumericLiteral(node.operand) && !ts.isBigIntLiteral(node.operand)) fail("contiene un operador");
+    } else if (!literalKinds.has(node.kind)) {
+      fail(ts.isArrowFunction(node) || ts.isFunctionExpression(node) ? "contiene una función" : "contiene código que no es una llamada, una propiedad ni un literal");
+    }
+  };
+  visit(expression);
+  return reason === undefined ? { names } : { reason };
+}
+
 function objectProperty(object: ts.ObjectLiteralExpression, name: string): ts.Expression | undefined {
   const property = object.properties.find((candidate) => {
     if (!ts.isPropertyAssignment(candidate) && !ts.isShorthandPropertyAssignment(candidate)) return false;
@@ -84,22 +175,85 @@ function definition(file: ts.SourceFile, kind: Kind): ts.ObjectLiteralExpression
   return expression.arguments[0];
 }
 
-function publicSchema(expression: ts.Expression | undefined, label: string, file: ts.SourceFile, imports: Imports, checker: ts.TypeChecker, root: string, sharedRoot: string, options: ts.CompilerOptions, outputDir: string, read: ReadSource): string | undefined {
+/** Where a contract reads its schemas and collects the modules of the composed ones. */
+interface SchemaScope {
+  readonly file: ts.SourceFile;
+  readonly imports: Imports;
+  readonly packages: PackageImports;
+  readonly checker: ts.TypeChecker;
+  readonly root: string;
+  readonly sharedRoot: string;
+  readonly options: ts.CompilerOptions;
+  readonly outputDir: string;
+  readonly read: ReadSource;
+  /** Name of the endpoint in the generated module names (`rpc.users.list`). */
+  readonly endpoint: string;
+  /** Modules of composed schemas, by file name, that this run writes. */
+  readonly composed: Map<string, string>;
+}
+
+/**
+ * Type of a public schema of a contract. The generator never runs a handler: the client types
+ * name the schema by its module, so it must live in `shared/`, which the browser may import and
+ * which cannot carry server code. A simple composition of `shared/` schemas with package
+ * functions, like `v.array(itemSchema)`, is copied with its imports to a module of `.meeko/types`.
+ */
+function publicSchema(expression: ts.Expression | undefined, label: string, scope: SchemaScope): string | undefined {
   if (!expression) return undefined;
-  let local: string;
+  const { file, imports, checker, root, sharedRoot, options, outputDir, read } = scope;
+  let local: string | undefined;
   let member: string | undefined;
   if (ts.isIdentifier(expression)) local = expression.text;
-  else if (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression)) { local = expression.expression.text; member = expression.name.text; }
-  else throw new Error(`${file.fileName}: ${label} debe referenciar un schema importado de shared/`);
-  const imported = imports.get(local);
-  if (!imported) throw new Error(`${file.fileName}: ${label} debe venir de shared/`);
+  else if (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression) && imports.has(expression.expression.text)) {
+    local = expression.expression.text;
+    member = expression.name.text;
+  }
+  const imported = local === undefined ? undefined : imports.get(local);
+  if (!imported) {
+    if (local !== undefined && !scope.packages.has(local)) {
+      throw new Error(`${file.fileName}: ${label} debe venir de shared/: ${local} no se importa de un archivo de shared/; exporte allí el schema e impórtelo en el contrato (${publicSchemasGuide})`);
+    }
+    return composedSchema(expression, label, scope);
+  }
   const exported = imported.exported === "*" ? member : imported.exported;
-  if (!exported || (imported.exported !== "*" && member)) throw new Error(`${file.fileName}: ${label} debe referenciar un único export de shared/`);
+  if (!exported || (imported.exported !== "*" && member)) throw new Error(`${file.fileName}: ${label} debe referenciar un único export de shared/ (${publicSchemasGuide})`);
   standardSchemaTypes(expression, checker, () => new Error(`${file.fileName}: ${label} debe exponer tipos de entrada y salida de Standard Schema concretos`));
   validateSharedGraph(imported.file, root, sharedRoot, options, new Set(), read);
-  const target = relative(outputDir, imported.file).replaceAll("\\", "/").replace(/\.(?:ts|mts|cts)$/, (suffix) => suffix === ".mts" ? ".mjs" : suffix === ".cts" ? ".cjs" : ".js");
-  const specifier = target.startsWith(".") ? target : `./${target}`;
-  return `typeof import(${JSON.stringify(specifier)})[${JSON.stringify(exported)}]`;
+  return `typeof import(${JSON.stringify(generatedSpecifier(outputDir, imported.file))})[${JSON.stringify(exported)}]`;
+}
+
+/** A schema composed in the contract (`v.array(itemSchema)`), typed through a generated module. */
+function composedSchema(expression: ts.Expression, label: string, scope: SchemaScope): string {
+  const { file, imports, packages, checker, root, sharedRoot, options, outputDir, read } = scope;
+  const example = `${label}: v.array(itemSchema), con itemSchema importado de shared/`;
+  const found = composedNames(expression);
+  if ("reason" in found) {
+    throw new Error(`${file.fileName}: ${label} debe ser un schema importado de shared/ o una composición simple de ellos (${example}); esta expresión ${found.reason}. Defina el schema en shared/, expórtelo e impórtelo en el contrato (${publicSchemasGuide})`);
+  }
+  const directory = join(outputDir, composedSchemasDirectory);
+  const lines: string[] = [];
+  const seen = new Set<string>();
+  for (const name of found.names) {
+    const shared = imports.get(name);
+    const external = packages.get(name);
+    if (shared) {
+      validateSharedGraph(shared.file, root, sharedRoot, options, seen, read);
+      lines.push(importLine(name, shared.exported, generatedSpecifier(directory, shared.file)));
+    } else if (external) {
+      lines.push(importLine(name, external.exported, external.specifier));
+    } else {
+      throw new Error(`${file.fileName}: ${label} debe venir de shared/: ${name} no se importa de shared/ ni de un paquete, y una composición sólo combina schemas de shared/ con funciones de paquetes como valibot (${example}; ${publicSchemasGuide})`);
+    }
+  }
+  standardSchemaTypes(expression, checker, () => new Error(`${file.fileName}: ${label} debe exponer tipos de entrada y salida de Standard Schema concretos`));
+  const name = `${scope.endpoint}.${label}`.replace(/[^\w.-]/g, "_");
+  scope.composed.set(`${name}.ts`, [
+    `// Generated by Meeko from ${relative(root, file.fileName).replaceAll("\\", "/")} (${label}). Only its type is read; it never runs.`,
+    ...lines.sort(),
+    `export const schema = ${expression.getText(file)};`,
+    "",
+  ].join("\n"));
+  return `typeof import(${JSON.stringify(generatedSpecifier(outputDir, join(directory, `${name}.ts`)))})["schema"]`;
 }
 
 function schemaInputType(expression: ts.Expression, checker: ts.TypeChecker, invalid: () => Error): ts.Type {
@@ -178,14 +332,18 @@ function validateSharedGraph(file: string, root: string, sharedRoot: string, opt
   visit(ast);
 }
 
-function shapeFor(endpoint: ApiEndpoint | RpcEndpoint, checker: ts.TypeChecker, program: ts.Program, root: string, options: ts.CompilerOptions, outputDir: string, read: ReadSource): { type: string; contentType?: "response" } {
+function shapeFor(endpoint: ApiEndpoint | RpcEndpoint, checker: ts.TypeChecker, program: ts.Program, root: string, options: ts.CompilerOptions, outputDir: string, read: ReadSource, composed: Map<string, string>): { type: string; contentType?: "response" } {
   const file = program.getSourceFile(endpoint.file);
   if (!file) throw new Error(`No se encuentra el handler: ${endpoint.file}`);
   const sharedRoot = join(root, "shared");
-  const imports = importMap(file, sharedRoot, options);
   const kind: Kind = endpoint.kind;
   const contract = definition(file, kind);
-  const schema = (name: string): string | undefined => publicSchema(objectProperty(contract, name), name, file, imports, checker, root, sharedRoot, options, outputDir, read);
+  const scope: SchemaScope = {
+    file, imports: importMap(file, sharedRoot, options), packages: packageImportMap(file, root, options),
+    checker, root, sharedRoot, options, outputDir, read, composed,
+    endpoint: endpoint.kind === "rpc" ? `rpc.${endpoint.id}` : `api.${endpoint.clientKey}.${endpoint.method.toLowerCase()}`,
+  };
+  const schema = (name: string): string | undefined => publicSchema(objectProperty(contract, name), name, scope);
   if (kind === "rpc") {
     const input = schema("input");
     const output = schema("output");
@@ -213,6 +371,20 @@ function shapeFor(endpoint: ApiEndpoint | RpcEndpoint, checker: ts.TypeChecker, 
     type: `import("@meekojs/meeko/framework").ApiOperation<${params ? `__Input<${params}>` : "undefined"}, ${query ? `__Input<${query}>` : "undefined"}, ${body ? `__Input<${body}>` : "undefined"}, ${output}>`,
     ...(responseType ? { contentType: "response" as const } : {}),
   };
+}
+
+/** Writes the modules of the composed schemas and removes those that no contract uses any more. */
+async function writeComposedSchemas(directory: string, composed: ReadonlyMap<string, string>): Promise<void> {
+  let existing: string[] = [];
+  try { existing = await readdir(directory); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  for (const name of existing) if (!composed.has(name)) await rm(join(directory, name), { recursive: true, force: true });
+  if (!composed.size) {
+    await rm(directory, { recursive: true, force: true });
+    return;
+  }
+  await mkdir(directory, { recursive: true });
+  for (const [name, source] of composed) await writeIfChanged(join(directory, name), source);
 }
 
 /** The literal `status` of an API definition; generated clients type a `204` as `undefined`. */
@@ -243,8 +415,9 @@ export async function generateServerContracts(projectRoot: string): Promise<Gene
   const programOptions = { ...options, noEmit: true };
   const program = ts.createProgram({ rootNames: files, options: programOptions, host: autoImportCompilerHost(programOptions, read) });
   const checker = program.getTypeChecker();
-  const api = discovered.api.map((endpoint) => ({ endpoint, shape: shapeFor(endpoint, checker, program, root, options, outputDir, read) }));
-  const rpc = discovered.rpc.map((endpoint) => ({ endpoint, shape: shapeFor(endpoint, checker, program, root, options, outputDir, read) }));
+  const composed = new Map<string, string>();
+  const api = discovered.api.map((endpoint) => ({ endpoint, shape: shapeFor(endpoint, checker, program, root, options, outputDir, read, composed) }));
+  const rpc = discovered.rpc.map((endpoint) => ({ endpoint, shape: shapeFor(endpoint, checker, program, root, options, outputDir, read, composed) }));
   const apiMethods = new Map<string, string[]>();
   for (const { endpoint, shape } of api) {
     const methods = apiMethods.get(endpoint.clientKey) ?? [];
@@ -252,7 +425,7 @@ export async function generateServerContracts(projectRoot: string): Promise<Gene
     apiMethods.set(endpoint.clientKey, methods);
   }
   const lines = [
-    "// Generated by Meeko. Public schemas must live in shared/.",
+    "// Generated by Meeko. Public schemas live in shared/; the ones composed in a contract, in contract-schemas/.",
     'type __Input<S> = S extends { readonly "~standard": { readonly types?: infer T } } ? NonNullable<T> extends { readonly input: infer I } ? I : never : never;',
     'type __Output<S> = S extends { readonly "~standard": { readonly types?: infer T } } ? NonNullable<T> extends { readonly output: infer O } ? O : never : never;',
     "export type ApiContract = {",
@@ -265,6 +438,7 @@ export async function generateServerContracts(projectRoot: string): Promise<Gene
   ];
   await mkdir(outputDir, { recursive: true });
   await mkdir(dirname(manifest), { recursive: true });
+  await writeComposedSchemas(join(outputDir, composedSchemasDirectory), composed);
   await writeIfChanged(types, lines.join("\n"));
   const publicManifest = { version: 1, api: api.map(({ endpoint, shape }) => ({ clientKey: endpoint.clientKey, pathname: endpoint.pathname, method: endpoint.method, ...(shape.contentType ? { contentType: shape.contentType } : {}) })), rpc: rpc.map(({ endpoint }) => ({ id: endpoint.id, pathname: endpoint.pathname })) };
   await writeIfChanged(manifest, `${JSON.stringify(publicManifest, null, 2)}\n`);

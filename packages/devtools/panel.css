@@ -1,32 +1,64 @@
+/*
+ * Meeko's tokens (apps/meeko/app/styles/tokens.css), the same as the in-page panel: blue accent,
+ * neutral surfaces and Inter when installed. The theme follows Chrome DevTools (`data-theme`, set by
+ * panel.js from chrome.devtools.panels.themeName) or, without it, the system.
+ */
 :root {
-  color-scheme: light dark;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color-scheme: light;
+  font-family: "Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
-  --surface: #f7f8fa;
+  font-feature-settings: "cv11", "ss03";
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --surface: #f4f5f7;
   --panel: #ffffff;
-  --line: #d8dce1;
-  --text: #202832;
-  --muted: #5b6672;
-  --brand: #2d618b;
-  --brand-soft: #e4f0f8;
-  --warning: #97631c;
-  --warning-soft: #fff3d9;
+  --line: rgb(0 0 0 / 0.1);
+  --text: #0d0e10;
+  --muted: #5f636c;
+  --brand: #2556c4;
+  --brand-soft: rgb(47 99 214 / 0.09);
+  --warning: #9a5a0c;
+  --warning-soft: rgb(154 90 12 / 0.1);
+  --nose: #b8365a;
+  --code-bg: #f6f7f9;
+  --selection: rgb(47 99 214 / 0.18);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --surface: #171c22;
-    --panel: #20262e;
-    --line: #39434e;
-    --text: #e8edf1;
-    --muted: #a6b2bd;
-    --brand: #8ec3e9;
-    --brand-soft: #25415a;
-    --warning: #f4cf84;
-    --warning-soft: #513e22;
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface: #101115;
+    --panel: #16181d;
+    --line: rgb(255 255 255 / 0.1);
+    --text: #eef0f3;
+    --muted: #8b909a;
+    --brand: #a6c3ff;
+    --brand-soft: rgb(143 180 255 / 0.12);
+    --warning: #f0b46a;
+    --warning-soft: rgb(240 180 106 / 0.12);
+    --nose: #f4a3b1;
+    --code-bg: #0e0f12;
+    --selection: rgb(143 180 255 / 0.28);
   }
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: #101115;
+  --panel: #16181d;
+  --line: rgb(255 255 255 / 0.1);
+  --text: #eef0f3;
+  --muted: #8b909a;
+  --brand: #a6c3ff;
+  --brand-soft: rgb(143 180 255 / 0.12);
+  --warning: #f0b46a;
+  --warning-soft: rgb(240 180 106 / 0.12);
+  --nose: #f4a3b1;
+  --code-bg: #0e0f12;
+  --selection: rgb(143 180 255 / 0.28);
+}
+
+::selection { background: var(--selection); }
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--surface); color: var(--text); }
 button, input, select, textarea { font: inherit; }
@@ -35,7 +67,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .app { width: 100%; min-width: 0; min-height: 100vh; display: flex; flex-direction: column; }
 .topbar { min-height: 54px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
 .identity { display: flex; align-items: center; gap: 8px; }
-.identity img { object-fit: contain; }
+.identity img { object-fit: contain; border-radius: 50%; }
 .identity div { display: flex; align-items: baseline; gap: 8px; }
 .identity strong { font-size: 14px; }
 .identity span, .file, .instance-id, .eyebrow, .relations dt { color: var(--muted); }
@@ -58,8 +90,8 @@ h1 span, .events h2 span { color: var(--muted); font-weight: 500; }
 .instance-button { display: flex; align-items: center; width: 100%; gap: 8px; padding: 7px 12px 7px 18px; border: 0; border-left: 3px solid transparent; background: none; color: var(--text); text-align: left; }
 .instance-button:hover { background: var(--surface); }
 .instance-button[aria-current="true"] { background: var(--brand-soft); border-left-color: var(--brand); font-weight: 650; }
-.instance-button .id { color: var(--muted); font-family: ui-monospace, Consolas, monospace; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.instance-button .breakpoint-dot { margin-left: auto; flex: none; width: 6px; height: 6px; border-radius: 50%; background: #be684f; }
+.instance-button .id { color: var(--muted); font-family: var(--font-mono); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.instance-button .breakpoint-dot { margin-left: auto; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--nose); }
 .list-empty { padding: 14px; color: var(--muted); line-height: 1.45; }
 .detail { min-width: 0; overflow: auto; padding: 18px; }
 .empty { max-width: 360px; margin: 60px auto; text-align: center; color: var(--muted); line-height: 1.5; }
@@ -68,8 +100,8 @@ h1 span, .events h2 span { color: var(--muted); font-weight: 500; }
 .detail-heading > div { min-width: 0; }
 .eyebrow { letter-spacing: .08em; font-size: 11px; font-weight: 650; }
 .detail h2 { margin-top: 5px; font-size: 20px; overflow-wrap: anywhere; }
-.file { margin-top: 5px; font-family: ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
-.instance-id { min-width: 0; padding-top: 16px; font-family: ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+.file { margin-top: 5px; font-family: var(--font-mono); overflow-wrap: anywhere; }
+.instance-id { min-width: 0; padding-top: 16px; font-family: var(--font-mono); overflow-wrap: anywhere; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
 .actions button { padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--text); }
 .actions button:hover, .actions button[aria-pressed="true"] { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
@@ -77,11 +109,11 @@ h1 span, .events h2 span { color: var(--muted); font-weight: 500; }
 .relations { display: flex; flex-wrap: wrap; gap: 18px; margin: 0 0 18px; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .relations div { min-width: 0; max-width: 100%; }
 .relations dt { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
-.relations dd { margin: 4px 0 0; font-family: ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+.relations dd { margin: 4px 0 0; font-family: var(--font-mono); overflow-wrap: anywhere; }
 .values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .values section { min-width: 0; }
 .values h3 { margin-bottom: 7px; font-size: 12px; }
-.values pre { min-height: 65px; max-height: 250px; overflow: auto; margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); font: 11px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.values pre { min-height: 65px; max-height: 250px; overflow: auto; margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); font: 11px/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .events { height: 190px; min-height: 125px; border-top: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; }
 .events-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
 .events-head label { display: flex; align-items: center; gap: 4px; color: var(--muted); white-space: nowrap; }
@@ -90,7 +122,7 @@ h1 span, .events h2 span { color: var(--muted); font-weight: 500; }
 .event-list li > * { min-width: 0; }
 .event-list li.list-empty { display: block; }
 .event-list li:last-child { border-bottom: 0; }
-.event-list time, .event-list .event-id { color: var(--muted); font-family: ui-monospace, Consolas, monospace; }
+.event-list time, .event-list .event-id { color: var(--muted); font-family: var(--font-mono); }
 .event-list .event-source { min-width: 0; overflow-wrap: anywhere; }
 .event-list button.event-source { width: 100%; padding: 0; border: 0; background: transparent; color: var(--brand); text-align: left; }
 .event-list button.event-source:hover { text-decoration: underline; }
@@ -108,7 +140,7 @@ h1 span, .events h2 span { color: var(--muted); font-weight: 500; }
 .editor h3 { margin-bottom: 8px; font-size: 12px; }
 .editor-fields { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 10px; align-items: start; }
 .editor-fields label { padding-top: 6px; color: var(--muted); }
-.editor select, .editor textarea { width: 100%; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--text); font: 11px/1.5 ui-monospace, Consolas, monospace; }
+.editor select, .editor textarea { width: 100%; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--text); font: 11px/1.5 var(--font-mono); }
 .editor textarea { min-height: 70px; resize: vertical; }
 .editor select:focus-visible, .editor textarea:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .editor .hint { margin-top: 6px; color: var(--muted); }

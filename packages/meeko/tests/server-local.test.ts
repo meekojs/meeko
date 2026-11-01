@@ -44,7 +44,12 @@ test("HTTP and local API/RPC share auth, CSRF, validation, and per-request state
     assert.equal((await httpApi.json() as { code?: string }).code, (await localApi.json() as { code?: string }).code);
     assert.equal((await httpRpc.json() as { code?: string }).code, (await localRpc.json() as { code?: string }).code);
   };
-  await pair({ value: "x" }, {}, 401);
+  // Local calls send the application's own Origin, like the SSR clients: a page requested with
+  // GET has none, and the call still reaches auth. Over HTTP, since 1.8, it is refused first.
+  await pair({ value: "x" }, { origin: "https://example.test" }, 401);
+  const anonymous = await local();
+  assert.equal((await anonymous.rpc("users.get", { value: "x" })).status, 401);
+  assert.equal((await http(rpcRequest({ value: "x" }))).status, 403);
   await pair({ value: "x" }, headers(false), 403);
   await pair({ value: 3 }, headers(), 400);
   const calls = await local(headers());

@@ -10,6 +10,10 @@ import {
 /** @typedef {import('./protocol.js').DevtoolsHook} DevtoolsHook */
 /** @typedef {import('./protocol.js').DevtoolsCommand} DevtoolsCommand */
 
+// The theme of Chrome DevTools, not only the system's; outside DevTools (tests) the CSS follows the system.
+const themeName = typeof chrome === "undefined" ? undefined : chrome.devtools?.panels?.themeName;
+if (themeName) document.documentElement.dataset.theme = themeName === "dark" ? "dark" : "light";
+
 const connection = required("connection");
 const instanceCount = required("instance-count");
 const instanceList = required("instance-list");

@@ -6,6 +6,7 @@ import test from "node:test";
 import type { AppManifest, Schema, ServerApp, ServerAppOptions, SqlRateLimitRow, SqlSessionDriver } from "../src/framework-server.ts";
 
 import { createBunServer } from "../src/bun.ts";
+import { createWorker } from "../src/cloudflare.ts";
 import {
   clientAddress, createServerApp, defineApiRoute, defineRpc, defineServerMiddleware, MemorySessionStore, RedisSessionStore, SessionManager, SqlSessionStore,
 } from "../src/framework-server.ts";
@@ -218,6 +219,133 @@ test("X-Forwarded-For entries with a port, as Azure Application Gateway writes t
   assert.equal(clientAddressOf(request("203.0.113.7:port"), trust), "10.0.0.1", "an invalid entry: the connection address");
   assert.equal(clientAddressOf(request("[2001:db8::1]junk"), trust), "10.0.0.1");
   assert.equal(clientAddressOf(request("300.0.0.1:80"), trust), "10.0.0.1");
+});
+
+/** A request with an optional connection address and headers. */
+function cfRequest(socket: string | undefined, headers: Record<string, string> = {}): Request {
+  return setSocketAddress(new Request("https://x.test/", { headers }), socket);
+}
+
+test("MEEKO_TRUST_PROXY=cloudflare reads CF-Connecting-IP only from trusted networks", () => {
+  const cf = { MEEKO_TRUST_PROXY: "cloudflare" };
+  assert.equal(trustProxyOf(cf), "cloudflare");
+  assert.equal(trustProxyOf({ MEEKO_TRUST_PROXY: "Cloudflare" }), "cloudflare");
+  // Cloudflare -> cloudflared -> Traefik (no trustedIPs: X-Forwarded-For is cloudflared's address) -> app.
+  const tunnel = { "x-forwarded-for": "172.18.0.1", "cf-connecting-ip": "203.0.113.9" };
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", tunnel), cf), "203.0.113.9");
+  assert.equal(clientAddress(cfRequest("10.0.1.5", tunnel), cf), "203.0.113.9", "the public helper applies the same policy");
+  assert.equal(clientAddressOf(cfRequest("127.0.0.1", { "cf-connecting-ip": "203.0.113.9" }), cf), "203.0.113.9", "cloudflared straight to the app on loopback");
+  assert.equal(clientAddressOf(cfRequest("192.168.1.20", { "cf-connecting-ip": " 203.0.113.9 " }), cf), "203.0.113.9");
+  // A public connection sent the header itself: ignored.
+  assert.equal(clientAddressOf(cfRequest("198.51.100.4", { "cf-connecting-ip": "203.0.113.9" }), cf), "198.51.100.4");
+  assert.equal(clientAddressOf(cfRequest("172.32.0.1", { "cf-connecting-ip": "203.0.113.9" }), cf), "172.32.0.1", "172.32/16 is outside 172.16.0.0/12");
+  assert.equal(clientAddressOf(cfRequest(undefined, { "cf-connecting-ip": "203.0.113.9" }), cf), undefined, "an unknown connection cannot vouch for the header");
+  // Absent, a list or garbage: the connection address, never the global bucket.
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5"), cf), "10.0.1.5");
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", { "cf-connecting-ip": "203.0.113.9, 198.51.100.1" }), cf), "10.0.1.5");
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", { "cf-connecting-ip": "not-an-ip" }), cf), "10.0.1.5");
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", { "cf-connecting-ip": "203.0.113.9:443" }), cf), "10.0.1.5");
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", { "cf-connecting-ip": "[2001:db8::1]" }), cf), "10.0.1.5");
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", { "cf-connecting-ip": "300.0.0.1" }), cf), "10.0.1.5");
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", { "cf-connecting-ip": "" }), cf), "10.0.1.5");
+  // True-Client-IP only when CF-Connecting-IP is absent, not when it is invalid.
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", { "true-client-ip": "203.0.113.10" }), cf), "203.0.113.10");
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", { "cf-connecting-ip": "203.0.113.9", "true-client-ip": "203.0.113.10" }), cf), "203.0.113.9");
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", { "cf-connecting-ip": "junk", "true-client-ip": "203.0.113.10" }), cf), "10.0.1.5");
+  // Without the cloudflare mode the header is never read.
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", { "cf-connecting-ip": "203.0.113.9" }), {}), "10.0.1.5");
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", tunnel), { MEEKO_TRUST_PROXY: "1" }), "172.18.0.1");
+});
+
+test("MEEKO_TRUST_PROXY=cloudflare: IPv6 clients, proxies and IPv4-mapped connections", () => {
+  const cf = { MEEKO_TRUST_PROXY: "cloudflare" };
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", { "cf-connecting-ip": "2001:DB8:1:2::7" }), cf), "2001:db8:1:2::7");
+  assert.equal(addressBucket(clientAddressOf(cfRequest("10.0.1.5", { "cf-connecting-ip": "2001:db8:1:2::7" }), cf)!), "2001:db8:1:2::/64");
+  assert.equal(clientAddressOf(cfRequest("::1", { "cf-connecting-ip": "203.0.113.9" }), cf), "203.0.113.9");
+  assert.equal(clientAddressOf(cfRequest("fd12:3456::2", { "cf-connecting-ip": "203.0.113.9" }), cf), "203.0.113.9", "ULA fc00::/7");
+  assert.equal(clientAddressOf(cfRequest("::ffff:10.0.0.3", { "cf-connecting-ip": "203.0.113.9" }), cf), "203.0.113.9", "IPv4-mapped is IPv4");
+  assert.equal(clientAddressOf(cfRequest("2001:db8::5", { "cf-connecting-ip": "203.0.113.9" }), cf), "2001:db8::5", "public IPv6: ignored");
+  assert.equal(clientAddressOf(cfRequest("fe80::1", { "cf-connecting-ip": "203.0.113.9" }), cf), "fe80::1", "link-local is not trusted by default");
+});
+
+test("MEEKO_TRUST_PROXY=cloudflare walks X-Forwarded-For: a hop outside the trusted networks is the client", () => {
+  const cf = { MEEKO_TRUST_PROXY: "cloudflare" };
+  // Someone reaches Traefik's public entrypoint directly: Traefik writes their address and the forged header loses.
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", { "x-forwarded-for": "198.51.100.66", "cf-connecting-ip": "203.0.113.9" }), cf), "198.51.100.66");
+  // Traefik with trustedIPs appends: Cloudflare's entry (the client) sits left of cloudflared; spoofed entries further left are ignored.
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", { "x-forwarded-for": "6.6.6.6, 203.0.113.9, 127.0.0.1", "cf-connecting-ip": "203.0.113.9" }), cf), "203.0.113.9");
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", { "x-forwarded-for": "[2001:db8::9]:443, 10.0.0.7", "cf-connecting-ip": "203.0.113.9" }), cf), "2001:db8::9");
+  // Every hop trusted: the header.
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", { "x-forwarded-for": "127.0.0.1, 10.0.0.7, fd00::3", "cf-connecting-ip": "203.0.113.9" }), cf), "203.0.113.9");
+  // A malformed hop: the connection address.
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", { "x-forwarded-for": "unknown, 10.0.0.7", "cf-connecting-ip": "203.0.113.9" }), cf), "10.0.1.5");
+  // A public connection is the client whatever X-Forwarded-For says.
+  assert.equal(clientAddressOf(cfRequest("198.51.100.4", { "x-forwarded-for": "10.0.0.7", "cf-connecting-ip": "203.0.113.9" }), cf), "198.51.100.4");
+});
+
+test("MEEKO_TRUSTED_PROXIES replaces the default networks and stops startup when invalid", async () => {
+  const env = (networks: string) => ({ MEEKO_TRUST_PROXY: "cloudflare", MEEKO_TRUSTED_PROXIES: networks });
+  const header = { "cf-connecting-ip": "203.0.113.9" };
+  assert.equal(clientAddressOf(cfRequest("100.64.3.4", header), env("100.64.0.0/10")), "203.0.113.9");
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", header), env("100.64.0.0/10")), "10.0.1.5", "the defaults no longer apply");
+  assert.equal(clientAddressOf(cfRequest("192.0.2.10", header), env("192.0.2.10 2001:db8:ffff::/48")), "203.0.113.9", "a bare address, separated by spaces");
+  assert.equal(clientAddressOf(cfRequest("2001:db8:ffff:1::2", header), env("192.0.2.10, 2001:db8:ffff::/48")), "203.0.113.9");
+  assert.equal(clientAddressOf(cfRequest("2001:db8:fffe::2", header), env("192.0.2.10, 2001:db8:ffff::/48")), "2001:db8:fffe::2");
+  assert.equal(clientAddressOf(cfRequest("10.0.1.5", header), env("  ")), "203.0.113.9", "empty: the defaults");
+  for (const invalid of ["10.0.0.0/33", "10.0.0.0/x", "localhost", "fc00::/129", ", ,"]) {
+    assert.throws(() => trustProxyOf(env(invalid)), /MEEKO_TRUSTED_PROXIES must list/, invalid);
+  }
+  // Only the cloudflare mode reads it.
+  assert.equal(trustProxyOf({ MEEKO_TRUST_PROXY: "1", MEEKO_TRUSTED_PROXIES: "localhost" }), 1);
+  await assert.rejects(app({ env: env("10.0.0.0/33") }), /MEEKO_TRUSTED_PROXIES/);
+  const server = await app();
+  try {
+    await assert.rejects(serveNode(server, { port: 0, platform: { name: "node", env: env("nope"), waitUntil() {} } }), /MEEKO_TRUSTED_PROXIES/);
+  } finally { await server.close(); }
+});
+
+test("with MEEKO_TRUST_PROXY=cloudflare, rateLimit counts per CF-Connecting-IP behind the tunnel", async () => {
+  const server = await app({ env: { MEEKO_TRUST_PROXY: "cloudflare" } });
+  const tunnel = (client: string) => ({ "x-forwarded-for": "172.18.0.1", "cf-connecting-ip": client });
+  try {
+    assert.equal((await server.fetch(get("/api/users/1", "10.0.1.5", tunnel("203.0.113.1")))).status, 200);
+    assert.equal((await server.fetch(get("/api/users/1", "10.0.1.5", tunnel("203.0.113.1")))).status, 429);
+    assert.equal((await server.fetch(get("/api/users/1", "10.0.1.5", tunnel("203.0.113.2")))).status, 200, "another visitor through the same tunnel");
+    // A direct client rotating the forged header stays in its own bucket.
+    assert.equal((await server.fetch(get("/api/users/1", "198.51.100.4", { "cf-connecting-ip": "203.0.113.3" }))).status, 200);
+    assert.equal((await server.fetch(get("/api/users/1", "198.51.100.4", { "cf-connecting-ip": "203.0.113.4" }))).status, 429);
+    const whoami = await server.fetch(get("/api/whoami", "10.0.1.5", tunnel("2001:db8::7")));
+    assert.deepEqual(await whoami.json(), { address: "2001:db8::7" });
+  } finally { await server.close(); }
+});
+
+test("the Node, Bun and Workers adapters apply MEEKO_TRUST_PROXY=cloudflare", async () => {
+  const env = { MEEKO_TRUST_PROXY: "cloudflare" };
+  const server = await app({ env });
+  const http = createServer(toNodeListener((request) => server.fetch(request)));
+  http.listen(0, "127.0.0.1");
+  await once(http, "listening");
+  try {
+    const { port } = http.address() as { port: number };
+    // cloudflared on loopback: its header names the client.
+    const response = await fetch(`http://127.0.0.1:${port}/api/whoami`, { headers: { "cf-connecting-ip": "203.0.113.9" } });
+    assert.deepEqual(await response.json(), { address: "203.0.113.9" });
+  } finally {
+    http.close();
+    await once(http, "close");
+  }
+  try {
+    const bun = createBunServer(server, { platform: { name: "bun", env, waitUntil() {} } });
+    const bunFetch = (address: string) => bun.fetch(new Request("http://app.test/api/whoami", { headers: { "cf-connecting-ip": "203.0.113.9" } }), { requestIP: () => ({ address }) } as never);
+    assert.deepEqual(await (await bunFetch("10.0.0.2"))!.json(), { address: "203.0.113.9" });
+    assert.deepEqual(await (await bunFetch("198.51.100.4"))!.json(), { address: "198.51.100.4" });
+  } finally { await server.close(); }
+  // Workers: Cloudflare's edge sets CF-Connecting-IP as the connection address, a public one, so the mode changes nothing.
+  const worker = createWorker(({ platform }) => createServerApp({ manifest, production: false, load: async (key) => routes([])[key], platform }));
+  const workerEnv = Object.freeze({ MEEKO_TRUST_PROXY: "cloudflare" });
+  const ctx = { waitUntil() {}, passThroughOnException() {} };
+  const fromEdge = await worker.fetch(new Request("https://app.test/api/whoami", { headers: { "cf-connecting-ip": "203.0.113.9", "x-forwarded-for": "6.6.6.6" } }), workerEnv, ctx);
+  assert.deepEqual(await fromEdge.json(), { address: "203.0.113.9" });
 });
 
 test("a custom key counts per subject, and an invalid limit or empty key is a server fault", async () => {

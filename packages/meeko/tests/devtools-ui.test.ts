@@ -231,3 +231,94 @@ test("la línea de tiempo integrada muestra la escritura y el tipo de cada lectu
   panel.unmount();
   browser.happyDOM.abort();
 });
+
+test("el panel integrado se fija en la esquina de position y rechaza otras", () => {
+  const document = (new HappyWindow() as unknown as Window).document;
+  const panel = mountDevtoolsPanel({ container: document.body, position: "top-left" });
+  assert.equal(document.querySelector("[data-meeko-devtools-panel]")?.getAttribute("data-position"), "top-left");
+  panel.unmount();
+  mountDevtoolsPanel({ container: document.body }).unmount();
+  assert.throws(() => mountDevtoolsPanel({ container: document.body, position: "middle" as never }), /position must be one of bottom-right, bottom-left, top-right, top-left/);
+  assert.equal(document.querySelector("[data-meeko-devtools-panel]"), null);
+});
+
+test("el panel integrado se minimiza a una pastilla con los eventos nuevos y lo recuerda", () => {
+  const browser = new HappyWindow();
+  const view = browser as unknown as Window;
+  const document = view.document;
+  const events: DevtoolsSnapshot["events"] = [{ id: 1, at: 0, kind: "mount", instanceId: "a" }];
+  const listeners = new Set<() => void>();
+  const hook: DevtoolsHook = {
+    protocolVersion: 1,
+    snapshot: () => ({ protocolVersion: 1, selectedId: null, instances: [], events }),
+    setSignal: () => ({ ok: true }),
+    subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    select() {}, highlight() {}, setBreakpoint() {},
+  };
+  (view as Window & { __MEEKO_DEVTOOLS__?: DevtoolsHook }).__MEEKO_DEVTOOLS__ = hook;
+  const panel = mountDevtoolsPanel({ container: document.body });
+  const host = document.querySelector("[data-meeko-devtools-panel]")!;
+  const shadow = host.shadowRoot!;
+  const minimize = shadow.querySelector<HTMLButtonElement>('button[aria-label^="Minimizar"]')!;
+  const pill = shadow.querySelector<HTMLButtonElement>(".pill")!;
+  assert.equal(minimize.getAttribute("aria-expanded"), "true");
+  assert.equal(minimize.getAttribute("aria-keyshortcuts"), "Alt+Shift+M");
+  assert.equal(pill.hidden, true);
+
+  minimize.click();
+  assert.ok(host.hasAttribute("data-minimized"));
+  assert.equal(shadow.querySelector<HTMLElement>(".panel")!.hidden, true);
+  assert.equal(pill.hidden, false);
+  assert.equal(minimize.getAttribute("aria-expanded"), "false");
+  assert.equal(shadow.activeElement, pill, "focus moves to the pill");
+  assert.equal(shadow.querySelector(".badge")?.textContent, "");
+  events.push({ id: 2, at: 0, kind: "signal", instanceId: "a" }, { id: 3, at: 0, kind: "signal", instanceId: "a" });
+  for (const listener of listeners) listener();
+  assert.equal(shadow.querySelector(".badge")?.textContent, "2");
+  assert.match(pill.getAttribute("aria-label") ?? "", /^Restaurar Meeko DevTools · 2 eventos nuevos \(Alt\+Mayús\+M\)$/);
+  assert.deepEqual(JSON.parse(view.localStorage.getItem("meeko:devtools-panel")!), { minimized: true, position: "bottom-right", configured: "bottom-right" });
+
+  // The state survives a new mount (a reload); the shortcut restores it.
+  panel.unmount();
+  const again = mountDevtoolsPanel({ container: document.body });
+  const reloaded = document.querySelector("[data-meeko-devtools-panel]")!;
+  assert.ok(reloaded.hasAttribute("data-minimized"));
+  view.dispatchEvent(new browser.KeyboardEvent("keydown", { code: "KeyM", key: "M", altKey: true, shiftKey: true }) as unknown as Event);
+  assert.equal(reloaded.hasAttribute("data-minimized"), false);
+  assert.equal(JSON.parse(view.localStorage.getItem("meeko:devtools-panel")!).minimized, false);
+
+  // The arrows move the panel to another corner, which a reload keeps while the configured one is the same.
+  const handle = reloaded.shadowRoot!.querySelector<HTMLButtonElement>(".handle")!;
+  handle.dispatchEvent(new browser.KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }) as unknown as Event);
+  handle.dispatchEvent(new browser.KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }) as unknown as Event);
+  assert.equal(reloaded.getAttribute("data-position"), "top-left");
+  assert.match(handle.getAttribute("aria-label") ?? "", /arriba a la izquierda/);
+  again.unmount();
+  mountDevtoolsPanel({ container: document.body }).unmount();
+  assert.equal(JSON.parse(view.localStorage.getItem("meeko:devtools-panel")!).position, "top-left");
+  const configured = mountDevtoolsPanel({ container: document.body, position: "bottom-left" });
+  assert.equal(document.querySelector("[data-meeko-devtools-panel]")!.getAttribute("data-position"), "bottom-left", "a new configured corner wins");
+  configured.unmount();
+  view.dispatchEvent(new browser.KeyboardEvent("keydown", { code: "KeyM", altKey: true, shiftKey: true }) as unknown as Event);
+  assert.equal(document.querySelector("[data-meeko-devtools-panel]"), null, "the shortcut is released on unmount");
+});
+
+test("el panel integrado sigue el data-theme de la página y sobrevive sin localStorage", async () => {
+  const browser = new HappyWindow();
+  const view = browser as unknown as Window;
+  const document = view.document;
+  Object.defineProperty(view, "localStorage", { get() { throw new Error("blocked"); } });
+  document.documentElement.setAttribute("data-theme", "light");
+  const panel = mountDevtoolsPanel({ container: document.body });
+  const host = document.querySelector("[data-meeko-devtools-panel]")!;
+  assert.equal(host.getAttribute("data-theme"), "light");
+  document.documentElement.setAttribute("data-theme", "dark");
+  await new Promise((done) => setTimeout(done, 0));
+  assert.equal(host.getAttribute("data-theme"), "dark");
+  document.documentElement.setAttribute("data-theme", "sepia");
+  await new Promise((done) => setTimeout(done, 0));
+  assert.equal(host.hasAttribute("data-theme"), false, "another theme follows the system");
+  host.shadowRoot!.querySelector<HTMLButtonElement>('button[aria-label^="Minimizar"]')!.click();
+  assert.ok(host.hasAttribute("data-minimized"));
+  panel.unmount();
+});

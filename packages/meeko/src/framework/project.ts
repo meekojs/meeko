@@ -27,17 +27,18 @@ import { visibleHost } from "../server/runtime/fetch-host";
 import { listeningMessage } from "../server/runtime/listen-address";
 import { handleProcessErrors, processErrorObserver } from "../server/runtime/process-errors";
 import { bunEntrySource, cloudflareEntrySource, denoEntrySource } from "./adapter-templates";
-import { buildDataFile, frameworkClientEntry, frameworkNodeEntry, frameworkServerEntry } from "./app-manifest";
+import { buildDataFile, discoverAppPlugins, findRuntimeFile, frameworkClientEntry, frameworkNodeEntry, frameworkServerEntry } from "./app-manifest";
 import { cloudflareAssetsDirectory, cloudflarePrerenderDirectory, resolveWrangler, wranglerConfig, wranglerSource } from "./cloudflare-build";
 import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./config";
 import { contentTypes } from "./content-types";
+import { devtoolsPanelPlugin, devtoolsPanelScript, resolveDevtoolsConfig } from "./dev-devtools";
 import { supervisedHmrPortEnv, supervisedPortEnv } from "./dev-link";
 import { recordEditorBridgeOff } from "./dev-lock";
 import { devHmrHost, devPortInUse, resolveDevPorts } from "./dev-port";
 import { createDevServerLogs } from "./dev-server-logs";
-import { createDevAppReloader, isDiscoverySource, isRouteOptionsSource, routeOptionsKey } from "./dev-watch";
+import { createDevAppReloader, hotFileKey, isDiscoverySource, isRouteOptionsSource, keepServerModules, reachesEagerModule, routeOptionsKey } from "./dev-watch";
 import { editorBridgeHost, editorBridgeOffReason, startEditorBridge } from "./editor-bridge";
-import { resolvedDocument, resolveSiteOrigin, setModuleDevelopmentMode } from "./module-loader";
+import { installedModulePackages, resolvedDocument, resolveSiteOrigin, setModuleDevelopmentMode } from "./module-loader";
 import { prerenderForBuild } from "./prerender";
 import { clientEntrySource, nodeEntrySource, serverEntrySource, staticClientEntrySource } from "./project-templates";
 import { discoverRouteMiddleware } from "./route-middleware-discovery";
@@ -419,11 +420,26 @@ function safeDecode(pathname: string): string {
 }
 
 /**
+ * Compiles `packages` as source: bundled into the server build and the dev module runner
+ * (`ssr.noExternal`), and served file by file to the dev client instead of pre-bundled
+ * (`optimizeDeps.exclude`). See {@link installedModulePackages}.
+ */
+export function withSourcePackages(config: InlineConfig, packages: readonly string[]): InlineConfig {
+  if (!packages.length) return config;
+  const ssr = config.ssr ?? {};
+  const noExternal = ssr.noExternal === true ? true : [...[ssr.noExternal ?? []].flat(), ...packages];
+  const optimizeDeps = config.optimizeDeps ?? {};
+  return { ...config, ssr: { ...ssr, noExternal }, optimizeDeps: { ...optimizeDeps, exclude: [...optimizeDeps.exclude ?? [], ...packages] } };
+}
+
+/**
  * The inline Vite configuration of a `meeko dev` or `meeko build` step with what the modules add:
- * their plugins after Meeko's, then each `extendViteConfig` in order.
+ * their plugins after Meeko's, then each `extendViteConfig` in order. The installed packages of the
+ * modules compile as source ({@link withSourcePackages}).
  */
 function withModules(modules: ResolvedModules, base: InlineConfig, command: "serve" | "build"): InlineConfig {
-  let config: Record<string, any> = modules.vitePlugins.length ? { ...base, plugins: [...base.plugins ?? [], ...modules.vitePlugins] } : base;
+  const sourced = withSourcePackages(base, installedModulePackages(modules.ownedDirectories));
+  let config: Record<string, any> = modules.vitePlugins.length ? { ...sourced, plugins: [...sourced.plugins ?? [], ...modules.vitePlugins] } : sourced;
   const ssr = Boolean((base.build as { ssr?: unknown } | undefined)?.ssr);
   for (const extend of modules.viteExtenders) config = extend(config, { command, ssr }) ?? config;
   return config as InlineConfig;
@@ -569,6 +585,10 @@ async function startDevelopment(root: string): Promise<Server> {
   let onOptionsChange: ((file: string) => void) | undefined;
   /** Runs a Vite restart once the app's work in flight drains, and rebuilds the app after it; set once the app exists. */
   let onRestart: ((start: () => Promise<void>) => Promise<void>) | undefined;
+  /** What the app's entry imports statically (`server/runtime.ts`, the server and universal plugins), as {@link hotFileKey}s. */
+  let eagerFiles: ReadonlySet<string> = new Set();
+  /** Rebuilds the app when an edit reaches {@link eagerFiles}; set once the app exists. */
+  let onEagerChange: (() => void) | undefined;
   // The processed global stylesheet on disk, for editor tools that read class names from CSS files.
   const stylesheetSnapshot = createGlobalStylesheetSnapshot(root, (message) => process.stderr.write(`[meeko] ${message}\n`), modules.stylesheets);
   const reportError = (error: unknown, requestId: string): void => {
@@ -584,14 +604,29 @@ async function startDevelopment(root: string): Promise<Server> {
     if (config.dev?.serverLogs !== false) {
       serverLogs = createDevServerLogs({ hot: () => vite?.ws });
     }
+    // `devtools` mounts the in-page panel; only here, never in a build or `meeko start`.
+    const devtools = resolveDevtoolsConfig(config.devtools);
     vite = await createViteServer(withModules(modules, {
       root, configFile: false,
-      plugins: [meeko(), stylesheetSnapshot.plugin, ...(serverLogs ? [serverLogs.plugin] : []), {
+      plugins: [meeko(), stylesheetSnapshot.plugin, ...(serverLogs ? [serverLogs.plugin] : []), ...(devtools.panel ? [devtoolsPanelPlugin(devtools)] : []), {
         name: "meeko:editor-bridge",
         // A restart (a changed `.env`, `server.restart()`) replaces `server.ws` and runs this
         // hook again for the new one. Its first client reaches it once `devServer.ws` points to
         // it: the bridge moves there before that client's first message.
         configureServer(server) { server.ws.on("connection", () => bridge?.refresh()); },
+      }, {
+        name: "meeko:dev-eager-modules",
+        // The app keeps the modules its entry imports statically from when it was created; pages and
+        // server modules load per request. An edit that reaches the former without a hot boundary
+        // (a plugin, a module it imports, server/runtime.ts) rebuilds the app, as the browser
+        // reloads: otherwise the stale plugin went on providing a context key the pages no longer read.
+        // Every hotUpdate hook runs before Vite sends the reload, so the browser waits for the new app.
+        // The nodes come from the graph: the Meeko plugin empties `modules` for the autoimport
+        // sources (app/utils, app/composables), whose edits it turns into a full reload.
+        hotUpdate({ file }) {
+          if (this.environment.name !== "ssr") return;
+          if (reachesEagerModule(this.environment.moduleGraph.getModulesByFile(file) ?? [], eagerFiles)) onEagerChange?.();
+        },
       }, {
         name: "meeko:dev-discovery",
         // A restart also replaces `server.watcher` and closes the old one with its listeners:
@@ -646,9 +681,17 @@ async function startDevelopment(root: string): Promise<Server> {
     const publicOrigin = meekoEnv(process.env, "PUBLIC_ORIGIN");
     const createDevApp = async (): Promise<ServerApp> => {
       await modules.callHook("routes:resolved", { routes: await discoverConfiguredRoutes(root) });
+      const runtimeFile = findRuntimeFile(root);
+      eagerFiles = new Set([
+        ...(await discoverAppPlugins(root)).filter((plugin) => plugin.mode !== "client").map((plugin) => plugin.file),
+        ...runtimeFile ? [runtimeFile] : [],
+      ].map(hotFileKey));
+      // A full reload of the Meeko plugin (an edited page or app/utils, a component added) keeps what this app holds.
+      keepServerModules(devServer.environments.ssr.moduleGraph, eagerFiles);
       const entry = await devServer.ssrLoadModule(`/${frameworkServerEntry}`) as { createApp(options: Omit<ServerAppOptions, "manifest" | "load" | "runtime">): Promise<ServerApp> };
       return entry.createApp({
         production: false,
+        root,
         platform: {
           name: "node", env: process.env,
           waitUntil(promise) { void Promise.resolve(promise).catch((error: unknown) => reportError(error, randomUUID())); },
@@ -657,7 +700,7 @@ async function startDevelopment(root: string): Promise<Server> {
         document: {
           // Vite's client and the unbundled global stylesheet replace the production manifest links.
           head: ({ nonce }) => `<script type="module"${nonce ? ` nonce="${escapeHtml(nonce)}"` : ""} src="/@vite/client"></script>`
-            + globalStylesheet(),
+            + globalStylesheet() + (devtools.panel ? devtoolsPanelScript(nonce, escapeHtml) : ""),
         },
       });
     };
@@ -729,6 +772,7 @@ async function startDevelopment(root: string): Promise<Server> {
       return next;
     });
     onTreeChange = (file) => { if (isDiscoverySource(resolve(file), sourceRoots)) reloader.rebuild(); };
+    onEagerChange = () => reloader.rebuild();
     // Since 1.5 an edit inside a page, a sidecar or a +group.ts may change a route's layout (or
     // its render), and since 1.6 its middleware, as may `{ global }` of a route middleware: the
     // manifest the app was created with changes, so the app is built again.

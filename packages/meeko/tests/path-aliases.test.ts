@@ -312,15 +312,16 @@ test("a prefix that tsconfig.json paths or a module's resolve.alias redefine tur
   // The project's tsconfig.json redefines @/ and a module redefines #shared/ in Vite.
   await write(root, {
     "tsconfig.json": `${JSON.stringify({ compilerOptions: { paths: { "@/*": ["./src/*"], "~/*": ["./*"] } }, files: [] })}\n`,
-    "meeko.config.mjs": [
-      "const aliaser = {",
+    "modules/aliaser.mjs": [
+      "export default {",
       '  meta: { name: "aliaser" },',
       '  setup(_options, meeko) { meeko.extendViteConfig((config) => { config.resolve = { ...config.resolve, alias: { "#shared": "/elsewhere" } }; }); },',
       '  [Symbol.for("meeko.module")]: true,',
       "};",
-      "export default { modules: [aliaser] };",
       "",
     ].join("\n"),
+    // Listed by its path, the documented form since 1.8 (an imported module warns MEEK126).
+    "meeko.config.mjs": 'export default { modules: ["./modules/aliaser.mjs"] };\n',
   });
   const stderrWrite = process.stderr.write;
   const warnings: string[] = [];

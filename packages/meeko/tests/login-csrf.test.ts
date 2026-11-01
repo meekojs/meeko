@@ -60,7 +60,7 @@ async function expectRejected(response: Response): Promise<void> {
   assert.equal(response.headers.get("set-cookie"), null, "no session cookie");
 }
 
-test("session.create() in a mutation without an allowed Origin is refused, so another site cannot plant a session", async () => {
+test("a mutation without an allowed Origin is refused, so another site cannot plant a session", async () => {
   resetEnvWarnings();
   const warnings: string[] = [];
   const original = console.warn;
@@ -68,10 +68,18 @@ test("session.create() in a mutation without an allowed Origin is refused, so an
   const store = new MemorySessionStore();
   const server = await app(store);
   try {
+    // Since 1.8 the route's default Origin check refuses these before session.create() runs.
     await expectRejected(await server.fetch(post("/api/login")));
     await expectRejected(await server.fetch(post("/api/login", { origin: "https://evil.example" })));
     await expectRejected(await server.fetch(post("/api/login", { origin: "null" })));
     await expectRejected(await server.fetch(post("/_meeko/rpc/login", { origin: "https://evil.example" }, {})));
+    assert.equal(warnings.length, 0, "the guard refused them, not session.create()");
+    // A host that skips the guards still meets session.create()'s own check, explained once.
+    const manager = new SessionManager({ store, production: false });
+    for (const headers of [{}, { origin: "https://evil.example" }]) {
+      const handle = await manager.load(new Request("https://shop.example/login", { method: "POST", headers }));
+      await assert.rejects(handle.create({ user: "mallory" }), (error: unknown) => error instanceof SessionSecurityError && error.code === "INVALID_ORIGIN");
+    }
   } finally {
     console.warn = original;
     await server.close();

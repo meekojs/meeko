@@ -40,6 +40,122 @@ export function isRouteOptionsSource(file: string, sourceRoots: readonly string[
   });
 }
 
+/** What {@link reachesEagerModule} reads of a Vite module node. */
+export interface HotModuleNode {
+  readonly file: string | null;
+  readonly isSelfAccepting?: boolean | undefined;
+  readonly importers: ReadonlySet<HotModuleNode>;
+  readonly acceptedHmrDeps: ReadonlySet<HotModuleNode>;
+}
+
+/** Comparable form of a file path: `/` separators, and no case on Windows. */
+export function hotFileKey(file: string): string {
+  const path = file.replaceAll("\\", "/");
+  return process.platform === "win32" ? path.toLowerCase() : path;
+}
+
+/**
+ * Whether an edit of `modules` reaches one of the `eager` files (keys of {@link hotFileKey}) through
+ * importers that do not take the update themselves. A module that accepts its own update (a
+ * component) or an importer that accepts it stops the walk: Vite replaces that module in place.
+ * The development app keeps the modules its entry imports statically (`server/runtime.ts` and the
+ * plugins) from when it was created; an edit that reaches them must rebuild it, as the browser
+ * reloads. Otherwise a plugin went on providing a `createContext` key that the pages, evaluated
+ * again, no longer read: `Missing Meeko context`.
+ */
+export function reachesEagerModule(modules: Iterable<HotModuleNode>, eager: ReadonlySet<string>): boolean {
+  if (!eager.size) return false;
+  const seen = new Set<HotModuleNode>();
+  const pending = [...modules];
+  for (let node = pending.pop(); node; node = pending.pop()) {
+    if (seen.has(node)) continue;
+    seen.add(node);
+    if (node.file && eager.has(hotFileKey(node.file))) return true;
+    if (node.isSelfAccepting) continue;
+    for (const importer of node.importers) if (!importer.acceptedHmrDeps.has(node)) pending.push(importer);
+  }
+  return false;
+}
+
+/**
+ * Whether `file` is a script of a Meeko module (under one of its `directories`: the folders of its
+ * entry, plugins, autoimports and components). Its edit reloads the browser, as one of `app/utils`
+ * or `app/plugins` of the project does, instead of updating the components that import it: a
+ * package rebuilt by its own tooling rewrites many files at once, and a component update applied
+ * while a later file of the same rebuild changed imported a second evaluation of a module that a
+ * plugin had already read (a `createContext` key: `Missing Meeko context`).
+ */
+export function isModuleScript(file: string, directories: readonly string[]): boolean {
+  if (!/\.[cm]?[jt]sx?$/.test(file) || /\.d\.[cm]?ts$/.test(file)) return false;
+  const key = hotFileKey(file);
+  return directories.some((directory) => key.startsWith(`${hotFileKey(directory).replace(/\/$/, "")}/`));
+}
+
+/** What {@link invalidateDevModules} reads of a Vite module node. */
+export interface DevModuleNode {
+  readonly file: string | null;
+  readonly importedModules: ReadonlySet<DevModuleNode>;
+}
+
+/** What {@link invalidateDevModules} uses of a Vite module graph. */
+export interface DevModuleGraph<Node extends DevModuleNode = DevModuleNode> {
+  readonly idToModuleMap: ReadonlyMap<string, Node>;
+  invalidateModule(module: Node, seen?: Set<Node>, timestamp?: number): void;
+  invalidateAll(): void;
+}
+
+/** What {@link invalidateDevModules} uses of a Vite development server. */
+export interface DevModuleServer {
+  /** The graph of every environment, which `invalidateAll` invalidates at once. */
+  readonly moduleGraph: { invalidateAll(): void };
+  readonly environments?: { readonly client: { readonly moduleGraph: DevModuleGraph }; readonly ssr?: { readonly moduleGraph: DevModuleGraph } };
+}
+
+/**
+ * Per server module graph, the eager files (keys of {@link hotFileKey}) whose evaluations the
+ * development app keeps. Keyed by the graph, not the server: Vite hands its plugins a proxy of the
+ * server, and a restart replaces the graph, after which the app is built again and registers anew.
+ */
+const keptServerModules = new WeakMap<object, ReadonlySet<string>>();
+
+/**
+ * Tells {@link invalidateDevModules} which files the development app imported when it was created
+ * from the server module `graph` (`server/runtime.ts` and the server and universal plugins, as
+ * {@link hotFileKey}s). Each new app registers its own.
+ */
+export function keepServerModules(graph: object, files: ReadonlySet<string>): void {
+  keptServerModules.set(graph, files);
+}
+
+/**
+ * Invalidates the modules of a development server before a full reload: every module of the
+ * browser, and every server module except the eager files registered with {@link keepServerModules}
+ * and what they import. The app keeps their evaluations until it is built again; the pages, which
+ * load per request, would otherwise evaluate them a second time, and a `createContext` key that a
+ * plugin provides would no longer be the one they read (`Missing Meeko context`). An edit of one
+ * of them rebuilds the app instead ({@link reachesEagerModule}), which starts from a clean graph.
+ */
+export function invalidateDevModules(server: DevModuleServer): void {
+  const { environments } = server;
+  const graph = environments?.ssr?.moduleGraph;
+  const eager = graph && keptServerModules.get(graph);
+  // Without a development app (a Vite project that uses the Meeko plugin alone), everything goes.
+  if (!environments || !graph || !eager?.size) { server.moduleGraph.invalidateAll(); return; }
+  environments.client.moduleGraph.invalidateAll();
+  // What an eager module imports is kept too: a module outside this set is imported by none of them,
+  // so invalidating it, and its importers with it, never reaches the set.
+  const kept = new Set<DevModuleNode>();
+  const pending = [...graph.idToModuleMap.values()].filter((node) => node.file && eager.has(hotFileKey(node.file)));
+  for (let node = pending.pop(); node; node = pending.pop()) {
+    if (kept.has(node)) continue;
+    kept.add(node);
+    pending.push(...node.importedModules);
+  }
+  const seen = new Set<DevModuleNode>();
+  const timestamp = Date.now();
+  for (const node of graph.idToModuleMap.values()) if (!kept.has(node)) graph.invalidateModule(node, seen, timestamp);
+}
+
 /**
  * What a route manifest says about each route's render, layouts and named middleware (isomorphic
  * and server), and which route middleware is global, to compare two discoveries.

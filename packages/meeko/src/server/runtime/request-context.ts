@@ -61,9 +61,9 @@ export interface RequestContext<out TServices = unknown, TEnv = unknown> {
   readonly idempotencyKey?: string | undefined;
   /**
    * IP del cliente (desde `1.2`): la de la conexión que entrega el adaptador o, con
-   * `MEEKO_TRUST_PROXY`, la que añadió a `X-Forwarded-For` el proxy de confianza más externo.
-   * `undefined` si no se conoce. Sin `MEEKO_TRUST_PROXY`, `X-Forwarded-For` nunca se lee, porque
-   * cualquier cliente puede enviarlo. La usa `rateLimit` y sirve para registros y auditoría. Fuera
+   * `MEEKO_TRUST_PROXY`, la que añadió a `X-Forwarded-For` el proxy de confianza más externo o
+   * (con `cloudflare`, desde `1.8`) la de `CF-Connecting-IP`. `undefined` si no se conoce. Sin
+   * `MEEKO_TRUST_PROXY`, `X-Forwarded-For` nunca se lee, porque cualquier cliente puede enviarlo. La usa `rateLimit` y sirve para registros y auditoría. Fuera
    * de un contexto, como en un middleware de servidor, la misma IP la da {@link clientAddress}.
    */
   readonly clientAddress?: string | undefined;
@@ -75,6 +75,12 @@ export interface RequestContext<out TServices = unknown, TEnv = unknown> {
  * `CF-Connecting-IP` en Workers) o, con `MEEKO_TRUST_PROXY`, la entrada de `X-Forwarded-For` que
  * añadió el proxy de confianza más externo (la `n`-ésima desde la derecha), sin su puerto. Sin
  * `MEEKO_TRUST_PROXY`, `X-Forwarded-For` nunca se lee, porque cualquier cliente puede enviarlo.
+ *
+ * Con `MEEKO_TRUST_PROXY=cloudflare` (desde `1.8`), tras Cloudflare Tunnel (`cloudflared`) y un
+ * proxy como Traefik, es la IP de `CF-Connecting-IP` (o, si falta, de `True-Client-IP`), pero sólo
+ * si la conexión y cada salto de `X-Forwarded-For` vienen de las redes de `MEEKO_TRUSTED_PROXIES`
+ * (por defecto, loopback y redes privadas). Si un salto viene de fuera, ese salto es el cliente; si
+ * la conexión viene de fuera o la cabecera no es una única IP, la de la conexión.
  * Sirve donde no hay `RequestContext`, como en `defineServerMiddleware` o en el handler de
  * `addServerHandler` de un módulo; en el resto, use `context.clientAddress`.
  *
@@ -83,11 +89,11 @@ export interface RequestContext<out TServices = unknown, TEnv = unknown> {
  * atiende un `ServerApp` sólo usa la IP de la conexión, salvo que reciba `env`.
  *
  * @param request Petición que recibe el middleware o el handler.
- * @param env Entorno del que leer `MEEKO_TRUST_PROXY`, como `process.env`; por defecto, el de la
- * aplicación que atiende la petición.
+ * @param env Entorno del que leer `MEEKO_TRUST_PROXY` y `MEEKO_TRUSTED_PROXIES`, como
+ * `process.env`; por defecto, el de la aplicación que atiende la petición.
  * @returns La IP normalizada (IPv6 en minúsculas, IPv4 mapeada como IPv4), o `undefined` si no se
  * conoce.
- * @throws {TypeError} Si `MEEKO_TRUST_PROXY` no es válida.
+ * @throws {TypeError} Si `MEEKO_TRUST_PROXY` o `MEEKO_TRUSTED_PROXIES` no son válidas.
  * @since 1.7.0
  * @example
  * ```ts

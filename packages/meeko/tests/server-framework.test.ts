@@ -62,7 +62,7 @@ test("API validates input, authentication, CSRF and output without leaking priva
 test("RPC and request state use the same isolated request context", async () => {
   const sessions = new SessionManager({ store: new MemorySessionStore(), secure: false });
   const rpc = defineRpc({ input: inputSchema, output: stringSchema, handler: ({ input, context }) => `${input.name}:${useRequestState(context, "counter", () => 1)}` });
-  const make = () => new Request("http://localhost/_meeko/rpc/name", { method: "POST", headers: { "content-type": "application/json" }, body: '{"name":"A"}' });
+  const make = () => new Request("http://localhost/_meeko/rpc/name", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost" }, body: '{"name":"A"}' });
   const request1 = make();
   const request2 = make();
   const context1 = createRequestContext(request1, {}, await sessions.load(request1));
@@ -173,13 +173,15 @@ test("origin: required rejects anonymous mutations without an allowed Origin bef
   assert.equal((await send(post({ origin: "https://admin.example.test" }))).status, 200);
   assert.equal(handled, 2);
 
-  // Safe methods are not checked, and routes without the option keep the 1.1 behavior.
+  // Safe methods are not checked; since 1.8, routes without the option check Origin too.
   const read = defineApiRoute({ origin: "required", response: stringSchema, handler: () => "ok" });
   const get = new Request("http://localhost/api/read");
   assert.equal((await dispatchApiRoute(read, createRequestContext(get, {}, await sessions.load(get)), sessions)).status, 200);
   const open = defineApiRoute({ body: inputSchema, response: stringSchema, handler: ({ body }) => body.name });
   const anonymous = post({});
-  assert.equal((await dispatchApiRoute(open, createRequestContext(anonymous, {}, await sessions.load(anonymous)), sessions)).status, 200);
+  assert.equal((await dispatchApiRoute(open, createRequestContext(anonymous, {}, await sessions.load(anonymous)), sessions)).status, 403);
+  const own = post({ origin: "http://localhost" });
+  assert.equal((await dispatchApiRoute(open, createRequestContext(own, {}, await sessions.load(own)), sessions)).status, 200);
 
   const rpc = defineRpc({ input: inputSchema, output: stringSchema, origin: "required", handler: ({ input }) => input.name });
   const call = (headers: Record<string, string>) => new Request("http://localhost/_meeko/rpc/auth/login", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: '{"name":"Ada"}' });
@@ -213,7 +215,7 @@ test("invalid input responds with the schema's issues; invalid output stays a ba
     "not an issue",
   ]);
   const route = defineApiRoute({ body, response: stringSchema, handler: () => "unreachable" });
-  const request = new Request("http://localhost/api/login", { method: "POST", headers: { "content-type": "application/json" }, body: '{"password":"secret-value"}' });
+  const request = new Request("http://localhost/api/login", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost" }, body: '{"password":"secret-value"}' });
   const context = createRequestContext(request, {}, await sessions.load(request));
   const response = await dispatchApiRoute(route, context, sessions);
   assert.equal(response.status, 400);
@@ -243,13 +245,13 @@ test("invalid input responds with the schema's issues; invalid output stays a ba
   assert.deepEqual(Object.keys(silentPayload), ["code", "status", "requestId"]);
 
   const rpc = defineRpc({ input: issuesSchema<{ name: string }>([{ message: "Escribe un nombre.", path: [{ key: "name" }] }]), output: stringSchema, handler: () => "x" });
-  const call = new Request("http://localhost/_meeko/rpc/users/rename", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+  const call = new Request("http://localhost/_meeko/rpc/users/rename", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost" }, body: "{}" });
   const invalidInput = await (await dispatchRpc(rpc, createRequestContext(call, {}, await sessions.load(call)), sessions)).json() as { code: string; issues?: unknown };
   assert.equal(invalidInput.code, "INVALID_INPUT");
   assert.deepEqual(invalidInput.issues, [{ path: "name", message: "Escribe un nombre." }]);
 
   const badOutput = defineRpc({ input: inputSchema, output: issuesSchema<string>([{ message: "private output detail", path: [{ key: "x" }] }]), handler: () => "x" });
-  const call2 = new Request("http://localhost/_meeko/rpc/users/get", { method: "POST", headers: { "content-type": "application/json" }, body: '{"name":"A"}' });
+  const call2 = new Request("http://localhost/_meeko/rpc/users/get", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost" }, body: '{"name":"A"}' });
   const output = await dispatchRpc(badOutput, createRequestContext(call2, {}, await sessions.load(call2)), sessions);
   assert.equal(output.status, 500);
   assert.deepEqual(Object.keys(await output.json() as object), ["code", "status", "requestId"]);
@@ -279,7 +281,7 @@ test("locals run after guards and validation and reach the handler typed", async
       return `${body.name}:${locals.user.name}:${visits}`;
     },
   });
-  const post = (body: string, headers: Record<string, string> = {}) => new Request("http://localhost/api/orders", { method: "POST", headers: { "content-type": "application/json", ...headers }, body });
+  const post = (body: string, headers: Record<string, string> = {}) => new Request("http://localhost/api/orders", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost", ...headers }, body });
   const send = async (request: Request) => dispatchApiRoute(route, createRequestContext(request, {}, await sessions.load(request)), sessions);
   assert.equal(await (await send(post('{"name":"order"}'))).json(), "order:Ada:3");
   assert.deepEqual(order, ["authorize", "locals", "handler"]);
@@ -306,7 +308,7 @@ test("locals run after guards and validation and reach the handler typed", async
     locals: ({ session }) => ({ userId: (session.current?.data as { userId: string }).userId }),
     handler: ({ input, locals }) => `${input.name}:${locals.userId}`,
   });
-  const anonymous = new Request("http://localhost/_meeko/rpc/orders/create", { method: "POST", headers: { "content-type": "application/json" }, body: '{"name":"A"}' });
+  const anonymous = new Request("http://localhost/_meeko/rpc/orders/create", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost" }, body: '{"name":"A"}' });
   assert.equal((await dispatchRpc(rpc, createRequestContext(anonymous, {}, await sessions.load(anonymous)), sessions)).status, 401);
   const handle = await sessions.load(new Request("http://localhost/"));
   const record = await handle.create({ userId: "u1" });
@@ -327,7 +329,7 @@ test("status chooses 201, 202 or 204 for JSON endpoints and generated clients re
   // @ts-expect-error only 200, 201, 202 and 204 are success statuses
   defineApiRoute({ response: stringSchema, status: 203, handler: () => "x" });
   const contextFor = async (request: Request) => createRequestContext(request, {}, await sessions.load(request));
-  const post = () => new Request("http://localhost/api/orders", { method: "POST", headers: { "content-type": "application/json" }, body: '{"name":"Ada"}' });
+  const post = () => new Request("http://localhost/api/orders", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost" }, body: '{"name":"Ada"}' });
 
   const createdResponse = await dispatchApiRoute(created, await contextFor(post()), sessions);
   assert.equal(createdResponse.status, 201);
@@ -335,13 +337,13 @@ test("status chooses 201, 202 or 204 for JSON endpoints and generated clients re
   assert.ok(createdResponse.headers.get("x-request-id"));
   assert.equal(await createdResponse.json(), "created:Ada");
   assert.equal((await dispatchApiRoute(accepted, await contextFor(new Request("http://localhost/api/jobs")), sessions)).status, 202);
-  const removedResponse = await dispatchApiRoute(removed, await contextFor(new Request("http://localhost/api/orders/1", { method: "DELETE" })), sessions);
+  const removedResponse = await dispatchApiRoute(removed, await contextFor(new Request("http://localhost/api/orders/1", { method: "DELETE", headers: { origin: "http://localhost" } })), sessions);
   assert.equal(removedResponse.status, 204);
   assert.equal(await removedResponse.text(), "");
   assert.equal(removedResponse.headers.get("content-type"), null);
 
   // Input and response validation keep working with a custom status.
-  const invalidBody = await dispatchApiRoute(created, await contextFor(new Request("http://localhost/api/orders", { method: "POST", headers: { "content-type": "application/json" }, body: '{"name":1}' })), sessions);
+  const invalidBody = await dispatchApiRoute(created, await contextFor(new Request("http://localhost/api/orders", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost" }, body: '{"name":1}' })), sessions);
   assert.equal(invalidBody.status, 400);
   const brokenOutput = defineApiRoute({ response: stringSchema, status: 201, handler: () => 42 as unknown as string });
   assert.equal((await (await dispatchApiRoute(brokenOutput, await contextFor(new Request("http://localhost/api/broken")), sessions)).json() as { code: string }).code, "INVALID_RESPONSE");
@@ -370,7 +372,7 @@ test("status chooses 201, 202 or 204 for JSON endpoints and generated clients re
   const api = createApiClient<{
     orders: { post: ApiOperation<undefined, undefined, { name: string }, string> };
     "orders.byId": { delete: ApiOperation<{ id: string }, undefined, undefined, undefined> };
-  }>(manifest, { baseUrl: "http://localhost", fetch: async (input, init) => {
+  }>(manifest, { baseUrl: "http://localhost", headers: { origin: "http://localhost" }, fetch: async (input, init) => {
     const request = new Request(input, init);
     return request.method === "POST" ? dispatchApiRoute(created, await contextFor(request), sessions) : dispatchApiRoute(removed, await contextFor(request), sessions);
   } });

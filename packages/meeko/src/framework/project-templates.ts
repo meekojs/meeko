@@ -87,6 +87,9 @@ export { load, manifest };
 
 const output = dirname(fileURLToPath(import.meta.url));
 
+// The project root: MEEKO_ROOT for an output deployed elsewhere, or the folder three levels up (.meeko/output/node).
+const projectRoot = process.env.MEEKO_ROOT ? resolve(process.env.MEEKO_ROOT) : resolve(output, "../../..");
+
 interface PrerenderIndex { readonly pages?: Record<string, { file: string; headOffset: number; etag: string; payload?: string; scriptHashes?: string[]; styleHashes?: string[] }> }
 
 async function prerenderSource(): Promise<PrerenderSource | undefined> {
@@ -125,6 +128,7 @@ export async function createNodeApp(options: { readonly prerendering?: boolean }
   return createApp({
     production: true,
     prerendering: options.prerendering === true,
+    root: projectRoot,
     platform: {
       name: "node",
       env: process.env,

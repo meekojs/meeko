@@ -72,9 +72,9 @@ function checkedStatus(definition: { readonly status?: unknown; readonly content
 /**
  * Ejecuta un endpoint de API con sus guardas y validaciones y devuelve la respuesta JSON, o lanza
  * un `ApiError`. Es la pieza de bajo nivel de {@link dispatchApiRoute}, que además normaliza errores.
- * El orden es: Origin (`origin: "required"`), Origin y CSRF de la sesión, `rateLimit`, `auth`,
- * `authorize`, `params`, `query`, `body`, `locals`, handler y `response`. La respuesta usa el
- * estado de `status` (`200` por defecto); con `204`, sin cuerpo.
+ * El orden es: Origin (desde `1.8`, en toda mutación salvo con `origin: "none"`), Origin y CSRF de
+ * la sesión, `rateLimit`, `auth`, `authorize`, `params`, `query`, `body`, `locals`, handler y
+ * `response`. La respuesta usa el estado de `status` (`200` por defecto); con `204`, sin cuerpo.
  *
  * @param definition Endpoint declarado con `defineApiRoute`.
  * @param context Contexto de la petición.
@@ -157,8 +157,11 @@ async function dispatchApiForm<P extends Schema | undefined, Q extends Schema | 
   try {
     const status = checkedStatus(definition);
     // A form needs no preflight, so any site can send one: every native submission needs this
-    // site's Origin, which browsers send with each POST, before its body is read.
-    if (!isAllowedOrigin(request, sessions.allowedOrigins ?? [])) throw new ApiError("INVALID_ORIGIN", 403);
+    // site's Origin, which browsers send with each POST, before its body is read. Since 1.8,
+    // `origin: "none"` exempts a submission without a session, such as a form-encoded webhook;
+    // with one, Origin is still required (guard() then checks it with the CSRF token).
+    const exempt = definition.origin === "none" && !context.session.current;
+    if (!exempt && !isAllowedOrigin(request, sessions.allowedOrigins ?? [])) throw new ApiError("INVALID_ORIGIN", 403);
     const maxBytes = options.maxBytes ?? defaultMaxBodyBytes;
     if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) throw new ApiError("INVALID_FORM_OPTIONS", 500);
     if (options.echo !== undefined && !(Array.isArray(options.echo) && options.echo.every((name) => typeof name === "string"))) throw new ApiError("INVALID_FORM_OPTIONS", 500);

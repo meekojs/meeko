@@ -1,3 +1,4 @@
+import type { DevtoolsPanelPosition } from "../devtools-ui/index";
 import type { ContentSecurityPolicy } from "../server/runtime/csp";
 import type { DocumentConfig } from "../shared/head";
 import type { ThemeConfig } from "../shared/theme";
@@ -212,6 +213,26 @@ export interface RobotsConfig {
 }
 
 /**
+ * Opciones de `devtools` en `meeko.config.ts`. Un objeto activa DevTools: sin `panel`, el panel
+ * se monta igual que con `devtools: true`.
+ *
+ * @since 1.8.0
+ * @example
+ * ```ts
+ * import type { MeekoDevtoolsConfig } from "@meekojs/meeko/framework";
+ *
+ * const devtools: MeekoDevtoolsConfig = { panel: true, position: "bottom-left" };
+ * ```
+ * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#panel-dentro-de-la-página
+ */
+export interface MeekoDevtoolsConfig {
+  /** Monta el panel dentro de la página en `meeko dev`. Por defecto, `true`. */
+  readonly panel?: boolean;
+  /** Esquina de la ventana en la que se fija el panel. Por defecto, `"bottom-right"`. */
+  readonly position?: DevtoolsPanelPosition;
+}
+
+/**
  * Configuración de proyecto de `meeko.config.ts`. Créela con {@link defineMeekoConfig}.
  *
  * @example
@@ -341,6 +362,22 @@ export interface MeekoConfig {
     readonly serverLogs?: boolean;
   };
   /**
+   * Meeko DevTools en `meeko dev`: con `true` (o un objeto con `panel` distinto de `false`),
+   * `meeko dev` monta el panel dentro de la página sin código de la aplicación. Nunca llega a
+   * `meeko build`, `meeko start` ni a las páginas prerenderizadas. Por defecto, `false` en 1.x: el
+   * panel no aparece salvo que se pida. La extensión de Chrome y el puente del editor funcionan
+   * con o sin esta opción.
+   * @since 1.8.0
+   * @example
+   * ```ts
+   * import { defineMeekoConfig } from "@meekojs/meeko/framework";
+   *
+   * export default defineMeekoConfig({ devtools: { position: "bottom-left" } });
+   * ```
+   * @see https://github.com/meekojs/meeko/blob/main/docs/devtools.md#panel-dentro-de-la-página
+   */
+  readonly devtools?: boolean | MeekoDevtoolsConfig;
+  /**
    * URL pública del sitio, de la que sólo cuenta el origen (`https://example.com`, sin ruta). La
    * usan `sitemap.xml`, `robots.txt` y, con `document.seo`, `<link rel="canonical">` y `og:url`.
    * Sin ella se usa `MEEKO_PUBLIC_ORIGIN` del entorno del build. Se fija en el build; no cambia
@@ -404,6 +441,6 @@ export interface MeekoConfig {
  * ```
  * @see https://github.com/meekojs/meeko/blob/main/docs/framework.md#layers
  */
-export function defineMeekoConfig<const T extends MeekoConfig>(config: T): T {
+export function defineMeekoConfig<const T extends MeekoConfig>(config: T & MeekoConfig): T {
   return config;
 }

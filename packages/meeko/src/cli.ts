@@ -15,7 +15,7 @@ import { cleanProject, formatCleanResult } from "./framework/clean";
 import { loadMeekoConfig } from "./framework/config";
 import { findLinkedMeeko, isSupervisedDevelopment, linkWatchEnabled, runSupervisedDevelopment, superviseDevelopment, warnLinkedMeekoRebuilds } from "./framework/dev-link";
 import { claimDevelopmentProject } from "./framework/dev-lock";
-import { loadProjectEnv } from "./framework/env-file";
+import { loadProjectEnv, resolveEnvFileArguments } from "./framework/env-file";
 import { initFrameworkProject } from "./framework/init";
 import { setModuleDevelopmentMode, warnLegacyLayerEntries } from "./framework/module-loader";
 import { prerenderProject } from "./framework/prerender";
@@ -32,7 +32,9 @@ const usage = "Uso: meeko dev [directorio]\n     meeko check [directorio | compo
   "     MEEKO_PUBLIC_ORIGIN  origen público de dev, start y preview para las comprobaciones de\n" +
   "                      Origin de HTTP y Socket tras un proxy\n" +
   "     MEEKO_REDIS_URL  Redis de las sesiones en producción si server/runtime.ts no las declara\n" +
-  "     MEEKO_TRUST_PROXY  proxies de confianza para X-Forwarded-For (un número o true)\n" +
+  "     MEEKO_TRUST_PROXY  proxies de confianza para X-Forwarded-For (un número o true), o\n" +
+  "                      cloudflare para leer CF-Connecting-IP tras Cloudflare Tunnel\n" +
+  "     MEEKO_TRUSTED_PROXIES  redes (CIDR) de los proxies con cloudflare; por defecto, privadas\n" +
   "     MEEKO_HMR_PORT   puerto del WebSocket de HMR de dev\n" +
   "     MEEKO_EDITOR_BRIDGE=0  desactiva el puente con el editor de dev\n" +
   "     MEEKO_LINK_WATCH=0     dev no se reinicia al reconstruir un @meekojs/meeko enlazado (avisa)\n" +
@@ -93,6 +95,25 @@ async function assertDirectory(path: string): Promise<void> {
   const found = await stat(path).catch(() => undefined);
   if (!found) throw new Error(`No existe el directorio ${withAbsolute(path)}`);
   if (!found.isDirectory()) throw new Error(`${path} no es un directorio`);
+}
+
+/**
+ * Makes the project root the working directory of this process and returns its absolute path.
+ * Tools that take the cwd as their base (`@tailwindcss/postcss` scans it for sources) would
+ * otherwise work on the folder `meeko` was launched from. A relative path is resolved first,
+ * against the original cwd; the arguments a supervised `dev` relaunches itself with are
+ * rewritten so the child, which inherits the new cwd, still finds the project.
+ */
+async function enterProject(path: string): Promise<string> {
+  await assertDirectory(path);
+  const origin = process.cwd();
+  const absolute = resolve(path);
+  const index = process.argv.indexOf(path, 3);
+  if (index !== -1) process.argv[index] = absolute;
+  // Node options such as `--env-file=.env.local` or `--env-file .env.local` were resolved against the original cwd.
+  process.execArgv.splice(0, process.execArgv.length, ...resolveEnvFileArguments(process.execArgv, origin));
+  process.chdir(absolute);
+  return absolute;
 }
 
 /** Reads a component, naming a missing file in Spanish. */
@@ -192,8 +213,7 @@ if (problem !== undefined) {
       process.stdout.write(doctorJson ? JSON.stringify(report, null, 2) + "\n" : formatDoctorReport(report));
       if (!report.ok) process.exitCode = 1;
     } else if (projectCommand) {
-      const root = input ?? ".";
-      await assertDirectory(root);
+      const root = await enterProject(input ?? ".");
       // Before anything reads the environment: PORT, MEEKO_LINK_WATCH or the app's own variables.
       loadProjectEnv(root);
       if (command === "dev") {
@@ -241,13 +261,13 @@ if (problem !== undefined) {
       process.stderr.write(report.stderr);
       if (result.failures.length > 0) process.exitCode = 1;
     } else if (command === "check" && (!input || (await stat(input).catch(() => undefined))?.isDirectory() || !input.endsWith(".meeko"))) {
-      if (input) await assertDirectory(input);
       if (output) throw new Error("--json sólo está disponible para un componente .meeko");
+      const root = await enterProject(input ?? ".");
       // meeko.config.ts and the runtime may read the project's variables.
-      loadProjectEnv(input ?? ".");
-      warnLegacyLayerEntries(input ?? ".", await loadCheckedMeekoConfig(input ?? "."));
-      writeDiagnostics(await checkFrameworkProject(input ?? "."));
-      process.stdout.write(`${resolve(input ?? ".")}: OK\n`);
+      loadProjectEnv(root);
+      warnLegacyLayerEntries(root, await loadCheckedMeekoConfig(root));
+      writeDiagnostics(await checkFrameworkProject(root));
+      process.stdout.write(`${root}: OK\n`);
     } else if (command === "init" || command === "init-framework") {
       if (!input) throw new Error("Falta el directorio de destino");
       const target = command === "init" ? await initProject(input) : await initFrameworkProject(input);
@@ -256,21 +276,21 @@ if (problem !== undefined) {
       process.stdout.write(`Proyecto creado en ${target}\nSiguiente paso: ${prefix}${manager} install && ${manager} run dev\n`);
     } else if (command === "routes") {
       if (!input) throw new Error("Falta el directorio del proyecto");
-      await assertDirectory(input);
+      const root = await enterProject(input);
       // The same preparation as `meeko check`, without TypeScript: tsc -p .meeko/tsconfig.*.json works after it.
       // The entries go last, so a discovery error leaves no .meeko/ behind in a wrong folder.
-      const files = await prepareFrameworkTypeDeclarations(input);
-      await prepareProject(input);
+      const files = await prepareFrameworkTypeDeclarations(root);
+      await prepareProject(root);
       for (const file of files) process.stdout.write(`${file}\n`);
     } else if (command === "prerender") {
       if (!input) throw new Error("Falta el directorio del proyecto");
-      await assertDirectory(input);
-      for (const file of await prerenderProject(input)) process.stdout.write(`${file}\n`);
+      const root = await enterProject(input);
+      for (const file of await prerenderProject(root))process.stdout.write(`${file}\n`);
     } else if (command === "check-app") {
       if (!input) throw new Error("Falta el directorio del proyecto");
       // A missing folder has no components either: without this, it passed as a project without errors.
-      await assertDirectory(input);
-      const diagnostics = await checkApp(input);
+      const root = await enterProject(input);
+      const diagnostics = await checkApp(root);
       writeDiagnostics(diagnostics);
       if (hasErrors(diagnostics)) process.exitCode = 1;
       else process.stdout.write(`${input}: OK\n`);

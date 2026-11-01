@@ -9,7 +9,8 @@ import { addressBucket, parseDuration, warnOnce } from "./env";
  * `429 RATE_LIMITED` con `Retry-After`, antes de validar la entrada y de ejecutar el handler.
  *
  * Sin `key`, cada IP de cliente tiene su contador (las IPv6 por su red /64) cuando Meeko la conoce:
- * la de la conexión o, con `MEEKO_TRUST_PROXY`, la de `X-Forwarded-For`. Si no la conoce, todos los
+ * la de la conexión o, con `MEEKO_TRUST_PROXY`, la de `X-Forwarded-For` o la de `CF-Connecting-IP`
+ * (con `cloudflare`, desde `1.8`), como `clientAddress`. Si no la conoce, todos los
  * clientes comparten el contador de la ruta.
  *
  * @typeParam S Tipo de los servicios.

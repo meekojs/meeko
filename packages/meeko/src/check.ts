@@ -14,6 +14,7 @@ import { UnexposedRefError } from "./app/runtime/element-refs";
 import { discoverAutoImports } from "./autoimports/registry";
 import { applyAutoImports, compileWithAutoImports } from "./autoimports/transform";
 import { aliasCandidates } from "./compiler/aliases";
+import { closedAttributeValuesOf } from "./compiler/attribute-values";
 import { routeBlockTypeSource } from "./compiler/codegen/route-block-types";
 import { pageRouteId } from "./compiler/codegen/server-script";
 import { moduleSpecifiers, replaceModuleSpecifiers } from "./compiler/import-graph";
@@ -284,14 +285,27 @@ export function requiredSnippetMessage(name: string): string {
   return `if:when en <snippet name="${name}"> deja de pasar el snippet cuando la condición es falsa, pero el hijo declara ${name} como obligatorio. Decláralo opcional en el defineSnippets del hijo (${name}?: [...]) o quita if:when`;
 }
 
+/** The type error of `AttributeLiteralCheck`: a literal outside the values of an attribute (MEEK122). */
+const attributeValueType = /"MEEK122: ([a-z][\w:.-]*) de <([^>]+)> no admite ese valor"/;
+
+/**
+ * Message of the `MEEK122` warning, with the value and the values that the standard admits. A
+ * warning in 1.x; it becomes an error in 2.0.
+ */
+export function attributeValueMessage(name: string, tags: readonly string[], value: string | undefined): string {
+  const values = closedAttributeValuesOf(tags, name) ?? [];
+  const shown = values.map((item) => item === "" ? '""' : item).join(", ");
+  return `${value === undefined ? "Ese valor" : value} no es un valor de ${name} en <${tags.join("> o <")}>: admite ${shown}. Es un aviso en 1.x y será un error en 2.0`;
+}
+
 /**
  * Type errors of `<component is>` with a tag (MEEK112, and MEEK031 for a void tag with content) and
  * of `bind="obj"` (MEEK113): the type text carries the code and the message, which the diagnostic
  * keeps without TypeScript's wrapping.
  */
-const meekTypeText = /"(MEEK(?:031|112|113)): ([^"]+)"/;
+const meekTypeText = /"(MEEK(?:031|112|113|131)): ([^"]+)"/;
 
-/** Message of a MEEK112, MEEK113 or MEEK031 type error, with what to do about it. */
+/** Message of a MEEK112, MEEK113, MEEK031 or MEEK131 type error, with what to do about it. */
 function meekTypeMessage(code: string, text: string): string {
   if (code === "MEEK112" && text.endsWith("no se aplica a ninguna etiqueta posible de is")) {
     return `${text}: Meeko no lo escribiría nunca; quítalo o añade a is una etiqueta que lo admita`;
@@ -406,6 +420,12 @@ export async function checkSource(source: string, filename: string, options: Che
       if (requiredSnippet) {
         return { code: "MEEK110", message: requiredSnippetMessage(requiredSnippet[1]!), filename: entry.original, location: locate(entry.source, offset ?? 0) };
       }
+      const attributeValue = attributeValueType.exec(diagnostic.message);
+      if (attributeValue) {
+        const tags = [...diagnostic.message.matchAll(/"MEEK122: [^ ]+ de <([^>]+)> no admite ese valor"/g)].map((match) => match[1]!);
+        const value = /Argument of type '([^']*)'/.exec(diagnostic.message)?.[1];
+        return { code: "MEEK122", message: attributeValueMessage(attributeValue[1]!, [...new Set(tags)], value), filename: entry.original, location: locate(entry.source, offset ?? 0), severity: "warning" };
+      }
       if (untrustedHtmlType.test(diagnostic.message)) {
         return { code: "MEEK107", message: untrustedHtmlMessage, filename: entry.original, location: locate(entry.source, offset ?? 0), severity: "warning" };
       }
@@ -445,8 +465,12 @@ export async function checkSource(source: string, filename: string, options: Che
   const sameError = (left: CompileDiagnostic, right: CompileDiagnostic): boolean =>
     left.filename === right.filename && left.code === right.code && left.message === right.message;
   const seen = new Set<string>();
+  // MEEK128 and MEEK129, misuses of `onCleanup` in the script; loaded only when the script uses it.
+  const cleanup = source.includes("onCleanup")
+    ? (await import("./language-server/cleanup")).componentCleanupDiagnostics(graph.root.source, graph.root.original)
+    : [];
   // Warnings of the checked component only; each imported component reports its own when checked.
-  return [...mapped, ...serverDiagnostics, ...graph.root.warnings].filter((item) => {
+  return [...mapped, ...serverDiagnostics, ...graph.root.warnings, ...cleanup].filter((item) => {
     if (item.severity === "warning" && item.filename !== graph.root.original) return false;
     const span = approximate.get(item);
     if (span && mapped.some((other) => other !== item && !approximate.has(other) && sameError(other, item)

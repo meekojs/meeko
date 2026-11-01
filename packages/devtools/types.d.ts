@@ -6,6 +6,8 @@ interface ChromeDevtoolsPanel {
 declare const chrome: {
   devtools: {
     panels: {
+      /** "dark" with the dark theme of Chrome DevTools, "default" otherwise. */
+      themeName?: string;
       create(title: string, iconPath: string, pagePath: string, callback?: (panel: ChromeDevtoolsPanel) => void): void;
     };
     inspectedWindow: {

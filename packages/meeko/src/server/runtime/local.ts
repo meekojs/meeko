@@ -61,10 +61,13 @@ export interface LocalApiInput {
 
 function publicHeaders(request: Request): Headers {
   const headers = new Headers();
-  for (const name of ["cookie", "origin", "x-meeko-csrf", "authorization"]) {
+  for (const name of ["cookie", "x-meeko-csrf", "authorization"]) {
     const value = request.headers.get(name);
     if (value !== null) headers.set(name, value);
   }
+  // A trusted call from server code, like the SSR clients: the application's own origin, so a
+  // page requested with GET (no Origin) can call a mutation. The session's CSRF still applies.
+  headers.set("origin", new URL(request.url).origin);
   return headers;
 }
 
@@ -98,7 +101,10 @@ function routeModule(module: unknown): unknown {
 /**
  * Crea funciones para llamar a la API y al RPC de la aplicación dentro del proceso, con objetos
  * `Request` en memoria y las credenciales de la petición original, sin red ni contexto global. Las
- * respuestas pasan por las mismas guardas y normalización de errores.
+ * respuestas pasan por las mismas guardas y normalización de errores. Desde `1.8`, como los clientes
+ * del SSR, cada llamada envía el origen de la aplicación (el de la petición original) como
+ * `Origin`, así que una mutación local funciona aunque la página se pidiera con `GET`; con sesión
+ * sigue necesitando el token CSRF de la petición original (`x-meeko-csrf`).
  *
  * @param options Manifiesto, contexto, sesiones y cargador.
  * @returns `{ api(clientKey, method, input?), rpc(id, input) }`, que devuelven un `Response` y nunca rechazan.

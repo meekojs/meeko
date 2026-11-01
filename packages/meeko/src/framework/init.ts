@@ -34,7 +34,8 @@ export default defineMeekoConfig({
   "references": [
     { "path": "./.meeko/tsconfig.app.json" },
     { "path": "./.meeko/tsconfig.server.json" },
-    { "path": "./.meeko/tsconfig.shared.json" }
+    { "path": "./.meeko/tsconfig.shared.json" },
+    { "path": "./.meeko/tsconfig.config.json" }
   ]
 }
 `,
@@ -95,6 +96,9 @@ header { margin-bottom: 2rem; }
 
 # Number of proxies in front of the server whose X-Forwarded-For can be trusted, for rateLimit.
 # MEEKO_TRUST_PROXY=1
+# Behind Cloudflare Tunnel, cloudflare reads CF-Connecting-IP when the proxies are in these networks.
+# MEEKO_TRUST_PROXY=cloudflare
+# MEEKO_TRUSTED_PROXIES=127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, ::1/128, fc00::/7
 `,
   "README.md": `# Meeko framework starter
 

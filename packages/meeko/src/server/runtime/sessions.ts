@@ -275,7 +275,10 @@ export interface SessionOptions<T> {
   sameSite?: "Lax" | "Strict" | "None";
   /** Nombre de la cookie; por defecto `__Host-meeko.sid`, o `meeko.sid` sin `secure`. */
   cookieName?: string;
-  /** Orígenes adicionales aceptados en las mutaciones autenticadas. */
+  /**
+   * Orígenes adicionales aceptados en las mutaciones de API y RPC (desde `1.8`, también sin sesión)
+   * y en los formularios nativos.
+   */
   allowedOrigins?: readonly string[];
 }
 
@@ -405,9 +408,9 @@ export const lockSessionCookie = Symbol("meeko.session.lockCookie");
 /** @internal Ties a handle to its request, so `create` can check the request's Origin. */
 export const bindSessionRequest = Symbol("meeko.session.bindRequest");
 /**
- * @internal Records how a guard settled the Origin of the request: `"verified"` after
- * `origin: "required"` or the CSRF check of an authenticated mutation, `"exempt"` with
- * `origin: "none"`.
+ * @internal Records how a guard settled the Origin of the request: `"verified"` after the
+ * default Origin check of a mutation (since 1.8) or the CSRF check of an authenticated one,
+ * `"exempt"` with `origin: "none"`.
  */
 export const settleSessionOrigin = Symbol("meeko.session.settleOrigin");
 
@@ -633,7 +636,7 @@ export class SessionManager<T = unknown> {
   readonly ttlMs: number;
   /** Nombre de la cookie de sesión. */
   readonly cookieName: string;
-  /** Orígenes adicionales aceptados en las mutaciones autenticadas y en las rutas con `origin: "required"`. */
+  /** Orígenes adicionales aceptados en las mutaciones de API y RPC, con o sin sesión, y en los formularios nativos. */
   readonly allowedOrigins: readonly string[];
   private readonly secure: boolean;
   private readonly sameSite: "Lax" | "Strict" | "None";

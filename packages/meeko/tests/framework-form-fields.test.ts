@@ -322,6 +322,10 @@ test("meeko check accepts the field component of docs/framework.md with field, w
     assert.deepEqual(diagnostics, [], `${file}: ${JSON.stringify(diagnostics)}`);
   }
   // The form of the setup that the section warns about.
-  const once = component!.replace("const value = computed(() => props.field?.value ?? model);", "const value = { value: props.field?.value ?? model };");
+  // The match ignores the trailing semicolon: Prettier removes it from the documentation.
+  const computedValue = /const value = computed\(\(\) => props\.field\?\.value \?\? model\);?/;
+  assert.match(component!, computedValue, "the section still declares the computed value");
+  const once = component!.replace(computedValue, "const value = { value: props.field?.value ?? model };");
+  assert.notEqual(once, component, "the setup variant differs from the documented component");
   assert.deepEqual((await checkSource(once, componentFile)).map((diagnostic) => diagnostic.code), ["MEEK101"]);
 });

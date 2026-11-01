@@ -63,15 +63,20 @@ export function parseDuration(value: unknown, label: string): number {
   throw new RangeError(`${label} must be a positive duration such as "30s", "5m", "12h" or "7d"`);
 }
 
-/** How many proxies in front of the server may add `X-Forwarded-For`; `true` trusts all of them. */
-export type TrustProxy = boolean | number;
+/**
+ * How many proxies in front of the server may add `X-Forwarded-For`; `true` trusts all of them.
+ * `"cloudflare"` (since 1.8) reads `CF-Connecting-IP` when every hop comes from a trusted network.
+ */
+export type TrustProxy = boolean | number | "cloudflare";
 
 const trustCache = new WeakMap<object, TrustProxy>();
 
 /**
  * `MEEKO_TRUST_PROXY`: unset, `false` or `0` trusts no proxy; a positive integer is the number of
- * proxies whose `X-Forwarded-For` entries are trusted; `true` trusts every entry.
- * @throws {TypeError} When the value is anything else.
+ * proxies whose `X-Forwarded-For` entries are trusted; `true` trusts every entry; `cloudflare`
+ * reads `CF-Connecting-IP` behind proxies in the networks of `MEEKO_TRUSTED_PROXIES`, which it
+ * validates too.
+ * @throws {TypeError} When either value is anything else.
  */
 export function trustProxyOf(env: unknown): TrustProxy {
   if (env && typeof env === "object" && trustCache.has(env)) return trustCache.get(env)!;
@@ -79,11 +84,83 @@ export function trustProxyOf(env: unknown): TrustProxy {
   let trust: TrustProxy;
   if (raw === undefined || raw === "false" || raw === "0") trust = false;
   else if (raw === "true") trust = true;
+  else if (raw.toLowerCase() === "cloudflare") {
+    trust = "cloudflare";
+    trustedNetworksOf(env);
+  }
   else if (/^[1-9]\d{0,1}$/.test(raw)) trust = Number(raw);
-  else throw new TypeError(`MEEKO_TRUST_PROXY must be true, false or the number of trusted proxies (1-99), not ${JSON.stringify(raw)}`);
+  else throw new TypeError(`MEEKO_TRUST_PROXY must be true, false or the number of trusted proxies (1-99), or cloudflare, not ${JSON.stringify(raw)}`);
   // process.env is a live object: only frozen records such as Worker bindings are cached.
   if (env && typeof env === "object" && Object.isFrozen(env)) trustCache.set(env, trust);
   return trust;
+}
+
+/** An IPv4 or IPv6 network: its 16-bit groups (two for IPv4, eight for IPv6) and prefix length. */
+export interface Network { readonly groups: readonly number[]; readonly prefix: number }
+
+/** Where `cloudflared` and the proxies in front of the server usually live: loopback and private networks. */
+export const defaultTrustedProxies = "127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, ::1/128, fc00::/7";
+
+/** The 16-bit groups of a normalized address: two for IPv4, eight for IPv6. */
+function addressGroups(address: string): number[] | undefined {
+  if (!address.includes(":")) {
+    const octets = address.split(".").map(Number);
+    return [(octets[0]! << 8) | octets[1]!, (octets[2]! << 8) | octets[3]!];
+  }
+  return expandIpv6(address);
+}
+
+/** A CIDR such as `10.0.0.0/8` or `fc00::/7`, or a single address, as a network. */
+function parseNetwork(entry: string): Network | undefined {
+  const slash = entry.indexOf("/");
+  const address = normalizeAddress(slash < 0 ? entry : entry.slice(0, slash));
+  if (address === undefined) return undefined;
+  const groups = addressGroups(address);
+  if (!groups) return undefined;
+  const bits = groups.length * 16;
+  if (slash < 0) return { groups, prefix: bits };
+  const prefix = entry.slice(slash + 1);
+  if (!/^\d{1,3}$/.test(prefix) || Number(prefix) > bits) return undefined;
+  return { groups, prefix: Number(prefix) };
+}
+
+function inNetwork(groups: readonly number[], network: Network): boolean {
+  if (groups.length !== network.groups.length) return false;
+  for (let bit = 0; bit < network.prefix; bit += 16) {
+    const width = Math.min(16, network.prefix - bit);
+    const mask = (0xffff << (16 - width)) & 0xffff;
+    if ((groups[bit / 16]! & mask) !== (network.groups[bit / 16]! & mask)) return false;
+  }
+  return true;
+}
+
+const networksCache = new Map<string, readonly Network[]>();
+
+/**
+ * The networks of `MEEKO_TRUSTED_PROXIES`, a list of CIDRs or addresses separated by commas or
+ * spaces; by default, {@link defaultTrustedProxies}.
+ * @throws {TypeError} When an entry is not a CIDR or an address.
+ */
+export function trustedNetworksOf(env: unknown): readonly Network[] {
+  const raw = envString(env, "MEEKO_TRUSTED_PROXIES") ?? defaultTrustedProxies;
+  let networks = networksCache.get(raw);
+  if (networks) return networks;
+  const entries = raw.split(/[\s,]+/).filter(Boolean);
+  networks = entries.map((entry) => {
+    const network = parseNetwork(entry);
+    if (!network) throw new TypeError(`MEEKO_TRUSTED_PROXIES must list CIDRs or IP addresses such as 10.0.0.0/8 or fc00::/7, not ${JSON.stringify(entry)}`);
+    return network;
+  });
+  if (!networks.length) throw new TypeError("MEEKO_TRUSTED_PROXIES must list at least one CIDR or IP address");
+  if (networksCache.size >= 64) networksCache.clear();
+  networksCache.set(raw, networks);
+  return networks;
+}
+
+/** Whether a normalized address belongs to one of `networks`. */
+export function isTrustedAddress(address: string, networks: readonly Network[]): boolean {
+  const groups = addressGroups(address);
+  return groups !== undefined && networks.some((network) => inNetwork(groups, network));
 }
 
 /** Addresses that the host saw on the connection, attached by each adapter. */
@@ -188,9 +265,10 @@ export function forwardedAddress(entry: string): string | undefined {
 
 /**
  * The client address of a request: the connection address, or with `MEEKO_TRUST_PROXY` the
- * `X-Forwarded-For` entry added by the outermost trusted proxy, without its port. `X-Forwarded-For`
- * is never read without that variable, because any client can send it. An entry that is not an
- * address falls back to the connection address, never to an unknown client.
+ * `X-Forwarded-For` entry added by the outermost trusted proxy, without its port, or with
+ * `MEEKO_TRUST_PROXY=cloudflare` the `CF-Connecting-IP` that trusted networks relayed.
+ * `X-Forwarded-For` is never read without that variable, because any client can send it. An entry
+ * that is not an address falls back to the connection address, never to an unknown client.
  */
 export function clientAddressOf(request: Request, env: unknown): string | undefined {
   const socket = socketAddresses.get(request);
@@ -198,10 +276,32 @@ export function clientAddressOf(request: Request, env: unknown): string | undefi
   if (trust === false) return socket;
   const header = request.headers.get("x-forwarded-for");
   const entries = header ? header.split(",").map((entry) => entry.trim()).filter(Boolean) : [];
+  if (trust === "cloudflare") return cloudflareClientAddress(request, socket, entries, trustedNetworksOf(env));
   if (!entries.length) return socket;
   // With n trusted proxies, the nth entry from the right was written by the outermost one.
   const chosen = trust === true ? entries[0]! : entries[Math.max(0, entries.length - trust)]!;
   return forwardedAddress(chosen) ?? socket;
+}
+
+/**
+ * The client address behind Cloudflare (`MEEKO_TRUST_PROXY=cloudflare`). Only when the connection
+ * and every `X-Forwarded-For` hop come from trusted networks did the request reach the server
+ * through Cloudflare's edge, `cloudflared` and private proxies; then `CF-Connecting-IP` (or, if
+ * absent, `True-Client-IP`) names the client. Walking `X-Forwarded-For` from the right, the first
+ * hop outside those networks is the client a trusted proxy saw: a request sent straight to a
+ * public proxy, with a forged `CF-Connecting-IP`, counts as that proxy's peer. A connection from
+ * outside, an unknown connection, or a malformed hop or header yields the connection address.
+ */
+function cloudflareClientAddress(request: Request, socket: string | undefined, entries: readonly string[], networks: readonly Network[]): string | undefined {
+  if (socket === undefined || !isTrustedAddress(socket, networks)) return socket;
+  for (let index = entries.length - 1; index >= 0; index--) {
+    const hop = forwardedAddress(entries[index]!);
+    if (hop === undefined) return socket;
+    if (!isTrustedAddress(hop, networks)) return hop;
+  }
+  const header = (request.headers.get("cf-connecting-ip") ?? request.headers.get("true-client-ip"))?.trim();
+  // One bare address: both headers carry a single IP, without port, brackets or zone.
+  return (header && /^[\d.a-f:]+$/i.test(header) ? normalizeAddress(header) : undefined) ?? socket;
 }
 
 /** The bucket of an address for rate limits: IPv4 as is, IPv6 by its /64 network. */

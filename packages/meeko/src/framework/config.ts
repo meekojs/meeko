@@ -14,7 +14,8 @@ import { isMeekoModule } from "../modules/define-meeko-module";
 import { contentSecurityPolicy } from "../server/runtime/csp";
 import { normalizeDocumentConfig, siteOrigin } from "../shared/head";
 import { resolveThemeConfig } from "../shared/theme";
-import { classifyModuleEntry, resolvedDocument, resolveMeekoModules, warnUnknownConfigKeys } from "./module-loader";
+import { resolveDevtoolsConfig } from "./dev-devtools";
+import { classifyModuleEntry, resolvedDocument, resolveMeekoModules } from "./module-loader";
 import { composeFrameworkRoutes } from "./modules";
 import { discoverLayouts } from "./routes-discovery";
 
@@ -111,8 +112,9 @@ async function configFile(root: string): Promise<string | undefined> {
  * Carga la configuración opcional del proyecto (`meeko.config.ts`, `.mts`, `.js` o `.mjs`) con el
  * soporte de TypeScript de Node 24 y valida sus campos. Sin archivo devuelve `{}`. Desde `1.7`, una
  * clave que ni Meeko ni un módulo leen (`sitmap: true`) da un aviso en la salida de errores, con la
- * clave conocida más parecida; con `modules`, el aviso llega al cargar los módulos, cuando se
- * conocen sus `meta.configKey`. Los mensajes de validación están en español desde `1.7`.
+ * clave conocida más parecida, al cargar los módulos (`meeko dev`, `meeko build`, `meeko check`),
+ * cuando se conocen sus `meta.configKey`; desde `1.8`, la clave de un módulo instalado que falta en
+ * `modules` es el aviso `MEEK127`. Los mensajes de validación están en español desde `1.7`.
  *
  * @param projectRoot Carpeta del proyecto.
  * @returns La configuración exportada por defecto.
@@ -188,6 +190,7 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
     if (!dev || typeof dev !== "object" || Array.isArray(dev)) throw new TypeError(`${file}: dev debe ser un objeto`);
     if (dev.serverLogs !== undefined && typeof dev.serverLogs !== "boolean") throw new TypeError(`${file}: dev.serverLogs debe ser un booleano`);
   }
+  resolveDevtoolsConfig(config.devtools, `${file}: devtools`);
   // `document.theme` is what the build bakes from `theme`; the configuration has one place for it.
   if (document !== undefined && document.theme !== undefined) throw new TypeError(`${file}: document.theme no es una opción de meeko.config.ts; use theme en el nivel superior`);
   try { resolveThemeConfig(config.theme, `${file}: theme`); }
@@ -232,8 +235,8 @@ export async function loadMeekoConfig(projectRoot: string): Promise<MeekoConfig>
     }
   }
   executedConfigs.add(config);
-  // Without modules every key is known here; with them, after their meta.configKey is read.
-  if (!Array.isArray(config.modules) || config.modules.length === 0) warnUnknownConfigKeys(root, config, []);
+  // The unknown keys are reported when the modules run (`resolveMeekoModules`), also without
+  // modules: a key may be the configKey of an installed module missing from `modules` (MEEK127).
   return config;
 }
 

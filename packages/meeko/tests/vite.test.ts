@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
-import { createLogger, createServer } from "vite";
+import { build, createLogger, createServer } from "vite";
 
 import { meeko } from "../src/vite.ts";
 import { createTempProject, linkRepositoryPackages } from "./helpers/temp-project.ts";
@@ -52,6 +52,107 @@ test("a component's CSS is a module beside its file, so PostCSS resolves relativ
     const style = await server.transformRequest(id);
     assert.match(style?.code ?? "", /rgb\(1, 2, 3\)/, "the relative @import is inlined");
     assert.match(style?.code ?? "", /\.card\[data-meeko-s-[0-9a-f]+\]/);
+  } finally {
+    await server.close();
+    await project.remove();
+  }
+});
+
+test("a component's css export is its stylesheet after PostCSS, in the SSR graph and in the browser", async () => {
+  // The SSR document embeds `css` before the client bundle loads: a PostCSS transform (Tailwind's
+  // @apply, @utilities) missing there would only apply after hydration.
+  const project = await createTempProject("vite-style-inline-");
+  const root = project.root;
+  await linkRepositoryPackages(root);
+  const brand = { postcssPlugin: "brand", Declaration(declaration: { value: string }) { declaration.value = declaration.value.replace("brand()", "rgb(4, 5, 6)"); } };
+  const server = await createServer({ root, configFile: false, plugins: [meeko()], css: { postcss: { plugins: [brand] } }, server: { middlewareMode: true, hmr: false }, logLevel: "silent" });
+  try {
+    await mkdir(join(root, "components"), { recursive: true });
+    await writeFile(join(root, "components", "tokens.css"), ".tokens { color: rgb(1, 2, 3); }\n");
+    const filename = join(root, "components", "Card.meeko");
+    await writeFile(filename, `<template><p class="card">x</p></template>\n<style scoped>\n@import "./tokens.css";\n.card { color: brand(); }\n</style>\n`);
+    const module = await server.ssrLoadModule(filename) as { css: string; renderToString: (props: object) => string };
+    assert.match(module.css, /rgb\(1, 2, 3\)/, "the relative @import is inlined");
+    assert.match(module.css, /\.card\[data-meeko-s-[0-9a-f]+\]\s*\{\s*color: rgb\(4, 5, 6\)/);
+    assert.doesNotMatch(module.css, /@import|brand\(\)/);
+    assert.match(module.renderToString({}), /<p class="card" data-meeko-s-[0-9a-f]+/);
+    // The browser module exports the same processed CSS (hot updates reapply it) and still
+    // imports the stylesheet that Vite injects and bundles.
+    const client = await server.transformRequest(filename);
+    assert.match(client?.code ?? "", /import "[^"]*\?meeko-style=[0-9a-f]{64}&lang\.css"/);
+    const inline = /import \w+ from "([^"]*\?meeko-style=[0-9a-f]{64}&inline&lang\.css)"/.exec(client?.code ?? "")?.[1];
+    assert.ok(inline, client?.code);
+    assert.match((await server.transformRequest(inline))?.code ?? "", /export default "[^"]*rgb\(4, 5, 6\)/);
+  } finally {
+    await server.close();
+    await project.remove();
+  }
+});
+
+test("the production client bundle keeps the compiler's css string and runs PostCSS once per component", { timeout: 60_000 }, async () => {
+  // Nothing reads `css` in the production client: the processed copy would be dead weight in the
+  // page chunks, and its `?inline` module a second PostCSS pass per component.
+  const project = await createTempProject("vite-style-client-build-");
+  const root = project.root;
+  await linkRepositoryPackages(root);
+  const runs: string[] = [];
+  const brand = {
+    postcssPlugin: "brand",
+    Once(_root: unknown, { result }: { result: { opts: { from?: string | undefined } } }) { runs.push(result.opts.from ?? ""); },
+    Declaration(declaration: { value: string }) { declaration.value = declaration.value.replace("brand()", "rgb(4, 5, 6)"); },
+  };
+  try {
+    const filename = join(root, "Card.meeko");
+    await writeFile(filename, `<template><p class="card">x</p></template>\n<style scoped>\n.card { color: brand(); }\n</style>\n`);
+    await writeFile(join(root, "entry.ts"), 'import * as card from "./Card.meeko";\n(globalThis as Record<string, unknown>).css = card.css;\n');
+    const result = await build({
+      root, configFile: false, plugins: [meeko()], logLevel: "silent", css: { postcss: { plugins: [brand] } },
+      build: { outDir: join(root, "dist"), write: false, minify: false, rollupOptions: { input: join(root, "entry.ts") } },
+    });
+    const outputs = (Array.isArray(result) ? result : [result]) as Array<{ output: Array<{ type: string; fileName: string; code?: string; source?: string | Uint8Array }> }>;
+    const chunks = outputs.flatMap((entry) => entry.output);
+    const code = chunks.map((chunk) => chunk.code ?? "").join("\n");
+    const assets = chunks.filter((chunk) => chunk.fileName.endsWith(".css")).map((chunk) => String(chunk.source)).join("\n");
+    // `css` is the compiler's string, before PostCSS; no processed copy and no `?inline` module.
+    assert.match(code, /brand\(\)/);
+    assert.doesNotMatch(code, /rgb\(4, 5, 6\)|&inline|__meeko_css/);
+    // The bundled stylesheet still carries the processed CSS.
+    assert.match(assets, /\.card\[data-meeko-s-[0-9a-f]+\]\s*\{\s*color: rgb\(4, 5, 6\)/);
+    assert.equal(runs.filter((from) => from.includes("Card.meeko")).length, 1, runs.join("\n"));
+  } finally {
+    await project.remove();
+  }
+});
+
+test("a host that does not process CSS (Vitest without css: true) keeps the compiler's css string", async () => {
+  // Vitest replaces every CSS module outside `test.css.include` with `export default ""`.
+  const project = await createTempProject("vite-style-unprocessed-");
+  const root = project.root;
+  await linkRepositoryPackages(root);
+  const emptyCss = { name: "empty-css", enforce: "post" as const, transform: (_code: string, id: string) => /\.css(?:$|\?)/.test(id) ? { code: 'export default ""' } : undefined };
+  const server = await createServer({ root, configFile: false, plugins: [meeko(), emptyCss], server: { middlewareMode: true, hmr: false }, logLevel: "silent" });
+  try {
+    const filename = join(root, "Card.meeko");
+    await writeFile(filename, `<template><p class="card">x</p></template>\n<style scoped>\n.card { color: red; }\n</style>\n`);
+    const module = await server.ssrLoadModule(filename) as { css: string };
+    assert.match(module.css, /\.card\[data-meeko-s-[0-9a-f]+\]\s*\{\s*color: red;?\s*\}/);
+  } finally {
+    await server.close();
+    await project.remove();
+  }
+});
+
+test("a component without a <style> exports an empty css string", async () => {
+  const project = await createTempProject("vite-style-none-");
+  const root = project.root;
+  await linkRepositoryPackages(root);
+  const server = await createServer({ root, configFile: false, plugins: [meeko()], server: { middlewareMode: true, hmr: false }, logLevel: "silent" });
+  try {
+    const filename = join(root, "Plain.meeko");
+    await writeFile(filename, `<template><p>x</p></template>\n`);
+    const module = await server.ssrLoadModule(filename) as { css: string };
+    assert.equal(module.css, "");
+    assert.doesNotMatch((await server.transformRequest(filename))?.code ?? "", /meeko-style/);
   } finally {
     await server.close();
     await project.remove();

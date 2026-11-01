@@ -101,7 +101,7 @@ function publicSchemas(file: string, root: string, options: ts.CompilerOptions, 
       let member: string | undefined;
       if (ts.isIdentifier(value)) local = value.text;
       else if (ts.isPropertyAccessExpression(value) && ts.isIdentifier(value.expression)) { local = value.expression.text; member = value.name.text; }
-      else throw new Error(`${file}: ${name}.${event} debe referenciar un schema importado de shared/`);
+      else throw new Error(`${file}: ${name}.${event} debe referenciar un schema importado de shared/: el navegador importa ese schema para validar cada mensaje, así que una composición (v.array(itemSchema)) se define y exporta en shared/ (véase docs/framework.md#schemas-públicos)`);
       const imported = imports.get(local);
       const importedFile = imported && resolveImport(imported.specifier, file, options);
       if (!imported || !importedFile || !inside(shared, importedFile)) throw new Error(`${file}: ${name}.${event} debe venir de shared/`);

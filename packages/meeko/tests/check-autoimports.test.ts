@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 
 import { discoverAutoImports } from "../src/autoimports/registry.ts";
+import { compileWithAutoImports } from "../src/autoimports/transform.ts";
 import { generateAutoImportTypes, transformTypeScriptAutoImports } from "../src/autoimports/typescript.ts";
 import { checkApp } from "../src/framework/check-app.ts";
 import { checkFrameworkProject } from "../src/framework/check-project.ts";
@@ -66,6 +67,52 @@ test("meeko check sees autoimports in .ts modules imported by a page and the gen
     await writeFile(join(root, "app", "pages", "index.meeko"), page('const link = href("/no-existe-xyz");'));
     const invalid = await checkApp(root);
     assert.ok(invalid.some((item) => item.filename === join(root, "app", "pages", "index.meeko") && /TS2769|TS2345/.test(item.code)), JSON.stringify(invalid));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("app/utils exports reach app/app.meeko like a layout, a page and a component; default exports are not autoimported", async () => {
+  const uses = (markup: string) => [
+    '<script lang="ts">',
+    "const price: Money = { amount: PRICE };",
+    "const label = formatPrice(price.amount);",
+    "</script>",
+    `<template>${markup}</template>`,
+    "",
+  ].join("\n");
+  const components = {
+    "app/app.meeko": uses("<main>{label}<MeekoOutlet /></main>"),
+    "app/layouts/default.meeko": uses("<div>{label}<MeekoOutlet /></div>"),
+    "app/pages/index.meeko": uses("<p>{label}</p>"),
+    "app/components/Price.meeko": uses("<span>{label}</span>"),
+  };
+  const root = await project("check-app-shell-", {
+    "app/utils/price.ts": "export function formatPrice(value: number): string { return `$${value}`; }\nexport const PRICE = 3;\nexport type Money = { amount: number };\n",
+    // `default` is not a name to autoimport: neither the declaration's name nor `default` itself.
+    "app/utils/legacy.ts": "export default function legacyLabel(): string { return \"legacy\"; }\n",
+    "app/utils/aliased.ts": "const aliased = 1;\nexport { aliased as default };\nexport class Shape {}\n",
+    ...components,
+  });
+  try {
+    const registry = await discoverAutoImports(root);
+    const names = registry.filter((entry) => !entry.specifier && !entry.component && !entry.componentType).map((entry) => entry.name).sort();
+    assert.deepEqual(names, ["PRICE", "Money", "Shape", "formatPrice"].sort());
+    for (const [name, source] of Object.entries(components)) {
+      const specifier = name === "app/app.meeko" ? "./utils/price.js" : "../utils/price.js";
+      for (const target of ["client", "server"] as const) {
+        const { code } = await compileWithAutoImports(source, join(root, name), {}, target, registry);
+        assert.ok(code.includes(`import { formatPrice as formatPrice } from "${specifier}";`), `${name} ${target}`);
+        assert.ok(code.includes(`import { PRICE as PRICE } from "${specifier}";`), `${name} ${target}`);
+        assert.ok(code.includes(`import type { Money as Money } from "${specifier}";`), `${name} ${target}`);
+      }
+    }
+    await prepareFrameworkTypeDeclarations(root);
+    assert.deepEqual((await checkApp(root)).map((item) => `${item.filename}:${item.code}: ${item.message}`), []);
+    // A default export used by its declared name is an unknown name, not a broken import.
+    await writeFile(join(root, "app", "app.meeko"), uses("<main>{label}{legacyLabel()}<MeekoOutlet /></main>"));
+    const unknown = await checkApp(root);
+    assert.ok(unknown.some((item) => item.filename === join(root, "app", "app.meeko") && item.code === "TS2304" && /legacyLabel/.test(item.message)), JSON.stringify(unknown));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

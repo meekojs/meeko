@@ -39,6 +39,8 @@ test("framework starter creates routable SSR/client sources and refuses overwrit
     };
     assert.deepEqual(tsconfig.references.map(({ path }) => path), [
       "./.meeko/tsconfig.app.json", "./.meeko/tsconfig.server.json", "./.meeko/tsconfig.shared.json",
+      // meeko.config.ts with the types of its modules (1.8).
+      "./.meeko/tsconfig.config.json",
     ]);
     // Sessions need no runtime file: memory in development, MEEKO_REDIS_URL in production.
     const envExample = await readFile(join(target, ".env.example"), "utf8");
