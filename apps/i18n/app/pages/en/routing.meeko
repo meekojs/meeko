@@ -1,0 +1,97 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		locale="en"
+		title="Languages and routes"
+		description="Default language without a prefix, generated /en/… routes, localized links, switcher, hreflang and sitemap."
+	>
+		<h2 id="strategy">Default language without a prefix</h2>
+		<p>
+			With
+			<code>strategy: 'prefix_except_default'</code>
+			, the default option, the URLs of the default language do not change and every other language lives under its prefix. The module generates the
+			<code>/en/…</code>
+			routes from the existing pages, with the same file, layouts and options: there is no need to duplicate pages.
+		</p>
+		<DocsCode
+			label="meeko.config.ts"
+			bind:code="examples.strategy"
+		/>
+		<p>
+			A project page at the URL of another language, such as
+			<code>app/pages/en/legal.meeko</code>
+			, replaces the generated route: that is how the prose of a page is written in each language.
+			<code>exclude</code>
+			leaves a route without versions and
+			<code>partial</code>
+			limits the ones of a language with a partial translation. A URL with the prefix of the default language, such as
+			<code>/es/guide</code>
+			, does not exist.
+		</p>
+		<h2 id="links">Localized links</h2>
+		<DocsCode bind:code="examples.links" />
+		<p>
+			<code>localePath</code>
+			adds the prefix of the document's language, or of the language it receives, and keeps the search and the fragment. Use it in the internal links of the interface.
+		</p>
+		<h2 id="switch">Language switcher</h2>
+		<DocsCode bind:code="examples.routing" />
+		<p>
+			<code>switchLocalePath</code>
+			returns the equivalent route of the current page in another language and
+			<code>pageLocales</code>
+			the languages that have a version of it. Use real links: they work without JavaScript and search engines follow them. Changing the language is a full navigation that stores the choice in a cookie;
+			<code>switchLocale</code>
+			does the same from a script.
+		</p>
+		<h2 id="seo">hreflang and sitemap</h2>
+		<DocsCode bind:code="examples.head" />
+		<p>
+			Each localized page declares
+			<code>lang</code>
+			,
+			<code>dir</code>
+			and one
+			<code>link rel="alternate"</code>
+			per language plus
+			<code>x-default</code>
+			, with absolute URLs based on
+			<code>site</code>
+			. With
+			<code>sitemap: true</code>
+			, Meeko's
+			<code>sitemap.xml</code>
+			lists each version with its alternates.
+		</p>
+		<h2 id="suggestion">Suggest the language, without redirecting</h2>
+		<DocsCode bind:code="examples.suggestion" />
+		<p>
+			URLs without a prefix always show the default language: the module never redirects based on
+			<code>Accept-Language</code>
+			or the cookie. That way each URL has a single content that search engines can index and caches can share.
+			<code>suggestedLocale</code>
+			proposes, only in the browser, the language of the cookie or of
+			<code>navigator.languages</code>
+			so that you can show a notice.
+		</p>
+		<h2 id="helpers">URL utilities</h2>
+		<DocsCode
+			label="Explicit imports"
+			bind:code="examples.paths"
+		/>
+		<p>
+			<code>localeOf</code>
+			returns the language of the first segment or the fallback it receives.
+			<code>localizedPath</code>
+			replaces a known prefix and omits the one of the default language;
+			<code>negotiateLocale</code>
+			chooses a configured language from an
+			<code>Accept-Language</code>
+			header or from a list of preferences.
+		</p>
+		<UILink href="/en/playground?tab=demo#messages">Try a switch with a query and a fragment</UILink>
+	</DocsPage>
+</template>

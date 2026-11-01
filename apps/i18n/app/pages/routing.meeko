@@ -5,29 +5,76 @@
 	<DocsPage
 		product="Meeko i18n"
 		title="Idiomas y rutas"
-		description="Cambia el idioma conservando la ruta, la búsqueda y el fragmento de la URL."
+		description="Idioma por defecto sin prefijo, rutas /en/… generadas, enlaces localizados, selector, hreflang y sitemap."
 	>
-		<h2 id="switch">switchLocale</h2>
+		<h2 id="strategy">Idioma por defecto sin prefijo</h2>
+		<p>
+			Con
+			<code>strategy: 'prefix_except_default'</code>
+			, la opción por defecto, las URL del idioma por defecto no cambian y cada otro idioma vive bajo su prefijo. El módulo genera las rutas
+			<code>/en/…</code>
+			a partir de las páginas existentes, con el mismo archivo, layouts y opciones: no hay que duplicar páginas.
+		</p>
+		<DocsCode
+			label="meeko.config.ts"
+			bind:code="examples.strategy"
+		/>
+		<p>
+			Una página del proyecto en la URL de otro idioma, como
+			<code>app/pages/en/legal.meeko</code>
+			, sustituye a la ruta generada: así se escribe la prosa de una página en cada idioma.
+			<code>exclude</code>
+			deja una ruta sin versiones y
+			<code>partial</code>
+			limita las de un idioma con traducción parcial. Una URL con el prefijo del idioma por defecto, como
+			<code>/es/guide</code>
+			, no existe.
+		</p>
+		<h2 id="links">Enlaces localizados</h2>
+		<DocsCode bind:code="examples.links" />
+		<p>
+			<code>localePath</code>
+			añade el prefijo del idioma del documento, o del idioma que recibe, y conserva la búsqueda y el fragmento. Úsalo en los enlaces internos de la interfaz.
+		</p>
+		<h2 id="switch">Selector de idioma</h2>
 		<DocsCode bind:code="examples.routing" />
 		<p>
-			El plugin reconoce el idioma en el primer segmento de la URL. Una ruta sin prefijo utiliza
-			<code>defaultLocale</code>
-			.
+			<code>switchLocalePath</code>
+			devuelve la ruta equivalente de la página actual en otro idioma y
+			<code>pageLocales</code>
+			los idiomas que tienen versión de ella. Usa enlaces reales: funcionan sin JavaScript y los buscadores los siguen. Cambiar de idioma es una navegación completa que guarda la elección en una cookie;
 			<code>switchLocale</code>
-			rechaza los idiomas que no están configurados.
+			hace lo mismo desde un script.
 		</p>
-		<div class="doc-note">
-			El módulo mantiene la selección de catálogos; las rutas localizadas deben existir en tu aplicación. Por ejemplo, este sitio define
-			<code>/playground</code>
-			y
-			<code>/[locale]/playground</code>
-			, y valida es, en y ar en el servidor.
-		</div>
-		<h2 id="navigation">Navegación entre idiomas</h2>
+		<h2 id="seo">hreflang y sitemap</h2>
+		<DocsCode bind:code="examples.head" />
 		<p>
-			Cambiar de idioma inicia una navegación completa mediante
-			<code>window.location.assign</code>
-			. La navegación interna del mismo idioma carga los namespaces que requiere la ruta. Conserva los borradores con un mecanismo de estado adecuado si deben sobrevivir a un cambio de documento.
+			Cada página localizada declara
+			<code>lang</code>
+			,
+			<code>dir</code>
+			y un
+			<code>link rel="alternate"</code>
+			por idioma más
+			<code>x-default</code>
+			, con URL absolutas a partir de
+			<code>site</code>
+			. Con
+			<code>sitemap: true</code>
+			, el
+			<code>sitemap.xml</code>
+			de Meeko lista cada versión con sus alternativas.
+		</p>
+		<h2 id="suggestion">Sugerir el idioma, sin redirigir</h2>
+		<DocsCode bind:code="examples.suggestion" />
+		<p>
+			Las URL sin prefijo siempre muestran el idioma por defecto: el módulo nunca redirige según
+			<code>Accept-Language</code>
+			ni la cookie. Así cada URL tiene un único contenido que los buscadores pueden indexar y las cachés pueden compartir.
+			<code>suggestedLocale</code>
+			propone, sólo en el navegador, el idioma de la cookie o de
+			<code>navigator.languages</code>
+			para que muestres un aviso.
 		</p>
 		<h2 id="helpers">Utilidades de URL</h2>
 		<DocsCode
@@ -38,7 +85,11 @@
 			<code>localeOf</code>
 			devuelve el idioma del primer segmento o el fallback recibido.
 			<code>localizedPath</code>
-			sustituye un prefijo conocido, conserva query y hash y devuelve una ruta relativa. Usa estas utilidades con rutas internas y tu lista de idiomas.
+			sustituye un prefijo conocido y omite el del idioma por defecto;
+			<code>negotiateLocale</code>
+			elige un idioma configurado a partir de una cabecera
+			<code>Accept-Language</code>
+			o de una lista de preferencias.
 		</p>
 		<UILink href="/playground?tab=demo#messages">Probar cambio con query y fragmento</UILink>
 	</DocsPage>

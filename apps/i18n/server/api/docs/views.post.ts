@@ -4,11 +4,11 @@ import { metricsRateLimits, navigationPaths, viewHandler, viewInput } from 'meek
 import { navigation } from '../../../app/utils/navigation'
 
 // Una vista de una página de la navegación, que envía el beacon del módulo meeko-docs. Sin cookies,
-// IP ni identificadores: sólo suma uno a la página y al día (UTC). Los alias del laboratorio
-// (/es/playground…) cuentan como /playground. Responde 204 siempre.
+// IP ni identificadores: sólo suma uno a la página y al día (UTC). /en/… cuenta como inglés y el
+// árabe del laboratorio (/ar/playground), como /playground. Responde 204 siempre.
 export default defineApiRoute({
 	body: viewInput,
 	status: 204,
 	rateLimit: metricsRateLimits.view,
-	handler: viewHandler({ site: 'i18n', knownPath: navigationPaths('i18n', navigation) }),
+	handler: viewHandler({ site: 'i18n', localized: true, knownPath: navigationPaths('i18n', navigation) }),
 })

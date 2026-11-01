@@ -9,6 +9,18 @@
 	gap: 0.75rem;
 	margin: 1.5rem 0;
 }
+.locale-actions [aria-current='page'] {
+	border-color: var(--line-strong);
+	background: var(--surface);
+	pointer-events: none;
+}
+.locale-suggestion {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 1.5rem 0 0;
+}
 .translation-result {
 	margin: 1.5rem 0;
 	border: 1px solid var(--line-strong);

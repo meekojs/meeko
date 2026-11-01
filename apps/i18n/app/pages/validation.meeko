@@ -24,7 +24,7 @@
 				{ name: 'different parameters', type: 'Preparación', description: 'Revisa placeholders y el nombre/tipo de los selectores del mismo mensaje.' },
 				{ name: 'other is required', type: 'Preparación', description: 'Añade other a cada estructura plural o select.' },
 				{ name: 'duplicate message key', type: 'Preparación', description: 'Usa claves distintas entre namespaces.' },
-				{ name: 'Missing i18n message', type: 'Ejecución', description: 'Revisa que la clave exista y que la ruta cargue su namespace.' },
+				{ name: 'Missing message', type: 'Ejecución', description: 'Revisa que la clave exista y que la ruta cargue su namespace (routes o global). La aplicación muestra la clave y avisa una vez en la consola.' },
 				{ name: 'Missing i18n value', type: 'Ejecución', description: 'Pasa un valor para cada parámetro requerido.' },
 				{ name: 'must be a finite number', type: 'Ejecución', description: 'Usa un número finito en el selector plural.' },
 				{ name: 'Unsupported locale', type: 'Ejecución', description: 'Elige un idioma incluido en catalogs.' },

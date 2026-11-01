@@ -197,6 +197,16 @@ test('views, the local filter and «¿Te sirvió?» land in the database', { ski
 	for (const path of ['/%70lurals', '//plurals/', '/en//playground', '/%65n/%70layground', '/en//nada']) assert.equal((await post('/api/docs/views', { path })).status, 204, path)
 	assert.deepEqual(await views(), { ...before, '/plurals': before['/plurals'] + 2, '/playground': before['/playground'] + 2 })
 	assert.deepEqual(await (await post('/api/docs/feedback', { path: '/en//playground', helpful: false })).json(), { saved: true })
-	assert.deepEqual((await db.query('SELECT path, helpful FROM docs_feedback ORDER BY id DESC LIMIT 1')).rows, [{ path: '/playground', helpful: false }])
+	assert.deepEqual((await db.query('SELECT path, helpful, locale FROM docs_feedback ORDER BY id DESC LIMIT 1')).rows, [{ path: '/playground', helpful: false, locale: 'en' }])
+	// /en/… counts as English without the prefix; the Arabic demo counts as the Spanish page.
+	const localeViews = async (locale) => (await db.query("SELECT coalesce(sum(views), 0)::int AS views FROM docs_page_views WHERE site = 'i18n' AND path = '/playground' AND locale = $1", [locale])).rows[0].views
+	const [spanish, english] = [await localeViews('es'), await localeViews('en')]
+	assert.ok(english >= 3, `English views of /playground: ${english}`)
+	assert.equal((await post('/api/docs/views', { path: '/ar/playground' })).status, 204)
+	assert.equal(await localeViews('es'), spanish + 1)
+	assert.equal(await localeViews('en'), english)
+	// A search from an English page stores its language.
+	assert.equal((await post('/api/docs/search', { q: 'english query', locale: 'en', results: 2 })).status, 204)
+	assert.deepEqual((await db.query("SELECT locale, results FROM docs_searches WHERE query = 'english query'")).rows, [{ locale: 'en', results: 2 }])
 	assert.deepEqual(errors, [])
 })

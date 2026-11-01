@@ -1,0 +1,38 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		locale="en"
+		title="Validation and errors"
+		description="Check the contracts before building and recognize the runtime errors."
+	>
+		<h2 id="commands">Project checks</h2>
+		<DocsCode
+			label="Terminal"
+			bind:code="examples.check"
+		/>
+		<p>
+			The module validates the catalogs when the application is prepared and generates the keys and parameters.
+			<code>meeko check</code>
+			checks the calls in your components.
+		</p>
+		<DocsApi
+			caption="Errors and recovery"
+			bind:rows="[
+				{ name: 'different message keys', type: 'Preparation', description: 'Check that every language declares the same keys.' },
+				{ name: 'different parameters', type: 'Preparation', description: 'Review the placeholders and the name/type of the selectors of the same message.' },
+				{ name: 'other is required', type: 'Preparation', description: 'Add other to each plural or select structure.' },
+				{ name: 'duplicate message key', type: 'Preparation', description: 'Use different keys across namespaces.' },
+				{ name: 'Missing message', type: 'Runtime', description: 'Check that the key exists and that the route loads its namespace (routes or global). The application shows the key and warns once in the console.' },
+				{ name: 'Missing i18n value', type: 'Runtime', description: 'Pass a value for each required parameter.' },
+				{ name: 'must be a finite number', type: 'Runtime', description: 'Use a finite number in the plural selector.' },
+				{ name: 'Unsupported locale', type: 'Runtime', description: 'Choose a language included in catalogs.' },
+			]"
+		/>
+		<h2 id="types">Generated types</h2>
+		<p>Unknown keys and missing or wrong arguments produce TypeScript diagnostics. Disabling the module removes its generated template. Keep the source code and the catalogs as the authority.</p>
+		<p>Test empty messages, quantities 0/1/2 and larger, formats with a fixed time zone and direct navigation to each language. The site's playground covers Spanish, English and Arabic both in SSR and in the browser.</p>
+	</DocsPage>
+</template>

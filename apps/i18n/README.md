@@ -56,6 +56,8 @@ El laboratorio está en `/playground` y `/{es,en,ar}/playground`. Las rutas loca
 
 La documentación se mantiene en español y dirección LTR. El plugin publica `lang`/`dir` del idioma activo en el documento; el shell declara explícitamente español/LTR y el bloque traducido declara su propio idioma y dirección.
 
+**Idioma compartido.** La cookie `meeko-locale` se declara con `domain: 'meekojs.com'` (`i18n.cookie` en `meeko.config.ts`), igual que en `apps/meeko`: el idioma elegido en uno de los tres sitios viaja a los otros dos. En `localhost` queda solo en ese host.
+
 ## Validación
 
 ```powershell

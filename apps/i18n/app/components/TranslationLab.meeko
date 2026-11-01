@@ -1,5 +1,9 @@
 <script lang="ts">
 	const i18n = useI18n()
+	const { t } = i18n
+	// The lab's controls speak the site's language (`site` and `shell`: Spanish for the Arabic demo);
+	// only the result block uses the document's locale and direction.
+	const uiLocale = t('shell.meta.lang')
 	const name = signal('Meeko')
 	const total = signal(2)
 	const role = signal('owner')
@@ -8,37 +12,31 @@
 </script>
 
 <template>
-	<div
+	<nav
 		class="locale-actions"
-		role="group"
-		aria-label="Idioma del ejemplo"
+		bind:aria-label="t('lab.languages')"
 	>
-		<UIButton
+		<UILink
+			each:of="i18n.pageLocales()"
+			each:as="code"
+			each:key="code"
 			variant="outline"
-			bind:disabled="i18n.locale === 'es'"
-			on:click="() => i18n.switchLocale('es')"
+			bind:href="i18n.switchLocalePath(code)"
+			bind:hreflang="code"
+			bind:lang="code"
+			bind:aria-current="code === i18n.locale ? 'page' : undefined"
 		>
-			Español
-		</UIButton>
-		<UIButton
-			variant="outline"
-			bind:disabled="i18n.locale === 'en'"
-			on:click="() => i18n.switchLocale('en')"
-		>
-			English
-		</UIButton>
-		<UIButton
-			variant="outline"
-			bind:disabled="i18n.locale === 'ar'"
-			on:click="() => i18n.switchLocale('ar')"
-		>
-			العربية
-		</UIButton>
-	</div>
-	<div class="translation-controls">
+			{i18n.localeName(code)}
+		</UILink>
+	</nav>
+	<div
+		class="translation-controls"
+		dir="ltr"
+		bind:lang="uiLocale"
+	>
 		<UIField
 			id="translation-name"
-			label="Nombre para traducir"
+			bind:label="t('lab.name')"
 		>
 			<snippet
 				name="default"
@@ -51,7 +49,7 @@
 				/>
 			</snippet>
 		</UIField>
-		<label for="translation-total">Cantidad de elementos: {total.value}</label>
+		<label for="translation-total">{t('lab.total', { total: total.value })}</label>
 		<input
 			id="translation-total"
 			type="range"
@@ -61,16 +59,16 @@
 			bind:value="total.value"
 			on:input="(event) => (total.value = Number(event.currentTarget.value))"
 		/>
-		<label for="translation-role">Permiso del usuario</label>
+		<label for="translation-role">{t('lab.role')}</label>
 		<select
 			id="translation-role"
 			bind:value="role.value"
 			on:change="(event) => (role.value = event.currentTarget.value)"
 		>
-			<option value="owner">Administrar</option>
-			<option value="viewer">Consultar</option>
+			<option value="owner">{t('lab.owner')}</option>
+			<option value="viewer">{t('lab.viewer')}</option>
 		</select>
-		<label for="translation-currency">Moneda</label>
+		<label for="translation-currency">{t('lab.currency')}</label>
 		<select
 			id="translation-currency"
 			bind:value="currency.value"
@@ -82,11 +80,11 @@
 	</div>
 	<section
 		class="translation-result"
-		aria-label="Resultado traducido"
 		aria-live="polite"
 		aria-atomic="true"
+		bind:aria-label="t('lab.result')"
 		bind:lang="i18n.locale"
-		bind:dir="i18n.locale === 'ar' ? 'rtl' : 'ltr'"
+		bind:dir="i18n.dir"
 	>
 		<p data-output="greeting">{i18n.t('greeting', { name: name.value })}</p>
 		<p data-output="plural">{i18n.t('cart.items', { total: total.value })}</p>
@@ -94,27 +92,27 @@
 		<dl>
 			<div>
 				<dt
-					lang="es"
 					dir="ltr"
+					bind:lang="uiLocale"
 				>
-					Moneda
+					{t('lab.currency')}
 				</dt>
 				<dd data-output="number">{i18n.number(12345.67, { style: 'currency', currency: currency.value })}</dd>
 			</div>
 			<div>
 				<dt
-					lang="es"
 					dir="ltr"
+					bind:lang="uiLocale"
 				>
-					Fecha · UTC
+					{t('lab.date')}
 				</dt>
 				<dd data-output="date">{i18n.date(date, { dateStyle: 'long', timeZone: 'UTC' })}</dd>
 			</div>
 		</dl>
 	</section>
-	<p>
-		Idioma activo:
+	<p bind:lang="uiLocale">
+		{t('lab.active')}
 		<code>{i18n.locale}</code>
-		. Datos de ejemplo locales. Cambiar idioma navega a otro documento; editar los controles no guarda información.
+		{t('lab.note')}
 	</p>
 </template>

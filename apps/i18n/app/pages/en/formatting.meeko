@@ -1,0 +1,46 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		locale="en"
+		title="Numbers and dates"
+		description="Use Intl with the active language and explicit options for your data."
+	>
+		<h2 id="formatters">number and date</h2>
+		<DocsCode
+			label="Inside a component"
+			bind:code="examples.format"
+		/>
+		<p>
+			<code>number</code>
+			accepts the options of
+			<code>Intl.NumberFormat</code>
+			;
+			<code>date</code>
+			, those of
+			<code>Intl.DateTimeFormat</code>
+			. The instances are reused per options within the translator.
+		</p>
+		<DocsApi
+			caption="Signatures of the formatters"
+			bind:rows="[
+				{ name: 'number', type: '(value: number, options?: Intl.NumberFormatOptions) => string', description: 'Currencies, percentages, decimals and other numeric representations.' },
+				{ name: 'date', type: '(value: Date | number, options?: Intl.DateTimeFormatOptions) => string', description: 'A date or timestamp, formatted for the active language.' },
+			]"
+		/>
+		<h2 id="ssr">Consistency between server and browser</h2>
+		<p>
+			Use the same date and set
+			<code>timeZone</code>
+			when the result must match in SSR and hydration. The playground uses a fixed date and UTC so you can compare the languages without depending on the clock or the time zone of the machine.
+		</p>
+		<p>
+			The currency is chosen with
+			<code>currency</code>
+			; the language defines how it is presented, not a currency conversion.
+		</p>
+		<UILink to="/playground">Compare formats</UILink>
+	</DocsPage>
+</template>

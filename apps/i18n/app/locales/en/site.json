@@ -1,0 +1,22 @@
+{
+	"error": {
+		"notFound": "This page does not exist",
+		"failed": "We could not load the page",
+		"description": "Go back to the i18n documentation to continue.",
+		"hint": "Check the address or choose a guide from the menu.",
+		"action": "Go to installation"
+	},
+	"lab": {
+		"languages": "Language of the example",
+		"name": "Name to translate",
+		"total": "Number of items: {total}",
+		"role": "User permission",
+		"owner": "Manage",
+		"viewer": "View",
+		"currency": "Currency",
+		"result": "Translated result",
+		"date": "Date · UTC",
+		"active": "Active language:",
+		"note": ". Local sample data. Changing the language navigates to another document; editing the controls stores nothing."
+	}
+}

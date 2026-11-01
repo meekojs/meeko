@@ -81,6 +81,9 @@ test('without a database the site works with its whole navigation and no announc
 	assert.equal(await page.locator('#docs-navigation a[href="/playground"]').count(), 1)
 	assert.equal(await page.locator('.docs-announcement').count(), 0)
 	assert.equal(await page.locator('.nav-featured').count(), 0)
+	// As the pages: without moderation to read, the sitemap hides nothing.
+	const sitemap = await (await fetch(server.base + '/sitemap.xml')).text()
+	for (const route of ['/playground', '/en/playground', '/ar/playground']) assert.ok(sitemap.includes(`<loc>https://i18n.meekojs.com${route}</loc>`), route)
 	assert.match(server.logs, /\[docs-moderation\] cannot read the moderation \(ECONNREFUSED\)/)
 	assert.equal(server.logs.match(/\[docs-moderation\] cannot read/g)?.length, 1, 'logged once')
 	assert.ok(!server.logs.includes('secret-e2e'), 'the password never reaches the log')
@@ -170,13 +173,15 @@ test('the shell hides, features and announces what the dashboard moderates', { s
 
 	// Equivalent URLs of the hidden page and of its aliases: 404 as a document and as the payload of
 	// a client navigation, as the router of Meeko would resolve them.
-	const variants = ['/playground', '/en/playground', '/ar/playground', '/%70layground', '/%70%6Cayground', '//playground', '/playground/', '/playground?x=1', '///playground//?y#z', '/en//playground', '/%65n/playground', '//es//playground/', '/es/%70layground?x']
+	const variants = ['/playground', '/ar/playground', '/%70layground', '/%70%6Cayground', '//playground', '/playground/', '/playground?x=1', '///playground//?y#z', '//es//playground/', '/es/%70layground?x']
 	for (const variant of variants) {
 		assert.equal((await fetch(server.base + variant)).status, 404, variant)
 		assert.equal((await fetch(server.base + variant, { headers: { accept: 'application/meeko+json' } })).status, 404, `${variant} (navigation payload)`)
 	}
 	assert.equal((await fetch(server.base + '/messages', { headers: { accept: 'application/meeko+json' } })).status, 200, 'a visible page keeps its payload')
-	for (const route of ['/playground', '/en/playground', '/ar/playground']) assert.equal((await page.goto(server.base + route)).status(), 404, route)
+	for (const route of ['/playground', '/ar/playground']) assert.equal((await page.goto(server.base + route)).status(), 404, route)
+	// A rule belongs to its language: the Spanish one leaves the English page in place.
+	assert.equal((await fetch(server.base + '/en/playground')).status, 200, 'a Spanish rule does not hide the English page')
 	assert.equal((await page.goto(server.base + '/messages', { waitUntil: 'networkidle' })).status(), 200, 'a rule of another site does not apply')
 	assert.equal(await nav.locator('a[href="/playground"]').count(), 0, 'not in the navigation')
 	assert.equal((await nav.locator('a[href="/messages"] .nav-featured').textContent())?.trim(), 'Destacado')
@@ -188,5 +193,70 @@ test('the shell hides, features and announces what the dashboard moderates', { s
 	await page.waitForFunction(() => globalThis.document.activeElement?.id === 'contenido')
 	const html = await page.goto(server.base + '/installation').then((response) => response.text())
 	assert.ok(!html.includes(notice.message), 'the closed announcement is not rendered again')
+
+	// English rules and announcements use the /en URLs and stay out of the Spanish site; a global one
+	// (locale null) reaches both.
+	const english = createDatabase({ connectionString: url, searchPath: schema })
+	let englishNotice
+	let globalNotice
+	try {
+		await saveModerationRule(english, { site: 'i18n', locale: 'en', path: '/plurals', action: 'hide', author: 'e2e' }, { allowUnknown: true })
+		await saveModerationRule(english, { site: 'i18n', locale: 'en', path: '/rtl', action: 'feature', author: 'e2e' }, { allowUnknown: true })
+		await saveModerationRule(english, { site: 'i18n', locale: null, path: '/validation', action: 'hide', author: 'e2e' }, { allowUnknown: true })
+		englishNotice = await createAnnouncement(english, { site: 'i18n', locale: 'en', message: 'English-only notice.', tone: 'info', active: true, author: 'e2e' })
+		globalNotice = await createAnnouncement(english, { site: 'i18n', locale: null, message: 'Notice for every language.', tone: 'info', active: true, author: 'e2e' })
+	} finally {
+		await english.end()
+	}
+	await wait()
+	for (const variant of ['/en/plurals', '/en//plurals', '/%65n/plurals', '/en/validation', '/validation']) assert.equal((await fetch(server.base + variant)).status, 404, variant)
+	assert.equal((await fetch(server.base + '/plurals')).status, 200, 'an English rule does not hide the Spanish page')
+	// The sitemap follows the rules in force, in each language, and in the alternates of the others.
+	const siteOrigin = 'https://i18n.meekojs.com'
+	const sitemapResponse = await fetch(server.base + '/sitemap.xml')
+	assert.equal(sitemapResponse.status, 200)
+	assert.match(sitemapResponse.headers.get('content-type'), /^application\/xml/)
+	assert.equal(sitemapResponse.headers.get('cache-control'), 'public, no-cache')
+	const sitemap = await sitemapResponse.text()
+	const listed = (route) => sitemap.includes(`<loc>${siteOrigin}${route}</loc>`)
+	const linked = (route) => sitemap.includes(`href="${siteOrigin}${route}"`)
+	for (const route of ['/validation', '/en/validation']) assert.ok(!listed(route) && !linked(route), `a global rule: ${route}`)
+	assert.ok(!listed('/en/plurals') && !linked('/en/plurals'), 'an English rule hides the English URL')
+	assert.ok(listed('/plurals'), 'an English rule leaves the Spanish URL')
+	assert.ok(!sitemap.includes(`<loc>${siteOrigin}/plurals</loc><xhtml:link`), 'and it has no alternates left')
+	// A Spanish rule hides /playground and its /ar alias, which answer 404; its English URL stays.
+	assert.ok(!listed('/playground') && !listed('/ar/playground') && !linked('/playground') && !linked('/ar/playground'), 'a Spanish rule and its alias')
+	assert.ok(listed('/en/playground'), 'a Spanish rule leaves the English URL')
+	assert.ok(sitemap.includes(`<loc>${siteOrigin}/rtl</loc><xhtml:link rel="alternate" hreflang="es"`), 'a visible page keeps its alternates')
+	assert.equal((await fetch(server.base + '/sitemap.xml', { method: 'POST' })).status, 405)
+	const etag = sitemapResponse.headers.get('etag')
+	assert.equal((await fetch(server.base + '/sitemap.xml', { headers: { 'if-none-match': etag } })).status, 304)
+	const endpoint = await (await fetch(server.base + '/_meeko-docs/moderation/i18n/en')).json()
+	assert.ok(endpoint.hidden.includes('/en/plurals'), JSON.stringify(endpoint.hidden))
+	assert.equal((await fetch(server.base + '/_meeko-docs/moderation/i18n/fr')).status, 404)
+	await page.goto(server.base + '/en/messages', { waitUntil: 'networkidle' })
+	assert.equal(await nav.locator('a[href="/en/plurals"]').count(), 0, 'not in the English navigation')
+	assert.equal(await nav.locator('a[href="/en/validation"]').count(), 0, 'a global rule hides it in English too')
+	assert.equal((await nav.locator('a[href="/en/rtl"] .nav-featured').textContent())?.trim(), 'Featured')
+	await page.getByRole('status').filter({ hasText: englishNotice.message }).waitFor()
+	await page.getByRole('status').filter({ hasText: globalNotice.message }).waitFor()
+	assert.equal(await page.getByRole('status').filter({ hasText: notice.message }).count(), 0, 'a Spanish announcement stays out of the English site')
+	assert.equal(await page.getByRole('status').filter({ hasText: englishNotice.message }).getByRole('button', { name: 'Close notice' }).count(), 1)
+	await page.goto(server.base + '/messages', { waitUntil: 'networkidle' })
+	assert.equal(await nav.locator('a[href="/plurals"]').count(), 1, 'still in the Spanish navigation')
+	assert.equal(await page.getByRole('status').filter({ hasText: englishNotice.message }).count(), 0)
+	await page.getByRole('status').filter({ hasText: globalNotice.message }).waitFor()
+
+	// A rule removed changes the sitemap without a build, and a cached copy is not reused.
+	const revealed = createDatabase({ connectionString: url, searchPath: schema })
+	try {
+		await revealed.query("DELETE FROM docs_moderation WHERE site = 'i18n' AND path = '/validation'")
+	} finally {
+		await revealed.end()
+	}
+	await wait()
+	const changed = await fetch(server.base + '/sitemap.xml', { headers: { 'if-none-match': etag } })
+	assert.equal(changed.status, 200, 'the rule that left changes the document')
+	assert.ok((await changed.text()).includes(`<loc>${siteOrigin}/en/validation</loc>`))
 	assert.deepEqual(errors, [])
 })

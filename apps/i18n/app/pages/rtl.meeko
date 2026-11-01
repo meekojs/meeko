@@ -27,7 +27,7 @@
 			<code>UIContainer</code>
 			ya usa márgenes y padding lógicos.
 		</p>
-		<p>En este sitio el shell documental declara español y LTR, mientras el resultado del laboratorio declara el idioma y la dirección del catálogo. Así puedes leer las instrucciones en español y comprobar el bloque árabe en RTL.</p>
+		<p>En este sitio el shell documental usa el idioma de la página en LTR (español en el laboratorio árabe), mientras el resultado del laboratorio declara el idioma y la dirección del catálogo. Así puedes leer las instrucciones y comprobar el bloque árabe en RTL.</p>
 		<UILink href="/ar/playground">Ver el laboratorio en árabe</UILink>
 	</DocsPage>
 </template>

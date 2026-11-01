@@ -15,7 +15,9 @@
 		/>
 		<p>
 			<code>common</code>
-			se carga siempre.
+			se carga siempre, junto a los namespaces de
+			<code>global</code>
+			, como el catálogo de un Shell compartido.
 			<code>routes</code>
 			relaciona IDs exactos del manifiesto con namespaces adicionales. Todos los idiomas declaran los mismos namespaces.
 		</p>

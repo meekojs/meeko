@@ -11,9 +11,9 @@
 			<code>meeko.config.ts</code>
 			. Las señales actualizan los argumentos de
 			<code>t</code>
-			;
-			<code>switchLocale</code>
-			cambia el prefijo de la ruta y carga el idioma en una navegación completa.
+			; los enlaces de idioma apuntan a
+			<code>switchLocalePath</code>
+			y cargan el otro idioma en una navegación completa, conservando la búsqueda y el fragmento.
 		</p>
 		<p>
 			La documentación permanece en español y dirección LTR. El bloque traducido declara su propio
@@ -24,9 +24,9 @@
 		</p>
 		<p>
 			Consulta
-			<a href="/routing">idiomas y rutas</a>
+			<MeekoLink to="/routing">idiomas y rutas</MeekoLink>
 			para la navegación y
-			<a href="/rtl">dirección RTL</a>
+			<MeekoLink to="/rtl">dirección RTL</MeekoLink>
 			para integrar el contenido de tu aplicación.
 		</p>
 	</DocsPage>

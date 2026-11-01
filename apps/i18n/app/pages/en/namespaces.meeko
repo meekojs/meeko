@@ -1,0 +1,51 @@
+<script lang="ts">
+	import { examples } from '../../utils/examples'
+	const i18n = useI18n()
+</script>
+<template>
+	<DocsPage
+		product="Meeko i18n"
+		locale="en"
+		title="Namespaces"
+		description="Split the catalogs and load the messages each route needs."
+	>
+		<h2 id="configuration">common and additional catalogs</h2>
+		<DocsCode
+			label="meeko.config.ts"
+			bind:code="examples.namespaces"
+		/>
+		<p>
+			<code>common</code>
+			is always loaded, together with the namespaces of
+			<code>global</code>
+			, such as the catalog of a shared shell.
+			<code>routes</code>
+			maps exact IDs of the manifest to additional namespaces. Every language declares the same namespaces.
+		</p>
+		<h2 id="example">A real namespace on this page</h2>
+		<p>
+			This route loads the
+			<code>checkout</code>
+			namespace through the site's
+			<code>routes</code>
+			option. The following result comes from that catalog:
+		</p>
+		<div class="translation-result">
+			<h3>{i18n.t('checkout.title')}</h3>
+			<p data-output="namespace">{i18n.t('checkout.summary', { total: 3 })}</p>
+		</div>
+		<DocsCode
+			label="app/locales/es/checkout.json"
+			bind:code="examples.checkout"
+		/>
+		<h2 id="keys">Organizing the keys</h2>
+		<p>
+			The name of the namespace organizes loading; it does not add a prefix to the keys. Here
+			<code>checkout.title</code>
+			comes from the
+			<code>checkout</code>
+			object of the JSON. Keys of different namespaces must be unique.
+		</p>
+		<p>The generated types include the keys of every namespace. Use each message on a route that loads its catalog: a key that TypeScript knows also needs to be available at runtime.</p>
+	</DocsPage>
+</template>
