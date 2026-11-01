@@ -24,7 +24,7 @@ export type SelectModel<T, Multiple extends boolean = false> = Multiple extends 
 export interface SelectOptionState {
 	/** La opción está elegida. */
 	readonly selected: boolean
-	/** Es la opción activa del teclado (`aria-activedescendant`). */
+	/** Es la opción activa del teclado (`aria-activedescendant`). Un select nativo no la expone: siempre `false`. */
 	readonly active: boolean
 	/** No se puede elegir: está deshabilitada o se alcanzó `max`. */
 	readonly disabled: boolean
@@ -73,7 +73,7 @@ export type SelectFilter<T> = (query: string, context: SelectFilterContext<T>) =
 export interface SelectSnippets<T> {
 	/** Contenido de cada opción de la lista; sin él, su etiqueta. */
 	option?: [option: T, state: SelectOptionState]
-	/** Cómo se muestra cada valor elegido en el disparador; sin él, las etiquetas separadas por comas. */
+	/** Cómo se muestra cada valor elegido en el disparador; sin él, las etiquetas separadas por comas. En Firefox, un select simple muestra su etiqueta. */
 	value?: [option: T]
 	/** Encabezado de un grupo de `groupBy`; sin él, su nombre. */
 	group?: [name: string]
@@ -109,9 +109,10 @@ export interface SelectField<Value> {
 type SelectKey<T> = T extends object ? keyof T & string : never
 
 /**
- * Props de la etiqueta propia `<UISelect>`, un select accesible sobre `<UIPopover>`. `T` es
- * el tipo de cada opción y `Multiple`, si se eligen varias; los dos se infieren de la etiqueta. Se
- * autoimporta en `app/`.
+ * Props de la etiqueta propia `<UISelect>`. Sin `multiple`, `searchable` ni `filter` es un `<select>`
+ * nativo con `appearance: base-select`; con ellos, una lista propia sobre `<UIPopover>`. `T` es el tipo
+ * de cada opción y `Multiple`, si se eligen varias; los dos se infieren de la etiqueta. Se autoimporta en
+ * `app/`.
  * @since 0.2.0
  * @example
  * ```html
@@ -134,7 +135,7 @@ export interface UISelectProps<T, Multiple extends boolean = false> {
 	readonly groupBy?: SelectKey<T> | ((option: T) => string | undefined)
 	/** Texto del disparador sin valor elegido. */
 	readonly placeholder?: string
-	/** `name` de los `<input type="hidden">` que se envían con el `<form>`, uno por valor. */
+	/** `name` con el que se envía al `<form>`: el del `<select>` o, en la lista propia, un `<input type="hidden">` por valor. */
 	readonly name?: string
 	/** Exige un valor al enviar el `<form>`. */
 	readonly required?: boolean
@@ -165,7 +166,7 @@ export interface UISelectProps<T, Multiple extends boolean = false> {
 	readonly invalid?: boolean
 	/** Clases del elemento raíz. */
 	readonly class?: string
-	/** Clases de la lista, el elemento con `popover`. */
+	/** Clases de la lista, el elemento con `popover`; en un select nativo, del `<select>`: `.mi-clase::picker(select)`. */
 	readonly listClass?: string
 	/** Dónde se abre la lista; `"bottom-start"` por defecto. */
 	readonly placement?: PopoverPlacement

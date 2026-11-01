@@ -1,0 +1,165 @@
+[data-meeko-select] [data-meeko-select-trigger] {
+	border-color: var(--ui-color-control-border);
+}
+/* Firefox keeps its own list, and paints it with these colours. */
+select[data-meeko-select-trigger] {
+	cursor: pointer;
+}
+select[data-meeko-select-trigger] option,
+select[data-meeko-select-trigger] optgroup {
+	background: var(--ui-color-surface-raised);
+	color: var(--ui-color-text);
+}
+
+@supports (appearance: base-select) {
+	select[data-meeko-select-trigger],
+	select[data-meeko-select-trigger]::picker(select) {
+		appearance: base-select;
+	}
+	select[data-meeko-select-trigger] {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: var(--ui-space-2);
+		text-align: start;
+	}
+	select[data-meeko-select-trigger]:has(option[data-meeko-select-placeholder]:checked) selectedcontent {
+		color: var(--ui-color-text-soft);
+	}
+	select[data-meeko-select-trigger]::picker-icon {
+		transition: rotate var(--ui-duration-base) var(--ui-ease-out);
+		color: var(--ui-color-text-soft);
+	}
+	select[data-meeko-select-trigger]:open::picker-icon {
+		rotate: 180deg;
+	}
+	select[data-meeko-select-trigger] selectedcontent,
+	select[data-meeko-select-trigger] option:not([hidden]) {
+		display: flex;
+		align-items: center;
+		gap: var(--ui-space-2);
+	}
+	select[data-meeko-select-trigger]::picker(select) {
+		position-area: var(--select-area, bottom span-right);
+		/* The browser's default is the side with the most room, not the one that was asked for. */
+		position-try-order: normal;
+		position-try-fallbacks: flip-block, flip-inline;
+		translate: 0 calc(var(--ui-space-1) * -1);
+		opacity: var(--ui-opacity-hidden);
+		transition:
+			opacity var(--ui-duration-base) var(--ui-ease-out),
+			translate var(--ui-duration-base) var(--ui-ease-out),
+			display var(--ui-duration-base) allow-discrete,
+			overlay var(--ui-duration-base) allow-discrete;
+		box-sizing: border-box;
+		margin-block: var(--select-offset, var(--ui-space-1));
+		inset: auto;
+		box-shadow: var(--ui-shadow-md);
+		border: var(--ui-border-width) solid var(--ui-color-border);
+		border-radius: var(--ui-radius-lg);
+		background: var(--ui-color-surface-raised);
+		padding: var(--ui-space-1);
+		min-width: anchor-size(width);
+		max-height: var(--ui-popover-max-height);
+		overflow: auto;
+		color: var(--ui-color-text);
+		font-size: var(--ui-font-size-md);
+		font-family: var(--ui-font-sans);
+	}
+	select[data-meeko-select-trigger]:open::picker(select) {
+		translate: 0;
+		opacity: var(--ui-opacity-visible);
+	}
+	@starting-style {
+		select[data-meeko-select-trigger]:open::picker(select) {
+			translate: 0 calc(var(--ui-space-1) * -1);
+			opacity: var(--ui-opacity-hidden);
+		}
+	}
+	select[data-meeko-select-trigger] option,
+	select[data-meeko-select-trigger] optgroup {
+		background: transparent;
+	}
+	select[data-meeko-select-trigger] option {
+		cursor: pointer;
+		border-radius: var(--ui-radius-sm);
+		padding: var(--ui-space-1-5) var(--ui-space-2);
+	}
+	select[data-meeko-select-trigger] option:hover,
+	select[data-meeko-select-trigger] option:focus-visible {
+		outline: 0;
+		background: var(--ui-color-control-active);
+	}
+	select[data-meeko-select-trigger] option:checked {
+		font-weight: var(--ui-font-weight-semibold);
+	}
+	select[data-meeko-select-trigger] option:disabled {
+		opacity: var(--ui-opacity-disabled);
+		cursor: not-allowed;
+	}
+	select[data-meeko-select-trigger] option::checkmark {
+		order: 1;
+		margin-inline-start: auto;
+		color: var(--ui-color-primary-text);
+	}
+	select[data-meeko-select-trigger] legend {
+		padding: var(--ui-space-1-5) var(--ui-space-2);
+		color: var(--ui-color-text-soft);
+		font-weight: var(--ui-font-weight-regular);
+		font-size: var(--ui-font-size-sm);
+	}
+
+	/* Where the list opens: the same places as <UIPopover>. */
+	select[data-placement^='left']::picker(select),
+	select[data-placement^='right']::picker(select) {
+		margin-inline: var(--select-offset, var(--ui-space-1));
+		margin-block: 0;
+	}
+	select[data-placement='top'] {
+		--select-area: top;
+	}
+	select[data-placement='top-start'] {
+		--select-area: top span-right;
+	}
+	select[data-placement='top-end'] {
+		--select-area: top span-left;
+	}
+	select[data-placement='bottom'] {
+		--select-area: bottom;
+	}
+	select[data-placement='bottom-end'] {
+		--select-area: bottom span-left;
+	}
+	select[data-placement='left'] {
+		--select-area: left;
+	}
+	select[data-placement='left-start'] {
+		--select-area: left span-bottom;
+	}
+	select[data-placement='left-end'] {
+		--select-area: left span-top;
+	}
+	select[data-placement='right'] {
+		--select-area: right;
+	}
+	select[data-placement='right-start'] {
+		--select-area: right span-bottom;
+	}
+	select[data-placement='right-end'] {
+		--select-area: right span-top;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	select[data-meeko-select-trigger]::picker(select),
+	select[data-meeko-select-trigger]::picker-icon {
+		transition: none;
+	}
+}
+
+/* Firefox paints its arrow at the very end of the select: the clear button goes just before it. */
+@supports not (appearance: base-select) {
+	[data-meeko-select][data-clearable] select + [data-meeko-select-clear] {
+		inset-inline-end: var(--ui-space-5);
+	}
+}

@@ -1,4 +1,5 @@
 export { useModal, useModalInstance } from './app/composables/useModal'
+export { withViewTransition } from './app/utils/view-transition'
 export type { UIActionAppearance, UIAnchorAttributes, UIButtonProps, UIForwardedAttributes, UILinkCardProps, UILinkProps, UIRouteTarget } from './app/types/button'
 export type { ModalContext, ModalDismissReason, ModalInstanceContext } from './app/types/modal'
 export type { PopoverExposed, PopoverMode, PopoverPlacement, PopoverRole, PopoverSnippets, PopoverToggleEvent, PopoverTrigger, UIPopoverProps } from './app/types/popover'

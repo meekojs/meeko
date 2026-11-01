@@ -1,0 +1,5 @@
+/* <UIThemeToggle>: the whole page fades between themes, with the browser's own crossfade of the root. */
+html:active-view-transition-type(ui-theme)::view-transition-group(root) {
+	animation-duration: var(--ui-duration-slow);
+	animation-timing-function: var(--ui-ease-out);
+}

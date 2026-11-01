@@ -32,6 +32,8 @@ test('public UI documentation renders every guide, navigates, copies code and va
 	assert.equal(await navigation.getByRole('link', { name: 'Badge', exact: true }).getAttribute('aria-current'), 'page')
 	await page.getByRole('searchbox', { name: 'Buscar en la guía', exact: true }).fill('')
 	await page.goto(origin)
+	// A click before hydration does nothing, and a cold Vite takes a while to get there.
+	await page.waitForFunction(() => globalThis.performance.getEntriesByName('meeko-hydration').length > 0)
 	await page.getByRole('button', { name: 'Guardar proyecto', exact: true }).click()
 	await page.getByRole('status').filter({ hasText: 'Cambios guardados' }).waitFor()
 	await page.screenshot({ path: output + '/documentation-desktop.png', fullPage: true })

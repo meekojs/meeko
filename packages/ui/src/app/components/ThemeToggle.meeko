@@ -14,6 +14,7 @@
 
 	import { uiMessages } from '../utils/messages'
 	import { themeToggleGroupLabel, themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from '../utils/theme-toggle'
+	import { withViewTransition } from '../utils/view-transition'
 
 	const props = defineProps<UIThemeToggleProps>()
 
@@ -38,11 +39,16 @@
 	const focused = computed(() => status.value.focused)
 	const group = computed(() => themeToggleGroupLabel(props.messages, text))
 
+	/** The theme writes `data-theme` synchronously, so the fade captures the page before and after it. */
+	const choose = (choice: string): void => {
+		withViewTransition(() => toggle.theme.set(choice as ThemeChoice), { types: ['ui-theme'] })
+	}
+
 	/** With JavaScript the form never posts: the theme changes at once, without a navigation. */
 	const submit = (event: SubmitEvent): void => {
 		event.preventDefault()
 		const submitter = event.submitter as HTMLButtonElement | null
-		toggle.theme.set((submitter?.name === 'theme' ? submitter.value : next.value) as ThemeChoice)
+		choose(submitter?.name === 'theme' ? submitter.value : next.value)
 	}
 
 	/** The arrow keys, `Home` and `End` move the focus and the choice, as in a native radio group. */
@@ -53,7 +59,7 @@
 		if (target === undefined) return
 		event.preventDefault()
 		radios[target]!.focus()
-		toggle.theme.set(radios[target]!.value as ThemeChoice)
+		choose(radios[target]!.value)
 	}
 </script>
 

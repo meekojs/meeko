@@ -1,30 +1,20 @@
 import { createRoot, signal } from '@meekojs/meeko'
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
-import { computePopoverPosition, listKeyTarget, normalizeText, placementArea, placementMargin, popoverPlacement, typeaheadIndex } from '../dist/app/utils/popover.js'
+import { listKeyTarget, normalizeText, popoverPlacement, typeaheadIndex } from '../dist/app/utils/popover.js'
 import { createSelect, defaultSelectFilter, groupOptions, sameOption, selectDisabled, selectLabel, selectValue, toggleSelection } from '../dist/app/utils/select.js'
 import { themeToggleItems, themeToggleKeyTarget, themeToggleMode, themeToggleStatus } from '../dist/app/utils/theme-toggle.js'
 
-test('placements map to CSS anchor positioning and the fallback flips and stays in the viewport', () => {
-	assert.equal(placementArea('bottom-start'), 'bottom span-right')
-	assert.equal(placementArea('top-end'), 'top span-left')
-	assert.equal(placementArea('right'), 'right')
-	assert.equal(placementArea('left-start'), 'left span-bottom')
+test('an unknown placement falls back to bottom-start, and popover.css places each one', async () => {
+	assert.equal(popoverPlacement('top-end'), 'top-end')
 	assert.equal(popoverPlacement('sideways'), 'bottom-start')
-	assert.equal(placementMargin('bottom-end', 8), '8px 0px 0px 0px')
-	assert.equal(placementMargin('top', 4), '0px 0px 4px 0px')
-	assert.equal(placementMargin('left', 2), '0px 2px 0px 0px')
-	assert.equal(placementMargin('right', -1), '0px 0px 0px 0px')
-	const viewport = { width: 800, height: 600 }
-	const size = { width: 200, height: 100 }
-	assert.deepEqual(computePopoverPosition({ left: 100, top: 100, width: 80, height: 30 }, size, viewport, 'bottom-start', 8), { x: 100, y: 138, side: 'bottom' })
-	assert.deepEqual(computePopoverPosition({ left: 100, top: 100, width: 80, height: 30 }, size, viewport, 'bottom-end', 0), { x: 0, y: 130, side: 'bottom' })
-	// No room below: it opens above.
-	assert.deepEqual(computePopoverPosition({ left: 100, top: 540, width: 80, height: 30 }, size, viewport, 'bottom-start', 8), { x: 100, y: 432, side: 'top' })
-	// Neither side has room: it keeps the side with more space, inside the viewport.
-	assert.equal(computePopoverPosition({ left: 0, top: 250, width: 10, height: 10 }, { width: 50, height: 400 }, viewport, 'bottom', 0).y, 200)
-	assert.deepEqual(computePopoverPosition({ left: 700, top: 200, width: 50, height: 20 }, size, viewport, 'right', 4), { x: 496, y: 160, side: 'left' })
+	assert.equal(popoverPlacement(undefined), 'bottom-start')
+	const css = await readFile(new URL('../src/app/styles/popover.css', import.meta.url), 'utf8')
+	for (const [placement, area] of Object.entries({ top: 'top', 'top-start': 'top span-right', 'top-end': 'top span-left', bottom: 'bottom', 'bottom-start': 'bottom span-right', 'bottom-end': 'bottom span-left', left: 'left', 'left-start': 'left span-bottom', 'left-end': 'left span-top', right: 'right', 'right-start': 'right span-bottom', 'right-end': 'right span-top' })) {
+		assert.match(css, new RegExp(`\\[data-placement='${placement}'\\] \\{\\s*position-area: ${area};`), placement)
+	}
 })
 
 test('menu keys and typeahead skip disabled items, ignore accents and cycle a repeated letter', () => {

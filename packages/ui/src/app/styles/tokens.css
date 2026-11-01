@@ -20,6 +20,7 @@
 	/* Borders */
 	--ui-color-border: var(--ui-color-surface-6);
 	--ui-color-border-strong: var(--ui-color-surface-8);
+	--ui-color-control-border: var(--ui-color-surface-9);
 
 	/* Text */
 	--ui-color-text: var(--ui-color-surface-12);
@@ -152,6 +153,8 @@
 	--ui-control-font-weight: var(--ui-font-weight-medium);
 	--ui-input-font-size: var(--ui-font-size-md);
 	--ui-opacity-disabled: 0.55;
+	--ui-opacity-hidden: 0;
+	--ui-opacity-visible: 1;
 
 	/* Depth */
 	--ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 8%);
@@ -163,6 +166,7 @@
 	--ui-duration-base: 180ms;
 	--ui-duration-slow: 220ms;
 	--ui-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+	--ui-ease-in: cubic-bezier(0.4, 0, 1, 1);
 	--ui-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
 	/* Layout */
@@ -211,6 +215,7 @@
 :root[data-theme='dark'] {
 	/* On pure black, panels rise by getting lighter; shadows only separate what overlaps. */
 	--ui-color-surface-raised: var(--ui-color-surface-3);
+	--ui-color-control-border: var(--ui-color-surface-10);
 	--ui-shadow-sm: 0 1px 2px rgb(0 0 0 / 60%);
 	--ui-shadow-md: 0 2px 4px rgb(0 0 0 / 50%), 0 6px 16px rgb(0 0 0 / 60%);
 	--ui-shadow-lg: 0 4px 8px rgb(0 0 0 / 50%), 0 16px 40px rgb(0 0 0 / 70%);

@@ -126,16 +126,17 @@ test('modals hydrate, stack, settle, restore focus and work on mobile', { timeou
 		() => 'Escape closed the wrong stack',
 	)
 	await assertBackdrop(1)
-	assert.match(await page.locator('dialog[open]').innerText(), /adicional cancelada/)
+	// The promise of open() settles when the exit ends, a moment after the dialog stops being [open].
+	await page.locator('dialog[open]', { hasText: 'adicional cancelada' }).waitFor()
 	await settleMotion()
 	assert.equal(await page.locator('dialog[open]').evaluate((element) => globalThis.getComputedStyle(element).scale), '1', 'previous modal returns to full size')
 	await page.getByRole('button', { name: 'Confirmar', exact: true }).click()
-	assert.equal(await page.locator('dialog[open][data-meeko-ui-modal-state="closing"]').count(), 1, 'programmatic confirmation keeps the modal mounted during its exit')
+	assert.equal(await page.locator('dialog[data-meeko-ui-modal-state="closing"]').count(), 1, 'programmatic confirmation keeps the modal mounted during its exit')
 	await until(
 		async () => (await page.locator('dialog[open]').count()) === 0,
 		() => 'Modal did not close',
 	)
-	assert.match(await page.getByRole('status').first().textContent(), /Acción confirmada/)
+	await page.getByRole('status').first().filter({ hasText: 'Acción confirmada' }).waitFor()
 	assert.equal(await page.locator('[data-meeko-ui-modal-order], [data-meeko-ui-modal-top]').count(), 0, 'closed dialogs release backdrop ownership')
 	assert.equal(await trigger.evaluate((element) => element === element.ownerDocument.activeElement), true, 'focus returns to the opener')
 	await trigger.click()
@@ -147,7 +148,7 @@ test('modals hydrate, stack, settle, restore focus and work on mobile', { timeou
 		async () => (await page.locator('dialog[open]').count()) === 0,
 		() => 'Backdrop did not dismiss',
 	)
-	assert.match(await page.getByRole('status').first().textContent(), /Acción cancelada/)
+	await page.getByRole('status').first().filter({ hasText: 'Acción cancelada' }).waitFor()
 	await page.getByRole('button', { name: 'Modal declarativo', exact: true }).click()
 	await page.locator('dialog[open]').waitFor()
 	await page.getByLabel('Nombre', { exact: true }).fill('Diego')

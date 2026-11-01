@@ -102,8 +102,8 @@ export interface PopoverSnippets {
 
 /**
  * Props de la etiqueta propia `<UIPopover>`: un contenido en la capa superior (`popover`),
- * anclado a su disparador con *CSS anchor positioning* y con un cálculo en JavaScript donde el
- * navegador no lo tiene. El modelo por defecto (`model="open"`) es la señal de apertura. Se
+ * anclado a su disparador con *CSS anchor positioning*; un navegador que no lo tenga lo abre sin
+ * anclar. El modelo por defecto (`model="open"`) es la señal de apertura. Se
  * autoimporta en `app/` como el resto de tipos de las etiquetas.
  * @since 0.2.0
  * @example

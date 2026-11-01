@@ -2,6 +2,7 @@
 	translate: 0 calc(var(--ui-modal-depth, 0) * var(--ui-modal-stack-offset) * -1);
 	scale: calc(1 - var(--ui-modal-depth, 0) * var(--ui-modal-stack-scale));
 	transition:
+		opacity var(--ui-duration-slow) var(--ui-ease-out),
 		scale var(--ui-duration-slow) var(--ui-ease-out),
 		translate var(--ui-duration-slow) var(--ui-ease-out);
 	box-sizing: border-box;
@@ -34,6 +35,7 @@
 	width: min(var(--ui-modal-width-lg), calc(100vw - var(--ui-space-8)));
 }
 .meeko-ui-modal::backdrop {
+	transition: opacity var(--ui-duration-slow) linear;
 	background: transparent;
 }
 .meeko-ui-modal[data-meeko-ui-modal-top]::backdrop {
@@ -107,8 +109,39 @@
 		padding: var(--ui-space-4);
 	}
 }
+/* The entrance is CSS: it does not block the page, and WebKit does not paint a modal that opens inside a
+   View Transition. No `display` or `overlay allow-discrete` here: they would keep the closing dialog in
+   the new capture of its exit. */
+@starting-style {
+	.meeko-ui-modal[open] {
+		translate: 0 var(--ui-space-4);
+		scale: calc(1 - var(--ui-modal-stack-scale));
+		opacity: var(--ui-opacity-hidden);
+	}
+	.meeko-ui-modal[open]::backdrop {
+		opacity: var(--ui-opacity-hidden);
+	}
+}
+/* The exit is a View Transition, with a name only during its own type: any other transition, such as a
+   navigation with a modal open, neither captures the modal nor plays its animation again. */
+html:active-view-transition-type(ui-modal-close) .meeko-ui-modal[data-meeko-ui-modal-state='closing'] {
+	view-transition-name: ui-modal;
+}
+html:active-view-transition-type(ui-modal-close)::view-transition-group(root) {
+	animation-duration: var(--ui-duration-base);
+}
+html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-modal) {
+	animation: ui-modal-out var(--ui-duration-base) var(--ui-ease-in) both;
+}
+@keyframes ui-modal-out {
+	to {
+		transform: translateY(var(--ui-space-3)) scale(calc(1 - var(--ui-modal-stack-scale)));
+		opacity: var(--ui-opacity-hidden);
+	}
+}
 @media (prefers-reduced-motion: reduce) {
-	.meeko-ui-modal {
+	.meeko-ui-modal,
+	.meeko-ui-modal::backdrop {
 		transition: none;
 	}
 }

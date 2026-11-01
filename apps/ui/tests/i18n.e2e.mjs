@@ -134,7 +134,7 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	assert.equal(await page.locator('[data-meeko-popover]:popover-open [data-meeko-select-empty]').innerText(), 'No results')
 	await page.keyboard.press('Escape')
 	await page.locator('#owner').click()
-	await page.locator('[data-meeko-popover]:popover-open [role="option"]:not([aria-disabled="true"])').first().click()
+	await page.locator('#owner option:not(:disabled, [hidden])').first().click()
 	assert.equal(await page.getByRole('button', { name: 'Clear selection', exact: true }).count(), 1)
 	await page.goto(origin + '/en/modals', { waitUntil: 'networkidle' })
 	const closeButtons = page.locator('.meeko-ui-modal-close')

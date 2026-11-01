@@ -4,13 +4,14 @@ import type { Signal } from '@meekojs/meeko'
  * `<UISelect>`: what `Select.meeko` needs besides its template. The pure helpers (labels,
  * comparison with `by`, search with accents removed, grouping, selection with `max`) are tested on
  * their own; `createSelect` keeps the state that the template renders, the same in SSR and
- * hydration, and attaches the keyboard and the pointer in the browser.
+ * hydration. A simple select is a native `<select>`, which brings its own list, keyboard and form
+ * value; only `multiple`, `searchable` and `filter` need the list, the keyboard and the pointer here.
  */
 import { computed, effect, onCleanup, signal, untrack } from '@meekojs/meeko'
 
 import type { SelectEntry, SelectGroup, SelectOptionState, SelectSettings } from '../types/select'
 
-import { adoptStyle, createTypeahead, listKeyTarget, normalizeText, typeaheadIndex, typeaheadKey } from './popover'
+import { createTypeahead, listKeyTarget, normalizeText, typeaheadIndex, typeaheadKey } from './popover'
 
 /** A value of the record of an object option, or `undefined`. */
 function field(option: unknown, key: string): unknown {
@@ -109,9 +110,6 @@ export function toggleSelection<T>(selected: readonly T[], option: T, options: {
 	return [...selected, option]
 }
 
-/** Rules of `<UISelect>` that the page adds once, in the `meeko` cascade layer: a list that scrolls. */
-export const selectStyle = '@layer meeko{[data-meeko-select] [data-meeko-popover]{max-height:min(20rem,60vh);overflow:auto;box-sizing:border-box}}'
-
 /** Whether a value is a promise or another thenable. */
 function thenable<T>(value: unknown): value is PromiseLike<T> {
 	return value !== null && (typeof value === 'object' || typeof value === 'function') && typeof (value as { then?: unknown }).then === 'function'
@@ -122,6 +120,8 @@ export function createSelect<T>(props: SelectSettings<T>, model: Signal<unknown>
 	const listboxId = `${id}-listbox`
 	const triggerId = computed(() => props.id ?? props.field?.id ?? `${id}-trigger`)
 	const multiple = computed(() => props.multiple === true)
+	/** The platform covers it: a `<select>`, which has no room for a search or for several values in a list. */
+	const native = computed(() => !multiple.value && props.searchable !== true && props.filter === undefined)
 	/** The signal that holds the value: the form field's, or the model. */
 	const target = (): { value: unknown } => props.field?.value ?? model
 	const open = signal(false)
@@ -153,12 +153,33 @@ export function createSelect<T>(props: SelectSettings<T>, model: Signal<unknown>
 	const valueText = computed(() => selected.value.map(label).join(', '))
 	const inputText = computed(() => (typing.value ? query.value : multiple.value ? '' : valueText.value))
 	const activeId = computed(() => (open.value && active.value >= 0 ? entries.value[active.value]?.id : undefined))
-	const hiddenValues = computed(() => (props.name === undefined && props.field === undefined ? [] : multiple.value ? selected.value.map((option) => selectValue(option, props)) : [selected.value[0] === undefined ? '' : selectValue(selected.value[0], props)]))
+	const hiddenValues = computed(() => (native.value || (props.name === undefined && props.field === undefined) ? [] : multiple.value ? selected.value.map((option) => selectValue(option, props)) : [selected.value[0] === undefined ? '' : selectValue(selected.value[0], props)]))
 	const name = computed(() => props.name ?? props.field?.name)
 	/** The clear button shows only while there is something to clear. */
 	const showClear = computed(() => props.clearable === true && props.disabled !== true && selected.value.length > 0)
 	const invalid = computed(() => (props.invalid === true || props.field?.invalid.value === true || (failed.value && selected.value.length === 0) ? 'true' : undefined))
 	const describedBy = computed(() => props.describedBy ?? props.field?.describedBy.value)
+
+	/**
+	 * One plus the chosen option; `0` when the options do not hold it. Then, and only then, the `<select>`
+	 * starts with a hidden option that stands for it: nothing chosen (the placeholder, so the browser does
+	 * not pick an option on its own) or a value outside them, which the model keeps until the application
+	 * changes it, as in the custom list. Browsers still expose a hidden option to assistive technology.
+	 */
+	const nativeIndex = computed(() => entries.value.findIndex(isSelected) + 1)
+	const blankChosen = computed(() => nativeIndex.value === 0 && selected.value.length > 0)
+	const blankValue = computed(() => (blankChosen.value ? selectValue(selected.value[0]!, props) : ''))
+	const blankLabel = computed(() => (blankChosen.value ? valueText.value : (props.placeholder ?? '')))
+
+	// One object per element: the compiler writes each binding of a template several times over.
+	const nativeAttributes = computed(() => ({ id: triggerId.value, class: props.listClass, name: name.value, required: props.required, disabled: props.disabled, 'aria-label': props.label, 'aria-describedby': describedBy.value, 'aria-invalid': invalid.value, 'data-placement': props.placement ?? 'bottom-start' }))
+	const triggerAttributes = computed(() => ({ id: triggerId.value, 'aria-controls': listboxId, 'aria-expanded': open.value ? ('true' as const) : ('false' as const), 'aria-activedescendant': activeId.value, 'aria-label': props.label, 'aria-describedby': describedBy.value, 'aria-invalid': invalid.value, 'aria-required': props.required ? ('true' as const) : undefined, disabled: props.disabled }))
+	const nativeOption = (entry: SelectEntry<T>) => ({ value: selectValue(entry.option, props), disabled: entry.disabled, selected: isSelected(entry) })
+	const listOption = (entry: SelectEntry<T>) => {
+		const chosen = isSelected(entry)
+		const blocked = isBlocked(entry)
+		return { id: entry.id, 'data-index': entry.index, 'aria-selected': chosen ? ('true' as const) : ('false' as const), 'aria-disabled': blocked ? ('true' as const) : undefined, 'data-active': active.value === entry.index ? '' : undefined, 'data-selected': chosen ? '' : undefined, 'data-disabled': blocked ? '' : undefined }
+	}
 
 	/** The first option that is not disabled, from `from` in a direction; `-1` if none. */
 	const firstEnabled = (from = 0, direction: 1 | -1 = 1): number => {
@@ -276,6 +297,13 @@ export function createSelect<T>(props: SelectSettings<T>, model: Signal<unknown>
 		rootElement?.querySelector<HTMLElement>('[data-meeko-select-trigger]')?.focus()
 	}
 
+	/** The option at a position of `select.options`, which holds the hidden one first when it is there. */
+	const chooseNative = (position: number): void => {
+		const index = position - (nativeIndex.value === 0 ? 1 : 0)
+		if (index >= 0) choose(index)
+	}
+	const nativeChange = (event: Event): void => chooseNative((event.currentTarget as HTMLSelectElement).selectedIndex)
+
 	const typeahead = createTypeahead()
 	/** Enter or Space handled by the key: the click that the button would also fire is not a toggle. */
 	let keyClick = false
@@ -388,12 +416,36 @@ export function createSelect<T>(props: SelectSettings<T>, model: Signal<unknown>
 		root?.querySelector<HTMLElement>('[data-meeko-select-trigger]')?.focus()
 	}
 
-	/** In the browser: the list's style, dismissal outside the component and the active option in view. */
+	/**
+	 * A native select: a choice made before hydration wins over the model. After that the model leads, and
+	 * setting `selectedIndex` also rebuilds the copy of `<selectedcontent>`, which is not reactive.
+	 */
+	const mountNative = (root: HTMLElement): (() => void) => {
+		const element = (): HTMLSelectElement | null => (native.value ? root.querySelector('select') : null)
+		const position = (): number => Math.max(0, untrack(() => nativeIndex.value) - 1)
+		const early = element()?.selectedIndex ?? position()
+		if (early !== position()) chooseNative(early)
+		return effect(() => {
+			const index = Math.max(0, nativeIndex.value - 1)
+			void entries.value
+			const offset = props.offset
+			// After this flush, which also renders the new options.
+			queueMicrotask(() => {
+				const select = element()
+				if (!select) return
+				select.selectedIndex = index
+				if (offset === undefined) select.style.removeProperty('--select-offset')
+				else select.style.setProperty('--select-offset', `${offset}px`)
+			})
+		})
+	}
+
+	/** In the browser: the native select, or dismissal outside the component and the active option in view. */
 	const mount = (root: HTMLElement | null): (() => void) => {
 		if (!root) return () => {}
 		rootElement = root
+		const stopNative = mountNative(root)
 		const document = root.ownerDocument
-		adoptStyle(document, 'select', selectStyle)
 		// Nodes of this document; `instanceof Node` would need the global of its window.
 		const node = (target: EventTarget | null): Node | undefined => (target !== null && typeof (target as Node).nodeType === 'number' ? (target as Node) : undefined)
 		const outside = (event: Event): void => {
@@ -414,6 +466,7 @@ export function createSelect<T>(props: SelectSettings<T>, model: Signal<unknown>
 		})
 		return () => {
 			stop()
+			stopNative()
 			document.removeEventListener('pointerdown', outside, true)
 			root.removeEventListener('focusout', focusout)
 			typeahead.clear()
@@ -425,6 +478,15 @@ export function createSelect<T>(props: SelectSettings<T>, model: Signal<unknown>
 		listboxId,
 		triggerId,
 		multiple,
+		native,
+		nativeIndex,
+		blankValue,
+		blankLabel,
+		nativeChange,
+		nativeAttributes,
+		triggerAttributes,
+		nativeOption,
+		listOption,
 		open,
 		active,
 		loading,

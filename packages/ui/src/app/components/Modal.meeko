@@ -57,6 +57,7 @@
 		ref:dialog
 		bind:class="['meeko-ui-modal', props.class].filter(Boolean).join(' ')"
 		bind:data-size="props.size ?? 'md'"
+		bind:closedby="props.closeOnEscape === false ? 'none' : props.closeOnBackdrop === false ? 'closerequest' : 'any'"
 		bind:aria-labelledby="id + '-title'"
 		bind:aria-describedby="props.description ? id + '-description' : undefined"
 	>
