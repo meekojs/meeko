@@ -50,7 +50,8 @@ test('forms hydrate, preserve native submission, keyboard and model updates; fee
 	)
 	assert.ok(boxes[0].bottom <= boxes[1].top, 'notifications never overlap')
 	await page.locator('.meeko-ui-toast').first().getByRole('button').click()
-	assert.equal(await page.locator('.meeko-ui-toast').count(), 1)
+	// The exit is a View Transition: the toast leaves the DOM after its capture, not in the click.
+	await page.waitForFunction(() => globalThis.document.querySelectorAll('.meeko-ui-toast').length === 1)
 	await page.locator('#clear').click()
 	await page.locator('#timed').click()
 	const timed = page.locator('.meeko-ui-toast').filter({ hasText: 'Aviso temporal' })
@@ -103,7 +104,7 @@ test('forms hydrate, preserve native submission, keyboard and model updates; fee
 	// Less motion, no transition: the toast just goes.
 	await page.locator('#notify').click()
 	await page.locator('.meeko-ui-toast').last().getByRole('button').click()
-	assert.equal(await page.locator('.meeko-ui-toast').count(), 0)
+	await page.waitForFunction(() => globalThis.document.querySelectorAll('.meeko-ui-toast').length === 0)
 	assert.deepEqual(await page.evaluate(() => globalThis.viewTransitionTypes), [['ui-toast-close']])
 	assert.deepEqual(errors, [])
 	const native = await browser.newContext({ javaScriptEnabled: false })
