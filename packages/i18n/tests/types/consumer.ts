@@ -1,4 +1,5 @@
-import type { I18n, I18nMessageValues, I18nValue } from "@meekojs/i18n";
+import type { I18n, I18nMessageKey, I18nMessageTags, I18nMessageValues, I18nRichPart, I18nValue } from "@meekojs/i18n";
+import type { I18nLocale, PageI18n } from "@meekojs/i18n/server";
 
 declare module "@meekojs/i18n" {
   interface GeneratedI18nMessages {
@@ -6,6 +7,14 @@ declare module "@meekojs/i18n" {
     items: { readonly total: number; readonly owner: I18nValue };
     ready: {};
     legacy: true;
+    linked: {};
+  }
+  interface GeneratedI18nTags {
+    linked: "code" | "a";
+  }
+  interface GeneratedI18nLocales {
+    es: true;
+    en: true;
   }
 }
 
@@ -17,6 +26,15 @@ i18n.t("ready", {});
 i18n.t("legacy");
 const values: I18nMessageValues<"items"> = { total: 1, owner: "Team" };
 i18n.t("items", values);
+// `has` takes any text, the code of a server, and narrows it to a key of the catalogs.
+declare const code: string;
+if (i18n.has(code)) {
+  const known: I18nMessageKey = code;
+  void known;
+}
+i18n.has("anything", { locale: "en" });
+// @ts-expect-error A key is text.
+i18n.has(7);
 declare const dynamic: "welcome" | "ready";
 i18n.t(dynamic, { name: "Team" });
 // @ts-expect-error A dynamic key can require parameters, even when another alternative is static.
@@ -39,3 +57,25 @@ i18n.t("items", { total: "two", owner: "Team" });
 i18n.t("items", { count: 2, owner: "Team" });
 // @ts-expect-error Static messages do not declare placeholder values.
 i18n.t("ready", { extra: true });
+// Another language: the options follow the values, which stay required when the message has them.
+i18n.t("ready", undefined, { locale: "en" });
+i18n.t("ready", {}, { locale: "en" });
+i18n.t("welcome", { name: "Meeko" }, { locale: "en" });
+// @ts-expect-error Required interpolation values cannot be skipped to reach the options.
+i18n.t("welcome", undefined, { locale: "en" });
+// @ts-expect-error locale is the only option, and a text.
+i18n.t("ready", {}, { locale: 1 });
+const parts: readonly I18nRichPart[] = i18n.rich("welcome", { name: "Meeko" });
+const tag: string | undefined = parts[0]?.tag;
+// @ts-expect-error rich() checks its key and values like t().
+i18n.rich("welcome");
+const tags: I18nMessageTags<"linked"> = "code";
+// @ts-expect-error Only the tags of that message.
+const wrongTag: I18nMessageTags<"linked"> = "kbd";
+const noTags: I18nMessageTags<"ready"> extends never ? true : false = true;
+const locale: I18nLocale = "en";
+// @ts-expect-error Only the locales of the catalogs.
+const wrongLocale: I18nLocale = "fr";
+declare const page: PageI18n;
+const pageLocale: "es" | "en" = page.locale;
+export { locale, noTags, pageLocale, tag, tags, wrongLocale, wrongTag };

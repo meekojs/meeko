@@ -20,10 +20,14 @@
     "./module": {
       "types": "./dist/module.d.ts",
       "default": "./dist/module.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
     }
   },
   "scripts": {
-    "build": "node ../../scripts/build-package.mjs",
+    "build": "node ../../scripts/build-package.mjs && node scripts/copy-components.mjs",
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "node --test tests/*.test.mjs",
     "prepack": "pnpm run build"

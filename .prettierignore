@@ -26,3 +26,5 @@ packages/devtools/types/protocol.d.ts
 packages/ui/src/app/components/Popover.meeko
 packages/ui/src/app/components/Select.meeko
 packages/ui/src/app/components/ThemeToggle.meeko
+packages/i18n/src/app/components/I18nT.meeko
+packages/i18n/src/app/components/internal/I18nTPart.meeko
