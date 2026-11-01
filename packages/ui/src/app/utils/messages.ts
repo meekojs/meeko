@@ -25,6 +25,19 @@ const spanish: UIMessages = {
 		group: 'Tema',
 		cycle: 'Tema: {current}. Cambiar a {next}',
 	},
+	page: { skip: 'Saltar al contenido' },
+	header: { label: 'Navegación principal', menu: 'Menú' },
+	footer: { label: 'Enlaces del pie' },
+	drawer: { close: 'Cerrar panel' },
+	navigationTree: { label: 'Navegación de la sección', featured: 'Destacado', empty: 'Sin resultados' },
+	navigationTabs: { label: 'Secciones' },
+	breadcrumb: { label: 'Ruta de navegación' },
+	pageNavigation: { label: 'Páginas anterior y siguiente', previous: 'Anterior', next: 'Siguiente' },
+	pagination: { label: 'Paginación', count: '{shown} de {total}', total: '{total} en total', loadMore: 'Cargar más', loading: 'Cargando…' },
+	tableOfContents: { label: 'En esta página' },
+	language: { label: 'Idioma', suggestion: 'Sugerencia de idioma', message: 'Esta página también está en {language}.', go: 'Leer en {language}', stay: 'Seguir en {language}' },
+	code: { label: 'Código', log: 'Registro', copy: 'Copiar', copied: 'Copiado', copyFailed: 'No se pudo copiar', good: 'Correcto', bad: 'Incorrecto' },
+	diff: { empty: 'Sin cambios.', added: 'Añadido:', removed: 'Eliminado:' },
 }
 
 const english: UIMessages = {
@@ -37,6 +50,19 @@ const english: UIMessages = {
 		group: 'Theme',
 		cycle: 'Theme: {current}. Switch to {next}',
 	},
+	page: { skip: 'Skip to content' },
+	header: { label: 'Main navigation', menu: 'Menu' },
+	footer: { label: 'Footer links' },
+	drawer: { close: 'Close panel' },
+	navigationTree: { label: 'Section navigation', featured: 'Featured', empty: 'No results' },
+	navigationTabs: { label: 'Sections' },
+	breadcrumb: { label: 'Breadcrumb' },
+	pageNavigation: { label: 'Previous and next pages', previous: 'Previous', next: 'Next' },
+	pagination: { label: 'Pagination', count: '{shown} of {total}', total: '{total} in total', loadMore: 'Load more', loading: 'Loading…' },
+	tableOfContents: { label: 'On this page' },
+	language: { label: 'Language', suggestion: 'Language suggestion', message: 'This page is also available in {language}.', go: 'Read in {language}', stay: 'Stay in {language}' },
+	code: { label: 'Code', log: 'Log', copy: 'Copy', copied: 'Copied', copyFailed: 'Could not copy', good: 'Correct', bad: 'Incorrect' },
+	diff: { empty: 'No changes.', added: 'Added:', removed: 'Removed:' },
 }
 
 /** The texts that come with the package. Spanish is complete and the last fallback of every locale. */
@@ -70,6 +96,19 @@ function merge(messages: UIMessages, layer: UIMessageOverrides | undefined): UIM
 		table: { ...messages.table, ...layer.table },
 		select: { ...messages.select, ...layer.select },
 		themeToggle: { ...messages.themeToggle, ...layer.themeToggle, labels: { ...messages.themeToggle.labels, ...layer.themeToggle?.labels } },
+		page: { ...messages.page, ...layer.page },
+		header: { ...messages.header, ...layer.header },
+		footer: { ...messages.footer, ...layer.footer },
+		drawer: { ...messages.drawer, ...layer.drawer },
+		navigationTree: { ...messages.navigationTree, ...layer.navigationTree },
+		navigationTabs: { ...messages.navigationTabs, ...layer.navigationTabs },
+		breadcrumb: { ...messages.breadcrumb, ...layer.breadcrumb },
+		pageNavigation: { ...messages.pageNavigation, ...layer.pageNavigation },
+		pagination: { ...messages.pagination, ...layer.pagination },
+		tableOfContents: { ...messages.tableOfContents, ...layer.tableOfContents },
+		language: { ...messages.language, ...layer.language },
+		code: { ...messages.code, ...layer.code },
+		diff: { ...messages.diff, ...layer.diff },
 	}
 }
 
@@ -102,6 +141,24 @@ function optional<T>(key: ContextKey<T>): T | undefined {
  */
 export function uiMessages(): LocalizedUIMessages {
 	return resolveUIMessages(optional(i18nKey)?.locale, optional(uiMessagesKey))
+}
+
+/**
+ * The texts of any locale, for a component that speaks a language other than the document's: read the
+ * configuration once in the setup and call the result with the locale. `translated` says whether that
+ * locale has texts of its own, so the markup does not claim `lang` over a fallback.
+ */
+export function uiMessagesFor(): (locale: string) => { readonly messages: LocalizedUIMessages; readonly translated: boolean } {
+	const config = optional(uiMessagesKey)
+	return (locale) => {
+		const tags = localeChain(canonicalLocale(locale) ?? '')
+		return { messages: resolveUIMessages(locale, config), translated: tags.some((tag) => own(builtinMessages, tag) !== undefined || own(config?.messages, tag) !== undefined) }
+	}
+}
+
+/** Fills the `{name}` placeholders of a text. */
+export function fillMessage(template: string, values: Readonly<Record<string, string>>): string {
+	return template.replace(/\{(\w+)\}/g, (match, name: string) => values[name] ?? match)
 }
 
 /** `{current}` and `{next}` of the `cycle` text of `<UIThemeToggle>`. */

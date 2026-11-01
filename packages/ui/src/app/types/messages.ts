@@ -43,6 +43,113 @@ export interface UIMessages {
 		 */
 		readonly cycle: string
 	}
+	/** `<UIPage>`. */
+	readonly page: {
+		/** Texto del enlace para saltar al contenido, si no se pasa `skipLabel`. */
+		readonly skip: string
+	}
+	/** `<UIHeader>`. */
+	readonly header: {
+		/** `aria-label` de la navegación principal, si no se pasa `label`. */
+		readonly label: string
+		/** `aria-label` del botón del menú en pantallas estrechas, si no se pasa `menuLabel`. */
+		readonly menu: string
+	}
+	/** `<UIFooter>`. */
+	readonly footer: {
+		/** `aria-label` de la navegación del pie, si no se pasa `label`. */
+		readonly label: string
+	}
+	/** `<UIDrawer>`. */
+	readonly drawer: {
+		/** `aria-label` del botón de cierre, si no se pasa `closeLabel`. */
+		readonly close: string
+	}
+	/** `<UINavigationTree>`. */
+	readonly navigationTree: {
+		/** `aria-label` de la navegación, si no se pasa `label`. */
+		readonly label: string
+		/** Etiqueta de un elemento con `featured`, si no se pasa `featuredLabel`. */
+		readonly featured: string
+		/** Mensaje sin grupos, si no se pasa `emptyText` ni el snippet `empty`. */
+		readonly empty: string
+	}
+	/** `<UINavigationTabs>`. */
+	readonly navigationTabs: {
+		/** `aria-label` de la navegación, si no se pasa `label`. */
+		readonly label: string
+	}
+	/** `<UIBreadcrumb>`. */
+	readonly breadcrumb: {
+		/** `aria-label` de la ruta, si no se pasa `label`. */
+		readonly label: string
+	}
+	/** `<UIPageNavigation>`. */
+	readonly pageNavigation: {
+		/** `aria-label` de la navegación, si no se pasa `label`. */
+		readonly label: string
+		/** Texto sobre el enlace anterior, si no se pasa `previousLabel`. */
+		readonly previous: string
+		/** Texto sobre el enlace siguiente, si no se pasa `nextLabel`. */
+		readonly next: string
+	}
+	/** `<UIPagination>`. */
+	readonly pagination: {
+		/** `aria-label` de la navegación, si no se pasa `label`. */
+		readonly label: string
+		/** Recuento con `shown` y `total`: `{shown}` y `{total}` son los números ya formateados. */
+		readonly count: string
+		/** Recuento sólo con `total`: `{total}` es el número ya formateado. */
+		readonly total: string
+		/** Texto de la acción, si no se pasa `loadMoreLabel`. */
+		readonly loadMore: string
+		/** Texto de la acción con `busy`, si no se pasa `loadingLabel`. */
+		readonly loading: string
+	}
+	/** `<UITableOfContents>`. */
+	readonly tableOfContents: {
+		/** Título y `aria-label` del índice, si no se pasa `label`. */
+		readonly label: string
+	}
+	/** `<UILocaleSwitcher>` y `<UILocaleSuggestion>`. */
+	readonly language: {
+		/** `aria-label` del selector, si no se pasa `label`. */
+		readonly label: string
+		/** `aria-label` de la sugerencia, en el idioma que ofrece. */
+		readonly suggestion: string
+		/** Texto de la sugerencia, en el idioma que ofrece: `{language}` es la etiqueta de ese idioma. */
+		readonly message: string
+		/** Enlace de la sugerencia, en el idioma que ofrece: `{language}` es la etiqueta de ese idioma. */
+		readonly go: string
+		/** Botón para quedarse, en el idioma actual: `{language}` es la etiqueta de ese idioma. */
+		readonly stay: string
+	}
+	/** `<UICodeBlock>` y los bloques de código dentro de `<UIProse>`. */
+	readonly code: {
+		/** Nombre accesible del bloque sin `label` ni `lang`. */
+		readonly label: string
+		/** Nombre accesible del registro en `mode="log"` sin `label`. */
+		readonly log: string
+		/** Texto del botón de copiar, si no se pasa `copyLabel`. */
+		readonly copy: string
+		/** Texto tras copiar, si no se pasa `copiedLabel`. */
+		readonly copied: string
+		/** Texto si la copia falla, si no se pasa `copyFailedLabel`. */
+		readonly copyFailed: string
+		/** Veredicto `good`, si no se pasa `verdictLabel`. */
+		readonly good: string
+		/** Veredicto `bad`, si no se pasa `verdictLabel`. */
+		readonly bad: string
+	}
+	/** `<UIDiff>`. */
+	readonly diff: {
+		/** Mensaje sin cambios, si no se pasa `emptyText`. */
+		readonly empty: string
+		/** Texto para lectores de pantalla ante una línea añadida, si no se pasa `lineLabels.add`. */
+		readonly added: string
+		/** Texto para lectores de pantalla ante una línea eliminada, si no se pasa `lineLabels.remove`. */
+		readonly removed: string
+	}
 }
 
 /**

@@ -8,6 +8,10 @@
 @import './card.css';
 @import './link-card.css';
 @import './badge.css';
+@import './navigation.css';
+@import './page.css';
+@import './code.css';
+@import './prose.css';
 
 .meeko-ui-button,
 .meeko-ui-input,

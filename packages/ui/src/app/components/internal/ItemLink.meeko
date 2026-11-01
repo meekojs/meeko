@@ -1,0 +1,47 @@
+<script lang="ts">
+	// The link of every list of the package: an <a> with `href`, or a route with <MeekoLink> with `to`.
+	import { computed } from '@meekojs/meeko'
+
+	import type { UIForwardedAttributes } from '../../types/button'
+	import type { UILinkTarget } from '../../types/navigation'
+
+	type Props = UIForwardedAttributes & {
+		link: UILinkTarget
+		current?: 'page' | 'location' | undefined
+		class?: string
+	}
+
+	const { link, current, class: className, ...rest } = defineProps<Props>()
+
+	const snippets = defineSnippets<{ default: [] }>()
+
+	const linkRel = computed(() => link.rel ?? (link.target === '_blank' ? 'noopener noreferrer' : undefined))
+	// In the spread, not as `bind:aria-current`: <MeekoLink> sets it from the active route and leaves this
+	// key out of a spread, while a bound attribute would be written next to its own and fail hydration.
+	const attributes = computed(() => (current ? { ...rest, 'aria-current': current } : rest))
+
+	// The spread stays before the attributes of the link, as in <UILink>: see the note there.
+	/* eslint-disable meeko/attributes-order */
+</script>
+
+<template>
+	<component
+		is="link.to !== undefined ? 'MeekoLink' : 'a'"
+		bind:to="link.to"
+		bind:params="link.params"
+		bind:search="link.search"
+		bind:resolve="link.resolve"
+		bind:match="link.match"
+		bind="attributes.value"
+		bind:href="link.href"
+		bind:target="link.target"
+		bind:rel="linkRel.value"
+		bind:download="link.download"
+		bind:hreflang="link.hreflang"
+		bind:lang="link.lang"
+		bind:title="link.title"
+		bind:class="className"
+	>
+		<render snippet="snippets.default" />
+	</component>
+</template>

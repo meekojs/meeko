@@ -183,6 +183,29 @@
 	--ui-modal-stack-scale: 0.04;
 	--ui-popover-max-height: min(20rem, 70vh);
 	--ui-table-column-min: 10rem;
+	--ui-header-height: 3.5rem;
+	--ui-page-sidebar-width: 15rem;
+	--ui-page-aside-width: 13.5rem;
+	--ui-drawer-width: 19rem;
+	--ui-prose-width: 48rem;
+	--ui-prose-measure: 70ch;
+	--ui-prose-code-size: 0.86em;
+	--ui-prose-code-padding: 0.1em 0.32em;
+	--ui-toc-max-height: 50dvh;
+	--ui-code-max-height: 36rem;
+	--ui-log-max-height: 20rem;
+	--ui-floating-panel-width: 23rem;
+	--ui-tabs-indicator-height: 2px;
+	--ui-landing-title-size: clamp(var(--ui-font-size-4xl), 6vw, var(--ui-font-size-6xl));
+	--ui-icon-size: 1rem;
+	--ui-icon-size-sm: 0.8125rem;
+	--ui-icon-stroke-width: 1.4;
+	--ui-opacity-subtle: 0.7;
+	--ui-opacity-hidden: 0;
+	--ui-opacity-visible: 1;
+	--ui-duration-spin: 800ms;
+	--ui-z-sticky: 20;
+	--ui-z-floating: 30;
 }
 
 :root[data-theme='dark'] {

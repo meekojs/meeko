@@ -1,0 +1,13 @@
+<script lang="ts">
+	const props = defineProps<{ path: string; class?: string }>()
+</script>
+
+<template>
+	<svg
+		viewBox="0 0 16 16"
+		aria-hidden="true"
+		bind:class="['meeko-ui-icon', props.class].filter(Boolean).join(' ')"
+	>
+		<path bind:d="props.path" />
+	</svg>
+</template>

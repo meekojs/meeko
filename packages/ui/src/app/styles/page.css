@@ -1,0 +1,222 @@
+/* A heading reached by an anchor stays clear of the sticky header. */
+:root:has(.meeko-ui-header[data-sticky]) {
+	scroll-padding-block-start: calc(var(--ui-header-height) + var(--ui-space-4));
+}
+.meeko-ui-page {
+	display: flex;
+	flex-direction: column;
+	min-height: 100dvh;
+	color: var(--ui-color-text);
+	font-family: var(--ui-font-sans);
+}
+/* Off the screen until the keyboard reaches it, so it never takes room. */
+.meeko-ui-skip-link {
+	position: fixed;
+	top: var(--ui-space-2);
+	translate: 0 calc(-100% - var(--ui-space-4));
+	z-index: var(--ui-z-floating);
+	transition: translate var(--ui-duration-fast) var(--ui-ease-out);
+	inset-inline-start: var(--ui-space-2);
+	box-shadow: var(--ui-shadow-md);
+	border-radius: var(--ui-radius-md);
+	background: var(--ui-color-primary);
+	padding: var(--ui-space-2) var(--ui-space-3);
+	color: var(--ui-color-primary-contrast);
+	font-weight: var(--ui-font-weight-medium);
+	font-size: var(--ui-font-size-md);
+	text-decoration: none;
+}
+.meeko-ui-skip-link:focus-visible {
+	translate: 0 0;
+	outline: var(--ui-focus-ring);
+	outline-offset: var(--ui-focus-ring-offset);
+}
+.meeko-ui-page-bar {
+	display: none;
+}
+.meeko-ui-page-body {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	flex: 1;
+	gap: var(--ui-space-12);
+	box-sizing: border-box;
+	margin-inline: auto;
+	padding-inline: var(--ui-container-gutter-md);
+	width: 100%;
+	max-width: var(--ui-container-xl);
+}
+.meeko-ui-page-main {
+	padding-block: var(--ui-space-10) var(--ui-space-20);
+	min-width: 0;
+}
+/* It takes the focus from the skip link only to move the reading position: a ring around it says nothing. */
+.meeko-ui-page-main:focus {
+	outline: none;
+}
+.meeko-ui-page-sidebar,
+.meeko-ui-page-aside {
+	position: sticky;
+	top: var(--ui-header-height);
+	align-self: start;
+	padding-block: var(--ui-space-8) var(--ui-space-10);
+	max-height: calc(100dvh - var(--ui-header-height));
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	scrollbar-color: transparent transparent;
+	scrollbar-width: thin;
+}
+.meeko-ui-page-sidebar:is(:hover, :focus-within),
+.meeko-ui-page-aside:is(:hover, :focus-within) {
+	scrollbar-color: var(--ui-color-border-strong) transparent;
+}
+.meeko-ui-page-body:has(> .meeko-ui-page-sidebar) {
+	grid-template-columns: var(--ui-page-sidebar-width) minmax(0, 1fr);
+}
+.meeko-ui-page-body:has(> .meeko-ui-page-aside) {
+	grid-template-columns: minmax(0, 1fr) var(--ui-page-aside-width);
+}
+.meeko-ui-page-body:has(> .meeko-ui-page-sidebar):has(> .meeko-ui-page-aside) {
+	grid-template-columns: var(--ui-page-sidebar-width) minmax(0, 1fr) var(--ui-page-aside-width);
+}
+.meeko-ui-page[data-layout='dashboard'] .meeko-ui-page-body {
+	gap: var(--ui-space-8);
+	max-width: var(--ui-container-2xl);
+}
+.meeko-ui-page[data-layout='dashboard'] .meeko-ui-page-main {
+	padding-block: var(--ui-space-8) var(--ui-space-12);
+}
+/* Each section of a landing page sets its own width, with <UIContainer> or a band. */
+.meeko-ui-page[data-layout='landing'] .meeko-ui-page-body {
+	display: block;
+	padding-inline: 0;
+	max-width: none;
+}
+.meeko-ui-page[data-layout='landing'] .meeko-ui-page-main {
+	padding-block: 0;
+}
+/* The collapsible table of contents belongs to the widths where the side column is gone. */
+.meeko-ui-page .meeko-ui-toc-collapsible {
+	display: none;
+	margin-bottom: var(--ui-space-8);
+}
+@media (max-width: 75rem) {
+	.meeko-ui-page-body {
+		gap: var(--ui-space-10);
+	}
+	.meeko-ui-page-aside {
+		display: none;
+	}
+	.meeko-ui-page-body:has(> .meeko-ui-page-aside) {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.meeko-ui-page-body:has(> .meeko-ui-page-sidebar):has(> .meeko-ui-page-aside) {
+		grid-template-columns: var(--ui-page-sidebar-width) minmax(0, 1fr);
+	}
+	.meeko-ui-page .meeko-ui-toc-collapsible {
+		display: block;
+	}
+}
+@media (max-width: 54rem) {
+	.meeko-ui-page-bar {
+		display: flex;
+		position: sticky;
+		top: var(--ui-header-height);
+		align-items: center;
+		gap: var(--ui-space-3);
+		z-index: var(--ui-z-sticky);
+		border-bottom: var(--ui-border-width) solid var(--ui-color-border);
+		background: var(--ui-color-bg);
+		padding-inline: var(--ui-container-gutter-md);
+		min-height: var(--ui-control-height-lg);
+	}
+	.meeko-ui-page-sidebar {
+		display: none;
+	}
+	.meeko-ui-page-body:has(> .meeko-ui-page-sidebar),
+	.meeko-ui-page-body:has(> .meeko-ui-page-sidebar):has(> .meeko-ui-page-aside) {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.meeko-ui-page-main {
+		padding-block-start: var(--ui-space-6);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.meeko-ui-skip-link {
+		transition: none;
+	}
+}
+
+/* Page header: the only <h1> */
+.meeko-ui-page-header {
+	display: grid;
+	gap: var(--ui-space-4);
+	margin-bottom: var(--ui-space-10);
+	border-bottom: var(--ui-border-width) solid var(--ui-color-border);
+	padding-bottom: var(--ui-space-8);
+	font-family: var(--ui-font-sans);
+}
+.meeko-ui-page-header-row {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: var(--ui-space-4) var(--ui-space-8);
+}
+.meeko-ui-page-header-text {
+	flex: 1 1 var(--ui-floating-panel-width);
+	min-width: 0;
+}
+.meeko-ui-page-header h1 {
+	margin: 0;
+	color: var(--ui-color-text);
+	font-weight: var(--ui-font-weight-semibold);
+	font-size: var(--ui-font-size-4xl);
+	line-height: var(--ui-line-height-tight);
+	letter-spacing: var(--ui-tracking-display);
+	text-wrap: balance;
+}
+.meeko-ui-page-header-text p {
+	margin: var(--ui-space-3) 0 0;
+	max-width: var(--ui-prose-measure);
+	color: var(--ui-color-text-soft);
+	font-size: var(--ui-font-size-lg);
+	line-height: var(--ui-line-height-relaxed);
+	text-wrap: pretty;
+}
+.meeko-ui-page-header-actions {
+	display: flex;
+	flex: none;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--ui-space-2);
+}
+.meeko-ui-page-header[data-layout='dashboard'] {
+	margin-bottom: var(--ui-space-6);
+	border-bottom: 0;
+	padding-bottom: 0;
+}
+.meeko-ui-page-header[data-layout='dashboard'] h1 {
+	font-size: var(--ui-font-size-3xl);
+	letter-spacing: var(--ui-tracking-tight);
+}
+.meeko-ui-page-header[data-layout='dashboard'] .meeko-ui-page-header-text p {
+	margin-top: var(--ui-space-1-5);
+	font-size: var(--ui-font-size-md);
+	line-height: var(--ui-line-height-normal);
+}
+.meeko-ui-page-header[data-layout='landing'] {
+	margin-bottom: 0;
+	border-bottom: 0;
+}
+.meeko-ui-page-header[data-layout='landing'] h1 {
+	font-weight: var(--ui-font-weight-bold);
+	font-size: var(--ui-landing-title-size);
+}
+.meeko-ui-page-header[data-layout='landing'] .meeko-ui-page-header-text p {
+	font-size: var(--ui-font-size-xl);
+}
+@media (max-width: 30rem) {
+	.meeko-ui-page-header h1 {
+		font-size: var(--ui-font-size-3xl);
+	}
+}
