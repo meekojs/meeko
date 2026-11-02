@@ -337,7 +337,7 @@ const short = href("/about", { params: { id: "1" } });
   });
 
   test("formats script, template and style sections", async () => {
-    const source = '<script lang="ts">\nconst count=signal(0);\n</script>\n<template><button  class="counter">{count.value}</button></template>\n<style>.counter{color:red;}</style>\n';
+    const source = '<script lang="ts">\nconst count=signal(0);\n</script>\n<template>\n<button  class="counter">{count.value}</button>\n</template>\n<style>.counter{color:red;}</style>\n';
     const uri = await client.open(file("Format.meeko"), source);
     const edits = await client.connection.sendRequest(DocumentFormattingRequest.type, { textDocument: { uri }, options: { tabSize: 2, insertSpaces: true } }) ?? [];
     const formatted = applyEdits(source, edits);
@@ -1073,7 +1073,7 @@ ${body}
   });
 
   test("formatting keeps PascalCase tags and their self-closing form", async () => {
-    const compact = page('<div><SaveButton bind:id="1" on:save="(id) => saved.push(id)" /><SaveButton bind:id="2"></SaveButton><p>after</p></div>');
+    const compact = page('<div>\n<SaveButton bind:id="1" on:save="(id) => saved.push(id)" /><SaveButton bind:id="2"></SaveButton>\n<p>after</p>\n</div>');
     const formatWith = async (format: Client): Promise<string> => {
       const uri = await format.open(file("app/pages/index.meeko"), compact);
       const edits = await format.connection.sendRequest(DocumentFormattingRequest.type, { textDocument: { uri }, options: { tabSize: 2, insertSpaces: true } }) ?? [];

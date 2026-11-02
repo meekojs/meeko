@@ -225,8 +225,8 @@ exports.run = async function run() {
   assert.ok(formatted.includes("color: red;"), "Formato de la sección CSS");
   assert.ok(formatted.includes('class="counter"'), "Formato de la sección HTML");
   assert.ok(!formatted.includes('<button  class='), "El formato HTML debe normalizar el espacio entre atributos");
-  assert.ok(formatted.includes("<template>\n"), "El formato debe separar la etiqueta template de su contenido");
-  assert.ok(formatted.includes("\n</template>"), "El formato debe separar el cierre de template");
+  assert.ok(formatted.includes("<template><button"), "El formato no debe añadir un nodo de texto tras la etiqueta template");
+  assert.ok(/<\/button\s*><\/template>/.test(formatted), "El formato no debe añadir un nodo de texto antes del cierre de template");
   assert.ok(formatted.includes("<style>\n"), "El formato debe separar la etiqueta style de su contenido");
   assert.ok(formatted.includes("\n</style>"), "El formato debe separar el cierre de style");
 

@@ -324,7 +324,7 @@ describe('meekoSortClasses tailwind', () => {
 		const filepath = join(root, 'app/components/Box.meeko')
 		const sorted = await template(component(unsorted), { filepath, meekoSortClasses: 'tailwind' })
 		// Unknown first (custom, meeko-probe) in their order; then layout, background, spacing, color, variants.
-		assert.equal(sorted, `<div\n  class="custom meeko-probe flex bg-brand p-gutter text-white hover:bg-brand/80 md:flex"\n  bind:class="'z-10 flex'"\n>\n  x\n</div>`)
+		assert.equal(sorted, `<div\n  class="custom meeko-probe flex bg-brand p-gutter text-white hover:bg-brand/80 md:flex"\n  bind:class="'z-10 flex'"\n  >x</div\n>`)
 		// off keeps the order and only normalizes.
 		assert.match(await template(component(unsorted), { filepath }), /class="hover:bg-brand\/80 text-white custom p-gutter meeko-probe bg-brand flex md:flex"/)
 		assert.deepEqual(
