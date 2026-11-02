@@ -642,8 +642,6 @@ async function runModules(root: string, config: MeekoConfig, dev: boolean): Prom
         if (typeof contents !== "string" && typeof contents !== "function" && !(contents instanceof Uint8Array)) throw new TypeError(`Módulo de Meeko ${name}: el archivo público ${key} necesita una cadena, bytes o una función`);
         publicFiles.set(key, contents);
         if (options?.headers !== undefined) {
-          // `server.headers` reads `*` in a path as a wildcard: it would reach other files.
-          if (key.includes("*")) throw new TypeError(`Módulo de Meeko ${name}: el archivo público ${key} no puede llevar cabeceras: su ruta contiene *`);
           if (!isPlainObject(options.headers)) throw new TypeError(`Módulo de Meeko ${name}: headers del archivo público ${key} debe ser un objeto de valores de cabecera`);
           validateHeaderValues(options.headers, `headers del archivo público ${key}`, `Módulo de Meeko ${name}`);
           publicFileHeaders.set(key, options.headers);

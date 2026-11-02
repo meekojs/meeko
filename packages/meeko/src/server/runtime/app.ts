@@ -127,6 +127,14 @@ export interface AppManifest {
    */
   readonly headers?: ServerHeaders | undefined;
   /**
+   * Cabeceras de los archivos públicos que un módulo añade con `addPublicFile`, por el `pathname`
+   * exacto que tiene una petición de ese archivo, ya codificado como URL (`/font%20test.woff2`). Se
+   * aplican sobre las cabeceras globales de `headers` y bajo sus patrones de ruta, que sustituyen
+   * sólo las cabeceras que fijan, sin distinguir mayúsculas de minúsculas.
+   * @since 1.8.0
+   */
+  readonly publicFileHeaders?: Readonly<Record<string, Readonly<Record<string, string>>>> | undefined;
+  /**
    * Identificador del build, distinto en cada `meeko build`. Entra en el `ETag` de las páginas con
    * `cache`, así que un despliegue nuevo invalida las copias del navegador. Sin él, cada proceso
    * usa uno aleatorio.
@@ -377,23 +385,26 @@ function jsonResponse(pathname: string, response: Response): boolean {
 }
 
 /**
- * The last step of every response of the application: the headers of `server.headers` that it
- * does not carry, the CSP when the page handler did not set one (`default-src 'none'` for JSON,
+ * The last step of every response of the application: the headers of `server.headers` and of the
+ * public file it serves that it does not carry, the CSP when the page handler did not set one (`default-src 'none'` for JSON,
  * the configured policy for the rest), and no shared cache for a response that sets a cookie.
  */
-function responseHeaders(policy: ContentSecurityPolicy | undefined, configured: ServerHeaders | undefined): (pathname: string, response: Response) => Response {
+function responseHeaders(policy: ContentSecurityPolicy | undefined, configured: ServerHeaders | undefined, files: AppManifest["publicFileHeaders"]): (pathname: string, response: Response) => Response {
   const global: [string, string][] = [];
   const patterns: { readonly test: RegExp; readonly headers: readonly [string, string][] }[] = [];
   for (const [name, value] of Object.entries(configured ?? {})) {
     if (typeof value === "string") global.push([name, value]);
     else patterns.push({ test: headerPattern(name), headers: Object.entries(value) });
   }
+  // Not a pattern: the name of a file only ever reaches its own path, whatever characters it has.
+  const fileHeaders = new Map(Object.entries(files ?? {}));
   const basePolicy = policy ? contentSecurityPolicy(policy) : undefined;
   return (pathname, response) => {
     // An upgrade (101) or another informational answer cannot be rebuilt.
     if (response.status < 200) return response;
-    // Later entries win: the global headers first, then each pattern in written order.
+    // Later entries win: the global headers first, the public file, then each pattern in written order.
     const extra = new Map<string, string>(global.map(([name, value]) => [name.toLowerCase(), value]));
+    for (const [name, value] of Object.entries(fileHeaders.get(pathname) ?? {})) extra.set(name.toLowerCase(), value);
     for (const pattern of patterns) if (pattern.test.test(pathname)) for (const [name, value] of pattern.headers) extra.set(name.toLowerCase(), value);
     // A 304 updates the stored response's headers: a policy without the hashes of that document would replace its own.
     const csp = basePolicy && response.status !== 304 && !response.headers.has("content-security-policy")
@@ -574,7 +585,7 @@ export async function createServerApp<Env = Readonly<Record<string, string | und
       ...(options.prerender ? { prerendered: options.prerender } : {}),
       ...(policy ? { contentSecurityPolicy: policy } : {}),
     };
-    const respond = responseHeaders(policy, manifest.headers);
+    const respond = responseHeaders(policy, manifest.headers, manifest.publicFileHeaders);
     const pages = createPageHandler(servedPages);
     const renderOnly = createPageHandler(pageOptions);
     const notFoundOnly = createPageHandler({ ...pageOptions, notFoundOnly: true });

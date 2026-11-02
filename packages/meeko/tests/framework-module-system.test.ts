@@ -113,7 +113,7 @@ export default defineMeekoConfig({
   assert.deepEqual(modules.plugins.map((plugin) => [plugin.mode, plugin.options]), [
     ["universal", { greeting: "From config" }], ["client", { mark: "inline" }], ["server", undefined],
   ]);
-  assert.deepEqual([...modules.publicFiles.keys()], ["__hello/shared.txt", "robots.txt", "sitemap.xml"]);
+  assert.deepEqual([...modules.publicFiles.keys()], ["__hello/shared.txt", "__hello/shared file-ñ#1%.txt", "robots.txt", "sitemap.xml"]);
   const sources = await resolveConfigSources(root);
   assert.deepEqual(sources.map((source) => [source.kind, source.name]), [["app", "app"], ["layer", "base"], ["module", "legacy"], ["module", "layer"]]);
   const routes = await discoverConfiguredRoutes(root);
@@ -324,6 +324,10 @@ async function assertModuleApp(origin: string, logs: () => string, browser: Awai
   assert.equal(await shared.text(), "shared");
   assert.equal(shared.headers.get("access-control-allow-origin"), "*");
   assert.equal((await fetch(`${origin}/robots.txt`)).headers.get("access-control-allow-origin"), null);
+  // Also when its name needs URL encoding: the request has it encoded.
+  const encoded = await fetch(`${origin}/__hello/shared%20file-%C3%B1%231%25.txt`);
+  assert.equal(await encoded.text(), "encoded");
+  assert.equal(encoded.headers.get("access-control-allow-origin"), "*");
   const sitemap = await fetch(`${origin}/sitemap.xml`);
   assert.match(sitemap.headers.get("content-type") ?? "", /xml/);
   const sitemapText = await sitemap.text();

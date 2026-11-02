@@ -10,6 +10,7 @@ import type { DocumentConfig } from "../shared/head";
 
 import { serializeJson } from "../core/server";
 import { discoverServerManifest } from "../server/api/manifest-discovery";
+import { assetKey } from "./asset-key";
 import { configuredModuleLayouts, discoverConfiguredRoutes, loadConfiguredModules, resolveConfigSources } from "./config";
 import { importSpecifier, pluginMode, pluginName, resolvedDocument } from "./module-loader";
 import { discoverRouteMiddleware } from "./route-middleware-discovery";
@@ -167,16 +168,16 @@ export async function discoverAppManifest(projectRoot: string, client: ClientAss
   const document = resolvedDocument(config, projectModules);
   // The response headers of the adapters with a server; the static adapter writes its own files.
   const response = config.server && config.server.adapter !== "static" ? config.server : undefined;
-  // The headers of a module's public file, which a pattern of `server.headers` for that path replaces.
-  const fileHeaders = config.server?.adapter === "static" ? [] : [...projectModules.publicFileHeaders].map(([path, headers]) => [`/${path}`, headers] as const);
-  const headers = fileHeaders.length ? { ...Object.fromEntries(fileHeaders), ...response?.headers } : response?.headers;
+  // The headers of a module's public file, by the pathname a request for it has.
+  const publicFileHeaders = config.server?.adapter === "static" ? [] : [...projectModules.publicFileHeaders].map(([path, headers]) => [assetKey(path.split("/")), headers] as const);
   const manifest: AppManifest = {
     version: 1,
     routes,
     ...(errorPage ? { errorPage } : {}),
     ...(document ? { document } : {}),
     ...(response?.contentSecurityPolicy ? { contentSecurityPolicy: response.contentSecurityPolicy } : {}),
-    ...(headers ? { headers } : {}),
+    ...(response?.headers ? { headers: response.headers } : {}),
+    ...(publicFileHeaders.length ? { publicFileHeaders: Object.fromEntries(publicFileHeaders) } : {}),
     server: {
       api: server.api.map((endpoint) => ({ ...endpoint, file: moduleKey(root, endpoint.file) })),
       rpc: server.rpc.map((endpoint) => ({ ...endpoint, file: moduleKey(root, endpoint.file) })),

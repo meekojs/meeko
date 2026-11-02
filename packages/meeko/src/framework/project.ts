@@ -28,6 +28,7 @@ import { listeningMessage } from "../server/runtime/listen-address";
 import { handleProcessErrors, processErrorObserver } from "../server/runtime/process-errors";
 import { bunEntrySource, cloudflareEntrySource, denoEntrySource } from "./adapter-templates";
 import { buildDataFile, discoverAppPlugins, findRuntimeFile, frameworkClientEntry, frameworkNodeEntry, frameworkServerEntry } from "./app-manifest";
+import { assetKey } from "./asset-key";
 import { cloudflareAssetsDirectory, cloudflarePrerenderDirectory, resolveWrangler, wranglerConfig, wranglerSource } from "./cloudflare-build";
 import { discoverConfiguredRoutes, loadConfiguredModules, loadMeekoConfig, resolveConfigSources } from "./config";
 import { contentTypes } from "./content-types";
@@ -130,16 +131,6 @@ async function listFiles(directory: string): Promise<string[]> {
     else if (entry.isFile()) found.push(file);
   }
   return found;
-}
-
-/**
- * URL pathname of a build file exactly as WHATWG URL serializes it, which is
- * what `new URL(request.url).pathname` yields for a browser request. `%`, `?`,
- * `#`, `\`, spaces and control characters in names are data, not URL syntax.
- */
-export function assetKey(segments: readonly string[]): string {
-  const escaped = segments.map((segment) => segment.replace(/[%?#\\ \u0000-\u001f\u007f]/g, (character) => encodeURIComponent(character)));
-  return new URL(`/${escaped.join("/")}`, "http://meeko.invalid").pathname;
 }
 
 type ViteManifest = Record<string, { file?: string; css?: string[]; assets?: string[]; imports?: string[] }>;
