@@ -155,6 +155,45 @@ export default defineUtilities(({ rule }) => names.map((name) => rule(\`.\${name
     assert.equal(templateOf(untrusted!.text), '<div class="extra alpha tone-a local stack zeta other card tone-b">x</div>');
   });
 
+  test("with an order, the class of a component, bind:class and meekoClassFunctions are sorted too, also on saving", async () => {
+    // Before 1.8 only @meekojs/prettier-plugin did it, and `prettier --check` failed right after saving.
+    const root = await project("prettier-classes-functions-", { "meeko.config.ts": "export default {};\n" });
+    const filename = join(root, "app", "pages", "index.meeko");
+    const source = [
+      '<script lang="ts">',
+      'const a = tv({ base: "b a", variants: { "z y": { x: ["d c"] } } });',
+      "</script>",
+      "",
+      "<template>",
+      "<p bind:class=\"on ? 'b a' : cn('f e')\"></p>",
+      "<p bind:title=\"on ? 'b a' : 'd c'\"></p>",
+      '<Card class="b  a b" />',
+      '<component is="Card" class="b a"></component>',
+      "</template>",
+      "",
+    ].join("\n");
+    const sorted = [
+      '<script lang="ts">',
+      'const a = tv({ base: "a b", variants: { "z y": { x: ["c d"] } } });',
+      "</script>",
+      "",
+      "<template>",
+      "<p bind:class=\"on ? 'a b' : cn('e f')\"></p>",
+      "<p bind:title=\"on ? 'b a' : 'd c'\"></p>",
+      '<Card class="a b" />',
+      '<component is="Card" class="a b"></component>',
+      "</template>",
+      "",
+    ].join("\n");
+    await writeFile(join(root, ".prettierrc"), '{ "meekoSortClasses": "alphabetical", "meekoClassFunctions": ["tv", "cn"] }\n');
+    assert.equal((await formatWithPrettier({ text: source, filename, tabSize: 2, insertSpaces: true, trusted: true }))!.text, sorted);
+    assert.equal((await formatWithPrettier({ text: sorted, filename, tabSize: 2, insertSpaces: true, trusted: true }))!.text, sorted);
+    // Without an order nothing beyond the static class of an element changes; nor in an untrusted workspace.
+    const untrusted = (await formatWithPrettier({ text: source, filename, tabSize: 2, insertSpaces: true, trusted: false }))!.text;
+    assert.ok(untrusted.includes('<Card class="b  a b" />'), untrusted);
+    assert.ok(untrusted.includes('tv({ base: "b a"'), untrusted);
+  });
+
   test("without app/styles/main.css only normalizes, and warns once", async () => {
     const root = await project("prettier-classes-missing-", { "meeko.config.ts": "export default {};\n" });
     const options: FormatOptions = { filepath: join(root, "app", "pages", "index.meeko"), meekoSortClasses: "stylesheet" };

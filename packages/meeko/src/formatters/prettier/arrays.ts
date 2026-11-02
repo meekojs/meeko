@@ -2,6 +2,8 @@ import type { AstPath, Doc, ParserOptions, Printer } from "prettier";
 
 import { printers as estreePrinters } from "prettier/plugins/estree";
 
+import { sortClassLiterals } from "./class-literals";
+
 /** Nodo ESTree con lo que necesita la regla: posiciones, decoradores y elementos. */
 interface ArrayLikeNode {
   readonly type: string;
@@ -224,6 +226,7 @@ export const preserveArrayBreaksPrinter = {
   ...(bundledPrinter.features ? { features: bundledPrinter.features } : {}),
   async preprocess(ast: unknown, options: ParserOptions) {
     const host = await loadHost(options);
+    await sortClassLiterals(ast, options);
     const result = host.preprocess ? await host.preprocess(ast, options) : ast;
     if (result && typeof result === "object") hostByRoot.set(result, host);
     return result;

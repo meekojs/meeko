@@ -68,7 +68,7 @@ Todo literal de esos argumentos se trata como lista de clases. Una cadena con es
 
 ### Servidor de lenguaje
 
-El servidor de lenguaje formatea con el plugin del núcleo (`@meekojs/meeko/prettier`), que no conoce estas opciones, y carga este paquete si la configuración del proyecto lo nombra. En ese caso, `meekoClassFunctions` también se aplica al guardar un `.meeko` en un workspace confiable. Sin embargo, el `class` de una etiqueta de componente y las cadenas sueltas de `bind:class` sólo se ordenan con la CLI: el editor las deja como están, no las desordena. Con `"stylesheet"`, una función del `<script>` no conoce en el editor las clases del `<style>` del componente, que quedan entre las desconocidas, de modo que el editor y la CLI pueden discrepar para esas clases.
+El servidor de lenguaje formatea con el plugin del núcleo (`@meekojs/meeko/prettier`), que desde `1.8` conoce estas opciones y da el mismo resultado que este paquete: `prettier --check` pasa después de guardar. En un workspace no confiable no ordena nada, porque ordenar puede ejecutar código del proyecto.
 
 ### Junto a `prettier-plugin-tailwindcss`
 

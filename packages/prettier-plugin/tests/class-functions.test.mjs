@@ -223,9 +223,9 @@ test('works when the language server puts the plugin of the core last', async ()
 	const formatted = await formatStable(component, options)
 	assert.match(formatted, /tv\(\{ base: "a b", variants: \{ "z y": \{ x: \["c d"\] \} \} \}\)/)
 	assert.match(formatted, /const b = cn\("a b"\)/)
-	// The template printer of the core knows neither a sortable `bind:class` nor a component's `class`.
-	assert.match(formatted, /bind:class="on \? 'b a' : cn\('e f'\)"/)
-	assert.match(formatted, /<Card class="b {2}a b"/)
+	// Since 1.8 the template printer of the core sorts them too: the editor gives what the CLI gives.
+	assert.match(formatted, /bind:class="on \? 'a b' : cn\('e f'\)"/)
+	assert.match(formatted, /<Card class="a b"/)
 	const arrays = '// first\nconst a = [\n  1, // one\n];\n/* last */\n'
 	assert.equal(await format(arrays, { filepath: 'a.ts', plugins: [plugin, corePlugin] }), arrays)
 })
