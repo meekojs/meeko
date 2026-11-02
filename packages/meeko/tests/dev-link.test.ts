@@ -295,18 +295,34 @@ test("a first server that fails with nothing written ends the supervisor with it
 });
 
 test("the starts of a server that keeps failing while its packages are written are bounded", { timeout: 90_000 }, async (context) => {
-  const { ui, count, output } = await supervisor(context, { failAfter: 600 });
+  const { ui, count, until, output } = await supervisor(context, { failAfter: 1500 });
   const deadline = Date.now() + 60_000;
-  // The first start, its six retries, and then it waits: without writes nothing starts it again.
-  while (!output().includes("próximo cambio")) {
+  const waits = () => output().match(/próximo cambio/g)?.length ?? 0;
+  const write = () => writeFile(join(ui, "dist", "index.js"), `export const at = ${Date.now()};\n`);
+  while (!output().includes("reintento 6 de 6")) {
     assert.ok(Date.now() < deadline, output());
-    await writeFile(join(ui, "dist", "index.js"), `export const at = ${Date.now()};\n`);
-    await new Promise((resolved) => setTimeout(resolved, 150));
+    await write();
+    await pause(150);
   }
-  assert.match(output(), /reintento 6 de 6/);
-  const starts = await count("start");
-  await new Promise((resolved) => setTimeout(resolved, 2000));
-  assert.equal(await count("start"), starts, output());
+  // The last server is written under as well, so only the limit stops the retries. The write comes
+  // long before it fails: one the watch reports after that (100 ms later) is the next change, which
+  // starts it again by design.
+  await until("start", 7);
+  await write();
+  while (waits() < 1) {
+    assert.ok(Date.now() < deadline, output());
+    await pause(25);
+  }
+  // The first start, its six retries, and then it waits: without writes nothing starts it again.
+  assert.equal(await count("start"), 7, output());
+  await pause(2000);
+  assert.equal(await count("start"), 7, output());
+  // The next change starts it once more, and it waits again without retrying.
+  await write();
+  await until("fail", 8);
+  await pause(2000);
+  assert.equal(await count("start"), 8, output());
+  assert.equal(waits(), 2, output());
 });
 
 /** A `fs.watch` whose events the test fires by hand: the platform does not produce them on demand. */
