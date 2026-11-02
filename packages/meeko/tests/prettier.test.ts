@@ -537,7 +537,7 @@ describe("Prettier in the language server", () => {
   test("saving a component keeps what it renders: no text node appears or disappears", async () => {
     const script = `<script lang="ts">\nimport { signal } from "@meekojs/meeko";\nconst items = signal(["a", "b"]);\nconst on = signal(true);\nconst label = "x";\n</script>\n`;
     const template = `<template><ul class="u" id="l"><li each:of="items.value" each:as="item" each:key="item" class="i">{item}</li></ul><div class="d" id="e"><button type="button" class="b" on:click="() => on.value = !on.value">{label}</button><button type="button">y</button><span if:when="on.value" class="s" id="t">Hi<b> you</b>!</span></div></template>`;
-    const options = { filepath: "Whitespace.meeko", plugins: [plugin], htmlWhitespaceSensitivity: "ignore", singleAttributePerLine: true, printWidth: 800, useTabs: true, meekoIndentSections: true } as const;
+    const options: prettier.Options & MeekoPrettierOptions = { filepath: "Whitespace.meeko", htmlWhitespaceSensitivity: "ignore", singleAttributePerLine: true, printWidth: 800, useTabs: true, meekoIndentSections: true };
     const source = `${script}${template}\n`;
     const formatted = await format(source, options);
     assert.notEqual(formatted, source, "the attributes go on their own lines");
