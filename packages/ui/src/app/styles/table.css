@@ -68,11 +68,13 @@
 	& a:not(.meeko-ui-button):hover {
 		text-decoration: underline;
 	}
-	/* A long type breaks inside its cell before the table scrolls. */
+	/* A type breaks at its spaces, and a name is never cut: `anywhere` would let the column shrink to a
+	   few letters (`docs/en/do|ctor.md`). `break-word` only cuts what does not fit even in a whole line,
+	   and it does not count for the width of the column, so a grid column stays inside the table. */
 	& code {
 		font-size: var(--ui-prose-code-size);
 		font-family: var(--ui-font-mono);
-		overflow-wrap: anywhere;
+		overflow-wrap: break-word;
 	}
 	& > tbody > tr:last-child > :is(th, td) {
 		border-bottom: 0;

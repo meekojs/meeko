@@ -220,6 +220,9 @@
 	color: var(--ui-color-text-soft);
 	font-size: var(--ui-font-size-xs);
 }
+.ui-markdown-editor .milkdown .cm-content {
+	font-variant-ligatures: none;
+}
 /* What floats over the text has the edge of a popover: in dark a shadow alone does not separate it. */
 .ui-markdown-editor .milkdown :is(.milkdown-toolbar, .milkdown-slash-menu, .milkdown-link-preview > .link-preview, .milkdown-link-edit > .link-edit, .language-picker > .list-wrapper) {
 	outline: var(--ui-border-width) solid var(--ui-color-border);
