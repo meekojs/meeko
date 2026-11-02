@@ -211,7 +211,7 @@ test("a name that existed never changes file: a nested Index does not take the o
     ["ButtonIndexIndex", "app/components/Button/Index/Index.meeko", undefined, "ButtonIndex", true],
   ]);
 
-  // A real ButtonIndex.meeko has that name by itself: the conflict is the one that 2.0 turns into an error.
+  // A real ButtonIndex.meeko has that name by itself: it is not one of the old names.
   const real = await tempProject(context, "index-names-real-inner");
   await put(real, "app/components/ButtonIndex.meeko", template);
   await put(real, "app/components/Button/Index/Index.meeko", template);
@@ -295,7 +295,7 @@ void current; void old; void own; void first; void second; void third;
   const conflicts = found.filter((item) => item.code === "MEEK135");
   assert.equal(conflicts.length, 1, JSON.stringify(found));
   assert.match(conflicts[0]!.filename, /Button[\\/]Index[\\/]Index\.meeko$/);
-  assert.equal(conflicts[0]!.message, "app/components/Button/Index/Index.meeko se llamaría <ButtonIndex>, pero app/components/Button/Index.meeko conserva ese nombre durante 1.x porque ya lo tenía: sigue siendo <ButtonIndexIndex>. En Meeko 2.0, al retirarse ese nombre anterior, app/components/Button/Index/Index.meeko pasará a ser <ButtonIndex>; renombra o mueve uno de los dos para evitar el cambio");
+  assert.equal(conflicts[0]!.message, "app/components/Button/Index/Index.meeko se llamaría <ButtonIndex>, pero app/components/Button/Index.meeko conserva ese nombre porque ya lo tenía: sigue siendo <ButtonIndexIndex>. Renombra o mueve uno de los dos");
   assert.deepEqual(found.filter((item) => item.code === "MEEK134").map((item) => page.slice(item.location.offset).match(/^\w+/)?.[0]), ["ButtonIndexProps", "ButtonIndex"]);
 
   const loader = await readFile(await generateComponentRegistry(root), "utf8");
@@ -373,7 +373,7 @@ void plain; void own; void events; void all; void first; void second;
   const conflicts = found.filter((item) => item.code === "MEEK135");
   assert.equal(conflicts.length, 1, JSON.stringify(found));
   assert.match(conflicts[0]!.filename, /Button[\\/]Index\.meeko$/);
-  assert.equal(conflicts[0]!.message, "app/components/Button/Index.meeko se llamaría <Button>, pero ese nombre es de app/components/Button.meeko: sigue siendo <ButtonIndex>. En Meeko 2.0 será un error; renombra o mueve uno de los dos");
+  assert.equal(conflicts[0]!.message, "app/components/Button/Index.meeko se llamaría <Button>, pero ese nombre es de app/components/Button.meeko: sigue siendo <ButtonIndex>. Renombra o mueve uno de los dos");
   const types = await readFile(await generateComponentRegistryTypes(root), "utf8");
   assert.doesNotMatch(types, /@deprecated/);
   const loader = await readFile(await generateComponentRegistry(root), "utf8");

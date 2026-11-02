@@ -290,7 +290,7 @@ export interface ComponentConflict {
   readonly file: string;
   /**
    * That file holds it as the name it had before 1.8 (`Button/Index.meeko`, which is `ButtonIndex`
-   * as well as `Button`), so the name is free in 2.0, when that alias goes.
+   * as well as `Button`).
    */
   readonly oldName?: true;
 }
@@ -304,7 +304,7 @@ export interface DiscoveredComponent {
   readonly deprecatedFor?: string;
   /**
    * A `Button/Index.meeko` whose new name another file has, `Button.meeko`: it keeps `ButtonIndex`,
-   * its only name, with the `MEEK135` warning (since 1.8). In 2.0 it will be an error.
+   * its only name, with the `MEEK135` warning (since 1.8).
    */
   readonly conflictsWith?: ComponentConflict;
 }
@@ -367,7 +367,7 @@ function catalog(files: readonly { directory: ComponentDirectory; file: string; 
     if (legacy === undefined) add({ name, file, source: directory.source }, directory.priority);
     else collapsed.push({ directory, file, name, legacy });
   }
-  // The file of each name before 1.8, when `Button/Index.meeko` was only `ButtonIndex`: through 1.x a
+  // The file of each name before 1.8, when `Button/Index.meeko` was only `ButtonIndex`: a
   // name that existed never changes file. Across sources the first one wins, as it did then; within
   // one, a file that has the name by itself keeps it (both at once were an error then).
   const former = new Map<string, { file: string; priority: number; old: boolean }>();

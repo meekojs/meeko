@@ -217,8 +217,8 @@ function deprecatedComponentNames(source: string, filename: string, compiled: Pi
   const conflicts: CompileDiagnostic[] = conflict?.conflictsWith ? [{
     code: "MEEK135", filename, location: locate(source, 0), severity: "warning",
     message: conflict.conflictsWith.oldName
-      ? `${own} se llamaría <${conflict.conflictsWith.name}>, pero ${path(conflict.conflictsWith.file)} conserva ese nombre durante 1.x porque ya lo tenía: sigue siendo <${conflict.name}>. En Meeko 2.0, al retirarse ese nombre anterior, ${own} pasará a ser <${conflict.conflictsWith.name}>; renombra o mueve uno de los dos para evitar el cambio`
-      : `${own} se llamaría <${conflict.conflictsWith.name}>, pero ese nombre es de ${path(conflict.conflictsWith.file)}: sigue siendo <${conflict.name}>. En Meeko 2.0 será un error; renombra o mueve uno de los dos`,
+      ? `${own} se llamaría <${conflict.conflictsWith.name}>, pero ${path(conflict.conflictsWith.file)} conserva ese nombre porque ya lo tenía: sigue siendo <${conflict.name}>. Renombra o mueve uno de los dos`
+      : `${own} se llamaría <${conflict.conflictsWith.name}>, pero ese nombre es de ${path(conflict.conflictsWith.file)}: sigue siendo <${conflict.name}>. Renombra o mueve uno de los dos`,
   }] : [];
   return [...conflicts, ...deprecatedNames(source, filename, compiled, registry)];
 }
