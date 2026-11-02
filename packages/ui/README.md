@@ -1107,6 +1107,8 @@ Las reglas y los nombres reservados están en [`DESIGN.md`](./DESIGN.md#movimien
 
 `UICommandPalette` no busca: lee `query` en tu código, busca donde quieras (Pagefind, un servidor o una lista local) y pásale `results` y `status`.
 
+Para abrirla o cerrarla desde el padre, asigna su `model` o llama a `show()` y `hide()` con una referencia: `<UICommandPalette ref:palette … />` y `palette.value?.show()`.
+
 ## Formularios y estados
 
 Los controles nuevos conservan el HTML nativo, el teclado y el envío de formularios. Todos los modelos se enlazan con una señal (`model="field"`), no con `bind:model`.

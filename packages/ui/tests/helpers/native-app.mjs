@@ -10,7 +10,7 @@ const cli = fileURLToPath(new URL('../../../meeko/dist/cli.js', import.meta.url)
 
 /** The page with what `apps/ui` does not document yet: every test and the visual review read it. */
 const showcase = `<script lang="ts">
-	import { signal, trustHtml } from '@meekojs/meeko'
+	import { signal, trustHtml, useElementRef } from '@meekojs/meeko'
 	import { withViewTransition } from '@meekojs/ui/runtime'
 
 	const tab = signal<'account' | 'team' | 'billing' | 'audit'>('team')
@@ -53,6 +53,7 @@ const showcase = `<script lang="ts">
 	const rich = [{ id: 1, name: 'Ana', color: 'violeta' }, { id: 2, name: 'Bea', color: 'cian', disabled: true }, { id: 3, name: 'Carla', color: 'rosa' }]
 	const person = signal<(typeof rich)[number] | null>(rich[2]!)
 	const selectOpen = signal(false)
+	const exposedPalette = useElementRef('exposedPalette')
 	const drawer = signal(false)
 	const drawerCloses = signal(0)
 </script>
@@ -102,6 +103,8 @@ const showcase = `<script lang="ts">
 			</UICommandPalette>
 			<UICommandPalette bind:trigger="false" bind:shortcut="false" label="Acciones" bind:results="buttons" status="ready" on:choose="(item) => (chosen.value = item)" model="selectOpen" />
 			<button id="open-actions" type="button" on:click="() => (selectOpen.value = true)">Acciones</button>
+			<UICommandPalette ref:exposedPalette bind:trigger="false" bind:shortcut="false" label="Expuesta" bind:results="buttons" status="ready" />
+			<button id="show-exposed" type="button" on:click="() => exposedPalette.value?.show()">Expuesta</button>
 			<p id="palette-out">{chosen.value}|{events.value.join()}|{active.value}</p>
 		</section>
 		<section id="drawers">

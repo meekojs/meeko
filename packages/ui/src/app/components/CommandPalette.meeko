@@ -29,6 +29,7 @@
 	const text = uiMessages().commandPalette
 	const palette = createCommandPalette<T>(props, { open, query, active }, useId(), { open: () => emit('open'), close: () => emit('close'), choose: (item) => emit('choose', item) })
 	onMounted(() => palette.mount(dialog.value, input.value))
+	defineExpose({ show: palette.show, hide: palette.hide })
 </script>
 
 <!-- Keep this template on one line, without whitespace between the tags: it would be text inside the trigger and the rows. Do not format this file (it is in .prettierignore; tests/one-line-templates.test.mjs guards it). -->

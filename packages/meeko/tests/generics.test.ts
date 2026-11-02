@@ -319,6 +319,11 @@ test(".d.meeko.ts keeps the type parameters for TypeScript consumers", { timeout
     assert.match(declaration, /export declare function hydrateScope<T extends \{\s*id: string;?\s*\}>\(__scope: __meeko\.DomScope, __inputProps: __MeekoComponentProps<T>.*\): __meeko\.ComponentRelease<ComponentExposed<T>>;/);
     assert.match(declaration, /export declare const __meekoTag: <T extends \{/);
     assert.match(declaration, /declare function __meeko_channels<T extends \{/);
+    // defineExpose brings the setup into the declaration. Its emits and snippets, which name T inside
+    // a type argument, came out as `T_1` and `T_2`, which do not exist (TS2304); now only what it exposes stays.
+    assert.doesNotMatch(declaration, /\bT_\d/);
+    assert.match(declaration, /declare function __setup<T extends \{\s*id: string;?\s*\}>\(\): \{\s*\[__meeko\.exposedKey\]: any;?\s*\};/);
+    assert.match(declaration, /export type ComponentExposed<T extends \{\s*id: string;?\s*\}> = ReturnType<typeof __setup<T>>\[typeof __meeko\.exposedKey\];/);
     await writeFile(join(root, "consumer.ts"), `import type { ComponentExposed, ComponentProps } from "./DataTable.meeko";
 interface User { id: string; email: string }
 const props: ComponentProps<User> = { rows: [{ id: "1", email: "e" }], onSelect: (row) => { const email: string = row.email; void email; } };

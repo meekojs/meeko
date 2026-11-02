@@ -36,6 +36,20 @@ export interface GenerateTypesOptions {
   readonly read?: (filename: string) => string | undefined;
 }
 
+/**
+ * Reduces the setup of a declaration to what `ComponentExposed` reads from it. TypeScript writes the
+ * rest of what it infers there, and without a checker for the imports it renames the parameters of
+ * `generic` inside a type argument (`choose: [item: T_1]`), which then do not exist (TS2304).
+ */
+function exposedSetupDeclaration(declaration: string): string {
+  const file = ts.createSourceFile("component.d.ts", declaration, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const setup = file.statements.find((statement): statement is ts.FunctionDeclaration => ts.isFunctionDeclaration(statement) && statement.name?.text === "__setup");
+  if (!setup?.type || !ts.isTypeLiteralNode(setup.type)) return declaration;
+  const exposed = setup.type.members.find((member) => member.getText(file).startsWith("[__meeko.exposedKey]"));
+  const open = setup.parameters.pos - 1;
+  return `${declaration.slice(0, open)}(): {\n    ${exposed?.getText(file) ?? ""}\n}${declaration.slice(setup.type.end)}`;
+}
+
 /** Genera declaraciones TypeScript para un componente y sus imports .meeko relativos. */
 export async function generateTypes(source: string, filename: string, options: GenerateTypesOptions = {}): Promise<string[]> {
   if (!filename.endsWith(".meeko")) throw new TypeError(`meeko types necesita un componente .meeko: ${filename}`);
@@ -56,7 +70,7 @@ export async function generateTypes(source: string, filename: string, options: G
     const error = result.diagnostics?.find((diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error
       && !(diagnostic.code >= 9005 && diagnostic.code <= 9039 && generated.includes("[__meeko.exposedKey]: __meeko_exposed")));
     if (error) throw new Error(ts.flattenDiagnosticMessageText(error.messageText, "\n"));
-    declarations.set(path, `${componentTypeDeclarationMarker}\n${result.outputText}`);
+    declarations.set(path, `${componentTypeDeclarationMarker}\n${exposedSetupDeclaration(result.outputText)}`);
     for (const { value: specifier } of moduleSpecifiers(generated, path)) {
       if (!specifier.endsWith(".meeko")) continue;
       // A component imported through a path alias (`@/widgets/Chart.meeko`): the first file that exists.

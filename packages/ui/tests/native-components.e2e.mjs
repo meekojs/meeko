@@ -254,6 +254,8 @@ for (const [name, start] of engines) {
 			)
 			await actions.getByRole('option', { name: 'Mover', exact: true }).click()
 			await out.filter({ hasText: 'Mover|' }).waitFor()
+			await page.locator('#show-exposed').click()
+			await page.getByRole('dialog', { name: 'Expuesta', exact: true }).waitFor()
 			assert.deepEqual(errors, [])
 			await page.close()
 		})
