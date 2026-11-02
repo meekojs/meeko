@@ -41,10 +41,28 @@ function isUnsafe(type: ts.Type, checker: ts.TypeChecker, location: ts.Node, see
 	return false
 }
 
+/**
+ * The specifier of an import of `expression` that TypeScript could not resolve. Such an import has an
+ * error type, which the checker reports as `any`: the cause is the import, not the schema.
+ */
+function unresolvedImport(expression: ts.Node, checker: ts.TypeChecker): string | undefined {
+	if (ts.isIdentifier(expression)) {
+		const declaration = checker.getSymbolAtLocation(expression)?.declarations?.[0]
+		const statement = declaration && ts.findAncestor(declaration, ts.isImportDeclaration)
+		if (statement && ts.isStringLiteral(statement.moduleSpecifier) && !checker.getSymbolAtLocation(statement.moduleSpecifier)) return statement.moduleSpecifier.text
+	}
+	return ts.forEachChild(expression, (child) => unresolvedImport(child, checker))
+}
+
+/** The error of a schema without concrete types, for `standardSchemaTypes`; `subject` says which schema it is. */
+export function schemaTypesError(subject: string): (specifier?: string) => Error {
+	return (specifier) => new Error(specifier === undefined ? `${subject} debe exponer tipos de entrada y salida de Standard Schema concretos` : `${subject} no tiene tipos porque TypeScript no resuelve el import "${specifier}". Revisa la ruta y moduleResolution en tsconfig.json: con NodeNext un import relativo necesita su extensión ("./schema.js"); con Bundler, no`)
+}
+
 /** Resolve the public Standard Schema contract without allowing erased client types. */
-export function standardSchemaTypes(expression: ts.Expression, checker: ts.TypeChecker, invalid: () => Error): StandardSchemaTypes {
+export function standardSchemaTypes(expression: ts.Expression, checker: ts.TypeChecker, invalid: (specifier?: string) => Error): StandardSchemaTypes {
 	const schemaType = checker.getTypeAtLocation(expression)
-	if (isErased(schemaType)) throw invalid()
+	if (isErased(schemaType)) throw invalid(unresolvedImport(expression, checker))
 	const standard = checker.getPropertyOfType(schemaType, '~standard')
 	if (!standard) throw invalid()
 	const standardType = checker.getTypeOfSymbolAtLocation(standard, expression)

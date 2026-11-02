@@ -10,7 +10,7 @@ import { discoverServerManifest } from '../server/api/manifest-discovery'
 import { resolveProjectAliases, withAliasPaths } from './aliases'
 import { resolveConfigSources } from './config'
 import { generateSocketContracts } from './socket-contracts-generate'
-import { standardSchemaTypes } from './standard-schema-types'
+import { schemaTypesError, standardSchemaTypes } from './standard-schema-types'
 
 export interface GeneratedServerContracts {
 	readonly types: string
@@ -224,7 +224,7 @@ function publicSchema(expression: ts.Expression | undefined, label: string, scop
 	}
 	const exported = imported.exported === '*' ? member : imported.exported
 	if (!exported || (imported.exported !== '*' && member)) throw new Error(`${file.fileName}: ${label} debe referenciar un único export de shared/ (${publicSchemasGuide})`)
-	standardSchemaTypes(expression, checker, () => new Error(`${file.fileName}: ${label} debe exponer tipos de entrada y salida de Standard Schema concretos`))
+	standardSchemaTypes(expression, checker, schemaTypesError(`${file.fileName}: ${label}`))
 	validateSharedGraph(imported.file, root, sharedRoot, options, new Set(), read)
 	return `typeof import(${JSON.stringify(generatedSpecifier(outputDir, imported.file))})[${JSON.stringify(exported)}]`
 }
@@ -252,7 +252,7 @@ function composedSchema(expression: ts.Expression, label: string, scope: SchemaS
 			throw new Error(`${file.fileName}: ${label} debe venir de shared/: ${name} no se importa de shared/ ni de un paquete, y una composición sólo combina schemas de shared/ con funciones de paquetes como valibot (${example}; ${publicSchemasGuide})`)
 		}
 	}
-	standardSchemaTypes(expression, checker, () => new Error(`${file.fileName}: ${label} debe exponer tipos de entrada y salida de Standard Schema concretos`))
+	standardSchemaTypes(expression, checker, schemaTypesError(`${file.fileName}: ${label}`))
 	const name = `${scope.endpoint}.${label}`.replace(/[^\w.-]/g, '_')
 	scope.composed.set(
 		`${name}.ts`,

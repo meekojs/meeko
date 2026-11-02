@@ -7,7 +7,7 @@ import { autoImportCompilerHost, autoImportSourceReader } from '../autoimports/t
 import { discoverServerManifest } from '../server/api/manifest-discovery'
 import { resolveProjectAliases, withAliasPaths } from './aliases'
 import { resolveConfigSources } from './config'
-import { standardSchemaTypes } from './standard-schema-types'
+import { schemaTypesError, standardSchemaTypes } from './standard-schema-types'
 
 /** An import of a channel file; its specifier resolves only when a schema uses it. */
 interface ImportedSymbol {
@@ -115,7 +115,7 @@ function publicSchemas(file: string, root: string, options: ts.CompilerOptions, 
 			if (!imported || !importedFile || !inside(shared, importedFile)) throw new Error(`${file}: ${name}.${event} debe venir de shared/`)
 			const exported = imported.exported === '*' ? member : imported.exported
 			if (!exported || (member && imported.exported !== '*')) throw new Error(`${file}: ${name}.${event} debe referenciar un único export de shared/`)
-			standardSchemaTypes(value, checker, () => new Error(`${file}: ${name}.${event} debe exponer tipos de entrada y salida de Standard Schema concretos`))
+			standardSchemaTypes(value, checker, schemaTypesError(`${file}: ${name}.${event}`))
 			validateSharedGraph(importedFile, root, shared, options, seen, read)
 			if (result[event]) throw new Error(`${file}: el evento de Socket ${name}.${event} está repetido`)
 			result[event] = { file: importedFile, exported }

@@ -442,3 +442,52 @@ export default defineRpc({ input: getUserInput, output: userSchema, handler: asy
 		await rm(root, { recursive: true, force: true })
 	}
 })
+
+test('server contract generator blames an import that TypeScript cannot resolve, not the types of the schema', async () => {
+	const root = await fixture()
+	try {
+		const unresolved = (label: string) => (error: Error) => {
+			assert.ok(error.message.includes(`${label} no tiene tipos porque TypeScript no resuelve el import "../../../shared/schemas/user"`), error.message)
+			assert.match(error.message, /moduleResolution/)
+			assert.doesNotMatch(error.message, /debe exponer tipos/)
+			return true
+		}
+		const api = join(root, 'server', 'api', 'users', 'index.get.ts')
+		const original = await readFile(api, 'utf8')
+		await writeFile(
+			api,
+			`import { defineApiRoute } from "@meekojs/meeko/server";
+import { userSchema } from "../../../shared/schemas/user";
+export default defineApiRoute({ response: userSchema, handler: async () => undefined });`,
+		)
+		await assert.rejects(generateServerContracts(root), unresolved('response'))
+
+		// Through a namespace: `schemas.userSchema`.
+		await writeFile(
+			api,
+			`import { defineApiRoute } from "@meekojs/meeko/server";
+import * as schemas from "../../../shared/schemas/user";
+export default defineApiRoute({ response: schemas.userSchema, handler: async () => undefined });`,
+		)
+		await assert.rejects(generateServerContracts(root), unresolved('response'))
+		await writeFile(api, original)
+
+		// Inside a composition: `s.array(userSchema)`.
+		const pkg = join(root, 'node_modules', 'fake-schema')
+		await mkdir(pkg, { recursive: true })
+		await writeFile(join(pkg, 'package.json'), JSON.stringify({ name: 'fake-schema', version: '1.0.0', type: 'module', types: './index.d.ts', exports: { '.': { types: './index.d.ts', default: './index.js' } } }))
+		await writeFile(join(pkg, 'index.js'), 'export const array = (item) => item;\n')
+		await writeFile(join(pkg, 'index.d.ts'), 'export declare function array<S>(item: S): S;\n')
+		await writeFile(
+			join(root, 'server', 'rpc', 'users', 'list.ts'),
+			`import { defineRpc } from "@meekojs/meeko/server";
+import * as s from "fake-schema";
+import { getUserInput } from "../../../shared/schemas/user.js";
+import { userSchema } from "../../../shared/schemas/user";
+export default defineRpc({ input: getUserInput, output: s.array(userSchema), handler: async () => [] });`,
+		)
+		await assert.rejects(generateServerContracts(root), unresolved('output'))
+	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
+})

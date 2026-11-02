@@ -80,3 +80,27 @@ test('Socket contracts accept shorthand properties that reference imported share
 	await writeFile(channelFile, "import { kitchenChanged } from '../../shared/schemas/kitchen.js';\nconst events = { kitchenChanged };\nexport default defineSocketChannel({ clientToServer: {}, serverToClient: { ...events } });\n")
 	await assert.rejects(generateSocketContracts(root), /serverToClient sólo admite propiedades con nombre/)
 })
+
+test('Socket contracts blame an import that TypeScript cannot resolve, not the types of the schema', async (context) => {
+	const base = resolve('.meeko')
+	await mkdir(base, { recursive: true })
+	const root = await mkdtemp(join(base, 'socket-contract-test-'))
+	context.after(async () => {
+		await rm(root, { recursive: true, force: true })
+	})
+	await mkdir(join(root, 'shared', 'schemas'), { recursive: true })
+	await mkdir(join(root, 'server', 'socket'), { recursive: true })
+	await writeFile(join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { module: 'NodeNext', moduleResolution: 'NodeNext', target: 'ES2022' } }))
+	await writeFile(join(root, 'shared', 'schemas', 'chat.ts'), "const schema = <I, O = I>() => ({ '~standard': { version: 1 as const, types: undefined as unknown as { input: I; output: O }, validate: (value: unknown) => ({ value: value as O }) } });\nexport const chatInput = schema<{ text: string }>();\nexport const chatOutput = schema<undefined, { text: string }>();\n")
+	// NodeNext needs the extension of a relative import in an ES module; the generator must say so.
+	await writeFile(join(root, 'server', 'socket', 'chat.ts'), "import { chatInput, chatOutput } from '../../shared/schemas/chat';\nexport default defineSocketChannel({ clientToServer: { message: chatInput }, serverToClient: { message: chatOutput } });\n")
+	await assert.rejects(generateSocketContracts(root), (error: Error) => {
+		assert.match(error.message, /clientToServer\.message no tiene tipos porque TypeScript no resuelve el import "\.\.\/\.\.\/shared\/schemas\/chat"/)
+		assert.match(error.message, /moduleResolution/)
+		assert.doesNotMatch(error.message, /debe exponer tipos/)
+		return true
+	})
+
+	await writeFile(join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler', target: 'ES2022' } }))
+	assert.equal((await generateSocketContracts(root)).count, 1)
+})
