@@ -77,12 +77,12 @@ export default defineMeekoModule({ meta: { name: "kit" }, setup(_options, meeko)
   await put(root, "base/app/pages/layer.meeko", "<template><p>layer</p></template>");
   await put(root, "base/app/components/Panel/Index.meeko", "<template><p>layer</p></template>");
   await put(root, "base/app/components/Card/Index.meeko", "<template><p>layer</p></template>");
-  // The project's Card takes the name of the layer's; the old name keeps reaching what it reached.
+  // The project's Card keeps its name, and the layer's Index the only one it has.
   await put(root, "app/components/Card.meeko", "<template><p>project</p></template>");
   const found = await discoverComponents(root);
   assert.deepEqual(found.map((entry) => [entry.name, entry.deprecatedFor]), [
     ["Card", undefined],
-    ["CardIndex", "Card"],
+    ["CardIndex", undefined],
     ["KitButton", undefined],
     ["KitButtonIndex", "KitButton"],
     ["KitIndex", undefined],
@@ -93,21 +93,138 @@ export default defineMeekoModule({ meta: { name: "kit" }, setup(_options, meeko)
   assert.match(found.find((entry) => entry.name === "CardIndex")!.file, /[\\/]base[\\/]app[\\/]components[\\/]Card[\\/]Index\.meeko$/);
 });
 
-test("Button.meeko and Button/Index.meeko in one source are the duplicate error, and a component with the old name keeps it", async (context) => {
+test("Button.meeko keeps <Button> and Button/Index.meeko keeps <ButtonIndex>, not deprecated, in one source and across sources", async (context) => {
+  const entry = async (root: string, name: string) => (await discoverComponents(root)).find((component) => component.name === name)!;
   const root = await tempProject(context, "index-names-duplicate");
   await put(root, "package.json", '{"private":true,"type":"module"}\n');
   await put(root, "meeko.config.mjs", "export default {};\n");
   await put(root, "app/components/Button.meeko", "<template><p>x</p></template>");
   await put(root, "app/components/Button/Index.meeko", "<template><p>x</p></template>");
-  await assert.rejects(discoverComponents(root), /Nombre de componente duplicado Button/);
-  assert.throws(() => discoverComponentsSync(root), /Nombre de componente duplicado Button/);
+  assert.deepEqual(await names(root), [["Button", undefined], ["ButtonIndex", undefined]]);
+  assert.deepEqual(discoverComponentsSync(root).map((component) => [component.name, component.deprecatedFor]), [["Button", undefined], ["ButtonIndex", undefined]]);
+  assert.match((await entry(root, "Button")).file, /Button\.meeko$/);
+  assert.equal((await entry(root, "Button")).conflictsWith, undefined);
+  assert.match((await entry(root, "ButtonIndex")).conflictsWith!.file, /Button\.meeko$/);
+  // Its types are not deprecated either, and each one is of its own file.
+  const registry = await discoverAutoImports(root);
+  for (const suffix of ["", "Props", "Emits", "Snippets", "Models", "Exposed"]) assert.equal(registry.find((item) => item.name === `ButtonIndex${suffix}`)?.deprecatedFor, undefined, suffix);
+  assert.match(registry.find((item) => item.name === "ButtonProps")!.file, /Button\.meeko$/);
+  assert.match(registry.find((item) => item.name === "ButtonIndexProps")!.file, /Index\.meeko$/);
 
+  // A real name wins across sources in either direction: <Button> never changes file.
+  const layered = await tempProject(context, "index-names-layer");
+  await put(layered, "package.json", '{"private":true,"type":"module"}\n');
+  await put(layered, "meeko.config.mjs", 'export default { extends: ["./base"] };\n');
+  await put(layered, "base/app/pages/layer.meeko", "<template><p>layer</p></template>");
+  await put(layered, "base/app/components/Button.meeko", "<template><p>layer</p></template>");
+  await put(layered, "app/components/Button/Index.meeko", "<template><p>project</p></template>");
+  assert.deepEqual(await names(layered), [["Button", undefined], ["ButtonIndex", undefined]]);
+  assert.match((await entry(layered, "Button")).file, /[\\/]base[\\/]app[\\/]components[\\/]Button\.meeko$/);
+  assert.match((await entry(layered, "ButtonIndex")).conflictsWith!.file, /[\\/]base[\\/]/);
+
+  // The same with a prefix: a module whose folder has both.
+  const moduled = await tempProject(context, "index-names-module");
+  await linkRepositoryPackages(moduled);
+  await put(moduled, "package.json", '{"private":true,"type":"module"}\n');
+  await put(moduled, "meeko.config.mjs", 'export default { modules: ["./modules/kit"] };\n');
+  await put(moduled, "modules/kit/index.mjs", `import { defineMeekoModule } from "@meekojs/meeko/framework";
+export default defineMeekoModule({ meta: { name: "kit" }, setup(_options, meeko) { meeko.addComponentsDir("./modules/kit/components", { prefix: "Kit" }); } });
+`);
+  await put(moduled, "modules/kit/components/Button.meeko", "<template><p>x</p></template>");
+  await put(moduled, "modules/kit/components/Button/index.meeko", "<template><p>x</p></template>");
+  assert.deepEqual(await names(moduled), [["KitButton", undefined], ["KitButtonIndex", undefined]]);
+
+  // With a real ButtonIndex as well, the old name has two files: the duplicate error of today.
+  await put(root, "app/components/ButtonIndex.meeko", "<template><p>x</p></template>");
+  await assert.rejects(discoverComponents(root), /Nombre de componente duplicado ButtonIndex/);
+
+  // Without Button.meeko, a real ButtonIndex keeps its name and there is no conflict.
   const other = await tempProject(context, "index-names-real");
   await put(other, "package.json", '{"private":true,"type":"module"}\n');
   await put(other, "meeko.config.mjs", "export default {};\n");
   await put(other, "app/components/Button/Index.meeko", "<template><p>x</p></template>");
   await put(other, "app/components/ButtonIndex.meeko", "<template><p>real</p></template>");
   assert.deepEqual(await names(other), [["Button", undefined], ["ButtonIndex", undefined]]);
+});
+
+test("a conflict is MEEK135 on the Index file, in meeko check and the editor, and both components work everywhere without MEEK134", { timeout: 240_000 }, async (context) => {
+  const root = await tempProject(context, "index-names-conflict");
+  await linkRepositoryPackages(root);
+  await put(root, "package.json", '{"private":true,"type":"module"}\n');
+  await put(root, "meeko.config.mjs", "export default {};\n");
+  await put(root, "app/components/Button.meeko", '<script lang="ts">\nconst props = defineProps<{ plain: string }>();\n</script>\n<template><p>{props.plain}</p></template>\n');
+  await put(root, "app/components/Button/Index.meeko", button);
+  const page = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const plain: ButtonProps = { plain: "a" };
+const own: ButtonIndexProps = { label: "a" };
+const events: ButtonIndexEmits = { press: [] };
+const all: ComponentProps<"ButtonIndex"> = { label: "a", onPress: () => {} };
+const first = resolveComponent("Button");
+const second = resolveComponent("ButtonIndex");
+const on = signal(true);
+void plain; void own; void events; void all; void first; void second;
+</script>
+<template><main><Button plain="a" /><ButtonIndex label="b">x</ButtonIndex><component is="on.value ? 'ButtonIndex' : 'section'" label="c">y</component></main></template>
+`;
+  await put(root, "app/pages/index.meeko", page);
+  const found = await checkFrameworkProject(root);
+  assert.deepEqual(found.filter((item) => item.severity !== "warning"), []);
+  assert.deepEqual(found.filter((item) => item.code === "MEEK134"), [], "ButtonIndex is its only name");
+  const conflicts = found.filter((item) => item.code === "MEEK135");
+  assert.equal(conflicts.length, 1, JSON.stringify(found));
+  assert.match(conflicts[0]!.filename, /Button[\\/]Index\.meeko$/);
+  assert.equal(conflicts[0]!.message, "app/components/Button/Index.meeko se llamaría <Button>, pero ese nombre es de app/components/Button.meeko: sigue siendo <ButtonIndex>. En Meeko 2.0 será un error; renombra o mueve uno de los dos");
+  const types = await readFile(await generateComponentRegistryTypes(root), "utf8");
+  assert.doesNotMatch(types, /@deprecated/);
+  const loader = await readFile(await generateComponentRegistry(root), "utf8");
+  assert.match(loader, /"Button": \(\) => import\("[^"]*Button\.meeko"\)/);
+  assert.match(loader, /"ButtonIndex": \(\) => import\("[^"]*Index\.meeko"\)/);
+
+  const project = new MeekoProject(root, { trusted: false });
+  try {
+    await project.ready();
+    const indexFile = join(root, "app", "components", "Button", "Index.meeko");
+    assert.ok(project.setDocument(indexFile, button), String(project.componentError(indexFile)));
+    const onIndex = await componentDiagnostics(project, TextDocument.create(pathToFileURL(indexFile).href, "meeko", 1, button), indexFile, () => undefined);
+    assert.deepEqual(onIndex.map((item) => item.code), ["MEEK135"]);
+
+    const file = join(root, "app", "pages", "index.meeko");
+    assert.ok(project.setDocument(file, page), String(project.componentError(file)));
+    const document = TextDocument.create(pathToFileURL(file).href, "meeko", 1, page);
+    assert.deepEqual(await componentDiagnostics(project, document, file, () => undefined), []);
+
+    const typing = TextDocument.create(pathToFileURL(file).href, "meeko", 1, "<template><But</template>\n");
+    const offered = componentNameCompletion(project, typing, file, typing.positionAt("<template><But".length))!.map((item) => item.label);
+    assert.ok(offered.includes("Button") && offered.includes("ButtonIndex"), offered.join());
+
+    const located = (path: string) => ({ uri: pathToFileURL(path).href, document: TextDocument.create(pathToFileURL(path).href, "meeko", 1, button) });
+    const feature: FeatureContext = { project, component: project.component(file)!, document, locate: located };
+    const at = (text: string) => document.positionAt(page.indexOf(text) + 2);
+    assert.ok(definition(feature, at("<ButtonIndex label"))!.some((target) => /Button\/Index\.meeko$/.test(target.uri)));
+    assert.ok(definition(feature, at('<Button plain'))!.some((target) => /components\/Button\.meeko$/.test(target.uri)));
+    // The card names each component as it is called, and its own file.
+    const card = JSON.stringify(hover(feature, at("<ButtonIndex label"))?.contents ?? null);
+    assert.match(card, /ButtonIndex/);
+    assert.match(card, /Button\/Index\.meeko/);
+    assert.match(JSON.stringify(hover(feature, at("<Button plain"))?.contents ?? null), /plain/);
+  } finally {
+    project.service.dispose();
+  }
+});
+
+test("meeko check does not warn about an old name outside a .meeko: ButtonIndexProps in a .ts compiles", { timeout: 240_000 }, async (context) => {
+  // Written in the docs as it is: MEEK134 comes from compiling a .meeko.
+  const root = await tempProject(context, "index-names-ts");
+  await linkRepositoryPackages(root);
+  await put(root, "package.json", '{"private":true,"type":"module"}\n');
+  await put(root, "meeko.config.mjs", "export default {};\n");
+  await put(root, "app/components/Button/Index.meeko", button);
+  await put(root, "app/utils/legacy.ts", 'export const legacy: ButtonIndexProps = { label: "a" };\n');
+  await put(root, "app/pages/index.meeko", "<template><p>x</p></template>\n");
+  assert.deepEqual(await checkFrameworkProject(root), []);
+  // The declaration carries the mark that an editor shows in that file.
+  assert.match(await readFile(join(root, ".meeko", "types", "autoimports", "client.d.ts"), "utf8"), /@deprecated Usa ButtonProps:[^\n]*\n\s*export import ButtonIndexProps/);
 });
 
 test("<Button>, its types, resolveComponent and is work with the new name; the old one works with MEEK134, in meeko check and the editor", { timeout: 240_000 }, async (context) => {

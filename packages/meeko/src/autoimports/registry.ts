@@ -34,6 +34,8 @@ export interface AutoImport {
    * `Button` for `ButtonIndex`, the old name of `Button/Index.meeko` (since 1.8).
    */
   deprecatedFor?: string;
+  /** The component that has the new name of this `Carpeta/Index.meeko`, for its `MEEK135` warning (since 1.8). */
+  conflictsWith?: { readonly name: string; readonly file: string };
   /**
    * Only for code that may run in the browser: components and modules of `app/`, but not the
    * sources of `server/`, `*.server.ts` or the route files, even though the scope is `app`.
@@ -246,6 +248,11 @@ function addFileImports(result: AutoImport[], root: string, directory: string, f
   }
 }
 
+/** The specifier of a TypeScript source as it is imported: `.ts` as `.js`, `.mts` as `.mjs` and `.cts` as `.cjs`. */
+export function outputSpecifier(path: string): string {
+  return path.replace(/\.[cm]?ts$/, (extension) => extension === ".mts" ? ".mjs" : extension === ".cts" ? ".cjs" : ".js");
+}
+
 /** The canonical component catalog consumed by autoimports and generated runtime/types. */
 export interface DiscoveredComponent {
   readonly name: string;
@@ -253,6 +260,11 @@ export interface DiscoveredComponent {
   readonly source: string;
   /** The name that replaces this one, which is a deprecated alias: `Button` for `ButtonIndex` (since 1.8). */
   readonly deprecatedFor?: string;
+  /**
+   * A `Button/Index.meeko` whose new name another file has, `Button.meeko`: it keeps `ButtonIndex`,
+   * its only name, with the `MEEK135` warning (since 1.8). In 2.0 it will be an error.
+   */
+  readonly conflictsWith?: { readonly name: string; readonly file: string };
 }
 
 interface ComponentDirectory {
@@ -297,19 +309,34 @@ function catalog(files: readonly { directory: ComponentDirectory; file: string; 
     }
   }
   const names = new Map<string, { component: DiscoveredComponent; priority: number }>();
-  const legacies = new Map<string, { component: DiscoveredComponent; priority: number }>();
+  const add = (component: DiscoveredComponent, priority: number): void => {
+    const previous = names.get(component.name);
+    if (previous) {
+      if (previous.priority === priority && previous.component.file !== component.file) throw new Error(`Nombre de componente duplicado ${component.name}: ${previous.component.file}, ${component.file}`);
+      if (previous.priority < priority) return;
+    }
+    names.set(component.name, { component, priority });
+  };
+  // The names a file has by itself first: `Button.meeko` keeps `<Button>` whatever source it is in,
+  // so that `<Button>` never changes file because a `Button/Index.meeko` exists.
+  const collapsed: Array<{ directory: ComponentDirectory; file: string; name: string; legacy: string }> = [];
   for (const { directory, file } of chosen.values()) {
     const { name, legacy } = componentName(file, directory);
-    if (legacy !== undefined) {
-      const previous = legacies.get(legacy);
-      if (!previous || directory.priority < previous.priority) legacies.set(legacy, { component: { name: legacy, file, source: directory.source, deprecatedFor: name }, priority: directory.priority });
+    if (legacy === undefined) add({ name, file, source: directory.source }, directory.priority);
+    else collapsed.push({ directory, file, name, legacy });
+  }
+  const own = new Map([...names].map(([name, { component }]) => [name, component.file]));
+  const legacies = new Map<string, { component: DiscoveredComponent; priority: number }>();
+  for (const { directory, file, name, legacy } of collapsed) {
+    const taken = own.get(name);
+    // MEEK135: its new name belongs to another file, so the old one is the only one it has, not deprecated.
+    if (taken !== undefined) {
+      add({ name: legacy, file, source: directory.source, conflictsWith: { name, file: taken } }, directory.priority);
+      continue;
     }
-    const previous = names.get(name);
-    if (previous) {
-      if (previous.priority === directory.priority && previous.component.file !== file) throw new Error(`Nombre de componente duplicado ${name}: ${previous.component.file}, ${file}`);
-      if (previous.priority < directory.priority) continue;
-    }
-    names.set(name, { component: { name, file, source: directory.source }, priority: directory.priority });
+    add({ name, file, source: directory.source }, directory.priority);
+    const previous = legacies.get(legacy);
+    if (!previous || directory.priority < previous.priority) legacies.set(legacy, { component: { name: legacy, file, source: directory.source, deprecatedFor: name }, priority: directory.priority });
   }
   // A component that really has the old name keeps it: the alias is only there for what it replaced.
   for (const [legacy, entry] of legacies) if (!names.has(legacy)) names.set(legacy, entry);
@@ -370,8 +397,8 @@ function staticComponentSources(root: string, config: MeekoConfig): readonly { r
 }
 
 function addComponentImports(result: AutoImport[], components: readonly DiscoveredComponent[]): void {
-  for (const { name, file, deprecatedFor } of components) {
-    addAutoImport(result, { name, imported: "*", file, scope: "app", typeOnly: false, component: true, ...(deprecatedFor ? { deprecatedFor } : {}) });
+  for (const { name, file, deprecatedFor, conflictsWith } of components) {
+    addAutoImport(result, { name, imported: "*", file, scope: "app", typeOnly: false, component: true, ...(deprecatedFor ? { deprecatedFor } : {}), ...(conflictsWith ? { conflictsWith } : {}) });
     for (const [suffix, imported] of componentTypes) addAutoImport(result, { name: `${name}${suffix}`, imported, file, scope: "app", typeOnly: true, component: false, componentType: true, ...(deprecatedFor ? { deprecatedFor: `${deprecatedFor}${suffix}` } : {}) });
   }
 }

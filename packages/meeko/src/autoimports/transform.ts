@@ -14,7 +14,7 @@ import { projectRoot } from "../compiler/project-root";
 import { checkClientBoundary } from "../compiler/transforms/client-boundary";
 import { resolveProjectAliases, resolveProjectAliasesSync } from "../framework/aliases";
 import { readThemeEnabledSync } from "../framework/config";
-import { autoImportCollision, discoverAutoImports } from "./registry";
+import { autoImportCollision, discoverAutoImports, outputSpecifier } from "./registry";
 
 function bindingNames(name: ts.BindingName, names: Set<string>): void {
   if (ts.isIdentifier(name)) names.add(name.text);
@@ -174,7 +174,7 @@ export function applyAutoImports(code: string, filename: string, registry: reado
     }
     let specifier = entry.specifier ?? relative(resolve(filename, ".."), entry.file).replaceAll("\\", "/");
     if (!entry.specifier && !specifier.startsWith(".")) specifier = `./${specifier}`;
-    if (!entry.component && !entry.specifier) specifier = specifier.replace(/\.[cm]?ts$/, ".js");
+    if (!entry.component && !entry.specifier) specifier = outputSpecifier(specifier);
     if (entry.component) imports.push(`import * as ${name} from ${JSON.stringify(specifier)};`);
     else imports.push(`import ${entry.typeOnly || !values.has(name) ? "type " : ""}{ ${entry.imported} as ${name} } from ${JSON.stringify(specifier)};`);
   }
@@ -209,6 +209,19 @@ export function checkComponentBoundary(
  * is first used.
  */
 function deprecatedComponentNames(source: string, filename: string, compiled: Pick<CompileResult, "code" | "mappings">, registry: readonly AutoImport[]): CompileDiagnostic[] {
+  const root = projectRoot(filename);
+  const path = (file: string): string => relative(root, file).replaceAll("\\", "/");
+  // MEEK135 on the file that cannot take the new name, which is where it is solved.
+  const own = path(resolve(filename));
+  const conflict = registry.find((entry) => entry.conflictsWith && path(entry.file) === own);
+  const conflicts: CompileDiagnostic[] = conflict?.conflictsWith ? [{
+    code: "MEEK135", filename, location: locate(source, 0), severity: "warning",
+    message: `${own} se llamaría <${conflict.conflictsWith.name}>, pero ese nombre es de ${path(conflict.conflictsWith.file)}: sigue siendo <${conflict.name}>. En Meeko 2.0 será un error; renombra o mueve uno de los dos`,
+  }] : [];
+  return [...conflicts, ...deprecatedNames(source, filename, compiled, registry)];
+}
+
+function deprecatedNames(source: string, filename: string, compiled: Pick<CompileResult, "code" | "mappings">, registry: readonly AutoImport[]): CompileDiagnostic[] {
   const deprecated = new Map(registry.flatMap((entry) => entry.deprecatedFor ? [[entry.name, entry] as const] : []));
   if (!deprecated.size) return [];
   const found = new Map<string, number>();

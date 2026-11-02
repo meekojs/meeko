@@ -9,7 +9,7 @@ import { aliasTsconfigPaths } from "../compiler/aliases";
 import { aliasesForScope, resolveProjectAliasesSync } from "../framework/aliases";
 import { readMeekoConfigSync } from "../framework/config";
 import { legacyLayerEntries } from "../framework/module-loader";
-import { autoImportCollision, discoverAutoImports } from "./registry";
+import { autoImportCollision, discoverAutoImports, outputSpecifier } from "./registry";
 import { applyAutoImports } from "./transform";
 
 export type TypeScriptScope = Exclude<ImportScope, "app">;
@@ -62,7 +62,7 @@ function publicSpecifier(outputDirectory: string, entry: AutoImport): string {
   if (entry.specifier) return entry.specifier;
   const path = relative(outputDirectory, entry.file).replaceAll("\\", "/");
   const prefixed = path.startsWith(".") ? path : `./${path}`;
-  return entry.component ? prefixed : prefixed.replace(/\.[cm]?ts$/, (extension) => extension === ".mts" ? ".mjs" : extension === ".cts" ? ".cjs" : ".js");
+  return entry.component ? prefixed : outputSpecifier(prefixed);
 }
 
 function scopeEntries(registry: readonly AutoImport[], scope: TypeScriptScope): AutoImport[] {

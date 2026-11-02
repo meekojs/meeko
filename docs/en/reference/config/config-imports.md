@@ -10,7 +10,7 @@ related:
   - "config:layers"
   - docs/framework.md#autoimports-y-typescript
   - docs/framework.md#configuración
-source-hash: 51d3aa35c06073c5068971aa494260b27afb0a348d86a7fbfb8e24960bd72b23
+source-hash: 557fb001be086425e51acff1d6d7e96e1143839396642982cf49167e3c4afc8d
 ---
 
 `imports` adds folders whose exports are auto-imported, in addition to the defaults (`app/components`, `app/composables`, `app/utils`, `app/stores`, `app/types`, `shared/{types,schemas,utils,constants,enums}` and `server/utils`). Each option only accepts folders within its root, and each folder inherits that root's scope, so a `server/` service never reaches a component.
@@ -44,7 +44,7 @@ Each entry is a relative path starting with its root (`app/…`, `shared/…`, `
 
 ## Result
 
-Each folder is read recursively, in the project and each layer. Only its `.ts` files contribute exports (excluding `*.test.ts`, `*.spec.ts` and `*.d.ts`); `.meeko` files in these folders are not components. The `.client.ts`, `.server.ts` and `.shared.ts` suffixes override the folder's scope. Export names are flat: the subfolder is not added to the name, unlike components (`App/Card.meeko` is `AppCard`). `export function total()` in `app/utils/cart/total.ts` is `total`, not `CartTotal`, and two files that export `total` in a scope are the duplicate name error, even in different folders. `.mts` and `.cts` do not work here: they are read and their names are declared, but using them makes `meeko check` and `meeko build` report `TS2307`, because the import Meeko generates points to `.js`, and the page responds `500` in `meeko dev`; a `.cts` with `export` also reports `TS1287`. Write these files as `.ts`.
+Each folder is read recursively, in the project and each layer. Its `.ts` and `.mts` files contribute exports (excluding `*.test.ts`, `*.spec.ts` and `*.d.ts`); `.meeko` files in these folders are not components. The `.client.ts`, `.server.ts` and `.shared.ts` suffixes override the folder's scope. Export names are flat: the subfolder is not added to the name, unlike components (`App/Card.meeko` is `AppCard`). `export function total()` in `app/utils/cart/total.ts` is `total`, not `CartTotal`, and two files that export `total` in a scope are the duplicate name error, even in different folders. A `.mts` contributes its exports like a `.ts`. A `.cts` only works for types: `export type` works, but a value with `export` gives `TS1287` in `meeko check` and `meeko build` and makes the page respond `500` in `meeko dev`, and `export =` contributes no name.
 
 - A `type` or `interface` is brought in with `import type`.
 - A project export with the name of a framework auto-import (`useRoute`, `useForm`…) takes priority.
