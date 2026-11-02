@@ -668,13 +668,15 @@ test("meeko dev keeps serving pages across Vite restarts", { timeout: 90_000 }, 
     }
   })();
   try {
-    // Twice, so the app follows every restart and not only the first.
+    // Twice, so the app follows every restart and not only the first. One write of `.env` is two
+    // change events, truncate and content: Vite restarts again if the second comes during a restart.
     for (const restart of [1, 2]) {
+      const before = count("server restarted");
       await writeFile(join(root, ".env"), `MEEKO_TEST_RESTART=${restart + 1}\n`);
-      await until(() => count("server restarted") === restart, () => `Vite did not restart (${restart}): ${logs}`);
+      await until(() => count("server restarted") > before, () => `Vite did not restart (${restart}): ${logs}`);
       assert.equal(await status("/"), 200, logs);
       // One app per restart.
-      assert.equal(count(runtimeLoaded), restart + 1, logs);
+      await until(async () => await status("/") === 200 && count(runtimeLoaded) === count("server restarted") + 1, () => `One app per restart (${restart}): ${logs}`);
     }
   } finally {
     polling = false;
@@ -685,8 +687,9 @@ test("meeko dev keeps serving pages across Vite restarts", { timeout: 90_000 }, 
   // A restart and a discovery change at once: the new app serves the added page.
   const pageFile = join(root, "app", "pages", "fresh.meeko");
   await writeFile(pageFile, '<script lang="ts">\nconst label = "with restart";\n</script>\n<template><p>{label}</p></template>\n');
+  const restarted = count("server restarted");
   await writeFile(join(root, ".env"), "MEEKO_TEST_RESTART=4\n");
-  await until(() => count("server restarted") === 3, () => `Vite did not restart (3): ${logs}`);
+  await until(() => count("server restarted") > restarted, () => `Vite did not restart (3): ${logs}`);
   await until(async () => await status("/fresh") === 200, () => `The page added with the restart was not served: ${logs}`);
   assert.equal(await status("/"), 200, logs);
   assert.equal(running.exitCode, null, logs);
