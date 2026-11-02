@@ -26,7 +26,7 @@ meeko auth hash
 ```text
 Contraseña:
 Repite la contraseña:
-scrypt$131072$8$1$qDDk4lEVlBfPaPUR69yHaw$WegdhAqKv_T2cKoowsGNBSNXPMZt64Cqj8fl29xngxQ
+scrypt$131072$8$1$5jmbLtw9yk7j9cKXvoj1Cw$MycUbPu8gwqzW2hpMac0eTDbEnanlwS4rw-uc4MbSiU
 ```
 
 ## Parámetros
@@ -103,13 +103,13 @@ export default defineApiRoute({
 ### Pegar el hash sin comillas en la shell
 
 ```sh bad
-export ADMIN_PASSWORD_HASH=scrypt$131072$8$1$jQXb_TSxcrlRUin1zqwB5A$VWVZOYuDzu9hjDwIlyBxBLriaJAn8Lj62IsGDeSRj24
+export ADMIN_PASSWORD_HASH=scrypt$131072$8$1$a60roveYGWNsSr73LMYxbw$eN20ddK5QyliDsTEoU5ah1SHPar1flUtYQd4J-a6dzI
 ```
 
 La shell expande `$1`, `$8` y el resto como variables: la variable queda en `scrypt31072`, y `verifyPassword` lanza `TypeError: Invalid password hash: expected scrypt$<N>$<r>$<p>$<salt>$<hash> within Meeko's limits`. Pasa igual con `$` en un `docker-compose.yml`, que también interpola.
 
 ```sh good
-export ADMIN_PASSWORD_HASH='scrypt$131072$8$1$jQXb_TSxcrlRUin1zqwB5A$VWVZOYuDzu9hjDwIlyBxBLriaJAn8Lj62IsGDeSRj24'
+export ADMIN_PASSWORD_HASH='scrypt$131072$8$1$a60roveYGWNsSr73LMYxbw$eN20ddK5QyliDsTEoU5ah1SHPar1flUtYQd4J-a6dzI'
 ```
 
 En un `.env` de Meeko no hacen falta comillas: no expande variables.

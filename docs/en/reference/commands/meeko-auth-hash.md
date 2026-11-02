@@ -11,7 +11,7 @@ related:
   - "@meekojs/meeko/password#needsRehash"
   - docs/framework.md#contraseñas
   - docs/framework.md#autenticación
-source-hash: 347dd57f0cfa7f32587759ae4a2a02821ce637b7ea33716f30394639beb2dfe8
+source-hash: 8241bdcbae32ef959ca3e8b6903affc8b4a7455ff188f516591af816eefe0932
 ---
 
 `meeko auth hash` hashes a password with [`hashPassword`](/en/docs/reference/hashpassword), the same hash checked by [`verifyPassword`](/en/docs/reference/verifypassword), without writing code. In a terminal it prompts twice without echoing; with a pipe, it reads stdin. Use it to create an initial administrator's or service account's password without leaving plaintext in shell history.
@@ -27,7 +27,7 @@ meeko auth hash
 ```text
 Contraseña:
 Repite la contraseña:
-scrypt$131072$8$1$qDDk4lEVlBfPaPUR69yHaw$WegdhAqKv_T2cKoowsGNBSNXPMZt64Cqj8fl29xngxQ
+scrypt$131072$8$1$5jmbLtw9yk7j9cKXvoj1Cw$MycUbPu8gwqzW2hpMac0eTDbEnanlwS4rw-uc4MbSiU
 ```
 
 ## Parameters
@@ -105,13 +105,13 @@ export default defineApiRoute({
 ### Paste the hash unquoted into the shell
 
 ```sh bad
-export ADMIN_PASSWORD_HASH=scrypt$131072$8$1$jQXb_TSxcrlRUin1zqwB5A$VWVZOYuDzu9hjDwIlyBxBLriaJAn8Lj62IsGDeSRj24
+export ADMIN_PASSWORD_HASH=scrypt$131072$8$1$a60roveYGWNsSr73LMYxbw$eN20ddK5QyliDsTEoU5ah1SHPar1flUtYQd4J-a6dzI
 ```
 
 The shell expands `$1`, `$8` and the rest as variables: the variable becomes `scrypt31072`, and `verifyPassword` throws `TypeError: Invalid password hash: expected scrypt$<N>$<r>$<p>$<salt>$<hash> within Meeko's limits`. The same happens with `$` in a `docker-compose.yml`, which also interpolates.
 
 ```sh good
-export ADMIN_PASSWORD_HASH='scrypt$131072$8$1$jQXb_TSxcrlRUin1zqwB5A$VWVZOYuDzu9hjDwIlyBxBLriaJAn8Lj62IsGDeSRj24'
+export ADMIN_PASSWORD_HASH='scrypt$131072$8$1$a60roveYGWNsSr73LMYxbw$eN20ddK5QyliDsTEoU5ah1SHPar1flUtYQd4J-a6dzI'
 ```
 
 In a Meeko `.env`, quotes are unnecessary: it does not expand variables.
