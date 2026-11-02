@@ -162,7 +162,24 @@ const entities: Readonly<Record<string, string>> = {
 	'&gt;': '>',
 	'&quot;': '"',
 	'&apos;': "'",
-	'&#39;': "'",
+}
+
+/** One pass, so that `&amp;lt;`, which is the text `&lt;`, does not become `<`. Shiki writes `<` as `&#x3C;`. */
+function decodeEntities(text: string): string {
+	return text.replace(/&(?:nbsp|amp|lt|gt|quot|apos|#\d+|#x[\da-f]+);/gi, (entity) => {
+		const named = entities[entity.toLowerCase()]
+		if (named !== undefined) return named
+		const code = entity[2]?.toLowerCase() === 'x' ? Number.parseInt(entity.slice(3, -1), 16) : Number.parseInt(entity.slice(2, -1), 10)
+		return code <= 0x10ffff ? String.fromCodePoint(code) : entity
+	})
+}
+
+/** Fields of the payload that name a place or a drawing: they are no text of the page. */
+const nonTextFields: ReadonlySet<string> = new Set(['editPath', 'editUrl', 'href', 'icon', 'id', 'slug', 'url'])
+
+/** A value that is one URL, one path or the outline of an SVG, whatever its field: `/docs/x`, `docs/x.md`, `M9 1.75…`. */
+function isText(value: string): boolean {
+	return !/^(?:[a-z][a-z\d+.-]*:\/\/\S*|\/\S*|(?:[\w.-]+\/)+[\w.-]+\.\w+|[Mm][\s\d.,lhvcsqtazLHVCSQTAZMm-]+)$/.test(value)
 }
 
 /** The text that full-text search indexes for a page: its content, without the navigation. */
@@ -170,16 +187,14 @@ export function searchableText(path: string, payload: unknown): string {
 	const chunks: string[] = []
 	const visit = (value: unknown): void => {
 		if (typeof value === 'string') {
-			const text = value
-				.replace(/<[^>]*>/g, ' ')
-				.replace(/&(?:nbsp|amp|lt|gt|quot|apos|#39);/g, (entity) => entities[entity] ?? entity)
+			const text = decodeEntities(value.replace(/<[^>]*>/g, ' '))
 				.replace(/\s+/g, ' ')
 				.trim()
-			if (text) chunks.push(text)
+			if (text && isText(text)) chunks.push(text)
 		} else if (Array.isArray(value)) {
 			for (const item of value) visit(item)
 		} else if (value !== null && typeof value === 'object') {
-			for (const item of Object.values(value)) visit(item)
+			for (const [field, item] of Object.entries(value)) if (!nonTextFields.has(field)) visit(item)
 		}
 	}
 	if (path === '/' || path === '/llms.txt' || path === '/llms-full.txt') return ''

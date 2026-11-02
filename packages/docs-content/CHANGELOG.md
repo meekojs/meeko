@@ -2,6 +2,10 @@
 
 Paquete privado, sin versiones publicadas. Cada entrada describe un cambio del contenido, del render o del esquema de la documentación.
 
+## Búsqueda
+
+- **Los extractos de la búsqueda ya no llevan basura.** `searchable_text` indexaba cualquier texto del payload, también rutas, archivos y trazos de iconos (`/docs/reference/signal M9 1.75…`), y dejaba sin decodificar las entidades numéricas de Shiki (`&#x3C;`), que el cliente volvía a escapar. Ahora omite esos campos y valores y decodifica todas las entidades una vez. El esquema no cambia, pero los snapshots ya publicados conservan su texto: surte efecto al volver a publicar.
+
 ## Idiomas (i18n, fase 1B)
 
 - **`listTranslations` conserva un `source-hash` publicado nulo.** Una revisión publicada sin hash, o con uno inválido, seguía contando como `translated` en la lista y sus contadores por el hash importado, mientras el detalle y el render decían `outdated`. Ahora el hash importado sólo cuenta sin revisión publicada.
