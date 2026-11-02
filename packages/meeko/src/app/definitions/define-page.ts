@@ -173,9 +173,9 @@ export function payloadHead(head: PageHead): PageHead {
 export const PAYLOAD_VERSION = 2;
 
 /**
- * `document.title` of the error page (`+error.meeko` or `app/error.meeko`) shown for a failure of
- * a matched route, such as `notFound()` or a loader error, and of the 404 page of a URL without a
- * route: in the SSR document and after a browser navigation.
+ * `document.title` of an error page (`+error.meeko` or `app/error.meeko`) without a `useHead` title,
+ * shown for a failure of a matched route, such as `notFound()` or a loader error, and for the 404
+ * page of a URL without a route: in the SSR document and after a browser navigation.
  */
 export const ERROR_PAGE_TITLE = "Error";
 

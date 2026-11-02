@@ -1,5 +1,5 @@
 import type { ReadonlySignal } from "../../core/reactivity";
-import type { DocumentConfig, HeadInput, HeadSource, HeadTag, ResolvedSeo } from "../../shared/head";
+import type { DocumentConfig, HeadEntry, HeadInput, HeadSource, HeadTag, ResolvedSeo } from "../../shared/head";
 import type { DocumentTheme, ThemeHead } from "../../shared/theme";
 import type { ComponentRelease, DomScope } from "./renderer";
 
@@ -106,6 +106,7 @@ export class BrowserHead implements ThemeHead {
   private readonly entries = new Set<LiveEntry>();
   private readonly config: LiveEntry;
   private readonly route: LiveEntry = { level: ROUTE_LEVEL, order: 0, input: undefined };
+  private errorTitle: HeadEntry | undefined;
   private order = 0;
   private holds = 0;
   private dirty = false;
@@ -166,11 +167,13 @@ export class BrowserHead implements ThemeHead {
 
   /**
    * Replaces the route head: the payload or the client route `head` of the committed page, and
-   * its pathname for `document.seo` (`undefined` on an error page).
+   * its pathname for `document.seo` (`undefined` on an error page), whose default title is
+   * `errorTitle`.
    */
-  setRoute(input: HeadInput | undefined, pathname?: string): void {
+  setRoute(input: HeadInput | undefined, pathname?: string, errorTitle?: HeadEntry): void {
     this.route.input = input;
     this.pathname = pathname;
+    this.errorTitle = errorTitle;
     this.changed();
   }
 
@@ -211,7 +214,7 @@ export class BrowserHead implements ThemeHead {
   private flush(): void {
     this.dirty = false;
     if (this.disposed) return;
-    const resolved = resolveHead([this.config, ...this.entries, this.route], { seo: this.seo, pathname: this.pathname });
+    const resolved = resolveHead([this.config, ...this.entries, ...this.errorTitle ? [this.errorTitle] : [], this.route], { seo: this.seo, pathname: this.pathname });
     const document = this.document;
     const title = resolved.title ?? this.defaultTitle;
     if (document.title !== title) document.title = title;

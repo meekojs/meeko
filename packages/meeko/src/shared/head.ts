@@ -828,16 +828,23 @@ export function rawText(tag: HeadTag): string {
 
 /**
  * The route head as a head input: `description` is a description meta tag that wins over the
- * route's other tags, and an error page without a title takes `errorTitle`.
+ * route's other tags.
  */
-export function routeHeadInput(head: HeadInput & { readonly description?: string | undefined }, errorTitle?: string): HeadInput {
-  const { description, title, ...rest } = head;
-  const resolvedTitle = title ?? errorTitle;
+export function routeHeadInput(head: HeadInput & { readonly description?: string | undefined }): HeadInput {
+  const { description, ...rest } = head;
   return {
     ...rest,
-    ...(resolvedTitle === undefined ? {} : { title: resolvedTitle }),
     ...(description === undefined ? {} : { meta: [...rest.meta ?? [], { name: "description", content: description }] }),
   };
+}
+
+/**
+ * The title of an error page that does not declare its own. A `useHead` of the error page and its
+ * components, whose level is the number of layouts around it, replaces it; the titles of those
+ * layouts do not, because they describe the page that failed.
+ */
+export function errorTitleEntry(title: string, layouts: number): HeadEntry {
+  return { level: layouts - 0.5, order: 0, input: { title } };
 }
 
 

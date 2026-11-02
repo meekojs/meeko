@@ -9,7 +9,7 @@ import type { LayoutWriter, ServerLayoutWriter } from "../../app/runtime/layout"
 import type { RouteSnapshot } from "../../app/runtime/navigation";
 import type { ErrorPageRecord, RouteMatch, RouteRecord } from "../../app/runtime/router";
 import type { TeleportEntry } from "../../app/runtime/teleport";
-import type { DocumentConfig, HeadInput } from "../../shared/head";
+import type { DocumentConfig, HeadEntry, HeadInput } from "../../shared/head";
 import type { ResolvedThemeConfig, ServerTheme } from "../../shared/theme";
 import type { PageRequest } from "../composables/usePage";
 import type { ServerRouteMiddleware, ServerRouteMiddlewareContext } from "../middleware/runtime";
@@ -34,7 +34,7 @@ import { styleModuleId } from "../../app/runtime/style-modules";
 import { renderWithSuspense } from "../../app/runtime/suspense";
 import { collectTeleports, TeleportCollector } from "../../app/runtime/teleport";
 import { escapeHtml, serializeJson } from "../../core/server";
-import { resolveHead, resolveSeo, routeHeadInput } from "../../shared/head";
+import { errorTitleEntry, resolveHead, resolveSeo, routeHeadInput } from "../../shared/head";
 import { resolveThemeConfig, THEME_ENDPOINT, withThemeAttributes } from "../../shared/theme";
 import { providePageScope } from "../composables/usePage";
 import { errorResponse } from "../contract-runtime";
@@ -301,9 +301,9 @@ export const DOCUMENT_HEAD_PREFIX = '<!doctype html><html><head><meta charset="u
  * The head of a document: `document` of the configuration, the components' `useHead` and the route
  * head. `pathname` names the page for `document.seo`; an error document has none.
  */
-function headDocument(options: DocumentOptions | undefined, nonce: string | undefined, collected: HeadCollector | undefined, route: HeadInput, pathname: string | undefined, theme: ServerTheme | undefined): HeadDocument {
+function headDocument(options: DocumentOptions | undefined, nonce: string | undefined, collected: HeadCollector | undefined, route: HeadInput, pathname: string | undefined, theme: ServerTheme | undefined, errorTitle?: HeadEntry): HeadDocument {
   const page = { seo: resolveSeo(options?.config?.seo, "document.seo"), pathname };
-  const head = resolveHead([...documentHeadEntries(options?.config, route), ...collected?.entries() ?? []], page);
+  const head = resolveHead([...documentHeadEntries(options?.config, route), ...errorTitle ? [errorTitle] : [], ...collected?.entries() ?? []], page);
   // `<html>` carries the theme of the request from the first byte, when the server knows it.
   return renderHeadDocument(theme ? { ...head, htmlAttrs: withThemeAttributes(head.htmlAttrs, theme) } : head, nonce);
 }
@@ -1037,7 +1037,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       store.seal();
       const payload = serializeJson({
         v: PAYLOAD_VERSION, error: true, render: "ssr", url: route!.url,
-        props: notFoundProps, state: rendered.state, sharedState: store.snapshot(), head: { title: ERROR_PAGE_TITLE },
+        props: notFoundProps, state: rendered.state, sharedState: store.snapshot(), head: {},
         ...(resources ? { resources } : {}),
         ...(options.errorPage!.layout ? { layoutProps } : {}),
       });
@@ -1051,9 +1051,9 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       const styleTags = documentStyleTags(styles, host.nonceAttribute);
       const script = options.clientEntry ? `<script type="module"${host.nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
       const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
-      // Titled like the error document of a matched route; the payload head carries the same
-      // title, so hydration still finds the host <title> after the managed head.
-      const head = headDocument(options.document, host.nonce, collected, routeHeadInput({}, ERROR_PAGE_TITLE), undefined, theme);
+      // Titled like the error document of a matched route; hydration resolves the same title, so
+      // it still finds the host <title> after the managed head.
+      const head = headDocument(options.document, host.nonce, collected, {}, undefined, theme, errorTitleEntry(ERROR_PAGE_TITLE, options.errorPage!.layouts.length));
       const placed = documentBody(rendered.html, teleports, options.production ?? true);
       const document = `${head.prefix}${csrfMeta}${head.head}${host.head}${styleTags}</head>${head.bodyOpen}<div id="app">${placed.app}</div>${placed.body}<script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
       return finish(new Response(headRequest ? null : document, {
@@ -1372,7 +1372,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
           // Plugins that failed (perhaps the failure shown here) leave the error page without their values.
           await startPlugins().catch(() => emptyPluginState), request.signal, theme, options.document?.config?.idPrefix);
           const host = documentParts(options.document, request, requestNonce());
-          const head = headDocument(options.document, host.nonce, collected, routeHeadInput({}, ERROR_PAGE_TITLE), undefined, theme);
+          const head = headDocument(options.document, host.nonce, collected, {}, undefined, theme, errorTitleEntry(ERROR_PAGE_TITLE, layouts.length));
           // The error page is not hydrated, so a missing target only keeps its teleport in place.
           const placed = documentBody(errorRendered.html, teleports, true);
           // Nor does its CSS arrive later: the document inlines it, as for a page.

@@ -111,9 +111,16 @@ useHead({ meta: [{ name: "robots", content: "noindex" }] });
 </script>
 <template><p class="error">{props.status}</p></template>`;
 
+const titledErrorPage = `<script lang="ts">
+import { useHead } from "@meekojs/meeko/framework";
+const props = defineProps<{ status: number; message: string }>();
+useHead(() => ({ title: \`Lost \${props.status}\` }));
+</script>
+<template><p class="error">{props.status}</p></template>`;
+
 const sources: Record<string, string> = {
   "app.meeko": appShell, "shell.meeko": shell, "Badge.meeko": badge, "count.meeko": countPage, "og.meeko": ogPage,
-  "plain.meeko": plainPage, "declared.meeko": declaredPage, "client.meeko": clientPage, "error.meeko": errorPage,
+  "plain.meeko": plainPage, "declared.meeko": declaredPage, "client.meeko": clientPage, "error.meeko": errorPage, "titled-error.meeko": titledErrorPage,
 };
 
 /** Compiles the components against the source runtime, so the test does not depend on dist/. */
@@ -147,6 +154,7 @@ const routes: readonly RouteRecord[] = createRouteManifest([
   { id: "/client", file: "client.meeko", layouts, sidecar: "client.route.ts", render: "client" },
   { id: "/about", file: "plain.meeko", layouts, sidecar: "about.route.ts", render: "prerender" },
   { id: "/broken", file: "plain.meeko", layouts, sidecar: "broken.route.ts", error: "error.meeko" },
+  { id: "/gone", file: "plain.meeko", layouts, sidecar: "gone.route.ts", error: "error.meeko" },
   { id: "/stream", file: "og.meeko", layouts, sidecar: "stream.route.ts", render: "stream" },
 ]);
 const appError: ErrorPageRecord = { file: "error.meeko", layouts: ["app.meeko"] };
@@ -163,8 +171,9 @@ const documentConfig: DocumentConfig = {
 };
 
 async function sidecars(): Promise<Record<string, ClientRoute>> {
-  const { definePageBody, useHead } = await runtime();
+  const { definePageBody, notFound, useHead } = await runtime();
   return {
+    "gone.route.ts": definePageBody(undefined, async () => notFound(), false) as ClientRoute,
     "declared.route.ts": { head: () => ({ title: "Declared", description: "from route", meta: [{ property: "og:title", content: "route" }] }) },
     // useHead in top-level <script server> code, merged with `export const head`, which wins.
     "body.route.ts": definePageBody(undefined, async () => {
@@ -428,6 +437,32 @@ test("error pages render the document config and their own useHead", { timeout: 
     assert.equal(await app.navigate("/plain"), true);
     assert.equal(document.title, "App · Site");
     assert.deepEqual(metas(document, 'meta[name="robots"]'), ["index"]);
+  } finally {
+    closeAll();
+    await cleanup();
+  }
+});
+
+test("the title of an error page wins over the default one, in SSR, hydration and navigation", { timeout: 30_000 }, async () => {
+  const { modules, cleanup } = await loadModules();
+  try {
+    const titled = { ...modules, "error.meeko": modules["titled-error.meeko"]! };
+    const server = await serve(titled);
+    // Above the title of app.meeko and below the template, for a URL without a route and for a failure.
+    const missing = await (await server(page("https://example.test/missing"))).text();
+    assert.match(missing, /<title>Lost 404 · Site<\/title>/);
+    assert.doesNotMatch(missing, /<title>Error/);
+    assert.match(await (await server(page("https://example.test/broken"))).text(), /<title>Lost 500 · Site<\/title>/);
+    // Hydrating the 404 document changes nothing, and the title follows each navigation.
+    const { app, document, ssrHead } = await boot(titled, "https://example.test/missing");
+    assert.equal(document.head.innerHTML, ssrHead);
+    assert.equal(document.title, "Lost 404 · Site");
+    assert.equal(await app.navigate("/plain"), true);
+    assert.equal(document.title, "App · Site");
+    assert.equal(await app.navigate("/gone"), true);
+    assert.equal(document.title, "Lost 404 · Site");
+    assert.equal(await app.navigate("/plain"), true);
+    assert.equal(document.title, "App · Site");
   } finally {
     closeAll();
     await cleanup();

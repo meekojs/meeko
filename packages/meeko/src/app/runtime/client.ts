@@ -1,4 +1,4 @@
-import type { DocumentConfig, HeadInput } from "../../shared/head";
+import type { DocumentConfig } from "../../shared/head";
 import type { PageHead, PageSchema } from "../definitions/define-page";
 import type { PluginRegistration } from "../definitions/define-plugin";
 import type { RouteMiddleware } from "../middleware/runtime";
@@ -15,7 +15,7 @@ import type { ErrorPageRecord, NamedLayoutRecord, NavigationContext, Navigator, 
 import { markingObserver } from "../../core/error-observer";
 import { batch, finishWithCleanup, runDry, signal } from "../../core/reactivity";
 import { ClientError } from "../../shared/clients";
-import { routeHeadInput } from "../../shared/head";
+import { errorTitleEntry, routeHeadInput } from "../../shared/head";
 import { resolveThemeConfig, THEME_STATE_KEY } from "../../shared/theme";
 import { provideResourceCache, ResourceCache, ResourceScope, withResourceScope } from "../composables/resources/engine";
 import { provideBrowserWindow } from "../composables/useStorage";
@@ -384,9 +384,6 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
   // Adopts the head that SSR wrote; a page without a title shows the host's, not the previous page's.
   const documentHead = new BrowserHead(browser.document, options.document);
   const themeConfig = resolveThemeConfig(options.document?.theme, "document.theme");
-  // An error page (notFound(), a loader or data failure, or app/error.meeko for a URL without
-  // a route) has the title of its SSR error document.
-  const routeHead = (head: PageHead, errorPage: boolean): HeadInput => routeHeadInput(head, errorPage ? ERROR_PAGE_TITLE : undefined);
   const appError = options.errorPage;
   const matched = matchRoute(options.routes, browser.location.pathname);
   // An error payload renders app/error.meeko, whatever the URL: a server answers it for a URL
@@ -486,7 +483,9 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
     // onMounted callbacks run once the whole tree has hydrated. The head adopts the SSR tags once,
     // with every useHead of the hydrated tree registered.
     release = documentHead.hold(() => {
-      documentHead.setRoute(routeHead(payload.head, payload.error), payload.error ? undefined : initialUrl.pathname);
+      // An error page without its own title has the one of its SSR error document.
+      if (payload.error) documentHead.setRoute(routeHeadInput(payload.head), undefined, errorTitleEntry(ERROR_PAGE_TITLE, appError!.layouts.length));
+      else documentHead.setRoute(routeHeadInput(payload.head), initialUrl.pathname);
       return withResourceScope(initialData, () => hydrateApp(committedRoute.state, () => mountBatch(() => withIdRoot(options.document?.idPrefix, () => first.component.hydrateScope({ root: options.root }, {}, payload.state)))));
     });
     resourceCache.merge(initialData.loadedData());
@@ -881,7 +880,9 @@ export async function mountClientApp(options: ClientAppOptions): Promise<ClientA
         catch (restoreError) { throw new AggregateError([error, restoreError], "Meeko navigation and CSRF recovery failed"); }
         throw error;
       }
-      documentHead.setRoute(routeHead(head, errorPage !== undefined), errorPage === undefined ? context.url.pathname : undefined);
+      // notFound(), a loader or data failure, or app/error.meeko for a URL without a route.
+      if (errorPage === undefined) documentHead.setRoute(routeHeadInput(head), context.url.pathname);
+      else documentHead.setRoute(routeHeadInput(head), undefined, errorTitleEntry(ERROR_PAGE_TITLE, (route ? route.layouts : appError!.layouts).length));
     });
     const committed = await viewTransitions.commit(() => {
       if (serverSharedState) stateStore.seedForNavigation(serverSharedState, commitWithToken);

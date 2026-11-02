@@ -162,9 +162,10 @@ test("a page request without a route renders app/error.meeko inside the root lay
   assert.equal(payload.error, true);
   assert.equal(payload.render, "ssr");
   assert.deepEqual(payload.props, { status: 404, message: "NOT_FOUND" });
-  // Titled like the error document of a matched route, in the markup and in the payload head.
+  // Titled like the error document of a matched route. The title is not in the payload head: that
+  // is the route head, which would win over a useHead of the error page.
   assert.match(body, /<head>.*<title>Error<\/title>.*<\/head>/s);
-  assert.deepEqual(payload.head, { title: "Error" });
+  assert.deepEqual(payload.head, {});
   assert.match(body, /src="\/client.js"/);
 
   const navigation = await server(new Request("https://example.test/missing", { headers: { accept: "application/meeko+json" } }));
