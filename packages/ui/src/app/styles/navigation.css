@@ -779,6 +779,7 @@ html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-drawer-
 	display: inline-flex;
 	flex: none;
 	align-items: center;
+	justify-self: start;
 	gap: var(--ui-space-0-5);
 	box-sizing: border-box;
 	border: var(--ui-border-width) solid var(--ui-color-border);

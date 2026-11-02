@@ -62,7 +62,8 @@
 	gap: var(--ui-space-2);
 	min-height: 1lh;
 }
-.meeko-ui-card-title {
+.meeko-ui-card-title,
+.meeko-ui-card-header :is(h1, h2, h3, h4) {
 	margin: 0;
 	color: inherit;
 	font-weight: var(--ui-font-weight-semibold);

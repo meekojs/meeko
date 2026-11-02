@@ -175,4 +175,4 @@ Para una marca propia, `ui.tokens` o una hoja de la app:
 
 ## Alias deprecados
 
-`src/app/styles/deprecated.css` mantiene `--meeko-ui-*` sólo para leerlos, porque las páginas de `apps/ui` aún los usan. Asignar uno ya no llega a los componentes, salvo `--meeko-ui-container-max-width` y `--meeko-ui-container-gutter`. El paquete nunca se publicó, así que el archivo se borra cuando las apps migren. No escribas `--meeko-ui-*` en código nuevo.
+`src/app/styles/deprecated.css` mantiene `--meeko-ui-*` sólo para leerlos, mientras terminan de migrar las webs. Asignar uno ya no llega a los componentes, salvo `--meeko-ui-container-max-width` y `--meeko-ui-container-gutter`. El paquete nunca se publicó, así que el archivo se borra cuando las apps migren. No escribas `--meeko-ui-*` en código nuevo.

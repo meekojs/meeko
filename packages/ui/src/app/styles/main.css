@@ -218,7 +218,8 @@
 @media (prefers-reduced-motion: reduce) {
 	.meeko-ui-button,
 	.meeko-ui-input,
-	[data-meeko-select-trigger] {
+	[data-meeko-select-trigger],
+	[data-meeko-popover-trigger] {
 		transition: none;
 	}
 	.meeko-ui-button[aria-busy='true']::before,
@@ -255,6 +256,56 @@
 	overflow: auto;
 	color: var(--ui-color-text);
 	font-size: var(--ui-font-size-md);
+}
+[data-meeko-popover][role='dialog'] {
+	padding: var(--ui-space-4);
+	width: min(var(--ui-floating-panel-width), calc(100vw - var(--ui-space-8)));
+}
+[data-meeko-popover][role='menu'] {
+	min-width: var(--ui-page-aside-width);
+}
+/* The trigger <UIPopover> paints looks like a control; `triggerClass` or any rule of the app replaces it. */
+[data-meeko-popover-trigger] {
+	display: inline-flex;
+	align-items: center;
+	transition: background-color var(--ui-duration-fast);
+	cursor: pointer;
+	border: var(--ui-border-width) solid var(--ui-color-border-strong);
+	border-radius: var(--ui-radius-md);
+	background: var(--ui-color-control);
+	padding: var(--ui-control-padding-md);
+	min-height: var(--ui-control-height-md);
+	color: var(--ui-color-text);
+	font: var(--ui-control-font-weight) var(--ui-control-font-size) / var(--ui-line-height-tight) var(--ui-font-sans);
+	letter-spacing: var(--ui-tracking-snug);
+}
+[data-meeko-popover-trigger]:hover,
+[data-meeko-popover-trigger][aria-expanded='true'] {
+	background: var(--ui-color-control-hover);
+}
+/* The items of a menu: a native <button> or <a>, or a <UIButton variant="ghost">. */
+[data-meeko-popover] :is([role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio']) {
+	display: flex;
+	justify-content: flex-start;
+	cursor: pointer;
+	border: 0;
+	border-radius: var(--ui-radius-sm);
+	background: transparent;
+	padding: var(--ui-space-1-5) var(--ui-space-2);
+	width: 100%;
+	min-height: 0;
+	color: inherit;
+	font: inherit;
+	text-align: start;
+	text-decoration: none;
+}
+[data-meeko-popover] :is([role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio']):is(:hover, :focus) {
+	outline: none;
+	background: var(--ui-color-control-active);
+}
+[data-meeko-popover] :is([role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio']):focus-visible {
+	outline: var(--ui-focus-ring);
+	outline-offset: calc(var(--ui-focus-ring-offset) * -1);
 }
 [data-meeko-select-list] [role='option'] {
 	cursor: pointer;

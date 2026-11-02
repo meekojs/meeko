@@ -14,7 +14,7 @@
 			each:as="item"
 			each:key="item.label"
 		>
-			<dt>{item.label}</dt>
+			<dt bind:lang="item.labelLang">{item.label}</dt>
 			<dd if:when="item.code">
 				<code bind:title="item.title">{item.value}</code>
 			</dd>

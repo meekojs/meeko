@@ -1,6 +1,7 @@
 .meeko-ui-badge {
 	display: inline-flex;
 	align-items: center;
+	justify-self: start;
 	vertical-align: middle;
 	border: var(--ui-border-width) solid var(--ui-color-border);
 	border-radius: var(--ui-radius-full);

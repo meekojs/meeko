@@ -15,7 +15,7 @@
  * A component inside the text is the end of its scope, so it keeps its own look. Inside @scope a selector
  * without :scope gets it as an implied ancestor: `.meeko-ui-prose h2` would look for a nested prose.
  */
-.meeko-ui-prose > :is(.meeko-ui-code-block, .meeko-ui-alert, .meeko-ui-table-scroll) {
+.meeko-ui-prose > :is(.meeko-ui-code-block, .meeko-ui-alert, .meeko-ui-table-scroll, .meeko-ui-card, .meeko-ui-diff) {
 	margin-block: 0 var(--ui-space-6);
 }
 .meeko-ui-prose > :first-child {

@@ -634,7 +634,7 @@ Un contenido en la capa superior del navegador (la API `popover`), anclado a su 
 </template>
 ```
 
-Meeko pinta un `<button>` con `popovertarget`, `aria-expanded`, `aria-controls` y `aria-haspopup` (según `role`), cuyo contenido es el snippet `trigger`, y el contenido suelto dentro de un elemento con `popover` y `data-meeko-popover`. Con `popovertarget`, el botón abre y cierra el contenido incluso antes de hidratar.
+Meeko pinta un `<button>` con `popovertarget`, `aria-expanded`, `aria-controls` y `aria-haspopup` (según `role`), cuyo contenido es el snippet `trigger`, y el contenido suelto dentro de un elemento con `popover` y `data-meeko-popover`. El botón tiene aspecto de control y los elementos con `role="menuitem"`, de opción de menú: `triggerClass`, `class` o cualquier regla de tu CSS los sustituyen. Con `popovertarget`, el botón abre y cierra el contenido incluso antes de hidratar.
 
 | Prop                    | Por defecto      | Qué hace                                                                                                                                |
 | ----------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1121,7 +1121,7 @@ Los controles nuevos conservan el HTML nativo, el teclado y el envío de formula
 | `UIEmpty`           | `title`, `description`, `variant="inline"` o `"panel"`; snippets `default` y `actions`.                                                                                                                     |
 | `UISkeleton`        | `lines`, `widths` (`full`, `long`, `short`), `label`; anuncia carga una vez y respeta movimiento reducido.                                                                                                  |
 | `UIStat`            | `label`, `value`, `detail`, con `dl/dt/dd`; los snippets `value` y `detail` admiten marcado, como un enlace.                                                                                                |
-| `UIDescriptionList` | `items` (`label`, `value`, `detail`, `code`, `title`), `columns` (1, 2 o 3), una columna en móvil. `code` pinta el valor en `<code>`.                                                                       |
+| `UIDescriptionList` | `items` (`label`, `labelLang`, `value`, `detail`, `code`, `title`), `columns` (1, 2 o 3), una columna en móvil. `code` pinta el valor en `<code>`.                                                                       |
 | `UIToast`           | `text`, `tone`, `duration`, `closeLabel`, `actions` (snippet o prop); evento `dismiss`. Popover nativo manual, sin tomar el foco.                                                                           |
 
 Los tipos de props, `UIDensity`, `UITone` y `UIToastContext` se exportan desde `@meekojs/ui/runtime`. Los textos predeterminados se configuran en `ui.messages.<locale>.feedback` (`close`, `empty`, `loading`); hay español e inglés.

@@ -95,6 +95,8 @@ export interface UIDescriptionItem {
 	code?: boolean
 	/** Con `code`, texto de ayuda del valor, como un hash completo tras uno abreviado. */
 	title?: string
+	/** `lang` de la etiqueta, si está en otro idioma que el valor. */
+	labelLang?: string
 }
 
 /** Lista semántica de datos. @example `<UIDescriptionList bind:items="facts" bind:columns="2" />` */
