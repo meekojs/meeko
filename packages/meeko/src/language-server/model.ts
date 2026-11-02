@@ -190,7 +190,7 @@ const channelDeclarations = [
   "type __MeekoEquals<A, B> = (<V>() => V extends A ? 1 : 2) extends (<V>() => V extends B ? 1 : 2) ? true : false;",
   "type __MeekoWritable<S> = S extends { readonly value: unknown } ? __MeekoEquals<Pick<S, \"value\">, { -readonly [K in keyof Pick<S, \"value\">]: Pick<S, \"value\">[K] }> extends true ? unknown : { readonly \"a model needs a writable signal; computed and readonly signals cannot be written\": never } : unknown;",
   "declare function __meeko_writable<S>(model: S & __MeekoWritable<S>): void;",
-  "type __MeekoNativeModels = { text: string; checkbox: boolean | undefined; radio: string | null | undefined; select: string; multiple: string[] };",
+  "type __MeekoNativeModels = { text: string; range: number | string; checkbox: boolean | undefined; radio: string | null | undefined; select: string; multiple: string[] };",
   "type __MeekoChannelsOf<M> = M extends { readonly __meekoChannels: infer C } ? C : { readonly models: null; readonly snippets: null };",
   "type __MeekoLoose = { readonly [name: string]: unknown };",
   "type __MeekoTagModels<Models> = [Models] extends [null] ? { readonly [name: string]: \"this component declares no defineModel\" } : Models;",
@@ -224,13 +224,13 @@ const snippetDeclarations = [
 ].join("\n");
 
 /** Native control kind of `model`, like the compiler; `undefined` where model is MEEK065. */
-function nativeModelKind(node: TemplateNode): "text" | "checkbox" | "radio" | "select" | "multiple" | undefined {
+function nativeModelKind(node: TemplateNode): "text" | "range" | "checkbox" | "radio" | "select" | "multiple" | undefined {
   const find = (name: string) => node.attrs?.find((attribute) => attribute.name === name);
   if (node.tagName === "input") {
     // `bind:type` makes the control text-like; together with a static `type` it is MEEK065.
     if (find("bind:type")) return find("type") ? undefined : "text";
     const type = (find("type")?.value ?? "text").trim().toLowerCase();
-    return type === "checkbox" ? "checkbox" : type === "radio" ? "radio" : "text";
+    return type === "checkbox" ? "checkbox" : type === "radio" ? "radio" : type === "range" ? "range" : "text";
   }
   if (node.tagName === "textarea") return "text";
   if (node.tagName === "select") return find("multiple") ? "multiple" : "select";

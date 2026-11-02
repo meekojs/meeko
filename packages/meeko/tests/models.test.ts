@@ -219,6 +219,157 @@ test("a control edited before hydration keeps the user's value", async () => {
   }
 });
 
+const range = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const amount = signal(4);
+const text = signal("4");
+</script>
+<template><form><input class="amount" type="range" min="0" max="10" step="2" model="amount" /><input class="text" type="range" min="0" max="10" model="text" /><output>{typeof amount.value}:{amount.value}|{typeof text.value}:{text.value}</output><button type="button" on:click="() => { amount.value = 8; }">set</button></form></template>`;
+
+test("model on a range keeps the type of its signal: a number gets numbers, a string still gets strings", async () => {
+  const { code } = compile(range, "Range.meeko");
+  assert.match(code, /__meeko\.bindModel\(__scope, 0, "range", \(\) => \(amount\)\)/);
+  const { component, cleanup } = await load({ Range: range }, "Range");
+  const window = new Window();
+  try {
+    const root = window.document.createElement("main");
+    root.innerHTML = component.renderToString({});
+    const amount = root.querySelector("input.amount") as unknown as HTMLInputElement;
+    const text = root.querySelector("input.text") as unknown as HTMLInputElement;
+    assert.equal(amount.getAttribute("value"), "4");
+    // Moved before hydration: the signal gets it with its own type.
+    amount.value = "6";
+    text.value = "7";
+    const release = component.hydrate(root as unknown as Element, {});
+    assert.equal(root.querySelector("output")?.textContent, "number:6|string:7");
+    amount.value = "2";
+    fire(window, amount as unknown as Element, "input");
+    assert.equal(root.querySelector("output")?.textContent, "number:2|string:7");
+    (root.querySelector("button") as unknown as HTMLElement).click();
+    assert.equal(amount.value, "8");
+    release();
+  } finally {
+    window.happyDOM.abort();
+    await cleanup();
+  }
+});
+
+test("model on a range checks the signal against its type, and on:input is its event", async () => {
+  assertCompileError('<script lang="ts">const v = signal(1);</script><template><input type="range" model="v" on:input="() => {}" /></template>', "MEEK065", 87);
+  const { root, cleanup } = await typeProject({
+    "Wrong.meeko": '<script lang="ts">\nimport { signal } from "@meekojs/meeko";\nconst v = signal(true);\n</script>\n<template><input type="range" model="v" /></template>\n',
+    "Right.meeko": '<script lang="ts">\nimport { signal } from "@meekojs/meeko";\nconst v = signal(1);\nconst s = signal("1");\n</script>\n<template><input type="range" model="v" /><input type="range" model="s" /></template>\n',
+  });
+  try {
+    assert.ok((await checkSource(await readFile(join(root, "Wrong.meeko"), "utf8"), join(root, "Wrong.meeko"))).some((item) => item.code === "TS2322"));
+    assert.deepEqual(await checkSource(await readFile(join(root, "Right.meeko"), "utf8"), join(root, "Right.meeko")), []);
+  } finally {
+    await cleanup();
+  }
+});
+
+const radioList = `<script lang="ts">
+const props = defineProps<{ options: readonly { value: string }[] }>();
+const value = defineModel<string>({ default: "" });
+</script>
+<template><label each:of="props.options" each:as="option" each:key="option.value"><input type="radio" name="group" bind:value="option.value" model="value" /></label></template>`;
+
+const radioParent = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+import * as RadioList from "./RadioList.meeko";
+const period = signal("a");
+</script>
+<template><form><RadioList model="period" bind:options="[{ value: 'a' }, { value: 'b' }]" /><output>{period.value}</output></form></template>`;
+
+test("a radio moved before hydration wins also when hydrating its list runs its model again", async () => {
+  const { component, cleanup } = await load({ RadioList: radioList, RadioParent: radioParent }, "RadioParent");
+  const window = new Window();
+  try {
+    const root = window.document.createElement("main");
+    root.innerHTML = component.renderToString({});
+    const [first, second] = [...root.querySelectorAll("input")] as unknown as HTMLInputElement[];
+    assert.equal(first!.checked, true);
+    // `bind:options` is a new array when it hydrates, so each row gets a new item and its effects run again.
+    first!.checked = false;
+    second!.checked = true;
+    const release = component.hydrate(root as unknown as Element, {});
+    assert.equal(root.querySelector("output")?.textContent, "b");
+    assert.equal(second!.checked, true);
+    assert.equal(first!.checked, false);
+    release();
+  } finally {
+    window.happyDOM.abort();
+    await cleanup();
+  }
+});
+
+test("a checkbox with model keeps the value of its spread, which is what the form sends; a text model does not take it", async () => {
+  const wrapper = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const on = signal(false);
+const text = signal("model");
+const rest = { value: "yes", checked: true, name: "accepted" };
+</script>
+<template><form><input class="box" type="checkbox" model="on" bind="rest" /><input class="text" model="text" bind="rest" /><output>{on.value}</output></form></template>`;
+  const { component, cleanup } = await load({ Wrapper: wrapper }, "Wrapper");
+  const window = new Window();
+  try {
+    const root = window.document.createElement("main");
+    root.innerHTML = component.renderToString({});
+    const box = root.querySelector("input.box") as unknown as HTMLInputElement;
+    const text = root.querySelector("input.text") as unknown as HTMLInputElement;
+    assert.equal(box.getAttribute("value"), "yes");
+    // The model still decides whether it is checked, and the value of a text control.
+    assert.equal(box.hasAttribute("checked"), false);
+    assert.equal(text.getAttribute("value"), "model");
+    const release = component.hydrate(root as unknown as Element, {});
+    assert.equal(box.value, "yes");
+    assert.equal(box.checked, false);
+    box.checked = true;
+    fire(window, box as unknown as Element, "change");
+    assert.equal(root.querySelector("output")?.textContent, "true");
+    assert.equal(box.value, "yes");
+    release();
+  } finally {
+    window.happyDOM.abort();
+    await cleanup();
+  }
+});
+
+test("a value the browser sanitized is not an edit: the model keeps what the application gave it", async () => {
+  const clamped = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const amount = signal(150);
+</script>
+<template><form><input type="range" max="100" model="amount" /><output>{amount.value}</output></form></template>`;
+  const { component, cleanup } = await load({ Clamped: clamped }, "Clamped");
+  const window = new Window();
+  const created: Array<Record<string, string>> = [];
+  try {
+    const root = window.document.createElement("main");
+    root.innerHTML = component.renderToString({});
+    const input = root.querySelector("input") as unknown as HTMLInputElement;
+    // Happy DOM does not clamp: the page's browser does, to the attribute and to a new control alike.
+    Object.defineProperty(input, "value", { configurable: true, get: () => "100", set: () => {} });
+    const create = window.document.createElement.bind(window.document);
+    window.document.createElement = ((name: string) => {
+      const element = create(name);
+      if (name === "input") {
+        created.push({ name });
+        Object.defineProperty(element, "value", { get: () => "100" });
+      }
+      return element;
+    }) as typeof window.document.createElement;
+    const release = component.hydrate(root as unknown as Element, {});
+    assert.equal(created.length, 1, "it compares with an untouched control only when the values differ");
+    assert.equal(root.querySelector("output")?.textContent, "150");
+    release();
+  } finally {
+    window.happyDOM.abort();
+    await cleanup();
+  }
+});
+
 const restoredCard = `<script lang="ts">
 const snippets = defineSnippets<{ default: [] }>();
 </script>

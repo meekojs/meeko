@@ -260,7 +260,7 @@ interface RenderBinding {
 /** `model="signal"` on a native form control. */
 interface ModelBinding {
   id: number;
-  kind: "text" | "checkbox" | "radio" | "select" | "multiple";
+  kind: "text" | "range" | "checkbox" | "radio" | "select" | "multiple";
   expression: string;
   offset: number;
   /** Value of a radio: a static attribute (quoted code) or a `bind:value` expression. */
@@ -1145,7 +1145,9 @@ function renderNodeContent(node: TemplateNode, bindings: TemplateBindings, conte
   const spreadDirective = custom ? undefined : node.attrs?.find((attribute) => attribute.name === "bind");
   const spread = spreadDirective ? spreadAttribute(node, spreadDirective, context) : undefined;
   /** The element's own attributes, which win over the spread's keys; `class` and `style` combine with it. */
-  const excluded = new Set<string>(model ? ["value", "checked"] : []);
+  // A checkbox or a radio with `model` owns `checked`: its `value` is what the form sends, and a
+  // wrapper can receive it in the spread (`<UICheckbox value="yes">`).
+  const excluded = new Set<string>(model ? (model.kind === "checkbox" || model.kind === "radio" ? ["checked"] : ["value", "checked"]) : []);
   if (modelSelected) excluded.add("selected");
   if (link) excluded.add("href").add("aria-current");
   const explicit: SpreadBinding["explicit"] = {};
@@ -1717,7 +1719,8 @@ function staticRouteHref(id: string): string {
 
 /**
  * `model="signal"` on a native control: text-like `<input>` and `<textarea>` (value, input),
- * checkbox and radio (checked, change), `<select>` (value, change) and `<select multiple>`.
+ * `<input type="range">` (value, input, with a number signal too), checkbox and radio (checked,
+ * change), `<select>` (value, change) and `<select multiple>`.
  */
 function nativeModel(node: TemplateNode, attribute: { name: string; value: string; start: number; end: number }, context: TemplateContext, id: number): ModelBinding {
   const fail = (message: string, offset = attribute.start): never => { throw compileError(context.source, context.filename, "MEEK065", message, offset); };
@@ -1735,7 +1738,7 @@ function nativeModel(node: TemplateNode, attribute: { name: string; value: strin
     if (dynamicType && staticType) fail("model con bind:type no admite además type=\"...\"; deja sólo uno de los dos", staticType.start);
     const type = dynamicType ? "text" : (staticType?.value ?? "text").trim().toLowerCase();
     if (["file", "submit", "reset", "button", "image"].includes(type)) fail(`model no se admite en <input type="${type}">`);
-    kind = type === "checkbox" ? "checkbox" : type === "radio" ? "radio" : "text";
+    kind = type === "checkbox" ? "checkbox" : type === "radio" ? "radio" : type === "range" ? "range" : "text";
   } else if (tag === "textarea") {
     kind = "text";
     if ((node.childNodes ?? []).some((child) => child.nodeName !== "#text" || Boolean(child.value?.trim()))) fail("<textarea model> no admite contenido; el modelo da su valor", node.start);
@@ -1747,7 +1750,7 @@ function nativeModel(node: TemplateNode, attribute: { name: string; value: strin
     return fail(`model se admite en <input>, <textarea> y <select>, no en <${tag}>`);
   }
   const property = kind === "checkbox" || kind === "radio" ? "checked" : "value";
-  const event = kind === "text" ? "input" : "change";
+  const event = kind === "text" || kind === "range" ? "input" : "change";
   for (const conflict of [`bind:${property}`, property, `on:${event}`]) {
     const found = find(conflict);
     if (found) fail(`model asigna ${property} y escucha ${event}; quita ${conflict}`, found.start);

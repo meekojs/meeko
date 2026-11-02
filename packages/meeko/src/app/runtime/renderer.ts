@@ -893,7 +893,23 @@ function editedControl(target: Element, kind: NativeModelKind): boolean {
   }
   if (kind === "select") return !pristineValueControl(target);
   const control = target as HTMLInputElement | HTMLTextAreaElement;
-  return control.value !== control.defaultValue;
+  if (control.value === control.defaultValue) return false;
+  return target.localName !== "input" || control.value !== untouchedInputValue(target as HTMLInputElement);
+}
+
+/**
+ * The value of this `<input>` if nobody had touched it. The browser sanitizes the attribute for the
+ * type: a range clamps it to its `min`, `max` and `step`, an email drops its spaces. That is no edit.
+ */
+function untouchedInputValue(control: HTMLInputElement): string {
+  const untouched = control.ownerDocument.createElement("input");
+  untouched.type = control.type;
+  untouched.multiple = control.multiple;
+  untouched.min = control.min;
+  untouched.max = control.max;
+  untouched.step = control.step;
+  untouched.defaultValue = control.defaultValue;
+  return untouched.value;
 }
 
 /** `<input>` types without a text value; a text `model` cannot bind them. */
@@ -928,7 +944,8 @@ function readControl(target: Element, kind: NativeModelKind, model: { value: unk
     if (control.checked) model.value = control.value;
   } else if (kind === "multiple") {
     model.value = Array.from((target as HTMLSelectElement).options).filter((option) => option.selected).map((option) => option.value);
-  } else model.value = (target as HTMLInputElement).value;
+  } else if (kind === "range" && typeof model.value === "number") model.value = (target as HTMLInputElement).valueAsNumber;
+  else model.value = (target as HTMLInputElement).value;
 }
 
 /**
@@ -960,10 +977,16 @@ export function bindModel<K extends NativeModelKind>(scope: DomScope, id: number
     readControl(target, kind, model);
   };
   const edited = editedControl(target, kind);
+  // Until it is read, the control holds what the user did: hydrating can run the effect below again
+  // (a list whose rows get a new item), and writing the signal's value would erase it.
+  let unread = edited;
   // Writing the restored value mid-hydration would change regions that have not hydrated yet;
   // it reaches the signal once the whole hydration batch has finished.
   const cancelRead = edited
-    ? afterMountBatch(() => observeCallback(readModel, report))
+    ? afterMountBatch(() => {
+        unread = false;
+        observeCallback(readModel, report);
+      })
     : () => {};
   let first = true;
   const stop = effect(() => {
@@ -971,15 +994,14 @@ export function bindModel<K extends NativeModelKind>(scope: DomScope, id: number
     const value = model.value;
     const radio = radioValue ? radioValue() : undefined;
     const option = radio === null || radio === undefined ? undefined : String(radio);
-    if (first) {
-      first = false;
-      if (edited) return;
-    }
+    const skip = unread || (first && edited);
+    first = false;
+    if (skip) return;
     const error = typeError();
     if (error) report(error);
     else applyModel(target, kind, value, option);
   });
-  const event = kind === "text" ? "input" : "change";
+  const event = kind === "text" || kind === "range" ? "input" : "change";
   const listener = (): void => observeCallback(readModel, report);
   target.addEventListener(event, listener);
   return () => {
