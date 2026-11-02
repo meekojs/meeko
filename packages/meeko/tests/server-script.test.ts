@@ -80,8 +80,21 @@ test("top-level code is detected by its exports or its request API calls", () =>
   assert.equal(analyze(page('import { redirect } from "./nav.js";\nexport const route = { load: () => redirect() };')).body, false);
 });
 
+test("export const layoutProps stays out of the page data and reaches only the layout", () => {
+  const source = page('const { params } = usePage();\nexport const doc = { id: params.id };\nconst nav = ["a"];\nexport const layoutProps = { nav };');
+  const script = analyze(source);
+  assert.deepEqual(script.exports.map((binding) => binding.name), ["doc"]);
+  assert.equal(script.layoutProps?.name, "layoutProps");
+  const module = serverScriptModule(source, file)!.code;
+  assert.match(module, /return \{ data: \{ doc \}, layoutProps \};/);
+  assert.match(module, /__meeko_definePageBody\(undefined, __meeko_body, false, true\)/);
+  // The browser's copy of the page reads `doc`, and never `layoutProps` nor what only it uses.
+  assert.doesNotMatch(compile(source, file).code, /layoutProps|\bnav\b/);
+});
+
 test("the compiler rejects the combinations top-level code cannot honour", () => {
   const cases: Array<[string, string, string, string?]> = [
+    ["MEEK072", 'export const layoutProps = { title: "a" };\nexport const route = definePage({ layoutProps: { title: "b" } });', 'layoutProps: { title: "b" }'],
     ["MEEK070", 'export const user = 1;\nexport const route = definePage({ load: () => 2 });', "load: () => 2"],
     ["MEEK071", "export const user = 1;\nexport function helper() {}", "export function helper"],
     ["MEEK071", "export const user = 1;\nexport class Box {}", "export class Box"],

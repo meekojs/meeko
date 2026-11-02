@@ -11,7 +11,6 @@
 	export const route = definePage({
 		render: 'ssr',
 		layout: 'docs',
-		layoutProps: ({ data }: { data: ExportsPage }) => ({ nav: data.nav, current: data.current, toc: data.toc, pager: data.pages, editUrl: data.editUrl, source: data.source, i18n: data.i18n }),
 	})
 
 	type ExportsPage = {
@@ -31,9 +30,9 @@
 	const { locale } = await usePageI18n()
 	const snapshot = await readPage<ExportsPage>('/docs/reference/exports', locale)
 	if (!snapshot) notFound()
-	export const { groups, total, kinds, nav, current, toc, pages, index, source, editUrl, head } = snapshot
+	export const { groups, total, kinds, index, head } = snapshot
 	// Without it in the payload (a snapshot older than the languages), the page is the original.
-	export const i18n = snapshot.i18n ?? null
+	export const layoutProps = { nav: snapshot.nav, current: snapshot.current, toc: snapshot.toc, pager: snapshot.pages, editUrl: snapshot.editUrl, source: snapshot.source, i18n: snapshot.i18n ?? null }
 </script>
 
 <script lang="ts">

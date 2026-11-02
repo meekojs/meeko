@@ -12,7 +12,6 @@
 	export const route = definePage({
 		render: 'ssr',
 		layout: 'docs',
-		layoutProps: ({ data }: { data: SymbolPage }) => ({ nav: data.nav, current: data.current, toc: data.toc, pager: data.pages, editUrl: data.editUrl, source: data.editPath, i18n: data.i18n }),
 	})
 
 	const { params } = usePage()
@@ -33,9 +32,9 @@
 	}
 	const snapshot = await readPage<SymbolPage>(`/docs/reference/${params.symbol}`, locale)
 	if (!snapshot) notFound()
-	export const { written, page, nav, current, pages, toc, editUrl, editPath, index, searchTitle, head } = snapshot
+	export const { written, page, index, searchTitle, head } = snapshot
 	// Without it in the payload (a snapshot older than the languages), the page is the original.
-	export const i18n = snapshot.i18n ?? null
+	export const layoutProps = { nav: snapshot.nav, current: snapshot.current, toc: snapshot.toc, pager: snapshot.pages, editUrl: snapshot.editUrl, source: snapshot.editPath, i18n: snapshot.i18n ?? null }
 </script>
 
 <script lang="ts">

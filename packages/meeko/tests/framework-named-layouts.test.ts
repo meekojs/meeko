@@ -16,6 +16,7 @@ import type * as framework_render_tsTypes from "../src/server/runtime/framework-
 
 import { createRouteManifest } from "../src/app/runtime/router.ts";
 import { compile } from "../src/compiler.ts";
+import { definePageBody } from "../src/server/runtime/page-body.ts";
 import { createTempProject } from "./helpers/temp-project.ts";
 
 
@@ -129,6 +130,7 @@ const routes: readonly RouteRecord[] = createRouteManifest([
   { id: "/absent", file: "a.meeko", layouts: ["app.meeko", "dashboard.meeko"], layout: dashboardLayout, sidecar: "absent.route.ts" },
   { id: "/dated", file: "a.meeko", layouts: ["app.meeko", "dashboard.meeko"], layout: dashboardLayout, sidecar: "dated.route.ts" },
   { id: "/stream", file: "a.meeko", layouts: ["app.meeko", "dashboard.meeko"], layout: dashboardLayout, sidecar: "stream.route.ts", render: "stream" },
+  { id: "/exported", file: "a.meeko", layouts: ["app.meeko", "dashboard.meeko"], layout: dashboardLayout, sidecar: "exported.route.ts" },
 ]);
 const appError: ErrorPageRecord = { file: "error.meeko", layouts: ["app.meeko", "dashboard.meeko"], layout: dashboardLayout };
 
@@ -142,6 +144,8 @@ const sidecars: Record<string, ClientRoute & { render?: string; layout?: unknown
   "absent.route.ts": { load: () => ({}), layoutProps: ({ data }: { data: { name?: string } }) => ({ title: data.name, showAlert: true }) },
   "dated.route.ts": { layoutProps: { title: new Date(0) as unknown as string } },
   "stream.route.ts": { render: "stream", load: () => ({ name: "Flujo" }), layoutProps: ({ data }: { data: { name: string } }) => ({ title: data.name }) },
+  // What a page compiles to with top-level server code and `export const layoutProps`.
+  "exported.route.ts": definePageBody(undefined, async () => ({ data: { doc: "cuerpo" }, layoutProps: { title: "Sólo para el layout" } }), false, true) as ClientRoute,
 };
 
 const flush = async (): Promise<void> => {
@@ -202,6 +206,27 @@ test("SSR renders the named layout with the page's layoutProps and hydrates them
     assert.equal(text(root, ".title"), "Conexiones");
     assert.equal(text(root, ".alert"), "Alerta");
     assert.equal(text(root, ".page"), "a");
+    assert.deepEqual(errors, []);
+  } finally {
+    closeAll();
+    await cleanup();
+  }
+});
+
+test("export const layoutProps reaches the layout once: in SSR, hydration and a client navigation, outside the page data", { timeout: 30_000 }, async () => {
+  const { modules, cleanup } = await loadModules();
+  try {
+    const { root, html, app, errors } = await boot(modules, "https://example.test/exported");
+    assert.match(html, /<header class="title">(?:<!--[^>]*-->)?Sólo para el layout/);
+    const payload = JSON.parse(/<script[^>]*id="meeko-payload"[^>]*>(.*?)<\/script>/s.exec(html)![1]!) as { props: { data: unknown }; layoutProps: unknown };
+    assert.deepEqual(payload.props.data, { doc: "cuerpo" });
+    assert.deepEqual(payload.layoutProps, { title: "Sólo para el layout" });
+    assert.equal(text(root, ".title"), "Sólo para el layout");
+    // A navigation brings them in its own payload, and the next page does not keep them.
+    assert.equal(await app.navigate("/g"), true);
+    assert.equal(text(root, ".title"), "Grupo");
+    assert.equal(await app.navigate("/exported"), true);
+    assert.equal(text(root, ".title"), "Sólo para el layout");
     assert.deepEqual(errors, []);
   } finally {
     closeAll();

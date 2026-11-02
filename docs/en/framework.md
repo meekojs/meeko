@@ -1,5 +1,5 @@
 ---
-source-hash: e08ab614d6faec73a0a52da70a3a2ee9309a7b0ea1a1c5907cd376b9f9ececa4
+source-hash: eb567cc59ad8cda22e31e8f0b37e7f828436ec98ba5b57c95d92ca1828ff39e4
 ---
 
 # Meeko as a full-stack framework
@@ -1027,7 +1027,22 @@ export const route = definePage({
 })
 ```
 
-The function receives the same context as `head` (`params`, `search`, `request`, `context`, `signal`, `state` and `data`); with top-level code in `<script server>`, `data` contains its exports. They merge with `+group.ts` props and take priority. They travel in the payload (`layoutProps`), so they must be JSON-serializable: an `undefined` prop (`{ title: data.user?.name }` without a user, or `layout.set({ title: undefined })`) leaves the prop unset, so the layout uses its default value on both server and browser; a value JSON cannot represent (a date, a `Map`, an instance) fails the page with an error naming the page, layout and prop. On a `render: "client"` page, the object already reaches the server HTML and the function runs in the browser after `load`. `export const layoutProps` in `<script server>` is not an option: it would be another page data field.
+With top-level code in `<script server>`, write the props as one more export. Since `1.8`, `export const layoutProps` is typed by its own values and checked against the layout; like `head`, it does not reach the page, so data that only the layout reads travels once, unless you also export it separately:
+
+```html
+<script server lang="ts">
+	export const route = definePage({ layout: 'docs' })
+
+	const { params } = usePage()
+	const snapshot = await readPage(params.slug)
+	export const doc = { html: snapshot.html }
+	export const layoutProps = { nav: snapshot.nav, title: snapshot.title }
+</script>
+```
+
+Exporting it and also declaring `route.layoutProps` is `MEEK072`.
+
+The function receives the same context as `head` (`params`, `search`, `request`, `context`, `signal`, `state` and `data`); with top-level code in `<script server>`, `data` contains its exports, typed since `1.8` when the options are an object literal without a spread. They merge with `+group.ts` props and take priority. They travel in the payload (`layoutProps`), so they must be JSON-serializable: an `undefined` prop (`{ title: data.user?.name }` without a user, or `layout.set({ title: undefined })`) leaves the prop unset, so the layout uses its default value on both server and browser; a value JSON cannot represent (a date, a `Map`, an instance) fails the page with an error naming the page, layout and prop. On a `render: "client"` page, the object already reaches the server HTML and the function runs in the browser after `load`. `export const layoutProps` in `<script server>` is not an option: it would be another page data field.
 
 **2. From the page's `<script>`: `useLayout()`.** It is auto-imported and, in a page, its type follows the layout selected by its `definePage` or `+group.ts` files (in another component, `useLayout<"dashboard">()`):
 

@@ -508,6 +508,27 @@ type ExactLayoutProps<T> = T extends { readonly layout: infer L extends string; 
 /** `Written` with each key of `Declared` at its declared type, and every other key `never`. */
 type ExactProps<Written, Declared> = { readonly [K in keyof Written]: K extends keyof Declared ? Declared[K] : never };
 
+/**
+ * `definePage` tal como lo ven `meeko check` y el editor en una página con código de nivel superior en
+ * `<script server>`: `D` son sus exports, los `data` que reciben `layoutProps` y `head` en ejecución.
+ *
+ * @typeParam D Exports de la página, como los ve el navegador.
+ * @since 1.8.0
+ * @example
+ * ```ts
+ * import type { PageBodyDefinePage } from "@meekojs/meeko/framework";
+ *
+ * declare const define: PageBodyDefinePage<{ readonly title: string }>;
+ * export const route = define({ head: ({ data }) => ({ title: data.title }) });
+ * ```
+ */
+export type PageBodyDefinePage<D> = <
+  const P extends PageSchema | undefined = undefined,
+  const S extends PageSchema | undefined = undefined,
+  C = unknown,
+  const T extends WrittenOptions = {},
+>(definition: T & AnyPageDefinition<P, S, D, C> & ExactLayoutProps<T>) => DefinedPage<P, S, D, C, T>;
+
 declare const typeArgumentsNotWritten: unique symbol;
 /**
  * Default of the type parameters that `definePage` can only learn from written type arguments: `T`

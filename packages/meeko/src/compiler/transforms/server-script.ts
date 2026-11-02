@@ -46,12 +46,25 @@ export interface ServerScript {
   readonly exports: readonly ServerBinding[];
   /** `export const head`, which sets the page head and stays on the server. */
   readonly head?: ServerBinding | undefined;
+  /** `export const layoutProps`, the props of the layout: they travel once, outside the page data. */
+  readonly layoutProps?: ServerBinding | undefined;
   /** `export const route = ...`: the statement and its initializer. */
-  readonly route?: { readonly start: number; readonly end: number; readonly initializerStart: number; readonly initializerEnd: number } | undefined;
+  readonly route?: {
+    readonly start: number;
+    readonly end: number;
+    readonly initializerStart: number;
+    readonly initializerEnd: number;
+    /** Its `params` and `search` as an object literal, when the options are one: all that `usePage()` reads of them. */
+    readonly request?: string;
+  } | undefined;
   /** Request APIs used without an import or a declaration of the same name. */
   readonly implicit: readonly PageRequestApi[];
   /** `usePage` imports from the framework: the local name and the specifier text to drop in typed copies. */
   readonly usePageImports: ReadonlyArray<{ readonly local: string; readonly start: number; readonly end: number }>;
+  /** `definePage` imports from the framework, likewise: typed copies give its `data` the type of the exports. */
+  readonly definePageImports?: ReadonlyArray<{ readonly local: string; readonly start: number; readonly end: number }>;
+  /** Whether `definePage` is used without a binding of that name, through its autoimport. */
+  readonly implicitDefinePage?: boolean;
 }
 
 function bindingNames(name: ts.BindingName, names: Set<string>): void {
@@ -238,6 +251,7 @@ export function analyzeServerScript(source: string, filename: string, section: S
   const apis = new Map<string, PageRequestApi>();
   const headApis = new Set(pageHeadApis.filter((name) => !moduleNames.has(name)));
   const usePageImports: Array<{ local: string; start: number; end: number }> = [];
+  const definePageImports: Array<{ local: string; start: number; end: number }> = [];
   for (const statement of file.statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier) || statement.moduleSpecifier.text !== frameworkModule) continue;
     const bindings = statement.importClause?.namedBindings;
@@ -245,14 +259,17 @@ export function analyzeServerScript(source: string, filename: string, section: S
     for (const [index, element] of bindings.elements.entries()) {
       const imported = (element.propertyName ?? element.name).text;
       if (!element.isTypeOnly && pageHeadApis.includes(imported)) headApis.add(element.name.text);
+      const elements = bindings.elements;
+      const span = (): { local: string; start: number; end: number } => {
+        const [start, end] = index < elements.length - 1 ? [element.getStart(file), elements[index + 1]!.getStart(file)]
+          : index > 0 ? [elements[index - 1]!.getEnd(), element.getEnd()]
+            : [element.getStart(file), element.getEnd()];
+        return { local: element.name.text, start: base + start, end: base + end };
+      };
+      if (!element.isTypeOnly && imported === "definePage") definePageImports.push(span());
       if (element.isTypeOnly || !(pageRequestApis as readonly string[]).includes(imported)) continue;
       apis.set(element.name.text, imported as PageRequestApi);
-      if (imported !== "usePage") continue;
-      const elements = bindings.elements;
-      const [start, end] = index < elements.length - 1 ? [element.getStart(file), elements[index + 1]!.getStart(file)]
-        : index > 0 ? [elements[index - 1]!.getEnd(), element.getEnd()]
-          : [element.getStart(file), element.getEnd()];
-      usePageImports.push({ local: element.name.text, start: base + start, end: base + end });
+      if (imported === "usePage") usePageImports.push(span());
     }
   }
   for (const api of pageRequestApis) if (!moduleNames.has(api)) apis.set(api, api);
@@ -261,6 +278,7 @@ export function analyzeServerScript(source: string, filename: string, section: S
   const statements: ServerStatement[] = [];
   const exports: ServerBinding[] = [];
   let head: ServerBinding | undefined;
+  let layoutProps: ServerBinding | undefined;
   /** `export const head = () => ...`: Meeko calls it after the top-level code, to compute the head. */
   let headFunction: ts.Expression | undefined;
   let route: { statement: ts.VariableStatement; declaration: ts.VariableDeclaration } | undefined;
@@ -301,7 +319,8 @@ export function analyzeServerScript(source: string, filename: string, section: S
           if (identifier.text === "head") {
             head = binding;
             if (declaration.initializer && declaration.name === identifier) headFunction = unwrapExpression(declaration.initializer);
-          } else exports.push(binding);
+          } else if (identifier.text === "layoutProps") layoutProps = binding;
+          else exports.push(binding);
         }
       }
       continue;
@@ -374,17 +393,22 @@ export function analyzeServerScript(source: string, filename: string, section: S
       if (load) fail("MEEK070", "Un <script server> con código de nivel superior no puede declarar también route.load: sus exports son los datos de la página. Deja el código de nivel superior o el loader", load);
       const routeHead = options && head && optionProperty(options, "head");
       if (routeHead) fail("MEEK072", "<script server> exporta head y además declara route.head; deja sólo uno de los dos", routeHead);
+      const routeLayoutProps = options && layoutProps && optionProperty(options, "layoutProps");
+      if (routeLayoutProps) fail("MEEK072", "<script server> exporta layoutProps y además declara route.layoutProps; deja sólo uno de los dos", routeLayoutProps);
       const render = options && optionProperty(options, "render");
       if (render && ts.isPropertyAssignment(render) && (ts.isStringLiteral(render.initializer) || ts.isNoSubstitutionTemplateLiteral(render.initializer)) && render.initializer.text === "client") {
         fail("MEEK074", 'Una página render: "client" no puede tener código de servidor de nivel superior: su <script server> se ejecuta en el navegador. Pide los datos con useApi o useRpcQuery, o renderiza en el servidor', render);
       }
     }
+    const written = initializer ? optionsObject(initializer) : undefined;
+    const literal = written?.properties.every((property) => !ts.isSpreadAssignment(property));
     routeInfo = {
       start: at(route.statement), end: base + route.statement.getEnd(),
       initializerStart: initializer ? at(initializer) : 0, initializerEnd: initializer ? base + initializer.getEnd() : 0,
+      ...written && literal ? { request: `{ ${written.properties.filter((property) => ["params", "search"].includes(property.name?.getText(file) ?? "")).map((property) => property.getText(file)).join(", ")} }` } : {},
     };
   }
-  return { body: true, statements, exports, head, route: routeInfo, implicit, usePageImports };
+  return { body: true, statements, exports, head, layoutProps, route: routeInfo, implicit, usePageImports, definePageImports, implicitDefinePage: !moduleNames.has("definePage") };
 }
 
 /**

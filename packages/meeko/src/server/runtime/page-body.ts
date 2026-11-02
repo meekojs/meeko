@@ -90,10 +90,11 @@ export type JsonShape<T> = T extends string | number | boolean | null ? T
  */
 export type SerializableExport<T extends Shape, Shape> = T;
 
-/** Exports of a run of top-level server code; `head` stays on the server. */
+/** Exports of a run of top-level server code; `head` stays on the server and `layoutProps` only reaches the layout. */
 export interface PageBodyResult {
   readonly data: Record<string, unknown>;
   readonly head?: unknown;
+  readonly layoutProps?: unknown;
 }
 
 /** `useHead` calls of each run of top-level server code. */
@@ -184,11 +185,12 @@ function thenable(value: unknown): value is PromiseLike<unknown> {
  * generated `load` runs the code per request and returns its exports; `head`
  * comes from `export const head` or else from the options.
  */
-export function definePageBody(options: Record<string, unknown> | undefined, body: () => Promise<PageBodyResult>, exportsHead: boolean): Record<string, unknown> {
+export function definePageBody(options: Record<string, unknown> | undefined, body: () => Promise<PageBodyResult>, exportsHead: boolean, exportsLayoutProps = false): Record<string, unknown> {
   if (options?.load !== undefined) throw new TypeError("MEEK070: un <script server> con código de nivel superior no puede declarar también route.load; deja sólo uno de los dos");
   if (options?.render === "client") throw new TypeError('MEEK074: una página render: "client" no puede tener código de servidor de nivel superior; su <script server> se ejecuta en el navegador');
   if (exportsHead && options?.head !== undefined) throw new TypeError("MEEK072: <script server> exporta head y además declara route.head; deja sólo uno de los dos");
-  const heads = new WeakMap<object, { readonly exported: unknown; readonly used: ReadonlyArray<() => HeadInput> }>();
+  if (exportsLayoutProps && options?.layoutProps !== undefined) throw new TypeError("MEEK072: <script server> exporta layoutProps y además declara route.layoutProps; deja sólo uno de los dos");
+  const heads = new WeakMap<object, { readonly exported: unknown; readonly used: ReadonlyArray<() => HeadInput>; readonly layoutProps: unknown }>();
   const load = async (context: BodyContext): Promise<Record<string, unknown>> => {
     const page: PageRequest<unknown, unknown> = {
       url: new URL(context.request.url), params: context.params, search: context.search, request: context.request, signal: context.signal,
@@ -204,7 +206,8 @@ export function definePageBody(options: Record<string, unknown> | undefined, bod
     // An exported promise arrives awaited; a `defer` value is sent later by the stream.
     const entries = await Promise.all(Object.entries(result.data).map(async ([key, value]) => [key, thenable(value) ? await value : value] as const));
     const data: Record<string, unknown> = Object.fromEntries(entries);
-    heads.set(data, { exported: exportsHead ? result.head : undefined, used });
+    const layoutProps = thenable(result.layoutProps) ? await result.layoutProps : result.layoutProps;
+    heads.set(data, { exported: exportsHead ? result.head : undefined, used, layoutProps });
     return data;
   };
   const optionsHead = options?.head as ((context: unknown) => PageHead) | undefined;
@@ -219,7 +222,9 @@ export function definePageBody(options: Record<string, unknown> | undefined, bod
     const merged = mergeHeadInputs([...stored.used.map((read) => read()), declared]) as PageHead;
     return declared?.description === undefined ? merged : { ...merged, description: declared.description };
   };
-  return { ...options, load, head };
+  // `export const layoutProps` stays out of `data`, so what only the layout reads travels once.
+  const layoutProps = (context: { readonly data: unknown }): unknown => typeof context.data === "object" && context.data !== null ? heads.get(context.data)?.layoutProps : undefined;
+  return { ...options, load, head, ...exportsLayoutProps ? { layoutProps } : {} };
 }
 
 /** @internal The exports of the page's top-level server code, as the compiled page reads them. */

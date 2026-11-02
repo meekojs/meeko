@@ -10,7 +10,6 @@
 	export const route = definePage({
 		render: 'ssr',
 		layout: 'docs',
-		layoutProps: ({ data }: { data: GuidePage }) => ({ nav: data.nav, current: data.current, toc: data.doc.toc, pager: data.pages, editUrl: data.doc.editUrl, source: data.doc.source, i18n: data.i18n }),
 	})
 
 	// /en/docs/x reads the English page of the snapshot (the Spanish text and `i18n.fallback` when it is not translated).
@@ -26,9 +25,11 @@
 	}
 	const snapshot = await readPage<GuidePage>(`/docs/${params.slug}`, locale)
 	if (!snapshot) notFound()
-	export const { doc, nav, pages, current, head } = snapshot
+	export const { head } = snapshot
+	// The template only reads the HTML: the rest of the document is for the layout.
+	export const doc = { html: snapshot.doc.html }
 	// Without it in the payload (a snapshot older than the languages), the page is the original.
-	export const i18n = snapshot.i18n ?? null
+	export const layoutProps = { nav: snapshot.nav, current: snapshot.current, toc: snapshot.doc.toc, pager: snapshot.pages, editUrl: snapshot.doc.editUrl, source: snapshot.doc.source, i18n: snapshot.i18n ?? null }
 </script>
 
 <script lang="ts">

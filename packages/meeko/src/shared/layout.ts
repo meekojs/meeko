@@ -105,6 +105,28 @@ export interface LayoutHandle<P extends object = Record<string, unknown>> {
 export type LayoutPropsInput<L extends string | false, C> = Partial<LayoutProps<L>> | ((context: C) => Partial<LayoutProps<L>>);
 
 /**
+ * Comprobación de `export const layoutProps` en el código de nivel superior de un `<script server>`,
+ * que `meeko check` y el editor aplican: cada clave escrita, con el tipo de esa prop en el layout que
+ * elige `route`, y `never` si el layout no la declara. Sin `layout` en `route`, el layout heredado se
+ * comprueba en `meeko check` del proyecto (`MEEK_PAGE_LAYOUT_PROPS`).
+ *
+ * @typeParam Route Tipo de `route`.
+ * @typeParam Written Tipo de `layoutProps`.
+ * @since 1.8.0
+ * @example
+ * ```html
+ * <script server lang="ts">
+ * export const route = definePage({ layout: "dashboard" });
+ * const { params } = usePage();
+ * export const layoutProps = { title: `Usuario ${params.id}` };
+ * </script>
+ * ```
+ */
+export type PageBodyLayoutProps<Route, Written> = Route extends { readonly layout: infer L extends string | false }
+  ? { readonly [K in keyof Written]: K extends keyof LayoutProps<L> ? LayoutProps<L>[K] : never }
+  : unknown;
+
+/**
  * Opciones de layout de las opciones de ruta (`definePage`): `layout` elige el layout con nombre y
  * `layoutProps` le pasa props, tipadas contra ese layout. Sin `layout`, la página hereda el de sus
  * `+group.ts` o `default`; entonces `meeko check` comprueba `layoutProps` contra el heredado.

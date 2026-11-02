@@ -1023,7 +1023,22 @@ export const route = definePage({
 })
 ```
 
-La función recibe el mismo contexto que `head` (`params`, `search`, `request`, `context`, `signal`, `state` y `data`); con código de nivel superior en `<script server>`, `data` son sus exports. Se combinan con las de los `+group.ts`, y ganan. Viajan en el payload (`layoutProps`), así que deben poder serializarse en JSON: una prop con `undefined` (`{ title: data.user?.name }` sin usuario, o `layout.set({ title: undefined })`) deja la prop sin valor, así que el layout usa su valor por defecto, en el servidor y en el navegador; un valor que JSON no representa (una fecha, un `Map`, una instancia) hace fallar la página con un error que nombra la página, el layout y la prop. En una página `render: "client"`, el objeto ya llega al HTML del servidor y la función se ejecuta en el navegador después de `load`. `export const layoutProps` en `<script server>` no es una opción: sería un dato más de la página.
+Con código de nivel superior en `<script server>`, escribe las props como un export más. Desde `1.8`, `export const layoutProps` se tipa con sus propios valores y se comprueba contra el layout; como `head`, no llega a la página, así que un dato que sólo lee el layout viaja una vez, si no lo exportas también por separado:
+
+```html
+<script server lang="ts">
+	export const route = definePage({ layout: 'docs' })
+
+	const { params } = usePage()
+	const snapshot = await readPage(params.slug)
+	export const doc = { html: snapshot.html }
+	export const layoutProps = { nav: snapshot.nav, title: snapshot.title }
+</script>
+```
+
+Exportarlo y declarar además `route.layoutProps` es `MEEK072`.
+
+La función recibe el mismo contexto que `head` (`params`, `search`, `request`, `context`, `signal`, `state` y `data`); con código de nivel superior en `<script server>`, `data` son sus exports, ya tipados desde `1.8` si las opciones son un objeto literal sin spread. Se combinan con las de los `+group.ts`, y ganan. Viajan en el payload (`layoutProps`), así que deben poder serializarse en JSON: una prop con `undefined` (`{ title: data.user?.name }` sin usuario, o `layout.set({ title: undefined })`) deja la prop sin valor, así que el layout usa su valor por defecto, en el servidor y en el navegador; un valor que JSON no representa (una fecha, un `Map`, una instancia) hace fallar la página con un error que nombra la página, el layout y la prop. En una página `render: "client"`, el objeto ya llega al HTML del servidor y la función se ejecuta en el navegador después de `load`. `export const layoutProps` en `<script server>` no es una opción: sería un dato más de la página.
 
 **2. Desde el `<script>` de la página: `useLayout()`.** Se autoimporta y, en una página, su tipo sigue al layout que eligen su `definePage` o sus `+group.ts` (en otro componente, `useLayout<"dashboard">()`):
 

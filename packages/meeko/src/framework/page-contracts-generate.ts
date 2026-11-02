@@ -155,7 +155,7 @@ export async function generatePageContracts(projectRoot: string): Promise<string
     }
     // A page that chooses its layout in definePage is checked there; one that inherits it, here.
     if (pageOptions.layout === undefined && routeModule) {
-      const routeType = body ? (body.route ? `typeof import(${JSON.stringify(importPath(output, routeModule))})["route"]` : undefined)
+      const routeType = body ? (body.layoutProps ? `{ readonly layoutProps: typeof import(${JSON.stringify(importPath(output, routeModule))})["layoutProps"] }` : body.route ? `typeof import(${JSON.stringify(importPath(output, routeModule))})["route"]` : undefined)
         : `__RouteOf<typeof import(${JSON.stringify(importPath(output, routeModule))})>`;
       // Routes added by extendRoutes share the page file: its layoutProps are checked once per file.
       const key = `${route.file}\0page`;

@@ -46,7 +46,7 @@ export function serverScriptModule(source: string, filename: string): { readonly
   };
   mapped(kept, 0);
   const data = script.exports.map((binding) => binding.name).join(", ");
-  code += `\nreturn { data: { ${data} }${script.head ? ", head" : ""} };\n}\n`;
+  code += `\nreturn { data: { ${data} }${script.head ? ", head" : ""}${script.layoutProps ? ", layoutProps" : ""} };\n}\n`;
   for (const statement of moved) {
     mapped(block.slice(statement.start, statement.end), statement.start);
     code += "\n";
@@ -59,7 +59,7 @@ export function serverScriptModule(source: string, filename: string): { readonly
     mapped(block.slice(route.initializerStart, route.initializerEnd), route.initializerStart);
     code += ";\n";
   }
-  code += `export const route = __meeko_definePageBody(${route && route.initializerEnd > route.initializerStart ? "__meeko_route" : "undefined"}, __meeko_body, ${script.head !== undefined});\n`;
+  code += `export const route = __meeko_definePageBody(${route && route.initializerEnd > route.initializerStart ? "__meeko_route" : "undefined"}, __meeko_body, ${script.head !== undefined}${script.layoutProps ? ", true" : ""});\n`;
   return { code, map: sourceMapForCompiled(code, source, filename, mappings) };
 }
 
@@ -67,27 +67,38 @@ export function serverScriptModule(source: string, filename: string): { readonly
  * TypeScript copy of a `<script server>` for type checking, with the same
  * offsets as `text`, which starts at `textStart` in the `.meeko` file. With
  * top-level code, `usePage()` is typed from the route options and `routeId`,
- * implicit request APIs are imported and `head` is checked; declarations are
+ * implicit request APIs are imported and `head` and `layoutProps` are checked; declarations are
  * appended after the block.
  */
 export function serverScriptTypes(text: string, textStart: number, script: ServerScript, routeId: string | undefined): string {
   if (!script.body) return text;
   let code = text;
-  for (const entry of script.usePageImports) {
+  // `data` of the route options has the type of the exports, which depend on `usePage()`: it reads a
+  // copy with the `params` and `search` of the options, or `route` would depend on itself (TS7022).
+  const request = script.route?.request;
+  const definePages = request === undefined ? [] : script.definePageImports ?? [];
+  for (const entry of [...script.usePageImports, ...definePages]) {
     const start = entry.start - textStart;
     const end = entry.end - textStart;
     if (start < 0 || end > code.length) continue;
     code = code.slice(0, start) + blank(code.slice(start, end)) + code.slice(end);
   }
   const framework = JSON.stringify(frameworkModule);
-  const request = `import(${framework}).PageRequestOf<${script.route ? "typeof route" : "undefined"}, ${JSON.stringify(routeId ?? "")}>`;
+  const pageRequest = `import(${framework}).PageRequestOf<${request !== undefined ? "typeof __meeko_request_route" : script.route ? "typeof route" : "undefined"}, ${JSON.stringify(routeId ?? "")}>`;
   const lines = [""];
+  if (request !== undefined) lines.push(`declare const __meeko_definePage: typeof import(${framework}).definePage;`, `const __meeko_request_route = __meeko_definePage(${request});`);
   const locals = new Set(script.usePageImports.map((entry) => entry.local));
   if (script.implicit.includes("usePage")) locals.add("usePage");
-  for (const local of locals) lines.push(`declare function ${local}(): ${request};`);
+  for (const local of locals) lines.push(`declare function ${local}(): ${pageRequest};`);
+  // `data` in the route options, the exports as the page sees them: `layoutProps: ({ data }) => …`.
+  const definePageLocals = new Set(definePages.map((entry) => entry.local));
+  if (request !== undefined && script.implicitDefinePage) definePageLocals.add("definePage");
+  const exportsType = `{ ${script.exports.map((binding) => `readonly ${binding.name}: import(${framework}).ServerData<Awaited<typeof ${binding.name}>>`).join("; ")} }`;
+  for (const local of definePageLocals) lines.push(`declare const ${local}: import(${framework}).PageBodyDefinePage<${exportsType}>;`);
   const imported = script.implicit.filter((api) => api !== "usePage");
   if (imported.length) lines.push(`import { ${imported.join(", ")} } from ${framework};`);
   if (script.head) lines.push(`void (head satisfies import(${framework}).PageBodyHead);`);
+  if (script.layoutProps) lines.push(`void (layoutProps satisfies import(${framework}).PageBodyLayoutProps<${script.route ? "typeof route" : "undefined"}, typeof layoutProps>);`);
   lines.push("export {};", "");
   return code + lines.join("\n");
 }

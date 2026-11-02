@@ -78,7 +78,7 @@ describe("interface Props extends the ComponentProps of a component", () => {
     await mkdir(resolve(".meeko"), { recursive: true });
     root = await mkdtemp(resolve(".meeko", "props-extends-"));
     await writeFile(join(root, "package.json"), '{"private":true,"type":"module"}\n');
-    await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { strict: true, types: ["node"], paths: { "@meekojs/meeko/internal": ["../../src/internal.ts"], "@meekojs/meeko": ["../../src/index.ts"] } } }));
+    await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { strict: true, types: ["node"], paths: { "@meekojs/meeko/internal": ["../../src/internal.ts"], "@meekojs/meeko/framework": ["../../src/framework.ts"], "@meekojs/meeko": ["../../src/index.ts"] } } }));
     for (const [name, source] of Object.entries(children)) await writeFile(join(root, `${name}.meeko`), source);
     project = new MeekoProject(root, { trusted: false });
     await project.ready();
@@ -153,6 +153,36 @@ void value; void wrong;
       assert.deepEqual(editor, [message]);
     });
   }
+
+  // Not about props, but the same two checkers: `data` of route options beside top-level server code.
+  test("data of the route options is typed from the exports of the page", async () => {
+    await mkdir(join(root, "app", "pages"), { recursive: true });
+    const server = (options: string, imports = ""): string => `<script server lang="ts">
+${imports}export const route = definePage(${options});
+const { params } = usePage();
+const row = await Promise.resolve({ title: String(params.id), count: 1 });
+export const title = row.title;
+export const count = row.count;
+</script>
+<script lang="ts">
+const props = defineProps<{ params: { id: string }; data: { title: string; count: number } }>();
+</script>
+<template><p>{props.data.title}</p></template>`;
+    const page = async (name: string, source: string): Promise<{ check: string[]; editor: string[] }> => {
+      const file = join(root, "app", "pages", `${name}.meeko`);
+      await writeFile(file, source);
+      const check = await checkSource(source, file);
+      assert.ok(project.setDocument(file, source), String(project.componentError(file)));
+      const editor = await componentDiagnostics(project, TextDocument.create(pathToFileURL(file).href, "meeko", 1, source), file, () => undefined);
+      return { check: check.map((item) => `${item.code}: ${item.message}`), editor: editor.map((item) => `${String(item.code)}: ${item.message}`) };
+    };
+    const typed = "{ layoutProps: ({ data }) => ({ title: data.title.toUpperCase(), count: data.count + 1 }) }";
+    assert.deepEqual(await page("[id]", server(typed)), { check: [], editor: [] });
+    assert.deepEqual(await page("[id]", server(typed, 'import { definePage } from "@meekojs/meeko/framework";\n')), { check: [], editor: [] });
+    const wrong = await page("[id]", server("{ layoutProps: ({ data }) => ({ title: data.missing }) }"));
+    assert.ok(wrong.check.some((item) => item.startsWith("TS2339") && item.includes("missing")), wrong.check.join("\n"));
+    assert.ok(wrong.editor.some((item) => item.startsWith("TS2339") && item.includes("missing")), wrong.editor.join("\n"));
+  });
 
   test("the proposed type keeps the variants of the union", async () => {
     assert.deepEqual(await report("UnionWrapper", unionWrapper), { check: [], editor: [] });

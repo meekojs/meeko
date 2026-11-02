@@ -96,11 +96,35 @@ const props = defineProps<{ data: { n: number } }>();
   assert.equal(contracts.match(/__CheckLayoutProps<__WrittenLayoutProps<[^\n]*"app\/pages\/docs\/guide\.meeko"/g)?.length, 1);
   assert.equal(contracts.match(/"app\/pages\/docs\/\+group\.ts"/g)?.length, 1);
   const block = await readFile(join(root, ".meeko", "routes", "app", "pages", "docs", "[slug].meeko.route.ts"), "utf8");
-  assert.match(block, /PageRequestOf<typeof route, "\/docs\/\[slug\]">/);
+  assert.match(block, /PageRequestOf<typeof __meeko_request_route, "\/docs\/\[slug\]">/);
 
   // A wrong prop is still reported for the shared page file.
   await put(root, "app/pages/docs/[slug].meeko", body("1"));
   await assert.rejects(checkFrameworkProject(root), /Las layoutProps de app\/pages\/docs\/\[slug\]\.meeko no coinciden con las props del layout docs/);
+
+  // `export const layoutProps`, typed by its own values: with the inherited layout and with its own.
+  const exported = (title: string, route = ""): string => `<script server lang="ts">
+${route}const { params } = usePage();
+export const slug: string = params.slug;
+const title = ${title};
+export const layoutProps = { title };
+</script>
+<script lang="ts">
+const props = defineProps<{ params: { slug: string }; data: { slug: string } }>();
+</script>
+<template><p>{props.data.slug}</p></template>
+`;
+  await put(root, "app/pages/docs/[slug].meeko", exported("params.slug"));
+  assert.deepEqual(await checkFrameworkProject(root), []);
+  await put(root, "app/pages/docs/[slug].meeko", exported("1"));
+  await assert.rejects(checkFrameworkProject(root), /Las layoutProps de app\/pages\/docs\/\[slug\]\.meeko no coinciden con las props del layout docs/);
+  const chosen = 'export const route = definePage({ layout: "docs" });\n';
+  await put(root, "app/pages/docs/[slug].meeko", exported("params.slug", chosen));
+  assert.deepEqual(await checkFrameworkProject(root), []);
+  await put(root, "app/pages/docs/[slug].meeko", exported("1", chosen));
+  await assert.rejects(checkFrameworkProject(root), /TS2322|TS2352|TS1360/);
+  await put(root, "app/pages/docs/[slug].meeko", exported("params.slug", chosen).replace("{ title }", "{ title, unknownProp: 1 }"));
+  await assert.rejects(checkFrameworkProject(root), /TS2322|TS2352|TS1360/);
 });
 
 test("extendModuleRoutes validates each result and keeps the routes without extenders", () => {
