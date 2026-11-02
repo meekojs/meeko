@@ -191,6 +191,12 @@ test('production i18n documentation renders guides, translates, switches locale 
 /** Spanish interface texts of the shell and of this site that an /en/ page must never contain. */
 const spanishInterface = ['Saltar al contenido', 'Buscar en la guía', 'Filtrar documentación', 'Ecosistema', 'Documentación', 'Menú', 'Paquete de Meeko', 'Licencia MIT', 'Destacado', 'No hay coincidencias', 'Copiar', 'Ejemplo .meeko', 'Propiedades', 'Tipo / valor inicial', 'Descripción', '¿Te sirvió', 'Añadir un comentario', 'Cerrar aviso', 'Cambiar tema', 'Tema:', 'Claro', 'Oscuro', 'Sistema', 'Idioma', 'Seguir en', 'Primeros pasos', 'Guías', 'Referencia', 'Nombre para traducir', 'Permiso del usuario', 'Moneda', 'Resultado traducido', 'Esta página no existe', 'Ir a la instalación']
 
+/** The only Spanish a copiable example of an /en/ page may show: the catalogs that teach the source language. */
+const sourceCatalogTexts = ['Hola {name}', 'Hola ', 'Listo para traducir', 'Tu cesta está vacía', '{count} elemento en tu cesta', '{count} elementos en tu cesta', '{name}, puedes administrar el proyecto.', '{name}, puedes consultar el proyecto.', 'Confirmar pedido', 'Tu pedido tiene {total} productos.']
+
+/** The accents of Spanish and its usual words, in the prose of a comment or in a text of an example. */
+const spanishCode = /[áéíóúñ¿¡]|\b(?:Por|por|defecto|Dentro|dentro|Sin|sin|Con|con|Un|Una|una|En|en tu|Tu|tu|Para|para|Sólo|Solo|Idioma|Catálogo|falta|requiere|clave|tres|sustituye|fragmentos|propiedades|español|inglés)\b/
+
 test('the English site has an English interface, hreflang, a switcher, /en links and an English sitemap', { timeout: 120_000 }, async (context) => {
 	const socket = createServer().listen(0, '127.0.0.1')
 	await once(socket, 'listening')
@@ -241,6 +247,11 @@ test('the English site has an English interface, hreflang, a switcher, /en links
 		assert.equal(await page.locator('html').getAttribute('lang'), 'en', route)
 		const texts = await interfaceTexts()
 		for (const spanish of spanishInterface) assert.ok(!texts.includes(spanish), `${route} shows the Spanish interface text «${spanish}»`)
+		// The copiable examples speak English too, except the catalogs that teach the source language.
+		const blocks = await page.locator('.meeko-ui-code-block pre').allInnerTexts()
+		const code = sourceCatalogTexts.reduce((text, allowed) => text.replaceAll(allowed, ''), blocks.join('\n'))
+		const spanishLine = code.split('\n').find((line) => spanishCode.test(line))
+		assert.equal(spanishLine, undefined, `${route} shows Spanish in a copiable example`)
 		// Every page has its English prose: no untranslated notice.
 		assert.equal(await page.locator('.docs-untranslated').count(), 0, route)
 		const base = route === '/en' ? '/' : route.slice(3)
