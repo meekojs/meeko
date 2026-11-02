@@ -56,7 +56,7 @@
 		</div>
 		<h2>One foundation, your own identity</h2>
 		<p>Use semantic tokens to connect colors, surfaces and focus with your CSS variables. Defaults are configured per application; each component can override them with its props.</p>
-		<div class="directory">
+		<div class="directory meeko-ui-not-prose">
 			<MeekoLink to="/theming">
 				<strong>Theming and customization</strong>
 				<span>Light, dark and the colors your site already has.</span>

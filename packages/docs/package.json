@@ -13,8 +13,8 @@
 		"./metrics": "./src/metrics/state.ts",
 		"./metrics/plugin": "./src/metrics/plugin.ts",
 		"./metrics/server": "./src/metrics/server.ts",
-		"./state": "./src/runtime/state.ts",
-		"./theme": "./src/theme.ts"
+		"./shell": "./src/runtime/shell.ts",
+		"./state": "./src/runtime/state.ts"
 	},
 	"scripts": {
 		"build": "node scripts/build.mjs"

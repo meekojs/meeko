@@ -14,7 +14,8 @@
 			"docsOf": "Documentación de {product}",
 			"featured": "Destacado",
 			"empty": "No hay coincidencias. Prueba con otro nombre.",
-			"menu": "Menú"
+			"menu": "Menú",
+			"contents": "Contenidos"
 		},
 		"search": {
 			"label": "Buscar en la guía",
@@ -36,7 +37,15 @@
 				}
 			},
 			"stay": "Seguir en {language}",
-			"suggestion": "Sugerencia de idioma"
+			"suggestion": "Sugerencia de idioma",
+			"message": {
+				"select": "locale",
+				"forms": {
+					"es": "Esta página también está en español.",
+					"en": "This page is also available in English.",
+					"other": "{language}"
+				}
+			}
 		},
 		"untranslated": {
 			"title": "Página sin traducir",
@@ -80,6 +89,7 @@
 			"unknown": "Cambiar tema",
 			"cycle": "Tema: {current}. Cambiar a {next}",
 			"group": "Tema"
-		}
+		},
+		"edit": "Editar en GitHub: {source}"
 	}
 }

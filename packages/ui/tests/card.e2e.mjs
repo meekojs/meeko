@@ -81,7 +81,7 @@ test('UICard hydrates snippets, changes variants and supports both themes and mo
 	assert.notEqual(styles.outline.color, styles.solid.color)
 	assert.equal(styles.outline.shadow, 'none')
 	assert.notEqual(styles.elevated.shadow, 'none')
-	// The docs' own ".doc-page p" rule is more specific than the classes of the card: on a solid, the text must still be the card's.
+	// The reading styles of the page's <UIProse> stop at the card: on a solid, the text must still be the card's.
 	const solidText = await page
 		.locator('.meeko-ui-card[data-variant="solid"]')
 		.last()

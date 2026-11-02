@@ -10,8 +10,8 @@
 	margin: 1.5rem 0;
 }
 .locale-actions [aria-current='page'] {
-	border-color: var(--line-strong);
-	background: var(--surface);
+	border-color: var(--ui-color-border-strong);
+	background: var(--ui-color-surface);
 	pointer-events: none;
 }
 .locale-suggestion {
@@ -23,16 +23,16 @@
 }
 .translation-result {
 	margin: 1.5rem 0;
-	border: 1px solid var(--line-strong);
-	border-radius: var(--radius-l);
-	background: var(--surface);
+	border: 1px solid var(--ui-color-border-strong);
+	border-radius: var(--ui-radius-lg);
+	background: var(--ui-color-surface);
 	padding: clamp(1.25rem, 3vw, 2rem);
 }
 .translation-result h2 {
 	margin-top: 0;
 }
 .translation-result [data-output='greeting'] {
-	color: var(--ink);
+	color: var(--ui-color-text);
 	font-weight: 550;
 	font-size: 1.4rem;
 }
@@ -44,28 +44,28 @@
 }
 .translation-result dt {
 	margin-bottom: 0.5rem;
-	color: var(--muted);
+	color: var(--ui-color-text-soft);
 	font-size: 0.8rem;
 }
 .translation-result dd {
 	margin: 0;
-	color: var(--ink);
+	color: var(--ui-color-text);
 }
 .translation-controls select,
 .translation-controls input[type='range'] {
 	width: 100%;
-	accent-color: var(--accent);
+	accent-color: var(--ui-color-primary);
 }
 .translation-controls select {
-	border: 1px solid var(--line-strong);
-	border-radius: var(--radius-s);
-	background: var(--surface);
+	border: 1px solid var(--ui-color-border-strong);
+	border-radius: var(--ui-radius-md);
+	background: var(--ui-color-surface);
 	padding: 0.65rem 0.8rem;
-	color: var(--ink);
+	color: var(--ui-color-text);
 	font: inherit;
 }
 .translation-controls label {
-	color: var(--ink-soft);
+	color: var(--ui-color-text-soft);
 	font-size: 0.85rem;
 }
 .translation-result p {

@@ -105,7 +105,7 @@
 	}
 	.theme-toggle-preview .theme-toggle-status {
 		margin: 0;
-		color: var(--muted);
+		color: var(--ui-color-text-soft);
 		font-size: 0.875rem;
 	}
 </style>

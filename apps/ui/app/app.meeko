@@ -11,12 +11,12 @@
 	}))
 </script>
 <template>
-	<DocsShell
+	<DocsSiteShell
 		name="UI"
 		packageName="@meekojs/ui"
 		repository="https://github.com/meekojs/meeko/tree/main/packages/ui"
 		bind:navigation="groups"
 	>
 		<MeekoOutlet />
-	</DocsShell>
+	</DocsSiteShell>
 </template>

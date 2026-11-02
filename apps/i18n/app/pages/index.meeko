@@ -55,7 +55,7 @@
 		</div>
 		<h2>Del catálogo a la interfaz</h2>
 		<p>El módulo valida los idiomas al preparar la aplicación y genera el contrato de TypeScript. En SSR y en el navegador se utiliza el catálogo del idioma activo; los formateadores se reutilizan por opciones.</p>
-		<div class="directory">
+		<div class="directory meeko-ui-not-prose">
 			<a href="/messages">
 				<strong>Parámetros tipados</strong>
 				<span>Claves, argumentos y contratos entre idiomas.</span>

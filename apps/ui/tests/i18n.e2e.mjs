@@ -75,8 +75,8 @@ test('the English UI documentation has an English interface, hreflang, a switche
 		const texts = await interfaceTexts()
 		for (const spanish of spanishInterface) assert.ok(!texts.includes(spanish), `${route} shows the Spanish interface text «${spanish}»`)
 		// Every page has its English prose: no untranslated notice and no Spanish prose marked as such.
-		assert.equal(await page.locator('.doc-untranslated').count(), 0, route)
-		assert.equal(await page.locator('main[lang]').count(), 0, route)
+		assert.equal(await page.locator('.docs-untranslated').count(), 0, route)
+		assert.equal(await page.locator('.docs-page[lang]').count(), 0, route)
 		assert.deepEqual(
 			await page.locator('link[rel="alternate"][hreflang]').evaluateAll((links) => links.map((link) => `${link.getAttribute('hreflang')} ${link.href}`)),
 			['es', 'en', 'x-default'].map((hreflang) => `${hreflang} https://ui.meekojs.com${hreflang === 'en' ? route : guide}`),
@@ -89,11 +89,12 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	const switcher = page.getByRole('navigation', { name: 'Language', exact: true })
 	assert.deepEqual(await switcher.getByRole('link').evaluateAll((links) => links.map((link) => [link.getAttribute('href'), link.getAttribute('hreflang'), link.getAttribute('lang'), link.getAttribute('aria-current')])), [
 		['/buttons', 'es', 'es', null],
-		['/en/buttons', 'en', 'en', 'true'],
+		['/en/buttons', 'en', 'en', 'page'],
 	])
 	// The suggestion floats over the page and speaks the suggested language.
-	const suggestion = page.getByRole('status', { name: 'Language suggestion', exact: true })
+	const suggestion = page.getByRole('complementary', { name: 'Language suggestion', exact: true })
 	await suggestion.waitFor()
+	assert.equal(await suggestion.getByRole('status').innerText(), 'Esta página también está en español.')
 	assert.equal(await suggestion.getByRole('link', { name: 'Leer esta página en español', exact: true }).getAttribute('href'), '/buttons')
 	assert.equal(await suggestion.evaluate((element) => globalThis.getComputedStyle(element).position), 'fixed')
 	await page.screenshot({ path: output + '/en-buttons-desktop.png' })
@@ -101,7 +102,7 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	await suggestion.waitFor({ state: 'detached' })
 	await page.reload({ waitUntil: 'networkidle' })
 	assert.equal(await suggestion.count(), 0, 'a remembered choice hides the suggestion')
-	assert.match(await page.locator('.header-actions [data-meeko-theme-toggle] button').getAttribute('aria-label'), /^Theme: \w+\. Switch to \w+$/)
+	assert.match(await page.getByRole('banner').locator('[data-meeko-theme-toggle] button').getAttribute('aria-label'), /^Theme: \w+\. Switch to \w+$/)
 	// Same-locale navigation stays in the document and in English.
 	await page.evaluate(() => {
 		globalThis.uiDocumentMarker = 'same-locale'
@@ -168,7 +169,7 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	await page.goto(origin + '/en/modals', { waitUntil: 'networkidle' })
 	assert.equal(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth), true)
 	assert.equal(await page.getByRole('navigation', { name: 'Language', exact: true }).isVisible(), true)
-	await page.locator('.mobile-menu > summary').click()
+	await page.getByRole('button', { name: 'Contents', exact: true }).click()
 	await page.getByRole('searchbox', { name: 'Search the guide', exact: true }).fill('table')
 	await page.getByRole('navigation', { name: 'UI documentation', exact: true }).getByRole('link', { name: 'Table', exact: true }).click()
 	await page.waitForURL(origin + '/en/tables')

@@ -1,79 +1,31 @@
 <script lang="ts">
+	// The structure of every documentation site, on @meekojs/ui and with no data source of its own: what it
+	// paints comes in `view`, and what the reader changes goes out as an event.
 	import { useI18n } from '@meekojs/i18n'
 
-	import { metricsActive, normalizeQuery, sendMetric, storedQuery } from '../../../metrics/state'
-	import { moderateNavigation, useDocsModeration } from '../../../runtime/state'
+	import type { DocsShellView } from '../../../runtime/shell'
+
 	import * as DocsAnnouncements from './Announcements.meeko'
 	import * as DocsNavigation from './Navigation.meeko'
-	interface Item {
-		href: string
-		label: string
-		description: string
-		aliases?: readonly string[]
-	}
-	const props = defineProps<{ name: string; packageName: string; repository: string; navigation: readonly { title: string; items: readonly Item[] }[] }>()
+	import * as DocsUntranslated from './Untranslated.meeko'
 
-	const snippets = defineSnippets<{ default: [] }>()
+	const props = defineProps<{ view: DocsShellView }>()
 
-	const i18n = useI18n()
-	const { t } = i18n
-	// The shell speaks the language of its catalog (`shell.meta.lang`): the document's in es and en,
-	// Spanish in a demo locale such as ar, which declares the Spanish catalog. Its links point to the
-	// pages of that language, so a partial locale never links to pages it does not have.
+	const emit = defineEmits<{ queryChange: [query: string]; dismissAnnouncement: [id: number]; stayLocale: [] }>()
+
+	const snippets = defineSnippets<{ default: []; aside?: []; headerActions?: []; searchResults?: [] }>()
+
+	const { t } = useI18n()
+	// The shell speaks the language of its catalog: the document's in es and en, Spanish in a demo locale
+	// such as ar, which declares the Spanish catalog.
 	const shellLocale = t('shell.meta.lang')
-	const linkLocale = i18n.locales.includes(shellLocale) ? shellLocale : i18n.defaultLocale
-	const framework = 'https://meekojs.com' + (linkLocale === i18n.defaultLocale ? '' : '/' + linkLocale)
-	// Páginas ocultas y destacadas desde el dashboard (vacío sin base de datos). La moderación de un
-	// idioma usa sus URL públicas (`/en/…`), así que se aplica a los enlaces ya localizados.
-	const moderation = useDocsModeration()
-	const query = signal('')
-	const localized = computed(() => props.navigation.map((group) => ({ title: group.title, items: group.items.map((item) => ({ ...item, href: i18n.localePath(item.href, linkLocale) })) })))
-	const groups = computed(() =>
-		moderateNavigation(localized.value, moderation.value)
-			.map((group) => ({ ...group, items: group.items.filter((item) => (item.label + ' ' + item.description).toLocaleLowerCase(shellLocale).includes(query.value.trim().toLocaleLowerCase(shellLocale))) }))
-			.filter((group) => group.items.length),
-	)
 
-	// The reader's language as a suggestion, never a redirect: computed in the browser after
-	// hydration (cookie, then navigator.languages) and only for a version this page has. Staying
-	// keeps the current language in the cookie, so it is not offered again.
-	const suggestion = signal<string | undefined>(undefined)
-	onMounted(() => {
-		const preferred = i18n.suggestedLocale()
-		suggestion.value = preferred !== undefined && i18n.pageLocales().includes(preferred) ? preferred : undefined
+	const brand = computed(() => {
+		const { name, brandName, homeHref } = props.view.product
+		return { name: brandName ?? 'Meeko', ...(brandName ? {} : { product: name }), href: homeHref, image: { src: '/brand/meeko-logo.png', width: 28, height: 28 }, ariaLabel: t('shell.brand.home', { name }) }
 	})
-	function stay(): void {
-		i18n.rememberLocale(i18n.locale)
-		suggestion.value = undefined
-	}
-
-	// The filter is a search of the guide: once the reader stops typing for 1.5 s (never per key), its
-	// normalized query and the pages it matched are counted, once per query. A query that looks like
-	// personal data or a secret is never sent (the server drops it too).
-	let searchTimer: ReturnType<typeof setTimeout> | undefined
-	let recorded = ''
-	function recordSearch() {
-		if (searchTimer !== undefined) clearTimeout(searchTimer)
-		searchTimer = undefined
-		const text = storedQuery(query.value)
-		if (text.length < 2 || text === recorded || !metricsActive()) return
-		recorded = text
-		sendMetric('/api/docs/search', { q: text, locale: linkLocale === 'en' ? 'en' : 'es', results: groups.value.reduce((count, group) => count + group.items.length, 0) })
-	}
-	onMounted(() => {
-		effect(() => {
-			const text = query.value
-			if (searchTimer !== undefined) clearTimeout(searchTimer)
-			searchTimer = normalizeQuery(text).length >= 2 ? setTimeout(recordSearch, 1500) : undefined
-		})
-		return () => {
-			if (searchTimer !== undefined) clearTimeout(searchTimer)
-		}
-	})
-
-	function closeMenu(event: MouseEvent) {
-		if (event.target instanceof Element && event.target.closest('a')) event.currentTarget instanceof Element && event.currentTarget.closest('details')?.removeAttribute('open')
-	}
+	const license = computed(() => [{ label: t('shell.footer.license'), href: 'https://github.com/meekojs/meeko/blob/main/LICENSE' }])
+	const hasToc = computed(() => (props.view.toc?.length ?? 0) > 0)
 </script>
 
 <template>
@@ -82,151 +34,122 @@
 		bind:lang="shellLocale"
 	>
 		<UIApp>
-			<a
-				class="skip-link"
-				href="#contenido"
+			<UIPage
+				layout="docs"
+				bind:skipLabel="t('shell.skip')"
+				bind:mainLang="props.view.locale.fallback ? props.view.locale.content : undefined"
 			>
-				{t('shell.skip')}
-			</a>
-			<header class="site-header">
-				<a
-					class="brand"
-					bind:href="i18n.localePath('/', linkLocale)"
-					bind:aria-label="t('shell.brand.home', { name: props.name })"
-				>
-					<img
-						src="/brand/meeko-logo.png"
-						width="28"
-						height="28"
-						alt=""
-					/>
-					<span>
-						<span class="brand-word">Meeko</span>
-						<strong>{props.name}</strong>
-					</span>
-				</a>
-				<nav
-					class="top-nav"
-					bind:aria-label="t('shell.nav.ecosystem')"
-				>
-					<a bind:href="i18n.localePath('/installation', linkLocale)">{t('shell.nav.docs')}</a>
-					<a bind:href="framework">{t('shell.nav.framework')}</a>
-					<a bind:href="props.repository">GitHub</a>
-				</nav>
-				<div class="header-actions">
-					<nav
-						if:when="i18n.pageLocales().length > 1"
-						class="locale-switch"
-						bind:aria-label="t('shell.locale.label')"
+				<snippet name="header">
+					<UIHeader
+						bind:brand="brand.value"
+						bind:items="props.view.product.links"
+						bind:label="t('shell.nav.ecosystem')"
+						bind:menuLabel="t('shell.nav.menu')"
 					>
-						<a
-							each:of="i18n.pageLocales()"
-							each:as="code"
-							each:key="code"
-							bind:href="i18n.switchLocalePath(code)"
-							bind:hreflang="code"
-							bind:lang="code"
-							bind:aria-current="code === i18n.locale ? 'true' : undefined"
-						>
-							<span aria-hidden="true">{code}</span>
-							<span class="sr-only">{i18n.localeName(code)}</span>
-						</a>
-					</nav>
-					<UIThemeToggle />
-					<details class="mobile-menu">
-						<summary>{t('shell.nav.menu')}</summary>
-						<div
-							class="mobile-panel"
-							on:click="closeMenu"
-						>
-							<label
-								class="search-label"
-								for="mobile-docs-search"
-							>
-								{t('shell.search.label')}
-							</label>
-							<UIInput
-								id="mobile-docs-search"
-								type="search"
-								model="query"
-								bind:placeholder="t('shell.search.placeholder')"
+						<snippet name="actions">
+							<render
+								if:when="snippets.searchResults && props.view.search?.mode === 'dialog'"
+								snippet="snippets.searchResults"
 							/>
-							<DocsNavigation
-								bind:groups="groups.value"
-								bind:product="props.name"
+							<render
+								if:when="snippets.headerActions"
+								snippet="snippets.headerActions"
 							/>
-						</div>
-					</details>
-				</div>
-			</header>
-			<DocsAnnouncements />
-			<UIContainer
-				size="3xl"
-				gutter="none"
-				class="site-layout"
-			>
-				<aside
-					id="docs-navigation"
-					class="sidebar"
+							<UILocaleSwitcher
+								bind:items="props.view.locales"
+								bind:label="t('shell.locale.label')"
+							/>
+							<UIThemeToggle />
+						</snippet>
+					</UIHeader>
+				</snippet>
+				<snippet
+					if:when="props.view.announcements.length > 0"
+					name="notices"
 				>
-					<label
-						class="search-label"
-						for="docs-search"
-					>
-						{t('shell.search.label')}
-					</label>
-					<UIInput
-						id="docs-search"
-						type="search"
-						model="query"
-						bind:placeholder="t('shell.search.placeholder')"
+					<DocsAnnouncements
+						bind:items="props.view.announcements"
+						on:dismiss="(id) => emit('dismissAnnouncement', id)"
 					/>
-					<DocsNavigation
-						bind:groups="groups.value"
-						bind:product="props.name"
-					/>
-					<a
-						class="sidebar-package"
-						bind:href="'https://www.npmjs.com/package/' + props.packageName"
+				</snippet>
+				<snippet name="bar">
+					<UIDrawer
+						bind:title="t('shell.nav.contents')"
+						bind:triggerLabel="t('shell.nav.contents')"
 					>
-						<code>{props.packageName}</code>
-						<span>{t('shell.package')}</span>
-					</a>
-				</aside>
-				<div class="page-content">
-					<render snippet="snippets.default" />
-					<footer class="site-footer">
-						<span>{t('shell.footer.tagline', { name: props.name })}</span>
-						<a href="https://github.com/meekojs/meeko/blob/main/LICENSE">{t('shell.footer.license')}</a>
-					</footer>
-				</div>
-			</UIContainer>
-			<div
-				if:when="suggestion.value"
-				class="locale-suggestion"
-				role="status"
-				bind:aria-label="t('shell.locale.suggestion')"
-			>
-				<svg
-					viewBox="0 0 16 16"
-					aria-hidden="true"
+						<DocsNavigation
+							searchId="docs-search-mobile"
+							bind:view="props.view"
+							on:queryChange="(query) => emit('queryChange', query)"
+						/>
+					</UIDrawer>
+				</snippet>
+				<snippet name="sidebar">
+					<div id="docs-navigation">
+						<DocsNavigation
+							searchId="docs-search"
+							bind:view="props.view"
+							on:queryChange="(query) => emit('queryChange', query)"
+						/>
+					</div>
+				</snippet>
+				<snippet
+					if:when="hasToc.value || snippets.aside"
+					name="aside"
 				>
-					<path d="M8 14.25A6.25 6.25 0 1 0 8 1.75a6.25 6.25 0 0 0 0 12.5ZM1.75 8h12.5M8 1.75c1.6 1.7 2.4 3.8 2.4 6.25S9.6 12.55 8 14.25C6.4 12.55 5.6 10.45 5.6 8S6.4 3.45 8 1.75Z" />
-				</svg>
-				<a
-					bind:href="i18n.switchLocalePath(suggestion.value!)"
-					bind:hreflang="suggestion.value"
-					bind:lang="suggestion.value"
+					<UITableOfContents
+						if:when="hasToc.value"
+						bind:entries="props.view.toc ?? []"
+					/>
+					<render
+						if:when="snippets.aside"
+						snippet="snippets.aside"
+					/>
+				</snippet>
+				<UITableOfContents
+					if:when="hasToc.value"
+					variant="collapsible"
+					bind:entries="props.view.toc ?? []"
+				/>
+				<DocsUntranslated
+					if:when="props.view.locale.fallback && props.view.locale.originalHref"
+					bind:href="props.view.locale.originalHref!"
+					bind:hreflang="props.view.locale.content"
+				/>
+				<render snippet="snippets.default" />
+				<UIPageNavigation
+					if:when="props.view.pager"
+					bind:previous="props.view.pager?.previous"
+					bind:next="props.view.pager?.next"
+				/>
+				<UILink
+					if:when="props.view.edit"
+					variant="ghost"
+					size="sm"
+					rel="noopener"
+					bind:href="props.view.edit!.href"
 				>
-					{t('shell.locale.offer', { locale: suggestion.value!, language: i18n.localeName(suggestion.value!) })}
-				</a>
-				<button
-					type="button"
-					on:click="stay"
-				>
-					{t('shell.locale.stay', { language: i18n.localeName(i18n.locale) })}
-				</button>
-			</div>
+					{t('shell.edit', { source: props.view.edit!.source })}
+				</UILink>
+				<snippet name="footer">
+					<UIFooter
+						bind:items="license.value"
+						bind:label="t('shell.footer.license')"
+					>
+						<snippet name="legal">{t('shell.footer.tagline', { name: props.view.product.name })}</snippet>
+					</UIFooter>
+				</snippet>
+			</UIPage>
+			<UILocaleSuggestion
+				if:when="props.view.locale.suggested"
+				bind:items="props.view.locales"
+				bind:suggested="props.view.locale.suggested"
+				bind:label="t('shell.locale.suggestion')"
+				bind:message="t('shell.locale.message', { locale: props.view.locale.suggested!, language: props.view.locales.find((item) => item.code === props.view.locale.suggested)?.label ?? '' })"
+				bind:goLabel="t('shell.locale.offer', { locale: props.view.locale.suggested!, language: props.view.locales.find((item) => item.code === props.view.locale.suggested)?.label ?? '' })"
+				bind:stayLabel="t('shell.locale.stay', { language: props.view.locales.find((item) => item.current)?.label ?? '' })"
+				on:stay="() => emit('stayLocale')"
+			/>
 		</UIApp>
 	</div>
 </template>

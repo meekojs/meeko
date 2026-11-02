@@ -24,11 +24,16 @@
 		errorMessage: (failure) => ((failure as { status?: number }).status === 429 ? t('shell.feedback.rateLimited') : t('shell.feedback.failed')),
 	})
 	const returnTo = computed(() => String(route.url.value).split('#')[0] + '#docs-feedback')
-	const length = computed(() => form.fields.comment.value?.length ?? 0)
+	const comment = signal(untrack(() => form.fields.comment.value ?? ''))
+	effect(() => {
+		form.fields.comment.value = comment.value
+	})
+	const length = computed(() => comment.value.length)
 	const over = computed(() => length.value > metricsLimits.comment)
 	const answered = computed(() => form.submitted.value)
 	// The schema's messages are Spanish: the widget shows its own text for each field in error.
-	const fieldError = computed(() => (form.errors.value.comment ? t('shell.feedback.commentTooLong', { max: metricsLimits.comment }) : form.errors.value.helpful ? t('shell.feedback.helpfulRequired') : undefined))
+	const commentError = computed(() => (over.value || form.errors.value.comment ? t('shell.feedback.commentTooLong', { max: metricsLimits.comment }) : undefined))
+	const helpfulError = computed(() => (form.errors.value.helpful ? t('shell.feedback.helpfulRequired') : undefined))
 </script>
 
 <template>
@@ -40,16 +45,19 @@
 		data-pagefind-ignore
 		bind:lang="t('shell.meta.lang')"
 	>
-		<p
-			class="thanks"
-			role="status"
-		>
-			{answered.value ? t('shell.feedback.thanks') : ''}
-		</p>
+		<div role="status">
+			<UIAlert
+				if:when="answered.value"
+				tone="success"
+				role="none"
+				bind:description="t('shell.feedback.thanks')"
+			/>
+		</div>
 		<form
 			if:when="!answered.value"
 			method="post"
 			novalidate
+			class="docs-feedback-form"
 			bind:action="action"
 			on:submit="form.submit"
 		>
@@ -63,219 +71,103 @@
 				name="path"
 				bind:value="form.fields.path.value"
 			/>
-			<div class="question">
+			<div class="docs-feedback-question">
 				<h2 id="docs-feedback-title">{t('shell.feedback.title')}</h2>
 				<div
-					class="answers"
+					class="docs-feedback-answers"
 					role="group"
 					aria-labelledby="docs-feedback-title"
 				>
-					<button
+					<UIButton
 						type="submit"
 						name="helpful"
 						value="true"
+						variant="outline"
+						size="sm"
 						bind:disabled="form.pending.value || over.value"
 						on:click="() => (form.fields.helpful.value = true)"
 					>
-						<svg
-							viewBox="0 0 16 16"
-							aria-hidden="true"
-						>
-							<path d="m3.25 8.5 3 3 6.5-7" />
-						</svg>
 						{t('shell.feedback.yes')}
-					</button>
-					<button
+					</UIButton>
+					<UIButton
 						type="submit"
 						name="helpful"
 						value="false"
+						variant="outline"
+						size="sm"
 						bind:disabled="form.pending.value || over.value"
 						on:click="() => (form.fields.helpful.value = false)"
 					>
-						<svg
-							viewBox="0 0 16 16"
-							aria-hidden="true"
-						>
-							<path d="m4 4 8 8M12 4l-8 8" />
-						</svg>
 						{t('shell.feedback.no')}
-					</button>
+					</UIButton>
 				</div>
 			</div>
-			<details
-				class="comment"
-				bind:open="Boolean(form.fields.comment.value) || Boolean(form.errors.value.comment)"
+			<UIDisclosure
+				bind:summary="t('shell.feedback.addComment')"
+				bind:open="Boolean(comment.value) || Boolean(commentError.value)"
 			>
-				<summary>{t('shell.feedback.addComment')}</summary>
-				<label for="docs-feedback-comment">{t('shell.feedback.commentLabel')}</label>
-				<textarea
+				<UIField
 					id="docs-feedback-comment"
-					name="comment"
-					rows="3"
-					aria-describedby="docs-feedback-counter docs-feedback-hint"
-					bind:value="form.fields.comment.value ?? ''"
-					bind:aria-invalid="over.value || form.errors.value.comment ? 'true' : undefined"
-					on:input="(event) => (form.fields.comment.value = (event.currentTarget as HTMLTextAreaElement).value)"
-				/>
-				<p
-					id="docs-feedback-counter"
-					class="counter"
-					bind:data-over="over.value ? 'true' : undefined"
+					bind:label="t('shell.feedback.commentLabel')"
+					bind:error="commentError.value"
+					bind:hint="t('shell.feedback.hint')"
+					bind:counter="t('shell.feedback.counter', { length: length.value, max: metricsLimits.comment })"
 				>
-					{t('shell.feedback.counter', { length: length.value, max: metricsLimits.comment })}
-				</p>
-				<p
-					id="docs-feedback-hint"
-					class="hint"
-				>
-					{t('shell.feedback.hint')}
-				</p>
-			</details>
-			<p
-				if:when="fieldError.value"
-				class="error"
-				role="alert"
-			>
-				{fieldError.value}
-			</p>
-			<p
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UITextarea
+							name="comment"
+							model="comment"
+							bind:rows="3"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:invalid="Boolean(commentError.value)"
+						/>
+					</snippet>
+				</UIField>
+			</UIDisclosure>
+			<UIAlert
+				if:when="helpfulError.value"
+				tone="danger"
+				bind:description="helpfulError.value"
+			/>
+			<UIAlert
 				if:when="form.error.value"
-				class="error"
-				role="alert"
-			>
-				{form.error.value}
-			</p>
+				tone="danger"
+				bind:description="form.error.value"
+			/>
 		</form>
 	</section>
 </template>
 
 <style scoped>
 	.docs-feedback {
-		margin-top: 3rem;
-		border-top: 1px solid var(--line);
-		padding-top: 1.5rem;
-		scroll-margin-top: calc(var(--header-height, 4rem) + 1rem);
+		margin-block-start: var(--ui-space-12);
+		border-block-start: var(--ui-border-width) solid var(--ui-color-border);
+		padding-block-start: var(--ui-space-6);
+		max-width: var(--ui-prose-width);
 	}
-	.thanks:empty {
-		display: none;
+	.docs-feedback-form {
+		display: grid;
+		gap: var(--ui-space-3);
 	}
-	.thanks {
-		margin: 0;
-		color: var(--ink-soft);
-		font-size: 0.95rem;
-	}
-	.question {
+	.docs-feedback-question {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 0.75rem 1.25rem;
+		gap: var(--ui-space-3) var(--ui-space-5);
 	}
 	h2 {
 		margin: 0;
-		font-weight: 560;
-		font-size: 1rem;
-		letter-spacing: -0.005em;
+		color: var(--ui-color-text);
+		font-weight: var(--ui-font-weight-semibold);
+		font-size: var(--ui-font-size-lg);
+		line-height: var(--ui-line-height-snug);
 	}
-	.answers {
+	.docs-feedback-answers {
 		display: flex;
-		gap: 0.5rem;
-	}
-	button {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-		transition:
-			border-color 0.15s,
-			background-color 0.15s,
-			color 0.15s;
-		cursor: pointer;
-		border: 1px solid var(--line-strong);
-		border-radius: 999px;
-		background: var(--surface);
-		padding: 0.35rem 0.95rem 0.35rem 0.75rem;
-		color: var(--ink);
-		font: 520 0.9rem/1.4 var(--font-ui);
-	}
-	button:hover:not(:disabled) {
-		border-color: var(--accent-line);
-		background: var(--surface-2);
-	}
-	button:focus-visible,
-	summary:focus-visible,
-	textarea:focus-visible {
-		outline: 2px solid var(--accent);
-		outline-offset: 2px;
-	}
-	button:disabled {
-		opacity: 0.55;
-		cursor: not-allowed;
-	}
-	svg {
-		fill: none;
-		stroke: currentColor;
-		stroke-linecap: round;
-		stroke-linejoin: round;
-		stroke-width: 1.6;
-		width: 14px;
-		height: 14px;
-	}
-	.comment {
-		margin-top: 0.875rem;
-	}
-	summary {
-		cursor: pointer;
-		border-radius: 4px;
-		width: fit-content;
-		color: var(--muted);
-		font-size: 0.875rem;
-	}
-	summary:hover {
-		color: var(--ink-soft);
-	}
-	label {
-		display: block;
-		margin: 0.75rem 0 0.375rem;
-		color: var(--ink-soft);
-		font-size: 0.875rem;
-	}
-	textarea {
-		box-sizing: border-box;
-		border: 1px solid var(--line-strong);
-		border-radius: var(--radius-s);
-		background: var(--surface);
-		padding: 0.6rem 0.75rem;
-		width: 100%;
-		max-width: 40rem;
-		min-height: 5.5rem;
-		resize: vertical;
-		color: var(--ink);
-		caret-color: var(--accent);
-		font: 0.92rem/1.55 var(--font-ui);
-	}
-	textarea[aria-invalid='true'] {
-		border-color: var(--danger);
-	}
-	.counter,
-	.hint {
-		margin: 0.375rem 0 0;
-		max-width: 40rem;
-		color: var(--muted);
-		font-size: 0.8rem;
-	}
-	.counter {
-		font-variant-numeric: tabular-nums;
-	}
-	.counter[data-over='true'],
-	.error {
-		color: var(--danger);
-	}
-	.error {
-		margin: 0.75rem 0 0;
-		font-size: 0.875rem;
-	}
-	@media (prefers-reduced-motion: reduce) {
-		button {
-			transition: none;
-		}
+		gap: var(--ui-space-2);
 	}
 </style>

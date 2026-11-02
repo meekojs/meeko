@@ -55,7 +55,7 @@
 		</div>
 		<h2>Una base, tu propia identidad</h2>
 		<p>Usa tokens semánticos para conectar colores, superficies y foco con tus variables CSS. Los valores por defecto se configuran por aplicación; cada componente puede sobrescribirlos con sus props.</p>
-		<div class="directory">
+		<div class="directory meeko-ui-not-prose">
 			<a href="/theming">
 				<strong>Temas y personalización</strong>
 				<span>Claro, oscuro y los colores que ya tiene tu web.</span>

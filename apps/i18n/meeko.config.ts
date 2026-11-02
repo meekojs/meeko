@@ -1,5 +1,4 @@
 import { defineMeekoConfig } from '@meekojs/meeko/framework'
-import { docsTheme } from 'meeko-docs/theme'
 
 export default defineMeekoConfig({
 	theme: { default: 'dark' },
@@ -8,7 +7,6 @@ export default defineMeekoConfig({
 	// meeko-docs sirve /sitemap.xml con la moderación vigente: un `sitemap: true` estático lo taparía.
 	site: 'https://i18n.meekojs.com',
 	modules: ['@meekojs/ui', 'meeko-docs', '@meekojs/i18n'],
-	ui: docsTheme,
 	// site: la moderación y los avisos del dashboard (DATABASE_URL, opcional).
 	docs: { site: 'i18n' },
 	i18n: {

@@ -131,20 +131,20 @@
 		font-size: 0.875rem;
 	}
 	.container-controls select {
-		border: 1px solid var(--line-strong);
-		border-radius: var(--radius-s);
-		background: var(--surface);
+		border: 1px solid var(--ui-color-border-strong);
+		border-radius: var(--ui-radius-md);
+		background: var(--ui-color-surface);
 		padding: 0.6rem 0.8rem;
-		color: var(--ink);
+		color: var(--ui-color-text);
 		font: inherit;
 	}
 	.container-preview {
-		border-block: 1px solid var(--line);
+		border-block: 1px solid var(--ui-color-border);
 		padding-block: 2rem;
 	}
 	.container-example {
-		border-inline: 1px dashed var(--accent);
-		background: var(--accent-soft);
+		border-inline: 1px dashed var(--ui-color-primary);
+		background: var(--ui-color-primary-soft);
 	}
 	.container-content {
 		padding-block: 2rem;

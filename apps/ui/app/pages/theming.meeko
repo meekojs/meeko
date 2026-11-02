@@ -20,17 +20,17 @@
 		</p>
 		<div class="token-list">
 			<div class="token-swatch">
-				<i style="background: var(--accent)" />
+				<i style="background: var(--ui-color-primary)" />
 				<strong>Acento</strong>
 				<code>--meeko-ui-accent</code>
 			</div>
 			<div class="token-swatch">
-				<i style="background: var(--pill)" />
+				<i style="background: var(--ui-color-primary-hover)" />
 				<strong>Acción principal</strong>
 				<code>--meeko-ui-primary</code>
 			</div>
 			<div class="token-swatch">
-				<i style="background: var(--surface-2)" />
+				<i style="background: var(--ui-color-surface)" />
 				<strong>Superficie</strong>
 				<code>--meeko-ui-surface</code>
 			</div>

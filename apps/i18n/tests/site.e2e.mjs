@@ -73,7 +73,7 @@ test('production i18n documentation renders guides, translates, switches locale 
 	assert.equal(new URL(page.url()).pathname, '/playground')
 	assert.deepEqual(await alternates(), ['es /playground', 'en /en/playground', 'ar /ar/playground', 'x-default /playground'])
 	// The shell offers it in the suggested language, floating over the page (no layout shift).
-	const suggestion = page.getByRole('status', { name: 'Sugerencia de idioma', exact: true })
+	const suggestion = page.getByRole('complementary', { name: 'Sugerencia de idioma', exact: true })
 	await suggestion.waitFor()
 	assert.equal(await suggestion.getByRole('link', { name: 'Read this page in English', exact: true }).getAttribute('href'), '/en/playground?tab=demo#messages')
 	assert.equal(await suggestion.evaluate((element) => globalThis.getComputedStyle(element).position), 'fixed')
@@ -86,7 +86,7 @@ test('production i18n documentation renders guides, translates, switches locale 
 	// The shell's language switcher keeps the page, its query and its fragment.
 	const switcher = page.getByRole('navigation', { name: 'Idioma', exact: true })
 	assert.deepEqual(await switcher.getByRole('link').evaluateAll((links) => links.map((link) => [link.getAttribute('hreflang'), link.getAttribute('href'), link.getAttribute('aria-current')])), [
-		['es', '/playground?tab=demo#messages', 'true'],
+		['es', '/playground?tab=demo#messages', 'page'],
 		['en', '/en/playground?tab=demo#messages', null],
 		['ar', '/ar/playground?tab=demo#messages', null],
 	])
@@ -124,8 +124,8 @@ test('production i18n documentation renders guides, translates, switches locale 
 	assert.equal(await page.locator('html').getAttribute('dir'), 'rtl')
 	assert.equal(await page.getByRole('region', { name: 'Resultado traducido' }).getAttribute('lang'), 'ar')
 	// The demo locale keeps the Spanish shell (its catalog), marked as Spanish and LTR.
-	assert.equal(await page.locator('.site-header').evaluate((element) => [element.closest('[lang]').getAttribute('lang'), globalThis.getComputedStyle(element).direction].join(' ')), 'es ltr')
-	assert.equal(await page.locator('.doc-untranslated').count(), 0, 'a demo locale shows the original without the notice')
+	assert.equal(await page.getByRole('banner').evaluate((element) => [element.closest('[lang]').getAttribute('lang'), globalThis.getComputedStyle(element).direction].join(' ')), 'es ltr')
+	assert.equal(await page.locator('.docs-untranslated').count(), 0, 'a demo locale shows the original without the notice')
 	// Arabic only has the playground (partial): its links point to the default version.
 	assert.equal(await page.getByRole('link', { name: 'idiomas y rutas', exact: true }).getAttribute('href'), '/routing')
 	assert.equal(await page.getByRole('region', { name: 'Resultado traducido' }).evaluate((element) => globalThis.getComputedStyle(element).direction), 'rtl')
@@ -134,22 +134,22 @@ test('production i18n documentation renders guides, translates, switches locale 
 	await page.setViewportSize({ width: 390, height: 844 })
 	assert.equal(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth), true)
 	await page.screenshot({ path: output + '/rtl-mobile.png', fullPage: true })
-	await page.locator('.mobile-menu > summary').click()
+	await page.getByRole('button', { name: 'Contenidos', exact: true }).click()
 	await page.getByRole('searchbox', { name: 'Buscar en la guía', exact: true }).fill('namespace')
 	const navigation = page.getByRole('navigation', { name: 'Documentación de i18n', exact: true })
 	await navigation.getByRole('link', { name: 'Namespaces', exact: true }).click()
 	await page.waitForURL(origin + '/namespaces')
 	await page.locator('[data-output="namespace"]').waitFor()
 	assert.equal(await page.locator('[data-output="namespace"]').innerText(), 'Tu pedido tiene 3 productos.')
-	assert.equal(await page.locator('.mobile-menu').getAttribute('open'), null)
+	assert.equal(await page.locator('dialog.meeko-ui-drawer:modal').count(), 0)
 	for (const locale of ['en', 'ar']) {
 		const ssr = await browser.newPage({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } })
 		await ssr.goto(origin + '/' + locale + '/playground')
 		assert.match(await ssr.locator('[data-output="greeting"]').innerText(), locale === 'en' ? /Hello Meeko/ : /مرحبًا/)
 		// The server renders the localized href, without JavaScript.
 		if (locale === 'en') assert.equal(await ssr.getByRole('link', { name: 'languages and routes', exact: true }).getAttribute('href'), '/en/routing')
-		await ssr.locator('.mobile-menu > summary').click()
 		const english = locale === 'en'
+		await ssr.getByRole('button', { name: english ? 'Contents' : 'Contenidos', exact: true }).click()
 		await ssr
 			.getByRole('navigation', { name: english ? 'i18n documentation' : 'Documentación de i18n', exact: true })
 			.getByRole('link', { name: english ? 'Installation' : 'Instalación', exact: true })
@@ -230,7 +230,7 @@ test('the English site has an English interface, hreflang, a switcher, /en links
 		const texts = await interfaceTexts()
 		for (const spanish of spanishInterface) assert.ok(!texts.includes(spanish), `${route} shows the Spanish interface text «${spanish}»`)
 		// Every page has its English prose: no untranslated notice.
-		assert.equal(await page.locator('.doc-untranslated').count(), 0, route)
+		assert.equal(await page.locator('.docs-untranslated').count(), 0, route)
 		const base = route === '/en' ? '/' : route.slice(3)
 		assert.deepEqual(
 			await page.locator('link[rel="alternate"][hreflang]').evaluateAll((links) => links.map((link) => `${link.getAttribute('hreflang')} ${link.href}`)),
@@ -239,14 +239,14 @@ test('the English site has an English interface, hreflang, a switcher, /en links
 			route,
 		)
 		// Internal links of the shell keep /en (the Arabic playground link of the lab is the exception).
-		const internal = await page.locator('.site-header a[href^="/"]:not([hreflang]), #docs-navigation a[href^="/"], main a[href^="/"]:not([hreflang])').evaluateAll((links) => links.map((link) => link.getAttribute('href')))
+		const internal = await page.locator('header.meeko-ui-header a[href^="/"]:not([hreflang]), #docs-navigation a[href^="/"], main a[href^="/"]:not([hreflang])').evaluateAll((links) => links.map((link) => link.getAttribute('href')))
 		for (const href of internal) assert.match(href, /^\/en(\/|$|\?)/, `${route} links to ${href}`)
 	}
 	await page.goto(origin + '/en/routing')
 	const switcher = page.getByRole('navigation', { name: 'Language', exact: true })
 	assert.deepEqual(await switcher.getByRole('link').evaluateAll((links) => links.map((link) => [link.textContent.replace(/\s+/g, ''), link.getAttribute('href'), link.getAttribute('hreflang'), link.getAttribute('lang'), link.getAttribute('aria-current')])), [
-		['esEspañol', '/routing', 'es', 'es', null],
-		['enEnglish', '/en/routing', 'en', 'en', 'true'],
+		['ESEspañol', '/routing', 'es', 'es', null],
+		['ENEnglish', '/en/routing', 'en', 'en', 'page'],
 	])
 	// The selector keeps its width: the active language does not move the header.
 	const widths = await switcher.getByRole('link').evaluateAll((links) => links.map((link) => link.getBoundingClientRect().width))
@@ -257,7 +257,7 @@ test('the English site has an English interface, hreflang, a switcher, /en links
 	assert.match(await page.evaluate(() => globalThis.document.cookie), /meeko-locale=es/)
 	// The theme switcher of the shell speaks English under /en.
 	await page.goto(origin + '/en/installation', { waitUntil: 'networkidle' })
-	assert.match(await page.locator('.header-actions [data-meeko-theme-toggle] button').getAttribute('aria-label'), /^Theme: \w+\. Switch to \w+$/)
+	assert.match(await page.getByRole('banner').locator('[data-meeko-theme-toggle] button').getAttribute('aria-label'), /^Theme: \w+\. Switch to \w+$/)
 	await page.getByRole('button', { name: 'Copy code' }).first().click()
 	// The 404 page of an English URL is English.
 	const missing = await page.goto(origin + '/en/does-not-exist')

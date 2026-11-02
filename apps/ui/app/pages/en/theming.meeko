@@ -21,17 +21,17 @@
 		</p>
 		<div class="token-list">
 			<div class="token-swatch">
-				<i style="background: var(--accent)" />
+				<i style="background: var(--ui-color-primary)" />
 				<strong>Accent</strong>
 				<code>--meeko-ui-accent</code>
 			</div>
 			<div class="token-swatch">
-				<i style="background: var(--pill)" />
+				<i style="background: var(--ui-color-primary-hover)" />
 				<strong>Primary action</strong>
 				<code>--meeko-ui-primary</code>
 			</div>
 			<div class="token-swatch">
-				<i style="background: var(--surface-2)" />
+				<i style="background: var(--ui-color-surface)" />
 				<strong>Surface</strong>
 				<code>--meeko-ui-surface</code>
 			</div>

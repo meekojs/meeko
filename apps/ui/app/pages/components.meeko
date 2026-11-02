@@ -48,7 +48,7 @@
 			each:key="group.title"
 		>
 			<h2>{group.title}</h2>
-			<div class="directory">
+			<div class="directory meeko-ui-not-prose">
 				<a
 					each:of="group.items"
 					each:as="item"

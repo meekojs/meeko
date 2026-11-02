@@ -12,12 +12,12 @@
 </script>
 
 <template>
-	<DocsShell
+	<DocsSiteShell
 		name="i18n"
 		packageName="@meekojs/i18n"
 		repository="https://github.com/meekojs/meeko/tree/main/packages/i18n"
 		bind:navigation="groups"
 	>
 		<MeekoOutlet />
-	</DocsShell>
+	</DocsSiteShell>
 </template>

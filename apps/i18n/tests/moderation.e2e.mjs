@@ -80,7 +80,7 @@ test('without a database the site works with its whole navigation and no announc
 	}
 	assert.equal(await page.locator('#docs-navigation a[href="/playground"]').count(), 1)
 	assert.equal(await page.locator('.docs-announcement').count(), 0)
-	assert.equal(await page.locator('.nav-featured').count(), 0)
+	assert.equal(await page.locator('#docs-navigation .meeko-ui-badge').count(), 0)
 	// As the pages: without moderation to read, the sitemap hides nothing.
 	const sitemap = await (await fetch(server.base + '/sitemap.xml')).text()
 	for (const route of ['/playground', '/en/playground', '/ar/playground']) assert.ok(sitemap.includes(`<loc>https://i18n.meekojs.com${route}</loc>`), route)
@@ -184,7 +184,7 @@ test('the shell hides, features and announces what the dashboard moderates', { s
 	assert.equal((await fetch(server.base + '/en/playground')).status, 200, 'a Spanish rule does not hide the English page')
 	assert.equal((await page.goto(server.base + '/messages', { waitUntil: 'networkidle' })).status(), 200, 'a rule of another site does not apply')
 	assert.equal(await nav.locator('a[href="/playground"]').count(), 0, 'not in the navigation')
-	assert.equal((await nav.locator('a[href="/messages"] .nav-featured').textContent())?.trim(), 'Destacado')
+	assert.equal((await nav.locator('a[href="/messages"] .meeko-ui-badge').textContent())?.trim(), 'Destacado')
 	const status = page.getByRole('status').filter({ hasText: notice.message })
 	await status.waitFor()
 	await page.screenshot({ path: join(output, 'moderation-desktop.png') })
@@ -237,7 +237,7 @@ test('the shell hides, features and announces what the dashboard moderates', { s
 	await page.goto(server.base + '/en/messages', { waitUntil: 'networkidle' })
 	assert.equal(await nav.locator('a[href="/en/plurals"]').count(), 0, 'not in the English navigation')
 	assert.equal(await nav.locator('a[href="/en/validation"]').count(), 0, 'a global rule hides it in English too')
-	assert.equal((await nav.locator('a[href="/en/rtl"] .nav-featured').textContent())?.trim(), 'Featured')
+	assert.equal((await nav.locator('a[href="/en/rtl"] .meeko-ui-badge').textContent())?.trim(), 'Featured')
 	await page.getByRole('status').filter({ hasText: englishNotice.message }).waitFor()
 	await page.getByRole('status').filter({ hasText: globalNotice.message }).waitFor()
 	assert.equal(await page.getByRole('status').filter({ hasText: notice.message }).count(), 0, 'a Spanish announcement stays out of the English site')

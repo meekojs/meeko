@@ -56,7 +56,7 @@
 		</div>
 		<h2>From the catalog to the interface</h2>
 		<p>The module validates the languages when the application is prepared and generates the TypeScript contract. In SSR and in the browser, the catalog of the active language is used; formatters are reused per options.</p>
-		<div class="directory">
+		<div class="directory meeko-ui-not-prose">
 			<MeekoLink to="/messages">
 				<strong>Typed parameters</strong>
 				<span>Keys, arguments and contracts between languages.</span>

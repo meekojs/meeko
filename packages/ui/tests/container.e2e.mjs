@@ -84,7 +84,8 @@ test('Container preserves semantics and fits mobile, 4K, wider and nested layout
 	assert.equal((await measure()).width, 500, 'the deprecated maximum still works')
 	assert.equal((await measure()).start, 20, 'the deprecated gutter still works')
 	await page.setViewportSize({ width: 3840, height: 2160 })
-	assert.equal(await page.locator('.site-layout').evaluate((element) => element.getBoundingClientRect().width), 1920, 'the public site uses the 3xl container')
+	// 96rem, the width of UIPage, on the fluid root of 20.8px at this size.
+	assert.ok(Math.abs((await page.locator('.meeko-ui-page-body').evaluate((element) => element.getBoundingClientRect().width)) - 96 * 20.8) < 1, 'the public site uses the width of UIPage, centered')
 	await page.screenshot({ path: output + '/container-4k.png' })
 	await page.setViewportSize({ width: 390, height: 844 })
 	assert.equal(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth), true)

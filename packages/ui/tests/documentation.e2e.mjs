@@ -41,17 +41,26 @@ test('public UI documentation renders every guide, navigates, copies code and va
 		await page.evaluate((value) => {
 			globalThis.document.documentElement.dataset.theme = value
 		}, theme)
+		// The guide paints with UI's tokens, pure white or pure black, with no palette of its own.
 		const palette = await page.evaluate(() => {
-			const style = globalThis.getComputedStyle(globalThis.document.documentElement)
-			return { ink: style.getPropertyValue('--ink').trim(), ui: style.getPropertyValue('--ui-color-text').trim() }
+			const root = globalThis.getComputedStyle(globalThis.document.documentElement)
+			const body = globalThis.getComputedStyle(globalThis.document.body)
+			const probe = globalThis.document.createElement('div')
+			probe.style.color = 'var(--ui-color-text)'
+			globalThis.document.body.append(probe)
+			const text = globalThis.getComputedStyle(probe).color
+			probe.remove()
+			return { old: root.getPropertyValue('--ink'), background: body.backgroundColor, color: body.color, text }
 		})
-		assert.equal(palette.ink, palette.ui)
+		assert.equal(palette.old, '')
+		assert.equal(palette.background, theme === 'light' ? 'rgb(255, 255, 255)' : 'rgb(0, 0, 0)')
+		assert.equal(palette.color, palette.text)
 	}
 	await page.setViewportSize({ width: 390, height: 844 })
-	await page.locator('.mobile-menu > summary').click()
+	await page.getByRole('button', { name: 'Contenidos', exact: true }).click()
 	await navigation.getByRole('link', { name: 'Field e Input', exact: true }).click()
 	await page.getByRole('heading', { name: 'Field e Input', level: 1 }).waitFor()
-	assert.equal(await page.locator('.mobile-menu').getAttribute('open'), null)
+	assert.equal(await page.locator('dialog.meeko-ui-drawer:modal').count(), 0)
 	await page.getByRole('button', { name: 'Guardar nombre', exact: true }).click()
 	await page.getByRole('alert').filter({ hasText: 'Escribe un nombre.' }).waitFor()
 	assert.equal(await page.locator('#name').getAttribute('aria-invalid'), 'true')
@@ -67,7 +76,7 @@ test('public UI documentation renders every guide, navigates, copies code and va
 	const ssr = await browser.newPage({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } })
 	await ssr.goto(origin + '/installation')
 	assert.equal(await ssr.getByRole('heading', { name: 'Instalación', level: 1 }).count(), 1)
-	await ssr.locator('.mobile-menu > summary').click()
+	await ssr.getByRole('button', { name: 'Contenidos', exact: true }).click()
 	await ssr.getByRole('navigation', { name: 'Documentación de UI', exact: true }).getByRole('link', { name: 'Todos los componentes', exact: true }).click()
 	assert.equal(await ssr.getByRole('heading', { name: 'Componentes', level: 1 }).count(), 1)
 	assert.deepEqual(errors, [])

@@ -1,44 +1,67 @@
 <script lang="ts">
+	// What the sidebar and the drawer of the small screens share: the filter, the guide and the package.
 	import { useI18n } from '@meekojs/i18n'
 
-	const props = defineProps<{ groups: readonly { title: string; items: readonly { href: string; label: string; aliases?: readonly string[]; featured?: boolean }[] }[]; product?: string }>({ product: 'UI' })
+	import type { DocsShellView } from '../../../runtime/shell'
 
-	const route = useRoute()
+	const props = defineProps<{ view: DocsShellView; searchId: string }>()
+
+	const emit = defineEmits<{ queryChange: [query: string] }>()
+
 	const { t } = useI18n()
+
+	const query = signal(untrack(() => props.view.search?.query ?? ''))
+	// The other copy of the filter, or a reset from the site, writes here without echoing the event.
+	effect(() => {
+		query.value = props.view.search?.query ?? ''
+	})
+	effect(() => {
+		const text = query.value
+		if (text !== untrack(() => props.view.search?.query ?? '')) emit('queryChange', text)
+	})
+
+	const packageGroups = computed(() => [{ title: t('shell.package'), items: [{ label: props.view.product.packageName ?? '', href: 'https://www.npmjs.com/package/' + props.view.product.packageName, code: true }] }])
 </script>
 
 <template>
-	<nav bind:aria-label="t('shell.nav.docsOf', { product: props.product })">
-		<section
-			each:of="props.groups"
-			each:as="group"
-			each:key="group.title"
-			class="nav-group"
+	<div class="docs-navigation">
+		<UIField
+			if:when="props.view.search?.mode === 'filter'"
+			bind:id="props.searchId"
+			bind:label="t('shell.search.label')"
 		>
-			<h2>{group.title}</h2>
-			<a
-				each:of="group.items"
-				each:as="item"
-				each:key="item.href"
-				bind:href="item.href"
-				bind:aria-current="route.path.value === item.href || item.aliases?.includes(route.path.value) ? 'page' : undefined"
+			<snippet
+				name="default"
+				params="id, describedBy"
 			>
-				{item.label}
-				<UIBadge
-					if:when="item.featured"
-					tone="accent"
-					class="nav-featured"
-				>
-					{t('shell.nav.featured')}
-				</UIBadge>
-			</a>
-		</section>
-		<p
-			if:when="!props.groups.length"
-			class="nav-empty"
-			role="status"
-		>
-			{t('shell.nav.empty')}
-		</p>
-	</nav>
+				<UIInput
+					type="search"
+					model="query"
+					bind:id="id"
+					bind:describedBy="describedBy"
+					bind:placeholder="t('shell.search.placeholder')"
+				/>
+			</snippet>
+		</UIField>
+		<UINavigationTree
+			bind:groups="props.view.navigation"
+			bind:current="props.view.current"
+			bind:label="t('shell.nav.docsOf', { product: props.view.product.name })"
+			bind:featuredLabel="t('shell.nav.featured')"
+			bind:emptyText="t('shell.nav.empty')"
+		/>
+		<UINavigationTree
+			if:when="props.view.product.packageName"
+			bind:collapsible="false"
+			bind:groups="packageGroups.value"
+			bind:label="t('shell.package')"
+		/>
+	</div>
 </template>
+
+<style scoped>
+	.docs-navigation {
+		display: grid;
+		gap: var(--ui-space-6);
+	}
+</style>

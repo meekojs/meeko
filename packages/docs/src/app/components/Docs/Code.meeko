@@ -4,38 +4,17 @@
 	const props = defineProps<{ code: string; label?: string }>()
 
 	const { t } = useI18n()
-
-	const status = signal('')
-	async function copy() {
-		try {
-			await navigator.clipboard.writeText(props.code)
-			status.value = t('shell.code.copied')
-		} catch {
-			status.value = t('shell.code.copyFailed')
-		}
-	}
 </script>
 
 <template>
-	<figure class="code-block">
-		<figcaption>
-			<span bind:lang="props.label === undefined ? t('shell.meta.lang') : undefined">{props.label ?? t('shell.code.label')}</span>
-			<button
-				type="button"
-				bind:lang="t('shell.meta.lang')"
-				bind:aria-label="t('shell.code.copyLabel')"
-				on:click="copy"
-			>
-				{t('shell.code.copy')}
-			</button>
-		</figcaption>
-		<pre tabindex="0"><code>{props.code}</code></pre>
-		<span
-			class="code-status"
-			role="status"
-			bind:lang="t('shell.meta.lang')"
-		>
-			{status.value}
-		</span>
-	</figure>
+	<UICodeBlock
+		bind:code="props.code"
+		bind:label="props.label ?? t('shell.code.label')"
+		bind:labelLang="props.label === undefined ? t('shell.meta.lang') : undefined"
+		bind:uiLang="t('shell.meta.lang')"
+		bind:copyLabel="t('shell.code.copy')"
+		bind:copyAriaLabel="t('shell.code.copyLabel')"
+		bind:copiedLabel="t('shell.code.copied')"
+		bind:copyFailedLabel="t('shell.code.copyFailed')"
+	/>
 </template>
