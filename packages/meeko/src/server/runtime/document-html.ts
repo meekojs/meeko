@@ -19,13 +19,16 @@ export function provideDocumentHtmlMarks(provider: () => Set<string> | undefined
  * Con la marca, el documento lleva en el payload un marcador en lugar del valor, y la hidratación
  * adopta el contenido del elemento sin leerlo ni reescribirlo. Las navegaciones de cliente siguen
  * recibiendo el valor completo. Si esa página vuelve a pintar el elemento, por ejemplo un `if:` que
- * se cierra y se abre, el navegador pide el valor al servidor: el DOM nunca aporta HTML.
+ * se cierra y se abre, el navegador pide el valor al servidor: el DOM nunca aporta HTML. Sólo inserta
+ * lo que esa respuesta declara marcado y coincide con el contenido del documento; si ya no está, por
+ * una nueva publicación o una redirección, no inserta nada y carga el documento de nuevo, una vez por
+ * minuto como mucho. Por eso no debe marcarse un HTML que cambia en cada petición si se vuelve a pintar.
  *
  * Sólo es para un valor que se lee en `html="..."`. **En el navegador de esa primera carga el valor
  * es el marcador**, así que `{doc.html.length}` o un `computed` que lo analice no darían lo mismo que
  * en el servidor: para eso, use `trustHtml` sin más. El valor viaja completo, como siempre, si
- * `html` no lo pintó en el documento (un `if:` cerrado) o si el SSR dejó el elemento vacío porque el
- * navegador sacaría su contenido. Fuera de una petición de página devuelve el valor sin marcarlo.
+ * `html` no lo pintó en el documento (un `if:` cerrado) o si el SSR dejó vacío alguno de sus elementos
+ * porque el navegador sacaría su contenido. Fuera de una petición de página devuelve el valor sin marcarlo.
  *
  * @param html HTML ya declarado de confianza con `trustHtml`.
  * @returns El mismo `html`, sin copiarlo.

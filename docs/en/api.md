@@ -1,5 +1,5 @@
 ---
-source-hash: c33282de1084da4a6890e1bd74b0f2c9e0eddbf76fa569e5f22020e764818dcc
+source-hash: 8e2abd33dca839838b26612bf690b0dcd1449cc71f0aad71c1ad9b762c1923f6
 ---
 
 # Meeko API
@@ -413,7 +413,7 @@ export const guide = { body: documentHtml(trustHtml("<h2>Guide</h2><p>A long art
 
 The document's payload carries a placeholder, and hydration adopts the element's content without reading or rewriting it. Client navigations receive the whole value. If the page paints the element again, such as an `if:` that closes and opens, the browser requests the value from the server: the DOM never provides HTML.
 
-It is not automatic because it changes what the browser sees on that first load: the value is the placeholder, so `{guide.body.length}` or a `computed` that analyzes it would not give the same as on the server. Mark it only if nothing else reads it. The value stays in the payload if `html` did not paint it in the document or if SSR left the element empty. See [`documentHtml`](/docs/reference/documenthtml).
+It is not automatic because it changes what the browser sees on that first load: the value is the placeholder, so `{guide.body.length}` or a `computed` that analyzes it would not give the same as on the server. Mark it only if nothing else reads it. The value stays in the payload if `html` did not paint it in the document or if SSR left any of its elements empty. If the page paints the element again, the browser requests the value from the server and only inserts the one that response declares marked; if it is gone, it loads the document again. See [`documentHtml`](/docs/reference/documenthtml).
 
 ### Lists with and without `each:key`
 

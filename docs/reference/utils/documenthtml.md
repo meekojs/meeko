@@ -65,7 +65,7 @@ export const items = ["<p>Primera</p>", "<p>Segunda</p>"].map((body, id) => ({ i
 
 ### Un elemento que se cierra y se abre
 
-Si la página vuelve a pintar el elemento, el navegador pide el valor al servidor con una petición de navegación de esa URL y lo inserta al llegar. Hasta entonces, el elemento queda vacío:
+Si la página vuelve a pintar el elemento, el navegador pide el valor al servidor con una petición de navegación de esa URL y lo inserta al llegar. Hasta entonces, el elemento queda vacío. La primera línea de una ruta `stream` ya basta: no espera a sus valores diferidos y cancela el resto de la respuesta:
 
 ```html
 <!-- app/pages/faq.meeko -->
@@ -140,10 +140,12 @@ export const body = documentHtml(trustHtml("<p>Hola</p>"));
 
 ## Notas
 
-- **Cuándo viaja completo.** Si `html` no lo pintó en el documento, como dentro de un `if:` cerrado, o si el SSR dejó el elemento vacío porque el navegador sacaría su contenido (un `<div>` en un `<p>`), el valor sigue en el payload. Un valor vacío tampoco se sustituye.
+- **Cuándo viaja completo.** Si `html` no lo pintó en el documento, como dentro de un `if:` cerrado, o si el SSR dejó vacío alguno de sus elementos porque el navegador sacaría su contenido (un `<div>` en un `<p>`), el valor sigue en el payload, aunque otro elemento sí lo muestre. Un valor vacío tampoco se sustituye.
 - **Por contenido.** La marca sigue al texto, porque un `string` no tiene identidad: cualquier otro dato de la página con exactamente el mismo texto también viaja como marcador. No marque un valor pequeño que pueda repetirse en otro dato.
-- **Seguridad.** El DOM nunca es el origen de un HTML: el navegador no lee el contenido del elemento para volver a pintarlo, sólo lo pide al servidor, en una ruta que el propio servidor escribió en el documento. Un valor que imita el marcador es un comentario sin efecto o, como mucho, nombra un HTML que el servidor ya declaró.
-- **Prerender y hosts estáticos.** El archivo `index.meeko.json` guarda el valor completo; el documento, el marcador.
-- **Caché.** El documento y su payload son una sola respuesta. Un documento antiguo en caché muestra su contenido y se hidrata igual, y la siguiente navegación recibe lo último que se publicó.
+- **Seguridad.** El DOM nunca es el origen de un HTML: el navegador no lee el contenido del elemento para volver a pintarlo, sólo lo pide al servidor. Y sólo inserta un valor que esa misma respuesta declare marcado con `documentHtml`, en `markedHtml`, y cuyo hash coincida con el que escribió el documento: ni una posición antigua ni otra ruta convierten un texto en HTML. Un valor que imita el marcador es un comentario sin efecto o, como mucho, nombra un HTML que el servidor declara marcado.
+- **Si el valor cambia de sitio.** Se reconoce por el hash de su contenido, así que en una lista reordenada cada elemento recupera su propio artículo.
+- **Si el valor ya no está.** Si se publicó otro contenido, se retiró, o la URL redirige, responde otra ruta, un `401`, `403`, `404` o `410`, o el documento en lugar del payload, no se inserta nada y el documento se carga de nuevo: se ve la página actual, o se llega a donde envíe el servidor, y se pierde el estado de cliente de esa página. Esa recarga ocurre una vez por minuto y URL como mucho. Si no basta, o `sessionStorage` no está disponible, el elemento queda vacío y el error llega a `onNavigationError` o `onError`. Un fallo de red o un `5xx` no recarga: avisa del error y el siguiente render del elemento lo reintenta.
+- **Un valor distinto en cada petición.** Una fecha o un identificador aleatorio dentro del HTML hacen que el valor nunca coincida, y volver a pintar el elemento acaba como en el caso anterior. Si la página vuelve a pintar ese elemento, no lo marque. En una página prerenderizada, el documento y el archivo salen de dos ejecuciones del loader, así que también deben dar el mismo HTML.
+- **Prerender y hosts estáticos.** El archivo `index.meeko.json` guarda el valor completo y su declaración; el documento, el marcador.
+- **Caché.** El documento y su payload son una sola respuesta. Un documento antiguo en caché muestra su contenido y se hidrata igual, y la siguiente navegación recibe lo último que se publicó. Si esa página vuelve a pintar el elemento, el documento se carga de nuevo.
 - **CSP.** No añade código en línea: el payload sigue siendo un bloque de datos, y `script-src` no necesita `unsafe-inline`.
-- **Sin servidor de Meeko.** Si la URL no responde al payload de navegación y devuelve el documento, volver a pintar el elemento recarga la página.

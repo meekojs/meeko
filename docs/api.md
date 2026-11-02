@@ -409,7 +409,7 @@ export const guide = { body: documentHtml(trustHtml("<h2>Guía</h2><p>Un artícu
 
 El payload del documento lleva un marcador, y la hidratación adopta el contenido del elemento sin leerlo ni reescribirlo. Las navegaciones de cliente reciben el valor completo. Si la página vuelve a pintar el elemento, por ejemplo un `if:` que se cierra y se abre, el navegador pide el valor al servidor: el DOM nunca aporta HTML.
 
-No es automático porque cambia lo que el navegador ve en esa primera carga: el valor es el marcador, así que `{guide.body.length}` o un `computed` que lo analice no darían lo mismo que en el servidor. Márquelo sólo si nada más lo lee. El valor sigue en el payload si `html` no lo pintó en el documento o si el SSR dejó el elemento vacío. Véase [`documentHtml`](/docs/reference/documenthtml).
+No es automático porque cambia lo que el navegador ve en esa primera carga: el valor es el marcador, así que `{guide.body.length}` o un `computed` que lo analice no darían lo mismo que en el servidor. Márquelo sólo si nada más lo lee. El valor sigue en el payload si `html` no lo pintó en el documento o si el SSR dejó vacío alguno de sus elementos. Si la página vuelve a pintar el elemento, el navegador pide el valor al servidor y sólo inserta el que esa respuesta declare marcado; si ya no está, carga el documento de nuevo. Véase [`documentHtml`](/docs/reference/documenthtml).
 
 ### Listas con y sin `each:key`
 

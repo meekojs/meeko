@@ -10,7 +10,7 @@ related:
   - "syntax:html"
   - "syntax:script-server"
   - docs/api.md#html-que-viaja-una-vez-documenthtml
-source-hash: 03aad9bb950d413492ac32106916bb40ea64568a2c8c03ccd0bc297133136566
+source-hash: e74a6aa75b76b69a9800cbf6126389bd0ea751b528f97fc6566f63ba18a2c7b4
 ---
 
 `documentHtml(html)` declares that a `TrustedHtml` only needs to travel once. Without this mark, page data painted with `html="..."` arrives twice on the first load: in the document's HTML and in the hydration payload. In a large article, that is half the weight.
@@ -66,7 +66,7 @@ export const items = ["<p>First</p>", "<p>Second</p>"].map((body, id) => ({ id, 
 
 ### An element that closes and opens
 
-If the page paints the element again, the browser requests the value from the server with a navigation request for that URL and inserts it on arrival. Until then, the element stays empty:
+If the page paints the element again, the browser requests the value from the server with a navigation request for that URL and inserts it on arrival. Until then, the element stays empty. The first line of a `stream` route is already enough: it does not wait for its deferred values and cancels the rest of the response:
 
 ```html
 <!-- app/pages/faq.meeko -->
@@ -141,10 +141,12 @@ export const body = documentHtml(trustHtml("<p>Hello</p>"));
 
 ## Notes
 
-- **When it travels whole.** If `html` did not paint it in the document, as inside a closed `if:`, or if SSR left the element empty because the browser would move its content out (a `<div>` in a `<p>`), the value stays in the payload. An empty value is not replaced either.
+- **When it travels whole.** If `html` did not paint it in the document, as inside a closed `if:`, or if SSR left any of its elements empty because the browser would move its content out (a `<div>` in a `<p>`), the value stays in the payload, even if another element shows it. An empty value is not replaced either.
 - **By content.** The mark follows the text, because a `string` has no identity: any other page data with exactly the same text also travels as a placeholder. Do not mark a small value that may repeat in other data.
-- **Security.** The DOM is never the source of HTML: the browser does not read the element's content to paint it again, it only requests it from the server, at a path the server itself wrote in the document. A value imitating the placeholder is a comment with no effect or, at most, names HTML the server already declared.
-- **Prerender and static hosts.** The `index.meeko.json` file stores the whole value; the document, the placeholder.
-- **Cache.** The document and its payload are a single response. An old cached document shows its content and hydrates the same, and the next navigation receives the latest published content.
+- **Security.** The DOM is never the source of HTML: the browser does not read the element's content to paint it again, it only requests it from the server. And it only inserts a value that that same response declares marked with `documentHtml`, in `markedHtml`, and whose hash matches the one the document wrote: neither an old position nor another route turns text into HTML. A value imitating the placeholder is a comment with no effect or, at most, names HTML the server declares marked.
+- **If the value moves.** It is recognized by the hash of its content, so in a reordered list each element recovers its own article.
+- **If the value is gone.** If other content was published, it was removed, or the URL redirects, answers another route, a `401`, `403`, `404` or `410`, or the document instead of the payload, nothing is inserted and the document loads again: the current page appears, or the server's destination, and that page's client state is lost. That reload happens at most once per minute and URL. If it is not enough, or `sessionStorage` is unavailable, the element stays empty and the error reaches `onNavigationError` or `onError`. A network failure or a `5xx` does not reload: it reports the error and the element's next render tries again.
+- **A value that differs in every request.** A date or a random identifier inside the HTML means the value never matches, and painting the element again ends as in the previous case. If the page paints that element again, do not mark it. On a prerendered page, the document and the file come from two runs of the loader, so they must also give the same HTML.
+- **Prerender and static hosts.** The `index.meeko.json` file stores the whole value and its declaration; the document, the placeholder.
+- **Cache.** The document and its payload are a single response. An old cached document shows its content and hydrates the same, and the next navigation receives the latest published content. If that page paints the element again, the document loads again.
 - **CSP.** It adds no inline code: the payload is still a data block, and `script-src` does not need `unsafe-inline`.
-- **Without a Meeko server.** If the URL does not answer the navigation payload and returns the document, painting the element again reloads the page.
