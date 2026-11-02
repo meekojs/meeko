@@ -35,7 +35,7 @@ export interface AutoImport {
    */
   deprecatedFor?: string;
   /** The component that has the new name of this `Carpeta/Index.meeko`, for its `MEEK135` warning (since 1.8). */
-  conflictsWith?: { readonly name: string; readonly file: string };
+  conflictsWith?: ComponentConflict;
   /**
    * Only for code that may run in the browser: components and modules of `app/`, but not the
    * sources of `server/`, `*.server.ts` or the route files, even though the scope is `app`.
@@ -264,7 +264,7 @@ export interface DiscoveredComponent {
    * A `Button/Index.meeko` whose new name another file has, `Button.meeko`: it keeps `ButtonIndex`,
    * its only name, with the `MEEK135` warning (since 1.8). In 2.0 it will be an error.
    */
-  readonly conflictsWith?: { readonly name: string; readonly file: string };
+  readonly conflictsWith?: ComponentConflict;
 }
 
 interface ComponentDirectory {
@@ -282,6 +282,19 @@ interface ComponentDirectory {
  * An `Index.meeko` at the root of the directory has no folder to take the name from: it stays `Index`.
  */
 function componentName(file: string, directory: ComponentDirectory): { readonly name: string; readonly legacy?: string } {
+/** The component that holds the new name of a `Carpeta/Index.meeko`, for its `MEEK135` warning. */
+export interface ComponentConflict {
+  /** The new name that the `Index.meeko` cannot take. */
+  readonly name: string;
+  /** The file that holds it. */
+  readonly file: string;
+  /**
+   * That file holds it as the name it had before 1.8 (`Button/Index.meeko`, which is `ButtonIndex`
+   * as well as `Button`), so the name is free in 2.0, when that alias goes.
+   */
+  readonly oldName?: true;
+}
+
   const parts = relative(directory.dir, file).replace(/\.meeko$/, "").split(/[\\/]/);
   const pascal = (list: readonly string[]): string => directory.prefix + list.map((part) => part.replace(/(^|[-_])(\w)/g, (_, _dash: string, letter: string) => letter.toUpperCase())).join("");
   const collapses = parts.length > 1 && /^[iI]ndex$/.test(parts.at(-1)!);
@@ -325,18 +338,25 @@ function catalog(files: readonly { directory: ComponentDirectory; file: string; 
     if (legacy === undefined) add({ name, file, source: directory.source }, directory.priority);
     else collapsed.push({ directory, file, name, legacy });
   }
-  const own = new Map([...names].map(([name, { component }]) => [name, component.file]));
-  const legacies = new Map<string, { component: DiscoveredComponent; priority: number }>();
+  // The file of each name before 1.8, when `Button/Index.meeko` was only `ButtonIndex`: through 1.x a
+  // name that existed never changes file. Across sources the first one wins, as it did then; within
+  // one, a file that has the name by itself keeps it (both at once were an error then).
+  const former = new Map<string, { file: string; priority: number; old: boolean }>();
+  for (const [name, { component, priority }] of names) former.set(name, { file: component.file, priority, old: false });
+  for (const { directory, file, legacy } of collapsed) {
+    const previous = former.get(legacy);
+    if (!previous || directory.priority < previous.priority) former.set(legacy, { file, priority: directory.priority, old: true });
+  }
   for (const { directory, file, name, legacy } of collapsed) {
-    const taken = own.get(name);
+    const holder = former.get(name);
     // MEEK135: its new name belongs to another file, so the old one is the only one it has, not deprecated.
-    if (taken !== undefined) {
-      add({ name: legacy, file, source: directory.source, conflictsWith: { name, file: taken } }, directory.priority);
+    if (holder) {
+      add({ name: legacy, file, source: directory.source, conflictsWith: { name, file: holder.file, ...(holder.old ? { oldName: true as const } : {}) } }, directory.priority);
       continue;
     }
     add({ name, file, source: directory.source }, directory.priority);
-    const previous = legacies.get(legacy);
-    if (!previous || directory.priority < previous.priority) legacies.set(legacy, { component: { name: legacy, file, source: directory.source, deprecatedFor: name }, priority: directory.priority });
+    // The alias is only there for a name this file really had.
+    if (former.get(legacy)?.file === file) names.set(legacy, { component: { name: legacy, file, source: directory.source, deprecatedFor: name }, priority: directory.priority });
   }
   // A component that really has the old name keeps it: the alias is only there for what it replaced.
   for (const [legacy, entry] of legacies) if (!names.has(legacy)) names.set(legacy, entry);
