@@ -12,7 +12,7 @@ import '@milkdown/crepe/theme/common/list-item.css'
 import '@milkdown/crepe/theme/common/placeholder.css'
 import '@milkdown/crepe/theme/common/table.css'
 import '@milkdown/crepe/theme/common/toolbar.css'
-import { HighlightStyle, LanguageDescription, syntaxHighlighting } from '@codemirror/language'
+import { HighlightStyle, LanguageDescription, LanguageSupport, StreamLanguage, syntaxHighlighting } from '@codemirror/language'
 import { EditorView } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
 import { CrepeBuilder } from '@milkdown/crepe/builder'
@@ -35,8 +35,35 @@ import type { MarkdownBlockParser } from './splice'
 
 import { createMarkdownSplicer, splitMarkdownSource } from './splice'
 
+/**
+ * The commands of a terminal, in `sh` and `powershell`: the command, its flags, its variables, strings
+ * and comments. These few lines stand in for a mode of `@codemirror/legacy-modes`, which only marks a
+ * fixed list of commands and would leave `pnpm install` without color.
+ */
+const terminal = StreamLanguage.define<{ start: boolean }>({
+	name: 'terminal',
+	startState: () => ({ start: true }),
+	token(stream, state) {
+		if (stream.sol()) state.start = true
+		if (stream.eatSpace()) return null
+		const start = state.start
+		state.start = false
+		if (stream.match(/^#.*/)) return 'comment'
+		if (stream.match(/^"(?:[^"\\]|\\.)*"?/) || stream.match(/^'[^']*'?/)) return 'string'
+		if (stream.match(/^\$[\w:{}]+/)) return 'variableName.special'
+		if (stream.match(/^[|&;]+/)) {
+			state.start = true
+			return null
+		}
+		if (stream.match(/^--?[\w-]+/)) return 'attributeName'
+		if (!stream.match(/^[^\s|&;"']+/)) stream.next()
+		return start ? 'variableName.function' : null
+	},
+})
+
 /** The languages of the code blocks of the documentation: importing them all costs 477 KB gzip. */
 const languages = [
+	LanguageDescription.of({ name: 'Shell', alias: ['sh', 'bash', 'zsh', 'shell', 'console', 'powershell', 'pwsh', 'ps1'], load: () => Promise.resolve(new LanguageSupport(terminal)) }),
 	LanguageDescription.of({ name: 'TypeScript', alias: ['ts'], extensions: ['ts', 'mts', 'cts'], load: () => import('@codemirror/lang-javascript').then((module) => module.javascript({ typescript: true })) }),
 	LanguageDescription.of({ name: 'JavaScript', alias: ['js'], extensions: ['js', 'mjs', 'cjs'], load: () => import('@codemirror/lang-javascript').then((module) => module.javascript()) }),
 	LanguageDescription.of({ name: 'HTML', alias: ['meeko', 'vue'], extensions: ['html', 'meeko'], load: () => import('@codemirror/lang-html').then((module) => module.html()) }),
@@ -58,7 +85,7 @@ const codeTheme = [
 		HighlightStyle.define([
 			{ tag: [tags.keyword, tags.modifier, tags.operatorKeyword], color: 'var(--ui-color-primary-text)' },
 			{ tag: [tags.string, tags.special(tags.string)], color: 'var(--ui-color-success-text)' },
-			{ tag: [tags.number, tags.bool, tags.null], color: 'var(--ui-color-orange-11)' },
+			{ tag: [tags.number, tags.bool, tags.null, tags.special(tags.variableName)], color: 'var(--ui-color-orange-11)' },
 			{ tag: [tags.comment], color: 'var(--ui-color-text-soft)', fontStyle: 'italic' },
 			{ tag: [tags.typeName, tags.className], color: 'var(--ui-color-cyan-11)' },
 			{ tag: [tags.function(tags.variableName), tags.function(tags.propertyName)], color: 'var(--ui-color-info-text)' },
