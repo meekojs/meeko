@@ -147,7 +147,7 @@ pnpm exec eslint app/components/Example.meeko --fix
 
 ## Uso directo del plugin
 
-La regla optativa [`meeko/attributes-order`](docs/rules/attributes-order.md) ordena por grupos: `ref:`, `each:*`, condicionales, definición, atributos planos, modelos, `bind:`, spread, eventos y contenido. Admite `order` y `alphabetical`; su autofix conserva el orden de expresiones y evita colisiones y spreads combinados con `class`/`style`. No se activa por defecto en `defineEslint` ni en `recommended`.
+La regla optativa [`meeko/attributes-order`](docs/rules/attributes-order.md) ordena por grupos: `ref:`, `each:*`, condicionales, definición, atributos planos, modelos, `bind:`, spread, eventos y contenido. Admite `order` y `alphabetical`; su autofix sólo cambia el orden de expresiones sin efectos y evita colisiones; si una puede tener efectos, ofrece una sugerencia. No se activa por defecto en `defineEslint` ni en `recommended`.
 
 La regla optativa [`meeko/html-self-closing`](docs/rules/html-self-closing.md) cierra con `/>` los elementos y componentes sin ningún nodo hijo (`<div></div>` pasa a `<div />`), con opciones `'always'`, `'never'` o `'any'` para `html.normal`, `html.void`, `component`, `svg` y `math`, e `ignoreWhitespace` para tratar como vacío el contenido de sólo saltos de línea y sangría. Con Meeko `1.7`, que no admite `<div />`, no comprueba los elementos HTML no vacíos. Tampoco se activa en `recommended` en `1.x`, para no generar diffs en proyectos existentes.
 

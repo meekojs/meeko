@@ -81,14 +81,20 @@ export default defineEslint({
 
 La regla recorre una vez el AST de plantilla y emite como máximo un aviso por etiqueta desordenada. `eslint --fix` conserva el texto original de cada atributo y los separadores de sus posiciones, incluidos saltos de línea, CRLF, indentación, entidades y valores multilínea. Prettier puede aplicar después el formato de un atributo por línea.
 
-La corrección es conservadora:
+Cada aviso tiene una salida, según lo que cambie al mover los atributos:
 
-- No cambia el orden relativo de atributos que pueden contener expresiones, aunque sean identificadores: una lectura podría ejecutar un getter. Por ejemplo, `bind:z="readZ()" bind:a="readA()"` se informa con `alphabetical: true`, pero no se corrige.
-- Permite mover atributos planos delante de `bind:` y spreads si conserva el orden relativo de expresiones. `ref:` no evalúa una expresión y puede subir al principio.
-- No corrige etiquetas que combinan `bind="objeto"` con `class`/`style` o sus variantes `bind:`: el compilador coloca la evaluación del spread según su posición y la de esos atributos. Mover un atributo plano podría adelantar esa evaluación.
-- No corrige colisiones de un nombre y su variante `bind:`, incluidos `class` y `style`, ni rangos separados por contenido que no sea espacio en blanco. Conserva el código para revisión manual.
-- Los atributos repetidos con la misma escritura y los comentarios HTML entre atributos son errores del parser de Meeko. Se conserva ese diagnóstico y no se modifica el archivo. Los comentarios HTML entre elementos permanecen intactos.
-- Puede informar sin corregir `<render args="…" snippet="…" />` o directivas `each:*` desordenadas si moverlas cambia el orden relativo de expresiones. No ofrece suggestions que supongan seguridad semántica.
+- **Autofix.** `eslint --fix` ordena si ninguna expresión que cambia de orden puede tener efectos. No los tienen los identificadores, las lecturas como `signal.value`, los literales, las plantillas, los ternarios y operadores sobre ellos, los arrays y objetos con esos valores, ni crear una función, como `(event) => emit('click', event)`. La regla da por hecho que una lectura no ejecuta un getter con efectos. Las expresiones que no cambian de orden entre sí dan igual: en `bind:title="read()" bind="rest" bind:to="to"`, la llamada sigue la primera y se corrige.
+- **Sugerencia.** Si una expresión que cambia de orden puede tener efectos (una llamada, `new`, `await`, `delete`, una asignación o un `++`) o no se puede analizar, `--fix` no la toca: el aviso ofrece la sugerencia de ordenar, que el editor aplica con Quick Fix. Nombra los atributos que se evalúan en otro momento, porque quien la aplica debe comprobar que el resultado no dependa de eso.
+- **A mano.** Los casos siguientes no se pueden mover sin cambiar el resultado o perder texto, y no tienen autofix ni sugerencia:
+  - Las colisiones de un nombre y su variante `bind:`, incluidos `class` y `style`: ahí el orden escrito sí decide el valor. Con `id="a" bind:id="b"` gana el primero en el HTML, y con `bind="obj"`, de `class` y `bind:class` sólo cuenta el último.
+  - Los rangos separados por contenido que no sea espacio en blanco.
+  - Los atributos repetidos con la misma escritura y los comentarios HTML entre atributos, que son errores del parser de Meeko: se conserva ese diagnóstico y no se modifica el archivo. Los comentarios HTML entre elementos permanecen intactos.
+
+### El orden y `bind="objeto"`
+
+Mover un `bind="objeto"` no cambia quién gana: la clave explícita gana en cualquier posición, y `class` y `style` se combinan siempre igual, las clases explícitas antes que las del objeto y los estilos del objeto antes que los explícitos. Da lo mismo en SSR, en hidratación y en las actualizaciones. Sólo cambia cuándo se evalúa el objeto en el servidor, que el compilador coloca en `bind` o en un `class` o `style` escrito antes, y el orden del texto de los atributos en el HTML.
+
+Con `alphabetical: true`, dos `bind:` pueden cambiar de orden, y cada uno escribe en su propio efecto, en el orden en que está escrito. En un control nativo eso puede importar: si `bind:value` escribe antes que `bind:max` en una misma actualización, el navegador recorta el valor al máximo anterior. Por eso, al mover `bind:value`, `bind:checked` o `bind:selected` respecto a otro `bind:` de un elemento, se ofrece una sugerencia y no un autofix.
 
 La regla no comprueba la validez de las directivas ni los tipos de sus expresiones. Usa `meeko check` para esos diagnósticos. Puede combinarse con `meeko/prefer-static-bindings`: al convertir un literal en atributo estático, el atributo pasa de `bindings` a `attributes` y las correcciones convergen.
 
