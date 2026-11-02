@@ -1,8 +1,9 @@
 <script lang="ts">
-	// The note of a page shown in its original language, with a link to the original.
+	// The note of a page shown in its original language, or of a translation older than its original,
+	// with a link to the original.
 	import { useI18n } from '@meekojs/i18n'
 
-	const props = defineProps<{ href: string; hreflang: string }>()
+	const props = defineProps<{ href: string; hreflang: string | undefined; kind?: 'untranslated' | 'outdated' }>()
 
 	const { t } = useI18n()
 </script>
@@ -13,10 +14,10 @@
 		bind:lang="t('shell.meta.lang')"
 	>
 		<UIAlert
-			tone="info"
-			bind:aria-label="t('shell.untranslated.title')"
-			bind:title="t('shell.untranslated.title')"
-			bind:description="t('shell.untranslated.message')"
+			bind:tone="props.kind === 'outdated' ? 'warning' : 'info'"
+			bind:aria-label="props.kind === 'outdated' ? t('shell.outdated.title') : t('shell.untranslated.title')"
+			bind:title="props.kind === 'outdated' ? t('shell.outdated.title') : t('shell.untranslated.title')"
+			bind:description="props.kind === 'outdated' ? t('shell.outdated.message') : t('shell.untranslated.message')"
 		>
 			<snippet name="icon">
 				<svg

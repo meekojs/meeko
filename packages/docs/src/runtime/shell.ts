@@ -44,6 +44,8 @@ export interface DocsShellNavigationItem {
  * ```
  */
 export interface DocsShellView {
+	/** Disposición de `<UIPage>`: `docs` por defecto; `landing` deja el ancho a cada sección de la página. */
+	readonly layout?: 'docs' | 'landing'
 	/** Identidad de la web y enlaces de la cabecera. */
 	readonly product: {
 		/** Nombre del producto, tras «Meeko» en la marca. */
@@ -56,12 +58,16 @@ export interface DocsShellView {
 		readonly homeHref: string
 		/** Marca que sustituye a «Meeko» más el producto, como en la web del framework. */
 		readonly brandName?: string
+		/** Logotipo de la marca; sin él, `/brand/meeko-logo.png`. */
+		readonly logo?: { readonly src: string; readonly width: number; readonly height: number }
 		/** Enlaces principales de la cabecera. */
-		readonly links?: readonly { readonly label: string; readonly href: string }[]
+		readonly links?: readonly { readonly label: string; readonly href: string; readonly rel?: string; readonly title?: string }[]
+		/** `aria-label` de esos enlaces; sin él, «Ecosistema», el de las webs de un paquete. */
+		readonly linksLabel?: string
 	}
 	/** Ruta actual, para marcar su enlace. */
 	readonly current: string
-	/** Grupos de la barra lateral, ya filtrados y moderados. */
+	/** Grupos de la barra lateral, ya filtrados y moderados. Sin grupos ni filtro, no hay barra lateral. */
 	readonly navigation: readonly { readonly title: string; readonly icon?: string; readonly items: readonly DocsShellNavigationItem[] }[]
 	/** Índice de la página, en la columna lateral y plegable en pantallas estrechas. */
 	readonly toc?: readonly { readonly id: string; readonly text: string; readonly level: number }[]
@@ -72,13 +78,17 @@ export interface DocsShellView {
 	}
 	/** Enlace para editar la página y ruta de su fuente en el repositorio. */
 	readonly edit?: { readonly href: string; readonly source: string }
-	/** Idioma pedido y el del contenido. Con `fallback`, el Shell avisa y marca el contenido con su `lang`. */
+	/** Idioma pedido y el del contenido. Con `fallback`, el Shell avisa y marca el artículo con su `lang`, no sus propios textos. */
 	readonly locale: {
 		readonly requested: string
 		readonly content: string
 		readonly fallback: boolean
-		/** Enlace al original, en la nota de una página sin traducir. */
+		/** Enlace al original, en la nota de una página sin traducir o desactualizada. */
 		readonly originalHref?: string | undefined
+		/** El original cambió después de traducirse esta página, que sigue publicada: el Shell avisa, con `originalHref`. */
+		readonly outdated?: boolean | undefined
+		/** Idioma del original, el `hreflang` del aviso de `outdated`. */
+		readonly original?: string | undefined
 		/** Idioma que se sugiere al lector, calculado tras hidratar; sin él no hay sugerencia. */
 		readonly suggested?: string | undefined
 	}

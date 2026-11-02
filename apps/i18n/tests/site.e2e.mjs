@@ -77,7 +77,7 @@ test('production i18n documentation renders guides, translates, switches locale 
 	await suggestion.waitFor()
 	assert.equal(await suggestion.getByRole('link', { name: 'Read this page in English', exact: true }).getAttribute('href'), '/en/playground?tab=demo#messages')
 	assert.equal(await suggestion.evaluate((element) => globalThis.getComputedStyle(element).position), 'fixed')
-	await suggestion.getByRole('button', { name: 'Seguir en Español', exact: true }).click()
+	await suggestion.getByRole('button', { name: 'Seguir en español', exact: true }).click()
 	await suggestion.waitFor({ state: 'detached' })
 	await page.reload({ waitUntil: 'networkidle' })
 	assert.equal(await suggestion.count(), 0, 'a remembered choice hides the suggestion')

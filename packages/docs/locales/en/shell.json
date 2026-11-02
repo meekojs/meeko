@@ -5,7 +5,8 @@
 		},
 		"skip": "Skip to content",
 		"brand": {
-			"home": "Meeko {name}, home"
+			"home": "Meeko {name}, home",
+			"site": "{name}, home"
 		},
 		"nav": {
 			"ecosystem": "Ecosystem",
@@ -36,8 +37,22 @@
 					"other": "{language}"
 				}
 			},
-			"stay": "Stay in {language}",
-			"suggestion": "Language suggestion",
+			"stay": {
+				"select": "locale",
+				"forms": {
+					"es": "Stay in Spanish",
+					"en": "Stay in English",
+					"other": "Stay in {language}"
+				}
+			},
+			"suggestion": {
+				"select": "locale",
+				"forms": {
+					"es": "Sugerencia de idioma",
+					"en": "Language suggestion",
+					"other": "Language suggestion"
+				}
+			},
 			"message": {
 				"select": "locale",
 				"forms": {
@@ -46,6 +61,10 @@
 					"other": "{language}"
 				}
 			}
+		},
+		"outdated": {
+			"title": "This translation may be out of date",
+			"message": "The original changed after this page was translated."
 		},
 		"untranslated": {
 			"title": "Not translated yet",
