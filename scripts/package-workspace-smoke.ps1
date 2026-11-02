@@ -27,6 +27,7 @@ try {
 
   @'
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
@@ -41,7 +42,10 @@ for (const name of ['meeko', 'ui', 'i18n', 'prettier-plugin', 'eslint-plugin']) 
   const metadata = JSON.parse(await readFile(new URL('../package.json', pathToFileURL(entry)), 'utf8'));
   for (const key of Object.keys(metadata.exports)) {
     if (key.includes('*')) continue;
-    await import('@meekojs/' + name + (key === '.' ? '' : key.slice(1)));
+    const specifier = '@meekojs/' + name + (key === '.' ? '' : key.slice(1));
+    // Node cannot import a stylesheet: it must resolve to a file of the tarball, for the bundler.
+    if (key.endsWith('.css')) assert.ok(existsSync(require.resolve(specifier)), specifier);
+    else await import(specifier);
   }
 }
 assert.equal(signal(3).value, 3);
