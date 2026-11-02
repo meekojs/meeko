@@ -7,10 +7,16 @@
     "meeko-module"
   ],
   "homepage": "https://i18n.meekojs.com",
+  "bugs": { "url": "https://github.com/meekojs/meeko/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/meekojs/meeko.git", "directory": "packages/i18n" },
+  "sideEffects": true,
   "type": "module",
   "license": "MIT",
   "files": [
-    "dist/"
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "exports": {
     ".": {
@@ -26,6 +32,7 @@
       "default": "./dist/server.js"
     }
   },
+  "types": "./dist/index.d.ts",
   "scripts": {
     "build": "node ../../scripts/build-package.mjs && node scripts/copy-components.mjs",
     "check": "tsc -p tsconfig.json --noEmit",
@@ -40,5 +47,7 @@
     "@types/node": "^24.0.0",
     "typescript": "7.0.2",
     "vite": "8.3.5"
-  }
+  },
+  "engines": { "node": ">=24" },
+  "publishConfig": { "access": "public", "provenance": true }
 }

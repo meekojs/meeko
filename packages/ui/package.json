@@ -7,7 +7,16 @@
 		"meeko-module"
 	],
 	"homepage": "https://ui.meekojs.com",
+	"bugs": {
+		"url": "https://github.com/meekojs/meeko/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/meekojs/meeko.git",
+		"directory": "packages/ui"
+	},
 	"license": "MIT",
+	"sideEffects": true,
 	"type": "module",
 	"exports": {
 		".": {
@@ -30,10 +39,15 @@
 		"./styles/fonts.css": "./src/app/styles/fonts.css",
 		"./styles/prose.css": "./src/app/styles/prose.css"
 	},
+	"types": "./dist/index.d.ts",
 	"files": [
 		"dist/",
 		"src/app/styles/",
-		"DESIGN.md"
+		"DESIGN.md",
+		"README.md",
+		"LICENSE",
+		"CHANGELOG.md",
+		"THIRD_PARTY_NOTICES.md"
 	],
 	"scripts": {
 		"build": "node ../../scripts/build-package.mjs && node scripts/copy-components.mjs",
@@ -108,5 +122,12 @@
 		"@milkdown/kit": {
 			"optional": true
 		}
+	},
+	"engines": {
+		"node": ">=24"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
 	}
 }

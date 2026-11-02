@@ -9,7 +9,16 @@
 		"icons"
 	],
 	"homepage": "https://ui.meekojs.com/icons",
+	"bugs": {
+		"url": "https://github.com/meekojs/meeko/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/meekojs/meeko.git",
+		"directory": "packages/icon"
+	},
 	"license": "MIT",
+	"sideEffects": true,
 	"type": "module",
 	"exports": {
 		".": {
@@ -21,9 +30,14 @@
 			"default": "./dist/module.js"
 		}
 	},
+	"types": "./dist/index.d.ts",
 	"files": [
 		"dist/",
-		"src/app/styles/"
+		"src/app/styles/",
+		"README.md",
+		"LICENSE",
+		"CHANGELOG.md",
+		"THIRD_PARTY_NOTICES.md"
 	],
 	"scripts": {
 		"build": "node ../../scripts/build-package.mjs && node scripts/copy-components.mjs",
@@ -47,5 +61,12 @@
 	},
 	"peerDependencies": {
 		"@meekojs/meeko": ">=1.7 <2"
+	},
+	"engines": {
+		"node": ">=24"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
 	}
 }

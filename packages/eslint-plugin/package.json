@@ -2,14 +2,19 @@
   "name": "@meekojs/eslint-plugin",
   "version": "0.1.0",
   "description": "ESLint parser and template rules for Meeko components.",
+  "keywords": ["meeko", "typescript", "eslint-plugin"],
   "homepage": "https://meekojs.com/docs/tooling",
+  "bugs": { "url": "https://github.com/meekojs/meeko/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/meekojs/meeko.git", "directory": "packages/eslint-plugin" },
+  "sideEffects": true,
   "type": "module",
   "license": "MIT",
-  "files": ["dist/", "README.md"],
+  "files": ["dist/", "README.md", "LICENSE", "CHANGELOG.md"],
   "exports": {
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
     "./parser": { "types": "./dist/parser.d.ts", "default": "./dist/parser.js" }
   },
+  "types": "./dist/index.d.ts",
   "scripts": {
     "build": "pnpm run types:generate && node ../../scripts/build-package.mjs",
     "check": "pnpm run types:generate && tsc6 -p tsconfig.json --noEmit",
@@ -34,5 +39,7 @@
     "@meekojs/meeko": "workspace:*",
     "@types/node": "^24.0.0",
     "eslint": "10.13.0"
-  }
+  },
+  "engines": { "node": ">=24" },
+  "publishConfig": { "access": "public", "provenance": true }
 }

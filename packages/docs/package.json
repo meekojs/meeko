@@ -28,5 +28,8 @@
 	},
 	"devDependencies": {
 		"tsx": "^4.20.0"
+	},
+	"peerDependencies": {
+		"@meekojs/meeko": ">=1.7 <2"
 	}
 }

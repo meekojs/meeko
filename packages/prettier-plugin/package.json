@@ -1,11 +1,19 @@
 {
   "name": "@meekojs/prettier-plugin",
   "version": "0.1.0",
+  "description": "Prettier formatting for Meeko components.",
+  "keywords": ["meeko", "typescript", "prettier-plugin"],
   "homepage": "https://meekojs.com/docs/tooling",
+  "bugs": { "url": "https://github.com/meekojs/meeko/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/meekojs/meeko.git", "directory": "packages/prettier-plugin" },
+  "sideEffects": true,
   "type": "module",
   "license": "MIT",
   "files": [
-    "dist/"
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "exports": {
     ".": {
@@ -13,6 +21,7 @@
       "default": "./dist/index.js"
     }
   },
+  "types": "./dist/index.d.ts",
   "scripts": {
     "build": "node ../../scripts/build-package.mjs",
     "check": "tsc -p tsconfig.json --noEmit",
@@ -40,5 +49,7 @@
     "typescript": "7.0.2",
     "prettier": "3.9.10",
     "vite": "8.3.5"
-  }
+  },
+  "engines": { "node": ">=24" },
+  "publishConfig": { "access": "public", "provenance": true }
 }
