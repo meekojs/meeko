@@ -16,7 +16,7 @@ import type * as framework_render_tsTypes from "../src/server/runtime/framework-
 
 import { createRouteManifest } from "../src/app/runtime/router.ts";
 import { compile } from "../src/compiler.ts";
-import { definePageBody } from "../src/server/runtime/page-body.ts";
+import { definePageBody, notFound } from "../src/server/runtime/page-body.ts";
 import { createTempProject } from "./helpers/temp-project.ts";
 
 
@@ -131,6 +131,8 @@ const routes: readonly RouteRecord[] = createRouteManifest([
   { id: "/dated", file: "a.meeko", layouts: ["app.meeko", "dashboard.meeko"], layout: dashboardLayout, sidecar: "dated.route.ts" },
   { id: "/stream", file: "a.meeko", layouts: ["app.meeko", "dashboard.meeko"], layout: dashboardLayout, sidecar: "stream.route.ts", render: "stream" },
   { id: "/exported", file: "a.meeko", layouts: ["app.meeko", "dashboard.meeko"], layout: dashboardLayout, sidecar: "exported.route.ts" },
+  { id: "/missing", file: "a.meeko", layouts: ["app.meeko", "dashboard.meeko"], layout: dashboardLayout, sidecar: "missing.route.ts" },
+  { id: "/failing", file: "a.meeko", layouts: ["app.meeko", "dashboard.meeko"], layout: dashboardLayout, sidecar: "failing.route.ts" },
 ]);
 const appError: ErrorPageRecord = { file: "error.meeko", layouts: ["app.meeko", "dashboard.meeko"], layout: dashboardLayout };
 
@@ -144,6 +146,8 @@ const sidecars: Record<string, ClientRoute & { render?: string; layout?: unknown
   "absent.route.ts": { load: () => ({}), layoutProps: ({ data }: { data: { name?: string } }) => ({ title: data.name, showAlert: true }) },
   "dated.route.ts": { layoutProps: { title: new Date(0) as unknown as string } },
   "stream.route.ts": { render: "stream", load: () => ({ name: "Flujo" }), layoutProps: ({ data }: { data: { name: string } }) => ({ title: data.name }) },
+  "missing.route.ts": definePageBody(undefined, async () => { notFound(); }, false) as ClientRoute,
+  "failing.route.ts": { load: () => { throw new Error("private failure"); } },
   // What a page compiles to with top-level server code and `export const layoutProps`.
   "exported.route.ts": definePageBody(undefined, async () => ({ data: { doc: "cuerpo" }, layoutProps: { title: "Sólo para el layout" } }), false, true) as ClientRoute,
 };
@@ -211,6 +215,77 @@ test("SSR renders the named layout with the page's layoutProps and hydrates them
     closeAll();
     await cleanup();
   }
+});
+
+test("a page not found in SSR renders app/error.meeko inside the layouts and hydrates; another failure stays bare", { timeout: 30_000 }, async () => {
+  const { modules, cleanup } = await loadModules();
+  try {
+    const server = await serve(modules);
+    const page = (path: string) => server(new Request(`https://example.test${path}`, { headers: { accept: "text/html" } }));
+    const response = await page("/missing");
+    assert.equal(response.status, 404);
+    assert.match(await response.text(), /class="sidebar"/);
+    // Same document as a URL without a route: the browser hydrates it, also the layout's controls.
+    const { root, html, app, errors } = await boot(modules, "https://example.test/missing");
+    assert.match(html, /<script id="meeko-payload"/);
+    assert.ok(root.querySelector(".sidebar"), html);
+    assert.deepEqual(errors, []);
+    // The next navigation works from there, with the layout mounted.
+    const sidebar = root.querySelector(".sidebar");
+    assert.equal(await app.navigate("/g"), true);
+    assert.equal(root.querySelector(".sidebar"), sidebar);
+    assert.equal(text(root, ".title"), "Grupo");
+    // A 500 may come from the layout itself: the error document stays without layouts.
+    const failed = await page("/failing");
+    assert.equal(failed.status, 500);
+    assert.doesNotMatch(await failed.text(), /class="sidebar"|meeko-payload/);
+  } finally {
+    closeAll();
+    await cleanup();
+  }
+});
+
+test("a 404 falls back to the bare error page when the layout fails, and a nearer +error.meeko keeps the page's layouts", { timeout: 30_000 }, async () => {
+  const { createFrameworkHandler } = await runtime();
+  const html = (text: string) => ({ css: "", renderWithState: () => ({ html: text, state: {} }) }) as unknown as ClientComponent;
+  const shell = {
+    css: "",
+    renderWithState: (props: { outlet: { renderWithState(): { html: string } } }) => ({ html: `<main>${props.outlet.renderWithState().html}</main>`, state: {} }),
+  } as unknown as ClientComponent;
+  const failing = { css: "", renderWithState: () => { throw new Error("layout failed"); } } as unknown as ClientComponent;
+  const errorView = (name: string) => ({ css: "", renderWithState: (props: { status: number }) => ({ html: `<p>${name}:${props.status}</p>`, state: {} }) }) as unknown as ClientComponent;
+  const modules: Record<string, ClientComponent> = { "page.meeko": html("<p>page</p>"), "shell.meeko": shell, "bad.meeko": failing, "error.meeko": errorView("app"), "+error.meeko": errorView("near") };
+  const missing = definePageBody(undefined, async () => { notFound(); }, false);
+  const handler = createFrameworkHandler({
+    routes: createRouteManifest([
+      { id: "/near", file: "page.meeko", layouts: ["shell.meeko"], error: "+error.meeko", sidecar: "missing.route.ts" },
+      { id: "/near-bad", file: "page.meeko", layouts: ["bad.meeko"], error: "+error.meeko", sidecar: "missing.route.ts" },
+      { id: "/root-bad", file: "page.meeko", layouts: ["shell.meeko"], sidecar: "missing.route.ts" },
+    ]),
+    errorPage: { file: "error.meeko", layouts: ["bad.meeko"] },
+    loadPage: async (file) => modules[file]! as never,
+    loadRoute: async () => missing as never,
+    onError: () => {},
+  });
+  const body = async (path: string): Promise<{ status: number; text: string }> => {
+    const response = await handler(new Request(`https://example.test${path}`, { headers: { accept: "text/html" } }));
+    return { status: response.status, text: await response.text() };
+  };
+  // Nearer +error.meeko: inside the page's layouts, not hydrated.
+  const near = await body("/near");
+  assert.equal(near.status, 404);
+  assert.match(near.text, /<main><p>near:404<\/p><\/main>/);
+  assert.doesNotMatch(near.text, /meeko-payload/);
+  // Its layout fails: the error page alone, never the failure.
+  const bad = await body("/near-bad");
+  assert.equal(bad.status, 404);
+  assert.match(bad.text, /<p>near:404<\/p>/);
+  assert.doesNotMatch(bad.text, /layout failed/);
+  // The root layout of app/error.meeko fails: the same page, alone.
+  const root = await body("/root-bad");
+  assert.equal(root.status, 404);
+  assert.match(root.text, /<p>app:404<\/p>/);
+  assert.doesNotMatch(root.text, /layout failed|meeko-payload/);
 });
 
 test("export const layoutProps reaches the layout once: in SSR, hydration and a client navigation, outside the page data", { timeout: 30_000 }, async () => {

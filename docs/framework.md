@@ -962,7 +962,7 @@ app/app.meeko
 
 **Navegación.** El navegador conserva los layouts que comparten la página saliente y la nueva, como siempre: si las dos usan el mismo layout con nombre, sigue montado con su estado (el DOM, el foco, el scroll de la barra lateral, lo escrito en un campo) y sólo cambia lo de dentro; si usan otro, el layout se libera y se monta el nuevo. Vale igual para páginas SSR, `render: "stream"`, `render: "client"`, prerenderizadas y las del adaptador `static`.
 
-**Página de error.** Una página que falla en el navegador (su loader, `notFound()` o un dato) muestra su `+error.meeko` o `app/error.meeko` dentro de sus propios layouts, el layout con nombre incluido, con las props de sus `+group.ts` y sin las de la página. La `404` de una URL sin ruta usa el layout `default` (si existe), con sus valores por defecto. El documento de error que el servidor responde a una página que falla no tiene layouts, como hasta ahora.
+**Página de error.** Una página que falla en el navegador (su loader, `notFound()` o un dato) muestra su `+error.meeko` o `app/error.meeko` dentro de sus propios layouts, el layout con nombre incluido, con las props de sus `+group.ts` y sin las de la página. La `404` de una URL sin ruta usa el layout `default` (si existe), con sus valores por defecto. Desde `1.8`, una página que responde `404` en el servidor (`notFound()` o un `ApiError` con ese estado) da el mismo documento, que se hidrata; con un `+error.meeko` más cercano, éste va dentro de los layouts de la página, sin hidratar. Si un layout falla al pintarlo, o el error es otro, el documento de error no tiene layouts, porque un layout puede ser lo que ha fallado.
 
 #### Opciones por carpeta: `+group.ts`
 

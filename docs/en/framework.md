@@ -1,5 +1,5 @@
 ---
-source-hash: eb567cc59ad8cda22e31e8f0b37e7f828436ec98ba5b57c95d92ca1828ff39e4
+source-hash: f8e1a987af104aa8c1abf16d7ef5cd429404effd653136f715ac2caed3160088
 ---
 
 # Meeko as a full-stack framework
@@ -966,7 +966,7 @@ app/app.meeko
 
 **Navigation.** The browser preserves layouts shared by the outgoing and incoming pages, as always: if both use the same named layout, it stays mounted with its state (DOM, focus, sidebar scroll, text entered in a field) and only its contents change; if they use different layouts, the old one is disposed of and the new one mounts. This works equally for SSR, `render: "stream"`, `render: "client"`, prerendered pages and the `static` adapter.
 
-**Error page.** A page that fails in the browser (its loader, `notFound()` or data) shows its `+error.meeko` or `app/error.meeko` inside its own layouts, including the named layout, with its `+group.ts` props and without the page's props. The `404` for an unmatched URL uses the `default` layout (if present), with its default values. The error document the server returns for a failed page has no layouts, as before.
+**Error page.** A page that fails in the browser (its loader, `notFound()` or data) shows its `+error.meeko` or `app/error.meeko` inside its own layouts, including the named layout, with its `+group.ts` props and without the page's props. The `404` for an unmatched URL uses the `default` layout (if present), with its default values. Since `1.8`, a page that responds `404` on the server (`notFound()` or an `ApiError` with that status) gives the same document, which hydrates; with a nearer `+error.meeko`, that page goes inside the page's layouts, without hydration. If a layout fails while painting it, or the error is another one, the error document has no layouts, because a layout may be what failed.
 
 #### Per-folder options: `+group.ts`
 

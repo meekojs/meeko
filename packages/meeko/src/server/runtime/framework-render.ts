@@ -974,6 +974,8 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     // Aborts timers and listeners of deferred values that will never be sent.
     const deferredWork = new AbortController();
     let errorRoute: string | undefined;
+    /** The route of this request, for the layouts of its error page. */
+    let matched: RouteRecord | undefined;
     let requestContext: RequestContext | undefined;
     /** The request state of the render that completed; a suspended pass replaces it. */
     let pageStore = stateStore;
@@ -1020,9 +1022,48 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       }
       return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
     };
+    /** app/error.meeko with status 404 inside the root layouts, hydrated like a page: a URL without a route, or a page that is not found. */
+    const renderNotFound = async (initial: StateStore): Promise<Response> => {
+      const page = await options.loadPage(options.errorPage!.file);
+      const plugins = await startPlugins();
+      const { tree, layoutProps } = await renderWithLayoutProps(options.errorPage!.layout?.name, {}, initial, async (named, store, seed) => {
+        const treeStyles: string[] = page.css ? [page.css] : [];
+        const { module, input } = await wrapInLayouts(options.loadPage, page, { ...notFoundProps }, options.errorPage!.layouts, treeStyles, named);
+        return { ...await renderPageTree(module, input, store, route!, plugins, request.signal, theme, options.document?.config?.idPrefix, seed), treeStyles };
+      }, options.errorPage!.layout?.file, options.errorPage!.file);
+      const { rendered, store, resources, head: collected, teleports } = tree;
+      const styles = [...tree.treeStyles, ...tree.styles];
+      pageStore = store;
+      store.seal();
+      const payload = serializeJson({
+        v: PAYLOAD_VERSION, error: true, render: "ssr", url: route!.url,
+        props: notFoundProps, state: rendered.state, sharedState: store.snapshot(), head: { title: ERROR_PAGE_TITLE },
+        ...(resources ? { resources } : {}),
+        ...(options.errorPage!.layout ? { layoutProps } : {}),
+      });
+      const headRequest = request.method === "HEAD";
+      if (wantsPayload(request)) {
+        return finish(new Response(headRequest ? null : payload, {
+          status: 404, headers: { "content-type": "application/meeko+json; charset=utf-8", "cache-control": "no-store" },
+        }));
+      }
+      const host = documentParts(options.document, request, requestNonce());
+      const styleTags = documentStyleTags(styles, host.nonceAttribute);
+      const script = options.clientEntry ? `<script type="module"${host.nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
+      const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
+      // Titled like the error document of a matched route; the payload head carries the same
+      // title, so hydration still finds the host <title> after the managed head.
+      const head = headDocument(options.document, host.nonce, collected, routeHeadInput({}, ERROR_PAGE_TITLE), undefined, theme);
+      const placed = documentBody(rendered.html, teleports, options.production ?? true);
+      const document = `${head.prefix}${csrfMeta}${head.head}${host.head}${styleTags}</head>${head.bodyOpen}<div id="app">${placed.app}</div>${placed.body}<script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
+      return finish(new Response(headRequest ? null : document, {
+        status: 404, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+      }), true, noncePolicy());
+    };
     try {
     const url = new URL(request.url);
     const match = options.notFoundOnly ? undefined : matchRoute(options.routes, url.pathname);
+    matched = match?.route;
     route = routeSnapshot(url, match?.route.id ?? null, match ? match.params : {}, pageSearchObject(url.searchParams), false);
     const errorPage = options.errorPage;
     if (!match && !(errorPage && wantsPage(request, url.pathname))) return finish(new Response("Not Found", {
@@ -1034,44 +1075,7 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
     if (requestContext && requestContext.request !== request) throw new TypeError("Request context belongs to another request");
     if (!match) {
       // A URL without a route: app/error.meeko inside the root layouts, hydrated like a page.
-      const renderNotFound = async (): Promise<Response> => {
-        const page = await options.loadPage(errorPage!.file);
-        const plugins = await startPlugins();
-        const { tree, layoutProps } = await renderWithLayoutProps(errorPage!.layout?.name, {}, stateStore, async (named, store, seed) => {
-          const treeStyles: string[] = page.css ? [page.css] : [];
-          const { module, input } = await wrapInLayouts(options.loadPage, page, { ...notFoundProps }, errorPage!.layouts, treeStyles, named);
-          return { ...await renderPageTree(module, input, store, route!, plugins, request.signal, theme, options.document?.config?.idPrefix, seed), treeStyles };
-        }, errorPage!.layout?.file, errorPage!.file);
-        const { rendered, store, resources, head: collected, teleports } = tree;
-        const styles = [...tree.treeStyles, ...tree.styles];
-        pageStore = store;
-        store.seal();
-        const payload = serializeJson({
-          v: PAYLOAD_VERSION, error: true, render: "ssr", url: route!.url,
-          props: notFoundProps, state: rendered.state, sharedState: store.snapshot(), head: { title: ERROR_PAGE_TITLE },
-          ...(resources ? { resources } : {}),
-          ...(errorPage!.layout ? { layoutProps } : {}),
-        });
-        const headRequest = request.method === "HEAD";
-        if (wantsPayload(request)) {
-          return finish(new Response(headRequest ? null : payload, {
-            status: 404, headers: { "content-type": "application/meeko+json; charset=utf-8", "cache-control": "no-store" },
-          }));
-        }
-        const host = documentParts(options.document, request, requestNonce());
-        const styleTags = documentStyleTags(styles, host.nonceAttribute);
-        const script = options.clientEntry ? `<script type="module"${host.nonceAttribute} src="${escapeHtml(options.clientEntry)}"></script>` : "";
-        const csrfMeta = requestContext?.session.current ? `<meta name="meeko-csrf-token" content="${escapeHtml(requestContext.session.current.csrfToken)}">` : "";
-        // Titled like the error document of a matched route; the payload head carries the same
-        // title, so hydration still finds the host <title> after the managed head.
-        const head = headDocument(options.document, host.nonce, collected, routeHeadInput({}, ERROR_PAGE_TITLE), undefined, theme);
-        const placed = documentBody(rendered.html, teleports, options.production ?? true);
-        const document = `${head.prefix}${csrfMeta}${head.head}${host.head}${styleTags}</head>${head.bodyOpen}<div id="app">${placed.app}</div>${placed.body}<script id="meeko-payload" type="application/json">${payload}</script>${script}${host.bodyEnd}</body></html>`;
-        return finish(new Response(headRequest ? null : document, {
-          status: 404, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
-        }), true, noncePolicy());
-      };
-      return requestContext ? await withRequestContext(requestContext, options.serverFetch, renderNotFound) : await renderNotFound();
+      return requestContext ? await withRequestContext(requestContext, options.serverFetch, () => renderNotFound(stateStore)) : await renderNotFound(stateStore);
     }
     const render = async (): Promise<Response> => {
     const middlewareResponse = hasRouteMiddleware(match.route, options) ? await runRouteMiddleware(await routeMiddlewareChain(match.route, options), {
@@ -1356,32 +1360,47 @@ export function createPageHandler(options: PageHandlerOptions): (request: Reques
       }));
       const errorFile = errorRoute;
       if (errorFile) {
-        try {
-          const renderError = async (): Promise<Response> => {
-            const errorPage = await options.loadPage(errorFile);
-            // A failure after the render sealed the page state still renders its error page.
-            const { rendered: errorRendered, head: collected, teleports, styles: errorStyles } = await renderPageTree(withLayoutWriter(withHeadLevel(errorPage, 0), serverLayoutWriter(undefined, {})), {
-              status: known.status, message: known.status >= 500 ? "Internal Server Error" : known.code,
-            }, pageStore.sealed ? new StateStore() : pageStore, route!,
-            // Plugins that failed (perhaps the failure shown here) leave the error page without their values.
-            await startPlugins().catch(() => emptyPluginState), request.signal, theme, options.document?.config?.idPrefix);
-            const host = documentParts(options.document, request, requestNonce());
-            const head = headDocument(options.document, host.nonce, collected, routeHeadInput({}, ERROR_PAGE_TITLE), undefined, theme);
-            // The error page is not hydrated, so a missing target only keeps its teleport in place.
-            const placed = documentBody(errorRendered.html, teleports, true);
-            // Nor does its CSS arrive later: the document inlines it, as for a page.
-            const styleTags = documentStyleTags([...errorPage.css ? [errorPage.css] : [], ...errorStyles], host.nonceAttribute);
-            const document = `${head.prefix}${head.head}${host.head}${styleTags}</head>${head.bodyOpen}<div id="app">${placed.app}</div>${placed.body}${host.bodyEnd}</body></html>`;
-            return finish(new Response(request.method === "HEAD" ? null : document, {
-              status: known.status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
-            }), true, noncePolicy());
-          };
-          return requestContext
-            ? await withRequestContext(requestContext, options.serverFetch, renderError)
-            : await renderError();
-        } catch (failure) {
-          report(failure);
-          // The error route failed; keep private errors out of the response.
+        const renderError = async (layouts: readonly string[], layout?: RouteRecord["layout"]): Promise<Response> => {
+          const errorPage = await options.loadPage(errorFile);
+          const treeStyles: string[] = errorPage.css ? [errorPage.css] : [];
+          const named = layout ? { file: layout.file, props: layout.props ?? {}, writer: serverLayoutWriter(layout.name, layout.props ?? {}) } : undefined;
+          const { module, input } = await wrapInLayouts(options.loadPage, errorPage, {
+            status: known.status, message: known.status >= 500 ? "Internal Server Error" : known.code,
+          }, layouts, treeStyles, named);
+          // A failure after the render sealed the page state still renders its error page.
+          const { rendered: errorRendered, head: collected, teleports, styles: errorStyles } = await renderPageTree(module, input, pageStore.sealed ? new StateStore() : pageStore, route!,
+          // Plugins that failed (perhaps the failure shown here) leave the error page without their values.
+          await startPlugins().catch(() => emptyPluginState), request.signal, theme, options.document?.config?.idPrefix);
+          const host = documentParts(options.document, request, requestNonce());
+          const head = headDocument(options.document, host.nonce, collected, routeHeadInput({}, ERROR_PAGE_TITLE), undefined, theme);
+          // The error page is not hydrated, so a missing target only keeps its teleport in place.
+          const placed = documentBody(errorRendered.html, teleports, true);
+          // Nor does its CSS arrive later: the document inlines it, as for a page.
+          const styleTags = documentStyleTags([...treeStyles, ...errorStyles], host.nonceAttribute);
+          const document = `${head.prefix}${head.head}${host.head}${styleTags}</head>${head.bodyOpen}<div id="app">${placed.app}</div>${placed.body}${host.bodyEnd}</body></html>`;
+          return finish(new Response(request.method === "HEAD" ? null : document, {
+            status: known.status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+          }), true, noncePolicy());
+        };
+        // A page that is not found keeps the frame of the site, as in a client navigation: with
+        // app/error.meeko, the document of a URL without a route, which hydrates; with a nearer
+        // +error.meeko, which the browser would not find, the page's layouts without hydration. A layout
+        // that fails here, or any other status (a layout may be what failed), leaves the bare error page.
+        const attempts: Array<() => Promise<Response>> = [];
+        if (known.status === 404 && errorFile === options.errorPage?.file) {
+          attempts.push(() => {
+            route = routeSnapshot(new URL(request.url), null, {}, pageSearchObject(new URL(request.url).searchParams), false);
+            return renderNotFound(pageStore.sealed ? new StateStore() : pageStore);
+          });
+        } else if (known.status === 404 && matched?.layouts.length) attempts.push(() => renderError(matched!.layouts, matched!.layout));
+        attempts.push(() => renderError([]));
+        for (const attempt of attempts) {
+          try {
+            return requestContext ? await withRequestContext(requestContext, options.serverFetch, attempt) : await attempt();
+          } catch (failure) {
+            report(failure);
+            // The error route failed; keep private errors out of the response.
+          }
         }
       }
       return finish(new Response(request.method === "HEAD" ? null : known.status >= 500 ? "Internal Server Error" : known.code, {
