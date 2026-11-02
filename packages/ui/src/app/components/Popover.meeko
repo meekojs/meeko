@@ -1,7 +1,7 @@
 <script lang="ts">
 	// <UIPopover>: the successor of the deprecated <MeekoPopover> of the core, with the same contract
-	// and markup. The behavior lives in ../utils/popover.ts. Its template stays on one line, outside
-	// Prettier (.prettierignore): whitespace between the tags would be text in the trigger.
+	// and markup. The behavior lives in ../utils/popover.ts. Its template has no whitespace
+	// between the tags: it would be text in the trigger.
 	import { onMounted, useId } from '@meekojs/meeko'
 
 	import type { PopoverSnippets, PopoverToggleEvent, UIPopoverProps } from '../types/popover'
@@ -24,5 +24,5 @@
 	defineExpose({ show: popover.show, hide: popover.hide, toggle: popover.toggle })
 </script>
 
-<!-- Keep this template on one line, without whitespace between the tags: it would be text inside the button and the content. Do not format this file (it is in .prettierignore; tests/one-line-templates.test.mjs guards it). -->
+<!-- No whitespace between the tags of this template: it would be text inside the button and the content. Prettier keeps it that way; tests/templates-without-whitespace.test.mjs guards it. -->
 <template><button if:when="!snippets.anchor && snippets.trigger" type="button" data-meeko-popover-trigger bind:id="popover.trigger.value.id" bind:class="props.triggerClass" bind:popovertarget="popover.trigger.value.popovertarget" bind:aria-controls="popover.trigger.value['aria-controls']" bind:aria-expanded="popover.trigger.value['aria-expanded']" bind:aria-haspopup="popover.trigger.value['aria-haspopup']" bind:aria-describedby="popover.trigger.value['aria-describedby']"><render snippet="snippets.trigger" /></button><render if:when="snippets.anchor" snippet="snippets.anchor" args="popover.trigger.value" /><div ref:content data-meeko-popover bind:id="popover.contentId" bind:popover="popover.mode.value" bind:role="popover.role.value" bind:aria-label="props.label" bind:aria-labelledby="popover.labelledBy.value" bind:tabindex="popover.role.value === 'dialog' ? '-1' : undefined" bind:class="props.class" bind:data-placement="popover.placement.value" bind:data-match-width="props.matchWidth ? '' : undefined"><render snippet="snippets.default" /></div></template>

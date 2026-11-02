@@ -22,21 +22,3 @@ pnpm-lock.yaml
 **/typescript-rules.generated.ts
 **/tests/fixtures/
 packages/devtools/types/protocol.d.ts
-# Templates on one line: whitespace between their tags would render as text (see each file).
-packages/ui/src/app/components/Popover.meeko
-packages/ui/src/app/components/Select.meeko
-packages/ui/src/app/components/Combobox.meeko
-packages/ui/src/app/components/ThemeToggle.meeko
-packages/ui/src/app/components/Tabs.meeko
-packages/ui/src/app/components/Tooltip.meeko
-packages/ui/src/app/components/CommandPalette.meeko
-packages/i18n/src/app/components/I18nT.meeko
-packages/i18n/src/app/components/internal/I18nTPart.meeko
-packages/meeko/src/app/components/MeekoAwait/MeekoAwait.meeko
-packages/meeko/src/app/components/MeekoLink/MeekoLink.meeko
-packages/meeko/src/app/components/MeekoPopover/MeekoPopover.meeko
-packages/meeko/src/app/components/MeekoSelect/MeekoSelect.meeko
-packages/meeko/src/app/components/MeekoThemeToggle/MeekoThemeToggle.meeko
-# The whitespace of these templates is part of their DOM: the benchmarks measure it and the tests read it.
-packages/meeko/benchmarks/cases/*.meeko
-packages/meeko/examples/**/*.meeko

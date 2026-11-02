@@ -1,7 +1,7 @@
 <script lang="ts" generic="Value extends string">
 	// <UITabs>: panels of one page, with the ARIA tabs pattern. The panels only change `hidden`, so the
-	// chosen one is already visible before hydration. Its template stays on one line, outside Prettier
-	// (.prettierignore): whitespace between the tags would be text inside the tabs.
+	// chosen one is already visible before hydration. Its template has no whitespace between the
+	// tags: it would be text inside the tabs.
 	import type { Snippet } from '@meekojs/meeko'
 
 	import { onMounted, useId } from '@meekojs/meeko'
@@ -27,5 +27,5 @@
 	onMounted(() => tabs.mount(root.value))
 </script>
 
-<!-- Keep this template on one line, without whitespace between the tags: it would be text inside the tabs. Do not format this file (it is in .prettierignore; tests/one-line-templates.test.mjs guards it). -->
+<!-- No whitespace between the tags of this template: it would be text inside the tabs. Prettier keeps it that way; tests/templates-without-whitespace.test.mjs guards it. -->
 <template><div ref:root bind:id="props.id" bind:class="['meeko-ui-tabs', props.class].filter(Boolean).join(' ')"><div role="tablist" class="meeko-ui-tabs-list" bind:aria-label="props.label" bind:aria-labelledby="props.labelledBy" on:keydown="tabs.keydown"><button each:of="props.items" each:as="item" each:key="item.value" type="button" role="tab" class="meeko-ui-tabs-tab" bind:id="tabs.tabId(item)" bind:aria-controls="tabs.panelId(item)" bind:aria-selected="tabs.selected.value === item.value ? 'true' : 'false'" bind:tabindex="tabs.selected.value === item.value ? '0' : '-1'" bind:disabled="item.disabled" on:click="() => tabs.choose(item)"><render if:when="snippets.tab" snippet="snippets.tab" args="item" /><template if:when="!snippets.tab">{item.label}</template><span class="meeko-ui-tabs-indicator" /></button></div><div each:of="props.items" each:as="item" each:key="item.value" role="tabpanel" class="meeko-ui-tabs-panel" tabindex="0" bind:id="tabs.panelId(item)" bind:aria-labelledby="tabs.tabId(item)" bind:hidden="tabs.selected.value !== item.value"><render if:when="panels['panel-' + item.value]" snippet="panels['panel-' + item.value]" /><render if:when="!panels['panel-' + item.value] && snippets.panel" snippet="snippets.panel" args="item" /></div></div></template>
