@@ -20,7 +20,7 @@
 .docs-actions {
 	display: flex;
 	flex-wrap: wrap;
-	align-items: center;
+	align-items: flex-end;
 	gap: var(--ui-space-3);
 	margin-block: var(--ui-space-5);
 }

@@ -330,6 +330,9 @@
 	font-size: var(--ui-font-size-sm);
 }
 [data-meeko-theme-toggle] button {
+	display: inline-flex;
+	justify-content: center;
+	align-items: center;
 	cursor: pointer;
 	border: var(--ui-border-width) solid var(--ui-color-border);
 	border-radius: var(--ui-radius-md);
@@ -338,6 +341,10 @@
 	min-height: var(--ui-control-height-md);
 	color: var(--ui-color-text);
 	font-size: var(--ui-font-size-sm);
+}
+/* An icon sits on the middle of the button, not on the baseline of a line of text. */
+[data-meeko-theme-icon] > svg {
+	display: block;
 }
 [data-meeko-theme-toggle] button:hover {
 	background: var(--ui-color-control-hover);

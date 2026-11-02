@@ -203,7 +203,7 @@ test('the English UI documentation has an English interface, hreflang, a switche
 	await page.getByRole('tab', { name: 'Team', exact: true }).click()
 	await page.getByRole('tabpanel', { name: 'Team', exact: true }).waitFor()
 	// The suggestion of the shell floats in the same place as the sample: close it first.
-	const shellSuggestion = page.getByRole('complementary', { name: 'Language suggestion', exact: true })
+	const shellSuggestion = page.getByRole('complementary', { name: 'Sugerencia de idioma', exact: true })
 	await shellSuggestion.getByRole('button', { name: 'Stay in English', exact: true }).click()
 	await shellSuggestion.waitFor({ state: 'detached' })
 	await page.getByRole('button', { name: 'Show the suggestion', exact: true }).click()
