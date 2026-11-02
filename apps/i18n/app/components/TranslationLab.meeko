@@ -6,113 +6,115 @@
 	const uiLocale = t('shell.meta.lang')
 	const name = signal('Meeko')
 	const total = signal(2)
-	const role = signal('owner')
-	const currency = signal('USD')
+	const roles = [
+		{ value: 'owner', label: t('lab.owner') },
+		{ value: 'viewer', label: t('lab.viewer') },
+	]
+	const role = signal<(typeof roles)[number] | null>(roles[0] ?? null)
+	const currencies = ['USD', 'EUR']
+	const currency = signal<string | null>('USD')
 	const date = Date.UTC(2026, 0, 15, 12)
+	const languages = computed(() => i18n.pageLocales().map((code) => ({ code, label: i18n.localeName(code), href: i18n.switchLocalePath(code), current: code === i18n.locale })))
+	const formats = computed(() => [
+		{ label: t('lab.currency'), labelLang: uiLocale, value: i18n.number(12345.67, { style: 'currency', currency: currency.value ?? 'USD' }) },
+		{ label: t('lab.date'), labelLang: uiLocale, value: i18n.date(date, { dateStyle: 'long', timeZone: 'UTC' }) },
+	])
 </script>
 
 <template>
-	<nav
-		class="locale-actions"
-		bind:aria-label="t('lab.languages')"
-	>
-		<UILink
-			each:of="i18n.pageLocales()"
-			each:as="code"
-			each:key="code"
-			variant="outline"
-			bind:href="i18n.switchLocalePath(code)"
-			bind:hreflang="code"
-			bind:lang="code"
-			bind:aria-current="code === i18n.locale ? 'page' : undefined"
-		>
-			{i18n.localeName(code)}
-		</UILink>
-	</nav>
-	<div
-		class="translation-controls"
-		dir="ltr"
-		bind:lang="uiLocale"
-	>
-		<UIField
-			id="translation-name"
-			bind:label="t('lab.name')"
-		>
-			<snippet
-				name="default"
-				params="id, describedBy"
-			>
-				<UIInput
-					model="name"
-					bind:id="id"
-					bind:describedBy="describedBy"
-				/>
-			</snippet>
-		</UIField>
-		<label for="translation-total">{t('lab.total', { total: total.value })}</label>
-		<input
-			id="translation-total"
-			type="range"
-			min="0"
-			max="12"
-			step="1"
-			bind:value="total.value"
-			on:input="(event) => (total.value = Number(event.currentTarget.value))"
+	<div class="docs-stack">
+		<UILocaleSwitcher
+			bind:label="t('lab.languages')"
+			bind:items="languages.value"
 		/>
-		<label for="translation-role">{t('lab.role')}</label>
-		<select
-			id="translation-role"
-			bind:value="role.value"
-			on:change="(event) => (role.value = event.currentTarget.value)"
+		<div
+			class="docs-stack"
+			dir="ltr"
+			bind:lang="uiLocale"
 		>
-			<option value="owner">{t('lab.owner')}</option>
-			<option value="viewer">{t('lab.viewer')}</option>
-		</select>
-		<label for="translation-currency">{t('lab.currency')}</label>
-		<select
-			id="translation-currency"
-			bind:value="currency.value"
-			on:change="(event) => (currency.value = event.currentTarget.value)"
+			<UIField
+				id="translation-name"
+				bind:label="t('lab.name')"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UIInput
+						model="name"
+						bind:id="id"
+						bind:describedBy="describedBy"
+					/>
+				</snippet>
+			</UIField>
+			<UISlider
+				id="translation-total"
+				model="total"
+				bind:label="t('lab.total', { total: total.value })"
+				bind:min="0"
+				bind:max="12"
+				bind:step="1"
+			/>
+			<UIField
+				id="translation-role"
+				bind:label="t('lab.role')"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UICombobox
+						by="value"
+						labelBy="label"
+						model="role"
+						bind:options="roles"
+						bind:id="id"
+						bind:describedBy="describedBy"
+					/>
+				</snippet>
+			</UIField>
+			<UIField
+				id="translation-currency"
+				bind:label="t('lab.currency')"
+			>
+				<snippet
+					name="default"
+					params="id, describedBy"
+				>
+					<UICombobox
+						model="currency"
+						bind:options="currencies"
+						bind:id="id"
+						bind:describedBy="describedBy"
+					/>
+				</snippet>
+			</UIField>
+		</div>
+		<section
+			aria-live="polite"
+			aria-atomic="true"
+			bind:aria-label="t('lab.result')"
+			bind:lang="i18n.locale"
+			bind:dir="i18n.dir"
 		>
-			<option value="USD">USD</option>
-			<option value="EUR">EUR</option>
-		</select>
+			<UICard>
+				<div class="docs-stack">
+					<p data-output="greeting">
+						<strong>{i18n.t('greeting', { name: name.value })}</strong>
+					</p>
+					<p data-output="plural">{i18n.t('cart.items', { total: total.value })}</p>
+					<p data-output="select">{i18n.t('invitation', { role: role.value?.value ?? 'owner', name: name.value })}</p>
+					<UIDescriptionList
+						bind:columns="2"
+						bind:items="formats.value"
+					/>
+				</div>
+			</UICard>
+		</section>
+		<p bind:lang="uiLocale">
+			{t('lab.active')}
+			<code>{i18n.locale}</code>
+			{t('lab.note')}
+		</p>
 	</div>
-	<section
-		class="translation-result"
-		aria-live="polite"
-		aria-atomic="true"
-		bind:aria-label="t('lab.result')"
-		bind:lang="i18n.locale"
-		bind:dir="i18n.dir"
-	>
-		<p data-output="greeting">{i18n.t('greeting', { name: name.value })}</p>
-		<p data-output="plural">{i18n.t('cart.items', { total: total.value })}</p>
-		<p data-output="select">{i18n.t('invitation', { role: role.value, name: name.value })}</p>
-		<dl>
-			<div>
-				<dt
-					dir="ltr"
-					bind:lang="uiLocale"
-				>
-					{t('lab.currency')}
-				</dt>
-				<dd data-output="number">{i18n.number(12345.67, { style: 'currency', currency: currency.value })}</dd>
-			</div>
-			<div>
-				<dt
-					dir="ltr"
-					bind:lang="uiLocale"
-				>
-					{t('lab.date')}
-				</dt>
-				<dd data-output="date">{i18n.date(date, { dateStyle: 'long', timeZone: 'UTC' })}</dd>
-			</div>
-		</dl>
-	</section>
-	<p bind:lang="uiLocale">
-		{t('lab.active')}
-		<code>{i18n.locale}</code>
-		{t('lab.note')}
-	</p>
 </template>

@@ -1,0 +1,21 @@
+<script lang="ts">
+	// The frame of a live example in a guide: a <UICard> with its content laid out in a row or a stack.
+	const props = defineProps<{ id?: string; layout?: 'row' | 'stack' }>()
+
+	const snippets = defineSnippets<{ default: [] }>()
+</script>
+
+<template>
+	<UICard
+		class="docs-preview"
+		padding="lg"
+	>
+		<div
+			class="docs-preview-content"
+			bind:id="props.id"
+			bind:data-layout="props.layout ?? 'row'"
+		>
+			<render snippet="snippets.default" />
+		</div>
+	</UICard>
+</template>

@@ -52,13 +52,13 @@
 			<code>@meekojs/i18n</code>
 			. The plugin provides one instance per application and SSR request.
 		</p>
-		<div class="doc-note">
+		<UIAlert tone="info">
 			After changing the catalogs, run
 			<code>meeko check</code>
 			to verify the generated contract. Do not edit the types in
 			<code>.meeko</code>
 			by hand.
-		</div>
+		</UIAlert>
 		<p>
 			Continue with
 			<MeekoLink to="/messages">messages and parameters</MeekoLink>

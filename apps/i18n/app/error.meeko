@@ -11,8 +11,8 @@
 		bind:description="t('error.description')"
 		bind:title="props.status === 404 ? t('error.notFound') : t('error.failed')"
 	>
-		<div class="error-page">
-			<p>{t('error.hint')}</p>
+		<p>{t('error.hint')}</p>
+		<div class="docs-actions">
 			<UILink to="/installation">{t('error.action')}</UILink>
 		</div>
 	</DocsPage>

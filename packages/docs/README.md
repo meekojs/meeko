@@ -5,7 +5,7 @@
 - `src/module.ts` registra los componentes `Docs*` y `docs.css`.
 - `src/app/components/Docs/` contiene el Shell, su adaptador, la navegación, la página, los bloques de código y la tabla de API, todos sobre `@meekojs/ui`.
 - `src/runtime/shell.ts` declara `DocsShellView`, el contrato del Shell (`meeko-docs/shell`).
-- `src/app/styles/docs.css` sólo dispone las demos de las guías con tokens `--ui-*`. **Esta base no tiene diseño propio:** ni paleta, ni fuentes, ni tema. Los colores, tamaños y fuentes salen de [`packages/ui`](../ui/DESIGN.md), que también sirve Inter.
+- `src/app/styles/docs.css` sólo dispone las guías con tokens `--ui-*`: `DocsPreview` (el marco de una demo), `.docs-actions`, `.docs-stack`, `.docs-grid`, `.docs-showcase`, `.docs-status` y `.docs-scale`. **Esta base no tiene diseño propio:** ni paleta, ni fuentes, ni tema. Los colores, tamaños y fuentes salen de [`packages/ui`](../ui/DESIGN.md), que también sirve Inter.
 - `assets/` contiene el logo derivado de la marca.
 - `scripts/assets.mjs` copia esos recursos al `public/` de la aplicación que lo ejecuta.
 - `scripts/build.mjs` genera declaraciones adyacentes de los componentes externos mediante la CLI de Meeko y el rebase común del monorepo. Las declaraciones se ignoran y se actualizan sólo si cambia su contenido.
@@ -39,7 +39,7 @@
 | `layout`  | `docs` por defecto; `landing` deja el ancho a cada sección. Sin grupos en `navigation` ni filtro, no hay barra lateral ni cajón.                                                                                                                                                          |
 | `product` | `brandName` y `logo` sustituyen a la marca de un paquete; `linksLabel` nombra los enlaces de la cabecera.                                                                                                                                                                                 |
 
-`DocsSiteShell` es el adaptador de una web de páginas `.meeko` (UI e i18n): recibe nombre, paquete, repositorio y navegación, y construye la vista con la moderación, el idioma y las métricas; su snippet `default` aloja el outlet. `DocsPage` admite `product` para el sufijo del título, con `Meeko UI` por defecto, y pinta `UIPageHeader`, `UIProse` y `DocsFeedback` sin un `<main>` propio. `DocsCode` y `DocsApi` son `UICodeBlock` y `UITable` con los textos del catálogo `shell`. `DocsAnnouncements` recibe `items` y emite `dismiss`, y el dashboard lo usa como vista previa.
+`DocsSiteShell` es el adaptador de una web de páginas `.meeko` (UI e i18n): recibe nombre, paquete, repositorio y navegación, y construye la vista con la moderación, el idioma y las métricas; su snippet `default` aloja el outlet. `DocsPage` admite `product` para el sufijo del título, con `Meeko UI` por defecto, y pinta `UIPageHeader`, `UIProse` y `DocsFeedback` sin un `<main>` propio. `DocsCode` y `DocsApi` son `UICodeBlock` y `UITable` con los textos del catálogo `shell`, y `DocsPreview`, una `UICard` con su contenido en fila o en pila. `DocsAnnouncements` recibe `items` y emite `dismiss`, y el dashboard lo usa como vista previa.
 
 Al cambiar esta base, comprueba ambas aplicaciones y los E2E de UI y de i18n. Los ejemplos del módulo i18n pertenecen a su aplicación, no a esta base compartida.
 
