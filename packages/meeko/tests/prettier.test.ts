@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 import { PassThrough } from "node:stream";
 import { after, describe, test } from "node:test";
 import { pathToFileURL } from "node:url";
+import { parseFragment } from "parse5";
 import * as prettier from "prettier";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
@@ -584,4 +585,76 @@ describe("Prettier in the language server", () => {
     const broken = component('<p if:when="count.value" each:of="[]">x</p>');
     assert.equal(await lspFormat(root, broken), broken);
   });
+});
+
+describe("What a component renders after saving it", () => {
+  interface ParsedHtml { nodeName: string; value?: string; childNodes?: ParsedHtml[] }
+  interface LoadedComponent {
+    renderWithState(props: object): { html: string; state: Record<string, unknown> };
+    hydrate(root: unknown, props: object, state: Record<string, unknown>): () => void;
+  }
+
+  /** Runs `body` with a temporary folder for compiled components. */
+  async function withComponents(body: (load: (text: string, name: string) => Promise<LoadedComponent>) => Promise<void>): Promise<void> {
+    await mkdir(resolve(".meeko"), { recursive: true });
+    const directory = await mkdtemp(join(resolve(".meeko"), "saving-"));
+    try {
+      await body(async (text, name) => {
+        const code = compile(text, join(directory, `${name}.meeko`)).code
+          .replace(`from "@meekojs/meeko/internal"`, `from ${JSON.stringify(pathToFileURL(resolve("src/internal.ts")).href)}`)
+          .replaceAll(`from "@meekojs/meeko"`, `from ${JSON.stringify(pathToFileURL(resolve("src/index.ts")).href)}`)
+          .replace(`from "./Card.meeko"`, `from "./Card.ts"`);
+        await writeFile(join(directory, `${name}.ts`), code);
+        return await import(pathToFileURL(join(directory, `${name}.ts`)).href) as LoadedComponent;
+      });
+    } finally { await rm(directory, { recursive: true, force: true }); }
+  }
+
+  const find = (node: ParsedHtml, tag: string): ParsedHtml | undefined => node.nodeName === tag ? node : (node.childNodes ?? []).map((child) => find(child, tag)).find(Boolean);
+  const textOf = (node: ParsedHtml): string => node.value ?? (node.childNodes ?? []).map(textOf).join("");
+  /** The text of an element as an HTML parser reads it, not as this compiler or `happy-dom` do. */
+  const parsedText = (html: string, tag: string): string => {
+    const element = find(parseFragment(html) as unknown as ParsedHtml, tag);
+    assert.ok(element, `<${tag}> in ${html}`);
+    return textOf(element);
+  };
+
+  test("the text after a line feed that the HTML parser ignores keeps its first characters", () => withComponents(async (load) => {
+    let id = 0;
+    for (const [template, tag] of [
+      ["<textarea>\n&amp;x</textarea>", "textarea"],
+      ["<textarea>\r\n&amp;x</textarea>", "textarea"],
+      ["<textarea>\n<!-- a -->\n  b</textarea>", "textarea"],
+      ["<textarea>\n<b>x</b></textarea>", "textarea"],
+      ["<textarea>\n\n&amp;x</textarea>", "textarea"],
+      ["<textarea>\n  a</textarea>", "textarea"],
+      ["<textarea>\na</textarea>", "textarea"],
+      ["<textarea>&#10;x</textarea>", "textarea"],
+      ["<textarea>\n&#10;x</textarea>", "textarea"],
+      ["<pre>\n&lt;b&gt;</pre>", "pre"],
+      ["<pre>\n&amp;x</pre>", "pre"],
+      ["<listing>\n&amp;x</listing>", "listing"],
+      ["<div>\n&amp;x</div>", "div"],
+    ] as const) {
+      const { html } = (await load(`<template>${template}</template>`, `Direct${id++}`)).renderWithState({});
+      assert.equal(parsedText(html, tag), parsedText(template.replaceAll("\r\n", "\n"), tag), template);
+    }
+  }));
+
+  test("a value after that line feed hydrates and updates", () => withComponents(async (load) => {
+    const source = `<script lang="ts">\nimport { signal } from "@meekojs/meeko";\nconst count = signal(0);\n</script>\n<template><pre>\n&amp;{count.value}</pre><button on:click="() => count.value++">+</button></template>`;
+    const component = await load(source, "Hydrated");
+    const rendered = component.renderWithState({});
+    assert.equal(parsedText(rendered.html, "pre"), "&0");
+    const window = new Window();
+    try {
+      const root = window.document.createElement("main");
+      root.innerHTML = rendered.html;
+      const release = component.hydrate(root, {}, rendered.state);
+      assert.equal(root.querySelector("pre")!.textContent, "&0");
+      (root.querySelector("button") as unknown as { click(): void }).click();
+      assert.equal(root.querySelector("pre")!.textContent, "&1");
+      release();
+    } finally { await window.happyDOM.close(); }
+  }));
 });

@@ -101,6 +101,26 @@ function componentTagName(node: ParsedNode, context: NormalizeContext): string |
   return name;
 }
 
+/** Elements whose HTML parser ignores a line feed right after the start tag. */
+const dropsFirstLineFeed = new Set(["pre", "listing", "textarea"]);
+
+/**
+ * When that line feed is a token of its own, parse5 places the text that follows where the tokenizer
+ * was after producing its first character: past a `<` in a `<textarea>`, or past all of `&amp;`. The
+ * compiler reads text from the source, so it would lose those characters. A line feed followed by
+ * more whitespace is one token with it, and the text correctly starts at that line feed.
+ */
+function restoreTextAfterLineFeed(text: TemplateNode | undefined, tagEnd: number, template: SfcSection): void {
+  const location = text?.sourceCodeLocation;
+  if (text?.nodeName !== "#text" || !location) return;
+  const lineFeed = /^(?:\r\n?|\n)/.exec(template.content.slice(tagEnd, tagEnd + 2))?.[0];
+  if (!lineFeed) return;
+  const start = tagEnd + lineFeed.length;
+  if (location.startOffset <= start) return;
+  text.start = template.contentStart + start;
+  text.sourceCodeLocation = { ...location, startOffset: start };
+}
+
 function normalize(node: ParsedNode, context: NormalizeContext): TemplateNode {
   const { template } = context;
   const location = node.sourceCodeLocation;
@@ -147,7 +167,10 @@ function normalize(node: ParsedNode, context: NormalizeContext): TemplateNode {
   }
   if (node.value !== undefined) result.value = node.value;
   if (attrs !== undefined) result.attrs = attrs;
-  if (node.childNodes !== undefined) result.childNodes = normalizeChildren(node.childNodes, context);
+  if (node.childNodes !== undefined) {
+    result.childNodes = normalizeChildren(node.childNodes, context);
+    if (dropsFirstLineFeed.has(node.tagName ?? "") && location?.startTag) restoreTextAfterLineFeed(result.childNodes[0], location.startTag.endOffset, template);
+  }
   if (node.content !== undefined) result.content = { childNodes: normalizeChildren(node.content.childNodes ?? [], context) };
   if (location !== undefined) result.sourceCodeLocation = location;
   if ((element || componentName !== undefined || node.tagName === "render" || node.tagName === "snippet" || node.tagName === "component" || result.tagName === "col") && location?.startTag && context.selfClosing.has(location.startOffset)) {
