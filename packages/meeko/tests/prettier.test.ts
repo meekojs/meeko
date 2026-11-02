@@ -657,4 +657,39 @@ describe("What a component renders after saving it", () => {
       release();
     } finally { await window.happyDOM.close(); }
   }));
+
+  test("formatting keeps a snippet next to text and interpolations, and preformatted content, for an HTML parser", () => withComponents(async (load) => {
+    await load(`<script lang="ts">\nconst snippets = defineSnippets<{ a: []; default?: [] }>();\n</script>\n<template><p>left<render snippet="snippets.a" />right</p></template>`, "Card");
+    const script = `<script lang="ts">\nimport * as Card from "./Card.meeko";\nconst x = "X";\n</script>\n`;
+    let id = 0;
+    for (const [template, tag, expected] of [
+      [`<Card>{x}<snippet name="a"> </snippet>{x}</Card>`, "p", "left right"],
+      [`<Card>{x}<snippet name="a"> <b>x</b> </snippet>{x}</Card>`, "p", "left x right"],
+      [`<Card>t<snippet name="a"> <b>x</b></snippet>t</Card>`, "p", "left xright"],
+      ["<textarea>&amp; &#10; &#32;</textarea>", "textarea", "& \n  "],
+      ["<textarea><!-- prettier-ignore -->\n  a</textarea>", "textarea", "<!-- prettier-ignore -->\n  a"],
+      ["<textarea> </textarea>", "textarea", " "],
+      ["<textarea>\n\n</textarea>", "textarea", "\n"],
+      ["<textarea>&#10;x</textarea>", "textarea", "x"],
+      ["<textarea>a\n}}\nb</textarea>", "textarea", "a\n}}\nb"],
+      ["<pre>&lt;b&gt; long enough to break</pre>", "pre", "<b> long enough to break"],
+      ["<pre>&amp;\n x</pre>", "pre", "&\n x"],
+      ["<pre>   </pre>", "pre", "   "],
+      ["<pre>a\n}}\n<b>x</b></pre>", "pre", "a\n}}\nx"],
+      ["<pre>\n&#10;x</pre>", "pre", "\nx"],
+      ["<p>a }} b</p>", "p", "a }} b"],
+    ] as const) {
+      const source = `${script}<template>${template}</template>\n`;
+      for (const htmlWhitespaceSensitivity of ["ignore", "css", "strict"] as const) {
+        for (const printWidth of [10, 15, 80]) {
+          const options = { htmlWhitespaceSensitivity, printWidth };
+          const formatted = await format(source, options);
+          assert.equal(await format(formatted, options), formatted, `${template}, ${htmlWhitespaceSensitivity}, ${printWidth}: stable`);
+          const { html } = (await load(formatted, `Saved${id++}`)).renderWithState({});
+          const text = parsedText(html, tag);
+          assert.equal(tag === "p" ? text.replace(/[\t\n\f\r ]+/g, " ") : text, expected, `${template}, ${htmlWhitespaceSensitivity}, ${printWidth}:\n${formatted}`);
+        }
+      }
+    }
+  }));
 });

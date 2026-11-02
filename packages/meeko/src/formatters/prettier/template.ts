@@ -11,7 +11,7 @@ import { classExpressionOption } from "./class-literals";
 import { classOrderOption, classTokens, sortClassTokens } from "./classes";
 
 const { group, indent, label, softline } = builders;
-const { mapDoc, replaceEndOfLine } = utils;
+const { mapDoc } = utils;
 
 /** Parser interno de la plantilla de un `.meeko`; sólo lo usa el parser `meeko` mediante `embed`. */
 export const templateParserName = "meeko-template";
@@ -58,6 +58,7 @@ interface HtmlNode {
   /** Expresión sin espacios exteriores de una interpolación `{expr}`. */
   meekoExpression?: string;
   setProperty(property: string, value: unknown): void;
+  createChild(node: Record<string, unknown>): HtmlNode;
   insertChildBefore(target: HtmlNode, node: Record<string, unknown>): void;
   removeChild(child: HtmlNode): void;
   walk(fn: (node: HtmlNode) => void): void;
@@ -182,10 +183,13 @@ function extractInterpolations(ast: HtmlNode): void {
   });
 }
 
+/** Lo que lee el printer HTML en lugar de un `}}` de un texto, que `meekoBraces` tomaría por un marcador. */
+const textBraces = "\uE002\uE002";
+
 /** Sustituye los marcadores `{{`/`}}` que imprime Prettier para una interpolación por `{`/`}`. */
 function meekoBraces(input: Doc): Doc {
   const visit = (item: Doc): Doc => {
-    if (typeof item === "string") return item === "{{" ? "{" : item === "}}" ? "}" : item;
+    if (typeof item === "string") return item === "{{" ? "{" : item === "}}" ? "}" : item.replaceAll(textBraces, "}}");
     if (Array.isArray(item)) return item.map(visit);
     switch (item.type) {
       case "label":
@@ -317,18 +321,74 @@ function contentSpansLines(node: HtmlNode): boolean {
   return Boolean(node.startSourceSpan && node.endSourceSpan && node.startSourceSpan.end.line < node.endSourceSpan.start.line);
 }
 
+/** What the HTML printer reads for the space at the edge of a `<snippet>`; it never reaches the output. */
+const snippetEdgeSpace = "\uE001";
+
 /**
  * `<snippet name="a"> <b>x</b> </snippet>`: for the compiler that space is content, and with a line
- * break it would be formatting. No line can break there, so the snippet is printed as written, unless
- * a neighbor without whitespace prints part of its tags.
+ * break it would be formatting, so no line may break there. Each one becomes a text node, which the
+ * printer keeps attached to the tags around it: what does not fit breaks inside those tags, as
+ * anywhere else without whitespace (`name="a"\n> <b`).
  */
-function isPrintedAsWritten(node: HtmlNode): boolean {
-  if (node.kind !== "element" || node.name !== "snippet") return false;
-  if ((node.prev && node.isLeadingSpaceSensitive && !node.hasLeadingSpaces) || (node.next && node.isTrailingSpaceSensitive && !node.hasTrailingSpaces)) return false;
+function keepSnippetEdges(node: HtmlNode): void {
+  const children = node.children!;
+  const opened = node.startSourceSpan?.end;
+  const closed = node.endSourceSpan?.start;
+  if (!opened || !closed) return;
+  const Span = node.sourceSpan.constructor as new (start: SourceLocation, end: SourceLocation) => SourceSpan;
+  const edge = (start: SourceLocation, end: SourceLocation): HtmlNode =>
+    node.createChild({ kind: "text", value: snippetEdgeSpace, sourceSpan: new Span(start, end), isLeadingSpaceSensitive: true, hasLeadingSpaces: false, isTrailingSpaceSensitive: true, hasTrailingSpaces: false });
+  const first = children[0];
+  const last = children[children.length - 1];
+  if (!first || !last) {
+    if (!node.hasDanglingSpaces || contentSpansLines(node)) return;
+    node.hasDanglingSpaces = false;
+    children.push(edge(opened, closed));
+    return;
+  }
+  if (!isTextLike(first) && first.hasLeadingSpaces && !startsOnItsOwnLine(first, node)) {
+    first.hasLeadingSpaces = false;
+    first.isLeadingSpaceSensitive = true;
+    children.unshift(edge(opened, first.sourceSpan.start));
+  }
+  if (!isTextLike(last) && last.hasTrailingSpaces && !endsOnItsOwnLine(last, node)) {
+    last.hasTrailingSpaces = false;
+    last.isTrailingSpaceSensitive = true;
+    children.push(edge(last.sourceSpan.end, closed));
+  }
+}
+
+/** Preformatted elements, whose parser also ignores a line feed right after the start tag. */
+const preformattedTags = new Set(["pre", "listing", "textarea"]);
+
+/** A character reference to a line feed, which the HTML parser ignores there as it does a literal one. */
+const lineFeedReference = /^&(?:#0*10|#[xX]0*[aA]|NewLine);?/;
+
+/**
+ * The content of a preformatted element that only stays the same as written: whitespace, which the
+ * printer would reduce to one line, and a first `&#10;`, which a line break before it turns into
+ * content. Prettier prints as written a preformatted element with a child that is not text, so these
+ * get one, empty and never printed.
+ */
+function hasOnlyItsWrittenForm(node: HtmlNode): boolean {
+  if (node.kind !== "element" || !preformattedTags.has(node.name ?? "")) return false;
   const first = node.children?.[0];
-  const last = node.children?.[node.children.length - 1];
-  if (!first || !last) return Boolean(node.hasDanglingSpaces && !contentSpansLines(node));
-  return (!isTextLike(first) && Boolean(first.hasLeadingSpaces) && !startsOnItsOwnLine(first, node)) || (!isTextLike(last) && Boolean(last.hasTrailingSpaces) && !endsOnItsOwnLine(last, node));
+  return first ? first.kind === "text" && lineFeedReference.test(first.value ?? "") : Boolean(node.hasDanglingSpaces);
+}
+
+/** A preformatted element that Prettier prints as written: it has a child that is not text. */
+function isPrintedAsWritten(node: HtmlNode): boolean {
+  return node.kind === "element" && preformattedTags.has(node.name ?? "") && (node.children ?? []).some((child) => !isTextLike(child));
+}
+
+/**
+ * Prettier prints an element as written as `[prefix, opening tag, content, ...closing tag, suffix]`,
+ * but the tags already have the prefix and the suffix, which is what it borrows from its neighbors:
+ * `<i>a</i><pre><b>x</b></pre>` would get a second `>`. The content is the source, not markers.
+ */
+function writtenElement(printed: Doc): Doc {
+  if (!Array.isArray(printed) || printed.length < 4 || typeof printed[0] !== "string" || typeof printed[printed.length - 1] !== "string") return printed;
+  return [printed[1]!, label(expressionLabel, printed[2]!), ...printed.slice(3, -1)];
 }
 
 /** A component with `<snippet>` blocks and nothing else: the compiler reads no text among them. */
@@ -348,7 +408,9 @@ function holdsOnlySnippets(node: HtmlNode): boolean {
  */
 function keepWhitespace(ast: HtmlNode): void {
   ast.walk((node) => {
+    if (node.kind === "text" && node.value?.includes("}}") && node.parent?.kind !== "interpolation" && node.parent?.name !== "script" && node.parent?.name !== "style") node.value = node.value.replaceAll("}}", textBraces);
     const children = node.children;
+    if (children && hasOnlyItsWrittenForm(node)) children.push(node.createChild({ kind: "comment", value: "", sourceSpan: node.sourceSpan }));
     if (!children || (node.kind !== "element" && node.kind !== "root") || node.isWhitespaceSensitive) return;
     if (holdsOnlySnippets(node)) {
       node.isDanglingSpaceSensitive = false;
@@ -359,13 +421,14 @@ function keepWhitespace(ast: HtmlNode): void {
     const first = children[0];
     const last = children[children.length - 1];
     if (!first || !last) {
-      node.isDanglingSpaceSensitive = Boolean(node.hasDanglingSpaces && !(snippet && contentSpansLines(node)));
+      if (snippet) keepSnippetEdges(node);
+      node.isDanglingSpaceSensitive = Boolean(node.hasDanglingSpaces && !snippet);
       return;
     }
     // The whitespace at the edges of the root belongs to the `<template>` section: the `meeko` printer keeps it.
     if (node.kind === "element") {
-      first.isLeadingSpaceSensitive = !snippet || isTextLike(first) || (Boolean(first.hasLeadingSpaces) && !startsOnItsOwnLine(first, node));
-      last.isTrailingSpaceSensitive = !snippet || isTextLike(last) || (Boolean(last.hasTrailingSpaces) && !endsOnItsOwnLine(last, node));
+      first.isLeadingSpaceSensitive = !snippet || isTextLike(first);
+      last.isTrailingSpaceSensitive = !snippet || isTextLike(last);
     }
     for (let index = 1; index < children.length; index++) {
       const previous = children[index - 1]!;
@@ -374,6 +437,7 @@ function keepWhitespace(ast: HtmlNode): void {
       previous.isTrailingSpaceSensitive = true;
       next.isLeadingSpaceSensitive = true;
     }
+    if (snippet) keepSnippetEdges(node);
   });
 }
 
@@ -408,9 +472,10 @@ const templatePrinter: Printer<HtmlNode> = {
   },
   print(path, options, print) {
     const { node } = path;
-    if (isPrintedAsWritten(node)) return replaceEndOfLine(options.originalText.slice(node.sourceSpan.start.offset, node.sourceSpan.end.offset));
     const printed = host(options).printer.print(path, options, print);
+    if (node.kind === "text" && node.value === snippetEdgeSpace) return mapDoc(printed, (item) => typeof item === "string" ? item.replaceAll(snippetEdgeSpace, " ") : item);
     if (node.kind === "root") return meekoBraces(printed);
+    if (isPrintedAsWritten(node)) return writtenElement(printed);
     const breaks = keepsLineBreaks(node) && typeof printed === "object" && !Array.isArray(printed) && printed.type === "group";
     return breaks ? { ...printed, break: true } : printed;
   },

@@ -18,6 +18,21 @@ const sensitivities = ['ignore', 'css', 'strict']
 
 const script = '<script lang="ts">\nconst items = ["a"];\nconst label = "x";\nconst on = true;\n</script>\n\n'
 
+// The tags of a snippet without whitespace outside share their markers with these neighbors.
+const snippetNeighbors = {
+	'an empty snippet with a space between interpolations': '<Card>{label}<snippet name="a"> </snippet>{label}</Card>',
+	'a snippet with spaces between interpolations': '<Card>{label}<snippet name="a"> <b>x</b> </snippet>{label}</Card>',
+	'a snippet with spaces between texts': '<Card>left<snippet name="a"> <b>x</b> </snippet>right</Card>',
+	'a snippet with spaces between elements': '<Card><i>a</i><snippet name="a"> <b>x</b> </snippet><i>b</i></Card>',
+	'a snippet with a space at its start only': '<Card>{label}<snippet name="a"> <b>x</b></snippet>{label}</Card>',
+	'a snippet with a space at its end only': '<Card>{label}<snippet name="a"><b>x</b> </snippet>{label}</Card>',
+	'a first snippet with spaces': '<Card><snippet name="a"> <b>x</b> </snippet> text</Card>',
+	'a last snippet with spaces': '<Card>text <snippet name="a"> <b>x</b> </snippet></Card>',
+	'a snippet with a comment at its edge': '<Card>{label}<snippet name="a"> <!-- c --> <b>x</b> </snippet></Card>',
+	'a snippet with an element without content at its edge': '<Card>{label}<snippet name="a"> <b></b> </snippet>{label}</Card>',
+	'a snippet with an element with children at its edge': '<Card>{label}<snippet name="a"> <b><i>x</i></b> </snippet>{label}</Card>',
+}
+
 const cases = {
 	'a list row with its directives': '<ul><li each:of="items" each:as="item">{item}</li></ul>',
 	'an interpolation with two attributes': '<button type="button" class="b">{label}</button>',
@@ -42,6 +57,14 @@ const cases = {
 	'a template region': '<template if:when="on"><p>a</p></template><p>b</p>',
 	'a preformatted element': '<pre class="a" id="b">{label}\n  x\n</pre>',
 	'a text area': '<textarea class="a" id="b">x</textarea>',
+	'closing braces in a text': '<p>a }} b {label} }}</p>',
+	'closing braces on a preformatted line': '<pre>a\n}}\n<b>x</b></pre><textarea>a\n}}\nb</textarea>',
+	'only whitespace in a preformatted element': '<div><pre>   </pre><textarea> </textarea><textarea>\n\n</textarea>t</div>',
+	'a preformatted element between its neighbors': '<div><i>a</i><pre><b>x</b>t</pre><i>b</i></div>',
+	'a line feed reference at the start of a preformatted element': '<pre>&#10;x</pre><textarea>\n&#10;x</textarea>',
+	'a comment-like text after the line feed of a text area': '<textarea>\n<!-- a -->\n  b</textarea>',
+	'character references after the line feed of a text area': '<textarea>\n&amp; &#10; &#32;</textarea><pre>\n&lt;b&gt;</pre>',
+	...snippetNeighbors,
 	'no element': 'text',
 	'an empty root with a space': ' ',
 	'a space at the edges of the root': ' <p>x</p> ',
@@ -67,6 +90,31 @@ for (const [name, template] of Object.entries(cases)) {
 		}
 	})
 }
+
+test('a snippet next to text and interpolations is stable and keeps its spaces at every width', { timeout: 120_000 }, async () => {
+	for (const template of Object.values(snippetNeighbors)) {
+		const source = `${script}<template>${template}</template>\n`
+		const expected = templateTree(source)
+		for (const htmlWhitespaceSensitivity of sensitivities) {
+			for (let printWidth = 1; printWidth <= 90; printWidth += printWidth < 40 ? 1 : 10) {
+				const options = { ...base, htmlWhitespaceSensitivity, printWidth }
+				const formatted = await format(source, { ...options, plugins: [plugin] })
+				const label = `${template}, ${htmlWhitespaceSensitivity}, ${printWidth}`
+				assert.deepEqual(templateTree(formatted), expected, label)
+				assert.equal(await format(formatted, { ...options, plugins: [plugin] }), formatted, `${label}: stable`)
+				assert.equal(await format(source, { ...options, plugins: [corePlugin] }), formatted, `${label}: the core`)
+			}
+		}
+	}
+})
+
+test('a snippet with a space at its edge breaks inside its tags, and fits on one line when it can', async () => {
+	const source = `${script}<template><Card>{label}<snippet name="a"> <b>x</b> </snippet>{label}</Card></template>\n`
+	assert.match(await format(source, { ...ignore, plugins: [plugin] }), /\{label\}<snippet name="a"> <b>x<\/b> <\/snippet>\{label\}/)
+	const narrow = await format(source, { ...ignore, plugins: [plugin], printWidth: 15 })
+	assert.match(narrow, /> <b/)
+	assert.match(narrow, /> <\/snippet/)
+})
 
 test('whitespace stays the printed form of the source: content on its own lines stays there', async () => {
 	const options = { ...ignore, plugins: [plugin], useTabs: true }
