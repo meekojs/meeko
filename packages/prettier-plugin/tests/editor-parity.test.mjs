@@ -9,6 +9,7 @@ import { format } from 'prettier'
 
 import { formatWithPrettier } from '../../meeko/dist/formatters/prettier/editor.js'
 import plugin from '../dist/index.js'
+import { templateTree } from './template-tree.mjs'
 
 // Saving in the editor formats with the plugin of the core, and `prettier --check` with this one:
 // they must agree, or the check fails right after saving.
@@ -79,9 +80,25 @@ test('the core and the plugin keep the same adjacent inline content with htmlWhi
 	assert.doesNotMatch(cli, /<\/code>\s+\./)
 })
 
-test('the core and the plugin keep the same whitespace with htmlWhitespaceSensitivity "ignore"', async () => {
-	for (const template of ['<ul><li each:of="a" each:as="b">{b}</li></ul>', '<div><button class="a" id="b">x</button><button>y</button></div>', '\n<p>\ntext\n</p>\n', ' <p>Hi<b> you</b></p>', '<span> </span>', ' ']) {
-		await assertSameEverywhere(`<template>${template}</template>\n`, { filepath: 'Component.meeko', htmlWhitespaceSensitivity: 'ignore', singleAttributePerLine: true, meekoIndentSections: true })
+test('the core and the plugin keep the same whitespace with every htmlWhitespaceSensitivity', async () => {
+	for (const htmlWhitespaceSensitivity of ['ignore', 'css', 'strict']) {
+		for (const template of ['<ul><li each:of="a" each:as="b">{b}</li></ul>', '<div><button class="a" id="b">x</button><button>y</button></div>', '\n<p>\ntext\n</p>\n', ' <p>Hi<b> you</b></p>', '<span> </span>', ' ']) {
+			await assertSameEverywhere(`<template>${template}</template>\n`, { filepath: 'Component.meeko', htmlWhitespaceSensitivity, singleAttributePerLine: true, meekoIndentSections: true })
+		}
+	}
+})
+
+test('saving in the editor without a project configuration keeps the text nodes', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'meeko-editor-whitespace-'))
+	try {
+		const filename = join(root, 'Component.meeko')
+		const text = '<template><ul><li each:of="a" each:as="b" class="c">{b}</li></ul><button>x</button><button>y</button></template>\n'
+		for (const trusted of [true, false]) {
+			const saved = await formatWithPrettier({ text, filename, tabSize: 2, insertSpaces: true, trusted })
+			assert.deepEqual(templateTree(saved.text, filename), templateTree(text, filename), `trusted: ${trusted}`)
+		}
+	} finally {
+		await rm(root, { recursive: true, force: true })
 	}
 })
 

@@ -339,7 +339,8 @@ function holdsOnlySnippets(node: HtmlNode): boolean {
 /**
  * The compiler renders the whitespace of a template as text nodes, so saving a file must not add or
  * remove any: `<li each:of="a" each:as="b">{b}</li>` keeps its text node without whitespace, and
- * `Hi<b> you</b>` keeps its space. `htmlWhitespaceSensitivity: "ignore"` alone would do both.
+ * `Hi<b> you</b>` keeps its space. Every `htmlWhitespaceSensitivity` follows this rule: left to
+ * itself, `"ignore"` would do both, and `"css"` would too wherever it takes an element for a block.
  * Formatting may still turn one whitespace into another (a space into a line break and indentation),
  * which renders the same outside `white-space: pre`. The compiler itself drops whitespace in two
  * places, which stay free: among the blocks of a component with only `<snippet>` content, and between
@@ -348,18 +349,23 @@ function holdsOnlySnippets(node: HtmlNode): boolean {
 function keepWhitespace(ast: HtmlNode): void {
   ast.walk((node) => {
     const children = node.children;
-    if (!children || (node.kind !== "element" && node.kind !== "root") || node.isWhitespaceSensitive || holdsOnlySnippets(node)) return;
+    if (!children || (node.kind !== "element" && node.kind !== "root") || node.isWhitespaceSensitive) return;
+    if (holdsOnlySnippets(node)) {
+      node.isDanglingSpaceSensitive = false;
+      for (const child of children) child.isLeadingSpaceSensitive = child.isTrailingSpaceSensitive = false;
+      return;
+    }
     const snippet = node.name === "snippet";
     const first = children[0];
     const last = children[children.length - 1];
     if (!first || !last) {
-      if (node.hasDanglingSpaces && !(snippet && contentSpansLines(node))) node.isDanglingSpaceSensitive = true;
+      node.isDanglingSpaceSensitive = Boolean(node.hasDanglingSpaces && !(snippet && contentSpansLines(node)));
       return;
     }
     // The whitespace at the edges of the root belongs to the `<template>` section: the `meeko` printer keeps it.
     if (node.kind === "element") {
-      if (!snippet || isTextLike(first) || (first.hasLeadingSpaces && !startsOnItsOwnLine(first, node))) first.isLeadingSpaceSensitive = true;
-      if (!snippet || isTextLike(last) || (last.hasTrailingSpaces && !endsOnItsOwnLine(last, node))) last.isTrailingSpaceSensitive = true;
+      first.isLeadingSpaceSensitive = !snippet || isTextLike(first) || (Boolean(first.hasLeadingSpaces) && !startsOnItsOwnLine(first, node));
+      last.isTrailingSpaceSensitive = !snippet || isTextLike(last) || (Boolean(last.hasTrailingSpaces) && !endsOnItsOwnLine(last, node));
     }
     for (let index = 1; index < children.length; index++) {
       const previous = children[index - 1]!;
@@ -396,17 +402,16 @@ const templatePrinter: Printer<HtmlNode> = {
     options.parser = "html";
     try {
       const processed = host(options).printer.preprocess(ast, options) as HtmlNode;
-      if (options.htmlWhitespaceSensitivity === "ignore") keepWhitespace(processed);
+      keepWhitespace(processed);
       return processed;
     } finally { options.parser = parser; }
   },
   print(path, options, print) {
-    const ignoresWhitespace = options.htmlWhitespaceSensitivity === "ignore";
     const { node } = path;
-    if (ignoresWhitespace && isPrintedAsWritten(node)) return replaceEndOfLine(options.originalText.slice(node.sourceSpan.start.offset, node.sourceSpan.end.offset));
+    if (isPrintedAsWritten(node)) return replaceEndOfLine(options.originalText.slice(node.sourceSpan.start.offset, node.sourceSpan.end.offset));
     const printed = host(options).printer.print(path, options, print);
     if (node.kind === "root") return meekoBraces(printed);
-    const breaks = ignoresWhitespace && keepsLineBreaks(node) && typeof printed === "object" && !Array.isArray(printed) && printed.type === "group";
+    const breaks = keepsLineBreaks(node) && typeof printed === "object" && !Array.isArray(printed) && printed.type === "group";
     return breaks ? { ...printed, break: true } : printed;
   },
   embed(path: AstPath<HtmlNode>, options: Options) {

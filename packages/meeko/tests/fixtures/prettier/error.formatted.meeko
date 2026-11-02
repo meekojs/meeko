@@ -12,16 +12,14 @@ const props = defineProps<Props>();
 <template>
 <section class="page-heading error-page">
   <p class="error-page__status">{String(props.status)}</p>
-  <h1>
-    {
-      props.status === 404
-        ? "Esta página no existe."
-        : "Algo falló al cargar esta página."
-    }
-  </h1>
-  <p>
-    Código: <code>{props.message}</code>
-  </p>
+  <h1>{
+    props.status === 404
+      ? "Esta página no existe."
+      : "Algo falló al cargar esta página."
+  }</h1>
+  <p
+    >Código: <code>{props.message}</code></p
+  >
   <p><a href="/">Volver al inicio</a></p>
 </section>
 </template>

@@ -53,7 +53,7 @@ describe("Prettier plugin for .meeko", () => {
   }
 
   test("keeps the order and attributes of the sections and the comments between them", async () => {
-    const source = '<!-- page -->\n<script server lang="ts">\nexport const route={}\n</script>\n<script lang="ts">\nconst a=1\n</script>\n\n\n<!-- view -->\n<template><p>{a}</p></template>\n<style scoped lang="css">.a{color:red}</style>\n';
+    const source = '<!-- page -->\n<script server lang="ts">\nexport const route={}\n</script>\n<script lang="ts">\nconst a=1\n</script>\n\n\n<!-- view -->\n<template>\n<p>{a}</p>\n</template>\n<style scoped lang="css">.a{color:red}</style>\n';
     assert.equal(await formatStable(source), '<!-- page -->\n<script server lang="ts">\nexport const route = {};\n</script>\n<script lang="ts">\nconst a = 1;\n</script>\n\n<!-- view -->\n<template>\n<p>{a}</p>\n</template>\n<style scoped lang="css">\n.a {\n  color: red;\n}\n</style>\n');
   });
 
@@ -117,7 +117,8 @@ describe("Prettier plugin for .meeko", () => {
     assert.match(template, /<render snippet="snippets\.default" \/>/);
     assert.match(template, /<input model="name" \/>/);
     assert.match(template, /model:open="visible"\s+model="name"/);
-    assert.match(template, /<snippet name="actions" params="close"\s*><button on:click="\(\) => close\(\)">x<\/button><\/snippet\s*>/);
+    // The compiler drops a line break at the edge of a snippet, so the format is free to write one.
+    assert.match(template, /<snippet name="actions" params="close"\s*>\s*<button on:click="\(\) => close\(\)">x<\/button>\s*<\/snippet\s*>/);
   });
 
   test("formats the if:when of a <snippet> as an expression", async () => {
@@ -134,7 +135,7 @@ describe("Prettier plugin for .meeko", () => {
       "const count = signal(0);\nconst pick = (n: number) => n;\n",
     )));
     assert.match(formatted, /<component is="pick\(count\.value\)" bind:label="count\.value" \/>/);
-    assert.match(formatted, /\/>\s*<p>after<\/p>\s*<\/div>/);
+    assert.match(formatted, /\/><p\s*>after<\/p\s*><\/div\s*>/);
   });
 
   test("keeps self-closing HTML elements, and their end tags, as written (since 1.8)", async () => {
@@ -145,12 +146,12 @@ describe("Prettier plugin for .meeko", () => {
     assert.match(formatted, /<span \/><textarea name="t" \/>/);
     assert.match(formatted, /<td \/>\s*<td>x<\/td>/);
     assert.match(formatted, /<div><\/div>/);
-    assert.match(formatted, /<p>after<\/p>\s*<\/section>/);
+    assert.match(formatted, /<p>after<\/p><\/section\s*>/);
   });
 
   test("formats {expr} interpolations, nested braces and strings", async () => {
     const formatted = templateOf(await formatStable(component(
-      '<p>Total:{count.value+1}items, { {a:"}"}.a } and {`x ${ {b:1}.b }`}</p>\n<p>{count.value>1?"Una cadena bastante larga para partir la línea":"Otra cadena también bastante larga"}</p>',
+      '<p>Total:{count.value+1}items, { {a:"}"}.a } and {`x ${ {b:1}.b }`}</p>\n<p>\n{count.value>1?"Una cadena bastante larga para partir la línea":"Otra cadena también bastante larga"}\n</p>',
     )));
     assert.equal(formatted, [
       '<p>Total:{count.value + 1}items, {{ a: "}" }.a} and {`x ${{ b: 1 }.b}`}</p>',
@@ -228,7 +229,7 @@ describe("Prettier plugin for .meeko", () => {
   test("does not add a <script lang=\"ts\"> to a component without one", async () => {
     const plain = await formatStable("<template>\n<p   class=\"x\">Hola</p>\n</template>\n\n<style scoped>\np{color:red}\n</style>\n");
     assert.equal(plain, "<template>\n<p class=\"x\">Hola</p>\n</template>\n\n<style scoped>\np {\n  color: red;\n}\n</style>\n");
-    const page = "<script server lang=\"ts\">\nexport const title=\"Hola\"\n</script>\n<template><h1>{title}</h1></template>\n";
+    const page = "<script server lang=\"ts\">\nexport const title=\"Hola\"\n</script>\n<template>\n<h1>{title}</h1>\n</template>\n";
     const formatted = await format(page);
     assert.equal(await format(formatted), formatted);
     assert.doesNotMatch(formatted, /<script lang="ts">/);
@@ -236,7 +237,7 @@ describe("Prettier plugin for .meeko", () => {
   });
 
   test("never changes the content of pre and textarea", async () => {
-    const formatted = templateOf(await formatStable(component("<section><pre>a\n   b   {count.value}\n</pre>\n<textarea>  keep\n   this  </textarea></section>")));
+    const formatted = templateOf(await formatStable(component("<section>\n<pre>a\n   b   {count.value}\n</pre>\n<textarea>  keep\n   this  </textarea>\n</section>")));
     // A line feed right after <pre> or <textarea> is ignored by HTML, so Prettier may add it.
     assert.equal(formatted, "<section>\n  <pre>\na\n   b   {count.value}\n</pre>\n  <textarea>\n  keep\n   this  </textarea>\n</section>");
   });
@@ -250,7 +251,7 @@ describe("Prettier plugin for .meeko", () => {
   });
 
   test("meekoIndentSections indents every section one level", async () => {
-    const source = '<script server lang="ts">\nexport const route={}\n</script>\n<script lang="ts">\nconst count=signal(0)\n</script>\n<template>\n<section><p>{count.value}</p><pre>a\n  b</pre></section>\n</template>\n<style>.a{color:red}</style>\n';
+    const source = '<script server lang="ts">\nexport const route={}\n</script>\n<script lang="ts">\nconst count=signal(0)\n</script>\n<template>\n<section>\n<p>{count.value}</p>\n<pre>a\n  b</pre>\n</section>\n</template>\n<style>.a{color:red}</style>\n';
     const flat = await formatStable(source, { meekoIndentSections: false });
     const indented = await formatStable(source, { meekoIndentSections: true });
     assert.equal(indented, [
@@ -390,7 +391,7 @@ describe("meekoPreserveArrayBreaks", () => {
 
   test("applies to the script and the template expressions of a .meeko file", async () => {
     const meeko = component(
-      '<ul><li each:of="[\n  1, 2]" each:as="n">{n}</li></ul>\n<p bind:title="[a,\n  b].join()">{[\n  a, b].length}</p>',
+      '<ul>\n<li each:of="[\n  1, 2]" each:as="n">{n}</li>\n</ul>\n<p bind:title="[a,\n  b].join()">\n{[\n  a, b].length}\n</p>',
       'const a = "a";\nconst b = "b";\nconst items = signal([\n  "a", "b"]);\nconst flat = ["a",\n  "b"];\n',
     );
     const formatted = await formatStable(meeko, { printWidth: 800 });
@@ -534,10 +535,10 @@ describe("Prettier in the language server", () => {
 
   });
 
-  test("saving a component keeps what it renders: no text node appears or disappears", async () => {
-    const script = `<script lang="ts">\nimport { signal } from "@meekojs/meeko";\nconst items = signal(["a", "b"]);\nconst on = signal(true);\nconst label = "x";\n</script>\n`;
+  for (const htmlWhitespaceSensitivity of ["ignore", "css", "strict"] as const) test(`saving a component with the sensitivity "${htmlWhitespaceSensitivity}" keeps what it renders: no text node appears or disappears`, async () => {
+    const script =`<script lang="ts">\nimport { signal } from "@meekojs/meeko";\nconst items = signal(["a", "b"]);\nconst on = signal(true);\nconst label = "x";\n</script>\n`;
     const template = `<template><ul class="u" id="l"><li each:of="items.value" each:as="item" each:key="item" class="i">{item}</li></ul><div class="d" id="e"><button type="button" class="b" on:click="() => on.value = !on.value">{label}</button><button type="button">y</button><span if:when="on.value" class="s" id="t">Hi<b> you</b>!</span></div></template>`;
-    const options: prettier.Options & MeekoPrettierOptions = { filepath: "Whitespace.meeko", htmlWhitespaceSensitivity: "ignore", singleAttributePerLine: true, printWidth: 800, useTabs: true, meekoIndentSections: true };
+    const options: prettier.Options & MeekoPrettierOptions = { filepath: "Whitespace.meeko", htmlWhitespaceSensitivity, singleAttributePerLine: true, printWidth: 800, useTabs: true, meekoIndentSections: true };
     const source = `${script}${template}\n`;
     const formatted = await format(source, options);
     assert.notEqual(formatted, source, "the attributes go on their own lines");

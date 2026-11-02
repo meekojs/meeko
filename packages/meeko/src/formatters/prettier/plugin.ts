@@ -284,7 +284,7 @@ const meekoPrinter: Printer<MeekoNode> = {
       const close = verbatim(options, node.contentEnd, node.end);
       const content = text.slice(node.contentStart, node.contentEnd);
       // The compiler renders this whitespace as text nodes: `<template><p></p></template>` has none.
-      const keepsEdges = parser === templateParserName && options.htmlWhitespaceSensitivity === "ignore";
+      const keepsEdges = parser === templateParserName;
       if (!content.trim()) return keepsEdges && content ? [open, " ", close] : [open, close];
       // The script needs it too: its class functions know the classes of the component's `<style>`.
       const classOrder = parser === templateParserName || parser === "typescript" ? (path.root as MeekoRootNode).classOrder : undefined;

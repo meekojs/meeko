@@ -12,7 +12,9 @@ import { templateTree } from './template-tree.mjs'
 // The compiler renders the whitespace of a template as text nodes, so saving a file must not change
 // what it renders: no whitespace appears, and none disappears, at any boundary between two nodes.
 const repository = fileURLToPath(new URL('../../../', import.meta.url))
-const ignore = { filepath: 'Component.meeko', htmlWhitespaceSensitivity: 'ignore', printWidth: 800, singleAttributePerLine: true }
+const base = { filepath: 'Component.meeko', printWidth: 800, singleAttributePerLine: true }
+const ignore = { ...base, htmlWhitespaceSensitivity: 'ignore' }
+const sensitivities = ['ignore', 'css', 'strict']
 
 const script = '<script lang="ts">\nconst items = ["a"];\nconst label = "x";\nconst on = true;\n</script>\n\n'
 
@@ -50,15 +52,18 @@ const cases = {
 for (const [name, template] of Object.entries(cases)) {
 	test(`formatting keeps the text nodes of ${name}`, async () => {
 		const source = `${script}<template>${template}</template>\n`
-		for (const [label, options] of [
-			['plugin', { ...ignore, plugins: [plugin] }],
-			['core', { ...ignore, plugins: [corePlugin] }],
-			['indented sections', { ...ignore, plugins: [plugin], meekoIndentSections: true }],
-			['narrow', { ...ignore, plugins: [plugin], printWidth: 20 }],
-		]) {
-			const formatted = await format(source, options)
-			assert.deepEqual(templateTree(formatted), templateTree(source), `${label}:\n${formatted}`)
-			assert.equal(await format(formatted, options), formatted, `${label}: stable`)
+		for (const htmlWhitespaceSensitivity of sensitivities) {
+			const sensitivity = { ...base, htmlWhitespaceSensitivity }
+			for (const [label, options] of [
+				['plugin', { ...sensitivity, plugins: [plugin] }],
+				['core', { ...sensitivity, plugins: [corePlugin] }],
+				['indented sections', { ...sensitivity, plugins: [plugin], meekoIndentSections: true }],
+				['narrow', { ...sensitivity, plugins: [plugin], printWidth: 20 }],
+			]) {
+				const formatted = await format(source, options)
+				assert.deepEqual(templateTree(formatted), templateTree(source), `${htmlWhitespaceSensitivity}, ${label}:\n${formatted}`)
+				assert.equal(await format(formatted, options), formatted, `${htmlWhitespaceSensitivity}, ${label}: stable`)
+			}
 		}
 	})
 }
@@ -77,11 +82,11 @@ test('a component with only snippets and the edge of a snippet stay free: the co
 	assert.deepEqual(templateTree(formatted), templateTree(source))
 })
 
-test('the other sensitivities keep the form of Prettier', async () => {
-	for (const htmlWhitespaceSensitivity of ['css', 'strict']) {
-		const formatted = await format(`${script}<template><p>x</p></template>\n`, { filepath: 'Component.meeko', plugins: [plugin], htmlWhitespaceSensitivity })
-		assert.match(formatted, /<template>\n<p>x<\/p>\n<\/template>/, htmlWhitespaceSensitivity)
-	}
+test('without an option, formatting keeps the text nodes too, as in an editor without a project configuration', async () => {
+	const source = `${script}<template><ul><li each:of="items" each:as="item">{item}</li></ul></template>\n`
+	const formatted = await format(source, { filepath: 'Component.meeko', plugins: [corePlugin] })
+	assert.match(formatted, /^<template><ul/m)
+	assert.deepEqual(templateTree(formatted), templateTree(source))
 })
 
 /** The `.meeko` files of a folder, at any depth. */
@@ -96,10 +101,12 @@ for (const directory of ['packages/ui/src', 'packages/i18n/src', 'packages/meeko
 		assert.ok(files.length, directory)
 		for (const file of files) {
 			const source = await readFile(file, 'utf8')
-			const options = { ...ignore, filepath: file, plugins: [plugin], useTabs: true, meekoIndentSections: true, singleQuote: true, semi: false }
-			const formatted = await format(source, options)
-			assert.deepEqual(templateTree(formatted, file), templateTree(source, file), file)
-			assert.equal(await format(formatted, options), formatted, `${file}: stable`)
+			for (const htmlWhitespaceSensitivity of sensitivities) {
+				const options = { ...base, htmlWhitespaceSensitivity, filepath: file, plugins: [plugin], useTabs: true, meekoIndentSections: true, singleQuote: true, semi: false }
+				const formatted = await format(source, options)
+				assert.deepEqual(templateTree(formatted, file), templateTree(source, file), `${file}, ${htmlWhitespaceSensitivity}`)
+				assert.equal(await format(formatted, options), formatted, `${file}, ${htmlWhitespaceSensitivity}: stable`)
+			}
 		}
 	})
 }

@@ -59,12 +59,11 @@ async function signIn(event: Event): Promise<void> {
       class="action action--primary login-submit"
       type="submit"
       bind:disabled="pending.value"
+      >{pending.value ? "Verificando…" : "Entrar al dashboard"}</button
     >
-      {pending.value ? "Verificando…" : "Entrar al dashboard"}
-    </button>
-    <p class="login-feedback" role="status" aria-live="polite">
-      {feedback.value}
-    </p>
+    <p class="login-feedback" role="status" aria-live="polite">{
+      feedback.value
+    }</p>
   </form>
 </section>
 </template>
