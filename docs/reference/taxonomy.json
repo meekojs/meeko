@@ -491,6 +491,12 @@
 					]
 				},
 				{
+					"name": "documentHtml",
+					"symbols": [
+						"@meekojs/meeko/framework#documentHtml"
+					]
+				},
+				{
 					"name": "hashPassword",
 					"symbols": [
 						"@meekojs/meeko/password#hashPassword"

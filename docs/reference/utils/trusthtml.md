@@ -10,6 +10,7 @@ related:
   - "syntax:html"
   - "syntax:interpolation"
   - "syntax:script-server"
+  - "@meekojs/meeko/framework#documentHtml"
   - docs/api.md#html-de-confianza-trustedhtml-y-trusthtml
   - docs/api.md#html-sin-escapar-con-html
 ---

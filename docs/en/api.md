@@ -1,5 +1,5 @@
 ---
-source-hash: 99114d8d8b82aac1da70e5fb8626000c5f12e267a7d5a6f1767bcefa5323911e
+source-hash: c33282de1084da4a6890e1bd74b0f2c9e0eddbf76fa569e5f22020e764818dcc
 ---
 
 # Meeko API
@@ -393,6 +393,27 @@ For user HTML, [DOMPurify](https://github.com/cure53/DOMPurify) is recommended (
 Server data retains the brand: a `<script server>` export or `load` result of type `TrustedHtml` reaches the template with that type (`ServerData<T>` and the page contract preserve it), because the payload is JSON and the brand exists only in types. Mark HTML in the server module producing it and declare `TrustedHtml` in its shared types.
 
 `MEEK107` is a warning: it appears but does not fail `meeko check` or `meeko build`, nor change SSR, hydration or generated code; everything that compiled in `1.2` still compiles and works the same. Inserting an unmarked `string` is deprecated: in `2.0`, the warning becomes an error (see [Deprecation](stability.md#deprecated-apis)).
+
+#### HTML that travels once: `documentHtml`
+
+Since `1.8`, a large `TrustedHtml` that is only read in `html="..."` can travel once. Without the mark, page data arrives twice on the first load: in the document's HTML and in the hydration payload, where JSON escaping also makes it heavier. `documentHtml` leaves it only in the HTML:
+
+```html
+<script server lang="ts">
+import { trustHtml } from "@meekojs/meeko";
+import { documentHtml } from "@meekojs/meeko/framework";
+
+export const guide = { body: documentHtml(trustHtml("<h2>Guide</h2><p>A long article.</p>")) };
+</script>
+
+<template>
+  <article html="guide.body"></article>
+</template>
+```
+
+The document's payload carries a placeholder, and hydration adopts the element's content without reading or rewriting it. Client navigations receive the whole value. If the page paints the element again, such as an `if:` that closes and opens, the browser requests the value from the server: the DOM never provides HTML.
+
+It is not automatic because it changes what the browser sees on that first load: the value is the placeholder, so `{guide.body.length}` or a `computed` that analyzes it would not give the same as on the server. Mark it only if nothing else reads it. The value stays in the payload if `html` did not paint it in the document or if SSR left the element empty. See [`documentHtml`](/docs/reference/documenthtml).
 
 ### Lists with and without `each:key`
 

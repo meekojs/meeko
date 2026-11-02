@@ -390,6 +390,27 @@ Los datos de servidor conservan la marca: un export de `<script server>` o el re
 
 `MEEK107` es un aviso: se muestra, pero no hace fallar `meeko check` ni `meeko build`, y no cambia el SSR, la hidratación ni el código generado; todo lo que compilaba en `1.2` sigue compilando y funcionando igual. Está deprecado insertar un `string` sin marcar: en `2.0` el aviso pasará a ser un error (véase [Deprecación](stability.md#apis-deprecadas)).
 
+#### HTML que viaja una vez: `documentHtml`
+
+Desde `1.8`, un `TrustedHtml` grande que sólo se lee en `html="..."` puede viajar una vez. Sin la marca, un dato de la página llega dos veces en la primera carga: en el HTML del documento y en el payload de hidratación, donde además pesa más por el escape de JSON. `documentHtml` lo deja sólo en el HTML:
+
+```html
+<script server lang="ts">
+import { trustHtml } from "@meekojs/meeko";
+import { documentHtml } from "@meekojs/meeko/framework";
+
+export const guide = { body: documentHtml(trustHtml("<h2>Guía</h2><p>Un artículo largo.</p>")) };
+</script>
+
+<template>
+  <article html="guide.body"></article>
+</template>
+```
+
+El payload del documento lleva un marcador, y la hidratación adopta el contenido del elemento sin leerlo ni reescribirlo. Las navegaciones de cliente reciben el valor completo. Si la página vuelve a pintar el elemento, por ejemplo un `if:` que se cierra y se abre, el navegador pide el valor al servidor: el DOM nunca aporta HTML.
+
+No es automático porque cambia lo que el navegador ve en esa primera carga: el valor es el marcador, así que `{guide.body.length}` o un `computed` que lo analice no darían lo mismo que en el servidor. Márquelo sólo si nada más lo lee. El valor sigue en el payload si `html` no lo pintó en el documento o si el SSR dejó el elemento vacío. Véase [`documentHtml`](/docs/reference/documenthtml).
+
 ### Listas con y sin `each:key`
 
 Desde `1.1`, `each:key` es opcional (antes, una lista sin clave daba `MEEK023`, que se retira). Sin clave, la clave de cada fila es su índice: la fila `i` conserva sus nodos y recibe el elemento `i`, y las filas sólo se añaden o se quitan al final. Al insertar, borrar o reordenar en medio de la lista, cada fila muestra el elemento que ahora ocupa su posición.

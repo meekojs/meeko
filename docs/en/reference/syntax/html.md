@@ -12,7 +12,8 @@ related:
   - "syntax:on"
   - docs/api.md#html-sin-escapar-con-html
   - docs/api.md#html-de-confianza-trustedhtml-y-trusthtml
-source-hash: b70f2f492c7d2df5b6a58d3443dd528d33e1d3cff3623aaf0fde7a8ce5ecf636
+  - "@meekojs/meeko/framework#documentHtml"
+source-hash: 08c97b4a03ec785a5303c5bc2dbc0b35f6bc9c4a43ad4347a5293ce33c20d7be
 ---
 
 `html="expresión"` fills an element with the expression's HTML, **without escaping**: use it to render processed Markdown, code highlighter output or an SVG icon. The expression is a `string`; `null` and `undefined` leave the element empty.
@@ -215,5 +216,6 @@ With `const count = 3`, `meeko check` reports `TS2345: Argument of type 'number'
 - **SSR.** Choose an element that accepts the content (`<div html>` for blocks, `<ul html>` for `<li>`, `<tbody html>` for rows): if the browser would move some content outside, SSR leaves the element empty and it is invisible without JavaScript.
 - **Hydration.** Identical content is untouched; different content is replaced entirely, losing any selection or focus inside it.
 - **Performance.** Every change replaces the entire `innerHTML`. For frequently changing content, use the template.
+- **Weight.** A value from page data arrives twice on the first load: in the HTML and in the payload. For a large one that only `html` reads, mark it with [`documentHtml`](/docs/reference/documenthtml) and it travels once.
 - **Custom elements.** On a hyphenated tag (`<x-markdown html="intro">`), `html` is a literal HTML attribute and the element accepts children. On a component tag, `html` is not a prop (`MEEK032`), and `bind:html` is an attribute called `html`.
 - **CSP.** Inserted content may contain `style` or `on*` attributes, blocked by a strict CSP: account for this when sanitizing.
