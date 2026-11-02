@@ -93,6 +93,9 @@ ${defaults.constants?.map((constant) => `${constant}\n`).join("") ?? ""}  return
 }
 function __meeko_resolveProps${G}(input: __MeekoComponentProps${A}): ${setupPropsType} {
   return __meeko.resolveProps(input, __meeko_defaultProps${A}()) as ${setupPropsType};
-}` : plainPropsDeclaration) + "\nexport type { __MeekoComponentProps as ComponentProps };";
+}` : plainPropsDeclaration) + "\nexport type { __MeekoComponentProps as ComponentProps };\n"
+    // The same props without the callbacks of `defineEmits`, for a wrapper: it can extend them, send
+    // the rest through `bind`, which admits no `on*` key, and declare those events itself.
+    + `type __MeekoOwnProps${G} = ${!emits ? `__MeekoComponentProps${A}` : scriptParts.propsTypeOffset === undefined ? "Record<string, never>" : defaults ? `__MeekoInputPropsOf${ofArguments(`__MeekoDeclaredProps${A}`)}` : `__MeekoDeclaredProps${A}`};\nexport type { __MeekoOwnProps as ComponentOwnProps };`;
   return { setupPropsType, propsDeclaration };
 }

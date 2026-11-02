@@ -1,5 +1,5 @@
 ---
-source-hash: 80f23dc2ae80c946015f2049689e754c9b3d73d0d92c59b421aabd6624c8c207
+source-hash: e08ab614d6faec73a0a52da70a3a2ee9309a7b0ea1a1c5907cd376b9f9ececa4
 ---
 
 # Meeko as a full-stack framework
@@ -1849,7 +1849,7 @@ Meeko analyzes AST exports from `app/{components,composables,utils,stores,types}
 
 Each option only accepts relative paths within its folder (`appDirs` within `app/`, `sharedDirs` within `shared/`, `serverDirs` within `server/`), with `/` or `\` and without `.` or `..`: any other path stops `meeko dev`, `meeko build` and `meeko check` with a `meeko.config.ts` error naming the entry (`imports.appDirs[1] debe ser una ruta relativa dentro de app/: …`), which the editor marks on that entry in a trusted workspace (`MEEK_CONFIG`). A folder already covered by auto-imports (`"app/composables"`) or contained within another listed folder is not read twice. Exports from these folders follow the same rules as those from the default folders: `import type` for `type` and `interface`, priority over framework auto-imports and an error if two files export the same name in a scope. A `*.server.ts` in an `appDirs` folder belongs to the server, and a component using it produces `MEEK108`.
 
-<a id="component-types"></a>**Types for each component.** Since `1.4`, each auto-imported component (`.meeko` files in the project's and its layers' `app/components`, and in module component folders) also contributes four types named after its tag, without an import: the component name, following the same rule as the tag and including the module prefix, followed by `Props`, `Snippets`, `Models` or `Exposed`.
+<a id="component-types"></a>**Types for each component.** Since `1.4`, each auto-imported component (`.meeko` files in the project's and its layers' `app/components`, and in module component folders) also contributes several types named after its tag, without an import: the component name, following the same rule as the tag and including the module prefix, followed by `Props`, `OwnProps` (since `1.8`, without the callbacks of `defineEmits`), `Snippets`, `Models` or `Exposed`.
 
 | Component                                                       | Tag              | Types                                                                    |
 | --------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------ |

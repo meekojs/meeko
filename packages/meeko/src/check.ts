@@ -306,6 +306,17 @@ export function attributeValueMessage(name: string, tags: readonly string[], val
 const meekTypeText = /"(MEEK(?:031|112|113|131)): ([^"]+)"/;
 
 /** Message of a MEEK112, MEEK113, MEEK031 or MEEK131 type error, with what to do about it. */
+/**
+ * Message of `TS2312` in a component: `interface Props extends X`, where `X`, at `offset`, is usually
+ * the `ComponentProps` of a component whose props are a union. An interface has one fixed shape, so
+ * TypeScript does not let it extend the several shapes of a union; an intersection keeps them.
+ */
+export function interfaceExtendsMessage(source: string, offset: number): string {
+  const base = /^[\w$.]+(?:<[^{}]*?>)?/.exec(source.slice(offset, offset + 256))?.[0] ?? "X";
+  const name = /interface\s+([\w$]+)[^{}]*$/.exec(source.slice(Math.max(0, offset - 512), offset))?.[1] ?? "Props";
+  return `Una interface no puede extender ${base} porque no tiene una forma única: suele ser una unión de props, y cada variante es distinta. Escribe un tipo, que conserva todas las variantes: type ${name} = ${base} & { … }`;
+}
+
 function meekTypeMessage(code: string, text: string): string {
   if (code === "MEEK112" && text.endsWith("no se aplica a ninguna etiqueta posible de is")) {
     return `${text}: Meeko no lo escribiría nunca; quítalo o añade a is una etiqueta que lo admita`;
@@ -435,7 +446,7 @@ export async function checkSource(source: string, filename: string, options: Che
       }
       const result: CompileDiagnostic = {
         code: diagnostic.code,
-        message: offset === undefined ? `TypeScript generado: ${diagnostic.message}` : diagnostic.message,
+        message: offset === undefined ? `TypeScript generado: ${diagnostic.message}` : diagnostic.code === "TS2312" ? interfaceExtendsMessage(entry.source, offset) : diagnostic.message,
         filename: entry.original,
         location: locate(entry.source, offset ?? 0),
       };
