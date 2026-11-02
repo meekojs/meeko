@@ -5,8 +5,12 @@ import { join, resolve } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 
+import type { ClientComponent } from "../src/app/runtime/client.ts";
 import type { TrustedHtml } from "../src/index.ts";
 
+import { PAYLOAD_VERSION } from "../src/app/definitions/define-page.ts";
+import { mountClientApp } from "../src/app/runtime/client.ts";
+import { defer } from "../src/app/runtime/deferred.ts";
 import { createRouteManifest } from "../src/app/runtime/router.ts";
 import { compile } from "../src/compiler.ts";
 import { collectRenderedHtml, rawHtml } from "../src/core/server.ts";
@@ -142,13 +146,17 @@ test("a prerendered document stores the navigation payload with the whole value"
 });
 
 test("rawHtml reports only what reaches the HTML", () => {
-  const seen = new Set<string>();
+  const seen = new Map<string, boolean>();
   collectRenderedHtml(seen, () => {
     rawHtml("<b>a</b>", "div");
     rawHtml("<div>b</div>", "p");
+    rawHtml("<div>c</div>", "article");
+    rawHtml("<div>c</div>", "p");
+    rawHtml("<div>d</div>", "p");
+    rawHtml("<div>d</div>", "article");
     rawHtml(null, "div");
   });
-  assert.deepEqual([...seen], ["<b>a</b>"]);
+  assert.deepEqual([...seen], [["<b>a</b>", true], ["<div>b</div>", false], ["<div>c</div>", false], ["<div>d</div>", false]]);
   rawHtml("<i>fuera</i>", "div");
   assert.equal(seen.has("<i>fuera</i>"), false);
 });
@@ -248,6 +256,136 @@ test("painting a marked value again asks the server, never the DOM", async () =>
     await cleanup();
   }
 });
+
+// A real handler, a compiled page and `mountClientApp`: what a browser does with a first document.
+const appRoutes = createRouteManifest([{ id: "/guide", file: "/guide.meeko", layouts: [], sidecar: "/guide.route.ts" }]);
+const trustedList = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const props = defineProps<{ data: { items: { id: number; kind: string; body: string }[] } }>();
+const open = signal(true);
+</script>
+<template><section if:when="open.value"><article each:of="props.data.items" each:as="item" each:key="item.id" data-id="{item.id}"><div if:when="item.kind === 'html'" class="trusted" html="item.body"></div><p if:when="item.kind === 'text'">{item.body}</p></article></section><button type="button" class="toggle" on:click="() => open.value = !open.value">t</button></template>`;
+const togglingData = `<script lang="ts">
+import { signal } from "@meekojs/meeko";
+const props = defineProps<{ data: { html: string } }>();
+const open = signal(true);
+</script>
+<template><section if:when="open.value"><article html="props.data.html"></article></section><button type="button" class="toggle" on:click="() => open.value = !open.value">t</button></template>`;
+const twoContainers = `<script lang="ts">
+const props = defineProps<{ data: { html: string } }>();
+</script>
+<template><article html="props.data.html"></article><p html="props.data.html"></p></template>`;
+
+interface MountedDocument {
+  browser: Window;
+  payload: Record<string, unknown> & { documentHtml?: unknown };
+  reloads: () => number;
+  errors: unknown[];
+  requests: () => number;
+  /** Closes and opens the `if:` of the page, and waits for what it asks the server. */
+  repaint: () => Promise<void>;
+  close: () => void;
+}
+
+const settle = (): Promise<void> => new Promise((done) => setTimeout(done, 25));
+const jsonResponse = (value: unknown, init: ResponseInit = {}): Response => new Response(JSON.stringify(value), { headers: { "content-type": "application/meeko+json" }, ...init });
+
+async function loadPage(source: string, name: string, directory: string): Promise<ClientComponent> {
+  const runtime = (path: string): string => JSON.stringify(pathToFileURL(resolve(path)).href);
+  const code = compile(source, join(directory, `${name}.meeko`)).code
+    .replace(`from "@meekojs/meeko/internal"`, `from ${runtime("src/internal.ts")}`)
+    .replaceAll(`from "@meekojs/meeko"`, `from ${runtime("src/index.ts")}`);
+  await writeFile(join(directory, `${name}.ts`), code);
+  return await import(pathToFileURL(join(directory, `${name}.ts`)).href) as ClientComponent;
+}
+
+/** Runs `body` with a temporary folder for compiled pages. */
+async function withPages<T>(body: (page: (source: string, name: string) => Promise<ClientComponent>, directory: string) => Promise<T>): Promise<T> {
+  await mkdir(resolve(".meeko"), { recursive: true });
+  const directory = await mkdtemp(resolve(".meeko", "document-html-"));
+  try { return await body((source, name) => loadPage(source, name, directory), directory); }
+  finally { await rm(directory, { recursive: true, force: true }); }
+}
+
+/**
+ * The document that `documentResponse` answers, hydrated in a new window, with `recover` answering
+ * what the browser asks the server afterwards.
+ */
+async function mountDocument(page: ClientComponent, documentResponse: Response, recover: (input: string, init?: RequestInit) => Promise<Response>, options: { serverData?: boolean | "static" } = {}): Promise<MountedDocument> {
+  const browser = new Window({ url: "http://local/guide" });
+  browser.document.write(await documentResponse.text());
+  await browser.happyDOM.waitUntilComplete();
+  let reloads = 0;
+  let requests = 0;
+  Object.defineProperty(browser.location, "reload", { value: () => { reloads++; } });
+  const errors: unknown[] = [];
+  const payload = JSON.parse(browser.document.getElementById("meeko-payload")!.textContent!) as MountedDocument["payload"];
+  const app = await mountClientApp({
+    routes: appRoutes,
+    root: browser.document.getElementById("app") as unknown as Element,
+    payload,
+    loadPage: async () => page,
+    browser: browser as unknown as globalThis.Window,
+    serverData: options.serverData ?? true,
+    onNavigationError: (error) => errors.push(error),
+    fetch: (async (input: string, init?: RequestInit) => { requests++; return await recover(input, init); }) as typeof fetch,
+  });
+  return {
+    browser, payload, errors,
+    reloads: () => reloads,
+    requests: () => requests,
+    repaint: async () => {
+      const toggle = browser.document.querySelector("button.toggle") as unknown as HTMLButtonElement;
+      toggle.click();
+      toggle.click();
+      await settle();
+    },
+    close: () => { app.dispose(); browser.happyDOM.abort(); },
+  };
+}
+
+const answerWith = (handle: (request: Request) => Promise<Response>) => (input: string, init?: RequestInit): Promise<Response> => handle(new Request(input, init));
+
+/** What a stream document has sent up to its payload, while its deferred values stay pending. */
+async function readDocumentUntilPayload(response: Response): Promise<string> {
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let html = "";
+  while (!html.includes("</script>")) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    html += decoder.decode(value, { stream: true });
+  }
+  await reader.cancel();
+  return html;
+}
+
+const plainText = "<b>user text, never declared trusted</b>";
+const listHandler = (load: () => unknown, page: ClientComponent): ((request: Request) => Promise<Response>) => createFrameworkHandler({
+  routes: appRoutes,
+  loadPage: async () => page,
+  loadRoute: async () => ({ load }),
+});
+
+test("a value that one element left empty travels whole, as without the mark", () => withPages(async (page) => {
+  const two = await page(twoContainers, "Two");
+  const block = "<div>safe</div>";
+  const render = async (marked: boolean): Promise<{ article: string; paragraph: string; requests: number; payload: MountedDocument["payload"] }> => {
+    const handle = listHandler(() => ({ html: marked ? documentHtml(trustHtml(block)) : block }), two);
+    const mounted = await mountDocument(two, await handle(requestDocument()), answerWith(handle));
+    try {
+      await settle();
+      return { article: mounted.browser.document.querySelector("article")!.innerHTML, paragraph: mounted.browser.document.querySelector("p")!.innerHTML, requests: mounted.requests(), payload: mounted.payload };
+    } finally { mounted.close(); }
+  };
+  const marked = await render(true);
+  const plain = await render(false);
+  assert.equal(marked.article, block);
+  assert.equal(marked.paragraph, block, "hydration fills the element the SSR left empty");
+  assert.equal(marked.requests, 0);
+  assert.equal(marked.payload.documentHtml, undefined);
+  assert.deepEqual({ article: marked.article, paragraph: marked.paragraph, requests: marked.requests }, { article: plain.article, paragraph: plain.paragraph, requests: plain.requests });
+}));
 
 test("an imitated placeholder that names nothing stays an inert comment", async () => {
   const { component, provide, cleanup } = await loadComponent(toggling);

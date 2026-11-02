@@ -446,7 +446,7 @@ interface ServerNamedLayout {
   readonly writer: LayoutWriter;
 }
 
-type RenderedTree = { rendered: { html: string; state: Record<string, unknown> }; store: StateStore; resources: Record<string, unknown> | undefined; styles: string[]; head: HeadCollector; teleports: readonly TeleportEntry[]; renderedHtml: ReadonlySet<string> };
+type RenderedTree = { rendered: { html: string; state: Record<string, unknown> }; store: StateStore; resources: Record<string, unknown> | undefined; styles: string[]; head: HeadCollector; teleports: readonly TeleportEntry[]; renderedHtml: ReadonlyMap<string, boolean> };
 
 /** Renders written by the page with `useLayout()` that a request repeats at most. */
 const layoutRenderAttempts = 3;
@@ -548,8 +548,8 @@ async function renderPageTree(
   const styles = new Set<string>();
   // Like the CSS, the useHead entries of the last pass.
   const head = new HeadCollector();
-  // And the values of `html` that the HTML of the last pass shows.
-  const renderedHtml = new Set<string>();
+  // And the values of `html` of the last pass, with whether its HTML shows them everywhere.
+  const renderedHtml = new Map<string, boolean>();
   const rendered = await renderWithSuspense((pass) => {
     if (pass > 1) store = new StateStore(baseline);
     else baseline = initial.snapshot();

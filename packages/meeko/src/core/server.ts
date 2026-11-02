@@ -29,18 +29,19 @@ export function rawHtml(value: string | null | undefined, tag?: string, namespac
   if (typeof value !== "string") throw new TypeError(`html="..." expects a string of HTML, null or undefined, not ${typeof value}`);
   if (tag === undefined) return value;
   const normalized = normalizeHtmlContent(value, tag, namespace);
-  if (normalized) renderedHtml?.add(value);
+  renderedHtml?.set(value, normalized !== "" && renderedHtml.get(value) !== false);
   return normalized;
 }
 
-/** Values of `html` that the server document being rendered shows; see {@link collectRenderedHtml}. */
-let renderedHtml: Set<string> | undefined;
+/** Values of `html` of the server document being rendered; see {@link collectRenderedHtml}. */
+let renderedHtml: Map<string, boolean> | undefined;
 
 /**
- * @internal Runs a synchronous server render and adds to `values` every value of `html` that reached
- * its HTML. One the SSR left empty, for the browser to fill it on hydration, is not there.
+ * @internal Runs a synchronous server render and records in `values` every value of `html`: `true`
+ * if all its elements show it in the HTML, `false` if the SSR left any of them empty, for the
+ * browser to fill it on hydration from the payload.
  */
-export function collectRenderedHtml<T>(values: Set<string>, render: () => T): T {
+export function collectRenderedHtml<T>(values: Map<string, boolean>, render: () => T): T {
   const previous = renderedHtml;
   renderedHtml = values;
   try { return render(); }

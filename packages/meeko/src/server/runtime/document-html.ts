@@ -60,14 +60,14 @@ const dataParts = ["props", "state", "sharedState", "resources", "layoutProps", 
  * becomes a placeholder, and `documentHtml` lists where the navigation payload of that URL has it.
  * `undefined` when no value qualifies, so a page that does not use the mark costs nothing.
  */
-export function withoutDocumentHtml(payload: Readonly<Record<string, unknown>>, rendered: ReadonlySet<string>): Record<string, unknown> | undefined {
+export function withoutDocumentHtml(payload: Readonly<Record<string, unknown>>, rendered: ReadonlyMap<string, boolean>): Record<string, unknown> | undefined {
   const marked = marks?.();
   if (!marked?.size) return undefined;
   const positions = new Map<string, number>();
   const paths: (readonly (string | number)[])[] = [];
   const replace = (value: unknown, path: readonly (string | number)[]): unknown => {
     if (typeof value === "string") {
-      if (!marked.has(value) || !rendered.has(value)) return value;
+      if (!marked.has(value) || rendered.get(value) !== true) return value;
       let position = positions.get(value);
       if (position === undefined) {
         position = paths.length;
