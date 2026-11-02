@@ -14,11 +14,10 @@
 	<label bind:class="['meeko-ui-choice', className].filter(Boolean).join(' ')">
 		<input
 			type="checkbox"
-			bind:checked="checked.value"
+			model="checked"
 			bind:aria-invalid="invalid ? 'true' : undefined"
 			bind:aria-describedby="[describedBy ?? rest['aria-describedby'], description ? id + '-description' : undefined].filter(Boolean).join(' ') || undefined"
 			bind="rest"
-			on:change="(event) => (checked.value = event.currentTarget.checked)"
 		/>
 		<span class="meeko-ui-choice-content">
 			<span>{label}</span>

@@ -26,13 +26,12 @@
 			>
 				<input
 					type="radio"
+					model="value"
 					bind:name="name ?? id"
 					bind:form="rest.form"
 					bind:value="option.value"
 					bind:disabled="option.disabled"
 					bind:required="required"
-					bind:checked="value.value === option.value"
-					on:change="() => (value.value = option.value)"
 				/>
 				<span>{option.label}</span>
 			</label>

@@ -43,8 +43,46 @@ const toast = useToast()
 </main>
 </template>`
 
+/** Every control of UI with a model, to edit them before the JavaScript arrives. */
+export const earlyPage = `<script lang="ts">
+import { signal } from '@meekojs/meeko'
+const text = signal('')
+const secret = signal('')
+const note = signal('')
+const accepted = signal(false)
+const alerts = signal(false)
+const period = signal('day')
+const volume = signal(4)
+const fruit = signal<string | null>(null)
+const city = signal<string | null>(null)
+const capped = signal(150)
+const values = () => [text.value, secret.value, note.value, accepted.value, alerts.value, period.value, volume.value, fruit.value, city.value].join('|')
+const sent = signal('')
+</script>
+<template>
+<main id="contenido">
+<form id="early" on:submit="(event) => { event.preventDefault(); sent.value = values() }">
+<UIInput aria-label="Nombre" name="text" model="text" />
+<UIInput aria-label="Clave" name="secret" type="password" model="secret" />
+<UITextarea aria-label="Nota" name="note" model="note" />
+<UICheckbox label="Aceptar" name="accepted" value="yes" model="accepted" />
+<UISwitch label="Avisos" name="alerts" value="on" model="alerts" />
+<UIRadioGroup legend="Periodo" name="period" model="period" bind:options="[{value:'day',label:'Día'},{value:'week',label:'Semana'}]" />
+<UISlider label="Volumen" name="volume" bind:min="0" bind:max="10" bind:step="2" model="volume" />
+<UISelect label="Fruta" name="fruit" placeholder="Elige" model="fruit" bind:options="['Manzana', 'Pera', 'Ciruela']" />
+<UICombobox label="Ciudad" name="city" searchable placeholder="Busca" model="city" bind:options="['Lima', 'Quito', 'Bogotá']" />
+<UISlider label="Tope" bind:max="100" model="capped" />
+<output id="values">{values()}</output>
+<output id="capped">{capped.value}</output>
+<button id="send" type="submit">Enviar</button>
+<button id="reset" type="button" on:click="() => { text.value = 'desde código'; accepted.value = false; volume.value = 2; period.value = 'day' }">Cambiar</button>
+<output id="sent">{sent.value}</output>
+</form>
+</main>
+</template>`
+
 /** Isolated consumer, no edits to apps/ui. All resources are released by the caller's context. */
-export async function startForms(context, { port = 4568, timeout = 120_000 } = {}) {
+export async function startForms(context, { port = 4568, timeout = 120_000, page = formsPage } = {}) {
 	const packageRoot = fileURLToPath(new URL('../../', import.meta.url))
 	const parent = join(packageRoot, '.meeko')
 	await mkdir(parent, { recursive: true })
@@ -71,7 +109,7 @@ export async function startForms(context, { port = 4568, timeout = 120_000 } = {
 		'package.json': JSON.stringify({ name: 'ui-forms-test', private: true, type: 'module' }),
 		'meeko.config.ts': `import { defineMeekoConfig } from '@meekojs/meeko/framework'\nexport default defineMeekoConfig({ modules: ['@meekojs/ui'] })\n`,
 		'app/app.meeko': '<template><UIApp><MeekoOutlet /></UIApp></template>',
-		'app/pages/index.meeko': formsPage,
+		'app/pages/index.meeko': page,
 	}
 	for (const [file, source] of Object.entries(files)) {
 		await mkdir(dirname(join(root, file)), { recursive: true })

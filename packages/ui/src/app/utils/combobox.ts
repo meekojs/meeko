@@ -322,6 +322,16 @@ export function createCombobox<T>(props: ComboboxSettings<T>, model: Signal<unkn
 		if (!root) return () => {}
 		rootElement = root
 		const document = root.ownerDocument
+		// What was typed before hydration is a search, as it would be now; without the focus it ended,
+		// and an ended search leaves the text of the selection.
+		const field = root.querySelector<HTMLInputElement>('input[role=combobox]')
+		if (field && field.value !== untrack(() => inputText.value)) {
+			if (document.activeElement === field) {
+				query.value = field.value
+				typing.value = true
+				openList()
+			} else field.value = untrack(() => inputText.value)
+		}
 		// Nodes of this document; `instanceof Node` would need the global of its window.
 		const node = (target: EventTarget | null): Node | undefined => (target !== null && typeof (target as Node).nodeType === 'number' ? (target as Node) : undefined)
 		const outside = (event: Event): void => {

@@ -8,13 +8,12 @@
 
 <template>
 	<input
+		model="value"
 		bind:spellcheck="spellcheck === undefined ? undefined : String(spellcheck)"
 		bind:type="type"
 		bind:aria-invalid="invalid ? 'true' : undefined"
 		bind:aria-describedby="describedBy ?? rest['aria-describedby']"
 		bind:class="['meeko-ui-input', className].filter(Boolean).join(' ')"
-		bind:value="value.value"
 		bind="rest"
-		on:input="(event) => (value.value = event.currentTarget.value)"
 	/>
 </template>

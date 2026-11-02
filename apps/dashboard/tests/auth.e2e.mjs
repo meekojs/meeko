@@ -119,6 +119,28 @@ test('the administrator logs in, navigates and logs out', { skip: url ? false : 
 		await page.screenshot({ path: join(screenshots, 'login-mobile.png') })
 		assert.deepEqual(errors, [])
 
+		// The credentials typed or autofilled before the JavaScript arrives are the ones the form sends.
+		const slow = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+		let release
+		const held = new Promise((resolve) => {
+			release = resolve
+		})
+		await slow.route('**/*', async (route) => {
+			if (route.request().resourceType() === 'script') await held
+			await route.continue()
+		})
+		await slow.goto(`${origin}/login?next=%2Fhealth`, { waitUntil: 'commit' })
+		await slow.getByLabel('Usuario').fill(account.username)
+		await slow.getByLabel('Contraseña').fill(account.password)
+		release()
+		await slow.waitForFunction(() => globalThis.performance.getEntriesByName('meeko-hydration').length > 0, undefined, { timeout: 60_000 })
+		assert.equal(await slow.getByLabel('Usuario').inputValue(), account.username)
+		// With an empty model the schema of the form would stop this submission with "Escribe tu usuario."
+		await Promise.all([slow.waitForURL(`${origin}/health`), slow.getByRole('button', { name: 'Entrar' }).click()])
+		await slow.getByRole('heading', { level: 1 }).waitFor()
+		await Promise.all([slow.waitForURL(/\/login$/), slow.getByRole('button', { name: 'Cerrar sesión' }).click()])
+		await slow.close()
+
 		// Without JavaScript the native forms do the same: log in, come back, log out.
 		const plain = await browser.newPage({ javaScriptEnabled: false, viewport: { width: 1280, height: 900 } })
 		await plain.goto(`${origin}/moderation`)

@@ -20,10 +20,9 @@
 		<span>{label}</span>
 		<input
 			type="range"
+			model="value"
 			bind:style="[style, '--slider-fill: ' + fill.value + '%'].filter(Boolean).join('; ')"
-			bind:value="value.value"
 			bind="rest"
-			on:input="(event) => (value.value = event.currentTarget.valueAsNumber)"
 		/>
 	</label>
 </template>
