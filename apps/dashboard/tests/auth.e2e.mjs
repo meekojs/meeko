@@ -84,7 +84,7 @@ test('the administrator logs in, navigates and logs out', { skip: url ? false : 
 		await Promise.all([page.waitForURL(`${origin}/sources?site=ui`), page.getByRole('button', { name: 'Entrar' }).click()])
 		await hydrated()
 		assert.equal(await page.getByRole('heading', { level: 1 }).textContent(), 'Fuentes')
-		assert.equal((await page.locator('.dash-user').textContent())?.trim(), account.username)
+		assert.equal((await page.getByTitle('Sesión iniciada').first().textContent())?.trim(), account.username)
 		const cookie = (await page.context().cookies(origin)).find((item) => item.name === 'meeko-dashboard.sid')
 		assert.ok(cookie?.httpOnly, 'the session cookie is HttpOnly')
 		assert.equal(cookie.sameSite, 'Strict')

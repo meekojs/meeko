@@ -93,7 +93,7 @@ test('the moderation screen hides, features and announces, and asks first', { sk
 	const errors = []
 	page.on('pageerror', (error) => errors.push(error.message))
 	const rows = (table) => page.locator(`table:has(caption:text("${table}")) tbody tr`)
-	const notice = page.locator('.dash-notice')
+	const notice = page.getByRole('status')
 
 	try {
 		await page.goto(origin + '/moderation?site=ui', { waitUntil: 'networkidle' })
@@ -125,7 +125,7 @@ test('the moderation screen hides, features and announces, and asks first', { sk
 		await picker.click()
 		await picker.fill('Modal')
 		await page.getByRole('option', { name: 'Modal · /modals' }).click()
-		await page.getByText('Destacar', { exact: true }).click()
+		await page.getByRole('radio', { name: 'Destacar' }).click()
 		await page.getByRole('button', { name: 'Destacar la página' }).click()
 		await notice.filter({ hasText: 'Destacada: Modal' }).waitFor()
 		assert.equal(await rows('Reglas de UI').count(), 2)
@@ -142,7 +142,7 @@ test('the moderation screen hides, features and announces, and asks first', { sk
 		await page.locator('#announcement-message').fill('La búsqueda falla de forma intermitente.')
 		await page.getByRole('combobox', { name: 'Tono' }).click()
 		await page.getByRole('option', { name: 'Incidencia' }).click()
-		const preview = page.locator('.dash-announcement-preview .docs-announcement')
+		const preview = page.locator('.moderation-preview .docs-announcement')
 		await preview.filter({ hasText: 'La búsqueda falla de forma intermitente.' }).waitFor()
 		assert.equal(await preview.getAttribute('role'), 'alert', 'a danger announcement interrupts')
 		assert.equal(await preview.getAttribute('data-tone'), 'danger')

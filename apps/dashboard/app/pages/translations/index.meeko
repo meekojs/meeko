@@ -14,9 +14,11 @@
 </script>
 
 <script lang="ts">
-	import type { TableColumn } from '@meekojs/ui/runtime'
+	import type { TableColumn, UINavigationTabsItem } from '@meekojs/ui/runtime'
 
 	import type { TranslationEntryRow, TranslationStatus } from '../../../shared/schemas/dashboard'
+
+	import { translationTones } from '../../utils/labels'
 
 	const i18n = useI18n()
 	const { t, localePath } = i18n
@@ -56,12 +58,21 @@
 		if (query.value.trim()) params.set('q', query.value.trim())
 		return localePath(`/translations${params.size ? `?${params}` : ''}`)
 	}
-	const filters = computed(() => [
-		{ value: 'all' as const, label: t('translations.all'), count: counts.total },
-		...statuses.map((value) => ({ value, label: t(`labels.translation.${value}`), count: counts[value] })),
-	])
-	function choose(event: MouseEvent, value: TranslationStatus | All) {
+	const filterValues: readonly (TranslationStatus | All)[] = ['all', ...statuses]
+	const filterLabel = (value: TranslationStatus | All) => (value === 'all' ? t('translations.all') : t(`labels.translation.${value}`))
+	const filters = computed<readonly UINavigationTabsItem[]>(() =>
+		filterValues.map((value) => ({
+			label: filterLabel(value),
+			href: statusLink(value),
+			current: status.value === value,
+			badge: format.number(value === 'all' ? counts.total : counts[value]),
+			...(value === 'all' ? {} : { badgeDot: true, badgeTone: translationTones[value] }),
+		})),
+	)
+	function choose(event: MouseEvent, item: UINavigationTabsItem) {
 		if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+		const value = filterValues.find((candidate) => filterLabel(candidate) === item.label)
+		if (!value) return
 		event.preventDefault()
 		status.value = value
 	}
@@ -83,7 +94,7 @@
 		{ key: 'status', label: t('translations.columns.status') },
 		{ key: 'file', label: t('translations.columns.file') },
 		{ key: 'imported', label: t('translations.columns.imported') },
-		{ key: 'actions', label: t('translations.columns.actions') },
+		{ key: 'actions', label: t('translations.columns.actions'), numeric: true },
 	] satisfies TableColumn<Row>[]
 </script>
 
@@ -100,30 +111,11 @@
 			if:when="translations.ok"
 			class="dash-stack"
 		>
-			<nav
-				class="dash-tabs dash-translation-tabs"
-				bind:aria-label="t('translations.byStatus')"
-			>
-				<a
-					each:of="filters.value"
-					each:as="filter"
-					each:key="filter.value"
-					bind:href="statusLink(filter.value)"
-					bind:aria-current="status.value === filter.value ? 'page' : undefined"
-					bind:data-status="filter.value === 'all' ? undefined : filter.value"
-					on:click="(event) => choose(event, filter.value)"
-				>
-					<span class="dash-tab-label">
-						<span
-							if:when="filter.value !== 'all'"
-							class="dash-dot"
-							aria-hidden="true"
-						/>
-						{filter.label}
-					</span>
-					<span class="dash-tab-count">{format.number(filter.count)}</span>
-				</a>
-			</nav>
+			<UINavigationTabs
+				bind:items="filters.value"
+				bind:label="t('translations.byStatus')"
+				on:select="choose"
+			/>
 
 			<form
 				class="dash-filters"
@@ -131,39 +123,56 @@
 				bind:aria-label="t('translations.filter')"
 				on:submit="(event) => event.preventDefault()"
 			>
-				<div class="dash-field dash-field-grow">
-					<label for="translations-query">{t('actions.search')}</label>
-					<UIInput
-						id="translations-query"
-						type="search"
-						model="query"
-						bind:placeholder="t('translations.placeholder')"
-					/>
-				</div>
-				<div class="dash-field">
-					<label for="translations-kind">{t('translations.columns.kind')}</label>
-					<UISelect
-						id="translations-kind"
-						model="kind"
-						bind:placeholder="t('filters.allMasculine')"
-						bind:options="kindOptions"
-						bind:labelBy="(value) => (value === 'all' ? t('filters.allMasculine') : t(`labels.kind.${value}`))"
-					/>
-				</div>
+				<UIField
+					id="translations-query"
+					class="dash-grow"
+					bind:label="t('actions.search')"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UIInput
+							type="search"
+							model="query"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:placeholder="t('translations.placeholder')"
+						/>
+					</snippet>
+				</UIField>
+				<UIField
+					id="translations-kind"
+					bind:label="t('translations.columns.kind')"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UISelect
+							model="kind"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:placeholder="t('filters.allMasculine')"
+							bind:options="kindOptions"
+							bind:labelBy="(value) => (value === 'all' ? t('filters.allMasculine') : t(`labels.kind.${value}`))"
+						/>
+					</snippet>
+				</UIField>
 			</form>
 
-			<div class="dash-results">
+			<div class="dash-tight">
 				<p
-					class="dash-count"
+					class="dash-meta"
 					role="status"
 					aria-live="polite"
 				>
 					{t('translations.count', { shown: format.number(rows.value.length), total: format.number(counts.total) })}
 				</p>
-				<div class="dash-table-scroll">
+				<UICard>
 					<UITable
-						class="dash-translations"
 						rowKey="actions"
+						bind:hideCaption="true"
 						bind:caption="t('translations.caption')"
 						bind:columns="columns"
 						bind:rows="rows.value"
@@ -175,22 +184,21 @@
 						>
 							<span
 								if:when="column.key === 'original'"
-								class="dash-source-cell"
+								class="dash-cell"
 							>
 								<a bind:href="localePath('/translations/' + row.original.id)">{row.translation?.title ?? row.original.title}</a>
 								<code>{row.original.path}</code>
 							</span>
 							<span
 								if:when="column.key === 'status'"
-								class="dash-translation-status"
-								bind:data-status="row.status"
 								bind:title="t(`labels.translationHelp.${row.status}`)"
 							>
-								<span
-									class="dash-dot"
-									aria-hidden="true"
-								/>
-								{t(`labels.translation.${row.status}`)}
+								<UIBadge
+									bind:dot="true"
+									bind:tone="translationTones[row.status]"
+								>
+									{t(`labels.translation.${row.status}`)}
+								</UIBadge>
 							</span>
 							<code if:when="column.key === 'file'">{row.file ?? '—'}</code>
 							<span
@@ -209,7 +217,7 @@
 									bind:href="localePath('/translations/' + row.original.id)"
 								>
 									{t('translations.compare')}
-									<span class="dash-visually-hidden">{row.original.path}</span>
+									<span class="meeko-ui-sr-only">{row.original.path}</span>
 								</UILink>
 								<UILink
 									if:when="row.translation && row.translation.removedAt === null"
@@ -218,12 +226,12 @@
 									bind:href="localePath('/sources/' + row.translation?.id + '/edit')"
 								>
 									{t('translations.editShort')}
-									<span class="dash-visually-hidden">{t('translations.editOf', { path: row.original.path })}</span>
+									<span class="meeko-ui-sr-only">{t('translations.editOf', { path: row.original.path })}</span>
 								</UILink>
 							</span>
 						</snippet>
 					</UITable>
-				</div>
+				</UICard>
 			</div>
 		</div>
 	</DashPage>

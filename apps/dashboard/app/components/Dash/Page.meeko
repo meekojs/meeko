@@ -9,22 +9,17 @@
 </script>
 
 <template>
-	<UIContainer
-		size="2xl"
-		class="dash-page"
+	<UIPageHeader
+		layout="dashboard"
+		bind:title="props.title"
+		bind:description="props.description"
 	>
-		<header class="dash-page-header">
-			<div>
-				<h1>{props.title}</h1>
-				<p>{props.description}</p>
-			</div>
-			<div
-				if:when="snippets.actions"
-				class="dash-page-actions"
-			>
-				<render snippet="snippets.actions" />
-			</div>
-		</header>
-		<render snippet="snippets.default" />
-	</UIContainer>
+		<snippet
+			if:when="snippets.actions"
+			name="actions"
+		>
+			<render snippet="snippets.actions" />
+		</snippet>
+	</UIPageHeader>
+	<render snippet="snippets.default" />
 </template>

@@ -9,7 +9,7 @@
 		bind:title="props.status === 404 ? t('errors.notFoundTitle') : t('errors.serverTitle')"
 		bind:description="props.status === 404 ? t('errors.notFoundText') : t('errors.serverText')"
 	>
-		<p class="dash-actions">
+		<div class="dash-actions">
 			<UILink bind:href="localePath('/')">{t('errors.backHome')}</UILink>
 			<UILink
 				variant="ghost"
@@ -17,6 +17,6 @@
 			>
 				{t('errors.seeSources')}
 			</UILink>
-		</p>
+		</div>
 	</DashPage>
 </template>

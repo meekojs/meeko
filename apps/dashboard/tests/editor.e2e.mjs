@@ -157,8 +157,8 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 		await locator.evaluate((element) => globalThis.getSelection().collapse(element, element.childNodes.length))
 	}
 	// The preview is the document of a sandboxed iframe: its content is read through the frame.
-	const previewFrame = page.locator('iframe.dash-preview-frame')
-	const preview = page.frameLocator('iframe.dash-preview-frame').locator('body')
+	const previewFrame = page.locator('iframe[sandbox]')
+	const preview = page.frameLocator('iframe[sandbox]').locator('body')
 	/** The focused element, as `tag#id:text`, to follow the focus through the modals. */
 	const focused = () =>
 		page.evaluate(() => {
@@ -175,6 +175,25 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 	await hydrated()
 	await preview.getByRole('heading', { level: 1, name: 'Diagnóstico del proyecto' }).waitFor({ timeout: 60_000 })
 	assert.equal(await page.getByLabel('Autor').count(), 0, 'the author is the user of the session (F5), not a field')
+
+	// The preview is dressed like the site: the prose of @meekojs/ui, on the tokens of the dashboard.
+	assert.equal(await preview.getAttribute('class'), 'dash-preview meeko-ui-prose')
+	const dressed = await preview.evaluate((body) => {
+		const heading = body.querySelector('h1')
+		return { text: globalThis.getComputedStyle(body).color, heading: globalThis.getComputedStyle(heading).color, background: globalThis.getComputedStyle(body).backgroundColor, weight: globalThis.getComputedStyle(heading).fontWeight }
+	})
+	const tokens = await page.evaluate(() => {
+		const probe = globalThis.document.createElement('div')
+		globalThis.document.body.append(probe)
+		const read = (property, value) => {
+			probe.style.setProperty(property, value)
+			return globalThis.getComputedStyle(probe).getPropertyValue(property)
+		}
+		const values = { text: read('color', 'var(--ui-color-text-soft)'), heading: read('color', 'var(--ui-color-text)'), background: read('background-color', 'var(--ui-color-bg)'), weight: read('font-weight', 'var(--ui-font-weight-semibold)') }
+		probe.remove()
+		return values
+	})
+	assert.deepEqual(dressed, tokens)
 
 	// Crepe opens by itself, in the browser, and opening it is not an edit.
 	await crepe.waitFor({ timeout: 60_000 })
@@ -239,7 +258,7 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 		[
 			'# Marcado hostil',
 			'',
-			'<style>#draft-author, #draft-markdown, .dash-editor-bar, button, body { display: none !important; }</style>',
+			'<style>#draft-note, #draft-markdown, .editor-bar, button, body { display: none !important; }</style>',
 			'<iframe src="/"></iframe>',
 			'<script>parent.document.title = "pwned"; parent.__pwned = 1; document.body.dataset.ran = "1"</script>',
 			`<details open ontoggle="parent.__pwned = 2; document.body.dataset.ran = '2'"><summary>Hostil</summary>Contenido hostil.</details>`,
@@ -342,7 +361,7 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 	// A reference page, whose frontmatter is edited as fields and never reaches Crepe.
 	await page.goto(`${origin}/sources/${ids.signal}/edit`, { waitUntil: 'networkidle' })
 	await hydrated()
-	await page.locator('.dash-preview-state').filter({ hasText: 'Render en' }).waitFor({ timeout: 60_000 })
+	await page.getByRole('status').filter({ hasText: 'Render en' }).waitFor({ timeout: 60_000 })
 	await crepe.waitFor({ timeout: 60_000 })
 	assert.equal(await crepe.getByText('source-hash').count(), 0)
 	assert.equal(await crepe.locator('hr').first().count(), 0, 'its delimiters are not a rule of the editor')
@@ -429,7 +448,7 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 	assert.equal(await page.getByText('Conflicto con Git', { exact: true }).count(), 1)
 	await page.getByRole('button', { name: /^Ver conflicto de la revisión/ }).click()
 	await page.getByRole('heading', { name: 'Base → Git ahora' }).waitFor()
-	assert.match((await page.locator('.dash-three-way').textContent()) ?? '', /Pruebas \(versión antigua\)/)
+	assert.match((await page.locator('.source-three-way').textContent()) ?? '', /Pruebas \(versión antigua\)/)
 	await page.getByRole('button', { name: 'Crear borrador: Git actual + mis cambios' }).click()
 	await status(/creado con Git actual y los cambios de la revisión/)
 	assert.equal(await page.getByText('Conflicto con Git', { exact: true }).count(), 1, 'the new draft is written from the Git of now')
@@ -451,7 +470,7 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 		.waitFor({ timeout: 120_000 })
 		.catch(async (error) => {
 			const text = async (selector) => ((await page.locator(selector).allTextContents()).join(' | ') || '(none)').replace(/\s+/g, ' ')
-			throw new Error([error.message, `failure: ${await text('.dash-failure')}`, `job: ${await text('.dash-job')}`, `server: ${logs.slice(-1500)}`].join(' // '))
+			throw new Error([error.message, `failure: ${await text('[role="alert"]')}`, `job: ${await text('[role="log"]')}`, `server: ${logs.slice(-1500)}`].join(' // '))
 		})
 	// The rollback commits while the publication renders, in the temporary schema.
 	const db = createDatabase({ connectionString: url, searchPath: schema })
@@ -465,7 +484,7 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 		.waitFor({ timeout: 180_000 })
 		.catch(async (error) => {
 			const text = async (selector) => ((await page.locator(selector).allTextContents()).join(' | ') || '(none)').replace(/\s+/g, ' ')
-			throw new Error([error.message, `notice: ${await text('.dash-notice')}`, `failure: ${await text('.dash-failure')}`, `job: ${await text('.dash-job')}`].join(' // '))
+			throw new Error([error.message, `notice: ${await text('[role="status"]')}`, `failure: ${await text('[role="alert"]')}`, `job: ${await text('[role="log"]')}`].join(' // '))
 		})
 	await page.reload({ waitUntil: 'networkidle' })
 	await hydrated()
@@ -475,12 +494,12 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 	// go from running to finished, and a reload of `meeko dev` meanwhile (another change to the
 	// workspace) loses that transition, while the job keeps its summary.
 	await page
-		.locator('.dash-job-summary')
-		.filter({ hasText: /Snapshot \d+ publicado y activo/ })
+		.getByText(/Snapshot \d+ publicado y activo/)
+		.first()
 		.waitFor({ timeout: 180_000 })
 		.catch(async (error) => {
 			const text = async (selector) => ((await page.locator(selector).allTextContents()).join(' | ') || '(none)').replace(/\s+/g, ' ')
-			throw new Error([error.message, `notice: ${await text('.dash-notice')}`, `failure: ${await text('.dash-failure')}`, `job: ${await text('.dash-job')}`, `server:\n${logs}`].join('\n'))
+			throw new Error([error.message, `notice: ${await text('[role="status"]')}`, `failure: ${await text('[role="alert"]')}`, `job: ${await text('[role="log"]')}`, `server:\n${logs}`].join('\n'))
 		})
 	await page.getByText(/incluye todas las revisiones publicadas/).waitFor({ timeout: 30_000 })
 
@@ -596,7 +615,7 @@ test('edit a source with its preview, save the draft and publish it; rejections,
 		element.value = value
 		element.dispatchEvent(new Event('input', { bubbles: true }))
 	}, over)
-	await page.locator('.dash-editor-size[data-over]').waitFor()
+	await page.locator('.meeko-ui-badge[data-tone="danger"]').filter({ hasText: 'kB' }).waitFor()
 	assert.equal(await page.getByRole('button', { name: /^(Crear|Guardar) borrador$/ }).isDisabled(), true)
 
 	// Expected in the console: the refused publication of the reference page (422), the failed save

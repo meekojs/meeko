@@ -1,0 +1,38 @@
+<script lang="ts">
+	// The account of the session and its logout: a native POST with the session's CSRF token, so it also
+	// works without JavaScript.
+	import { emptyInput } from '../../../shared/schemas/dashboard'
+
+	const props = defineProps<{ user: string; class?: string }>()
+
+	const { t } = useI18n()
+
+	const logout = useForm({ schema: emptyInput, initial: {}, action: '/api/auth/logout', submit: () => api.auth.logout.post() })
+</script>
+
+<template>
+	<form
+		method="post"
+		action="/api/auth/logout"
+		bind:class="['dash-account', props.class].filter(Boolean).join(' ')"
+	>
+		<input
+			type="hidden"
+			name="_csrf"
+			bind:value="logout.csrfToken"
+		/>
+		<span
+			class="dash-user"
+			bind:title="t('a11y.session')"
+		>
+			{props.user}
+		</span>
+		<UIButton
+			type="submit"
+			variant="outline"
+			bind:title="t('account.logoutTitle', { user: props.user })"
+		>
+			{t('account.logout')}
+		</UIButton>
+	</form>
+</template>

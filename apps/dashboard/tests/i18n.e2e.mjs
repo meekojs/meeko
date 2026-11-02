@@ -168,7 +168,7 @@ ${server.logs().slice(-2000)}`,
 				title: globalThis.document.title,
 				alternates: [...globalThis.document.querySelectorAll('link[rel="alternate"][hreflang]')].map((link) => [link.getAttribute('hreflang'), new URL(link.href).pathname]),
 				links: [...globalThis.document.querySelectorAll('a[href^="/"]:not([hreflang])')].map((link) => link.getAttribute('href')),
-				selector: [...globalThis.document.querySelectorAll('.dash-locale a')].map((link) => [link.getAttribute('hreflang'), new URL(link.href).pathname, link.getAttribute('aria-current')]),
+				selector: [...globalThis.document.querySelectorAll('.meeko-ui-locale-switcher a')].map((link) => [link.getAttribute('hreflang'), new URL(link.href).pathname, link.getAttribute('aria-current')]),
 			}
 		})
 		assert.doesNotMatch(report.text, spanish, `${path}: Spanish text in the page`)
@@ -180,7 +180,7 @@ ${server.logs().slice(-2000)}`,
 		assert.deepEqual(new Map(report.alternates).get('x-default'), base, `${path}: x-default`)
 		assert.deepEqual(report.selector, [
 			['es', base, null],
-			['en', pathname, 'true'],
+			['en', pathname, 'page'],
 		])
 		// Every internal link keeps /en, except the assets of the page.
 		for (const href of report.links) assert.ok(href === '/en' || href.startsWith('/en/') || href.startsWith('/brand/'), `${path}: link without /en: ${href}`)
@@ -201,13 +201,13 @@ ${server.logs().slice(-2000)}`,
 	// The language switch keeps the page and its query --------------------------------------------
 
 	await open('/en/sources?site=ui')
-	await page.locator('.dash-locale a[hreflang="es"]').click()
+	await page.locator('.meeko-ui-locale-switcher a[hreflang="es"]').click()
 	await page.waitForURL((address) => address.pathname === '/sources' && address.search === '?site=ui', { timeout: 60_000 })
 	await hydrated()
 	assert.equal(await page.getAttribute('html', 'lang'), 'es')
 	assert.equal(await page.getByRole('heading', { level: 1 }).textContent(), 'Fuentes')
 	assert.equal((await browserContext.cookies(origin)).find((cookie) => cookie.name === 'meeko-dashboard-locale')?.value, 'es', 'the choice is remembered')
-	await page.locator('.dash-locale a[hreflang="en"]').click()
+	await page.locator('.meeko-ui-locale-switcher a[hreflang="en"]').click()
 	await page.waitForURL((address) => address.pathname === '/en/sources', { timeout: 60_000 })
 	await hydrated()
 
@@ -240,9 +240,9 @@ ${server.logs().slice(-2000)}`,
 	assert.equal(await page.getByRole('link', { name: 'Edit the translation' }).count(), 0)
 	await open(`/en/translations/${ids.testing}`)
 	await page.getByText('+Nuevo parrafo del original.').waitFor({ timeout: 30_000 })
-	assert.ok((await page.locator('.dash-translation-status').textContent())?.includes('Outdated'))
-	assert.equal(await page.locator('pre.dash-markdown[lang="es"]').count(), 1)
-	assert.equal(await page.locator('pre.dash-markdown[lang="en"]').count(), 1)
+	assert.equal(await page.locator('.meeko-ui-badge').filter({ hasText: 'Outdated' }).count(), 1)
+	assert.equal(await page.locator('pre[lang="es"]').count(), 1)
+	assert.equal(await page.locator('pre[lang="en"]').count(), 1)
 
 	// The editor of a translation: English preview, and marking it as translated writes the current hash.
 	await page.getByRole('link', { name: 'Edit the translation' }).click()
@@ -253,7 +253,7 @@ ${server.logs().slice(-2000)}`,
 	await page.waitForFunction((expected) => globalThis.document.querySelector('#frontmatter-source-hash')?.value === expected, hash(original), { timeout: 30_000 })
 	await page.getByRole('button', { name: 'Create draft' }).click()
 	await page
-		.locator('.dash-notice')
+		.getByRole('status')
 		.filter({ hasText: /Draft #\d+ created\./ })
 		.waitFor({ timeout: 30_000 })
 
@@ -270,12 +270,12 @@ ${server.logs().slice(-2000)}`,
 	const notices = page.getByRole('table', { name: /^Announcements of Framework/ })
 	assert.equal(await notices.locator('.dash-locale-tag[data-locale="all"]').count(), 1)
 	// The English preview renders the Shell's own component, with its catalog.
-	assert.ok(await page.locator('.dash-announcement-frame').count())
+	assert.ok(await page.locator('.moderation-preview-frame').count())
 
 	// Metrics per language --------------------------------------------------------------------------
 
 	await open('/en/metrics?lang=en')
-	assert.equal(await page.getByRole('navigation', { name: 'Language' }).last().getByRole('link', { name: 'English' }).getAttribute('aria-current'), 'true')
+	assert.equal(await page.getByRole('navigation', { name: 'Language' }).last().getByRole('link', { name: 'English' }).getAttribute('aria-current'), 'page')
 	await page.getByText('/en/docs/doctor', { exact: true }).waitFor({ timeout: 30_000 })
 	assert.equal(await page.getByText('/docs/testing', { exact: true }).count(), 0)
 	await open('/en/metrics?lang=es')
@@ -290,7 +290,7 @@ ${server.logs().slice(-2000)}`,
 	await visitor.goto(`${origin}/login`, { waitUntil: 'networkidle' })
 	assert.equal(new URL(visitor.url()).pathname, '/login', 'no redirect')
 	assert.equal(await visitor.getAttribute('html', 'lang'), 'es')
-	const suggestion = visitor.locator('.dash-locale-suggestion')
+	const suggestion = visitor.getByRole('complementary', { name: 'Idioma' })
 	await suggestion.waitFor({ timeout: 60_000 })
 	assert.equal(await suggestion.getByRole('link', { name: 'English' }).getAttribute('href'), '/en/login')
 	// On a phone the header fits: no horizontal scroll with the switch and the logout.

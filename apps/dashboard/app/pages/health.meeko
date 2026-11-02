@@ -115,18 +115,18 @@
 				{checking.value ? t('health.checking') : t('health.check')}
 			</UIButton>
 		</snippet>
-		<DashFailure
-			if:when="failure.value"
-			bind:failure="failure.value"
-		/>
-		<DashFailure
-			if:when="jobFailure.value"
-			bind:title="t('health.cannotStart')"
-			bind:failure="jobFailure.value"
-		/>
 		<div class="dash-stack">
+			<DashFailure
+				if:when="failure.value"
+				bind:failure="failure.value"
+			/>
+			<DashFailure
+				if:when="jobFailure.value"
+				bind:title="t('health.cannotStart')"
+				bind:failure="jobFailure.value"
+			/>
 			<p
-				class="dash-count"
+				class="dash-meta dash-status"
 				role="status"
 				aria-live="polite"
 			>
@@ -135,240 +135,216 @@
 				<span if:when="!checking.value && !report.value && jobs.value.health?.status === 'failed'">{t('health.lastFailed')}</span>
 			</p>
 
-			<div
+			<UISkeleton
 				if:when="checking.value && !report.value"
-				class="dash-skeleton"
-				aria-hidden="true"
-			>
-				<span />
-				<span />
-				<span />
-			</div>
+				bind:lines="3"
+				bind:widths="['full', 'long', 'short']"
+			/>
 
-			<div
+			<UICard
 				if:when="report.value"
-				class="dash-stack"
+				bind:title="t('health.pending')"
 			>
-				<section aria-labelledby="pending-heading">
-					<div class="dash-panel-head">
-						<h2
-							id="pending-heading"
-							class="dash-section-title"
-						>
-							{t('health.pending')}
-						</h2>
-						<span class="dash-muted">{formatNumber(report.value?.pendingReferences.length ?? 0)}</span>
-					</div>
-					<p
-						if:when="!report.value?.pendingReferences.length"
-						class="dash-empty"
-					>
-						{t('health.pendingNone')}
-						<code>docs/reference/taxonomy.json</code>
-					</p>
-					<ul
-						if:when="report.value?.pendingReferences.length"
-						class="dash-list"
-					>
-						<li
-							each:of="report.value?.pendingReferences ?? []"
-							each:as="item"
-							each:key="item.symbol"
-						>
-							<strong>{item.name}</strong>
-							<span
-								class="dash-muted"
-								lang="es"
-							>
-								{item.groupTitle}
-							</span>
-							<code>{item.symbol}</code>
-						</li>
-					</ul>
-				</section>
-
-				<section aria-labelledby="links-heading">
-					<div class="dash-panel-head">
-						<h2
-							id="links-heading"
-							class="dash-section-title"
-						>
-							{t('health.broken')}
-						</h2>
-						<UIBadge
-							if:when="report.value?.brokenLinks.length"
-							tone="danger"
-						>
-							{formatNumber(report.value?.brokenLinks.length ?? 0)}
-						</UIBadge>
-					</div>
-					<p class="dash-section-lead">{t('health.brokenLead')}</p>
-					<div class="dash-table-scroll">
-						<UITable
-							bind:caption="t('health.broken')"
-							bind:emptyText="t('health.brokenNone')"
-							bind:columns="linkColumns"
-							bind:rows="report.value?.brokenLinks ?? []"
-							bind:rowKey="linkKey"
-						>
-							<snippet
-								name="cell"
-								params="row, column"
-							>
-								<code if:when="column.key === 'file'">{row.file}{row.line ? ':' + row.line : ''}</code>
-								<code if:when="column.key === 'href'">{row.href}</code>
-								<code if:when="column.key === 'target'">{row.target}</code>
-								<span if:when="column.key === 'reason'">{reason(row.reason)}</span>
-							</snippet>
-						</UITable>
-					</div>
-				</section>
-
-				<section
-					class="dash-results"
-					aria-labelledby="exports-heading"
+				<snippet name="actions">
+					<UIBadge>{formatNumber(report.value?.pendingReferences.length ?? 0)}</UIBadge>
+				</snippet>
+				<UIEmpty
+					if:when="!report.value?.pendingReferences.length"
+					bind:title="t('health.pendingNone')"
 				>
-					<div class="dash-panel-head">
-						<h2
-							id="exports-heading"
-							class="dash-section-title"
+					<code>docs/reference/taxonomy.json</code>
+				</UIEmpty>
+				<ul
+					if:when="report.value?.pendingReferences.length"
+					class="dash-list"
+				>
+					<li
+						each:of="report.value?.pendingReferences ?? []"
+						each:as="item"
+						each:key="item.symbol"
+					>
+						<strong>{item.name}</strong>
+						<span
+							class="dash-soft"
+							lang="es"
 						>
-							{t('health.exports')}
-						</h2>
-						<span class="dash-muted">{formatNumber(report.value?.undocumentedExports.length ?? 0)}</span>
-					</div>
-					<p class="dash-section-lead">{t('health.exportsLead')}</p>
+							{item.groupTitle}
+						</span>
+						<code>{item.symbol}</code>
+					</li>
+				</ul>
+			</UICard>
+
+			<UICard
+				if:when="report.value"
+				bind:title="t('health.broken')"
+				bind:description="t('health.brokenLead')"
+			>
+				<snippet
+					if:when="report.value?.brokenLinks.length"
+					name="actions"
+				>
+					<UIBadge tone="danger">{formatNumber(report.value?.brokenLinks.length ?? 0)}</UIBadge>
+				</snippet>
+				<UITable
+					bind:hideCaption="true"
+					bind:caption="t('health.broken')"
+					bind:emptyText="t('health.brokenNone')"
+					bind:columns="linkColumns"
+					bind:rows="report.value?.brokenLinks ?? []"
+					bind:rowKey="linkKey"
+				>
+					<snippet
+						name="cell"
+						params="row, column"
+					>
+						<code if:when="column.key === 'file'">{row.file}{row.line ? ':' + row.line : ''}</code>
+						<code if:when="column.key === 'href'">{row.href}</code>
+						<code if:when="column.key === 'target'">{row.target}</code>
+						<span if:when="column.key === 'reason'">{reason(row.reason)}</span>
+					</snippet>
+				</UITable>
+			</UICard>
+
+			<UICard
+				if:when="report.value"
+				bind:title="t('health.exports')"
+				bind:description="t('health.exportsLead')"
+			>
+				<snippet name="actions">
+					<UIBadge>{formatNumber(report.value?.undocumentedExports.length ?? 0)}</UIBadge>
+				</snippet>
+				<div class="dash-tight">
 					<form
 						class="dash-filters"
 						role="search"
 						bind:aria-label="t('health.filterExports')"
 						on:submit="(event) => event.preventDefault()"
 					>
-						<div class="dash-field dash-field-grow">
-							<label for="exports-query">{t('actions.search')}</label>
-							<UIInput
-								id="exports-query"
-								type="search"
-								model="exportQuery"
-								bind:placeholder="t('health.exportsPlaceholder')"
-							/>
-						</div>
-						<div class="dash-field">
-							<label for="exports-kind">{t('health.columns.kind')}</label>
-							<UISelect
-								id="exports-kind"
-								model="exportKind"
-								bind:placeholder="t('filters.allMasculine')"
-								bind:options="exportKinds.value"
-								bind:labelBy="kindOption"
-							/>
-						</div>
-					</form>
-					<div class="dash-table-scroll">
-						<UITable
-							rowKey="id"
-							bind:caption="t('health.exports')"
-							bind:emptyText="t('health.exportsNone')"
-							bind:columns="exportColumns"
-							bind:rows="shownExports.value"
+						<UIField
+							id="exports-query"
+							class="dash-grow"
+							bind:label="t('actions.search')"
 						>
 							<snippet
-								name="cell"
-								params="row, column"
+								name="default"
+								params="id, describedBy"
 							>
-								<span
-									if:when="column.key === 'name'"
-									class="dash-source-cell"
-								>
-									<code>{row.name}</code>
-									<UIBadge
-										if:when="row.deprecated"
-										tone="danger"
-									>
-										{t('health.deprecated')}
-									</UIBadge>
-								</span>
-								<code if:when="column.key === 'specifier'">{row.specifier}</code>
-								<span if:when="column.key === 'kindLabel'">{kindName(row.kind, row.kindLabel)}</span>
+								<UIInput
+									type="search"
+									model="exportQuery"
+									bind:id="id"
+									bind:describedBy="describedBy"
+									bind:placeholder="t('health.exportsPlaceholder')"
+								/>
 							</snippet>
-						</UITable>
-					</div>
-					<div
-						if:when="exports.value.length > pageSize"
-						class="dash-more"
-					>
-						<span class="dash-muted">{showAll.value ? t('health.showingAll', { total: formatNumber(exports.value.length) }) : t('health.showingSome', { shown: pageSize, total: formatNumber(exports.value.length) })}</span>
-						<UIButton
-							variant="outline"
-							size="sm"
-							on:click="() => (showAll.value = !showAll.value)"
+						</UIField>
+						<UIField
+							id="exports-kind"
+							bind:label="t('health.columns.kind')"
 						>
-							{showAll.value ? t('health.showLess') : t('health.showAll')}
-						</UIButton>
-					</div>
-				</section>
-			</div>
-
-			<section aria-labelledby="pages-heading">
-				<div class="dash-panel-head">
-					<h2
-						id="pages-heading"
-						class="dash-section-title"
-					>
-						{t('health.meekoPages')}
-					</h2>
-					<span class="dash-muted">UI {formatNumber(pageCounts.value.ui)} · i18n {formatNumber(pageCounts.value.i18n)}</span>
-				</div>
-				<p class="dash-section-lead">{t('health.meekoLead')}</p>
-				<div class="dash-table-scroll">
+							<snippet
+								name="default"
+								params="id, describedBy"
+							>
+								<UISelect
+									model="exportKind"
+									bind:id="id"
+									bind:describedBy="describedBy"
+									bind:placeholder="t('filters.allMasculine')"
+									bind:options="exportKinds.value"
+									bind:labelBy="kindOption"
+								/>
+							</snippet>
+						</UIField>
+					</form>
 					<UITable
 						rowKey="id"
-						bind:caption="t('health.meekoCaption')"
-						bind:columns="pageColumns"
-						bind:rows="pages"
-						bind:emptyText="health.ok ? t('health.meekoNone') : t('health.meekoUnreadable')"
+						bind:hideCaption="true"
+						bind:caption="t('health.exports')"
+						bind:emptyText="t('health.exportsNone')"
+						bind:columns="exportColumns"
+						bind:rows="shownExports.value"
 					>
 						<snippet
 							name="cell"
 							params="row, column"
 						>
 							<span
-								if:when="column.key === 'title'"
-								class="dash-source-cell"
+								if:when="column.key === 'name'"
+								class="dash-cell"
 							>
-								<a bind:href="localePath('/sources/' + row.id)">{row.title}</a>
+								<code>{row.name}</code>
 								<UIBadge
-									if:when="row.removedAt"
+									if:when="row.deprecated"
 									tone="danger"
 								>
-									{t('badge.removed')}
+									{t('health.deprecated')}
 								</UIBadge>
 							</span>
-							<span if:when="column.key === 'site'">{siteLabels[row.site]}</span>
-							<code if:when="column.key === 'path'">{row.path}</code>
-							<span
-								if:when="column.key === 'importedAt'"
-								class="dash-nowrap"
-							>
-								{formatDate(row.importedAt)}
-							</span>
+							<code if:when="column.key === 'specifier'">{row.specifier}</code>
+							<span if:when="column.key === 'kindLabel'">{kindName(row.kind, row.kindLabel)}</span>
 						</snippet>
 					</UITable>
+					<UIPagination
+						if:when="exports.value.length > pageSize"
+						bind:hasMore="true"
+						bind:countText="showAll.value ? t('health.showingAll', { total: formatNumber(exports.value.length) }) : t('health.showingSome', { shown: pageSize, total: formatNumber(exports.value.length) })"
+						bind:loadMoreLabel="showAll.value ? t('health.showLess') : t('health.showAll')"
+						on:loadMore="() => (showAll.value = !showAll.value)"
+					/>
 				</div>
-			</section>
+			</UICard>
 
-			<section aria-labelledby="health-job-heading">
-				<h2
-					id="health-job-heading"
-					class="dash-section-title"
+			<UICard
+				bind:title="t('health.meekoPages')"
+				bind:description="t('health.meekoLead')"
+			>
+				<snippet name="actions">
+					<UIBadge>UI {formatNumber(pageCounts.value.ui)} · i18n {formatNumber(pageCounts.value.i18n)}</UIBadge>
+				</snippet>
+				<UITable
+					rowKey="id"
+					bind:hideCaption="true"
+					bind:caption="t('health.meekoCaption')"
+					bind:columns="pageColumns"
+					bind:rows="pages"
+					bind:emptyText="health.ok ? t('health.meekoNone') : t('health.meekoUnreadable')"
 				>
-					{t('health.lastCheck')}
-				</h2>
+					<snippet
+						name="cell"
+						params="row, column"
+					>
+						<span
+							if:when="column.key === 'title'"
+							class="dash-cell"
+						>
+							<a bind:href="localePath('/sources/' + row.id)">{row.title}</a>
+							<UIBadge
+								if:when="row.removedAt"
+								tone="danger"
+							>
+								{t('badge.removed')}
+							</UIBadge>
+						</span>
+						<span if:when="column.key === 'site'">{siteLabels[row.site]}</span>
+						<code if:when="column.key === 'path'">{row.path}</code>
+						<span
+							if:when="column.key === 'importedAt'"
+							class="dash-nowrap"
+						>
+							{formatDate(row.importedAt)}
+						</span>
+					</snippet>
+				</UITable>
+			</UICard>
+
+			<UICard bind:title="t('health.lastCheck')">
 				<DashJob
 					bind:empty="t('health.noCheck')"
 					bind:job="jobs.value.health"
 				/>
-			</section>
+			</UICard>
 		</div>
 	</DashPage>
 </template>

@@ -24,10 +24,7 @@
 	},
 	"locale": {
 		"label": "Language",
-		"suggestion": "Your browser prefers another language.",
-		"switchTo": "View the dashboard in {name}",
 		"stay": "Stay in English",
-		"dismiss": "Dismiss the language suggestion",
 		"es": "Spanish",
 		"en": "English",
 		"all": "All languages",
@@ -61,7 +58,7 @@
 		"serverText": "The dashboard server failed while preparing this page. Check its console.",
 		"backHome": "Back to the overview",
 		"seeSources": "See the sources",
-		"DATABASE_UNAVAILABLE": "Cannot connect to the documentation database. Check DATABASE_URL in apps/dashboard/.env and that voidcat-local:5432 answers.",
+		"DATABASE_UNAVAILABLE": "Cannot connect to the documentation database. Check DATABASE_URL in apps/dashboard/.env and that its server answers.",
 		"SCHEMA_MISSING": "The database does not have the documentation tables. Run pnpm -F meeko-site run db:migrate.",
 		"SOURCE_NOT_FOUND": "That source does not exist. An import may have changed its id.",
 		"SNAPSHOT_NOT_FOUND": "That snapshot no longer exists: the snapshot retention deleted it.",
@@ -162,11 +159,6 @@
 		"noMarkdownHelp": ".meeko pages do not keep their text in the database: they are edited in the repository.",
 		"importStale": "Import out of date",
 		"importStaleHelp": "Git changed since the last import: import the sources again."
-	},
-	"diff": {
-		"empty": "No differences.",
-		"added": "Added: ",
-		"removed": "Removed: "
 	},
 	"job": {
 		"started": "Started {date}",

@@ -1,4 +1,5 @@
 <script lang="ts">
+	// What the dashboard says about a failure, in the language of the page: the design is <UIAlert>.
 	import type { Failure } from '../../utils/errors'
 
 	import { failureMessage, issueText } from '../../utils/i18n'
@@ -9,29 +10,20 @@
 </script>
 
 <template>
-	<div
-		class="dash-failure"
-		role="alert"
+	<UIAlert
+		tone="danger"
+		bind:title="props.title ?? i18n.t('errors.title')"
+		bind:description="failureMessage(i18n, props.failure)"
 	>
-		<svg
-			viewBox="0 0 16 16"
-			aria-hidden="true"
+		<p
+			if:when="props.failure.detail"
+			class="dash-failure-line"
 		>
-			<path d="M8 1.75 14.75 13.75H1.25zM8 6.25v3.5M8 11.75v.01" />
-		</svg>
-		<div>
-			<p class="dash-failure-title">{props.title ?? i18n.t('errors.title')}</p>
-			<p>{failureMessage(i18n, props.failure)}</p>
-			<p
-				if:when="props.failure.detail"
-				class="dash-failure-detail"
-			>
-				{issueText(i18n, props.failure.detail)}
-			</p>
-			<p class="dash-failure-code">
-				{i18n.t('errors.code')}
-				<code>{props.failure.code}</code>
-			</p>
-		</div>
-	</div>
+			<code>{issueText(i18n, props.failure.detail)}</code>
+		</p>
+		<p class="dash-failure-line">
+			{i18n.t('errors.code')}
+			<code>{props.failure.code}</code>
+		</p>
+	</UIAlert>
 </template>

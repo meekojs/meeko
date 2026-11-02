@@ -1,0 +1,14 @@
+<script lang="ts">
+	// The language of a row, abbreviated, with its full name as a title.
+	const props = defineProps<{ locale: string; short: string; name: string }>()
+</script>
+
+<template>
+	<abbr
+		class="dash-locale-tag"
+		bind:data-locale="props.locale"
+		bind:title="props.name"
+	>
+		<UIBadge bind:tone="props.locale === 'en' ? 'accent' : 'neutral'">{props.short}</UIBadge>
+	</abbr>
+</template>

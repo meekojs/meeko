@@ -117,7 +117,7 @@ test('the metrics screen charts the views, ranks pages and searches, and reviews
 
 		await page.goto(origin + '/metrics', { waitUntil: 'networkidle' })
 		assert.equal(await page.getByRole('link', { name: 'Métricas' }).getAttribute('aria-current'), 'page', 'the section of the header')
-		assert.equal((await page.locator('.metrics-presets a[aria-current="true"]').textContent()).trim(), '30 días')
+		assert.equal((await page.getByRole('navigation', { name: 'Rango de fechas' }).locator('a[aria-current]').textContent()).trim(), '30 días')
 
 		// Totals, the chart (30 days, one column each) and its table.
 		const totals = page.getByRole('region', { name: 'Totales del rango' })
@@ -143,7 +143,7 @@ test('the metrics screen charts the views, ranks pages and searches, and reviews
 		assert.deepEqual(await pages.locator('li code').allTextContents(), ['/docs/signal', '/docs/api'])
 		const empty = page.getByRole('region', { name: 'Búsquedas sin resultados' })
 		assert.deepEqual(await empty.locator('.metrics-query').allTextContents(), ['nada parecido', 'otra cosa'])
-		const searches = page.getByRole('region', { name: 'Búsquedas más frecuentes' })
+		const searches = page.getByRole('region', { name: 'Búsquedas más frecuentes', exact: true })
 		assert.match(await searches.locator('tbody tr').first().textContent(), /nada parecido\s*2\s*Ninguno/)
 		const helpful = page.getByRole('region', { name: '¿Te sirvió? por página' })
 		assert.match(await helpful.locator('tbody tr').first().textContent(), /\/docs\/signal\s*33\s*%\s*1 sí · 2 no\s*1/)
@@ -152,10 +152,10 @@ test('the metrics screen charts the views, ranks pages and searches, and reviews
 		// Comments: pending by default, filtered by answer and by page.
 		const list = page.locator('.metrics-comment-items > li')
 		assert.equal(await list.count(), 2)
-		await page.getByText('Respondió no').click()
+		await page.getByRole('radio', { name: 'Respondió no' }).click()
 		await page.waitForFunction(() => globalThis.document.querySelectorAll('.metrics-comment-items > li').length === 1)
 		assert.match(await list.first().textContent(), /Falta un ejemplo con effect\./)
-		await page.getByText('Sí y no').click()
+		await page.getByRole('radio', { name: 'Sí y no' }).click()
 		await page.locator('#comment-path').fill('api')
 		await page.waitForFunction(() => globalThis.document.querySelector('.metrics-comment-items')?.textContent?.includes('Muy clara') && globalThis.document.querySelectorAll('.metrics-comment-items > li').length === 1)
 		await page.locator('#comment-path').fill('')
@@ -164,10 +164,10 @@ test('the metrics screen charts the views, ranks pages and searches, and reviews
 		// Mark as reviewed: it leaves the pending ones and is reviewed in the database.
 		const target = list.filter({ hasText: 'Falta un ejemplo' })
 		await target.getByRole('button', { name: /Marcar como revisado/ }).click()
-		await page.locator('.dash-notice').filter({ hasText: 'marcado como revisado' }).waitFor()
+		await page.getByRole('status').filter({ hasText: 'marcado como revisado' }).waitFor()
 		await page.waitForFunction(() => globalThis.document.querySelectorAll('.metrics-comment-items > li').length === 1)
 		assert.notEqual((await db.query('SELECT reviewed_at FROM docs_feedback WHERE id = $1', [comments[0].id])).rows[0].reviewed_at, null)
-		await page.getByText('Revisados').click()
+		await page.getByRole('radio', { name: 'Revisados' }).click()
 		await page.waitForFunction(() => globalThis.document.querySelector('.metrics-comment-items')?.textContent?.includes('Falta un ejemplo'))
 
 		// Delete asks first: cancel keeps it, confirm deletes it and the focus goes to the heading.
@@ -187,7 +187,7 @@ test('the metrics screen charts the views, ranks pages and searches, and reviews
 			.click()
 		await dialog.getByRole('button', { name: 'Borrar el comentario' }).click()
 		await dialog.waitFor({ state: 'hidden' })
-		await page.locator('.dash-notice').filter({ hasText: 'borrado' }).waitFor()
+		await page.getByRole('status').filter({ hasText: 'borrado' }).waitFor()
 		await page.getByText('Aún no has revisado ningún comentario de este rango.').waitFor()
 		await page.waitForFunction(() => globalThis.document.activeElement?.id === 'comments-heading')
 		assert.equal((await db.query('SELECT count(*)::int AS count FROM docs_feedback WHERE id = $1', [comments[0].id])).rows[0].count, 0)
@@ -204,7 +204,7 @@ test('the metrics screen charts the views, ranks pages and searches, and reviews
 		await page.goto(origin + '/metrics', { waitUntil: 'networkidle' })
 		await page.getByRole('link', { name: '7 días' }).click()
 		await page.waitForURL(/from=/)
-		await page.locator('.metrics-presets a[aria-current="true"]').filter({ hasText: '7 días' }).waitFor()
+		await page.getByRole('navigation', { name: 'Rango de fechas' }).locator('a[aria-current]').filter({ hasText: '7 días' }).waitFor()
 		assert.match(await page.getByRole('region', { name: 'Totales del rango' }).textContent(), /50/)
 		await page.goto(`${origin}/metrics?from=${day(1)}&to=${day(5)}`, { waitUntil: 'networkidle' })
 		await page.getByRole('alert').filter({ hasText: 'No se pudieron cargar las métricas' }).waitFor()
@@ -227,7 +227,7 @@ test('the metrics screen charts the views, ranks pages and searches, and reviews
 			`INSERT INTO docs_feedback (site, path, helpful, comment, created_at)
 			SELECT 'ui', '/buttons', false, 'Comentario ' || n, now() - n * interval '1 minute' FROM generate_series(1, 26) AS n`,
 		)
-		const pager = page.locator('.metrics-pager')
+		const pager = page.getByRole('navigation', { name: 'Páginas de comentarios' })
 		const lastOf = async (filter) => {
 			await pager.filter({ hasText: 'Página 1 de 2' }).waitFor()
 			await pager.getByRole('button', { name: 'Más antiguos' }).click()
@@ -241,17 +241,17 @@ test('the metrics screen charts the views, ranks pages and searches, and reviews
 			.first()
 			.getByRole('button', { name: /Marcar como revisado/ })
 			.click()
-		await page.locator('.dash-notice').filter({ hasText: 'marcado como revisado' }).waitFor()
+		await page.getByRole('status').filter({ hasText: 'marcado como revisado' }).waitFor()
 		await page.waitForFunction(() => globalThis.document.querySelectorAll('.metrics-comment-items > li').length === 25)
 		assert.equal(await pager.count(), 0, 'the 25 pending comments fit in one page')
 		await db.query("UPDATE docs_feedback SET reviewed_at = now() WHERE site = 'ui'")
-		await page.getByText('Revisados').click()
+		await page.getByRole('radio', { name: 'Revisados' }).click()
 		await lastOf('reviewed')
 		await list
 			.first()
 			.getByRole('button', { name: /Volver a pendiente/ })
 			.click()
-		await page.locator('.dash-notice').filter({ hasText: 'de nuevo pendiente' }).waitFor()
+		await page.getByRole('status').filter({ hasText: 'de nuevo pendiente' }).waitFor()
 		await page.waitForFunction(() => globalThis.document.querySelectorAll('.metrics-comment-items > li').length === 25)
 		assert.equal(await pager.count(), 0, 'the 25 reviewed comments fit in one page')
 

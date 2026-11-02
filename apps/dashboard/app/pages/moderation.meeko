@@ -81,13 +81,15 @@
 	}
 
 	const tabs = computed(() =>
-		sites.map((name) => ({
-			name,
-			href: localePath(name === 'site' ? '/moderation' : `/moderation?site=${name}`),
-			label: siteLabels[name],
-			rules: data.value?.counts[name].rules ?? 0,
-			live: data.value?.counts[name].live ?? 0,
-		})),
+		sites.map((name) => {
+			const counts = data.value?.counts[name] ?? { rules: 0, live: 0 }
+			return {
+				label: siteLabels[name],
+				href: localePath(name === 'site' ? '/moderation' : `/moderation?site=${name}`),
+				current: name === site,
+				badge: t('moderation.tabRules', { count: counts.rules }) + (counts.live ? ' · ' + t('moderation.tabLive', { count: counts.live }) : ''),
+			}
+		}),
 	)
 	const pageCount = computed(() => data.value?.pages.length ?? 0)
 	const delay = t('moderation.delay')
@@ -223,7 +225,7 @@
 		{ key: 'reason', label: t('moderation.columns.reason') },
 		{ key: 'author', label: t('moderation.columns.author') },
 		{ key: 'createdAt', label: t('moderation.columns.date') },
-		{ key: 'id', label: t('moderation.columns.actions') },
+		{ key: 'id', label: t('moderation.columns.actions'), numeric: true },
 	] as const
 
 	// Announcements --------------------------------------------------------------------------------
@@ -243,6 +245,9 @@
 	const messageLength = computed(() => message.value.trim().length)
 	const messageCounter = computed(() => t('moderation.announcement.counter', { length: messageLength.value, max: maxMessageLength }))
 	const messageTooLong = computed(() => messageLength.value > maxMessageLength)
+	// The message says its own errors next to it; the rest, such as the dates, go above the actions.
+	const messageError = computed(() => (messageTooLong.value ? t('moderation.announcement.tooLong', { max: maxMessageLength }) : !messageLength.value && announcementError.value === t('validation.message') ? announcementError.value : undefined))
+	const formError = computed(() => (announcementError.value && announcementError.value !== t('validation.message') && !messageTooLong.value ? announcementError.value : ''))
 	const preview = computed(() => [{ id: editing.value ?? 0, message: message.value.trim() || t('moderation.announcement.placeholder'), tone: tone.value ?? 'info' }])
 	const previewNote = computed(() => {
 		if (!active.value) return t('moderation.preview.inactive')
@@ -371,7 +376,7 @@
 		{ key: 'startsAt', label: t('moderation.columns.validity') },
 		{ key: 'state', label: t('moderation.columns.state') },
 		{ key: 'author', label: t('moderation.columns.author') },
-		{ key: 'id', label: t('moderation.columns.actions') },
+		{ key: 'id', label: t('moderation.columns.actions'), numeric: true },
 	] as const
 	const validity = (item: AnnouncementRow) => (item.startsAt || item.endsAt ? `${item.startsAt ? formatDate(item.startsAt) : t('moderation.validity.now')} → ${item.endsAt ? formatDate(item.endsAt) : t('moderation.validity.noEnd')}` : t('moderation.validity.none'))
 
@@ -432,168 +437,161 @@
 		bind:title="t('moderation.title')"
 		bind:description="t('moderation.description')"
 	>
-		<nav
-			class="dash-tabs"
-			bind:aria-label="t('moderation.columns.site')"
-		>
-			<a
-				each:of="tabs.value"
-				each:as="tab"
-				each:key="tab.name"
-				bind:href="tab.href"
-				bind:aria-current="tab.name === site ? 'page' : undefined"
-			>
-				{tab.label}
-				<span class="dash-tab-count">{t('moderation.tabRules', { count: tab.rules })}{tab.live ? ' · ' + t('moderation.tabLive', { count: tab.live }) : ''}</span>
-			</a>
-		</nav>
-		<DashFailure
-			if:when="loadFailure.value"
-			bind:failure="loadFailure.value"
-		/>
-		<p
-			class="dash-notice"
-			role="status"
-			aria-live="polite"
-		>
-			{notice.value}
-		</p>
-		<div
-			if:when="data.value"
-			class="dash-stack"
-		>
+		<div class="dash-stack">
+			<UINavigationTabs
+				bind:items="tabs.value"
+				bind:label="t('moderation.columns.site')"
+			/>
+			<DashFailure
+				if:when="loadFailure.value"
+				bind:failure="loadFailure.value"
+			/>
+			<DashNotice bind:text="notice.value" />
 			<form
-				class="dash-filters dash-moderation-filter"
+				if:when="data.value"
+				class="dash-filters"
 				bind:aria-label="t('moderation.filterLabel')"
 				on:submit="(event) => event.preventDefault()"
 			>
-				<div class="dash-field">
-					<label for="moderation-locale">{t('moderation.filter')}</label>
-					<UISelect
-						id="moderation-locale"
-						model="listLocale"
-						bind:options="localeChoices"
-						bind:labelBy="localeLabel"
-					/>
-				</div>
-				<p class="dash-hint">{t('moderation.filterHint')}</p>
-			</form>
-			<section
-				class="dash-panel"
-				aria-labelledby="rules-heading"
-			>
-				<div class="dash-panel-head">
-					<h2
-						id="rules-heading"
-						tabindex="-1"
-					>
-						{t('moderation.pages')}
-					</h2>
-					<span class="dash-muted">{t('moderation.known', { count: pageCount.value, site: siteLabels[site] })}</span>
-				</div>
-				<form
-					class="dash-moderation-form"
-					novalidate
-					on:submit="
-						(event) => {
-							event.preventDefault()
-							submitRule()
-						}
-					"
+				<UIField
+					id="moderation-locale"
+					bind:label="t('moderation.filter')"
+					bind:description="t('moderation.filterHint')"
 				>
-					<div class="dash-field dash-moderation-page">
-						<label for="rule-page">{t('moderation.columns.page')}</label>
-						<UICombobox
-							id="rule-page"
-							searchable
-							by="path"
-							model="page"
-							bind:placeholder="t('moderation.rule.pagePlaceholder')"
-							bind:options="data.value?.pages ?? []"
-							bind:labelBy="pageLabel"
-							bind:groupBy="site === 'site' ? pageGroup : undefined"
-							bind:invalid="ruleError.value === t('moderation.rule.choosePage')"
-						/>
-					</div>
-					<div class="dash-field">
-						<label for="rule-locale">{t('moderation.columns.locale')}</label>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
 						<UISelect
-							id="rule-locale"
-							model="ruleLocale"
+							model="listLocale"
+							bind:id="id"
+							bind:describedBy="describedBy"
 							bind:options="localeChoices"
 							bind:labelBy="localeLabel"
 						/>
-					</div>
-					<fieldset class="dash-segmented">
-						<legend>{t('moderation.columns.rule')}</legend>
-						<label>
-							<input
-								type="radio"
-								name="rule-action"
-								value="hide"
-								bind:checked="action.value === 'hide'"
-								on:change="() => (action.value = 'hide')"
-							/>
-							{t('moderation.rule.hideShort')}
-						</label>
-						<label>
-							<input
-								type="radio"
-								name="rule-action"
-								value="feature"
-								bind:checked="action.value === 'feature'"
-								on:change="() => (action.value = 'feature')"
-							/>
-							{t('moderation.rule.featureShort')}
-						</label>
-					</fieldset>
-					<div class="dash-field dash-field-grow">
-						<label for="rule-reason">{t('moderation.columns.reason')}</label>
-						<input
-							id="rule-reason"
-							class="meeko-ui-input"
-							model="reason"
-							bind:placeholder="t('moderation.rule.reasonPlaceholder')"
-							bind:aria-invalid="reasonTooLong.value ? 'true' : undefined"
+					</snippet>
+				</UIField>
+			</form>
+			<UICard
+				if:when="data.value"
+				headingId="rules-heading"
+				bind:title="t('moderation.pages')"
+				bind:description="t('moderation.known', { count: pageCount.value, site: siteLabels[site] })"
+			>
+				<div class="dash-tight">
+					<form
+						class="moderation-rule"
+						novalidate
+						on:submit="
+							(event) => {
+								event.preventDefault()
+								submitRule()
+							}
+						"
+					>
+						<div class="moderation-rule-page">
+							<UIField
+								id="rule-page"
+								bind:label="t('moderation.columns.page')"
+							>
+								<snippet
+									name="default"
+									params="id, describedBy"
+								>
+									<UICombobox
+										searchable
+										by="path"
+										model="page"
+										bind:id="id"
+										bind:describedBy="describedBy"
+										bind:placeholder="t('moderation.rule.pagePlaceholder')"
+										bind:options="data.value?.pages ?? []"
+										bind:labelBy="pageLabel"
+										bind:groupBy="site === 'site' ? pageGroup : undefined"
+										bind:invalid="ruleError.value === t('moderation.rule.choosePage')"
+									/>
+								</snippet>
+							</UIField>
+						</div>
+						<UIField
+							id="rule-locale"
+							bind:label="t('moderation.columns.locale')"
+						>
+							<snippet
+								name="default"
+								params="id, describedBy"
+							>
+								<UISelect
+									model="ruleLocale"
+									bind:id="id"
+									bind:describedBy="describedBy"
+									bind:options="localeChoices"
+									bind:labelBy="localeLabel"
+								/>
+							</snippet>
+						</UIField>
+						<UIRadioGroup
+							name="rule-action"
+							variant="segmented"
+							model="action"
+							bind:legend="t('moderation.columns.rule')"
+							bind:options="[
+								{ value: 'hide', label: t('moderation.rule.hideShort') },
+								{ value: 'feature', label: t('moderation.rule.featureShort') },
+							]"
 						/>
-					</div>
-					<div class="dash-moderation-submit">
-						<UIButton
-							type="submit"
-							bind:disabled="savingRule.value"
+						<UIField
+							id="rule-reason"
+							bind:label="t('moderation.columns.reason')"
 						>
-							{ruleSubmit.value}
-						</UIButton>
-						<UIButton
-							if:when="page.value || reason.value"
-							variant="ghost"
-							on:click="resetRule"
-						>
-							{t('moderation.rule.clear')}
-						</UIButton>
-					</div>
-				</form>
-				<p
-					if:when="existing.value"
-					class="dash-hint"
-				>
-					{t('moderation.rule.existing', { action: actionLabel(existing.value?.action ?? 'hide').toLocaleLowerCase(i18n.locale), author: existing.value?.author ?? '' })}
-				</p>
-				<p
-					if:when="ruleError.value"
-					class="dash-field-error"
-					role="alert"
-				>
-					{ruleError.value}
-				</p>
-				<DashFailure
-					if:when="ruleFailure.value"
-					bind:title="t('moderation.rule.notSaved')"
-					bind:failure="ruleFailure.value"
-				/>
-				<div class="dash-table-scroll">
+							<snippet
+								name="default"
+								params="id, describedBy"
+							>
+								<UIInput
+									model="reason"
+									bind:id="id"
+									bind:describedBy="describedBy"
+									bind:placeholder="t('moderation.rule.reasonPlaceholder')"
+									bind:invalid="reasonTooLong.value"
+								/>
+							</snippet>
+						</UIField>
+						<div class="dash-actions">
+							<UIButton
+								type="submit"
+								bind:disabled="savingRule.value"
+							>
+								{ruleSubmit.value}
+							</UIButton>
+							<UIButton
+								if:when="page.value || reason.value"
+								variant="ghost"
+								on:click="resetRule"
+							>
+								{t('moderation.rule.clear')}
+							</UIButton>
+						</div>
+					</form>
+					<p
+						if:when="existing.value"
+						class="dash-meta"
+					>
+						{t('moderation.rule.existing', { action: actionLabel(existing.value?.action ?? 'hide').toLocaleLowerCase(i18n.locale), author: existing.value?.author ?? '' })}
+					</p>
+					<UIAlert
+						if:when="ruleError.value"
+						tone="danger"
+						bind:description="ruleError.value"
+					/>
+					<DashFailure
+						if:when="ruleFailure.value"
+						bind:title="t('moderation.rule.notSaved')"
+						bind:failure="ruleFailure.value"
+					/>
 					<UITable
 						rowKey="id"
+						bind:hideCaption="true"
 						bind:emptyText="t('moderation.rule.empty')"
 						bind:caption="t('moderation.rule.caption', { site: siteLabels[site] })"
 						bind:columns="ruleColumns"
@@ -605,19 +603,17 @@
 						>
 							<span
 								if:when="column.key === 'path'"
-								class="dash-source-cell"
+								class="dash-cell"
 							>
 								<strong>{row.title ?? t('moderation.rule.gone')}</strong>
 								<code>{row.path}</code>
 							</span>
-							<abbr
+							<DashLocaleTag
 								if:when="column.key === 'locale'"
-								class="dash-locale-tag"
-								bind:data-locale="row.locale ?? 'all'"
-								bind:title="localeLabel(toChoice(row.locale))"
-							>
-								{localeShort(row.locale)}
-							</abbr>
+								bind:locale="row.locale ?? 'all'"
+								bind:name="localeLabel(toChoice(row.locale))"
+								bind:short="localeShort(row.locale)"
+							/>
 							<UIBadge
 								if:when="column.key === 'action'"
 								bind:tone="row.action === 'hide' ? 'danger' : 'accent'"
@@ -642,7 +638,7 @@
 									on:click="() => editRule(row)"
 								>
 									{t('moderation.rule.edit')}
-									<span class="dash-visually-hidden">{t('moderation.rule.ofPath', { path: publicPath(row.path, row.locale) })}</span>
+									<span class="meeko-ui-sr-only">{t('moderation.rule.ofPath', { path: publicPath(row.path, row.locale) })}</span>
 								</UIButton>
 								<UIButton
 									size="sm"
@@ -650,163 +646,179 @@
 									on:click="() => askRemoveRule(row)"
 								>
 									{t('moderation.rule.remove')}
-									<span class="dash-visually-hidden">{t('moderation.rule.ofPath', { path: publicPath(row.path, row.locale) })}</span>
+									<span class="meeko-ui-sr-only">{t('moderation.rule.ofPath', { path: publicPath(row.path, row.locale) })}</span>
 								</UIButton>
 							</span>
 						</snippet>
 					</UITable>
 				</div>
-			</section>
+			</UICard>
 
-			<section
-				class="dash-panel"
-				aria-labelledby="announcements-heading"
+			<UICard
+				if:when="data.value"
+				headingId="announcements-heading"
+				bind:title="t('moderation.announcements')"
+				bind:description="t('moderation.announcementsHint', { site: siteLabels[site] })"
 			>
-				<div class="dash-panel-head">
-					<h2
-						id="announcements-heading"
-						tabindex="-1"
-					>
-						{t('moderation.announcements')}
-					</h2>
-					<span class="dash-muted">{t('moderation.announcementsHint', { site: siteLabels[site] })}</span>
-				</div>
-				<div class="dash-announcement-editor">
-					<form
-						id="announcement-form"
-						class="dash-form"
-						novalidate
-						on:submit="
-							(event) => {
-								event.preventDefault()
-								void submitAnnouncement()
-							}
-						"
-					>
-						<p class="dash-announcement-mode">{editing.value === null ? t('moderation.announcement.new') : t('moderation.announcement.editing', { id: editing.value })}</p>
-						<div class="dash-field">
-							<label for="announcement-message">{t('moderation.columns.message')}</label>
-							<textarea
+				<div class="dash-stack">
+					<div class="dash-columns">
+						<form
+							id="announcement-form"
+							class="dash-form"
+							novalidate
+							on:submit="
+								(event) => {
+									event.preventDefault()
+									void submitAnnouncement()
+								}
+							"
+						>
+							<h3 class="dash-heading">{editing.value === null ? t('moderation.announcement.new') : t('moderation.announcement.editing', { id: editing.value })}</h3>
+							<UIField
 								id="announcement-message"
-								class="meeko-ui-input dash-announcement-text"
-								rows="3"
-								aria-describedby="announcement-counter"
-								model="message"
-								bind:aria-invalid="messageTooLong.value || announcementError.value === t('validation.message') ? 'true' : undefined"
-							/>
-							<p
-								id="announcement-counter"
-								class="dash-counter"
-								bind:data-over="messageTooLong.value ? 'true' : undefined"
+								bind:label="t('moderation.columns.message')"
+								bind:counter="messageCounter.value"
+								bind:error="messageError.value"
 							>
-								{messageCounter.value}
-							</p>
-						</div>
-						<div class="dash-announcement-row">
-							<div class="dash-field">
-								<label for="announcement-tone">{t('moderation.columns.tone')}</label>
-								<UISelect
+								<snippet
+									name="default"
+									params="id, describedBy"
+								>
+									<UITextarea
+										model="message"
+										bind:rows="3"
+										bind:id="id"
+										bind:describedBy="describedBy"
+										bind:invalid="Boolean(messageError.value)"
+									/>
+								</snippet>
+							</UIField>
+							<div class="moderation-announcement-row">
+								<UIField
 									id="announcement-tone"
-									model="tone"
-									bind:options="tones"
-									bind:labelBy="toneLabel"
-								/>
-							</div>
-							<div class="dash-field">
-								<label for="announcement-locale">{t('moderation.columns.locale')}</label>
-								<UISelect
+									bind:label="t('moderation.columns.tone')"
+								>
+									<snippet
+										name="default"
+										params="id, describedBy"
+									>
+										<UISelect
+											model="tone"
+											bind:id="id"
+											bind:describedBy="describedBy"
+											bind:options="tones"
+											bind:labelBy="toneLabel"
+										/>
+									</snippet>
+								</UIField>
+								<UIField
 									id="announcement-locale"
-									model="announcementLocale"
-									bind:options="localeChoices"
-									bind:labelBy="localeLabel"
-								/>
-							</div>
-							<div class="dash-field">
-								<label for="announcement-start">{t('moderation.announcement.start')}</label>
-								<input
+									bind:label="t('moderation.columns.locale')"
+								>
+									<snippet
+										name="default"
+										params="id, describedBy"
+									>
+										<UISelect
+											model="announcementLocale"
+											bind:id="id"
+											bind:describedBy="describedBy"
+											bind:options="localeChoices"
+											bind:labelBy="localeLabel"
+										/>
+									</snippet>
+								</UIField>
+								<UIField
 									id="announcement-start"
-									class="meeko-ui-input"
-									type="datetime-local"
-									aria-describedby="announcement-dates"
-									model="startsAt"
-								/>
-							</div>
-							<div class="dash-field">
-								<label for="announcement-end">{t('moderation.announcement.end')}</label>
-								<input
+									bind:label="t('moderation.announcement.start')"
+								>
+									<snippet
+										name="default"
+										params="id"
+									>
+										<UIInput
+											type="datetime-local"
+											describedBy="announcement-dates"
+											model="startsAt"
+											bind:id="id"
+										/>
+									</snippet>
+								</UIField>
+								<UIField
 									id="announcement-end"
-									class="meeko-ui-input"
-									type="datetime-local"
-									aria-describedby="announcement-dates"
-									model="endsAt"
-								/>
+									bind:label="t('moderation.announcement.end')"
+								>
+									<snippet
+										name="default"
+										params="id"
+									>
+										<UIInput
+											type="datetime-local"
+											describedBy="announcement-dates"
+											model="endsAt"
+											bind:id="id"
+										/>
+									</snippet>
+								</UIField>
 							</div>
-						</div>
-						<p
-							id="announcement-dates"
-							class="dash-hint"
-						>
-							{t('moderation.announcement.datesHint')}
-						</p>
-						<label class="dash-check">
-							<input
-								type="checkbox"
+							<p
+								id="announcement-dates"
+								class="dash-meta"
+							>
+								{t('moderation.announcement.datesHint')}
+							</p>
+							<UICheckbox
 								model="active"
+								bind:label="t('moderation.announcement.active')"
 							/>
-							{t('moderation.announcement.active')}
-						</label>
-						<p
-							if:when="announcementError.value"
-							class="dash-field-error"
-							role="alert"
-						>
-							{announcementError.value}
-						</p>
-						<DashFailure
-							if:when="announcementFailure.value"
-							bind:title="t('moderation.announcement.notSaved')"
-							bind:failure="announcementFailure.value"
-						/>
-						<div class="dash-actions">
-							<UIButton
-								type="submit"
-								bind:disabled="savingAnnouncement.value"
-							>
-								{savingAnnouncement.value ? t('actions.saving') : editing.value === null ? t('moderation.announcement.create') : t('moderation.announcement.save')}
-							</UIButton>
-							<UIButton
-								if:when="editing.value !== null || message.value"
-								variant="ghost"
-								on:click="resetAnnouncement"
-							>
-								{editing.value === null ? t('moderation.announcement.empty') : t('moderation.announcement.cancelEdit')}
-							</UIButton>
-						</div>
-					</form>
-					<figure class="dash-announcement-preview">
-						<figcaption>
-							{t('moderation.preview.title')}
-							<span class="dash-muted">{previewNote.value}</span>
-						</figcaption>
-						<div
-							class="dash-announcement-frame"
-							inert
-						>
-							<DocsAnnouncements bind:items="preview.value" />
-							<div
-								class="dash-announcement-page"
-								aria-hidden="true"
-							>
-								<span />
-								<span />
-								<span />
+							<UIAlert
+								if:when="formError.value"
+								tone="danger"
+								bind:description="formError.value"
+							/>
+							<DashFailure
+								if:when="announcementFailure.value"
+								bind:title="t('moderation.announcement.notSaved')"
+								bind:failure="announcementFailure.value"
+							/>
+							<div class="dash-actions">
+								<UIButton
+									type="submit"
+									bind:disabled="savingAnnouncement.value"
+								>
+									{savingAnnouncement.value ? t('actions.saving') : editing.value === null ? t('moderation.announcement.create') : t('moderation.announcement.save')}
+								</UIButton>
+								<UIButton
+									if:when="editing.value !== null || message.value"
+									variant="ghost"
+									on:click="resetAnnouncement"
+								>
+									{editing.value === null ? t('moderation.announcement.empty') : t('moderation.announcement.cancelEdit')}
+								</UIButton>
 							</div>
-						</div>
-					</figure>
-				</div>
-				<div class="dash-table-scroll">
+						</form>
+						<figure class="moderation-preview">
+							<figcaption class="dash-cell">
+								<span class="dash-heading">{t('moderation.preview.title')}</span>
+								<span class="dash-meta">{previewNote.value}</span>
+							</figcaption>
+							<div
+								class="moderation-preview-frame"
+								inert
+							>
+								<DocsAnnouncements bind:items="preview.value" />
+								<div aria-hidden="true">
+									<UISkeleton
+										bind:lines="3"
+										bind:widths="['short', 'full', 'long']"
+									/>
+								</div>
+							</div>
+						</figure>
+					</div>
 					<UITable
 						rowKey="id"
+						bind:hideCaption="true"
 						bind:emptyText="t('moderation.announcement.none')"
 						bind:caption="t('moderation.announcement.caption', { site: siteLabels[site] })"
 						bind:columns="announcementColumns"
@@ -818,25 +830,23 @@
 						>
 							<span
 								if:when="column.key === 'message'"
-								class="dash-announcement-cell"
+								class="dash-cell"
 							>
 								{row.message}
 							</span>
-							<abbr
+							<DashLocaleTag
 								if:when="column.key === 'locale'"
-								class="dash-locale-tag"
-								bind:data-locale="row.locale ?? 'all'"
-								bind:title="localeLabel(toChoice(row.locale))"
-							>
-								{localeShort(row.locale)}
-							</abbr>
-							<span
+								bind:locale="row.locale ?? 'all'"
+								bind:name="localeLabel(toChoice(row.locale))"
+								bind:short="localeShort(row.locale)"
+							/>
+							<UIBadge
 								if:when="column.key === 'tone'"
-								class="dash-tone"
-								bind:data-tone="row.tone"
+								bind:dot="true"
+								bind:tone="row.tone"
 							>
 								{toneLabel(row.tone)}
-							</span>
+							</UIBadge>
 							<span
 								if:when="column.key === 'startsAt'"
 								class="dash-nowrap"
@@ -860,7 +870,7 @@
 									on:click="() => editAnnouncement(row)"
 								>
 									{t('moderation.announcement.edit')}
-									<span class="dash-visually-hidden">{t('moderation.announcement.ofId', { id: row.id })}</span>
+									<span class="meeko-ui-sr-only">{t('moderation.announcement.ofId', { id: row.id })}</span>
 								</UIButton>
 								<UIButton
 									size="sm"
@@ -868,7 +878,7 @@
 									on:click="() => void toggleAnnouncement(row)"
 								>
 									{row.active ? t('moderation.announcement.deactivate') : t('moderation.announcement.activate')}
-									<span class="dash-visually-hidden">{t('moderation.announcement.ofId', { id: row.id })}</span>
+									<span class="meeko-ui-sr-only">{t('moderation.announcement.ofId', { id: row.id })}</span>
 								</UIButton>
 								<UIButton
 									size="sm"
@@ -876,13 +886,13 @@
 									on:click="() => askRemoveAnnouncement(row)"
 								>
 									{t('moderation.announcement.delete')}
-									<span class="dash-visually-hidden">{t('moderation.announcement.ofId', { id: row.id })}</span>
+									<span class="meeko-ui-sr-only">{t('moderation.announcement.ofId', { id: row.id })}</span>
 								</UIButton>
 							</span>
 						</snippet>
 					</UITable>
 				</div>
-			</section>
+			</UICard>
 		</div>
 
 		<UIModal
@@ -903,6 +913,7 @@
 					{t('actions.cancel')}
 				</UIButton>
 				<UIButton
+					tone="danger"
 					bind:disabled="answering.value"
 					on:click="answer"
 				>
@@ -912,3 +923,51 @@
 		</UIModal>
 	</DashPage>
 </template>
+
+<style scoped>
+	.moderation-rule {
+		display: grid;
+		grid-template-columns: minmax(var(--ui-floating-panel-width), 2fr) minmax(var(--ui-table-column-min), 1fr) auto minmax(var(--ui-table-column-min), 2fr) auto;
+		align-items: end;
+		gap: var(--ui-space-3) var(--ui-space-4);
+	}
+	.moderation-announcement-row {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: var(--ui-space-3);
+	}
+	.moderation-preview {
+		display: grid;
+		align-content: start;
+		gap: var(--ui-space-3);
+		margin: 0;
+		min-width: 0;
+	}
+	/* The rest of a documentation page, drawn as quiet bars under the real banner: nothing is loading. */
+	.moderation-preview-frame {
+		display: grid;
+		gap: var(--ui-space-4);
+		border: var(--ui-border-width) solid var(--ui-color-border);
+		border-radius: var(--ui-radius-lg);
+		background: var(--ui-color-bg);
+		padding: var(--ui-space-4);
+		overflow: hidden;
+	}
+	.moderation-preview-frame :global(.meeko-ui-skeleton > span) {
+		animation: none;
+	}
+	@media (max-width: 75rem) {
+		.moderation-rule {
+			grid-template-columns: minmax(0, 1fr) auto;
+		}
+		.moderation-rule-page {
+			grid-column: 1 / -1;
+		}
+	}
+	@media (max-width: 40rem) {
+		.moderation-rule,
+		.moderation-announcement-row {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+</style>

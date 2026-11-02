@@ -55,113 +55,108 @@
 </script>
 
 <template>
-	<UIContainer
-		size="sm"
-		class="dash-login"
-	>
-		<section
-			class="dash-login-panel"
-			aria-labelledby="login-title"
+	<div class="dash-login">
+		<UICard
+			variant="elevated"
+			padding="lg"
+			bind:aria-label="t('login.title')"
 		>
-			<img
-				class="dash-login-mark"
-				src="/brand/meeko-logo.png"
-				width="44"
-				height="44"
-				alt=""
-			/>
-			<h1 id="login-title">{t('login.title')}</h1>
-			<p class="dash-login-lead">{t('login.lead')}</p>
-
-			<p
-				if:when="!configured"
-				class="dash-login-alert"
-				role="status"
-			>
-				{t('login.errors.LOGIN_NOT_CONFIGURED')}
-			</p>
-			<p
-				if:when="form.error.value"
-				class="dash-login-alert"
-				role="alert"
-				data-tone="danger"
-			>
-				{form.error.value}
-			</p>
-
-			<form
-				class="dash-login-form"
-				method="post"
-				action="/api/auth/login"
-				novalidate
-				bind:aria-busy="form.pending.value ? 'true' : undefined"
-				on:submit="form.submit"
-			>
-				<input
-					type="hidden"
-					name="return"
-					bind:value="back"
+			<div class="dash-form">
+				<img
+					src="/brand/meeko-logo.png"
+					width="44"
+					height="44"
+					alt=""
 				/>
-				<input
-					type="hidden"
-					name="next"
-					bind:value="form.fields.next.value"
+				<UIPageHeader
+					layout="dashboard"
+					class="dash-login-header"
+					bind:title="t('login.title')"
+					bind:description="t('login.lead')"
 				/>
-				<UIField
-					id="login-username"
-					bind:label="t('login.username')"
-					bind:error="fieldError(form.errors.value.username)"
+				<UIAlert
+					if:when="!configured"
+					tone="warning"
+					role="status"
+					bind:description="t('login.errors.LOGIN_NOT_CONFIGURED')"
+				/>
+				<UIAlert
+					if:when="form.error.value"
+					tone="danger"
+					bind:description="form.error.value ?? ''"
+				/>
+				<form
+					class="dash-form"
+					method="post"
+					action="/api/auth/login"
+					novalidate
+					bind:aria-busy="form.pending.value ? 'true' : undefined"
+					on:submit="form.submit"
 				>
-					<snippet
-						name="default"
-						params="id, describedBy"
+					<input
+						type="hidden"
+						name="return"
+						bind:value="back"
+					/>
+					<input
+						type="hidden"
+						name="next"
+						bind:value="form.fields.next.value"
+					/>
+					<UIField
+						id="login-username"
+						bind:label="t('login.username')"
+						bind:error="fieldError(form.errors.value.username)"
 					>
-						<input
-							class="meeko-ui-input"
-							name="username"
-							type="text"
-							autocomplete="username"
-							autocapitalize="none"
-							spellcheck="false"
-							required
-							model="form.fields.username"
-							bind:id="id"
-							bind:aria-describedby="describedBy"
-							bind:aria-invalid="form.errors.value.username ? 'true' : undefined"
-						/>
-					</snippet>
-				</UIField>
-				<UIField
-					id="login-password"
-					bind:label="t('login.password')"
-					bind:error="fieldError(form.errors.value.password)"
-				>
-					<snippet
-						name="default"
-						params="id, describedBy"
+						<snippet
+							name="default"
+							params="id, describedBy"
+						>
+							<UIInput
+								name="username"
+								type="text"
+								autocomplete="username"
+								autocapitalize="none"
+								required
+								model="form.fields.username"
+								bind:spellcheck="false"
+								bind:id="id"
+								bind:describedBy="describedBy"
+								bind:invalid="Boolean(form.errors.value.username)"
+							/>
+						</snippet>
+					</UIField>
+					<UIField
+						id="login-password"
+						bind:label="t('login.password')"
+						bind:error="fieldError(form.errors.value.password)"
 					>
-						<input
-							class="meeko-ui-input"
-							name="password"
-							type="password"
-							autocomplete="current-password"
-							required
-							model="form.fields.password"
-							bind:id="id"
-							bind:aria-describedby="describedBy"
-							bind:aria-invalid="form.errors.value.password ? 'true' : undefined"
-						/>
-					</snippet>
-				</UIField>
-				<UIButton
-					type="submit"
-					class="dash-login-submit"
-					bind:disabled="form.pending.value"
-				>
-					{form.pending.value ? t('login.submitting') : t('login.submit')}
-				</UIButton>
-			</form>
-			<p class="dash-login-note">{t('login.lifetime', lifetime)}</p>
-		</section>
-	</UIContainer>
+						<snippet
+							name="default"
+							params="id, describedBy"
+						>
+							<UIInput
+								name="password"
+								type="password"
+								autocomplete="current-password"
+								required
+								model="form.fields.password"
+								bind:id="id"
+								bind:describedBy="describedBy"
+								bind:invalid="Boolean(form.errors.value.password)"
+							/>
+						</snippet>
+					</UIField>
+					<UIButton
+						type="submit"
+						size="lg"
+						bind:loading="form.pending.value"
+					>
+						{form.pending.value ? t('login.submitting') : t('login.submit')}
+					</UIButton>
+				</form>
+				<p class="dash-meta">{t('login.lifetime', lifetime)}</p>
+			</div>
+		</UICard>
+	</div>
 </template>

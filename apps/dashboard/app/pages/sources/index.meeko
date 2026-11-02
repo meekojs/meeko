@@ -112,62 +112,100 @@
 				bind:aria-label="t('sources.filter')"
 				on:submit="(event) => event.preventDefault()"
 			>
-				<div class="dash-field dash-field-grow">
-					<label for="sources-query">{t('actions.search')}</label>
-					<UIInput
-						id="sources-query"
-						type="search"
-						model="query"
-						bind:placeholder="t('sources.placeholder')"
-					/>
-				</div>
-				<div class="dash-field">
-					<label for="sources-site">{t('sources.columns.site')}</label>
-					<UISelect
-						id="sources-site"
-						model="site"
-						bind:placeholder="t('filters.allFeminine')"
-						bind:options="siteOptions"
-						bind:labelBy="(value) => (value === 'all' ? t('filters.allFeminine') : siteLabels[value])"
-					/>
-				</div>
-				<div class="dash-field">
-					<label for="sources-locale">{t('sources.columns.locale')}</label>
-					<UISelect
-						id="sources-locale"
-						model="locale"
-						bind:placeholder="t('filters.allMasculine')"
-						bind:options="localeOptions"
-						bind:labelBy="(value) => (value === 'all' ? t('filters.allMasculine') : t(`locale.${value}`))"
-					/>
-				</div>
-				<div class="dash-field">
-					<label for="sources-kind">{t('sources.columns.kind')}</label>
-					<UISelect
-						id="sources-kind"
-						model="kind"
-						bind:placeholder="t('filters.allMasculine')"
-						bind:options="kindOptions"
-						bind:labelBy="(value) => (value === 'all' ? t('filters.allMasculine') : t(`labels.kind.${value}`))"
-					/>
-				</div>
-				<div class="dash-field">
-					<label for="sources-state">{t('sources.columns.state')}</label>
-					<UISelect
-						id="sources-state"
-						model="state"
-						bind:placeholder="t('filters.allMasculine')"
-						bind:options="stateOptions"
-						bind:labelBy="(value) => (value === 'all' ? t('filters.allMasculine') : stateFilterLabel(value))"
-					/>
-				</div>
-				<label class="dash-check">
-					<input
-						type="checkbox"
-						model="includeRemoved"
-					/>
-					{t('sources.includeRemoved')}
-				</label>
+				<UIField
+					id="sources-query"
+					class="dash-grow"
+					bind:label="t('actions.search')"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UIInput
+							type="search"
+							model="query"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:placeholder="t('sources.placeholder')"
+						/>
+					</snippet>
+				</UIField>
+				<UIField
+					id="sources-site"
+					bind:label="t('sources.columns.site')"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UISelect
+							model="site"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:placeholder="t('filters.allFeminine')"
+							bind:options="siteOptions"
+							bind:labelBy="(value) => (value === 'all' ? t('filters.allFeminine') : siteLabels[value])"
+						/>
+					</snippet>
+				</UIField>
+				<UIField
+					id="sources-locale"
+					bind:label="t('sources.columns.locale')"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UISelect
+							model="locale"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:placeholder="t('filters.allMasculine')"
+							bind:options="localeOptions"
+							bind:labelBy="(value) => (value === 'all' ? t('filters.allMasculine') : t(`locale.${value}`))"
+						/>
+					</snippet>
+				</UIField>
+				<UIField
+					id="sources-kind"
+					bind:label="t('sources.columns.kind')"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UISelect
+							model="kind"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:placeholder="t('filters.allMasculine')"
+							bind:options="kindOptions"
+							bind:labelBy="(value) => (value === 'all' ? t('filters.allMasculine') : t(`labels.kind.${value}`))"
+						/>
+					</snippet>
+				</UIField>
+				<UIField
+					id="sources-state"
+					bind:label="t('sources.columns.state')"
+				>
+					<snippet
+						name="default"
+						params="id, describedBy"
+					>
+						<UISelect
+							model="state"
+							bind:id="id"
+							bind:describedBy="describedBy"
+							bind:placeholder="t('filters.allMasculine')"
+							bind:options="stateOptions"
+							bind:labelBy="(value) => (value === 'all' ? t('filters.allMasculine') : stateFilterLabel(value))"
+						/>
+					</snippet>
+				</UIField>
+				<UICheckbox
+					model="includeRemoved"
+					bind:label="t('sources.includeRemoved')"
+				/>
 				<UIButton
 					if:when="filtered.value"
 					variant="ghost"
@@ -177,19 +215,18 @@
 				</UIButton>
 			</form>
 
-			<div class="dash-results">
+			<div class="dash-tight">
 				<p
-					class="dash-count"
+					class="dash-meta"
 					role="status"
 					aria-live="polite"
 				>
 					{t('sources.count', { shown: format.number(rows.value.length), total: format.number(all.length) })}
 				</p>
-
-				<div class="dash-table-scroll">
+				<UICard>
 					<UITable
-						class="dash-sources"
 						rowKey="id"
+						bind:hideCaption="true"
 						bind:caption="t('sources.caption')"
 						bind:columns="columns"
 						bind:rows="rows.value"
@@ -201,20 +238,18 @@
 						>
 							<span
 								if:when="column.key === 'title'"
-								class="dash-source-cell"
+								class="dash-cell"
 							>
 								<a bind:href="localePath('/sources/' + row.id)">{row.title}</a>
 								<code>{row.file ?? row.path}</code>
 							</span>
 							<span if:when="column.key === 'site'">{siteLabels[row.site]}</span>
-							<abbr
+							<DashLocaleTag
 								if:when="column.key === 'locale'"
-								class="dash-locale-tag"
-								bind:data-locale="row.locale"
-								bind:title="t(`locale.${row.locale}`)"
-							>
-								{t(`locale.short.${row.locale}`)}
-							</abbr>
+								bind:locale="row.locale"
+								bind:name="t(`locale.${row.locale}`)"
+								bind:short="t(`locale.short.${row.locale}`)"
+							/>
 							<span if:when="column.key === 'kind'">{t(`labels.kind.${row.kind}`)}</span>
 							<DashStateBadge
 								if:when="column.key === 'state'"
@@ -230,7 +265,7 @@
 							</span>
 						</snippet>
 					</UITable>
-				</div>
+				</UICard>
 			</div>
 		</div>
 	</DashPage>

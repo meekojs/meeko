@@ -24,10 +24,7 @@
 	},
 	"locale": {
 		"label": "Idioma",
-		"suggestion": "Tu navegador prefiere otro idioma.",
-		"switchTo": "Ver el dashboard en {name}",
 		"stay": "Seguir en español",
-		"dismiss": "Descartar la sugerencia de idioma",
 		"es": "Español",
 		"en": "Inglés",
 		"all": "Todos los idiomas",
@@ -61,7 +58,7 @@
 		"serverText": "El servidor del dashboard falló al preparar esta página. Revisa su consola.",
 		"backHome": "Volver al resumen",
 		"seeSources": "Ver las fuentes",
-		"DATABASE_UNAVAILABLE": "No se puede conectar con la base de documentación. Comprueba DATABASE_URL en apps/dashboard/.env y que voidcat-local:5432 responde.",
+		"DATABASE_UNAVAILABLE": "No se puede conectar con la base de documentación. Comprueba DATABASE_URL en apps/dashboard/.env y que su servidor responde.",
 		"SCHEMA_MISSING": "La base no tiene las tablas de la documentación. Ejecuta pnpm -F meeko-site run db:migrate.",
 		"SOURCE_NOT_FOUND": "Esa fuente no existe. Puede que una importación la haya cambiado de identificador.",
 		"SNAPSHOT_NOT_FOUND": "Ese snapshot ya no existe: la retención de snapshots lo borró.",
@@ -162,11 +159,6 @@
 		"noMarkdownHelp": "Las páginas .meeko no guardan su texto en la base: se editan en el repositorio.",
 		"importStale": "Importación desactualizada",
 		"importStaleHelp": "Git cambió desde la última importación: importa las fuentes de nuevo."
-	},
-	"diff": {
-		"empty": "Sin diferencias.",
-		"added": "Añadida: ",
-		"removed": "Eliminada: "
 	},
 	"job": {
 		"started": "Iniciado {date}",

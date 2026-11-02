@@ -12,6 +12,7 @@ function catalogs(locale: 'en' | 'es'): Record<string, string> {
 export default defineMeekoConfig({
 	// The identity of Meeko's documentation webs: the tokens of @meekojs/ui and the same themes.
 	theme: { default: 'dark' },
+	viewTransitions: true,
 	modules: ['@meekojs/ui', '@meekojs/ui/editor', 'meeko-docs', '@meekojs/i18n'],
 	// Bilingual interface: Spanish without a prefix (the usual URLs) and English under /en/…, from
 	// the same pages. `shell` is the catalog of meeko-docs, whose components the moderation preview
@@ -74,7 +75,7 @@ export default defineMeekoConfig({
 			title: 'Meeko Dashboard',
 			meta: [
 				{ name: 'robots', content: 'noindex, nofollow' },
-				{ name: 'theme-color', content: '#0a0b0d' },
+				{ name: 'theme-color', content: '#000000' },
 			],
 			link: [{ rel: 'icon', type: 'image/png', href: '/brand/meeko-logo.png' }],
 		},

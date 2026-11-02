@@ -24,7 +24,7 @@
 		</span>
 		<span
 			if:when="!props.state && !props.removed"
-			class="dash-muted"
+			class="dash-soft"
 			bind:title="t('badge.noMarkdownHelp')"
 		>
 			{t('badge.noMarkdown')}

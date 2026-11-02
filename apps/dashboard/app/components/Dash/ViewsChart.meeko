@@ -1,4 +1,6 @@
 <script lang="ts">
+	import type { TableColumn } from '@meekojs/ui/runtime'
+
 	interface Day {
 		day: string
 		views: number
@@ -52,6 +54,11 @@
 		event.preventDefault()
 		active.value = Math.min(count - 1, Math.max(0, moves[event.key]!))
 	}
+
+	const columns = [
+		{ key: 'day', label: t('chart.day'), rowHeader: true, format: (day: string) => long(day) },
+		{ key: 'views', label: t('chart.viewsColumn'), numeric: true, format: (views: number) => formatNumber(views) },
+	] satisfies TableColumn<Day>[]
 
 	function onPointer(event: PointerEvent): void {
 		const target = event.currentTarget as HTMLElement
@@ -131,56 +138,37 @@
 				{labelled.value.has(index) ? short(entry.day) : ''}
 			</span>
 		</div>
-		<details class="table-view">
-			<summary>{t('chart.table')}</summary>
-			<div class="table-scroll">
-				<table>
-					<caption>{props.label}</caption>
-					<thead>
-						<tr>
-							<th scope="col">{t('chart.day')}</th>
-							<th
-								scope="col"
-								class="num"
-							>
-								{t('chart.viewsColumn')}
-							</th>
-						</tr>
-					</thead>
-					<tbody>
-						<tr
-							each:of="props.days"
-							each:as="entry"
-							each:key="entry.day"
-						>
-							<th scope="row">{long(entry.day)}</th>
-							<td class="num">{formatNumber(entry.views)}</td>
-						</tr>
-					</tbody>
-				</table>
-			</div>
-		</details>
+		<div class="table-view">
+			<UIDisclosure bind:summary="t('chart.table')">
+				<div class="table-scroll">
+					<UITable
+						density="compact"
+						rowKey="day"
+						bind:hideCaption="true"
+						bind:caption="props.label"
+						bind:columns="columns"
+						bind:rows="props.days"
+					/>
+				</div>
+			</UIDisclosure>
+		</div>
 	</figure>
 </template>
 
 <style scoped>
 	.views-chart {
-		--chart-mark: #5b8cec;
-		--chart-axis: 2.75rem;
+		--chart-axis: var(--ui-control-height-lg);
 		margin: 0;
-	}
-	:global(:root[data-theme='light']) .views-chart {
-		--chart-mark: #2f63d6;
 	}
 	.plot {
 		position: relative;
-		margin-left: var(--chart-axis);
-		border-radius: var(--radius-s);
-		height: 13rem;
+		margin-inline-start: var(--chart-axis);
+		border-radius: var(--ui-radius-md);
+		height: calc(var(--ui-space-24) * 2);
 	}
 	.plot:focus-visible {
-		outline: 2px solid var(--accent);
-		outline-offset: 6px;
+		outline: var(--ui-focus-ring);
+		outline-offset: var(--ui-space-1-5);
 	}
 	.grid {
 		position: absolute;
@@ -191,15 +179,15 @@
 		position: absolute;
 		right: 0;
 		left: 0;
-		border-top: 1px solid var(--line);
+		border-top: var(--ui-border-width) solid var(--ui-color-border);
 	}
 	.tick span {
 		position: absolute;
 		top: 0;
-		right: calc(100% + 0.5rem);
+		right: calc(100% + var(--ui-space-2));
 		transform: translateY(-50%);
-		color: var(--muted);
-		font-size: 0.75rem;
+		color: var(--ui-color-text-soft);
+		font-size: var(--ui-font-size-xs);
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}
@@ -218,55 +206,56 @@
 		height: 100%;
 	}
 	.column[data-active='true'] {
-		background: color-mix(in srgb, var(--chart-mark) 8%, transparent);
+		background: var(--ui-color-primary-soft);
 	}
 	.bar {
-		transition: height 0.32s var(--ease-out);
-		border-radius: 4px 4px 0 0;
-		background: var(--chart-mark);
-		width: min(24px, calc(100% - 2px));
+		transition: height var(--ui-duration-slow) var(--ui-ease-out);
+		border-radius: var(--ui-radius-xs) var(--ui-radius-xs) 0 0;
+		background: var(--ui-color-primary);
+		width: min(var(--ui-space-6), calc(100% - 2 * var(--ui-border-width)));
 	}
 	.bar[data-zero='true'] {
 		height: 0;
 	}
 	.column[data-active='true'] .bar {
-		background: color-mix(in srgb, var(--chart-mark) 82%, var(--ink));
+		background: var(--ui-color-primary-hover);
 	}
 	.tooltip {
 		display: grid;
 		position: absolute;
-		top: -0.5rem;
-		gap: 0.125rem;
+		top: calc(var(--ui-space-2) * -1);
+		gap: var(--ui-space-0-5);
 		transform: translate(-50%, -100%);
-		z-index: 1;
-		box-shadow: var(--shadow-lg);
-		border: 1px solid var(--line-strong);
-		border-radius: var(--radius);
-		background: var(--surface-2);
-		padding: 0.4375rem 0.625rem;
+		z-index: var(--ui-z-floating);
+		box-shadow: var(--ui-shadow-md);
+		border: var(--ui-border-width) solid var(--ui-color-border-strong);
+		border-radius: var(--ui-radius-lg);
+		background: var(--ui-color-surface-raised);
+		padding: var(--ui-space-1-5) var(--ui-space-2);
 		pointer-events: none;
-		font-size: 0.8125rem;
+		font-size: var(--ui-font-size-sm);
 		white-space: nowrap;
 	}
 	.tooltip[data-edge='start'] {
-		transform: translate(-1rem, -100%);
+		transform: translate(calc(var(--ui-space-4) * -1), -100%);
 	}
 	.tooltip[data-edge='end'] {
-		transform: translate(calc(-100% + 1rem), -100%);
+		transform: translate(calc(-100% + var(--ui-space-4)), -100%);
 	}
 	.tooltip strong {
-		font-weight: 600;
-		font-size: 0.9375rem;
+		font-weight: var(--ui-font-weight-semibold);
+		font-size: var(--ui-font-size-md);
 		font-variant-numeric: tabular-nums;
 	}
 	.tooltip span {
-		color: var(--muted);
+		color: var(--ui-color-text-soft);
 	}
 	.axis {
 		display: flex;
-		margin: 0.5rem 0 0 var(--chart-axis);
-		color: var(--muted);
-		font-size: 0.75rem;
+		margin-inline-start: var(--chart-axis);
+		margin-block-start: var(--ui-space-2);
+		color: var(--ui-color-text-soft);
+		font-size: var(--ui-font-size-xs);
 	}
 	.axis span {
 		flex: 1 1 0;
@@ -276,50 +265,17 @@
 		white-space: nowrap;
 	}
 	.axis span:first-child {
-		text-align: left;
+		text-align: start;
 	}
 	.axis span:last-child {
-		text-align: right;
+		text-align: end;
 	}
 	.table-view {
-		margin-top: 1rem;
-		font-size: 0.875rem;
-	}
-	.table-view summary {
-		cursor: pointer;
-		width: fit-content;
-		color: var(--accent-ink);
+		margin-block-start: var(--ui-space-4);
 	}
 	.table-scroll {
-		margin-top: 0.75rem;
-		max-height: 18rem;
+		max-height: var(--ui-log-max-height);
 		overflow: auto;
-	}
-	table {
-		border-collapse: collapse;
-		width: 100%;
-	}
-	caption {
-		position: absolute;
-		clip-path: inset(50%);
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-	}
-	th,
-	td {
-		border-bottom: 1px solid var(--line);
-		padding: 0.375rem 0.5rem;
-		font-weight: 400;
-		text-align: left;
-	}
-	thead th {
-		color: var(--muted);
-		font-weight: 500;
-	}
-	.num {
-		font-variant-numeric: tabular-nums;
-		text-align: right;
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.bar {

@@ -31,6 +31,7 @@
 	import { frontmatterKeys, headLineCount, lineRange, readFrontmatter, writeFrontmatter } from '../../../utils/frontmatter'
 	import { siteLabels } from '../../../utils/labels'
 	import { previewDocument, readPreviewTokens } from '../../../utils/preview-document'
+	import { previewStyles } from '../../../utils/preview-styles'
 	import { setUnsaved } from '../../../utils/unsaved'
 
 	export interface Props {
@@ -188,7 +189,7 @@
 	const previewSource = computed(() => {
 		const current = preview.value
 		if (!current || typeof document === 'undefined') return null
-		return previewDocument({ html: current.html, theme: theme.value, tokens: readPreviewTokens(document.documentElement) })
+		return previewDocument({ html: current.html, theme: theme.value, styles: previewStyles, tokens: readPreviewTokens(document.documentElement, previewStyles) })
 	})
 
 	const issueKind = (kind: PreviewIssue['kind']) => t(`editor.issues.${kind}`)
@@ -211,6 +212,22 @@
 	function setField(row: Pick<FrontmatterField, 'key' | 'kind'>, value: string) {
 		if (fields.value) head.value = writeFrontmatter(head.value, row.key, row.kind, value)
 	}
+	// Each row edits its own signal, tied to the head both ways: a stamp changes the field, and a change of
+	// the field that writes the same value (a list with a new empty line) leaves what is being typed alone.
+	const fieldModels = rows.map((row) => {
+		const written = computed(() => fieldValue(row.key))
+		const model = signal(written.value)
+		effect(() => {
+			model.value = written.value
+		})
+		effect(() => {
+			const value = model.value
+			untrack(() => {
+				if (value !== written.value) setField(row, value)
+			})
+		})
+		return { ...row, model }
+	})
 
 	/** The text area of the code mode: it appears when the mode changes, in the next frames. */
 	async function codeArea(): Promise<HTMLTextAreaElement | null> {
@@ -228,7 +245,7 @@
 	async function goToLine(line: number) {
 		const offset = headLineCount(head.value)
 		if (line <= offset) {
-			const details = document.getElementById('draft-frontmatter')
+			const details = document.querySelector('#draft-frontmatter details')
 			if (details instanceof HTMLDetailsElement) details.open = true
 			const field = fields.value?.filter((candidate) => candidate.line <= line).at(-1)
 			document.getElementById(field ? fieldId(field.key) : 'frontmatter-text')?.focus()
@@ -321,213 +338,236 @@
 		/>
 		<div
 			if:when="data"
-			class="dash-stack dash-editor"
+			class="dash-stack"
 		>
-			<form
-				class="dash-panel dash-editor-bar"
-				bind:aria-label="t('editor.draft')"
-				on:submit="
-					(event) => {
-						event.preventDefault()
-						void save()
-					}
-				"
+			<UICard>
+				<form
+					class="editor-bar"
+					bind:aria-label="t('editor.draft')"
+					on:submit="
+						(event) => {
+							event.preventDefault()
+							void save()
+						}
+					"
+				>
+					<div class="editor-note">
+						<UIField
+							id="draft-note"
+							bind:label="t('editor.note')"
+							bind:description="t('editor.noteHint')"
+						>
+							<snippet
+								name="default"
+								params="id, describedBy"
+							>
+								<UIInput
+									model="note"
+									bind:id="id"
+									bind:describedBy="describedBy"
+								/>
+							</snippet>
+						</UIField>
+					</div>
+					<div class="editor-save">
+						<p class="dash-meta">{origin.value}</p>
+						<p
+							class="dash-meta"
+							role="status"
+							aria-live="polite"
+						>
+							<UIBadge
+								bind:dot="true"
+								bind:tone="dirty.value ? 'accent' : 'neutral'"
+							>
+								{status.value}
+							</UIBadge>
+						</p>
+						<UIButton
+							type="submit"
+							bind:disabled="saving.value || !dirty.value || tooLarge.value"
+						>
+							{saving.value ? t('actions.saving') : draftId.value === null ? t('editor.create') : t('editor.save')}
+						</UIButton>
+					</div>
+					<div
+						if:when="data.source.importStale"
+						class="editor-wide"
+					>
+						<UIAlert
+							tone="warning"
+							bind:description="t('editor.importStale')"
+						/>
+					</div>
+					<div
+						if:when="original"
+						class="editor-wide"
+					>
+						<UIAlert
+							tone="info"
+							bind:title="t('editor.translation.title', { title: original?.title ?? '' })"
+							bind:description="t('editor.translation.text')"
+						>
+							<snippet name="actions">
+								<UIButton
+									size="sm"
+									variant="outline"
+									bind:disabled="stamping.value || !original?.baseHash"
+									on:click="markTranslated"
+								>
+									{stamping.value ? t('editor.translation.stamping') : t('editor.translation.stamp')}
+								</UIButton>
+							</snippet>
+						</UIAlert>
+					</div>
+					<div
+						if:when="stampFailure.value"
+						class="editor-wide"
+					>
+						<DashFailure
+							bind:title="t('editor.translation.failed')"
+							bind:failure="stampFailure.value!"
+						/>
+					</div>
+					<div
+						if:when="saveFailure.value"
+						class="editor-wide"
+					>
+						<DashFailure
+							bind:title="t('editor.notSaved')"
+							bind:failure="saveFailure.value!"
+						/>
+					</div>
+					<div class="editor-wide editor-notice">
+						<DashNotice bind:text="notice.value">
+							<a
+								if:when="draftId.value !== null"
+								bind:href="localePath('/sources/' + props.params.id + '#revisiones')"
+							>
+								{t('editor.publishFromSource')}
+							</a>
+						</DashNotice>
+					</div>
+				</form>
+			</UICard>
+
+			<UICard
+				if:when="hasFrontmatter"
+				id="draft-frontmatter"
+				density="compact"
 			>
-				<div class="dash-editor-fields">
+				<UIDisclosure bind:summary="t('editor.frontmatter.title') + ' · ' + (asText ? t('editor.frontmatter.asTextShort') : t('editor.frontmatter.count', { count: fields.value?.length ?? 0 }))">
 					<UIField
-						id="draft-note"
-						bind:label="t('editor.note')"
-						bind:description="t('editor.noteHint')"
+						if:when="asText"
+						id="frontmatter-text"
+						bind:label="t('editor.frontmatter.asText')"
 					>
 						<snippet
 							name="default"
 							params="id, describedBy"
 						>
-							<UIInput
-								model="note"
+							<UITextarea
+								class="dash-code"
+								model="head"
+								bind:rows="8"
+								bind:spellcheck="false"
 								bind:id="id"
 								bind:describedBy="describedBy"
 							/>
 						</snippet>
 					</UIField>
-				</div>
-				<div class="dash-editor-save">
-					<p class="dash-editor-origin">{origin.value}</p>
-					<p
-						class="dash-editor-status"
-						role="status"
-						aria-live="polite"
-						bind:data-dirty="dirty.value ? 'true' : undefined"
-					>
-						<span
-							class="dash-dot"
-							aria-hidden="true"
-						/>
-						{status.value}
-					</p>
-					<UIButton
-						type="submit"
-						bind:disabled="saving.value || !dirty.value || tooLarge.value"
-					>
-						{saving.value ? t('actions.saving') : draftId.value === null ? t('editor.create') : t('editor.save')}
-					</UIButton>
-				</div>
-				<p
-					if:when="data.source.importStale"
-					class="dash-hint dash-editor-warning"
-				>
-					{t('editor.importStale')}
-				</p>
-				<div
-					if:when="original"
-					class="dash-callout dash-editor-translation"
-					role="note"
-				>
-					<p>
-						<strong>{t('editor.translation.title', { title: original?.title ?? '' })}</strong>
-						{t('editor.translation.text')}
-					</p>
-					<UIButton
-						size="sm"
-						variant="outline"
-						bind:disabled="stamping.value || !original?.baseHash"
-						on:click="markTranslated"
-					>
-						{stamping.value ? t('editor.translation.stamping') : t('editor.translation.stamp')}
-					</UIButton>
-				</div>
-				<DashFailure
-					if:when="stampFailure.value"
-					bind:title="t('editor.translation.failed')"
-					bind:failure="stampFailure.value"
-				/>
-				<DashFailure
-					if:when="saveFailure.value"
-					bind:title="t('editor.notSaved')"
-					bind:failure="saveFailure.value"
-				/>
-				<p
-					class="dash-notice"
-					role="status"
-					aria-live="polite"
-				>
-					{notice.value}
-					<a
-						if:when="notice.value && draftId.value !== null"
-						bind:href="localePath('/sources/' + props.params.id + '#revisiones')"
-					>
-						{t('editor.publishFromSource')}
-					</a>
-				</p>
-			</form>
-
-			<details
-				if:when="hasFrontmatter"
-				id="draft-frontmatter"
-				class="dash-panel dash-frontmatter"
-			>
-				<summary>
-					{t('editor.frontmatter.title')}
-					<span class="dash-frontmatter-count">{asText ? t('editor.frontmatter.asTextShort') : t('editor.frontmatter.count', { count: fields.value?.length ?? 0 })}</span>
-				</summary>
-				<div
-					if:when="asText"
-					class="dash-frontmatter-text"
-				>
-					<label for="frontmatter-text">{t('editor.frontmatter.asText')}</label>
-					<textarea
-						id="frontmatter-text"
-						class="meeko-ui-input"
-						rows="8"
-						spellcheck="false"
-						model="head"
-					/>
-				</div>
-				<div
-					if:when="!asText"
-					class="dash-frontmatter-fields"
-				>
 					<div
-						each:of="rows"
-						each:as="row"
-						each:key="row.key"
-						class="dash-frontmatter-field"
-						bind:data-key="row.key"
+						if:when="!asText"
+						class="editor-frontmatter"
 					>
-						<label bind:for="fieldId(row.key)">{row.key}</label>
-						<textarea
-							if:when="row.kind === 'list'"
-							class="meeko-ui-input"
-							rows="4"
-							spellcheck="false"
-							bind:id="fieldId(row.key)"
-							bind:value="fieldValue(row.key)"
-							on:input="(event) => setField(row, event.currentTarget.value)"
-						/>
-						<input
-							if:when="row.kind === 'text'"
-							class="meeko-ui-input"
-							spellcheck="false"
-							bind:id="fieldId(row.key)"
-							bind:readonly="row.key === 'source-hash'"
-							bind:value="fieldValue(row.key)"
-							on:input="(event) => setField(row, event.currentTarget.value)"
-						/>
+						<div
+							each:of="fieldModels"
+							each:as="row"
+							each:key="row.key"
+							bind:class="row.key === 'description' || row.key === 'source-hash' ? 'editor-wide' : undefined"
+						>
+							<UIField
+								bind:id="fieldId(row.key)"
+								bind:label="row.key"
+							>
+								<snippet
+									name="default"
+									params="id, describedBy"
+								>
+									<UITextarea
+										if:when="row.kind === 'list'"
+										class="dash-code"
+										model="row.model"
+										bind:rows="4"
+										bind:spellcheck="false"
+										bind:id="id"
+										bind:describedBy="describedBy"
+									/>
+									<UIInput
+										if:when="row.kind === 'text'"
+										model="row.model"
+										bind:spellcheck="false"
+										bind:class="row.key === 'source-hash' ? 'dash-code' : undefined"
+										bind:id="id"
+										bind:describedBy="describedBy"
+										bind:readonly="row.key === 'source-hash'"
+									/>
+								</snippet>
+							</UIField>
+						</div>
 					</div>
-				</div>
-			</details>
+				</UIDisclosure>
+			</UICard>
 
-			<div class="dash-editor-panes">
+			<div class="editor-panes">
 				<section
-					class="dash-pane"
+					class="dash-tight"
 					aria-labelledby="markdown-heading"
 				>
 					<h2
 						id="markdown-heading"
-						class="dash-visually-hidden"
+						class="meeko-ui-sr-only"
 					>
 						Markdown
 					</h2>
-					<UIMarkdownEditor
-						id="draft-markdown"
-						class="dash-editor-markdown"
-						describedBy="draft-size"
-						model="body"
-						model:mode="mode"
-						bind:label="t('editor.markdownLabel')"
-					>
-						<snippet name="tools">
-							<span
-								class="dash-editor-size"
-								bind:data-over="tooLarge.value ? 'true' : undefined"
-							>
-								{sizeLabel.value}
-							</span>
-						</snippet>
-					</UIMarkdownEditor>
+					<div class="editor-markdown">
+						<UIMarkdownEditor
+							id="draft-markdown"
+							describedBy="draft-size"
+							model="body"
+							model:mode="mode"
+							bind:label="t('editor.markdownLabel')"
+						>
+							<snippet name="tools">
+								<UIBadge bind:tone="tooLarge.value ? 'danger' : 'neutral'">{sizeLabel.value}</UIBadge>
+							</snippet>
+						</UIMarkdownEditor>
+					</div>
 					<p
 						id="draft-size"
-						class="dash-visually-hidden"
+						class="meeko-ui-sr-only"
 					>
 						{sizeLabel.value}
 					</p>
 				</section>
 
 				<section
-					class="dash-pane"
+					class="dash-tight"
 					aria-labelledby="preview-heading"
 					bind:aria-busy="previewing.value ? 'true' : undefined"
 				>
-					<div class="dash-pane-head">
-						<h2 id="preview-heading">{t('editor.preview.title')}</h2>
-						<div class="dash-pane-tools">
-							<label class="dash-check">
-								<input
-									type="checkbox"
-									model="auto"
-								/>
-								{t('editor.preview.auto')}
-							</label>
+					<div class="dash-row">
+						<h2
+							id="preview-heading"
+							class="dash-heading"
+						>
+							{t('editor.preview.title')}
+						</h2>
+						<div class="dash-actions">
+							<UICheckbox
+								model="auto"
+								bind:label="t('editor.preview.auto')"
+							/>
 							<UIButton
 								size="sm"
 								variant="outline"
@@ -539,7 +579,7 @@
 						</div>
 					</div>
 					<p
-						class="dash-preview-state"
+						class="dash-meta dash-status"
 						role="status"
 						aria-live="polite"
 					>
@@ -552,55 +592,45 @@
 						bind:title="t('editor.preview.failed')"
 						bind:failure="previewFailure.value"
 					/>
-					<div
+					<UICard
 						if:when="preview.value && preview.value.issues.length"
-						class="dash-issues"
-						role="region"
+						density="compact"
 						bind:aria-label="t('editor.preview.issues')"
 					>
-						<p class="dash-issues-title">
-							{t('editor.preview.issueCount', { count: preview.value?.issues.length ?? 0 })}
-							<span if:when="blocking.value">· {t('editor.preview.blocking', { count: blocking.value })}</span>
-						</p>
-						<ul class="dash-issue-list">
+						<snippet name="header">
+							<p class="dash-heading">
+								{t('editor.preview.issueCount', { count: preview.value?.issues.length ?? 0 })}
+								<span if:when="blocking.value">· {t('editor.preview.blocking', { count: blocking.value })}</span>
+							</p>
+						</snippet>
+						<ul class="editor-issues">
 							<li
 								each:of="preview.value?.issues ?? []"
 								each:as="issue"
 								each:index="index"
 								each:key="index"
-								class="dash-issue"
-								bind:data-kind="issue.kind"
 							>
-								<span class="dash-issue-kind">{issueKind(issue.kind)}</span>
-								<span
-									class="dash-issue-message"
-									lang="en"
-								>
-									{issue.message}
-								</span>
-								<button
+								<UIBadge bind:tone="issue.kind === 'link' ? 'accent' : 'danger'">{issueKind(issue.kind)}</UIBadge>
+								<code lang="en">{issue.message}</code>
+								<UIButton
 									if:when="issue.line !== null"
-									type="button"
-									class="dash-issue-line"
+									size="sm"
+									variant="ghost"
 									on:click="() => void goToLine(issue.line ?? 1)"
 								>
 									{t('editor.preview.line', { line: String(issue.line) })}
-								</button>
+								</UIButton>
 							</li>
 						</ul>
-					</div>
-					<div
+					</UICard>
+					<UISkeleton
 						if:when="!preview.value && !previewFailure.value"
-						class="dash-skeleton"
-						aria-hidden="true"
-					>
-						<span />
-						<span />
-						<span />
-					</div>
+						bind:lines="3"
+						bind:widths="['full', 'long', 'short']"
+					/>
 					<iframe
 						if:when="previewSource.value"
-						class="dash-preview-frame"
+						class="editor-preview"
 						sandbox=""
 						referrerpolicy="no-referrer"
 						bind:title="t('editor.preview.frame')"
@@ -612,3 +642,105 @@
 		</div>
 	</DashPage>
 </template>
+
+<style scoped>
+	.editor-bar {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: end;
+		gap: var(--ui-space-3) var(--ui-space-6);
+	}
+	.editor-note {
+		max-width: var(--ui-container-sm);
+	}
+	.editor-save {
+		display: grid;
+		justify-items: end;
+		gap: var(--ui-space-1-5);
+	}
+	.editor-bar > .editor-wide {
+		grid-column: 1 / -1;
+	}
+	/* Without a notice, its live region takes no row of the bar. */
+	.editor-notice:not(:has(.meeko-ui-alert)) {
+		display: contents;
+	}
+	.editor-frontmatter {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(min(var(--ui-floating-panel-width), 100%), 1fr));
+		gap: var(--ui-space-3) var(--ui-space-4);
+	}
+	.editor-frontmatter > .editor-wide {
+		grid-column: 1 / -1;
+	}
+	.editor-panes {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		align-items: start;
+		gap: var(--ui-space-4);
+	}
+	.editor-markdown {
+		--ui-markdown-editor-height: max(30.625rem, calc(100dvh - 15.375rem));
+	}
+	.editor-issues {
+		display: grid;
+		gap: var(--ui-space-1-5);
+		margin: 0;
+		padding: 0;
+		font-size: var(--ui-font-size-sm);
+		list-style: none;
+	}
+	.editor-issues li {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr) auto;
+		align-items: center;
+		gap: var(--ui-space-2);
+	}
+	.editor-issues code {
+		overflow-wrap: anywhere;
+	}
+	/* The render of the site in a sandboxed iframe; its rules live in the document inside it. */
+	.editor-preview {
+		display: block;
+		transition: opacity var(--ui-duration-base) var(--ui-ease-out);
+		box-sizing: border-box;
+		border: var(--ui-border-width) solid var(--ui-color-border);
+		border-radius: var(--ui-radius-lg);
+		background: var(--ui-color-bg);
+		width: 100%;
+		height: calc(100dvh - 18rem);
+		min-height: 28rem;
+	}
+	.editor-preview[data-stale] {
+		opacity: var(--ui-opacity-subtle);
+	}
+	@media (max-width: 75rem) {
+		.editor-panes {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.editor-markdown {
+			--ui-markdown-editor-height: 28rem;
+		}
+		.editor-preview {
+			height: 70dvh;
+			min-height: 22rem;
+		}
+	}
+	@media (max-width: 48rem) {
+		.editor-bar {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.editor-save {
+			justify-items: start;
+		}
+		.editor-issues li {
+			grid-template-columns: minmax(0, 1fr);
+			justify-items: start;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.editor-preview {
+			transition: none;
+		}
+	}
+</style>

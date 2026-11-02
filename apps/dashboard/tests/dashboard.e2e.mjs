@@ -123,7 +123,7 @@ test('the dashboard shows the overview, filters the sources, opens a detail and 
 	assert.equal(await page.getByRole('heading', { level: 1 }).textContent(), 'Resumen')
 	const framework = page.getByRole('row', { name: /^Framework/ }).first()
 	assert.match((await framework.textContent()) ?? '', /2/)
-	assert.match((await page.locator('.dash-strip').textContent()) ?? '', new RegExp(`#${second}`))
+	assert.match((await page.getByRole('region', { name: 'Publicación' }).textContent()) ?? '', new RegExp(`#${second}`))
 	await page.getByRole('link', { name: /fuentes de Framework: Editada/ }).click()
 	await page.waitForURL(/\/sources\?site=site&state=edited/)
 	await hydrated()
@@ -153,7 +153,7 @@ test('the dashboard shows the overview, filters the sources, opens a detail and 
 	await page.waitForURL(/\/sources\/\d+$/)
 	await page.getByRole('heading', { level: 1, name: 'Doctor' }).waitFor()
 	assert.equal(await page.getByRole('cell', { name: 'Publicada' }).count(), 1)
-	assert.match((await page.locator('.dash-diff-line[data-kind="add"]').allTextContents()).join('\n'), /Una línea editada desde el dashboard/)
+	assert.match((await page.locator('.meeko-ui-diff-line[data-kind="add"]').allTextContents()).join('\n'), /Una línea editada desde el dashboard/)
 
 	// Snapshots: roll back to the first one, in the temporary schema, after confirming.
 	await page.goto(`${origin}/snapshots`, { waitUntil: 'networkidle' })
@@ -161,7 +161,7 @@ test('the dashboard shows the overview, filters the sources, opens a detail and 
 	await page.getByRole('button', { name: `Volver al #${first}` }).click()
 	const dialog = page.getByRole('dialog')
 	await dialog.waitFor({ state: 'visible' })
-	assert.match(((await dialog.textContent()) ?? '').replace(/\s+/g, ' '), new RegExp(`Sustituye a #${second}`))
+	assert.match(((await dialog.textContent()) ?? '').replace(/\s+/g, ' '), new RegExp(`Sustituye a ?#${second}`))
 	await dialog.getByRole('button', { name: 'Activar snapshot' }).click()
 	await dialog.waitFor({ state: 'hidden' })
 	await page
@@ -176,6 +176,11 @@ test('the dashboard shows the overview, filters the sources, opens a detail and 
 		await page.goto(origin + path, { waitUntil: 'networkidle' })
 		assert.equal(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.document.documentElement.clientWidth), true, `${path} overflows at 390 px`)
 	}
+
+	// On a phone the sections and the account are in the menu of the header.
+	await page.getByRole('button', { name: 'Menú' }).click()
+	await page.getByRole('navigation', { name: 'Menú' }).getByRole('link', { name: 'Fuentes' }).waitFor()
+	await page.getByRole('button', { name: 'Cerrar sesión' }).waitFor()
 
 	// Another origin cannot start a job: no session, so `origin: 'required'` is the guard.
 	const refused = await fetch(`${origin}/_meeko/rpc/jobs/start`, { method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://evil.example' }, body: JSON.stringify({ kind: 'import' }) })

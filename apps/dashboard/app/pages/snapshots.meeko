@@ -138,6 +138,17 @@
 	const conflictSummary = computed(() => (conflict.value ? jobSummary(i18n, conflict.value) : null))
 	const pendingChange = (revision: PendingRevision) => (revision.change === 'archived' ? t('snapshots.pending.archived', { id: revision.id, date: formatDate(revision.archivedAt ?? revision.publishedAt) }) : t('snapshots.pending.published', { id: revision.id, author: revision.author, date: formatDate(revision.publishedAt) }))
 
+	const targetFacts = computed(() => {
+		const snapshot = target.value
+		if (!snapshot) return []
+		return [
+			{ label: t('snapshots.columns.publishedAt'), value: formatDate(snapshot.publishedAt) },
+			{ label: t('snapshots.columns.publishedBy'), value: snapshot.publishedBy ?? '—' },
+			{ label: t('snapshots.columns.pages'), value: `${formatNumber(snapshot.pages)} · ${t('snapshots.split', { es: formatNumber(snapshot.pagesByLocale.es), en: formatNumber(snapshot.pagesByLocale.en) })}` },
+			...(active.value ? [{ label: t('snapshots.confirm.replaces'), value: `#${active.value.id}` }] : []),
+		]
+	})
+
 	const columns = [
 		{ key: 'id', label: t('snapshots.columns.id') },
 		{ key: 'publishedAt', label: t('snapshots.columns.publishedAt') },
@@ -154,93 +165,75 @@
 		bind:description="t('snapshots.description')"
 	>
 		<div class="dash-stack">
-			<section
-				class="dash-panel"
-				aria-labelledby="actions-heading"
+			<UICard
+				bind:title="t('snapshots.actions')"
+				bind:description="t('snapshots.actionsHint')"
 			>
-				<div class="dash-panel-head">
-					<h2 id="actions-heading">{t('snapshots.actions')}</h2>
-					<span class="dash-muted">{t('snapshots.actionsHint')}</span>
-				</div>
-				<div class="dash-actions">
-					<UIButton
-						variant="secondary"
-						bind:disabled="busy.value"
-						on:click="importSources"
+				<div class="dash-tight">
+					<div class="dash-actions">
+						<UIButton
+							variant="secondary"
+							bind:disabled="busy.value"
+							on:click="importSources"
+						>
+							{starting.value === 'import' ? t('actions.starting') : t('snapshots.import')}
+						</UIButton>
+						<UIButton
+							bind:disabled="busy.value"
+							on:click="askPublish"
+						>
+							{t('snapshots.publish')}
+						</UIButton>
+					</div>
+					<p class="dash-meta">{t('snapshots.hint')}</p>
+					<DashFailure
+						if:when="jobFailure.value"
+						bind:title="t('snapshots.cannotStart')"
+						bind:failure="jobFailure.value"
+					/>
+					<UIAlert
+						if:when="conflict.value"
+						tone="danger"
+						bind:title="t('snapshots.conflict')"
+						bind:description="conflictSummary.value ?? ''"
 					>
-						{starting.value === 'import' ? t('actions.starting') : t('snapshots.import')}
-					</UIButton>
-					<UIButton
-						bind:disabled="busy.value"
-						on:click="askPublish"
-					>
-						{t('snapshots.publish')}
-					</UIButton>
-				</div>
-				<p class="dash-hint">{t('snapshots.hint')}</p>
-				<DashFailure
-					if:when="jobFailure.value"
-					bind:title="t('snapshots.cannotStart')"
-					bind:failure="jobFailure.value"
-				/>
-				<div
-					if:when="conflict.value"
-					class="dash-failure"
-					role="alert"
-				>
-					<div>
-						<p class="dash-failure-title">{t('snapshots.conflict')}</p>
-						<p>{conflictSummary.value}</p>
-						<p class="dash-actions">
+						<snippet name="actions">
 							<UIButton
 								bind:disabled="busy.value"
 								on:click="retry"
 							>
 								{t('snapshots.retry')}
 							</UIButton>
-						</p>
-					</div>
+						</snippet>
+					</UIAlert>
+					<DashNotice bind:text="notice.value" />
+					<DashJob
+						bind:empty="t('snapshots.noJob')"
+						bind:job="jobs.value.content"
+					/>
 				</div>
-				<p
-					class="dash-notice"
-					role="status"
-					aria-live="polite"
-				>
-					{notice.value}
-				</p>
-				<DashJob
-					bind:empty="t('snapshots.noJob')"
-					bind:job="jobs.value.content"
-				/>
-			</section>
+			</UICard>
 
-			<section
-				class="dash-panel"
-				aria-labelledby="pending-heading"
-			>
-				<div class="dash-panel-head">
-					<h2 id="pending-heading">{t('snapshots.pending.title')}</h2>
-					<span class="dash-muted">{pending.value ? t('snapshots.pending.count', { count: pending.value.revisions.length }) : ''}</span>
-				</div>
-				<p
+			<UICard bind:title="t('snapshots.pending.title')">
+				<snippet
+					if:when="pending.value"
+					name="actions"
+				>
+					<UIBadge>{pending.value ? t('snapshots.pending.count', { count: pending.value.revisions.length }) : ''}</UIBadge>
+				</snippet>
+				<UIEmpty
 					if:when="!pending.value"
-					class="dash-empty"
-				>
-					{t('snapshots.pending.unreadable')}
-				</p>
-				<p
+					bind:title="t('snapshots.pending.unreadable')"
+				/>
+				<UIEmpty
 					if:when="pending.value && !pending.value.revisions.length"
-					class="dash-empty"
-				>
-					{pending.value?.activeSnapshotId ? t('snapshots.pending.allIncluded', { id: pending.value.activeSnapshotId }) : t('snapshots.pending.none')}
-				</p>
+					bind:title="pending.value?.activeSnapshotId ? t('snapshots.pending.allIncluded', { id: pending.value.activeSnapshotId }) : t('snapshots.pending.none')"
+				/>
 				<div
 					if:when="pending.value && pending.value.revisions.length"
-					class="dash-stack"
+					class="dash-tight"
 				>
-					<p class="dash-section-lead">
-						{pendingLead.value}
-					</p>
+					<p class="dash-meta">{pendingLead.value}</p>
 					<ul class="dash-list">
 						<li
 							each:of="pending.value?.revisions ?? []"
@@ -248,93 +241,76 @@
 							each:key="revision.id"
 						>
 							<a bind:href="localePath('/sources/' + revision.sourceId)">{revision.title}</a>
-							<abbr
-								class="dash-locale-tag"
-								bind:data-locale="revision.locale"
-								bind:title="t(`locale.${revision.locale}`)"
-							>
-								{t(`locale.short.${revision.locale}`)}
-							</abbr>
-							<span class="dash-muted">
+							<DashLocaleTag
+								bind:locale="revision.locale"
+								bind:name="t(`locale.${revision.locale}`)"
+								bind:short="t(`locale.short.${revision.locale}`)"
+							/>
+							<span class="dash-soft">
 								<code>{revision.path}</code>
 								· {pendingChange(revision)}
 							</span>
 						</li>
 					</ul>
 				</div>
-			</section>
+			</UICard>
 
-			<section aria-labelledby="snapshots-heading">
-				<div class="dash-panel-head">
-					<h2
-						id="snapshots-heading"
-						class="dash-section-title"
-					>
-						{t('snapshots.saved')}
-					</h2>
-					<span class="dash-muted">{t('snapshots.retention')}</span>
-				</div>
+			<UICard
+				bind:title="t('snapshots.saved')"
+				bind:description="t('snapshots.retention')"
+			>
 				<DashFailure
 					if:when="listFailure.value"
 					bind:failure="listFailure.value"
 				/>
-				<div
+				<UITable
 					if:when="!listFailure.value"
-					class="dash-table-scroll"
+					rowKey="id"
+					bind:hideCaption="true"
+					bind:caption="t('snapshots.caption')"
+					bind:emptyText="t('snapshots.empty')"
+					bind:columns="columns"
+					bind:rows="list.value"
 				>
-					<UITable
-						class="dash-snapshots"
-						rowKey="id"
-						bind:caption="t('snapshots.caption')"
-						bind:emptyText="t('snapshots.empty')"
-						bind:columns="columns"
-						bind:rows="list.value"
+					<snippet
+						name="cell"
+						params="row, column"
 					>
-						<snippet
-							name="cell"
-							params="row, column"
+						<strong if:when="column.key === 'id'">#{String(row.id)}</strong>
+						<span
+							if:when="column.key === 'publishedAt'"
+							class="dash-nowrap"
 						>
-							<strong if:when="column.key === 'id'">#{String(row.id)}</strong>
-							<span
-								if:when="column.key === 'publishedAt'"
-								class="dash-nowrap"
-							>
-								{formatDate(row.publishedAt)}
-							</span>
-							<span if:when="column.key === 'publishedBy'">{row.publishedBy ?? '—'}</span>
-							<span
-								if:when="column.key === 'pages'"
-								class="dash-num"
-								bind:title="t('snapshots.byLocale', { es: formatNumber(row.pagesByLocale.es), en: formatNumber(row.pagesByLocale.en) })"
-							>
-								{formatNumber(row.pages)}
-								<span class="dash-muted dash-pages-split">{t('snapshots.split', { es: formatNumber(row.pagesByLocale.es), en: formatNumber(row.pagesByLocale.en) })}</span>
-							</span>
-							<span if:when="column.key === 'note'">{row.note ?? '—'}</span>
-							<span
-								if:when="column.key === 'active'"
-								class="dash-row-action"
-							>
-								<UIBadge
-									if:when="row.active"
-									tone="accent"
-								>
-									{t('snapshots.activeBadge')}
-								</UIBadge>
-								<UIButton
-									if:when="!row.active"
-									size="sm"
-									variant="outline"
-									bind:disabled="busy.value || activating.value"
-									on:click="() => askActivate(row)"
-								>
-									{activateLabel(row)}
-								</UIButton>
-							</span>
-						</snippet>
-					</UITable>
-				</div>
-			</section>
+							{formatDate(row.publishedAt)}
+						</span>
+						<span if:when="column.key === 'publishedBy'">{row.publishedBy ?? '—'}</span>
+						<span
+							if:when="column.key === 'pages'"
+							class="dash-cell"
+							bind:title="t('snapshots.byLocale', { es: formatNumber(row.pagesByLocale.es), en: formatNumber(row.pagesByLocale.en) })"
+						>
+							{formatNumber(row.pages)}
+							<span class="dash-meta dash-nowrap">{t('snapshots.split', { es: formatNumber(row.pagesByLocale.es), en: formatNumber(row.pagesByLocale.en) })}</span>
+						</span>
+						<span if:when="column.key === 'note'">{row.note ?? '—'}</span>
+						<UIBadge
+							if:when="column.key === 'active' && row.active"
+							tone="accent"
+						>
+							{t('snapshots.activeBadge')}
+						</UIBadge>
+						<UIButton
+							if:when="column.key === 'active' && !row.active"
+							size="sm"
+							variant="outline"
+							bind:disabled="busy.value || activating.value"
+							on:click="() => askActivate(row)"
+						>
+							{activateLabel(row)}
+						</UIButton>
+					</snippet>
+				</UITable>
+			</UICard>
 		</div>
 
 		<UIModal
@@ -342,32 +318,18 @@
 			bind:title="t('snapshots.confirm.title', { id: target.value?.id ?? '' })"
 			bind:description="t('snapshots.confirm.text')"
 		>
-			<dl
-				if:when="target.value"
-				class="dash-facts"
-			>
-				<div>
-					<dt>{t('snapshots.columns.publishedAt')}</dt>
-					<dd>{formatDate(target.value?.publishedAt)}</dd>
-				</div>
-				<div>
-					<dt>{t('snapshots.columns.publishedBy')}</dt>
-					<dd>{target.value?.publishedBy ?? '—'}</dd>
-				</div>
-				<div>
-					<dt>{t('snapshots.columns.pages')}</dt>
-					<dd>{formatNumber(target.value?.pages ?? 0)} · {t('snapshots.split', { es: formatNumber(target.value?.pagesByLocale.es ?? 0), en: formatNumber(target.value?.pagesByLocale.en ?? 0) })}</dd>
-				</div>
-				<div if:when="active.value">
-					<dt>{t('snapshots.confirm.replaces')}</dt>
-					<dd>#{String(active.value?.id)}</dd>
-				</div>
-			</dl>
-			<DashFailure
-				if:when="activateFailure.value"
-				bind:title="t('snapshots.confirm.failed')"
-				bind:failure="activateFailure.value"
-			/>
+			<div class="dash-tight">
+				<UIDescriptionList
+					if:when="target.value"
+					bind:columns="2"
+					bind:items="targetFacts.value"
+				/>
+				<DashFailure
+					if:when="activateFailure.value"
+					bind:title="t('snapshots.confirm.failed')"
+					bind:failure="activateFailure.value"
+				/>
+			</div>
 			<snippet name="footer">
 				<UIButton
 					variant="ghost"
@@ -389,38 +351,39 @@
 			bind:title="t('snapshots.publishModal.title')"
 			bind:description="t('snapshots.publishModal.text')"
 		>
-			<form
-				id="publish-form"
-				class="dash-form"
-				on:submit="
-					(event) => {
-						event.preventDefault()
-						void publish()
-					}
-				"
-			>
-				<UIField
-					id="publish-note"
-					bind:label="t('snapshots.columns.note')"
-					bind:description="t('snapshots.publishModal.noteHint')"
+			<div class="dash-tight">
+				<form
+					id="publish-form"
+					on:submit="
+						(event) => {
+							event.preventDefault()
+							void publish()
+						}
+					"
 				>
-					<snippet
-						name="default"
-						params="id, describedBy"
+					<UIField
+						id="publish-note"
+						bind:label="t('snapshots.columns.note')"
+						bind:description="t('snapshots.publishModal.noteHint')"
 					>
-						<UIInput
-							model="note"
-							bind:id="id"
-							bind:describedBy="describedBy"
-						/>
-					</snippet>
-				</UIField>
-			</form>
-			<DashFailure
-				if:when="jobFailure.value"
-				bind:title="t('snapshots.publishModal.failed')"
-				bind:failure="jobFailure.value"
-			/>
+						<snippet
+							name="default"
+							params="id, describedBy"
+						>
+							<UIInput
+								model="note"
+								bind:id="id"
+								bind:describedBy="describedBy"
+							/>
+						</snippet>
+					</UIField>
+				</form>
+				<DashFailure
+					if:when="jobFailure.value"
+					bind:title="t('snapshots.publishModal.failed')"
+					bind:failure="jobFailure.value"
+				/>
+			</div>
 			<snippet name="footer">
 				<UIButton
 					variant="ghost"
