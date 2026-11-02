@@ -260,6 +260,33 @@ test('the navigation components work in a browser, with and without JavaScript',
 		await page.close()
 	})
 
+	await t.test('UIProse dresses its own text and stops at a component inside it', async () => {
+		const { page, errors } = await open()
+		const read = (selector, property) =>
+			page
+				.locator(selector)
+				.first()
+				.evaluate((element, name) => globalThis.getComputedStyle(element)[name], property)
+		const token = (name) =>
+			page.evaluate((property) => {
+				const probe = globalThis.document.createElement('div')
+				probe.style.fontSize = `var(${property})`
+				globalThis.document.body.append(probe)
+				const size = globalThis.getComputedStyle(probe).fontSize
+				probe.remove()
+				return size
+			}, name)
+		// Its reading styles reach the text: a selector in @scope without :scope would match nothing here.
+		assert.equal(await read('#handwritten > h2', 'fontSize'), await token('--ui-font-size-2xl'))
+		assert.equal(await read('#snapshot code', 'fontFamily'), await read('#snapshot pre code', 'fontFamily'))
+		assert.notEqual(await read('#snapshot p code', 'backgroundColor'), 'rgba(0, 0, 0, 0)')
+		// A card keeps its own text, on a solid too: the color and margin of the prose end at it.
+		const card = page.locator('#handwritten .meeko-ui-card')
+		assert.equal(await card.locator('.meeko-ui-card-body p').evaluate((element) => globalThis.getComputedStyle(element).color), await card.evaluate((element) => globalThis.getComputedStyle(element).color))
+		assert.deepEqual(errors, [])
+		await page.close()
+	})
+
 	await t.test('UICodeBlock and UIProse copy, say so, and come back', async () => {
 		const { page, errors } = await open()
 		const block = page.locator('.meeko-ui-code-block').first()

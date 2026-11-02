@@ -1,0 +1,27 @@
+<script lang="ts">
+	// <UIDisclosure>: a native <details>, so it opens with the keyboard and without JavaScript.
+	import type { UIDisclosureProps } from '../types/feedback'
+
+	import { icons } from '../utils/icons'
+	import * as Icon from './internal/Icon.meeko'
+
+	const props = defineProps<UIDisclosureProps>()
+
+	const snippets = defineSnippets<{ default: [] }>()
+</script>
+
+<template>
+	<details
+		bind:class="['meeko-ui-disclosure', props.class].filter(Boolean).join(' ')"
+		bind:open="props.open"
+	>
+		<summary>
+			{props.summary}
+			<Icon
+				class="meeko-ui-nav-chevron"
+				bind:path="icons.chevron"
+			/>
+		</summary>
+		<div class="meeko-ui-disclosure-body"><render snippet="snippets.default" /></div>
+	</details>
+</template>

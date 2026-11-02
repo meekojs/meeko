@@ -44,6 +44,12 @@
 	& > tbody > tr > th {
 		color: var(--ui-color-text);
 	}
+	/* A long type breaks inside its cell before the table scrolls. */
+	& code {
+		font-size: var(--ui-prose-code-size);
+		font-family: var(--ui-font-mono);
+		overflow-wrap: anywhere;
+	}
 	& > tbody > tr:last-child > :is(th, td) {
 		border-bottom: 0;
 	}

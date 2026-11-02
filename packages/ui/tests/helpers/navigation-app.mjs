@@ -74,6 +74,7 @@ const showcase = `<script lang="ts">
 				<snippet name="actions"><UILocaleSwitcher bind:items="locales" /></snippet>
 			</UIHeader>
 		</snippet>
+		<snippet name="notices"><UIAlert tone="info" description="Aviso de la página" /></snippet>
 		<snippet name="bar">
 			<UIDrawer id="menu" title="Contenidos" triggerLabel="Contenidos" model="drawerOpen" on:close="() => closes.value++">
 				<UINavigationTree bind:groups="groups" label="Contenidos" />
@@ -98,14 +99,14 @@ const showcase = `<script lang="ts">
 		<UIPagination bind:shown="shown.value" bind:total="5" bind:busy="busy.value" on:loadMore="loadMore" />
 		<UIPagination bind:total="1200" bind:hasMore="true" bind:moreLink="{ to: '/about' }" loadMoreLabel="Siguiente tanda" />
 		<section class="tall"><h2 id="dos">Segunda sección</h2><h3 id="dos-a">Un apartado</h3></section>
-		<UICodeBlock code="pnpm add @meekojs/ui" lang="sh" label="Instalación" />
+		<UICodeBlock code="pnpm add @meekojs/ui" lang="sh" label="Instalación" labelLang="es" uiLang="es" copyAriaLabel="Copiar el comando" />
 		<UICodeBlock code="const a = 1" bind:html="highlighted" lang="ts" verdict="good" />
 		<UICodeBlock code="const a = b" lang="ts" verdict="bad" />
 		<UICodeBlock bind:code="'[info] build\\n[warn] lento'" mode="log" label="Salida" />
 		<UIDiff bind:diff="diff" label="Cambios en la guía" />
 		<UIDiff diff="" label="Sin cambios" />
 		<UIProse as="article" id="snapshot" bind:html="snapshot" />
-		<UIProse id="handwritten"><h2>A mano</h2><p>Con marcado propio.</p></UIProse>
+		<UIProse id="handwritten"><h2>A mano</h2><p>Con marcado propio.</p><UICard title="Dentro del texto" variant="solid"><p>Texto de la card.</p></UICard></UIProse>
 		<section class="tall"><h2 id="tres">Tercera sección</h2></section>
 		<UIPageNavigation bind:previous="{ label: 'Inicio', to: '/' }" bind:next="{ label: 'Acerca de', to: '/about' }" />
 		<button type="button" id="suggest" on:click="() => (showSuggestion.value = true)">Sugerir</button>

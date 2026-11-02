@@ -58,6 +58,13 @@ const tokens = { light: declarations(block(tokensCss, ':root')), dark: declarati
 const color = (theme, scale, step) => palette[theme][`--ui-color-${scale}-${step}`]
 const primary = (step) => color('dark', 'primary', step)
 
+test('the rules of the prose scope are written from :scope: a class would be read as a nested prose', async () => {
+	const prose = await read('prose.css')
+	const scope = prose.slice(prose.indexOf('@scope ('))
+	assert.ok(scope.includes(':scope h2'))
+	assert.ok(!scope.includes('.meeko-ui-prose', scope.indexOf('{')))
+})
+
 test('form control borders reach 3:1 against every background and control state they sit on', () => {
 	for (const theme of ['light', 'dark']) {
 		const step = (tokens[theme]['--ui-color-control-border'] ?? tokens.light['--ui-color-control-border']).match(/surface-(\d+)/)[1]

@@ -31,6 +31,20 @@
 	outline: var(--ui-focus-ring);
 	outline-offset: var(--ui-focus-ring-offset);
 }
+/* Notices under the header, on the width of the page; without any, it takes no room. */
+.meeko-ui-page-notices {
+	display: grid;
+	gap: var(--ui-space-2);
+	box-sizing: border-box;
+	margin-inline: auto;
+	padding-inline: var(--ui-container-gutter-md);
+	padding-block-start: var(--ui-space-3);
+	width: 100%;
+	max-width: var(--ui-page-width);
+}
+.meeko-ui-page-notices:not(:has(*)) {
+	display: none;
+}
 .meeko-ui-page-bar {
 	display: none;
 }
@@ -43,7 +57,7 @@
 	margin-inline: auto;
 	padding-inline: var(--ui-container-gutter-md);
 	width: 100%;
-	max-width: var(--ui-container-xl);
+	max-width: var(--ui-page-width);
 }
 .meeko-ui-page-main {
 	padding-block: var(--ui-space-10) var(--ui-space-20);
@@ -80,7 +94,6 @@
 }
 .meeko-ui-page[data-layout='dashboard'] .meeko-ui-page-body {
 	gap: var(--ui-space-8);
-	max-width: var(--ui-container-2xl);
 }
 .meeko-ui-page[data-layout='dashboard'] .meeko-ui-page-main {
 	padding-block: var(--ui-space-8) var(--ui-space-12);

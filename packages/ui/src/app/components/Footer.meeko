@@ -6,7 +6,7 @@
 	import * as Brand from './internal/Brand.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
-	const props = defineProps<UIFooterProps>({ size: 'xl' })
+	const props = defineProps<UIFooterProps>({ size: '2xl' })
 
 	const snippets = defineSnippets<{ brand?: []; about?: []; actions?: []; legal?: [] }>()
 

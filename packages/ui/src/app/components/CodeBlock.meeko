@@ -69,6 +69,7 @@
 			<span
 				if:when="props.label"
 				class="meeko-ui-code-label"
+				bind:lang="props.labelLang"
 			>
 				{props.label}
 			</span>
@@ -82,6 +83,8 @@
 				if:when="showsCopy.value"
 				type="button"
 				class="meeko-ui-code-copy"
+				bind:lang="props.uiLang"
+				bind:aria-label="props.copyAriaLabel"
 				bind:data-ready="ready.value ? '' : undefined"
 				bind:data-state="state.value === 'idle' ? undefined : state.value"
 				on:click="copy"
@@ -92,6 +95,7 @@
 				if:when="showsCopy.value"
 				class="meeko-ui-sr-only"
 				role="status"
+				bind:lang="props.uiLang"
 			>
 				{state.value === 'idle' ? '' : copyState.value}
 			</span>

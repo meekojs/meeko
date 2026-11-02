@@ -14,6 +14,12 @@
 		accent-color: var(--ui-color-primary);
 		color-scheme: light;
 		caret-color: var(--ui-color-primary-text);
+		/*
+		 * The whole interface grows with the screen, here and nowhere else: every token is in rem. 16px
+		 * up to 1440, 18px at 2560 and 21px at 3840. The percentages keep the reader's own font size,
+		 * and the zoom works because it narrows the viewport.
+		 */
+		font-size: clamp(100%, 82% + 0.2vw, 137.5%);
 		-webkit-text-size-adjust: 100%;
 		text-size-adjust: 100%;
 	}

@@ -52,6 +52,8 @@ test('the navigation components render on the server with their semantics', { ti
 
 	await t.test('UIPage: one main, focusable, with its skip link, in every layout', () => {
 		assert.equal(count(es, /<main\b/g), 1)
+		assert.ok(block(es, 'class="meeko-ui-page-notices"', '</section>').includes('Aviso de la página'), 'the notices have their place under the header')
+		assert.ok(!landing.includes('meeko-ui-page-notices'), 'without the snippet there is no wrapper')
 		const main = tag(es, /<main\b/)
 		assert.equal(attribute(main, 'id'), 'contenido')
 		assert.equal(attribute(main, 'tabindex'), '-1')
@@ -250,6 +252,9 @@ test('the navigation components render on the server with their semantics', { ti
 		assert.equal(blocks.length, 4)
 		const [plain, highlighted, bad, log] = blocks
 		assert.ok(plain.includes('Instalación'))
+		assert.equal(attribute(tag(plain, /meeko-ui-code-label/), 'lang'), 'es')
+		assert.equal(attribute(tag(plain, /meeko-ui-code-copy/), 'lang'), 'es')
+		assert.equal(attribute(tag(plain, /meeko-ui-code-copy/), 'aria-label'), 'Copiar el comando')
 		assert.ok(plain.includes('sh'))
 		assert.match(plain, /<pre[^>]*tabindex="0"[^>]*><code>pnpm add @meekojs\/ui<\/code><\/pre>/)
 		assert.ok(plain.includes('Copiar'))

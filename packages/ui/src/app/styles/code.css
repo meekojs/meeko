@@ -23,7 +23,7 @@
 	padding-block: var(--ui-space-1);
 	min-height: var(--ui-control-height-md);
 	color: var(--ui-color-text-soft);
-	font-size: var(--ui-font-size-xs);
+	font-size: var(--ui-font-size-sm);
 }
 .meeko-ui-code-label {
 	color: var(--ui-color-text);
@@ -167,7 +167,7 @@ pre.meeko-ui-code-content,
 	.meeko-ui-code-content > pre,
 	.meeko-ui-prose .code-block pre {
 		padding: var(--ui-space-3);
-		font-size: var(--ui-font-size-xs);
+		font-size: var(--ui-font-size-sm);
 	}
 }
 @media (prefers-reduced-motion: reduce) {

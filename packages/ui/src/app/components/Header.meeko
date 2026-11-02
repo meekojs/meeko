@@ -10,7 +10,7 @@
 	import * as Icon from './internal/Icon.meeko'
 	import * as ItemLink from './internal/ItemLink.meeko'
 
-	const props = defineProps<UIHeaderProps>({ sticky: true, size: 'xl' })
+	const props = defineProps<UIHeaderProps>({ sticky: true, size: '2xl' })
 
 	const snippets = defineSnippets<{ brand?: []; nav?: []; actions?: []; menu?: [] }>()
 

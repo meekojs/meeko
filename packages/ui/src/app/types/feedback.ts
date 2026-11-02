@@ -16,8 +16,29 @@ export type UIAlertProps = Omit<ElementAttributes<'section'>, 'title' | 'role' |
 	dismiss?: boolean
 	/** Nombre accesible del cierre; usa los mensajes de UI por defecto. */
 	closeLabel?: string
-	/** Semántica; danger usa alert y los demás note por defecto. */
-	role?: 'alert' | 'status' | 'note'
+	/** Semántica; danger usa alert y los demás note por defecto. `none`, dentro de una región viva que ya existía. */
+	role?: 'alert' | 'status' | 'note' | 'none'
+	/** Clases adicionales. */
+	class?: string
+}
+
+/**
+ * Contenido plegable con `<details>` nativo: se abre con el teclado y sin JavaScript. Su contenido se
+ * conserva en el documento, así que un formulario envía sus campos aunque esté plegado.
+ *
+ * @since 0.2.0
+ * @example
+ * ```html
+ * <UIDisclosure summary="Añadir un comentario" bind:open="Boolean(comment.value)">
+ * 	<UITextarea model="comment" />
+ * </UIDisclosure>
+ * ```
+ */
+export interface UIDisclosureProps {
+	/** Texto del elemento que lo abre. */
+	summary: string
+	/** Abierto; el lector puede cambiarlo después. */
+	open?: boolean
 	/** Clases adicionales. */
 	class?: string
 }

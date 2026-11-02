@@ -106,7 +106,7 @@ export interface UIHeaderProps {
 	readonly menuLabel?: string
 	/** Se queda fija arriba al desplazarse; `true` por defecto. */
 	readonly sticky?: boolean
-	/** Ancho máximo del contenido, como en `<UIContainer>`; `"xl"` por defecto. */
+	/** Ancho máximo del contenido, como en `<UIContainer>`; `"2xl"` por defecto, el de `<UIPage>`. */
 	readonly size?: UIContainerSize
 	/** Clases adicionales, tras la del componente. */
 	readonly class?: string
@@ -151,7 +151,7 @@ export interface UIFooterProps {
 	readonly items?: readonly UINavigationLink[]
 	/** `aria-label` de la navegación. */
 	readonly label?: string
-	/** Ancho máximo del contenido, como en `<UIContainer>`; `"xl"` por defecto. */
+	/** Ancho máximo del contenido, como en `<UIContainer>`; `"2xl"` por defecto, el de `<UIPage>`. */
 	readonly size?: UIContainerSize
 	/** Clases adicionales, tras la del componente. */
 	readonly class?: string
@@ -629,10 +629,16 @@ export interface UICodeBlockProps {
 	readonly copy?: boolean
 	/** Texto del botón de copiar. */
 	readonly copyLabel?: string
+	/** Nombre accesible del botón de copiar, si el texto visible no basta. */
+	readonly copyAriaLabel?: string
 	/** Texto tras copiar. */
 	readonly copiedLabel?: string
 	/** Texto si la copia falla. */
 	readonly copyFailedLabel?: string
+	/** Idioma del botón de copiar y de su aviso, si no es el del documento. */
+	readonly uiLang?: string
+	/** Idioma del título, si no es el del documento. */
+	readonly labelLang?: string
 	/** Clases adicionales, tras la del componente. */
 	readonly class?: string
 }

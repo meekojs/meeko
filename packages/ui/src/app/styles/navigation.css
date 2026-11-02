@@ -11,8 +11,11 @@
 	letter-spacing: var(--ui-tracking-snug);
 	text-decoration: none;
 }
+/* It grows with the text beside it; the width and height attributes keep its proportion. */
 .meeko-ui-brand img {
 	display: block;
+	width: auto;
+	height: var(--ui-brand-image-height);
 }
 .meeko-ui-brand-product {
 	color: var(--ui-color-primary-text);
@@ -190,7 +193,7 @@
 	gap: var(--ui-space-3) var(--ui-space-6);
 	border-top: var(--ui-border-width) solid var(--ui-color-border);
 	padding-top: var(--ui-space-5);
-	font-size: var(--ui-font-size-xs);
+	font-size: var(--ui-font-size-sm);
 }
 .meeko-ui-footer-inner > .meeko-ui-footer-legal:only-child {
 	border-top: 0;
@@ -234,7 +237,7 @@
 	padding: var(--ui-space-1) var(--ui-space-2);
 	color: var(--ui-color-text);
 	font-weight: var(--ui-font-weight-medium);
-	font-size: var(--ui-font-size-sm);
+	font-size: var(--ui-font-size-md);
 }
 .meeko-ui-nav-group-title > span {
 	display: inline-flex;
@@ -288,6 +291,7 @@ details[open] > summary > .meeko-ui-nav-chevron {
 	border-radius: var(--ui-radius-sm);
 	padding: var(--ui-space-1) var(--ui-space-2);
 	color: inherit;
+	font-size: var(--ui-font-size-md);
 	line-height: var(--ui-line-height-normal);
 	text-decoration: none;
 }
@@ -305,7 +309,7 @@ details[open] > summary > .meeko-ui-nav-chevron {
 }
 .meeko-ui-nav-link[data-code] .meeko-ui-nav-label {
 	overflow: hidden;
-	font-size: var(--ui-font-size-sm);
+	font-size: var(--ui-font-size-md);
 	font-family: var(--ui-font-mono);
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -316,7 +320,7 @@ details[open] > summary > .meeko-ui-nav-chevron {
 }
 .meeko-ui-nav-empty {
 	padding: var(--ui-space-1) var(--ui-space-2);
-	font-size: var(--ui-font-size-sm);
+	font-size: var(--ui-font-size-md);
 }
 
 /* Drawer: closed, the UA hides it; `display` and `overlay` keep it painted while it leaves. */
@@ -608,7 +612,7 @@ html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-drawer-
 	align-items: center;
 	gap: var(--ui-space-1-5);
 	color: var(--ui-color-text-soft);
-	font-size: var(--ui-font-size-xs);
+	font-size: var(--ui-font-size-sm);
 }
 .meeko-ui-page-nav-link > span {
 	font-weight: var(--ui-font-weight-medium);
@@ -655,7 +659,7 @@ html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-drawer-
 /* Table of contents */
 .meeko-ui-toc {
 	color: var(--ui-color-text-soft);
-	font-size: var(--ui-font-size-sm);
+	font-size: var(--ui-font-size-md);
 	line-height: var(--ui-line-height-normal);
 	font-family: var(--ui-font-sans);
 }
@@ -756,10 +760,11 @@ html:active-view-transition-type(ui-modal-close)::view-transition-old(ui-drawer-
 		color var(--ui-duration-fast);
 	border-radius: var(--ui-radius-sm);
 	padding-inline: var(--ui-space-1-5);
+	min-width: var(--ui-space-8);
 	height: 100%;
 	color: var(--ui-color-text-soft);
 	font-weight: var(--ui-font-weight-medium);
-	font-size: var(--ui-font-size-xs);
+	font-size: var(--ui-font-size-md);
 	text-decoration: none;
 }
 .meeko-ui-locale-switcher a:hover {

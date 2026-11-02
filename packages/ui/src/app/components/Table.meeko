@@ -15,6 +15,7 @@
 			cell?: [row: T, column: TableColumn<T>, value: T[keyof T], index: number]
 			footer?: [column: TableColumn<T>, rows: readonly T[]]
 			empty?: []
+			caption?: []
 		}
 	>()
 
@@ -53,8 +54,8 @@
 	<div
 		class="meeko-ui-table-scroll"
 		tabindex="0"
-		bind:role="props.caption ? 'region' : undefined"
-		bind:aria-labelledby="props.caption ? id + '-caption' : undefined"
+		bind:role="props.caption || snippets.caption ? 'region' : undefined"
+		bind:aria-labelledby="props.caption || snippets.caption ? id + '-caption' : undefined"
 	>
 		<table
 			role="table"
@@ -64,10 +65,14 @@
 			bind:style="'--table-columns: ' + (props.gridColumns ?? 'repeat(' + Math.max(1, props.columns.length) + ', minmax(var(--ui-table-column-min), 1fr))')"
 		>
 			<caption
-				if:when="props.caption"
+				if:when="props.caption || snippets.caption"
 				bind:id="id + '-caption'"
 			>
-				{props.caption}
+				<render
+					if:when="snippets.caption"
+					snippet="snippets.caption"
+				/>
+				{snippets.caption ? '' : props.caption}
 			</caption>
 			<thead
 				if:when="!props.hideHeader"

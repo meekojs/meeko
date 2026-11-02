@@ -52,6 +52,23 @@ Pasos de cada escala: 1-2 fondos, 3-5 controles, 6-8 bordes, 9-10 sólidos, 11-1
 }
 ```
 
+## Escala fluida
+
+La interfaz crece con la pantalla en un solo sitio, la base global: `html { font-size: clamp(100%, 82% + 0.2vw, 137.5%) }`. Todos los tokens de tamaño, espacio, radio y control están en `rem`, así que crecen a la vez.
+
+| Pantalla | Raíz con el navegador a 16px |
+| -------- | ---------------------------- |
+| 390      | 16px                         |
+| 1440     | 16px                         |
+| 2560     | 18px                         |
+| 3840     | 21px                         |
+
+- **El lector manda.** Los porcentajes parten del tamaño de letra de su navegador, y el zoom funciona porque reduce el viewport. Nunca uses sólo `vw` ni `px` en la raíz.
+- **Escribe en tokens o en `rem`.** Lo que se escribe en `px` no crece: sólo el grosor de un borde, el anillo de foco y las sombras.
+- **Sin la base** (`ui: { base: false }`) no hay escala: la decide la aplicación.
+
+**Lo mínimo para leer:** el cuerpo de una documentación y `UIProse` usan `lg` (1rem). La navegación lateral, las tablas y los controles, `md` o más. Ningún texto de lectura baja de `sm`: `xs` queda para un badge o un metadato suelto.
+
 ## Tipografía
 
 `--ui-font-sans` es Inter Variable y `--ui-font-mono`, la mono del sistema. La mono es para código y datos, no un adorno «técnico».
@@ -77,15 +94,16 @@ Pasos de cada escala: 1-2 fondos, 3-5 controles, 6-8 bordes, 9-10 sólidos, 11-1
 - **Radios:** `--ui-radius-xs` 3px, `-sm` 4px (opción de una lista), `-md` 6px (controles), `-lg` 8px (cards, popovers), `-xl` 12px (modales), `-full` (badges, `pill`).
 - **Bordes:** `--ui-border-width` (1px). No uses bordes de color gruesos en un lateral.
 - **Sombras:** `--ui-shadow-sm`, `-md` (popover, card elevada), `-lg` (modal). En oscuro un panel se eleva con `--ui-color-surface-raised`; la sombra sólo separa lo que se solapa.
+- **Página:** `--ui-page-width` (`--ui-container-2xl`, 96rem) es el ancho de `UIPage`, y `UIHeader` y `UIFooter` lo siguen. El texto se limita a `--ui-prose-measure` (75ch), y el código, las tablas y las demos, a `--ui-prose-width` (`--ui-container-lg`). Así no queda media pantalla vacía en 2K ni hay líneas interminables.
 - **Contenedor:** `--ui-container-sm` 40rem, `-md` 48rem, `-lg` 64rem, `-xl` 80rem, `-2xl` 96rem, `-3xl` 120rem, `-4k` 240rem. Márgenes: `--ui-container-gutter-sm`, `-md`, `-lg`. Mejor `<UIContainer>` que leerlos a mano.
 
 ## Controles
 
-| Tamaño | Alto                          | Alto táctil | Padding                   | Texto                       |
-| ------ | ----------------------------- | ----------- | ------------------------- | --------------------------- |
-| `sm`   | `--ui-control-height-sm` 28px | 36px        | `--ui-control-padding-sm` | `--ui-control-font-size-sm` |
-| `md`   | `--ui-control-height-md` 32px | 40px        | `--ui-control-padding-md` | `--ui-control-font-size`    |
-| `lg`   | `--ui-control-height-lg` 40px | 44px        | `--ui-control-padding-lg` | `--ui-control-font-size-lg` |
+| Tamaño | Alto                             | Alto táctil | Padding                   | Texto                       |
+| ------ | -------------------------------- | ----------- | ------------------------- | --------------------------- |
+| `sm`   | `--ui-control-height-sm` 1,75rem | 36px        | `--ui-control-padding-sm` | `--ui-control-font-size-sm` |
+| `md`   | `--ui-control-height-md` 2,25rem | 40px        | `--ui-control-padding-md` | `--ui-control-font-size`    |
+| `lg`   | `--ui-control-height-lg` 2,75rem | 44px        | `--ui-control-padding-lg` | `--ui-control-font-size-lg` |
 
 Con `pointer: coarse` los altos crecen solos, y los inputs usan `--ui-input-font-size` a 16px para que iOS no amplíe la página al enfocarlos.
 

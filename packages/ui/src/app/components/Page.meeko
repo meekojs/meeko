@@ -33,10 +33,12 @@
 			if:when="snippets.header"
 			snippet="snippets.header"
 		/>
-		<render
+		<div
 			if:when="snippets.notices"
-			snippet="snippets.notices"
-		/>
+			class="meeko-ui-page-notices"
+		>
+			<render snippet="snippets.notices" />
+		</div>
 		<div
 			if:when="snippets.bar"
 			class="meeko-ui-page-bar"
