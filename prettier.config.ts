@@ -13,6 +13,11 @@ const config: Config &
 	endOfLine: 'auto',
 	htmlWhitespaceSensitivity: 'ignore',
 	meekoIndentSections: true,
+	overrides: [
+		// The examples of the documentation are `html` fences in Meeko syntax. Prettier's HTML parser would
+		// change what they say: `<Content />` becomes `<content />` and a lone `<form>` gets closed.
+		{ files: '*.md', options: { embeddedLanguageFormatting: 'off' } },
+	],
 	printWidth: 800,
 	semi: false,
 	singleAttributePerLine: true,
