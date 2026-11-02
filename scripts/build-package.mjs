@@ -1,7 +1,7 @@
 import { build } from 'esbuild'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import ts from 'typescript'
@@ -35,14 +35,23 @@ function outputSpecifier(specifier, importer) {
 	return path.startsWith('.') ? path : `./${path}`
 }
 
+// The build goes to a folder beside dist, at the same depth so that source maps stay valid, and only
+// what changed moves to dist at the end. Whoever reads dist meanwhile, such as `meeko dev` or an e2e,
+// finds complete files, and a build that changes nothing writes nothing.
+const building = join(root, '.dist-building')
+await rm(building, { recursive: true, force: true, maxRetries: 5 })
+
 // Check types and emit declarations first. JavaScript is emitted exclusively by esbuild.
-const result = spawnSync(process.execPath, [compiler, '-p', config, '--emitDeclarationOnly', '--declaration', '--noEmitOnError'], {
+const result = spawnSync(process.execPath, [compiler, '-p', config, '--emitDeclarationOnly', '--declaration', '--noEmitOnError', '--outDir', building], {
 	cwd: root,
 	stdio: 'inherit',
 	windowsHide: true,
 })
 if (result.error) throw result.error
-if (result.status !== 0) process.exit(result.status ?? 1)
+if (result.status !== 0) {
+	await rm(building, { recursive: true, force: true, maxRetries: 5 })
+	process.exit(result.status ?? 1)
+}
 
 const sources = (await filesIn(sourceRoot)).filter((file) => file.endsWith('.ts') && !file.endsWith('.d.ts'))
 // esbuild resolves extensionless local imports; marking each resolved module external
@@ -51,7 +60,7 @@ await build({
 	absWorkingDir: root,
 	entryPoints: sources,
 	outbase: sourceRoot,
-	outdir,
+	outdir: building,
 	bundle: true,
 	packages: 'external',
 	platform: 'neutral',
@@ -74,8 +83,8 @@ await build({
 
 // Bundler resolution permits extensionless declarations. Published declarations must
 // also work in strict NodeNext consumers, so rewrite only AST module specifiers.
-for (const file of (await filesIn(outdir)).filter((file) => file.endsWith('.d.ts'))) {
-	const sourceFile = join(sourceRoot, relative(outdir, file).replace(/\.d\.ts$/, '.ts'))
+for (const file of (await filesIn(building)).filter((file) => file.endsWith('.d.ts'))) {
+	const sourceFile = join(sourceRoot, relative(building, file).replace(/\.d\.ts$/, '.ts'))
 	const text = await readFile(file, 'utf8')
 	const ast = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true)
 	const edits = []
@@ -91,6 +100,29 @@ for (const file of (await filesIn(outdir)).filter((file) => file.endsWith('.d.ts
 	for (const edit of edits.sort((a, b) => b.start - a.start)) output = output.slice(0, edit.start) + edit.replacement + output.slice(edit.end)
 	if (output !== text) await writeFile(file, output)
 }
+
+/** Windows refuses a rename over a file that something holds open for a moment. */
+async function moveWithRetries(from, to) {
+	for (let attempt = 0; ; attempt++) {
+		try {
+			return await rename(from, to)
+		} catch (error) {
+			if (attempt >= 20 || !['EPERM', 'EBUSY', 'EACCES'].includes(error.code)) throw error
+			await new Promise((done) => setTimeout(done, 50 * (attempt + 1)))
+		}
+	}
+}
+
+// A rename replaces each file at once; a file that did not change keeps its time.
+await mkdir(outdir, { recursive: true })
+for (const file of await filesIn(building)) {
+	const target = join(outdir, relative(building, file))
+	const previous = await readFile(target).catch(() => undefined)
+	if (previous?.equals(await readFile(file))) continue
+	await mkdir(dirname(target), { recursive: true })
+	await moveWithRetries(file, target)
+}
+await rm(building, { recursive: true, force: true, maxRetries: 5 })
 
 // Delete stale outputs only after successful compilation. dist is a fixed child of root.
 const expected = new Set(

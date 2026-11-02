@@ -17,3 +17,4 @@ node_modules/
 
 # Incremental progress reports from hc workers (Codex sandbox fallback)
 /.hc-reports/
+.dist-building/

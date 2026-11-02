@@ -13,7 +13,7 @@ import { checkApp } from "./framework/check-app";
 import { checkFrameworkProject, loadCheckedMeekoConfig, prepareFrameworkTypes } from "./framework/check-project";
 import { cleanProject, formatCleanResult } from "./framework/clean";
 import { loadMeekoConfig } from "./framework/config";
-import { findLinkedMeeko, isSupervisedDevelopment, linkWatchEnabled, runSupervisedDevelopment, superviseDevelopment, warnLinkedMeekoRebuilds } from "./framework/dev-link";
+import { findLinkedMeeko, findLinkedPackages, isSupervisedDevelopment, linkWatchEnabled, runSupervisedDevelopment, superviseDevelopment, warnLinkedMeekoRebuilds } from "./framework/dev-link";
 import { claimDevelopmentProject } from "./framework/dev-lock";
 import { loadProjectEnv, resolveEnvFileArguments } from "./framework/env-file";
 import { initFrameworkProject } from "./framework/init";
@@ -230,7 +230,7 @@ if (problem !== undefined) {
           await prepareFrameworkTypes(root);
           return startProject(root, false);
         };
-        if (linked && linkWatchEnabled()) process.exitCode = await superviseDevelopment(linked);
+        if (linked && linkWatchEnabled()) process.exitCode = await superviseDevelopment(linked, { related: findLinkedPackages(resolve(root)) });
         else if (supervised) await runSupervisedDevelopment(start, stopDevelopmentServer, developmentServerPorts);
         else {
           // Without a supervisor the server keeps the build it loaded: each rebuild is reported.

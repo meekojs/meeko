@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { appendFile, mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test, { mock } from "node:test";
+import { pathToFileURL } from "node:url";
 
-import { createSettleDebounce, findLinkedMeeko, linkWatchEnabled, warnLinkedMeekoRebuilds, watchLinkedMeeko } from "../src/framework/dev-link.ts";
+import { createSettleDebounce, findLinkedMeeko, findLinkedPackages, linkWatchEnabled, warnLinkedMeekoRebuilds, watchLinkedMeeko } from "../src/framework/dev-link.ts";
 
 /** A junction on Windows (no privilege needed), a directory symlink elsewhere. */
 const link = (target: string, path: string) => symlink(target, path, process.platform === "win32" ? "junction" : "dir");
@@ -177,4 +179,130 @@ test("an unsupervised dev warns once per settled rebuild of the linked Meeko", {
   await appendFile(index, "\n");
   await pause(600);
   assert.equal(lines.length, 2);
+});
+
+test("findLinkedPackages finds the linked packages built for Meeko, also through another one", async (context) => {
+  const root = await sandbox(context);
+  const app = join(root, "apps", "site");
+  const write = async (directory: string, manifest: object, dist = true): Promise<void> => {
+    await mkdir(dist ? join(directory, "dist") : directory, { recursive: true });
+    await writeFile(join(directory, "package.json"), JSON.stringify(manifest));
+  };
+  await write(app, { dependencies: { "@meekojs/docs": "workspace:*", "plain-tool": "workspace:*", registry: "1.0.0" } }, false);
+  await write(join(root, "packages", "docs"), { name: "@meekojs/docs", peerDependencies: { "@meekojs/meeko": "*" }, dependencies: { "@meekojs/ui": "workspace:*" } }, false);
+  await write(join(root, "packages", "ui"), { name: "@meekojs/ui", peerDependencies: { "@meekojs/meeko": "*" }, dependencies: { "@meekojs/docs": "workspace:*" } });
+  await write(join(root, "packages", "plain"), { name: "plain-tool" });
+  await write(join(app, "node_modules", "registry"), { name: "registry", dependencies: { "@meekojs/meeko": "*" } });
+  await mkdir(join(app, "node_modules", "@meekojs"), { recursive: true });
+  await link(join(root, "packages", "docs"), join(app, "node_modules", "@meekojs", "docs"));
+  await link(join(root, "packages", "plain"), join(app, "node_modules", "plain-tool"));
+  await mkdir(join(root, "packages", "docs", "node_modules", "@meekojs"), { recursive: true });
+  await link(join(root, "packages", "ui"), join(root, "packages", "docs", "node_modules", "@meekojs", "ui"));
+  await mkdir(join(root, "packages", "ui", "node_modules", "@meekojs"), { recursive: true });
+  // A cycle between linked packages ends: each one is visited once.
+  await link(join(root, "packages", "docs"), join(root, "packages", "ui", "node_modules", "@meekojs", "docs"));
+  const ui = join(root, "packages", "ui");
+  // `docs` has no `dist`, `plain-tool` does not use Meeko and `registry` is an install.
+  assert.deepEqual(findLinkedPackages(app), [{ directory: ui, dist: join(ui, "dist") }]);
+  assert.deepEqual(findLinkedPackages(join(root, "missing")), []);
+});
+
+/** A supervisor whose server fails while `ready` is missing, as one that reads a `dist` halfway. */
+async function supervisor(context: { after(fn: () => Promise<void>): void }, options: { failAfter?: number; ready?: boolean } = {}) {
+  const root = await sandbox(context);
+  const meeko = join(root, "meeko");
+  const ui = join(root, "ui");
+  await mkdir(join(meeko, "dist"), { recursive: true });
+  await mkdir(join(ui, "dist"), { recursive: true });
+  const ready = join(root, "ready");
+  const log = join(root, "log");
+  if (options.ready) await writeFile(ready, "");
+  await writeFile(log, "");
+  const script = join(root, "supervisor.mts");
+  const module = pathToFileURL(resolve("src/framework/dev-link.ts")).href;
+  await writeFile(script, `import { appendFileSync, existsSync } from "node:fs";
+import { isSupervisedDevelopment, runSupervisedDevelopment, superviseDevelopment } from ${JSON.stringify(module)};
+const log = ${JSON.stringify(log)};
+if (isSupervisedDevelopment()) {
+  appendFileSync(log, "start\\n");
+  await new Promise((done) => setTimeout(done, ${options.failAfter ?? 0}));
+  await runSupervisedDevelopment(async () => {
+    if (!existsSync(${JSON.stringify(ready)})) throw new Error("halfway");
+    appendFileSync(log, "ready\\n");
+    return {};
+  }, async () => {}).catch(() => { appendFileSync(log, "fail\\n"); process.exit(1); });
+} else {
+  const dir = (directory) => ({ directory, dist: directory + "/dist" });
+  process.exitCode = await superviseDevelopment(dir(${JSON.stringify(meeko)}), { delay: 100, stopTimeout: 1000, related: [dir(${JSON.stringify(ui)})] });
+}
+`);
+  const running = spawn(process.execPath, ["--import", "tsx", script], { cwd: resolve("."), stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  let output = "";
+  running.stdout.on("data", (chunk: Buffer) => { output += chunk.toString(); });
+  running.stderr.on("data", (chunk: Buffer) => { output += chunk.toString(); });
+  const exited = new Promise<number | null>((done) => { running.once("exit", (code) => done(code)); });
+  context.after(async () => {
+    running.kill();
+    await exited;
+  });
+  const lines = async (): Promise<string[]> => (await readFile(log, "utf8")).split("\n").filter(Boolean);
+  const count = async (line: string): Promise<number> => (await lines()).filter((item) => item === line).length;
+  const until = async (line: string, times: number): Promise<void> => {
+    const start = Date.now();
+    while (await count(line) < times) {
+      if (Date.now() - start > 30_000) throw new Error(`${times} × ${line} did not arrive: ${(await lines()).join()}\n${output}`);
+      await new Promise((done) => setTimeout(done, 25));
+    }
+  };
+  return { meeko, ui, ready, count, until, exited, output: () => output };
+}
+
+test("a server that fails on a package being written comes back when that package settles", { timeout: 90_000 }, async (context) => {
+  const { meeko, ui, ready, count, until, output } = await supervisor(context, { ready: true });
+  await until("ready", 1);
+  // Meeko is rebuilt and the restart finds `@meekojs/ui` halfway. Before, nothing else restarted it.
+  await rm(ready);
+  await writeFile(join(meeko, "dist", "index.js"), "export {};\n");
+  await until("fail", 1);
+  await new Promise((done) => setTimeout(done, 500));
+  assert.equal(await count("start"), 2, "nothing was written since it started: it is not retried");
+  assert.match(output(), /próximo cambio de .*meeko.*ui/s);
+  await writeFile(join(ui, "dist", "index.js"), "export {};\n");
+  await writeFile(ready, "");
+  await until("ready", 2);
+  // A build of that package does not restart a healthy server.
+  await writeFile(join(ui, "dist", "index.js"), "export const again = 1;\n");
+  await new Promise((done) => setTimeout(done, 500));
+  assert.equal(await count("start"), 3);
+});
+
+test("a server that read a package while it was written starts again by itself, waiting for it to settle", { timeout: 90_000 }, async (context) => {
+  const { ui, ready, count, until } = await supervisor(context, { failAfter: 800 });
+  await until("start", 1);
+  await writeFile(join(ui, "dist", "index.js"), "export {};\n");
+  await until("fail", 1);
+  await writeFile(ready, "");
+  await until("ready", 1);
+  assert.equal(await count("start"), 2);
+});
+
+test("a first server that fails with nothing written ends the supervisor with its code", { timeout: 90_000 }, async (context) => {
+  const { count, exited } = await supervisor(context);
+  assert.equal(await exited, 1);
+  assert.equal(await count("start"), 1);
+});
+
+test("the starts of a server that keeps failing while its packages are written are bounded", { timeout: 90_000 }, async (context) => {
+  const { ui, count, output } = await supervisor(context, { failAfter: 600 });
+  const deadline = Date.now() + 60_000;
+  // The first start, its six retries, and then it waits: without writes nothing starts it again.
+  while (!output().includes("próximo cambio")) {
+    assert.ok(Date.now() < deadline, output());
+    await writeFile(join(ui, "dist", "index.js"), `export const at = ${Date.now()};\n`);
+    await new Promise((resolved) => setTimeout(resolved, 150));
+  }
+  assert.match(output(), /reintento 6 de 6/);
+  const starts = await count("start");
+  await new Promise((resolved) => setTimeout(resolved, 2000));
+  assert.equal(await count("start"), starts, output());
 });
