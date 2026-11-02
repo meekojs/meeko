@@ -135,6 +135,231 @@ const header: NonNullable<AppModalSnippets["header"]> | undefined = undefined;
   assert.ok(wrong.some((item) => item.code === "TS2345"), JSON.stringify(wrong));
 });
 
+/**
+ * What `meeko types` of the published `@meekojs/meeko@1.7.1` writes for a component with props, events,
+ * a model, snippets and `defineExpose`, as it is: the declaration that a package published with it ships.
+ */
+const declaration171 = `// @meeko-generated component-declaration v1
+import * as __meeko from "@meekojs/meeko/internal";
+type __MeekoEmits = __meeko.Emits<{
+    press: [event: MouseEvent];
+}>;
+type __MeekoEmitProps = __meeko.EmitProps<__MeekoEmits>;
+type __MeekoDeclaredProps = {
+    label: string;
+    tone?: "neutral" | "danger";
+};
+export type ComponentProps = __MeekoDeclaredProps & __MeekoEmitProps;
+declare function __setup(__props: ComponentProps): {
+    [__meeko.exposedKey]: any;
+    [__meeko.borrowedKey]: any;
+    props: Readonly<{
+        label: string;
+        tone?: "neutral" | "danger";
+    }>;
+    emit: __meeko.Emit<__meeko.Emits<{
+        press: [event: MouseEvent];
+    }>>;
+    open: __meeko.Signal<boolean>;
+    snippets: __meeko.SnippetMap<__meeko.SnippetTypes<{
+        default: [];
+    }>>;
+};
+export type ComponentExposed = ReturnType<typeof __setup>[typeof __meeko.exposedKey];
+type __MeekoModels = {
+    "default": boolean;
+};
+export type ComponentModels = {
+    "default"?: __meeko.Signal<__MeekoModels["default"]>;
+};
+type __MeekoSnippets = __meeko.SnippetTypes<{
+    default: [];
+}>;
+export type ComponentSnippets = __meeko.SnippetMap<__MeekoSnippets>;
+export declare const __meekoChannels: {
+    readonly models: ComponentModels;
+    readonly snippets: ComponentSnippets;
+};
+type __MeekoTagProps<P> = P extends unknown ? {
+    [K in keyof P]: {} extends Record<K, unknown> ? P[K] : {} extends Pick<P, K> ? P[K] | undefined : P[K];
+} : never;
+export declare const __meekoTag: (props: __MeekoTagProps<ComponentProps> & __meeko.ExtraProps, events: NoInfer<__meeko.EventNames<ComponentProps>>, models: NoInfer<ComponentModels>, snippets: NoInfer<ComponentSnippets>) => __meeko.TagInput<ComponentExposed>;
+export declare const css = "";
+export declare const hasDataAwait: boolean;
+export declare const __meekoChildren: (() => readonly unknown[]) | null;
+export declare const __meekoReactiveProps: boolean;
+export declare function renderWithState(__inputProps: ComponentProps): {
+    html: string;
+    state: __meeko.HotState;
+};
+export declare function renderToString(__inputProps: ComponentProps, __state?: __meeko.HotState): string;
+export declare function hydrate(root: Element, __inputProps: ComponentProps, __state?: __meeko.HotState): () => void;
+export declare function hydrateScope(__scope: __meeko.DomScope, __inputProps: ComponentProps, __state?: __meeko.HotState): __meeko.ComponentRelease<ComponentExposed>;
+export {};
+`;
+
+/** The generic one of the same release: its types take the parameters of the component. */
+const genericDeclaration171 = `// @meeko-generated component-declaration v1
+import * as __meeko from "@meekojs/meeko/internal";
+export type ComponentProps<T> = {
+    items: readonly T[];
+};
+export type ComponentExposed<T> = null;
+export type ComponentModels<T> = null;
+export type ComponentSnippets<T> = null;
+declare function __meeko_channels<T>(): {
+    readonly models: ComponentModels<T>;
+    readonly snippets: ComponentSnippets<T>;
+};
+export declare const __meekoChannels: ReturnType<typeof __meeko_channels>;
+type __MeekoTagProps<P> = P extends unknown ? {
+    [K in keyof P]: {} extends Record<K, unknown> ? P[K] : {} extends Pick<P, K> ? P[K] | undefined : P[K];
+} : never;
+export declare const __meekoTag: <T>(props: __MeekoTagProps<ComponentProps<T>> & __meeko.ExtraProps, events: NoInfer<__meeko.EventNames<ComponentProps<T>>>, models: __meeko.NoModels, snippets: __meeko.NoSnippets) => __meeko.TagInput<ComponentExposed<T>>;
+export declare const css = "";
+export declare const hasDataAwait: boolean;
+export declare const __meekoChildren: (() => readonly unknown[]) | null;
+export declare const __meekoReactiveProps: boolean;
+export declare function renderWithState<T>(__inputProps: ComponentProps<T>): {
+    html: string;
+    state: __meeko.HotState;
+};
+export declare function renderToString<T>(__inputProps: ComponentProps<T>, __state?: __meeko.HotState): string;
+export declare function hydrate<T>(root: Element, __inputProps: ComponentProps<T>, __state?: __meeko.HotState): () => void;
+export declare function hydrateScope<T>(__scope: __meeko.DomScope, __inputProps: ComponentProps<T>, __state?: __meeko.HotState): __meeko.ComponentRelease<ComponentExposed<T>>;
+export {};
+`;
+
+const legacyModule = `import { defineMeekoModule } from "@meekojs/meeko/framework";
+export default defineMeekoModule({
+  meta: { name: "kit" },
+  setup(_options, meeko) {
+    meeko.addComponentsDir("./node_modules/published-kit/components");
+  },
+});
+`;
+
+/** A project that installed a package of components, with a declaration of each generation. */
+const publishedPackage = (declaration: string): Record<string, string> => ({
+  "package.json": '{"private":true,"type":"module"}\n',
+  "meeko.config.mjs": 'export default { modules: ["./modules/kit"] };\n',
+  "modules/kit/index.mjs": legacyModule,
+  "node_modules/published-kit/package.json": '{"name":"published-kit","version":"1.0.0","type":"module"}\n',
+  // The source of `declaration171`: `meeko check` compiles it for a `.meeko` that uses it, and TypeScript
+  // reads the declaration for a `.ts` and for the global types.
+  "node_modules/published-kit/components/Legacy.meeko": `<script lang="ts">
+const props = defineProps<{ label: string; tone?: "neutral" | "danger" }>();
+const emit = defineEmits<{ press: [event: MouseEvent] }>();
+const open = defineModel<boolean>({ default: false });
+const snippets = defineSnippets<{ default: [] }>();
+defineExpose({ focus: (): void => {} });
+</script>
+<template><button type="button" bind:data-open="open.value ? '' : undefined" on:click="(event) => emit('press', event)">{props.label}<render snippet="snippets.default" /></button></template>
+`,
+  "node_modules/published-kit/components/Legacy.d.meeko.ts": declaration,
+});
+
+test("a package published before 1.8 keeps its types without republishing: <Name>Props is its ComponentProps", { timeout: 300_000 }, async (context) => {
+  const root = await tempProject(context, "legacy-declaration");
+  await linkRepositoryPackages(root);
+  await put(root, {
+    ...publishedPackage(declaration171),
+    "node_modules/published-kit/components/LegacyList.meeko": '<script lang="ts" generic="T">\nconst props = defineProps<{ items: readonly T[] }>();\n</script>\n<template><ul><li each:of="props.items" each:as="item">{String(item)}</li></ul></template>\n',
+    "node_modules/published-kit/components/LegacyList.d.meeko.ts": genericDeclaration171,
+    // As the application wrote it with 1.7: the callbacks are in the type, and it does not touch it.
+    "app/utils/legacy.ts": 'export const label = (props: LegacyProps): string => props.label;\nexport const full: LegacyProps = { label: "a", tone: "danger", onPress: () => {} };\nexport const list: LegacyListProps<number> = { items: [1, 2] };\n',
+    "app/pages/index.meeko": `<script lang="ts">
+const props: LegacyProps = { label: "a" };
+const models: LegacyModels = {};
+const snippets: LegacySnippets = { default: undefined as never };
+const list: LegacyListProps<string> = { items: ["x"] };
+void props; void models; void snippets; void list;
+</script>
+<template><main><Legacy label="a" on:press="() => {}">x</Legacy><LegacyList bind:items="[1, 2]" /></main></template>
+`,
+  });
+
+  const registry = await discoverAutoImports(root);
+  const imported = (name: string) => registry.filter((item) => item.name === name).map((item) => item.imported);
+  assert.deepEqual(imported("LegacyProps"), ["ComponentProps"]);
+  assert.deepEqual(imported("LegacyListProps"), ["ComponentProps"]);
+  assert.deepEqual(imported("LegacySnippets"), ["ComponentSnippets"]);
+  assert.deepEqual(imported("LegacyModels"), ["ComponentModels"]);
+  assert.deepEqual(imported("LegacyExposed"), ["ComponentExposed"]);
+  // Its declaration has no map of events: the name it never had does not exist.
+  assert.deepEqual(imported("LegacyEmits"), []);
+  // The static registry of the editor, which does not run modules, reads the declaration of a layer the same.
+  const layered = await tempProject(context, "legacy-declaration-static");
+  await put(layered, {
+    "package.json": '{"private":true,"type":"module"}\n',
+    "meeko.config.mjs": 'export default { extends: ["./base"] };\n',
+    "base/app/components/Legacy.meeko": "<template><p>x</p></template>\n",
+    "base/app/components/Legacy.d.meeko.ts": declaration171,
+  });
+  assert.deepEqual(discoverAutoImportsSync(layered).filter((item) => item.name === "LegacyProps" || item.name === "LegacyEmits").map((item) => [item.name, item.imported]), [["LegacyProps", "ComponentProps"]]);
+
+  // The cases of the review: the import of a script and the global of a declaration.
+  assert.match(applyAutoImports("export const label = (props: LegacyProps) => props.label;\n", join(root, "app", "utils", "x.ts"), registry, "client"), /^import type \{ ComponentProps as LegacyProps \} from "[^"]*Legacy\.meeko";$/m);
+  const client = await readFile((await generateAutoImportTypes(root)).client, "utf8");
+  assert.match(client, /export import LegacyProps = __meeko_type_\d+\.ComponentProps;/);
+  assert.doesNotMatch(client, /__MeekoPropsOnly|ComponentEmits|LegacyEmits/);
+
+  // `meeko check` of a project that upgraded: no error, and no need to touch anything.
+  assert.deepEqual((await checkFrameworkProject(root)).filter((item) => (item.severity ?? "error") === "error").map((item) => `${item.code}: ${item.message}`), []);
+
+  // It is really the type of the component, not an `any`.
+  await put(root, { "app/utils/legacy.ts": 'export const wrong: LegacyProps = { label: 1 };\n' });
+  await assert.rejects(checkFrameworkProject(root), /legacy\.ts.*TS2322/s);
+  // <Name>Emits is an honest "cannot find name" where it would say nothing about the component.
+  await put(root, { "app/utils/legacy.ts": 'export const events: LegacyEmits = {};\n' });
+  await assert.rejects(checkFrameworkProject(root), /legacy\.ts.*TS2304.*LegacyEmits/s);
+});
+
+test("a declaration of 1.8 gives <Name>Props without callbacks and <Name>Emits, a project source has no declaration to read, and an export * keeps the names of 1.7", { timeout: 300_000 }, async (context) => {
+  const root = await tempProject(context, "current-declaration");
+  await linkRepositoryPackages(root);
+  const current = `// @meeko-generated component-declaration v1
+type __MeekoEmits = { press: [event: MouseEvent] };
+type __MeekoDeclaredProps = { label: string };
+export type ComponentProps = __MeekoDeclaredProps & { onPress?: (event: MouseEvent) => void };
+type __MeekoPropsOnly = __MeekoDeclaredProps;
+export type { __MeekoPropsOnly };
+export type { __MeekoEmits as ComponentEmits };
+export type ComponentSnippets = null;
+export type ComponentModels = null;
+export type ComponentExposed = null;
+`;
+  await put(root, {
+    ...publishedPackage(current),
+    "node_modules/published-kit/components/Forwarded.meeko": "<template><p>x</p></template>\n",
+    "node_modules/published-kit/components/Forwarded.d.meeko.ts": 'export * from "./Legacy.meeko";\n',
+    "app/components/Own.meeko": '<script lang="ts">\nconst props = defineProps<{ title: string }>();\nconst emit = defineEmits<{ close: [] }>();\n</script>\n<template><button type="button" on:click="() => emit(\'close\')">{props.title}</button></template>\n',
+    "app/pages/index.meeko": `<script lang="ts">
+const own: OwnProps = { title: "a" };
+const events: OwnEmits = { close: [] };
+const props: LegacyProps = { label: "a" };
+const press: LegacyEmits = { press: [new MouseEvent("click")] };
+void own; void events; void props; void press;
+</script>
+<template><main><Own title="a" on:close="() => {}" /><Legacy label="a" on:press="() => {}">x</Legacy></main></template>
+`,
+  });
+  const registry = await discoverAutoImports(root);
+  const imported = (name: string) => registry.filter((item) => item.name === name).map((item) => item.imported);
+  assert.deepEqual(imported("LegacyProps"), ["__MeekoPropsOnly"]);
+  assert.deepEqual(imported("LegacyEmits"), ["ComponentEmits"]);
+  assert.deepEqual(imported("OwnProps"), ["__MeekoPropsOnly"]);
+  assert.deepEqual(imported("OwnEmits"), ["ComponentEmits"]);
+  // What an `export *` brings is not read: only what every declaration has always had is assumed.
+  assert.deepEqual(imported("ForwardedProps"), ["ComponentProps"]);
+  assert.deepEqual(imported("ForwardedEmits"), []);
+  assert.deepEqual(imported("ForwardedSnippets"), ["ComponentSnippets"]);
+  assert.deepEqual((await checkFrameworkProject(root)).filter((item) => (item.severity ?? "error") === "error").map((item) => `${item.code}: ${item.message}`), []);
+  // Without callbacks, as the migration guide says.
+  await put(root, { "app/utils/wrong.ts": 'export const wrong: LegacyProps = { label: "a", onPress: () => {} };\n' });
+  await assert.rejects(checkFrameworkProject(root), /wrong\.ts.*TS2353/s);
+});
+
 test("the props types of the built-in tags and RouteId are autoimported from the framework, and a project type wins", { timeout: 300_000 }, async (context) => {
   const root = await tempProject(context, "builtin-tag-types");
   await linkRepositoryPackages(root);

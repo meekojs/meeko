@@ -163,8 +163,37 @@ function isYieldingBuiltin(entry: AutoImport): boolean {
  * The types that the module of each autoimported component exports, by the suffix of their name:
  * `<AppCard>` gives `AppCardProps` (since 1.8, without the callbacks of `defineEmits`, which are in
  * `ComponentProps<"AppCard">`), `AppCardEmits`, `AppCardSnippets`, `AppCardModels` and `AppCardExposed`.
+ * Each one lists the names it may have, the current one first: a package published before 1.8 ships
+ * a declaration without `__MeekoPropsOnly` or `ComponentEmits`, and only `ComponentProps` gives its
+ * props, as it did then. Its `<Name>Emits`, a name it never had, does not exist.
  */
-const componentTypes = [["Props", "__MeekoPropsOnly"], ["Emits", "ComponentEmits"], ["Snippets", "ComponentSnippets"], ["Models", "ComponentModels"], ["Exposed", "ComponentExposed"]] as const;
+const componentTypes: ReadonlyArray<readonly [suffix: string, names: readonly string[]]> = [["Props", ["__MeekoPropsOnly", "ComponentProps"]], ["Emits", ["ComponentEmits"]], ["Snippets", ["ComponentSnippets"]], ["Models", ["ComponentModels"]], ["Exposed", ["ComponentExposed"]]];
+
+/** What every declaration exported before 1.8: all that can be assumed of an `export *`, which is not read. */
+const typesBefore18 = ["ComponentProps", "ComponentSnippets", "ComponentModels", "ComponentExposed"];
+
+/**
+ * The exports of the `.d.meeko.ts` next to a component, the one TypeScript reads for it: that of an
+ * installed or linked package, which `generateTypes` does not regenerate. `undefined` without one: a
+ * source of the project, whose module the current compiler generates with every name.
+ */
+function adjacentDeclarationExports(file: string): ReadonlySet<string> | undefined {
+  const path = file.replace(/\.meeko$/, ".d.meeko.ts");
+  let source: string;
+  try { source = readFileSync(path, "utf8"); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw error; }
+  const exported = new Set<string>();
+  for (const statement of ts.createSourceFile(path, source, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS).statements) {
+    if (ts.isExportDeclaration(statement)) {
+      const clause = statement.exportClause;
+      if (!clause) for (const name of typesBefore18) exported.add(name);
+      else if (ts.isNamedExports(clause)) for (const element of clause.elements) exported.add(element.name.text);
+    } else if ((ts.isTypeAliasDeclaration(statement) || ts.isInterfaceDeclaration(statement)) && ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
+      exported.add(statement.name.text);
+    }
+  }
+  return exported;
+}
 
 /**
  * How readily an entry steps aside for another autoimport with the same name: `0` never; `1` a type
@@ -253,6 +282,19 @@ export function outputSpecifier(path: string): string {
   return path.replace(/\.[cm]?ts$/, (extension) => extension === ".mts" ? ".mjs" : extension === ".cts" ? ".cjs" : ".js");
 }
 
+/** The component that holds the new name of a `Carpeta/Index.meeko`, for its `MEEK135` warning. */
+export interface ComponentConflict {
+  /** The new name that the `Index.meeko` cannot take. */
+  readonly name: string;
+  /** The file that holds it. */
+  readonly file: string;
+  /**
+   * That file holds it as the name it had before 1.8 (`Button/Index.meeko`, which is `ButtonIndex`
+   * as well as `Button`), so the name is free in 2.0, when that alias goes.
+   */
+  readonly oldName?: true;
+}
+
 /** The canonical component catalog consumed by autoimports and generated runtime/types. */
 export interface DiscoveredComponent {
   readonly name: string;
@@ -282,19 +324,6 @@ interface ComponentDirectory {
  * An `Index.meeko` at the root of the directory has no folder to take the name from: it stays `Index`.
  */
 function componentName(file: string, directory: ComponentDirectory): { readonly name: string; readonly legacy?: string } {
-/** The component that holds the new name of a `Carpeta/Index.meeko`, for its `MEEK135` warning. */
-export interface ComponentConflict {
-  /** The new name that the `Index.meeko` cannot take. */
-  readonly name: string;
-  /** The file that holds it. */
-  readonly file: string;
-  /**
-   * That file holds it as the name it had before 1.8 (`Button/Index.meeko`, which is `ButtonIndex`
-   * as well as `Button`), so the name is free in 2.0, when that alias goes.
-   */
-  readonly oldName?: true;
-}
-
   const parts = relative(directory.dir, file).replace(/\.meeko$/, "").split(/[\\/]/);
   const pascal = (list: readonly string[]): string => directory.prefix + list.map((part) => part.replace(/(^|[-_])(\w)/g, (_, _dash: string, letter: string) => letter.toUpperCase())).join("");
   const collapses = parts.length > 1 && /^[iI]ndex$/.test(parts.at(-1)!);
@@ -358,8 +387,6 @@ function catalog(files: readonly { directory: ComponentDirectory; file: string; 
     // The alias is only there for a name this file really had.
     if (former.get(legacy)?.file === file) names.set(legacy, { component: { name: legacy, file, source: directory.source, deprecatedFor: name }, priority: directory.priority });
   }
-  // A component that really has the old name keeps it: the alias is only there for what it replaced.
-  for (const [legacy, entry] of legacies) if (!names.has(legacy)) names.set(legacy, entry);
   return [...names.values()].map(({ component }) => component).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
 }
 
@@ -419,7 +446,11 @@ function staticComponentSources(root: string, config: MeekoConfig): readonly { r
 function addComponentImports(result: AutoImport[], components: readonly DiscoveredComponent[]): void {
   for (const { name, file, deprecatedFor, conflictsWith } of components) {
     addAutoImport(result, { name, imported: "*", file, scope: "app", typeOnly: false, component: true, ...(deprecatedFor ? { deprecatedFor } : {}), ...(conflictsWith ? { conflictsWith } : {}) });
-    for (const [suffix, imported] of componentTypes) addAutoImport(result, { name: `${name}${suffix}`, imported, file, scope: "app", typeOnly: true, component: false, componentType: true, ...(deprecatedFor ? { deprecatedFor: `${deprecatedFor}${suffix}` } : {}) });
+    const declared = adjacentDeclarationExports(file);
+    for (const [suffix, candidates] of componentTypes) {
+      const imported = candidates.find((candidate) => declared?.has(candidate) ?? true);
+      if (imported) addAutoImport(result, { name: `${name}${suffix}`, imported, file, scope: "app", typeOnly: true, component: false, componentType: true, ...(deprecatedFor ? { deprecatedFor: `${deprecatedFor}${suffix}` } : {}) });
+    }
   }
 }
 
