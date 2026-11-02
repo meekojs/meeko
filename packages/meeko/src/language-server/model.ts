@@ -1142,7 +1142,8 @@ export function createVirtualComponent(source: string, filename: string, options
   if (emitsTypeText) code += `type __MeekoEmits${G} = ${emitsTypeText};\n`;
   code += "type __MeekoEmitPropsOf<T> = { [K in keyof T & string as `on${Capitalize<K>}`]?: ((...args: T[K] extends readonly unknown[] ? T[K] : never) => void) | undefined };\n";
   code += `type __MeekoComponentProps${G} = (${inputProps})${emitsTypeText ? ` & __MeekoEmitPropsOf<__MeekoEmits${A}>` : ""};\nexport type { __MeekoComponentProps as ComponentProps };\n`;
-  code += `type __MeekoOwnProps${G} = (${inputProps});\nexport type { __MeekoOwnProps as ComponentOwnProps };\n`;
+  code += `type __MeekoPropsOnly${G} = (${inputProps});\nexport type { __MeekoPropsOnly };\n`;
+  code += `${emitsTypeText ? "" : `type __MeekoEmits${G} = {};\n`}export type { __MeekoEmits as ComponentEmits };\n`;
   // Structural, without importing the package: it satisfies `Component<ComponentProps>`.
   code += `export declare function renderToString${G}(props: __MeekoComponentProps${A}, state?: Record<string, unknown>): string;\n`;
   code += `export declare function renderWithState${G}(props: __MeekoComponentProps${A}): { html: string; state: Record<string, unknown> };\n`;

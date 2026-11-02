@@ -6,9 +6,9 @@ import test from "node:test";
 import { compile } from "../src/compiler";
 
 const cases = [
-  ["examples/counter/Counter.meeko", "./fixtures/codegen/Counter.meeko", "29563779bd27ddf34ebd3143a30548e27e67fcf3dd6290b444080677f5bce2ea", "0b7543eab376a28cf5e10a23888bdeb552a33951158a5cf6dc6bb143aa8f52a8", "2f6b35eb05f4c16e143195d2df58fc9e0d423af5df7bba29cfc8cfad8154d393", "0081d2ca435fa6a9b92c9caeedd99a0989a2115bfcd77a0b30f60f0173b08c84"],
-  ["examples/nested/Parent.meeko", "./fixtures/codegen/Parent.meeko", "cf0d33151010d44733f362ff85390b966f76b74dd1eee08e0d22f8b1a343d9f7", "599cd69439bf1d71b00b17b5cb613e11cb4216989c5b7840fdc4ef2d17eac8eb", "d0ac24df1efeec253eb05d0e1ccec95df3474a692cfa5907a4531a19d3d7994d", "eb60278750140e434166c10bf5053b323dde259592b08775c417848f0e8ad9a5"],
-  ["tests/fixtures/CleanupErrors.meeko", "./fixtures/codegen/CleanupErrors.meeko", "f5eca2841ef371c2dc2285e9b560b1fbe3fe1c5ffdf09858cda57912b4ebcc87", "39b6d8001954cd4ab416f91b3a8868ae25edf1b89d13d651139c96ebec3444f2", "26e800af8b50536949f84b9aeee0b1ca5b078a7704f82472d75e7ec9ebcb1580", "35afa2af6fbf4c0d761d1b3daf7ffeb2695fef743ae3c3a79f2454a1b5ae501a"],
+  ["examples/counter/Counter.meeko", "./fixtures/codegen/Counter.meeko", "946883c164f689af7a76469205fd7c8cce978f8a14d0f517fb14a010bf5c69e9", "e63c1ab12c8478c76d4869ba48227e586d32ffb3d9071c2e5008909332a2e883", "d31ad7fce5f3db8a7bbf38eaa220d127dd062684b64d2baf90cc6f3aecfc06c6", "369511807c0ee7171482fc755ada598824ee1976fc6bfda1798db15642d12029"],
+  ["examples/nested/Parent.meeko", "./fixtures/codegen/Parent.meeko", "4cc7ba0e071c074e33f187b309e7f6ccfb9a68fdd5052f87b803f99bed0c05f2", "b42786ec882fec4f7ac29c15436eebe5cb38a508a125220e50a3a83389b3009f", "8562ba850fd09fac22d1223607400f68e7d17f6618659865e2bdbcd9e61d1f5d", "7f53257adff043fd689e7f341391861c4954cda822141259154a2b72e13bc708"],
+  ["tests/fixtures/CleanupErrors.meeko", "./fixtures/codegen/CleanupErrors.meeko", "48b74e7e136cf2d81c9442bf259c9ef3e3098a3e1a3133f6730fac6e97c04799", "ba531a02520946cb3385dfe6bf37fa2e1793b43f7d2de02987d7861c94be6f70", "4b390ffeff0a0ae8c6f31ece78145223601394e853f55efdb6036c34eeac8f49", "f77dc210ed4bf6106012b27a6a38f7b1baaa4a19f2c64e636c3c7283f77f5694"],
 ] as const;
 
 const hash = (value: string): string => createHash("sha256").update(value).digest("hex");

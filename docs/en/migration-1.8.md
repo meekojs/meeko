@@ -1,5 +1,5 @@
 ---
-source-hash: 5aa48c78e15b557d2c696ba79d53f90e9c71dca6633896875dfd68580bcd01fa
+source-hash: 82e416ae5898f3f8961d1c97f9aadef07d804033c494662a3392f00ff7c1228e
 ---
 
 # Upgrade from 1.7 to 1.8
@@ -160,6 +160,17 @@ A key for an installed module absent from `modules` (`i18n: { … }` without `'@
 4. Run `meeko check`: `MEEK101` identifies copies read only once, `MEEK125` identifies assignments and `TS2344` a name that is not a prop.
 
 Defaults can now read top-level literal constants and imports; a setup variable previously producing `TS2304` is now `MEEK123`.
+
+## Component types
+
+`<Name>Props` no longer includes the callbacks of `defineEmits`. If your code reads or writes them on that type, change it to `ComponentProps<"Name">`:
+
+```diff
+- const props: BaseButtonProps = { href: '/x', onClick }
++ const props: ComponentProps<'BaseButton'> = { href: '/x', onClick }
+```
+
+Only types change, and `meeko check` flags each case with `TS2353` or `TS2339`. `BaseButtonEmits`, new, is the `defineEmits` map. This makes a wrapper possible; see [Wrapping another component](api.md#wrapping-another-component).
 
 ## Other visible changes
 

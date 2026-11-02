@@ -21,6 +21,10 @@ interface Props {
 }
 type __MeekoComponentProps = Props;
 export type { __MeekoComponentProps as ComponentProps };
+type __MeekoPropsOnly = __MeekoComponentProps;
+export type { __MeekoPropsOnly };
+type __MeekoEmits = {};
+export type { __MeekoEmits as ComponentEmits };
 function __setup(__props: Props) {
 const props = __props as Readonly<Props>;
 const snippets: __meeko.SnippetMap<__MeekoSnippets> = __meeko.useSnippets<__MeekoSnippets>(__props);

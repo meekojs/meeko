@@ -10,6 +10,9 @@ type __MeekoEmitProps = __meeko.EmitProps<__MeekoEmits>;
 type __MeekoDeclaredProps = MeekoPopoverProps;
 type __MeekoComponentProps = __MeekoDeclaredProps & __MeekoEmitProps;
 export type { __MeekoComponentProps as ComponentProps };
+type __MeekoPropsOnly = __MeekoDeclaredProps;
+export type { __MeekoPropsOnly };
+export type { __MeekoEmits as ComponentEmits };
 function __setup(__props: __MeekoComponentProps, __meeko_refs: __meeko.ElementRefs) {
 type __MeekoRefs = { "content": __meeko.ElementOf<"div", false> };
 const __meeko_borrowed = new Set<unknown>();

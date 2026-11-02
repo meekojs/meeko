@@ -235,12 +235,12 @@ export function resolveProps(input: object, defaults: object): object {
 /** State of a view of {@link withoutEventProps}, kept in its proxy target. */
 interface EventsState {
   readonly props: object;
-  /** Callback props of the events that the component declares, such as `onClick`. */
-  readonly hidden: ReadonlySet<string>;
+  /** Callback props of the events that the component declares, such as `onClick`; `null` when the compiler cannot list them. */
+  readonly hidden: ReadonlySet<string> | null;
 }
 
 function hiddenKey(state: EventsState, key: string | symbol): boolean {
-  return typeof key === "string" && state.hidden.has(key);
+  return typeof key === "string" && (state.hidden ? state.hidden.has(key) : /^on[A-Z]/.test(key));
 }
 
 const eventsTraps: ProxyHandler<EventsState> = {
@@ -262,11 +262,12 @@ const eventsTraps: ProxyHandler<EventsState> = {
  * events (`onClick` for `click`) in `Object.keys`, `in`, `{ ...props }` and a rest
  * `const { a, ...rest } = props`, so that the object matches the type of `defineProps`, which does
  * not declare them, and `bind="rest"` does not receive them. `emit` reads them from the original
- * props. Internal to compiled components.
+ * props. `null` is a map of events that the script does not spell, such as `defineEmits<ButtonEmits>()`:
+ * any `onX` key may be one, so all of them leave the enumeration. Internal to compiled components.
  */
-export function withoutEventProps(props: object, names: readonly string[]): object {
-  if (names.length === 0) return props;
-  const view = new Proxy<EventsState>({ props, hidden: new Set(names) }, eventsTraps);
+export function withoutEventProps(props: object, names: readonly string[] | null): object {
+  if (names?.length === 0) return props;
+  const view = new Proxy<EventsState>({ props, hidden: names && new Set(names) }, eventsTraps);
   if (isReactiveProps(props)) reactiveViews.add(view);
   return view;
 }

@@ -1257,7 +1257,7 @@ export function definition(base: FeatureContext, position: Position): Location[]
 
 /** Macro whose type argument or value gives each type of a component's module. */
 const componentTypeMacros: Readonly<Record<string, string>> = {
-  ComponentProps: "defineProps", ComponentSnippets: "defineSnippets", ComponentModels: "defineModel", ComponentExposed: "defineExpose",
+  ComponentProps: "defineProps", ComponentEmits: "defineEmits", ComponentSnippets: "defineSnippets", ComponentModels: "defineModel", ComponentExposed: "defineExpose",
 };
 
 /** Span of the macro behind a component type in the component's `<script>`, if it has one. */

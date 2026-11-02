@@ -154,9 +154,10 @@ function isYieldingBuiltin(entry: AutoImport): boolean {
 
 /**
  * The types that the module of each autoimported component exports, by the suffix of their name:
- * `<AppCard>` gives `AppCardProps`, `AppCardSnippets`, `AppCardModels` and `AppCardExposed`.
+ * `<AppCard>` gives `AppCardProps` (since 1.8, without the callbacks of `defineEmits`, which are in
+ * `ComponentProps<"AppCard">`), `AppCardEmits`, `AppCardSnippets`, `AppCardModels` and `AppCardExposed`.
  */
-const componentTypes = [["Props", "ComponentProps"], ["OwnProps", "ComponentOwnProps"], ["Snippets", "ComponentSnippets"], ["Models", "ComponentModels"], ["Exposed", "ComponentExposed"]] as const;
+const componentTypes = [["Props", "__MeekoPropsOnly"], ["Emits", "ComponentEmits"], ["Snippets", "ComponentSnippets"], ["Models", "ComponentModels"], ["Exposed", "ComponentExposed"]] as const;
 
 /**
  * How readily an entry steps aside for another autoimport with the same name: `0` never; `1` a type

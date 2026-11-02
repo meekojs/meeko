@@ -363,7 +363,7 @@ export type PropsSpreadCheck<T, M> = {
  * object without its `undefined` keys, which Meeko treats as absent props. The generated code
  * spreads it before the explicit props, which win. `component` only types the check.
  */
-export function spreadProps<M, T extends object | null | undefined>(component: () => M, value: T & NoInfer<T extends object ? PropsSpreadCheck<T, M> : unknown>): NoInfer<T> {
+export function spreadProps<M, T extends object | null | undefined>(component: () => M, value: T & NoInfer<T extends object ? PropsSpreadCheck<T, M> : unknown>): T {
   void component;
   if (value === null || value === undefined) return {} as T;
   if (typeof value !== "object") throw new TypeError(`MEEK113: bind="…" espera un objeto de props, no ${typeof value}`);

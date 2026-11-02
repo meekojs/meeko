@@ -43,26 +43,7 @@ interface Props extends Base${typeArguments} { extra?: string }
 const props = defineProps<Props>();
 </script><template><p>{props.extra}</p></template>`;
 
-/** The wrapper of a union: the intersection keeps its variants, also without the listeners. */
-const unionWrapper = `<script lang="ts">
-import type { ComponentOwnProps, ComponentProps } from "./UnionEmits.meeko";
-type Props = ComponentOwnProps & { extra?: string };
-const props = defineProps<Props>();
-const emit = defineEmits<{ click: [] }>();
-const narrow = (value: ComponentProps): string => value.kind === "a" ? value.a : value.b;
-void narrow; void props; void emit;
-</script><template><p>{props.kind === "a" ? props.a : props.b}</p></template>`;
-
-/** The wrapper of an object: the rest goes through `bind`, which admits no `on*` key, and it re-emits. */
-const wrapper = `<script lang="ts">
-import * as Emits from "./Emits.meeko";
-import type { ComponentOwnProps } from "./Emits.meeko";
-interface Props extends ComponentOwnProps { extra?: string }
-const { extra, ...rest } = defineProps<Props>();
-const emit = defineEmits<{ click: [event: MouseEvent] }>();
-</script><template><Emits bind="rest" on:click="(event) => emit('click', event)" /><p>{extra}</p></template>`;
-
-/** The same wrapper over `ComponentProps`, which carries `onClick`: two explanations, both precise. */
+/** A wrapper over `ComponentProps`, which carries `onClick`: `bind` rejects it, with a precise error. */
 const carrying = `<script lang="ts">
 import * as Emits from "./Emits.meeko";
 import type { ComponentProps } from "./Emits.meeko";
@@ -106,48 +87,15 @@ describe("interface Props extends the ComponentProps of a component", () => {
     });
   }
 
-  test("a wrapper extends ComponentOwnProps, forwards the rest with bind and declares the event itself", async () => {
-    assert.deepEqual(await report("Wrapper", wrapper), { check: [], editor: [] });
-  });
-
   test("the rest of ComponentProps carries the listeners, which bind rejects: MEEK113, not a silent loss", async () => {
     const { check, editor } = await report("Carrying", carrying);
     assert.ok(check.some((item) => item.startsWith("MEEK113: bind no admite claves on*")), check.join("\n"));
     assert.ok(editor.some((item) => item.startsWith("MEEK113: bind no admite claves on*")), editor.join("\n"));
   });
 
-  for (const [name, child, members] of [
-    ["emits and props", "Emits", "{ label: string; size?: number }"],
-    ["defaults", "Defaults", "{ label: string; size?: number | undefined }"],
-    ["no emits", "Plain", "{ label: string }"],
-  ] as const) {
-    test(`ComponentOwnProps has the props without the listeners: ${name}`, async () => {
-      const source = `<script lang="ts">
-import type { ComponentOwnProps } from "./${child}.meeko";
-const same = (value: ComponentOwnProps): ${members} => value;
-const back = (value: ${members}): ComponentOwnProps => value;
-const none: "onClick" extends keyof ComponentOwnProps ? never : true = true;
-void same; void back; void none;
-</script><template><p>x</p></template>`;
-      assert.deepEqual(await report(`Own${child}`, source), { check: [], editor: [] });
-    });
-  }
-
-  test("ComponentOwnProps of a generic component keeps its parameters", async () => {
-    const source = `<script lang="ts">
-import type { ComponentOwnProps } from "./Generic.meeko";
-const value: ComponentOwnProps<number> = { value: 1 };
-const wrong: ComponentOwnProps<string> = { value: 1 };
-void value; void wrong;
-</script><template><p>x</p></template>`;
-    const message = "TS2322: Type 'number' is not assignable to type 'string'.";
-    assert.deepEqual(await report("OwnGeneric", source), { check: [message], editor: [message] });
-  });
-
   for (const child of ["Union", "UnionEmits"]) {
     test(`props that are a union propose a type with an intersection: ${child}`, async () => {
-      const source = extending(child);
-      const { check, editor } = await report(`Extends${child}`, source);
+      const { check, editor } = await report(`Extends${child}`, extending(child));
       const message = "TS2312: Una interface no puede extender Base porque no tiene una forma única: suele ser una unión de props, y cada variante es distinta. Escribe un tipo, que conserva todas las variantes: type Props = Base & { … }";
       assert.deepEqual(check, [message]);
       assert.deepEqual(editor, [message]);
@@ -184,7 +132,4 @@ const props = defineProps<{ params: { id: string }; data: { title: string; count
     assert.ok(wrong.editor.some((item) => item.startsWith("TS2339") && item.includes("missing")), wrong.editor.join("\n"));
   });
 
-  test("the proposed type keeps the variants of the union", async () => {
-    assert.deepEqual(await report("UnionWrapper", unionWrapper), { check: [], editor: [] });
-  });
 });

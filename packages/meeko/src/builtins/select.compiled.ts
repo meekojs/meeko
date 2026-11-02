@@ -11,6 +11,9 @@ type __MeekoEmitProps<T, Multiple extends boolean = false> = __meeko.EmitProps<_
 type __MeekoDeclaredProps<T, Multiple extends boolean = false> = MeekoSelectProps<T, Multiple>;
 type __MeekoComponentProps<T, Multiple extends boolean = false> = __MeekoDeclaredProps<T, Multiple> & __MeekoEmitProps<T, Multiple>;
 export type { __MeekoComponentProps as ComponentProps };
+type __MeekoPropsOnly<T, Multiple extends boolean = false> = __MeekoDeclaredProps<T, Multiple>;
+export type { __MeekoPropsOnly };
+export type { __MeekoEmits as ComponentEmits };
 function __setup<T, Multiple extends boolean = false>(__props: __MeekoComponentProps<T, Multiple>, __meeko_refs: __meeko.ElementRefs) {
 type __MeekoRefs = { "root": __meeko.ElementOf<"div", false> };
 const __meeko_borrowed = new Set<unknown>();

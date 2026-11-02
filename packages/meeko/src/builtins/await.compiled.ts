@@ -16,6 +16,10 @@ interface Props {
 }
 type __MeekoComponentProps = Props;
 export type { __MeekoComponentProps as ComponentProps };
+type __MeekoPropsOnly = __MeekoComponentProps;
+export type { __MeekoPropsOnly };
+type __MeekoEmits = {};
+export type { __MeekoEmits as ComponentEmits };
 function __setup(__props: Props, __meeko_refs: __meeko.ElementRefs) {
 type __MeekoRefs = { "box": __meeko.ElementOf<"div", false> };
 const props = __props as Readonly<Props>;

@@ -22,6 +22,9 @@ type __MeekoEmitProps = __meeko.EmitProps<__MeekoEmits>;
 type __MeekoDeclaredProps = Props;
 type __MeekoComponentProps = __MeekoDeclaredProps & __MeekoEmitProps;
 export type { __MeekoComponentProps as ComponentProps };
+type __MeekoPropsOnly = __MeekoDeclaredProps;
+export type { __MeekoPropsOnly };
+export type { __MeekoEmits as ComponentEmits };
 function __setup(__props: __MeekoComponentProps) {
 const __meeko_route = __meeko_useRoute();
 const __meeko_links = __meeko.linkResolver();

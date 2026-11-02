@@ -2273,7 +2273,9 @@ function compileScript(section: SfcSection, source: string, filename: string, ho
     // Since 1.8 the callbacks of the declared events (`onClick`) are not among its keys: the
     // type does not declare them, and `const { a, ...rest } = props` must not carry them.
     const events = emitsDeclaration ? emitNames(emitsDeclaration.typeArgument, file) : undefined;
-    const propsSource = events?.length ? `__meeko.withoutEventProps(__props, ${JSON.stringify(events.map(emitPropName))})` : "__props";
+    // A map that the script does not spell (`defineEmits<ButtonEmits>()`) is only known at run time.
+    const propsSource = emitsDeclaration && !events ? "__meeko.withoutEventProps(__props, null)"
+      : events?.length ? `__meeko.withoutEventProps(__props, ${JSON.stringify(events.map(emitPropName))})` : "__props";
     // Each destructured prop must exist in every member of the props, as in a TypeScript
     // destructuring (`TS2344` on its name); the check is `unknown`, so the type stays the same.
     const keysCheck = pattern?.bindings.length

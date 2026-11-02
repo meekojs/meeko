@@ -108,7 +108,7 @@ export function componentModuleAt(context: FeatureContext, generatedOffset: numb
 }
 
 /** Types that the module of a component exports for its channels. */
-const componentTypeNames: ReadonlySet<string> = new Set(["ComponentProps", "__MeekoComponentProps", "ComponentSnippets", "ComponentModels", "ComponentExposed"]);
+const componentTypeNames: ReadonlySet<string> = new Set(["ComponentProps", "__MeekoComponentProps", "__MeekoPropsOnly", "__MeekoEmits", "ComponentSnippets", "ComponentModels", "ComponentExposed"]);
 
 /**
  * The component whose channel type an identifier names: `AppCardSnippets`, the autoimported type
@@ -128,7 +128,7 @@ export function componentTypeAt(context: FeatureContext, generatedOffset: number
   const fileName = declaration.getSourceFile().fileName;
   const component = context.project.virtualEntry(fileName) ?? generatedDeclarationOwner(context, fileName);
   return component && component.filename.endsWith(".meeko") && component !== context.component
-    ? { component, node, type: declaration.name.text === "__MeekoComponentProps" ? "ComponentProps" : declaration.name.text }
+    ? { component, node, type: declaration.name.text === "__MeekoComponentProps" || declaration.name.text === "__MeekoPropsOnly" ? "ComponentProps" : declaration.name.text === "__MeekoEmits" ? "ComponentEmits" : declaration.name.text }
     : undefined;
 }
 

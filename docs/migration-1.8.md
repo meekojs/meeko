@@ -157,6 +157,17 @@ Una clave de un módulo instalado que no está en `modules` (`i18n: { … }` sin
 
 Los defaults pueden leer ahora constantes de nivel superior de literales e imports; una variable del setup que antes daba `TS2304` es `MEEK123`.
 
+## Tipos de un componente
+
+`<Nombre>Props` ya no incluye los callbacks de `defineEmits`. Si tu código los lee o los escribe en ese tipo, cámbialo por `ComponentProps<"Nombre">`:
+
+```diff
+- const props: BaseButtonProps = { href: '/x', onClick }
++ const props: ComponentProps<'BaseButton'> = { href: '/x', onClick }
+```
+
+Sólo cambian los tipos, y `meeko check` señala cada caso con `TS2353` o `TS2339`. `BaseButtonEmits`, nuevo, es el mapa de `defineEmits`. Con esto se puede escribir un envoltorio; véase [Envolver otro componente](api.md#envolver-otro-componente).
+
 ## Otros cambios visibles
 
 - **`css` de un componente.** Con el plugin de Vite de Meeko, el export `css` es el CSS ya procesado por PostCSS en el grafo SSR y en `meeko dev`, y sigue siendo la cadena del compilador en el bundle de cliente de producción (véase [stability.md](stability.md#formato-meeko-y-módulo-generado)). Un test de Vitest que lea `Componente.css` o haga SSR de un componente sigue recibiendo un CSS no vacío: sin `test.css: true`, Vitest no procesa CSS y `css` es la cadena del compilador; con `css: true`, el CSS procesado.

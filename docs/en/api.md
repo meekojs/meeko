@@ -1,5 +1,5 @@
 ---
-source-hash: 50426b2125de586fd3d503bfc9fbec5bd8361cfcacb0510554c0ad26fe324fe6
+source-hash: 29f390e7ef57fa97d3aa90921e6428946015712f9a2751c655d36f3302647809
 ---
 
 # Meeko API
@@ -1357,7 +1357,7 @@ The first browser `await` splits setup:
 
 ## Generated module
 
-Each `.meeko` exports `ComponentProps`, `ComponentOwnProps` (since `1.8`), `ComponentExposed` (since `1.1`; `null` without `defineExpose`), the `ComponentModels` and `ComponentSnippets` types (since `1.1`; `null` without `defineModel` or `defineSnippets`), `css`, `renderWithState(props)`, `renderToString(props)`, `hydrate(root, props, state?)` and `hydrateScope(scope, props, state?)`; on a component with `generic`, these types and functions carry its type parameters (see [Generic components](#generic-components-generic)). With `defineEmits`, `ComponentProps` includes optional callback props for each event (`onSave`). The application supplies the same serializable props to server and browser. `renderWithState` returns HTML and a writable signal snapshot validated as JSON; `hydrate` restores those values before claiming existing HTML. Children carry their own state within their comment markers. The compiler uses `hydrateScope` for those children. The cleanup function disposes observers and events. A difference in initial HTML produces a hydration error.
+Each `.meeko` exports `ComponentProps`, `ComponentEmits` (since `1.8`; the `defineEmits` map, and `{}` without it), `ComponentExposed` (since `1.1`; `null` without `defineExpose`), the `ComponentModels` and `ComponentSnippets` types (since `1.1`; `null` without `defineModel` or `defineSnippets`), `css`, `renderWithState(props)`, `renderToString(props)`, `hydrate(root, props, state?)` and `hydrateScope(scope, props, state?)`; on a component with `generic`, these types and functions carry its type parameters (see [Generic components](#generic-components-generic)). With `defineEmits`, `ComponentProps` includes optional callback props for each event (`onSave`). The application supplies the same serializable props to server and browser. `renderWithState` returns HTML and a writable signal snapshot validated as JSON; `hydrate` restores those values before claiming existing HTML. Children carry their own state within their comment markers. The compiler uses `hydrateScope` for those children. The cleanup function disposes observers and events. A difference in initial HTML produces a hydration error.
 
 ```ts
 import { hydrate, renderWithState } from './Counter.meeko'
@@ -1371,29 +1371,34 @@ const release = hydrate(document.querySelector('#counter')!, props, state)
 // Llamar release() cuando la raíz deje de usarse.
 ```
 
-Since `1.4`, each auto-imported component also has those four types with its tag name, without an import: `<AppCard>` (`app/components/App/Card.meeko`) gives `AppCardProps`, `AppCardSnippets`, `AppCardModels` and `AppCardExposed`, which are exactly its `ComponentProps`, `ComponentSnippets`, `ComponentModels` and `ComponentExposed`, including `null` (see [Types for each component](framework.md#component-types)). The `.meeko` module does not export them with that name, because the name depends on where the project auto-imports it (folder and module prefix), not the component: from an explicit import they remain `import type { ComponentSnippets as CardSnippets } from "./Card.meeko"`.
+Since `1.4`, each auto-imported component also has those types with its tag name, without an import: `<AppCard>` (`app/components/App/Card.meeko`) gives `AppCardProps`, its props without callbacks (since `1.8`; see [Wrapping another component](#wrapping-another-component)), `AppCardEmits` (since `1.8`), `AppCardSnippets`, `AppCardModels` and `AppCardExposed`, which are exactly its `ComponentEmits`, `ComponentSnippets`, `ComponentModels` and `ComponentExposed`, including `null` (see [Types for each component](framework.md#component-types)). The `.meeko` module does not export them with that name, because the name depends on where the project auto-imports it (folder and module prefix), not the component: from an explicit import they remain `import type { ComponentSnippets as CardSnippets } from "./Card.meeko"`.
 
-**Wrapping another component.** `ComponentProps` is what the parent passes, so it includes the callback props of `defineEmits`: `on:click` reaches the child as the `onClick` prop. Since `1.8`, `ComponentOwnProps` (`AppCardOwnProps` on an auto-imported component) is the same props without those callbacks, which is what a wrapper needs: `bind` does not accept `on*` keys (`MEEK113`), and declaring the same event with `defineEmits` would clash with the inherited prop.
+<a id="wrapping-another-component"></a>**Wrapping another component.** Since `1.8`, an auto-imported component has three types for this:
+
+| Type | What it is |
+| --- | --- |
+| `BaseButtonProps` | Its props, without the callbacks of `defineEmits`. |
+| `BaseButtonEmits` | The `defineEmits` map, to write `defineEmits<BaseButtonEmits>()`. |
+| `ComponentProps<"BaseButton">` | Everything the parent can pass, including `onClick`. |
+
+A wrapper extends the props, declares the events and forwards the rest. If the other component's props are a union, such as a route, a link or a button, the variants are kept: passing `to` and `href` together is still an error in the wrapper's parent.
 
 ```html
 <script lang="ts">
-  import * as Button from './Button.meeko'
-  import type { ComponentOwnProps } from './Button.meeko'
+  type Props = BaseButtonProps & { label: string }
 
-  interface Props extends ComponentOwnProps {
-    hint?: string
-  }
-  const { hint, ...rest } = defineProps<Props>()
-  const emit = defineEmits<{ click: [event: MouseEvent] }>()
+  const { label, ...rest } = defineProps<Props>()
+  const emit = defineEmits<BaseButtonEmits>()
 </script>
 
 <template>
-  <Button bind="rest" on:click="(event) => emit('click', event)" />
-  <small>{hint}</small>
+  <BaseButton bind="rest" on:click="(event) => emit('click', event)">{label}</BaseButton>
 </template>
 ```
 
-If the other component's props are a union, `interface Props extends X` is `TS2312`: an interface has a single shape. Write a type, which keeps the variants: `type Props = ComponentOwnProps & { hint?: string }`. The callbacks and their mapped type do not prevent `extends`; the union does.
+`bind` does not accept `on*` keys (`MEEK113`), which is why the event is forwarded with `on:click`. `on:click` reaches the child as the `onClick` prop: that is why `ComponentProps` includes them. With a union you have to write a `type`, as in the example: `interface Props extends BaseButtonProps` is `TS2312`, because an interface has a single shape; with props that are an object, both forms work.
+
+A map the script does not spell, such as `defineEmits<BaseButtonEmits>()`, leaves every `onX` key out of the enumeration of `props` and of the rest, because the compiler does not know the names; reading `props.onX` still works.
 
 Since `1.5`, a script signal whose value is `undefined` travels in `renderWithState` state (under the `"meeko:undefined"` key, listing their names) and hydrates as `undefined`, even if the browser script creates it with another value. A value JSON does not faithfully represent (a date, a `Map`, a class instance or an `undefined` inside an object) fails with the component and signal, and a hint: `app/pages/agenda.meeko: the signal "when" cannot be sent to the browser with the SSR state (Non-plain object at $.when)`. Only top-level writable script signals travel: a `computed`, constant or signal stored inside an object is not part of state.
 
