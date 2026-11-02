@@ -107,7 +107,8 @@ async function moveWithRetries(from, to) {
 		try {
 			return await rename(from, to)
 		} catch (error) {
-			if (attempt >= 20 || !['EPERM', 'EBUSY', 'EACCES'].includes(error.code)) throw error
+			if (!['EPERM', 'EBUSY', 'EACCES'].includes(error.code)) throw error
+			if (attempt >= 10) return writeFile(to, await readFile(from))
 			await new Promise((done) => setTimeout(done, 50 * (attempt + 1)))
 		}
 	}
