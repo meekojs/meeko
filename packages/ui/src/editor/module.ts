@@ -45,7 +45,7 @@ export default defineMeekoModule({
 	meta: {
 		name: '@meekojs/ui/editor',
 		compatibility: {
-			meeko: '>=1.7 <2',
+			meeko: '>=1.8 <2',
 		},
 	},
 	setup(_options, meeko) {

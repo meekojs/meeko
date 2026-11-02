@@ -1,10 +1,10 @@
 # Actualizar de 1.7 a 1.8
 
-`1.8` es un minor. `<MeekoPopover>`, `<MeekoSelect>` y `<MeekoThemeToggle>` quedan obsoletos: siguen funcionando en `1.x` y se retiran en `2.0`. UI `0.2.0` ofrece sus reemplazos con el mismo contrato. La nueva API pública estable `useThemeToggle()` permite construir un selector propio. Los módulos se registran por su nombre (`modules: ['@meekojs/i18n']`) con sus opciones en su clave; importarlos y `[módulo, opciones]` quedan obsoletos (`MEEK126`). Como cambio de seguridad, toda mutación de API y RPC comprueba `Origin` por defecto, también sin sesión (véase [Origin en todas las mutaciones](#origin-en-todas-las-mutaciones)). Esta guía describe los cambios previstos, todavía sin publicar; consulta también el [CHANGELOG](../packages/meeko/CHANGELOG.md) y la [política de estabilidad](stability.md).
+`1.8` es un minor. `<MeekoPopover>`, `<MeekoSelect>` y `<MeekoThemeToggle>` quedan obsoletos: siguen funcionando en `1.x` y se retiran en `2.0`. UI `1.8.0` ofrece sus reemplazos con el mismo contrato. La nueva API pública estable `useThemeToggle()` permite construir un selector propio. Los módulos se registran por su nombre (`modules: ['@meekojs/i18n']`) con sus opciones en su clave; importarlos y `[módulo, opciones]` quedan obsoletos (`MEEK126`). Como cambio de seguridad, toda mutación de API y RPC comprueba `Origin` por defecto, también sin sesión (véase [Origin en todas las mutaciones](#origin-en-todas-las-mutaciones)). Esta guía describe los cambios previstos, todavía sin publicar; consulta también el [CHANGELOG](../packages/meeko/CHANGELOG.md) y la [política de estabilidad](stability.md).
 
 ## Orden recomendado
 
-1. Actualiza core a `1.8` y `@meekojs/ui` a `0.2.0` cuando están publicados. UI 0.2 requiere Meeko `>=1.8 <2`; no uses el nuevo `UIThemeToggle` con core 1.7.
+1. Actualiza core a `1.8` y `@meekojs/ui` a `1.8.0` cuando están publicados. UI 1.8 requiere Meeko `>=1.8 <2`; no uses el nuevo `UIThemeToggle` con core 1.7.
 2. Activa el módulo UI en `meeko.config.ts`.
 3. Renombra las tres etiquetas y actualiza los imports explícitos de sus tipos.
 4. Ejecuta `meeko check` y comprueba los controles, sus estilos y los formularios en tu aplicación.
@@ -14,7 +14,7 @@
 ## Módulo UI requerido
 
 ```sh
-pnpm add @meekojs/meeko@^1.8.0 @meekojs/ui@^0.2.0
+pnpm add @meekojs/meeko@^1.8.0 @meekojs/ui@^1.8.0
 ```
 
 ```ts
@@ -30,7 +30,7 @@ Conserva el resto de tu configuración. `theme` sólo es necesario para el selec
 
 ## Renombrar etiquetas
 
-| Hasta 1.7            | Desde core 1.8 con UI 0.2 |
+| Hasta 1.7            | Desde core 1.8 con UI 1.8 |
 | -------------------- | ------------------------- |
 | `<MeekoPopover>`     | `<UIPopover>`             |
 | `<MeekoSelect>`      | `<UICombobox>`            |
@@ -182,3 +182,20 @@ Un paquete de componentes publicado antes de `1.8` sigue funcionando sin republi
 Al actualizar `@meekojs/eslint-plugin`, `defineEslint()` activa el conjunto completo `recommended-natural` de Perfectionist con orden natural ascendente (`item2` antes que `item10`): imports, exports, objetos, clases, módulos, interfaces, tipos, enums, `switch`, `Set`, `Map` y demás, también en el `<script>` de un `.meeko`. Puedes ver muchos avisos nuevos; en Meeko 1.x son `warn` y `perfectionist/sort-imports` y `perfectionist/sort-named-imports` pasan a `error` en 2.0. `eslint --fix` los resuelve, pero reordena también donde el orden se observa, como `Object.keys`, un `Map` o los campos de una clase con efectos: revisa el diff antes de aceptarlo. Si tu CI usa `--max-warnings 0`, estos avisos también hacen fallar su ejecución.
 
 Para desactivarlos todos usa `defineEslint({ perfectionist: false })`. Para apagar una regla concreta usa `defineEslint({ rules: { 'perfectionist/sort-objects': 'off' } })`. Para exigir los imports como errores usa `defineEslint({ rules: { 'perfectionist/sort-imports': 'error', 'perfectionist/sort-named-imports': 'error' } })`; el override de severidad conserva el orden natural. Las reglas `perfectionist/*` ya no requieren declarar `perfectionist: true`, pero siguen rechazándose si lo desactivas explícitamente. Consulta las [opciones del plugin](../packages/eslint-plugin/README.md#ordenar-y-limpiar-imports).
+
+## Instalar los paquetes nuevos
+
+Preparación de release, sin publicar: espera a que npm confirme las seis versiones. Todos los paquetes públicos se alinean en `1.8.0`.
+
+```sh
+pnpm add @meekojs/meeko@^1.8.0 @meekojs/ui@^1.8.0 @meekojs/i18n@^1.8.0 @meekojs/icon@^1.8.0
+pnpm add -D @meekojs/eslint-plugin@^1.8.0 @meekojs/prettier-plugin@^1.8.0 eslint prettier vite
+```
+
+Registra sólo los módulos que uses en `modules`. `@meekojs/ui/editor` pertenece al paquete UI y se registra aparte. Para usarlo instala también sus peers opcionales:
+
+```sh
+pnpm add @milkdown/crepe@^7.23.0 @milkdown/kit@^7.23.0 @codemirror/lang-css@^6.3.1 @codemirror/lang-html@^6.4.12 @codemirror/lang-javascript@^6.2.5 @codemirror/lang-json@^6.0.2 @codemirror/language@^6.13.1 @codemirror/view@^6.43.15 @lezer/highlight@^1.2.5
+```
+
+Las colecciones `@iconify-json/*` se instalan explícitamente en el consumidor; revisa la licencia de cada colección antes de distribuir sus iconos. Véase [Publicar los paquetes de Meeko](releasing.md#publicar-los-paquetes-de-meeko).

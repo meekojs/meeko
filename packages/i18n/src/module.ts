@@ -92,7 +92,7 @@ function openGraphLocale(locale: string): string {
 
 export default defineMeekoModule<I18nModuleOptions>({
   // `modules: ["@meekojs/i18n"]` resolves this `./module` subpath; the options live in `i18n: { … }`.
-  meta: { name: "@meekojs/i18n", configKey: "i18n", compatibility: { meeko: ">=1.7 <2" } },
+  meta: { name: "@meekojs/i18n", configKey: "i18n", compatibility: { meeko: ">=1.8 <2" } },
   setup(options, meeko) {
     if (!options.catalogs || typeof options.catalogs !== "object" || Array.isArray(options.catalogs)) throw new TypeError("i18n: catalogs must be an object");
     const locales = Object.keys(options.catalogs);

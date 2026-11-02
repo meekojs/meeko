@@ -1,6 +1,6 @@
 {
 	"name": "@meekojs/ui",
-	"version": "0.1.0",
+	"version": "1.8.0",
 	"description": "Typed UI components and themes for Meeko.",
 	"keywords": [
 		"meeko",
@@ -90,7 +90,7 @@
 		"@codemirror/language": "^6.13.1",
 		"@codemirror/view": "^6.43.15",
 		"@lezer/highlight": "^1.2.5",
-		"@meekojs/meeko": ">=1.7 <2",
+		"@meekojs/meeko": ">=1.8 <2",
 		"@milkdown/crepe": "^7.23.0",
 		"@milkdown/kit": "^7.23.0"
 	},

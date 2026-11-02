@@ -1,6 +1,6 @@
 {
 	"name": "@meekojs/icon",
-	"version": "0.1.0",
+	"version": "1.8.0",
 	"description": "Typed Iconify icons for Meeko, resolved at build time.",
 	"keywords": [
 		"meeko",
@@ -60,7 +60,7 @@
 		"vite": "8.3.5"
 	},
 	"peerDependencies": {
-		"@meekojs/meeko": ">=1.7 <2"
+		"@meekojs/meeko": ">=1.8 <2"
 	},
 	"engines": {
 		"node": ">=24"

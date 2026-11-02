@@ -1,6 +1,6 @@
 {
   "name": "@meekojs/eslint-plugin",
-  "version": "0.1.0",
+  "version": "1.8.0",
   "description": "ESLint parser and template rules for Meeko components.",
   "keywords": ["meeko", "typescript", "eslint-plugin"],
   "homepage": "https://meekojs.com/docs/tooling",
@@ -32,7 +32,7 @@
     "typescript": "npm:@typescript/typescript6@6.0.2"
   },
   "peerDependencies": {
-    "@meekojs/meeko": ">=1.7 <2",
+    "@meekojs/meeko": ">=1.8 <2",
     "eslint": "^10.0.0"
   },
   "devDependencies": {

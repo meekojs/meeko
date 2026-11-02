@@ -22,7 +22,7 @@ export default defineMeekoModule<UIOptions>({
 		name: '@meekojs/ui',
 		configKey: 'ui',
 		compatibility: {
-			meeko: '>=1.7 <2',
+			meeko: '>=1.8 <2',
 		},
 	},
 	defaults: {},

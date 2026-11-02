@@ -30,6 +30,6 @@
 		"tsx": "^4.20.0"
 	},
 	"peerDependencies": {
-		"@meekojs/meeko": ">=1.7 <2"
+		"@meekojs/meeko": ">=1.8 <2"
 	}
 }

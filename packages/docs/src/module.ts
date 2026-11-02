@@ -30,7 +30,7 @@ declare module '@meekojs/meeko/framework' {
 
 /** Base documental privada del monorepo; no forma parte de los paquetes publicados. */
 export default defineMeekoModule<DocsModuleOptions>({
-	meta: { name: 'meeko-docs', configKey: 'docs', compatibility: { meeko: '>=1.7 <2' } },
+	meta: { name: 'meeko-docs', configKey: 'docs', compatibility: { meeko: '>=1.8 <2' } },
 	setup(options, meeko) {
 		meeko.addComponentsDir(new URL('./app/components', import.meta.url))
 		meeko.addStylesheet(new URL('./app/styles/docs.css', import.meta.url))

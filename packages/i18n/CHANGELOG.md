@@ -1,9 +1,9 @@
 # Cambios de Meeko i18n
 
-## Sin publicar
+## 1.8.0 — sin publicar
 
 - **`@meekojs/i18n/server` se puede importar fuera de un build.** Importaba su módulo virtual de forma estática, así que cargar esa entrada pública en Node daba `ERR_UNSUPPORTED_ESM_URL_SCHEME`. Ahora `usePageI18n()` lo carga al ejecutarse.
-- **Compatibilidad prevista al publicar.** Meeko `>=1.8 <2`, en `peerDependencies` y `meta.compatibility` a la vez, porque el módulo necesita `meeko.extendRoutes`. Los rangos cambian en el commit de release, junto con la versión del núcleo; hasta entonces, en `1.7` el módulo falla con un error claro al cargar.
+- **Requiere Meeko `>=1.8 <2`,** en `peerDependencies` y `meta.compatibility` a la vez, porque el módulo necesita `meeko.extendRoutes`.
 - **`i18n.has(key)`.** Una clave que llega de un dato, como el código de error de un servidor, obligaba a mantener a mano una lista de las claves del catálogo, porque `useI18n()` no decía si una clave existe. Ahora `has` lo dice sin avisar de un mensaje ausente, con `{ locale }` para otro idioma, y estrecha la clave a `I18nMessageKey`. Un namespace aún sin cargar da `false`.
 - **`localeAlternates` es público.** Un sitemap dinámico (`sitemap: false` y `sitemapXml`) tenía que reescribir las alternativas de cada URL. Ahora `@meekojs/i18n` exporta `localeAlternates(pathname, routing, available?)`, la misma función que usa el módulo.
 - **El sitemap respeta `exclude` y `partial` al declarar alternativas.** Con `exclude: ['/admin/*']` y páginas en `/admin/users` y `/en/admin/users`, el `<head>` no declaraba alternativas, pero el sitemap sí, porque las emparejaba por la existencia de la URL. Ahora juzga cada URL por el ID de la ruta que la sirve, también en las rutas dinámicas, con las mismas reglas que el `<head>`.

@@ -81,4 +81,4 @@ Cada `<nombre>.svg` (en kebab-case) de `app/icons` es `local:<nombre>`. Al compi
 
 ## Requisitos
 
-`@meekojs/meeko` `>=1.7 <2`, con el registro de módulos por su nombre (`modules: ['@meekojs/icon']`) de 1.8.
+`@meekojs/meeko` `>=1.8 <2`, con el registro de módulos por su nombre (`modules: ['@meekojs/icon']`) de 1.8.

@@ -40,7 +40,7 @@ const resolvedRegistry = '\0meeko-icon:registry'
  * ```
  */
 export default defineMeekoModule<IconModuleOptions>({
-	meta: { name: '@meekojs/icon', configKey: 'icon', compatibility: { meeko: '>=1.7 <2' } },
+	meta: { name: '@meekojs/icon', configKey: 'icon', compatibility: { meeko: '>=1.8 <2' } },
 	defaults: {},
 	setup(options, meeko) {
 		const resolved = resolveOptions(options)

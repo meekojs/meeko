@@ -1,6 +1,6 @@
 {
   "name": "@meekojs/prettier-plugin",
-  "version": "0.1.0",
+  "version": "1.8.0",
   "description": "Prettier formatting for Meeko components.",
   "keywords": ["meeko", "typescript", "prettier-plugin"],
   "homepage": "https://meekojs.com/docs/tooling",
@@ -29,7 +29,7 @@
     "prepack": "pnpm run build"
   },
   "peerDependencies": {
-    "@meekojs/meeko": ">=1.7 <2",
+    "@meekojs/meeko": ">=1.8 <2",
     "prettier": "^3.9.10",
     "tailwindcss": "^4.0.0"
   },
